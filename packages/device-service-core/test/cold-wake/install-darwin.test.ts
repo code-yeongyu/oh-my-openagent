@@ -13,43 +13,90 @@ afterEach(removeTempHomes)
 
 const LABEL_PLIST = (home: string, label: string) => join(home, "Library", "LaunchAgents", `${label}.plist`)
 
-/** launchctl and plutil over one in-memory table value; the relayd plist file only has to exist. */
-function fakeLaunchd(options: { readonly bootstrapFailures?: number } = {}) {
+const RELAYD_JOB = "gui/501/ai.omo.relay-daemon"
+
+type Interloper = { readonly at: "bootout" | "bootstrap" | "settle"; readonly keepsTable: boolean }
+
+/**
+ * launchctl and plutil over one in-memory table value; the relayd plist file only has to exist, and its job starts
+ * loaded (pid 100). As launchd does, a bootstrap of a loaded job fails with "5: Input/output error". `lingerPrints`: a
+ * booted-out job still prints as loaded, with its old pid, that many times. `interloper`: another writer (omo#14069,
+ * OmO Desktop's device-service reinstall) loads the device service job once, right after omo's bootout, right before
+ * omo's bootstrap, or after omo's bootstrap succeeded ("settle"), from a plist that kept or dropped the table.
+ */
+function fakeLaunchd(
+  options: {
+    readonly bootstrapFailures?: number
+    readonly lingerPrints?: number
+    readonly interloper?: Interloper
+  } = {},
+) {
   const home = tempHome("cwd-")
   const relayd = LABEL_PLIST(home, "ai.omo.relay-daemon")
   mkdirSync(dirname(relayd), { recursive: true })
   writeFileSync(relayd, "<plist/>")
-  const state: { table: string | undefined; loaded: Set<string>; failures: number } = {
-    table: undefined,
-    loaded: new Set(),
+  const state = {
+    table: undefined as string | undefined,
+    jobs: new Map<string, string>([[RELAYD_JOB, "100"]]),
     failures: options.bootstrapFailures ?? 0,
+    lingering: undefined as { job: string; pid: string; prints: number } | undefined,
+    nextPid: 200,
   }
+  let interloper = options.interloper
+  let relaydBootstrapped = false
+  const interlope = (at: Interloper["at"]) => {
+    if (interloper?.at !== at || (at !== "settle" && state.jobs.has(RELAYD_JOB))) return
+    if (!interloper.keepsTable) state.table = undefined
+    state.jobs.set(RELAYD_JOB, "900")
+    state.lingering = undefined
+    interloper = undefined
+  }
+  const eio = { exitCode: 5, output: "Bootstrap failed: 5: Input/output error" }
   const runs: string[] = []
   const omo = fakeOmoHost(true)
   const run: RunCommand = async (argv) => {
     runs.push(argv.join(" "))
     if (argv[0] === "/usr/bin/env") return omo.answer(argv)
-    const [tool, verb, target, value] = argv
+    const [tool, verb, target = "", value] = argv
+    if (tool === "plutil" && verb === "-extract" && target !== "EnvironmentVariables" && relaydBootstrapped)
+      interlope("settle")
     if (tool === "plutil" && verb === "-extract")
       return target === "EnvironmentVariables" || state.table !== undefined
         ? ok(`${state.table ?? ""}\n`)
         : { exitCode: 1, output: "No value at that key path" }
     if (tool === "plutil" && verb === "-replace") state.table = argv[4]
     if (tool === "plutil" && verb === "-remove") state.table = undefined
-    if (tool === "launchctl" && verb === "print")
-      return state.loaded.has(target ?? "") ? ok() : { exitCode: 113, output: "not found" }
-    if (tool === "launchctl" && verb === "bootout") state.loaded.delete(target ?? "")
-    if (tool === "launchctl" && verb === "bootstrap") {
-      if (state.failures-- > 0) return { exitCode: 5, output: "Bootstrap failed: 5: Input/output error" }
-      state.loaded.add(
-        `${target}/${value?.endsWith("ai.omo.session-host.plist") ? "ai.omo.session-host" : "ai.omo.relay-daemon"}`,
-      )
+    if (tool !== "launchctl") return ok()
+    const lingering = state.lingering?.job === target && state.lingering.prints > 0 ? state.lingering : undefined
+    if (verb === "print") {
+      const pid = state.jobs.get(target)
+      if (pid !== undefined) return ok(`\tstate = running\n\tpid = ${pid}\n`)
+      if (lingering === undefined) return { exitCode: 113, output: "not found" }
+      lingering.prints--
+      return ok(`\tstate = running\n\tpid = ${lingering.pid}\n`)
+    }
+    if (verb === "bootout") {
+      const pid = state.jobs.get(target)
+      state.jobs.delete(target)
+      if (pid !== undefined) state.lingering = { job: target, pid, prints: options.lingerPrints ?? 0 }
+      interlope("bootout")
+    }
+    if (verb === "bootstrap") {
+      const job = `${target}/${value?.endsWith("ai.omo.session-host.plist") ? "ai.omo.session-host" : "ai.omo.relay-daemon"}`
+      if (job === RELAYD_JOB) interlope("bootstrap")
+      const stillLeaving = state.lingering?.job === job && state.lingering.prints > 0
+      if (stillLeaving || state.jobs.has(job) || state.failures-- > 0) return eio
+      state.jobs.set(job, String(state.nextPid++))
+      if (job === RELAYD_JOB) relaydBootstrapped = true
     }
     return ok()
   }
   const host: ColdWakeHost = { platform: "darwin", home, uid: 501, run, pause: async () => {} }
   return { host, home, runs, state, relayd, omo }
 }
+
+const relaydBootstraps = (runs: readonly string[]) =>
+  runs.filter((r) => r.startsWith("launchctl bootstrap") && r.endsWith("ai.omo.relay-daemon.plist"))
 
 describe("cold wake on macOS", () => {
   test("loads the LaunchAgent (it runs at load), writes the entry into the device service's plist and reloads that job", async () => {
@@ -58,16 +105,57 @@ describe("cold wake on macOS", () => {
     const plist = LABEL_PLIST(home, "ai.omo.session-host")
     expect(readFileSync(plist, "utf8")).toContain("<string>ai.omo.session-host</string>")
     expect(JSON.parse(state.table ?? "")).toEqual({ omo: { launchd: "ai.omo.session-host", senders: [] } })
-    expect(runs).toEqual([
-      "launchctl bootout gui/501/ai.omo.session-host",
+    expect(runs.slice(0, 10)).toEqual([
+      "launchctl print gui/501/ai.omo.session-host",
       "launchctl enable gui/501/ai.omo.session-host",
       `launchctl bootstrap gui/501 ${plist}`,
       `plutil -extract EnvironmentVariables.OMO_RELAYD_SERVICES raw -o - ${relayd}`,
       `plutil -extract EnvironmentVariables xml1 -o - ${relayd}`,
       `plutil -replace EnvironmentVariables.OMO_RELAYD_SERVICES -string ${state.table} ${relayd}`,
-      "launchctl bootout gui/501/ai.omo.relay-daemon",
+      `launchctl print ${RELAYD_JOB}`,
+      `launchctl bootout ${RELAYD_JOB}`,
+      `launchctl print ${RELAYD_JOB}`,
       `launchctl bootstrap gui/501 ${relayd}`,
     ])
+    // Then it watches the plist's table while the restart settles.
+    expect(new Set(runs.slice(10))).toEqual(
+      new Set([`plutil -extract EnvironmentVariables.OMO_RELAYD_SERVICES raw -o - ${relayd}`]),
+    )
+    expect(state.jobs.get(RELAYD_JOB)).not.toBe("100")
+  })
+
+  // omo#14069: OmO Desktop reinstalls the device service when it stops, rewriting its plist and loading the job between
+  // omo's bootout and bootstrap; a bootstrap of the now-loaded job can only fail with EIO 5.
+  test.each([
+    { at: "bootout", keepsTable: true, outcome: { kind: "installed", serviceRestarted: true }, bootstraps: 0 },
+    { at: "bootout", keepsTable: false, outcome: { kind: "service_replaced" }, bootstraps: 0 },
+    { at: "bootstrap", keepsTable: true, outcome: { kind: "installed", serviceRestarted: true }, bootstraps: 1 },
+    { at: "bootstrap", keepsTable: false, outcome: { kind: "service_replaced" }, bootstraps: 1 },
+    { at: "settle", keepsTable: true, outcome: { kind: "installed", serviceRestarted: true }, bootstraps: 1 },
+    { at: "settle", keepsTable: false, outcome: { kind: "service_replaced" }, bootstraps: 1 },
+  ] as const)(
+    "a job another writer loads at our $at is judged by its plist (table kept: $keepsTable), never re-bootstrapped",
+    async ({ at, keepsTable, outcome, bootstraps }) => {
+      const { host, runs } = fakeLaunchd({ interloper: { at, keepsTable } })
+      expect(await installColdWake(host, LAUNCH)).toEqual(outcome)
+      expect(relaydBootstraps(runs)).toHaveLength(bootstraps)
+    },
+  )
+
+  test("waits for a booted-out job to leave before it bootstraps the device service again", async () => {
+    const { host, runs } = fakeLaunchd({ lingerPrints: 3 })
+    expect(await installColdWake(host, LAUNCH)).toEqual({ kind: "installed", serviceRestarted: true })
+    const relaydRuns = runs.filter((r) => r.startsWith("launchctl") && r.includes("relay-daemon"))
+    expect(relaydRuns.slice(relaydRuns.indexOf(`launchctl bootout ${RELAYD_JOB}`) + 1)).toEqual([
+      ...Array.from({ length: 4 }, () => `launchctl print ${RELAYD_JOB}`),
+      expect.stringMatching(/^launchctl bootstrap gui\/501 .*ai\.omo\.relay-daemon\.plist$/),
+    ])
+  })
+
+  test("a job still running its old process after the wait fails the restart instead of bootstrapping over it", async () => {
+    const { host, runs } = fakeLaunchd({ lingerPrints: Number.POSITIVE_INFINITY })
+    expect(await installColdWake(host, LAUNCH)).toMatchObject({ kind: "failed", step: "service_restart" })
+    expect(relaydBootstraps(runs)).toEqual([])
   })
 
   test("a second install only checks: the job is loaded and the entry is there", async () => {
