@@ -2,6 +2,7 @@ import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import type { ThreadResolveResult } from "../addressing"
 import { relayAddressBook, relayAddressEntry, type RelayAddressBook } from "../remote/address-book"
 import { endedRow, rowThreadId, type RemoteSessionRow } from "../remote/ports"
+import { accountDevices } from "../remote/account"
 import { remoteAvailable } from "../remote/remote-ops"
 import {
   assembleAddressBook,
@@ -446,8 +447,8 @@ async function lookupAcross(
   if (probe === undefined || (await remote.sessions.canLookup?.().catch(() => false)) !== true) return undefined
   let online: readonly { readonly device: string; readonly online: boolean }[]
   try {
-    const here = await remote.sessions.thisDevice()
-    online = (await remote.sessions.devices()).filter((device) => device.online && device.device !== here)
+    const { here, devices } = await accountDevices(remote.client)
+    online = devices.filter((device) => device.online && device.device !== here)
   } catch {
     return undefined
   }

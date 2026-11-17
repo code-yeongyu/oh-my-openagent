@@ -4,7 +4,8 @@ import { createRelaySessionHost, listedThread } from "../control/relay-session-h
 import type { HostedThread, SessionHost, SessionOpenRequest } from "../control/session-host"
 import { threadToolFailure } from "../errors"
 import { type AliasError, type AliasRegistry, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
-import { aliasFailure, deviceOnline, remoteAvailable } from "./remote-ops"
+import { accountDevices } from "./account"
+import { aliasFailure, deviceRefusal, remoteAvailable } from "./remote-ops"
 
 type LocalEntry = {
   readonly thread_id: string
@@ -42,13 +43,11 @@ async function targetDevice(
   remote: RemoteThreadSurface,
   device: string,
 ): Promise<{ readonly id?: string } | { readonly result: ThreadToolResult }> {
-  const here = await remote.sessions.thisDevice()
-  const row = (await remote.sessions.devices()).find(
-    (candidate) => candidate.device === device || candidate.label === device,
-  )
+  const { here, devices } = await accountDevices(remote.client)
+  const row = devices.find((candidate) => candidate.device === device || candidate.label === device)
   if (row !== undefined && row.device === here) return {}
   if (row === undefined) {
-    const missing = await deviceOnline(remote, device)
+    const missing = deviceRefusal(devices, device)
     return {
       result:
         missing ?? invalid(`No device ${device}.`, "Call thread_list with all_scope to see the account's devices."),

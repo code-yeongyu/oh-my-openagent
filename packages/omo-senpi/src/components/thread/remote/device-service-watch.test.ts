@@ -1,3 +1,4 @@
+import { fakeRemoteClient } from "../thread-remote-fixture"
 import { describe, expect, test } from "bun:test"
 import {
   LocalApiError,
@@ -5,7 +6,7 @@ import {
   type DeviceService,
   type RemoteAttach,
 } from "@oh-my-opencode/device-service-core/device-service"
-import { createDeviceServiceSessions } from "./device-service"
+import { createDeviceServiceSessions } from "../../remote/port/device-service"
 import type { JsonObject, RemoteResync, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 import { followRemote } from "./remote-ops"
 
@@ -409,6 +410,11 @@ describe("watch v2 (#12719): a remote session followed across drops, restarts an
     const device = fakeDevice(engine)
     const remote: RemoteThreadSurface = {
       sessions: { ...portOver(device), devices: async () => [{ device: "b", label: "b", online: true }] },
+      client: fakeRemoteClient({
+        state: () => "connected",
+        here: "a",
+        devices: () => [{ device: "b", label: "b", online: true }],
+      }),
       chain: { stamp: (record) => record },
     }
     const row: RemoteSessionRow = {
