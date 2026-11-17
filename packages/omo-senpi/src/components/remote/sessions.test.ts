@@ -472,6 +472,7 @@ describe("durable-id addressing", () => {
       member: () => Promise.reject(new Error("the listing alone resolves a listed durable id")),
       sessionsList: client.sessions.list,
       devicesList: client.devices.list,
+      self: () => client,
       localSessions: () => Promise.reject(new Error("the listing alone resolves a listed durable id")),
     } as const
     expect(await valueOf(resolveSessionTarget(core, PEER, ENGINE_ID))).toMatchObject({

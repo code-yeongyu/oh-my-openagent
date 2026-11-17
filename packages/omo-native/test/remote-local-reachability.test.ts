@@ -81,6 +81,7 @@ const SPAWN_CALL_SITES = [
   "packages/omo-native/remote-session-verbs.ts: personDelivery(remote; dependencies)",
   "packages/omo-native/remote-session-verbs.ts: personDelivery(remote; dependencies)",
   "packages/omo-native/remote-session-verbs.ts: personSenderProvenance(remote; -)",
+  "packages/omo-native/remote-session-verbs.ts: runSessionOn(remote; args)",
   "packages/omo-native/remote-session-verbs.ts: sendTo(remote; row)",
   'packages/omo-opencode/src/cli/service-auth/account-home.ts: facts.run("/usr/bin/id"; ["-P"])',
   'packages/omo-opencode/src/cli/service-auth/account-home.ts: facts.run(reg; ["query", key, "/v", "ProfileImagePath"])',

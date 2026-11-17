@@ -233,9 +233,18 @@ export type ThreadInterruptResult =
     }
   | ThreadDataError
 
-/** `closed` is false when no live owner held the thread, so there was nothing to close. */
+/**
+ * `closed` is whether this call shut the session down. `reason` is always set: `closed` when it did,
+ * `not_live` when nothing live held it (the session stays as it was).
+ */
 export type ThreadCloseResult =
-  | { readonly kind: "ok"; readonly thread_id: string; readonly closed: boolean; readonly device?: string }
+  | {
+      readonly kind: "ok"
+      readonly thread_id: string
+      readonly closed: boolean
+      readonly reason: "closed" | "not_live"
+      readonly device?: string
+    }
   | ThreadDataError
 
 export type ThreadHandoffResult =
