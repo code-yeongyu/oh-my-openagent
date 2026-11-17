@@ -27,7 +27,7 @@ function waitingRead(leg: Leg, streaming: boolean) {
     const here = surface(undefined, { engine })
     return {
       read: (wait_ms: number) => here.run("thread_read", { thread: "dur-local", wait_ms }),
-      identity: { thread_id: "dur-local" },
+      identity: { thread: "dur-local" },
       watchers: here.watchers as Set<SessionWatchHandlers>,
       watching: here.watching,
       endWatches: here.endWatches,
@@ -37,7 +37,7 @@ function waitingRead(leg: Leg, streaming: boolean) {
   const b = account({ engine })
   return {
     read: (wait_ms: number) => surface(b.remote).run("thread_read", { thread: "dur-on-b", wait_ms }),
-    identity: { thread_id: "dur-on-b", device: "b" },
+    identity: { thread: "dur-on-b", device: "b" },
     watchers: b.watchers as Set<SessionWatchHandlers>,
     watching: b.watching,
     endWatches: (reason: string) => b.endWatches(reason as RemoteWatchEnd),
