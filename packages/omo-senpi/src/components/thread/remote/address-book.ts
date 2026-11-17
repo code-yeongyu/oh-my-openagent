@@ -11,8 +11,11 @@ const statusOf = (state: string): ThreadStatus => (state === "ended" ? "resumabl
 
 export function relayAddressEntry(row: RemoteSessionRow, aliases?: readonly string[]): ThreadAddressEntry {
   const updated = new Date(row.updated_ms).toISOString()
+  const thread_id = rowThreadId(row)
+  const session_ids =
+    thread_id.length > 0 && row.session_id.length > 0 && row.session_id !== thread_id ? [row.session_id] : undefined
   return {
-    thread_id: rowThreadId(row),
+    thread_id,
     name: row.title,
     status: statusOf(row.state),
     cwd: row.project,
@@ -20,6 +23,7 @@ export function relayAddressEntry(row: RemoteSessionRow, aliases?: readonly stri
     updated_at: updated,
     device: row.device,
     ...(aliases === undefined ? {} : { aliases }),
+    ...(session_ids === undefined ? {} : { session_ids }),
     transport: { kind: "relay", row },
   }
 }

@@ -25,7 +25,7 @@ const helperReplySchema = z
     created: z.boolean(),
     skipped: z.boolean(),
     slot: z.number().int().min(0).max(7),
-    error: z.enum(["locked", "store", "not-owned", "exists", "missing", "denied", "refused"]),
+    error: z.enum(["locked", "store", "not-owned", "exists", "missing", "denied", "refused", "acl"]),
     reason: z.string(),
     status: z.number(),
   })

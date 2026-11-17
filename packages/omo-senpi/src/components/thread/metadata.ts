@@ -76,7 +76,7 @@ export const THREAD_TOOL_METADATA: readonly ThreadToolEntry[] = [
     name: "thread_close",
     label: "Close session",
     description:
-      "Closes another session on this device or on another of the account's devices, for when the user is done with that session and wants it shut down" +
+      "Closes a session. Omit thread or pass self to close this session. thread accepts a thread_id, a unique name, or a sessionId from thread_list (rpc-N or the short session id), which resolves to the durable thread_id; the result is closed true or false plus a reason" +
       ROUTE_TO_TASK,
     exposure: THREAD_TOOL_EXPOSURE,
   },
@@ -92,7 +92,7 @@ export const THREAD_TOOL_METADATA: readonly ThreadToolEntry[] = [
     name: "thread_rename",
     label: "Rename session",
     description:
-      "Changes the label a session is listed under, for when the user asks to call a session something clearer",
+      "Renames a session's label, for when the user asks to call a session something clearer. Omit thread or pass self to rename this session. thread accepts a thread_id, a unique name, or a sessionId from thread_list (rpc-N or the short session id), which resolves to the durable thread_id; a miss names that thread_id",
     exposure: THREAD_TOOL_EXPOSURE,
   },
   {
@@ -144,4 +144,4 @@ export const THREAD_TOOL_METADATA: readonly ThreadToolEntry[] = [
  * tokens, so the per-tool entries above stay free of policy prose.
  */
 export const THREAD_FAMILY_PROMPT_GUIDELINES =
-  "Thread tools address peer sessions, never child tasks: call thread_list first and pass a thread_id or unique name it returned, never a guessed address; an ambiguous name returns candidates instead of delivering; leave all_scope unset to stay inside this workspace and set it only when the caller explicitly asks for sessions in every workspace; when you mention a thread to the user, paste the link its result carries instead of writing its id or inventing a link."
+  "Thread tools address peer sessions, never child tasks: call thread_list first and pass a thread_id, a unique name, or that row's sessionId (rpc-N or the short session id), which resolves to the durable thread_id; thread_rename and thread_close take this session when thread is omitted or self; an ambiguous name returns candidates instead of delivering; leave all_scope unset to stay inside this workspace and set it only when the caller explicitly asks for sessions in every workspace; when you mention a thread to the user, paste the link its result carries instead of writing its id or inventing a link."

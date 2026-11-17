@@ -242,7 +242,11 @@ export function resolution(
     // UNKNOWN_CALLER stands for an ABSENT identity, so it must never match an entry: a thread
     // that happened to carry it as its durable id would otherwise be renamed or re-modelled by
     // any caller whose host passes no execution context.
-    const caller = callerId === UNKNOWN_CALLER ? undefined : entries.find((entry) => entry.thread_id === callerId)
+    const caller =
+      callerId === UNKNOWN_CALLER
+        ? undefined
+        : (entries.find((entry) => entry.thread_id === callerId) ??
+          entries.find((entry) => entry.session_ids?.includes(callerId) === true))
     if (caller === undefined)
       return {
         kind: "error" as const,
