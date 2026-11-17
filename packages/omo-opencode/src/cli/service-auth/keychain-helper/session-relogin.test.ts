@@ -2,7 +2,7 @@ import { describe, expect, onTestFinished, test } from "bun:test"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { CredentialStoreError } from "../keystore"
+import { CredentialStoreError, KeychainItemNotOwnedError } from "../keystore"
 import type { DiscardedCredential } from "../session"
 import { A, credentials, fakeKeychain, helperSession } from "./fake-keychain.test-support"
 
@@ -164,5 +164,14 @@ describe("#11589 review folds", () => {
     // Recovery may already remove the reported slot; what matters is that clear() attempted every one of the 8 names.
     expect(new Set(keychain.events.filter((event) => event.startsWith("remove .old"))).size).toBe(8)
     expect(keychain.items.has(`${A}.old.5`)).toBe(false)
+  })
+
+  test("#given an item neither the helper nor this process may delete #when signing out #then the failure is the access-control mismatch, not a locked or unavailable store (#13757)", async () => {
+    const keychain = fakeKeychain()
+    keychain.put(A, stored, "other-app", "other")
+    const { store, session } = await helperSession(keychain)
+    const failure = session.update(async () => store.clear())
+    await expect(failure).rejects.toBeInstanceOf(KeychainItemNotOwnedError)
+    expect(keychain.items.get(A)?.owner).toBe("other-app")
   })
 })

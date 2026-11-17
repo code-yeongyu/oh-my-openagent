@@ -86,9 +86,10 @@ describe("omo-ai packed install", () => {
     tarball = join(root, packed!)
   }, 60_000)
 
+  // Removing two copied install trees and their shared cache (~2 GB) outlasts the 40 s default hook bound on Windows.
   afterAll(() => {
     if (root !== "") rmSync(root, { recursive: true, force: true })
-  })
+  }, STEP_BOUND_MS)
 
   test("ships the Senpi patch installer and installs a Senpi that surfaces pre-replay results natively", async () => {
     const listing = await step(["tar", "-tzf", tarball], { cwd: root })
