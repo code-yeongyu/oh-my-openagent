@@ -12,7 +12,7 @@ import { answered, closeThread, interruptThread, setModelOn } from "../control/o
 import { createRelayControl } from "../control/relay-control"
 import { createLiveThreadSurface } from "../live-surface"
 import { liveReadResult } from "../tools/read-ops"
-import { closingPorts } from "./closing-ports.test-fixture"
+import { closingPorts } from "./testing/closing-ports"
 import { createLazyRemoteSurface } from "../../remote/port/lazy-remote"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 import { createRelaySessionHost } from "../control/relay-session-host"

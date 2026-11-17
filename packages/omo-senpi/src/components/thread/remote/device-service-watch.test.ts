@@ -6,7 +6,7 @@ import {
   type DeviceService,
   type RemoteAttach,
 } from "@oh-my-opencode/device-service-core/device-service"
-import { closingPorts } from "./closing-ports.test-fixture"
+import { closingPorts } from "./testing/closing-ports"
 import type { JsonObject, RemoteResync, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 import { followRemote } from "./remote-ops"
 

@@ -1,6 +1,6 @@
 import { afterEach } from "bun:test"
-import { createDeviceServiceSessions } from "../../remote/port/device-service"
-import type { RemoteSessionsPort } from "./ports"
+import { createDeviceServiceSessions } from "../../../remote/port/device-service"
+import type { RemoteSessionsPort } from "../ports"
 
 type PortOptions = Parameters<typeof createDeviceServiceSessions>[0]
 

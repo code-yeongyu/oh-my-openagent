@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { CommandResult, DeviceService, RemoteAttach } from "@oh-my-opencode/device-service-core"
-import { closingPorts } from "./closing-ports.test-fixture"
+import { closingPorts } from "./testing/closing-ports"
 
 // omo#13037 A6 addendum 3: the wake mark follows the service this connection reached. A reconnect to an older service
 // (its welcome below the gate) stops the mark at once; nothing is remembered from the connection before.
