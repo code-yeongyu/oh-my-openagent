@@ -84,6 +84,19 @@ describe("reading back the units on Linux", () => {
     })
   })
 
+  // The ensure reuses a host another omo started (no pin): that host serves the agent dir, so the unit is running.
+  test("an enabled oneshot session host whose ensure reused an unpinned host is running, not pinned", async () => {
+    const host = linuxHost({
+      sessionHost: "LoadState=loaded\nActiveState=inactive\nUnitFileState=enabled\n",
+      relayd: "LoadState=loaded\nActiveState=active\n",
+      table: ENTRY_LINUX,
+      pinned: false,
+    })
+    const status = await readColdWake(host, LAUNCH)
+    expect(status.sessionHost.state).toBe("running")
+    expect(status.pinnedHost).toBe(false)
+  })
+
   // #13669 review L1: a unit whose latest ensure failed is not reported running because a host happens to be up.
   test("a failed oneshot session host stays stopped even with a pinned host up", async () => {
     const host = linuxHost({

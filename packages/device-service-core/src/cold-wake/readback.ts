@@ -119,9 +119,10 @@ async function readDarwin(host: ColdWakeHost) {
 export async function readColdWake(host: ColdWakeHost, launch: SessionHostLaunch): Promise<ColdWakeStatus> {
   const { ensureFailed, ...units } = host.platform === "darwin" ? await readDarwin(host) : await readLinux(host)
   const pinned = await readPinnedHost(host, launch)
-  // The unit is one ensure per start, so between starts it is not active; the host it started is what runs.
+  // The unit is one ensure per start, so between starts it is not active; the host its ensure started or reused runs.
+  const hostUp = pinned === "pinned" || pinned === "unpinned"
   const sessionHost =
-    units.sessionHost.state === "stopped" && units.sessionHost.enabled && !ensureFailed && pinned === "pinned"
+    units.sessionHost.state === "stopped" && units.sessionHost.enabled && !ensureFailed && hostUp
       ? { ...units.sessionHost, state: "running" as const }
       : units.sessionHost
   return { ...units, sessionHost, pinnedHost: typeof pinned === "string" ? pinned === "pinned" : "unknown" }
