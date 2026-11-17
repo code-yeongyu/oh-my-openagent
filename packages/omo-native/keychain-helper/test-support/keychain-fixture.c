@@ -55,9 +55,12 @@ static OSStatus purge(SecKeychainRef keychain) {
   CFDictionarySetValue(query, kSecMatchLimit, kSecMatchLimitAll);
   CFTypeRef items = NULL;
   OSStatus status = SecItemCopyMatching(query, &items);
+  CFRelease(list);
+  CFRelease(query);
   if (status == errSecItemNotFound) return errSecSuccess;
   for (CFIndex i = 0; status == errSecSuccess && i < CFArrayGetCount(items); i++)
     status = SecKeychainItemDelete((SecKeychainItemRef)CFArrayGetValueAtIndex(items, i));
+  if (items != NULL) CFRelease(items);
   return status;
 }
 
