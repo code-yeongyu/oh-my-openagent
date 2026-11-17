@@ -1,4 +1,4 @@
-import type { ThreadCandidate } from "../addressing"
+import { AMBIGUOUS_CANDIDATE_LIMIT, normalizeThreadName, type ThreadCandidate } from "../addressing"
 import type { ThreadLocalAliasNote, ThreadStatus, ThreadToolResult } from "../contracts"
 import { createRelaySessionHost, listedThread } from "../control/relay-session-host"
 import type { HostedThread, SessionHost, SessionOpenRequest } from "../control/session-host"
