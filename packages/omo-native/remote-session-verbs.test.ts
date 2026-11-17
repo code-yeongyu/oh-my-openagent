@@ -7,6 +7,7 @@ import type { DeviceService } from "../device-service-core/src/index.ts"
 import { createRemoteThreadFixture, fakeRemoteClient } from "../omo-senpi/src/components/thread/thread-remote-fixture"
 import type { RemoteCommandDependencies } from "./remote-cli"
 import { REMOTE_EXIT } from "./remote-exit"
+import { parseSession } from "./remote-session-args"
 import { personSenderProvenance, runSession } from "./remote-session-verbs"
 
 // The command reaches its client through the state dir it is connected on; a connected device service has its endpoint file there.
@@ -83,7 +84,7 @@ describe("omo remote open connection", () => {
         },
         attach: async () => {
           calls.push(`${name}:attach`)
-          return { onEvent: () => () => {}, detached: new Promise(() => {}) }
+          return { onEvent: () => () => {}, detached: new Promise(() => {}), detach: async () => {} }
         },
         endpointCommand: async () => {
           calls.push(`${name}:endpoint`)
@@ -137,5 +138,51 @@ describe("omo remote open connection", () => {
     })
     expect(dialed[0]?.wasClosed()).toBe(true)
     expect(lines.length).toBeGreaterThan(0)
+  })
+})
+
+// #14074: the sessions port owns the attach pool; a verb that left it open kept an idle-detach timer armed after the
+// command returned, and in one test process that timer fired into a later test.
+describe("omo remote session verbs close what they opened", () => {
+  const remoteFixture = createRemoteThreadFixture()
+
+  test("#given a session verb ran over the device-service surface #when it returns #then its sessions port was closed once (#14074)", async () => {
+    const account = remoteFixture.account()
+    let closes = 0
+    const sessions = new Proxy(account.remote.sessions, {
+      get: (target, key) =>
+        key === "close"
+          ? async () => {
+              closes += 1
+              await target.close?.()
+            }
+          : Reflect.get(target, key, target),
+    })
+    const lines: string[] = []
+    const dependencies = {
+      connect: async () => {
+        throw new Error("the verb reaches the device through the injected surface")
+      },
+      output: (line: string) => lines.push(line),
+      error: (line: string) => lines.push(line),
+      write: () => {},
+      now: () => 0,
+      stateDir: connectedStateDir(),
+      accountShow: async () => {
+        throw new Error("account show is not part of a session verb")
+      },
+      remote: () => ({ ...account.remote, sessions }),
+    } as unknown as RemoteCommandDependencies
+    try {
+      await runSession(
+        {} as DeviceService,
+        parseSession("interrupt", ["b/no-such-session"]).session,
+        true,
+        dependencies,
+      )
+      expect({ closes, answered: lines.length > 0 }).toEqual({ closes: 1, answered: true })
+    } finally {
+      await remoteFixture.cleanup()
+    }
   })
 })

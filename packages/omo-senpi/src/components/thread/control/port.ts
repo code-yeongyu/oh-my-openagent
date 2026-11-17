@@ -1,4 +1,5 @@
 import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from "../errors"
+import type { EntryPageRead } from "../paged-reader"
 import type { ThreadTranscriptEntry } from "../reader"
 import type { InterruptOutcome } from "./interrupt"
 import type { ModelChoice } from "../tools/model-match"
@@ -40,10 +41,18 @@ export type SessionControl = {
   readonly setThinkingLevel: (level: string, scope?: "turn") => Promise<void>
   readonly getMessages: () => Promise<readonly ThreadTranscriptEntry[]>
   /**
-   * Waits, bounded, until the thread stops running, on the leg's own status events (never a polling loop). Absent: the
-   * leg has no such event source here, and a waiting read answers `unsupported`.
+   * One page of the session's newest entries, sent by its holder (`paged-reader.ts`, #14047). `unsupported`: the holder
+   * pages nothing, and the read takes the whole transcript (`getMessages`). Absent: this leg always reads it whole.
    */
-  readonly waitSettled?: (timeoutMs: number, signal?: AbortSignal) => Promise<ThreadWaitOutcome>
+  readonly readEntryPage?: (read: {
+    readonly max_bytes?: number
+    readonly cursor?: string
+  }) => Promise<EntryPageRead | { readonly kind: "unsupported" }>
+  /**
+   * Waits, bounded, until the thread's turn is observed to end, on the leg's own status events (never a polling loop):
+   * `wait-settled.ts` over the remote watch on another device, over the endpoint's session subscription on this one.
+   */
+  readonly waitSettled: (timeoutMs: number, signal?: AbortSignal) => Promise<ThreadWaitOutcome>
 }
 
 /**

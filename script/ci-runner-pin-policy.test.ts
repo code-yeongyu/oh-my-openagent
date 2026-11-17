@@ -32,8 +32,10 @@ interface Job {
 
 // A matrix expression can yield any quoted JSON it holds: each list of a `fromJSON(cond && '[...]' || '[...]')`
 // (#13802), and each object-list argument of a `fromJSON(format('[{0}{1}]', cond && '{...},' || '', '{...}'))`
-// (#13928), whose template is not JSON itself. A literal that does not parse leaves the matrix unresolved.
-const FORMAT_TEMPLATE = /format\(\s*'[^']*'/g
+// (#13928), whose template is not JSON itself. A literal that does not parse leaves the matrix unresolved, and so does a
+// template holding anything beyond `{N}` placeholders, brackets and commas: a `{{ }}`-escaped leg in it is unreadable here.
+const FORMAT_TEMPLATE = /format\(\s*'([^']*)'/g
+const PLACEHOLDER_TEMPLATE = /^(?:\{\d+\}|[[\],\s])*$/
 const JSON_LITERAL = /'([[{][^']*)'/g
 
 function parseLiteral(literal: string): readonly unknown[] | undefined {
@@ -47,6 +49,8 @@ function parseLiteral(literal: string): readonly unknown[] | undefined {
 
 function literalLists(value: unknown): readonly unknown[] | undefined {
   if (typeof value !== "string") return Array.isArray(value) ? value : undefined
+  const templates = [...value.matchAll(FORMAT_TEMPLATE)].map((match) => match[1] ?? "")
+  if (templates.some((template) => !PLACEHOLDER_TEMPLATE.test(template))) return undefined
   const lists = [...value.replace(FORMAT_TEMPLATE, "format(").matchAll(JSON_LITERAL)].map((match) =>
     parseLiteral(match[1] ?? ""),
   )
@@ -127,10 +131,11 @@ describe("Ubuntu runner pin policy (#9928)", () => {
 
   test("#given a format() matrix include #when its runners are read #then every object-list argument is a leg and the template is not", () => {
     const runner = (include: string): Job => ({ "runs-on": "${{ matrix.runner }}", strategy: { matrix: { include } } })
-    // publish-platform.yml desktop-engine include, verbatim (#13928): the darwin legs must resolve to their pinned image.
-    const publishPlatform = runner(
-      '${{ fromJSON(format(\'[{0}{1}]\', inputs.operator_darwin_artifacts == \'\' && \'{"host":"darwin-arm64","runner":"macos-15","rust_target":"aarch64-apple-darwin","clang_arch":"arm64","binary":"senpi-desktop-engine"},{"host":"darwin-x64","runner":"macos-15","rust_target":"x86_64-apple-darwin","clang_arch":"x86_64","binary":"senpi-desktop-engine"},\' || \'\', \'{"host":"linux-x64","runner":"ubuntu-22.04","rust_target":"x86_64-unknown-linux-gnu","binary":"senpi-desktop-engine"},{"host":"linux-arm64","runner":"ubuntu-22.04-arm","rust_target":"aarch64-unknown-linux-gnu","binary":"senpi-desktop-engine"},{"host":"win32-x64","runner":"windows-latest","rust_target":"x86_64-pc-windows-msvc","binary":"senpi-desktop-engine.exe"},{"host":"win32-arm64","runner":"windows-11-arm","rust_target":"aarch64-pc-windows-msvc","binary":"senpi-desktop-engine.exe"}\')) }}',
-    )
+    // publish-platform.yml desktop-engine include (#13928), read from the workflow: the darwin legs must resolve to their pinned image.
+    const publishPlatform = (
+      Bun.YAML.parse(readFileSync(join(WORKFLOWS_DIR, "publish-platform.yml"), "utf8")) as { jobs: Record<string, Job> }
+    ).jobs["desktop-engine"]
+    if (publishPlatform === undefined) throw new Error("publish-platform.yml has no desktop-engine job")
     expect(matrixValues(publishPlatform, "runner")).toEqual([
       "macos-15",
       "macos-15",
@@ -149,5 +154,11 @@ describe("Ubuntu runner pin policy (#9928)", () => {
     )
     expect(matrixValues(unparseableArg, "runner")).toBe("unresolved")
     expect(floats(unparseableArg)).toBe(true)
+    // A leg written into the template through the `{{ }}` escape is a runner the inventory cannot read (#13981 review).
+    const templateLeg = runner(
+      '${{ fromJSON(format(\'[{{"runner":"ubuntu-latest"}},{0}]\', \'{"runner":"macos-15"}\')) }}',
+    )
+    expect(matrixValues(templateLeg, "runner")).toBe("unresolved")
+    expect(floats(templateLeg)).toBe(true)
   })
 })

@@ -6,6 +6,7 @@ import { join } from "node:path"
 import type { GatewayEndpointRef, ReleaseSessionRequest } from "./gateway/adapter"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import type { RemoteThreadSurface } from "./remote/ports"
+import { createThreadSdk as createBundledThreadSdk } from "../../extension/thread-sdk"
 import { createThreadSdk, type ThreadSdk } from "./sdk"
 import { createRemoteThreadFixture, fakeRemoteClient } from "./thread-remote-fixture"
 import type { ThreadHost, ThreadHostSession } from "./tools"
@@ -170,6 +171,26 @@ function countingRemote(remote: RemoteThreadSurface): {
   }
 }
 
+describe("thread SDK: options are checked at the boundary", () => {
+  test.each([
+    ["the bundled entry", createBundledThreadSdk],
+    ["the component", createThreadSdk],
+  ] as const)(
+    "#given %s #when created without options or without agentDir #then it throws a TypeError naming the missing fields",
+    (_entry, create) => {
+      const call = create as (options?: unknown) => ThreadSdk
+      expect(() => call()).toThrow(
+        new TypeError(
+          "createThreadSdk needs { agentDir, cwd, uid, user }; missing or invalid: agentDir, cwd, user, uid",
+        ),
+      )
+      expect(() => call({ cwd: process.cwd(), uid: 501, user: "q" })).toThrow(
+        new TypeError("createThreadSdk needs { agentDir, cwd, uid, user }; missing or invalid: agentDir"),
+      )
+    },
+  )
+})
+
 describe("thread SDK: sessions", () => {
   test("#given a host and a terminal session #when listed and read #then rows carry surface and the live transcript comes from the session's endpoint", async () => {
     const { sdk } = fixture()
@@ -255,7 +276,10 @@ describe("thread SDK: read reaches the account like the agent tools (#12833)", (
     expect(await sdk.read({ thread: "lane-b" })).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b" })
     expect(
       account.sent.filter((entry) => entry.via === "session").map((entry) => [entry.device, entry.rpc?.["type"]]),
-    ).toEqual([["b", "get_messages"]])
+    ).toEqual([
+      ["b", "get_entries"],
+      ["b", "get_messages"],
+    ])
   })
 
   test("#given an alias held by a thread on this device and omo thread run from another workspace #when read and send name the alias without all_scope #then both reach that thread; the raw id alone stays scope_denied", async () => {

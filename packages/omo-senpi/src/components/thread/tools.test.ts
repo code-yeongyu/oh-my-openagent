@@ -1250,49 +1250,77 @@ describe("tool receipts the store could not settle", () => {
 })
 
 describe("receipts stored before one field named a session (#14044 4a)", () => {
-  test("#given thread_create and thread_rename receipts stored in the old shape #when the same keys are retried #then each replays the current shape: thread is the address string and no endpoint internal comes back", async () => {
+  /** Writes a settled receipt through the real store under the key a retry of `args` uses, as an earlier build would. */
+  async function stored(
+    f: ReturnType<typeof fixture>,
+    operation: ThreadToolName,
+    args: Record<string, unknown>,
+    result: unknown,
+  ): Promise<void> {
+    const parsed = parseThreadParams(threadToolParamSchemas[operation], args)
+    if (parsed.kind !== "ok") throw new Error(`invalid ${operation} args`)
+    const scope = { principal: "session:caller", operation, idempotency_key: String(args["idempotency_key"]) }
+    expect(await f.store.toolReceiptBegin({ ...scope, now: Date.now(), args_hash: hashArgs(parsed.value) })).toEqual({
+      kind: "accepted",
+    })
+    await f.store.toolReceiptSettle({ ...scope, now: Date.now(), result: result as ThreadToolResult })
+  }
+
+  test("#given thread_create, thread_list, thread_rename and an ambiguous thread_read receipts stored in the old shape #when the same keys are retried #then each replays the current shape: thread is the address string and no endpoint internal comes back", async () => {
     // given: receipts written by a build before #14044, under the keys the retries below use
     const f = fixture()
-    const stored = async (operation: ThreadToolName, args: Record<string, unknown>, result: unknown) => {
-      const parsed = parseThreadParams(threadToolParamSchemas[operation], args)
-      if (parsed.kind !== "ok") throw new Error(`invalid ${operation} args`)
-      const scope = { principal: "session:caller", operation, idempotency_key: String(args["idempotency_key"]) }
-      expect(await f.store.toolReceiptBegin({ ...scope, now: Date.now(), args_hash: hashArgs(parsed.value) })).toEqual({
-        kind: "accepted",
-      })
-      await f.store.toolReceiptSettle({ ...scope, now: Date.now(), result: result as ThreadToolResult })
-    }
     const created = { name: "old create", idempotency_key: "create-before-14044" }
+    const listed = { idempotency_key: "list-before-14044" }
     const renamed = { thread: "peer", name: "Renamed", idempotency_key: "rename-before-14044" }
-    await stored("thread_create", created, {
+    const ambiguous = { thread: "twin", idempotency_key: "read-before-14044" }
+    const oldRow = {
+      sessionId: "route-peer",
+      durableSessionId: "dur-peer",
+      thread_id: "dur-peer",
+      name: "old create",
+      status: "live",
+      cwd: "/w",
+      created_at: "2026-11-01T00:00:00.000Z",
+      updated_at: "2026-11-01T00:00:00.000Z",
+      socket: "/tmp/thread-tools-test.sock",
+      endpoint_kind: "rpc_host",
+      endpoint: { kind: "rpc_host", socket: "/tmp/thread-tools-test.sock", routing_id: "route-peer" },
+      surface: "daemon",
+      alive: true,
+    }
+    await stored(f, "thread_create", created, {
       kind: "ok",
-      thread: {
-        sessionId: "route-peer",
-        durableSessionId: "dur-peer",
-        thread_id: "dur-peer",
-        name: "old create",
-        status: "live",
-        cwd: "/w",
-        created_at: "2026-11-01T00:00:00.000Z",
-        updated_at: "2026-11-01T00:00:00.000Z",
-        socket: "/tmp/thread-tools-test.sock",
-        endpoint_kind: "rpc_host",
-        endpoint: { kind: "rpc_host", socket: "/tmp/thread-tools-test.sock", routing_id: "route-peer" },
-        requested_skills: ["lead"],
-      },
+      thread: { ...oldRow, requested_skills: ["lead"] },
       deduplicated: false,
       prompt: { delivery: { kind: "started", turn_id: "1" }, deduplicated: false, endpoint: { kind: "rpc_host" } },
     })
-    await stored("thread_rename", renamed, { kind: "ok", thread_id: "dur-peer", name: "Renamed" })
+    await stored(f, "thread_list", listed, { kind: "ok", threads: [oldRow], scope: "workspace" })
+    await stored(f, "thread_rename", renamed, { kind: "ok", thread_id: "dur-peer", name: "Renamed" })
+    const oldCandidates = [
+      { id: "dur-twin-1", name: "twin", cwd: "/w", preview: "", updatedAt: null, state: "live" },
+      { id: "dur-twin-2", name: "twin", cwd: "/w", preview: "", updatedAt: null, state: "live" },
+    ]
+    await stored(f, "thread_read", ambiguous, {
+      kind: "error",
+      error: {
+        code: "ambiguous_target",
+        message: "Two threads are named twin.",
+        next_action: "Pass one thread.",
+        details: { candidates: oldCandidates },
+      },
+    })
 
     // when
     const run = runner(f, "caller")
-    const replayedCreate = await run("thread_create", created, "caller")
-    const replayedRename = await run("thread_rename", renamed, "caller")
+    const replayed = {
+      create: await run("thread_create", created, "caller"),
+      list: await run("thread_list", listed, "caller"),
+      rename: await run("thread_rename", renamed, "caller"),
+      read: await run("thread_read", ambiguous, "caller"),
+    }
 
-    // then
-    expect(replayedCreate).toEqual({
-      kind: "ok",
+    // then: the whole result, in the shape a current call answers
+    const row = {
       thread: "dur-peer",
       name: "old create",
       status: "live",
@@ -1300,11 +1328,92 @@ describe("receipts stored before one field named a session (#14044 4a)", () => {
       created_at: "2026-11-01T00:00:00.000Z",
       updated_at: "2026-11-01T00:00:00.000Z",
       link: "[old create](omo-thread://v1/dur-peer)",
-      requested_skills: ["lead"],
-      deduplicated: false,
-      prompt: { delivery: { kind: "started", turn_id: "1" }, deduplicated: false },
-    } as unknown as ThreadToolResult)
-    expect(replayedRename).toEqual({ kind: "ok", thread: "dur-peer", name: "Renamed" })
+      surface: "daemon",
+      alive: true,
+    }
+    const candidates = oldCandidates.map(({ id, ...rest }) => ({ thread: id, ...rest }))
+    expect(replayed).toStrictEqual({
+      create: {
+        kind: "ok",
+        ...row,
+        requested_skills: ["lead"],
+        deduplicated: false,
+        prompt: { delivery: { kind: "started", turn_id: "1" }, deduplicated: false },
+      },
+      list: { kind: "ok", threads: [row], scope: "workspace" },
+      rename: { kind: "ok", thread: "dur-peer", name: "Renamed" },
+      read: {
+        kind: "error",
+        error: {
+          code: "ambiguous_target",
+          message: "Two threads are named twin.",
+          next_action: "Pass one thread.",
+          details: { candidates },
+        },
+      },
+    } as unknown as typeof replayed)
+    expect(f.setSessionName).not.toHaveBeenCalled()
+    expect(f.prompt).not.toHaveBeenCalled()
+  })
+
+  test("#given receipts stored in the current shape #when the same keys are retried #then each replays byte-identical to what was stored", async () => {
+    // given: results a current build wrote, success and refusal alike
+    const f = fixture()
+    const row = {
+      thread: "dur-peer",
+      name: "peer",
+      status: "live",
+      cwd: "/w",
+      created_at: "2026-11-17T00:00:00.000Z",
+      updated_at: null,
+      link: "[peer](omo-thread://v1/dur-peer)",
+      surface: "daemon",
+      alive: true,
+      controls: ["send", "read"],
+    }
+    const receipts = [
+      {
+        operation: "thread_create" as const,
+        args: { name: "peer", idempotency_key: "create-current" },
+        result: { kind: "ok", ...row, requested_skills: ["lead"], deduplicated: false },
+      },
+      {
+        operation: "thread_list" as const,
+        args: { idempotency_key: "list-current" },
+        result: { kind: "ok", threads: [row], scope: "workspace", devices: [] },
+      },
+      {
+        operation: "thread_rename" as const,
+        args: { thread: "peer", name: "Renamed", idempotency_key: "rename-current" },
+        result: { kind: "ok", thread: "dur-peer", name: "Renamed" },
+      },
+      {
+        operation: "thread_read" as const,
+        args: { thread: "twin", idempotency_key: "read-current" },
+        result: {
+          kind: "error",
+          error: {
+            code: "ambiguous_target",
+            message: "Two threads are named twin.",
+            next_action: "Pass one thread.",
+            details: {
+              candidates: [
+                { thread: "dur-twin-1", name: "twin", cwd: "/w", preview: "", updatedAt: null, state: "live" },
+              ],
+            },
+          },
+        },
+      },
+    ]
+    for (const receipt of receipts) await stored(f, receipt.operation, receipt.args, receipt.result)
+
+    // when
+    const run = runner(f, "caller")
+    const replayed: string[] = []
+    for (const receipt of receipts) replayed.push(JSON.stringify(await run(receipt.operation, receipt.args, "caller")))
+
+    // then
+    expect(replayed).toEqual(receipts.map((receipt) => JSON.stringify(receipt.result)))
     expect(f.setSessionName).not.toHaveBeenCalled()
   })
 })

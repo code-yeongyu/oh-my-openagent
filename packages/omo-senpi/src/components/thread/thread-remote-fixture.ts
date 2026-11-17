@@ -18,8 +18,10 @@ import type {
   RemoteWatchHandlers,
 } from "./remote/ports"
 import type { ThreadTranscriptEntry } from "./reader"
+import { answerGetEntries, senpiProjector, type FakeEntryLog } from "./thread-remote-entries-fixture"
 import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
 import type { ThreadCloseOutcome } from "./tools/ports"
+import type { SessionWatchHandlers } from "./control/wait-settled"
 
 // The listing key (what b's connector assigned) deliberately differs from the durable id (audit class C8, #13017): a test
 // that passes with either id proves nothing about which one a tool path matched.
@@ -214,6 +216,8 @@ export function createRemoteThreadFixture() {
       /** The turn finishes before its prompt's reply reaches the sender: its records go out at once, before the aim. */
       recordsBeforeReply?: boolean
       rows?: readonly RemoteSessionRow[]
+      /** b's session entries, which its engine pages through `get_entries` (#14047); absent: an engine that pages nothing. */
+      entries?: FakeEntryLog
       /** Devices the account listing names as not answering this round. */
       incomplete?: readonly string[]
       /** Extra devices the account lists beyond this one and b. */
@@ -338,6 +342,11 @@ export function createRemoteThreadFixture() {
           ...options.liveState,
         })
       if (rpc["type"] === "get_messages") return ok({ messages: [...engine.messages] })
+      if (rpc["type"] === "get_entries") {
+        if (options.entries === undefined) return { kind: "refused", reason: "unsupported" }
+        const paged = answerGetEntries(options.entries, rpc)
+        return "refused" in paged ? { kind: "refused", reason: paged.refused } : ok(paged.data)
+      }
       if (rpc["type"] === "interrupt") return ok(engine.interrupt)
       // b's user set `threads.chainCountLimit` (senpi S32): its engine answers `{success: false, errorCode: "chain_count_limit"}`,
       // which the device service hands back as this refusal (device-service.ts).
@@ -474,6 +483,7 @@ export function createRemoteThreadFixture() {
               },
     }
     const remote: RemoteThreadSurface = {
+      loadProjector: async () => senpiProjector,
       client: fakeRemoteClient({
         state: () => options.plan ?? "connected",
         // This device's own id comes from the same account read: unknown names no device, a failed read fails it.
@@ -706,6 +716,13 @@ export function createRemoteThreadFixture() {
     let localListings = 0
     // How often a session on this device was prompted directly (a delivery never prompts; this counts any leak).
     let localPrompts = 0
+    // The session watches open on this device's endpoint, as b's are in `watchers`; `watching` settles at the first.
+    const watchers = new Set<SessionWatchHandlers>()
+    const ends = new Set<(reason: string) => void>()
+    let watchStarted: () => void = () => {}
+    const watching = new Promise<void>((resolve) => {
+      watchStarted = resolve
+    })
     const host: ThreadHost = {
       socket: "/tmp/thread-remote-test.sock",
       listSessions: async () => {
@@ -734,6 +751,26 @@ export function createRemoteThreadFixture() {
       closeSession: async (sessionId, durableId) => {
         closed.push([sessionId, durableId])
         return extra.closeOutcome ?? "closed"
+      },
+      watchSession: async (_sessionId, handlers) => {
+        watchers.add(handlers)
+        let end: (reason: string) => void = () => {}
+        const ended = new Promise<string>((resolve) => {
+          end = resolve
+        })
+        ends.add(end)
+        watchStarted()
+        return {
+          kind: "ok",
+          watch: {
+            ended,
+            initial: { status: engine.streaming ? "running" : "idle" },
+            stop: () => {
+              watchers.delete(handlers)
+              end("stopped")
+            },
+          },
+        }
       },
     }
     const agentDir = mkdtempSync(join(tmpdir(), "thread-remote-"))
@@ -804,6 +841,11 @@ export function createRemoteThreadFixture() {
       agentDir,
       listings: () => localListings,
       prompts: () => localPrompts,
+      watchers,
+      watching,
+      endWatches: (reason: string) => {
+        for (const end of [...ends]) end(reason)
+      },
       enqueuedFor: (durableId: string) => enqueued.filter((target) => target === durableId).length,
     }
   }
