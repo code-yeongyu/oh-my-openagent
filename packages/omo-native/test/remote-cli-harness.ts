@@ -10,6 +10,8 @@ import { defaultWorld } from "../../device-service-core/test/local-api/conforman
 import type { RemoteClient } from "../../omo-senpi/src/components/remote/index"
 import type { Credentials } from "../../omo-opencode/src/cli/service-auth/protocol"
 import type { RemoteThreadSurface } from "../../omo-senpi/src/components/thread/remote/ports"
+import { createLocalSessions } from "../../omo-senpi/src/components/remote/local-sessions"
+import type { ThreadHost } from "../../omo-senpi/src/components/thread/tools/ports"
 import type { BootstrapSetup, DeviceLink } from "../remote-bootstrap"
 import { runRemoteVerb } from "../remote-cli"
 import type { ColdWake } from "../remote-cold-wake"
@@ -54,6 +56,28 @@ export const testBootstrap = (overrides: Partial<BootstrapSetup> = {}): Bootstra
   ...overrides,
 })
 
+const unused = async (): Promise<never> => {
+  throw new Error("this test drives no session on this device")
+}
+
+// This device's operator endpoint as every harness test sees it: it answers at once and holds no session. Without it,
+// `sessions` reads the machine's real endpoint under the listing's real 10 s local bound, so a loaded host lists this
+// device as unanswered (#14113), and an unisolated HOME lists the host's own sessions.
+const noLocalSessions: ThreadHost = {
+  socket: "no-local-endpoint.sock",
+  listSessions: async () => [],
+  openSession: unused,
+  getMessages: unused,
+  getState: unused,
+  prompt: unused,
+  interrupt: unused,
+  setSessionName: unused,
+  setModel: unused,
+  getAvailableModels: unused,
+  setThinkingLevel: unused,
+  getAvailableThinkingLevels: unused,
+}
+
 export async function run(
   args: readonly string[],
   stateDir?: string,
@@ -90,14 +114,21 @@ export async function run(
       error: (line) => err.push(line),
       bootstrap,
       coldWake: {
-        install: async () => (coldWake.push("install"), { kind: "installed", serviceRestarted: false }),
-        uninstall: async () => (coldWake.push("uninstall"), { kind: "removed", serviceRestarted: false }),
+        install: async () => {
+          coldWake.push("install")
+          return { kind: "installed", serviceRestarted: false }
+        },
+        uninstall: async () => {
+          coldWake.push("uninstall")
+          return { kind: "removed", serviceRestarted: false }
+        },
         status: async () => undefined,
       },
       linkDevice: async () => {
         throw new Error("this test links no device")
       },
       optOut: { read: () => false, record: () => {}, clear: () => {} },
+      localSessions: async () => createLocalSessions(async () => noLocalSessions),
       ...(remote === undefined ? {} : { remote: () => remote }),
       ...extra,
     },
