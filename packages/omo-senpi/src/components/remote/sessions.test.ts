@@ -357,7 +357,7 @@ describe("sessions controls", () => {
   test("#given an engine that reports no background jobs #when sessions.interrupt runs #then background is not_supported", async () => {
     const { owner, sent } = await onWorld()
     expect(await valueOf(clientOn(owner.stateDir, fakeClock()).sessions.interrupt(LIVE))).toEqual({
-      thread_id: LIVE,
+      thread: LIVE,
       turn_id: "7",
       interrupted: true,
       background: { status: "not_supported" },

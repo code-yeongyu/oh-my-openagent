@@ -49,7 +49,8 @@ export type ThreadAddressEntry = ThreadSummary & {
 
 /** The candidate payload every ambiguity error carries (up to ten). */
 export type ThreadCandidate = {
-  readonly id: string
+  /** The address to pass back as `thread`. */
+  readonly thread: string
   readonly name: string
   readonly cwd: string
   readonly preview: string
@@ -128,7 +129,7 @@ function guardInput(value: string, what: string): Guarded {
       error: addressError(
         "invalid_arguments",
         `The ${what} must be a string.`,
-        `Pass a thread_id or a unique name from thread_list as the ${what}.`,
+        `Pass a thread value or a unique name from thread_list as the ${what}.`,
       ),
     }
   }
@@ -149,7 +150,7 @@ function guardInput(value: string, what: string): Guarded {
       error: addressError(
         "invalid_arguments",
         `The ${what} is empty.`,
-        `Pass a thread_id or a unique name from thread_list as the ${what}.`,
+        `Pass a thread value or a unique name from thread_list as the ${what}.`,
       ),
     }
   }
@@ -171,7 +172,7 @@ function addressError(
 
 function toCandidate(entry: ThreadAddressEntry): ThreadCandidate {
   return {
-    id: entry.thread_id,
+    thread: entry.thread_id,
     name: entry.name,
     cwd: entry.cwd,
     preview: entry.preview ?? "",
@@ -314,17 +315,21 @@ const SESSION_ID_SHAPE = /^(?:rpc-\d+|[A-Za-z0-9_-]{16,})$/
 function notFound(target: string, scope: string, visible: readonly ThreadAddressEntry[]): ThreadAddressError {
   const base = `No visible thread matches "${target}" in ${scope}.`
   if (!SESSION_ID_SHAPE.test(target)) {
-    return addressError("not_found", base, "Call thread_list and pass the thread_id or a unique name it returned.")
+    return addressError(
+      "not_found",
+      base,
+      "Call thread_list and pass a row's thread value or a unique name it returned.",
+    )
   }
   const ids = visible
     .map((entry) => entry.thread_id)
     .filter((id) => id.length > 0)
     .slice(0, 5)
-  const listed = ids.length === 0 ? "" : ` Visible thread_id values: ${ids.join(", ")}.`
+  const listed = ids.length === 0 ? "" : ` Visible thread values: ${ids.join(", ")}.`
   return addressError(
     "not_found",
-    `${base} "${target}" is a sessionId, not a thread_id. Pass that row's thread_id (the durable id), or omit thread / pass self for this session.${listed}`,
-    "Call thread_list and pass thread_id, the durable id, not sessionId.",
+    `${base} "${target}" is a session id, not a thread value. Pass the thread value thread_list shows, or omit thread / pass self for this session.${listed}`,
+    "Call thread_list and pass a row's thread value.",
   )
 }
 
@@ -357,8 +362,8 @@ export function resolveTarget(
     if (hit.kind === "error" && hit.code === "scope_denied") {
       return addressError(
         "scope_denied",
-        `Thread ${sessionHits[0].thread_id} (sessionId "${target}") exists outside this workspace.`,
-        `Call thread_list with all_scope and pass thread_id ${sessionHits[0].thread_id}, or target a thread in this workspace.`,
+        `Thread ${sessionHits[0].thread_id} (session id "${target}") exists outside this workspace.`,
+        `Call thread_list with all_scope and pass thread ${sessionHits[0].thread_id}, or target a thread in this workspace.`,
       )
     }
     return hit
@@ -367,8 +372,8 @@ export function resolveTarget(
     const ids = sessionHits.map((entry) => entry.thread_id).filter((id) => id.length > 0)
     return addressError(
       "ambiguous_target",
-      `${sessionHits.length} visible threads share the sessionId "${target}". Pass one thread_id: ${ids.join(", ")}.`,
-      "Call thread_list and pass the exact thread_id of the intended thread.",
+      `${sessionHits.length} visible threads share the session id "${target}". Pass one thread: ${ids.join(", ")}.`,
+      "Call thread_list and pass the exact thread value of the intended thread.",
       toCandidates(sessionHits),
     )
   }
@@ -405,7 +410,7 @@ export function resolveTarget(
     return addressError(
       "ambiguous_target",
       `${matches.length} visible threads share the name "${target}".`,
-      "Call thread_list and pass the exact thread_id of the intended thread.",
+      "Call thread_list and pass the exact thread value of the intended thread.",
       toCandidates(matches),
     )
   }
@@ -474,14 +479,14 @@ export function fuzzyMatch(entries: readonly ThreadAddressEntry[], query: string
     return addressError(
       "invalid_arguments",
       `A fuzzy query needs at least ${FUZZY_MIN_QUERY_LENGTH} characters; "${query}" is too short.`,
-      "Pass a longer query, or call thread_list and pass the thread_id or a unique name it returned.",
+      "Pass a longer query, or call thread_list and pass a row's thread value or a unique name it returned.",
     )
   }
   if (entries.length > FUZZY_MAX_CANDIDATES) {
     return addressError(
       "ambiguous_target",
       `${entries.length} threads are in scope; the fuzzy scan is capped at ${FUZZY_MAX_CANDIDATES}.`,
-      "Call thread_list, pick the intended thread, and pass its thread_id instead of a fuzzy query.",
+      "Call thread_list, pick the intended thread, and pass its thread value instead of a fuzzy query.",
     )
   }
   if (entries.length === 0) {
@@ -499,14 +504,14 @@ export function fuzzyMatch(entries: readonly ThreadAddressEntry[], query: string
     return addressError(
       "not_found",
       `No thread scored close enough to "${query}" (best ${leader.score.toFixed(3)}).`,
-      "Call thread_list and pass the thread_id, or retry with a longer, more distinctive query.",
+      "Call thread_list and pass a row's thread value, or retry with a longer, more distinctive query.",
     )
   }
   if (leader.score - runnerUp < FUZZY_ACCEPT_MARGIN) {
     return addressError(
       "ambiguous_target",
       `Several threads match "${query}" about equally (best ${leader.score.toFixed(3)}, runner-up ${runnerUp.toFixed(3)}).`,
-      "Call thread_list and pass the exact thread_id of the intended thread.",
+      "Call thread_list and pass the exact thread value of the intended thread.",
       toCandidates(scored.slice(0, AMBIGUOUS_CANDIDATE_LIMIT).map((candidate) => candidate.entry)),
     )
   }

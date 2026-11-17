@@ -80,10 +80,10 @@ export function controlRefusalOf(error: unknown): ThreadToolFailure | undefined 
     : undefined
 }
 
-/** The thread a result names: its id, and its device when it is on another one. */
+/** The thread a result names: `thread`, the address to pass back, and its device when it is on another one. */
 export function controlIdentity(control: Pick<SessionControl, "thread_id" | "device">): {
-  readonly thread_id: string
+  readonly thread: string
   readonly device?: string
 } {
-  return { thread_id: control.thread_id, ...(control.device === undefined ? {} : { device: control.device }) }
+  return { thread: control.thread_id, ...(control.device === undefined ? {} : { device: control.device }) }
 }

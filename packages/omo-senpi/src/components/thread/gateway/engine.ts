@@ -147,7 +147,7 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
       endpoint === null &&
       decideDelivery("offline", mode, request.expected_turn_id ?? null, null).kind === "refuse"
     ) {
-      return fail("turn_conflict", "The target has no live turn to steer.", { target: target.durable_id })
+      return fail("turn_conflict", "The target has no live turn to steer.", { thread: target.durable_id })
     }
     const facts = senderFacts(
       request.sender,

@@ -253,7 +253,7 @@ export function resolution(
         ...threadToolFailure(
           "caller_context_missing",
           "The caller's durable session id is not in the thread address book.",
-          "Call thread_list and pass an explicit thread_id, or retry from a session with caller context.",
+          "Call thread_list and pass an explicit thread, or retry from a session with caller context.",
         ),
       }
     target = caller.thread_id
@@ -292,7 +292,7 @@ export async function replyOnDevice(
         "not_found",
         `The sender ${sender.session_id} is not listed on device ${sender.device}, the device its delivery came from.`,
         "Retry when that session is running on its device, or send to another thread as a normal send.",
-        { thread_id: sender.session_id, device: sender.device },
+        { thread: sender.session_id, device: sender.device },
       ),
     }) as ThreadResolveResult
   const remote = options.remote
@@ -331,7 +331,7 @@ export async function replyOnDevice(
         "host_unavailable",
         `Device ${sender.device}, where the sender's delivery came from, did not answer whether it holds ${sender.session_id}.`,
         "Retry when that device answers.",
-        { thread_id: sender.session_id, device: sender.device, reason: probed.reason },
+        { thread: sender.session_id, device: sender.device, reason: probed.reason },
       ),
     } as ThreadResolveResult
   return missing()
@@ -471,7 +471,7 @@ async function lookupAcross(
     return { kind: "ok", entry: relayAddressEntry(endedRow(only.device, only.key, address)), resolution: "id" }
   if (holders.length > 1) {
     const candidates = holders.map((holder) => ({
-      id: address,
+      thread: address,
       name: "",
       cwd: "",
       preview: "",
@@ -498,7 +498,7 @@ async function lookupAcross(
         "host_unavailable",
         `No device that answered holds session ${address}, and ${silent.join(", ")} did not answer.`,
         "Retry when that device answers.",
-        { thread_id: address, devices: silent },
+        { thread: address, devices: silent },
       ),
     } as ThreadResolveResult
   return {
@@ -507,7 +507,7 @@ async function lookupAcross(
       "not_found",
       `No online device of this account holds session ${address}.`,
       "The session may live on a device that is offline: retry when that device is online, or call thread_list.",
-      { thread_id: address },
+      { thread: address },
     ),
   } as ThreadResolveResult
 }
