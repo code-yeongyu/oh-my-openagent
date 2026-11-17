@@ -111,6 +111,23 @@ describe.skipIf(!isDarwin)("omo-keychain helper: OmO's own keychain (#13116 desi
     expect(existsSync(root)).toBe(false)
   })
 
+  test("store-create removes a partial store a crashed create left behind", async () => {
+    const partial = `${root}.partial-999999`
+    mkdirSync(partial, { mode: 0o700 })
+    writeFileSync(join(partial, "unlock-key"), "f".repeat(64), { mode: 0o600 })
+    expect((await run(omo("store-create"))).reply).toEqual({ ok: true, created: true })
+    expect(existsSync(partial)).toBe(false)
+  })
+
+  test("a damaged active store can still be deactivated, after which requests naming no store reach the login keychain", async () => {
+    await activeStore()
+    chmodSync(join(root, "unlock-key"), 0o644)
+    expect((await run(omo("read"))).reply).toMatchObject({ error: "store-refused", reason: "key" })
+    expect((await run(omo("store-deactivate"))).reply).toEqual({ ok: true })
+    expect((await run(request("read"))).reply).toMatchObject({ missing: true })
+    chmodSync(join(root, "unlock-key"), 0o600)
+  })
+
   test("a symlinked store folder is refused even when it points at a valid store", async () => {
     await activeStore()
     renameSync(root, `${root}-real`)

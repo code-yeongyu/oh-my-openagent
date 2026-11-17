@@ -7,17 +7,49 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
+static bool remove_lock_files(const char *root);
+
 static void remove_partial(const char *dir) {
   char path[DEDICATED_PATH_BYTES];
   if (dedicated_join(path, sizeof path, dir, DEDICATED_KEYCHAIN_NAME)) unlink(path);
   if (dedicated_join(path, sizeof path, dir, DEDICATED_KEY_NAME)) unlink(path);
+  remove_lock_files(dir);
   rmdir(dir);
+}
+
+// A store-create that crashed leaves `<root>.partial-<pid>` holding a key and keychain pair (review L4). Before the
+// next create, every such folder owned by this user whose creating process is gone is removed.
+static void remove_stale_partials(const char *root) {
+  char parent[DEDICATED_PATH_BYTES], prefix[DEDICATED_PATH_BYTES];
+  if ((size_t)snprintf(parent, sizeof parent, "%s", root) >= sizeof parent) return;
+  char *slash = strrchr(parent, '/');
+  if (slash == NULL) return;
+  *slash = '\0';
+  if ((size_t)snprintf(prefix, sizeof prefix, "%s.partial-", slash + 1) >= sizeof prefix) return;
+  DIR *dir = opendir(parent);
+  if (dir == NULL) return;
+  size_t prefix_length = strlen(prefix);
+  for (struct dirent *entry = readdir(dir); entry != NULL; entry = readdir(dir)) {
+    if (strncmp(entry->d_name, prefix, prefix_length) != 0) continue;
+    char *end = NULL;
+    long pid = strtol(entry->d_name + prefix_length, &end, 10);
+    if (end == NULL || *end != '\0' || pid <= 0 || (kill((pid_t)pid, 0) == 0 || errno != ESRCH)) continue;
+    char path[DEDICATED_PATH_BYTES];
+    struct stat info;
+    if (!dedicated_join(path, sizeof path, parent, entry->d_name) || lstat(path, &info) != 0 || !S_ISDIR(info.st_mode) ||
+        info.st_uid != geteuid())
+      continue;
+    remove_partial(path);
+  }
+  closedir(dir);
 }
 
 static const char *write_key(const char *dir, char key[DEDICATED_KEY_HEX]) {
@@ -86,6 +118,7 @@ const char *dedicated_create(bool *created, OSStatus *status) {
   if (lstat(root, &info) == 0) return dedicated_open(status);
   const char *refusal = ensure_parent(root);
   if (refusal != NULL) return refusal;
+  remove_stale_partials(root);
   snprintf(partial, sizeof partial, "%s.partial-%d", root, (int)getpid());
   refusal = build_store(partial, status);
   if (refusal == NULL && rename(partial, root) != 0) refusal = errno == EEXIST || errno == ENOTEMPTY ? "exists" : "rename";

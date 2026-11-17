@@ -26,6 +26,14 @@ bool store_select(store_step step, const request *req) {
     reply_error("store-refused", "home", errSecSuccess);
     return false;
   }
+  // Withdrawing the marker needs only the trusted root, never an openable keychain, so a damaged store can still be
+  // turned off (`disable --discard`, review L1) and store-less requests reach the login keychain again.
+  if (step == STORE_STEP_DEACTIVATE) {
+    const char *refusal = dedicated_set_active(false);
+    if (refusal != NULL) reply_error("store-refused", refusal, errSecSuccess);
+    else reply_ok(NULL);
+    return false;
+  }
   if (step == STORE_STEP_NONE && !migrating && !dedicated_active()) {
     reply_error("store-refused", "store-inactive", errSecSuccess);
     return false;
