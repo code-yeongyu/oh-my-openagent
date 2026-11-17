@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test"
-import { CredentialStoreError, createCredentialStore, INTERACTIVE_READ_WAIT, type SecretApi } from "../keystore"
+import {
+  CredentialStoreError,
+  createCredentialStore,
+  DedicatedStoreError,
+  INTERACTIVE_READ_WAIT,
+  KeychainItemNotOwnedError,
+  type SecretApi,
+} from "../keystore"
 import type { HelperAccess } from "./access"
 import { A, API, credentials } from "./fake-keychain.test-support"
 import { dedicatedFake } from "./dedicated-fake.test-support"
@@ -96,6 +103,23 @@ describe("sign-in storage while OmO's own keychain is active (#13116)", () => {
     expect((await store.read())?.device.id).toBe(credentials.device.id)
     expect(fake.calls.every((call) => call.store === "omo")).toBe(true)
     expect(fake.calls.some((call) => call.verb === "approve")).toBe(false)
+    expect(untouchable.touched).toBe(0)
+  })
+
+  test("#given an item in OmO's keychain another program owns #when the sign-in is cleared #then it fails as an OmO-keychain store error, never the login-keychain not-owned error", async () => {
+    const fake = dedicatedFake({ state: "active" })
+    fake.omo.put(A, "dummy-unreadable", "other-app", "other")
+    untouchable.touched = 0
+    const store = storeOn(
+      async () => fake.access,
+      () => true,
+    )
+    const failure = await store.clear().then(
+      () => null,
+      (error: unknown) => error,
+    )
+    expect(failure).toBeInstanceOf(DedicatedStoreError)
+    expect(failure).not.toBeInstanceOf(KeychainItemNotOwnedError)
     expect(untouchable.touched).toBe(0)
   })
 

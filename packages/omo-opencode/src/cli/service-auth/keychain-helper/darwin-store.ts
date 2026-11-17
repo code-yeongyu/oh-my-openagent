@@ -44,6 +44,9 @@ const OLD_SLOTS_FULL_MESSAGE =
 const NOT_OWNED_MESSAGE =
   'The OmO sign-in in the macOS keychain (item "omo-cli") is owned by a different program, and macOS does not let this one remove it. Open Keychain Access, delete the "omo-cli" item for OmO, then try again.'
 
+const DEDICATED_NOT_OWNED_MESSAGE =
+  'The OmO sign-in in OmO\'s own keychain (item "omo-cli") is owned by a different program, so omo cannot remove it. Run "omo account store disable --discard", then sign in again.'
+
 const failed = (reply: HelperReply, verb: string) => {
   const dedicated = dedicatedStoreRefusal(reply)
   if (dedicated !== null) return new HelperReadError("dedicated", dedicated)
@@ -126,6 +129,8 @@ export function lockedDarwinStore(deps: DarwinStoreDeps, lease: HelperLease): Lo
       const removed = await helper({ verb: "remove", account: deps.account })
       if (removed.error === "not-owned")
         await deps.ownDelete(deps.account).catch((error: unknown) => {
+          if (error instanceof HelperReadError && error.failure === "dedicated")
+            throw new HelperReadError("dedicated", DEDICATED_NOT_OWNED_MESSAGE)
           throw new HelperItemNotOwned(NOT_OWNED_MESSAGE, { cause: error })
         })
       else if (removed.ok !== true) throw failed(removed, "remove")
