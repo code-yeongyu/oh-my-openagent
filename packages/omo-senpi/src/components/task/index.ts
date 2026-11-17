@@ -127,10 +127,18 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
         ...(ctx.idleCoordinator !== undefined && { coordinator: ctx.idleCoordinator }),
       })
 
+      // The same inputs the planner resolves a spawn against: the register-time cwd its live config reads,
+      // the agent table it was composed with, and the parent's service tier for the fast-tier step.
       registerModelRoutingRpc(pi, {
-        cwd: () => engine.runtime.cwd(),
+        cwd: () => cwd,
         loadConfig: (projectDir) => loadConfig({ cwd: projectDir }),
         registry: () => engine.runtime.modelRegistry(),
+        planner: () => ({
+          agents: engine.agents,
+          ...(engine.runtime.parentServiceTier() === undefined
+            ? {}
+            : { parentServiceTier: engine.runtime.parentServiceTier() }),
+        }),
       })
       pi.registerMessageRenderer?.(TASK_COMPLETION_MESSAGE_TYPE, renderTaskCompletion)
       pi.registerMessageRenderer?.(TEAM_MEMBER_LIVENESS_MESSAGE_TYPE, renderTeamMemberLiveness)

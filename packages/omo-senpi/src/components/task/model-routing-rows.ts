@@ -1,14 +1,16 @@
-import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
+import { isExcludedModel, type OmoConfig } from "@oh-my-opencode/omo-config-core"
 import {
   BUILTIN_CATEGORY_DEFAULTS,
   resolveAgent,
   resolveCategory,
-  resolveTaskAgents,
+  type AgentDefinition,
   type ModelSelectionSource,
   type SenpiModelPort,
 } from "@oh-my-opencode/senpi-task"
 
+import { inheritParentFastMode } from "./fast-mode-inheritance"
 import type { TaskModelRegistry } from "./planner"
+import type { ParentServiceTier } from "./runtime-context"
 
 export type ModelRoutingSource = "override" | "provider-fallback" | "unresolved"
 
@@ -23,12 +25,29 @@ export type ModelRoutingRow = {
 
 const BUILTIN_CATEGORY_NAMES = BUILTIN_CATEGORY_DEFAULTS.map((definition) => definition.name)
 
+/** What the planner resolves a spawn against besides the config: its agent table and the parent's service tier. */
+export type ModelRoutingPlannerInputs = {
+  readonly agents: Readonly<Record<string, AgentDefinition>>
+  readonly parentServiceTier?: ParentServiceTier
+}
+
 /**
- * Every builtin and configured category under its canonical name, then every task agent, each resolved by
- * `resolveCategory` / `resolveAgent` exactly as the planner resolves a spawn. `variant` is the thinking level the
- * child runs at, in the planner's precedence (reasoning, then reasoningEffort, then variant).
+ * Every builtin and configured category, then every task agent, each under its canonical name and resolved by
+ * `resolveCategory` / `resolveAgent` exactly as the planner resolves a spawn: against the planner's own agent table,
+ * then the parent fast-tier step. `variant` is the thinking level the child runs at, in the planner's precedence
+ * (reasoning, then reasoningEffort, then variant). The round-robin distributor is not consulted, so a read never
+ * advances a rotation: a `round_robin` lane shows its first entry.
  */
-export function resolveModelRoutingRows(omoConfig: OmoConfig, registry: TaskModelRegistry): readonly ModelRoutingRow[] {
+export function resolveModelRoutingRows(
+  omoConfig: OmoConfig,
+  registry: TaskModelRegistry,
+  planner: ModelRoutingPlannerInputs,
+): readonly ModelRoutingRow[] {
+  const effectiveModel = (model: string): string => {
+    const fast = inheritParentFastMode({ model }, registry, planner.parentServiceTier).model
+    // The -fast sibling is a different model: exclude_models keeps the planned one, as the planner does.
+    return isExcludedModel(fast, omoConfig.exclude_models) ? model : fast
+  }
   const categoryNames = [...new Set([...BUILTIN_CATEGORY_NAMES, ...Object.keys(omoConfig.categories ?? {})])].sort()
   const categories = new Map<string, ModelRoutingRow>()
   for (const name of categoryNames) {
@@ -40,29 +59,35 @@ export function resolveModelRoutingRows(omoConfig: OmoConfig, registry: TaskMode
         ? routed(
             "category",
             resolution.category,
-            `${resolution.spec.provider}/${resolution.spec.modelId}`,
+            effectiveModel(`${resolution.spec.provider}/${resolution.spec.modelId}`),
             resolution.modelSelection.source,
             resolution.spec.reasoning ?? resolution.spec.reasoningEffort ?? resolution.spec.variant,
           )
         : unresolved("category", resolution.category),
     )
   }
-  const agents = resolveTaskAgents(omoConfig)
-  const agentRows = Object.keys(agents)
-    .sort()
-    .map((name): ModelRoutingRow => {
-      const resolution = resolveAgent(name, agents, registry, { omoConfig })
-      if (resolution.kind !== "resolved") return unresolved("agent", resolution.agent)
-      const record = resolution.resolved_model
-      return routed(
+  // A retired alias key (omo-senpi-*) resolves to its canonical omo-native-* agent, so it shares that row.
+  const agents = new Map<string, ModelRoutingRow>()
+  for (const name of Object.keys(planner.agents).sort()) {
+    const resolution = resolveAgent(name, planner.agents, registry, { omoConfig })
+    if (agents.has(resolution.agent)) continue
+    if (resolution.kind !== "resolved") {
+      agents.set(resolution.agent, unresolved("agent", resolution.agent))
+      continue
+    }
+    const record = resolution.resolved_model
+    agents.set(
+      resolution.agent,
+      routed(
         "agent",
         resolution.agent,
-        resolution.model,
+        effectiveModel(resolution.model),
         resolution.modelSource,
         record?.reasoning ?? record?.reasoning_effort ?? record?.variant,
-      )
-    })
-  return [...categories.values(), ...agentRows]
+      ),
+    )
+  }
+  return [...categories.values(), ...agents.values()]
 }
 
 function routed(

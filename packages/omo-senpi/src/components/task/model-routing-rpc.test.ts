@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { SenpiModelPort } from "@oh-my-opencode/senpi-task"
+import { resolveTaskAgents, type SenpiModelPort } from "@oh-my-opencode/senpi-task"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { loadSenpiOmoConfig } from "../config-resolution"
@@ -48,10 +48,13 @@ function project(configText?: string): { readonly home: string; readonly cwd: st
 }
 
 function deps(home: string, cwd: string, overrides: Partial<ModelRoutingRpcDeps> = {}): ModelRoutingRpcDeps {
+  // The planner's agent table is composed once, from the config the session started with.
+  const agents = resolveTaskAgents(loadSenpiOmoConfig({ cwd, env: { HOME: home } }).config)
   return {
     cwd: () => cwd,
     loadConfig: (projectDir) => loadSenpiOmoConfig({ cwd: projectDir, env: { HOME: home } }),
     registry: () => liveRegistry,
+    planner: () => ({ agents }),
     ...overrides,
   }
 }

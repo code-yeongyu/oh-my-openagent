@@ -2,7 +2,7 @@ import { statSync } from "node:fs"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import type { SenpiOmoConfigResult } from "../config-resolution"
-import { resolveModelRoutingRows, type ModelRoutingRow } from "./model-routing-rows"
+import { resolveModelRoutingRows, type ModelRoutingPlannerInputs, type ModelRoutingRow } from "./model-routing-rows"
 import type { TaskModelRegistry } from "./planner"
 
 /**
@@ -21,9 +21,12 @@ export type ModelRoutingAnswer =
     }
 
 export interface ModelRoutingRpcDeps {
+  /** The directory the planner's live config is read from (the task component's register-time cwd). */
   readonly cwd: () => string
   readonly loadConfig: (cwd: string) => SenpiOmoConfigResult
   readonly registry: () => TaskModelRegistry | undefined
+  /** The planner's own agent table and the parent's service tier, read per answer. */
+  readonly planner: () => ModelRoutingPlannerInputs
 }
 
 // A layer the loader could not read or parse is skipped, so rows built without it would describe a config the user
@@ -54,7 +57,7 @@ function answerModelRouting(deps: ModelRoutingRpcDeps): ModelRoutingAnswer {
   const registry = deps.registry()
   if (registry === undefined)
     return { kind: "error", code: "registry_unavailable", message: "The session has no model registry yet." }
-  return { schemaVersion: 1, rows: resolveModelRoutingRows(loaded.config, registry) }
+  return { schemaVersion: 1, rows: resolveModelRoutingRows(loaded.config, registry, deps.planner()) }
 }
 
 function isDirectory(path: string): boolean {

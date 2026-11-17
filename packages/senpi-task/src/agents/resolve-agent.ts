@@ -10,6 +10,7 @@ import type { ResolvedModelRecord } from "../state"
 import { agentModelCandidates, type AgentModelCandidate } from "./agent-model-entry"
 import { findExactAgentModel, parseAvailableAgentModels, type ParsedAgentModel } from "./agent-model-registry"
 import { agentPersona } from "./agent-persona"
+import { BUILTIN_AGENTS } from "./builtin"
 import { AGENT_FALLBACK_CHAINS } from "./builtin/fallback-chains"
 import { canonicalAgentName } from "./builtin/legacy-agent-names"
 import type { AgentDefinition } from "./types"
@@ -139,12 +140,14 @@ export function resolveAgent<TModel extends SenpiModelPort>(
     definition.models?.length && options.distributeModels
       ? options.distributeModels(`agent:${name}`, configuredModels, definition.models_distribution)
       : configuredModels
-  const userAgent =
-    options.omoConfig?.agents !== undefined && Object.hasOwn(options.omoConfig.agents, name)
-      ? options.omoConfig.agents[name]
-      : undefined
+  // Who chose the direct model, read from the definition this spawn resolves rather than from a config
+  // read at another time: a builtin agent still on its own builtin model/models is omo's, anything
+  // else (an omo.json override, an omo.json-only agent) is the user's.
+  const builtin = Object.hasOwn(BUILTIN_AGENTS, name) ? BUILTIN_AGENTS[name] : undefined
   const directSource: ModelSelectionSource =
-    userAgent?.model !== undefined || (userAgent?.models?.length ?? 0) > 0 ? "user" : "builtin"
+    builtin !== undefined && definition.model === builtin.model && definition.models === builtin.models
+      ? "builtin"
+      : "user"
   for (const candidate of directModels) {
     attemptedModel = candidate.model
     const found = findExactAgentModel(candidate.model, registry)

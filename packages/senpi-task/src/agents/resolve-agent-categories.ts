@@ -44,14 +44,14 @@ function findOnlyCategoryModel<TModel extends SenpiModelPort>(
   input: ResolveAgentCategoryInput<TModel>,
 ): AgentCategorySelection | undefined {
   if (Array.isArray(input.registry.getAvailable())) return undefined
-  const fallbackModel = firstCategoryDefaultModel(input.categories, input.omoConfig)
-  if (fallbackModel === undefined) return undefined
-  const found = findExactAgentModel(fallbackModel, input.registry)
+  const fallback = firstCategoryModel(input.categories, input.omoConfig)
+  if (fallback === undefined) return undefined
+  const found = findExactAgentModel(fallback.model, input.registry)
   if (found === undefined) return undefined
   return {
     provider: found.provider,
     modelId: found.modelId,
-    source: firstCategoryModelSource(input.categories, input.omoConfig),
+    source: fallback.source,
     ...(input.configuredTuning.variant !== undefined ? { variant: input.configuredTuning.variant } : {}),
     ...(input.configuredTuning.reasoningEffort !== undefined
       ? { reasoningEffort: input.configuredTuning.reasoningEffort }
@@ -60,37 +60,29 @@ function findOnlyCategoryModel<TModel extends SenpiModelPort>(
 }
 
 // The model the agent would have run on had a category resolved: the first listed category's
-// model. A user `categories.<name>.model` outranks the builtin default so a failure names what the
-// user actually configured instead of a builtin they never chose. Feeds `attemptedModel` on the
-// model_unavailable and no-registry paths.
-export function firstCategoryDefaultModel(
+// model, and who supplied it. A user `categories.<name>.model` outranks the builtin default so a
+// failure names what the user actually configured instead of a builtin they never chose. Feeds
+// `attemptedModel` on the model_unavailable and no-registry paths, and the find-only selection.
+function firstCategoryModel(
   categories: readonly string[] | undefined,
   omoConfig?: OmoConfig,
-): string | undefined {
+): { readonly model: string; readonly source: ModelSelectionSource } | undefined {
   const userCategories = omoConfig?.categories
   for (const name of categories ?? []) {
     const userModel =
       userCategories !== undefined && Object.hasOwn(userCategories, name) ? userCategories[name]?.model : undefined
-    if (userModel !== undefined) return userModel
+    if (userModel !== undefined) return { model: userModel, source: "user" }
     const builtin = Object.hasOwn(DEFAULT_CATEGORIES, name) ? DEFAULT_CATEGORIES[name] : undefined
-    if (builtin?.model !== undefined) return builtin.model
+    if (builtin?.model !== undefined) return { model: builtin.model, source: "builtin" }
   }
   return undefined
 }
 
-// Who supplied firstCategoryDefaultModel's answer, walking the categories the same way.
-function firstCategoryModelSource(categories: readonly string[], omoConfig: OmoConfig): ModelSelectionSource {
-  const userCategories = omoConfig.categories
-  for (const name of categories) {
-    if (
-      userCategories !== undefined &&
-      Object.hasOwn(userCategories, name) &&
-      userCategories[name]?.model !== undefined
-    )
-      return "user"
-    if (Object.hasOwn(DEFAULT_CATEGORIES, name) && DEFAULT_CATEGORIES[name]?.model !== undefined) return "builtin"
-  }
-  return "builtin"
+export function firstCategoryDefaultModel(
+  categories: readonly string[] | undefined,
+  omoConfig?: OmoConfig,
+): string | undefined {
+  return firstCategoryModel(categories, omoConfig)?.model
 }
 
 // Categories supply the MODEL only: prompt_append, tools, temperature, top_p, maxTokens and
