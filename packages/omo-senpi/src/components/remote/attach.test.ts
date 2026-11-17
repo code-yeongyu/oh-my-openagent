@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
+import { createConnection } from "node:net"
 import { dirname } from "node:path"
 import { PEER, SESSION_ID } from "../../../../device-service-core/test/local-api/conformance/world.ts"
 import { pushDetached, pushFrame, pushRecords, pushSnapshot, reader, THREAD, worldWith } from "./attach.test-support"
-import { serveRemoteAttach } from "../../../../omo-native/remote-attach"
+import { pipeAddress, serveRemoteAttach } from "../../../../omo-native/remote-attach"
 import type { RemoteClientDeps } from "./client"
+import { nextActionFor } from "./codes"
 import { DEADLINES } from "./deadlines"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
 import { clientOn, closeClients, failureOf, fakeClock, startModeOwner, startOwner } from "./testing/fake-service"
@@ -56,6 +58,19 @@ const attached = async (
 
 // The endpoint server a caller outside `omo remote`'s local-only graph injects (#13440): omo-native's own.
 const SERVING: Partial<RemoteClientDeps> = { serveAttach: (attach, label) => serveRemoteAttach(attach, { label }) }
+
+// Windows serves the endpoint on a named pipe derived from the path and secret. The `.sock` path is not a file.
+const pipeIsOpen = (socketPath: string): Promise<boolean> => {
+  const address = pipeAddress(socketPath, readFileSync(`${socketPath}.secret`))
+  return new Promise((resolve) => {
+    const socket = createConnection(address)
+    socket.once("connect", () => {
+      socket.destroy()
+      resolve(true)
+    })
+    socket.once("error", () => resolve(false))
+  })
+}
 
 const ids = (handle: AttachHandle): string[] => handle.pending().map((request) => request.request_id)
 
@@ -260,6 +275,20 @@ describe("attach rows: events buffer", () => {
   })
 })
 
+describe("attach rows: read", () => {
+  test("#given an attach over the device service #when a read asks for a page the service refuses #then invalid_arguments, as the same read of a session on this device answers", async () => {
+    const { handle } = await attached({ sessionId: "engine-1", isStreaming: false, pendingDialogs: [] })
+    // The service refuses a page size outside 1-200 invalid_request; session.read carries nothing else of the caller's.
+    for (const tail of [0, 201])
+      expect(failureOf(await handle.read({ tail }))).toMatchObject({
+        code: "invalid_arguments",
+        next_action: nextActionFor("invalid_arguments"),
+        details: { local_api_code: "invalid_request" },
+      })
+    await handle.detach()
+  })
+})
+
 describe("attach rows: events reader", () => {
   test("#given an attach's events being read #when a second reader iterates them at the same time #then it fails at its start and the first keeps reading", async () => {
     const { owner, handle } = await attached({ sessionId: "engine-1", isStreaming: true, pendingDialogs: [] })
@@ -286,10 +315,17 @@ describe("attach rows: end", () => {
     const { handle } = await attached(STATE, [], SERVING)
     const served = await handle.serveEndpoint()
     if (served.kind !== "ok") throw new Error(`expected an endpoint, got ${JSON.stringify(served)}`)
-    expect(existsSync(served.value.socketPath)).toBe(true)
+    if (process.platform === "win32") {
+      expect(existsSync(`${served.value.socketPath}.secret`)).toBe(true)
+      expect(await pipeIsOpen(served.value.socketPath)).toBe(true)
+    } else {
+      expect(existsSync(served.value.socketPath)).toBe(true)
+    }
     expect(served.value.sessionRef).toBe(SESSION_ID)
     await handle.detach()
-    expect(existsSync(served.value.socketPath)).toBe(false)
+    expect(
+      existsSync(process.platform === "win32" ? `${served.value.socketPath}.secret` : served.value.socketPath),
+    ).toBe(false)
   })
 
   test("#given a client built without serveAttach #when serveEndpoint runs #then it answers unsupported{serve_endpoint} as data", async () => {

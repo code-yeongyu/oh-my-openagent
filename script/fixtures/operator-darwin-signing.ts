@@ -129,9 +129,20 @@ export function machoSigned(options: {
   identifier?: string
   team?: string
   runtime?: boolean
+  /** Mach-O header cputype and cpusubtype (capability bits included); arm64 ARM64_ALL by default. */
+  cpu?: readonly [cpuType: number, cpuSubtype: number]
   cms?: Uint8Array
+  /** Signs the finished CodeDirectory; its CMS length must not depend on the CodeDirectory's bytes. */
+  sign?: (codeDirectory: Uint8Array) => Uint8Array
   extraBlobs?: ReadonlyArray<readonly [number, Uint8Array]>
 }): { file: Uint8Array; codeDirectory: Uint8Array } {
+  if (options.sign) {
+    const placeholder = options.sign(new Uint8Array(1))
+    const { codeDirectory } = machoSigned({ ...options, sign: undefined, cms: placeholder })
+    const cms = options.sign(codeDirectory)
+    if (cms.byteLength !== placeholder.byteLength) throw new Error("fixture CMS length depends on the CodeDirectory")
+    return machoSigned({ ...options, sign: undefined, cms })
+  }
   const requirements = blob(0xfade0c01, new Uint8Array(4))
   const cms = blob(0xfade0b01, options.cms ?? new Uint8Array())
   const ident = new TextEncoder().encode(`${options.identifier ?? "ai.sisyphuslabs.fixture"}\0`)
@@ -145,6 +156,8 @@ export function machoSigned(options: {
   const header = new Uint8Array(48)
   const le = new DataView(header.buffer)
   le.setUint32(0, 0xfeedfacf, true)
+  le.setUint32(4, options.cpu?.[0] ?? 0x0100000c, true)
+  le.setUint32(8, options.cpu?.[1] ?? 0, true)
   le.setUint32(16, 1, true)
   le.setUint32(20, 16, true)
   le.setUint32(32, 0x1d, true)
