@@ -22,6 +22,11 @@ describe("omo-senpi skill-pointers bunshin pointer", () => {
       // A line break after the owner form ends it like punctuation (#13467 review L1).
       "check disk on my fleet\nthen report",
       "my fleet\nrun df",
+      // A device state or an environment after the owner form is still a device request (#14059 review L1, L2).
+      "our fleet is down",
+      "is our fleet offline?",
+      "check our fleet in prod",
+      "run df on our fleet in parallel",
     ] as const
     for (const text of triggers) {
       expect({ text, matched: matchedSkillPointerNames(text) }).toEqual({ text, matched: ["bunshin"] })
@@ -46,6 +51,9 @@ describe("omo-senpi skill-pointers bunshin pointer", () => {
       "our fleet is aging and needs new trucks",
       "our fleet in the harbor",
       "our fleets are docked",
+      // A line break does not end the owner form when the next line continues the sentence (#14059 review L3).
+      "our fleet\nis aging",
+      "our fleet\nin the harbor",
       "the fleet hosts a regatta",
       "bunshins",
       "the mesh network",

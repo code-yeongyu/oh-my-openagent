@@ -137,10 +137,10 @@ const TARGETS: readonly SkillPointerTarget[] = [
     customType: BUNSHIN_CUSTOM_TYPE,
     // `fleet` alone is an ordinary word (a vehicle fleet, a "fleet dashboard"), so it counts only with a device
     // sense: the user's fleet as the object of the request (`my fleet(s)`, `our fleet(s)` followed by the end of the line, punctuation or a
-    // function word, so not `our fleet management UI`, `our fleet of delivery trucks` or `our fleet is aging` (#13467 review L1, L2)) or a fleet machine noun (`fleet hosts`,
+    // function word, so not `our fleet management UI`, `our fleet of delivery trucks` or `our fleet is aging`, but `our fleet is down` and `our fleet in prod` are device requests (#13467 review L1, L2; #14059 review L1-L3)) or a fleet machine noun (`fleet hosts`,
     // `fleet box`, a host name such as `fleet-node-3`; `hosts` before an article is the verb) (#13446, #13467 review L3).
     pattern: skillNamePattern(
-      String.raw`(?:bunshin|(?:my|our)\s+fleets?(?=[^\S\n]*(?:$|\n|[,.;:!?)]|(?:and|or|now|then|today|please|up|down|via|with|from|to|on|for)\b))|fleet[\s-]+(?:machines?|devices?|hosts?(?!\s+(?:a|an|the)\b)|nodes?|box(?:es)?)(?:-[a-z0-9]+)*|machine[\s-]*mesh)`,
+      String.raw`(?:bunshin|(?:my|our)\s+fleets?(?=[^\S\n]*(?:$|\n(?![^\S\n]*(?:is|are|in)\b)|[,.;:!?)]|(?:and|or|now|then|today|please|up|down|offline|online|unreachable|via|with|from|to|on|for)\b|(?:is|are)\s+(?:down|up|offline|online|unreachable|slow|healthy)\b|in\s+(?:prod|production|staging|parallel)\b))|fleet[\s-]+(?:machines?|devices?|hosts?(?!\s+(?:a|an|the)\b)|nodes?|box(?:es)?)(?:-[a-z0-9]+)*|machine[\s-]*mesh)`,
     ),
     expandedBlockPattern: /<skill\s+name="bunshin"/i,
     instruction: "",
