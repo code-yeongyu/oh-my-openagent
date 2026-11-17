@@ -73,8 +73,6 @@ OSStatus add_owned(const char *account, const buffer *value);
 OSStatus update_data(const char *account, const buffer *value);
 OSStatus rename_item(const char *from, const char *to);
 OSStatus delete_item(const char *account);
-// Deletes by attributes through `/usr/bin/security`. Used when this binary is not on the item ACL.
-bool security_delete_generic_password(const char *account);
 
 const char *classify_partition_description(CFStringRef description);
 const char *partition_kind(SecKeychainItemRef item);
