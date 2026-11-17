@@ -183,7 +183,7 @@ describe("/remote", () => {
   it("#given a text that starts with -- #when /remote send runs #then the text is sent verbatim after the -- terminator", async () => {
     // given
     const run = fakeRunner({
-      send: ok({ kind: "ok", thread_id: "s1", device: "dev_mac", delivery: { kind: "started" }, reply: "done." }),
+      send: ok({ kind: "ok", thread: "s1", device: "dev_mac", delivery: { kind: "started" }, reply: "done." }),
     })
     const ui = fakeUi()
     const reply = nextNote(ui, (message) => message.includes("done."))
@@ -206,7 +206,7 @@ describe("/remote", () => {
     await invoke(run, "send dev_mac/s1 hello", ui)
     const reply = nextNote(ui, (message) => message.includes("later"))
     const notesBeforeReply = ui.notes.length
-    answer.resolve(ok({ kind: "ok", thread_id: "s1", delivery: { kind: "started" }, reply: "later" }))
+    answer.resolve(ok({ kind: "ok", thread: "s1", delivery: { kind: "started" }, reply: "later" }))
 
     // then
     expect(notesBeforeReply).toBe(1)
@@ -329,7 +329,7 @@ describe("/remote", () => {
 
   it("#given a running session #when /remote interrupt runs #then the CLI's result is shown", async () => {
     // given
-    const run = fakeRunner({ interrupt: ok({ kind: "ok", thread_id: "s1", device: "dev_mac", interrupted: true }) })
+    const run = fakeRunner({ interrupt: ok({ kind: "ok", thread: "s1", device: "dev_mac", interrupted: true }) })
     const ui = fakeUi()
 
     // when
@@ -415,7 +415,7 @@ describe("/remote", () => {
     const run = fakeRunner({
       devices: ok(DEVICES),
       sessions: ok(LISTING),
-      send: ok({ kind: "ok", thread_id: "s1", device: "dev_mac", delivery: { kind: "started" }, reply: "on it" }),
+      send: ok({ kind: "ok", thread: "s1", device: "dev_mac", delivery: { kind: "started" }, reply: "on it" }),
     })
     const ui = fakeUi(
       [
@@ -444,7 +444,7 @@ describe("/remote", () => {
     const run = fakeRunner({
       devices: ok(DEVICES),
       sessions: ok(LISTING),
-      open: ok({ kind: "ok", thread: { thread_id: "s2", device: "dev_mac" }, deduplicated: false }),
+      open: ok({ kind: "ok", thread: "s2", device: "dev_mac", deduplicated: false }),
     })
     const ui = fakeUi([
       (options) => options.find((option) => option.includes("mengmota-mac")),
@@ -570,7 +570,7 @@ describe("/remote", () => {
     const run = fakeRunner({
       devices: ok(DEVICES),
       sessions: ok(LISTING),
-      interrupt: ok({ kind: "ok", thread_id: "s1", device: "dev_mac", interrupted: false }),
+      interrupt: ok({ kind: "ok", thread: "s1", device: "dev_mac", interrupted: false }),
     })
     const ui = fakeUi([
       (options) => options.find((option) => option.includes("mengmota-mac")),
