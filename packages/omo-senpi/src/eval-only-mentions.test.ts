@@ -23,7 +23,8 @@ import {
 // Model-facing text must never name an eval-only tool as a direct call (#14034): a model that follows
 // "call thread_list first" finds no thread_list in its tool list and decides the family never registered.
 // Contract guarded: every registered eval-only tool named in a shipped promptGuidelines entry, tool
-// description or bundled skill is written in its eval form (`tool.<name>(`) or on a line that says eval.
+// description, parameter description or bundled skill is written in its eval form (`tool.<name>(`) or in a
+// sentence that says eval.
 //
 // The eval-only names come from the real engine (the pinned senpi dist publishes a redirect hint per
 // eval-only tool it registers) plus every omo tool declared with exposure "eval". Only names that carry
@@ -115,21 +116,20 @@ function shippedSkillTexts(): ModelFacingText[] {
   )
 }
 
+// A bare mention passes only when its own sentence says eval, so one "eval" on a long line cannot cover it.
 function directMentions(names: readonly string[], texts: readonly ModelFacingText[]): string[] {
-  const patterns = names.map((name) => ({
-    name,
-    pattern: new RegExp(`(?<![\\w.])${name}(?!\\w)`),
-  }))
+  const patterns = names.map((name) => ({ name, pattern: new RegExp(`(?<![\\w.])${name}(?!\\w)`) }))
   return texts.flatMap(({ source, text }) =>
-    text
-      .split("\n")
-      .flatMap((line, index) =>
-        /\beval\b/i.test(line)
-          ? []
-          : patterns
-              .filter(({ pattern }) => pattern.test(line))
-              .map(({ name }) => `${source}:${index + 1} names ${name} without its eval form: ${line.trim()}`),
-      ),
+    text.split("\n").flatMap((line, index) =>
+      line
+        .split(/(?<=[.!?;])\s+/)
+        .filter((sentence) => !/\beval\b/i.test(sentence))
+        .flatMap((sentence) =>
+          patterns
+            .filter(({ pattern }) => pattern.test(sentence))
+            .map(({ name }) => `${source}:${index + 1} names ${name} without its eval form: ${sentence.trim()}`),
+        ),
+    ),
   )
 }
 
@@ -138,15 +138,30 @@ interface RegisteredTool {
   readonly description: string
   readonly exposure: unknown
   readonly promptGuidelines: readonly string[]
+  readonly parameterDescriptions: readonly string[]
+}
+
+function schemaDescriptions(schema: unknown): string[] {
+  if (Array.isArray(schema)) return schema.flatMap(schemaDescriptions)
+  if (typeof schema !== "object" || schema === null) return []
+  return Object.entries(schema).flatMap(([key, value]) =>
+    key === "description" && typeof value === "string" ? [value] : schemaDescriptions(value),
+  )
 }
 
 function registeredTool(record: Record<string, unknown>): RegisteredTool {
-  const { name, description, exposure, promptGuidelines } = record
+  const { name, description, exposure, promptGuidelines, parameters } = record
   if (typeof name !== "string" || typeof description !== "string") throw new Error("tool without name or description")
   const guidelines = Array.isArray(promptGuidelines)
     ? promptGuidelines.filter((entry) => typeof entry === "string")
     : []
-  return { name, description, exposure, promptGuidelines: guidelines }
+  return {
+    name,
+    description,
+    exposure,
+    promptGuidelines: guidelines,
+    parameterDescriptions: schemaDescriptions(parameters),
+  }
 }
 
 describe("eval-only tools in model-facing text", () => {
@@ -164,6 +179,7 @@ describe("eval-only tools in model-facing text", () => {
     const toolTexts = tools.flatMap((tool) => [
       { source: `${tool.name} description`, text: tool.description },
       ...tool.promptGuidelines.map((text) => ({ source: `${tool.name} promptGuidelines`, text })),
+      ...tool.parameterDescriptions.map((text) => ({ source: `${tool.name} parameters`, text })),
     ])
     const mentions = directMentions(names, [...toolTexts, ...shippedSkillTexts()])
 
