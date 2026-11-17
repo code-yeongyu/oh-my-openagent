@@ -458,7 +458,22 @@ jobs:
           # proxy, TLS override, NODE_OPTIONS or BUN_* setting reaches it.
           RUN_DIR="$(mktemp -d "${RUNNER_TEMP}/operator-darwin-run.XXXXXX")"
           : > "${RUN_DIR}/empty-bunfig.toml"
+          # env -i drops the runner environment so a proxy, TLS override or NODE_OPTIONS cannot reach the
+          # verifier. Windows cannot create a process without its system root, so only those variables are forwarded.
+          WIN_BASE=()
+          if [ -n "${SYSTEMROOT:-}" ]; then
+            WIN_BASE+=(
+              "SYSTEMROOT=${SYSTEMROOT}"
+              "SYSTEMDRIVE=${SYSTEMDRIVE:-}"
+              "WINDIR=${WINDIR:-$SYSTEMROOT}"
+              "PATHEXT=${PATHEXT:-.COM;.EXE;.BAT;.CMD}"
+              "COMSPEC=${COMSPEC:-${SYSTEMROOT}\\system32\\cmd.exe}"
+              "TEMP=${TEMP:-}"
+              "TMP=${TMP:-}"
+            )
+          fi
           (cd "$RUN_DIR" && env -i PATH="$PATH" HOME="$RUN_DIR" RUNNER_TEMP="$RUNNER_TEMP" GH_TOKEN="${GH_TOKEN:-}" \
+            "${WIN_BASE[@]}" \
             bun --no-env-file --config="${RUN_DIR}/empty-bunfig.toml" "${OPERATOR_DARWIN_VERIFIER}/operator-darwin-verify.ts" \
             --dir "$OPERATOR_DARWIN_DIR" --tag "$TAG" \
             --manifest-sha256 "$MANIFEST_SHA256" --prepared-sha "$PREPARED_RELEASE_SHA" --version "$VERSION" --repo "$GITHUB_WORKSPACE" \

@@ -7,6 +7,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { bashPath, forBash, windowsProcessEnv } from "./publish-operator-darwin-windows-env"
+
 /**
  * Release security contract (#13943): two operator-darwin workflow steps, executed from the parsed
  * publish-platform.yml.
@@ -55,11 +57,12 @@ describe("Verify operator darwin artifacts step", () => {
     )
     const result = spawnSync("bash", ["-c", `${stubs.join("\n")}\n${stepRun("Verify operator darwin artifacts")}`], {
       env: {
-        PATH: process.env.PATH ?? "",
-        CALLS: calls,
-        GITHUB_WORKSPACE: root,
-        OPERATOR_DARWIN_VERIFIER: pinned,
-        OPERATOR_DARWIN_DIR: root,
+        ...windowsProcessEnv(),
+        PATH: bashPath(),
+        CALLS: forBash(calls),
+        GITHUB_WORKSPACE: forBash(root),
+        OPERATOR_DARWIN_VERIFIER: forBash(pinned),
+        OPERATOR_DARWIN_DIR: forBash(root),
         MANIFEST_SHA256: pin === "real" ? createHash("sha256").update(manifest).digest("hex") : pin,
         PREPARED_RELEASE_SHA: "2".repeat(40),
         TAG: "operator-darwin-111111111111",
@@ -67,8 +70,8 @@ describe("Verify operator darwin artifacts step", () => {
         ACTOR: "maintainer",
         TRIGGERING_ACTOR: "maintainer",
         REPOSITORY: "o/r",
-        RUNNER_TEMP: root,
-        GITHUB_STEP_SUMMARY: join(root, "summary"),
+        RUNNER_TEMP: forBash(root),
+        GITHUB_STEP_SUMMARY: forBash(join(root, "summary")),
       },
       encoding: "utf8",
     })
@@ -117,15 +120,16 @@ describe("Verify operator darwin artifacts step with the real bun", () => {
         cwd: root,
         encoding: "utf8",
         env: {
-          PATH: process.env.PATH ?? "",
-          HOME: process.env.HOME ?? root,
+          ...windowsProcessEnv(),
+          PATH: bashPath(),
+          HOME: forBash(process.env.HOME ?? root),
           // A runner whose environment carries interception settings must not pass them to the verifier.
           HTTPS_PROXY: "http://127.0.0.1:9",
           NODE_TLS_REJECT_UNAUTHORIZED: "0",
           NODE_OPTIONS: "--require /nonexistent",
-          GITHUB_WORKSPACE: root,
-          OPERATOR_DARWIN_DIR: root,
-          OPERATOR_DARWIN_VERIFIER: pinned,
+          GITHUB_WORKSPACE: forBash(root),
+          OPERATOR_DARWIN_DIR: forBash(root),
+          OPERATOR_DARWIN_VERIFIER: forBash(pinned),
           MANIFEST_SHA256: createHash("sha256").update(manifest).digest("hex"),
           PREPARED_RELEASE_SHA: "2".repeat(40),
           TAG: "operator-darwin-111111111111",
@@ -133,8 +137,8 @@ describe("Verify operator darwin artifacts step with the real bun", () => {
           ACTOR: "maintainer",
           TRIGGERING_ACTOR: "maintainer",
           REPOSITORY: "o/r",
-          RUNNER_TEMP: pinned,
-          GITHUB_STEP_SUMMARY: join(root, "summary"),
+          RUNNER_TEMP: forBash(pinned),
+          GITHUB_STEP_SUMMARY: forBash(join(root, "summary")),
         },
       },
     )
