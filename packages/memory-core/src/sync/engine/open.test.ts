@@ -79,7 +79,8 @@ test("two devices over HTTP converge through the production adapters, and the st
   await a.engine.runCycle()
   await b.engine.runCycle()
   expect(await Bun.file(join(db.repo, "note.md")).text()).toBe("---\ndescription: n\n---\nhello\n")
-  expect(await b.status()).toMatchObject({ kind: "synced", updatedWhileOffline: 1 })
+  // A first sync is not a return from an offline gap, so it carries no offline count.
+  expect(await b.status()).toEqual({ kind: "synced", at: expect.any(Number) })
 }, 60_000)
 
 test("retiring the journal directory does not release the live engine lease", async () => {
