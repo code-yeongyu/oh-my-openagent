@@ -18,7 +18,11 @@ export type StoreSwitchDeps = {
 /** How the login keychain's sign-in was handled: moved, absent, or left there because it could not be read silently. */
 export type EnableMove = "copied" | "none" | "kept-active" | "left-locked" | "left-unreadable"
 export type EnableOutcome = { readonly created: boolean; readonly moved: EnableMove; readonly loginLeftover: boolean }
-export type DisableOutcome = { readonly moved: "copied" | "none"; readonly erased: boolean }
+export type DisableOutcome = {
+  readonly moved: "copied" | "none"
+  readonly erased: boolean
+  readonly damagedLeftInPlace?: true
+}
 
 export class StoreSwitchError extends Error {}
 
@@ -64,6 +68,10 @@ export function storeSwitch(deps: StoreSwitchDeps) {
         const removed = loginPresent && login.owned === true && current.value !== undefined && (await removeLogin())
         return { created, moved: "kept-active", loginLeftover: loginPresent && !removed }
       }
+      // An inactive store is never authoritative (the same rule disable follows): whatever an earlier, interrupted
+      // enable left in it is dropped before activation, so it can never come back as the live sign-in (review M1).
+      await ok({ verb: "remove", store: "omo-migrate" }, "clear OmO's keychain before enabling it")
+      await deps.access.call({ verb: "remove", account: `${deps.account}.staging`, store: "omo-migrate" }, deps.lease)
       let moved: EnableMove = "none"
       if (login.error === "locked") moved = "left-locked"
       else if (login.error !== undefined) throw refused(login, "read the login keychain")
@@ -83,7 +91,17 @@ export function storeSwitch(deps: StoreSwitchDeps) {
       // An inactive store is never authoritative: whatever it holds is a leftover from an enable or disable that
       // stopped early, older than the login keychain's sign-in, so it is dropped and never copied over it.
       const current: HelperReply = state === "active" ? await call({ verb: "read", store: "omo-migrate" }) : {}
-      if (current.error !== undefined) throw refused(current, "read OmO's keychain")
+      // A damaged store (wrong mode, bad key) refuses every read; --discard still turns it off, so store-less requests
+      // work again, and leaves the folder for the user to delete (review L1).
+      const damaged = current.error === "store-refused"
+      if (current.error !== undefined && !(damaged && discard))
+        throw new StoreSwitchError(
+          `${refused(current, "read OmO's keychain").message}${damaged ? " To turn it off anyway, run omo account store disable --discard." : ""}`,
+        )
+      if (damaged) {
+        await ok({ verb: "store-deactivate", store: "omo" }, "deactivate OmO's keychain")
+        return { moved: "none", erased: false, damagedLeftInPlace: true }
+      }
       if (current.value !== undefined) {
         if (discard)
           throw new StoreSwitchError(

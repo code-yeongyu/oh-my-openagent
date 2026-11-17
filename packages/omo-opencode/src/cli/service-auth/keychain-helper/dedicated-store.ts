@@ -33,7 +33,7 @@ export function dedicatedStoreState(home: string = accountHomeDirectory()): Dedi
 
 const REFUSAL_MESSAGES: Readonly<Record<string, string>> = {
   "store-required":
-    "OmO's own keychain is active on this Mac, but this omo did not ask for it. Update omo and the OmO desktop app, then try again.",
+    "OmO's own keychain was turned on while this command was running. Run the command again; if this keeps happening, update omo and the OmO desktop app.",
   "store-inactive": "OmO's own keychain was turned off while omo was using it. Run the command again.",
   home: "OmO's own keychain is used only when HOME is the home directory the user database lists for your account. Run omo without changing HOME, or check that your account has a home directory.",
   active: "OmO's own keychain is still active. Run omo account store disable first.",

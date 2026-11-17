@@ -28,6 +28,14 @@ describe("turning OmO's own keychain on (#13116)", () => {
     expect(fake.calls.some((call) => call.store === "login" && call.verb !== "read")).toBe(false)
   })
 
+  test("#given an inactive store still holding an old sign-in from an interrupted enable #when enabled with the login keychain locked #then the old sign-in is dropped, never made live (review M1)", async () => {
+    const fake = dedicatedFake({ state: "inactive", loginLocked: true })
+    fake.omo.put(A, "dummy-logged-out", "helper")
+    expect(await switcherFor(fake).enable()).toMatchObject({ moved: "left-locked" })
+    expect(fake.state()).toBe("active")
+    expect(fake.omo.items.has(A)).toBe(false)
+  })
+
   test("#given a rerun after a crash between activation and cleanup #when enabled again #then OmO's copy is kept and the leftover login copy is removed", async () => {
     const fake = dedicatedFake({ state: "active" })
     fake.omo.put(A, "dummy-rotated", "helper")
@@ -75,6 +83,14 @@ describe("turning OmO's own keychain off (#13116)", () => {
     expect(await switcherFor(fake).disable(false)).toEqual({ moved: "none", erased: true })
     expect(fake.state()).toBe("absent")
     expect(fake.login.items.get(A)?.value).toBe("dummy-sign-in")
+  })
+
+  test("#given an active store the helper refuses (damaged) #when disabled #then it points at --discard; #when --discard #then the store is turned off and left in place (review L1)", async () => {
+    const fake = dedicatedFake({ state: "active", damaged: true })
+    await expect(switcherFor(fake).disable(false)).rejects.toThrow(/--discard/)
+    expect(fake.state()).toBe("active")
+    expect(await switcherFor(fake).disable(true)).toEqual({ moved: "none", erased: false, damagedLeftInPlace: true })
+    expect(fake.state()).toBe("inactive")
   })
 
   test("#given --discard #when a sign-in remains #then it refuses; #when signed out #then the store is erased", async () => {

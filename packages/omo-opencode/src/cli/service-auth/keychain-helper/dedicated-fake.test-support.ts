@@ -15,6 +15,8 @@ export function dedicatedFake(
     readonly state?: DedicatedStoreState
     /** The keychain file is gone but the folder remains (a crash inside an erase): only store-erase can open it. */
     readonly keychainGone?: boolean
+    /** A damaged store (wrong mode, bad key): every call that opens it is refused; deactivation still works. */
+    readonly damaged?: boolean
   } = {},
 ) {
   const login = fakeKeychain()
@@ -58,6 +60,11 @@ export function dedicatedFake(
     ) {
       if (request.verb !== "store-erase") return { error: "store-refused", reason: "missing" }
       state = "absent"
+      return { ok: true }
+    }
+    if (options.damaged === true && request.store !== undefined && request.store !== "login") {
+      if (request.verb !== "store-deactivate") return { error: "store-refused", reason: "mode" }
+      state = "inactive"
       return { ok: true }
     }
     if (request.verb.startsWith("store-")) return step(request)

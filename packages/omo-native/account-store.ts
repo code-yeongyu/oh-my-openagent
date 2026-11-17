@@ -73,7 +73,12 @@ export async function runAccountStore(deps: AccountStoreDependencies, flags: rea
     )
   try {
     if (verb === "disable") {
-      deps.output(JSON.stringify({ store: "login", ...(await locked((switcher) => switcher.disable(discard))) }))
+      const disabled = await locked((switcher) => switcher.disable(discard))
+      if (disabled.damagedLeftInPlace === true)
+        deps.error(
+          `omo: OmO's own keychain was damaged, so it was turned off without being erased. Delete ${dedicatedStoreRoot()} yourself.`,
+        )
+      deps.output(JSON.stringify({ store: "login", ...disabled }))
       return ACCOUNT_EXIT.ok
     }
     const enabled = await locked((switcher) => switcher.enable())
