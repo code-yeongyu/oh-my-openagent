@@ -3,17 +3,33 @@
 #include <errno.h>
 #include <pthread.h>
 #include <stdlib.h>
+#include <sys/event.h>
+#include <time.h>
 #include <unistd.h>
 
-// EOF on stdin only ever means the client died or exited. Before the reply, a non-mutating verb exits at once, which
-// ends any dialog it holds; a mutating verb finishes its native call first, so a killed client never leaves a
-// half-applied mutation (design 2 and 3.6, R2).
+// The client is gone when its stdin reaches EOF or when the process that spawned the helper exits, whichever comes
+// first: another process can inherit the write end of stdin, so EOF alone may never come (#14029). Before the reply, a
+// non-mutating verb exits at once, which ends any dialog it holds; a mutating verb finishes its native call first, so a
+// killed client never leaves a half-applied mutation (design 2 and 3.6, R2). That grace is bounded: a mutating call
+// still blocked `limits.grace_ms` after the client left waits on a prompt nobody will answer, and while the helper
+// lives it holds the session lock the client handed it. Every run also ends after `limits.lifetime_ms`, client or not.
+
+helper_limits limits = {.lifetime_ms = 600000, .grace_ms = 30000};
 
 static pthread_mutex_t state_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t state_changed = PTHREAD_COND_INITIALIZER;
 static bool client_gone = false;
 static bool replying = false;
 static bool request_mutates = false;
+static pid_t caller = 0;
+
+static void mark_client_gone(void) {
+  pthread_mutex_lock(&state_lock);
+  client_gone = true;
+  if (!replying && !request_mutates) _exit(EXIT_CLIENT_GONE);
+  pthread_cond_broadcast(&state_changed);
+  pthread_mutex_unlock(&state_lock);
+}
 
 static void *watch_stdin(void *unused) {
   (void)unused;
@@ -23,21 +39,72 @@ static void *watch_stdin(void *unused) {
     if (got > 0 || (got < 0 && errno == EINTR)) continue;
     break;
   }
-  pthread_mutex_lock(&state_lock);
-  client_gone = true;
-  if (!replying && !request_mutates) _exit(EXIT_CLIENT_GONE);
-  pthread_cond_broadcast(&state_changed);
-  pthread_mutex_unlock(&state_lock);
+  mark_client_gone();
   return NULL;
+}
+
+// NOTE_EXIT on the spawning process. A caller that is already gone (registration fails with ESRCH, or the helper was
+// reparented to launchd before it looked) counts as gone at once. Without a kqueue, poll the parent pid instead.
+static void *watch_caller(void *unused) {
+  (void)unused;
+  int queue = caller > 1 ? kqueue() : -1;
+  if (caller > 1 && queue >= 0) {
+    struct kevent change;
+    struct kevent event;
+    EV_SET(&change, (uintptr_t)caller, EVFILT_PROC, EV_ADD | EV_ONESHOT, NOTE_EXIT, 0, NULL);
+    int got;
+    do got = kevent(queue, &change, 1, &event, 1, NULL);
+    while (got < 0 && errno == EINTR);
+    close(queue);
+  } else
+    while (caller > 1 && getppid() == caller) sleep(1);
+  mark_client_gone();
+  return NULL;
+}
+
+static struct timespec after_ms(long ms) {
+  struct timespec at;
+  clock_gettime(CLOCK_REALTIME, &at);
+  at.tv_sec += ms / 1000;
+  at.tv_nsec += (ms % 1000) * 1000000L;
+  if (at.tv_nsec >= 1000000000L) {
+    at.tv_sec += 1;
+    at.tv_nsec -= 1000000000L;
+  }
+  return at;
+}
+
+static bool earlier(struct timespec a, struct timespec b) {
+  return a.tv_sec < b.tv_sec || (a.tv_sec == b.tv_sec && a.tv_nsec < b.tv_nsec);
+}
+
+// The main thread ends the process itself once its work is done; this thread only ends a run that overstays.
+static void *watchdog(void *unused) {
+  (void)unused;
+  struct timespec deadline = after_ms(limits.lifetime_ms);
+  pthread_mutex_lock(&state_lock);
+  while (!client_gone)
+    if (pthread_cond_timedwait(&state_changed, &state_lock, &deadline) == ETIMEDOUT) _exit(EXIT_DEADLINE);
+  struct timespec grace = after_ms(limits.grace_ms);
+  if (earlier(grace, deadline)) deadline = grace;
+  for (;;)
+    if (pthread_cond_timedwait(&state_changed, &state_lock, &deadline) == ETIMEDOUT) _exit(EXIT_DEADLINE);
+}
+
+static void start_thread(void *(*body)(void *)) {
+  pthread_t thread;
+  pthread_create(&thread, NULL, body, NULL);
+  pthread_detach(thread);
 }
 
 void session_start(bool mutates) {
   pthread_mutex_lock(&state_lock);
   request_mutates = mutates;
+  caller = getppid();
   pthread_mutex_unlock(&state_lock);
-  pthread_t watcher;
-  pthread_create(&watcher, NULL, watch_stdin, NULL);
-  pthread_detach(watcher);
+  start_thread(watchdog);
+  start_thread(watch_stdin);
+  start_thread(watch_caller);
 }
 
 void session_wait_for_client_exit(void) {

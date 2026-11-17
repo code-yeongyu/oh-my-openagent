@@ -49,6 +49,66 @@ describe.skipIf(!isDarwin)(
       })
     })
 
+    test("#given another process keeps the helper's stdin open #when the helper's caller exits #then the helper ends on its own (#14029)", async () => {
+      // The caller shell spawns the helper behind a writer that outlives the caller and never closes the helper's stdin,
+      // the way an inherited pipe end did in the field: EOF never comes, so only the caller's exit can end the helper.
+      const caller = Bun.spawn(
+        [
+          "/bin/sh",
+          "-c",
+          `{ printf '%s\\n' "$2"; exec /bin/sh -c 'echo "writer $$" >&2; exec sleep 30'; } | "$0" --keychain "$1" --no-ui --hold-before-reply & wait`,
+          harness.helper,
+          harness.keychain,
+          JSON.stringify({ v: 1, verb: "read", account: ACCOUNT }),
+        ],
+        { stdin: "ignore", stdout: "pipe", stderr: "pipe", env: {} },
+      )
+      const reader = caller.stderr.getReader()
+      const decoder = new TextDecoder()
+      let stderr = ""
+      while (!(stderr.includes("held\n") && /writer \d+\n/.test(stderr))) {
+        const chunk = await reader.read()
+        if (chunk.done) break
+        stderr += decoder.decode(chunk.value, { stream: true })
+      }
+      const writer = Number(/writer (\d+)\n/.exec(stderr)?.[1])
+      expect(stderr).toContain("held\n")
+      try {
+        caller.kill("SIGKILL")
+        await caller.exited
+        // The helper is the last holder of the caller's stdout, so end of file there is the helper's exit.
+        expect(await new Response(caller.stdout).text()).toBe("")
+      } finally {
+        if (writer > 1) process.kill(writer, "SIGKILL")
+      }
+    }, 10_000)
+
+    test("#given a mutating native call that never returns #when its client is gone past the grace #then the helper exits without writing", async () => {
+      const account = "c".repeat(64)
+      const child = Bun.spawn(
+        [harness.helper, "--keychain", harness.keychain, "--no-ui", "--stall-mutation", "--grace-ms", "200"],
+        { stdin: "pipe", stdout: "pipe", stderr: "pipe", env: {} },
+      )
+      child.stdin.write(`${JSON.stringify({ v: 1, verb: "write", account, value: "dummy-stalled" })}\n`)
+      child.stdin.flush()
+      expect((await readLine(child.stderr)).line).toBe("stalled\n")
+      child.stdin.end()
+      expect(await child.exited).toBe(5)
+      expect((await harness.run({ v: 1, verb: "read", account })).reply?.value).toBeUndefined()
+    }, 10_000)
+
+    test("#given a client that never closes stdin #when the helper's lifetime runs out #then it exits", async () => {
+      const child = Bun.spawn(
+        [harness.helper, "--keychain", harness.keychain, "--no-ui", "--hold-before-reply", "--lifetime-ms", "300"],
+        { stdin: "pipe", stdout: "pipe", stderr: "pipe", env: {} },
+      )
+      child.stdin.write(`${JSON.stringify({ v: 1, verb: "read", account: ACCOUNT })}\n`)
+      child.stdin.flush()
+      expect((await readLine(child.stderr)).line).toBe("held\n")
+      expect(await child.exited).toBe(5)
+      child.stdin.end()
+    }, 10_000)
+
     test("a reply is followed by a wait for EOF, so the client decides when the helper exits", async () => {
       const child = Bun.spawn([harness.helper, "--keychain", harness.keychain, "--no-ui"], {
         stdin: "pipe",
