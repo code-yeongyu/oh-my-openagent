@@ -21,6 +21,7 @@ import type { ThreadTranscriptEntry } from "./reader"
 import { answerGetEntries, senpiProjector, type FakeEntryLog } from "./thread-remote-entries-fixture"
 import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
 import type { ThreadCloseOutcome } from "./tools/ports"
+import type { SessionWatchHandlers } from "./control/wait-settled"
 
 // The listing key (what b's connector assigned) deliberately differs from the durable id (audit class C8, #13017): a test
 // that passes with either id proves nothing about which one a tool path matched.
@@ -715,6 +716,13 @@ export function createRemoteThreadFixture() {
     let localListings = 0
     // How often a session on this device was prompted directly (a delivery never prompts; this counts any leak).
     let localPrompts = 0
+    // The session watches open on this device's endpoint, as b's are in `watchers`; `watching` settles at the first.
+    const watchers = new Set<SessionWatchHandlers>()
+    const ends = new Set<(reason: string) => void>()
+    let watchStarted: () => void = () => {}
+    const watching = new Promise<void>((resolve) => {
+      watchStarted = resolve
+    })
     const host: ThreadHost = {
       socket: "/tmp/thread-remote-test.sock",
       listSessions: async () => {
@@ -743,6 +751,26 @@ export function createRemoteThreadFixture() {
       closeSession: async (sessionId, durableId) => {
         closed.push([sessionId, durableId])
         return extra.closeOutcome ?? "closed"
+      },
+      watchSession: async (_sessionId, handlers) => {
+        watchers.add(handlers)
+        let end: (reason: string) => void = () => {}
+        const ended = new Promise<string>((resolve) => {
+          end = resolve
+        })
+        ends.add(end)
+        watchStarted()
+        return {
+          kind: "ok",
+          watch: {
+            ended,
+            initial: { status: engine.streaming ? "running" : "idle" },
+            stop: () => {
+              watchers.delete(handlers)
+              end("stopped")
+            },
+          },
+        }
       },
     }
     const agentDir = mkdtempSync(join(tmpdir(), "thread-remote-"))
@@ -813,6 +841,11 @@ export function createRemoteThreadFixture() {
       agentDir,
       listings: () => localListings,
       prompts: () => localPrompts,
+      watchers,
+      watching,
+      endWatches: (reason: string) => {
+        for (const end of [...ends]) end(reason)
+      },
       enqueuedFor: (durableId: string) => enqueued.filter((target) => target === durableId).length,
     }
   }

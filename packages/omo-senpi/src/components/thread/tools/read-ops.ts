@@ -82,12 +82,6 @@ export async function readLive(
 ): Promise<ThreadToolResult> {
   let wait: ThreadWaitOutcome | undefined
   if (value.wait_ms !== undefined) {
-    if (control.waitSettled === undefined)
-      return failure(
-        "unsupported",
-        "wait_ms needs a thread on another device.",
-        `Use monitor({ type: "rpc", target: "${control.thread_id}" }).`,
-      )
     try {
       wait = await control.waitSettled(value.wait_ms, signal)
     } catch (error) {
@@ -126,7 +120,7 @@ async function pagedReadResult(
   if (page.kind === "error") return page
   return {
     kind: "ok",
-    thread_id: control.thread_id,
+    thread: control.thread_id,
     link: threadLink(control.thread_id, control.title),
     items: liveItems(page.messages),
     truncated: page.truncated,
