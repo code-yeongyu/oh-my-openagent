@@ -24,6 +24,7 @@ static const struct {
 #ifdef OMO_KEYCHAIN_TEST_BUILD
 static bool test_hold_before_reply = false;
 static bool test_as_root = false;
+static bool test_stall_mutation = false;
 #endif
 
 static void refuse_argv(void) {
@@ -31,6 +32,15 @@ static void refuse_argv(void) {
   if (write(STDOUT_FILENO, reply, sizeof reply - 1) < 0) _exit(EXIT_REFUSED_ARGV);
   _exit(EXIT_REFUSED_ARGV);
 }
+
+#ifdef OMO_KEYCHAIN_TEST_BUILD
+static long test_milliseconds(const char *text) {
+  char *end = NULL;
+  long value = strtol(text, &end, 10);
+  if (end == text || *end != '\0' || value <= 0) refuse_argv();
+  return value;
+}
+#endif
 
 // Release builds take no arguments at all: no keychain path, no flags (design 1, "Refusals"). The test-only flags exist
 // only when OMO_KEYCHAIN_TEST_BUILD is defined, so their strings are absent from a release binary.
@@ -42,6 +52,9 @@ static void parse_argv(int argc, char **argv) {
     } else if (strcmp(argv[i], "--no-ui") == 0) store.no_ui = true;
     else if (strcmp(argv[i], "--hold-before-reply") == 0) test_hold_before_reply = true;
     else if (strcmp(argv[i], "--as-root") == 0) test_as_root = true;
+    else if (strcmp(argv[i], "--stall-mutation") == 0) test_stall_mutation = true;
+    else if (strcmp(argv[i], "--lifetime-ms") == 0 && i + 1 < argc) limits.lifetime_ms = test_milliseconds(argv[++i]);
+    else if (strcmp(argv[i], "--grace-ms") == 0 && i + 1 < argc) limits.grace_ms = test_milliseconds(argv[++i]);
     else if (strcmp(argv[i], "--classify-partition") == 0 && i + 1 < argc) {
       CFStringRef hex = CFStringCreateWithCString(NULL, argv[++i], kCFStringEncodingUTF8);
       printf("%s\n", classify_partition_description(hex));
@@ -131,6 +144,12 @@ int main(int argc, char **argv) {
     fputs("held\n", stderr);
     fflush(stderr);
     session_wait_for_client_exit();
+  }
+  if (test_stall_mutation && VERBS[verb_index].mutates) {
+    // Grace seam: a mutating native call that never returns, like one blocked on a prompt nobody can answer.
+    fputs("stalled\n", stderr);
+    fflush(stderr);
+    for (;;) pause();
   }
 #endif
   dispatch(VERBS[verb_index].verb, &req);
