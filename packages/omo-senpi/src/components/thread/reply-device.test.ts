@@ -71,12 +71,33 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
     await fixture.cleanup()
   })
 
-  async function consumed(deliveries: readonly Delivery[], rows: readonly RemoteSessionRow[]) {
+  async function consumed(
+    deliveries: readonly Delivery[],
+    rows: readonly RemoteSessionRow[],
+    { listingReads }: { readonly listingReads?: number } = {},
+  ) {
     const agentDir = mkdtempSync(join(tmpdir(), "thr-reply-device-"))
     directories.push(agentDir)
     const store = createGatewayStore({ agentDir })
     stores.push(store)
     const account = fixture.account({ rows, live: rows.map((row) => row.session_id) })
+    // `listingReads`: how many reads of the account session listing answer before every later one throws.
+    let reads = 0
+    const listing = account.remote.sessions
+    const remote =
+      listingReads === undefined
+        ? account.remote
+        : {
+            ...account.remote,
+            sessions: {
+              ...listing,
+              sessions: async (...args: Parameters<typeof listing.sessions>) => {
+                reads += 1
+                if (reads > listingReads) throw new Error("account list failed")
+                return await listing.sessions(...args)
+              },
+            },
+          }
     const handlers = new Map<string, Handler[]>()
     const tools: CapturedTool[] = []
     const pi = {
@@ -113,7 +134,7 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
       stateDirectory: join(agentDir, "state"),
       agentDir: () => agentDir,
       store,
-      remote: account.remote,
+      remote,
     }).register(pi as never, { logger, config: { getFlag: () => undefined } } as never)
     const ctx = { sessionManager: { getSessionId: () => "dur-caller" } }
     const dispatch = async (event: string, payload: Record<string, unknown> = {}) => {
@@ -277,6 +298,25 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
       expect(admittedOn()).toEqual([])
     },
   )
+
+  test("#given an unattested delivery from a session this device holds whose id b also lists #when the run replies by the name b's row carries #then it is ambiguous_target and nothing reaches either copy", async () => {
+    const { reply, admittedOn, prompts, reachedLocally } = await consumed(
+      [{ id: "rpc:local/d-1", session_id: "dur-local", name: "duty" }],
+      [{ ...B_ROW, durable_id: "dur-local", title: "duty" }],
+    )
+    expect(await reply("duty")).toMatchObject({ kind: "error", error: { code: "ambiguous_target" } })
+    expect(admittedOn()).toEqual([])
+    expect(prompts()).toBe(0)
+    expect(reachedLocally("dur-local")).toBe(false)
+  })
+
+  test("#given an unattested delivery whose sender is listed only on b #when the account listing cannot be read again to confirm the device #then it is host_unavailable and nothing is sent", async () => {
+    const { reply, admittedOn } = await consumed([{ id: "rpc:local/d-1", session_id: "dur-on-b" }], [B_ROW], {
+      listingReads: 1,
+    })
+    expect(await reply("dur-on-b")).toMatchObject({ kind: "error", error: { code: "host_unavailable" } })
+    expect(admittedOn()).toEqual([])
+  })
 
   test("#given an unattested delivery whose stated name another device's session carries #when the run replies by that name #then it is reply_target_mismatch and nothing is sent", async () => {
     const { reply, admittedOn } = await consumed(
