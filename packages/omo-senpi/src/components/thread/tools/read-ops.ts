@@ -75,7 +75,7 @@ export async function readThread(
 }
 
 /** `thread_read` of a live thread through its control: the optional wait, then one bounded slice. */
-export async function readLive(
+async function readLive(
   control: SessionControl,
   value: ThreadReadInput,
   signal?: AbortSignal,
