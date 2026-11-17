@@ -56,13 +56,18 @@ export async function remoteReady(remote: RemoteThreadSurface): Promise<Failure 
   return { here: status.here }
 }
 
+/** An alias holder as a failure names it: the thread to pass back, and its device. */
+export function holderDetails(holder: AliasHolder): { readonly thread: string; readonly device: string } {
+  return { thread: holder.session_id, device: holder.device }
+}
+
 export function aliasFailure(error: AliasError): Failure {
   if (error.code === "alias_taken")
     return fail(
       "alias_taken",
       error.message,
       "Choose another alias; the holder is named in details.",
-      error.details?.holder === undefined ? undefined : { holder: error.details.holder },
+      error.details?.holder === undefined ? undefined : { holder: holderDetails(error.details.holder) },
     )
   if (error.code === "alias_invalid")
     return fail("invalid_arguments", error.message, "Use 1-64 visible characters that do not look like a session id.", {
@@ -110,7 +115,7 @@ export async function holderTarget(
       "device_offline",
       `Device ${holder.device} holding this thread is offline.`,
       "Retry when that device is online; nothing was queued.",
-      { device: holder.device, thread_id: holder.session_id },
+      { device: holder.device, thread: holder.session_id },
     )
   const located = await remote.sessions.locate(holder.device, holder.session_id)
   const row =
@@ -128,7 +133,7 @@ export async function holderTarget(
     "Call thread_list with all_scope to find the live thread, then claim the alias for it again with thread_rename.",
     {
       device: holder.device,
-      thread_id: holder.session_id,
+      thread: holder.session_id,
       ...(located.kind === "refused" ? { reason: located.reason } : {}),
     },
   )
