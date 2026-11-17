@@ -14,7 +14,7 @@ import {
 import type { Session } from "./session"
 
 export type DisplayCode = { readonly verificationUri: string; readonly userCode: string; readonly matchingCode: string }
-type DeviceLoginOptions = {
+export type DeviceLoginOptions = {
   readonly name: string
   readonly platform: Platform
   readonly show: (code: DisplayCode) => void
@@ -24,6 +24,8 @@ type DeviceLoginOptions = {
    * device code that asks the service to replace that device; false (or no callback) keeps the refusal.
    */
   readonly replaceDevice?: (existing: MachineDevice) => Promise<boolean>
+  /** A replacement already agreed on another route (the browser sign-in's `machine_exists`): start with it. */
+  readonly replacing?: MachineDevice
   /** This machine's hardware digest (#6503), sent only when the service advertises machine identity. */
   readonly machineDigest?: string
   readonly now?: () => number
@@ -41,25 +43,32 @@ const REPLACE_MISMATCH =
 export async function loginDevice(session: Session, options: DeviceLoginOptions): Promise<DeviceLoginResult> {
   await session.ready()
   const keys = generateDeviceKeys()
+  if (options.replacing !== undefined) return replaceEarlierDevice(session, options, keys, options.replacing)
   try {
     return await authorizeDevice(session, options, keys)
   } catch (error) {
     // #6503: this machine already has its device. Never retried as is, never a reason to remove or inherit that device
     // here: only the service replaces it, after the person approves the replacement on its page (#14032).
     if (!(error instanceof ApiRefusal) || error.code !== "machine_exists") throw error
-    const existing = error.machineDevice
-    if (options.replaceDevice === undefined || !(await options.replaceDevice(existing))) throw error
-    try {
-      return await authorizeDevice(session, options, keys, {
-        ...(existing.deviceId === undefined ? {} : { deviceId: existing.deviceId }),
-      })
-    } catch (replaceError) {
-      // An older service ignores `replace` and refuses the same way again.
-      if (replaceError instanceof ApiRefusal && replaceError.code === "machine_exists") {
-        throw new SignInError(REPLACE_UNSUPPORTED)
-      }
-      throw replaceError
-    }
+    if (options.replaceDevice === undefined || !(await options.replaceDevice(error.machineDevice))) throw error
+    return replaceEarlierDevice(session, options, keys, error.machineDevice)
+  }
+}
+
+async function replaceEarlierDevice(
+  session: Session,
+  options: DeviceLoginOptions,
+  keys: ReturnType<typeof generateDeviceKeys>,
+  existing: MachineDevice,
+): Promise<DeviceLoginResult> {
+  try {
+    return await authorizeDevice(session, options, keys, {
+      ...(existing.deviceId === undefined ? {} : { deviceId: existing.deviceId }),
+    })
+  } catch (error) {
+    // An older service ignores `replace` and refuses the same way again.
+    if (error instanceof ApiRefusal && error.code === "machine_exists") throw new SignInError(REPLACE_UNSUPPORTED)
+    throw error
   }
 }
 

@@ -4,11 +4,10 @@ import { serviceAccountsOpen } from "./accounts-gate"
 import { isClosedBareLogin, isClosedDeviceLogin, withClosedDeviceLoginOptions } from "./closed-device-login"
 import { openSignInBrowser } from "./browser"
 import { deviceName, devicePlatform } from "./device-name"
-import { loginDevice } from "./device-flow"
 import { advertisesMachineIdentity, readMachineDigest } from "./machine-digest"
 import { refuseSecondMachineDevice } from "./machine-device"
 import { createCredentialStore, INTERACTIVE_READ_WAIT } from "./keystore"
-import { BrowserUnavailable, loginLoopback } from "./loopback"
+import { signInByRoute } from "./login-routes"
 import { type ChooseDevice, type ListedDevice, RequestFailure, serviceOrigin, SignInError } from "./protocol"
 import { decideReplace } from "./replace-device"
 import { resolveMemoryRoot, syncPinDir } from "@oh-my-opencode/memory-core/sync-device-retire"
@@ -151,37 +150,35 @@ async function run(
           : `Signed in to OmO as ${terminalText(email)}.`,
       )
     }
-    if (!options.device && options.browser !== false) {
-      try {
-        await loginLoopback(session, {
-          accounts: accountsOrigin(options, process.env),
-          name,
-          platform,
-          open: openSignInBrowser,
-          chooseDevice,
-          ...digest,
-        })
-        await signedIn()
-        return
-      } catch (error) {
-        if (!(error instanceof BrowserUnavailable)) throw error
-      }
-    }
-    const { replacedDeviceId } = await loginDevice(session, {
-      name,
-      platform,
-      chooseDevice,
-      replaceDevice: decideReplace({
-        replace: options.replace === true,
-        interactive: process.stdin.isTTY === true,
-        confirm: async (message) => (await confirm({ message, initialValue: false })) === true,
-        log: (line) => console.log(line),
-      }),
-      ...digest,
-      show: (code) => {
-        console.log(`Open ${code.verificationUri}`)
-        console.log(`User code: ${code.userCode}`)
-        console.log(`Matching code: ${code.matchingCode}`)
+    const { replacedDeviceId } = await signInByRoute(session, {
+      ...(!options.device && options.browser !== false
+        ? {
+            loopback: {
+              accounts: accountsOrigin(options, process.env),
+              name,
+              platform,
+              open: openSignInBrowser,
+              chooseDevice,
+              ...digest,
+            },
+          }
+        : {}),
+      device: {
+        name,
+        platform,
+        chooseDevice,
+        replaceDevice: decideReplace({
+          replace: options.replace === true,
+          interactive: process.stdin.isTTY === true,
+          confirm: async (message) => (await confirm({ message, initialValue: false })) === true,
+          log: (line) => console.log(line),
+        }),
+        ...digest,
+        show: (code) => {
+          console.log(`Open ${code.verificationUri}`)
+          console.log(`User code: ${code.userCode}`)
+          console.log(`Matching code: ${code.matchingCode}`)
+        },
       },
     })
     if (replacedDeviceId !== undefined)
