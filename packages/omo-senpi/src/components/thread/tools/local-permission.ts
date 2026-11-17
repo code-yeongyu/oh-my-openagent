@@ -1,5 +1,4 @@
 import { findDiskSessions } from "../address-book"
-import { workspaceDirectories } from "../addressing"
 import type { ThreadToolSurfaceOptions } from "./ports"
 
 export type ThreadPermissionRequest = {
@@ -9,10 +8,14 @@ export type ThreadPermissionRequest = {
   autoApproveAsk?: true
 }
 
-type LocalityOptions = Pick<ThreadToolSurfaceOptions, "sessionsDirectory" | "callerWorkspaceRoot">
+type LocalityOptions = Pick<ThreadToolSurfaceOptions, "sessionsDirectory">
 
-/** Tools that only read, or only touch this device's gateway store: no call of theirs acts on another device. */
-const ALWAYS_LOCAL: ReadonlySet<string> = new Set([
+/**
+ * Tools that never change another device: reads (`thread_list`, `thread_read`) and this device's own gateway store
+ * (report, outbox, ack, answer). A read may reach the account's other devices through the device service, but it
+ * changes nothing there, so reads are exempt from the ask on purpose.
+ */
+const NEVER_CHANGES_ANOTHER_DEVICE: ReadonlySet<string> = new Set([
   "thread_list",
   "thread_read",
   "thread_report",
@@ -21,7 +24,6 @@ const ALWAYS_LOCAL: ReadonlySet<string> = new Set([
   "thread_answer",
 ])
 
-/** Tools whose `thread` names the session they act on; absent means the caller itself. */
 const ADDRESSED: ReadonlySet<string> = new Set([
   "thread_send",
   "thread_handoff",
@@ -37,7 +39,9 @@ const ADDRESSED: ReadonlySet<string> = new Set([
  * runs inside an eval cell the permission system has already decided; a nested ask for a call that stays on this device
  * adds an approval per call (an approval storm) and protects nothing the cell does not already run with. Such a call is
  * a request whose `ask` is approved without a prompt, scoped to its target, so `allow` and `deny` rules still decide
- * first. A call that names another device, or a session this device does not hold, keeps the tool-named ask.
+ * first. A call that may change another device keeps the tool-named ask. A target is local only as `self` or as the
+ * exact durable id of a session file this device holds: a name or an alias can resolve to another device's thread
+ * (the resolver tries account aliases before names), so it always asks.
  */
 export function threadToolPermission(name: string, options: LocalityOptions) {
   return (input: Record<string, unknown>): ThreadPermissionRequest[] => {
@@ -48,31 +52,25 @@ export function threadToolPermission(name: string, options: LocalityOptions) {
 }
 
 function localTarget(name: string, input: Record<string, unknown>, options: LocalityOptions): string | undefined {
-  if (ALWAYS_LOCAL.has(name)) return "*"
+  if (NEVER_CHANGES_ANOTHER_DEVICE.has(name)) return "*"
   if (name === "thread_create") {
     if (input["device"] !== undefined) return undefined
-    const existing = input["thread"]
-    return existing === undefined ? "*" : addressedTarget(existing, input, options)
+    const sources = [input["thread"], input["fork_from"]].filter((source) => source !== undefined)
+    if (sources.length === 0) return "*"
+    return sources.every((source) => heldHere(source, options)) ? String(sources[0]) : undefined
   }
   if (ADDRESSED.has(name)) {
     if (name === "thread_handoff" && input["match"] === "fuzzy") return undefined
-    return addressedTarget(input["thread"] ?? "self", input, options)
+    const address = input["thread"] ?? "self"
+    if (address === "self") return address
+    return heldHere(address, options) ? String(address) : undefined
   }
   return undefined
 }
 
-function addressedTarget(
-  address: unknown,
-  input: Record<string, unknown>,
-  options: LocalityOptions,
-): string | undefined {
-  if (typeof address !== "string" || address.length === 0) return undefined
-  if (address === "self") return address
+function heldHere(address: unknown, options: LocalityOptions): boolean {
+  if (typeof address !== "string" || address.length === 0) return false
   const sessionsDirectory = options.sessionsDirectory?.()
-  if (sessionsDirectory === undefined) return undefined
-  const found = findDiskSessions(sessionsDirectory, address, {
-    all_scope: input["all_scope"] === true,
-    workspaceRoots: workspaceDirectories(options.callerWorkspaceRoot()),
-  })
-  return found.length > 0 ? address : undefined
+  if (sessionsDirectory === undefined) return false
+  return findDiskSessions(sessionsDirectory, address, { id_only: true }).length > 0
 }

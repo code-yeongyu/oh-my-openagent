@@ -13,10 +13,7 @@ const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
  * thread tool call (`threadToolPermission`): a send to a session this device holds asks for nothing, any other asks.
  */
 export function threadSendPermission(
-  options: Pick<
-    ThreadToolSurfaceOptions,
-    "callerReplyTargets" | "callerReplySenders" | "sessionsDirectory" | "callerWorkspaceRoot"
-  >,
+  options: Pick<ThreadToolSurfaceOptions, "callerReplyTargets" | "callerReplySenders" | "sessionsDirectory">,
 ) {
   const otherwise = threadToolPermission("thread_send", options)
   return (input: Record<string, unknown>): ThreadPermissionRequest[] => {

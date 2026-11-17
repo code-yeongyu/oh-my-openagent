@@ -19,6 +19,7 @@ type CapturedTool = {
 
 const LOCAL_ID = "0195f0c2-1a2b-7c3d-8e4f-a1b2c3d4e5f6"
 const REMOTE_ID = "0195f0c2-1a2b-7c3d-8e4f-0f0e0d0c0b0a"
+const LOCAL_NAME = "local-helper"
 const dirs: string[] = []
 
 afterEach(() => {
@@ -52,7 +53,7 @@ function threadTools(): ReadonlyMap<string, CapturedTool> {
   mkdirSync(sessionDir, { recursive: true })
   writeFileSync(
     join(sessionDir, `2026-11-17T00-00-00-000Z_${LOCAL_ID}.jsonl`),
-    `${JSON.stringify({ type: "session", id: LOCAL_ID, cwd: "/tmp/workspace", timestamp: "2026-11-17T00:00:00.000Z" })}\n`,
+    `${JSON.stringify({ type: "session", id: LOCAL_ID, cwd: "/tmp/workspace", timestamp: "2026-11-17T00:00:00.000Z" })}\n${JSON.stringify({ type: "session_info", name: LOCAL_NAME })}\n`,
   )
   const tools = new Map<string, CapturedTool>()
   const pi = {
@@ -91,6 +92,8 @@ const LOCAL_CALLS: ReadonlyArray<readonly [string, Record<string, unknown>]> = [
   ["thread_list", { all_scope: true }],
   ["thread_read", { thread: LOCAL_ID }],
   ["thread_create", { name: "helper", prompt: "hi" }],
+  ["thread_create", { fork_from: LOCAL_ID }],
+  ["thread_read", { thread: REMOTE_ID }],
   ["thread_send", { thread: LOCAL_ID, message: "hi" }],
   ["thread_handoff", { thread: LOCAL_ID, message: "hi" }],
   ["thread_interrupt", { thread: LOCAL_ID }],
@@ -116,11 +119,14 @@ describe("i22: routine local thread tool calls ask for no approval", () => {
     },
   )
 
-  test("#given calls that name another device or a session this device does not hold #when parsed #then each still asks", () => {
+  test("#given calls that name another device, a session this device does not hold, or a target by name (an account alias resolves before a name) #when parsed #then each still asks", () => {
     const tools = threadTools()
     const asks = [
       requests(tools, "thread_create", { device: "other-device", name: "x" }),
       requests(tools, "thread_create", { thread: REMOTE_ID }),
+      requests(tools, "thread_create", { fork_from: REMOTE_ID }),
+      requests(tools, "thread_send", { thread: LOCAL_NAME, message: "hi" }),
+      requests(tools, "thread_close", { thread: LOCAL_NAME, all_scope: true }),
       requests(tools, "thread_send", { thread: REMOTE_ID, message: "hi" }),
       requests(tools, "thread_send", { thread: "an-account-alias", message: "hi" }),
       requests(tools, "thread_handoff", { thread: "near name", match: "fuzzy", message: "hi" }),
