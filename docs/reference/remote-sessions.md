@@ -44,7 +44,9 @@ The canonical session identity is the durable `thread.thread_id` that `open --js
 directly to `send`, `model`, `interrupt`, `close` or `attach`; the CLI finds its device in the account
 listing. All five also take `<device>/<session>`, with either the durable id or the listing key in the
 `SESSION` column; an explicit device skips the account listing, and a durable id that device has not
-listed yet (a session opened a moment ago) is located on that device.
+listed yet (a session opened a moment ago) is located on that device. A bare id is found through the
+account listing, which can lag a session opened a moment ago: right after `open`, use
+`<device>/<thread_id>`.
 
 `send`
 with `--steer` goes into the running turn, and `--no-wait` returns once the session took the message
@@ -56,12 +58,25 @@ for every stop, including a failed verification or install.
 
 ## Set up a device
 
-Remote sessions are **on by default**. The moment `omo login` completes, it switches them on for this device and
-prints one line:
+Remote sessions are **on by default**. When `omo login` completes, it turns them on for this device. What it prints
+depends on whether this device already runs the current device service.
+
+If it does, login switches remote sessions on right away and prints:
 
 ```text
 Remote is on for this device: other signed-in devices can reach it. Turn off: omo remote disable
 ```
+
+If it does not (a new device, or one still running an older service), login does not wait for the install. It starts
+`omo remote enable --after-login` in the background, exits, and prints:
+
+```text
+Remote is turning on for this device in the background. Check: omo remote status. Turn off: omo remote disable
+```
+
+The background enable installs the service and then switches remote sessions on. Check how far it got with
+`omo remote status`. To turn remote off, run `omo remote disable`, even while the background enable is still running:
+the enable sees the record and leaves remote off.
 
 Every omo start then keeps the device set up (`omo remote bootstrap`). `omo remote disable` turns remote sessions
 off and records that in `~/.omo/remote-sessions.json`, so neither `omo login` nor an omo start turns them on again;

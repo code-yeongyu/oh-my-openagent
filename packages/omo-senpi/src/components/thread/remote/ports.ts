@@ -1,3 +1,4 @@
+import type { RemoteClient } from "../../remote"
 import type { DeviceService } from "@oh-my-opencode/device-service-core/device-service"
 import type { AliasRegistry } from "./alias-port"
 
@@ -214,6 +215,8 @@ export type { AliasError, AliasErrorCode, AliasHolder, AliasRegistry, AliasResul
 /** Everything the tools need to reach past this machine. Absent: the tools are exactly the local ones. */
 export type RemoteThreadSurface = {
   readonly sessions: RemoteSessionsPort
+  /** The one remote client (#13414): the account's state, this device and the device list are read through it. */
+  readonly client: RemoteClient
   /** Absent until the account service's alias registry ships: aliases are then refused typed, never guessed. */
   readonly aliases?: AliasRegistry
   readonly chain: ChainCountWire

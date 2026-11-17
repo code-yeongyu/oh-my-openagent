@@ -22,6 +22,17 @@ import { join } from "node:path"
 import { createGatewayStore } from "../gateway/store"
 import type { OutboundDelivery } from "../gateway/transport"
 import { createRelayTransport } from "./relay-transport"
+import { fakeRemoteClient } from "../thread-remote-fixture"
+
+// The account these adapter rows run in: this device and b, online, read through the remote client.
+const B_ONLINE = fakeRemoteClient({
+  state: () => "connected",
+  here: "here",
+  devices: () => [
+    { device: "here", label: "this mac", online: true },
+    { device: "b", label: "studio", online: true },
+  ],
+})
 
 // The thread tools' bodies over the relay control of `row`: what thread_set_model, thread_interrupt, thread_close
 // and thread_read send once the device is found online.
@@ -275,7 +286,15 @@ describe("device-service adapter of the thread tools' account surface", () => {
       response: { type: "response", command: "open_session", success: true, data: { sessionId: "s-new" } },
     })
     expect(closed).toBe(false)
-    const surface: RemoteThreadSurface = { sessions: port, chain: { stamp: (record: JsonObject) => record } }
+    const surface: RemoteThreadSurface = {
+      sessions: port,
+      client: fakeRemoteClient({
+        state: () => "connected",
+        here: "a",
+        devices: () => [{ device: "b", label: "b", online: true }],
+      }),
+      chain: { stamp: (record: JsonObject) => record },
+    }
     expect(
       await setModelRemote(
         surface,
@@ -366,10 +385,12 @@ describe("device-service adapter of the thread tools' account surface", () => {
     let loads = 0
     const surface = createLazyRemoteSurface({
       version: "0.0.0-test",
+      sender: { kind: "session", id: "caller" },
       loadRuntime: async () => {
         loads += 1
         if (loads === 1) throw new Error("sidecar missing")
         return {
+          remoteClient: () => fakeRemoteClient({ state: () => "connected", here: null, devices: () => [] }),
           remoteSessionsPort: () =>
             createDeviceServiceSessions({
               version: "0.0.0-test",
@@ -452,7 +473,7 @@ describe("device-service adapter: a session created on another device is address
       retryDelay: async () => {},
     })
     const created = await createRelaySessionHost(
-      { sessions: port, chain: { stamp: (record: JsonObject) => record } },
+      { sessions: port, client: B_ONLINE, chain: { stamp: (record: JsonObject) => record } },
       "b",
     ).open({})
     if (created.kind !== "ok" || !("thread" in created)) throw new Error(`create failed: ${JSON.stringify(created)}`)
@@ -487,7 +508,7 @@ describe("device-service adapter: a session created on another device is address
       retryDelay: async () => {},
     })
     const created = await createRelaySessionHost(
-      { sessions: port, chain: { stamp: (record: JsonObject) => record } },
+      { sessions: port, client: B_ONLINE, chain: { stamp: (record: JsonObject) => record } },
       "b",
     ).open({})
     if (created.kind !== "ok" || !("thread" in created)) throw new Error(`create failed: ${JSON.stringify(created)}`)
@@ -900,7 +921,7 @@ describe("device-service adapter: relay round trips per thread op", () => {
           (conn) => ({ conn, owned: true }),
         ),
     })
-    const surface: RemoteThreadSurface = { sessions: port, chain: { stamp: (rpc) => rpc } }
+    const surface: RemoteThreadSurface = { sessions: port, client: B_ONLINE, chain: { stamp: (rpc) => rpc } }
     let seen = 0
     // The relay frames since the last call.
     const take = (): string[] => {
