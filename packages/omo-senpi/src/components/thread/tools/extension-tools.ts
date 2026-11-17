@@ -44,10 +44,7 @@ export async function recordThreadCreator(
   runtimeId: string,
   created: ThreadToolResult,
 ): Promise<ThreadToolResult> {
-  const createdId =
-    created.kind === "ok"
-      ? (created as { readonly thread?: { readonly thread_id?: unknown } }).thread?.thread_id
-      : undefined
+  const createdId = created.kind === "ok" ? (created as { readonly thread?: unknown }).thread : undefined
   if (typeof createdId !== "string") return created
   const creator = resolveCallerDurableId(options, view, runtimeId)
   if (creator !== undefined && creator !== createdId)

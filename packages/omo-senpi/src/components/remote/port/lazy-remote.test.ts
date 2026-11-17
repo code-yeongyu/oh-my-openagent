@@ -33,7 +33,7 @@ describe("#12833: the default remote surface reaches the account's alias registr
     })
     expect(await run("thread_send", { thread: "build bot", message: "hi" })).toMatchObject({
       kind: "ok",
-      thread_id: "dur-local",
+      thread: "dur-local",
     })
   })
 
