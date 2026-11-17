@@ -40,10 +40,10 @@ export type SessionControl = {
   readonly setThinkingLevel: (level: string, scope?: "turn") => Promise<void>
   readonly getMessages: () => Promise<readonly ThreadTranscriptEntry[]>
   /**
-   * Waits, bounded, until the thread stops running, on the leg's own status events (never a polling loop). Absent: the
-   * leg has no such event source here, and a waiting read answers `unsupported`.
+   * Waits, bounded, until the thread's turn is observed to end, on the leg's own status events (never a polling loop):
+   * `wait-settled.ts` over the remote watch on another device, over the endpoint's session subscription on this one.
    */
-  readonly waitSettled?: (timeoutMs: number, signal?: AbortSignal) => Promise<ThreadWaitOutcome>
+  readonly waitSettled: (timeoutMs: number, signal?: AbortSignal) => Promise<ThreadWaitOutcome>
 }
 
 /**

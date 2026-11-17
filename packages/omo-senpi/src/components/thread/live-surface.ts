@@ -7,6 +7,7 @@ import {
   authRequiredError,
   resolveRpcSocketTransport,
   withRpcSocket,
+  type RpcObject,
 } from "@oh-my-opencode/senpi-task/rpc-socket-client"
 import { resolveThreadSocket } from "./live-surface-paths"
 import type { SenpiExtensionAPI } from "../../extension/types"
@@ -26,6 +27,8 @@ import type { EndpointLiveness, GatewayEndpointPort, GatewayEndpointRef } from "
 import { releaseReply, wakeReply } from "./gateway-replies"
 import type { ThreadTranscriptEntry, ThreadHost, ThreadHostSession } from "./tools"
 import type { ThreadHostView, ThreadHostViewRequest, ThreadSessionPort } from "./tools/ports"
+import type { SessionWatchHandlers, SessionWatchOutcome } from "./control/wait-settled"
+import type { JsonObject } from "./remote/ports"
 import { acceptedControls, LEGACY_TUI_COMMANDS, tuiCommandsFrom } from "./endpoint-controls"
 import { answerUiRequest } from "./ui-answer"
 import { fencedCommand } from "./attachment-fence"
@@ -81,6 +84,11 @@ export const HOST_STATUS_ALL_ARGS = ["host", "status", "--all", "--include-worke
  * the host advertises it.
  */
 const OBSERVE = { observe: true } as const
+/**
+ * The records a waiting `thread_read` reads off a session's stream: its run's start and settle. Never the streamed
+ * deltas, and never `agent_end`, which carries the run's whole message list; the status stream says when a run ends.
+ */
+const WATCHED_RECORDS = ["agent_start", "turn_start", "agent_settled"]
 
 /** The commands any terminal control endpoint answers, an older one included (senpi before its session controls). */
 export const TUI_ENDPOINT_COMMANDS: ReadonlySet<string> = LEGACY_TUI_COMMANDS
@@ -335,15 +343,10 @@ export function createLiveThreadSurface(
   const kindOf = (socket: string): EndpointKind =>
     kinds.get(resolve(socket)) ?? (isTuiControlSocket(socket) ? "tui" : "rpc_host")
 
-  const callFrame = async (
-    socket: string,
-    type: string,
-    data: Record<string, unknown> = {},
-    timeoutMs?: number,
-    durableSessionId?: string,
-    openedName?: string,
-    attached?: boolean,
-  ): Promise<RpcFrame> => {
+  const keyRoot = () => options.keyRoot ?? (env.SENPI_RPC_KEY_ROOT?.trim() || resolveAgentHome({ env }))
+
+  /** How one command reaches `socket`: what serves it, the dialer, and the secret written first. */
+  const dialFor = async (socket: string, type: string) => {
     const tui = kindOf(socket) === "tui"
     if (tui && !LEGACY_TUI_COMMANDS.has(type) && !(await learnTuiCommands(socket)).has(type))
       throw new Error(`unsupported:${type}`)
@@ -363,6 +366,19 @@ export function createLiveThreadSurface(
       secret = transport.secret
       if (transport.address !== socket) dial = () => connect(transport.address)
     }
+    return { tui, dial, secret }
+  }
+
+  const callFrame = async (
+    socket: string,
+    type: string,
+    data: Record<string, unknown> = {},
+    timeoutMs?: number,
+    durableSessionId?: string,
+    openedName?: string,
+    attached?: boolean,
+  ): Promise<RpcFrame> => {
+    const { tui, dial, secret } = await dialFor(socket, type)
     const frame = await requestFrame(socket, { type, ...data }, dial, {
       timeoutMs: timeoutMs ?? (tui ? TUI_REQUEST_TIMEOUT_MS : undefined),
       secret,
@@ -370,7 +386,7 @@ export function createLiveThreadSurface(
       openedName,
       ...(attached === true ? { attached } : {}),
       rpcHost: !tui,
-      keyRoot: () => options.keyRoot ?? (env.SENPI_RPC_KEY_ROOT?.trim() || resolveAgentHome({ env })),
+      keyRoot,
     })
     if (frame.success === false && (frame.errorCode ?? frame.error) === "auth_required") throw authRequiredError(socket)
     return frame
@@ -386,6 +402,133 @@ export function createLiveThreadSurface(
     dataRecord(await callFrame(socket, type, data, timeoutMs, durableSessionId, undefined, attached), type) as T
   const call = <T>(type: string, data: Record<string, unknown> = {}, durableSessionId?: string): Promise<T> =>
     callOn<T>(legacy, type, data, undefined, durableSessionId)
+
+  /**
+   * One session followed on its endpoint's observing `subscribe_sessions` stream (what `monitor({ type: "rpc" })`
+   * reads): the snapshot row is where the watch starts, each later `session_status` is a status change, and the run's
+   * own records arrive mirrored. The connection is never an attachment, so it holds no session and resets no idle window.
+   * The engine's records name no turn: while the session runs, one observing `get_state` reads its `currentTurnId`
+   * (the id `prompt` answered with), and the run records forwarded after it carry that id.
+   */
+  const watchOn = async (
+    socket: string,
+    sessionId: string,
+    handlers: SessionWatchHandlers,
+  ): Promise<SessionWatchOutcome> => {
+    const { tui, dial, secret } = await dialFor(socket, "subscribe_sessions")
+    let end!: (reason: string) => void
+    const ended = new Promise<string>((resolveEnd) => {
+      end = resolveEnd
+    })
+    let previous: string | undefined
+    let turn: string | undefined
+    const currentTurn = async (): Promise<string | undefined> => {
+      const state = await callOn<Record<string, unknown>>(socket, "get_state", { sessionId })
+      return typeof state.currentTurnId === "string" && state.currentTurnId !== "" ? state.currentTurnId : undefined
+    }
+    // Records that arrive while the snapshot or a running turn's id is still being read are held, then applied in order.
+    let held: RpcObject[] | undefined = []
+    // `apply` may hold again (a run starting mid-release); what is left goes ahead of anything that arrives later.
+    const holding = (): RpcObject[] | undefined => held
+    const release = () => {
+      const queued = held ?? []
+      held = undefined
+      while (queued.length > 0 && holding() === undefined) apply(queued.shift() as RpcObject)
+      holding()?.unshift(...queued)
+    }
+    const apply = (entry: RpcObject) => {
+      if (entry.sessionId !== sessionId) return
+      if (entry.type !== "session_status")
+        return handlers.record(
+          (turn === undefined || "turnId" in entry ? entry : { ...entry, turnId: turn }) as JsonObject,
+        )
+      if (typeof entry.status !== "string") return
+      if (entry.status === "running" && previous !== "running") {
+        turn = undefined
+        held ??= []
+        void currentTurn()
+          .catch(() => undefined)
+          .then((current) => {
+            turn = current
+            release()
+          })
+      }
+      const cause = entry.lastChange
+      handlers.status?.({
+        from: previous,
+        to: entry.status,
+        derived: false,
+        ...(record(cause) && typeof cause.cause === "string" ? { cause: cause.cause } : {}),
+      })
+      previous = entry.status
+      if (entry.status === "closed") end("session_closed")
+    }
+    let opened!: (outcome: SessionWatchOutcome) => void
+    const answer = new Promise<SessionWatchOutcome>((resolveAnswer) => {
+      opened = resolveAnswer
+    })
+    const conversation = withRpcSocket(
+      socket,
+      {
+        connect: dial,
+        secret,
+        timeoutMs: tui ? TUI_REQUEST_TIMEOUT_MS : REQUEST_TIMEOUT_MS,
+        listen: {
+          frame: (entry) => (held === undefined ? apply(entry) : held.push(entry)),
+          closed: () => end("connection_closed"),
+        },
+      },
+      async (request) => {
+        if (!tui)
+          if (secret === undefined) await authenticateRpcHost(request, socket, keyRoot)
+          else await request({ type: "get_protocol_info", ...OBSERVE })
+        const reply = await request({
+          type: "subscribe_sessions",
+          sessions: { ids: [sessionId] },
+          mirror: WATCHED_RECORDS,
+          ...OBSERVE,
+        })
+        if (reply.success !== true || !record(reply.data)) {
+          opened({ kind: "refused", reason: String(reply.errorCode ?? reply.error ?? "subscribe_refused") })
+          return
+        }
+        const snapshot = Array.isArray(reply.data.snapshot) ? reply.data.snapshot : []
+        const row = snapshot.find((candidate) => record(candidate) && candidate.sessionId === sessionId)
+        const status = record(row) && typeof row.status === "string" ? row.status : undefined
+        previous = status
+        if (status === "running") turn = await currentTurn().catch(() => undefined)
+        release()
+        let stop!: () => void
+        const stopped = new Promise<void>((resolveStop) => {
+          stop = resolveStop
+        })
+        opened({
+          kind: "ok",
+          watch: {
+            ended,
+            ...(status === undefined
+              ? {}
+              : { initial: { status, ...(turn === undefined ? {} : { currentTurnId: turn }) } }),
+            stop: () => {
+              end("stopped")
+              stop()
+            },
+          },
+        })
+        await Promise.race([stopped, ended])
+      },
+    )
+    return await Promise.race([
+      answer,
+      conversation.then(
+        () => answer,
+        (error: unknown) => {
+          end("connection_closed")
+          throw error
+        },
+      ),
+    ])
+  }
 
   const enumerate = async (): Promise<readonly KnownEndpoint[]> => {
     const [reports, recorded] = await Promise.all([
@@ -547,6 +690,7 @@ export function createLiveThreadSurface(
     getMessages: async (sessionId) =>
       (await send<{ messages: ThreadTranscriptEntry[] }>("get_messages", { sessionId })).messages,
     getState: (sessionId) => send("get_state", { sessionId }),
+    watchSession: (sessionId, handlers) => watchOn(socket ?? legacy, sessionId, handlers),
     prompt: (sessionId, message, options, durableId) => send("prompt", { sessionId, message, ...options }, durableId),
     interrupt: (sessionId, request, durableId) => send("interrupt", { sessionId, ...request }, durableId),
     setSessionName: async (sessionId, name, durableId) => {

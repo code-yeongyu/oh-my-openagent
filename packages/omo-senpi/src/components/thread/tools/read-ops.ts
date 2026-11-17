@@ -72,12 +72,6 @@ export async function readThread(
   const { control } = located
   let wait: ThreadWaitOutcome | undefined
   if (value.wait_ms !== undefined) {
-    if (control.waitSettled === undefined)
-      return failure(
-        "unsupported",
-        "wait_ms needs a thread on another device.",
-        `Use monitor({ type: "rpc", target: "${control.thread_id}" }).`,
-      )
     try {
       wait = await control.waitSettled(value.wait_ms, signal)
     } catch (error) {
