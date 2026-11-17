@@ -159,7 +159,7 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
       } else {
         expect(result).toMatchObject({
           kind: "error",
-          error: { code: "reply_target_mismatch", details: { resolved_thread_id: "dur-on-b", device: "b" } },
+          error: { code: "reply_target_mismatch", details: { thread: "dur-on-b", device: "b" } },
         })
         expect(admits()).toHaveLength(0)
       }

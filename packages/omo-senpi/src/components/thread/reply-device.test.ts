@@ -278,8 +278,8 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
         [{ id, session_id: "dur-on-b", name: "duty" }],
         [{ ...B_ROW, title: "duty" }],
       )
-      expect(await reply("dur-on-b")).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
-      expect(await reply("duty")).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
+      expect(await reply("dur-on-b")).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b" })
+      expect(await reply("duty")).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b" })
       expect(admittedOn()).toEqual(["b", "b"])
       expect(prompts()).toBe(0)
     },
