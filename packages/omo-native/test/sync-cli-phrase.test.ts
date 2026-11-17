@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "bun:test"
+import { afterEach, expect, mock, test } from "bun:test"
 import { Command } from "commander"
 
 import { ACCOUNT, fixture } from "../../memory-core/src/sync/account/testing/genesis-enable.test-support"
@@ -7,6 +7,7 @@ import { writePhraseGenesisMarker } from "../../memory-core/src/sync/genesis/phr
 import { phraseMarkerExists } from "../../memory-core/src/sync/account/testing/phrase-enable.test-support"
 import { phraseNoticeStatus } from "../../memory-core/src/sync/account/phrase-notice"
 import { enableSync } from "../../memory-core/src/sync/account/enable"
+import { failAnchorListingAfterPin } from "../../memory-core/src/sync/crypto/testing/retired-pin-listing.test-support"
 import {
   configureSyncCommands,
   EXIT_UNSUPPORTED_HERE,
@@ -140,6 +141,23 @@ test("#given a person at the terminal #when enable creates a phrase genesis #the
   expect(leakedWords(shown, [...r.out, ...r.err])).toEqual([])
   expect(terminal.written.join("")).toContain(`Save your recovery phrase for ${ACCOUNT}`)
   expect(terminal.written.at(-1)).toContain("\u001b[?1049l")
+})
+
+// #12382 review L2 (moved here in the A4 train, where enable creates its genesis through the phrase path): the CLI's own
+// error sink, not the library, tells the person the root-change check was skipped, and the pinned enable still exits 0.
+test("#given a phrase genesis that pinned but could not read the retired pins #when enable completes #then stderr names the skipped check once and it exits 0", async () => {
+  const terminal = scriptedTerminal()
+  try {
+    const r = await runEnable({ env: { [PHRASE_GENESIS_FLAG]: "1" }, terminal: terminal.open }, async (f) => {
+      failAnchorListingAfterPin(f.input.pinDir)
+    })
+    mock.restore()
+    expect(r.exit).toBe(0)
+    expect(r.out).toContain("Memory sync is on for this device.")
+    expect(r.err.filter((line) => line.includes("EACCES"))).toHaveLength(1)
+  } finally {
+    mock.restore()
+  }
 })
 
 // #13631 (CLI half): with no injected floor port the CLI reads the service floor itself, fresh, through the
