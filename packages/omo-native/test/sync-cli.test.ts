@@ -1,6 +1,8 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, mock, test } from "bun:test"
 
 import type { AccountHttp, PairingHttp, PendingApproval } from "../../memory-core/src/sync/account/index.ts"
+import { fixture as genesisFixture } from "../../memory-core/src/sync/account/testing/genesis-enable.test-support.ts"
+import { failAnchorListingAfterPin } from "../../memory-core/src/sync/crypto/testing/retired-pin-listing.test-support.ts"
 import { createInMemoryDeviceKeyring } from "../../memory-core/src/sync/keyring-port"
 import { Command } from "commander"
 
@@ -134,6 +136,22 @@ describe("omo sync", () => {
     const result = await runSync(["sync", "enable"], { context: async () => context({ keys: 0, switches }) })
     expect(switches).toEqual([])
     expect(result.exit).toBe(EXIT_UNSUPPORTED_HERE)
+  })
+
+  // #12382 review L2: the CLI's own error sink, not the library, tells the person the root-change check was skipped.
+  test("enable that pinned but could not read the retired pins says so on the error sink, and still exits 0", async () => {
+    const f = await genesisFixture()
+    try {
+      failAnchorListingAfterPin(f.input.pinDir)
+      const authority = { signal: new AbortController().signal, admit: <T>(dispatch: () => T): T => dispatch() }
+      const result = await runSync(["sync", "enable"], { context: async () => ({ ...f.input, authority }) })
+      mock.restore()
+      expect(result.exit).toBe(0)
+      expect(result.err.filter((line) => line.includes("EACCES"))).toHaveLength(1)
+    } finally {
+      mock.restore()
+      await f.close()
+    }
   })
 
   test("enable while another window holds the recovery setup lock exits 1 with the in-progress line, writing nothing", async () => {

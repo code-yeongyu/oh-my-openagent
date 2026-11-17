@@ -49,12 +49,16 @@ async function run(
 const ROOT_CHANGED_JOINED =
   "This account's memory history changed since this device last joined. If you did not reset memory sync, stop and check your devices."
 const ROOT_CHANGED_CREATED = "This device started a new memory history for this account."
+// The ceremony pinned, but the retired pins could not be read, so a changed history cannot be ruled out (#12382).
+const rootCheckSkipped = (reason: string): string =>
+  `This device could not check whether this account's memory history changed (${reason}). If you did not reset memory sync, check your devices.`
 
 async function enable(dependencies: SyncCommandDependencies, context: SyncContext): Promise<number> {
   const outcome = await enableSync(context)
   if (outcome.kind === "joined") {
     dependencies.output("Memory sync is on for this device.")
     if (outcome.rootChanged === true) dependencies.error(ROOT_CHANGED_CREATED)
+    if (outcome.rootCheck !== undefined) dependencies.error(rootCheckSkipped(outcome.rootCheck.reason))
     return 0
   }
   if (outcome.kind === "in_progress") {
@@ -77,6 +81,7 @@ async function enable(dependencies: SyncCommandDependencies, context: SyncContex
     case "joined":
       dependencies.output("This device joined your memory. Memory sync is on.")
       if (joined.rootChanged === true) dependencies.error(ROOT_CHANGED_JOINED)
+      if (joined.rootCheck !== undefined) dependencies.error(rootCheckSkipped(joined.rootCheck.reason))
       return 0
     case "expired":
       dependencies.error("The request expired before another device approved it. Run `omo sync enable` again.")
