@@ -49,7 +49,7 @@ export const ThreadReadParams = Type.Object({
     Type.Integer({
       minimum: 1,
       maximum: THREAD_READ_WAIT_MAX_MS,
-      description: "Wait up to this many ms for a remote thread's turn to end, then read; see result.wait.",
+      description: "Wait up to this many ms for the thread's turn to end, then read; see result.wait.",
     }),
   ),
   all_scope: AllScope,
