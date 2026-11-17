@@ -120,7 +120,7 @@ async function pagedReadResult(
   if (page.kind === "error") return page
   return {
     kind: "ok",
-    thread_id: control.thread_id,
+    thread: control.thread_id,
     link: threadLink(control.thread_id, control.title),
     items: liveItems(page.messages),
     truncated: page.truncated,
