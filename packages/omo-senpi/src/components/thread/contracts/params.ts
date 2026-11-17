@@ -35,7 +35,7 @@ export const ThreadReadParams = Type.Object({
   cursor: Type.Optional(
     Type.String({
       description:
-        "Opaque cursor from an earlier thread_read to continue a truncated transcript; a transcript revision that moved past it returns cursor_stale.",
+        "Opaque cursor from an earlier tool.thread_read() to continue a truncated transcript; a transcript revision that moved past it returns cursor_stale.",
     }),
   ),
   max_bytes: Type.Optional(
@@ -80,7 +80,7 @@ const SelfOrThread = Type.Optional(
   Type.String({
     minLength: 1,
     description:
-      "Thread to act on. Omit or pass self for this session. Accepts a thread_id, a unique name, or a sessionId from thread_list (rpc-N or the short session id); a sessionId resolves to that row's durable thread_id. A miss names the durable thread_id to pass.",
+      "Thread to act on. Omit or pass self for this session. Accepts a thread_id, a unique name, or a sessionId from tool.thread_list() (rpc-N or the short session id); a sessionId resolves to that row's durable thread_id. A miss names the durable thread_id to pass.",
   }),
 )
 
@@ -196,7 +196,7 @@ export const ThreadReportParams = Type.Object({
       ],
       {
         description:
-          "For kind question: which extension UI request request_id is. It decides the answer forms thread_answer accepts: confirm takes yes/no (any case, surrounding spaces ignored), input and editor take any text including empty, question and select take non-blank text. Without it the answer goes out in every text form at once, so a question, select, input or editor each reads its own and the text must be non-blank; a yes/no word also goes out as the confirm field, so an undeclared confirm reads yes/no too (any other text reads as no).",
+          "For kind question: which extension UI request request_id is. It decides the answer forms tool.thread_answer() accepts: confirm takes yes/no (any case, surrounding spaces ignored), input and editor take any text including empty, question and select take non-blank text. Without it the answer goes out in every text form at once, so a question, select, input or editor each reads its own and the text must be non-blank; a yes/no word also goes out as the confirm field, so an undeclared confirm reads yes/no too (any other text reads as no).",
       },
     ),
   ),
