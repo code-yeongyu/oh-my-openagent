@@ -256,10 +256,9 @@ function unansweredOf(value: unknown): readonly string[] {
 }
 
 function sessionVerbLines(verb: string, target: string, result: Record<string, unknown>): readonly string[] {
-  if (verb === "open" && typeof result["thread"] === "string") return [`Opened ${result["thread"]}.`]
-  if (verb === "open" && isRecord(result["thread"])) {
-    const { device, thread_id: id } = result["thread"]
-    return [`Opened ${typeof device === "string" ? `${device}/` : ""}${String(id)}.`]
+  if (verb === "open" && typeof result["thread"] === "string") {
+    const device = result["device"]
+    return [`Opened ${typeof device === "string" ? `${device}/` : ""}${result["thread"]}.`]
   }
   if (verb === "send") {
     const reply = result["reply"]

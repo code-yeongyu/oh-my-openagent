@@ -132,7 +132,7 @@ describe("thread SDK runtime", () => {
       ),
     ).toEqual([])
     const sdk = await import(outputs.threadSdkOutputPath)
-    expect(Object.keys(sdk).sort()).toEqual(["SDK_VERSION", "createThreadSdk", "readSessionFacts"])
+    expect(Object.keys(sdk).sort()).toEqual(["createThreadSdk", "readSessionFacts"])
   })
 
   test("#given the built SDK two levels below the extensions directory #when plain node opens it #then the store runs on the emitted worker sidecar", async () => {
