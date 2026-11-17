@@ -70,6 +70,9 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
       ["session", "b", "set_session_name"],
     ])
     expect(openSession).not.toHaveBeenCalled()
+    // #13414 4c: the account is read through the one remote client, never the session port. One device list names this
+    // device and finds b; the open's own online check reads it once more until sessions.open learns offline from its reply.
+    expect(a.accountReads).toEqual(["service.status", "devices.list", "devices.list"])
   })
 
   test("#given a thread on b #when thread_list runs with or without all_scope #then both list this device's thread and b's thread with its device (the merged account list)", async () => {

@@ -7,6 +7,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { bashPath, forBash, windowsProcessEnv } from "./publish-operator-darwin-windows-env"
+
 /**
  * Release security contract (#13943): two operator-darwin workflow steps, executed from the parsed
  * publish-platform.yml.
@@ -43,15 +45,24 @@ describe("Verify operator darwin artifacts step", () => {
     const calls = join(root, "calls")
     const manifest = '{"source_sha":"1111111111111111111111111111111111111111"}'
     writeFileSync(join(root, "operator-darwin-manifest.json"), manifest)
-    const stubs = ["jq", "git", "bun"].map(
+    const stubs = ["jq", "git"].map(
       (tool) =>
-        `${tool}() { echo "${tool} $*" >> "$CALLS"; ${tool === "jq" ? "echo 1111111111111111111111111111111111111111" : tool === "bun" ? 'echo "| rows |" > "$RUNNER_TEMP/operator-darwin-rows.md"' : ":"}; }`,
+        `${tool}() { echo "${tool} $*" >> "$CALLS"; ${tool === "jq" ? "echo 1111111111111111111111111111111111111111" : ":"}; }`,
+    )
+    // The pinned verifier copy the guard step exports; this stand-in logs its argv and writes the rows.
+    const pinned = tempDir("operator-darwin-pinned-")
+    writeFileSync(
+      join(pinned, "operator-darwin-verify.ts"),
+      `import { appendFileSync } from "node:fs"\nappendFileSync(${JSON.stringify(calls)}, "verifier " + Bun.argv.slice(2).join(" ") + "\\n")\nawait Bun.write(process.env.RUNNER_TEMP + "/operator-darwin-rows.md", "| rows |\\n")\n`,
     )
     const result = spawnSync("bash", ["-c", `${stubs.join("\n")}\n${stepRun("Verify operator darwin artifacts")}`], {
       env: {
-        PATH: process.env.PATH ?? "",
-        CALLS: calls,
-        OPERATOR_DARWIN_DIR: root,
+        ...windowsProcessEnv(),
+        PATH: bashPath(),
+        CALLS: forBash(calls),
+        GITHUB_WORKSPACE: forBash(root),
+        OPERATOR_DARWIN_VERIFIER: forBash(pinned),
+        OPERATOR_DARWIN_DIR: forBash(root),
         MANIFEST_SHA256: pin === "real" ? createHash("sha256").update(manifest).digest("hex") : pin,
         PREPARED_RELEASE_SHA: "2".repeat(40),
         TAG: "operator-darwin-111111111111",
@@ -59,8 +70,8 @@ describe("Verify operator darwin artifacts step", () => {
         ACTOR: "maintainer",
         TRIGGERING_ACTOR: "maintainer",
         REPOSITORY: "o/r",
-        RUNNER_TEMP: root,
-        GITHUB_STEP_SUMMARY: join(root, "summary"),
+        RUNNER_TEMP: forBash(root),
+        GITHUB_STEP_SUMMARY: forBash(join(root, "summary")),
       },
       encoding: "utf8",
     })
@@ -80,7 +91,104 @@ describe("Verify operator darwin artifacts step", () => {
     const outcome = run("real")
     expect(outcome.status).toBe(0)
     expect(outcome.calls.split("\n")[0]).toStartWith("jq -r .source_sha // empty")
-    expect(outcome.calls).toContain("bun .github/workflows/operator-darwin-verify.ts")
+    expect(outcome.calls).toMatch(/^verifier --dir \S+ --tag operator-darwin-111111111111 .*--repo \S+/m)
+  })
+})
+
+describe("Verify operator darwin artifacts step with the real bun", () => {
+  // The checkout is the dispatched ref: everything in it is attacker-controlled. The step must run only the pinned
+  // verifier copy (OPERATOR_DARWIN_VERIFIER), from outside the checkout, with no Bun config, .env or proxy/TLS env.
+  const run = (checkout: (root: string) => void) => {
+    const root = tempDir("operator-darwin-ref-")
+    const pinned = tempDir("operator-darwin-pinned-")
+    const seen = join(pinned, "SEEN.json")
+    // Stand-in for the pinned verifier: records what it saw and writes the rows the step cats.
+    writeFileSync(
+      join(pinned, "operator-darwin-verify.ts"),
+      `await Bun.write(${JSON.stringify(seen)}, JSON.stringify({ cwd: process.cwd(), tls: process.env.NODE_TLS_REJECT_UNAUTHORIZED ?? null, proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy ?? null, nodeOptions: process.env.NODE_OPTIONS ?? null }))\nawait Bun.write(process.env.RUNNER_TEMP + "/operator-darwin-rows.md", "| rows |\\n")\n`,
+    )
+    checkout(root)
+    const manifest = '{"source_sha":"1111111111111111111111111111111111111111"}'
+    writeFileSync(join(root, "operator-darwin-manifest.json"), manifest)
+    const result = spawnSync(
+      "bash",
+      [
+        "-c",
+        `jq() { echo 1111111111111111111111111111111111111111; }\ngit() { :; }\n${stepRun("Verify operator darwin artifacts")}`,
+      ],
+      {
+        cwd: root,
+        encoding: "utf8",
+        env: {
+          ...windowsProcessEnv(),
+          PATH: bashPath(),
+          HOME: forBash(process.env.HOME ?? root),
+          // A runner whose environment carries interception settings must not pass them to the verifier.
+          HTTPS_PROXY: "http://127.0.0.1:9",
+          NODE_TLS_REJECT_UNAUTHORIZED: "0",
+          NODE_OPTIONS: "--require /nonexistent",
+          GITHUB_WORKSPACE: forBash(root),
+          OPERATOR_DARWIN_DIR: forBash(root),
+          OPERATOR_DARWIN_VERIFIER: forBash(pinned),
+          MANIFEST_SHA256: createHash("sha256").update(manifest).digest("hex"),
+          PREPARED_RELEASE_SHA: "2".repeat(40),
+          TAG: "operator-darwin-111111111111",
+          VERSION: "5.1.75",
+          ACTOR: "maintainer",
+          TRIGGERING_ACTOR: "maintainer",
+          REPOSITORY: "o/r",
+          RUNNER_TEMP: forBash(pinned),
+          GITHUB_STEP_SUMMARY: forBash(join(root, "summary")),
+        },
+      },
+    )
+    const facts = existsSync(seen) ? JSON.parse(readFileSync(seen, "utf8")) : null
+    return { status: result.status, root, facts, evil: existsSync(join(root, "EVIL_RAN")) }
+  }
+  const evil = (root: string) => `await Bun.write(${JSON.stringify(join(root, "EVIL_RAN"))}, "ran")\n`
+
+  test("#13964 L1: a top-level preload in the checkout's bunfig.toml does not run", () => {
+    const outcome = run((root) => {
+      writeFileSync(join(root, "bunfig.toml"), 'preload = ["./evil.ts"]\n')
+      writeFileSync(join(root, "evil.ts"), evil(root))
+    })
+    expect({ status: outcome.status, verifierRan: outcome.facts !== null, evil: outcome.evil }).toEqual({
+      status: 0,
+      verifierRan: true,
+      evil: false,
+    })
+  })
+
+  test("#13964 M1: a checkout tsconfig.json/jsconfig.json paths:'*' cannot swap the verifier", () => {
+    const outcome = run((root) => {
+      for (const config of ["tsconfig.json", "jsconfig.json"])
+        writeFileSync(
+          join(root, config),
+          JSON.stringify({ compilerOptions: { baseUrl: ".", paths: { "*": ["./evil.ts"] } } }),
+        )
+      mkdirSync(join(root, ".github/workflows"), { recursive: true })
+      writeFileSync(join(root, ".github/workflows/operator-darwin-verify.ts"), evil(root))
+      writeFileSync(join(root, "evil.ts"), evil(root))
+    })
+    expect({ status: outcome.status, verifierRan: outcome.facts !== null, evil: outcome.evil }).toEqual({
+      status: 0,
+      verifierRan: true,
+      evil: false,
+    })
+    expect(outcome.facts?.cwd.startsWith(outcome.root)).toBe(false)
+  })
+
+  test("#13964 M1: a checkout .env and the runner env cannot turn off TLS or route the verifier through a proxy", () => {
+    const outcome = run((root) =>
+      writeFileSync(
+        join(root, ".env"),
+        "NODE_TLS_REJECT_UNAUTHORIZED=0\nHTTPS_PROXY=http://127.0.0.1:9\nNODE_OPTIONS=--require /nonexistent\n",
+      ),
+    )
+    expect({ status: outcome.status, facts: outcome.facts }).toEqual({
+      status: 0,
+      facts: { cwd: expect.any(String), tls: null, proxy: null, nodeOptions: null },
+    })
   })
 })
 
@@ -114,6 +222,7 @@ describe("Refuse operator darwin verifier code that differs from the default bra
       'export const TEAM_ID = "523JNR86LZ"\n',
     )
     writeFileSync(join(checkout, ".github/workflows/publish.yml"), "name: publish\n")
+    writeFileSync(join(checkout, "bunfig.toml"), "[test]\n")
     git(checkout, "add", "-A")
     git(checkout, "commit", "-q", "-m", "dev")
     git(checkout, "remote", "add", "origin", origin)
@@ -126,12 +235,32 @@ describe("Refuse operator darwin verifier code that differs from the default bra
       ["-c", stepRun("Refuse operator darwin verifier code that differs from the default branch")],
       {
         cwd: checkout,
-        env: { PATH: process.env.PATH ?? "", HOME: root, DEFAULT_BRANCH: "dev", GIT_CONFIG_NOSYSTEM: "1" },
+        env: {
+          PATH: process.env.PATH ?? "",
+          HOME: root,
+          DEFAULT_BRANCH: "dev",
+          GIT_CONFIG_NOSYSTEM: "1",
+          RUNNER_TEMP: root,
+          GITHUB_ENV: join(root, "github-env"),
+        },
         encoding: "utf8",
       },
     )
-    return { status: result.status, stdout: result.stdout }
+    const env = existsSync(join(root, "github-env")) ? readFileSync(join(root, "github-env"), "utf8") : ""
+    const pinned = env.match(/^OPERATOR_DARWIN_VERIFIER=(.+)$/m)?.[1] ?? ""
+    return { status: result.status, stdout: result.stdout, pinned }
   }
+
+  test("#13964 M1: the guard exports a pinned copy of the default branch's verifier outside the checkout", () => {
+    const outcome = dispatch((checkout) =>
+      writeFileSync(join(checkout, ".github/workflows/publish.yml"), "name: publish\n# release\n"),
+    )
+    expect(outcome.status).toBe(0)
+    expect(outcome.pinned).not.toBe("")
+    expect(readFileSync(join(outcome.pinned, "operator-darwin-verify.ts"), "utf8")).toBe(
+      'export const TEAM_ID = "523JNR86LZ"\n',
+    )
+  })
 
   test("LOW-5: a release ref that changes the verifier's pins is refused", () => {
     const outcome = dispatch((checkout) =>
@@ -142,8 +271,14 @@ describe("Refuse operator darwin verifier code that differs from the default bra
     )
     expect(outcome.status).toBe(1)
     expect(outcome.stdout).toContain(
-      "::error::operator_darwin_artifacts refused: .github/workflows/operator-darwin-*.ts differ from dev",
+      "::error::operator_darwin_artifacts refused: .github/workflows/operator-darwin-*.ts or bunfig.toml differ from dev",
     )
+  })
+
+  test("#13964 L1: a release ref that changes bunfig.toml is refused", () => {
+    const outcome = dispatch((checkout) => writeFileSync(join(checkout, "bunfig.toml"), 'preload = ["./probe.ts"]\n'))
+    expect(outcome.status).toBe(1)
+    expect(outcome.stdout).toContain("operator-darwin-*.ts or bunfig.toml differ from dev")
   })
 
   test("a release ref carrying the merged verifier (other workflow files may differ) is admitted", () => {
@@ -151,6 +286,6 @@ describe("Refuse operator darwin verifier code that differs from the default bra
       writeFileSync(join(checkout, ".github/workflows/publish.yml"), "name: publish\n# release-branch only\n"),
     )
     expect(outcome.status).toBe(0)
-    expect(outcome.stdout).toContain("The operator darwin verifier equals dev.")
+    expect(outcome.stdout).toContain("The operator darwin verifier equals dev; pinned copy at ")
   })
 })

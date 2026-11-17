@@ -12,8 +12,18 @@ describe("thread_close: close a thread on this device or on another one", () => 
     const a = account()
     const { run, closed } = surface(a.remote)
     const input = { thread: "dur-local", idempotency_key: "close-once" }
-    expect(await run("thread_close", input)).toEqual({ kind: "ok", thread_id: "dur-local", closed: true })
-    expect(await run("thread_close", input)).toEqual({ kind: "ok", thread_id: "dur-local", closed: true })
+    expect(await run("thread_close", input)).toEqual({
+      kind: "ok",
+      thread_id: "dur-local",
+      closed: true,
+      reason: "closed",
+    })
+    expect(await run("thread_close", input)).toEqual({
+      kind: "ok",
+      thread_id: "dur-local",
+      closed: true,
+      reason: "closed",
+    })
     expect(closed).toEqual([["route-local", "dur-local"]])
     expect(a.sent).toEqual([])
   })
@@ -24,6 +34,7 @@ describe("thread_close: close a thread on this device or on another one", () => 
       kind: "ok",
       thread_id: "dur-local",
       closed: false,
+      reason: "not_live",
     })
   })
 
@@ -42,6 +53,7 @@ describe("thread_close: close a thread on this device or on another one", () => 
       kind: "ok",
       thread_id: "dur-on-b",
       closed: true,
+      reason: "closed",
       device: "b",
     })
     expect(a.live.has("rk-on-b")).toBe(false)
@@ -56,6 +68,7 @@ describe("thread_close: close a thread on this device or on another one", () => 
       kind: "ok",
       thread_id: "dur-on-b",
       closed: true,
+      reason: "closed",
       device: "b",
     })
     expect(a.live.has("rk-on-b")).toBe(false)
@@ -83,6 +96,7 @@ describe("thread_close: close a thread on this device or on another one", () => 
       kind: "ok",
       thread_id: "dur-on-b",
       closed: false,
+      reason: "not_live",
       device: "b",
     })
     expect(a.sent).toEqual([])
@@ -95,6 +109,7 @@ describe("thread_close: close a thread on this device or on another one", () => 
       kind: "ok",
       thread_id: "dur-on-b",
       closed: false,
+      reason: "not_live",
       device: "b",
     })
   })
@@ -106,6 +121,7 @@ describe("thread_close: close a thread on this device or on another one", () => 
       kind: "ok",
       thread_id: "dur-saved",
       closed: false,
+      reason: "not_live",
     })
     expect(closed).toEqual([])
   })
@@ -145,5 +161,54 @@ describe("thread_close: close a thread on this device or on another one", () => 
       kind: "error",
       error: { code: "host_unavailable", details: { device: "b", reason: "host_detached" } },
     })
+  })
+
+  test("#given this session #when thread_close omits thread #then it closes the caller and reports closed", async () => {
+    const a = account()
+    const { run, closed } = surface(a.remote, { caller: "dur-local" })
+    expect(await run("thread_close", {})).toEqual({
+      kind: "ok",
+      thread_id: "dur-local",
+      closed: true,
+      reason: "closed",
+    })
+    expect(closed).toEqual([["route-local", "dur-local"]])
+  })
+
+  test("#given a local session listed as route-local #when thread_close names that sessionId #then it closes the durable thread", async () => {
+    const a = account()
+    const { run, closed } = surface(a.remote)
+    expect(await run("thread_close", { thread: "route-local" })).toEqual({
+      kind: "ok",
+      thread_id: "dur-local",
+      closed: true,
+      reason: "closed",
+    })
+    expect(closed).toEqual([["route-local", "dur-local"]])
+  })
+
+  test("#given b lists a short session id distinct from its durable id #when thread_close names the session id #then b's session is closed and the result names the durable id", async () => {
+    const a = account()
+    const { run } = surface(a.remote)
+    expect(await run("thread_close", { thread: "rk-on-b" })).toEqual({
+      kind: "ok",
+      thread_id: "dur-on-b",
+      closed: true,
+      reason: "closed",
+      device: "b",
+    })
+    expect(a.sent.map((entry) => [entry.via, entry.device, entry.rpc])).toEqual([["session", "b", UNLOAD]])
+    expect(a.live.has("rk-on-b")).toBe(false)
+  })
+
+  test("#given no thread has sessionId rpc-9 #when thread_close names it #then not_found names thread_id and a visible durable id", async () => {
+    const a = account()
+    const { run } = surface(a.remote)
+    const result = await run("thread_close", { thread: "rpc-9" })
+    expect(result).toMatchObject({ kind: "error", error: { code: "not_found" } })
+    if (result.kind !== "error") throw new Error("expected not_found")
+    expect(result.error.message).toContain("thread_id")
+    expect(result.error.message).toContain("dur-local")
+    expect(result.error.next_action).toContain("thread_id")
   })
 })
