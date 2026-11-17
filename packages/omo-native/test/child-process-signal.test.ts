@@ -333,4 +333,55 @@ await maybeReexecUnderBun({
       expect((await parent.exit).code).toBe(0)
     }, 30_000)
   })
+
+  describe("#given a signal that reaches the launcher the moment its child exists #when runChild is waiting", () => {
+    test("#then the launcher relays it instead of dying by its default disposition (#13979)", async () => {
+      // A loaded host can deschedule the launcher right after spawn while the child already runs and its
+      // supervisor signals the launcher. The preload makes that ordering certain: it raises SIGUSR1 on the
+      // launcher as soon as the real spawn returns, before runChild's next statement runs.
+      const root = createRoot()
+      const preloadPath = join(root, "signal-at-spawn.cjs")
+      writeFile(
+        preloadPath,
+        `const childProcess = require("node:child_process")
+const realSpawn = childProcess.spawn
+childProcess.spawn = function (...args) {
+  const child = realSpawn.apply(this, args)
+  process.kill(process.pid, "SIGUSR1")
+  return child
+}
+`,
+      )
+      // No handler of its own: only a SIGUSR1 relayed by the launcher can end this child. Its stdio is
+      // ignored so a launcher that dies leaves no pipe of the test held open by the orphaned child.
+      const childPath = join(root, "child.mjs")
+      const pidFile = join(root, "child.pid")
+      writeFile(
+        childPath,
+        `import { writeFileSync } from "node:fs"\nwriteFileSync(${JSON.stringify(pidFile)}, String(process.pid))\nsetInterval(() => {}, 1000)\n`,
+      )
+      const parentPath = join(root, "parent.mjs")
+      writeFile(
+        parentPath,
+        `import { runChild } from ${JSON.stringify(CHILD_PROCESS_MODULE)}
+const result = await runChild(process.execPath, [${JSON.stringify(childPath)}], { stdio: "ignore" })
+process.stdout.write(JSON.stringify(result))
+`,
+      )
+      const parent = Bun.spawn([process.execPath, "--preload", preloadPath, parentPath], {
+        stdout: "pipe",
+        stderr: "pipe",
+      })
+      const [stdout, stderr] = await Promise.all([
+        new Response(parent.stdout).text(),
+        new Response(parent.stderr).text(),
+        parent.exited,
+      ])
+      // A launcher that died leaves the child running; it is reaped by afterEach.
+      if (existsSync(pidFile)) fixturePids.push(Number(readFileSync(pidFile, "utf8")))
+
+      expect({ code: parent.exitCode, signal: parent.signalCode }, stderr).toEqual({ code: 0, signal: null })
+      expect(JSON.parse(stdout)).toEqual({ status: null, signal: "SIGUSR1" })
+    }, 30_000)
+  })
 })
