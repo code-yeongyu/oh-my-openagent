@@ -255,14 +255,16 @@ function createProblems(r: Readonly<Record<string, unknown>>): string[] {
   return [
     ...(refused === undefined
       ? []
-      : [`first message not delivered: ${text(refused.code)} - ${text(refused.message)}`, `next: ${text(refused.next_action)}`]),
+      : [
+          `first message not delivered: ${text(refused.code)} - ${text(refused.message)}`,
+          `next: ${text(refused.next_action)}`,
+        ]),
     ...warnings.map((warning) => `warning: ${text(warning.code)} - ${text(warning.message)}`),
   ]
 }
 
 function sendView(r: Readonly<Record<string, unknown>>, args: Args): ResultView {
-  const target =
-    linkTitle(r.link) ?? (text(r.name) || undefined) ?? label(args.thread) ?? label(r.thread) ?? "thread"
+  const target = linkTitle(r.link) ?? (text(r.name) || undefined) ?? label(args.thread) ?? label(r.thread) ?? "thread"
   const delivery = (r.delivery ?? {}) as {
     readonly kind?: string
     readonly turn_id?: string

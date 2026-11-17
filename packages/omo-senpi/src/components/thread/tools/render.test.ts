@@ -344,7 +344,9 @@ describe("thread_read / thread_list / thread_create results", () => {
       updated_at: null,
       link: threadLink(PEER, "scratch"),
       deduplicated: false,
-      prompt: { error: { code: "rate_limited", message: "Too many messages this turn.", next_action: "Send it next turn." } },
+      prompt: {
+        error: { code: "rate_limited", message: "Too many messages this turn.", next_action: "Send it next turn." },
+      },
       warnings: [{ code: "unsupported", message: "The device could not name the thread.", next_action: "Rename it." }],
     } as ThreadToolResult
     expect(result("thread_create", created, { name: "scratch", prompt: "hi" })).toEqual([
@@ -507,7 +509,12 @@ describe("control and relay results", () => {
     const callLines = call("thread_set_model", { thread: "planner", model: `${esc}gpt-x` }).join("\n")
     const resultLines = result(
       "thread_set_model",
-      { kind: "ok", thread: PEER, model: { provider: `${esc}openai`, id: "gpt-x" }, device: `${esc}b` } as ThreadToolResult,
+      {
+        kind: "ok",
+        thread: PEER,
+        model: { provider: `${esc}openai`, id: "gpt-x" },
+        device: `${esc}b`,
+      } as ThreadToolResult,
       { thread: "planner" },
     ).join("\n")
     expect(callLines).toBe("thread_set_model planner -> gpt-x")
