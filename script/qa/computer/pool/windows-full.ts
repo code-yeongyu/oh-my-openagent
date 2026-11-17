@@ -4,9 +4,11 @@
 //   --ledger <facts.jsonl>... --out <tsv> --host <label> [--measured-at <iso>]
 //   --validate <tsv>
 //   --plan <tsv> --guest on|off [--out <plan.json>]
+//   --compare <committed.tsv> <fresh.tsv>   (exit 1 naming each leg whose verdict moved)
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 
 import {
+  compareLedgers,
   decideTier,
   LEGS,
   ledgerRows,
@@ -75,11 +77,25 @@ function plan(args: readonly string[]): number {
   return 0
 }
 
+function compare(args: readonly string[]): number {
+  const [committed, fresh] = positional(args, "--compare")
+  if (committed === undefined || fresh === undefined) throw new Error("--compare needs <committed.tsv> <fresh.tsv>")
+  const drift = compareLedgers(readFileSync(committed, "utf8"), readFileSync(fresh, "utf8"))
+  for (const d of drift) console.log(`LEDGER drift: ${d}`)
+  if (drift.length === 0) console.log(`LEDGER matches ${committed}: every verdict re-measured`)
+  else
+    console.log(
+      `LEDGER drift in ${drift.length} leg(s): re-measure on purpose and commit the new ledger with its reason`,
+    )
+  return drift.length === 0 ? 0 : 1
+}
+
 function main(args: readonly string[]): number {
   if (args.includes("--ledger")) return ledger(args)
   if (args.includes("--validate")) return validate(args)
+  if (args.includes("--compare")) return compare(args)
   if (args.includes("--plan")) return plan(args)
-  console.error("usage: windows-full.ts --ledger|--validate|--plan (see the header)")
+  console.error("usage: windows-full.ts --ledger|--validate|--compare|--plan (see the header)")
   return 2
 }
 

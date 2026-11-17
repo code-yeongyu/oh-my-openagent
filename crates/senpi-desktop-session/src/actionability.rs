@@ -13,7 +13,7 @@
 
 use std::time::{Duration, Instant};
 
-use senpi_desktop_core::ax::{AxBounds, AxHandle, AxOwner};
+use senpi_desktop_core::ax::{AxBackend, AxBounds, AxHandle, AxOwner};
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode, ErrorReport};
 use senpi_desktop_core::report::{Disposition, ReportMode};
 
@@ -26,6 +26,8 @@ use crate::worker_input::interrupted;
 pub(crate) const AUTO_WAIT: Duration = Duration::from_secs(5);
 
 const POLL: Duration = Duration::from_millis(50);
+/// Depth guard for the walk from a hit up to the target it may sit inside.
+const MAX_OCCLUDER_DEPTH: u8 = 64;
 
 /// The time the battery waits on: the host's in a session; a test swaps in
 /// its fake's clock so the wait does not depend on how busy the host is.
@@ -195,8 +197,10 @@ impl Worker {
     }
 
     /// Whether the element under the centre of `bounds` is another element
-    /// of the same window that neither contains nor sits inside the target.
-    /// Anything the hit test cannot establish counts as not covered.
+    /// of the same window that neither contains nor sits inside the target,
+    /// and is not one of the target's own descendants (a row wider than its
+    /// list's viewport). Anything the hit test cannot establish counts as
+    /// not covered.
     fn occluded(&mut self, handle: &AxHandle, bounds: &AxBounds) -> bool {
         let (x, y) = (bounds.x + bounds.width / 2.0, bounds.y + bounds.height / 2.0);
         let Ok(backend) = self.backend() else { return false };
@@ -209,11 +213,33 @@ impl Worker {
         if contains(&hit_bounds, bounds) || contains(bounds, &hit_bounds) {
             return false;
         }
-        matches!(
+        let same_window = matches!(
             (ax.owner(&hit, &windows), ax.owner(handle, &windows)),
             (Ok(AxOwner::Window(hit_window)), Ok(AxOwner::Window(own_window))) if hit_window == own_window
-        )
+        );
+        same_window && outside_of(ax, hit, handle)
     }
+}
+
+/// Whether `node` provably lies outside `target`'s subtree: its parents
+/// reach the root without meeting `target`. A parent the backend cannot
+/// read, or a chain past the depth guard, leaves that unproven and answers
+/// `false`, like every other read `occluded` cannot establish. A backend
+/// that cannot compare its own elements cannot prove either way; the walk is
+/// skipped and `node` counts as outside, as before `same_element` existed.
+fn outside_of(ax: &mut dyn AxBackend, mut node: AxHandle, target: &AxHandle) -> bool {
+    if !ax.same_element(&node, &node) {
+        return true;
+    }
+    for _ in 0..MAX_OCCLUDER_DEPTH {
+        match ax.parent(&node) {
+            Ok(None) => return true,
+            Ok(Some(parent)) if ax.same_element(&parent, target) => return false,
+            Ok(Some(parent)) => node = parent,
+            Err(_) => return false,
+        }
+    }
+    false
 }
 
 /// Whether the element offers `action`; an element that lists no actions

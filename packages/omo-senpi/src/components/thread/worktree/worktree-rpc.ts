@@ -93,7 +93,7 @@ async function removeRequested(record: Record<string, unknown>, root: string, gi
       ownCommits === Infinity
         ? `the reflog of branch ${branch} could not be read, so its work cannot be ruled out`
         : ownCommits === 0
-          ? `branch ${branch} has no reflog entry (reflogs are off in this repository), so its work cannot be ruled out`
+          ? `branch ${branch} has no reflog entry (reflogs may be off in this repository), so its work cannot be ruled out`
           : `branch ${branch} has commits of its own`
     return folderFailure("worktree_left_behind", `${path} was not removed: ${why}.`, { path, branch })
   }

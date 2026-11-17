@@ -39,9 +39,18 @@ describe("a listing key that differs from the durable id (decision 0027 D2)", ()
         .map((entry) => [entry.device, entry.session]),
     ).toEqual([["b", "rk-b-7"]])
     expect(await run("thread_send", { thread: "rk-b-7", message: "by key" })).toMatchObject({
-      kind: "error",
-      error: { code: "not_found" },
+      kind: "ok",
+      thread_id: SPLIT.durable_id,
+      device: "b",
     })
+    expect(
+      a.sent
+        .filter((entry) => entry.rpc?.["type"] === "admit_external_message")
+        .map((entry) => [entry.device, entry.session]),
+    ).toEqual([
+      ["b", "rk-b-7"],
+      ["b", "rk-b-7"],
+    ])
   })
   test("#given the same row #when thread_create names its durable id #then it is that live thread on b (not not_found)", async () => {
     const a = fixture.account({ rows: [SPLIT], live: ["rk-b-7"] })
