@@ -2,12 +2,15 @@ import { API } from "typescript/unstable/async"
 import type { SourceFile } from "typescript/unstable/ast"
 
 // The connection to the native API process is gone: vscode-jsonrpc's ConnectionErrors.Closed (1) or .Disposed (2). The
-// TypeScript API does not export the error class, so it is matched by its name and code.
+// TypeScript API does not export the error class, so it is matched by its name and code. A killed process's pipe can
+// also break as a raw EPIPE on the next write (seen on Windows, junit run 44183497571), which is the same fact - the
+// peer is dead - so the restart path takes it too.
 const connectionGone = (error: unknown): boolean =>
-  error instanceof Error &&
-  error.constructor.name === "ConnectionError" &&
-  "code" in error &&
-  (error.code === 1 || error.code === 2)
+  (error instanceof Error &&
+    error.constructor.name === "ConnectionError" &&
+    "code" in error &&
+    (error.code === 1 || error.code === 2)) ||
+  (error instanceof Error && (error as NodeJS.ErrnoException).code === "EPIPE")
 
 export class TypeScriptSourceParser {
   readonly #cwd: string
