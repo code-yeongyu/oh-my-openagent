@@ -82,14 +82,21 @@ describe("sign-in storage while OmO's own keychain is active (#13116)", () => {
     await expect(store.read()).rejects.toThrow(/older than this omo/)
   })
 
-  test("#given an item in OmO's keychain the helper cannot read #when it is read #then a store error, never signed out", async () => {
+  test("#given an item in OmO's keychain the helper cannot read #when read and then signed in fresh #then row 8b: signed out, moved aside, new sign-in lands, nothing read another way", async () => {
     const fake = dedicatedFake({ state: "active" })
-    fake.omo.put(A, JSON.stringify(credentials), "other-app", "other")
+    fake.omo.put(A, "dummy-unreadable", "other-app", "other")
+    untouchable.touched = 0
     const store = storeOn(
       async () => fake.access,
       () => true,
     )
-    await expect(store.read()).rejects.toThrow(/helper cannot read/)
+    expect(await store.read()).toBeNull()
+    await store.write(credentials, "fresh-sign-in")
+    expect(fake.omo.items.get(`${A}.old`)?.value).toBe("dummy-unreadable")
+    expect((await store.read())?.device.id).toBe(credentials.device.id)
+    expect(fake.calls.every((call) => call.store === "omo")).toBe(true)
+    expect(fake.calls.some((call) => call.verb === "approve")).toBe(false)
+    expect(untouchable.touched).toBe(0)
   })
 
   test("#given an inactive store #when the sign-in is written and read #then no helper call carries a store field", async () => {

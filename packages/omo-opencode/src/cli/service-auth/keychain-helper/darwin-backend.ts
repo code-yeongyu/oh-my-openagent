@@ -164,11 +164,10 @@ function dedicatedOptions<O extends Parameters<typeof createDarwinBackend>[0]>(o
     ...options,
     access: { ...access, call: (call, lease) => access.call({ ...call, store: "omo" }, lease) },
     secrets: {
+      // Never a value and never the login keychain: an item the helper cannot read takes row 8b (reads as signed out,
+      // a fresh sign-in moves it aside), as it does in the login keychain.
       get: async () => {
-        throw new HelperReadError(
-          "dedicated",
-          "OmO's own keychain holds a sign-in that OmO's keychain helper cannot read, and omo never reads it another way. Run omo account store disable --discard after omo logout, then sign in again.",
-        )
+        throw new HelperReadError("dedicated", NO_LOGIN_KEYCHAIN)
       },
       set: async () => {
         throw new HelperReadError("dedicated", NO_LOGIN_KEYCHAIN)
