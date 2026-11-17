@@ -10,7 +10,7 @@ import { serveWorkerPort, workerMemorySyncSource } from "./workerPort"
 
 // An engine process in miniature, wired the way senpi provideSessionWorkerData hands each session Worker its value:
 // the main thread selects once; each Worker gets workerData.extensionData[name] plus its transfers; dispose on exit.
-// Usage: bun hostSelection.fixture.ts <desktop|declared-null|unparseable|cli|no-port|throwing|malformed|late|hang|in-process|late-connected|memoized>
+// Usage: bun hostSelection.fixture.ts <desktop|declared-null|unparseable|cli|no-port|throwing|malformed|late|hang|in-process|late-connected|memoized|slow-sidecar>
 
 type Report = {
   readonly source: string
@@ -101,6 +101,59 @@ async function inMain(scenario: string): Promise<void> {
   const attachGate = new Promise<void>((resolve) => {
     releaseAttach = resolve
   })
+  if (scenario === "slow-sidecar") {
+    // The sidecar import outlasts the bootstrap bound: the selection answers within the bound anyway, and the claim the
+    // late sidecar then runs takes the descriptor once and closes it without starting the exchange.
+    const sidecarLoaded = Promise.withResolvers<void>()
+    const lateTake = Promise.withResolvers<PassThrough>()
+    let attached = 0
+    const host = selectHostMemorySyncSource({
+      declared: () => true,
+      bootstrapDeadlineMs: 200,
+      sidecar: async () => {
+        await sidecarLoaded.promise
+        return {
+          serveWorkerPort,
+          claimInheritedDesktopSync: (deadline) =>
+            claimDesktopSync({
+              deadline,
+              take: () => {
+                claims += 1
+                const stream = new PassThrough()
+                lateTake.resolve(stream)
+                return stream
+              },
+              attach: async () => {
+                attached += 1
+                return { kind: "connected", channel }
+              },
+            }),
+        }
+      },
+    })
+    const bounded = <T>(promise: Promise<T>, fallback: T) =>
+      Promise.race([promise, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), 10_000))])
+    const answer = await bounded(
+      host.selection.then((settled) =>
+        settled.kind === "unavailable" ? `unavailable:${settled.reason}` : settled.kind,
+      ),
+      "pending",
+    )
+    sidecarLoaded.resolve()
+    const stream = await bounded(lateTake.promise, undefined)
+    const lateStream =
+      stream === undefined
+        ? "never-taken"
+        : await bounded(
+            new Promise<string>((resolve) => {
+              if (stream.destroyed) resolve("closed")
+              else stream.once("close", () => resolve("closed"))
+            }),
+            "open",
+          )
+    process.stdout.write(`${JSON.stringify({ scenario, claims, attached, answer, lateStream })}\n`)
+    process.exit(0)
+  }
   const host =
     scenario === "no-port" || scenario === "malformed"
       ? undefined
@@ -109,9 +162,14 @@ async function inMain(scenario: string): Promise<void> {
             if (scenario === "throwing") throw new Error("stub failure")
             return scenario !== "cli"
           },
+          ...(scenario === "hang"
+            ? { bootstrapDeadlineMs: 500 }
+            : scenario === "late-connected"
+              ? { bootstrapDeadlineMs: 200 }
+              : {}),
           sidecar: async () => ({
             serveWorkerPort,
-            claimInheritedDesktopSync: () =>
+            claimInheritedDesktopSync: (deadline) =>
               claimDesktopSync({
                 take: (name) => {
                   claims += 1
@@ -120,11 +178,7 @@ async function inMain(scenario: string): Promise<void> {
                     ? new PassThrough()
                     : undefined
                 },
-                ...(scenario === "hang"
-                  ? { attachDeadlineMs: 500 }
-                  : scenario === "late-connected"
-                    ? { attachDeadlineMs: 200 }
-                    : {}),
+                deadline,
                 attach: async (stream): Promise<DesktopSyncAttachment> => {
                   if (scenario === "late" || scenario === "late-connected") await attachGate
                   if (scenario === "hang") await new Promise(() => {})

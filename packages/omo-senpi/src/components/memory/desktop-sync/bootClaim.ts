@@ -42,7 +42,7 @@ export function claimMemorySyncAtBoot(take: TakeInheritedPrivateChannel): void {
   selectHostMemorySyncSource({
     declared: launchCarriedPrivateTable,
     sidecar: async () => ({
-      claimInheritedDesktopSync: () => claimDesktopSync({ take, attach: attachDesktopSyncChannel }),
+      claimInheritedDesktopSync: (deadline) => claimDesktopSync({ take, attach: attachDesktopSyncChannel, deadline }),
       serveWorkerPort,
     }),
   })

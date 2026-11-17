@@ -253,6 +253,25 @@ describe("session Workers in a shared-worker engine", () => {
     expect(result.source).toBe("unavailable:private_channel_unavailable")
   }, 30_000)
 
+  // #12048: the bootstrap bound covers the whole selection (v11 section 7.3), the sidecar import included.
+  test("a sidecar import that outlasts the deadline answers unavailable within the bound, and its late claim closes the descriptor", async () => {
+    useTestTimeout(30_000)
+    const result = (await engine("slow-sidecar")) as unknown as {
+      scenario: string
+      claims: number
+      attached: number
+      answer: string
+      lateStream: string
+    }
+    expect(result).toEqual({
+      scenario: "slow-sidecar",
+      claims: 1,
+      attached: 0,
+      answer: "unavailable:private_channel_unavailable",
+      lateStream: "closed",
+    })
+  }, 30_000)
+
   test("the selection is memoized per process: a second call returns the first and claims nothing again", async () => {
     useTestTimeout(30_000)
     const result = (await engine("memoized")) as unknown as {

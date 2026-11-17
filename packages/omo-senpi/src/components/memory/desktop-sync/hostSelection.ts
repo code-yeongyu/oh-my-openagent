@@ -16,7 +16,8 @@ export type MemorySyncSelection =
   | { readonly kind: "desktop"; readonly channel: DesktopSyncEngineWire }
 /** The lazily loaded half: the claim (desktopClaim.ts) and the answer on each Worker's port (workerPort.ts). */
 export interface HostMemorySyncSidecar {
-  claimInheritedDesktopSync(): Promise<MemorySyncSelection>
+  /** `deadline` aborts when the selection's bootstrap bound, started before this sidecar loaded, passes. */
+  claimInheritedDesktopSync(deadline: AbortSignal): Promise<MemorySyncSelection>
   serveWorkerPort(selection: Promise<MemorySyncSelection>, port: MessagePort, closed: AbortSignal): void
 }
 /** One session Worker's memory-sync value for senpi provideSessionWorkerData: a private port, transferred. */
@@ -33,6 +34,9 @@ export interface HostMemorySync {
 
 export const MEMORY_SYNC_CHANNEL = "memory-sync"
 export const MEMORY_SYNC_WORKER_DATA = "omo.memory-sync.v1"
+/** The bootstrap exchange bound (v11 section 7.3): a declared launch's whole selection, sidecar load included. */
+const BOOTSTRAP_DEADLINE_MS = 10_000
+const CHANNEL_UNAVAILABLE: MemorySyncSelection = { kind: "unavailable", reason: "private_channel_unavailable" }
 
 const HOST_KEY = Symbol.for("omo.memory-sync.host-selection.v10")
 type HostGlobal = typeof globalThis & { [HOST_KEY]?: HostMemorySync }
@@ -43,6 +47,8 @@ export function selectHostMemorySyncSource(options: {
   readonly declared: () => boolean
   /** Loaded only for a declared launch's claim or a Worker's port; a failed load is selection_failed or a closed port. */
   readonly sidecar: () => Promise<HostMemorySyncSidecar>
+  /** The bootstrap bound; the production value unless a test shortens it. */
+  readonly bootstrapDeadlineMs?: number
 }): HostMemorySync {
   const host = globalThis as HostGlobal
   if (host[HOST_KEY] !== undefined) return host[HOST_KEY]
@@ -68,8 +74,19 @@ export function selectHostMemorySyncSource(options: {
 
 async function select(options: Parameters<typeof selectHostMemorySyncSource>[0]): Promise<MemorySyncSelection> {
   try {
-    return options.declared() ? await (await options.sidecar()).claimInheritedDesktopSync() : { kind: "cli" }
+    if (!options.declared()) return { kind: "cli" }
   } catch {
     return { kind: "unavailable", reason: "selection_failed" }
   }
+  // The bound starts before the sidecar import, so a slow or stuck import still answers within it (#12048).
+  const deadline = new AbortController()
+  const timer = setTimeout(() => deadline.abort(), options.bootstrapDeadlineMs ?? BOOTSTRAP_DEADLINE_MS)
+  const expired = new Promise<MemorySyncSelection>((resolve) =>
+    deadline.signal.addEventListener("abort", () => resolve(CHANNEL_UNAVAILABLE), { once: true }),
+  )
+  const claimed = options
+    .sidecar()
+    .then((loaded) => loaded.claimInheritedDesktopSync(deadline.signal))
+    .catch((): MemorySyncSelection => ({ kind: "unavailable", reason: "selection_failed" }))
+  return Promise.race([claimed, expired]).finally(() => clearTimeout(timer))
 }
