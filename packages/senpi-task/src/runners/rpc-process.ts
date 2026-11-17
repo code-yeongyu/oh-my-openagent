@@ -8,7 +8,7 @@ import { designatedChainText } from "./designated-fallback-profile"
 import { childRetryFallbackProfile } from "./retry-fallback-profile"
 import { createRpcChildHandle, type CreateRpcChildHandleOptions } from "./rpc/handle"
 import { createRpcModelAdmission, type RpcModelAdmission } from "./rpc/model-admission"
-import { type MalformedLineHandler, RpcProtocolClient } from "./rpc/protocol-client"
+import { type MalformedLineHandler, RPC_REQUEST_DEADLINE_MS, RpcProtocolClient } from "./rpc/protocol-client"
 import { type RpcSpawnDescriptor, buildRpcSpawn } from "./rpc/spawn"
 import { discardUnstartedRpcHandle } from "./rpc/start-cleanup"
 import { createTaskRecordStore } from "../store"
@@ -19,8 +19,11 @@ import { ChildParentLink, type ParentPermissionMode } from "./parent-link"
 const DEFAULT_HEARTBEAT_INTERVAL_MS = 10_000
 /** senpi capability: a single-session `--mode rpc` process accepts `set_retry_fallback` before its first turn. */
 const RETRY_FALLBACK_COMMAND_CAPABILITY = "retry_fallback_command"
-/** How long a child's start waits for the engine to answer its fallback chain before the start fails. */
-const DEFAULT_FALLBACK_CHAIN_DEADLINE_MS = 10_000
+/** How long a child's start waits for the engine to answer its fallback chain before the start fails.
+ *  One RPC request budget: a cold Windows start of the member extension has taken longer than 10s
+ *  before the engine can answer, and the residency test already allows a full request deadline per launch.
+ */
+const DEFAULT_FALLBACK_CHAIN_DEADLINE_MS = RPC_REQUEST_DEADLINE_MS
 
 export type RpcProcessRunnerOptions = {
   readonly terminateChild?: CreateRpcChildHandleOptions["terminateChild"]
