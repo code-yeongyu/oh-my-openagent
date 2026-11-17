@@ -37,9 +37,9 @@ export const grantSchema = tokenSchema.extend({
   owner: credentialOwnerSchema.optional(),
   writerFloor: z.union([z.literal(1), z.literal(2)]).optional(),
   freshAuthorizationProof: nonempty.optional(),
-  /** #14032: the earlier device of this computer the service signed out for a replace sign-in. Never stored. */
-  replacedDeviceId: nonempty.optional(),
 })
+/** #14032: the device-token reply, which also names the earlier device a replace sign-in signed out. Never stored. */
+export const deviceTokenGrantSchema = grantSchema.extend({ replacedDeviceId: nonempty.optional() })
 export const credentialSchema = grantSchema.extend({
   signingPrivateKey: nonempty,
   sealingPrivateKey: nonempty,

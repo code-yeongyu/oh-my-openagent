@@ -4,7 +4,7 @@ import {
   ApiRefusal,
   type ChooseDevice,
   deviceCodeSchema,
-  grantSchema,
+  deviceTokenGrantSchema,
   jsonRequest,
   type MachineDevice,
   parseReply,
@@ -98,7 +98,7 @@ async function authorizeDevice(
     if (now() >= expiresAt) break
     try {
       const { replacedDeviceId, ...grant } = parseReply(
-        grantSchema,
+        deviceTokenGrantSchema,
         await session.request(
           "/v1/device/token",
           jsonRequest({
