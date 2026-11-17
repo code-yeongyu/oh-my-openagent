@@ -14,6 +14,13 @@ export const VERBS = [
 ] as const
 
 /**
+ * `omo remote enable --after-login`: the enable `omo login` starts in the background (omo#13722), not the user turning
+ * remote on, so a `omo remote disable` typed while it installs keeps remote off (#13724 review M1). Internal: not in
+ * the usage.
+ */
+export const AFTER_LOGIN_FLAG = "--after-login"
+
+/**
  * The verbs whose whole call path is the account read plus the local API (omo#13440): they open no network connection
  * in this process. A verb that reaches the network belongs in NETWORK_REMOTE_VERBS; the two lists partition VERBS.
  */

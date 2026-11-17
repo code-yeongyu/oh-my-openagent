@@ -166,8 +166,10 @@ jobs:
 
           # Explicit, logged waiver of the hosted CI wait. An empty receipt keeps the default path below.
           if [ -n "$CI_BASIS_RECEIPT" ]; then
-            LC_ALL=C # ASCII-only character classes for the shape checks; this block always exits.
-            if ! [[ "$CI_BASIS_RECEIPT" =~ ^[[:print:]]{1,128}$ ]]; then
+            LC_ALL=C # code-point ranges for the shape checks; this block always exits.
+            # An explicit space-to-tilde range, not [[:print:]]: Git Bash on Windows still classifies UTF-8 characters
+            # under LC_ALL=C, so [[:print:]] accepted a non-ASCII receipt there (#13955).
+            if [ "${#CI_BASIS_RECEIPT}" -gt 128 ] || [[ "$CI_BASIS_RECEIPT" == *[!\ -~]* ]]; then
               echo "::error::ci_basis_receipt refused: it must be 1-128 printable ASCII characters with no newline or control character."
               exit 1
             fi

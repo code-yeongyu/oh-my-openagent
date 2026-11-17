@@ -18,6 +18,8 @@ export type SliceSignature = {
   readonly runtime: boolean
   /** Mach-O cputype of the slice (0x0100000c arm64, 0x01000007 x86_64). */
   readonly cpuType: number
+  /** Mach-O cpusubtype without the capability bits (0 ARM64_ALL, 2 arm64e, 3 X86_ALL). */
+  readonly cpuSubtype: number
   /** sha256 hex of the requirements blob (the designated requirement), "" when the slice has none. */
   readonly requirementsSha256: string
   /** True when the slice carries an entitlements or DER entitlements blob. */
@@ -134,6 +136,7 @@ function readSlice(bytes: Uint8Array, range: { start: number; end: number }): Sl
     team: teamOffset === 0 ? "" : cString(cd, teamOffset),
     runtime: (cdv.getUint32(12, false) & 0x10000) !== 0,
     cpuType: le.getUint32(4, true),
+    cpuSubtype: le.getUint32(8, true) & 0x00ffffff,
     requirementsSha256: requirements ? hex(sha256(requirements)) : "",
     entitlements: blobs.has(5) || blobs.has(7),
     cdhash: hex(sha256(cd).subarray(0, 20)),
