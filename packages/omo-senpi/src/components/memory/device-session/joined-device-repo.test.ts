@@ -176,7 +176,11 @@ describe("a joined device with sync on and no memory repository (#14094)", () =>
     const { root, paths } = await freshDevice()
 
     // when
-    const context = createMemoryIdentityContext({ identity: "agent", identityPaths: paths, binding: undefined as never })
+    const context = createMemoryIdentityContext({
+      identity: "agent",
+      identityPaths: paths,
+      binding: undefined as never,
+    })
     const access = getMemoryRepo(context)
 
     // then
@@ -196,7 +200,9 @@ describe("a joined device with sync on and no memory repository (#14094)", () =>
 
     // then
     expect(commitCount(paths.repo)).toBe(1)
-    expect(info.filter((line) => line.includes("created this device's memory repository")).length).toBeLessThanOrEqual(1)
+    expect(info.filter((line) => line.includes("created this device's memory repository")).length).toBeLessThanOrEqual(
+      1,
+    )
   })
 
   test("#given two first syncs at the same moment #when both reach the seam #then exactly one creates and logs", async () => {
