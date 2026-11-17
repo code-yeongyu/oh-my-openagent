@@ -29,7 +29,7 @@ export const ThreadCreateParams = Type.Object({
   name: Type.Optional(
     Type.String({
       description:
-        "Display label for the new thread; an existing thread with the same normalized name returns name_conflict, and later renames change only the label while thread_id stays the address.",
+        "Display label for the new thread; an existing thread with the same normalized name returns name_conflict, and later renames change only the label while the thread value stays the address.",
     }),
   ),
   cwd: Type.Optional(

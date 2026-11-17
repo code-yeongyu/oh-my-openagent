@@ -76,7 +76,7 @@ export const THREAD_TOOL_METADATA: readonly ThreadToolEntry[] = [
     name: "thread_close",
     label: "Close session",
     description:
-      "Closes a session. Omit thread or pass self to close this session. thread accepts a thread_id, a unique name, or a sessionId (rpc-N or the short session id) from thread_list (tool.thread_list() in an eval cell), which resolves to the durable thread_id; the result is closed true or false plus a reason" +
+      "Closes a session. Omit thread or pass self to close this session. thread accepts the thread value of a thread_list row (tool.thread_list() in an eval cell), an alias, or a unique name; the result is closed true or false plus a reason" +
       ROUTE_TO_TASK,
     exposure: THREAD_TOOL_EXPOSURE,
   },
@@ -92,7 +92,7 @@ export const THREAD_TOOL_METADATA: readonly ThreadToolEntry[] = [
     name: "thread_rename",
     label: "Rename session",
     description:
-      "Renames a session's label, for when the user asks to call a session something clearer. Omit thread or pass self to rename this session. thread accepts a thread_id, a unique name, or a sessionId (rpc-N or the short session id) from thread_list (tool.thread_list() in an eval cell), which resolves to the durable thread_id; a miss names that thread_id",
+      "Renames a session's label, for when the user asks to call a session something clearer. Omit thread or pass self to rename this session. thread accepts the thread value of a thread_list row (tool.thread_list() in an eval cell), an alias, or a unique name; a miss names the thread value to pass",
     exposure: THREAD_TOOL_EXPOSURE,
   },
   {
@@ -144,4 +144,4 @@ export const THREAD_TOOL_METADATA: readonly ThreadToolEntry[] = [
  * tokens, so the per-tool entries above stay free of policy prose.
  */
 export const THREAD_FAMILY_PROMPT_GUIDELINES =
-  "Thread tools address peer sessions, never child tasks; while an eval tool exists they run only inside an eval cell, as tool.thread_<verb>(): call tool.thread_list() first and pass a thread_id, a unique name, or that row's sessionId (rpc-N or the short session id), which resolves to the durable thread_id; tool.thread_rename() and tool.thread_close() take this session when thread is omitted or self; an ambiguous name returns candidates instead of delivering; leave all_scope unset to stay inside this workspace and set it only when the caller explicitly asks for sessions in every workspace; when you mention a thread to the user, paste the link its result carries instead of writing its id or inventing a link."
+  "Thread tools address peer sessions, never child tasks; while an eval tool exists they run only inside an eval cell, as tool.thread_<verb>(): call tool.thread_list() first and pass a row's thread value (every result names a session as thread, the exact string to pass back), an alias, or a unique name; tool.thread_rename() and tool.thread_close() take this session when thread is omitted or self; an ambiguous name returns candidates instead of delivering; leave all_scope unset to stay inside this workspace and set it only when the caller explicitly asks for sessions in every workspace; when you mention a thread to the user, paste the link its result carries instead of writing its id or inventing a link."

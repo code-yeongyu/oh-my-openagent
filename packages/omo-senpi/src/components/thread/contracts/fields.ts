@@ -9,7 +9,7 @@ export const THREAD_READ_MAX_BYTES = 1048576
 
 export const ThreadAddress = Type.String({
   description:
-    "Recipient thread id, unique name, or sessionId (rpc-N or the short session id) as returned by thread_list (tool.thread_list() in an eval cell). A sessionId resolves to that row's durable thread_id. A name shared by several threads returns ambiguous_target with candidates. self addresses the caller's own session.",
+    "Recipient thread: the thread value of a thread_list row (tool.thread_list() in an eval cell) or of any thread tool result, an alias, a unique name, or the first 8+ characters of a thread value when only one thread starts with them. A name or prefix shared by several threads returns ambiguous_target with candidates. self addresses the caller's own session.",
 })
 
 export const AllScope = Type.Optional(

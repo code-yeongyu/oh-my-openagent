@@ -51,6 +51,16 @@ export type ContractHostOptions = {
    * already holds them, as the engine takes it before it writes the marker and the answer (get-snapshot.js).
    */
   readonly beforeSnapshot?: readonly Frame[]
+  /** The session's status in a `subscribe_sessions` snapshot ("idle" by default). */
+  readonly subscribeStatus?: string
+  /** Records written right behind the `subscribe_sessions` answer, before the client could read its snapshot. */
+  readonly afterSubscribe?: readonly Frame[]
+  /** `subscribe_sessions` is refused with this error code. */
+  readonly subscribeRefusal?: string
+  /** The turn `get_state` reports running (`currentTurnId`), as the engine does while a run is under way. */
+  readonly currentTurnId?: string
+  /** What `get_state` answers, whole, instead of the default: the host's state when the read lands. */
+  readonly state?: Frame
 }
 export type ContractHost = {
   readonly socket: string
@@ -74,6 +84,15 @@ export type ContractHost = {
   readonly snapshotted: () => Promise<void>
   /** Writes these records of the session (`sessionId` "rpc-1") to every connection attached to it, as a live host does. */
   readonly push: (records: readonly Frame[]) => void
+  /** Settles once a `subscribe_sessions` was answered. */
+  readonly subscribed: () => Promise<void>
+  /**
+   * Writes records to every subscribed connection as the host's status stream does: `session_status` always, any
+   * other record only when its type is in the subscription's `mirror`; `sessionId` "rpc-1" unless the record names one.
+   */
+  readonly publish: (records: readonly Frame[]) => void
+  /** Ends every subscribed connection from the host's side. */
+  readonly dropSubscribers: () => void
 }
 
 /**
@@ -150,6 +169,11 @@ export async function withContractHost(
   const sockets = new Set<Socket>()
   const attachedClients = new Set<Socket>()
   const firstSnapshot = Promise.withResolvers<void>()
+  const firstSubscribe = Promise.withResolvers<void>()
+  const subscribers = new Map<Socket, ReadonlySet<string>>()
+  const streamed = (record: Frame) => `${JSON.stringify({ sessionId: "rpc-1", ...record })}\n`
+  const mirrored = (mirror: ReadonlySet<string>, record: Frame) =>
+    record.type === "session_status" || mirror.has(String(record.type))
   let nextConnection = 0
   let preset = "read-only"
   const durableId = options.durableId ?? "dur-selected"
@@ -284,6 +308,21 @@ export async function withContractHost(
             respond(frame, { sessions: ended ? [] : [session()] })
             continue
           }
+          if (frame.type === "subscribe_sessions") {
+            if (options.subscribeRefusal !== undefined) {
+              respond(frame, undefined, options.subscribeRefusal)
+              continue
+            }
+            const mirror = new Set(Array.isArray(frame.mirror) ? frame.mirror.map(String) : [])
+            subscribers.set(client, mirror)
+            client.once("close", () => subscribers.delete(client))
+            const row = { type: "session_status", ...session(), status: options.subscribeStatus ?? "idle" }
+            respond(frame, { subscriptionId: "sub-1", snapshot: ended ? [] : [row], seq: 0 })
+            for (const record of options.afterSubscribe ?? [])
+              if (mirrored(mirror, record)) client.write(streamed(record))
+            firstSubscribe.resolve()
+            continue
+          }
           if (frame.type === "warm") {
             respond(frame, { warmed: true })
             continue
@@ -365,7 +404,13 @@ export async function withContractHost(
             continue
           }
           if (frame.type === "get_state") {
-            respond(frame, { isStreaming: false })
+            respond(
+              frame,
+              options.state ??
+                (options.currentTurnId === undefined
+                  ? { isStreaming: false }
+                  : { isStreaming: true, currentTurnId: options.currentTurnId }),
+            )
             continue
           }
           // senpi modes/rpc/get-entries-command.js: an unknown `before` is refused RPC_ERROR_ENTRY_NOT_FOUND ("not_found"),
@@ -478,6 +523,14 @@ export async function withContractHost(
       },
       live: () => !ended,
       snapshotted: () => firstSnapshot.promise,
+      subscribed: () => firstSubscribe.promise,
+      publish: (records) => {
+        for (const [client, mirror] of subscribers)
+          for (const record of records) if (mirrored(mirror, record)) client.write(streamed(record))
+      },
+      dropSubscribers: () => {
+        for (const client of subscribers.keys()) client.end()
+      },
       push: (records) => {
         for (const client of attachedClients)
           for (const record of records) client.write(`${JSON.stringify({ ...record, sessionId: "rpc-1" })}\n`)
