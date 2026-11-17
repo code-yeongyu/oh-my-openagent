@@ -92,7 +92,7 @@ export function localSessionMembers(hostOn: HostOn) {
       run(target, "interrupted the turn", async ({ port, routing, durable }) => {
         // The thread tools' one interrupt body: this device's host gets the record thread_interrupt sends.
         const outcome = await interruptOver((request) => port.interrupt(routing, request, durable), undefined)
-        return ok({ thread_id: thread, ...outcome, device: target.device })
+        return ok({ thread, ...outcome, device: target.device })
       }),
     setReasoning: (target: LocalTarget, level: string) =>
       run(target, "set the thinking level", async ({ port, routing, durable }) => {

@@ -90,6 +90,30 @@ describe("device service clock seam", () => {
     expect(await waking).toMatch(/^no final state for endpoint command \S+ within 120000 ms$/)
   })
 
+  test("a command on a live attach with no final state fails request_timeout at its bound on the given timers", async () => {
+    const clock = fakeClock()
+    const { owner, withheld } = await startMode("ack-no-final")
+    const service = await serviceOn(owner, clock)
+    const attach = await service.attach(PEER, SESSION_ID)
+    await attach.snapshot
+    const defaulted = attach.command({ type: "get_state" }).catch((error: unknown) => error)
+    const bounded = attach.command({ type: "get_messages" }, { waitMs: 30_000 }).catch((error: unknown) => error)
+    await withheld("final_state")
+    await service.status()
+    clock.advance(29_999)
+    expect(clock.armed()).toBe(2)
+    clock.advance(1)
+    const read = await bounded
+    expect(read).toBeInstanceOf(LocalApiError)
+    expect((read as LocalApiError).code).toBe("request_timeout")
+    // Its id is kept: the command was sent, so its outcome may still arrive.
+    expect((read as LocalApiError).command_id).toEqual(expect.any(String))
+    clock.advance(89_999)
+    expect(clock.armed()).toBe(1)
+    clock.advance(1)
+    expect(await outcomeOf(Promise.reject(await defaulted))).toBe("request_timeout")
+  })
+
   test("a command in flight when its attach ends waits 30 s on the given timers", async () => {
     const clock = fakeClock()
     const { owner, withheld } = await startMode("ack-no-final")
@@ -100,7 +124,8 @@ describe("device service clock seam", () => {
     await withheld("final_state")
     await attach.detach()
     clock.advance(29_999)
-    expect(clock.armed()).toBe(1)
+    // The drain bound and the command's own 120 s wait; the drain fires first.
+    expect(clock.armed()).toBe(2)
     clock.advance(1)
     expect(await commanding).toBe("the attach ended before the command settled: detached")
   })
