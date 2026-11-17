@@ -264,6 +264,20 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
     },
   )
 
+  // An unattested sender has no device to pin, so when two devices list its durable id the reply cannot tell which copy
+  // sent the delivery: it is refused whatever order the account listing returns the rows in.
+  test.each([
+    ["c, b", [C_SAME_ID, B_ROW]],
+    ["b, c", [B_ROW, C_SAME_ID]],
+  ] as const)(
+    "#given an unattested delivery whose sender id is listed on b and c (listing order %s) #when the run replies by that id #then it is ambiguous_target and nothing is sent",
+    async (_order, rows) => {
+      const { reply, admittedOn } = await consumed([{ id: "rpc:local/d-1", session_id: "dur-on-b" }], rows)
+      expect(await reply("dur-on-b")).toMatchObject({ kind: "error", error: { code: "ambiguous_target" } })
+      expect(admittedOn()).toEqual([])
+    },
+  )
+
   test("#given an unattested delivery whose stated name another device's session carries #when the run replies by that name #then it is reply_target_mismatch and nothing is sent", async () => {
     const { reply, admittedOn } = await consumed(
       [{ id: "rpc:local/d-1", session_id: "dur-gone", name: "c thread" }],
