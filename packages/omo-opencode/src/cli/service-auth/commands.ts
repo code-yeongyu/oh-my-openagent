@@ -105,6 +105,7 @@ async function run(
       store,
       signal: controller.signal,
       ...(deviceService === undefined ? {} : { deviceService }),
+      log: (line) => console.error(line),
       beforeKeysDiscarded: retireSyncPinOnDiscard({
         pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())),
         log: (line) => console.error(line),

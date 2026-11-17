@@ -26,6 +26,7 @@ import {
   tokenSchema,
 } from "./protocol"
 import { requestApi } from "./protocol-request"
+import { type MachineIdentity, reconcileDevice, thisMachine } from "./machine-reconcile"
 import {
   clearSignedOutMarker,
   readSignedOutMarker,
@@ -107,6 +108,10 @@ export function createSession(options: {
   readonly beforeKeysDiscarded: BeforeKeysDiscarded
   /** This machine's device service; absent, no device service is told anything. */
   readonly deviceService?: DeviceServiceHandoff
+  /** The machine a refreshed device binds to and is named after (#13651); this computer unless a test says otherwise. */
+  readonly machine?: MachineIdentity
+  /** Where a post-refresh device fix-up reports a refusal; silent when absent (a TUI host must not write over its screen). */
+  readonly log?: (line: string) => void
 }) {
   const api = serviceOrigin(options.api)
   const deviceService = options.deviceService
@@ -198,12 +203,46 @@ export function createSession(options: {
       )
     }
   }
+  /**
+   * One refresh point for every caller (login, whoami, token, memory sync): after a rotation, outside the lock, the
+   * device is bound to this machine and a generated label renamed (#13651). Neither ever fails the token.
+   */
+  async function renewed(
+    read: (view: LockedStore<Credentials> | null) => Promise<Credentials | null>,
+  ): Promise<Credentials | null> {
+    const outcome = await locked(async (view) => {
+      const current = await read(view)
+      if (current === null) return null
+      const next = await refreshed(current)
+      return { next, rotated: next !== current }
+    })
+    if (outcome === null) return null
+    if (outcome.rotated) await reconcile(outcome.next)
+    return outcome.next
+  }
+  async function reconcile(credentials: Credentials): Promise<void> {
+    await reconcileDevice({
+      api,
+      credentials,
+      machine: options.machine ?? thisMachine,
+      nowMs: now(),
+      request,
+      accountOf,
+      log: options.log ?? (() => undefined),
+      renamed: (name) =>
+        locked(async () => {
+          const stored = await store.readAuthoritative()
+          if (stored !== null && stored.device.id === credentials.device.id)
+            await store.write({ ...stored, device: { ...stored.device, name } })
+        }),
+    })
+  }
   async function snapshot(): Promise<Credentials | null> {
-    return locked(async (view) => {
+    return renewed(async (view) => {
       const current = await store.read()
       if (current === null) return null
       await view?.settle()
-      return refreshed(current)
+      return current
     })
   }
   // #13265: the signed-in account's email through the session's own token; undefined when the service does not say.
@@ -231,13 +270,15 @@ export function createSession(options: {
       !(await store.migrationPending?.())
     )
       return snapshot.accessToken
-    return locked(async (view) => {
+    const renewedCredentials = await renewed(async (view) => {
       const current = await store.readAuthoritative()
       if (current === null) throw new SignInError(`Not signed in. ${signInHint("first")}`)
       if (expect !== undefined && !expect(current)) throw new CredentialIdentityChanged()
       await view?.settle()
-      return (await refreshed(current)).accessToken
+      return current
     })
+    if (renewedCredentials === null) throw new SignInError(`Not signed in. ${signInHint("first")}`)
+    return renewedCredentials.accessToken
   }
   return {
     request,
