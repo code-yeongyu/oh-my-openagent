@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { ApiRefusal } from "../omo-opencode/src/cli/service-auth/protocol"
 import type { Session } from "../omo-opencode/src/cli/service-auth/session"
+import { sessionFailure, type SessionOutcomeDependencies } from "./account-session-outcome"
 import { ACCOUNT_EXIT } from "./account-show"
 
 // `omo account devices` lists the account's live devices; `omo account devices revoke <id>` signs out ANOTHER device of
@@ -27,10 +28,7 @@ const listedSchema = z.object({
 })
 type Listed = z.infer<typeof listedSchema>["devices"][number]
 
-export interface AccountDevicesDependencies {
-  readonly output: (line: string) => void
-  readonly error: (line: string) => void
-}
+export type AccountDevicesDependencies = SessionOutcomeDependencies
 
 const USAGE = "omo account devices: use devices or devices revoke <id>"
 
@@ -63,7 +61,8 @@ async function revoke(dependencies: AccountDevicesDependencies, session: Session
     dependencies.error(`omo account devices revoke: no live device ${id} on this account (run omo account devices)`)
     return reply(dependencies, { revoked: false, error: "not_found" }, ACCOUNT_EXIT.failed)
   }
-  if (target.current === true) {
+  // The stored credential decides too: a service that omits or misreports `current` never gets this device revoked.
+  if (target.current === true || target.id === (await dependencies.store.read())?.device.id) {
     dependencies.error("omo account devices revoke: that is this device; sign it out with omo logout")
     return reply(dependencies, { revoked: false, error: "this_device", device: view(target) }, ACCOUNT_EXIT.invalid)
   }
@@ -91,11 +90,18 @@ export async function runDevicesVerb(
   session: Session,
   flags: readonly string[],
 ): Promise<number> {
-  if (flags.length === 0) return reply(dependencies, { devices: (await liveDevices(session)).map(view) })
   const [action, id, ...rest] = flags
-  if (action !== "revoke" || id === undefined || id === "" || id.startsWith("--") || rest.length > 0) {
+  if (
+    flags.length > 0 &&
+    (action !== "revoke" || id === undefined || id === "" || id.startsWith("--") || rest.length > 0)
+  ) {
     dependencies.error(USAGE)
     return ACCOUNT_EXIT.invalid
   }
-  return revoke(dependencies, session, id)
+  try {
+    if (id === undefined) return reply(dependencies, { devices: (await liveDevices(session)).map(view) })
+    return await revoke(dependencies, session, id)
+  } catch (error) {
+    return sessionFailure(dependencies, session, error, "omo account devices: the request failed")
+  }
 }

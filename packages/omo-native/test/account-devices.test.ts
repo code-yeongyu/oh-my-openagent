@@ -39,9 +39,9 @@ function account(rows: Row[], options: { readonly deleteStatus?: number; readonl
   return { api, calls }
 }
 
-async function run(api: string, args: string[]) {
+async function run(api: string, args: string[], stored: object | null = { ...grant, ...privateKeys }) {
   const store = memorySecrets().store(api)
-  await store.write({ ...grant, ...privateKeys })
+  if (stored !== null) await store.write(stored as typeof grant & typeof privateKeys)
   const home = await temporaryHome()
   const out: unknown[] = []
   const err: string[] = []
@@ -107,6 +107,44 @@ describe("omo account devices", () => {
     expect(result.out).toMatchObject([{ revoked: false, error: "this_device" }])
     expect(calls.some((call) => call.startsWith("DELETE"))).toBe(false)
     expect(result.stored?.device.id).toBe(grant.device.id)
+  })
+
+  test("#given a list without the current flag #when revoking the stored device's id #then it refuses and deletes nothing", async () => {
+    const { current: _current, ...own } = row(grant.device.id, grant.device.name)
+    const { api, calls } = account([own as Row, row("dev-twin", "twin")])
+
+    const result = await run(api, ["devices", "revoke", grant.device.id])
+
+    expect(result.code).toBe(ACCOUNT_EXIT.invalid)
+    expect(result.out).toMatchObject([{ revoked: false, error: "this_device" }])
+    expect(calls.some((call) => call.startsWith("DELETE"))).toBe(false)
+  })
+
+  test("#given no stored sign-in #when listing #then it reports signed out with its own exit code", async () => {
+    const { api, calls } = account([])
+
+    const result = await run(api, ["devices"], null)
+
+    expect(result.code).toBe(ACCOUNT_EXIT.signedOut)
+    expect(result.out).toEqual([{ signedIn: false }])
+    expect(calls).toEqual([])
+  })
+
+  test("#given a sign-in the service ended #when listing #then it reports ended like account token", async () => {
+    const api = fakeApi((request) =>
+      new URL(request.url).pathname === "/v1/session/refresh"
+        ? refusal("device_revoked", undefined, 401)
+        : new Response("unexpected", { status: 500 }),
+    )
+
+    const result = await run(api, ["devices"], {
+      ...grant,
+      ...privateKeys,
+      accessTokenExpiresAt: "2000-01-01T00:00:00Z",
+    })
+
+    expect(result.code).toBe(ACCOUNT_EXIT.ended)
+    expect(result.out).toEqual([{ ended: { code: "device_revoked" } }])
   })
 
   test("#given an id that is not a live device of this account #when revoking #then it refuses without a delete", async () => {

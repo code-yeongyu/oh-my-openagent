@@ -4,7 +4,6 @@ import { syncPinDir } from "../memory-core/src/sync/pin-dir"
 import {
   createCredentialStore,
   type CredentialStore,
-  CredentialStoreError,
   INTERACTIVE_READ_WAIT,
   InvalidCredentialState,
   KeychainLockedError,
@@ -23,12 +22,11 @@ import {
   type DeviceServiceHandoff,
   discardedOf,
   type Session,
-  SessionEnded,
 } from "../omo-opencode/src/cli/service-auth/session"
 import { retireSyncPinOnDiscard } from "../omo-opencode/src/cli/service-auth/sync-pin-retire"
 import { retireSyncDevice } from "../memory-core/src/sync/device-retire"
-import { RecoveryExhausted, RecoveryPending } from "../omo-opencode/src/cli/service-auth/owned-refresh"
 import { runDevicesVerb } from "./account-devices"
+import { sessionFailure, signedOut } from "./account-session-outcome"
 import { ACCOUNT_EXIT, accountStoreFailure, showAccount } from "./account-show"
 import { cliDeviceServiceHandoff } from "./device-service-handoff"
 
@@ -70,13 +68,6 @@ const sessionOf = (dependencies: AccountCommandDependencies): Session =>
     ...(dependencies.home === undefined ? {} : { home: dependencies.home }),
     ...(dependencies.deviceService === undefined ? {} : { deviceService: dependencies.deviceService }),
   })
-
-async function signedOut(dependencies: AccountCommandDependencies, session: Session): Promise<number> {
-  const marker = await session.signedOutMarker()
-  return marker === null
-    ? reply(dependencies, { signedIn: false }, ACCOUNT_EXIT.signedOut)
-    : reply(dependencies, { signedIn: false, signedOut: marker }, ACCOUNT_EXIT.loggedOut)
-}
 
 const parseInput = (text: string): Credentials | null => {
   try {
@@ -135,24 +126,7 @@ async function token(dependencies: AccountCommandDependencies): Promise<number> 
       ...(current.owner === undefined ? {} : { owner: current.owner }),
     })
   } catch (error) {
-    // Storage failures keep their own outcome; another native read can repeat the same timeout.
-    if (error instanceof CredentialStoreError) throw error
-    if (error instanceof SessionEnded || error instanceof RecoveryExhausted)
-      return reply(dependencies, { ended: { code: error.code } }, ACCOUNT_EXIT.ended)
-    if (error instanceof RecoveryPending)
-      return reply(
-        dependencies,
-        { uncertain: { deadline: new Date(error.deadline).toISOString() } },
-        ACCOUNT_EXIT.uncertain,
-      )
-    const after = await dependencies.store.read()
-    dependencies.error(error instanceof Error ? error.message : "omo account token: the refresh failed")
-    // The refusal code tells the desktop why the sign-in ended (desktop#3522); the message never leaves stderr.
-    // Any other error with the item gone means another process signed out (forget/logout) meanwhile.
-    if (after === null) return signedOut(dependencies, session)
-    if (after.refreshState === "uncertain")
-      return reply(dependencies, { ended: { code: "refresh_recovery_expired" } }, ACCOUNT_EXIT.ended)
-    return ACCOUNT_EXIT.failed
+    return sessionFailure(dependencies, session, error, "omo account token: the refresh failed")
   }
 }
 
