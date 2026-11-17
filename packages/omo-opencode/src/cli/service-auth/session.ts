@@ -26,7 +26,13 @@ import {
   tokenSchema,
 } from "./protocol"
 import { requestApi } from "./protocol-request"
-import { type MachineIdentity, reconcileDevice, thisMachine } from "./machine-reconcile"
+import {
+  DEVICE_FIXUP_BUDGET_MS,
+  type MachineIdentity,
+  machineRefusalPath,
+  reconcileDevice,
+  thisMachine,
+} from "./machine-reconcile"
 import {
   clearSignedOutMarker,
   readSignedOutMarker,
@@ -220,14 +226,24 @@ export function createSession(options: {
     if (outcome.rotated) await reconcile(outcome.next)
     return outcome.next
   }
+  // The fix-up has one overall budget: its requests abort when it runs out, and the caller gets its token then
+  // whatever is still pending, so a stalled service never holds a refreshed token back.
   async function reconcile(credentials: Credentials): Promise<void> {
-    await reconcileDevice({
+    const machine = options.machine ?? thisMachine
+    const budget = AbortSignal.timeout(machine.budgetMs ?? DEVICE_FIXUP_BUDGET_MS)
+    const stop = signal === undefined ? budget : AbortSignal.any([signal, budget])
+    const stopped = new Promise<void>((resolve) => {
+      if (stop.aborted) resolve()
+      else stop.addEventListener("abort", () => resolve(), { once: true })
+    })
+    const fixup = reconcileDevice({
       api,
       credentials,
-      machine: options.machine ?? thisMachine,
+      machine,
       nowMs: now(),
-      request,
+      request: (path, init) => requestApi(api, path, init, stop),
       accountOf,
+      refusalPath: machineRefusalPath(options.home ?? homedir(), credentialId(api)),
       log: options.log ?? (() => undefined),
       renamed: (name) =>
         locked(async () => {
@@ -236,6 +252,7 @@ export function createSession(options: {
             await store.write({ ...stored, device: { ...stored.device, name } })
         }),
     })
+    await Promise.race([fixup, stopped])
   }
   async function snapshot(): Promise<Credentials | null> {
     return renewed(async (view) => {

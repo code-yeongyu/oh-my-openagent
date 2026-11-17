@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, onTestFinished, test } from "bun:test"
 import { createPublicKey, verify } from "node:crypto"
 import type { CredentialStore } from "./keystore"
 import { generateDeviceKeys } from "./device-keys"
@@ -28,7 +28,15 @@ function memoryStore(initial: Credentials) {
   return { store, current: () => value }
 }
 
-type Service = { name: string; bound: boolean | undefined; bindAnswer: "bound" | "machine_exists" }
+type Service = {
+  name: string
+  bound: boolean | undefined
+  bindAnswer: "bound" | "machine_exists"
+  /** Rows of other devices listed before this one; they may be malformed. */
+  others?: unknown[]
+  /** When set, the device list answers only after this settles. */
+  stall?: Promise<void>
+}
 
 function service(initial: Service) {
   const state = { ...initial }
@@ -43,8 +51,10 @@ function service(initial: Service) {
       return Response.json({ ...expiredTokens, accessToken: `access-${rotation}`, refreshToken: `refresh-${rotation}` })
     }
     if (request.method === "GET" && pathname === "/v1/devices") {
+      await state.stall
       return Response.json({
         devices: [
+          ...(state.others ?? []),
           {
             id: grant.device.id,
             name: state.name,
@@ -89,7 +99,7 @@ function service(initial: Service) {
   return { api, state, binds, renames }
 }
 
-async function signedIn(name: string, server: ReturnType<typeof service>) {
+async function signedIn(name: string, server: ReturnType<typeof service>, budgetMs?: number) {
   const stored: Credentials = {
     ...grant,
     ...expiredTokens,
@@ -109,7 +119,7 @@ async function signedIn(name: string, server: ReturnType<typeof service>) {
       forgotten.push("discard")
     },
     deviceService: { adopt: async () => undefined, forget: async () => void forgotten.push("forget") },
-    machine: { digest: async () => DIGEST, name: () => "build-box" },
+    machine: { digest: async () => DIGEST, name: () => "build-box", ...(budgetMs === undefined ? {} : { budgetMs }) },
     log: (line) => lines.push(line),
   })
   return { session, memory, lines, forgotten, stored }
@@ -142,6 +152,48 @@ describe("a refresh binds an unbound device to its machine once (#13651)", () =>
     expect(after?.accessToken).toBe("access-1")
     expect(m.forgotten).toEqual([])
     expect(m.lines).toHaveLength(1)
+
+    // The refusal is remembered: a later refresh neither re-sends the signed bind nor logs again.
+    await m.session.accessToken()
+    expect(server.binds).toHaveLength(1)
+    expect(m.lines).toHaveLength(1)
+  })
+
+  test("a malformed row of another device does not stop this device's bind and rename", async () => {
+    const server = service({
+      name: "omo CLI on build-box",
+      bound: false,
+      bindAnswer: "bound",
+      others: [{ id: "device-odd", name: "" }, { id: "device-partial" }, "not-a-row"],
+    })
+    const m = await signedIn("omo CLI on build-box", server)
+
+    await m.session.accessToken()
+    expect(server.binds.map((bind) => bind.verified)).toEqual([true])
+    expect(server.renames).toHaveLength(1)
+    expect(m.lines).toEqual([])
+  })
+
+  test("an unreadable row of this device is logged, and nothing is sent", async () => {
+    const server = service({ name: "", bound: false, bindAnswer: "bound" })
+    const m = await signedIn("omo CLI on build-box", server)
+
+    await m.session.accessToken()
+    expect(server.binds).toEqual([])
+    expect(server.renames).toEqual([])
+    expect(m.lines).toHaveLength(1)
+  })
+
+  test("a stalled device list does not hold the refreshed token past the fix-up budget", async () => {
+    const stalled = Promise.withResolvers<void>()
+    onTestFinished(() => stalled.resolve())
+    const server = service({ name: "build-box", bound: false, bindAnswer: "bound", stall: stalled.promise })
+    const m = await signedIn("build-box", server, 200)
+
+    const started = performance.now()
+    expect(await m.session.accessToken()).toBe("access-1")
+    expect(performance.now() - started).toBeLessThan(3_000)
+    expect(server.binds).toEqual([])
   })
 
   test("a bound device, or a service that does not report binding, is never sent a bind", async () => {
