@@ -46,7 +46,10 @@ const DIGEST_CHARS = 32
 // entry written by the previous process, so an unlocked keychain then refuses access. The path is the helper's bytes,
 // under the user temp dir, and it is not removed on exit: the next process executes that same path.
 async function sourceDigest(source: string): Promise<string> {
-  return createHash("sha256").update(await readFile(source)).digest("hex").slice(0, DIGEST_CHARS)
+  return createHash("sha256")
+    .update(await readFile(source))
+    .digest("hex")
+    .slice(0, DIGEST_CHARS)
 }
 
 async function defaultPinDir(): Promise<string> {
