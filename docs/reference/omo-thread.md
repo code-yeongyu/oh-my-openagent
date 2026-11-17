@@ -546,9 +546,9 @@ every other subcommand prints the full result.
 
 | Subcommand | `--json` on success |
 | --- | --- |
-| `list` | `[{thread_id, name, status: live\|resumable, cwd, created_at, updated_at: <ISO 8601 string>\|null, surface: tui\|desktop\|child\|daemon, endpoint: {kind: rpc_host\|tui, socket, routing_id}, alive, error_note?, ...}]`; live and degraded rows use the same bounded final-record policy, so `updated_at` is null rather than an older timestamp when the final complete valid entry's timestamp cannot be proved. After live and degraded rows are combined, the public list sorts known `updated_at` newest first, then unknown activity last, with `thread_id` ascending for ties. A live row also carries its endpoint's own `list_sessions` fields (`sessionId`, the routing handle; `durableSessionId`, `sessionPath`, `attachments`, `kind`, `socket`, `endpoint_kind`) |
-| `send` | `{kind:"ok", thread_id, delivery_id, message_seq, delivery: {kind: queued\|queued_offline\|started\|steered, ...}, effective_mode, endpoint_kind: rpc_host\|tui\|null, deduplicated}` |
-| `read` | `{kind:"ok", thread_id, items: [{seq, role: user\|assistant\|tool\|system, content}], truncated, next_cursor?, source, source_incomplete?, error_note?}` |
+| `list` | `[{thread, name, status: live\|resumable, machine?, cwd, created_at, updated_at: <ISO 8601 string>\|null, link, surface?: tui\|desktop\|child\|daemon, alive?, controls?, error_note?, device?, alias?}]`; `thread` is the address `read` and `send` take back. Live and degraded rows use the same bounded final-record policy, so `updated_at` is null rather than an older timestamp when the final complete valid entry's timestamp cannot be proved. After live and degraded rows are combined, the public list sorts known `updated_at` newest first, then unknown activity last, with `thread` ascending for ties. Routing ids, socket and session-file paths are not shown (#14044) |
+| `send` | `{kind:"ok", thread, delivery_id, message_seq, delivery: {kind: queued\|queued_offline\|started\|steered, ...}, effective_mode, endpoint_kind: rpc_host\|tui\|null, deduplicated}` |
+| `read` | `{kind:"ok", thread, link, items: [{seq, role: user\|assistant\|tool\|system, content}], truncated, next_cursor?, source, source_incomplete?, error_note?}` |
 | `bind` | `{kind:"ok", binding: <binding>, deduplicated}` |
 | `unbind` | `{kind:"ok", binding, already_closed, in_flight: [delivery ids], deduplicated}` |
 | `rebind` | `{kind:"ok", binding, closed: [delivery ids], deduplicated}` |

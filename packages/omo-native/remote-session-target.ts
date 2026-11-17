@@ -29,7 +29,7 @@ export async function resolveSessionTarget(
       row === undefined ? "not_found" : "ambiguous_target",
       row === undefined ? `No session ${session} on this account.` : `More than one device holds session ${session}.`,
       row === undefined ? "Run omo remote sessions to see them." : "Address the session as <device>/<session>.",
-      { thread_id: session },
+      { thread: session },
     ),
   }
 }
