@@ -43,14 +43,9 @@ function context(warnings: string[]) {
 }
 function api() {
   const tools: Record<string, unknown>[] = []
-  const removedToolHints = new Map<string, string>()
   return {
     tools,
-    removedToolHints,
     pi: {
-      registerRemovedToolHint(name: string, hint: string) {
-        removedToolHints.set(name, hint)
-      },
       cwd: process.cwd(),
       rpc: { emit() {}, handle() {} },
       registerTool(tool: Record<string, unknown>) {
@@ -1201,19 +1196,6 @@ describe("thread component production registration", () => {
       context([]) as never,
     )
     expect(f.tools.map((tool) => tool.name)).toEqual(FOURTEEN)
-  })
-
-  // The removed chat-binding tools answer with a pointer to the gateway instead of a bare unknown-tool error.
-  test("#given the removed-tool hint capability #when the component registers #then each removed chat-binding tool gets a hint and none is registered", () => {
-    const f = api()
-    createThreadComponent({ host: host(), stateDirectory: "/tmp/thread-test-state" }).register(
-      f.pi as never,
-      context([]) as never,
-    )
-    const removed = ["thread_bind", "thread_unbind", "thread_rebind", "thread_bindings"]
-    expect([...f.removedToolHints.keys()].sort()).toEqual([...removed].sort())
-    for (const name of removed) expect(f.removedToolHints.get(name)?.trim().length, name).toBeGreaterThan(0)
-    expect(f.tools.map((tool) => tool.name).filter((name) => removed.includes(String(name)))).toEqual([])
   })
 
   test("registers all fourteen tools when a test host is supplied and no host flag exists", () => {
