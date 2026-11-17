@@ -118,7 +118,7 @@ export function createRelaySessionHost(
             threadToolFailure(
               "unsupported",
               `Device ${device} created the thread but did not name its relay key (${located.reason}).`,
-              "Address it by thread_id once thread_list with all_scope lists it, or update omo on that device.",
+              "Address it by its thread value once thread_list with all_scope lists it, or update omo on that device.",
               { device, reason: located.reason },
             ),
           )

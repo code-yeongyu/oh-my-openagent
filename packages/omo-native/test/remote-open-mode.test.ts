@@ -91,7 +91,7 @@ describe("omo remote open with create options", () => {
     expect(result.types.filter((type) => type === "prompt")).toHaveLength(1)
     expect(JSON.parse(result.out[0] ?? "{}")).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-new-on-b" },
+      thread: "dur-new-on-b",
       prompt: { delivery: expect.any(Object) },
     })
   })

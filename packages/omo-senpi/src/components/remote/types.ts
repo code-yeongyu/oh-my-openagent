@@ -285,7 +285,7 @@ export type InterruptJob = { readonly kind: string; readonly id: string; readonl
  * is a mirror, not the thread type itself: derive it from thread/contracts/results.ts once #13444 lands on dev.
  */
 export type InterruptResult = {
-  readonly thread_id: string
+  readonly thread: string
   readonly turn_id?: string
   readonly interrupted: boolean
   readonly background:
