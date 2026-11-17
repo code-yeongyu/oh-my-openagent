@@ -19,6 +19,9 @@ describe("omo-senpi skill-pointers bunshin pointer", () => {
       "run it on my fleet, then report",
       "check the machine mesh",
       "machine-mesh health",
+      // A line break after the owner form ends it like punctuation (#13467 review L1).
+      "check disk on my fleet\nthen report",
+      "my fleet\nrun df",
     ] as const
     for (const text of triggers) {
       expect({ text, matched: matchedSkillPointerNames(text) }).toEqual({ text, matched: ["bunshin"] })
@@ -39,6 +42,10 @@ describe("omo-senpi skill-pointers bunshin pointer", () => {
       "my fleets of ships",
       "our fleet's fuel costs",
       "our fleet size grew last year",
+      // is / are / in after the owner form describe the fleet, not a request to it (#13467 review L2).
+      "our fleet is aging and needs new trucks",
+      "our fleet in the harbor",
+      "our fleets are docked",
       "the fleet hosts a regatta",
       "bunshins",
       "the mesh network",
