@@ -79,13 +79,30 @@ export const aliasedDaclVerdict = (
   )
 }
 
+// The vendored script's SetOwner is refused on the GitHub runner: SeRestorePrivilege is present and
+// disabled, and the progress record is the first stderr line. icacls enables the privilege. The DACL
+// written afterwards is still the vendored one-ACE descriptor. dacl.ts stays byte-pinned.
+const OWNER_LINE = "$acl.SetOwner($sid)\n"
+const RUNNER_PREFIX = String.raw`$ProgressPreference = 'SilentlyContinue'
+$ErrorActionPreference = 'Stop'
+$ownerSet = & icacls.exe $env:LA_PATH /setowner "*$($env:LA_SID)" 2>&1
+if ($LASTEXITCODE -ne 0) { throw "setowner failed: $ownerSet" }
+`
+if (!APPLY_DACL_SCRIPT.includes(OWNER_LINE)) {
+  throw new Error("the vendored DACL script no longer sets the owner on its own line")
+}
+const RUNNER_APPLY_SCRIPT = APPLY_DACL_SCRIPT.replace("$ErrorActionPreference = 'Stop'\n", RUNNER_PREFIX).replace(
+  OWNER_LINE,
+  "",
+)
+
 export const applyExactDacl = async (
   path: string,
   userSid: string,
   kind: "dir" | "file",
   run: PowerShellRunner = runPowerShell,
 ): Promise<void> => {
-  const { code, err } = await run(APPLY_DACL_SCRIPT, { LA_PATH: path, LA_SID: userSid, LA_KIND: kind })
+  const { code, err } = await run(RUNNER_APPLY_SCRIPT, { LA_PATH: path, LA_SID: userSid, LA_KIND: kind })
   if (code !== 0)
     throw new LocalApiError("insecure_state_dir", `the exact DACL could not be applied${firstErrorLine(err)}`)
 }

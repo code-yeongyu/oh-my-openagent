@@ -128,6 +128,19 @@ describe("the SDDL alias of the user", () => {
 })
 
 describe("applying the exact DACL", () => {
+  test("the runner apply script sets the owner with icacls and does not call SetOwner", async () => {
+    let script = ""
+    const run = async (text: string) => {
+      script = text
+      return { code: 0, out: "applied" }
+    }
+    await applyExactDacl("C:\\state", U, "file", run)
+    expect(script.includes("icacls.exe")).toBe(true)
+    expect(script.includes("$ProgressPreference = 'SilentlyContinue'")).toBe(true)
+    expect(script.includes("Set-Acl")).toBe(true)
+    expect(script.includes("SetOwner")).toBe(false)
+  })
+
   test("a failed apply names the first line of the script's error", async () => {
     const failing = async () => ({
       code: 1,
