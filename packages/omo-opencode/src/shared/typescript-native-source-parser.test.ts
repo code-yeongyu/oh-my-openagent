@@ -11,7 +11,9 @@ import { TypeScriptSourceParser } from "./typescript-native-source-parser"
 
 const nativeChildren = (): number[] => {
   // Windows has no pgrep; CIM lists this process's direct children there (ParentProcessId is stable, unlike a
-  // /proc ppid after exit). PowerShell startup cost is fine here: the call sites are per-phase, not per poll.
+  // /proc ppid after exit). The querying PowerShell is itself a direct child of this process, so it is excluded
+  // by its own PID the way memory-core's windows-process-tree.mjs excludes its query process. PowerShell startup
+  // cost is fine here: the call sites are per-phase, not per poll.
   if (process.platform === "win32") {
     let out = ""
     try {
@@ -21,7 +23,7 @@ const nativeChildren = (): number[] => {
           "-NoProfile",
           "-NonInteractive",
           "-Command",
-          `(Get-CimInstance Win32_Process -Filter "ParentProcessId=${process.pid}") | ForEach-Object { $_.ProcessId }`,
+          `(Get-CimInstance Win32_Process -Filter "ParentProcessId=${process.pid}") | Where-Object { $_.ProcessId -ne $PID } | ForEach-Object { $_.ProcessId }`,
         ],
         { encoding: "utf8", windowsHide: true, timeout: 5_000 },
       )
