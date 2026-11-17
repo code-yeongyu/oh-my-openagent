@@ -27,6 +27,9 @@ describe("omo-senpi skill-pointers bunshin pointer", () => {
       "is our fleet offline?",
       "check our fleet in prod",
       "run df on our fleet in parallel",
+      // The same device state or environment on the next line reads the same (#14059 review L1).
+      "our fleet\nis down",
+      "my fleet\n  in prod",
     ] as const
     for (const text of triggers) {
       expect({ text, matched: matchedSkillPointerNames(text) }).toEqual({ text, matched: ["bunshin"] })
