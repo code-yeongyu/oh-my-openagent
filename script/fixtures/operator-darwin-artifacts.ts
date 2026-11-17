@@ -80,19 +80,20 @@ export function writeFixture(files = buildFiles(), manifest: Record<string, unkn
     writeFileSync(join(dir, name), bytes)
     writeFileSync(join(dir, `${name}.sha256`), `${digest}  ${name}\n`)
     const keychain = ARTIFACTS[name]?.keychain
-    const slice = (cpuType: number): SliceFacts => ({
+    const slice = ([cpuType, cpuSubtype]: readonly [number, number]): SliceFacts => ({
       identifier: ARTIFACTS[name]?.identifier ?? "",
       team: TEAM_ID,
       signerTeam: TEAM_ID,
       runtime: true,
       cpuType,
+      cpuSubtype,
       requirementsSha256: keychain?.requirementsSha256 ?? createHash("sha256").update(`requirements:${name}`).digest("hex"),
       entitlements: false,
       cdhash: createHash("sha256").update(`cd:${name}:${cpuType}`).digest("hex").slice(0, 40),
       start: 0,
       hashedEnd: bytes.byteLength,
     })
-    signatures.set(name, keychain ? keychain.cpuTypes.map(slice) : [slice(name.includes("arm64") ? 0x0100000c : 0x01000007)])
+    signatures.set(name, keychain ? keychain.architectures.map(slice) : [slice(name.includes("arm64") ? [0x0100000c, 0] : [0x01000007, 3])])
   }
   const manifestText = JSON.stringify({ schema: "omo-darwin-operator-manifest/1", source_sha: SOURCE_SHA, version: VERSION, operator: "fixture-operator", sha256, ...manifest })
   writeFileSync(join(dir, MANIFEST), manifestText)
