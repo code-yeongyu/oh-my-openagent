@@ -142,6 +142,32 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     })
   })
 
+  test("#given b did not answer and the account listing serves b's rows from the relay's cache #when thread_list runs #then those rows are not live: a snapshot of an unreachable device is no liveness check (#14043)", async () => {
+    const a = account({ rows: [{ ...B_ROW, source: "cache" }], incomplete: ["b"] })
+    const { run } = surface(a.remote)
+    const listed = await run("thread_list", { all_scope: true })
+    expect(listed.kind === "ok" && "threads" in listed && listed.threads.find((t) => t.device === "b")).toMatchObject({
+      thread_id: "dur-on-b",
+      status: "resumable",
+    })
+  })
+
+  test("#given b answered live #when thread_list runs #then its idle row stays live", async () => {
+    const a = account({ rows: [{ ...B_ROW, source: "live" }] })
+    const { run } = surface(a.remote)
+    const listed = await run("thread_list", {})
+    expect(listed.kind === "ok" && "threads" in listed && listed.threads.find((t) => t.device === "b")).toMatchObject({
+      status: "live",
+    })
+  })
+
+  test("#given b lists a session with an empty title #when thread_list runs #then the row carries a derived label (its folder's name), never an empty name (#14043)", async () => {
+    const a = account({ rows: [{ ...B_ROW, title: "" }] })
+    const { run } = surface(a.remote)
+    const listed = await run("thread_list", {})
+    expect(listed.kind === "ok" && "threads" in listed && listed.threads.find((t) => t.device === "b")?.name).toBe("b")
+  })
+
   test("#given the account's devices, one of them not answering this listing round and one offline #when thread_list runs #then devices names each with its metadata and listing state, and the unanswered device is incomplete, not silently absent", async () => {
     const a = account({
       incomplete: ["c"],

@@ -1,14 +1,11 @@
 import type { ThreadAddressEntry } from "../addressing"
-import type { ThreadStatus } from "../contracts/results"
 import type { ThreadToolFailure } from "../errors"
-import { rowThreadId, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
+import { rowStatus, rowThreadId, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
 import { holderTarget, remoteReady } from "./remote-ops"
 
 // Decision 0027 section 1: the relay transport's address book. The account listing becomes entries of the SAME shape the
 // local book yields, so one resolver judges local and remote threads together: an exact durable id, then an account
 // alias, then the name ladder across every entry (two devices sharing a name are ambiguous_target naming each device).
-const statusOf = (state: string): ThreadStatus => (state === "ended" ? "resumable" : "live")
-
 export function relayAddressEntry(row: RemoteSessionRow, aliases?: readonly string[]): ThreadAddressEntry {
   const updated = new Date(row.updated_ms).toISOString()
   const thread_id = rowThreadId(row)
@@ -17,7 +14,7 @@ export function relayAddressEntry(row: RemoteSessionRow, aliases?: readonly stri
   return {
     thread_id,
     name: row.title,
-    status: statusOf(row.state),
+    status: rowStatus(row),
     cwd: row.project,
     created_at: updated,
     updated_at: updated,

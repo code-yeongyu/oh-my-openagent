@@ -1,6 +1,7 @@
 import type { RemoteClient } from "../../remote"
 import type { DeviceService } from "@oh-my-opencode/device-service-core/device-service"
 import type { AliasRegistry } from "./alias-port"
+import type { ThreadStatus } from "../contracts/results"
 
 export type JsonObject = { readonly [key: string]: unknown }
 
@@ -16,6 +17,11 @@ export type RemoteSessionRow = {
   readonly path: string
   readonly state: string
   readonly updated_ms: number
+  /**
+   * `live`: the device answered this listing round. `cache`: it did not, and the relay served its last snapshot, whose
+   * `state` is only what it was then (#14043). Absent (an older service, a row built here): treated as `live`.
+   */
+  readonly source?: "live" | "cache"
 }
 
 export type RemoteDevice = {
@@ -224,6 +230,17 @@ export type RemoteThreadSurface = {
 
 /** The id a listing row has ABOVE the ports (decision 0027 D2): its durable id and nothing else; "" when the device publishes none. */
 export const rowThreadId = (row: RemoteSessionRow): string => row.durable_id ?? ""
+
+/**
+ * A listing row's thread status. Live only when its device answered this round with a non-ended state: a cached row of a
+ * device that did not answer is a snapshot (often days old, of sessions long gone), never proof the session runs (#14043).
+ */
+export const rowStatus = (row: RemoteSessionRow): ThreadStatus =>
+  row.state === "ended" || row.source === "cache" ? "resumable" : "live"
+
+/** A listing row's display name: its title, else its folder's name, so no listed thread shows an empty name (#14043). */
+export const rowLabel = (row: RemoteSessionRow): string =>
+  row.title !== "" ? row.title : (row.project.split(/[\\/]/).findLast((part) => part !== "") ?? "")
 
 /**
  * A session a device holds on disk but no engine runs (omo#13037 A4.2): built from that device's own probe answer, its
