@@ -37,7 +37,7 @@ export function contextTail(
   const afterCompaction = new Set<string>()
   let compaction: JsonObject | undefined
   let reachedRoot = false
-  for (let current = byId.get(leaf); current !== undefined; ) {
+  for (let current = byId.get(leaf); current !== undefined;) {
     const id = idOf(current)
     if (id === undefined || onPath.has(id)) break
     onPath.add(id)

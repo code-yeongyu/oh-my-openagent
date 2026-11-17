@@ -180,7 +180,9 @@ describe("thread SDK: options are checked at the boundary", () => {
     (_entry, create) => {
       const call = create as (options?: unknown) => ThreadSdk
       expect(() => call()).toThrow(
-        new TypeError("createThreadSdk needs { agentDir, cwd, uid, user }; missing or invalid: agentDir, cwd, user, uid"),
+        new TypeError(
+          "createThreadSdk needs { agentDir, cwd, uid, user }; missing or invalid: agentDir, cwd, user, uid",
+        ),
       )
       expect(() => call({ cwd: process.cwd(), uid: 501, user: "q" })).toThrow(
         new TypeError("createThreadSdk needs { agentDir, cwd, uid, user }; missing or invalid: agentDir"),
