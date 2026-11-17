@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { createLiveThreadSurface } from "../../thread/live-surface"
 import { createRemoteClient, type RemoteClient, type RemoteClientDeps } from "../client"
+import { createLocalSessions } from "../local-sessions"
 import type { RemoteFailure, RemoteSender } from "../types"
 
 // The device service fakes (device-service-core's conformance owner and its failure modes) and the one clock both layers
@@ -19,14 +20,16 @@ const PERSON: RemoteSender = { kind: "person", uid: "user-1" }
 // reach whatever socket the machine's own omo host names (OMO_RPC_SOCKET_PATH and its siblings), so the listing that
 // reads this device's sessions (#13787) could block on a real host.
 const NO_OPERATOR_ENDPOINT = join(tmpdir(), "omo-remote-tests-no-endpoint", "rpc.sock")
-const noLocalHost: RemoteClientDeps["localThreadHost"] = async (connect) =>
-  createLiveThreadSurface(undefined, {
-    socket: NO_OPERATOR_ENDPOINT,
-    env: {},
-    statusAll: async () => undefined,
-    registry: async () => [],
-    connect,
-  })
+const noLocalHost: RemoteClientDeps["localSessions"] = async () =>
+  createLocalSessions(async (connect) =>
+    createLiveThreadSurface(undefined, {
+      socket: NO_OPERATOR_ENDPOINT,
+      env: {},
+      statusAll: async () => undefined,
+      registry: async () => [],
+      connect,
+    }),
+  )
 
 const clients: RemoteClient[] = []
 
@@ -40,7 +43,7 @@ export const clientOn = (
     version: "5.1.70",
     stateDir,
     timers: clock,
-    localThreadHost: noLocalHost,
+    localSessions: noLocalHost,
     ...extra,
   })
   clients.push(client)

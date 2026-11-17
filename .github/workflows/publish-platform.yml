@@ -356,7 +356,8 @@ jobs:
   operator-darwin:
     if: github.repository == 'code-yeongyu/oh-my-openagent' && inputs.operator_darwin_artifacts != ''
     runs-on: ubuntu-24.04
-    # Every network lookup in the verifier is bounded; this caps the whole job well below the 6 h default.
+    # The verifier's two network lookups (Apple ticket, GitHub role) time out per call. The gh and git commands in
+    # the other steps have no per-call bound, so this caps the whole job well below the 6 h default.
     timeout-minutes: 30
     permissions:
       # Draft releases are listed only to tokens with push access; nothing here writes.
@@ -374,8 +375,13 @@ jobs:
         with:
           bun-version: "1.4.4"
 
-      # The verifier and its pins run from the dispatched ref (#13943): refuse one that differs from the default
-      # branch's, so a release branch cannot carry its own trust rules. A release branch takes the merged files.
+      # The checkout is the dispatched ref (#13943, #13964). This step refuses a ref whose operator-darwin-*.ts or
+      # bunfig.toml differ from the default branch's, and copies the DEFAULT BRANCH's verifier bytes outside the
+      # checkout. The verify step runs only that copy, from an empty working directory, with no Bun config, no .env
+      # and a cleared environment, so no file in the ref (bunfig.toml, tsconfig.json/jsconfig.json paths, .env) can
+      # replace the verifier or intercept its lookups. It does NOT pin this workflow file itself: a ref that edits
+      # publish-platform.yml can drop this step, which only a protected environment or a branch rule closes (owner
+      # setting).
       - name: Refuse operator darwin verifier code that differs from the default branch
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch || 'dev' }}
@@ -385,12 +391,19 @@ jobs:
             echo "::error::operator_darwin_artifacts refused: could not fetch ${DEFAULT_BRANCH} to compare the verifier."
             exit 1
           fi
-          if ! git diff --quiet FETCH_HEAD HEAD -- '.github/workflows/operator-darwin-*.ts'; then
-            echo "::error::operator_darwin_artifacts refused: .github/workflows/operator-darwin-*.ts differ from ${DEFAULT_BRANCH}; the dispatched ref must carry the merged verifier unchanged."
-            git diff --stat FETCH_HEAD HEAD -- '.github/workflows/operator-darwin-*.ts'
+          if ! git diff --quiet FETCH_HEAD HEAD -- '.github/workflows/operator-darwin-*.ts' bunfig.toml; then
+            echo "::error::operator_darwin_artifacts refused: .github/workflows/operator-darwin-*.ts or bunfig.toml differ from ${DEFAULT_BRANCH}; the dispatched ref must carry the merged verifier unchanged."
+            git diff --stat FETCH_HEAD HEAD -- '.github/workflows/operator-darwin-*.ts' bunfig.toml
             exit 1
           fi
-          echo "The operator darwin verifier equals ${DEFAULT_BRANCH}."
+          PINNED="${RUNNER_TEMP}/operator-darwin-verifier"
+          mkdir -p "$PINNED"
+          git ls-tree --name-only FETCH_HEAD .github/workflows/ | grep '/operator-darwin-[a-z]*\.ts$' | while read -r path; do
+            git show "FETCH_HEAD:${path}" > "${PINNED}/${path##*/}"
+          done
+          test -s "${PINNED}/operator-darwin-verify.ts"
+          echo "OPERATOR_DARWIN_VERIFIER=${PINNED}" >> "$GITHUB_ENV"
+          echo "The operator darwin verifier equals ${DEFAULT_BRANCH}; pinned copy at ${PINNED}."
 
       - name: Download operator darwin artifacts
         env:
@@ -440,10 +453,32 @@ jobs:
             echo "::error::operator_darwin_artifacts refused: could not fetch source ${SOURCE_SHA} and prepared_release_sha ${PREPARED_RELEASE_SHA}."
             exit 1
           fi
-          bun .github/workflows/operator-darwin-verify.ts --dir "$OPERATOR_DARWIN_DIR" --tag "$TAG" \
-            --manifest-sha256 "$MANIFEST_SHA256" --prepared-sha "$PREPARED_RELEASE_SHA" --version "$VERSION" --repo . \
+          # Run the pinned default-branch verifier from an empty directory outside the checkout: no bunfig.toml,
+          # tsconfig/jsconfig or .env from the ref is in reach, and the environment is rebuilt from scratch so no
+          # proxy, TLS override, NODE_OPTIONS or BUN_* setting reaches it.
+          RUN_DIR="$(mktemp -d "${RUNNER_TEMP}/operator-darwin-run.XXXXXX")"
+          : > "${RUN_DIR}/empty-bunfig.toml"
+          # env -i drops the runner environment so a proxy, TLS override or NODE_OPTIONS cannot reach the
+          # verifier. Windows cannot create a process without its system root, so only those variables are forwarded.
+          WIN_BASE=()
+          if [ -n "${SYSTEMROOT:-}" ]; then
+            WIN_BASE+=(
+              "SYSTEMROOT=${SYSTEMROOT}"
+              "SYSTEMDRIVE=${SYSTEMDRIVE:-}"
+              "WINDIR=${WINDIR:-$SYSTEMROOT}"
+              "PATHEXT=${PATHEXT:-.COM;.EXE;.BAT;.CMD}"
+              "COMSPEC=${COMSPEC:-${SYSTEMROOT}\\system32\\cmd.exe}"
+              "TEMP=${TEMP:-}"
+              "TMP=${TMP:-}"
+            )
+          fi
+          (cd "$RUN_DIR" && env -i PATH="$PATH" HOME="$RUN_DIR" RUNNER_TEMP="$RUNNER_TEMP" GH_TOKEN="${GH_TOKEN:-}" \
+            "${WIN_BASE[@]}" \
+            bun --no-env-file --config="${RUN_DIR}/empty-bunfig.toml" "${OPERATOR_DARWIN_VERIFIER}/operator-darwin-verify.ts" \
+            --dir "$OPERATOR_DARWIN_DIR" --tag "$TAG" \
+            --manifest-sha256 "$MANIFEST_SHA256" --prepared-sha "$PREPARED_RELEASE_SHA" --version "$VERSION" --repo "$GITHUB_WORKSPACE" \
             --actor "$ACTOR" --triggering-actor "$TRIGGERING_ACTOR" --repository "$REPOSITORY" \
-            --summary "${RUNNER_TEMP}/operator-darwin-rows.md"
+            --summary "${RUNNER_TEMP}/operator-darwin-rows.md")
           {
             echo "### Darwin artifacts: OPERATOR-BUILT"
             echo "npm provenance covers this publish run only; the darwin build is attested by the Developer ID signature, Apple notarization and the sha256 values below, which the release records."

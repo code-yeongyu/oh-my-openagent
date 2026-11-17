@@ -76,8 +76,16 @@ export const ThreadInterruptParams = Type.Object({
   all_scope: AllScope,
 })
 
+const SelfOrThread = Type.Optional(
+  Type.String({
+    minLength: 1,
+    description:
+      "Thread to act on. Omit or pass self for this session. Accepts a thread_id, a unique name, or a sessionId from thread_list (rpc-N or the short session id); a sessionId resolves to that row's durable thread_id. A miss names the durable thread_id to pass.",
+  }),
+)
+
 const ThreadCloseParams = Type.Object({
-  thread: ThreadAddress,
+  thread: SelfOrThread,
   idempotency_key: IdempotencyKey,
   all_scope: AllScope,
 })
@@ -102,7 +110,7 @@ export const ThreadHandoffParams = Type.Object({
 })
 
 export const ThreadRenameParams = Type.Object({
-  thread: ThreadAddress,
+  thread: SelfOrThread,
   name: Type.Optional(
     Type.String({
       minLength: 1,
