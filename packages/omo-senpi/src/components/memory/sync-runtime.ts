@@ -6,6 +6,7 @@ export {
   listRemotes,
   openAccountSession,
   openDeviceSync,
+  repoHasCommit,
   resolveSpace,
 } from "@oh-my-opencode/memory-core/sync-engine"
 export {
@@ -18,7 +19,7 @@ export {
   verifiedPhraseNoticeStatus,
 } from "@oh-my-opencode/memory-core/sync-engine"
 // A freeze status exists only while the engine runs, so its words ship with the engine, not the eager bundle.
-export { failureRpcSync, freezeFailure } from "./sync-status-copy"
+export { causeNote, failureRpcSync, freezeFailure } from "./sync-status-copy"
 
 /** Proves the packaged sidecar's file assets load: the Loro wasm and the case-fold table beside it. */
 export async function checkSyncRuntime(): Promise<void> {

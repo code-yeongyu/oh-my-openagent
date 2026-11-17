@@ -29,11 +29,19 @@
         "test/fixtures/trust-ensure-probe.ts",
         "test/fixtures/trust-stage-probe.ts",
         "test/packed-consumer.mjs",
+        "test/remote-attach-support.ts",
+        // the shared omo remote CLI test kit remote-cli.test.ts and remote-cli-session-host.test.ts import (omo#13602): a
+        // test-support module, so knip's test plugin lists it as an exports-unchecked entry and its exports would go unchecked
+        // without this row
+        "test/remote-cli-harness.ts",
         // the call-site rule remote-local-reachability.test.ts imports (omo#13440): a test-support module, so knip's test
         // plugin lists it as an exports-unchecked entry and its exports would go unchecked without this row
         "test/spawn-call-sites.ts",
         "test/teardown.test-support.ts",
         "test/trust-certificate-fixtures.ts",
+        // the private-TMPDIR helper the trust suites import (omo#13697): a test-support module, so knip's test plugin lists
+        // it as an exports-unchecked entry and its exports would go unchecked without this row
+        "test/trust-private-tmpdir.ts",
       ],
       "ignoreFiles": [
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs

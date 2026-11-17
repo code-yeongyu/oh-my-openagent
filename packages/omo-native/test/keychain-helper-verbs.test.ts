@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { existsSync } from "node:fs"
+import { chmodSync, copyFileSync, existsSync } from "node:fs"
+import { join } from "node:path"
 import { ACCOUNT, createHarness, type Harness, isDarwin, userSearchList } from "./keychain-helper.test-support"
 
 const STAGING = `${ACCOUNT}.staging`
@@ -107,6 +108,18 @@ describe.skipIf(!isDarwin)("omo-keychain helper verbs on a throwaway keychain (#
     })
     for (const name of slots) expect(await harness.fixture("delete", name)).toContain("status 0")
     expect((await harness.run({ v: 1, verb: "remove", account: ACCOUNT })).reply).toEqual({ ok: true })
+  })
+
+  test("#given a helper-owned item #when remove runs from a different binary path on an unlocked keychain #then the item is deleted", async () => {
+    expect((await harness.run(request("write", { value: "dummy-stuck" }))).reply).toEqual({ ok: true, created: true })
+    expect(await harness.fixture("read", ACCOUNT)).toContain("status -25293")
+    const copy = join(harness.dir, "omo-keychain-other-path")
+    copyFileSync(harness.helper, copy)
+    chmodSync(copy, 0o755)
+    expect((await harness.run({ v: 1, verb: "remove", account: ACCOUNT }, { binary: copy })).reply).toEqual({
+      ok: true,
+    })
+    expect(await harness.fixture("read", ACCOUNT)).toContain("status -25300")
   })
 
   test("an item another identity created is never read, written, staged over or deleted", async () => {

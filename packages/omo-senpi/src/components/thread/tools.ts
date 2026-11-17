@@ -11,6 +11,9 @@ import {
   threadToolParamSchemas,
   type ThreadCloseInput,
   type ThreadCreateInput,
+  type ThreadCreatePrompt,
+  type ThreadResultSummary,
+  type ThreadSendResult,
   type ThreadHandoffInput,
   type ThreadInterruptInput,
   type ThreadListInput,
@@ -24,6 +27,8 @@ import {
   type ThreadToolResult,
 } from "./contracts"
 import { THREAD_FAMILY_PROMPT_GUIDELINES } from "./metadata"
+import { createLaunch } from "./control/create-launch"
+import { createdDeviceRow } from "./remote/address-book"
 import { threadLink } from "./thread-link"
 export type { ThreadTranscriptEntry } from "./reader"
 import { hashArgs } from "./gateway/bindings"
@@ -33,9 +38,10 @@ import type { DeliveryPipeline } from "./gateway/pipeline"
 import type { DeliveryTarget } from "./gateway/transport"
 import { createGatewayServices } from "./tools/gateway-services"
 import { listThreads, readThread } from "./tools/read-ops"
-import { createRelayTools } from "./tools/relay-tools"
+import { createRelayTools, REMOVED_RELAY_TOOL_HINTS } from "./tools/relay-tools"
 import { consumedSendersOf, threadSendPermission } from "./tools/reply-permission"
 import { otherDevice, replyTargetMismatch } from "./tools/reply-target"
+import { accountDevices } from "./remote/account"
 import { claimCreatedAlias, listAcross, planCreate, renameAlias, withAlias } from "./remote/lazy-ops"
 import { locateControl } from "./control/locate"
 import { closeThread, interruptThread, setModelOn, setThinkingLevelOn } from "./control/operations"
@@ -326,101 +332,178 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
     parameters: threadToolParamSchemas.thread_create,
     promptGuidelines: [THREAD_FAMILY_PROMPT_GUIDELINES],
     execute: (id: string, args: ThreadCreateInput, _signal, _onUpdate, ectx) =>
-      execute("thread_create", id, args, ectx, async (current, value, _operationId, callerId) => {
-        const skills =
-          value.skills === undefined || value.skills.length === 0 ? undefined : checkInitialSkills(value.skills)
-        if (skills?.kind === "invalid")
-          return failure(
-            "invalid_arguments",
-            `Not a skill name: ${skills.names.join(", ")}. Pass the names of installed skills, never a path or text.`,
-            "Pass skill names as listed by the skill index.",
-            { invalid: skills.names },
-          )
-        const loaded = skills?.kind === "ok" ? skills.names : undefined
-        const entries = resolveEntries(options, current)
-        const callerCwd = options.callerWorkspaceRoot()
-        const plan = await planCreate(options.remote, value, {
-          host: createLocalSessionHost(options.host, entries),
-          ...(callerCwd.trim() === "" ? {} : { callerCwd }),
-          resolve: (address) => resolution(options, entries, address, callerId, true),
-          // Decision 0027: an existing thread or a fork source is found by the same resolver every send uses, not by a second ladder.
-          locate: async (address) => {
-            const found = await resolveAcross(options, entries, address, callerId, true)
-            if (found.kind === "error")
-              return { kind: "error", result: { kind: "error", error: found } as ThreadToolResult }
-            // A session found only by a probe (no file path: its device holds it but runs it nowhere) is no existing thread to
-            // open (omo#13037 A4.4): today's answer for a holder that cannot be reached, and no open is sent. A listed ended
-            // thread still opens from its file, as before.
-            if (
-              found.entry.transport?.kind === "relay" &&
-              found.entry.transport.row.state === "ended" &&
-              found.entry.transport.row.path === ""
+      execute("thread_create", id, args, ectx, async (current, value, operationId, callerId) => {
+        const launch = createLaunch(value, options.remote?.permissionPreset?.())
+        if ("kind" in launch) return launch
+        const made = await (async (): Promise<ThreadToolResult> => {
+          const skills =
+            value.skills === undefined || value.skills.length === 0 ? undefined : checkInitialSkills(value.skills)
+          if (skills?.kind === "invalid")
+            return failure(
+              "invalid_arguments",
+              `Not a skill name: ${skills.names.join(", ")}. Pass the names of installed skills, never a path or text.`,
+              "Pass skill names as listed by the skill index.",
+              { invalid: skills.names },
             )
-              return {
-                kind: "error",
-                result: failure(
-                  "not_found",
-                  `Thread ${found.entry.thread_id} on device ${found.entry.transport.row.device} is not running there.`,
-                  "Call thread_list with all_scope to find the live thread.",
-                  { device: found.entry.transport.row.device, thread_id: found.entry.thread_id },
-                ),
-              }
-            return found.entry.transport?.kind === "relay"
-              ? { kind: "remote", row: found.entry.transport.row }
-              : { kind: "local", address: found.entry.thread_id, accountWide: true }
-          },
-          existing: (address) => existingHere(current, address, callerId),
-        })
-        if (plan.kind === "done") return await withAlias(options.remote, value.alias, plan.result, plan.device)
-        // An alias no account holds names the thread on its device instead (#13104); a given name wins.
-        // Trimmed like thread_rename's alias-as-name, so " x " and "x" name the thread the same way.
-        const name = plan.localAlias === undefined ? value.name : (value.name ?? value.alias?.trim())
-        if (name !== undefined) {
-          const conflict = checkNameConflict(await plan.host.visible(), name)
-          if (conflict.kind === "error") return { kind: "error", error: conflict } as ThreadToolResult
-        }
-        const preset = plan.creates ? options.remote?.permissionPreset?.() : undefined
-        const opened = await plan.host.open({
-          ...plan.request,
-          ...(plan.creates && name !== undefined ? { name } : {}),
-          ...(plan.creates && loaded !== undefined ? { initialSkills: loaded } : {}),
-          ...(preset === undefined ? {} : { permissionPreset: preset }),
-        })
-        if (opened.kind === "error") return opened
-        const created: ThreadToolResult = {
-          kind: "ok",
-          thread: { ...opened.thread, ...(plan.creates && loaded !== undefined ? { requested_skills: loaded } : {}) },
-          deduplicated: false,
-          ...workspaceNote(opened.thread, callerCwd),
-        }
-        const recorded = plan.creates ? await recordThreadCreator(options, current, callerId, created) : created
-        if (plan.localAlias !== undefined)
-          return recorded.kind === "ok"
-            ? ({ ...recorded, alias_scope: "local", alias_unavailable: plan.localAlias } as ThreadToolResult)
-            : recorded
-        if (!plan.creates) return await withAlias(options.remote, value.alias, recorded, plan.host.device)
-        const claimed = await claimCreatedAlias(options.remote, value.alias, recorded, plan.host.device)
-        if (!("local" in claimed)) return claimed
-        // The account was gone by the claim, after the create: the alias names the new thread here, as with no account.
-        if (recorded.kind !== "ok" || !("thread" in recorded) || value.alias === undefined) return recorded
-        const local = { alias_scope: "local", alias_unavailable: claimed.local } as const
-        if (value.name !== undefined) return { ...recorded, ...local } as ThreadToolResult
-        const localName = value.alias.trim()
-        const named = await nameCreatedThread(recorded.thread.thread_id, localName, await plan.host.visible(), callerId)
-        return (
-          named === undefined
-            ? {
-                ...recorded,
-                thread: {
-                  ...recorded.thread,
-                  name: localName,
-                  link: threadLink(recorded.thread.thread_id, localName),
-                },
-                ...local,
-              }
-            : { ...recorded, ...local, local_name_unavailable: named }
-        ) as ThreadToolResult
+          const loaded = skills?.kind === "ok" ? skills.names : undefined
+          const entries = resolveEntries(options, current)
+          const callerCwd = options.callerWorkspaceRoot()
+          const plan = await planCreate(options.remote, value, {
+            host: createLocalSessionHost(options.host, entries),
+            ...(callerCwd.trim() === "" ? {} : { callerCwd }),
+            resolve: (address) => resolution(options, entries, address, callerId, true),
+            // Decision 0027: an existing thread or a fork source is found by the same resolver every send uses, not by a second ladder.
+            locate: async (address) => {
+              const found = await resolveAcross(options, entries, address, callerId, true)
+              if (found.kind === "error")
+                return { kind: "error", result: { kind: "error", error: found } as ThreadToolResult }
+              // A session found only by a probe (no file path: its device holds it but runs it nowhere) is no existing thread to
+              // open (omo#13037 A4.4): today's answer for a holder that cannot be reached, and no open is sent. A listed ended
+              // thread still opens from its file, as before.
+              if (
+                found.entry.transport?.kind === "relay" &&
+                found.entry.transport.row.state === "ended" &&
+                found.entry.transport.row.path === ""
+              )
+                return {
+                  kind: "error",
+                  result: failure(
+                    "not_found",
+                    `Thread ${found.entry.thread_id} on device ${found.entry.transport.row.device} is not running there.`,
+                    "Call thread_list with all_scope to find the live thread.",
+                    { device: found.entry.transport.row.device, thread_id: found.entry.thread_id },
+                  ),
+                }
+              return found.entry.transport?.kind === "relay"
+                ? { kind: "remote", row: found.entry.transport.row }
+                : { kind: "local", address: found.entry.thread_id, accountWide: true }
+            },
+            existing: (address) => existingHere(current, address, callerId),
+          })
+          if (plan.kind === "done") return await withAlias(options.remote, value.alias, plan.result, plan.device)
+          // An alias no account holds names the thread on its device instead (#13104); a given name wins.
+          // Trimmed like thread_rename's alias-as-name, so " x " and "x" name the thread the same way.
+          const name = plan.localAlias === undefined ? value.name : (value.name ?? value.alias?.trim())
+          if (name !== undefined) {
+            const conflict = checkNameConflict(await plan.host.visible(), name)
+            if (conflict.kind === "error") return { kind: "error", error: conflict } as ThreadToolResult
+          }
+          const preset = plan.creates ? launch.permissionPreset : undefined
+          const opened = await plan.host.open({
+            ...plan.request,
+            ...(plan.creates && name !== undefined ? { name } : {}),
+            ...(plan.creates && loaded !== undefined ? { initialSkills: loaded } : {}),
+            ...(preset === undefined ? {} : { permissionPreset: preset }),
+            ...(plan.creates ? launch.profile : {}),
+          })
+          if (opened.kind === "error") return opened
+          const created: ThreadToolResult = {
+            kind: "ok",
+            thread: { ...opened.thread, ...(plan.creates && loaded !== undefined ? { requested_skills: loaded } : {}) },
+            deduplicated: false,
+            ...workspaceNote(opened.thread, callerCwd),
+          }
+          const recorded = plan.creates ? await recordThreadCreator(options, current, callerId, created) : created
+          if (plan.localAlias !== undefined)
+            return recorded.kind === "ok"
+              ? ({ ...recorded, alias_scope: "local", alias_unavailable: plan.localAlias } as ThreadToolResult)
+              : recorded
+          if (!plan.creates) return await withAlias(options.remote, value.alias, recorded, plan.host.device)
+          const claimed = await claimCreatedAlias(options.remote, value.alias, recorded, plan.host.device)
+          if (!("local" in claimed)) return claimed
+          // The account was gone by the claim, after the create: the alias names the new thread here, as with no account.
+          if (recorded.kind !== "ok" || !("thread" in recorded) || value.alias === undefined) return recorded
+          const local = { alias_scope: "local", alias_unavailable: claimed.local } as const
+          if (value.name !== undefined) return { ...recorded, ...local } as ThreadToolResult
+          const localName = value.alias.trim()
+          const named = await nameCreatedThread(
+            recorded.thread.thread_id,
+            localName,
+            await plan.host.visible(),
+            callerId,
+          )
+          return (
+            named === undefined
+              ? {
+                  ...recorded,
+                  thread: {
+                    ...recorded.thread,
+                    name: localName,
+                    link: threadLink(recorded.thread.thread_id, localName),
+                  },
+                  ...local,
+                }
+              : { ...recorded, ...local, local_name_unavailable: named }
+          ) as ThreadToolResult
+        })()
+        if (value.prompt === undefined || made.kind !== "ok" || !("thread" in made) || made.deduplicated) return made
+        return {
+          ...made,
+          prompt: await firstPrompt(current, made.thread, value, operationId, callerId),
+        } as ThreadToolResult
       }),
+  }
+  /**
+   * Delivers a create's `prompt` to the thread it just made, through the one send path (#13410), under a key derived
+   * from the create's own: a replayed create answers its stored result, so the prompt is sent once per key. The target is
+   * the created thread itself (its device and durable id), never a lookup by name, so a listing that has not caught up
+   * yet cannot answer not_found (#13001).
+   */
+  async function firstPrompt(
+    current: ThreadHostView,
+    thread: ThreadResultSummary,
+    value: ThreadCreateInput,
+    operationId: string,
+    callerId: string,
+  ): Promise<ThreadCreatePrompt> {
+    const target: DeliveryTarget =
+      thread.device === undefined
+        ? { kind: "local", thread_id: thread.thread_id, all_scope: true }
+        : {
+            kind: "remote",
+            row: createdDeviceRow(thread.device, thread),
+          }
+    const send = {
+      thread: thread.thread_id,
+      message: value.prompt ?? "",
+      ...(value.delivery === undefined ? {} : { delivery: value.delivery }),
+    }
+    // The thread exists from here on: a delivery that throws (a store or connection failure, not a typed refusal) is the
+    // prompt's outcome, never the create's, so the caller still gets the thread it made (review L1 at 0571de8).
+    let sent: ThreadToolResult
+    try {
+      sent = await deliverThrough(
+        options,
+        pipeline,
+        current,
+        target,
+        send,
+        `${operationId}:prompt`,
+        callerId,
+        undefined,
+      )
+    } catch (error) {
+      return {
+        error: threadToolFailure(
+          "internal_error",
+          `The thread was created, but its first prompt was not delivered: ${error instanceof Error ? error.message : String(error)}.`,
+          `Send it with thread_send to ${thread.thread_id}; read the thread first if the prompt may have arrived.`,
+          { thread_id: thread.thread_id },
+        ),
+      }
+    }
+    if (sent.kind === "error") return { error: sent.error }
+    const { delivery, deduplicated, delivery_id, effective_mode, endpoint } = sent as Extract<
+      ThreadSendResult,
+      { kind: "ok" }
+    >
+    return {
+      delivery,
+      deduplicated,
+      ...(delivery_id === undefined ? {} : { delivery_id }),
+      ...(effective_mode === undefined ? {} : { effective_mode }),
+      ...(endpoint === undefined ? {} : { endpoint }),
+    }
   }
   /**
    * Names a thread thread_create already made, through the same path thread_rename takes (the create's name check against
@@ -467,9 +550,9 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
   const read: AnyTool = {
     ...metadata("thread_read"),
     parameters: threadToolParamSchemas.thread_read,
-    execute: (id: string, args: ThreadReadInput, _signal, _onUpdate, ectx) =>
+    execute: (id: string, args: ThreadReadInput, signal, _onUpdate, ectx) =>
       execute("thread_read", id, args, ectx, async (current, value, _operationId, callerId) =>
-        readThread(options, current, value, callerId),
+        readThread(options, current, value, callerId, signal),
       ),
   }
   const send: AnyTool = {
@@ -497,10 +580,11 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
     parameters: threadToolParamSchemas.thread_close,
     execute: (id: string, args: ThreadCloseInput, _signal, _onUpdate, ectx) =>
       execute("thread_close", id, args, ectx, async (current, value, _operationId, callerId) => {
-        const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
+        const located = await locateControl(options, current, value.thread ?? "self", value.all_scope, callerId)
         if (located.kind === "error") return located.result
         // Nothing live holds it: there is nothing to close, and the thread stays resumable from its session file.
-        if (located.kind === "not_live") return { kind: "ok", ...controlIdentity(located), closed: false }
+        if (located.kind === "not_live")
+          return { kind: "ok", ...controlIdentity(located), closed: false, reason: "not_live" }
         return await closeThread(located.control)
       }),
   }
@@ -521,7 +605,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
           return failure("invalid_arguments", "Pass a new name, a new alias, or both.", "Retry with name or alias.")
         // Every refusal runs before the alias or the name changes anywhere: the target's own liveness first (locate:
         // a thread with no live owner, a device that is offline), then the name checks.
-        const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
+        const located = await locateControl(options, current, value.thread ?? "self", value.all_scope, callerId)
         if (located.kind === "error") return located.result
         const thread = located.kind === "control" ? located.control : located
         // #13066: the name is checked on the target device's own listing, and only when a live owner holds the thread.
@@ -611,7 +695,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
       }
     return { kind: "file", sessionPath: entry.session_path }
   }
-  const relayTools = createRelayTools({ options, relay, view, failure })
+  const relayTools = createRelayTools({ options, relay, failure })
   const dispose = () => {
     pipeline.dispose()
     unanswered.clear()
@@ -829,8 +913,9 @@ async function deliverThrough(
 }
 
 /**
- * Registers the eighteen tools, and with `pi.on` the store extensions' session tools at each `session_start`
- * (`tools/extension-tools.ts`); `dispose` (shutdown) cancels the relay's background retries and drops the receipt-recovery keys.
+ * Registers the fourteen tools, a removed-tool hint for each chat-binding tool sessions no longer have, and with `pi.on`
+ * the store extensions' session tools at each `session_start` (`tools/extension-tools.ts`); `dispose` (shutdown) cancels
+ * the relay's background retries and drops the receipt-recovery keys.
  */
 export function registerThreadTools(
   pi: ExtensionToolHost,
@@ -840,6 +925,7 @@ export function registerThreadTools(
   const built = buildThreadTools(options)
   // Thread tools run on the loop side of a split session (engine `ToolDefinition.runs`).
   for (const tool of built.tools) pi.registerTool({ ...tool, runs: "brain" })
+  for (const [name, hint] of Object.entries(REMOVED_RELAY_TOOL_HINTS)) pi.registerRemovedToolHint?.(name, hint)
   if (pi.on !== undefined)
     registerExtensionTools(pi as ExtensionToolHost & Required<Pick<ExtensionToolHost, "on">>, options, log)
   return { dispose: built.dispose }
@@ -853,7 +939,7 @@ async function thisDeviceOf(
   senders: readonly ConsumedSender[],
 ): Promise<string | undefined> {
   if (options.remote === undefined || !senders.some((sender) => sender.device !== undefined)) return undefined
-  return (await options.remote.sessions.thisDevice().catch(() => undefined)) ?? undefined
+  return (await accountDevices(options.remote.client).catch(() => undefined))?.here ?? undefined
 }
 
 /** True when `address` is an approved reply to a consumed sender on another device, or names such senders ambiguously. */
