@@ -2,12 +2,11 @@
 
 import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process"
-import { dirname, join } from "node:path"
 import { createInterface } from "node:readline"
-import { fileURLToPath } from "node:url"
 
 import { resolveComputerSettings } from "@oh-my-opencode/senpi-desktop-tool"
 import { type ChildFactory, DesktopEngineUnavailableError } from "@oh-my-opencode/senpi-desktop-service"
+import { FAKE_ENGINE_PATH } from "@oh-my-opencode/senpi-desktop-service/testing"
 
 import type { ComponentContext, ComponentLogger } from "../../extension/types"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
@@ -17,10 +16,6 @@ import type {
 } from "../telemetry/omo-native-computer-use"
 import { createComputerUseComponent } from "./index"
 
-const FAKE_ENGINE = join(
-  dirname(fileURLToPath(import.meta.url)),
-  "../../../../senpi-desktop-service/test/fake-engine.mjs",
-)
 const children: ChildProcessWithoutNullStreams[] = []
 
 class HostApi extends FakeExtensionAPI {
@@ -53,7 +48,7 @@ function fakeEngine(): {
   })
   return {
     factory: () => {
-      const child = spawn(process.execPath, [FAKE_ENGINE, "--stdio"], {
+      const child = spawn(process.execPath, [FAKE_ENGINE_PATH, "--stdio"], {
         env: { ...process.env, FAKE_ENGINE_DESKTOP: "1" },
         stdio: "pipe",
       })

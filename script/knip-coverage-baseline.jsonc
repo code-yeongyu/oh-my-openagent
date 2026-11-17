@@ -37,8 +37,6 @@
     "script/ci-fast-path.mjs": ["exports"],
     // pre-existing at origin dev 4686e425b5: unused export(s) judgeLeg
     "script/ci-leg-tests-guard.mjs": ["exports"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) platformOnlyStepTexts
-    "script/ci-platform-invocations.mjs": ["exports"],
     // pre-existing at origin dev 4686e425b5: unused export(s) claudeCodePackageFor, lockfileIntegrity
     "script/claude-code-pin.ts": ["exports"],
     // pre-existing at origin dev 4686e425b5: unused export(s) proveStagedDesktopEngine
@@ -114,7 +112,9 @@
   // Vendored build output pinned by packages/omo-senpi/vendor/PIN.json: upstream code, never export-checked here either.
   // The omo 5.1.66 local API decoders, vendored byte for byte (git blob ids pinned in its PIN.json) for the old-client
   // tests: a released omo's code, never export-checked here either.
-  "ignore": ["packages/shared-skills/upstreams/**", "packages/omo-senpi/vendor/**", "packages/device-service-core/vendor/omo-5.1.66-decoder/**"],
+  // The device service local API client, vendored byte for byte from omo-relay-daemon (omo#13475, pinned by its PIN.json):
+  // upstream's code and API, export-checked in that repo, never here.
+  "ignore": ["packages/shared-skills/upstreams/**", "packages/omo-senpi/vendor/**", "packages/device-service-core/vendor/omo-5.1.66-decoder/**", "packages/device-service-core/src/local-api/**"],
   "workspaces": {
     ".": {
       "includeEntryExports": true,
@@ -215,8 +215,6 @@
         "script/check-temp-leak-report-only.d.mts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "script/ci-fast-path.d.mts",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "script/ci-platform-invocations.d.mts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "script/fixtures/senpi-hooks-state-error-runner.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
@@ -994,8 +992,6 @@
         "src/sync/crypto/vendor/sync-format/snapshot.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) PLAINTEXT_LIMIT
         "src/sync/crypto/vendor/sync-format/stream.ts": ["exports"],
-        // pre-existing at origin dev 4686e425b5: unused export(s) SyncCommitError
-        "src/sync/engine/adapters/git-sync-repo.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) OversizedItemError
         "src/sync/engine/batches.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) ManualClock, inProcessLock
@@ -1008,8 +1004,6 @@
         "src/sync/engine/index.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) MAX_RECEIPTS
         "src/sync/item/capture-receipts.ts": ["exports"],
-        // pre-existing at origin dev 4686e425b5: unused export(s) x25519PublicKey
-        "src/sync/recovery/derive.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) VETO_WINDOW_MS
         "src/sync/recovery/index.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) VETO_WINDOW_MS
@@ -2271,7 +2265,7 @@
         "src/components/thread/contracts/fields.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) THREAD_MESSAGE_MAX_BYTES, THREAD_SUMMARY_MAX_LENGTH
         "src/components/thread/contracts/index.ts": ["exports"],
-        // pre-existing at origin dev 4686e425b5: unused export(s) ThreadListParams, ThreadReadParams, ThreadInterruptParams, ThreadHandoffParams, ThreadRenameParams, ThreadSetModelParams, ThreadSetReasoningParams, ThreadBindParams, ThreadUnbindParams, ThreadRebindParams and 5 more
+        // pre-existing at origin dev 4686e425b5: unused export(s) ThreadListParams, ThreadReadParams, ThreadInterruptParams, ThreadHandoffParams, ThreadRenameParams, ThreadSetModelParams, ThreadSetReasoningParams, ThreadReportParams, ThreadOutboxParams, ThreadOutboxAckParams and 1 more
         "src/components/thread/contracts/params.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) ENDPOINT_REGISTRY_LAYOUT, canonicalEndpointPath, socketNamesDirectory
         "src/components/thread/endpoint-registry.ts": ["exports"],

@@ -125,9 +125,9 @@ test("an enable that pinned still joins, and reports the root-change check as sk
   expect(pinned.ok && pinned.anchor.genesisDigest).toBe(f.built.digest)
 })
 
-test("no bridge preserves needs_first_device without changing switches", async () => {
+test("no bridge answers passkey_unavailable for the passkey method without changing switches", async () => {
   const f = await setup()
   const { genesis: _genesis, ...input } = f.input
-  expect(await enableSync(input)).toEqual({ kind: "needs_first_device" })
+  expect(await enableSync(input)).toEqual({ kind: "passkey_unavailable" })
   expect(f.server.switches).toHaveLength(0)
 })

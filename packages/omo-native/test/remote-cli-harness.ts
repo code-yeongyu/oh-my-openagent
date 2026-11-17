@@ -1,4 +1,5 @@
 import { afterEach } from "bun:test"
+import { generateKeyPairSync } from "node:crypto"
 import { chmodSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -6,10 +7,13 @@ import { join } from "node:path"
 import { connectDeviceService } from "../../device-service-core/src/index.ts"
 import { type FakeOwner, startFakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
 import { defaultWorld } from "../../device-service-core/test/local-api/conformance/world.ts"
+import type { RemoteClient } from "../../omo-senpi/src/components/remote/index"
+import type { Credentials } from "../../omo-opencode/src/cli/service-auth/protocol"
 import type { RemoteThreadSurface } from "../../omo-senpi/src/components/thread/remote/ports"
 import type { BootstrapSetup, DeviceLink } from "../remote-bootstrap"
 import { runRemoteVerb } from "../remote-cli"
 import type { ColdWake } from "../remote-cold-wake"
+import type { RemoteOptOut } from "../remote-opt-out"
 
 // The `omo remote` test harness: the real verbs over a fake device service (the conformance owner), with this omo's
 // sign-in, bootstrap and session host unit as seams. Shared by every remote-cli test file.
@@ -56,7 +60,13 @@ export async function run(
   account = SIGNED_IN,
   bootstrap = testBootstrap(),
   remote?: RemoteThreadSurface,
-  extra: { readonly packageRoot?: string; readonly coldWake?: ColdWake; readonly linkDevice?: DeviceLink } = {},
+  extra: {
+    readonly packageRoot?: string
+    readonly coldWake?: ColdWake
+    readonly linkDevice?: DeviceLink
+    readonly client?: () => RemoteClient
+    readonly optOut?: RemoteOptOut
+  } = {},
 ) {
   let dir = stateDir
   if (dir === undefined) {
@@ -87,6 +97,7 @@ export async function run(
       linkDevice: async () => {
         throw new Error("this test links no device")
       },
+      optOut: { read: () => false, record: () => {}, clear: () => {} },
       ...(remote === undefined ? {} : { remote: () => remote }),
       ...extra,
     },
@@ -94,3 +105,18 @@ export async function run(
   )
   return { code, out, err, written, coldWake }
 }
+
+/** A signed-in session's credential with real key material, as the device link hands it over. */
+export const signedInCredential = (): Credentials => ({
+  accessToken: "access-1",
+  accessTokenExpiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+  refreshToken: "refresh-1",
+  device: { id: "dev-self", name: "This Mac" },
+  accountId: "acct-1",
+  signingPrivateKey: generateKeyPairSync("ed25519")
+    .privateKey.export({ format: "der", type: "pkcs8" })
+    .toString("base64"),
+  sealingPrivateKey: generateKeyPairSync("x25519")
+    .privateKey.export({ format: "der", type: "pkcs8" })
+    .toString("base64"),
+})

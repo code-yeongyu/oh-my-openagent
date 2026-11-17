@@ -15,7 +15,11 @@ export type ReadResult =
 export type Row8bChoice = "re-login" | "password-dialog"
 const ROW_8B_DEFAULT: Row8bChoice = "re-login"
 
-export type ReadFailure = "locked" | "store" | "pending" | "denied"
+export type ReadFailure = "locked" | "store" | "pending" | "denied" | "acl"
+
+/** Shown when the keychain is unlocked but this program is not on the item's access list. */
+export const ACL_DENIAL_MESSAGE =
+  "macOS Keychain refused access because this program is not on the sign-in's access list. The keychain is unlocked. Remove the omo-cli item in Keychain Access, then sign in again."
 export class HelperReadError extends Error {
   constructor(
     readonly failure: ReadFailure,
@@ -42,6 +46,7 @@ export type DarwinReadDeps = {
 
 function failure(reply: HelperReply): HelperReadError {
   if (reply.error === "locked") return new HelperReadError("locked", "The keychain is locked.")
+  if (reply.error === "acl") return new HelperReadError("acl", ACL_DENIAL_MESSAGE)
   return new HelperReadError("store", `The keychain helper answered ${reply.error ?? "unexpectedly"}.`)
 }
 
