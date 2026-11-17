@@ -127,22 +127,11 @@ describe("members whose part has not landed", () => {
   test("#given this build #when each later member is called #then each answers unsupported naming it, as data", async () => {
     const client = await clientWith({})
     const thread = "dev-a/key-1" as Parameters<typeof client.sessions.get>[0]
-    const features = [
-      failureOf(await client.sessions.get(thread)),
-      failureOf(await client.sessions.open({ device: "dev-a" })),
-      failureOf(await client.sessions.close(thread)),
-      failureOf(await client.attach(thread)),
-      failureOf(await client.aliases.resolve("a")),
-      failureOf(await client.sessions.resolve("a")),
-    ].map((failure) => [failure.code, failure.details?.["feature"]])
-    expect(features).toEqual([
-      ["unsupported", "sessions.get"],
-      ["unsupported", "sessions.open"],
-      ["unsupported", "sessions.close"],
-      ["unsupported", "attach"],
-      ["unsupported", "aliases"],
-      ["unsupported", "sessions.resolve"],
+    const features = [failureOf(await client.aliases.resolve("a"))].map((failure) => [
+      failure.code,
+      failure.details?.["feature"],
     ])
+    expect(features).toEqual([["unsupported", "aliases"]])
   })
 })
 

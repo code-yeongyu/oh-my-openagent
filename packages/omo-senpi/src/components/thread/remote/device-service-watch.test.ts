@@ -1,3 +1,4 @@
+import { fakeRemoteClient } from "../thread-remote-fixture"
 import { describe, expect, test } from "bun:test"
 import {
   LocalApiError,
@@ -410,6 +411,11 @@ describe("watch v2 (#12719): a remote session followed across drops, restarts an
     const device = fakeDevice(engine)
     const remote: RemoteThreadSurface = {
       sessions: { ...portOver(device), devices: async () => [{ device: "b", label: "b", online: true }] },
+      client: fakeRemoteClient({
+        state: () => "connected",
+        here: "a",
+        devices: () => [{ device: "b", label: "b", online: true }],
+      }),
       chain: { stamp: (record) => record },
     }
     const row: RemoteSessionRow = {

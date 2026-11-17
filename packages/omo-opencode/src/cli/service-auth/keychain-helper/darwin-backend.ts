@@ -1,9 +1,10 @@
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { accountHome, lockDirectoryIn } from "../account-home"
+import { CredentialStoreError } from "../keystore"
 import { type HelperAccess, resolveHelperAccess } from "./access"
 import { type ApprovalCache, processApprovalCache } from "./approval-cache"
-import { HelperReadError, readThroughHelper, type Row8bChoice } from "./darwin-read"
+import { ACL_DENIAL_MESSAGE, HelperReadError, readThroughHelper, type Row8bChoice } from "./darwin-read"
 import { lockedDarwinStore, type LockedDarwinStore } from "./darwin-store"
 import type { HelperLease } from "./client"
 import { bundleCandidates, machineCandidates } from "./location"
@@ -69,6 +70,7 @@ export function asKeystoreError(error: unknown, pending: (message: string) => Er
   if (!(error instanceof HelperReadError)) return error
   if (error.failure === "pending") return pending(error.message)
   if (error.failure === "locked") return Object.assign(new Error(error.message), { code: "-25308" })
+  if (error.failure === "acl") return new CredentialStoreError(ACL_DENIAL_MESSAGE)
   return error
 }
 

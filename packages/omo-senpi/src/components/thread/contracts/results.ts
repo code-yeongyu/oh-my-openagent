@@ -149,6 +149,13 @@ export type ThreadListResult =
        * unreachable), or `devices_unavailable` when only the device roster failed (the threads are still merged).
        */
       readonly remote_unavailable?: string
+      /**
+       * Set when the threads are listed without the account's aliases, so a missing alias is unknown, not free: the alias
+       * registry could not be read (`sign_in`, or `host_unavailable`), or was not asked because the account's other devices
+       * cannot be reached from here (`not_asked`): the device service is not connected, or it answered that the account's
+       * plan has no relay (`plan_required`, a Free plan).
+       */
+      readonly aliases_unavailable?: "sign_in" | "host_unavailable" | "not_asked"
     }
   | ThreadDataError
 
@@ -226,9 +233,18 @@ export type ThreadInterruptResult =
     }
   | ThreadDataError
 
-/** `closed` is false when no live owner held the thread, so there was nothing to close. */
+/**
+ * `closed` is whether this call shut the session down. `reason` is always set: `closed` when it did,
+ * `not_live` when nothing live held it (the session stays as it was).
+ */
 export type ThreadCloseResult =
-  | { readonly kind: "ok"; readonly thread_id: string; readonly closed: boolean; readonly device?: string }
+  | {
+      readonly kind: "ok"
+      readonly thread_id: string
+      readonly closed: boolean
+      readonly reason: "closed" | "not_live"
+      readonly device?: string
+    }
   | ThreadDataError
 
 export type ThreadHandoffResult =
@@ -281,35 +297,6 @@ export type ThreadBinding = BindingRecord
 
 export type ThreadOutboxRow = OutboxRow
 
-export type ThreadBindResult =
-  { readonly kind: "ok"; readonly binding: ThreadBinding; readonly deduplicated: boolean } | ThreadDataError
-
-export type ThreadUnbindResult =
-  | {
-      readonly kind: "ok"
-      readonly binding: ThreadBinding
-      /** True when the binding was already detached or expired: the call replays success and changes nothing. */
-      readonly already_closed: boolean
-      /** Deliveries accepted through this binding that the session has not taken yet. */
-      readonly in_flight: readonly string[]
-      readonly deduplicated: boolean
-    }
-  | ThreadDataError
-
-export type ThreadRebindResult =
-  | {
-      readonly kind: "ok"
-      readonly binding: ThreadBinding
-      /** Deliveries queued under the old revision, closed with a binding_closed refusal instead of being moved. */
-      readonly closed: readonly string[]
-      readonly deduplicated: boolean
-    }
-  | ThreadDataError
-
-export type ThreadBindingsResult =
-  | { readonly kind: "ok"; readonly bindings: readonly ThreadBinding[]; readonly next_cursor: string | null }
-  | ThreadDataError
-
 export type ThreadReportResult =
   | {
       readonly kind: "ok"
@@ -345,10 +332,6 @@ export type ThreadAnswerResult =
   | ThreadDataError
 
 export type ThreadToolResult =
-  | ThreadBindResult
-  | ThreadUnbindResult
-  | ThreadRebindResult
-  | ThreadBindingsResult
   | ThreadReportResult
   | ThreadOutboxResult
   | ThreadOutboxAckResult

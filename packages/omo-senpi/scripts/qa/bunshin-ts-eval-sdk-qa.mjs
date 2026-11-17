@@ -20,7 +20,7 @@ function option(name, fallback) {
 }
 const pluginRoot = option("--plugin-root", join(packageRoot, "plugin"))
 const deadlineMs = 120_000
-const CHECKS = 5
+const CHECKS = 6
 const SDK_IMPORT = 'const sdk = await import(`${env("OMO_BUNSHIN_TS_SDK_ROOT")}/sdk.js`);'
 
 async function runSession(sandbox) {
@@ -87,7 +87,10 @@ async function runSession(sandbox) {
         "BunshinSessionError",
         "SDK_VERSION",
       ])
-      assert.match(session.agent.removedToolHints.bunshin ?? "", /OMO_BUNSHIN_TS_SDK_ROOT/)
+      const hint = session.agent.removedToolHints.bunshin ?? ""
+      assert.match(hint, /OMO_BUNSHIN_TS_SDK_ROOT/)
+      assert.match(hint, /"\$OMO_BUNSHIN_TS_SDK_ROOT"/)
+      assert.match(hint, /scripts\/node\/bunshin-node\.mjs/)
     })
     await check(
       2,
@@ -139,6 +142,25 @@ async function runSession(sandbox) {
         `${SDK_IMPORT} const base = { OMO_DEVICE_SERVICE_STATE_DIR: env("OMO_DEVICE_SERVICE_STATE_DIR") }; const relay = await sdk.pickTransport({ ...base, BUNSHIN_TS_TRANSPORT: "relay" }); const hub = await sdk.pickTransport({ ...base, BUNSHIN_TS_TRANSPORT: "hub" }).then(() => "picked", e => e.code); const auto = await sdk.pickTransport(base); print(JSON.stringify({ relay: relay.kind, auto: auto.kind, hub }))`,
       )
       assert.deepEqual(out, { relay: "relay", auto: "relay", hub: "hub_not_bundled" })
+    })
+    await check(5, "process.exit inside a cell throws and the next cell keeps its globals", async () => {
+      const failed = await session.executeTool(
+        "eval",
+        {
+          language: "js",
+          code: 'globalThis.omoQaMarker = "kept"; process.exit(1)',
+          summary: "process.exit must not kill the JS kernel",
+        },
+        { signal: AbortSignal.timeout(60_000) },
+      )
+      const text = failed.content
+        .filter((part) => part.type === "text")
+        .map((part) => part.text)
+        .join("\n")
+      assert.match(text, /process\.exit\(1\) ran inside a JavaScript cell/)
+      assert.match(text, /kernel stayed up/)
+      const out = await cellJson('print(JSON.stringify({ marker: globalThis.omoQaMarker }))')
+      assert.equal(out.marker, "kept")
     })
     await sdkClose(cellJson)
   } finally {
@@ -230,8 +252,8 @@ async function supervise() {
   const after = realHomes.map((home) => credentialDigest(home))
   const changedPaths = realHomes.filter((_, index) => before[index] !== after[index])
   const realSenpiUntouched = changedPaths.length === 0
-  if (realSenpiUntouched) log("PASS check 5: realSenpiUntouched\n")
-  else log(`FAIL check 5: realSenpiUntouched changed=${JSON.stringify(changedPaths)}\n`)
+  if (realSenpiUntouched) log("PASS check 6: realSenpiUntouched\n")
+  else log(`FAIL check 6: realSenpiUntouched changed=${JSON.stringify(changedPaths)}\n`)
   log(
     `RESULT ${JSON.stringify({ workerExit: code, realSenpiUntouched, changedPaths, isolatedAgentDir: join(sandbox, "agent"), checkedHomes: realHomes, isolationScope: "credential-file digests of the real agent homes" })}\n`,
   )

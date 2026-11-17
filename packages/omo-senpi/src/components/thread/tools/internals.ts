@@ -2,6 +2,7 @@ import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import type { ThreadResolveResult } from "../addressing"
 import { relayAddressBook, relayAddressEntry, type RelayAddressBook } from "../remote/address-book"
 import { endedRow, rowThreadId, type RemoteSessionRow } from "../remote/ports"
+import { accountDevices } from "../remote/account"
 import { remoteAvailable } from "../remote/remote-ops"
 import {
   assembleAddressBook,
@@ -241,7 +242,11 @@ export function resolution(
     // UNKNOWN_CALLER stands for an ABSENT identity, so it must never match an entry: a thread
     // that happened to carry it as its durable id would otherwise be renamed or re-modelled by
     // any caller whose host passes no execution context.
-    const caller = callerId === UNKNOWN_CALLER ? undefined : entries.find((entry) => entry.thread_id === callerId)
+    const caller =
+      callerId === UNKNOWN_CALLER
+        ? undefined
+        : (entries.find((entry) => entry.thread_id === callerId) ??
+          entries.find((entry) => entry.session_ids?.includes(callerId) === true))
     if (caller === undefined)
       return {
         kind: "error" as const,
@@ -446,8 +451,8 @@ async function lookupAcross(
   if (probe === undefined || (await remote.sessions.canLookup?.().catch(() => false)) !== true) return undefined
   let online: readonly { readonly device: string; readonly online: boolean }[]
   try {
-    const here = await remote.sessions.thisDevice()
-    online = (await remote.sessions.devices()).filter((device) => device.online && device.device !== here)
+    const { here, devices } = await accountDevices(remote.client)
+    online = devices.filter((device) => device.online && device.device !== here)
   } catch {
     return undefined
   }
