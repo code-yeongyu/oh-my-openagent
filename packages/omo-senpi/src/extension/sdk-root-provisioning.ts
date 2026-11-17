@@ -6,7 +6,7 @@ export const DAG_SDK_ROOT_ENV = "OMO_DAG_SDK_ROOT"
 export const AGENT_TOOLKIT_SDK_ROOT_ENV = "OMO_AGENT_TOOLKIT_SDK_ROOT"
 export const BUNSHIN_TS_SDK_ROOT_ENV = "OMO_BUNSHIN_TS_SDK_ROOT"
 /** The bunshin repo's node-agent executable. Importing it runs main() and process.exit. */
-export const BUNSHIN_NODE_AGENT_ENTRY = "scripts/node/bunshin-node.mjs"
+const BUNSHIN_NODE_AGENT_ENTRY = "scripts/node/bunshin-node.mjs"
 export const BUNSHIN_TS_CELL_HINT =
   'Fleet work: in a JS eval cell, const { bunshin } = await import(`${env("' +
   BUNSHIN_TS_SDK_ROOT_ENV +
