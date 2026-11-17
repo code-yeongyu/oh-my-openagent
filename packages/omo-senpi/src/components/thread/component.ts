@@ -660,6 +660,9 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
             ),
           )
         if (options.store === undefined) await store.dispose().catch(() => undefined)
+        // The surface this component built holds the device-service connection a thread tool opened; left open it keeps
+        // the engine alive after its last session ends (#14054: `omo -p` never exited). A later call reconnects lazily.
+        if (options.remote === undefined) await remote.sessions.close?.().catch(() => undefined)
       })
     },
   }
