@@ -318,7 +318,7 @@ function notFound(target: string, scope: string, visible: readonly ThreadAddress
   if (DURABLE_ID_SHAPE.test(target))
     return addressError(
       "not_found",
-      `${base} No reachable endpoint lists a thread with that thread_id, and no session file for it was found.`,
+      `${base} No reachable endpoint lists a thread with that thread_id.`,
       "Call thread_list with all_scope to check the id; a thread on a device that is offline is found once it is online.",
     )
   if (!SESSION_ID_SHAPE.test(target)) {

@@ -336,7 +336,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
         const launch = createLaunch(value, options.remote?.permissionPreset?.())
         if ("kind" in launch) return launch
         // #14050: a new thread with no first prompt and no name is an empty session nobody asked for; refuse it as data.
-        const named = (value.name ?? value.alias ?? "").trim() !== ""
+        const named = (value.name?.trim() ?? "") !== "" || (value.alias?.trim() ?? "") !== ""
         if (value.thread === undefined && value.fork_from === undefined && value.prompt === undefined && !named)
           return failure(
             "invalid_arguments",
