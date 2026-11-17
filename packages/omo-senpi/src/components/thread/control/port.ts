@@ -1,4 +1,5 @@
 import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from "../errors"
+import type { EntryPageRead } from "../paged-reader"
 import type { ThreadTranscriptEntry } from "../reader"
 import type { InterruptOutcome } from "./interrupt"
 import type { ModelChoice } from "../tools/model-match"
@@ -40,6 +41,14 @@ export type SessionControl = {
   readonly setThinkingLevel: (level: string, scope?: "turn") => Promise<void>
   readonly getMessages: () => Promise<readonly ThreadTranscriptEntry[]>
   /**
+   * One page of the session's newest entries, sent by its holder (`paged-reader.ts`, #14047). `unsupported`: the holder
+   * pages nothing, and the read takes the whole transcript (`getMessages`). Absent: this leg always reads it whole.
+   */
+  readonly readEntryPage?: (read: {
+    readonly max_bytes?: number
+    readonly cursor?: string
+  }) => Promise<EntryPageRead | { readonly kind: "unsupported" }>
+  /**
    * Waits, bounded, until the thread stops running, on the leg's own status events (never a polling loop). Absent: the
    * leg has no such event source here, and a waiting read answers `unsupported`.
    */
@@ -80,10 +89,10 @@ export function controlRefusalOf(error: unknown): ThreadToolFailure | undefined 
     : undefined
 }
 
-/** The thread a result names: its id, and its device when it is on another one. */
+/** The thread a result names: `thread`, the address to pass back, and its device when it is on another one. */
 export function controlIdentity(control: Pick<SessionControl, "thread_id" | "device">): {
-  readonly thread_id: string
+  readonly thread: string
   readonly device?: string
 } {
-  return { thread_id: control.thread_id, ...(control.device === undefined ? {} : { device: control.device }) }
+  return { thread: control.thread_id, ...(control.device === undefined ? {} : { device: control.device }) }
 }

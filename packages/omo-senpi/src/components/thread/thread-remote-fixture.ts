@@ -18,6 +18,7 @@ import type {
   RemoteWatchHandlers,
 } from "./remote/ports"
 import type { ThreadTranscriptEntry } from "./reader"
+import { answerGetEntries, senpiProjector, type FakeEntryLog } from "./thread-remote-entries-fixture"
 import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
 import type { ThreadCloseOutcome } from "./tools/ports"
 
@@ -154,7 +155,7 @@ export function fakeRemoteClient(account: {
 }
 
 export const comparable = (result: ThreadToolResult): unknown => {
-  const { thread_id: _id, link: _link, device: _device, ...rest } = result as Record<string, unknown>
+  const { thread: _thread, link: _link, device: _device, ...rest } = result as Record<string, unknown>
   return rest
 }
 
@@ -214,6 +215,8 @@ export function createRemoteThreadFixture() {
       /** The turn finishes before its prompt's reply reaches the sender: its records go out at once, before the aim. */
       recordsBeforeReply?: boolean
       rows?: readonly RemoteSessionRow[]
+      /** b's session entries, which its engine pages through `get_entries` (#14047); absent: an engine that pages nothing. */
+      entries?: FakeEntryLog
       /** Devices the account listing names as not answering this round. */
       incomplete?: readonly string[]
       /** Extra devices the account lists beyond this one and b. */
@@ -338,6 +341,11 @@ export function createRemoteThreadFixture() {
           ...options.liveState,
         })
       if (rpc["type"] === "get_messages") return ok({ messages: [...engine.messages] })
+      if (rpc["type"] === "get_entries") {
+        if (options.entries === undefined) return { kind: "refused", reason: "unsupported" }
+        const paged = answerGetEntries(options.entries, rpc)
+        return "refused" in paged ? { kind: "refused", reason: paged.refused } : ok(paged.data)
+      }
       if (rpc["type"] === "interrupt") return ok(engine.interrupt)
       // b's user set `threads.chainCountLimit` (senpi S32): its engine answers `{success: false, errorCode: "chain_count_limit"}`,
       // which the device service hands back as this refusal (device-service.ts).
@@ -474,6 +482,7 @@ export function createRemoteThreadFixture() {
               },
     }
     const remote: RemoteThreadSurface = {
+      loadProjector: async () => senpiProjector,
       client: fakeRemoteClient({
         state: () => options.plan ?? "connected",
         // This device's own id comes from the same account read: unknown names no device, a failed read fails it.

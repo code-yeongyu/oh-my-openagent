@@ -34,7 +34,7 @@ describe("#13012 route parity", () => {
       const { run } = surface(a.remote)
       expect(await run("thread_close", { thread: B_ROW.title, all_scope })).toMatchObject({
         kind: "ok",
-        thread_id: B_ROW.durable_id,
+        thread: B_ROW.durable_id,
         device: B_ROW.device,
         closed: false,
       })
@@ -51,7 +51,8 @@ describe("#13012 route parity", () => {
         await run("thread_handoff", { thread: "release planne", match: "fuzzy", message: "continue", all_scope }),
       ).toMatchObject({
         kind: "ok",
-        thread: { thread_id: B_ROW.durable_id, device: B_ROW.device },
+        thread: B_ROW.durable_id,
+        device: B_ROW.device,
         resolved_by: "fuzzy",
       })
       expect(
@@ -86,7 +87,7 @@ describe("#13012 route parity", () => {
       await run("thread_handoff", { thread: "local pee", match: "fuzzy", message: "continue", all_scope: true }),
     ).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-local" },
+      thread: "dur-local",
       resolved_by: "fuzzy",
     })
     expect(listings).toBe(1)
@@ -104,7 +105,8 @@ describe("#13012 route parity", () => {
       }),
     ).toMatchObject({
       kind: "ok",
-      thread: { thread_id: B_ROW.durable_id, device: B_ROW.device },
+      thread: B_ROW.durable_id,
+      device: B_ROW.device,
       resolved_by: "fuzzy",
     })
   })
@@ -126,10 +128,11 @@ describe("#13012 route parity", () => {
     })
     expect(byFuzzy).toMatchObject({
       kind: "ok",
-      thread: { thread_id: B_ROW.durable_id, device: B_ROW.device },
+      thread: B_ROW.durable_id,
+      device: B_ROW.device,
       resolved_by: "fuzzy",
     })
-    expect(byExact).toMatchObject({ kind: "ok", thread: { thread_id: B_ROW.durable_id, device: B_ROW.device } })
+    expect(byExact).toMatchObject({ kind: "ok", thread: B_ROW.durable_id, device: B_ROW.device })
     const calls = (sent: typeof fuzzy.sent) =>
       sent.map((call) => [call.via, call.device, call.session, call.rpc?.["type"]])
     expect(calls(fuzzy.sent)).toStrictEqual(calls(exact.sent))
@@ -166,8 +169,8 @@ describe("#13012 route parity", () => {
       message: "continue",
       all_scope: true,
     })
-    expect(byFuzzy).toMatchObject({ kind: "ok", thread: { thread_id: "dur-old", device: "b" }, resolved_by: "fuzzy" })
-    expect(byExact).toMatchObject({ kind: "ok", thread: { thread_id: "dur-old", device: "b" } })
+    expect(byFuzzy).toMatchObject({ kind: "ok", thread: "dur-old", device: "b", resolved_by: "fuzzy" })
+    expect(byExact).toMatchObject({ kind: "ok", thread: "dur-old", device: "b" })
     expect(relayCalls(fuzzy.sent)).toStrictEqual(relayCalls(exact.sent))
     expect(admits(fuzzy.sent)).toStrictEqual([["b", "rk-old"]])
   })
@@ -184,7 +187,7 @@ describe("#13012 route parity", () => {
       const { run } = surface(a.remote)
       expect(
         await run("thread_handoff", { thread: "release planne", match: "fuzzy", message: "continue", all_scope: true }),
-      ).toMatchObject({ kind: "ok", thread: { thread_id: target[0], device: "b" }, resolved_by: "fuzzy" })
+      ).toMatchObject({ kind: "ok", thread: target[0], device: "b", resolved_by: "fuzzy" })
       expect(admits(a.sent)).toStrictEqual([["b", target[1]]])
     },
   )
@@ -204,8 +207,8 @@ describe("#13012 route parity", () => {
       message: "continue",
       all_scope: true,
     })
-    expect(byFuzzy).toMatchObject({ kind: "ok", thread: { thread_id: "dur-local" }, resolved_by: "fuzzy" })
-    expect(byExact).toMatchObject({ kind: "ok", thread: { thread_id: "dur-local" } })
+    expect(byFuzzy).toMatchObject({ kind: "ok", thread: "dur-local", resolved_by: "fuzzy" })
+    expect(byExact).toMatchObject({ kind: "ok", thread: "dur-local" })
     expect(admits(fuzzy.sent)).toStrictEqual([])
     expect(admits(exact.sent)).toStrictEqual([])
   })
@@ -381,7 +384,7 @@ describe("#13012 route parity", () => {
     const { run } = surface(a.remote)
     expect(await run("thread_rename", { thread: B_ROW.durable_id, name: "local peer" })).toMatchObject({
       kind: "ok",
-      thread_id: B_ROW.durable_id,
+      thread: B_ROW.durable_id,
       name: "local peer",
       device: B_ROW.device,
     })

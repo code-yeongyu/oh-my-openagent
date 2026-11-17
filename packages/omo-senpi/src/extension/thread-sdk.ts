@@ -3,7 +3,12 @@ import { dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { GATEWAY_STORE_WORKER_BUNDLE_NAME } from "../components/thread/gateway/store"
-import { createThreadSdk as createSdk, type ThreadSdk, type ThreadSdkOptions } from "../components/thread/sdk"
+import {
+  assertThreadSdkOptions,
+  createThreadSdk as createSdk,
+  type ThreadSdk,
+  type ThreadSdkOptions,
+} from "../components/thread/sdk"
 
 export type { LocatedThread, ThreadSdk, ThreadSdkOptions } from "../components/thread/sdk"
 // `omo host status --all` stamps each terminal row's `last_activity_at` with the same reader `omo thread list` uses.
@@ -23,6 +28,7 @@ const sidecarAnchor = pathToFileURL(join(dirname(fileURLToPath(import.meta.url))
 const sidecarPresent = existsSync(fileURLToPath(new URL(`./${GATEWAY_STORE_WORKER_BUNDLE_NAME}`, sidecarAnchor)))
 
 export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
+  assertThreadSdkOptions(options)
   return createSdk(
     options.workerModuleUrl !== undefined || !sidecarPresent ? options : { ...options, workerModuleUrl: sidecarAnchor },
   )
