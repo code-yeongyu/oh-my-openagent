@@ -3,6 +3,7 @@ import type { ThreadLocalAliasNote, ThreadStatus, ThreadToolResult } from "../co
 import { createRelaySessionHost, listedThread } from "../control/relay-session-host"
 import type { HostedThread, SessionHost, SessionOpenRequest } from "../control/session-host"
 import { threadToolFailure } from "../errors"
+import { openedResult } from "../tools/thread-row"
 import { type AliasError, type AliasRegistry, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
 import { accountDevices } from "./account"
 import { aliasFailure, deviceRefusal, remoteAvailable } from "./remote-ops"
@@ -106,7 +107,7 @@ export type CreatePlan =
 
 const alreadyLive = (thread: HostedThread, device?: string): CreatePlan => ({
   kind: "done",
-  result: { kind: "ok", thread, deduplicated: true },
+  result: openedResult(thread, true),
   ...(device === undefined ? {} : { device }),
 })
 

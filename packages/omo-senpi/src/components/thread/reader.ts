@@ -312,7 +312,7 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
       return fail(
         "not_found",
         `No session transcript exists at ${source.path}.`,
-        "Call thread_list to get a current thread_id, then read that thread instead.",
+        "Call thread_list to get a current thread value, then read that thread instead.",
       )
     }
     loaded = file

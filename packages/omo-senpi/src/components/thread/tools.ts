@@ -17,7 +17,7 @@ import {
   type ThreadCloseInput,
   type ThreadCreateInput,
   type ThreadCreatePrompt,
-  type ThreadResultSummary,
+  type ThreadCreateResult,
   type ThreadSendResult,
   type ThreadHandoffInput,
   type ThreadInterruptInput,
@@ -52,6 +52,7 @@ import { locateControl } from "./control/locate"
 import { closeThread, interruptThread, setModelOn, setThinkingLevelOn } from "./control/operations"
 import { controlIdentity, controlRefusalOf } from "./control/port"
 import type { LocalAliasReason, LocalExisting } from "./remote/cross-device"
+import type { HostedThread } from "./control/session-host"
 import { recordThreadCreator, registerExtensionTools, type ExtensionToolHost } from "./tools/extension-tools"
 export type { ThreadHost, ThreadHostSession, ThreadToolSurfaceOptions } from "./tools/ports"
 export { UNKNOWN_CALLER } from "./tools/ports"
@@ -80,6 +81,7 @@ import {
   replyOnDevice,
   resolveAcross,
 } from "./tools/internals"
+import { openedResult, threadRow } from "./tools/thread-row"
 
 /** How many keys a tool surface keeps for recovering receipts whose admission reply was lost. */
 export const RECEIPT_RECOVERY_MAX_KEYS = 4_096
@@ -340,6 +342,8 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
       execute("thread_create", id, args, ectx, async (current, value, operationId, callerId) => {
         const launch = createLaunch(value, options.remote?.permissionPreset?.())
         if ("kind" in launch) return launch
+        // The session the open answered, with its listing key: a first prompt to a thread on another device needs it.
+        let opened: HostedThread | undefined
         const made = await (async (): Promise<ThreadToolResult> => {
           const skills =
             value.skills === undefined || value.skills.length === 0 ? undefined : checkInitialSkills(value.skills)
@@ -376,7 +380,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
                     "not_found",
                     `Thread ${found.entry.thread_id} on device ${found.entry.transport.row.device} is not running there.`,
                     "Call thread_list with all_scope to find the live thread.",
-                    { device: found.entry.transport.row.device, thread_id: found.entry.thread_id },
+                    { device: found.entry.transport.row.device, thread: found.entry.thread_id },
                   ),
                 }
               return found.entry.transport?.kind === "relay"
@@ -394,19 +398,19 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
             if (conflict.kind === "error") return { kind: "error", error: conflict } as ThreadToolResult
           }
           const preset = plan.creates ? launch.permissionPreset : undefined
-          const opened = await plan.host.open({
+          const outcome = await plan.host.open({
             ...plan.request,
             ...(plan.creates && name !== undefined ? { name } : {}),
             ...(plan.creates && loaded !== undefined ? { initialSkills: loaded } : {}),
             ...(preset === undefined ? {} : { permissionPreset: preset }),
             ...(plan.creates ? launch.profile : {}),
           })
-          if (opened.kind === "error") return opened
+          if (outcome.kind === "error") return outcome
+          opened = outcome.thread
           const created: ThreadToolResult = {
-            kind: "ok",
-            thread: { ...opened.thread, ...(plan.creates && loaded !== undefined ? { requested_skills: loaded } : {}) },
-            deduplicated: false,
-            ...workspaceNote(opened.thread, callerCwd),
+            ...openedResult(outcome.thread, false),
+            ...(plan.creates && loaded !== undefined ? { requested_skills: loaded } : {}),
+            ...workspaceNote(outcome.thread, callerCwd),
           }
           const recorded = plan.creates ? await recordThreadCreator(options, current, callerId, created) : created
           if (plan.localAlias !== undefined)
@@ -421,30 +425,18 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
           const local = { alias_scope: "local", alias_unavailable: claimed.local } as const
           if (value.name !== undefined) return { ...recorded, ...local } as ThreadToolResult
           const localName = value.alias.trim()
-          const named = await nameCreatedThread(
-            recorded.thread.thread_id,
-            localName,
-            await plan.host.visible(),
-            callerId,
-          )
+          const named = await nameCreatedThread(recorded.thread, localName, await plan.host.visible(), callerId)
           return (
             named === undefined
-              ? {
-                  ...recorded,
-                  thread: {
-                    ...recorded.thread,
-                    name: localName,
-                    link: threadLink(recorded.thread.thread_id, localName),
-                  },
-                  ...local,
-                }
+              ? { ...recorded, name: localName, link: threadLink(recorded.thread, localName), ...local }
               : { ...recorded, ...local, local_name_unavailable: named }
           ) as ThreadToolResult
         })()
-        if (value.prompt === undefined || made.kind !== "ok" || !("thread" in made) || made.deduplicated) return made
+        if (value.prompt === undefined || made.kind !== "ok" || opened === undefined) return made
+        if ((made as Extract<ThreadCreateResult, { kind: "ok" }>).deduplicated) return made
         return {
           ...made,
-          prompt: await firstPrompt(current, made.thread, value, operationId, callerId),
+          prompt: await firstPrompt(current, opened, value, operationId, callerId),
         } as ThreadToolResult
       }),
   }
@@ -456,7 +448,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
    */
   async function firstPrompt(
     current: ThreadHostView,
-    thread: ThreadResultSummary,
+    thread: HostedThread,
     value: ThreadCreateInput,
     operationId: string,
     callerId: string,
@@ -493,7 +485,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
           "internal_error",
           `The thread was created, but its first prompt was not delivered: ${error instanceof Error ? error.message : String(error)}.`,
           `Send it with thread_send to ${thread.thread_id}; read the thread first if the prompt may have arrived.`,
-          { thread_id: thread.thread_id },
+          { thread: thread.thread_id },
         ),
       }
     }
@@ -870,7 +862,7 @@ async function deliverThrough(
     if (resolvedBy === undefined || row === undefined)
       return {
         kind: "ok",
-        thread_id: sent.thread_id,
+        thread: sent.thread_id,
         link: threadLink(sent.thread_id, title),
         delivery: sent.delivery,
         deduplicated: sent.deduplicated,
@@ -879,7 +871,7 @@ async function deliverThrough(
     const seen = new Date(row.updated_ms).toISOString()
     return {
       kind: "ok",
-      thread: {
+      ...threadRow({
         thread_id: sent.thread_id,
         name: row.title,
         status: "live",
@@ -888,7 +880,7 @@ async function deliverThrough(
         updated_at: seen,
         device: row.device,
         link: threadLink(sent.thread_id, row.title),
-      },
+      }),
       resolved_by: resolvedBy,
       delivery: sent.delivery,
       deduplicated: sent.deduplicated,
@@ -905,7 +897,7 @@ async function deliverThrough(
     const title = current.sessions.find((session) => (session.durableSessionId ?? session.sessionId) === threadId)?.name
     return {
       kind: "ok",
-      thread_id: threadId,
+      thread: threadId,
       link: threadLink(threadId, title),
       delivery: sent.delivery,
       message_seq: sent.message_seq,
@@ -921,7 +913,7 @@ async function deliverThrough(
     return failure("not_found", `Thread ${threadId} is not in the address book.`, "Call thread_list and retry.")
   return {
     kind: "ok",
-    thread,
+    ...threadRow(thread),
     resolved_by: resolvedBy,
     delivery: sent.delivery,
     message_seq: sent.message_seq,

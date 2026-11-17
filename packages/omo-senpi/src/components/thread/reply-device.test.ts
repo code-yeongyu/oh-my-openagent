@@ -178,7 +178,7 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
       [{ id: "device:b/d-1", session_id: "dur-on-b", name: "on b" }],
       [C_SAME_ID, B_ROW],
     )
-    expect(await reply("dur-on-b")).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
+    expect(await reply("dur-on-b")).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b" })
     expect(admittedOn()).toEqual(["b"])
   })
 
@@ -205,7 +205,7 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
       [{ id: "device:b/d-1", session_id: "dur-on-b", name: "planner" }],
       [B_ROW, C_PLANNER],
     )
-    expect(await reply("planner")).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
+    expect(await reply("planner")).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b" })
     expect(admittedOn()).toEqual(["b"])
   })
 
@@ -215,7 +215,7 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
       [B_ROW],
     )
     const listedBefore = listings()
-    expect(await reply("local peer")).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
+    expect(await reply("local peer")).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b" })
     expect(admittedOn()).toEqual(["b"])
     expect(prompts()).toBe(0)
     expect(listings() - listedBefore).toBe(0)
@@ -252,7 +252,7 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
       [{ id: `device:${encodeURIComponent("b c")}/d-1`, session_id: "dur-on-b" }],
       [spaced],
     )
-    expect(await reply("dur-on-b")).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b c" })
+    expect(await reply("dur-on-b")).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b c" })
     expect(admittedOn()).toEqual(["b c"])
   })
 
@@ -262,7 +262,7 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
       const { reply, admittedOn } = await consumed([{ id, session_id: "dur-local", name: "local peer" }], [B_ROW])
       for (const address of ["dur-local", "local peer"]) {
         const result = await reply(address)
-        expect(result).toMatchObject({ kind: "ok", thread_id: "dur-local" })
+        expect(result).toMatchObject({ kind: "ok", thread: "dur-local" })
         expect(result).not.toHaveProperty("device")
       }
       expect(admittedOn()).toEqual([])
@@ -332,16 +332,16 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
       [{ id: "device:b/d-1", session_id: "dur-on-b", name: "on b" }],
       [B_ROW],
     )
-    expect(await reply("dur-on-b")).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
-    expect(await reply("on b")).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
+    expect(await reply("dur-on-b")).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b" })
+    expect(await reply("on b")).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b" })
     expect(admittedOn()).toEqual(["b", "b"])
   })
 
   test("unchanged: #given a run that consumed no delivery #when it sends by id and by name #then each resolves as before: b's id to b, the local name here", async () => {
     const { reply, admittedOn } = await consumed([], [B_ROW])
-    expect(await reply("dur-on-b")).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
+    expect(await reply("dur-on-b")).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b" })
     const here = await reply("local peer")
-    expect(here).toMatchObject({ kind: "ok", thread_id: "dur-local" })
+    expect(here).toMatchObject({ kind: "ok", thread: "dur-local" })
     expect(here).not.toHaveProperty("device")
     expect(admittedOn()).toEqual(["b"])
   })

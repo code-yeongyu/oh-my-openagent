@@ -661,7 +661,8 @@ describe("omo remote session verbs", () => {
     // Review LOW at c09a616: --json still names the model the session opened on, as it did before #13409.
     expect(JSON.parse(out.join(""))).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-new-on-b", device: "b" },
+      thread: "dur-new-on-b",
+      device: "b",
       model: { provider: "openai", id: "gpt-6" },
     })
     expect(types(a.sent, "open_session").map((entry) => [entry.rpc?.["provider"], entry.rpc?.["modelId"]])).toEqual([
@@ -946,7 +947,7 @@ describe("omo remote session verbs", () => {
     const { out } = await run(["interrupt", "b/dur-on-b", "--json"], undefined, SIGNED_IN, testBootstrap(), a.remote)
     expect(JSON.parse(out.join(""))).toEqual({
       kind: "ok",
-      thread_id: "dur-on-b",
+      thread: "dur-on-b",
       turn_id: "turn-b",
       interrupted: true,
       background: { status: "not_supported" },
@@ -986,7 +987,7 @@ describe("omo remote session verbs", () => {
   test.each([
     [
       ["send", "/session", "hi"],
-      "omo remote send: name the session as <device>/<session> (the SESSION column of omo remote sessions) or by the thread_id open printed",
+      "omo remote send: name the session as <device>/<session> (the SESSION column of omo remote sessions) or by the thread value open printed",
     ],
     [["send", "b/dur-on-b"], "omo remote send: the message text is required"],
     [["send", "b/dur-on-b", "hi", "--steer", "--follow-up"], "omo remote send: pass --steer or --follow-up, not both"],

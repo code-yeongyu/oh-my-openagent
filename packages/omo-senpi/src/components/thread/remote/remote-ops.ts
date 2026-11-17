@@ -110,7 +110,7 @@ export async function holderTarget(
       "device_offline",
       `Device ${holder.device} holding this thread is offline.`,
       "Retry when that device is online; nothing was queued.",
-      { device: holder.device, thread_id: holder.session_id },
+      { device: holder.device, thread: holder.session_id },
     )
   const located = await remote.sessions.locate(holder.device, holder.session_id)
   const row =
@@ -128,7 +128,7 @@ export async function holderTarget(
     "Call thread_list with all_scope to find the live thread, then claim the alias for it again with thread_rename.",
     {
       device: holder.device,
-      thread_id: holder.session_id,
+      thread: holder.session_id,
       ...(located.kind === "refused" ? { reason: located.reason } : {}),
     },
   )

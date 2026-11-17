@@ -20,7 +20,7 @@ const approved = (address: string) => [
   { permission: "thread_send", patterns: [address], always: [address], autoApproveAsk: true as const },
 ]
 /** Known to exist on one leg only: a gateway row's sequence and endpoint kind here, the device there (contracts/results.ts). */
-const LEG_ONLY_KEYS: ReadonlySet<string> = new Set(["thread_id", "link", "message_seq", "endpoint", "device"])
+const LEG_ONLY_KEYS: ReadonlySet<string> = new Set(["thread", "link", "message_seq", "endpoint", "device"])
 const sharedKeys = (result: object) =>
   Object.keys(result)
     .filter((key) => !LEG_ONLY_KEYS.has(key))
@@ -93,7 +93,7 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
       delivery_id?: unknown
       effective_mode?: unknown
     }
-    expect(result).toMatchObject({ kind: "ok", thread_id: TARGET[leg].id, deduplicated: false })
+    expect(result).toMatchObject({ kind: "ok", thread: TARGET[leg].id, deduplicated: false })
     expect(delivery_id).toMatch(UUID)
     expect(["started", "queued", "queued_offline"]).toContain(delivery.kind)
     expect(effective_mode).toBe(delivery.kind === "queued_offline" ? "auto" : "follow_up")
@@ -128,11 +128,11 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
       expect(permission({ thread: TARGET[leg].name, message: "reply" })).toEqual(approved(TARGET[leg].name))
       expect(await run("thread_send", { thread: TARGET[leg].id, message: "reply" })).toMatchObject({
         kind: "ok",
-        thread_id: TARGET[leg].id,
+        thread: TARGET[leg].id,
       })
       expect(await run("thread_send", { thread: TARGET[leg].name, message: "reply" })).toMatchObject({
         kind: "ok",
-        thread_id: TARGET[leg].id,
+        thread: TARGET[leg].id,
       })
     },
   )
@@ -150,7 +150,7 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
       expect(permission({ thread: TARGET[leg].name, message: "reply" })).toEqual(approved(TARGET[leg].name))
       const result = await run("thread_send", { thread: TARGET[leg].name, message: "reply" })
       if (leg === "local") {
-        expect(result).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
+        expect(result).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b" })
         expect(admits()).toHaveLength(1)
         // The local namesake ("local peer", dur-local) received nothing: no prompt and no gateway delivery.
         expect(prompts()).toBe(0)

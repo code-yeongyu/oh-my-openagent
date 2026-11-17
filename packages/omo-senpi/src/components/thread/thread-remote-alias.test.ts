@@ -7,7 +7,7 @@ afterEach(cleanup)
 
 const rows = (listed: ThreadToolResult) =>
   listed.kind === "ok" && "threads" in listed
-    ? listed.threads.map((thread) => [thread.thread_id, thread.device ?? null, thread.alias ?? null])
+    ? listed.threads.map((thread) => [thread.thread, thread.device ?? null, thread.alias ?? null])
     : []
 
 // #13923: an account alias names a session on any device of the account, as a lane name a caller sets, lists and addresses.
@@ -17,7 +17,7 @@ describe("an account alias for a session on another device (#13923)", () => {
     const { run } = surface(a.remote)
     expect(await run("thread_rename", { thread: "dur-on-b", alias: "Lane X" })).toMatchObject({
       kind: "ok",
-      thread_id: "dur-on-b",
+      thread: "dur-on-b",
       device: "b",
       alias: "Lane X",
     })
@@ -83,10 +83,10 @@ describe("an account alias for a session on another device (#13923)", () => {
   test("#given an alias held by b's session #when thread_interrupt and thread_close name the alias #then each command goes to b's session", async () => {
     const a = account({ aliases: new Map([["lane-b", { session_id: "dur-on-b", device: "b" }]]) })
     const { run } = surface(a.remote)
-    expect(await run("thread_interrupt", { thread: "lane-b" })).toMatchObject({ kind: "ok", thread_id: "dur-on-b" })
+    expect(await run("thread_interrupt", { thread: "lane-b" })).toMatchObject({ kind: "ok", thread: "dur-on-b" })
     expect(await run("thread_close", { thread: "lane-b" })).toMatchObject({
       kind: "ok",
-      thread_id: "dur-on-b",
+      thread: "dur-on-b",
       device: "b",
       closed: true,
     })
@@ -112,7 +112,7 @@ describe("an account alias for a session on another device (#13923)", () => {
     }
     expect(await reading).toMatchObject({
       kind: "ok",
-      thread_id: "dur-on-b",
+      thread: "dur-on-b",
       device: "b",
       wait: { outcome: "settled", status: "idle", turn_id: "5" },
     })

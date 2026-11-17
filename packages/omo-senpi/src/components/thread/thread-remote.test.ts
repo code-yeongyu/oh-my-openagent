@@ -16,7 +16,7 @@ describe("thread_set_model on another device", () => {
     const result = await run("thread_set_model", { thread: "dur-on-b", model: "opus" })
     expect(result).toEqual({
       kind: "ok",
-      thread_id: "dur-on-b",
+      thread: "dur-on-b",
       model: { provider: "anthropic", id: "claude-opus" },
       device: "b",
     })
@@ -51,7 +51,7 @@ describe("thread_set_reasoning on another device", () => {
         level: "high",
         ...(scope === undefined ? {} : { scope }),
       })
-      expect(result).toMatchObject({ kind: "ok", thread_id: "dur-on-b", level: "high", scope: scope ?? "session" })
+      expect(result).toMatchObject({ kind: "ok", thread: "dur-on-b", level: "high", scope: scope ?? "session" })
       expect(a.sent.map((entry) => [entry.via, entry.device, entry.session, entry.rpc])).toEqual([
         ["session", "b", "rk-on-b", { type: "set_thinking_level", sessionId: "rk-on-b", level: "high", scope: "turn" }],
       ])
@@ -64,7 +64,7 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     const a = account()
     const { run, openSession } = surface(a.remote)
     const result = await run("thread_create", { device: "studio", name: "fresh" })
-    expect(result).toMatchObject({ kind: "ok", thread: { thread_id: "dur-new-on-b", device: "b", name: "fresh" } })
+    expect(result).toMatchObject({ kind: "ok", thread: "dur-new-on-b", device: "b", name: "fresh" })
     expect(a.sent.map((entry) => [entry.via, entry.device, entry.rpc?.["type"]])).toEqual([
       ["endpoint", "b", "open_session"],
       ["session", "b", "set_session_name"],
@@ -83,7 +83,7 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
       expect(
         listed.kind === "ok" &&
           "threads" in listed &&
-          listed.threads.map((thread) => [thread.thread_id, thread.device ?? "here"]),
+          listed.threads.map((thread) => [thread.thread, thread.device ?? "here"]),
       ).toEqual([
         ["dur-local", "here"],
         ["dur-on-b", "b"],
@@ -110,7 +110,7 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     const { run } = surface(account({ devicesFail: true }).remote)
     const listed = await run("thread_list", {})
     expect(listed).toMatchObject({ kind: "ok", remote_unavailable: "devices_unavailable" })
-    expect(listed.kind === "ok" && "threads" in listed && listed.threads.map((t) => t.thread_id)).toEqual([
+    expect(listed.kind === "ok" && "threads" in listed && listed.threads.map((t) => t.thread)).toEqual([
       "dur-local",
       "dur-on-b",
     ])
@@ -125,7 +125,7 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
       for (const args of [{}, { all_scope: true }]) {
         const listed = await run("thread_list", args)
         expect(listed).toMatchObject({ kind: "ok", remote_unavailable: "host_unavailable" })
-        expect(listed.kind === "ok" && "threads" in listed && listed.threads.map((t) => t.thread_id)).toEqual([
+        expect(listed.kind === "ok" && "threads" in listed && listed.threads.map((t) => t.thread)).toEqual([
           "dur-local",
         ])
       }
@@ -137,7 +137,7 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     const { run } = surface(a.remote)
     const listed = await run("thread_list", {})
     expect(listed.kind === "ok" && "threads" in listed && listed.threads.find((t) => t.device === "b")).toMatchObject({
-      thread_id: "dur-on-b",
+      thread: "dur-on-b",
       status: "resumable",
     })
   })
@@ -202,7 +202,8 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     const { run } = surface(a.remote)
     expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-on-b", device: "b" },
+      thread: "dur-on-b",
+      device: "b",
       deduplicated: false,
     })
     expect(a.sent).toEqual([
@@ -229,7 +230,8 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     const { run } = surface(a.remote)
     expect(await run("thread_create", { device: "studio" })).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-new-on-b", device: "b" },
+      thread: "dur-new-on-b",
+      device: "b",
     })
     expect(await run("thread_create", { fork_from: "dur-on-b" })).toMatchObject({
       kind: "error",
@@ -238,7 +240,8 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     const bare = account({ openData: { sessionId: "bmV3LXNlc3Npb24tMDAwMQ" } })
     expect(await surface(bare.remote).run("thread_create", { device: "studio" })).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "bmV3LXNlc3Npb24tMDAwMQ", device: "b" },
+      thread: "bmV3LXNlc3Npb24tMDAwMQ",
+      device: "b",
     })
   })
 })
@@ -257,7 +260,7 @@ describe("A3: an existing thread is named by id or alias only; a device only to 
   test("#given no id and no device #when thread_create runs #then the thread is created on this device exactly as before", async () => {
     const a = account()
     const { run, openSession } = surface(a.remote)
-    expect(await run("thread_create", {})).toMatchObject({ kind: "ok", thread: { thread_id: "dur-created-here" } })
+    expect(await run("thread_create", {})).toMatchObject({ kind: "ok", thread: "dur-created-here" })
     expect(openSession).toHaveBeenCalledTimes(1)
     expect(a.sent).toEqual([])
   })
@@ -272,16 +275,16 @@ describe("A3: an existing thread is named by id or alias only; a device only to 
     const { run } = surface(a.remote)
     expect(await run("thread_send", { thread: "release-train", message: "go" })).toMatchObject({
       kind: "ok",
-      thread_id: "dur-on-b",
+      thread: "dur-on-b",
       device: "b",
     })
     expect(await run("thread_send", { thread: "dur-local", message: "here" })).toMatchObject({
       kind: "ok",
-      thread_id: "dur-local",
+      thread: "dur-local",
     })
     expect(await run("thread_send", { thread: "local peer", message: "alias first" })).toMatchObject({
       kind: "ok",
-      thread_id: "dur-on-b",
+      thread: "dur-on-b",
       device: "b",
     })
   })
@@ -301,7 +304,8 @@ describe("A3: an existing thread is named by id or alias only; a device only to 
     const { run } = surface(a.remote)
     expect(await run("thread_create", { alias: "mine" })).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-created-here", alias: "mine" },
+      thread: "dur-created-here",
+      alias: "mine",
     })
     expect(await run("thread_rename", { thread: "mine", alias: "renamed" })).toMatchObject({
       kind: "ok",
@@ -379,7 +383,7 @@ describe("#12833: a name reaches a thread on another device by its title", () =>
     const { run } = surface(a.remote)
     expect(await run("thread_send", { thread: "release  train", message: "go" })).toMatchObject({
       kind: "ok",
-      thread_id: "dur-on-b",
+      thread: "dur-on-b",
       device: "b",
     })
     expect(
@@ -389,11 +393,11 @@ describe("#12833: a name reaches a thread on another device by its title", () =>
     ).toEqual([["b", "dur-on-b"]])
     expect(await run("thread_send", { thread: "local peer", message: "here" })).toMatchObject({
       kind: "ok",
-      thread_id: "dur-local",
+      thread: "dur-local",
     })
     expect(await run("thread_close", { thread: "stale" })).toMatchObject({
       kind: "ok",
-      thread_id: "dur-old-on-b",
+      thread: "dur-old-on-b",
       closed: false,
     })
   })
@@ -424,11 +428,11 @@ describe("#12833: a name reaches a thread on another device by its title", () =>
       const { run, openSession } = surface(a.remote)
       expect(await run("thread_send", { thread: "local peer", message: "here" })).toMatchObject({
         kind: "ok",
-        thread_id: "dur-local",
+        thread: "dur-local",
       })
       expect(await run("thread_send", { thread: "release train", message: "there" })).toMatchObject({
         kind: "ok",
-        thread_id: "dur-on-b",
+        thread: "dur-on-b",
         device: "b",
       })
       expect(await run("thread_send", { thread: "nobody", message: "x" })).toMatchObject({
@@ -462,12 +466,12 @@ describe("#12833: a name reaches a thread on another device by its title", () =>
     const { run } = surface(a.remote)
     expect(await run("thread_send", { thread: "tui-b", message: "go" })).toMatchObject({
       kind: "ok",
-      thread_id: "sJMySZH_wlx9qQ25AU60qQ",
+      thread: "sJMySZH_wlx9qQ25AU60qQ",
       device: "b",
     })
     expect(await run("thread_send", { thread: "rpc-b", message: "go" })).toMatchObject({
       kind: "ok",
-      thread_id: "JkMGhxKatogMmrmtCW-oFA",
+      thread: "JkMGhxKatogMmrmtCW-oFA",
       device: "b",
     })
     expect(
@@ -497,10 +501,10 @@ describe("#12833: a name reaches a thread on another device by its title", () =>
     }
     const a = account({ aliases: new Map([["my-far", { session_id: "dur-far", device: "here" }]]) })
     const { run } = surface(a.remote, { sessions: [near, far] })
-    expect(await run("thread_read", { thread: "my-far" })).toMatchObject({ kind: "ok", thread_id: "dur-far" })
+    expect(await run("thread_read", { thread: "my-far" })).toMatchObject({ kind: "ok", thread: "dur-far" })
     expect(await run("thread_send", { thread: "my-far", message: "hi" })).toMatchObject({
       kind: "ok",
-      thread_id: "dur-far",
+      thread: "dur-far",
     })
     expect(await run("thread_read", { thread: "dur-far" })).toMatchObject({
       kind: "error",
@@ -513,7 +517,7 @@ describe("#12833: a name reaches a thread on another device by its title", () =>
     const online = account({ rows: [titled("b", "dur-on-b", "other")], aliases: gone })
     expect(await surface(online.remote).run("thread_send", { thread: "stale-b", message: "x" })).toMatchObject({
       kind: "error",
-      error: { code: "not_found", details: { device: "b", thread_id: "dur-gone" } },
+      error: { code: "not_found", details: { device: "b", thread: "dur-gone" } },
     })
     const offline = account({ rows: [titled("b", "dur-on-b", "other")], aliases: gone, online: false })
     expect(await surface(offline.remote).run("thread_send", { thread: "stale-b", message: "x" })).toMatchObject({
@@ -569,7 +573,7 @@ describe("the device service is not connected, or the alias registry is not ther
     const { run } = surface(a.remote)
     expect(await run("thread_send", { thread: "local peer", message: "local" })).toMatchObject({
       kind: "ok",
-      thread_id: "dur-local",
+      thread: "dur-local",
     })
     expect(await run("thread_send", { thread: "dur-on-b", message: "remote" })).toMatchObject({
       kind: "error",
@@ -587,7 +591,7 @@ describe("the device service is not connected, or the alias registry is not ther
     const { run, openSession } = surface(a.remote)
     expect(await run("thread_create", { alias: "x" })).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-created-here" },
+      thread: "dur-created-here",
       alias_scope: "local",
       alias_unavailable: "no_registry",
     })
@@ -617,7 +621,7 @@ describe("A5: the relay is paid only", () => {
     })
     expect(a.sent).toEqual([])
     expect(await store.list()).toEqual([])
-    expect(await run("thread_create", {})).toMatchObject({ kind: "ok", thread: { thread_id: "dur-created-here" } })
+    expect(await run("thread_create", {})).toMatchObject({ kind: "ok", thread: "dur-created-here" })
     expect(openSession).toHaveBeenCalledTimes(1)
   })
 })
@@ -785,7 +789,8 @@ describe("remote == local: the same call answers the same on b as on this device
     const { run } = surface(a.remote)
     expect(await run("thread_create", { thread: "dur-on-b", alias: "bee" })).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-on-b", alias: "bee" },
+      thread: "dur-on-b",
+      alias: "bee",
     })
     expect(a.aliases.get("bee")).toEqual({ session_id: "dur-on-b", device: "b" })
   })
@@ -813,7 +818,7 @@ describe("remote == local, round 2: send modes, handoff, list and alias order", 
       expect(listed).toMatchObject({ kind: "ok" })
       if (listed.kind !== "ok" || !("threads" in listed))
         throw new Error(`thread_list failed: ${JSON.stringify(listed)}`)
-      expect(listed.threads.map((thread) => thread.thread_id)).toContain("dur-local")
+      expect(listed.threads.map((thread) => thread.thread)).toContain("dur-local")
     },
   )
 
@@ -841,7 +846,7 @@ describe("remote == local, round 2: send modes, handoff, list and alias order", 
     const { run } = surface(a.remote)
     expect(await run("thread_create", { device: "studio", alias: "bee" })).toMatchObject({
       kind: "error",
-      error: { code: "host_unavailable", details: { thread_id: "dur-new-on-b" } },
+      error: { code: "host_unavailable", details: { thread: "dur-new-on-b" } },
     })
   })
 
@@ -854,7 +859,7 @@ describe("remote == local, round 2: send modes, handoff, list and alias order", 
     const { run } = surface(a.remote, { sessions: twins })
     expect(await run("thread_read", { thread: "twin" })).toMatchObject({
       kind: "ok",
-      thread_id: "dur-on-b",
+      thread: "dur-on-b",
       device: "b",
     })
   })

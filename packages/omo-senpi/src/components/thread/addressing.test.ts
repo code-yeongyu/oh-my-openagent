@@ -96,7 +96,7 @@ describe("resolveTarget sessionId aliases", () => {
     const entries = [thread({ thread_id: "01a1e7fb-5411-7000-8e3c-93cccc725011", session_ids: ["rpc-1"] })]
     const result = expectError(resolveTarget(entries, "rpc-9", { callerWorkspaceRoot: CALLER }), "not_found")
     expect(result.kind === "error" ? result.message : "").toContain("01a1e7fb-5411-7000-8e3c-93cccc725011")
-    expect(result.kind === "error" ? result.next_action : "").toContain("thread_id")
+    expect(result.kind === "error" ? result.next_action : "").toContain("thread value")
   })
 })
 

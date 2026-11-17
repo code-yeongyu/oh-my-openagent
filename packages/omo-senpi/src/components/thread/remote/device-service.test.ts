@@ -301,7 +301,7 @@ describe("device-service adapter of the thread tools' account surface", () => {
         { device: "b", session_id: "s1", title: "t", project: "/p", path: "/p/s1.jsonl", state: "idle", updated_ms: 2 },
         { model: "a/m1" },
       ),
-    ).toEqual({ kind: "ok", thread_id: "", device: "b", model: { provider: "a", id: "m1" } })
+    ).toEqual({ kind: "ok", thread: "", device: "b", model: { provider: "a", id: "m1" } })
     expect(closed).toBe(false)
   })
 

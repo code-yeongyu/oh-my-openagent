@@ -80,7 +80,7 @@ const SelfOrThread = Type.Optional(
   Type.String({
     minLength: 1,
     description:
-      "Thread to act on. Omit or pass self for this session. Accepts a thread_id, a unique name, or a sessionId from thread_list (rpc-N or the short session id); a sessionId resolves to that row's durable thread_id. A miss names the durable thread_id to pass.",
+      "Thread to act on. Omit or pass self for this session. Accepts the thread value of a thread_list row, an alias, or a unique name. A miss names the thread value to pass.",
   }),
 )
 

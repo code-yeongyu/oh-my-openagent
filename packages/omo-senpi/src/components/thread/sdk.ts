@@ -25,7 +25,12 @@ export type {
   StoreExtensionRefusalCode,
 } from "./gateway/store-extensions"
 import type { DeliveryTarget } from "./gateway/transport"
-import type { ExternalAuthor, GatewayDeliveryMode, GatewayDeliveryResult } from "./gateway/types"
+import type {
+  ExternalAuthor,
+  GatewayDeliveryMode,
+  GatewayDeliveryResult,
+  GatewayDeliverySuccess,
+} from "./gateway/types"
 import { createLiveThreadSurface, parseHostStatusAll } from "./live-surface"
 import { resolveThreadSocket } from "./live-surface-paths"
 import { createGatewayResolver, createGatewayServices } from "./tools/gateway-services"
@@ -92,6 +97,11 @@ type Reported = Promise<
   RelayResult<Omit<ReportOpResult, "arm_seq"> & { readonly deduplicated: boolean; readonly wake?: ArmWake }> | Failure
 >
 
+/** A send's answer: the gateway's delivery facts, with the session named `thread`, the address `read` and `send` take back. */
+export type ThreadSdkSendResult =
+  | (Omit<GatewayDeliverySuccess, "thread_id"> & { readonly thread: string })
+  | Exclude<GatewayDeliveryResult, GatewayDeliverySuccess>
+
 /** Where a session lives right now, as `omo daemon adopt` needs it. */
 export type LocatedThread = Pick<
   AddressEntry,
@@ -119,7 +129,7 @@ export type ThreadSdk = StoreExtensionApi & {
         readonly binding_id?: string
         readonly author?: ExternalAuthor
       },
-  ) => Promise<GatewayDeliveryResult>
+  ) => Promise<ThreadSdkSendResult>
   readonly bind: (
     request: Scoped & Keyed & { readonly session: string; readonly binding: Omit<BindInput, "session_durable_id"> },
   ) => Relayed<"bind">
@@ -316,6 +326,12 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     return resolved.kind === "error" ? { kind: "error", error: resolved } : { id: resolved.entry.thread_id }
   }
 
+  function named(sent: GatewayDeliveryResult): ThreadSdkSendResult {
+    if (sent.kind !== "ok") return sent
+    const { thread_id, ...facts } = sent
+    return { ...facts, thread: thread_id }
+  }
+
   async function inbound(
     request: Parameters<ThreadSdk["send"]>[0] & { readonly binding_id: string },
   ): Promise<GatewayDeliveryResult> {
@@ -382,7 +398,8 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
       ),
     send: (request) =>
       guarded(async () => {
-        if (request.binding_id !== undefined) return await inbound({ ...request, binding_id: request.binding_id })
+        if (request.binding_id !== undefined)
+          return named(await inbound({ ...request, binding_id: request.binding_id }))
         if (request.thread === undefined)
           return fail(
             "invalid_arguments",
@@ -446,7 +463,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
             `A command-line send reached a session on device ${sent.device}, which the engine does not admit.`,
             "Report this: the relay transport must refuse a command-line sender before sending.",
           )
-        return sent
+        return named(sent)
       }),
     bind: (request) =>
       guarded(async () => {

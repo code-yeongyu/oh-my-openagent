@@ -155,7 +155,7 @@ export function fakeRemoteClient(account: {
 }
 
 export const comparable = (result: ThreadToolResult): unknown => {
-  const { thread_id: _id, link: _link, device: _device, ...rest } = result as Record<string, unknown>
+  const { thread: _thread, link: _link, device: _device, ...rest } = result as Record<string, unknown>
   return rest
 }
 
