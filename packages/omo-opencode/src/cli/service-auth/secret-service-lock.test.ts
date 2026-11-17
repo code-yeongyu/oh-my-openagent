@@ -9,13 +9,24 @@ import { parseLockedReply } from "./secret-service-lock"
 const FAKE_SECRET_SERVICE = `
 import sys
 from gi.repository import Gio, GLib
-locked = sys.argv[1] == "locked"
-xml = """<node><interface name="org.freedesktop.Secret.Collection"><property name="Locked" type="b" access="read"/></interface></node>"""
-info = Gio.DBusNodeInfo.new_for_xml(xml).interfaces[0]
+mode = sys.argv[1]
+state = {"locked": mode != "unlocked"}
+COLLECTION = "/org/freedesktop/secrets/aliases/default"
+xml = """<node><interface name="org.freedesktop.Secret.Collection"><property name="Locked" type="b" access="read"/></interface>
+<interface name="org.freedesktop.Secret.Service"><method name="Unlock"><arg name="objects" type="ao" direction="in"/><arg name="unlocked" type="ao" direction="out"/><arg name="prompt" type="o" direction="out"/></method></interface></node>"""
+node = Gio.DBusNodeInfo.new_for_xml(xml)
 def get_property(conn, sender, path, iface, name):
-    return GLib.Variant("b", locked)
+    return GLib.Variant("b", state["locked"])
+# "unlockable" unlocks with no prompt (prompt "/"); "locked" needs a prompt, which nothing may ever open.
+def unlock(conn, sender, path, iface, method, params, invocation):
+    if mode == "unlockable":
+        state["locked"] = False
+        invocation.return_value(GLib.Variant("(aoo)", ([COLLECTION], "/")))
+    else:
+        invocation.return_value(GLib.Variant("(aoo)", ([], "/org/freedesktop/secrets/prompt/u1")))
 def on_bus(conn, name):
-    conn.register_object("/org/freedesktop/secrets/aliases/default", info, None, get_property, None)
+    conn.register_object(COLLECTION, node.interfaces[0], None, get_property, None)
+    conn.register_object("/org/freedesktop/secrets", node.interfaces[1], unlock, None, None)
 def on_name(conn, name):
     print("READY", flush=True)
 Gio.bus_own_name(Gio.BusType.SESSION, "org.freedesktop.secrets", Gio.BusNameOwnerFlags.NONE, on_bus, on_name, None)
@@ -76,7 +87,7 @@ describe("parseLockedReply", () => {
 describe.skipIf(!canRun)(
   "probeSecretServiceLock against a fake Secret Service on a private D-Bus (desktop#3509)",
   () => {
-    const probeIn = (fake: "locked" | "unlocked" | "none"): string => {
+    const probeIn = (fake: "locked" | "unlockable" | "unlocked" | "none"): string => {
       const dir = mkdtempSync(join(tmpdir(), "omo-secret-service-"))
       try {
         const fakePath = join(dir, "fake.py")
@@ -108,8 +119,11 @@ describe.skipIf(!canRun)(
       }
     }
 
-    test("a locked default collection is locked", () => {
+    test("a locked default collection whose unlock needs a prompt is locked", () => {
       expect(probeIn("locked")).toBe("locked")
+    })
+    test("a locked default collection that unlocks without a prompt is unlocked (#14039)", () => {
+      expect(probeIn("unlockable")).toBe("unlocked")
     })
     test("an unlocked default collection is unlocked", () => {
       expect(probeIn("unlocked")).toBe("unlocked")
