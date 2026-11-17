@@ -12,6 +12,7 @@ const rootConfig = readFileSync(new URL("../bunfig.root.toml", import.meta.url),
 const win2ConfigPath = new URL("../bunfig.win2.toml", import.meta.url)
 const win2ParallelConfigPath = new URL("../bunfig.win2.parallel.toml", import.meta.url)
 const win2WindowsParallelConfigPath = new URL("../bunfig.win2.parallel.windows.toml", import.meta.url)
+const win2RestConfigPath = new URL("../bunfig.win2.parallel.rest.toml", import.meta.url)
 
 function quarantinedTestPaths(config: string): readonly string[] {
   return [...config.matchAll(/"([^"]+\.test\.ts)"/g)].map((match) => match[1] ?? "")
@@ -74,6 +75,7 @@ describe("root test CI partition", () => {
     expect(existsSync(win2ConfigPath)).toBe(true)
     expect(existsSync(win2ParallelConfigPath)).toBe(true)
     expect(existsSync(win2WindowsParallelConfigPath)).toBe(true)
+    expect(existsSync(win2RestConfigPath)).toBe(true)
     expect(quotedPatterns(readFileSync(win2ConfigPath, "utf8"))).toContain("packages/omo-opencode/**")
     expect(quotedPatterns(readFileSync(win2ConfigPath, "utf8"))).toContain("packages/memory-core/**")
   })
@@ -90,15 +92,22 @@ describe("root test CI partition", () => {
   })
 
   test("#given the shared quarantine module #when the shard-2 bunfigs are read #then each ignores exactly the quarantined files", () => {
-    for (const configPath of [win2ParallelConfigPath, win2WindowsParallelConfigPath]) {
+    for (const configPath of [win2ParallelConfigPath, win2WindowsParallelConfigPath, win2RestConfigPath]) {
       expect(existsSync(configPath)).toBe(true)
 
       expect(quarantinedTestPaths(readFileSync(configPath, "utf8"))).toEqual([...ROOT_TEST_SERIAL_QUARANTINE_PATHS])
     }
   })
 
+  test("#given the macOS shard-2 light bunfig #when its ignore list is read #then it is the shared remainder plus the top-level script tree", () => {
+    const parallel = quotedPatterns(readFileSync(win2ParallelConfigPath, "utf8"))
+    const rest = quotedPatterns(readFileSync(win2RestConfigPath, "utf8"))
+
+    expect(rest).toEqual([...parallel, "script/**"])
+  })
+
   test("#given the shard-2 remainder bunfigs #when a shard-2 leg runs the remainder #then each keeps every bunfig.root.toml exclusion", () => {
-    for (const configPath of [win2ParallelConfigPath, win2WindowsParallelConfigPath]) {
+    for (const configPath of [win2ParallelConfigPath, win2WindowsParallelConfigPath, win2RestConfigPath]) {
       const parallelPatterns = quotedPatterns(readFileSync(configPath, "utf8"))
 
       for (const pattern of quotedPatterns(rootConfig)) {

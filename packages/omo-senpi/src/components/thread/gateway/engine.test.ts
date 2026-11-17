@@ -7,7 +7,7 @@ import { join } from "node:path"
 import { ROOT_LIFETIME_MS } from "./constants"
 import type { GatewayDeliverRequest } from "./engine"
 import { gatewayInboxDirectory } from "./paths"
-import { createRemoteThreadFixture } from "../thread-remote-fixture"
+import { createRemoteThreadFixture, fakeRemoteClient } from "../thread-remote-fixture"
 import type { RemoteThreadSurface } from "../remote/ports"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
 import { settled } from "./testing/settled"
@@ -111,12 +111,12 @@ describe("#13014: a local send to a session parked on a question names the wait,
   const remote = createRemoteThreadFixture().account().remote
   const down: RemoteThreadSurface = {
     ...remote,
-    sessions: {
-      ...remote.sessions,
-      thisDevice: async () => {
-        throw new Error("device service down")
-      },
-    },
+    client: fakeRemoteClient({
+      state: () => "connected",
+      here: "here",
+      devices: () => [],
+      fail: { kind: "error", code: "host_unavailable", message: "device service down", next_action: "Retry." },
+    }),
   }
   test.each([
     ["whose device service names this device", remote, { kind: "approval", device: "here" }],
