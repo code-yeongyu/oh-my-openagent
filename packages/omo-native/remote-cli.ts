@@ -1,3 +1,5 @@
+import { borrowedService } from "./remote-session-verbs"
+import { remoteClientForPerson } from "../omo-senpi/src/components/remote/index"
 import { existsSync } from "node:fs"
 
 import { type DeviceService, deviceServiceEndpointPath } from "../device-service-core/src/index.ts"
@@ -17,6 +19,10 @@ import {
 } from "./remote-local"
 import { isHelpFlag, REMOTE_USAGE, verbUsage } from "./remote-usage"
 import { VERBS } from "./remote-verbs"
+import { parseTarget, type RemoteSessionTarget } from "./remote-session-args"
+import { resolveSessionTarget } from "./remote-session-target"
+import { attachAddressed, createDeviceServiceSessions } from "../omo-senpi/src/components/remote/port/device-service"
+import type { JsonObject } from "../omo-senpi/src/components/thread/remote/ports"
 
 export type { RemoteCommandDependencies } from "./remote-local"
 // `omo remote`: the sessions on this account's other devices, through this device's service. A thin CLI over the
@@ -63,7 +69,13 @@ export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: 
   // switch, the device link and the session host unit. It reaches the network, so it is not a local-only verb.
   if (parsed.command === "enable") {
     try {
-      return await runEnableVerb(dependencies, dependencies.bootstrap, dependencies, parsed.json)
+      return await runEnableVerb(
+        dependencies,
+        dependencies.bootstrap,
+        dependencies,
+        parsed.json,
+        parsed.afterLogin === true,
+      )
     } catch (error) {
       return reportFailure(dependencies, error)
     }
@@ -88,7 +100,11 @@ export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: 
   }
   const localUnits = parsed.command === "status" ? await dependencies.coldWake.status() : undefined
   const code = await runLocalRemoteVerb(
-    localUnits === undefined ? dependencies : { ...dependencies, localUnits },
+    {
+      ...dependencies,
+      localSessions: dependencies.localSessions ?? thisDeviceSessions,
+      ...(localUnits === undefined ? {} : { localUnits }),
+    },
     parsed,
   )
   // After the verb's connection is closed (a changed table restarts the device service, which would cut it), and whatever
@@ -111,6 +127,11 @@ export function disableNotSavedNotice(reason: string, switchedOff: boolean): str
     : `omo remote disable: the choice could not be saved (${reason}) and remote could not be turned off, so it may still be on. Fix the error above, then run omo remote disable again.`
 }
 
+// This device's own sessions (`sessions` lists them) come from its operator endpoint, a socket: loaded here, on first
+// use, outside remote-local's graph (omo#13440), and handed to the person client.
+const thisDeviceSessions = async () =>
+  (await import("../omo-senpi/src/components/remote/local-sessions")).createLocalSessions()
+
 export type RemoteAttachLaunch = { readonly engineArgs: readonly string[] }
 
 /**
@@ -126,13 +147,15 @@ export async function prepareRemoteAttach(
     return REMOTE_EXIT.ok
   }
   const [target, ...extra] = args
-  const slash = target?.indexOf("/") ?? -1
-  if (target === undefined || extra.length > 0 || slash <= 0 || slash === target.length - 1) {
+  let parsedTarget: RemoteSessionTarget
+  try {
+    if (extra.length > 0) throw new UsageError("unexpected arguments")
+    parsedTarget = parseTarget("attach", target)
+  } catch (error) {
+    if (!(error instanceof UsageError)) throw error
     dependencies.error("usage: omo remote attach <device>/<session>   (the SESSION column of omo remote sessions)")
     return REMOTE_EXIT.usage
   }
-  const device = target.slice(0, slash)
-  const sessionId = target.slice(slash + 1)
   const signedOut = await accountNotice(dependencies)
   if (signedOut !== undefined) return signedOut
   if (!existsSync(dependencies.stateDir) || !existsSync(deviceServiceEndpointPath(dependencies.stateDir))) {
@@ -150,9 +173,36 @@ export async function prepareRemoteAttach(
     return reportFailure(dependencies, error)
   }
   try {
-    const attach = await service.attach(device, sessionId)
+    // A bare durable id is found in the account listing; for `<device>/<session>`, attachAddressed locates a durable id on
+    // that device and attaches on its key, and attaches a listing key directly (omo#13707).
+    const remote = (
+      dependencies.remote ??
+      ((connected: DeviceService) => ({
+        sessions: createDeviceServiceSessions({
+          version: connected.serviceVersion,
+          connect: async () => ({ conn: connected, owned: false }),
+        }),
+        // `omo remote` is a person at this device; the account reads go through the one remote client (#13414).
+        client: remoteClientForPerson({
+          version: connected.serviceVersion,
+          stateDir: dependencies.stateDir,
+          connect: async () => borrowedService(connected),
+          localSessions: dependencies.localSessions ?? thisDeviceSessions,
+        }),
+        chain: { stamp: (record: JsonObject) => record },
+      }))
+    )(service)
+    // Only the resolve reads through the surface; its client's own connection must not outlive it.
+    const resolved = await resolveSessionTarget(remote, parsedTarget).finally(() => remote.client.close())
+    if (resolved.kind === "error") {
+      service.close()
+      dependencies.error(`omo remote: ${resolved.error.message}`)
+      dependencies.error(resolved.error.next_action)
+      return REMOTE_EXIT.failed
+    }
+    const { attached: attach } = await attachAddressed(service, resolved.row.device, resolved.row.session_id)
     await attach.snapshot
-    const endpoint = await serveRemoteAttach(attach, { label: target })
+    const endpoint = await serveRemoteAttach(attach, { label: target ?? parsedTarget.session })
     void service.closed.then(() => endpoint.close())
     return { engineArgs: ["--attach", endpoint.socketPath, "--session", endpoint.sessionRef, "--no-extensions"] }
   } catch (error) {

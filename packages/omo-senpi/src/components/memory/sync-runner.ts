@@ -203,7 +203,7 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
       resolved = await resolveSession({ identity, paths, space })
     } catch (error) {
       if (isSyncSessionDeferred(error)) {
-        hooks.deferred(error.message)
+        hooks.deferred(error.message, error.wake)
         return null
       }
       if (isSyncConfigError(error)) {
@@ -255,7 +255,8 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
       stateDir: join(paths.runtime, "sync-device"),
       locksDir: paths.locks,
       session,
-      log: (line) => logger.info(line, { identity }),
+      // A failed cycle comes at warn so it shows where the person and a harness look; routine lines stay at info.
+      log: (line, level) => (level === "warn" ? logger.warn(line, { identity }) : logger.info(line, { identity })),
       ...(options.onStatusChange === undefined ? {} : { onStatusChange: () => options.onStatusChange?.(paths.repo) }),
     })
     if (device === null) {

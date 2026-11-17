@@ -45,6 +45,12 @@ diagnostics go to stderr.
 | 8 | Keychain unavailable: `{"keychain":"unavailable"}` |
 | 9 | Native storage failure or timeout: `{"error":"store-unavailable"}` |
 
+`omo account show` prints one JSON object and does not refresh the sign-in. A signed-in object includes `refreshState`:
+
+- `ok` means the stored sign-in has no refresh fence.
+- `uncertain` means a protocol-2 refresh attempt is still eligible on this boot: its deadline has not passed and the recovery clock still matches.
+- `expired` means the stored fence is `uncertain` and recovery can no longer be proved. That is no `refreshAttempt`, an attempt whose state is `exhausted`, or an attempt the recovery clock rejects because the deadline passed, the machine rebooted, or the clock itself is unavailable. `signedIn` stays true and the exit code stays 0. The keychain item is not rewritten.
+
 After a storage failure, the command reports that failure without another store
 read. Native operations are still awaited: there is no additional command
 deadline or forced process termination. A native timeout can therefore still

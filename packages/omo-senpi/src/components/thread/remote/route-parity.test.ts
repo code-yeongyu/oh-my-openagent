@@ -1,8 +1,14 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
-import { B_ROW, createRemoteThreadFixture } from "../thread-remote-fixture"
-import { createDeviceServiceSessions } from "./device-service"
-import { createLazyRemoteSurface } from "./lazy-remote"
+import { B_ROW, createRemoteThreadFixture, fakeRemoteClient } from "../thread-remote-fixture"
+import { createRemoteClient } from "../../remote/client"
+import { createLazyRemoteSurface } from "../../remote/port/lazy-remote"
+import { closingPorts } from "./testing/closing-ports"
+
+// #13873: every port is closed after each test, so no idle detach timer outlives it.
+const sessionsPort = closingPorts()
 
 const { account, surface, cleanup } = createRemoteThreadFixture()
 afterEach(cleanup)
@@ -221,12 +227,17 @@ describe("#13012 route parity", () => {
     const a = account()
     const { run } = surface({
       ...a.remote,
-      sessions: {
-        ...a.remote.sessions,
-        thisDevice: async () => {
-          throw new Error("device lookup failed")
+      client: fakeRemoteClient({
+        state: () => "connected",
+        here: "here",
+        devices: () => [],
+        devicesFail: {
+          kind: "error",
+          code: "host_unavailable",
+          message: "device lookup failed",
+          next_action: "Retry.",
         },
-      },
+      }),
     })
     expect(await run("thread_read", { thread: B_ROW.title })).toMatchObject({
       kind: "error",
@@ -241,9 +252,16 @@ describe("#13012 route parity", () => {
       let connects = 0
       const remote = createLazyRemoteSurface({
         version: "0.0.0",
+        sender: { kind: "session", id: "caller" },
         loadRuntime: async () => ({
-          createDeviceServiceSessions: () =>
-            createDeviceServiceSessions({
+          // A state dir with no device service endpoint in it: the client finds the service absent without connecting.
+          remoteClient: (version, sender) =>
+            createRemoteClient(sender, {
+              version,
+              stateDir: join(tmpdir(), `omo-absent-device-service-${process.pid}`),
+            }),
+          remoteSessionsPort: () =>
+            sessionsPort({
               version: "0.0.0",
               connect: async () => {
                 connects += 1
@@ -256,7 +274,8 @@ describe("#13012 route parity", () => {
         kind: "error",
         error: { code: "not_found" },
       })
-      expect(connects).toBe(1)
+      // The client reads the service state and finds no service, so the session port never opens a connection.
+      expect(connects).toBe(0)
     },
   )
 

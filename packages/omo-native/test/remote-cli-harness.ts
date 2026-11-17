@@ -7,6 +7,7 @@ import { join } from "node:path"
 import { connectDeviceService } from "../../device-service-core/src/index.ts"
 import { type FakeOwner, startFakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
 import { defaultWorld } from "../../device-service-core/test/local-api/conformance/world.ts"
+import type { RemoteClient } from "../../omo-senpi/src/components/remote/index"
 import type { Credentials } from "../../omo-opencode/src/cli/service-auth/protocol"
 import type { RemoteThreadSurface } from "../../omo-senpi/src/components/thread/remote/ports"
 import type { BootstrapSetup, DeviceLink } from "../remote-bootstrap"
@@ -63,6 +64,7 @@ export async function run(
     readonly packageRoot?: string
     readonly coldWake?: ColdWake
     readonly linkDevice?: DeviceLink
+    readonly client?: () => RemoteClient
     readonly optOut?: RemoteOptOut
   } = {},
 ) {

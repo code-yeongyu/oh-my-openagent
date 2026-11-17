@@ -21,7 +21,8 @@ const SYNC_START_FAILED = "sync-start-failed"
 
 /** What a start pass reports while it runs: why it defers, and the stage a stuck pass is named by. */
 export interface StartPassHooks {
-  deferred(message: string): void
+  /** `wake` aborts when what the pass waits for is gone (the waiting account signed out, #13624): retry at once. */
+  deferred(message: string, wake?: AbortSignal): void
   stage(name: string): void
   /** True once the pass was replaced at its deadline: it must not open or start an engine. */
   replaced(): boolean
@@ -90,6 +91,7 @@ export function launchStart<T>(
   let failures = state.failures
   let stage = "account read"
   let replaced = false
+  let wake: AbortSignal | undefined
   // A new backoff step says why sync waits; at the cap every pass is silent but one reminder per 15 minutes.
   // A pass already replaced at its deadline says nothing more: the fresh pass owns the repo's retry state.
   const waiting = (line: string, stillLine: string, code: string): void => {
@@ -106,12 +108,14 @@ export function launchStart<T>(
   }
   const pass = launch
     .start({
-      deferred: (message) =>
+      deferred: (message, signal) => {
+        wake = signal
         waiting(
           `memory sync is waiting: ${message} Sync retries on its own.`,
           `memory sync is still waiting: ${message}`,
           SYNC_SESSION_DEFERRED,
-        ),
+        )
+      },
       stage: (name) => {
         stage = name
       },
@@ -184,10 +188,18 @@ export function launchStart<T>(
       }),
     )
   }
+  // The next pass starts after the backoff, or as soon as a deferral's wake signal aborts.
   void ready.then(() => {
     if (!retrying) return
-    const retry = setTimeout(relaunch, state.retryMs)
-    retry.unref?.()
+    const retry = (): void => {
+      clearTimeout(timer)
+      wake?.removeEventListener("abort", retry)
+      relaunch()
+    }
+    const timer = setTimeout(retry, state.retryMs)
+    timer.unref?.()
+    if (wake?.aborted) retry()
+    else wake?.addEventListener("abort", retry, { once: true })
   })
   return held
 }
