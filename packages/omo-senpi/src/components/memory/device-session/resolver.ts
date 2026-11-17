@@ -23,6 +23,7 @@ const REPO_NOT_CREATED = "the memory repository is not created yet; sync starts 
 export interface DeviceSessionRuntime {
   readonly openAccountSession: (options: AccountSessionOptions) => Promise<AccountSessionOutcome>
   readonly deviceKeyringFromMaterial: (material: DeviceKeyMaterial) => Promise<DeviceKeyring>
+  readonly isDeviceSyncOff: (pinDir: string, account: string) => Promise<boolean>
   readonly GitSpaceConfig: typeof GitSpaceConfig
   readonly listRemotes: typeof listRemotes
   readonly repoHasCommit: typeof repoHasCommit
@@ -82,6 +83,7 @@ export function createDeviceSessionResolver(options: {
       return {
         ...opened.session,
         ...legacy,
+        turnedOff: () => runtime.isDeviceSyncOff(options.pinDir, account.descriptor.accountId),
         onEnded: (notify) => {
           if (account.signal.aborted) notify()
           else account.signal.addEventListener("abort", notify, { once: true })
@@ -114,6 +116,7 @@ export function createDeviceSessionResolver(options: {
     return {
       ...opened.session,
       ...legacy,
+      turnedOff: () => runtime.isDeviceSyncOff(options.pinDir, account.accountId),
       onEnded: (notify) => {
         ended.add(notify)
       },

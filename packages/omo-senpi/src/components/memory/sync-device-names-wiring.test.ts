@@ -44,6 +44,7 @@ function runnerKnowing(names: Readonly<Record<string, string>>): SyncRunner {
   return {
     acquire: async () => {},
     release: async () => {},
+    idleTurnedOff: async () => {},
     status: async () => null,
     deviceName: (principal) => names[principal],
   }

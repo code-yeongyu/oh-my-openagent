@@ -29,7 +29,8 @@ export function serviceProblem(error: unknown): SyncRpcProblem {
     : unavailable(error instanceof RetiredSyncOperation ? error.code : "operation_failed")
 }
 
-const LOGGABLE_CODE = /^[A-Z0-9_]{1,32}$/i
+/** The shape of a code that is safe to log: an identifier, never free text. */
+export const LOGGABLE_CODE = /^[A-Z0-9_]{1,32}$/i
 
 /**
  * Log fields for the error behind an unavailable problem; a RetiredSyncOperation says all it knows in its code.

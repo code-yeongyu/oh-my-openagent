@@ -110,6 +110,10 @@ export async function cliAccountOperation(
         device === options.descriptor.serviceDeviceId
           ? pairing.setDeviceSync(device, enabled)
           : Promise.reject(unavailable()),
+      disableDeviceSync: (device) =>
+        device === options.descriptor.serviceDeviceId
+          ? pairing.disableDeviceSync(device)
+          : Promise.reject(unavailable()),
     },
     async devices() {
       const response = await doFetch(`${http.baseUrl}/v1/devices`, {

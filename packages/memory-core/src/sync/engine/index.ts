@@ -13,6 +13,7 @@ export {
 } from "../account/session"
 export { type ApproveOutcome, approveDevice } from "../account/approve"
 export { type EnableMethod, type EnableOutcome, enableSync } from "../account/enable"
+export { type DisableOutcome, disableSync, isDeviceSyncOff } from "../account/device-switch"
 export {
   acknowledgePhraseVoid,
   type AcknowledgeInput,
@@ -23,7 +24,7 @@ export {
 } from "../account/phrase-notice"
 export { type CeremonyClock, type JoinOutcome, joinAccount } from "../account/join"
 export type { AccountHttp } from "../account/http"
-export type { PairingHttp } from "../account/pairing-http"
+export type { DeviceSyncOff, PairingHttp } from "../account/pairing-http"
 export type { SyncOperationAuthority, SyncOperationOptions } from "../operation-authority"
 export { type DeviceSync, openDeviceSync, type OpenDeviceSyncOptions, type SyncSession } from "./open"
 export type { RefusalCode, Sealer, Transport, Verifier } from "./ports"

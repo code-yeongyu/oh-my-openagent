@@ -13,6 +13,7 @@ export function wireSyncRpc(options: {
   readonly pinDir: string
   readonly signal: AbortSignal
   readonly syncStatus: () => Promise<MemoryRpcSync | undefined>
+  readonly stopSync?: () => Promise<void>
   readonly env: Readonly<Record<string, string | undefined>>
   readonly logger: { error(message: string, fields?: Record<string, unknown>): void }
   readonly warn?: (message: string, fields: Record<string, unknown>) => void
@@ -33,6 +34,7 @@ export function wireSyncRpc(options: {
     },
     runtime: {
       enableSync: async (input) => (await import("#omo-memory-sync-runtime")).enableSync(input),
+      disableSync: async (input) => (await import("#omo-memory-sync-runtime")).disableSync(input),
       joinAccount: async (input) => (await import("#omo-memory-sync-runtime")).joinAccount(input),
       approveDevice: async (input) => (await import("#omo-memory-sync-runtime")).approveDevice(input),
       phraseNoticeStatus: async (place) => (await import("#omo-memory-sync-runtime")).phraseNoticeStatus(place),
@@ -42,6 +44,7 @@ export function wireSyncRpc(options: {
     pinDir: options.pinDir,
     signal: options.signal,
     syncStatus: options.syncStatus,
+    ...(options.stopSync === undefined ? {} : { stopSync: options.stopSync }),
     phraseGate: phraseGateFrom(options.env, options.logger),
     ...(options.warn === undefined ? {} : { warn: options.warn }),
   })

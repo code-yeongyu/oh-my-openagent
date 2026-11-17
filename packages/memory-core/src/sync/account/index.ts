@@ -1,5 +1,6 @@
 export { type ApproveOutcome, approveDevice } from "./approve.ts"
 export { deviceKeyringFromMaterial } from "./device-keyring.ts"
+export { type DisableOutcome, disableSync } from "./device-switch.ts"
 export { type EnableOutcome, type EnableSyncInput, enableSync } from "./enable.ts"
 export type {
   GenesisBridge,
@@ -10,4 +11,4 @@ export type {
 export type { SyncOperationAuthority } from "../operation-authority.ts"
 export { type AccountHttp, AccountHttpError, createAccountHttp } from "./http.ts"
 export { type CeremonyClock, type JoinOutcome, joinAccount } from "./join.ts"
-export { createPairingHttp, type PairingHttp, type PendingApproval } from "./pairing-http.ts"
+export { createPairingHttp, type DeviceSyncOff, type PairingHttp, type PendingApproval } from "./pairing-http.ts"
