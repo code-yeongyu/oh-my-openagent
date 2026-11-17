@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "bun:test"
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { dirname, join, relative } from "node:path"
+import { dirname, join, relative, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { KILL_GRACE_MS, omoRunner } from "./run-omo"
@@ -107,6 +107,8 @@ describe("omoRunner", () => {
     const importers = files(src).filter((path) => /from\s+["'][^"']*\/run-omo["']/.test(readFileSync(path, "utf8")))
 
     // then
-    expect(importers.map((path) => relative(src, path))).toEqual(["components/remote/tui/command.ts"])
+    expect(importers.map((path) => relative(src, path).split(sep).join("/"))).toEqual([
+      "components/remote/tui/command.ts",
+    ])
   })
 })
