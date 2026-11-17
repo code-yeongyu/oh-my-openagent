@@ -39,7 +39,8 @@ const ADDRESSED: ReadonlySet<string> = new Set([
  * runs inside an eval cell the permission system has already decided; a nested ask for a call that stays on this device
  * adds an approval per call (an approval storm) and protects nothing the cell does not already run with. Such a call is
  * a request whose `ask` is approved without a prompt, scoped to its target, so `allow` and `deny` rules still decide
- * first. A call that may change another device keeps the tool-named ask. A target is local only as `self` or as the
+ * first. A call that may change another device, or claim an alias in the account-wide registry every device shares
+ * (`alias` on `thread_create` or `thread_rename`), keeps the tool-named ask. A target is local only as `self` or as the
  * exact durable id of a session file this device holds: a name or an alias can resolve to another device's thread
  * (the resolver tries account aliases before names), so it always asks.
  */
@@ -53,6 +54,7 @@ export function threadToolPermission(name: string, options: LocalityOptions) {
 
 function localTarget(name: string, input: Record<string, unknown>, options: LocalityOptions): string | undefined {
   if (NEVER_CHANGES_ANOTHER_DEVICE.has(name)) return "*"
+  if (input["alias"] !== undefined) return undefined
   if (name === "thread_create") {
     if (input["device"] !== undefined) return undefined
     const sources = [input["thread"], input["fork_from"]].filter((source) => source !== undefined)
