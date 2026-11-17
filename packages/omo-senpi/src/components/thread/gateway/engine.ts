@@ -12,7 +12,11 @@ import type { GatewayStore } from "./store"
 import type {
   DeliveryAuthority,
   ExternalAuthor,
-  GatewayDeliveryMode, GatewayDeliveryResult, GatewaySender, Provenance } from "./types"
+  GatewayDeliveryMode,
+  GatewayDeliveryResult,
+  GatewaySender,
+  Provenance,
+} from "./types"
 
 export type GatewayTarget = {
   readonly durable_id: string

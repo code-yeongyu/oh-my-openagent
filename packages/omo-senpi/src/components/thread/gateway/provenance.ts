@@ -66,7 +66,9 @@ export function renderDeliveryDisplayText(row: {
   readonly envelope: Pick<StoredDeliveryEnvelope, "provenance" | "authority">
   readonly body: string
 }): string {
-  return row.envelope.authority === "creator" ? row.body : `${deliveryProvenanceLine(row.envelope.provenance)}\n${row.body}`
+  return row.envelope.authority === "creator"
+    ? row.body
+    : `${deliveryProvenanceLine(row.envelope.provenance)}\n${row.body}`
 }
 
 export function renderDeliveryText(row: RenderedDelivery): string {

@@ -57,7 +57,11 @@ const choose = () => {
   if (lastUser.includes("Now send the child")) return { toolCalls: [SEND] }
   return { text: "CHILD_OK" }
 }
-fake = await startFakeModelServer(new Proxy([], { get: (target, key) => (key === "length" ? 1e9 : /^\d+$/.test(String(key)) ? choose() : Reflect.get(target, key)) }))
+fake = await startFakeModelServer(
+  new Proxy([], {
+    get: (target, key) => (key === "length" ? 1e9 : /^\d+$/.test(String(key)) ? choose() : Reflect.get(target, key)),
+  }),
+)
 writeMockModelsJson(scratch.agentDir, fake)
 const extension = join(process.cwd(), "packages/omo-senpi/plugin/extensions/omo.js")
 const configAgent = join(scratch.dir, ".omo", "agent")
