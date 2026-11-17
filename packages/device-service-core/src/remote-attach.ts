@@ -257,6 +257,7 @@ export function openAttach(
             // command fails as a session.command that timed out, its id kept because its outcome may still arrive.
             const cancelWait = timers.after(waitMs, () => {
               settle()
+              delegated.forget(commandId)
               reject(
                 new LocalApiError("request_timeout", `no final state for command ${commandId} within ${waitMs} ms`, {
                   command_id: commandId,
