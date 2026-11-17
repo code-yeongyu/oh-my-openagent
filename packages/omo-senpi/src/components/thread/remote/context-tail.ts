@@ -10,9 +10,10 @@ import type { JsonObject, SessionProjector } from "./ports"
  * then the entries from its `firstKeptEntryId`, then everything after it; with none, every entry of the path. So a path
  * cut off at its oldest fetched entry projects the same tail as the whole path when:
  * - the walk reached the session's root; or
- * - the latest compaction on the path and its first kept entry were fetched (nothing older is projected); or
- * - no compaction is on the fetched part and it projects at least the window's messages (an older compaction, its
- *   summary and its kept entries all precede them in the context, and an edit is always newer than the entry it edits).
+ * - the entries after the latest fetched compaction (or every fetched entry, with none) project at least the window's
+ *   messages: they are the context's last ones, since a compaction's summary and its kept entries precede them, and an
+ *   edit is always newer than the entry it edits; or
+ * - the latest compaction on the path and its first kept entry were fetched (nothing older is projected).
  */
 export type TailStatus =
   | { readonly kind: "closed"; readonly tail: ContextTail; readonly keepFrom: number }
@@ -32,6 +33,8 @@ export function contextTail(
   const byId = new Map(entries.flatMap((entry) => (idOf(entry) === undefined ? [] : [[idOf(entry), entry] as const])))
   if (!byId.has(leaf)) return complete ? { kind: "unanswerable" } : { kind: "need_older" }
   const onPath = new Set<string>()
+  // The path's entries newer than its latest compaction (all of them while none is found).
+  const afterCompaction = new Set<string>()
   let compaction: JsonObject | undefined
   let reachedRoot = false
   for (let current = byId.get(leaf); current !== undefined; ) {
@@ -39,6 +42,7 @@ export function contextTail(
     if (id === undefined || onPath.has(id)) break
     onPath.add(id)
     if (compaction === undefined && current["type"] === "compaction") compaction = current
+    if (compaction === undefined) afterCompaction.add(id)
     const parent = current["parentId"]
     if (typeof parent !== "string" || parent === "") {
       reachedRoot = true
@@ -54,12 +58,17 @@ export function contextTail(
       message: message as ThreadTranscriptEntry,
     })),
   )
-  const closed =
-    reachedRoot ||
-    complete ||
-    (compaction !== undefined ? firstKept !== undefined && onPath.has(firstKept) : messages.length >= CONTEXT_TAIL_MESSAGES)
+  const recent = projected
+    .filter((entry) => afterCompaction.has(entry.sourceEntry.id))
+    .reduce((count, entry) => count + entry.messages.length, 0)
+  const tailIsRecent = recent >= CONTEXT_TAIL_MESSAGES
+  const closed = reachedRoot || complete || tailIsRecent || (firstKept !== undefined && onPath.has(firstKept))
   if (!closed) return { kind: "need_older" }
-  return { kind: "closed", tail: { messages, revision: leaf }, keepFrom: keepFrom(entries, projected, firstKept) }
+  return {
+    kind: "closed",
+    tail: { messages, revision: leaf },
+    keepFrom: keepFrom(entries, projected, tailIsRecent ? undefined : firstKept),
+  }
 }
 
 /**

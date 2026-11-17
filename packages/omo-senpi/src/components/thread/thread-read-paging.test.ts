@@ -94,6 +94,13 @@ const COMPACTED = [
   ...chain("p", "u1", 20, "after compaction"),
 ]
 
+// A session compacted long ago (keeping from e10), with 200 messages since: those alone are the context's tail.
+const COMPACTED_LONG_AGO = [
+  ...chain("e", null, 400, "before compaction"),
+  entry("compaction", "c1", "e399", { summary: "long ago", firstKeptEntryId: "e10", tokensBefore: 9000 }),
+  ...chain("p", "c1", 200, "after compaction"),
+]
+
 describe("#14047: thread_read of a thread on another device costs its slice, not its transcript", () => {
   test("#given a long transcript on b's paging engine #when thread_read takes 1500 bytes #then b sends pages of its newest entries (under a quarter of the transcript), never get_messages, and the answer equals this device's read of the same transcript", async () => {
     const { run, localAt, reads, log } = pagingAccount(sessionEntries(MESSAGES))
@@ -124,6 +131,13 @@ describe("#14047: thread_read of a thread on another device costs its slice, not
     const there = await walk(run)
     expect(there).toEqual(await walk((args) => localAt(leaf, args)))
     expect(there.length).toBe(Math.min(60, senpiContext([...entries], leaf).length))
+  })
+
+  test("#given a session with more than a window of messages since its compaction #when thread_read runs cold #then one page of b's newest entries answers it (the compaction's kept entries are never fetched), as this device's engine reads it", async () => {
+    const { run, localAt, reads } = pagingAccount([...COMPACTED_LONG_AGO], "p199")
+    const there = await run({ max_bytes: 3000 })
+    expect(reads().map((reply) => reply.rpc["type"])).toEqual(["get_entries"])
+    expect(withoutCursor(there)).toEqual(withoutCursor(await localAt("p199", { max_bytes: 3000 })))
   })
 
   test("#given a read b already answered #when the transcript has not changed and thread_read runs again #then b is asked only for entries after the newest one kept, answers none, and the result is the same", async () => {
