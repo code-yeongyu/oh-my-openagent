@@ -150,7 +150,8 @@ export function sessionVerbLines(
   result: ThreadToolResult,
 ): string[] {
   if (result.kind !== "ok") return []
-  if (verb === "open" && "thread" in result) return [`${result.thread.device ?? ""}/${result.thread.thread_id}`]
+  if (verb === "open" && "deduplicated" in result && "name" in result)
+    return [`${result.device ?? ""}/${result.thread}`]
   if (verb === "send" && "delivery" in result) {
     const { delivery } = result
     if (delivery.kind === "queued" || delivery.kind === "queued_offline") return [queuedLine(label, delivery)]
