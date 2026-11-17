@@ -83,9 +83,10 @@ export const aliasedDaclVerdict = (
   )
 }
 
-// A fresh FileSecurity passed to Set-Acl is refused ("unauthorized operation") on the GitHub runner,
-// with or without SetOwner. icacls sets the owner, then Get-Acl edits that live descriptor down to
-// one protected ACE. The vendored dacl.ts stays byte-pinned.
+// A fresh FileSecurity passed to Set-Acl is refused on the GitHub runner, and the Get-Acl/Set-Acl
+// cmdlets often cannot load Microsoft.PowerShell.Security there. icacls sets the owner, then the
+// item's own GetAccessControl/SetAccessControl edits that live descriptor down to one protected ACE.
+// The vendored dacl.ts stays byte-pinned.
 const RUNNER_APPLY_SCRIPT = String.raw`
 $ProgressPreference = 'SilentlyContinue'
 $ErrorActionPreference = 'Continue'
@@ -94,7 +95,8 @@ $ownerCode = $LASTEXITCODE
 $ErrorActionPreference = 'Stop'
 if ($ownerCode -ne 0) { throw "setowner failed: $ownerOut" }
 $sid = New-Object System.Security.Principal.SecurityIdentifier($env:LA_SID)
-$acl = Get-Acl -LiteralPath $env:LA_PATH
+$item = Get-Item -LiteralPath $env:LA_PATH
+$acl = $item.GetAccessControl()
 $acl.SetAccessRuleProtection($true, $false)
 foreach ($rule in @($acl.Access)) { [void]$acl.RemoveAccessRule($rule) }
 if ($env:LA_KIND -eq 'dir') {
@@ -106,7 +108,7 @@ $grant = New-Object System.Security.AccessControl.FileSystemAccessRule($sid,
   [System.Security.AccessControl.FileSystemRights]::FullControl, $inherit,
   [System.Security.AccessControl.PropagationFlags]::None, [System.Security.AccessControl.AccessControlType]::Allow)
 $acl.AddAccessRule($grant)
-Set-Acl -LiteralPath $env:LA_PATH -AclObject $acl
+$item.SetAccessControl($acl)
 Write-Output 'applied'
 `
 

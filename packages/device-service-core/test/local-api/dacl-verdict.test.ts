@@ -136,8 +136,10 @@ describe("applying the exact DACL", () => {
     }
     await applyExactDacl("C:\\state", U, "file", run)
     expect(script.includes("icacls.exe")).toBe(true)
-    expect(script.includes("Get-Acl")).toBe(true)
-    expect(script.includes("Set-Acl")).toBe(true)
+    expect(script.includes("GetAccessControl")).toBe(true)
+    expect(script.includes("SetAccessControl")).toBe(true)
+    expect(script.includes("Get-Acl")).toBe(false)
+    expect(script.includes("Set-Acl")).toBe(false)
     expect(script.includes("SetOwner")).toBe(false)
   })
 

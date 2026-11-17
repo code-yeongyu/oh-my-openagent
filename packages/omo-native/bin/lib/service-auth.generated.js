@@ -268,7 +268,8 @@ $ownerCode = $LASTEXITCODE
 $ErrorActionPreference = 'Stop'
 if ($ownerCode -ne 0) { throw "setowner failed: $ownerOut" }
 $sid = New-Object System.Security.Principal.SecurityIdentifier($env:LA_SID)
-$acl = Get-Acl -LiteralPath $env:LA_PATH
+$item = Get-Item -LiteralPath $env:LA_PATH
+$acl = $item.GetAccessControl()
 $acl.SetAccessRuleProtection($true, $false)
 foreach ($rule in @($acl.Access)) { [void]$acl.RemoveAccessRule($rule) }
 if ($env:LA_KIND -eq 'dir') {
@@ -280,7 +281,7 @@ $grant = New-Object System.Security.AccessControl.FileSystemAccessRule($sid,
   [System.Security.AccessControl.FileSystemRights]::FullControl, $inherit,
   [System.Security.AccessControl.PropagationFlags]::None, [System.Security.AccessControl.AccessControlType]::Allow)
 $acl.AddAccessRule($grant)
-Set-Acl -LiteralPath $env:LA_PATH -AclObject $acl
+$item.SetAccessControl($acl)
 Write-Output 'applied'
 `,applyExactDacl2=async(path,userSid,kind,run=runPowerShell2)=>{let{code,err}=await run(RUNNER_APPLY_SCRIPT,{LA_PATH:path,LA_SID:userSid,LA_KIND:kind});if(code!==0)throw new LocalApiError("insecure_state_dir",`the exact DACL could not be applied${firstErrorLine(err)}`)},verifyExactDacl2=async(path,userSid,kind,run=runPowerShell2)=>{let dacl;try{dacl=await describeDacl(path,run)}catch(error){if(error instanceof LocalApiError)return!1;throw error}return aliasedDaclVerdict(dacl,userSid,kind,await userSidToken(userSid,run))},windowsSecureFile2=(userSid,run=runPowerShell2)=>async(path,kind)=>{let target=kind==="dir"?"dir":"file";if(await applyExactDacl2(path,userSid,target,run),!await verifyExactDacl2(path,userSid,target,run))throw new LocalApiError("insecure_state_dir","the DACL is not exactly one ACE for the user")};init_version();var CHECKSUMS="checksums.txt",SIGNATURE="checksums.txt.sig",MANIFEST="latest.json",SIGNATURE_BYTES=64,CHECKSUMS_MAX_BYTES=65536,MANIFEST_MAX_BYTES=4096,BINARY_MAX_BYTES=536870912,DEVICE_SERVICE_HOSTS=["darwin-arm64","darwin-x64","linux-x64","linux-arm64","windows-x64","windows-arm64"],isDeviceServiceHost=(value)=>DEVICE_SERVICE_HOSTS.some((host)=>host===value),deviceServiceHost=(platform,arch)=>{let host=`${platform==="win32"?"windows":platform}-${arch}`;return isDeviceServiceHost(host)?host:void 0},deviceServiceAssetName=(host)=>host.startsWith("windows-")?`omo-device-service-${host}.exe`:`omo-device-service-${host}`,RELEASE_FILES=new Set([MANIFEST,...DEVICE_SERVICE_HOSTS.map(deviceServiceAssetName)]),CHECKSUM_LINE=/^([0-9a-f]{64}) {2}([A-Za-z0-9.-]+)$/,strictUtf8=(bytes)=>{try{return new TextDecoder("utf-8",{fatal:!0}).decode(bytes)}catch{return}},parseChecksums=(bytes)=>{let text=strictUtf8(bytes);if(text===void 0||!text.endsWith(`
 `))return;let digests=new Map;for(let line of text.slice(0,-1).split(`
