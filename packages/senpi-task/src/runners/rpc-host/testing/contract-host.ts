@@ -59,6 +59,8 @@ export type ContractHostOptions = {
   readonly subscribeRefusal?: string
   /** The turn `get_state` reports running (`currentTurnId`), as the engine does while a run is under way. */
   readonly currentTurnId?: string
+  /** What `get_state` answers, whole, instead of the default: the host's state when the read lands. */
+  readonly state?: Frame
 }
 export type ContractHost = {
   readonly socket: string
@@ -404,9 +406,10 @@ export async function withContractHost(
           if (frame.type === "get_state") {
             respond(
               frame,
-              options.currentTurnId === undefined
-                ? { isStreaming: false }
-                : { isStreaming: true, currentTurnId: options.currentTurnId },
+              options.state ??
+                (options.currentTurnId === undefined
+                  ? { isStreaming: false }
+                  : { isStreaming: true, currentTurnId: options.currentTurnId }),
             )
             continue
           }

@@ -293,7 +293,9 @@ type EndpointListing = {
 }
 
 export type LiveThreadSurface = ThreadHost &
-  Required<Pick<ThreadHost, "endpoint" | "listView" | "listTarget">> & { readonly gateway: GatewayEndpointPort }
+  Required<Pick<ThreadHost, "endpoint" | "listView" | "listTarget" | "watchSession">> & {
+    readonly gateway: GatewayEndpointPort
+  }
 
 function isConnectRefusal(error: unknown): boolean {
   const code = record(error) ? error.code : undefined
@@ -408,7 +410,9 @@ export function createLiveThreadSurface(
    * reads): the snapshot row is where the watch starts, each later `session_status` is a status change, and the run's
    * own records arrive mirrored. The connection is never an attachment, so it holds no session and resets no idle window.
    * The engine's records name no turn: while the session runs, one observing `get_state` reads its `currentTurnId`
-   * (the id `prompt` answered with), and the run records forwarded after it carry that id.
+   * (the id `prompt` answered with), and the run records forwarded after it carry that id. That read can land after a
+   * fast run ended or a later one began, so its turn is taken only when its `lifecycle.runId` is the run whose
+   * `agent_start` the stream showed; with no `agent_start` seen, only from a state that is still streaming.
    */
   const watchOn = async (
     socket: string,
@@ -422,9 +426,30 @@ export function createLiveThreadSurface(
     })
     let previous: string | undefined
     let turn: string | undefined
+    // The run whose `agent_start` the stream showed and that has not settled yet.
+    let startedRun: string | undefined
+    const runOf = (entry: RpcObject) =>
+      entry.type === "agent_start" && typeof entry.runId === "string" ? entry.runId : undefined
     const currentTurn = async (): Promise<string | undefined> => {
       const state = await callOn<Record<string, unknown>>(socket, "get_state", { sessionId, ...OBSERVE })
-      return typeof state.currentTurnId === "string" && state.currentTurnId !== "" ? state.currentTurnId : undefined
+      const current =
+        typeof state.currentTurnId === "string" && state.currentTurnId !== "" ? state.currentTurnId : undefined
+      const run = readFor()
+      if (run === null) return undefined
+      const lifecycle = record(state.lifecycle) ? state.lifecycle : {}
+      if (run !== undefined) return lifecycle.runId === run ? current : undefined
+      return state.isStreaming === true ? current : undefined
+    }
+    // The run a turn-id read is for: the one already seen starting, else the first one a held record starts; null when a
+    // held settle shows the run ended before any start, so no id the read returns can be its own.
+    const readFor = (): string | undefined | null => {
+      if (startedRun !== undefined) return startedRun
+      for (const entry of held ?? []) {
+        if (entry.type === "agent_settled") return null
+        const run = runOf(entry)
+        if (run !== undefined) return run
+      }
+      return undefined
     }
     // Records that arrive while the snapshot or a running turn's id is still being read are held, then applied in order.
     let held: RpcObject[] | undefined = []
@@ -438,6 +463,7 @@ export function createLiveThreadSurface(
     }
     const apply = (entry: RpcObject) => {
       if (entry.sessionId !== sessionId) return
+      startedRun = entry.type === "agent_settled" ? undefined : (runOf(entry) ?? startedRun)
       if (entry.type !== "session_status")
         return handlers.record(
           (turn === undefined || "turnId" in entry ? entry : { ...entry, turnId: turn }) as JsonObject,
@@ -686,7 +712,7 @@ export function createLiveThreadSurface(
   const sessionMethods = (
     socket: string | undefined,
     send: <T>(type: string, data?: Record<string, unknown>, durableSessionId?: string) => Promise<T>,
-  ): ThreadSessionPort => ({
+  ): ThreadSessionPort & Required<Pick<ThreadSessionPort, "watchSession">> => ({
     getMessages: async (sessionId) =>
       (await send<{ messages: ThreadTranscriptEntry[] }>("get_messages", { sessionId })).messages,
     getState: (sessionId) => send("get_state", { sessionId }),

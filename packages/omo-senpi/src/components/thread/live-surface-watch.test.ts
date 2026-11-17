@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { withContractHost, type ContractHost } from "../../../../senpi-task/src/runners/rpc-host/testing/contract-host"
 import type { SessionWatchHandlers } from "./control/wait-settled"
+import { createLazyLiveThreadSurface } from "./lazy-live-surface"
 import { createLiveThreadSurface } from "./live-surface"
 import type { RemoteStatusChange } from "./remote/ports"
 
@@ -95,17 +96,38 @@ describe("thread_read wait on this device: the endpoint's observing session subs
     })
   })
 
-  test("#given an idle session #when a run starts and settles at once #then the settle is held until get_state names the run's turn, and carries it", async () => {
-    await withContractHost({ auth: true, currentTurnId: "4" }, async (host) => {
-      const { seen, handlers, next } = collector()
-      await watch(host, handlers)
-      host.publish([{ type: "session_status", status: "running" }, { type: "agent_settled" }])
-      await next(2)
-      expect(seen).toEqual([
-        { status: { from: "idle", to: "running", derived: false } },
-        { record: { type: "agent_settled", sessionId: "rpc-1", turnId: "4" } },
-      ])
-    })
+  test.each([
+    ["is the run the stream saw start", "run-a", { turnId: "5" }],
+    ["belongs to a later run that began meanwhile", "run-b", {}],
+  ] as const)(
+    "#given a run that starts and settles before its turn read lands #when the read's run %s #then the settle carries that turn only when the runs match (fast-run race)",
+    async (_label, readRun, stamp) => {
+      const state = { isStreaming: true, currentTurnId: readRun === "run-a" ? "5" : "9", lifecycle: { runId: readRun } }
+      await withContractHost({ auth: true, state }, async (host) => {
+        const { seen, handlers, next } = collector()
+        await watch(host, handlers)
+        host.publish([
+          { type: "agent_start", runId: "run-a" },
+          { type: "session_status", status: "running" },
+          { type: "agent_settled" },
+          { type: "session_status", status: "idle" },
+        ])
+        await next(4)
+        expect(seen[2]).toEqual({ record: { type: "agent_settled", sessionId: "rpc-1", ...stamp } })
+        expect(seen[3]).toEqual({ status: { from: "running", to: "idle", derived: false } })
+      })
+    },
+  )
+
+  test("#given a running snapshot whose turn read finds the run already over #when no run start was seen #then the watch starts with no turn id", async () => {
+    await withContractHost(
+      { auth: true, subscribeStatus: "running", state: { isStreaming: false, currentTurnId: "7" } },
+      async (host) => {
+        const outcome = await watch(host, collector().handlers)
+        expect(outcome).toMatchObject({ kind: "ok", watch: { initial: { status: "running" } } })
+        expect((outcome as { watch: { initial?: object } }).watch.initial).not.toHaveProperty("currentTurnId")
+      },
+    )
   })
 
   test("#given a watched session #when its status becomes closed #then the watch ends session_closed", async () => {
@@ -133,4 +155,27 @@ describe("thread_read wait on this device: the endpoint's observing session subs
       expect(await watch(host, collector().handlers)).toEqual({ kind: "refused", reason: "invalid_subscription" })
     })
   })
+})
+
+describe("thread_read wait on this device through the component's host (createLazyLiveThreadSurface, component.ts)", () => {
+  test.each(["the host itself", "the endpoint that listed the session"] as const)(
+    "#given the lazy host the thread component builds #when a session is watched through %s #then the watch opens on the endpoint's subscription and reports its status changes",
+    async (via) => {
+      await withContractHost({ auth: true }, async (host) => {
+        const lazy = createLazyLiveThreadSurface(undefined, {
+          env: { OMO_CODING_AGENT_DIR: host.root, SENPI_RPC_SOCKET: host.socket, SENPI_RPC_KEY_ROOT: host.root },
+          statusAll: async () => undefined,
+          registry: async () => [],
+          loadRuntime: async () => ({ createLiveThreadSurface }),
+        })
+        const port = via === "the host itself" ? lazy : lazy.endpoint(host.socket)
+        const { seen, handlers, next } = collector()
+        const outcome = await port.watchSession?.("rpc-1", handlers, "dur-selected")
+        expect(outcome).toMatchObject({ kind: "ok", watch: { initial: { status: "idle" } } })
+        host.publish([{ type: "session_status", status: "running" }])
+        await next(1)
+        expect(seen).toEqual([{ status: { from: "idle", to: "running", derived: false } }])
+      })
+    },
+  )
 })
