@@ -1,8 +1,8 @@
 import { AsyncLocalStorage } from "node:async_hooks"
-import { execFile } from "node:child_process"
 import { createHash } from "node:crypto"
 import { mkdir } from "node:fs/promises"
-import { basename, join } from "node:path"
+import { join } from "node:path"
+import { getProcessCommandName } from "@oh-my-opencode/memory-core/process-identity"
 import {
   type LockHolder,
   type LockLease,
@@ -77,16 +77,6 @@ const HELPER_FINISHING_MS = 60_000
 
 const helperArgv0 = /(^|-)omo-keychain(-test)?$/
 
-/** The holder's argv[0] basename, or null when the process is gone or `ps` cannot say. */
-function processName(pid: number): Promise<string | null> {
-  return new Promise((resolve) => {
-    execFile("/bin/ps", ["-o", "args=", "-p", String(pid)], { timeout: 2_000 }, (error, stdout) => {
-      const argv0 = error === null ? stdout.trim().split(/\s+/, 1)[0] : undefined
-      resolve(argv0 === undefined || argv0 === "" ? null : basename(argv0))
-    })
-  })
-}
-
 function duration(ms: number): string {
   const units = [
     [86_400_000, "day"],
@@ -108,7 +98,7 @@ function duration(ms: number): string {
  */
 async function credentialLockBusy(error: LockWaitTimeoutError): Promise<SignInError> {
   const holder: LockHolder | null = error.holder
-  const name = holder === null ? null : await processName(holder.ownerPid)
+  const name = holder === null ? null : await getProcessCommandName(holder.ownerPid)
   if (holder === null || name === null)
     return new SignInError(
       `OmO's sign-in lock stayed busy and its holder has exited or could not be read. Run the command again. If it keeps failing while no omo command is running, delete ${error.lockPath} and try again.`,
