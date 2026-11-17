@@ -157,6 +157,7 @@ export function loroWasmSourcePath() {
   )
 }
 const threadClientEntryPath = join(packageRoot, "src", "components", "thread", "live-surface.ts")
+const wakeEntryPath = join(packageRoot, "src", "components", "thread", "wake", "wake-runtime.ts")
 const telemetryRecoveryEntryPath = join(packageRoot, "src", "components", "telemetry", "session-summary-recovery.ts")
 const feedbackEntryPath = join(packageRoot, "src", "components", "feedback", "runtime.ts")
 const desktopToolkitEntryPath = join(packageRoot, "src", "components", "desktop-toolkit", "runtime.ts")
@@ -217,6 +218,7 @@ const threadClientOutputPath = join(
   "extensions",
   "omo-thread-client.js",
 )
+const wakeOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-wake.js")
 const telemetryRecoveryOutputPath = join(
   process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot,
   "extensions",
@@ -264,6 +266,7 @@ const externalSpecifiers = [
   "#omo-telemetry-otlp-runtime",
   "#omo-memory-sync-runtime",
   "#omo-thread-client-runtime",
+  "#omo-wake-runtime",
   "#omo-telemetry-recovery-runtime",
   // telemetry-core loads its immediate sender through this import; the plugin manifest maps it to the recovery sidecar.
   "#telemetry-immediate-send",
@@ -285,6 +288,16 @@ const BUILD_SETTINGS = JSON.stringify({
   secondaryMinifier: "terser@5.44.0",
   loaderAliases: SENPI_LOADER_ALIASES,
 })
+// #13155: the externals list carries the running node's builtinModules (node 26 adds node:ffi), and it
+// feeds the marker digest, so a byte-identical bundle built under another node read as stale. The digest
+// therefore records the builtin family as ONE stable token and digests only the source-derived
+// externals, which is what freshness must track.
+const NODE_BUILTIN_SET_MARKER = "<node-builtins>"
+export function digestSettingsFor(externals, builtinNames) {
+  const builtins = new Set(builtinNames)
+  const sourceDerived = externals.filter((specifier) => !builtins.has(specifier) && !specifier.startsWith("node:"))
+  return JSON.stringify({ settings: BUILD_SETTINGS, externals: [...sourceDerived, NODE_BUILTIN_SET_MARKER] })
+}
 
 export const extensionBuildPaths = {
   scriptDir,
@@ -315,6 +328,7 @@ export const extensionBuildPaths = {
   telemetryOtlpOutputPath,
   memorySyncOutputPath,
   threadClientOutputPath,
+  wakeOutputPath,
   telemetryRecoveryOutputPath,
   feedbackOutputPath,
   desktopToolkitOutputPath,
@@ -375,6 +389,7 @@ export function resolveOutputs(options) {
     telemetryOtlpOutput: sibling(options.telemetryOtlpOutputPath, telemetryOtlpOutputPath, "omo-telemetry-otlp.js"),
     memorySyncOutput: sibling(options.memorySyncOutputPath, memorySyncOutputPath, "omo-memory-sync.js"),
     threadClientOutput: sibling(options.threadClientOutputPath, threadClientOutputPath, "omo-thread-client.js"),
+    wakeOutput: sibling(options.wakeOutputPath, wakeOutputPath, "omo-wake.js"),
     telemetryRecoveryOutput: sibling(
       options.telemetryRecoveryOutputPath,
       telemetryRecoveryOutputPath,
@@ -426,6 +441,7 @@ export async function buildExtension(options = {}) {
     telemetryOtlpOutput,
     memorySyncOutput,
     threadClientOutput,
+    wakeOutput,
     telemetryRecoveryOutput,
     feedbackOutput,
     desktopToolkitOutput,
@@ -465,6 +481,7 @@ export async function buildExtension(options = {}) {
     assets: true,
   })
   const threadClientInputs = await buildEntry(threadClientEntryPath, threadClientOutput, buildDefines)
+  const wakeInputs = await buildEntry(wakeEntryPath, wakeOutput, buildDefines)
   const telemetryRecoveryInputs = await buildEntry(telemetryRecoveryEntryPath, telemetryRecoveryOutput, buildDefines)
   const feedbackInputs = await buildEntry(feedbackEntryPath, feedbackOutput, buildDefines)
   const desktopToolkitInputs = await buildEntry(desktopToolkitEntryPath, desktopToolkitOutput, buildDefines)
@@ -515,6 +532,7 @@ export async function buildExtension(options = {}) {
     telemetryOtlpInputs,
     memorySyncInputs,
     threadClientInputs,
+    wakeInputs,
     telemetryRecoveryInputs,
     feedbackInputs,
     desktopToolkitInputs,
@@ -555,7 +573,7 @@ async function buildEntry(entry, output, buildDefines, externals = externalSpeci
       metafile,
       buildDefines,
       repoRoot,
-      buildSettings: JSON.stringify({ settings: BUILD_SETTINGS, externals }),
+      buildSettings: digestSettingsFor(externals, builtinModuleNames),
       buildScriptPath,
     })
   } finally {

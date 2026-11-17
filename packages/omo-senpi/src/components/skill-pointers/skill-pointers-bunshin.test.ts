@@ -43,6 +43,10 @@ describe("omo-senpi skill-pointers bunshin pointer", () => {
     const content = injectedContent(pi, BUNSHIN_CUSTOM_TYPE)
     expect(content).toStartWith("<omo-bunshin-pointer>")
     expect(content).toContain("OMO_BUNSHIN_TS_SDK_ROOT")
+    // Shell form and forbidden entry the pointer must carry. An unquoted ls of the desktop path
+    // (spaces and parentheses) prints a false miss, and importing the node-agent executable exits the kernel.
+    expect(content).toContain('"$OMO_BUNSHIN_TS_SDK_ROOT"')
+    expect(content).toContain("scripts/node/bunshin-node.mjs")
   })
 
   it("#given a prompt without fleet wording #when dispatched #then no bunshin pointer is injected", async () => {

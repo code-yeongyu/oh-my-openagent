@@ -1,10 +1,19 @@
 import { workspaceEntries } from "../addressing"
-import type { ThreadReadInput, ThreadToolResult } from "../contracts"
+import type { ThreadReadInput, ThreadToolResult, ThreadWaitOutcome } from "../contracts"
 import { locateControl } from "../control/locate"
-import { controlIdentity } from "../control/port"
+import { controlIdentity, controlRefusalOf } from "../control/port"
 import { readTranscript, type ThreadTranscriptEntry } from "../reader"
 import { threadLink } from "../thread-link"
-import { addressBook, degradedSummary, failure, resolveEntries, summary, transcriptRole } from "./internals"
+import {
+  addressBook,
+  degradedSummary,
+  failure,
+  resolveEntries,
+  sendAddressBook,
+  summary,
+  transcriptRole,
+} from "./internals"
+import { threadRow } from "./thread-row"
 import type { ThreadHostSession, ThreadHostView, ThreadToolSurfaceOptions } from "./ports"
 
 /**
@@ -32,13 +41,13 @@ export function listThreads(
     (entry) => entry.error_note !== undefined && entry.status !== "live" && inScope(entry.thread_id),
   )
   const order = new Map(book.map((entry, index) => [entry.thread_id, index]))
-  const threads = [
-    ...visible.map((session) => summary(session, entryOf(session))),
-    ...degraded.map(degradedSummary),
-  ].sort(
-    (left, right) =>
-      (order.get(left.thread_id) ?? Number.MAX_SAFE_INTEGER) - (order.get(right.thread_id) ?? Number.MAX_SAFE_INTEGER),
-  )
+  const threads = [...visible.map((session) => summary(session, entryOf(session))), ...degraded.map(degradedSummary)]
+    .sort(
+      (left, right) =>
+        (order.get(left.thread_id) ?? Number.MAX_SAFE_INTEGER) -
+        (order.get(right.thread_id) ?? Number.MAX_SAFE_INTEGER),
+    )
+    .map((thread) => threadRow(thread))
   return { kind: "ok", threads, scope: allScope === true ? "all" : "workspace" }
 }
 
@@ -56,13 +65,32 @@ export async function readThread(
   current: ThreadHostView,
   value: ThreadReadInput,
   callerId: string,
+  signal?: AbortSignal,
 ): Promise<ThreadToolResult> {
   const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
   if (located.kind === "error") return located.result
   if (located.kind === "not_live") return readDegraded(options, current, located.thread_id, value)
   const { control } = located
+  let wait: ThreadWaitOutcome | undefined
+  if (value.wait_ms !== undefined) {
+    if (control.waitSettled === undefined)
+      return failure(
+        "unsupported",
+        "wait_ms needs a thread on another device.",
+        `Use monitor({ type: "rpc", target: "${control.thread_id}" }).`,
+      )
+    try {
+      wait = await control.waitSettled(value.wait_ms, signal)
+    } catch (error) {
+      const refusal = controlRefusalOf(error)
+      if (refusal === undefined) throw error
+      return { kind: "error", error: refusal }
+    }
+  }
   const result = liveReadResult(control.thread_id, control.title, await control.getMessages(), value)
-  return result.kind === "ok" ? { ...result, ...controlIdentity(control) } : result
+  return result.kind === "ok"
+    ? { ...result, ...controlIdentity(control), ...(wait === undefined ? {} : { wait }) }
+    : result
 }
 
 /** A live session's transcript through the bounded reader; the same window rules on this device and on another one. */
@@ -76,7 +104,7 @@ export function liveReadResult(
   if (live.kind === "error") return { kind: "error", error: live.error }
   return {
     kind: "ok",
-    thread_id: threadId,
+    thread: threadId,
     link: threadLink(threadId, title),
     items: live.items.map((item, index) => ({
       seq: index + 1,
@@ -90,9 +118,9 @@ export function liveReadResult(
 }
 
 /**
- * A thread with no live owner is read from its JSONL only when its ENDPOINT is dead: the address
- * book then carries the durable path and the endpoint's failure. Any other non-live thread stays
- * `not_resumable`, as before endpoints were enumerated.
+ * A thread with no live owner is read from its session file, the one a send to it finds (a closed thread, or one whose
+ * endpoint is dead, which adds the endpoint's failure as `error_note`). Only a thread with no file here is
+ * `not_resumable`.
  */
 function readDegraded(
   options: ThreadToolSurfaceOptions,
@@ -100,8 +128,8 @@ function readDegraded(
   threadId: string,
   value: ThreadReadInput,
 ): ThreadToolResult {
-  const entry = addressBook(options, current).find((candidate) => candidate.thread_id === threadId)
-  if (entry === undefined || entry.error_note === undefined || entry.session_path === null)
+  const entry = sendAddressBook(options, current, threadId, true).find((candidate) => candidate.thread_id === threadId)
+  if (entry === undefined || entry.session_path === null)
     return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live.")
   const durable = readTranscript(
     { kind: "jsonl", path: entry.session_path, live_host_present: false },
@@ -122,13 +150,13 @@ function readDegraded(
   }))
   return {
     kind: "ok",
-    thread_id: threadId,
+    thread: threadId,
     link: threadLink(threadId, entry.title),
     items,
     truncated: durable.truncated,
     ...(durable.next_cursor === null ? {} : { next_cursor: durable.next_cursor }),
     source: durable.source,
     source_incomplete: durable.source_incomplete,
-    error_note: entry.error_note,
+    ...(entry.error_note === undefined ? {} : { error_note: entry.error_note }),
   }
 }

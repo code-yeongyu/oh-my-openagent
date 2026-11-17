@@ -33,7 +33,7 @@ const openFrames = (sent: ReturnType<typeof account>["sent"]) =>
   sent.filter((entry) => entry.rpc?.["type"] === "open_session").map((entry) => entry.rpc)
 const localOpenFrames = (openSession: ReturnType<typeof surface>["openSession"]) =>
   openSession.mock.calls.map((call) => (call as unknown as [Record<string, unknown>])[0])
-const SUMMARY_FIELDS = ["thread_id", "name", "status", "cwd", "created_at", "updated_at", "link"] as const
+const SUMMARY_FIELDS = ["thread", "name", "status", "cwd", "created_at", "updated_at", "link"] as const
 const creators = (agentDir: string): Array<[string, string]> => {
   const db = new Database(gatewayDatabasePath(agentDir), { readonly: true })
   try {
@@ -51,21 +51,25 @@ describe("SessionHost: a new thread starts in its creator's approval mode on bot
   test("#given a creator in ask #when it creates here and on b #then both open_session frames name ask and the results have one shape", async () => {
     const a = account()
     const { run, openSession } = surface({ ...a.remote, permissionPreset: () => "ask" })
-    const here = (await run("thread_create", { name: "child here" })) as Extract<ThreadToolResult, { kind: "ok" }> & {
-      thread: Record<string, unknown>
-    }
+    const here = (await run("thread_create", { name: "child here" })) as Extract<ThreadToolResult, { kind: "ok" }> &
+      Record<string, unknown>
     const there = (await run("thread_create", { device: "studio", name: "child there" })) as Extract<
       ThreadToolResult,
       { kind: "ok" }
-    > & { thread: Record<string, unknown> }
+    > &
+      Record<string, unknown>
     expect(here).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-created-here", status: "live" },
+      thread: "dur-created-here",
+      status: "live",
       deduplicated: false,
     })
     expect(there).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-new-on-b", name: "child there", status: "live", device: "b" },
+      thread: "dur-new-on-b",
+      name: "child there",
+      status: "live",
+      device: "b",
       deduplicated: false,
     })
     expect(localOpenFrames(openSession)).toEqual([
@@ -73,30 +77,30 @@ describe("SessionHost: a new thread starts in its creator's approval mode on bot
     ])
     expect(openFrames(a.sent)).toEqual([expect.objectContaining({ permissionPreset: "ask" })])
     expect(a.sent.map((entry) => entry.rpc?.["type"])).toEqual(["open_session", "set_session_name"])
-    expect(Object.keys(there).sort()).toEqual(Object.keys(here).sort())
+    expect(
+      Object.keys(there)
+        .filter((key) => key !== "device")
+        .sort(),
+    ).toEqual(Object.keys(here).sort())
     for (const field of SUMMARY_FIELDS) {
-      expect(typeof here.thread[field]).toBe("string")
-      expect(typeof there.thread[field]).toBe("string")
+      expect(typeof here[field]).toBe("string")
+      expect(typeof there[field]).toBe("string")
     }
   })
 
-  test("#given a creator in ask #when it forks a thread here and one on b #then both open_session frames name ask and forkFrom", async () => {
+  test("#given a creator in ask #when it forks a thread here and one on b #then both are refused unsupported (#13031) and no open_session frame is sent", async () => {
     const a = account()
     const { run, openSession } = surface({ ...a.remote, permissionPreset: () => "ask" })
     expect(await run("thread_create", { fork_from: "dur-local" })).toMatchObject({
-      kind: "ok",
-      thread: { thread_id: "dur-created-here" },
-      deduplicated: false,
+      kind: "error",
+      error: { code: "unsupported", details: { thread: "dur-local" } },
     })
     expect(await run("thread_create", { fork_from: "dur-on-b" })).toMatchObject({
-      kind: "ok",
-      thread: { thread_id: "dur-new-on-b", device: "b" },
-      deduplicated: false,
+      kind: "error",
+      error: { code: "unsupported", details: { thread: "dur-on-b", device: "b" } },
     })
-    expect(localOpenFrames(openSession)).toEqual([
-      expect.objectContaining({ forkFrom: "dur-local", permissionPreset: "ask" }),
-    ])
-    expect(openFrames(a.sent)).toEqual([expect.objectContaining({ forkFrom: "dur-on-b", permissionPreset: "ask" })])
+    expect(localOpenFrames(openSession)).toEqual([])
+    expect(openFrames(a.sent)).toEqual([])
   })
 
   test("#given a creator that names no preset #when it creates on both legs #then neither frame carries permissionPreset", async () => {
@@ -106,6 +110,16 @@ describe("SessionHost: a new thread starts in its creator's approval mode on bot
     await run("thread_create", { device: "studio" })
     expect(localOpenFrames(openSession)).toEqual([expect.not.objectContaining({ permissionPreset: expect.anything() })])
     expect(openFrames(a.sent)).toEqual([expect.not.objectContaining({ permissionPreset: expect.anything() })])
+  })
+
+  test("#given a creator working in its own folder #when it creates here and on b with no cwd #then only the open here starts in the creator's folder", async () => {
+    const a = account()
+    const { run, openSession } = surface(a.remote)
+    await run("thread_create", {})
+    await run("thread_create", { device: "studio" })
+    // b never sees this device's folders: its engine picks its own.
+    expect(localOpenFrames(openSession)).toEqual([expect.objectContaining({ cwd: process.cwd() })])
+    expect(openFrames(a.sent)).toEqual([expect.not.objectContaining({ cwd: expect.anything() })])
   })
 })
 
@@ -117,12 +131,17 @@ describe("SessionHost: opening an existing thread on both legs", () => {
     const there = await run("thread_create", { thread: "dur-on-b" })
     expect(here).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-local", name: "local peer", status: "live" },
+      thread: "dur-local",
+      name: "local peer",
+      status: "live",
       deduplicated: true,
     })
     expect(there).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-on-b", name: "on b", status: "live", device: "b" },
+      thread: "dur-on-b",
+      name: "on b",
+      status: "live",
+      device: "b",
       deduplicated: true,
     })
     expect(openSession).not.toHaveBeenCalled()
@@ -137,8 +156,8 @@ describe("SessionHost: opening an existing thread on both legs", () => {
     )
     const here = await run("thread_create", { thread: "dur-on-disk" })
     const there = await run("thread_create", { thread: "dur-on-b" })
-    expect(here).toMatchObject({ kind: "ok", thread: { thread_id: "dur-created-here" }, deduplicated: false })
-    expect(there).toMatchObject({ kind: "ok", thread: { thread_id: "dur-on-b", device: "b" }, deduplicated: false })
+    expect(here).toMatchObject({ kind: "ok", thread: "dur-created-here", deduplicated: false })
+    expect(there).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b", deduplicated: false })
     expect(localOpenFrames(openSession)).toEqual([{ sessionPath: expect.stringContaining("dur-on-disk.jsonl") }])
     expect(a.sent).toEqual([
       {
@@ -158,11 +177,11 @@ describe("SessionHost: a name is checked against the device the thread lands on"
     const here = await run("thread_create", { name: "Local Peer" })
     expect(there).toMatchObject({
       kind: "error",
-      error: { code: "name_conflict", details: { candidates: [{ id: "dur-on-b", name: "on b" }] } },
+      error: { code: "name_conflict", details: { candidates: [{ thread: "dur-on-b", name: "on b" }] } },
     })
     expect(here).toMatchObject({
       kind: "error",
-      error: { code: "name_conflict", details: { candidates: [{ id: "dur-local", name: "local peer" }] } },
+      error: { code: "name_conflict", details: { candidates: [{ thread: "dur-local", name: "local peer" }] } },
     })
     expect(Object.keys(comparable(there) as object)).toEqual(Object.keys(comparable(here) as object))
     expect(openSession).not.toHaveBeenCalled()
@@ -174,7 +193,8 @@ describe("SessionHost: a name is checked against the device the thread lands on"
     const { run } = surface(a.remote)
     expect(await run("thread_create", { device: "studio", name: "on b" })).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-new-on-b", device: "b" },
+      thread: "dur-new-on-b",
+      device: "b",
     })
   })
 })
@@ -197,11 +217,14 @@ describe("SessionHost: the creator record and the alias follow the open on both 
     const { run } = surface(a.remote)
     expect(await run("thread_create", { device: "studio", alias: "bee" })).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-new-on-b", alias: "bee", device: "b" },
+      thread: "dur-new-on-b",
+      alias: "bee",
+      device: "b",
     })
     expect(await run("thread_create", { alias: "me" })).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-created-here", alias: "me" },
+      thread: "dur-created-here",
+      alias: "me",
     })
     expect(a.aliases.get("bee")).toEqual({ session_id: "dur-new-on-b", device: "b" })
     expect(a.aliases.get("me")).toEqual({ session_id: "dur-created-here", device: "here" })
@@ -215,8 +238,8 @@ describe("SessionHost: the creator record and the alias follow the open on both 
       ThreadToolResult,
       { kind: "ok" }
     >
-    expect(here).toMatchObject({ thread: { requested_skills: ["programming"] } })
-    expect(there).toMatchObject({ thread: { requested_skills: ["programming"] } })
+    expect(here).toMatchObject({ requested_skills: ["programming"] })
+    expect(there).toMatchObject({ requested_skills: ["programming"] })
     expect(localOpenFrames(openSession)).toEqual([expect.objectContaining({ initialSkills: ["programming"] })])
     expect(openFrames(a.sent)).toEqual([
       expect.objectContaining({ context: { initial_skills: JSON.stringify(["programming"]) } }),

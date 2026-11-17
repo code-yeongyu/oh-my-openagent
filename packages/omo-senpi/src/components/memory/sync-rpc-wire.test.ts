@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { registerSyncRpc } from "./sync-rpc-registration"
@@ -22,6 +22,7 @@ import { enableSync } from "../../../../memory-core/src/sync/account/enable"
 import { joinAccount } from "../../../../memory-core/src/sync/account/join"
 import { approveDevice } from "../../../../memory-core/src/sync/account/approve"
 import { startChainWireServer } from "../../../../memory-core/src/sync/account/testing/chain-wire-server.test-support"
+import { removeTree } from "../../../../../test-support/remove-tree"
 
 const cleanup: (() => Promise<unknown>)[] = []
 afterEach(async () => {
@@ -54,7 +55,9 @@ async function setup(empty = false) {
   const server = startChainWireServer(world.account, chain)
   cleanup.push(() => server.stop())
   const claimsRoot = await mkdtemp(join(tmpdir(), "g3-wire-"))
-  cleanup.push(() => rm(claimsRoot, { recursive: true, force: true }))
+  // The claims churn lease, lock and guard files here up to dispose; on Windows a just-unlinked one can still be
+  // listed, and Bun's recursive rm then reports success but leaves the root. removeTree checks it is gone.
+  cleanup.push(() => removeTree(claimsRoot))
   const joining = await newDevice()
   const memberPin = freshStateDir()
   if (!empty) {
@@ -234,9 +237,9 @@ test("#given actual pairing codes #when the person submits a different code #the
   expect(f.chain.length).toBe(before)
 }, 15_000)
 
-test("#given an empty keyring without genesis bridge #when registered enable runs #then it retains needs_first_device", async () => {
+test("#given an empty keyring without genesis bridge #when registered enable runs #then it asks for a method and offers none", async () => {
   const f = await setup(true)
-  expect(await f.joiner.call("enable")).toEqual({ kind: "needs_first_device" })
+  expect(await f.joiner.call("enable")).toEqual({ kind: "method_required", methods: [] })
   expect(f.server.pending()).toHaveLength(0)
-  expect(await f.joiner.call("status")).toMatchObject({ enable: { kind: "needs_first_device" } })
+  expect(await f.joiner.call("status")).toMatchObject({ enable: { kind: "method_required", methods: [] } })
 })

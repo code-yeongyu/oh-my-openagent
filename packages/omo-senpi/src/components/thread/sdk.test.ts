@@ -7,9 +7,10 @@ import type { GatewayEndpointRef, ReleaseSessionRequest } from "./gateway/adapte
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import type { RemoteThreadSurface } from "./remote/ports"
 import { createThreadSdk, type ThreadSdk } from "./sdk"
-import { createRemoteThreadFixture } from "./thread-remote-fixture"
+import { createRemoteThreadFixture, fakeRemoteClient } from "./thread-remote-fixture"
 import type { ThreadHost, ThreadHostSession } from "./tools"
 import type { ThreadHostViewRequest } from "./tools/ports"
+import { startFakeEngineHost } from "./wake/testing/fake-engine-host"
 import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
 
 const TUI_SOCKET = "/tmp/t-0123456789abcdef.sock"
@@ -142,13 +143,13 @@ function countingRemote(remote: RemoteThreadSurface): {
   readonly calls: string[]
 } {
   const calls: string[] = []
-  const counted = <T extends object>(port: T): T =>
+  const counted = <T extends object>(port: T, prefix = ""): T =>
     new Proxy(port, {
       get: (target, key, receiver) => {
         const value: unknown = Reflect.get(target, key, receiver)
         if (typeof value !== "function") return value
         return (...args: unknown[]) => {
-          calls.push(String(key))
+          calls.push(`${prefix}${String(key)}`)
           return Reflect.apply(value, target, args)
         }
       },
@@ -157,6 +158,12 @@ function countingRemote(remote: RemoteThreadSurface): {
     remote: {
       ...remote,
       sessions: counted(remote.sessions),
+      client: {
+        ...remote.client,
+        service: counted(remote.client.service, "client.service."),
+        devices: counted(remote.client.devices, "client.devices."),
+        sessions: counted(remote.client.sessions, "client.sessions."),
+      },
       ...(remote.aliases === undefined ? {} : { aliases: counted(remote.aliases) }),
     },
     calls,
@@ -164,20 +171,20 @@ function countingRemote(remote: RemoteThreadSurface): {
 }
 
 describe("thread SDK: sessions", () => {
-  test("#given a host and a terminal session #when listed and read #then rows carry surface and endpoint and the live transcript comes from the session's endpoint", async () => {
+  test("#given a host and a terminal session #when listed and read #then rows carry surface and the live transcript comes from the session's endpoint", async () => {
     const { sdk } = fixture()
     const listed = await sdk.list({})
     expect(listed).toMatchObject({
       kind: "ok",
       scope: "workspace",
       threads: [
-        { thread_id: "dur-host", surface: "desktop", endpoint: { kind: "rpc_host", socket: HOST_SOCKET } },
-        { thread_id: "dur-tui", surface: "tui", endpoint: { kind: "tui" } },
+        { thread: "dur-host", surface: "desktop" },
+        { thread: "dur-tui", surface: "tui" },
       ],
     })
     expect(await sdk.read({ thread: "host lane" })).toMatchObject({
       kind: "ok",
-      thread_id: "dur-host",
+      thread: "dur-host",
       items: [{ seq: 1, role: "user", content: JSON.stringify("hello from the host") }],
     })
   })
@@ -227,6 +234,15 @@ describe("thread SDK: read reaches the account like the agent tools (#12833)", (
   const remoteFixture = createRemoteThreadFixture()
   afterEach(remoteFixture.cleanup)
 
+  test("#given a thread on b #when omo thread list runs #then b's thread is listed with its device beside this device's, as the agent's thread_list lists it", async () => {
+    const account = remoteFixture.account()
+    const { sdk } = fixture({ remote: account.remote })
+    const listed = await sdk.list({})
+    expect(listed.kind === "ok" && "threads" in listed && listed.threads.find((t) => t.device === "b")).toMatchObject({
+      thread: "dur-on-b",
+    })
+  })
+
   test("#given aliases held by a thread here and by one on b #when omo thread read names each alias #then the first reads this device's transcript and the second b's", async () => {
     const account = remoteFixture.account({
       aliases: new Map([
@@ -235,8 +251,8 @@ describe("thread SDK: read reaches the account like the agent tools (#12833)", (
       ]),
     })
     const { sdk } = fixture({ remote: account.remote })
-    expect(await sdk.read({ thread: "lane-here" })).toMatchObject({ kind: "ok", thread_id: "dur-host" })
-    expect(await sdk.read({ thread: "lane-b" })).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
+    expect(await sdk.read({ thread: "lane-here" })).toMatchObject({ kind: "ok", thread: "dur-host" })
+    expect(await sdk.read({ thread: "lane-b" })).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b" })
     expect(
       account.sent.filter((entry) => entry.via === "session").map((entry) => [entry.device, entry.rpc?.["type"]]),
     ).toEqual([["b", "get_messages"]])
@@ -247,7 +263,7 @@ describe("thread SDK: read reaches the account like the agent tools (#12833)", (
       aliases: new Map([["lane-here", { session_id: "dur-host", device: "here" }]]),
     })
     const { sdk, store } = fixture({ remote: account.remote, cwd: "/thread-sdk-other-workspace" })
-    expect(await sdk.read({ thread: "lane-here" })).toMatchObject({ kind: "ok", thread_id: "dur-host" })
+    expect(await sdk.read({ thread: "lane-here" })).toMatchObject({ kind: "ok", thread: "dur-host" })
     expect(await sdk.read({ thread: "dur-host" })).toMatchObject({ kind: "error", error: { code: "scope_denied" } })
     expect(await sdk.send({ thread: "lane-here", text: "ping" })).toMatchObject({ kind: "ok", deduplicated: false })
     expect((await store.list({ target_durable_id: "dur-host" })).map((row) => row.sender)).toEqual(["cli:501"])
@@ -272,7 +288,7 @@ describe("thread SDK: read reaches the account like the agent tools (#12833)", (
     ])
   })
 
-  test("#given a published thread id and the account surface set #when omo thread send names that id #then it is delivered with no host listing, no alias call and no listing, and its one device-service call is the thisDevice read that stamps its sender device (#12860, #13004)", async () => {
+  test("#given a published thread id and the account surface set #when omo thread send names that id #then it is delivered with no host listing, no alias call and no listing, and its one device-service call is the device read that stamps its sender device (#12860, #13004)", async () => {
     const account = remoteFixture.account({
       aliases: new Map([["lane-here", { session_id: "dur-host", device: "here" }]]),
     })
@@ -287,22 +303,22 @@ describe("thread SDK: read reaches the account like the agent tools (#12833)", (
     expect((await store.list({ target_durable_id: "dur-host" })).map((row) => row.sender)).toEqual(["cli:501"])
     expect(views).toEqual([])
     // Decision 0027 section 3: every delivery names its sender device, read once and kept for the process.
-    expect(counting.calls).toEqual(["thisDevice"])
+    expect(counting.calls).toEqual(["client.devices.list"])
     expect((await store.list({ target_durable_id: "dur-host" }))[0]?.envelope.provenance?.device).toBe("here")
     expect(await sdk.send({ thread: "dur-host", text: "again" })).toMatchObject({ kind: "ok" })
-    expect(counting.calls).toEqual(["thisDevice"])
+    expect(counting.calls).toEqual(["client.devices.list"])
   })
 
   test("#given the device service cannot answer #when omo thread send names a thread here #then the send still goes and its row names why it carries no sender device (#13004)", async () => {
     const account = remoteFixture.account()
     const down = {
       ...account.remote,
-      sessions: {
-        ...account.remote.sessions,
-        thisDevice: async () => {
-          throw new Error("device service down")
-        },
-      },
+      client: fakeRemoteClient({
+        state: () => "connected",
+        here: "here",
+        devices: () => [],
+        fail: { kind: "error", code: "host_unavailable", message: "device service down", next_action: "Retry." },
+      }),
     }
     const { sdk, store } = fixture({ remote: down })
     await store.registerIncarnation({
@@ -675,4 +691,33 @@ describe("thread SDK: takeover", () => {
     if (located.kind !== "ok") throw new Error("located")
     expect(await sdk.release(located.thread, {})).toMatchObject({ success: false, error: "host_unavailable" })
   })
+})
+
+// #13037 cold wake: `omo daemon run` has the operator daemon load omo with no session open, so its thread component
+// declares the delivery consumer before any session runs. The SDK asks the host thread_create opens sessions on.
+describe("thread SDK: the operator daemon's warm", () => {
+  test.each([
+    ["warms its default profile", undefined, { kind: "warm", state: "warmed" }],
+    ["is draining", { success: false, error: "host_draining" }, { kind: "refused", code: "host_draining" }],
+    ["predates warm", { success: false, error: "unknown_command" }, { kind: "unsupported" }],
+  ] as const)(
+    "#given an operator daemon that %s #when the SDK warms it #then one session-less warm reaches that host and its answer is classified",
+    async (_what, reply, expected) => {
+      const host = await startFakeEngineHost(reply === undefined ? {} : { warm: () => reply })
+      try {
+        const warmSdk = createThreadSdk({
+          agentDir: mkdtempSync(join(tmpdir(), "thread-sdk-warm-")),
+          cwd: process.cwd(),
+          uid: 501,
+          user: "tester",
+          env: { OMO_RPC_SOCKET_PATH: host.socketPath },
+        })
+        sdks.push(warmSdk)
+        expect(await warmSdk.warmDaemon()).toEqual(expected)
+        expect(host.frames.filter((frame) => frame.type === "warm")).toEqual([{ id: expect.any(String), type: "warm" }])
+      } finally {
+        await host.close()
+      }
+    },
+  )
 })
