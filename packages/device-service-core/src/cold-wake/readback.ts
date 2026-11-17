@@ -86,9 +86,11 @@ async function readDarwin(host: ColdWakeHost) {
     if (!existsSync(join(agents, `${label}.plist`))) return { loaded: false, state: "not_installed" as const }
     const printed = await host.run(["launchctl", "print", `gui/${host.uid}/${label}`])
     if (printed.exitCode !== 0) return { loaded: false, state: "stopped" as const }
+    const lastExit = /^\s*last exit code = (\d+)$/m.exec(printed.output)?.[1]
     return {
       loaded: true,
       state: /^\s*state = running$/m.test(printed.output) ? ("running" as const) : ("stopped" as const),
+      exitedNonZero: lastExit !== undefined && lastExit !== "0",
     }
   }
   const sessionHost = await job(SESSION_HOST_LAUNCHD_LABEL)
@@ -104,13 +106,9 @@ async function readDarwin(host: ColdWakeHost) {
   ])
   const raw = table.exitCode === 0 ? table.output.replace(/\n$/, "") : undefined
   return {
-    // The job runs its ensure and exits, so loaded says nothing about the host: readColdWake asks the pinned host.
-    sessionHost: {
-      unit: SESSION_HOST_LAUNCHD_LABEL,
-      state: sessionHost.loaded ? ("stopped" as const) : sessionHost.state,
-      enabled: sessionHost.loaded,
-    },
-    ensureFailed: false,
+    // The job runs its ensure and exits: running only while that ensure runs, else readColdWake asks the host.
+    sessionHost: { unit: SESSION_HOST_LAUNCHD_LABEL, state: sessionHost.state, enabled: sessionHost.loaded },
+    ensureFailed: sessionHost.loaded && sessionHost.exitedNonZero,
     deviceService: { unit: RELAYD_LAUNCHD_LABEL, state: relayd.state },
     coldWakeEntry: relayd.state === "not_installed" ? false : withColdWake(raw, "darwin").kind === "unchanged",
   }
@@ -120,10 +118,10 @@ export async function readColdWake(host: ColdWakeHost, launch: SessionHostLaunch
   const { ensureFailed, ...units } = host.platform === "darwin" ? await readDarwin(host) : await readLinux(host)
   const pinned = await readPinnedHost(host, launch)
   // The unit is one ensure per start, so between starts it is not active; the host its ensure started or reused runs.
-  const hostUp = pinned === "pinned" || pinned === "unpinned"
-  const sessionHost =
-    units.sessionHost.state === "stopped" && units.sessionHost.enabled && !ensureFailed && hostUp
-      ? { ...units.sessionHost, state: "running" as const }
-      : units.sessionHost
+  // When the host cannot be read, neither can that.
+  const between = units.sessionHost.state === "stopped" && units.sessionHost.enabled && !ensureFailed
+  const hostState: UnitState =
+    typeof pinned !== "string" ? "unknown" : pinned === "none" ? units.sessionHost.state : "running"
+  const sessionHost = between ? { ...units.sessionHost, state: hostState } : units.sessionHost
   return { ...units, sessionHost, pinnedHost: typeof pinned === "string" ? pinned === "pinned" : "unknown" }
 }

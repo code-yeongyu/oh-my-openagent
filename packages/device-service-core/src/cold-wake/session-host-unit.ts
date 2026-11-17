@@ -8,6 +8,7 @@ import { isAbsolute } from "node:path"
 // `omo daemon run` ensures the host, which detaches, and exits. The service manager runs it once per start: at login and
 // on every cold wake (the device service starts the unit), so a host that died is ensured again then; one that runs is
 // reused and never killed (systemd KillMode=process, launchd AbandonProcessGroup), so a stop never ends a session.
+const ENSURE_TIMEOUT_SECONDS = 300
 export const SESSION_HOST_SYSTEMD_UNIT = "omo-session-host.service"
 export const SESSION_HOST_LAUNCHD_LABEL = "ai.omo.session-host"
 
@@ -71,6 +72,8 @@ export const systemdQuote = (value: string, dollars: boolean): string => {
  * run with the user's manager (`default.target`) and again on every cold wake (the device service's `systemctl start`).
  * Nothing re-runs it on a timer: a rerun of an ensure that exits 0 was a restart loop. `StartLimitIntervalSec=0` keeps
  * cold-wake starts from being rate-limited; `KillMode=process` leaves the host running when the ensure ends.
+ * A oneshot has no start timeout by default, so a hung ensure would hold every later start (and the bootstrap's blocking
+ * one) forever: ENSURE_TIMEOUT_SECONDS ends it as failed, above a handoff's drain of the old host plus the new boot.
  */
 export const systemdSessionHostUnit = (launch: SessionHostLaunch): string =>
   [
@@ -80,6 +83,7 @@ export const systemdSessionHostUnit = (launch: SessionHostLaunch): string =>
     "",
     "[Service]",
     "Type=oneshot",
+    `TimeoutStartSec=${ENSURE_TIMEOUT_SECONDS}`,
     `ExecStart=${launch.argv.map((arg) => systemdQuote(arg, true)).join(" ")}`,
     ...launch.env.map(([key, value]) => `Environment=${systemdQuote(`${key}=${value}`, false)}`),
     "KillMode=process",

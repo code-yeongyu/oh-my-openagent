@@ -220,7 +220,7 @@ not running (`packages/device-service-core/src/cold-wake/`).
 | --- | --- | --- |
 | Unit | systemd user unit `~/.config/systemd/user/omo-session-host.service`, enabled (`WantedBy=default.target`) | LaunchAgent `ai.omo.session-host`, `~/Library/LaunchAgents/ai.omo.session-host.plist` |
 | Runs | `<omo> daemon run --pinned` (an npm launcher script under the runtime that ran it), with `OMO_CODING_AGENT_DIR` set to the agent dir the bootstrap registers and `PATH` as it was at install | same |
-| Runs when | `Type=oneshot`, `StartLimitIntervalSec=0`, `KillMode=process`: at login and on every start | `RunAtLoad`, `AbandonProcessGroup`: at load and on every `launchctl kickstart` |
+| Runs when | `Type=oneshot`, `TimeoutStartSec=300` (a hung start ends as failed), `StartLimitIntervalSec=0`, `KillMode=process`: at login and on every start | `RunAtLoad`, `AbandonProcessGroup`: at load and on every `launchctl kickstart` |
 | Table entry | `OMO_RELAYD_SERVICES` entry `"omo": {"systemd_user": "omo-session-host.service", "senders": []}` in the drop-in `~/.config/systemd/user/omo-relay-daemon.service.d/50-omo-cold-wake.conf` | entry `"omo": {"launchd": "ai.omo.session-host", "senders": []}` in the device service's plist `EnvironmentVariables` |
 
 `omo daemon run` ensures the host, which detaches, and exits. The unit runs it once per start: at login, on

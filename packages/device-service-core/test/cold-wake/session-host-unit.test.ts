@@ -40,6 +40,7 @@ describe("the systemd user unit", () => {
         "",
         "[Service]",
         "Type=oneshot",
+        "TimeoutStartSec=300",
         'ExecStart="/home/u/.local/bin/omo" "daemon" "run" "--pinned"',
         'Environment="OMO_CODING_AGENT_DIR=/home/u/.omo/agent"',
         'Environment="PATH=/home/u/.local/bin:/usr/bin"',
