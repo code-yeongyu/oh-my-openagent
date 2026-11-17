@@ -1,5 +1,11 @@
 import type { HelperCall, HelperLease, HelperReply } from "./client"
-import { type DarwinReadDeps, HelperReadError, readThroughHelper, type ReadResult } from "./darwin-read"
+import {
+  ACL_DENIAL_MESSAGE,
+  type DarwinReadDeps,
+  HelperReadError,
+  readThroughHelper,
+  type ReadResult,
+} from "./darwin-read"
 import { migrate } from "./migration"
 import { deleteOldSlots, namesFromRead, OLD_SLOT_COUNT, oldSlotsOf, runRecovery } from "./recovery"
 
@@ -33,8 +39,10 @@ const OLD_SLOTS_FULL_MESSAGE =
 
 const failed = (reply: HelperReply, verb: string) =>
   new HelperReadError(
-    reply.error === "locked" ? "locked" : "store",
-    `The keychain helper could not ${verb} the sign-in (${reply.error ?? "no answer"}).`,
+    reply.error === "locked" ? "locked" : reply.error === "acl" ? "acl" : "store",
+    reply.error === "acl"
+      ? ACL_DENIAL_MESSAGE
+      : `The keychain helper could not ${verb} the sign-in (${reply.error ?? "no answer"}).`,
   )
 
 /**
