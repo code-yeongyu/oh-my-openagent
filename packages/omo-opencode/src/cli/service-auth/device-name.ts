@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process"
 import { hostname } from "node:os"
 import { SignInError, type Platform } from "./protocol"
 
@@ -5,7 +6,23 @@ import { SignInError, type Platform } from "./protocol"
 // (`<machine>/<code>`) use: no "omo CLI on" prefix (#14044). macOS's mDNS suffix is not part of the name.
 const UNNAMED = "unnamed-machine"
 
-export function deviceName(host: string = hostname()): string {
+// macOS's kernel hostname can be a reverse-DNS name (a tailnet FQDN); LocalHostName is the machine's own name, the one the
+// desktop registers under too (omo-desktop-app#7942), so one Mac running both names one device.
+function machineHost(): string {
+  if (process.platform !== "darwin") return hostname()
+  try {
+    const local = execFileSync("scutil", ["--get", "LocalHostName"], {
+      encoding: "utf8",
+      timeout: 2_000,
+      windowsHide: true,
+    }).trim()
+    return local === "" ? hostname() : local
+  } catch {
+    return hostname()
+  }
+}
+
+export function deviceName(host: string = machineHost()): string {
   const clean = host
     .replace(/[\p{Cc}\p{Zl}\p{Zp}\p{Cf}\u3164\u115F\u1160\uFFA0]/gu, "")
     .trim()
