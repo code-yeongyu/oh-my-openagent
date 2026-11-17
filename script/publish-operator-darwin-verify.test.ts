@@ -3,7 +3,9 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { rmSync, unlinkSync, writeFileSync } from "node:fs"
 import { basename, join } from "node:path"
+import { createHash, X509Certificate } from "node:crypto"
 import {
+  inspectSignatures,
   Refusal,
   type SliceFacts,
   type Tools,
@@ -20,6 +22,7 @@ import {
   VERSION,
   writeFixture,
 } from "./fixtures/operator-darwin-artifacts"
+import { certificateNames, issue, machoSigned, signedData } from "./fixtures/operator-darwin-signing"
 
 /**
  * Release security contract (#13921): publish-platform consumes operator-built darwin artifacts only after
@@ -86,6 +89,66 @@ async function run(fixture: Fixture, overrides: Overrides = {}, input: RunInput 
   return { ...verdict, tickets }
 }
 
+/**
+ * A Mach-O whose CodeDirectory says team 523JNR86LZ, signed by a foreign Developer ID leaf that is CA-valid under a
+ * generated root and CA, with our team's leaf prepended to the CMS list; inspected with those test-only anchors.
+ */
+function caValidForeignSigner(): SliceFacts[] {
+  const CN = "2.5.4.3"
+  const OU = "2.5.4.11"
+  const root = issue({ subject: [[CN, "Test Root CA"]], serial: 30 })
+  const ca = issue({
+    subject: [[CN, "Test Developer ID CA"]],
+    issuer: certificateNames(root.certificate).subject,
+    issuerKey: root.key,
+    serial: 31,
+  })
+  const caName = certificateNames(ca.certificate).subject
+  const ours = issue({
+    subject: [
+      [CN, "Ours"],
+      [OU, "523JNR86LZ"],
+    ],
+    issuer: caName,
+    issuerKey: ca.key,
+    serial: 32,
+    developerIdApplication: true,
+  })
+  const foreign = issue({
+    subject: [
+      [CN, "Attacker"],
+      [OU, "ATTACKER99"],
+    ],
+    issuer: caName,
+    issuerKey: ca.key,
+    serial: 33,
+    developerIdApplication: true,
+  })
+  const { file } = machoSigned({
+    code: new Uint8Array(5000),
+    identifier: "ai.sisyphuslabs.omo",
+    sign: (codeDirectory) =>
+      signedData({
+        signedOver: codeDirectory,
+        key: foreign.key,
+        signer: foreign.certificate,
+        certificates: [ours.certificate, foreign.certificate],
+      }),
+  })
+  return inspectSignatures(file, {
+    root: new X509Certificate(root.certificate),
+    developerIdCa: new X509Certificate(ca.certificate),
+  })
+}
+
+/** Rewrites both keychain-helper slices of a fresh fixture's facts. */
+function keychainSlices(change: (slice: SliceFacts) => SliceFacts): Overrides {
+  const fixture = writeFixture()
+  dirs.push(fixture.dir)
+  const slices = (fixture.signatures.get("omo-keychain-darwin-universal") ?? []).map(change)
+  return { inspect: (target) => (target === "omo-keychain-darwin-universal" ? slices : undefined) }
+}
+
 function forge(name: string, change: Partial<SliceFacts>): Overrides {
   const fixture = writeFixture()
   dirs.push(fixture.dir)
@@ -99,8 +162,8 @@ describe("operator darwin verifier", () => {
     const outcome = await run(writeFixture())
     expect(outcome).toMatchObject({ ok: true })
     expect(outcome.detail).toContain(SOURCE_SHA)
-    // 6 notarized artifacts; the two signed-only trust helpers have no ticket.
-    expect(outcome.tickets).toHaveLength(6)
+    // 6 notarized artifacts, 7 slices (the keychain helper is universal); the two signed-only trust helpers have none.
+    expect(outcome.tickets).toHaveLength(7)
   })
 
   const refusals: Array<[string, () => Promise<{ ok: boolean; detail: string }>, RegExp]> = [
@@ -246,6 +309,57 @@ describe("operator darwin verifier", () => {
       "a missing hardened runtime",
       () => run(writeFixture(), forge("omo-darwin-x64-baseline", { runtime: false })),
       /hardened runtime flag missing/,
+    ],
+    [
+      "review NIT-1: a CA-valid foreign signer with our leaf prepended, end to end",
+      () =>
+        run(writeFixture(), { inspect: (name) => (name === "omo-darwin-arm64" ? caValidForeignSigner() : undefined) }),
+      /^omo-darwin-arm64: signed by team ATTACKER99, expected 523JNR86LZ$/,
+    ],
+    [
+      "#13964 LOW-2: an arm64e keychain helper slice",
+      () =>
+        run(
+          writeFixture(),
+          keychainSlices((slice) => (slice.cpuType === 0x0100000c ? { ...slice, cpuSubtype: 2 } : slice)),
+        ),
+      /omo-keychain-darwin-universal: slices are not exactly x86_64 \+ arm64/,
+    ],
+    [
+      "#13964 LOW-1: a pinned manifest that is not JSON",
+      () => {
+        const fixture = writeFixture()
+        writeFileSync(join(fixture.dir, "operator-darwin-manifest.json"), "{not json")
+        return run(fixture, {}, { manifestSha256: createHash("sha256").update("{not json").digest("hex") })
+      },
+      /^operator-darwin-manifest\.json is not valid JSON$/,
+    ],
+    [
+      "a keychain helper with another designated requirement",
+      () =>
+        run(
+          writeFixture(),
+          keychainSlices((slice) => ({ ...slice, requirementsSha256: "0".repeat(64) })),
+        ),
+      /omo-keychain-darwin-universal: designated requirement differs/,
+    ],
+    [
+      "a keychain helper with entitlements",
+      () =>
+        run(
+          writeFixture(),
+          keychainSlices((slice) => ({ ...slice, entitlements: true })),
+        ),
+      /omo-keychain-darwin-universal: carries entitlements/,
+    ],
+    [
+      "a keychain helper missing its x86_64 slice",
+      () =>
+        run(
+          writeFixture(),
+          keychainSlices((slice) => ({ ...slice, cpuType: 0x0100000c })),
+        ),
+      /omo-keychain-darwin-universal: slices are not exactly x86_64 \+ arm64/,
     ],
     [
       "a notarized artifact without a ticket",

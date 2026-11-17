@@ -828,8 +828,8 @@
     "packages/omo-senpi/src/components/thread/contracts/fields.ts": ["THREAD_SUMMARY_MAX_LENGTH"],
     // pre-existing at origin dev 4686e425b5: unused export(s) THREAD_MESSAGE_MAX_BYTES, THREAD_SUMMARY_MAX_LENGTH
     "packages/omo-senpi/src/components/thread/contracts/index.ts": ["THREAD_MESSAGE_MAX_BYTES", "THREAD_SUMMARY_MAX_LENGTH"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) ThreadListParams, ThreadReadParams, ThreadInterruptParams, ThreadHandoffParams, ThreadRenameParams, ThreadSetModelParams, ThreadSetReasoningParams, ThreadBindParams, ThreadUnbindParams, ThreadRebindParams and 5 more
-    "packages/omo-senpi/src/components/thread/contracts/params.ts": ["ThreadListParams", "ThreadReadParams", "ThreadInterruptParams", "ThreadHandoffParams", "ThreadRenameParams", "ThreadSetModelParams", "ThreadSetReasoningParams", "ThreadBindParams", "ThreadUnbindParams", "ThreadRebindParams", "ThreadBindingsParams", "ThreadReportParams", "ThreadOutboxParams", "ThreadOutboxAckParams", "ThreadAnswerParams"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ThreadListParams, ThreadReadParams, ThreadInterruptParams, ThreadHandoffParams, ThreadRenameParams, ThreadSetModelParams, ThreadSetReasoningParams, ThreadReportParams, ThreadOutboxParams, ThreadOutboxAckParams and 1 more
+    "packages/omo-senpi/src/components/thread/contracts/params.ts": ["ThreadListParams", "ThreadReadParams", "ThreadInterruptParams", "ThreadHandoffParams", "ThreadRenameParams", "ThreadSetModelParams", "ThreadSetReasoningParams", "ThreadReportParams", "ThreadOutboxParams", "ThreadOutboxAckParams", "ThreadAnswerParams"],
     // pre-existing at origin dev 4686e425b5: unused export(s) ENDPOINT_REGISTRY_LAYOUT, canonicalEndpointPath, socketNamesDirectory
     "packages/omo-senpi/src/components/thread/endpoint-registry.ts": ["ENDPOINT_REGISTRY_LAYOUT", "canonicalEndpointPath", "socketNamesDirectory"],
     // pre-existing at origin dev 4686e425b5: unused export(s) isBlankAnswer

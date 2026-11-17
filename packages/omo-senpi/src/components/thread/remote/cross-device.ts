@@ -12,7 +12,8 @@ import {
 import { remoteNotSetUp } from "./address-book"
 import type { WorktreeRequest } from "../worktree/thread-worktree"
 import { placeFolder } from "./create-folder"
-import { aliasFailure, remoteAvailable } from "./remote-ops"
+import { accountDevices } from "./account"
+import { aliasFailure, remoteReady } from "./remote-ops"
 import {
   planCreate as placeCreate,
   signedOut,
@@ -101,7 +102,7 @@ export async function claimCreatedAlias(
     return result
   let claimed: Awaited<ReturnType<AliasRegistry["claim"]>>
   try {
-    const holderDevice = device ?? (await remote.sessions.thisDevice()) ?? ""
+    const holderDevice = device ?? (await accountDevices(remote.client)).here ?? ""
     claimed = await remote.aliases.claim({
       alias,
       holder: { session_id: result.thread.thread_id, device: holderDevice },
@@ -144,7 +145,7 @@ export async function renameAlias(
   const current = await remote.aliases.aliasesOf([threadId])
   if (current.kind === "error") return signedOut(current.error) ? { local: "sign_in" } : aliasFailure(current.error)
   const from = current.value.get(threadId)
-  const holderDevice = device ?? (await remote.sessions.thisDevice()) ?? ""
+  const holderDevice = device ?? (await accountDevices(remote.client)).here ?? ""
   const changed =
     from === undefined
       ? await remote.aliases.claim({
@@ -215,18 +216,18 @@ export async function listAcross(
 ): Promise<ThreadToolResult> {
   if (remote === undefined || local.kind !== "ok" || !("threads" in local)) return local
   const ids = local.threads.map((thread) => thread.thread_id)
-  const unavailable = await remoteAvailable(remote)
-  if (unavailable !== undefined) {
-    const notSetUp =
-      unavailable.error.code === "host_unavailable" && remoteNotSetUp(unavailable.error.details?.["state"])
-    const listed = !allScope && notSetUp ? local : { ...local, remote_unavailable: unavailable.error.code }
+  const ready = await remoteReady(remote)
+  if ("kind" in ready) {
+    const notSetUp = ready.error.code === "host_unavailable" && remoteNotSetUp(ready.error.details?.["state"])
+    const listed = !allScope && notSetUp ? local : { ...local, remote_unavailable: ready.error.code }
     // The registry is asked only while the account's other devices can be reached (#12833): not while the device service is
     // not connected, nor on a plan without a relay (plan_required). A row's missing alias is then unknown, never "holds none" (#13923).
     return remote.aliases === undefined || ids.length === 0 ? listed : { ...listed, aliases_unavailable: "not_asked" }
   }
   const known = new Set(ids)
   const [here, hereName, listed, roster] = await Promise.all([
-    remote.sessions.thisDevice().catch(() => null),
+    // This device's id came with the relay state, in the same status round (#13414 U5).
+    Promise.resolve(ready.here),
     remote.sessions.thisDeviceName?.().catch(() => null) ?? Promise.resolve(null),
     accountListing(remote).then(
       (listing) => ({ ok: true as const, listing }),
