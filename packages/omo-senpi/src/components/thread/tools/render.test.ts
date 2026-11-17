@@ -135,6 +135,22 @@ describe("thread_send / thread_handoff results", () => {
     ).toEqual(["-> planner  queued #1: waits for approval"])
   })
 
+  test("#given a queued delivery held by a Stop or pause #when it renders #then it says the thread is paused, not busy, and names the device", () => {
+    expect(
+      result(
+        "thread_send",
+        sent({ kind: "queued", queue_position: 1, waiting_on: { kind: "hold", device: "b" } }),
+        sendArgs,
+      ),
+    ).toEqual(["-> planner  queued #1: thread is paused or stopped on b; delivers when it resumes"])
+  })
+
+  test("#given a queued delivery waiting on a wake #when it renders #then it says no engine runs the thread yet", () => {
+    expect(
+      result("thread_send", sent({ kind: "queued", queue_position: 3, waiting_on: { kind: "wake" } }), sendArgs),
+    ).toEqual(["-> planner  queued #3: no engine is running the thread; it starts to take the message"])
+  })
+
   test("#given an offline target #when it renders #then it says the message waits for the thread to start", () => {
     const offline = {
       kind: "ok",
@@ -317,6 +333,28 @@ describe("thread_read / thread_list / thread_create results", () => {
     expect(result("thread_create", opened, { thread: PEER })).toEqual(["scratch is already open"])
   })
 
+  test("#given a create whose first message was refused and a step that failed after it #when thread_create renders #then the refusal and the warning show beside the created thread", () => {
+    const created = {
+      kind: "ok",
+      thread: PEER,
+      name: "scratch",
+      status: "live",
+      cwd: "/w",
+      created_at: "t",
+      updated_at: null,
+      link: threadLink(PEER, "scratch"),
+      deduplicated: false,
+      prompt: { error: { code: "rate_limited", message: "Too many messages this turn.", next_action: "Send it next turn." } },
+      warnings: [{ code: "unsupported", message: "The device could not name the thread.", next_action: "Rename it." }],
+    } as ThreadToolResult
+    expect(result("thread_create", created, { name: "scratch", prompt: "hi" })).toEqual([
+      "created scratch",
+      "  first message not delivered: rate_limited - Too many messages this turn.",
+      "  next: Send it next turn.",
+      "  warning: unsupported - The device could not name the thread.",
+    ])
+  })
+
   test("#given a name conflict #when thread_create renders #then the error stays specific", () => {
     expect(
       result(
@@ -462,6 +500,18 @@ describe("control and relay results", () => {
       "  #3 milestone: 50% done",
       "  #4 question: ship it?",
     ])
+  })
+
+  test("#given fields carrying terminal escape codes #when the call and the result render #then no escape reaches the terminal", () => {
+    const esc = "\u001b[31m"
+    const callLines = call("thread_set_model", { thread: "planner", model: `${esc}gpt-x` }).join("\n")
+    const resultLines = result(
+      "thread_set_model",
+      { kind: "ok", thread: PEER, model: { provider: `${esc}openai`, id: "gpt-x" }, device: `${esc}b` } as ThreadToolResult,
+      { thread: "planner" },
+    ).join("\n")
+    expect(callLines).toBe("thread_set_model planner -> gpt-x")
+    expect(resultLines).toBe("planner now uses openai/gpt-x\n  on device b")
   })
 
   test("#given a result the details do not carry #when it renders #then the content text is parsed instead", () => {

@@ -4,6 +4,7 @@ import {
   excerptRendererText,
   joinRendererTokens,
   normalizeRendererText,
+  stripTerminalControls,
 } from "@oh-my-opencode/senpi-task/renderer-text"
 
 import type { ThreadToolName, ThreadToolResult } from "../contracts"
@@ -39,7 +40,7 @@ export function withThreadRenderers(tool: AnyTool): AnyTool {
 
 export function renderThreadCall(name: ThreadToolName) {
   return (args: unknown, theme: Theme, _context?: unknown): RenderComponent => {
-    const tail = callTail(name, argsOf(args))
+    const tail = stripTerminalControls(callTail(name, argsOf(args)))
     const head = theme.fg("toolTitle", theme.bold(name))
     return new Text(tail.length === 0 ? head : `${head} ${theme.fg("accent", tail)}`, 0, 0)
   }
@@ -54,7 +55,12 @@ export function renderThreadResult(name: ThreadToolName) {
   ): RenderComponent => {
     const result = resultOf(output)
     const view = result === undefined ? rawView(output) : resultView(name, result, argsOf(context?.args))
-    const lines = [theme.fg(view.tone, view.headline), ...view.details.map((line) => theme.fg("muted", `  ${line}`))]
+    // Every printed field can come from a peer, a device or the model's own arguments: a row is cleaned whole, so no
+    // field that skipped `text()` can carry a terminal escape to the screen.
+    const lines = [
+      theme.fg(view.tone, stripTerminalControls(view.headline)),
+      ...view.details.map((line) => theme.fg("muted", `  ${stripTerminalControls(line)}`)),
+    ]
     if (options.expanded && result !== undefined)
       lines.push(
         ...JSON.stringify(result, null, 2)
@@ -147,11 +153,13 @@ function resultView(name: ThreadToolName, result: ThreadToolResult, args: Args):
         ...(skills === undefined || skills.length === 0 ? [] : [`skills: ${skills.join(", ")}`]),
         ...(typeof r.alias === "string" ? [`alias: ${r.alias}`] : []),
         ...device(r),
+        ...createProblems(r),
       ]
-      if (r.deduplicated === true) return { tone: "success", headline: `${title} is already open`, details }
+      const tone = createProblems(r).length === 0 ? "success" : "warning"
+      if (r.deduplicated === true) return { tone, headline: `${title} is already open`, details }
       const verb =
         typeof args.thread === "string" ? "opened" : typeof args.fork_from === "string" ? "forked" : "created"
-      return { tone: "success", headline: `${verb} ${title}`, details }
+      return { tone, headline: `${verb} ${title}`, details }
     }
     case "thread_interrupt": {
       const turn = typeof r.turn_id === "string" ? ` (turn ${short(r.turn_id)})` : ""
@@ -224,10 +232,32 @@ function queuedLine(delivery: {
   readonly waiting_on?: { readonly kind?: string; readonly device?: string }
 }): string {
   const position = delivery.queue_position
-  if (delivery.waiting_on?.kind !== "approval") return `queued #${position}: waits for the running turn`
-  const where =
-    typeof delivery.waiting_on.device === "string" ? excerptRendererText(delivery.waiting_on.device, LABEL_WIDTH) : ""
-  return `queued #${position}: waits for approval${where.length === 0 ? "" : ` on ${where}`}`
+  const waiting = delivery.waiting_on
+  const where = typeof waiting?.device === "string" ? ` on ${excerptRendererText(waiting.device, LABEL_WIDTH)}` : ""
+  switch (waiting?.kind) {
+    case "approval":
+      return `queued #${position}: waits for approval${where}`
+    case "hold":
+      return `queued #${position}: thread is paused or stopped${where}; delivers when it resumes`
+    case "wake":
+      return `queued #${position}: no engine is running the thread${where}; it starts to take the message`
+    default:
+      return `queued #${position}: waits for the running turn`
+  }
+}
+
+type Failure = { readonly code?: string; readonly message?: string; readonly next_action?: string }
+
+/** What went wrong after thread_create made the thread: its first message refused, or a later step failed. */
+function createProblems(r: Readonly<Record<string, unknown>>): string[] {
+  const refused = (r.prompt as { readonly error?: Failure } | undefined)?.error
+  const warnings = (r.warnings as readonly Failure[] | undefined) ?? []
+  return [
+    ...(refused === undefined
+      ? []
+      : [`first message not delivered: ${text(refused.code)} - ${text(refused.message)}`, `next: ${text(refused.next_action)}`]),
+    ...warnings.map((warning) => `warning: ${text(warning.code)} - ${text(warning.message)}`),
+  ]
 }
 
 function sendView(r: Readonly<Record<string, unknown>>, args: Args): ResultView {
