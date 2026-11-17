@@ -18,6 +18,7 @@ import {
 } from "@oh-my-opencode/omo-opencode/service-auth"
 import { randomUUID } from "node:crypto"
 import type { HeldDeviceCredential } from "@oh-my-opencode/device-service-core"
+import { syncRequestHeaders } from "@oh-my-opencode/memory-core/sync-capabilities"
 import { deviceKeyringFromMaterial } from "@oh-my-opencode/memory-core/sync-account-ports"
 import { cliAccountOperation, scopedCliKeyring } from "./cli-account-operation"
 
@@ -87,7 +88,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
 
 async function accountIdOf(api: string, token: string, doFetch: typeof fetch): Promise<string> {
-  const response = await doFetch(`${api}/v1/me`, { headers: { authorization: `Bearer ${token}` } })
+  const response = await doFetch(`${api}/v1/me`, { headers: syncRequestHeaders(token) })
   if (!response.ok) throw new Error(`memory sync: the account read failed (${response.status})`)
   const body: unknown = await response.json()
   const account = isRecord(body) ? body["account"] : undefined
@@ -98,7 +99,7 @@ async function accountIdOf(api: string, token: string, doFetch: typeof fetch): P
 
 /** The service device this token authenticates: the one row the device list marks current. */
 async function currentDeviceOf(api: string, token: string, doFetch: typeof fetch): Promise<string | null> {
-  const response = await doFetch(`${api}/v1/devices`, { headers: { authorization: `Bearer ${token}` } })
+  const response = await doFetch(`${api}/v1/devices`, { headers: syncRequestHeaders(token) })
   if (!response.ok) throw new Error(`memory sync: the device read failed (${response.status})`)
   return currentServiceDevice(await response.json())
 }

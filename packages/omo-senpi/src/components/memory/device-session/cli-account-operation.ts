@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { createAccountHttp, createPairingHttp } from "@oh-my-opencode/memory-core/sync-account-ports"
+import { syncRequestHeaders } from "@oh-my-opencode/memory-core/sync-capabilities"
 import type { DeviceKeyring } from "@oh-my-opencode/memory-core/keyring"
 import type { DesktopSyncDescriptor, DesktopSyncOperation, SyncOperationAuthority } from "./account-source"
 
@@ -113,7 +114,7 @@ export async function cliAccountOperation(
     },
     async devices() {
       const response = await doFetch(`${http.baseUrl}/v1/devices`, {
-        headers: { authorization: `Bearer ${await token()}` },
+        headers: syncRequestHeaders(await token()),
       })
       if (!response.ok) throw new Error(`Device list refused (${response.status}).`)
       const parsed = devices.safeParse(await response.json())

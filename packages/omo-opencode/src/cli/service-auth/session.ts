@@ -1,5 +1,6 @@
 import { homedir } from "node:os"
 import { refuseIfLocalOnly } from "@oh-my-opencode/device-service-core/local-only"
+import { syncRequestHeaders } from "@oh-my-opencode/memory-core/sync-capabilities"
 import { heldCredentialLease, withCredentialLock } from "./credential-lock"
 import { signInHint } from "./accounts-gate"
 import type { CredentialOwner } from "./credential-owner"
@@ -130,7 +131,7 @@ export function createSession(options: {
   const request = (path: string, init: RequestInit) => requestApi(api, path, init, signal)
   /** The account a token's sign-in belongs to; undefined when the service does not say (never blocks logout). */
   const accountOf = async (access: string): Promise<string | undefined> => {
-    const body = await request("/v1/me", { headers: { authorization: `Bearer ${access}` } }).catch(() => null)
+    const body = await request("/v1/me", { headers: syncRequestHeaders(access) }).catch(() => null)
     const id =
       typeof body === "object" &&
       body !== null &&
@@ -208,7 +209,7 @@ export function createSession(options: {
   }
   // #13265: the signed-in account's email through the session's own token; undefined when the service does not say.
   async function emailOf(access: string): Promise<string | undefined> {
-    const body = await request("/v1/me", { headers: { authorization: `Bearer ${access}` } }).catch(() => null)
+    const body = await request("/v1/me", { headers: syncRequestHeaders(access) }).catch(() => null)
     const user =
       typeof body === "object" && body !== null && "user" in body ? (body as { user?: unknown }).user : undefined
     const email =
@@ -320,7 +321,7 @@ export function createSession(options: {
               }
               await request(`/v1/devices/${encodeURIComponent(current.device.id)}`, {
                 method: "DELETE",
-                headers: { authorization: `Bearer ${access}` },
+                headers: syncRequestHeaders(access),
               })
             }
             return true
@@ -352,7 +353,7 @@ export function createSession(options: {
     accessToken: (expect?: (current: Credentials) => boolean) => accessTokenImpl(expect),
     async removeForLimit(error: unknown, choose: ChooseDevice): Promise<boolean> {
       if (!(error instanceof ApiRefusal) || error.detail === undefined) throw error
-      const headers = { authorization: `Bearer ${error.detail.managementToken}` }
+      const headers = syncRequestHeaders(error.detail.managementToken)
       const listed = parseReply(deviceListSchema, await request("/v1/devices", { headers }))
       const devices = listed.devices.filter((device) => device.revokedAt === null)
       const chosen = await choose(devices)
