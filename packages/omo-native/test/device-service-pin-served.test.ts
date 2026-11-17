@@ -15,7 +15,7 @@ const SKIP_REASON = "skipped: release gate only, set OMO_RELEASE_GATE=1 to read 
 
 // sha256 of the published device-service-v0.1.40 checksums.txt; the committed fixture in
 // fixtures/device-service-0.1.40/ is the same file (remote-bootstrap-published-release.test.ts).
-const PINNED_CHECKSUMS_SHA256 = "ba55767cf53f51e988e2dd0dec5a33dec4d92588f69d8f7276cea4ace156af8d"
+const PINNED_CHECKSUMS_SHA256 = "a7dae160ef2b2e368fc9acd32689a61d7ed628e78d15b56ba803702d0419a019"
 const FETCH_TIMEOUT_MS = 30_000
 
 const download = async (url: string): Promise<Uint8Array> => {

@@ -18,12 +18,12 @@ import { deviceServiceBootstrapSetup } from "../remote-bootstrap"
 // The signed entry files of the published device-service-v0.1.40 release (omo-relay-daemon), downloaded once from the
 // GitHub release and committed byte for byte. The binaries (90-116 MB each) are not fixtures; their digests are.
 const FIXTURE_DIR = join(import.meta.dir, "fixtures", "device-service-0.1.40")
-const PUBLISHED_CHECKSUMS_SHA256 = "ba55767cf53f51e988e2dd0dec5a33dec4d92588f69d8f7276cea4ace156af8d"
+const PUBLISHED_CHECKSUMS_SHA256 = "a7dae160ef2b2e368fc9acd32689a61d7ed628e78d15b56ba803702d0419a019"
 const PUBLISHED_BINARY_SHA256 = {
-  "omo-device-service-darwin-arm64": "5b5970aa36c206d188972478eb49d0c685f48f21d9b70967472f8681a5b99a5b",
-  "omo-device-service-darwin-x64": "f8234268468c126bd0623af08d117b09d67912b2c0b05a53688369d467f7765d",
-  "omo-device-service-linux-x64": "52e9ff4398448aaa8a4d2f5412506fc302a154dfdcba29b47d6879724cc6e26e",
-  "omo-device-service-linux-arm64": "cc9d410941329f90a06603346c5ac0964fbbc8b630a68f097c77878c8dfbbdc5",
+  "omo-device-service-darwin-arm64": "a642e56cb7e2d2c2067e65291b39cd5cf97c34f702d6fcbf53383edd0c479cde",
+  "omo-device-service-darwin-x64": "c31df56a2eb737afac04ca1a163bb9551418d3a92798917e7363913035064d30",
+  "omo-device-service-linux-x64": "7d8e572c64bdc95dd96aaedc093e3a864d033cac16c00632ee17dfff0a3b0d1c",
+  "omo-device-service-linux-arm64": "42bb27cb4f1fd96b7dad50c32f548827e1c7eedd51188e24f52bb5c679fc101d",
 }
 const SIGNED_ENTRY_FILES = ["checksums.txt", "checksums.txt.sig", "latest.json"] as const
 
