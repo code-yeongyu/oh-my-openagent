@@ -9,8 +9,8 @@ import type { ThreadHostSession } from "./tools"
 const fixture = createRemoteThreadFixture()
 afterEach(fixture.cleanup)
 
-// A long transcript: 400 messages of ~2 KiB, ~800 KiB as one get_messages answer.
-const MESSAGES: readonly ThreadTranscriptEntry[] = Array.from({ length: 400 }, (_, index) => ({
+// A long transcript: 2000 messages of ~2 KiB, ~4 MiB as one get_messages answer (several 512 KiB pages).
+const MESSAGES: readonly ThreadTranscriptEntry[] = Array.from({ length: 2000 }, (_, index) => ({
   role: index % 2 === 0 ? "user" : "assistant",
   content: `message ${index} ${"x".repeat(2000)}`,
 }))
@@ -55,7 +55,7 @@ const withoutCursor = (result: ThreadToolResult) => {
 }
 
 describe("#14047: thread_read of a thread on another device costs its slice, not its transcript", () => {
-  test("#given a long transcript on b's paging engine #when thread_read takes 1500 bytes #then b sends a page of its newest entries, never get_messages, and the answer equals this device's read of the same transcript", async () => {
+  test("#given a long transcript on b's paging engine #when thread_read takes 1500 bytes #then b sends pages of its newest entries (under a quarter of the transcript), never get_messages, and the answer equals this device's read of the same transcript", async () => {
     const { run, reads } = pagingAccount()
     const here = await run("thread_read", { thread: "dur-local", max_bytes: 1500 })
     const there = await run("thread_read", { thread: "dur-on-b", max_bytes: 1500 })
@@ -64,7 +64,7 @@ describe("#14047: thread_read of a thread on another device costs its slice, not
     expect(reads().some((reply) => reply.rpc["type"] === "get_messages")).toBe(false)
     const paged = reads().reduce((total, reply) => total + reply.bytes, 0)
     const whole = JSON.stringify({ messages: MESSAGES }).length
-    expect(paged).toBeLessThan(whole / 2)
+    expect(paged).toBeLessThan(whole / 4)
   })
 
   test("#given a truncated read on both legs #when each follows its next_cursor to the end #then both walks return the same items", async () => {
@@ -92,7 +92,7 @@ describe("#14047: thread_read of a thread on another device costs its slice, not
     const before = reads().length
     const again = await run("thread_read", { thread: "dur-on-b", max_bytes: 1500 })
     const repeat = reads().slice(before)
-    expect(repeat.map((reply) => reply.rpc["since"])).toEqual(["e399"])
+    expect(repeat.map((reply) => reply.rpc["since"])).toEqual(["e1999"])
     expect(repeat[0]?.data["entries"]).toEqual([])
     expect(again).toEqual(first)
   })
@@ -102,14 +102,14 @@ describe("#14047: thread_read of a thread on another device costs its slice, not
     const first = await run("thread_read", { thread: "dur-on-b", max_bytes: 1500 })
     const cursor = cursorOf(first)
     expect(cursor).toBeDefined()
-    log.entries.push({ type: "message", id: "e400", message: { role: "assistant", content: "the newest answer" } })
+    log.entries.push({ type: "message", id: "e2000", message: { role: "assistant", content: "the newest answer" } })
     const before = reads().length
     expect(await run("thread_read", { thread: "dur-on-b", cursor, max_bytes: 1500 })).toMatchObject({
       kind: "error",
       error: { code: "cursor_stale" },
     })
     const refreshed = reads().slice(before)
-    expect(refreshed.map((reply) => reply.rpc["since"])).toEqual(["e399"])
+    expect(refreshed.map((reply) => reply.rpc["since"])).toEqual(["e1999"])
     expect((refreshed[0]?.data["entries"] as unknown[]).length).toBe(1)
     const fresh = await run("thread_read", { thread: "dur-on-b" })
     const items = itemsOf(fresh)
