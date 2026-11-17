@@ -9,7 +9,7 @@ export const THREAD_READ_MAX_BYTES = 1048576
 
 export const ThreadAddress = Type.String({
   description:
-    "Recipient thread id or unique name as returned by thread_list; a name shared by several threads returns ambiguous_target with candidates.",
+    "Recipient thread id, unique name, or sessionId (rpc-N or the short session id) as returned by thread_list. A sessionId resolves to that row's durable thread_id. A name shared by several threads returns ambiguous_target with candidates. self addresses the caller's own session.",
 })
 
 export const AllScope = Type.Optional(
@@ -64,12 +64,7 @@ export const thinkingLevel = (description: string) =>
 
 export const BindingId = Type.String({
   minLength: 1,
-  description: "Binding id as returned by thread_bind or thread_bindings.",
-})
-
-export const ExpectedRevision = Type.Integer({
-  minimum: 1,
-  description: "Revision the caller last saw for this binding; a binding that moved since returns stale_revision.",
+  description: "Id of the chat binding the gateway keeps for the thread.",
 })
 
 // No schema maxLength: the cap is in UTF-8 bytes, and the relay enforces it as message_too_large

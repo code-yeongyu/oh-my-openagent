@@ -1,7 +1,8 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { verifyDeveloperIdSigner } from "../.github/workflows/operator-darwin-cms.ts"
+import { X509Certificate } from "node:crypto"
+import { type TrustAnchors, verifyDeveloperIdSigner } from "../.github/workflows/operator-darwin-cms.ts"
 import { certificateNames, fixtureFile, issue, signedData } from "./fixtures/operator-darwin-signing"
 
 /**
@@ -157,6 +158,102 @@ describe("operator darwin CMS signer", () => {
     })
     expect(refusal(() => verifyDeveloperIdSigner(realCodeDirectory, cms))).toBe(
       "REFUSED: the signing certificate is not exactly one certificate in the CMS",
+    )
+  })
+
+  describe("with a generated root and Developer ID CA (test-only trust anchors)", () => {
+    const root = issue({ subject: [[CN, "Test Root CA"]], serial: 20 })
+    const ca = issue({
+      subject: [[CN, "Test Developer ID CA"]],
+      issuer: certificateNames(root.certificate).subject,
+      issuerKey: root.key,
+      serial: 21,
+    })
+    const caName = certificateNames(ca.certificate).subject
+    const anchors: TrustAnchors = {
+      root: new X509Certificate(root.certificate),
+      developerIdCa: new X509Certificate(ca.certificate),
+    }
+    const ours = issue({
+      subject: [
+        [CN, "Developer ID Application: Ours (523JNR86LZ)"],
+        [OU, "523JNR86LZ"],
+      ],
+      issuer: caName,
+      issuerKey: ca.key,
+      serial: 22,
+      developerIdApplication: true,
+    })
+    const foreign = issue({
+      subject: [
+        [CN, "Developer ID Application: Attacker (ATTACKER99)"],
+        [OU, "ATTACKER99"],
+      ],
+      issuer: caName,
+      issuerKey: ca.key,
+      serial: 23,
+      developerIdApplication: true,
+    })
+
+    test("control: our CA-valid leaf signing is accepted with our team", () => {
+      const cms = signedData({
+        signedOver: realCodeDirectory,
+        key: ours.key,
+        signer: ours.certificate,
+        certificates: [ours.certificate],
+      })
+      expect(verifyDeveloperIdSigner(realCodeDirectory, cms, anchors)).toEqual({ team: "523JNR86LZ" })
+    })
+
+    test("review NIT-1: a CA-VALID foreign signer with our leaf PREPENDED to the list reads the foreign team", () => {
+      const cms = signedData({
+        signedOver: realCodeDirectory,
+        key: foreign.key,
+        signer: foreign.certificate,
+        certificates: [ours.certificate, foreign.certificate],
+      })
+      // The team comes from the certificate that signed, never from the first one in the list; the verifier then
+      // refuses any team other than 523JNR86LZ (publish-operator-darwin-verify.test.ts, "signed by team").
+      expect(verifyDeveloperIdSigner(realCodeDirectory, cms, anchors)).toEqual({ team: "ATTACKER99" })
+    })
+  })
+
+  test("#13964 LOW-1: a signing certificate OpenSSL cannot parse is a typed refusal, not a thrown OpenSSL error", () => {
+    // Same issuer and serial as the real leaf, so it is selected as the signer; its public-key BIT STRING tag is
+    // corrupted, which makes X509Certificate throw (measured: OPENSSL NO_START_LINE).
+    const broken = realLeaf.slice()
+    const rsa = Buffer.from(broken).indexOf(
+      Buffer.from([0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01]),
+    )
+    broken[rsa + 13] = 0x04
+    const foreign = issue({ subject: [[CN, "Attacker"]], serial: 12 })
+    const cms = signedData({ signedOver: realCodeDirectory, key: foreign.key, signer: broken, certificates: [broken] })
+    expect(refusal(() => verifyDeveloperIdSigner(realCodeDirectory, cms))).toBe(
+      "REFUSED: the signing certificate is not a valid X.509 certificate",
+    )
+  })
+
+  test("#13964 L7: 32 nested indefinite-length levels are parsed, even with an element inside; 33 are refused", () => {
+    const nested = (levels: number, inner: number[] = []) =>
+      Uint8Array.from([
+        ...Array.from({ length: levels }, () => [0x30, 0x80]).flat(),
+        ...inner,
+        ...new Array(levels * 2).fill(0),
+      ])
+    expect(refusal(() => verifyDeveloperIdSigner(realCodeDirectory, nested(32)))).not.toContain("DER nesting exceeds")
+    expect(refusal(() => verifyDeveloperIdSigner(realCodeDirectory, nested(32, [0x05, 0x00])))).not.toContain(
+      "DER nesting exceeds",
+    )
+    expect(refusal(() => verifyDeveloperIdSigner(realCodeDirectory, nested(33)))).toBe(
+      "REFUSED: DER nesting exceeds 32 indefinite-length levels",
+    )
+  })
+
+  test("review NIT-2: 200k nested indefinite-length elements are a typed refusal, not a stack overflow", () => {
+    const bomb = new Uint8Array(400_000)
+    for (let index = 0; index < bomb.length; index += 2) bomb.set([0x30, 0x80], index)
+    expect(refusal(() => verifyDeveloperIdSigner(realCodeDirectory, bomb))).toBe(
+      "REFUSED: DER nesting exceeds 32 indefinite-length levels",
     )
   })
 })
