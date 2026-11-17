@@ -326,9 +326,7 @@ export function createRelayTransport(
     return result
   }
 
-  async function chain(
-    callerId: string,
-  ): Promise<{ readonly delivery_id: string; readonly root_id: string; readonly hop: number }> {
+  async function chain(): Promise<{ readonly delivery_id: string; readonly root_id: string; readonly hop: number }> {
     const cause = options.callerCause?.()
     const prior = cause === undefined ? undefined : (await store.deliveryView(cause))?.row
     return {
@@ -385,7 +383,7 @@ export function createRelayTransport(
       }
     }
     const facts = senderFacts(delivery.sender, await options.senderProvenance())
-    const { delivery_id, root_id, hop } = await chain(delivery.caller_id)
+    const { delivery_id, root_id, hop } = await chain()
     const name = delivery.sender.kind === "session" ? delivery.sender.name?.trim() : undefined
     const recordFor = (effective: EffectiveLane) =>
       remote.chain.stamp(

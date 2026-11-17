@@ -75,7 +75,7 @@ export async function readThread(
 }
 
 /** `thread_read` of a live thread through its control: the optional wait, then one bounded slice. */
-export async function readLive(
+async function readLive(
   control: SessionControl,
   value: ThreadReadInput,
   signal?: AbortSignal,
@@ -103,10 +103,7 @@ export async function readLive(
  * the holder answers `unsupported`, or the cursor came from the whole-transcript reader. An entry cursor on a leg that
  * no longer pages is stale.
  */
-async function pagedReadResult(
-  control: SessionControl,
-  value: ThreadReadInput,
-): Promise<ThreadToolResult | undefined> {
+async function pagedReadResult(control: SessionControl, value: ThreadReadInput): Promise<ThreadToolResult | undefined> {
   const entryCursor = value.cursor !== undefined && isEntryCursor(value.cursor)
   if (value.cursor !== undefined && !entryCursor) return undefined
   const page = await control.readEntryPage?.({

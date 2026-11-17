@@ -14,9 +14,6 @@ export type { LocatedThread, ThreadSdk, ThreadSdkOptions } from "../components/t
 // `omo host status --all` stamps each terminal row's `last_activity_at` with the same reader `omo thread list` uses.
 export { readSessionFacts } from "../components/thread/session-facts"
 
-declare const OMO_SENPI_PACKAGE_VERSION: string
-export const SDK_VERSION = typeof OMO_SENPI_PACKAGE_VERSION === "undefined" ? "dev" : OMO_SENPI_PACKAGE_VERSION
-
 /**
  * Built to `plugin/runtime/thread-sdk/sdk.js`, two levels below the `extensions/` directory that
  * holds the store worker sidecar; a bundler cannot inline a Worker's entry, so the store is pointed
