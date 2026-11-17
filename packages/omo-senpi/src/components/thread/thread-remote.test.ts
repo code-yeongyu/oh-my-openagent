@@ -147,7 +147,7 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     const { run } = surface(a.remote)
     const listed = await run("thread_list", { all_scope: true })
     expect(listed.kind === "ok" && "threads" in listed && listed.threads.find((t) => t.device === "b")).toMatchObject({
-      thread_id: "dur-on-b",
+      thread: "dur-on-b",
       status: "resumable",
     })
   })
@@ -256,7 +256,8 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     const { run } = surface(a.remote)
     expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-on-b", device: "b" },
+      thread: "dur-on-b",
+      device: "b",
       deduplicated: false,
     })
     expect(a.sent.map((entry) => [entry.via, entry.device, entry.rpc?.["type"], entry.rpc?.["sessionPath"]])).toEqual([
