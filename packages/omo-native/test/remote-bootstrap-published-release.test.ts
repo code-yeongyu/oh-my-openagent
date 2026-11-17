@@ -15,9 +15,9 @@ import { compareVersions } from "../../device-service-core/src/release/version.t
 import packageJson from "../package.json" with { type: "json" }
 import { deviceServiceBootstrapSetup } from "../remote-bootstrap"
 
-// The signed entry files of the published device-service-v0.1.39 release (omo-relay-daemon), downloaded once from the
+// The signed entry files of the published device-service-v0.1.40 release (omo-relay-daemon), downloaded once from the
 // GitHub release and committed byte for byte. The binaries (90-116 MB each) are not fixtures; their digests are.
-const FIXTURE_DIR = join(import.meta.dir, "fixtures", "device-service-0.1.39")
+const FIXTURE_DIR = join(import.meta.dir, "fixtures", "device-service-0.1.40")
 const PUBLISHED_CHECKSUMS_SHA256 = "ba55767cf53f51e988e2dd0dec5a33dec4d92588f69d8f7276cea4ace156af8d"
 const PUBLISHED_BINARY_SHA256 = {
   "omo-device-service-darwin-arm64": "5b5970aa36c206d188972478eb49d0c685f48f21d9b70967472f8681a5b99a5b",
@@ -39,7 +39,7 @@ afterEach(async () => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
 
-describe("the pinned device service release is the published 0.1.39", () => {
+describe("the pinned device service release is the published 0.1.40", () => {
   test("its published checksums.txt verifies under this build's compiled-in release key and names this pin", async () => {
     // given the published release's signed entry files
     const checksums = published("checksums.txt")
@@ -64,9 +64,9 @@ describe("the pinned device service release is the published 0.1.39", () => {
   })
 
   test("the start-up install fetches the pinned release and passes its signature check before asking for the binary", async () => {
-    // given a local origin serving the published 0.1.39 entry files, and no binary
+    // given a local origin serving the published 0.1.40 entry files, and no binary
     const requested: string[] = []
-    const prefix = "/stable/device-service/0.1.39/"
+    const prefix = "/stable/device-service/0.1.40/"
     const server = Bun.serve({
       hostname: "127.0.0.1",
       port: 0,
@@ -78,7 +78,7 @@ describe("the pinned device service release is the published 0.1.39", () => {
       },
     })
     servers.push(server)
-    const stateDir = mkdtempSync(join(tmpdir(), "pin-0139-"))
+    const stateDir = mkdtempSync(join(tmpdir(), "pin-0140-"))
     chmodSync(stateDir, 0o700)
     dirs.push(stateDir)
     const runs: (readonly string[])[] = []
@@ -107,7 +107,7 @@ describe("the pinned device service release is the published 0.1.39", () => {
         (file) => `${prefix}${file}`,
       ),
     )
-    expect(setup.pinVersion).toBe("0.1.39")
+    expect(setup.pinVersion).toBe("0.1.40")
     expect(outcome).toEqual({
       ok: false,
       state: "service_degraded",
