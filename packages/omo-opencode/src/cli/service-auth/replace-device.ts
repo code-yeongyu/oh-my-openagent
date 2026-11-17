@@ -1,7 +1,7 @@
 import { type MachineDevice, SignInError } from "./protocol"
 import { terminalText } from "./terminal-text"
 
-export function earlierDeviceLabel(existing: MachineDevice): string {
+function earlierDeviceLabel(existing: MachineDevice): string {
   const parts = [
     ...(existing.deviceName === undefined ? [] : [terminalText(existing.deviceName)]),
     ...(existing.deviceId === undefined ? [] : [`id ${terminalText(existing.deviceId)}`]),
