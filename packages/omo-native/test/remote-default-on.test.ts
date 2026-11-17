@@ -7,6 +7,7 @@ import { cliDeviceServiceHandoff } from "../device-service-handoff"
 import {
   REMOTE_KEPT_OFF_AFTER_SIGN_IN,
   REMOTE_ON_AFTER_SIGN_IN,
+  REMOTE_TURNING_ON_AFTER_SIGN_IN,
   runEnableVerb,
   runLoginSetup,
 } from "../remote-bootstrap"
@@ -43,7 +44,11 @@ describe("remote sessions on by default", () => {
       return "linked" as const
     }
     const record = { off: false }
-    const optOut = { read: () => record.off, record: () => (record.off = true), clear: () => (record.off = false) }
+    const optOut = {
+      read: () => record.off,
+      record: () => (record.off = true),
+      clear: () => (record.off = false),
+    }
     const remote = { linkDevice, optOut }
     return { owner, connect, record, remote }
   }
@@ -84,7 +89,11 @@ describe("remote sessions on by default", () => {
     ["the account is signed out", { exitCode: 4, stdout: '{"signedIn":false}' }],
   ])("disable records the opt-out and removes the unit when %s", async (_why, account) => {
     const record = { off: false }
-    const optOut = { read: () => record.off, record: () => (record.off = true), clear: () => (record.off = false) }
+    const optOut = {
+      read: () => record.off,
+      record: () => (record.off = true),
+      clear: () => (record.off = false),
+    }
     const { code, coldWake } = await run(["disable"], privateDir(), account, testBootstrap(), undefined, { optOut })
     expect([code, record.off, coldWake]).toEqual([REMOTE_EXIT.unavailable, true, ["uninstall"]])
   })
@@ -169,7 +178,10 @@ describe("omo login switches remote sessions on and says so", () => {
     const world = defaultWorld()
     const owner = await startFakeOwner({
       stateDir: privateDir(),
-      world: { ...world, status: { ...world.status, state: "sign_in_required" as const, device: null } },
+      world: {
+        ...world,
+        status: { ...world.status, state: "sign_in_required" as const, device: null },
+      },
     })
     owners.push(owner)
     const connect = () => connectDeviceService({ version: "5.1.52", stateDir: owner.stateDir })
@@ -201,15 +213,24 @@ describe("omo login switches remote sessions on and says so", () => {
         }).adopt(signedInCredential())
         return "linked" as const
       },
-      optOut: { read: () => record.off, record: () => (record.off = true), clear: () => (record.off = false) },
+      optOut: {
+        read: () => record.off,
+        record: () => (record.off = true),
+        clear: () => (record.off = false),
+      },
     }
-    return { owner, out, coldWake, io, remote }
+    const backgroundStarts: string[] = []
+    const background = (verb: "enable" | "bootstrap") => {
+      backgroundStarts.push(verb)
+    }
+    return { owner, out, coldWake, io, remote, background, backgroundStarts }
   }
 
-  // 5.1.73 (#13602 follow-up): a machine with no reachable service manager (a container, a test) gets install_failed
-  // suppress_failed and nothing changed; login succeeded, so it stays quiet, while omo remote enable still says why.
-  test("an install the service manager could not confirm leaves login quiet, and enable still reports it", async () => {
-    const { io, remote } = await signedInDeviceWithSwitchOff(false)
+  // omo#13722: login never installs the device service itself. With no current service running, the install (download,
+  // the platform's permission steps, the service registration) is handed to a detached omo remote enable, so login exits
+  // at once on every platform; before, an install that never settled held login until its test timed out on Windows.
+  test("a device with no running service: login hands the install to a background enable, prints the line, never waits", async () => {
+    const { io, remote, background, backgroundStarts } = await signedInDeviceWithSwitchOff(false)
     const out: string[] = []
     const noService = {
       ...io,
@@ -218,41 +239,83 @@ describe("omo login switches remote sessions on and says so", () => {
       output: (line: string) => out.push(line),
       error: (line: string) => out.push(`stderr: ${line}`),
     }
+    const installs: string[] = []
     const setup = {
       ...testBootstrap(),
-      install: async () => ({
-        ok: false as const,
-        state: "service_degraded" as const,
-        action: "The OmO device service could not be installed (install-service: suppress_failed).",
-        suppressed: true as const,
-      }),
+      install: () => {
+        installs.push("install")
+        return new Promise<never>(() => {})
+      },
     }
-    expect(await runLoginSetup(noService, setup, remote)).toBe("not_on")
-    expect(out).toEqual([])
-    await runEnableVerb(noService, setup, remote, false)
-    expect(out).toEqual([expect.stringContaining("stderr: The OmO device service could not be installed")])
+    const settled = await Promise.race([
+      runLoginSetup(noService, setup, remote, background),
+      Bun.sleep(5_000).then(() => "login waited on the install"),
+    ])
+    expect(settled).toBe("background")
+    expect([installs, backgroundStarts, out]).toEqual([[], ["enable"], [REMOTE_TURNING_ON_AFTER_SIGN_IN]])
+  })
+
+  // #13724 review M1: an opt-out is enforced at login on any device. With no current service (none, or an older one),
+  // the background omo remote bootstrap installs it and turns its switch off; login itself never installs.
+  test("a recorded opt-out with no current service: login installs nothing itself and hands it to a background bootstrap", async () => {
+    const { io, remote, background, backgroundStarts } = await signedInDeviceWithSwitchOff(true)
+    const out: string[] = []
+    const noService = {
+      ...io,
+      stateDir: privateDir(),
+      connect: () => connectDeviceService({ version: "5.1.52", stateDir: privateDir() }),
+      output: (line: string) => out.push(line),
+    }
+    const installs: string[] = []
+    const setup = {
+      ...testBootstrap(),
+      install: async () => {
+        installs.push("install")
+        return { ok: true as const }
+      },
+    }
+    expect(await runLoginSetup(noService, setup, remote, background)).toBe("kept_off")
+    expect([installs, backgroundStarts, out]).toEqual([[], ["bootstrap"], [REMOTE_KEPT_OFF_AFTER_SIGN_IN]])
   })
 
   test("switches the service on, links the device, installs the unit and prints the one line", async () => {
-    const { owner, out, coldWake, io, remote } = await signedInDeviceWithSwitchOff(false)
-    expect(await runLoginSetup(io, testBootstrap(), remote)).toBe("on")
+    const { owner, out, coldWake, io, remote, background, backgroundStarts } = await signedInDeviceWithSwitchOff(false)
+    expect(await runLoginSetup(io, testBootstrap(), remote, background)).toBe("on")
     expect(out).toEqual([REMOTE_ON_AFTER_SIGN_IN])
-    expect([owner.state.status.enabled, owner.state.adoptions, coldWake]).toEqual([true, 1, ["install"]])
+    expect([owner.state.status.enabled, owner.state.adoptions, coldWake, backgroundStarts]).toEqual([
+      true,
+      1,
+      ["install"],
+      [],
+    ])
   })
 
   test("keeps a recorded opt-out: nothing is switched on, and the line says how to turn it on", async () => {
-    const { owner, out, coldWake, io, remote } = await signedInDeviceWithSwitchOff(true)
-    expect(await runLoginSetup(io, testBootstrap(), remote)).toBe("kept_off")
+    const { owner, out, coldWake, io, remote, background, backgroundStarts } = await signedInDeviceWithSwitchOff(true)
+    expect(await runLoginSetup(io, testBootstrap(), remote, background)).toBe("kept_off")
     expect(out).toEqual([REMOTE_KEPT_OFF_AFTER_SIGN_IN])
-    expect([owner.state.status.enabled, owner.state.adoptions, coldWake]).toEqual([false, 0, ["uninstall"]])
+    expect([owner.state.status.enabled, owner.state.adoptions, coldWake, backgroundStarts]).toEqual([
+      false,
+      0,
+      ["uninstall"],
+      [],
+    ])
   })
 
   // #13602 security re-review M1: a recorded opt-out is enforced at login, not only at the next omo start. A switch that
   // came back on (a reinstall or a forget resets it) is turned off and the unit removed before the line is printed.
   test("with an opt-out on record, turns a switch that came back on off again and removes the unit", async () => {
-    const { owner, out, coldWake, io, remote } = await signedInDeviceWithSwitchOff(true, true)
-    expect(await runLoginSetup(io, testBootstrap(), remote)).toBe("kept_off")
+    const { owner, out, coldWake, io, remote, background, backgroundStarts } = await signedInDeviceWithSwitchOff(
+      true,
+      true,
+    )
+    expect(await runLoginSetup(io, testBootstrap(), remote, background)).toBe("kept_off")
     expect(out).toEqual([REMOTE_KEPT_OFF_AFTER_SIGN_IN])
-    expect([owner.state.status.enabled, owner.state.adoptions, coldWake]).toEqual([false, 0, ["uninstall"]])
+    expect([owner.state.status.enabled, owner.state.adoptions, coldWake, backgroundStarts]).toEqual([
+      false,
+      0,
+      ["uninstall"],
+      [],
+    ])
   })
 })

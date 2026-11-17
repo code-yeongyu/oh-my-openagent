@@ -190,14 +190,14 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
     identity: string,
     paths: MemoryIdentityPaths,
     space: SyncSpaceInputs,
-    onDeferred: (message: string) => void,
+    onDeferred: (message: string, wake: AbortSignal | undefined) => void,
   ): Promise<Running | SyncUnavailableStatus | SyncConfigInvalidStatus | null> => {
     let resolved: SyncSessionResolution
     try {
       resolved = await resolveSession({ identity, paths, space })
     } catch (error) {
       if (isSyncSessionDeferred(error)) {
-        onDeferred(error.message)
+        onDeferred(error.message, error.wake)
         return null
       }
       if (isSyncConfigError(error)) {
@@ -247,7 +247,8 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
       stateDir: join(paths.runtime, "sync-device"),
       locksDir: paths.locks,
       session,
-      log: (line) => logger.info(line, { identity }),
+      // A failed cycle comes at warn so it shows where the person and a harness look; routine lines stay at info.
+      log: (line, level) => (level === "warn" ? logger.warn(line, { identity }) : logger.info(line, { identity })),
       ...(options.onStatusChange === undefined ? {} : { onStatusChange: () => options.onStatusChange?.(paths.repo) }),
     })
     if (device === null) {
@@ -268,7 +269,8 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
     return { device, unwatch }
   }
 
-  // A deferred pass is replaced by a fresh one after the retry delay while the repo is still held by the same sessions.
+  // A deferred pass is replaced by a fresh one after the retry delay, or as soon as its wake signal aborts, while the
+  // repo is still held by the same sessions.
   const launch = (
     identity: string,
     paths: MemoryIdentityPaths,
@@ -282,9 +284,11 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
     quietMs = 0,
   ): Held => {
     let deferred = false
+    let wake: AbortSignal | undefined
     let nextQuietMs = 0
-    const ready = start(identity, paths, space, (message) => {
+    const ready = start(identity, paths, space, (message, signal) => {
       deferred = true
+      wake = signal
       if (retryMs !== previousRetryMs) {
         logger.warn(`memory sync is waiting: ${message} Sync retries on its own.`, {
           identity,
@@ -310,7 +314,9 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
     const held: Held = { users, ready }
     void ready.then(() => {
       if (!deferred) return
-      const retry = setTimeout(() => {
+      const retry = () => {
+        clearTimeout(timer)
+        wake?.removeEventListener("abort", retry)
         if (repos.get(paths.repo) === held)
           repos.set(
             paths.repo,
@@ -324,8 +330,11 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
               nextQuietMs,
             ),
           )
-      }, retryMs)
-      retry.unref?.()
+      }
+      const timer = setTimeout(retry, retryMs)
+      timer.unref?.()
+      if (wake?.aborted) retry()
+      else wake?.addEventListener("abort", retry, { once: true })
     })
     return held
   }

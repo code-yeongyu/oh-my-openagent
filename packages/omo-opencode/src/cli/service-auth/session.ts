@@ -155,6 +155,9 @@ export function createSession(options: {
     }
     if (Date.parse(current.accessTokenExpiresAt) > now() + 30_000) return current
     refuseIfLocalOnly("service-auth/session.ts refresh")
+    // A legacy credential has no owner, so this fence cannot carry a refreshAttempt. That absence is terminal:
+    // the next token call ends the session, and `omo account show` reports refreshState "expired". An in-progress
+    // protocol-2 journal always includes refreshAttempt; this write is not one.
     await store.write({ ...current, refreshState: "uncertain" })
     try {
       const tokens = parseReply(

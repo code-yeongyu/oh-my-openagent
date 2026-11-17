@@ -1,4 +1,5 @@
 import type { AddressBookHost, DiskSession } from "../address-book"
+import type { InterruptRequest } from "../control/interrupt"
 import type { ThreadControl } from "../endpoint-controls"
 import type { EndpointKind } from "../endpoint-registry"
 import type {
@@ -87,6 +88,10 @@ export type ThreadHost = {
     readonly forkFrom?: string
     readonly initialSkills?: readonly string[]
     readonly permissionPreset?: string
+    /** The engine's launch profile: the model (`provider` + `modelId`) and thinking level the new session starts on. */
+    readonly provider?: string
+    readonly modelId?: string
+    readonly thinkingLevel?: string
   }) => Promise<ThreadHostSession>
   readonly getMessages: (sessionId: string) => Promise<readonly ThreadTranscriptEntry[]>
   readonly getState: (sessionId: string) => Promise<{ readonly isStreaming?: boolean; readonly activeTurnId?: string }>
@@ -96,11 +101,12 @@ export type ThreadHost = {
     options?: { readonly streamingBehavior?: "steer" | "followUp" },
     durable_session_id?: string,
   ) => Promise<{ readonly turnId?: string }>
+  /** The engine's `interrupt` record with `request`'s fields (`control/interrupt.ts`); answers the engine's reply data. */
   readonly interrupt: (
     sessionId: string,
-    turnId?: string,
+    request: InterruptRequest,
     durable_session_id?: string,
-  ) => Promise<{ readonly interrupted?: boolean; readonly turnId?: string }>
+  ) => Promise<Readonly<Record<string, unknown>>>
   readonly setSessionName: (sessionId: string, name: string, durable_session_id?: string) => Promise<void>
   readonly setModel: (
     sessionId: string,

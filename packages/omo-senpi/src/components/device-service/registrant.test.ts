@@ -213,7 +213,8 @@ test("#given an operator daemon whose endpoint registry lives under another agen
       deferStartupWork: () => undefined,
     })
   })
-  expect(started.map(({ agentDir }) => agentDir)).toEqual([registryOwner])
+  // the registrant registers the platform-resolved dir (D:\srv\... on Windows), so compare with resolve()
+  expect(started.map(({ agentDir }) => agentDir)).toEqual([resolve(registryOwner)])
 })
 
 // #13604 (L2): senpi always names an absolute registry dir; a relative one is unreadable, so the registrant falls back

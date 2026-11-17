@@ -1,4 +1,5 @@
 import type { DeviceAbsentReason, Provenance } from "../gateway/types"
+import { accountDevices } from "./account"
 import type { RemoteThreadSurface } from "./ports"
 
 /** This device's account device id, or why a delivery names none. */
@@ -18,7 +19,7 @@ async function thisDeviceId(remote: RemoteThreadSurface | undefined): Promise<Th
   if (cached !== undefined) return { device: cached }
   let device: string | null
   try {
-    device = await remote.sessions.thisDevice()
+    device = (await accountDevices(remote.client)).here
   } catch {
     return { device_absent: "device_service_unavailable" }
   }

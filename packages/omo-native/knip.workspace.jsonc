@@ -39,6 +39,9 @@
         "test/spawn-call-sites.ts",
         "test/teardown.test-support.ts",
         "test/trust-certificate-fixtures.ts",
+        // the private-TMPDIR helper the trust suites import (omo#13697): a test-support module, so knip's test plugin lists
+        // it as an exports-unchecked entry and its exports would go unchecked without this row
+        "test/trust-private-tmpdir.ts",
       ],
       "ignoreFiles": [
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs

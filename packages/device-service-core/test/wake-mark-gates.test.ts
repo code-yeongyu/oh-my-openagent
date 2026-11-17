@@ -7,6 +7,7 @@ import {
   type DeviceService,
   LOCATE_SINGLE_MIN_SERVICE_VERSION,
   LocalApiError,
+  NotSentError,
   WAKE_MARK_MIN_SERVICE_VERSION,
 } from "../src/index.ts"
 import { connectLocalApi, type LocalApiClient } from "../src/local-api/client.ts"
@@ -56,13 +57,13 @@ async function spiedService(
       return {
         ...client,
         // The owner stands in for a service before the mark: it gets the command without it, so the attach settles.
-        command: (attach, rpc, commandId, route, commandOptions) => {
-          calls.commands.push([rpc, commandOptions])
-          return client.command(attach, rpc, commandId, route)
-        },
-        wakeCommand: async (...args) => {
-          calls.wakes.push(args)
-          throw new LocalApiError("unsupported", "the stand-in owner takes no wake target")
+        commandTo: async (target, rpc, commandId, route, mark) => {
+          if ("wake" in target) {
+            calls.wakes.push([target.wake.device, target.wake.durable_id, rpc])
+            throw new LocalApiError("unsupported", "the stand-in owner takes no wake target")
+          }
+          calls.commands.push([rpc, mark])
+          return await client.commandTo(target, rpc, commandId, route)
         },
         request: (type, params) => {
           if (type === "session.locate") calls.locates.push(params)
@@ -93,11 +94,8 @@ describe("omo#13037: the wake mark and the single-probe locate are gated on the 
     await attach.command(ADMIT, { accepts: ["session-wake:v1"] }).catch(() => undefined)
     expect(calls.commands).toEqual([[ADMIT, undefined]])
     const refused = await service.wakeCommand(PEER, "dur-1", ADMIT).catch((error: unknown) => error)
-    expect(refused).toBeInstanceOf(LocalApiError)
-    expect({ code: (refused as LocalApiError).code, not_sent: (refused as LocalApiError).not_sent }).toEqual({
-      code: "unsupported",
-      not_sent: true,
-    })
+    expect(refused).toBeInstanceOf(NotSentError)
+    expect((refused as NotSentError).code).toBe("unsupported")
     expect(calls.wakes).toEqual([])
     await service.locate(PEER, "dur-1", { single: true }).catch(() => undefined)
     expect(calls.locates).toEqual([{ device: PEER, engine_id: "dur-1" }])
@@ -135,5 +133,19 @@ describe("omo#13037: the wake mark and the single-probe locate are gated on the 
       commands: [[ADMIT, undefined]],
       locates: [{ device: PEER, engine_id: "dur-1" }],
     })
+  })
+
+  test("#given a service below the minimum #when a wake is asked #then it is refused unsent, naming the service's version, the minimum and an action", async () => {
+    // omo#13763: a bare `unsupported` left the user no way to tell an outdated device service from a missing feature.
+    const { service, calls } = await spiedService({ wakeMark: "1.5.0", singleLocate: null })
+    const refused = await service.wakeCommand(PEER, "dur-1", ADMIT).catch((error: unknown) => error)
+    expect(refused).toBeInstanceOf(NotSentError)
+    const { code, reason, action } = refused as NotSentError
+    expect({ code, names: [reason.includes("1.4.0"), reason.includes("1.5.0")], hasAction: action !== null }).toEqual({
+      code: "unsupported",
+      names: [true, true],
+      hasAction: true,
+    })
+    expect(calls.wakes).toEqual([])
   })
 })

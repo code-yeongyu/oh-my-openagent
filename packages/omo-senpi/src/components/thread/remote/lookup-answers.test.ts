@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { type DeviceService, LocalApiError } from "@oh-my-opencode/device-service-core"
-import { createDeviceServiceSessions } from "./device-service"
+import { closingPorts } from "./testing/closing-ports"
+
+// #13873: every port is closed after each test, so no idle detach timer outlives it.
+const sessionsPort = closingPorts()
 
 // omo#13037 A7.2.6: the sender's own device service answers a single-probe locate toward a device that does not list
 // the wake feature with the empty page - the `session_not_found` refusal, sent with no query going out. The lookup
@@ -19,7 +22,10 @@ function serviceAnswering(answer: () => Promise<{ readonly key: string }>): Devi
 }
 
 const lookupWith = async (answer: () => Promise<{ readonly key: string }>) => {
-  const port = createDeviceServiceSessions({ version: "5.1.70", connect: async () => serviceAnswering(answer) })
+  const port = sessionsPort({
+    version: "5.1.70",
+    connect: async () => ({ conn: serviceAnswering(answer), owned: true }),
+  })
   return await port.lookup?.("dev-c", "0195f0c2-1a2b-7c3d-8e4f-00000000c001")
 }
 
@@ -51,9 +57,9 @@ describe("omo#13037 A7.2.6: how the single probe's answers are read", () => {
   )
 
   test("review: #given a service that never answers the single probe #then the lookup returns silent within the client's own cap", async () => {
-    const port = createDeviceServiceSessions({
+    const port = sessionsPort({
       version: "5.1.70",
-      connect: async () => serviceAnswering(() => new Promise(() => {})),
+      connect: async () => ({ conn: serviceAnswering(() => new Promise(() => {})), owned: true }),
       lookupCapMs: 50,
     })
     const started = performance.now()

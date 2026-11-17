@@ -36,13 +36,17 @@ export function createDeviceSessionResolver(options: {
   readonly loadRuntime: () => Promise<DeviceSessionRuntime>
   readonly fetch?: typeof fetch
 }): (request: SyncSessionRequest) => Promise<SyncSessionResolution> {
-  // Repos whose last pass deferred because the memory repository had no first commit yet.
-  const awaitingRepo = new Set<string>()
+  // Repos whose last pass deferred because the memory repository had no first commit yet, with the lifetime signal of
+  // the account that pass resolved.
+  const awaitingRepo = new Map<string, AbortSignal>()
   return async ({ paths, space }) => {
-    // The account was resolved on the pass that deferred; while the repository is still missing, a retry asks no
-    // credential and makes no request (a keychain "Allow", not "Always Allow", would otherwise prompt every time).
-    if (awaitingRepo.has(paths.repo) && !(await options.loadRuntime()).repoHasCommit(paths.repo))
-      throw new SyncSessionDeferredError(REPO_NOT_CREATED, undefined)
+    // The account was resolved on the pass that deferred; while the repository is still missing and that account is
+    // still live, a retry asks no credential and makes no request (a keychain "Allow", not "Always Allow", would
+    // otherwise prompt every time). Its signal aborting (signed out, channel closed, #13624) ends the wait: the account
+    // is read again, so a signed-out device goes idle and an unavailable one reports why.
+    const waiting = awaitingRepo.get(paths.repo)
+    if (waiting !== undefined && !waiting.aborted && !(await options.loadRuntime()).repoHasCommit(paths.repo))
+      throw new SyncSessionDeferredError(REPO_NOT_CREATED, undefined, waiting)
     awaitingRepo.delete(paths.repo)
     const account = await options.source()
     if (account === null) return null
@@ -53,13 +57,15 @@ export function createDeviceSessionResolver(options: {
     // never by a read or a session start (#13486). Until its first commit lands, the creation may still be writing that
     // config, so the session is deferred and the runner retries it.
     if (!runtime.repoHasCommit(paths.repo)) {
-      awaitingRepo.add(paths.repo)
-      throw new SyncSessionDeferredError(REPO_NOT_CREATED, undefined)
+      awaitingRepo.set(paths.repo, account.signal)
+      throw new SyncSessionDeferredError(REPO_NOT_CREATED, undefined, account.signal)
     }
     const resolved = runtime.resolveSpace(new runtime.GitSpaceConfig(paths.repo), {
       profile: space.profile,
       remotes: runtime.listRemotes(space.projectDir),
     })
+    // A repository that left its per-device local: space (#13720): its older journal is that space's.
+    const legacy = resolved.legacySpaceId === null ? {} : { legacySpace: resolved.legacySpaceId }
     const ended = new Set<() => void>()
     if (account.kind === "desktop") {
       const opened = await runtime.openAccountSession({
@@ -75,6 +81,7 @@ export function createDeviceSessionResolver(options: {
       if (!opened.ok) return { idle: opened.reason }
       return {
         ...opened.session,
+        ...legacy,
         onEnded: (notify) => {
           if (account.signal.aborted) notify()
           else account.signal.addEventListener("abort", notify, { once: true })
@@ -106,6 +113,7 @@ export function createDeviceSessionResolver(options: {
     if (!opened.ok) return { idle: opened.reason }
     return {
       ...opened.session,
+      ...legacy,
       onEnded: (notify) => {
         ended.add(notify)
       },
