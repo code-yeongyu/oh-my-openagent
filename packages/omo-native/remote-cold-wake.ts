@@ -95,6 +95,8 @@ function coldWakeNotice(outcome: ColdWakeOutcome): string | undefined {
       return "Cold wake is not set up: the OmO device service is not installed as a user service on this device."
     case "table_invalid":
       return `Cold wake is not set up: the device service's OMO_RELAYD_SERVICES table cannot be read (${outcome.reason}). Fix or remove it, then run omo remote bootstrap.`
+    case "service_replaced":
+      return "Cold wake was not changed: the device service was reinstalled while it restarted (OmO Desktop reinstalls it when it stops), and that reinstall did not keep omo's cold-wake entry. Run the command again."
     case "failed":
       return `Cold wake could not be set up (${outcome.step}: ${outcome.detail}). Messages to this device's sessions need a running omo until it is.`
   }
