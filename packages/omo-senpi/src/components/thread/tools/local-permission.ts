@@ -11,9 +11,10 @@ export type ThreadPermissionRequest = {
 type LocalityOptions = Pick<ThreadToolSurfaceOptions, "sessionsDirectory">
 
 /**
- * Tools that never change another device: reads (`thread_list`, `thread_read`) and this device's own gateway store
- * (report, outbox, ack, answer). A read may reach the account's other devices through the device service, but it
- * changes nothing there, so reads are exempt from the ask on purpose.
+ * Tools that never change another device: reads (`thread_list`, `thread_read`) and the gateway relay tools (report,
+ * outbox, ack, answer). A read may reach the account's other devices through the device service, but it changes nothing
+ * there, so reads are exempt from the ask on purpose. `thread_report` and `thread_answer` can post to an external chat
+ * the session is bound to: that is the binding the session already has, not another device, so they are exempt too.
  */
 const NEVER_CHANGES_ANOTHER_DEVICE: ReadonlySet<string> = new Set([
   "thread_list",
