@@ -72,6 +72,15 @@ describe("root test Bun config", () => {
     expect(output).toContain("filters did not match any test files")
   })
 
+  test("#given the macOS shard-2 light config #when bun discovers a top-level script test #then it is left to the heavy half", () => {
+    const output = spawnBun([
+      "--config=bunfig.win2.parallel.rest.toml",
+      "test",
+      "script/ci-root-test-partition.test.ts",
+    ])
+    expect(output).toContain("filters did not match any test files")
+  })
+
   test("#given the Windows rpc-host invocation config #when bun discovers the quarantined durable-json test #then it is left to the serial quarantine", () => {
     const output = spawnBun([
       "--config=bunfig.win2.parallel.toml",

@@ -44,7 +44,7 @@ export const THREAD_TOOL_METADATA: readonly ThreadToolEntry[] = [
     name: "thread_list",
     label: "List sessions",
     description:
-      "Shows every addressable session with its id, name, and status, for when the user needs a valid target address before acting on a session" +
+      "Shows every addressable session on this device and the account's other devices with its id, name, status and device, plus the account's devices, for when the user needs a valid target address before acting on a session" +
       ROUTE_TO_TASK,
     exposure: THREAD_TOOL_EXPOSURE,
   },
@@ -68,7 +68,7 @@ export const THREAD_TOOL_METADATA: readonly ThreadToolEntry[] = [
     name: "thread_interrupt",
     label: "Interrupt session turn",
     description:
-      "Stops the turn running in another session, for when the user wants to halt a session that is going down the wrong path" +
+      "Stops the turn running in another session, and the background jobs that turn started, for when the user wants to halt a session that is going down the wrong path; the result's background lists what was stopped" +
       ROUTE_TO_TASK,
     exposure: THREAD_TOOL_EXPOSURE,
   },
@@ -76,7 +76,7 @@ export const THREAD_TOOL_METADATA: readonly ThreadToolEntry[] = [
     name: "thread_close",
     label: "Close session",
     description:
-      "Closes another session on this device or on another of the account's devices, for when the user is done with that session and wants it shut down" +
+      "Closes a session. Omit thread or pass self to close this session. thread accepts a thread_id, a unique name, or a sessionId from thread_list (rpc-N or the short session id), which resolves to the durable thread_id; the result is closed true or false plus a reason" +
       ROUTE_TO_TASK,
     exposure: THREAD_TOOL_EXPOSURE,
   },
@@ -92,7 +92,7 @@ export const THREAD_TOOL_METADATA: readonly ThreadToolEntry[] = [
     name: "thread_rename",
     label: "Rename session",
     description:
-      "Changes the label a session is listed under, for when the user asks to call a session something clearer",
+      "Renames a session's label, for when the user asks to call a session something clearer. Omit thread or pass self to rename this session. thread accepts a thread_id, a unique name, or a sessionId from thread_list (rpc-N or the short session id), which resolves to the durable thread_id; a miss names that thread_id",
     exposure: THREAD_TOOL_EXPOSURE,
   },
   {
@@ -107,33 +107,6 @@ export const THREAD_TOOL_METADATA: readonly ThreadToolEntry[] = [
     label: "Set session reasoning level",
     description:
       "Sets how much reasoning a session applies, for when the user asks to raise or lower the thinking effort of a session",
-    exposure: THREAD_TOOL_EXPOSURE,
-  },
-  {
-    name: "thread_bind",
-    label: "Bind session to chat thread",
-    description:
-      "Attaches a session to an external chat thread on Discord, Telegram, Slack, Notion, Feishu, herdr or a custom connector, for when the user wants a chat conversation connected to a session",
-    exposure: THREAD_TOOL_EXPOSURE,
-  },
-  {
-    name: "thread_unbind",
-    label: "Unbind chat thread",
-    description: "Detaches a session from its bound chat thread, for when the user wants that chat connection closed",
-    exposure: THREAD_TOOL_EXPOSURE,
-  },
-  {
-    name: "thread_rebind",
-    label: "Rebind chat thread",
-    description:
-      "Moves a bound chat thread over to another session, for when the user wants that chat served by a different session",
-    exposure: THREAD_TOOL_EXPOSURE,
-  },
-  {
-    name: "thread_bindings",
-    label: "List chat bindings",
-    description:
-      "Shows which chat threads are bound to which sessions with their revisions, for when the user needs a binding id or its revision",
     exposure: THREAD_TOOL_EXPOSURE,
   },
   {
@@ -171,4 +144,4 @@ export const THREAD_TOOL_METADATA: readonly ThreadToolEntry[] = [
  * tokens, so the per-tool entries above stay free of policy prose.
  */
 export const THREAD_FAMILY_PROMPT_GUIDELINES =
-  "Thread tools address peer sessions, never child tasks: call thread_list first and pass a thread_id or unique name it returned, never a guessed address; an ambiguous name returns candidates instead of delivering; leave all_scope unset to stay inside this workspace and set it only when the caller explicitly asks for sessions in every workspace; when you mention a thread to the user, paste the link its result carries instead of writing its id or inventing a link."
+  "Thread tools address peer sessions, never child tasks: call thread_list first and pass a thread_id, a unique name, or that row's sessionId (rpc-N or the short session id), which resolves to the durable thread_id; thread_rename and thread_close take this session when thread is omitted or self; an ambiguous name returns candidates instead of delivering; leave all_scope unset to stay inside this workspace and set it only when the caller explicitly asks for sessions in every workspace; when you mention a thread to the user, paste the link its result carries instead of writing its id or inventing a link."

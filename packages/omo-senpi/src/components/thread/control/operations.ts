@@ -26,6 +26,7 @@ export async function interruptThread(control: SessionControl, turnId: string | 
     ...controlIdentity(control),
     ...(result.turn_id === undefined ? {} : { turn_id: result.turn_id }),
     interrupted: result.interrupted,
+    background: result.background,
   }
 }
 
@@ -38,7 +39,8 @@ export async function closeThread(control: SessionControl): Promise<ThreadToolRe
       "Close it from the client that holds it, or send it a message first so it can be closed for every holder.",
       control.device === undefined ? undefined : { device: control.device },
     )
-  return { kind: "ok", ...controlIdentity(control), closed: outcome === "closed" }
+  const closed = outcome === "closed"
+  return { kind: "ok", ...controlIdentity(control), closed, reason: closed ? "closed" : "not_live" }
 }
 
 /**

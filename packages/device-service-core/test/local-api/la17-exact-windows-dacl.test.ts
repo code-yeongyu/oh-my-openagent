@@ -3,16 +3,13 @@ import { join } from "node:path"
 import { afterEach, describe, expect, test } from "bun:test"
 import { writeToken, type SecureFile } from "../../src/local-api/access.ts"
 import {
-  applyExactDacl,
   currentUserSid,
   DESCRIBE_DACL_SCRIPT,
   describeDacl,
-  verifyExactDacl,
-  windowsSecureFile,
   type PowerShellRunner,
   runPowerShell,
-  userSidToken,
 } from "../../src/local-api/dacl.ts"
+import { applyExactDacl, userSidToken, verifyExactDacl, windowsSecureFile } from "../../src/release/windows-dacl.ts"
 import { LocalApiError } from "../../src/local-api/errors.ts"
 import { rejectionOf } from "./conformance/rejection.ts"
 import { cleanup, freshStateDir } from "./support.ts"
