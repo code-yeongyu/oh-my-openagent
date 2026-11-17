@@ -94,7 +94,9 @@ describe("combined macOS CI execution contract (#9974)", () => {
     expect(steps.find((step) => step.id === "root-tests-posix-2b")?.run).toBe(
       "bash .github/scripts/ci-root-shard-2.sh light",
     )
-    expect(script("ci-root-shard-2.sh")).toContain("bun --config=bunfig.win2.parallel.toml test --timeout 20000 ./script")
+    expect(script("ci-root-shard-2.sh")).toContain(
+      "bun --config=bunfig.win2.parallel.toml test --timeout 20000 ./script",
+    )
     expect(script("ci-root-shard-2.sh")).not.toContain("test --timeout 20000 script ")
     expect(steps.find((step) => step.id === "codex-platform-tests")?.run).toBe(
       "bash .github/scripts/ci-codex-platform-build.sh\nbash .github/scripts/ci-codex-platform-node.sh\nbun test packages/omo-opencode/src/cli/cli-installer.platform.test.ts\n",
