@@ -20,7 +20,11 @@ export type Harness = {
   readonly fixtureAt: (op: string, keychain: string, ...args: string[]) => Promise<string>
   readonly run: (
     request: object | string,
-    options?: { readonly binary?: string; readonly args?: readonly string[] },
+    options?: {
+      readonly binary?: string
+      readonly args?: readonly string[]
+      readonly env?: Readonly<Record<string, string>>
+    },
   ) => Promise<HelperRun>
   readonly dispose: () => Promise<void>
 }
@@ -92,7 +96,7 @@ export async function createHarness(): Promise<Harness> {
       stdin: "pipe",
       stdout: "pipe",
       stderr: "pipe",
-      env: {},
+      env: { ...options.env },
     })
     child.stdin.write(`${typeof request === "string" ? request : JSON.stringify(request)}\n`)
     child.stdin.flush()

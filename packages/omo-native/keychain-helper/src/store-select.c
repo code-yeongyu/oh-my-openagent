@@ -1,4 +1,6 @@
-#include "omo-keychain.h"
+#include "dedicated.h"
+
+#include <string.h>
 
 // Which keychain a request runs against (#13116 design r2):
 //   no "store"       the login keychain, as before; refused while OmO's own keychain is active (an older client or a
@@ -19,6 +21,11 @@ bool store_select(store_step step, const request *req) {
     reply_error("refused", "store", errSecSuccess);
     return false;
   }
+  char root[DEDICATED_PATH_BYTES];
+  if (!dedicated_root(root, sizeof root)) {
+    reply_error("store-refused", "home", errSecSuccess);
+    return false;
+  }
   if (step == STORE_STEP_NONE && !migrating && !dedicated_active()) {
     reply_error("store-refused", "store-inactive", errSecSuccess);
     return false;
@@ -26,6 +33,13 @@ bool store_select(store_step step, const request *req) {
   OSStatus status = errSecSuccess;
   bool created = false;
   const char *refusal = step == STORE_STEP_CREATE ? dedicated_create(&created, &status) : dedicated_open(&status);
+  if (step == STORE_STEP_ERASE && refusal != NULL && strcmp(refusal, "missing") == 0) {
+    refusal = dedicated_erase_leftover();
+    if (refusal == NULL) {
+      reply_ok(NULL);
+      return false;
+    }
+  }
   if (refusal == NULL && step == STORE_STEP_ACTIVATE) refusal = dedicated_set_active(true);
   if (refusal == NULL && step == STORE_STEP_DEACTIVATE) refusal = dedicated_set_active(false);
   if (refusal == NULL && step == STORE_STEP_ERASE) refusal = dedicated_erase(req->account.bytes, &status);

@@ -4,6 +4,7 @@
 #include "dedicated.h"
 
 #include <CoreServices/CoreServices.h>
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -118,4 +119,40 @@ const char *dedicated_erase(const char *account, OSStatus *status) {
   if (!dedicated_join(path, sizeof path, root, DEDICATED_KEY_NAME) || unlink(path) != 0) return "key";
   if (rmdir(root) != 0) return "rmdir";
   return NULL;
+}
+
+// Security leaves `.fl<hash>` lock files beside a keychain; only those, owned by this user, are removed here.
+static bool remove_lock_files(const char *root) {
+  DIR *dir = opendir(root);
+  if (dir == NULL) return false;
+  bool ok = true;
+  for (struct dirent *entry = readdir(dir); entry != NULL; entry = readdir(dir)) {
+    if (strncmp(entry->d_name, ".fl", 3) != 0) continue;
+    char path[DEDICATED_PATH_BYTES];
+    struct stat info;
+    if (!dedicated_join(path, sizeof path, root, entry->d_name) || lstat(path, &info) != 0 || !S_ISREG(info.st_mode) ||
+        info.st_uid != geteuid() || unlink(path) != 0)
+      ok = false;
+  }
+  closedir(dir);
+  return ok;
+}
+
+// `store-erase` after a crash between SecKeychainDelete and the folder removal (code review r1, LOW 2): the keychain
+// file is already gone, so the store cannot be opened; an inactive, owner-only folder holding only the key is removed.
+const char *dedicated_erase_leftover(void) {
+  char root[DEDICATED_PATH_BYTES], path[DEDICATED_PATH_BYTES];
+  if (!dedicated_root(root, sizeof root)) return "home";
+  const char *refusal = dedicated_check_parent(root);
+  struct stat info;
+  if (refusal == NULL && (lstat(root, &info) != 0 || S_ISLNK(info.st_mode) || !S_ISDIR(info.st_mode) ||
+                          info.st_uid != geteuid() || (info.st_mode & 07777) != 0700))
+    refusal = "missing";
+  if (refusal == NULL && dedicated_active()) refusal = "active";
+  if (refusal == NULL && (!dedicated_join(path, sizeof path, root, DEDICATED_KEYCHAIN_NAME) || lstat(path, &info) == 0 || errno != ENOENT))
+    refusal = "missing";
+  if (refusal == NULL && (!dedicated_join(path, sizeof path, root, DEDICATED_KEY_NAME) || (unlink(path) != 0 && errno != ENOENT)))
+    refusal = "key";
+  if (refusal == NULL && (!remove_lock_files(root) || rmdir(root) != 0)) refusal = "rmdir";
+  return refusal;
 }

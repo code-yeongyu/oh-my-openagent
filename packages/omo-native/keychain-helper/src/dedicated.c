@@ -141,7 +141,13 @@ const char *dedicated_open(OSStatus *status) {
 // names no store cannot dodge the marker with another HOME (r2 finding 3, delta L1).
 bool dedicated_active(void) {
   char root[DEDICATED_PATH_BYTES], marker[DEDICATED_PATH_BYTES];
-  if (!root_under(account_home(), root, sizeof root) || !dedicated_join(marker, sizeof marker, root, DEDICATED_ACTIVE_NAME))
+  const char *home = account_home();
+#ifndef OMO_KEYCHAIN_TEST_BUILD
+  // Without a password-database home the marker cannot be checked, so the store is assumed active: a request that
+  // names no store is refused rather than risk a second sign-in in the login keychain (code review r1, LOW 3).
+  if (home == NULL && dedicated_root_override == NULL) return true;
+#endif
+  if (!root_under(home, root, sizeof root) || !dedicated_join(marker, sizeof marker, root, DEDICATED_ACTIVE_NAME))
     return false;
   struct stat info;
   return lstat(marker, &info) == 0;

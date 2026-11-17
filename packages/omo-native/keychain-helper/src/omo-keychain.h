@@ -85,6 +85,7 @@ extern const char *dedicated_root_override;
 const char *dedicated_open(OSStatus *status);
 const char *dedicated_create(bool *created, OSStatus *status);
 const char *dedicated_erase(const char *account, OSStatus *status);
+const char *dedicated_erase_leftover(void);
 bool dedicated_active(void);
 const char *dedicated_set_active(bool active);
 

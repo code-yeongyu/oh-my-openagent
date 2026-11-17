@@ -1,5 +1,15 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test"
-import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { join } from "node:path"
 import { ACCOUNT, createHarness, type Harness, isDarwin, userSearchList } from "./keychain-helper.test-support"
 
@@ -90,6 +100,27 @@ describe.skipIf(!isDarwin)("omo-keychain helper: OmO's own keychain (#13116 desi
     expect((await run(omo("store-erase"))).reply).toEqual({ ok: true })
     expect(existsSync(root)).toBe(false)
     expect((await run(migrate("store-create"))).reply).toEqual({ error: "refused", reason: "store" })
+  })
+
+  test("store-erase finishes a store whose keychain file is already gone (a crash between delete and folder removal)", async () => {
+    await run(omo("store-create"))
+    await harness.fixtureAt("destroy", dedicatedKeychain())
+    expect(existsSync(dedicatedKeychain())).toBe(false)
+    expect((await run(omo("read"))).reply).toMatchObject({ error: "store-refused" })
+    expect((await run(omo("store-erase"))).reply).toEqual({ ok: true })
+    expect(existsSync(root)).toBe(false)
+  })
+
+  test("a symlinked store folder is refused even when it points at a valid store", async () => {
+    await activeStore()
+    renameSync(root, `${root}-real`)
+    symlinkSync(`${root}-real`, root)
+    expect((await run(omo("write", { value: "dummy" }))).reply).toMatchObject({
+      error: "store-refused",
+      reason: "symlink",
+    })
+    rmSync(root)
+    renameSync(`${root}-real`, root)
   })
 
   test("a damaged store is refused by name and never falls back to the login keychain", async () => {
