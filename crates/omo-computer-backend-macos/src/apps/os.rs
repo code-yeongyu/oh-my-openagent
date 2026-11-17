@@ -1,5 +1,6 @@
-//! The macOS app sources: running app processes (bundle id and path from the process's own
-//! bundle, window ownership from the window list, the activation policy from the bundle's
+//! The macOS app sources: running app processes (each app's main executable only, so a
+//! helper, crash reporter or XPC service inside the bundle never stands for the app; bundle id
+//! and path from the process's own bundle, window ownership from the window list, the activation policy from the bundle's
 //! `LSUIElement` / `LSBackgroundOnly`), and installed apps found under the standard
 //! application folders.
 //! The launch and reveal run in the UI helper through `NSWorkspace`; until that helper exists
@@ -13,7 +14,7 @@ use omo_computer_core::error::{EngineCode, Reason};
 
 use super::scan::app_bundles;
 use super::seam::{AppsOs, InstalledApp, RunningApp};
-use crate::capture::os::cf::{self, cf_string, CfRef, Owned};
+use crate::capture::os::cf::{self, cf_string, CfRef};
 use crate::capture::os::{listing, process};
 
 /// The application folders; the scan descends into their subfolders (Utilities, vendors).
@@ -23,20 +24,20 @@ const FOLDERS: [&str; 2] = ["/Applications", "/System/Applications"];
 unsafe extern "C" {
     fn CFBundleGetValueForInfoDictionaryKey(bundle: CfRef, key: CfRef) -> CfRef;
     fn CFBooleanGetTypeID() -> usize;
-    fn CFNumberGetTypeID() -> usize;
 }
 
 /// The live app sources.
 #[derive(Debug, Default)]
 pub struct Os;
 
-/// The process's own bundle: the innermost `.app` holding the executable (a helper app inside
-/// another bundle is its own app).
-fn bundle_of(executable: &Path) -> Option<PathBuf> {
-    executable
-        .ancestors()
-        .find(|p| p.extension().is_some_and(|e| e == "app"))
-        .map(Path::to_path_buf)
+/// The app whose main executable `executable` is; `None` for any other process under a bundle
+/// (a crashpad handler under Frameworks, an XPC service, a plain helper binary).
+fn main_bundle(executable: &Path) -> Option<PathBuf> {
+    let app = process::app_bundle(executable)?;
+    let main = process::main_executable(app)?;
+    let same = main == executable
+        || std::fs::canonicalize(&main).is_ok_and(|resolved| resolved == executable);
+    same.then(|| app.to_path_buf())
 }
 
 /// Every pid of the machine (`proc_listallpids`).
@@ -64,7 +65,7 @@ fn truthy(value: CfRef) -> bool {
         (
             cf::CFGetTypeID(value),
             CFBooleanGetTypeID(),
-            CFNumberGetTypeID(),
+            cf::CFNumberGetTypeID(),
         )
     };
     if kind == boolean {
@@ -79,18 +80,7 @@ fn truthy(value: CfRef) -> bool {
 
 /// The bundle declares a background or agent-only app (not the regular activation policy).
 fn background(app: &Path) -> bool {
-    let bytes = app.as_os_str().as_encoded_bytes();
-    let Ok(length) = isize::try_from(bytes.len()) else {
-        return false;
-    };
-    // SAFETY: `bytes` is a path of `length` bytes; the default allocator.
-    let url = Owned::new(unsafe {
-        cf::CFURLCreateFromFileSystemRepresentation(std::ptr::null(), bytes.as_ptr(), length, true)
-    });
-    // SAFETY: `url` is a valid CFURL; +1 bundle or null.
-    let Some(bundle) =
-        url.and_then(|url| Owned::new(unsafe { cf::CFBundleCreate(std::ptr::null(), url.get()) }))
-    else {
+    let Some(bundle) = process::bundle(app) else {
         return false;
     };
     [c"LSUIElement", c"LSBackgroundOnly"].iter().any(|name| {
@@ -119,7 +109,7 @@ impl AppsOs for Os {
         all_pids()
             .into_iter()
             .filter_map(|pid| {
-                let bundle = bundle_of(&process::path(pid)?)?;
+                let bundle = main_bundle(&process::path(pid)?)?;
                 Some(RunningApp {
                     pid,
                     bundle_id: process::bundle_identifier(&bundle),
@@ -159,5 +149,61 @@ impl AppsOs for Os {
 
     fn process_path(&mut self, pid: u32) -> Option<String> {
         process::path(pid).map(|p| p.display().to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::main_bundle;
+
+    /// A bundle on disk: `Contents/MacOS/Main` is the main executable, beside a crashpad-style
+    /// helper under Frameworks and an XPC service.
+    fn fixture(root: &Path) -> std::path::PathBuf {
+        let app = root.join("Fixture.app");
+        let contents = app.join("Contents");
+        let files = [
+            contents.join("MacOS/Main"),
+            contents.join("Frameworks/Kit.framework/Helpers/crashpad_handler"),
+            contents.join("XPCServices/Fetch.xpc/Contents/MacOS/Fetch"),
+        ];
+        for file in &files {
+            std::fs::create_dir_all(file.parent().expect("parent")).expect("dir");
+            std::fs::write(file, b"").expect("file");
+        }
+        std::fs::write(
+            contents.join("Info.plist"),
+            concat!(
+                r#"<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict>"#,
+                "<key>CFBundleIdentifier</key><string>com.example.fixture</string>",
+                "<key>CFBundleExecutable</key><string>Main</string>",
+                "<key>CFBundlePackageType</key><string>APPL</string>",
+                "</dict></plist>"
+            ),
+        )
+        .expect("plist");
+        app
+    }
+
+    #[test]
+    fn only_the_main_executable_is_the_running_app() {
+        let root = std::env::temp_dir().join(format!("apps-main-{}", std::process::id()));
+        std::fs::create_dir_all(&root).expect("root");
+        // proc_pidpath answers resolved paths (/private/var, not /var).
+        let app = fixture(&root.canonicalize().expect("canonical"));
+        let contents = app.join("Contents");
+        assert_eq!(main_bundle(&contents.join("MacOS/Main")), Some(app.clone()));
+        assert_eq!(
+            main_bundle(&contents.join("Frameworks/Kit.framework/Helpers/crashpad_handler")),
+            None,
+            "a helper executable is not the app"
+        );
+        assert_eq!(
+            main_bundle(&contents.join("XPCServices/Fetch.xpc/Contents/MacOS/Fetch")),
+            None,
+            "an XPC service is not the app"
+        );
+        std::fs::remove_dir_all(&root).expect("cleanup");
     }
 }

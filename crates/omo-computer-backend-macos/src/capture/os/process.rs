@@ -1,5 +1,5 @@
-//! Per-process reads: the start time from `proc_pidinfo` and the bundle id of the
-//! application containing the executable.
+//! Per-process reads: the start time from `proc_pidinfo`, the app an executable belongs to,
+//! its bundle id and the bundle's main executable.
 
 use std::ffi::c_void;
 use std::path::{Path, PathBuf};
@@ -37,26 +37,51 @@ pub fn path(pid: u32) -> Option<PathBuf> {
     String::from_utf8(buffer).ok().map(PathBuf::from)
 }
 
-/// `CFBundleIdentifier` of the outermost `.app` holding `pid`'s executable.
-pub fn bundle_id(pid: u32) -> Option<String> {
-    let executable = path(pid)?;
-    let app = executable
+/// The app an executable belongs to: the innermost `.app` holding it (a helper app inside
+/// another bundle is its own app). The window listing and `apps.list()` share this identity.
+pub fn app_bundle(executable: &Path) -> Option<&Path> {
+    executable
         .ancestors()
-        .filter(|p| p.extension().is_some_and(|e| e == "app"))
-        .last()?;
-    bundle_identifier(app)
+        .find(|p| p.extension().is_some_and(|e| e == "app"))
 }
 
-/// `CFBundleIdentifier` of the bundle at `app`.
-pub fn bundle_identifier(app: &Path) -> Option<String> {
+/// `CFBundleIdentifier` of the app holding `pid`'s executable.
+pub fn bundle_id(pid: u32) -> Option<String> {
+    bundle_identifier(app_bundle(&path(pid)?)?)
+}
+
+/// The CFBundle at `app`.
+pub fn bundle(app: &Path) -> Option<Owned> {
     let bytes = app.as_os_str().as_encoded_bytes();
     let length = isize::try_from(bytes.len()).ok()?;
     // SAFETY: `bytes` is a path of `length` bytes; the default allocator.
     let url = Owned::new(unsafe {
         cf::CFURLCreateFromFileSystemRepresentation(std::ptr::null(), bytes.as_ptr(), length, true)
     })?;
-    // SAFETY: `url` is a valid CFURL.
-    let bundle = Owned::new(unsafe { cf::CFBundleCreate(std::ptr::null(), url.get()) })?;
+    // SAFETY: `url` is a valid CFURL; +1 bundle or null.
+    Owned::new(unsafe { cf::CFBundleCreate(std::ptr::null(), url.get()) })
+}
+
+/// `CFBundleIdentifier` of the bundle at `app`.
+pub fn bundle_identifier(app: &Path) -> Option<String> {
+    let bundle = bundle(app)?;
     // SAFETY: `bundle` is a valid CFBundle; the identifier is not owned (Get rule).
     cf::string(unsafe { cf::CFBundleGetIdentifier(bundle.get()) })
+}
+
+/// The bundle's main executable (`CFBundleExecutable`, wherever the bundle layout puts it).
+pub fn main_executable(app: &Path) -> Option<PathBuf> {
+    let bundle = bundle(app)?;
+    // SAFETY: `bundle` is a valid CFBundle; +1 CFURL or null.
+    let url = Owned::new(unsafe { cf::CFBundleCopyExecutableURL(bundle.get()) })?;
+    let mut buffer = vec![0u8; libc::PATH_MAX as usize];
+    let size = isize::try_from(buffer.len()).ok()?;
+    // SAFETY: `url` is a valid CFURL; the buffer holds `size` bytes and is NUL-terminated on success.
+    let ok =
+        unsafe { cf::CFURLGetFileSystemRepresentation(url.get(), true, buffer.as_mut_ptr(), size) };
+    if !ok {
+        return None;
+    }
+    let text = std::ffi::CStr::from_bytes_until_nul(&buffer).ok()?;
+    Some(PathBuf::from(text.to_str().ok()?))
 }

@@ -31,7 +31,6 @@ unsafe extern "C" {
     static kCFBooleanTrue: CfRef;
     static kCFBooleanFalse: CfRef;
     fn CFRetain(value: CfRef) -> CfRef;
-    fn CFArrayGetTypeID() -> usize;
 }
 
 type GetWindow = unsafe extern "C" fn(CfRef, *mut u32) -> i32;
@@ -74,8 +73,7 @@ fn elements(element: CfRef, name: &CStr) -> Vec<Owned> {
     let Some(list) = copy(element, name) else {
         return Vec::new();
     };
-    // SAFETY: plain type-id reads on a live value.
-    if unsafe { cf::CFGetTypeID(list.get()) != CFArrayGetTypeID() } {
+    if !cf::is_array(list.get()) {
         return Vec::new();
     }
     // SAFETY: `list` is a CFArray (checked above).

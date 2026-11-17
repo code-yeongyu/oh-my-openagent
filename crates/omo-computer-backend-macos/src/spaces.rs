@@ -61,11 +61,12 @@ mod os {
         })?;
         // SAFETY: the probed symbol's signature; mask 7 = every Space kind; +1 CFArray.
         let spaces = Owned::new(unsafe { copy(connection(), 7, windows.get()) })?;
-        // SAFETY: `spaces` is a CFArray of CFNumbers.
-        if unsafe { cf::CFArrayGetCount(spaces.get()) } < 1 {
+        // The private symbol's answer is checked, not trusted: a CFArray, then a CFNumber.
+        // SAFETY: `spaces` is a CFArray (checked first).
+        if !cf::is_array(spaces.get()) || unsafe { cf::CFArrayGetCount(spaces.get()) } < 1 {
             return None;
         }
-        // SAFETY: index 0 in bounds.
+        // SAFETY: index 0 in bounds; `cf::int` type-checks the element.
         cf::int(unsafe { cf::CFArrayGetValueAtIndex(spaces.get(), 0) }).map(|s| s.to_string())
     }
 }

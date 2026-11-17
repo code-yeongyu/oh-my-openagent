@@ -104,6 +104,29 @@ fn apps_list_dedupes_by_bundle_id_and_sorts() {
 }
 
 #[test]
+fn apps_list_keeps_the_window_owner_of_a_bundle_whatever_the_process_order() {
+    let record = |pid, has_windows| RunningApp {
+        pid,
+        bundle_id: Some("com.google.Chrome".into()),
+        name: "Google Chrome".into(),
+        path: Some("/Applications/Google Chrome.app".into()),
+        regular: true,
+        has_windows,
+    };
+    for running in [
+        vec![record(90, false), record(40, true)],
+        vec![record(40, true), record(90, false)],
+    ] {
+        let mut os = FakeApps {
+            running,
+            ..FakeApps::default()
+        };
+        let pids: Vec<_> = list(&mut os).iter().map(|a| a.pid).collect();
+        assert_eq!(pids, vec![Some(40)], "the window owner, never a helper");
+    }
+}
+
+#[test]
 fn apps_open_returns_a_handle_only_when_the_pid_is_inside_the_bundle() {
     let mut os = fixture();
     os.launched_path = Some("/Applications/Notes.app/Contents/MacOS/Notes".into());
@@ -228,27 +251,5 @@ fn running_lists_window_owners_and_windowless_regular_apps() {
         keys,
         vec!["com.example.menubar", "com.example.windowless"],
         "running window owners plus regular-policy apps; a windowless background agent is not listed"
-    );
-}
-
-#[test]
-fn installed_scan_finds_nested_bundles_but_never_inside_one() {
-    let root = std::env::temp_dir().join(format!("omo-apps-scan-{}", std::process::id()));
-    let make = |rel: &str| std::fs::create_dir_all(root.join(rel)).expect("mkdir");
-    make("Top.app/Contents/Helpers/Inner.app");
-    make("Utilities/Tool.app");
-    make("Vendor/Suite/Editor.app");
-    make("a/b/c/d/TooDeep.app");
-    let mut found: Vec<String> = super::scan::app_bundles(&root)
-        .iter()
-        .filter_map(|p| p.strip_prefix(&root).ok())
-        .map(|p| p.display().to_string())
-        .collect();
-    found.sort();
-    std::fs::remove_dir_all(&root).expect("cleanup");
-    assert_eq!(
-        found,
-        vec!["Top.app", "Utilities/Tool.app", "Vendor/Suite/Editor.app"],
-        "vendor subfolders are scanned; a bundle's own helpers and anything past the depth are not"
     );
 }

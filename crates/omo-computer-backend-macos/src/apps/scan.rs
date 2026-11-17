@@ -26,3 +26,28 @@ fn scan(folder: &Path, depth: usize, out: &mut Vec<PathBuf>) {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn installed_scan_finds_nested_bundles_but_never_inside_one() {
+        let root = std::env::temp_dir().join(format!("omo-apps-scan-{}", std::process::id()));
+        let make = |rel: &str| std::fs::create_dir_all(root.join(rel)).expect("mkdir");
+        make("Top.app/Contents/Helpers/Inner.app");
+        make("Utilities/Tool.app");
+        make("Vendor/Suite/Editor.app");
+        make("a/b/c/d/TooDeep.app");
+        let mut found: Vec<String> = super::app_bundles(&root)
+            .iter()
+            .filter_map(|p| p.strip_prefix(&root).ok())
+            .map(|p| p.display().to_string())
+            .collect();
+        found.sort();
+        std::fs::remove_dir_all(&root).expect("cleanup");
+        assert_eq!(
+            found,
+            vec!["Top.app", "Utilities/Tool.app", "Vendor/Suite/Editor.app"],
+            "vendor subfolders are scanned; a bundle's own helpers and anything past the depth are not"
+        );
+    }
+}

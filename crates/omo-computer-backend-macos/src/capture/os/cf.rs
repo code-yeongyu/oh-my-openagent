@@ -40,6 +40,8 @@ unsafe extern "C" {
     pub fn CFBooleanGetValue(boolean: CfRef) -> bool;
     pub fn CFGetTypeID(value: CfRef) -> usize;
     pub fn CFStringGetTypeID() -> usize;
+    pub fn CFNumberGetTypeID() -> usize;
+    pub fn CFArrayGetTypeID() -> usize;
     pub fn CFStringGetLength(string: CfRef) -> isize;
     pub fn CFStringGetCString(
         string: CfRef,
@@ -57,6 +59,13 @@ unsafe extern "C" {
     ) -> CfRef;
     pub fn CFBundleCreate(allocator: CfRef, url: CfRef) -> CfRef;
     pub fn CFBundleGetIdentifier(bundle: CfRef) -> CfRef;
+    pub fn CFBundleCopyExecutableURL(bundle: CfRef) -> CfRef;
+    pub fn CFURLGetFileSystemRepresentation(
+        url: CfRef,
+        absolute: bool,
+        buffer: *mut u8,
+        size: isize,
+    ) -> bool;
 }
 
 #[link(name = "CoreGraphics", kind = "framework")]
@@ -111,13 +120,20 @@ pub fn string(value: CfRef) -> Option<String> {
         .map(|s| s.to_string_lossy().into_owned())
 }
 
-/// An integer CFNumber; `None` for null.
+/// The value is a CFArray; `false` for null.
+pub fn is_array(value: CfRef) -> bool {
+    // SAFETY: plain type-id reads on a live value.
+    !value.is_null() && unsafe { CFGetTypeID(value) == CFArrayGetTypeID() }
+}
+
+/// An integer CFNumber; `None` for null or a non-number.
 pub fn int(value: CfRef) -> Option<i64> {
-    if value.is_null() {
+    // SAFETY: plain type-id reads on a live value.
+    if value.is_null() || unsafe { CFGetTypeID(value) != CFNumberGetTypeID() } {
         return None;
     }
     let mut out: i64 = 0;
-    // SAFETY: `value` is a CFNumber and `out` an i64.
+    // SAFETY: `value` is a CFNumber (checked above) and `out` an i64.
     unsafe { CFNumberGetValue(value, NUMBER_SINT64, (&raw mut out).cast()) }.then_some(out)
 }
 
