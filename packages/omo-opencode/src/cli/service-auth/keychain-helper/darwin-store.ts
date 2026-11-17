@@ -6,6 +6,7 @@ import {
   readThroughHelper,
   type ReadResult,
 } from "./darwin-read"
+import { dedicatedStoreRefusal } from "./dedicated-store"
 import { migrate } from "./migration"
 import { deleteOldSlots, namesFromRead, OLD_SLOT_COUNT, oldSlotsOf, runRecovery } from "./recovery"
 
@@ -37,13 +38,16 @@ const ALL_OLD_SLOTS = Array.from({ length: OLD_SLOT_COUNT }, (_, slot) => slot)
 const OLD_SLOTS_FULL_MESSAGE =
   'The macOS keychain holds 8 earlier OmO sign-ins that cannot be removed automatically. Open Keychain Access, delete the items whose account name ends in ".old" or ".old.1" to ".old.7" for OmO, then sign in again.'
 
-const failed = (reply: HelperReply, verb: string) =>
-  new HelperReadError(
+const failed = (reply: HelperReply, verb: string) => {
+  const dedicated = dedicatedStoreRefusal(reply)
+  if (dedicated !== null) return new HelperReadError("dedicated", dedicated)
+  return new HelperReadError(
     reply.error === "locked" ? "locked" : reply.error === "acl" ? "acl" : "store",
     reply.error === "acl"
       ? ACL_DENIAL_MESSAGE
       : `The keychain helper could not ${verb} the sign-in (${reply.error ?? "no answer"}).`,
   )
+}
 
 /**
  * The session-lock view (design 3.3, 3.4, 3.6): every helper mutation is handed the lease; reads never prompt (an

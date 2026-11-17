@@ -29,6 +29,7 @@ import { retireSyncPinOnDiscard } from "../omo-opencode/src/cli/service-auth/syn
 import { retireSyncDevice } from "../memory-core/src/sync/device-retire"
 import { RecoveryExhausted, RecoveryPending } from "../omo-opencode/src/cli/service-auth/owned-refresh"
 import { ACCOUNT_EXIT, accountStoreFailure, showAccount } from "./account-show"
+import { accountStoreDependencies, runAccountStore } from "./account-store"
 import { cliDeviceServiceHandoff } from "./device-service-handoff"
 
 export { ACCOUNT_EXIT }
@@ -204,6 +205,8 @@ async function runVerb(dependencies: AccountCommandDependencies, args: readonly 
       await session.forget()
       return reply(dependencies, { forgotten: true })
     }
+    case "store":
+      return runAccountStore(accountStoreDependencies(dependencies.api, dependencies), flags)
     case "retire-sync": {
       // The desktop's discard of its own sealed session (#12280): the pin of that account is retired.
       const account = flags[0] === "--account" && flags.length === 2 ? flags[1] : undefined
@@ -216,7 +219,7 @@ async function runVerb(dependencies: AccountCommandDependencies, args: readonly 
     }
     default:
       dependencies.error(
-        "usage: omo account show [--account <id>]|adopt [--replace]|token|export|forget [--device <id>]|retire-sync --account <id>",
+        "usage: omo account show [--account <id>]|adopt [--replace]|token|export|forget [--device <id>]|retire-sync --account <id>|store status|enable|disable [--discard]",
       )
       return ACCOUNT_EXIT.invalid
   }
