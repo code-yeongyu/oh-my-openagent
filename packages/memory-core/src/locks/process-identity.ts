@@ -53,11 +53,17 @@ async function readWin32StartIdentity(pid: number): Promise<string | null> {
   return value === null ? null : `win32-creation-date:${value}`
 }
 
-// `tasklist /FO CSV /NH` prints `"bun.exe","1234","Console","1","12,345 K"` for a match and an INFO line otherwise.
-async function readWin32ImageName(pid: number): Promise<string | null> {
-  const row = await execFileText("tasklist.exe", ["/FI", `PID eq ${pid}`, "/FO", "CSV", "/NH"])
-  const match = row === null ? null : /^"([^"]+)","(\d+)"/.exec(row)
+/**
+ * The image name in `tasklist /FO CSV /NH` output, which is `"bun.exe","1234","Console","1","12,345 K"` for a match and
+ * an INFO line otherwise. Only the first row counts, and only when it names the pid that was asked for.
+ */
+export function tasklistImageName(output: string | null, pid: number): string | null {
+  const match = output === null ? null : /^"([^"]+)","(\d+)"/.exec(output)
   return match === null || Number(match[2]) !== pid ? null : match[1]
+}
+
+async function readWin32ImageName(pid: number): Promise<string | null> {
+  return tasklistImageName(await execFileText("tasklist.exe", ["/FI", `PID eq ${pid}`, "/FO", "CSV", "/NH"]), pid)
 }
 
 type ReadProcessStartIdentity = (pid: number) => Promise<string | null>
