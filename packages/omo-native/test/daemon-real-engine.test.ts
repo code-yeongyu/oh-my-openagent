@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { createHash } from "node:crypto"
 import { lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import { join, relative, resolve } from "node:path"
@@ -18,9 +18,25 @@ const runningChildren = new Set<ChildProcess>()
 // Headroom over any single status spawn, so the observing reads land inside the idle window on a loaded runner.
 const OBSERVED_IDLE_EXIT_MS = 8_000
 const REQUIRED_REACHABLE_READS = 2
+const IDLE_TEST_BUDGET_MS = OBSERVED_IDLE_EXIT_MS * 6
 
 const TEST_BUDGET_MS = 30_000
 setDefaultTimeout(TEST_BUDGET_MS)
+// Every run() waits for its child's own exit. The test's deadline is only a safety net, and it fires this long before
+// bun's timeout, so a child still running then fails the awaited test as a SpawnBudgetError naming the command and its
+// output. A net equal to the test budget fired after the test had timed out, as an unhandled rejection (#13980).
+const DEADLINE_MARGIN_MS = 2_000
+let testDeadline = 0
+
+class SpawnBudgetError extends Error {
+  override name = "SpawnBudgetError"
+}
+
+function startTestDeadline(budgetMs: number): void {
+  testDeadline = Date.now() + budgetMs - DEADLINE_MARGIN_MS
+}
+
+beforeEach(() => startTestDeadline(TEST_BUDGET_MS))
 
 afterEach(() => {
   for (const child of runningChildren) child.kill("SIGKILL")
@@ -52,8 +68,8 @@ function sandbox() {
 }
 
 // A cold `node` start on a loaded host can take longer than any fixed per-spawn budget (#9679), so each child runs
-// until it closes; the only bound is the test's own budget, which names the command it was waiting on.
-function run(command: string, args: readonly string[], env: NodeJS.ProcessEnv, deadlineMs = TEST_BUDGET_MS) {
+// until it closes; the only bound is the test's deadline, which names the command it was waiting on.
+function run(command: string, args: readonly string[], env: NodeJS.ProcessEnv) {
   return new Promise<{ exitCode: number; stdout: string; stderr: string }>((resolvePromise, reject) => {
     const child = spawn(command, [...args], { env, stdio: ["ignore", "pipe", "pipe"] })
     runningChildren.add(child)
@@ -65,10 +81,17 @@ function run(command: string, args: readonly string[], env: NodeJS.ProcessEnv, d
     child.stderr.setEncoding("utf8").on("data", (chunk: string) => {
       stderr += chunk
     })
-    const deadline = setTimeout(() => {
-      child.kill("SIGKILL")
-      reject(new Error(`${command} ${args.join(" ")} did not exit within the ${deadlineMs} ms test budget`))
-    }, deadlineMs)
+    const deadline = setTimeout(
+      () => {
+        child.kill("SIGKILL")
+        reject(
+          new SpawnBudgetError(
+            `${command} ${args.join(" ")} was still running at the test deadline\nstdout: ${stdout}\nstderr: ${stderr}`,
+          ),
+        )
+      },
+      Math.max(0, testDeadline - Date.now()),
+    )
     child.on("error", (error) => {
       clearTimeout(deadline)
       runningChildren.delete(child)
@@ -253,6 +276,7 @@ if (process.platform !== "win32") {
     test(
       "#given a short idle shard #when status reads keep arriving #then observing reads do not keep it alive",
       async () => {
+        startTestDeadline(IDLE_TEST_BUDGET_MS)
         const { socket, env } = sandbox()
         const supervisorPid = await ensureShard(socket, {
           ...env,
@@ -295,7 +319,7 @@ if (process.platform !== "win32") {
         expect(reachableReads).toBe(REQUIRED_REACHABLE_READS)
         ownedPids.delete(supervisorPid)
       },
-      OBSERVED_IDLE_EXIT_MS * 6,
+      IDLE_TEST_BUDGET_MS,
     )
   })
 }
