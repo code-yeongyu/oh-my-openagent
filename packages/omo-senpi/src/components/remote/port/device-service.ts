@@ -101,9 +101,9 @@ const notSentReason = (error: unknown): string => (error instanceof LocalApiErro
 // read reports the engine's code, so a remote command answers exactly what the same command does locally (#12755).
 const sessionReason = (code: string): string => (code === "session_not_found" ? "unknown_session" : code)
 
-// The engine records the thread tools send that change nothing on the other device (thread_read, the pre-send probe).
-// Like the port's read, every failure of one is a typed refusal: there is nothing that may have run.
-const READ_ONLY_RECORDS: ReadonlySet<string> = new Set(["get_state", "get_messages"])
+// The engine records the thread tools send that change nothing on the other device (thread_read and its paged form,
+// the pre-send probe). Like the port's read, every failure of one is a typed refusal: there is nothing that may have run.
+const READ_ONLY_RECORDS: ReadonlySet<string> = new Set(["get_state", "get_messages", "get_entries"])
 
 // omo#13037 A6: only a peer delivery carries the wake mark, and only through a service that carries it.
 const MARKED_RECORDS: ReadonlySet<string> = new Set(["admit_external_message"])

@@ -3,6 +3,8 @@ import { relayAddressEntry } from "../remote/address-book"
 import { rowThreadId } from "../remote/ports"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "../remote/ports"
 import { outcomeFailure } from "../remote/outcome"
+import { readContextTail } from "../remote/transcript-tail"
+import { selectEntryPage } from "../paged-reader"
 import { replyData } from "../remote/remote-ops"
 import type { ModelChoice } from "../tools/model-match"
 import { closeLadder, SESSION_GONE, type RecordAnswer } from "./close-ladder"
@@ -32,7 +34,10 @@ const THINKING_LEVEL_UNSUPPORTED =
  * (`sessionCommand`): the same records this device's endpoint takes, so each answer maps to the same result. The
  * caller has already found the device online (`locateControl`); a device that goes away in between refuses typed.
  */
-export function createRelayControl(remote: RemoteThreadSurface, row: RemoteSessionRow): SessionControl {
+export function createRelayControl(
+  remote: RemoteThreadSurface,
+  row: RemoteSessionRow,
+): SessionControl & Required<Pick<SessionControl, "waitSettled" | "readEntryPage">> {
   const { device, session_id: sessionId } = row
   const commandOutcome = async (rpc: JsonObject, options?: { readonly fresh?: boolean }) => {
     const outcome = await remote.sessions.sessionCommand(device, sessionId, { ...rpc, sessionId }, options)
@@ -115,6 +120,14 @@ export function createRelayControl(remote: RemoteThreadSurface, row: RemoteSessi
     getMessages: async () => {
       const listed = (await command({ type: "get_messages" }))["messages"]
       return Array.isArray(listed) ? (listed as ThreadTranscriptEntry[]) : []
+    },
+    readEntryPage: async (read) => {
+      const project = await remote.loadProjector?.().catch(() => undefined)
+      if (project === undefined) return { kind: "unsupported" }
+      const tail = await readContextTail(remote.sessions, device, sessionId, project)
+      if (tail.kind === "unsupported") return tail
+      if (tail.kind === "failed") return outcomeFailure(tail.outcome, device)
+      return selectEntryPage(tail.tail, read)
     },
     waitSettled: (timeoutMs, signal) =>
       waitForTurnEnd(
