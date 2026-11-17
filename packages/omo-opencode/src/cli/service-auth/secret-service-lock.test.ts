@@ -17,13 +17,23 @@ xml = """<node><interface name="org.freedesktop.Secret.Collection"><property nam
 node = Gio.DBusNodeInfo.new_for_xml(xml)
 def get_property(conn, sender, path, iface, name):
     return GLib.Variant("b", state["locked"])
-# "unlockable" unlocks with no prompt (prompt "/"); "locked" needs a prompt, which nothing may ever open.
+# Unlock replies by mode: (unlocked paths, prompt, collection unlocked afterwards). "resolved" answers the alias with the
+# real collection path (as oo7 does), "raced" lists nothing because another client unlocked first, "stuck" says no prompt
+# yet stays locked, "locked" needs a prompt, which nothing may ever open, and "error" fails the call.
+REPLIES = {
+    "resolved": (["/org/freedesktop/secrets/collection/login"], "/", True),
+    "raced": ([], "/", True),
+    "stuck": ([], "/", False),
+    "locked": ([], "/org/freedesktop/secrets/prompt/u1", False),
+}
 def unlock(conn, sender, path, iface, method, params, invocation):
-    if mode == "unlockable":
+    if mode == "error":
+        invocation.return_dbus_error("org.freedesktop.Secret.Error.NoSuchObject", "no such collection")
+        return
+    unlocked, prompt, opened = REPLIES[mode]
+    if opened:
         state["locked"] = False
-        invocation.return_value(GLib.Variant("(aoo)", ([COLLECTION], "/")))
-    else:
-        invocation.return_value(GLib.Variant("(aoo)", ([], "/org/freedesktop/secrets/prompt/u1")))
+    invocation.return_value(GLib.Variant("(aoo)", (unlocked, prompt)))
 def on_bus(conn, name):
     conn.register_object(COLLECTION, node.interfaces[0], None, get_property, None)
     conn.register_object("/org/freedesktop/secrets", node.interfaces[1], unlock, None, None)
@@ -87,7 +97,7 @@ describe("parseLockedReply", () => {
 describe.skipIf(!canRun)(
   "probeSecretServiceLock against a fake Secret Service on a private D-Bus (desktop#3509)",
   () => {
-    const probeIn = (fake: "locked" | "unlockable" | "unlocked" | "none"): string => {
+    const probeIn = (fake: "locked" | "resolved" | "raced" | "stuck" | "error" | "unlocked" | "none"): string => {
       const dir = mkdtempSync(join(tmpdir(), "omo-secret-service-"))
       try {
         const fakePath = join(dir, "fake.py")
@@ -119,11 +129,15 @@ describe.skipIf(!canRun)(
       }
     }
 
-    test("a locked default collection whose unlock needs a prompt is locked", () => {
-      expect(probeIn("locked")).toBe("locked")
-    })
-    test("a locked default collection that unlocks without a prompt is unlocked (#14039)", () => {
-      expect(probeIn("unlockable")).toBe("unlocked")
+    // #14039: a locked collection is asked to Unlock; only a finished unlock (prompt "/") followed by Locked=false counts.
+    test.each([
+      ["answers with the real collection path", "unlocked", "resolved"],
+      ["lists nothing because another client unlocked it first", "unlocked", "raced"],
+      ["finishes without a prompt but the collection stays locked", "locked", "stuck"],
+      ["needs a prompt", "locked", "locked"],
+      ["fails with a D-Bus error", "locked", "error"],
+    ] as const)("a locked default collection whose Unlock %s is %s", (_case, expected, fake) => {
+      expect(probeIn(fake)).toBe(expected)
     })
     test("an unlocked default collection is unlocked", () => {
       expect(probeIn("unlocked")).toBe("unlocked")

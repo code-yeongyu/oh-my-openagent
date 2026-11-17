@@ -20,10 +20,10 @@ export const parseLockedReply = (stdout: string): SecretServiceLockState | null 
   return match[1] === "true" ? "locked" : "unlocked"
 }
 
-// Service.Unlock answers (unlocked objects, prompt). Prompt "/" means it unlocked with no one asked (a keyring
-// with an empty password, #14039); any other prompt path is a prompt object, which omo never runs.
-const unlockedWithoutPrompt = (stdout: string): boolean =>
-  /objectpath\s+'\/'\s*\)\s*$/.test(stdout) && stdout.includes(`'${DEFAULT_COLLECTION}'`)
+// Service.Unlock answers (unlocked objects, prompt). Prompt "/" means the request finished with no one asked (a keyring
+// with an empty password, #14039). The object list is not compared: a service may answer the alias with the real
+// collection path, or list nothing because another client unlocked it first, so Locked is read again instead.
+const finishedWithoutPrompt = (stdout: string): boolean => /objectpath\s+'\/'\s*\)\s*$/.test(stdout)
 
 type GdbusAnswer = { readonly kind: "reply"; readonly stdout: string } | { readonly kind: "failed" | "unknown" }
 
@@ -51,9 +51,7 @@ const gdbus = (args: readonly string[], timeoutMs: number): Promise<GdbusAnswer>
     })
   })
 
-// A locked default collection is first asked to unlock without a prompt; it stays "locked" when that needs a
-// prompt, fails, or does not answer in time, so no dialog ever opens and nothing falls back to a file.
-export const probeSecretServiceLock: SecretServiceLockProbe = async () => {
+const readLocked = async (timeoutMs: number): Promise<SecretServiceLockState> => {
   const answer = await gdbus(
     [
       "--object-path",
@@ -63,10 +61,17 @@ export const probeSecretServiceLock: SecretServiceLockProbe = async () => {
       "org.freedesktop.Secret.Collection",
       "Locked",
     ],
-    PROBE_TIMEOUT_MS,
+    timeoutMs,
   )
   if (answer.kind === "unknown") return "unknown"
-  const state = answer.kind === "reply" ? (parseLockedReply(answer.stdout) ?? "absent") : "absent"
+  return answer.kind === "reply" ? (parseLockedReply(answer.stdout) ?? "absent") : "absent"
+}
+
+// A locked default collection is first asked to unlock without a prompt; it stays "locked" when that needs a
+// prompt, fails, or does not answer in time, so no dialog ever opens and nothing falls back to a file. A returned
+// prompt object is deliberately neither run nor dismissed: the service drops it when this gdbus call disconnects.
+export const probeSecretServiceLock: SecretServiceLockProbe = async () => {
+  const state = await readLocked(PROBE_TIMEOUT_MS)
   if (state !== "locked") return state
   const unlock = await gdbus(
     [
@@ -78,5 +83,6 @@ export const probeSecretServiceLock: SecretServiceLockProbe = async () => {
     ],
     UNLOCK_TIMEOUT_MS,
   )
-  return unlock.kind === "reply" && unlockedWithoutPrompt(unlock.stdout) ? "unlocked" : "locked"
+  if (unlock.kind !== "reply" || !finishedWithoutPrompt(unlock.stdout)) return "locked"
+  return (await readLocked(UNLOCK_TIMEOUT_MS)) === "unlocked" ? "unlocked" : "locked"
 }
