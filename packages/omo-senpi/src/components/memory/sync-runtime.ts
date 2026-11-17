@@ -4,6 +4,7 @@ export {
   deviceKeyringFromMaterial,
   GitSpaceConfig,
   listRemotes,
+  loadTrustAnchor,
   openAccountSession,
   openDeviceSync,
   repoHasCommit,
