@@ -92,9 +92,14 @@ export function storeSwitch(deps: StoreSwitchDeps) {
         await copy(current.value, "login", "copy back into the login keychain")
         moved = "copied"
       }
-      await ok({ verb: "store-deactivate", store: "omo" }, "deactivate OmO's keychain")
-      await ok({ verb: "remove", store: "omo-migrate" }, "remove the sign-in from OmO's keychain")
-      await deps.access.call({ verb: "remove", account: `${deps.account}.staging`, store: "omo-migrate" }, deps.lease)
+      if (state === "active") await ok({ verb: "store-deactivate", store: "omo" }, "deactivate OmO's keychain")
+      // A store whose keychain file is already gone (a crash inside an earlier erase) answers "missing" here; the
+      // erase below finishes it (code review r2).
+      const removed = await call({ verb: "remove", store: "omo-migrate" })
+      const gone = removed.error === "store-refused" && removed.reason === "missing"
+      if (removed.ok !== true && !gone) throw refused(removed, "remove the sign-in from OmO's keychain")
+      if (!gone)
+        await deps.access.call({ verb: "remove", account: `${deps.account}.staging`, store: "omo-migrate" }, deps.lease)
       await ok({ verb: "store-erase", store: "omo" }, "erase OmO's keychain")
       return { moved, erased: true }
     },

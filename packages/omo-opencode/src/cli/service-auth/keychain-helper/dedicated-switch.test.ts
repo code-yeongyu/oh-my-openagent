@@ -69,6 +69,14 @@ describe("turning OmO's own keychain off (#13116)", () => {
     },
   )
 
+  test("#given an inactive store whose keychain file is gone (a crash inside an erase) #when disabled #then the leftover folder is erased", async () => {
+    const fake = dedicatedFake({ state: "inactive", keychainGone: true })
+    fake.login.put(A, "dummy-sign-in", "helper")
+    expect(await switcherFor(fake).disable(false)).toEqual({ moved: "none", erased: true })
+    expect(fake.state()).toBe("absent")
+    expect(fake.login.items.get(A)?.value).toBe("dummy-sign-in")
+  })
+
   test("#given --discard #when a sign-in remains #then it refuses; #when signed out #then the store is erased", async () => {
     const fake = dedicatedFake({ state: "active" })
     fake.omo.put(A, "dummy-sign-in", "helper")

@@ -164,7 +164,9 @@ function dedicatedOptions<O extends Parameters<typeof createDarwinBackend>[0]>(o
     ...options,
     access: { ...access, call: (call, lease) => access.call({ ...call, store: "omo" }, lease) },
     secrets: {
-      get: async () => null,
+      get: async () => {
+        throw new HelperReadError("dedicated", NO_LOGIN_KEYCHAIN)
+      },
       set: async () => {
         throw new HelperReadError("dedicated", NO_LOGIN_KEYCHAIN)
       },

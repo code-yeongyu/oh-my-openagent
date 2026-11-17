@@ -9,7 +9,14 @@ import { fakeKeychain } from "./fake-keychain.test-support"
  * keychain-helper-dedicated.test.ts): no store field is refused while active, "omo" is refused while inactive,
  * "omo-migrate" and "login" are the copy steps, and store-erase keeps a sign-in.
  */
-export function dedicatedFake(options: { readonly loginLocked?: boolean; readonly state?: DedicatedStoreState } = {}) {
+export function dedicatedFake(
+  options: {
+    readonly loginLocked?: boolean
+    readonly state?: DedicatedStoreState
+    /** The keychain file is gone but the folder remains (a crash inside an erase): only store-erase can open it. */
+    readonly keychainGone?: boolean
+  } = {},
+) {
   const login = fakeKeychain()
   const omo = fakeKeychain()
   let state: DedicatedStoreState = options.state ?? "absent"
@@ -43,6 +50,16 @@ export function dedicatedFake(options: { readonly loginLocked?: boolean; readonl
   }
   const call = async (request: HelperCall, lease?: HelperLease): Promise<HelperReply> => {
     calls.push(request)
+    if (
+      options.keychainGone === true &&
+      state !== "absent" &&
+      request.store !== undefined &&
+      request.store !== "login"
+    ) {
+      if (request.verb !== "store-erase") return { error: "store-refused", reason: "missing" }
+      state = "absent"
+      return { ok: true }
+    }
     if (request.verb.startsWith("store-")) return step(request)
     if (request.store === undefined)
       return state === "active" ? { error: "store-refused", reason: "store-required" } : toLogin(request, lease)
