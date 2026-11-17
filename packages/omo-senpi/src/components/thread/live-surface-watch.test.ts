@@ -64,6 +64,8 @@ describe("thread_read wait on this device: the endpoint's observing session subs
       expect(subscribe?.mirror).toContain("agent_settled")
       expect(subscribe?.mirror).not.toContain("message_update")
       expect(sentTypes(host)).toEqual(["subscribe_sessions", "get_state"])
+      // The turn-id read observes: a waiting read never counts as an attached client (#14061 review B1).
+      expect(host.frames.find(({ frame }) => frame.type === "get_state")?.frame).toMatchObject({ observe: true })
       outcome.watch.stop()
       expect(await outcome.watch.ended).toBe("stopped")
     })

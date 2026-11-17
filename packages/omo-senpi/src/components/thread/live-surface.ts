@@ -423,7 +423,7 @@ export function createLiveThreadSurface(
     let previous: string | undefined
     let turn: string | undefined
     const currentTurn = async (): Promise<string | undefined> => {
-      const state = await callOn<Record<string, unknown>>(socket, "get_state", { sessionId })
+      const state = await callOn<Record<string, unknown>>(socket, "get_state", { sessionId, ...OBSERVE })
       return typeof state.currentTurnId === "string" && state.currentTurnId !== "" ? state.currentTurnId : undefined
     }
     // Records that arrive while the snapshot or a running turn's id is still being read are held, then applied in order.
