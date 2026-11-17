@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, afterAll, describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
@@ -40,7 +40,7 @@ const tempDir = (prefix: string) => {
 }
 
 // The step hashes the manifest with `shasum -a 256` because macOS runners have no `sha256sum`. Git bash (Windows
-// runners) has no `shasum`, so this forwards to sha256sum exactly where the platform lacks it — the same shim
+// runners) has no `shasum`, so this forwards to sha256sum exactly where the platform lacks it; the same shim
 // release-assets-verify-workflow.test.ts ships.
 const shasumShimDir = (() => {
   if (spawnSync("bash", ["-c", "command -v shasum"], { timeout: 5_000 }).status === 0) return ""
@@ -52,6 +52,11 @@ const shasumShimDir = (() => {
   chmodSync(join(bin, "shasum"), 0o755)
   return bin
 })()
+// The shim directory outlives the per-test scratch (every run()'s env references it), so it is swept once at the
+// end of the file instead of after each test.
+afterAll(() => {
+  if (shasumShimDir !== "") rmSync(shasumShimDir, { recursive: true, force: true })
+})
 const stepPath = (): string => (shasumShimDir === "" ? bashPath() : `${shasumShimDir}${delimiter}${bashPath()}`)
 
 describe("Verify operator darwin artifacts step", () => {
