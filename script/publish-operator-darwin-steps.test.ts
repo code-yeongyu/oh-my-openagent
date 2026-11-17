@@ -45,7 +45,10 @@ const tempDir = (prefix: string) => {
 const shasumShimDir = (() => {
   if (spawnSync("bash", ["-c", "command -v shasum"], { timeout: 5_000 }).status === 0) return ""
   const bin = mkdtempSync(join(tmpdir(), "operator-darwin-bin-"))
-  writeFileSync(join(bin, "shasum"), '#!/bin/bash\n[ "$1" = -a ] && [ "$2" = 256 ] || exit 2\nshift 2\nexec sha256sum "$@"\n')
+  writeFileSync(
+    join(bin, "shasum"),
+    '#!/bin/bash\n[ "$1" = -a ] && [ "$2" = 256 ] || exit 2\nshift 2\nexec sha256sum "$@"\n',
+  )
   chmodSync(join(bin, "shasum"), 0o755)
   return bin
 })()
