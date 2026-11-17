@@ -2,6 +2,7 @@ import { mock } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import type { DeviceRow, RemoteClient, RemoteFailure, ServiceStatus } from "../remote"
 import type { ThreadToolName, ThreadToolResult } from "./contracts"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import type {
@@ -63,6 +64,94 @@ export const ENGINE: Engine = {
 
 /** The levels both legs' engines run in these tests; `xhigh` is refused on both. */
 const THINKING_LEVELS: readonly string[] = ["off", "low", "high"]
+
+const unsupported = (member: string): RemoteFailure => ({
+  kind: "error",
+  code: "unsupported",
+  message: `The fake remote client has no ${member}.`,
+  next_action: "Fake it in the test that calls it.",
+})
+
+/**
+ * The remote client of a fake account: its device service state and devices, this device on the self row. `fail` makes
+ * every account read settle with that failure (a device service that cannot answer).
+ */
+export function fakeRemoteClient(account: {
+  readonly state: () => string
+  readonly here: string | null
+  readonly devices: () => readonly RemoteDevice[]
+  readonly fail?: RemoteFailure
+  /** Only the device list fails with this (the service state still answers). */
+  readonly devicesFail?: RemoteFailure
+  /** Each account read, by member name, in call order. */
+  readonly reads?: string[]
+}): RemoteClient {
+  const row = (device: RemoteDevice): DeviceRow => ({
+    id: device.device,
+    name: device.label,
+    kind: "device",
+    platform: "linux",
+    online: device.online,
+    last_seen_ms: null,
+    ...(device.device === account.here ? { self: true as const } : {}),
+    caps: { attach: true, machine: false, control: false },
+  })
+  const none =
+    (member: string) =>
+    async (..._args: unknown[]): Promise<RemoteFailure> =>
+      unsupported(member)
+  return {
+    service: {
+      info: none("service.info"),
+      status: async () => {
+        account.reads?.push("service.status")
+        if (account.fail !== undefined) return account.fail
+        const state = account.state() as ServiceStatus["state"]
+        const device = account.here === null ? null : { id: account.here, name: account.here }
+        return {
+          kind: "ok",
+          value: { state, since_ms: 0, device, origin_configured: true, enabled: true, service_version: "test" },
+        }
+      },
+      setEnabled: none("service.setEnabled"),
+      control: none("service.control"),
+      setControl: none("service.setControl"),
+      bootstrap: none("service.bootstrap"),
+      wake: none("service.wake"),
+      setWake: none("service.setWake"),
+    },
+    devices: {
+      list: async () => {
+        account.reads?.push("devices.list")
+        return account.fail ?? account.devicesFail ?? { kind: "ok", value: account.devices().map(row) }
+      },
+      resolve: none("devices.resolve"),
+    },
+    sessions: {
+      list: none("sessions.list"),
+      resolve: none("sessions.resolve"),
+      get: none("sessions.get"),
+      open: none("sessions.open"),
+      send: none("sessions.send"),
+      read: none("sessions.read"),
+      follow: () => ({
+        [Symbol.asyncIterator]: async function* () {
+          yield { kind: "failed" as const, failure: unsupported("sessions.follow") }
+        },
+        stop: () => {},
+      }),
+      wait: none("sessions.wait"),
+      interrupt: none("sessions.interrupt"),
+      setModel: none("sessions.setModel"),
+      setReasoning: none("sessions.setReasoning"),
+      close: none("sessions.close"),
+      archive: none("sessions.archive"),
+    },
+    attach: none("attach"),
+    aliases: { resolve: none("aliases.resolve"), set: none("aliases.set"), clear: none("aliases.clear") },
+    close: () => {},
+  }
+}
 
 export const comparable = (result: ThreadToolResult): unknown => {
   const { thread_id: _id, link: _link, device: _device, ...rest } = result as Record<string, unknown>
@@ -160,6 +249,8 @@ export function createRemoteThreadFixture() {
       openRefuse?: string
       /** b knows a session it just opened only by its relay key (relayKeys), not by its durable id: a listing that has not caught up yet. */
       relayKeyOnly?: boolean
+      /** The device service throws on b's admit_external_message (a lost connection mid-delivery). */
+      admitThrows?: string
     } = {},
   ) {
     const engine = options.engine ?? ENGINE
@@ -311,6 +402,7 @@ export function createRemoteThreadFixture() {
     ])
       if (!devices.some((known) => known.device === device)) devices.push({ device, label: device, online: true })
     const registryCalls: string[] = []
+    const accountReads: string[] = []
     const down = <T>(): Promise<AliasResult<T>> =>
       options.registryDown === "throws"
         ? Promise.reject(new Error("alias registry connection reset"))
@@ -382,15 +474,40 @@ export function createRemoteThreadFixture() {
               },
     }
     const remote: RemoteThreadSurface = {
+      client: fakeRemoteClient({
+        state: () => options.plan ?? "connected",
+        // This device's own id comes from the same account read: unknown names no device, a failed read fails it.
+        here: options.selfDevice === "unknown" ? null : "here",
+        devices: () => devices,
+        reads: accountReads,
+        ...(options.selfDevice === "throws"
+          ? { fail: { kind: "error", code: "host_unavailable", message: "device.info failed", next_action: "Retry." } }
+          : {}),
+        ...(options.devicesFail === true
+          ? {
+              devicesFail: {
+                kind: "error",
+                code: "host_unavailable",
+                message: "closed",
+                next_action: "Retry.",
+              } as const,
+            }
+          : {}),
+      }),
       sessions: {
-        status: async () => ({ state: options.plan ?? "connected" }),
+        status: async () => {
+          accountReads.push("port.status")
+          return { state: options.plan ?? "connected" }
+        },
         thisDevice: async () => {
+          accountReads.push("port.thisDevice")
           deviceReads.thisDevice += 1
           if (options.selfDevice === "throws") throw new Error("device.info failed")
           return options.selfDevice === "unknown" ? null : "here"
         },
         thisDeviceName: async () => "this mac",
         devices: async () => {
+          accountReads.push("port.devices")
           deviceReads.devices += 1
           if (options.devicesFail === true) throw new Error("closed")
           return devices
@@ -423,6 +540,8 @@ export function createRemoteThreadFixture() {
         },
         sessionCommand: async (device, session, rpc) => {
           sent.push({ via: "session", device, session, rpc })
+          if (rpc["type"] === "admit_external_message" && options.admitThrows !== undefined)
+            throw new Error(options.admitThrows)
           const outcome = answer(rpc, session)
           if (rpc["type"] === "prompt" && outcome.kind === "ok") {
             answeredPrompt = true
@@ -530,6 +649,7 @@ export function createRemoteThreadFixture() {
       watchers,
       watching,
       endWatches,
+      accountReads,
     }
   }
 

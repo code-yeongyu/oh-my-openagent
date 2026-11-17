@@ -20,10 +20,13 @@ import { createRelayTransport, type RelayTransportOptions } from "../thread/remo
 import { replyData } from "../thread/remote/remote-ops"
 import { stampThisDevice } from "../thread/remote/this-device"
 import { type ClientCore, ok, type Outcome, type RemoteClient } from "./client"
-import { nextActionFor, remoteFailure } from "./codes"
+import { nextActionFor, readFailureFromError, remoteFailure } from "./codes"
 import { DEADLINES } from "./deadlines"
 import { createDeviceServiceSessions } from "./port/device-service"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
+import { clientMessageIdOf } from "./client-message-id"
+import type { LocalSessions } from "./local-sessions"
+import { sessionDetail } from "./session-detail"
 import type {
   DeviceRow,
   SessionRow,
@@ -36,7 +39,6 @@ import type {
   RemoteFailure,
   SendReceipt,
   SendRequest,
-  SessionDetail,
   ThreadHandle,
 } from "./types"
 
@@ -185,10 +187,43 @@ export function personIdentity(uid: string): { readonly sender: GatewaySender; r
   return { sender: { kind: "person", uid: numeric, user: userInfo().username }, caller: `person:${uid}` }
 }
 
-/** How many keyed opens a client remembers for replay. */
-const OPENS_KEPT = 256
+/** A session's message to a session on its own device: its thread tools deliver it, never this client. */
+// A client built without this device's operator endpoint (RemoteClientDeps.localSessions) reaches no session on it.
+const noLocalSessions = (device: string): RemoteFailure =>
+  remoteFailure(
+    "unsupported",
+    "This client cannot reach a session on its own device: it was built without this device's operator endpoint.",
+    "Call this member on a client built with localSessions.",
+    { details: { feature: "local_sessions", device } },
+  )
 
-/** The receipts of this client's sends and opens: a repeat under one idempotency key replays the first answer. */
+const selfDelivery = (device: string): RemoteFailure =>
+  remoteFailure(
+    "local_only",
+    "A session's message to a session on its own device is delivered by that device's thread tools.",
+    "Send it from the calling session's thread tools (thread_send); sessions.send reaches other devices.",
+    { details: { device } },
+  )
+
+/** How many idempotency keys a client remembers for replay, in each of its stores (opens, sends, send receipts). */
+const KEYS_KEPT = 256
+
+/**
+ * Every idempotency store's one rule: `entry` is kept under `key` as the newest, and past KEYS_KEPT the oldest settled
+ * entries are forgotten; one still in flight is never dropped, or its repeat would run again.
+ */
+function keepNewest<V extends { readonly settled: boolean }>(held: Map<string, V>, key: string, entry: V): void {
+  held.set(key, entry)
+  for (const [oldest, kept] of held) {
+    if (held.size <= KEYS_KEPT) break
+    if (kept.settled) held.delete(oldest)
+  }
+}
+
+/**
+ * The receipts of this client's sends and opens: a repeat under one idempotency key replays the first answer. A send
+ * without a key keeps a receipt under a fresh one nobody can retry, so the store keeps the newest (keepNewest).
+ */
 function createReceipts(now: () => number): RelayTransportOptions["store"] {
   type Receipt = { readonly hash: string; settled: boolean; result?: unknown; note?: string }
   const held = new Map<string, Receipt>()
@@ -199,7 +234,7 @@ function createReceipts(now: () => number): RelayTransportOptions["store"] {
     toolReceiptBegin: async (request): Promise<ToolReceiptBegin> => {
       const known = held.get(keyOf(request))
       if (known === undefined) {
-        held.set(keyOf(request), { hash: request.args_hash, settled: false })
+        keepNewest(held, keyOf(request), { hash: request.args_hash, settled: false })
         return { kind: "accepted" }
       }
       if (known.hash !== request.args_hash) return { kind: "conflict" }
@@ -233,8 +268,8 @@ function createReceipts(now: () => number): RelayTransportOptions["store"] {
 export function sessionMembers(core: ClientCore): SessionMembers {
   const { sender } = core
   const receipts = createReceipts(() => core.timers.now())
-  // Keyed opens, newest last: a repeat replays (and refreshes) one; past OPENS_KEPT the oldest is forgotten.
-  const opens = new Map<string, { readonly hash: string; readonly result: R<OpenResult> }>()
+  // Keyed opens, newest last: a repeat replays (and refreshes) one; past KEYS_KEPT the oldest settled is forgotten.
+  const opens = new Map<string, { readonly hash: string; readonly result: R<OpenResult>; settled: boolean }>()
   const legs = new WeakMap<
     DeviceService,
     { readonly remote: RemoteThreadSurface; readonly relay: ReturnType<typeof createRelayTransport> }
@@ -245,12 +280,25 @@ export function sessionMembers(core: ClientCore): SessionMembers {
   const legOf = (svc: DeviceService) => {
     const known = legs.get(svc)
     if (known !== undefined) return known
+    const port = createDeviceServiceSessions({
+      version: core.deps.version,
+      connect: async () => ({ conn: svc, owned: false }),
+      dialEndpoint: async () => ({ conn: await core.dial(), owned: true }),
+    })
     const remote: RemoteThreadSurface = {
-      sessions: createDeviceServiceSessions({
-        version: core.deps.version,
-        connect: async () => ({ conn: svc, owned: false }),
-        dialEndpoint: async () => ({ conn: await core.dial(), owned: true }),
-      }),
+      // The thread bodies this member runs read the account through the client they belong to (#13414 U5).
+      client: core.self(),
+      sessions: {
+        ...port,
+        // The account's device listing may leave out this device, which only thisDevice() names; a connected service's
+        // own device is online, so the relay host's online check finds it.
+        devices: async () => {
+          const [rows, self] = await Promise.all([port.devices(), svc.thisDevice()])
+          return self === null || rows.some((row) => row.device === self.id)
+            ? rows
+            : [{ device: self.id, label: self.name, online: true }, ...rows]
+        },
+      },
       chain: { stamp: (record) => record },
     }
     const relay = createRelayTransport({
@@ -296,6 +344,53 @@ export function sessionMembers(core: ClientCore): SessionMembers {
   const controlOf = (svc: DeviceService, { device, session }: Target): SessionControl =>
     createRelayControl(legOf(svc).remote, namedDeviceRow(device, session))
 
+  // A session on this device is served by its own operator endpoint: the relay cannot route to the device that asks.
+  const onThisDevice = async <T>(
+    device: string,
+    body: (members: LocalSessions["members"]) => Promise<Outcome<T>>,
+  ): Promise<Outcome<T>> => {
+    const leg = await core.localSessions()
+    return leg === undefined ? noLocalSessions(device) : await body(leg.members)
+  }
+  // A person's sends on this device under an idempotency key, newest last: a repeat replays one, other arguments
+  // conflict, and one that ran nothing frees its key (the relay leg's receipts do this for other devices).
+  const localSends = new Map<
+    string,
+    { readonly hash: string; readonly result: Promise<Outcome<SendReceipt>>; settled: boolean }
+  >()
+  const localSend = async (
+    thread: ThreadHandle,
+    target: SessionTarget,
+    device: DeviceRow,
+    request: SendRequest,
+    caller: string,
+  ): Promise<Outcome<SendReceipt>> => {
+    const run = () =>
+      onThisDevice(target.device, (local) =>
+        local.send(target, thread, device, request, clientMessageIdOf(caller, request.idempotency_key)),
+      )
+    const key = request.idempotency_key
+    if (key === undefined) return await run()
+    const hash = hashArgs({ thread, text: request.text, mode: request.mode, expected: request.expected_turn_id })
+    const known = localSends.get(key)
+    if (known !== undefined)
+      return known.hash === hash
+        ? await known.result
+        : remoteFailure(
+            "idempotency_conflict",
+            "The idempotency key was already used for another send.",
+            nextActionFor("idempotency_conflict"),
+          )
+    const entry = { hash, result: run(), settled: false }
+    keepNewest(localSends, key, entry)
+    const settled = await entry.result
+    entry.settled = true
+    if (settled.kind === "error" && settled.uncertain !== true) localSends.delete(key)
+    return settled
+  }
+  const isThisDevice = async (svc: DeviceService, device: string): Promise<boolean> =>
+    (await svc.thisDevice())?.id === device
+
   const resolve = async (thread: ThreadHandle, stage: Stage): Promise<Outcome<SessionTarget>> => {
     const named = targetOf(thread)
     return "kind" in named
@@ -308,12 +403,14 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     opts: Opts | undefined,
     body: (control: SessionControl, target: Target, svc: DeviceService) => Promise<ThreadToolResult>,
     value: (result: ThreadToolResult) => T,
+    onThisDevice: (target: SessionTarget) => Promise<Outcome<T>>,
   ): R<T> => {
     const stage = budget(opts, DEADLINES.drive)
     const resolved = await resolve(thread, stage)
     if (resolved.kind === "error") return resolved
     const target = resolved.value
     return core.member(stage(), DEADLINES.drive, true, async (svc) => {
+      if (await isThisDevice(svc, target.device)) return await onThisDevice(target)
       const result = await answered(() => body(controlOf(svc, target), target, svc))
       return result.kind === "error" ? fromThread(result.error) : ok(value(result))
     })
@@ -353,7 +450,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
   /** One send to the session the device lists under `target` (already resolved); `thread` is the caller's handle. */
   const deliverTo = async (
     thread: ThreadHandle,
-    target: Target,
+    target: SessionTarget,
     request: SendRequest,
     stage: Stage,
   ): R<SendReceipt> => {
@@ -377,9 +474,19 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     const device = await deviceRow(target.device, stage(DEADLINES.devices))
     if (device.kind === "error") return device
     return core.member<SendReceipt>(stage(), DEADLINES.drive, true, async (svc) => {
+      if (await isThisDevice(svc, target.device))
+        return from.sender.kind === "person"
+          ? await localSend(thread, target, device.value, request, from.caller)
+          : selfDelivery(target.device)
       const row = namedDeviceRow(target.device, target.session)
       const mode = request.mode ?? "auto"
       const expected = request.expected_turn_id === undefined ? undefined : String(request.expected_turn_id)
+      // A person's followUp prompt carries a client message id, the receipt's delivery_id: every record of the turn that
+      // answers it carries it too. The relay's steer record carries none, so a steer names none.
+      const clientMessageId =
+        from.sender.kind === "person" && mode !== "steer"
+          ? clientMessageIdOf(from.caller, request.idempotency_key)
+          : undefined
       const sent = await legOf(svc).relay.deliver({
         sender: from.sender,
         caller_id: from.caller,
@@ -388,6 +495,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
         mode,
         ...(expected === undefined ? {} : { expected_turn_id: expected }),
         idempotency_key: request.idempotency_key ?? randomUUID(),
+        ...(clientMessageId === undefined ? {} : { client_message_id: clientMessageId }),
         args: { thread, text: request.text, mode, expected_turn_id: expected },
       })
       if (sent.kind === "error") return fromThread(sent.error)
@@ -400,7 +508,9 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       const base = {
         thread,
         device: device.value,
-        ...(sent.delivery_id === undefined ? {} : { delivery_id: sent.delivery_id }),
+        ...((sent.delivery_id ?? clientMessageId) === undefined
+          ? {}
+          : { delivery_id: sent.delivery_id ?? clientMessageId }),
       }
       const { delivery } = sent
       switch (delivery.kind) {
@@ -469,13 +579,10 @@ export function sessionMembers(core: ClientCore): SessionMembers {
             "The idempotency key was already used for another open.",
             nextActionFor("idempotency_conflict"),
           )
-    const result = openOnce(request, asked, openBudget(request, opts))
-    opens.set(key, { hash, result })
-    for (const oldest of opens.keys()) {
-      if (opens.size <= OPENS_KEPT) break
-      opens.delete(oldest)
-    }
-    const settled = await result
+    const entry = { hash, result: openOnce(request, asked, openBudget(request, opts)), settled: false }
+    keepNewest(opens, key, entry)
+    const settled = await entry.result
+    entry.settled = true
     if (settled.kind === "error" && settled.partial === undefined && settled.uncertain !== true) opens.delete(key)
     return settled
   }
@@ -485,30 +592,51 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     asked: SessionOpenRequest & LaunchProfile,
     stage: Stage,
   ): R<OpenResult> => {
-    const device = await deviceRow(request.device, stage(DEADLINES.devices))
-    // This device with no device service: thread_create's local host needs a running engine's extension context, which
-    // a client does not have, so the open is local only.
-    if (device.kind === "ok" && device.value.self === true && device.value.kind === "local")
-      return remoteFailure(
-        "local_only",
-        "This device has no device service, so a session can only be opened here from inside omo.",
-        "Call service.bootstrap to install the device service, then call sessions.open again.",
-      )
-    if (device.kind === "error") return device
-    const made = await core.member(stage(DEADLINES.openEndpoint), DEADLINES.openEndpoint, true, async (svc) => {
-      const outcome = await createRelaySessionHost(legOf(svc).remote, device.value.id).open(asked)
-      if (outcome.kind === "error") return modelUnavailable(fromThread(outcome.error), request.model)
-      return ok({
-        key: outcome.thread.sessionId,
-        warnings: (outcome.thread.warnings ?? []).map((warning) => warning.message),
-      })
-    })
+    const made = await core.member(
+      stage(DEADLINES.openEndpoint),
+      DEADLINES.openEndpoint,
+      true,
+      async (svc) => {
+        const device = await deviceRow(request.device, stage(DEADLINES.devices))
+        if (device.kind === "error") return device
+        // This device opens on its own operator endpoint, never through the relay to itself (#13787).
+        if (device.value.self === true) {
+          // A session's message to a session on its own device belongs to its thread tools: refused before the open.
+          if (request.first !== undefined && sender.kind !== "person" && sender.kind !== "cli")
+            return selfDelivery(device.value.id)
+          const leg = await core.localSessions()
+          if (leg === undefined) return noLocalSessions(device.value.id)
+          const local = await leg.open(device.value.id, asked)
+          if (local.kind === "ok") return ok({ device: device.value, key: local.key, warnings: [] })
+          return "error" in local ? fromThread(local.error) : modelUnavailable(local, request.model)
+        }
+        const outcome = await createRelaySessionHost(legOf(svc).remote, device.value.id).open(asked)
+        if (outcome.kind === "error") return modelUnavailable(fromThread(outcome.error), request.model)
+        return ok({
+          device: device.value,
+          key: outcome.thread.sessionId,
+          warnings: (outcome.thread.warnings ?? []).map((warning) => warning.message),
+        })
+      },
+      // No device service on this device (the connection says so, not a row): the operator endpoint could open a session,
+      // but no handle would address it, since every session member reaches a session through the service.
+      () =>
+        request.device === "local"
+          ? remoteFailure(
+              "local_only",
+              "This device has no device service, so a session can only be opened here from inside omo.",
+              "Call service.bootstrap to install the device service, then call sessions.open again.",
+            )
+          : remoteFailure("not_found", `No device has the id ${request.device}.`, nextActionFor("not_found"), {
+              details: { kind: "device" },
+            }),
+    )
     if (made.kind === "error") return made
-    const target = { device: device.value.id, session: made.value.key }
+    const target = { device: made.value.device.id, session: made.value.key }
     const thread = handleOf(target.device, target.session)
     const result: OpenResult = {
       thread,
-      device: device.value,
+      device: made.value.device,
       ...(made.value.warnings.length === 0 ? {} : { warnings: made.value.warnings }),
     }
     if (request.first === undefined) return ok(result)
@@ -542,33 +670,16 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       const resolved = await resolve(thread, stage)
       if (resolved.kind === "error") return resolved
       const target = resolved.value
-      const { row } = target
-      // Not listed (yet): there is no row to report it with.
-      if (row === undefined) return unknownSession(target.device, target.session)
+      // A session the listing does not carry yet (one just opened) is read from its device as named, like every member:
+      // only the device's own unknown_session makes it not_found.
       return core.member(stage(), DEADLINES.observeRead, false, async (svc) => {
+        const device = await deviceRow(target.device, stage(DEADLINES.devices))
+        if (device.kind === "error") return device
+        if (await isThisDevice(svc, target.device))
+          return await onThisDevice(target.device, (local) => local.get(target, thread, device.value))
         const state = await engineState(svc, target)
         if (state.kind === "error") return state
-        const data = state.value
-        const model = isObject(data["model"]) ? data["model"] : {}
-        const provider = text(model["provider"])
-        const id = text(model["id"])
-        const turn = text(data["currentTurnId"])
-        const queued = data["pendingMessageCount"]
-        const detail: SessionDetail = {
-          ...row,
-          cwd: text(data["cwd"]) ?? row.path,
-          model: provider === undefined || id === undefined ? "" : `${provider}/${id}`,
-          reasoning: text(data["thinkingLevel"]) ?? "",
-          preset: text(data["permissionPreset"]) ?? "",
-          ...(turn === undefined
-            ? {}
-            : { turn: { id: turn, state: data["isStreaming"] === true ? "running" : "idle" } }),
-          pending: {
-            dialogs: Array.isArray(data["pendingDialogs"]) ? data["pendingDialogs"].length : 0,
-            queued: typeof queued === "number" ? queued : 0,
-          },
-        }
-        return ok(detail)
+        return ok(sessionDetail(handleOf(target.device, target.session), device.value, target.row, state.value))
       })
     },
     read: async (thread, page, opts) => {
@@ -577,14 +688,16 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       if (resolved.kind === "error") return resolved
       const target = resolved.value
       return core.member(stage(), DEADLINES.observeRead, false, async (svc) => {
+        if (await isThisDevice(svc, target.device))
+          return await onThisDevice(target.device, (local) => local.read(target, page))
         const attached = await svc.attach(target.device, target.session)
         try {
-          return ok(
-            await attached.read({
+          return await attached
+            .read({
               ...(page?.before === undefined ? {} : { before: page.before }),
               ...(page?.tail === undefined ? {} : { tail: page.tail }),
-            }),
-          )
+            })
+            .then(ok, readFailureFromError)
         } finally {
           await attached.detach()
         }
@@ -597,6 +710,8 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       if (resolved.kind === "error") return resolved
       const target = resolved.value
       return core.member(stage(), DEADLINES.drive, true, async (svc) => {
+        if (await isThisDevice(svc, target.device))
+          return await onThisDevice(target.device, (local) => local.interrupt(target, thread))
         const { device, session } = target
         const outcome = await legOf(svc).remote.sessions.sessionCommand(device, session, {
           type: "interrupt",
@@ -644,6 +759,14 @@ export function sessionMembers(core: ClientCore): SessionMembers {
         (result) => ({
           model: "model" in result && isObject(result.model) ? `${result.model.provider}/${result.model.id}` : model,
         }),
+        // This device's host sets a model only as its default for every session, never this session's own.
+        async ({ device }) =>
+          remoteFailure(
+            "unsupported",
+            "A session on this device cannot have its own model set from a client yet; its host would change the device's default.",
+            nextActionFor("unsupported"),
+            { details: { feature: "session_model_on_this_device", device } },
+          ),
       )
     },
     // scope turn is the engine's only session-local thinking level (session scope rewrites the model's remembered one).
@@ -654,6 +777,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
         opts,
         (control) => setThinkingLevelOn(control, level as ThreadThinkingLevel, "turn"),
         () => ({ reasoning: level }),
+        (target) => onThisDevice(target.device, (local) => local.setReasoning(target, level)),
       ),
     close: async (thread, opts) => {
       const stage = budget(opts, DEADLINES.close)
@@ -661,6 +785,8 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       if (resolved.kind === "error") return resolved
       const target = resolved.value
       return core.member(stage(), DEADLINES.close, true, async (svc) => {
+        if (await isThisDevice(svc, target.device))
+          return await onThisDevice(target.device, (local) => local.close(target))
         const result = await answered(() => closeThread(controlOf(svc, target)))
         if (result.kind === "error") return fromThread(result.error)
         return ok({ closed: "closed" in result && result.closed === true })

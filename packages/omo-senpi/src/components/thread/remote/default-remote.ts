@@ -1,4 +1,5 @@
 import { createLazyRemoteSurface } from "../../remote/port/lazy-remote"
+import type { RemoteSender } from "../../remote/types"
 import type { RemoteThreadSurface } from "./ports"
 
 /**
@@ -8,11 +9,13 @@ import type { RemoteThreadSurface } from "./ports"
  */
 export function createDefaultRemoteSurface(options: {
   readonly version: string
+  readonly sender: RemoteSender
   readonly log?: (line: string) => void
   readonly permissionPreset?: () => string | undefined
 }): RemoteThreadSurface {
   return createLazyRemoteSurface({
     version: options.version,
+    sender: options.sender,
     loadRuntime: () => import("#omo-thread-client-runtime"),
     loadAliasRegistry: async () => {
       const [{ createServiceAliasRegistry }, { cliServiceAccess }] = await Promise.all([
