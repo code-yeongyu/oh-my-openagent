@@ -28,6 +28,7 @@ import {
 import { retireSyncPinOnDiscard } from "../omo-opencode/src/cli/service-auth/sync-pin-retire"
 import { retireSyncDevice } from "../memory-core/src/sync/device-retire"
 import { RecoveryExhausted, RecoveryPending } from "../omo-opencode/src/cli/service-auth/owned-refresh"
+import { runDevicesVerb } from "./account-devices"
 import { ACCOUNT_EXIT, accountStoreFailure, showAccount } from "./account-show"
 import { cliDeviceServiceHandoff } from "./device-service-handoff"
 
@@ -186,6 +187,9 @@ async function runVerb(dependencies: AccountCommandDependencies, args: readonly 
           let forgotten = false
           const code = await session.update(async (current) => {
             if (current !== null && current.device.id !== device) {
+              dependencies.error(
+                `omo account forget --device acts on this device only; sign out device ${device} with omo account devices revoke ${device}`,
+              )
               return reply(dependencies, { forgotten: false, device: deviceOf(current) }, ACCOUNT_EXIT.conflict)
             }
             if (current !== null) await retireHook(dependencies)(discardedOf(current, "forget"))
@@ -204,6 +208,8 @@ async function runVerb(dependencies: AccountCommandDependencies, args: readonly 
       await session.forget()
       return reply(dependencies, { forgotten: true })
     }
+    case "devices":
+      return runDevicesVerb(dependencies, sessionOf(dependencies), flags)
     case "retire-sync": {
       // The desktop's discard of its own sealed session (#12280): the pin of that account is retired.
       const account = flags[0] === "--account" && flags.length === 2 ? flags[1] : undefined
@@ -216,7 +222,7 @@ async function runVerb(dependencies: AccountCommandDependencies, args: readonly 
     }
     default:
       dependencies.error(
-        "usage: omo account show [--account <id>]|adopt [--replace]|token|export|forget [--device <id>]|retire-sync --account <id>",
+        "usage: omo account show [--account <id>]|adopt [--replace]|token|export|forget [--device <id>]|devices [revoke <id>]|retire-sync --account <id>",
       )
       return ACCOUNT_EXIT.invalid
   }
