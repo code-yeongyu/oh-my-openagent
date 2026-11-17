@@ -1,6 +1,7 @@
 import { closeSync, constants, openSync } from "node:fs"
-import { Readable } from "node:stream"
 import { ReadStream, WriteStream } from "node:tty"
+
+import { nonBlockingTtyReadable } from "./nonblocking-tty-readable.ts"
 
 import type { PhraseSurface } from "../memory-core/src/sync/genesis/phrase-bridge.ts"
 import type { PhraseEntrySurface } from "../memory-core/src/sync/recovery/bridge-recover-phrase.ts"
@@ -62,8 +63,8 @@ export function openControllingTerminal(): PhraseTerminal | null {
     opened.push(openSync("/dev/tty", "w"))
     const mode = new ReadStream(opened[0] ?? -1)
     const readFd = opened[1] ?? -1
-    const input = Readable.fromWeb(Bun.file(readFd).stream())
-    // Bun.file does not own the descriptor; it is closed once the cancelled reader has let go of it.
+    const input = nonBlockingTtyReadable(readFd)
+    // The reader does not own the descriptor; it is closed once the destroyed reader has let go of it.
     input.once("close", () => closeSync(readFd))
     const output = new WriteStream(opened[2] ?? -1)
     mode.setRawMode(true)
