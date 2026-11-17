@@ -93,6 +93,25 @@ async function readProcessStartIdentity(pid: number): Promise<string | null> {
   return null
 }
 
+/**
+ * The basename of a live process's argv[0], or null when the process is gone or the platform cannot say. Lets a
+ * caller name a lock holder by what it runs; Linux reads /proc, macOS and FreeBSD ask ps, Windows answers null.
+ */
+export async function getProcessCommandName(pid: number): Promise<string | null> {
+  let argv0: string | undefined
+  if (process.platform === "linux") {
+    try {
+      argv0 = (await readFile(`/proc/${pid}/cmdline`, "utf8")).split("\0", 1)[0]
+    } catch {
+      return null
+    }
+  } else if (process.platform === "darwin" || process.platform === "freebsd") {
+    argv0 = (await execFileText("/bin/ps", ["-o", "args=", "-p", String(pid)]))?.split(/\s+/, 1)[0]
+  }
+  const name = argv0?.slice(argv0.lastIndexOf("/") + 1)
+  return name === undefined || name === "" ? null : name
+}
+
 function identityScheme(identity: string): string | null {
   const separator = identity.indexOf(":")
   return separator <= 0 ? null : identity.slice(0, separator)
