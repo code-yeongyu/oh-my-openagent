@@ -240,6 +240,38 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     ])
   })
 
+  test("#given b is offline and the listing serves b's thread from the relay's cache #when thread_create names it by id #then it is refused device_offline, never answered ok as already live, and nothing reaches b (#14043)", async () => {
+    const a = account({ online: false, rows: [{ ...B_ROW, source: "cache" }], incomplete: ["b"] })
+    const { run } = surface(a.remote)
+    expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({
+      kind: "error",
+      error: { code: "device_offline" },
+    })
+    expect(a.sent).toEqual([])
+  })
+
+  test("#given b answered again but its row still came from the cache #when thread_create names it by id #then b is asked to open that session file, as for an ended thread (#14043)", async () => {
+    const a = account({ rows: [{ ...B_ROW, source: "cache" }] })
+    const { run } = surface(a.remote)
+    expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({
+      kind: "ok",
+      thread: { thread_id: "dur-on-b", device: "b" },
+      deduplicated: false,
+    })
+    expect(a.sent.map((entry) => [entry.via, entry.device, entry.rpc?.["type"], entry.rpc?.["sessionPath"]])).toEqual([
+      ["endpoint", "b", "open_session", B_ROW.path],
+    ])
+  })
+
+  test("#given b lists a thread with an empty title #when it is listed and then addressed #then it is listed under its folder's name, yet resolves by its thread id only: the derived label is display-only, never an address (#14043)", async () => {
+    const a = account({ rows: [{ ...B_ROW, title: "" }] })
+    const { run } = surface(a.remote)
+    const listed = await run("thread_list", {})
+    expect(listed.kind === "ok" && "threads" in listed && listed.threads.find((t) => t.device === "b")?.name).toBe("b")
+    expect(await run("thread_read", { thread: "dur-on-b" })).toMatchObject({ kind: "ok" })
+    expect(await run("thread_read", { thread: "b" })).toMatchObject({ kind: "error", error: { code: "not_found" } })
+  })
+
   test("#given a thread on b #when thread_create forks it #then the fork is refused unsupported naming b's source, and nothing reaches b (#13031)", async () => {
     const a = account()
     const { run } = surface(a.remote)
