@@ -177,7 +177,7 @@ describe("thread tools across host endpoints", () => {
     const w = world({ legacy, shard, reports: () => [report(legacy, true), report(shard, true)] })
 
     // when
-    const created = await w.run("thread_create", {})
+    const created = await w.run("thread_create", { name: "live-surface-endpoints-180" })
 
     // then
     expect(created).toMatchObject({ kind: "ok", thread: { sessionId: "rpc-2" } })
@@ -327,7 +327,7 @@ describe("thread tools across host endpoints", () => {
     // when
     const results = [
       await w.run("thread_list", {}),
-      await w.run("thread_create", {}),
+      await w.run("thread_create", { name: "live-surface-endpoints-330" }),
       await w.run("thread_read", { thread: "anything" }),
     ]
     const sent = await w.run("thread_send", { thread: "anything", message: "x" })

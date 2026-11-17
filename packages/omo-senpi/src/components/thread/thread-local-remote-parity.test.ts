@@ -147,8 +147,11 @@ describe("B2: thread_create answers one summary shape on both legs", () => {
     const b = account({
       openData: { sessionId: "rpc-9", state: { durableSessionId: "dur-new-on-b", ...ENGINE_STATE } },
     })
-    const here = await local.run("thread_create", {})
-    const there = await surface(b.remote).run("thread_create", { device: "studio" })
+    const here = await local.run("thread_create", { name: "thread-local-remote-parity-150" })
+    const there = await surface(b.remote).run("thread_create", {
+      name: "thread-local-remote-parity-151",
+      device: "studio",
+    })
     expect(here).toMatchObject({ kind: "ok", thread: { thread_id: "dur-created-here" } })
     expect(there).toMatchObject({ kind: "ok", thread: { thread_id: "dur-new-on-b", device: "b" } })
     expect(threadKeys(here)).toEqual(SUMMARY_KEYS)
@@ -173,7 +176,7 @@ describe("B3: a thread created outside the caller's workspace says how to addres
       sessions.push(opened)
       return opened
     })
-    const created = await local.run("thread_create", { cwd: folder })
+    const created = await local.run("thread_create", { name: "thread-local-remote-parity-176", cwd: folder })
     expect(created).toMatchObject({
       kind: "ok",
       thread: { thread_id: "dur-away", cwd: folder },
@@ -192,8 +195,11 @@ describe("B3: a thread created outside the caller's workspace says how to addres
     async (leg) => {
       const created =
         leg === "local"
-          ? await surface(undefined).run("thread_create", {})
-          : await surface(account().remote).run("thread_create", { device: "studio" })
+          ? await surface(undefined).run("thread_create", { name: "thread-local-remote-parity-195" })
+          : await surface(account().remote).run("thread_create", {
+              name: "thread-local-remote-parity-196",
+              device: "studio",
+            })
       expect(created).toMatchObject({ kind: "ok" })
       expect(created).not.toHaveProperty("workspace_scope")
       expect(created).not.toHaveProperty("scope_next_action")

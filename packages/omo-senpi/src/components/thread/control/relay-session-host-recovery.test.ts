@@ -14,7 +14,7 @@ describe("a create on another device that opened the session is never lost to a 
   test("#given b opened the session but cannot locate its listing key #when thread_create runs twice under one idempotency key #then both answer the created thread by its durable id with a warning, and b opens one session", async () => {
     const a = account({ openData: ENGINE_OPEN_REPLY, relayKeys: new Map() })
     const { run } = surface(a.remote)
-    const args = { device: "studio", idempotency_key: "create-once-1" }
+    const args = { name: "create-once", device: "studio", idempotency_key: "create-once-1" }
 
     const first = await run("thread_create", args)
     const replay = await run("thread_create", args)

@@ -335,6 +335,14 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
       execute("thread_create", id, args, ectx, async (current, value, operationId, callerId) => {
         const launch = createLaunch(value, options.remote?.permissionPreset?.())
         if ("kind" in launch) return launch
+        // #14050: a new thread with no first prompt and no name is an empty session nobody asked for; refuse it as data.
+        const named = (value.name ?? value.alias ?? "").trim() !== ""
+        if (value.thread === undefined && value.fork_from === undefined && value.prompt === undefined && !named)
+          return failure(
+            "invalid_arguments",
+            "thread_create makes a new thread only with a prompt or a name; neither was given, so nothing was created.",
+            "Pass prompt (the new thread's first message) or name, or pass thread to open an existing thread.",
+          )
         const made = await (async (): Promise<ThreadToolResult> => {
           const skills =
             value.skills === undefined || value.skills.length === 0 ? undefined : checkInitialSkills(value.skills)
@@ -354,7 +362,11 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
             resolve: (address) => resolution(options, entries, address, callerId, true),
             // Decision 0027: an existing thread or a fork source is found by the same resolver every send uses, not by a second ladder.
             locate: async (address) => {
-              const found = await resolveAcross(options, entries, address, callerId, true)
+              // #14049: an existing thread whose process exited is still this device's when its session file is here, so
+              // the ladder sees the files an id or name names (the send address book), and an id nothing lists is looked
+              // up once on every online device of the account (A4.3.3), as a send to that id is.
+              const known = toThreadAddressEntries(sendAddressBook(options, current, address, true))
+              const found = await resolveAcross(options, known, address, callerId, true, "exact", true)
               if (found.kind === "error")
                 return { kind: "error", result: { kind: "error", error: found } as ThreadToolResult }
               // A session found only by a probe (no file path: its device holds it but runs it nowhere) is no existing thread to

@@ -20,23 +20,33 @@ describe("thread_create with a model and a reasoning level (#13409)", () => {
     const a = account()
     const { run, openSession } = surface(a.remote)
     const options = { model: "anthropic/claude-opus-5-5", reasoning: "high" }
-    expect(await run("thread_create", options)).toMatchObject({ kind: "ok", thread: { thread_id: "dur-created-here" } })
-    expect(await run("thread_create", { device: "studio", ...options })).toMatchObject({
+    expect(await run("thread_create", { name: "with-model-here", ...options })).toMatchObject({
+      kind: "ok",
+      thread: { thread_id: "dur-created-here" },
+    })
+    expect(
+      await run("thread_create", { name: "thread-create-options-24", device: "studio", ...options }),
+    ).toMatchObject({
       kind: "ok",
       thread: { thread_id: "dur-new-on-b", device: "b" },
     })
     const launch = { provider: "anthropic", modelId: "claude-opus-5-5", thinkingLevel: "high" }
     expect(localOpens(openSession)).toEqual([expect.objectContaining(launch)])
     expect(openFrames(a.sent)).toEqual([expect.objectContaining(launch)])
-    expect(types(a.sent)).toEqual(["open_session"])
+    // The name a create needs (#14050) is set after the open on b; no set_model follows.
+    expect(types(a.sent)).toEqual(["open_session", "set_session_name"])
   })
 
   test("#given a model the engine cannot resolve #when created here and on b #then each answers model_not_found and opens nothing", async () => {
     const refusal = "model_unavailable: no model anthropic/nope"
     const a = account({ openRefuse: refusal })
     const { run } = surface(a.remote, { openThrows: refusal })
-    const here = await run("thread_create", { model: "anthropic/nope" })
-    const there = await run("thread_create", { device: "studio", model: "anthropic/nope" })
+    const here = await run("thread_create", { name: "thread-create-options-38", model: "anthropic/nope" })
+    const there = await run("thread_create", {
+      name: "thread-create-options-39",
+      device: "studio",
+      model: "anthropic/nope",
+    })
     for (const result of [here, there])
       expect(result).toMatchObject({
         kind: "error",
@@ -49,11 +59,13 @@ describe("thread_create with a model and a reasoning level (#13409)", () => {
     const a = account()
     const { run, openSession } = surface(a.remote)
     for (const model of ["opus", "/opus", "anthropic/"])
-      expect(await run("thread_create", { device: "studio", model })).toMatchObject({
+      expect(await run("thread_create", { name: "thread-create-options-52", device: "studio", model })).toMatchObject({
         kind: "error",
         error: { code: "invalid_arguments" },
       })
-    expect(await run("thread_create", { model: "opus" })).toMatchObject({ kind: "error" })
+    expect(await run("thread_create", { name: "thread-create-options-56", model: "opus" })).toMatchObject({
+      kind: "error",
+    })
     expect(a.sent).toEqual([])
     expect(openSession).not.toHaveBeenCalled()
   })
@@ -93,7 +105,11 @@ describe("thread_create with an approval mode (#13409): the creator may keep or 
     test(`#given a creator in ${creator ?? "an unknown mode"} #when it asks for ${asked} on b #then ${allowed ? "the frame names it" : "scope_denied, nothing opened"}`, async () => {
       const a = account()
       const { run } = surface(creator === undefined ? a.remote : { ...a.remote, permissionPreset: () => creator })
-      const result = await run("thread_create", { device: "studio", permission_preset: asked })
+      const result = await run("thread_create", {
+        name: "thread-create-options-96",
+        device: "studio",
+        permission_preset: asked,
+      })
       if (allowed) {
         expect(result).toMatchObject({ kind: "ok" })
         expect(openFrames(a.sent)).toEqual([expect.objectContaining({ permissionPreset: asked })])
@@ -109,7 +125,9 @@ describe("thread_create with an approval mode (#13409): the creator may keep or 
   test("#given a creator in workspace #when it asks for read-only here #then this device's open names read-only", async () => {
     const a = account()
     const { run, openSession } = surface({ ...a.remote, permissionPreset: () => "workspace" })
-    expect(await run("thread_create", { permission_preset: "read-only" })).toMatchObject({ kind: "ok" })
+    expect(
+      await run("thread_create", { name: "thread-create-options-112", permission_preset: "read-only" }),
+    ).toMatchObject({ kind: "ok" })
     expect(localOpens(openSession)).toEqual([expect.objectContaining({ permissionPreset: "read-only" })])
   })
 })
