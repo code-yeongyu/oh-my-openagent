@@ -35,7 +35,7 @@ export const ThreadCreateParams = Type.Object({
   cwd: Type.Optional(
     Type.String({
       description:
-        "Working directory the new thread runs in; leaving it unset keeps the thread inside the caller's workspace. A relative path resolves against the caller's folder on this device; on another device pass an absolute path of that device (thread_list (tool.thread_list({ all_scope: true }) in an eval cell) shows its threads' folders). A folder that does not exist refuses the create with invalid_arguments.",
+        "Working directory the new thread runs in; leaving it unset keeps the thread inside the caller's workspace. A relative path resolves against the caller's folder on this device; on another device pass an absolute path of that device (thread_list with all_scope, which is tool.thread_list({ all_scope: true }) in an eval cell, shows its threads' folders). A folder that does not exist refuses the create with invalid_arguments.",
     }),
   ),
   worktree: Type.Optional(
