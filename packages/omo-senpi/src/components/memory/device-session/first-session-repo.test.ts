@@ -8,9 +8,9 @@ import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
 import type { DeviceKeyring } from "@oh-my-opencode/memory-core/keyring"
 import { GitSpaceConfig, listRemotes, repoHasCommit, resolveSpace } from "@oh-my-opencode/memory-core/sync-engine"
 
-import { createSyncRunner } from "../sync-runner"
+import { createSyncRunner, SYNC_IDLE_NO_DEVICE_SESSION, SYNC_IDLE_NOT_JOINED } from "../sync-runner"
 import { isSyncSessionDeferred } from "../sync-session-deferred"
-import type { CliDeviceAccount } from "./account-source"
+import type { CliDeviceAccount, DeviceAccount } from "./account-source"
 import { createDeviceSessionResolver, type DeviceSessionRuntime } from "./resolver"
 
 // #13486: on a newly enabled or joined device the first session starts sync before its memory repository exists
@@ -46,9 +46,10 @@ function countingSource() {
   return { source, passes: () => passes }
 }
 
-function signedInCli(): CliDeviceAccount {
+function signedInCli(signal = new AbortController().signal): CliDeviceAccount {
   return {
     kind: "cli",
+    signal,
     api: "http://127.0.0.1:9",
     accountId: "account",
     accessToken: async () => "token",
@@ -162,6 +163,131 @@ describe("the first session on a new device (#13486)", () => {
     } finally {
       jest.useRealTimers()
       await runner.release(paths.repo)
+    }
+  })
+})
+
+// #13624: while sync waits for the repository, the account is not read again (#13486), so an account change during the
+// wait reaches sync only through the account's own lifetime signal.
+describe("an account change while sync waits for the memory repository (#13624)", () => {
+  // `duringFirstPass` runs inside the first account read, after the account it returns was captured.
+  async function waitingRunner(
+    next: () => DeviceAccount | null,
+    duringFirstPass?: (lifetime: AbortController) => void,
+  ) {
+    const { paths, projectDir } = await freshDevice()
+    const lifetime = new AbortController()
+    const opened: string[] = []
+    const idle: { message: string; reason: unknown }[] = []
+    const warnings: string[] = []
+    const errors: string[] = []
+    let passes = 0
+    const runner = createSyncRunner({
+      logger: {
+        info: (message, fields) => {
+          if (message === SYNC_IDLE_NO_DEVICE_SESSION || message === SYNC_IDLE_NOT_JOINED)
+            idle.push({ message, reason: (fields as { reason?: unknown } | undefined)?.reason })
+        },
+        warn: (message) => warnings.push(message),
+        error: (message) => errors.push(message),
+      },
+      resolveSession: createDeviceSessionResolver({
+        source: async () => {
+          passes++
+          if (passes > 1) return next()
+          const account = signedInCli(lifetime.signal)
+          duringFirstPass?.(lifetime)
+          return account
+        },
+        pinDir: join(projectDir, "pins"),
+        loadRuntime: async () => realSpaceRuntime(opened),
+      }),
+    })
+    await runner.acquire("agent", paths, { enabled: true }, { profile: null, projectDir })
+    await runner.status(paths.repo)
+    return { runner, paths, lifetime, opened, idle, warnings, errors, passes: () => passes }
+  }
+
+  test("a sign-out goes idle at the account's signal, with one account pass for the change and no retry after", async () => {
+    jest.useFakeTimers()
+    const sync = await waitingRunner(() => null)
+    try {
+      expect(sync.warnings).toHaveLength(1)
+      expect(sync.passes()).toBe(1)
+      sync.lifetime.abort()
+      await sync.runner.status(sync.paths.repo)
+
+      // No retry delay elapsed: the signal itself ended the wait.
+      expect(sync.idle).toEqual([{ message: SYNC_IDLE_NO_DEVICE_SESSION, reason: undefined }])
+      expect(sync.passes()).toBe(2)
+
+      // Idle is final until the next bind: the wait's retry timer no longer reads the account or reports waiting.
+      jest.advanceTimersByTime(3_600_000)
+      await sync.runner.status(sync.paths.repo)
+      expect(sync.passes()).toBe(2)
+      expect(sync.warnings).toHaveLength(1)
+      expect(sync.opened).toEqual([])
+      expect(sync.errors).toEqual([])
+    } finally {
+      jest.useRealTimers()
+      await sync.runner.release(sync.paths.repo)
+    }
+  })
+
+  test("an account that becomes unavailable reports its reason at the account's signal", async () => {
+    jest.useFakeTimers()
+    const sync = await waitingRunner(() => ({ kind: "unavailable", reason: "private_channel_unavailable" }))
+    try {
+      expect(sync.passes()).toBe(1)
+      sync.lifetime.abort()
+      await sync.runner.status(sync.paths.repo)
+
+      expect(sync.idle).toEqual([{ message: SYNC_IDLE_NOT_JOINED, reason: "private_channel_unavailable" }])
+      expect(sync.passes()).toBe(2)
+      jest.advanceTimersByTime(3_600_000)
+      await sync.runner.status(sync.paths.repo)
+      expect(sync.passes()).toBe(2)
+      expect(sync.errors).toEqual([])
+    } finally {
+      jest.useRealTimers()
+      await sync.runner.release(sync.paths.repo)
+    }
+  })
+
+  test("a wait the signal ends leaves no retry timer behind", async () => {
+    jest.useFakeTimers()
+    const sync = await waitingRunner(() => null)
+    try {
+      // The waiting pass's retry delay is the one timer the runner holds.
+      expect(jest.getTimerCount()).toBe(1)
+      sync.lifetime.abort()
+      await sync.runner.status(sync.paths.repo)
+
+      expect(sync.idle).toEqual([{ message: SYNC_IDLE_NO_DEVICE_SESSION, reason: undefined }])
+      // The retry ran at the signal, so its delay timer is gone instead of pending for up to five minutes.
+      expect(jest.getTimerCount()).toBe(0)
+    } finally {
+      jest.useRealTimers()
+      await sync.runner.release(sync.paths.repo)
+    }
+  })
+
+  test("an account whose signal aborted before the wait began is read again at once, not after the retry delay", async () => {
+    jest.useFakeTimers()
+    const sync = await waitingRunner(
+      () => null,
+      (lifetime) => lifetime.abort(),
+    )
+    try {
+      // No timer advanced: the deferral already carried an aborted signal, so no abort event is ever coming.
+      expect(sync.idle).toEqual([{ message: SYNC_IDLE_NO_DEVICE_SESSION, reason: undefined }])
+      expect(sync.passes()).toBe(2)
+      expect(sync.warnings).toHaveLength(1)
+      expect(jest.getTimerCount()).toBe(0)
+      expect(sync.errors).toEqual([])
+    } finally {
+      jest.useRealTimers()
+      await sync.runner.release(sync.paths.repo)
     }
   })
 })

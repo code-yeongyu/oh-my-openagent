@@ -14,7 +14,10 @@ export const senpiProjector: SessionProjector = (entries, leafId) =>
   sessionManager.buildSessionProjection(entries as never, leafId).entries
 
 /** `session.messages` of a session holding these entries at this leaf: what get_messages answers. */
-export const senpiContext = (entries: readonly ThreadTranscriptEntry[], leafId: string | null): ThreadTranscriptEntry[] =>
+export const senpiContext = (
+  entries: readonly ThreadTranscriptEntry[],
+  leafId: string | null,
+): ThreadTranscriptEntry[] =>
   sessionManager.buildSessionContext(entries as never, leafId).messages as unknown as ThreadTranscriptEntry[]
 
 /**
@@ -80,7 +83,14 @@ export function sessionEntries(messages: readonly ThreadTranscriptEntry[], every
   let parent: string | null = null
   messages.forEach((message, index) => {
     if (index % every === 0) {
-      entries.push({ type: "model_change", id: `mc${index}`, parentId: parent, timestamp: stamp(index), provider: "anthropic", modelId: "claude-opus" })
+      entries.push({
+        type: "model_change",
+        id: `mc${index}`,
+        parentId: parent,
+        timestamp: stamp(index),
+        provider: "anthropic",
+        modelId: "claude-opus",
+      })
       parent = `mc${index}`
     }
     entries.push({ type: "message", id: `e${index}`, parentId: parent, timestamp: stamp(index), message })

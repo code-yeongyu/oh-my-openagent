@@ -69,7 +69,8 @@ function pagingAccount(entries: ThreadTranscriptEntry[], leaf?: string) {
     fixture
       .surface(remote, { sessions: [LOCAL], engine: { ...ENGINE, messages: senpiContext(log.entries, at) } })
       .run("thread_read", { thread: "dur-local", ...args })
-  const reads = () => replies.filter((reply) => reply.rpc["type"] === "get_entries" || reply.rpc["type"] === "get_messages")
+  const reads = () =>
+    replies.filter((reply) => reply.rpc["type"] === "get_entries" || reply.rpc["type"] === "get_messages")
   return { run, localAt, log, reads }
 }
 
@@ -106,7 +107,9 @@ describe("#14047: thread_read of a thread on another device costs its slice, not
     const { run, localAt, reads, log } = pagingAccount(sessionEntries(MESSAGES))
     const there = await run({ max_bytes: 1500 })
     expect(there).toMatchObject({ kind: "ok", truncated: true, source: "live_host", device: "b" })
-    expect(withoutCursor(there)).toEqual(withoutCursor(await localAt(String(log.entries.at(-1)?.["id"]), { max_bytes: 1500 })))
+    expect(withoutCursor(there)).toEqual(
+      withoutCursor(await localAt(String(log.entries.at(-1)?.["id"]), { max_bytes: 1500 })),
+    )
     expect(reads().some((reply) => reply.rpc["type"] === "get_messages")).toBe(false)
     const paged = reads().reduce((total, reply) => total + reply.bytes, 0)
     expect(paged).toBeLessThan(JSON.stringify({ messages: MESSAGES }).length / 4)
@@ -115,23 +118,26 @@ describe("#14047: thread_read of a thread on another device costs its slice, not
   test.each([
     ["a session that branched (abandoned messages, a branch summary)", BRANCHED, "b9"],
     ["a session that compacted (its summary, kept messages and a custom message after it)", COMPACTED, "p19"],
-  ] as const)("#given %s on b #when thread_read walks every page #then it reads exactly what this device's engine reads for that session", async (_label, entries, leaf) => {
-    const { run, localAt } = pagingAccount([...entries], leaf)
-    const walk = async (read: (args: JsonObject) => Promise<ThreadToolResult>) => {
-      const items: unknown[] = []
-      for (let cursor: string | undefined, page = 0; page < 100; page += 1) {
-        const result = await read({ max_bytes: 3000, ...(cursor === undefined ? {} : { cursor }) })
-        if (result.kind !== "ok") throw new Error(JSON.stringify(result))
-        items.push(...itemsOf(result))
-        cursor = cursorOf(result)
-        if (cursor === undefined) return items
+  ] as const)(
+    "#given %s on b #when thread_read walks every page #then it reads exactly what this device's engine reads for that session",
+    async (_label, entries, leaf) => {
+      const { run, localAt } = pagingAccount([...entries], leaf)
+      const walk = async (read: (args: JsonObject) => Promise<ThreadToolResult>) => {
+        const items: unknown[] = []
+        for (let cursor: string | undefined, page = 0; page < 100; page += 1) {
+          const result = await read({ max_bytes: 3000, ...(cursor === undefined ? {} : { cursor }) })
+          if (result.kind !== "ok") throw new Error(JSON.stringify(result))
+          items.push(...itemsOf(result))
+          cursor = cursorOf(result)
+          if (cursor === undefined) return items
+        }
+        throw new Error("the walk did not end")
       }
-      throw new Error("the walk did not end")
-    }
-    const there = await walk(run)
-    expect(there).toEqual(await walk((args) => localAt(leaf, args)))
-    expect(there.length).toBe(Math.min(60, senpiContext([...entries], leaf).length))
-  })
+      const there = await walk(run)
+      expect(there).toEqual(await walk((args) => localAt(leaf, args)))
+      expect(there.length).toBe(Math.min(60, senpiContext([...entries], leaf).length))
+    },
+  )
 
   test("#given a session with more than a window of messages since its compaction #when thread_read runs cold #then one page of b's newest entries answers it (the compaction's kept entries are never fetched), as this device's engine reads it", async () => {
     const { run, localAt, reads } = pagingAccount([...COMPACTED_LONG_AGO], "p199")
@@ -155,7 +161,9 @@ describe("#14047: thread_read of a thread on another device costs its slice, not
     const { run, log, reads } = pagingAccount(sessionEntries(MESSAGES))
     const cursor = cursorOf(await run({ max_bytes: 1500 }))
     expect(cursor).toBeDefined()
-    log.entries.push(entry("message", "e2000", "e1999", { message: { role: "assistant", content: "the newest answer" } }))
+    log.entries.push(
+      entry("message", "e2000", "e1999", { message: { role: "assistant", content: "the newest answer" } }),
+    )
     const before = reads().length
     expect(await run({ cursor, max_bytes: 1500 })).toMatchObject({ kind: "error", error: { code: "cursor_stale" } })
     const refreshed = reads().slice(before)
@@ -173,7 +181,11 @@ describe("#14047: thread_read of a thread on another device costs its slice, not
     log.leaf = "e99"
     const before = reads().length
     const moved = await run({ max_bytes: 1500 })
-    expect(reads().slice(before).map((reply) => Object.keys(reply.rpc).filter((key) => key === "since" || key === "tail"))).toEqual([["since"]])
+    expect(
+      reads()
+        .slice(before)
+        .map((reply) => Object.keys(reply.rpc).filter((key) => key === "since" || key === "tail")),
+    ).toEqual([["since"]])
     expect(withoutCursor(moved)).toEqual(withoutCursor(await localAt("e99", { max_bytes: 1500 })))
     expect(await run({ cursor, max_bytes: 1500 })).toMatchObject({ kind: "error", error: { code: "cursor_stale" } })
   })
@@ -202,7 +214,9 @@ describe("#14047: thread_read of a thread on another device costs its slice, not
       const { run, localAt, log, reads } = pagingAccount(sessionEntries(MESSAGES.slice(0, 30)))
       log.refuse = reason
       const refused = await run({ max_bytes: 800 })
-      expect(comparable(refused)).toEqual(comparable(await localAt(String(log.entries.at(-1)?.["id"]), { max_bytes: 800 })))
+      expect(comparable(refused)).toEqual(
+        comparable(await localAt(String(log.entries.at(-1)?.["id"]), { max_bytes: 800 })),
+      )
       delete log.refuse
       await run({ max_bytes: 800 })
       expect(reads().map((reply) => reply.rpc["type"])).toEqual(["get_entries", "get_messages", "get_entries"])
