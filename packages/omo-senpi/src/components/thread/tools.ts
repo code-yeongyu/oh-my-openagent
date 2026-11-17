@@ -751,10 +751,11 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
         ? resolveEntries(options, current)
         : toThreadAddressEntries(sendAddressBook(options, current, address, true))
     // A reply to a sender on this device resolves among this device's entries only (A4.3.1), and only by the sender's
-    // exact id or stated name: an id prefix never turns an approved reply into a send to another thread.
+    // exact id or stated name: an id prefix never turns an approved reply into a send to another thread. A send never
+    // targets its own caller, so an id prefix is resolved without it (UUIDv7 ids share 8 hex characters for ~65 s).
     const resolved: ThreadResolveResult & { readonly all_scope?: boolean | undefined } =
       replyTo === undefined
-        ? await resolveAcross(options, entries, address, callerId, scope, match, true)
+        ? await resolveAcross(options, entries, address, callerId, scope, match, true, { exclude: callerId })
         : resolution(options, entries, address, callerId, scope, false)
     if (resolved.kind === "error")
       return { kind: "error", result: { kind: "error", error: resolved } as ThreadToolResult }

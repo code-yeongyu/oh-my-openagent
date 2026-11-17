@@ -10,6 +10,7 @@ afterEach(cleanup)
 
 const LOCAL_ID = "01a1e898-0000-7000-8000-00000000000a"
 const REMOTE_ID = "01a1e898-0000-7000-8000-00000000000b"
+const CALLER_ID = "01a1e898-0000-7000-8000-00000000000c"
 
 const localSession = (durableSessionId: string, name: string): ThreadHostSession => ({
   sessionId: `route-${name}`,
@@ -72,5 +73,36 @@ describe("#14044: a unique durable-id prefix addresses a thread", () => {
       error: { code: "not_found" },
     })
     expect(enqueuedFor(LOCAL_ID)).toBe(0)
+  })
+})
+
+describe("#14067 review: the caller is no prefix candidate for a send or a handoff, and stays one for a control", () => {
+  const withCaller = () =>
+    surface(undefined, {
+      caller: CALLER_ID,
+      sessions: [localSession(CALLER_ID, "me"), localSession(LOCAL_ID, "alpha")],
+    })
+
+  test.each(["thread_send", "thread_handoff"] as const)(
+    "#given the caller's id shares the 8-char prefix with one other thread #when %s names that prefix #then it reaches the other thread",
+    async (tool) => {
+      const { run, enqueuedFor } = withCaller()
+      expect(await run(tool, { thread: "01a1e898", message: "hi" })).toMatchObject({ kind: "ok", thread: LOCAL_ID })
+      expect(enqueuedFor(LOCAL_ID)).toBe(1)
+      expect(enqueuedFor(CALLER_ID)).toBe(0)
+    },
+  )
+
+  test("#given the caller's id shares the 8-char prefix with one other thread #when thread_read names that prefix #then it is ambiguous_target naming both", async () => {
+    const result = await withCaller().run("thread_read", { thread: "01a1e898" })
+    expect(result).toMatchObject({ kind: "error", error: { code: "ambiguous_target" } })
+    const candidates = (result as { error: { details?: { candidates?: readonly { thread: string }[] } } }).error.details
+      ?.candidates
+    expect(candidates?.map((candidate) => candidate.thread).sort()).toEqual([LOCAL_ID, CALLER_ID])
+  })
+
+  test("#given one thread whose id starts with 01a1e898 #when thread_read names that prefix #then it reads that thread", async () => {
+    const { run } = surface(undefined, { sessions: [localSession(LOCAL_ID, "alpha")] })
+    expect(await run("thread_read", { thread: "01a1e898" })).toMatchObject({ kind: "ok", thread: LOCAL_ID })
   })
 })

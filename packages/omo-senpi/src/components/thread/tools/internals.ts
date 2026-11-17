@@ -1,5 +1,5 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
-import type { ThreadResolveResult } from "../addressing"
+import type { ThreadResolveOptions, ThreadResolveResult } from "../addressing"
 import { relayAddressBook, relayAddressEntry, type RelayAddressBook } from "../remote/address-book"
 import { endedRow, rowThreadId, type RemoteSessionRow } from "../remote/ports"
 import { accountDevices } from "../remote/account"
@@ -237,7 +237,7 @@ export function resolution(
   target: string,
   callerId: string,
   allScope?: boolean,
-  idPrefix = true,
+  idPrefix: ThreadResolveOptions["id_prefix"] = true,
 ) {
   if (target === "self") {
     // UNKNOWN_CALLER stands for an ABSENT identity, so it must never match an entry: a thread
@@ -358,6 +358,7 @@ export async function resolveAcross(
   allScope: boolean | undefined,
   match: "exact" | "fuzzy" = "exact",
   lookup = false,
+  idPrefix: ThreadResolveOptions["id_prefix"] = true,
 ): Promise<ThreadResolveResult & { readonly all_scope?: boolean | undefined }> {
   if (match === "fuzzy" && allScope !== true && options.callerWorkspaceRoot().trim() === "")
     return {
@@ -372,7 +373,7 @@ export async function resolveAcross(
     entries: readonly ThreadAddressEntry[],
     ranked: readonly ThreadAddressEntry[] = entries,
   ): ThreadResolveResult => {
-    const exact = resolution(options, entries, address, callerId, allScope)
+    const exact = resolution(options, entries, address, callerId, allScope, idPrefix)
     if (match === "exact") return exact
     // Exact first (#13141): an id, alias or name the exact path resolves is the answer, so fuzzy only ranks what exact
     // cannot reach. The caller stays excluded, as the fuzzy scan excludes it: a handoff never targets its own sender.
