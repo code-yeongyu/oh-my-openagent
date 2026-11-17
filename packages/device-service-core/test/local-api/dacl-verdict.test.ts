@@ -192,7 +192,7 @@ describe("applying the exact DACL", () => {
     })
   })
 
-  test("an error record split over CLIXML Error strings is decoded, not cut at its category", async () => {
+  test("an error record split over CLIXML Error strings is decoded whole, up to its position line", async () => {
     const failing = async () => ({
       code: 1,
       out: "",
@@ -204,7 +204,7 @@ describe("applying the exact DACL", () => {
     })
     expect(await rejectionOf(applyExactDacl("C:\\state", U, "dir", failing))).toMatchObject({
       reason:
-        'the exact DACL could not be applied: Exception calling "SetAccessControl" with "1" argument(s): "Attempted to perform an',
+        'the exact DACL could not be applied: Exception calling "SetAccessControl" with "1" argument(s): "Attempted to perform an unauthorized operation."',
     })
   })
 

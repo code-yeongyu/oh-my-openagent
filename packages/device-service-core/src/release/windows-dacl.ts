@@ -49,14 +49,19 @@ const clixmlText = (line: string): string =>
     .replace(/_x([0-9A-Fa-f]{4})_/g, (_, hex: string) => String.fromCharCode(Number.parseInt(hex, 16)))
     .replace(/&(lt|gt|quot|apos|amp);/g, (_, entity: string) => XML_ENTITIES[entity] ?? "")
 
-const firstErrorLine = (err: string | undefined): string => {
-  const line = (err ?? "")
+// PowerShell wraps a long message over several lines and then prints its position ("At line:", "+ ...").
+const POSITION_LINE = /^(?:At line:\d|At .*char:\d|\+ )/
+
+const errorMessage = (err: string | undefined): string => {
+  const lines = (err ?? "")
     .split(/\r?\n/)
     .filter((text) => !text.trim().startsWith("#< CLIXML"))
     .flatMap((text) => (text.trim().startsWith("<") ? clixmlText(text).split(/\r?\n/) : [text]))
     .map((text) => text.trim())
-    .find((text) => text !== "")
-  return line === undefined ? "" : `: ${line.slice(0, 300)}`
+    .filter((text) => text !== "")
+  const end = lines.findIndex((text) => POSITION_LINE.test(text))
+  const message = lines.slice(0, end === -1 ? lines.length : end).join(" ")
+  return message === "" ? "" : `: ${message.slice(0, 300)}`
 }
 
 // The SDDL token for userSid on this machine (an alias such as "LA", or the SID itself); undefined when it cannot be
@@ -114,7 +119,7 @@ export const applyExactDacl = async (
 ): Promise<void> => {
   const { code, err } = await run(RUNNER_APPLY_SCRIPT, { LA_PATH: path, LA_SID: userSid, LA_KIND: kind })
   if (code !== 0)
-    throw new LocalApiError("insecure_state_dir", `the exact DACL could not be applied${firstErrorLine(err)}`)
+    throw new LocalApiError("insecure_state_dir", `the exact DACL could not be applied${errorMessage(err)}`)
 }
 
 // Fails closed: a DACL that cannot be read back is not exact.
