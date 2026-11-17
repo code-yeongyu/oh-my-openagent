@@ -49,7 +49,7 @@ export const ThreadReadParams = Type.Object({
     Type.Integer({
       minimum: 1,
       maximum: THREAD_READ_WAIT_MAX_MS,
-      description: "Wait up to this many ms for a remote thread's turn to end, then read; see result.wait.",
+      description: "Wait up to this many ms for the thread's turn to end, then read; see result.wait.",
     }),
   ),
   all_scope: AllScope,
@@ -80,7 +80,7 @@ const SelfOrThread = Type.Optional(
   Type.String({
     minLength: 1,
     description:
-      "Thread to act on. Omit or pass self for this session. Accepts a thread_id, a unique name, or a sessionId from tool.thread_list() (rpc-N or the short session id); a sessionId resolves to that row's durable thread_id. A miss names the durable thread_id to pass.",
+      "Thread to act on. Omit or pass self for this session. Accepts the thread value of a tool.thread_list() row, an alias, or a unique name. A miss names the thread value to pass.",
   }),
 )
 
