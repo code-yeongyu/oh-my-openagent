@@ -41,6 +41,7 @@ import { listThreads, readThread } from "./tools/read-ops"
 import { createRelayTools, REMOVED_RELAY_TOOL_HINTS } from "./tools/relay-tools"
 import { consumedSendersOf, threadSendPermission } from "./tools/reply-permission"
 import { otherDevice, replyTargetMismatch } from "./tools/reply-target"
+import { accountDevices } from "./remote/account"
 import { claimCreatedAlias, listAcross, planCreate, renameAlias, withAlias } from "./remote/lazy-ops"
 import { locateControl } from "./control/locate"
 import { closeThread, interruptThread, setModelOn, setThinkingLevelOn } from "./control/operations"
@@ -937,7 +938,7 @@ async function thisDeviceOf(
   senders: readonly ConsumedSender[],
 ): Promise<string | undefined> {
   if (options.remote === undefined || !senders.some((sender) => sender.device !== undefined)) return undefined
-  return (await options.remote.sessions.thisDevice().catch(() => undefined)) ?? undefined
+  return (await accountDevices(options.remote.client).catch(() => undefined))?.here ?? undefined
 }
 
 /** True when `address` is an approved reply to a consumed sender on another device, or names such senders ambiguously. */
