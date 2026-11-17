@@ -25,12 +25,12 @@ describe("a listing key that differs from the durable id (decision 0027 D2)", ()
     const listed = await run("thread_list", { all_scope: true })
     const row =
       listed.kind === "ok" && "threads" in listed
-        ? (listed.threads as readonly { thread_id: string; device?: string }[]).find((t) => t.device === "b")
+        ? (listed.threads as readonly { thread: string; device?: string }[]).find((t) => t.device === "b")
         : undefined
-    expect(row?.thread_id).toBe(SPLIT.durable_id)
+    expect(row?.thread).toBe(SPLIT.durable_id)
     expect(await run("thread_send", { thread: SPLIT.durable_id ?? "", message: "hi" })).toMatchObject({
       kind: "ok",
-      thread_id: SPLIT.durable_id,
+      thread: SPLIT.durable_id,
       device: "b",
     })
     expect(
@@ -40,7 +40,7 @@ describe("a listing key that differs from the durable id (decision 0027 D2)", ()
     ).toEqual([["b", "rk-b-7"]])
     expect(await run("thread_send", { thread: "rk-b-7", message: "by key" })).toMatchObject({
       kind: "ok",
-      thread_id: SPLIT.durable_id,
+      thread: SPLIT.durable_id,
       device: "b",
     })
     expect(
@@ -60,7 +60,8 @@ describe("a listing key that differs from the durable id (decision 0027 D2)", ()
     expect(result).toMatchObject({
       kind: "ok",
       deduplicated: true,
-      thread: { thread_id: SPLIT.durable_id, device: "b" },
+      thread: SPLIT.durable_id,
+      device: "b",
     })
   })
   test("#given b creates a thread whose engine reports a durable id different from the listing key #when thread_create runs on b #then the returned id is the durable id and a send to it resolves (round trip)", async () => {
@@ -73,7 +74,7 @@ describe("a listing key that differs from the durable id (decision 0027 D2)", ()
     })
     const { run } = fixture.surface(a.remote)
     const created = await run("thread_create", { device: "b" })
-    expect(created).toMatchObject({ kind: "ok", thread: { thread_id: DURABLE, device: "b" } })
+    expect(created).toMatchObject({ kind: "ok", thread: DURABLE, device: "b" })
     // Round trip: the id handed back is the one the resolver takes (the new row is listed under rk-b-9 with that durable id).
     const b = fixture.account({
       rows: [SPLIT, { ...SPLIT, session_id: "rk-b-9", durable_id: DURABLE, title: "new on b" }],
@@ -82,7 +83,7 @@ describe("a listing key that differs from the durable id (decision 0027 D2)", ()
     const again = fixture.surface(b.remote)
     expect(await again.run("thread_send", { thread: DURABLE, message: "hi" })).toMatchObject({
       kind: "ok",
-      thread_id: DURABLE,
+      thread: DURABLE,
       device: "b",
     })
     expect(

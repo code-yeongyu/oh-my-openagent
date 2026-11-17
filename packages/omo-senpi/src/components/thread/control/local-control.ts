@@ -3,6 +3,7 @@ import type { ThreadHostSession, ThreadToolSurfaceOptions } from "../tools/ports
 import type { ThreadSummary } from "../contracts"
 import { interruptOver } from "./interrupt"
 import { refuse, SESSION_ONLY_THINKING_SCOPE, type SessionControl } from "./port"
+import { waitForTurnEnd } from "./wait-settled"
 
 const THINKING_LEVEL_UNSUPPORTED = "thinking_level_unsupported:"
 
@@ -59,5 +60,27 @@ export function createLocalControl(
       }
     },
     getMessages: () => port.getMessages(routing),
+    waitSettled: async (timeoutMs, signal) => {
+      const { watchSession } = port
+      if (watchSession === undefined)
+        throw refuse(
+          "unsupported",
+          `The host holding thread ${threadId} cannot report when its turn ends.`,
+          "Update omo on this device and restart its host.",
+          { command: "subscribe_sessions" },
+        )
+      return await waitForTurnEnd(
+        (handlers) => watchSession(routing, handlers, threadId),
+        (reason) =>
+          refuse(
+            "unsupported",
+            `The endpoint holding thread ${threadId} refused to report its status (${reason}).`,
+            "Update omo on this device and restart its host.",
+            { command: "subscribe_sessions", reason },
+          ),
+        timeoutMs,
+        signal,
+      )
+    },
   }
 }
