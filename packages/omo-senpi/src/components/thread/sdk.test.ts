@@ -6,6 +6,7 @@ import { join } from "node:path"
 import type { GatewayEndpointRef, ReleaseSessionRequest } from "./gateway/adapter"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import type { RemoteThreadSurface } from "./remote/ports"
+import { createThreadSdk as createBundledThreadSdk } from "../../extension/thread-sdk"
 import { createThreadSdk, type ThreadSdk } from "./sdk"
 import { createRemoteThreadFixture, fakeRemoteClient } from "./thread-remote-fixture"
 import type { ThreadHost, ThreadHostSession } from "./tools"
@@ -169,6 +170,24 @@ function countingRemote(remote: RemoteThreadSurface): {
     calls,
   }
 }
+
+describe("thread SDK: options are checked at the boundary", () => {
+  test.each([
+    ["the bundled entry", createBundledThreadSdk],
+    ["the component", createThreadSdk],
+  ] as const)(
+    "#given %s #when created without options or without agentDir #then it throws a TypeError naming the missing fields",
+    (_entry, create) => {
+      const call = create as (options?: unknown) => ThreadSdk
+      expect(() => call()).toThrow(
+        new TypeError("createThreadSdk needs { agentDir, cwd, uid, user }; missing or invalid: agentDir, cwd, user, uid"),
+      )
+      expect(() => call({ cwd: process.cwd(), uid: 501, user: "q" })).toThrow(
+        new TypeError("createThreadSdk needs { agentDir, cwd, uid, user }; missing or invalid: agentDir"),
+      )
+    },
+  )
+})
 
 describe("thread SDK: sessions", () => {
   test("#given a host and a terminal session #when listed and read #then rows carry surface and the live transcript comes from the session's endpoint", async () => {

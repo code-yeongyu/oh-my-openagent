@@ -750,11 +750,12 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
       match === "fuzzy"
         ? resolveEntries(options, current)
         : toThreadAddressEntries(sendAddressBook(options, current, address, true))
-    // A reply to a sender on this device resolves among this device's entries only (A4.3.1).
+    // A reply to a sender on this device resolves among this device's entries only (A4.3.1), and only by the sender's
+    // exact id or stated name: an id prefix never turns an approved reply into a send to another thread.
     const resolved: ThreadResolveResult & { readonly all_scope?: boolean | undefined } =
       replyTo === undefined
         ? await resolveAcross(options, entries, address, callerId, scope, match, true)
-        : resolution(options, entries, address, callerId, scope)
+        : resolution(options, entries, address, callerId, scope, false)
     if (resolved.kind === "error")
       return { kind: "error", result: { kind: "error", error: resolved } as ThreadToolResult }
     // The allowance approved this send as a reply to a consumed delivery's sender (by id or stated name): deliver only when

@@ -75,6 +75,22 @@ export type ThreadSdkOptions = {
   readonly remote?: RemoteThreadSurface
 }
 
+/**
+ * The SDK's boundary check: a script that calls `createThreadSdk()` with no options, or without one of the four fields
+ * every operation reads, gets a TypeError naming the missing fields instead of a property read deep inside.
+ */
+export function assertThreadSdkOptions(options: unknown): asserts options is ThreadSdkOptions {
+  const given = typeof options === "object" && options !== null ? (options as Record<string, unknown>) : {}
+  const missing = [
+    ...(["agentDir", "cwd", "user"] as const).filter(
+      (field) => typeof given[field] !== "string" || (given[field] as string).length === 0,
+    ),
+    ...(typeof given["uid"] === "number" ? [] : ["uid"]),
+  ]
+  if (missing.length > 0)
+    throw new TypeError(`createThreadSdk needs { agentDir, cwd, uid, user }; missing or invalid: ${missing.join(", ")}`)
+}
+
 type Failure = { readonly kind: "error"; readonly error: ThreadToolFailure }
 type Scoped = { readonly all_scope?: boolean }
 type Keyed = { readonly idempotency_key?: string }
@@ -244,6 +260,7 @@ async function guarded<T>(body: () => Promise<T>): Promise<T | Failure> {
  * the engine enumerates and the gateway store under `agentDir`.
  */
 export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
+  assertThreadSdkOptions(options)
   const principal = `cli:${options.uid}`
   const env = { ...(options.env ?? process.env), OMO_CODING_AGENT_DIR: options.agentDir }
   const engineStatusAll = options.engineStatusAll

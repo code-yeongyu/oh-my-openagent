@@ -13,7 +13,12 @@
  *      same-named thread is visible, because the id already names one thread.
  *   2. Otherwise the target is matched against NFKC-normalized names over the
  *      visible entries: one match resolves as a name, two or more are
- *      `ambiguous_target` with candidates, zero is `not_found`.
+ *      `ambiguous_target` with candidates.
+ *   3. With no name match, an address of at least 8 hex characters (hyphens
+ *      allowed) that starts exactly one entry's durable id resolves to it as
+ *      `id_prefix`, scoped like an id hit; two or more are `ambiguous_target`
+ *      with candidates, zero is `not_found`. `id_prefix: false` turns the
+ *      step off (an approved reply resolves only by the sender's exact id or name).
  *
  * Workspace scope: two paths share one workspace when they sit inside the
  * same git work tree (canonical `git rev-parse --show-toplevel` equality;
@@ -61,7 +66,7 @@ export type ThreadCandidate = {
 }
 
 /** How a resolveTarget hit was found. */
-export type ThreadTargetResolution = "id" | "alias" | "name"
+export type ThreadTargetResolution = "id" | "alias" | "name" | "id_prefix"
 
 /** Which fuzzy signal produced the accepted score. */
 export type ThreadFuzzyBasis = "name" | "preview" | "cwd"
@@ -71,6 +76,8 @@ export type ThreadResolveOptions = {
   readonly all_scope?: boolean
   /** The caller's workspace root; required for the default scoped path. */
   readonly callerWorkspaceRoot?: string
+  /** Resolve a unique durable-id prefix of at least 8 hex characters after the name step misses (default true). */
+  readonly id_prefix?: boolean
 }
 
 /** Flat data-error shape: a taxonomy code plus the recovery prompt. */
@@ -312,6 +319,9 @@ function scopedIdHit(
 
 const SESSION_ID_SHAPE = /^(?:rpc-\d+|[A-Za-z0-9_-]{16,})$/
 
+/** The shortest address that may name a thread by a prefix of its durable id: 8 hex characters, hyphens allowed after. */
+const ID_PREFIX_SHAPE = /^[0-9a-f][0-9a-f-]{7,}$/i
+
 function notFound(target: string, scope: string, visible: readonly ThreadAddressEntry[]): ThreadAddressError {
   const base = `No visible thread matches "${target}" in ${scope}.`
   if (!SESSION_ID_SHAPE.test(target)) {
@@ -413,6 +423,28 @@ export function resolveTarget(
       "Call thread_list and pass the exact thread value of the intended thread.",
       toCandidates(matches),
     )
+  }
+
+  // Ladder step 3: a durable-id prefix, over every entry the id step sees, one entry per thread.
+  if (opts.id_prefix !== false && ID_PREFIX_SHAPE.test(target)) {
+    const prefix = target.toLowerCase()
+    const byThread = new Map<string, ThreadAddressEntry>()
+    for (const entry of entries)
+      if (entry.thread_id.toLowerCase().startsWith(prefix) && !byThread.has(entry.thread_id))
+        byThread.set(entry.thread_id, entry)
+    const prefixed = [...byThread.values()]
+    if (prefixed.length === 1) {
+      const hit = scopedIdHit(prefixed[0], opts, callerRoot, hasCallerRoot, rootResolver)
+      return hit.kind === "ok" ? { ...hit, resolution: "id_prefix" } : hit
+    }
+    if (prefixed.length >= 2) {
+      return addressError(
+        "ambiguous_target",
+        `${prefixed.length} threads have an id starting with "${target}".`,
+        "Pass a longer prefix or the exact thread value from the candidates.",
+        toCandidates(prefixed),
+      )
+    }
   }
   return notFound(target, opts.all_scope === true ? "the daemon-wide scope" : "this workspace", visible)
 }

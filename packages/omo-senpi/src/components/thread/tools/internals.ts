@@ -237,6 +237,7 @@ export function resolution(
   target: string,
   callerId: string,
   allScope?: boolean,
+  idPrefix = true,
 ) {
   if (target === "self") {
     // UNKNOWN_CALLER stands for an ABSENT identity, so it must never match an entry: a thread
@@ -258,7 +259,11 @@ export function resolution(
       }
     target = caller.thread_id
   }
-  return resolveTarget(entries, target, { all_scope: allScope, callerWorkspaceRoot: options.callerWorkspaceRoot() })
+  return resolveTarget(entries, target, {
+    all_scope: allScope,
+    callerWorkspaceRoot: options.callerWorkspaceRoot(),
+    id_prefix: idPrefix,
+  })
 }
 
 export function routingId(session: ThreadHostSession): string {
