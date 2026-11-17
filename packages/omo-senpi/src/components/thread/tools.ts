@@ -763,10 +763,21 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
         ? resolveEntries(options, current)
         : toThreadAddressEntries(sendAddressBook(options, current, address, true))
     // A reply to a sender on this device resolves among this device's entries only (A4.3.1).
-    const resolved: ThreadResolveResult & { readonly all_scope?: boolean | undefined } =
+    let resolved: ThreadResolveResult & { readonly all_scope?: boolean | undefined } =
       replyTo === undefined
         ? await resolveAcross(options, entries, address, callerId, scope, match, true)
         : resolution(options, entries, address, callerId, scope)
+    // #14048: a delivery id without a device part (`rpc:local/<id>`, a bare row id) proves no device: another device's
+    // delivery arrives that way when the connection that admitted it declared no remote origin. A sender this device does
+    // not hold is then looked up account-wide, and the reply goes only to the session its durable id names.
+    if (replyTo !== undefined && resolved.kind === "error" && resolved.code === "not_found") {
+      resolved = await resolveAcross(options, entries, address, callerId, scope, match, true)
+      if (resolved.kind === "ok" && resolved.entry.transport?.kind === "relay") {
+        const mismatch = replyTargetMismatch(options, address, resolved.entry, here)
+        if (resolved.entry.thread_id !== replyTo.session_id && mismatch !== undefined) return refuse(mismatch)
+        return { kind: "remote", row: resolved.entry.transport.row }
+      }
+    }
     if (resolved.kind === "error")
       return { kind: "error", result: { kind: "error", error: resolved } as ThreadToolResult }
     // The allowance approved this send as a reply to a consumed delivery's sender (by id or stated name): deliver only when

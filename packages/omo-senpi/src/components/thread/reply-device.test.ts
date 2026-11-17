@@ -248,6 +248,31 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
     },
   )
 
+  // #14048: the receiving device service admitted b's delivery on a connection that declared no remote origin, so the
+  // engine keyed it `rpc:local/<id>` (or a bare id): nothing attests the device, and the sender is listed only on b.
+  test.each(["rpc:local/d-1", "d-1"])(
+    "#given an unattested delivery (id %s) whose sender is listed only on b #when the run replies by its id and by its stated name #then both reach b's row",
+    async (id) => {
+      const { reply, admittedOn, prompts } = await consumed(
+        [{ id, session_id: "dur-on-b", name: "duty" }],
+        [{ ...B_ROW, title: "duty" }],
+      )
+      expect(await reply("dur-on-b")).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
+      expect(await reply("duty")).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
+      expect(admittedOn()).toEqual(["b", "b"])
+      expect(prompts()).toBe(0)
+    },
+  )
+
+  test("#given an unattested delivery whose stated name another device's session carries #when the run replies by that name #then it is reply_target_mismatch and nothing is sent", async () => {
+    const { reply, admittedOn } = await consumed(
+      [{ id: "rpc:local/d-1", session_id: "dur-gone", name: "c thread" }],
+      [B_ROW, C_OTHER],
+    )
+    expect(await reply("c thread")).toMatchObject({ kind: "error", error: { code: "reply_target_mismatch" } })
+    expect(admittedOn()).toEqual([])
+  })
+
   test("unchanged: #given a delivery relayed from b #when the run replies by the sender's id and by its stated name #then both reach b's listed row", async () => {
     const { reply, admittedOn } = await consumed(
       [{ id: "device:b/d-1", session_id: "dur-on-b", name: "on b" }],

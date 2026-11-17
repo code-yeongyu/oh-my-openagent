@@ -138,7 +138,8 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
   )
 
   // A4.3.1 of #13037: a reply resolves on the device the consumed delivery came from, so a name another thread carries
-  // never redirects it: the sender on b is reached on b, and a sender on this device that stated b's name is not found here.
+  // never redirects it: the sender on b is reached on b. A sender whose delivery names no device and that stated b's name is
+  // looked up account-wide (#14048), and b's thread is not that sender, so it is refused by name.
   test.each(LEGS)(
     "#given a run woken by a sender that stated the %s thread's name but is another session #when it replies by that name #then the ask is approved from the delivery, and the send never reaches the thread carrying that name",
     async (leg) => {
@@ -156,7 +157,10 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
         expect(enqueuedFor("dur-local")).toBe(0)
         expect(reachedLocally("dur-local")).toBe(false)
       } else {
-        expect(result).toMatchObject({ kind: "error", error: { code: "not_found" } })
+        expect(result).toMatchObject({
+          kind: "error",
+          error: { code: "reply_target_mismatch", details: { resolved_thread_id: "dur-on-b", device: "b" } },
+        })
         expect(admits()).toHaveLength(0)
       }
     },
