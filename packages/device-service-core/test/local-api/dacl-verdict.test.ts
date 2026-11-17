@@ -136,7 +136,7 @@ describe("applying the exact DACL", () => {
     }
     await applyExactDacl("C:\\state", U, "file", run)
     expect(script.includes("icacls.exe")).toBe(true)
-    expect(script.includes("$ProgressPreference = 'SilentlyContinue'")).toBe(true)
+    expect(script.includes("Get-Acl")).toBe(true)
     expect(script.includes("Set-Acl")).toBe(true)
     expect(script.includes("SetOwner")).toBe(false)
   })
@@ -176,6 +176,18 @@ describe("applying the exact DACL", () => {
     expect(await rejectionOf(applyExactDacl("C:\\state", U, "dir", failing))).toMatchObject({
       reason:
         'the exact DACL could not be applied: Exception calling "SetAccessControl": Attempted to perform an unauthorized operation.',
+    })
+  })
+
+  test("a CLIXML line with encoded newlines reports the text inside the string tag", async () => {
+    const failing = async () => ({
+      code: 1,
+      out: "",
+      err: '<Objs><S>Exception_x000D__x000A_</S><S>calling "SetAccessControl": Attempted to perform an unauthorized operation.</S></Objs>',
+    })
+    expect(await rejectionOf(applyExactDacl("C:\\state", U, "dir", failing))).toMatchObject({
+      reason:
+        'the exact DACL could not be applied: calling "SetAccessControl": Attempted to perform an unauthorized operation.',
     })
   })
 
