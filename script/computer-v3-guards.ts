@@ -174,7 +174,10 @@ const pathKey = (value: string): string => (process.platform === "win32" ? value
 function symlinkLoop(absolute: string): boolean {
   const normalized = resolve(absolute)
   const { root } = parse(normalized)
-  const rest = normalized.slice(root.length).split(sep).filter((part) => part !== "")
+  const rest = normalized
+    .slice(root.length)
+    .split(sep)
+    .filter((part) => part !== "")
   let current = root
   const seen = new Set<string>()
   for (const part of rest) {

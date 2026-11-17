@@ -323,10 +323,7 @@ async function main(argv: readonly string[]): Promise<number> {
     return 0
   } catch (error) {
     // Anything the checks did not anticipate still ends as the one typed line, never a stack trace.
-    const reason =
-      error instanceof Refusal
-        ? error.message
-        : `unexpected verifier error: ${describeUnexpected(error)}`
+    const reason = error instanceof Refusal ? error.message : `unexpected verifier error: ${describeUnexpected(error)}`
     console.log(`::error::operator_darwin_artifacts refused: ${reason}`)
     return 1
   }

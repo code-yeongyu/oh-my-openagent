@@ -24,5 +24,4 @@ export const bashPath = (): string => {
 }
 
 // Git bash does not open a backslash path mixed with a forward slash.
-export const forBash = (value: string): string =>
-  process.platform === "win32" ? value.replaceAll("\\", "/") : value
+export const forBash = (value: string): string => (process.platform === "win32" ? value.replaceAll("\\", "/") : value)
