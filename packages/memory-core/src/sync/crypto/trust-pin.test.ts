@@ -283,7 +283,9 @@ describe("a pin retired when its principal's keys are discarded (#12280)", () =>
       const root = join(dir, "trust-anchor")
       const newest = readdirSync(root)
         .filter((name) => name.includes(".retired-"))
-        .sort((a, b) => Number(b.split(".retired-")[1]?.split("-")[0]) - Number(a.split(".retired-")[1]?.split("-")[0]))[0]
+        .sort(
+          (a, b) => Number(b.split(".retired-")[1]?.split("-")[0]) - Number(a.split(".retired-")[1]?.split("-")[0]),
+        )[0]
       const unreadable = join(root, newest ?? "", "pin.json")
       chmodSync(unreadable, 0o000)
 
