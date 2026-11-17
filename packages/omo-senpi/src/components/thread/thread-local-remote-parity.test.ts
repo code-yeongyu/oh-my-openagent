@@ -135,6 +135,11 @@ describe("#13215: a session another device holds but lists nowhere answers read 
       expect(here?.code).toBe("not_resumable")
       expect(there).toEqual(here)
     }
+    const withoutDevice = ({ device: _device, ...rest }: Record<string, unknown>) => rest
+    const closedHere = (await local.run("thread_close", { thread: CLOSED })) as Record<string, unknown>
+    const closedThere = (await remote.run("thread_close", { thread: CLOSED })) as Record<string, unknown>
+    expect(closedHere).toMatchObject({ kind: "ok", closed: false, reason: "not_live" })
+    expect(withoutDevice(closedThere)).toEqual(withoutDevice(closedHere))
   })
 })
 
