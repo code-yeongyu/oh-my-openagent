@@ -165,7 +165,10 @@ function dedicatedOptions<O extends Parameters<typeof createDarwinBackend>[0]>(o
     access: { ...access, call: (call, lease) => access.call({ ...call, store: "omo" }, lease) },
     secrets: {
       get: async () => {
-        throw new HelperReadError("dedicated", NO_LOGIN_KEYCHAIN)
+        throw new HelperReadError(
+          "dedicated",
+          "OmO's own keychain holds a sign-in that OmO's keychain helper cannot read, and omo never reads it another way. Run omo account store disable --discard after omo logout, then sign in again.",
+        )
       },
       set: async () => {
         throw new HelperReadError("dedicated", NO_LOGIN_KEYCHAIN)

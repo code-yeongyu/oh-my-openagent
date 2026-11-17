@@ -45,6 +45,15 @@ export type DarwinReadDeps = {
   readonly row8b?: Row8bChoice
 }
 
+/**
+ * The own-identity read's failure counts as "not readable this way", except in OmO's own keychain (#13116), where an
+ * item the helper cannot read is an error to report, never a sign-in to treat as missing.
+ */
+export function dedicatedOrUndefined(error: unknown): undefined {
+  if (error instanceof HelperReadError && error.failure === "dedicated") throw error
+  return undefined
+}
+
 function failure(reply: HelperReply): HelperReadError {
   const dedicated = dedicatedStoreRefusal(reply)
   if (dedicated !== null) return new HelperReadError("dedicated", dedicated)
@@ -96,7 +105,7 @@ export async function readThroughHelper(deps: DarwinReadDeps, allowPrompt: boole
       reply,
     }
 
-  const own = await deps.ownSilentGet().catch(() => undefined)
+  const own = await deps.ownSilentGet().catch(dedicatedOrUndefined)
   if (typeof own === "string") return { kind: "value", value: own, source: "own-identity", reply }
   if (reply.cdat === undefined || reply.mdat === undefined) throw failure(reply)
   const cached = deps.cache.consume({ cdat: reply.cdat, mdat: reply.mdat })

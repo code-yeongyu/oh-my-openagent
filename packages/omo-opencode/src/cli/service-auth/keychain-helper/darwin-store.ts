@@ -2,6 +2,7 @@ import type { HelperCall, HelperLease, HelperReply } from "./client"
 import {
   ACL_DENIAL_MESSAGE,
   type DarwinReadDeps,
+  dedicatedOrUndefined,
   HelperReadError,
   readThroughHelper,
   type ReadResult,
@@ -92,7 +93,7 @@ export function lockedDarwinStore(deps: DarwinStoreDeps, lease: HelperLease): Lo
           state.mdat !== undefined &&
           deps.cache.consume({ cdat: state.cdat, mdat: state.mdat }) !== null
         const readable =
-          lastRead !== null || approved || (await deps.ownSilentGet().catch(() => undefined)) !== undefined
+          lastRead !== null || approved || (await deps.ownSilentGet().catch(dedicatedOrUndefined)) !== undefined
         if (readable || intent !== "fresh-sign-in") {
           await deps.ownOverwrite(value)
           if (lastRead?.source === "approved")
