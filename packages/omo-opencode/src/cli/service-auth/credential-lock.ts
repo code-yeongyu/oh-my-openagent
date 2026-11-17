@@ -60,11 +60,10 @@ export async function withCredentialLock<T>(
   if (outer !== undefined) return action(outer)
   await mkdir(directory, { recursive: true, mode: 0o700 })
   try {
-    return await withLock(
-      lock,
-      (lease) => held.run(new Map([...(owned ?? []), [lock, lease]]), () => action(lease)),
-      { ownerTag, staleAfterMs: CREDENTIAL_LOCK_STALE_AFTER_MS },
-    )
+    return await withLock(lock, (lease) => held.run(new Map([...(owned ?? []), [lock, lease]]), () => action(lease)), {
+      ownerTag,
+      staleAfterMs: CREDENTIAL_LOCK_STALE_AFTER_MS,
+    })
   } catch (error) {
     // Only this acquire's own wait: a timeout raised inside `action` belongs to another lock and keeps its own error.
     if (error instanceof LockWaitTimeoutError && error.lockPath === lock) throw await credentialLockBusy(error)
@@ -117,6 +116,10 @@ async function credentialLockBusy(error: LockWaitTimeoutError): Promise<SignInEr
   const pid = holder.ownerPid
   const age = Math.max(0, Date.now() - holder.acquiredAtEpochMs)
   const held = `has held OmO's sign-in lock (${error.lockPath}) for ${duration(age)}`
+  if (pid === process.pid)
+    return new SignInError(
+      `This omo process (pid ${pid}) ${held} in another part of the same command and did not release it. Run the command again, and report it with /bug if it keeps failing.`,
+    )
   if (helperArgv0.test(name))
     return new SignInError(
       age < HELPER_FINISHING_MS

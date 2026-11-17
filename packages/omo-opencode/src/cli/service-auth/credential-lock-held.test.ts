@@ -1,7 +1,7 @@
 // #14029: when the credential lock stays held for the whole wait, the account commands must name the holder and the
 // one action that frees it. A bare lock timeout reached `omo login`/`whoami`/`logout` as "unexpected error".
 import { afterEach, describe, expect, test } from "bun:test"
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { credentialLockPaths, withCredentialLock } from "./credential-lock"
@@ -18,12 +18,20 @@ afterEach(async () => {
   for (const home of homes.splice(0)) rmSync(home, { recursive: true, force: true })
 })
 
-function holdLock(argv0: string, heldForMs: number): { readonly home: string; readonly lock: string; readonly pid: number } {
+function holdLock(
+  argv0: string,
+  heldForMs: number,
+): { readonly home: string; readonly lock: string; readonly pid: number } {
   const home = mkdtempSync(join(tmpdir(), "credlock-held-"))
   homes.push(home)
-  const binary = join(home, argv0)
-  copyFileSync("/bin/sleep", binary)
-  const holder = Bun.spawn([binary, "600"], { stdin: "ignore", stdout: "ignore", stderr: "ignore" })
+  // argv0 names the holder the way `ps` reports it. A copied coreutils binary would not do: a multicall build (uutils)
+  // dispatches on argv[0] and exits at once under any other name.
+  const holder = Bun.spawn([process.execPath, "-e", "setInterval(() => {}, 1_000_000)"], {
+    argv0: join(home, argv0),
+    stdin: "ignore",
+    stdout: "ignore",
+    stderr: "ignore",
+  })
   holders.push(holder)
   const { directory, lock } = credentialLockPaths(API, home)
   mkdirSync(directory, { recursive: true })
@@ -41,11 +49,22 @@ const refusal = (home: string): Promise<unknown> =>
   )
 
 describe("withCredentialLock when the lock stays held", () => {
-  test("#given a keychain helper left holding the lock for two days, and another live process #when the wait runs out #then each refusal names the holder pid, the lock and the one action", async () => {
+  test("#given a keychain helper left holding the lock for two days, one still finishing, and another live process #when the wait runs out #then each refusal names the holder pid, the lock and the one action", async () => {
     const helper = holdLock("0123abcd-omo-keychain", 2 * 86_400_000)
+    const finishing = holdLock("4567ef01-omo-keychain", 1_000)
     const other = holdLock("some-tool", 5_000)
 
-    const [helperError, otherError] = await Promise.all([refusal(helper.home), refusal(other.home)])
+    const [helperError, finishingError, otherError] = await Promise.all([
+      refusal(helper.home),
+      refusal(finishing.home),
+      refusal(other.home),
+    ])
+
+    expect(finishingError).toBeInstanceOf(SignInError)
+    const finishingMessage = (finishingError as SignInError).message
+    expect(finishingMessage).toContain(`OmO keychain helper (pid ${finishing.pid})`)
+    expect(finishingMessage).toContain("Try again in a minute")
+    expect(finishingMessage).not.toContain("kill")
 
     expect(helperError).toBeInstanceOf(SignInError)
     const helperMessage = (helperError as SignInError).message

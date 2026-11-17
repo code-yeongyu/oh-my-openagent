@@ -43,52 +43,54 @@ static void *watch_stdin(void *unused) {
   return NULL;
 }
 
-// NOTE_EXIT on the spawning process. A caller that is already gone (registration fails with ESRCH, or the helper was
-// reparented to launchd before it looked) counts as gone at once. Without a kqueue, poll the parent pid instead.
+// NOTE_EXIT on the spawning process. Only ESRCH proves the caller already gone (as does a helper reparented to launchd
+// before it looked); any other kqueue failure falls back to polling the parent pid, never to "gone".
+static bool caller_exit_watched(void) {
+  int queue = kqueue();
+  if (queue < 0) return false;
+  struct kevent change;
+  struct kevent event;
+  EV_SET(&change, (uintptr_t)caller, EVFILT_PROC, EV_ADD | EV_ONESHOT, NOTE_EXIT, 0, NULL);
+  int got;
+  do got = kevent(queue, &change, 1, &event, 1, NULL);
+  while (got < 0 && errno == EINTR);
+  int failure = got < 0 ? errno : (event.flags & EV_ERROR) != 0 ? (int)event.data : 0;
+  close(queue);
+  return failure == 0 || failure == ESRCH;
+}
+
 static void *watch_caller(void *unused) {
   (void)unused;
-  int queue = caller > 1 ? kqueue() : -1;
-  if (caller > 1 && queue >= 0) {
-    struct kevent change;
-    struct kevent event;
-    EV_SET(&change, (uintptr_t)caller, EVFILT_PROC, EV_ADD | EV_ONESHOT, NOTE_EXIT, 0, NULL);
-    int got;
-    do got = kevent(queue, &change, 1, &event, 1, NULL);
-    while (got < 0 && errno == EINTR);
-    close(queue);
-  } else
-    while (caller > 1 && getppid() == caller) sleep(1);
+  if (caller > 1 && !caller_exit_watched())
+    while (getppid() == caller) sleep(1);
   mark_client_gone();
   return NULL;
 }
 
-static struct timespec after_ms(long ms) {
-  struct timespec at;
-  clock_gettime(CLOCK_REALTIME, &at);
-  at.tv_sec += ms / 1000;
-  at.tv_nsec += (ms % 1000) * 1000000L;
-  if (at.tv_nsec >= 1000000000L) {
-    at.tv_sec += 1;
-    at.tv_nsec -= 1000000000L;
-  }
-  return at;
+static long monotonic_ms(void) {
+  struct timespec now;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  return now.tv_sec * 1000L + now.tv_nsec / 1000000L;
 }
 
-static bool earlier(struct timespec a, struct timespec b) {
-  return a.tv_sec < b.tv_sec || (a.tv_sec == b.tv_sec && a.tv_nsec < b.tv_nsec);
+// Waits on state_changed until `deadline` (monotonic ms) and exits there. Relative waits: a wall-clock step (sleep/wake,
+// NTP) must not end a run early.
+static void wait_or_exit_at(long deadline) {
+  long left = deadline - monotonic_ms();
+  if (left <= 0) _exit(EXIT_DEADLINE);
+  struct timespec span = {.tv_sec = left / 1000, .tv_nsec = (left % 1000) * 1000000L};
+  pthread_cond_timedwait_relative_np(&state_changed, &state_lock, &span);
 }
 
 // The main thread ends the process itself once its work is done; this thread only ends a run that overstays.
 static void *watchdog(void *unused) {
   (void)unused;
-  struct timespec deadline = after_ms(limits.lifetime_ms);
+  long deadline = monotonic_ms() + limits.lifetime_ms;
   pthread_mutex_lock(&state_lock);
-  while (!client_gone)
-    if (pthread_cond_timedwait(&state_changed, &state_lock, &deadline) == ETIMEDOUT) _exit(EXIT_DEADLINE);
-  struct timespec grace = after_ms(limits.grace_ms);
-  if (earlier(grace, deadline)) deadline = grace;
-  for (;;)
-    if (pthread_cond_timedwait(&state_changed, &state_lock, &deadline) == ETIMEDOUT) _exit(EXIT_DEADLINE);
+  while (!client_gone) wait_or_exit_at(deadline);
+  long grace = monotonic_ms() + limits.grace_ms;
+  if (grace < deadline) deadline = grace;
+  for (;;) wait_or_exit_at(deadline);
 }
 
 static void start_thread(void *(*body)(void *)) {
