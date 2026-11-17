@@ -217,8 +217,20 @@ export type ChainCountWire = {
 export type { AliasError, AliasErrorCode, AliasHolder, AliasRegistry, AliasResult } from "./alias-port"
 
 /** Everything the tools need to reach past this machine. Absent: the tools are exactly the local ones. */
+/**
+ * senpi's `buildSessionProjection(entries, leafId).entries`: the session's context along the leaf, each projected entry
+ * with the messages it contributes (`get_messages` answers exactly these messages). A paged thread_read projects the
+ * entries it fetched with it (#14047).
+ */
+export type SessionProjector = (
+  entries: readonly JsonObject[],
+  leafId: string | null,
+) => readonly { readonly sourceEntry: { readonly id: string }; readonly messages: readonly object[] }[]
+
 export type RemoteThreadSurface = {
   readonly sessions: RemoteSessionsPort
+  /** The engine's own projector, loaded on the first paged read; absent (the CLI), remote reads take `get_messages`. */
+  readonly loadProjector?: () => Promise<SessionProjector>
   /** The one remote client (#13414): the account's state, this device and the device list are read through it. */
   readonly client: RemoteClient
   /** Absent until the account service's alias registry ships: aliases are then refused typed, never guessed. */
