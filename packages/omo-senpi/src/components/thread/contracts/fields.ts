@@ -9,7 +9,7 @@ export const THREAD_READ_MAX_BYTES = 1048576
 
 export const ThreadAddress = Type.String({
   description:
-    "Recipient thread: the thread value of a thread_list row (or of any thread tool result), an alias, or a unique name. A name shared by several threads returns ambiguous_target with candidates. self addresses the caller's own session.",
+    "Recipient thread: the thread value of a tool.thread_list() row (or of any thread tool result), an alias, or a unique name. A name shared by several threads returns ambiguous_target with candidates. self addresses the caller's own session.",
 })
 
 export const AllScope = Type.Optional(
