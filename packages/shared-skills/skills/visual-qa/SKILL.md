@@ -286,7 +286,7 @@ task(subagent_type="oracle",
   description="Visual QA pass B: visual fidelity and CJK precision",
   prompt="""
 REVIEW TYPE: VISUAL FIDELITY AND CJK PRECISION (read-only)
-TIER INTENT: Treat this as the focused visual pass. Directly open the screenshots with the available image-viewing tool (`view_image`, `look_at`, or browser inspection) before judging. Anchor every claim to the script evidence, source code, and captures.
+TIER INTENT: Treat this as the focused visual pass. Directly open the screenshots with the image-viewing tool your harness lists (`view_image` on Codex, `look_at`, called as `tool.look_at()` inside an eval cell where it is eval-only, or browser inspection) before judging. Anchor every claim to the script evidence, source code, and captures.
 
 INTENT:
 {What the user requested and the mock or baseline to match.}
