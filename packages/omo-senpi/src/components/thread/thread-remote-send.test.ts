@@ -123,7 +123,7 @@ describe("remote == local: the same call answers the same on b as on this device
         expect(result).toMatchObject({ kind: "ok" })
         expect(result).toHaveProperty("delivery_id", expect.stringMatching(UUID))
         expect(result).toHaveProperty("effective_mode")
-        expect(result).toHaveProperty("endpoint")
+        expect(result).not.toHaveProperty("endpoint")
       }
       // b was idle, so the default mode took the follow_up lane its record carried.
       expect(there).toMatchObject({ delivery_id: record["deliveryId"], effective_mode: "follow_up" })

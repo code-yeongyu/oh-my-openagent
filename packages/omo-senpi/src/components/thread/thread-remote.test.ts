@@ -220,7 +220,7 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     const { run } = surface(a.remote)
     expect(await run("thread_create", { fork_from: "dur-on-b" })).toMatchObject({
       kind: "error",
-      error: { code: "unsupported", details: { reason: "fork_unsupported", source: "dur-on-b", device: "b" } },
+      error: { code: "unsupported", details: { reason: "fork_unsupported", thread: "dur-on-b", device: "b" } },
     })
     expect(a.sent).toEqual([])
   })
@@ -294,7 +294,7 @@ describe("A3: an existing thread is named by id or alias only; a device only to 
     const { run, openSession } = surface(a.remote)
     expect(await run("thread_create", { alias: "taken" })).toMatchObject({
       kind: "error",
-      error: { code: "alias_taken", details: { holder: { session_id: "dur-on-b", device: "b" } } },
+      error: { code: "alias_taken", details: { holder: { thread: "dur-on-b", device: "b" } } },
     })
     expect(openSession).not.toHaveBeenCalled()
   })
@@ -314,7 +314,7 @@ describe("A3: an existing thread is named by id or alias only; a device only to 
     expect([...a.aliases.keys()].sort()).toEqual(["other", "renamed"])
     expect(await run("thread_rename", { thread: "renamed", alias: "other" })).toMatchObject({
       kind: "error",
-      error: { code: "alias_taken", details: { holder: { session_id: "dur-on-b" } } },
+      error: { code: "alias_taken", details: { holder: { thread: "dur-on-b" } } },
     })
     expect(await run("thread_rename", { thread: "renamed" })).toMatchObject({
       kind: "error",
@@ -409,9 +409,9 @@ describe("#12833: a name reaches a thread on another device by its title", () =>
     expect(result).toMatchObject({ kind: "error", error: { code: "ambiguous_target" } })
     const candidates =
       result.kind === "error"
-        ? (result.error.details?.["candidates"] as readonly { id: string; device?: string }[])
+        ? (result.error.details?.["candidates"] as readonly { thread: string; device?: string }[])
         : []
-    expect(candidates.map((candidate) => [candidate.id, candidate.device]).sort()).toEqual([
+    expect(candidates.map((candidate) => [candidate.thread, candidate.device]).sort()).toEqual([
       ["dur-on-b", "b"],
       ["dur-on-c", "c"],
     ])
@@ -542,7 +542,7 @@ describe("#12833: a name reaches a thread on another device by its title", () =>
     const result = await run("thread_send", { thread: "local peer", message: "x" })
     const candidates =
       result.kind === "error"
-        ? (result.error.details?.["candidates"] as readonly { id: string; device?: string }[])
+        ? (result.error.details?.["candidates"] as readonly { thread: string; device?: string }[])
         : []
     expect(result).toMatchObject({ kind: "error", error: { code: "ambiguous_target" } })
     expect(candidates.length).toBe(10)
@@ -557,9 +557,9 @@ describe("#12833: a name reaches a thread on another device by its title", () =>
     expect(result).toMatchObject({ kind: "error", error: { code: "ambiguous_target" } })
     const candidates =
       result.kind === "error"
-        ? (result.error.details?.["candidates"] as readonly { id: string; device?: string }[])
+        ? (result.error.details?.["candidates"] as readonly { thread: string; device?: string }[])
         : []
-    expect(candidates.map((candidate) => [candidate.id, candidate.device]).sort()).toEqual([
+    expect(candidates.map((candidate) => [candidate.thread, candidate.device]).sort()).toEqual([
       ["dur-local", "here"],
       ["dur-on-b", "b"],
     ])
@@ -781,7 +781,7 @@ describe("remote == local: the same call answers the same on b as on this device
     expect(openSession).not.toHaveBeenCalled()
     const forked = await run("thread_create", { fork_from: "mine" })
     expect(openSession).toHaveBeenCalledTimes(0)
-    expect((forked as unknown as { error: { details: { source?: string } } }).error.details.source).toBe("dur-local")
+    expect((forked as unknown as { error: { details: { thread?: string } } }).error.details.thread).toBe("dur-local")
   })
 
   test("#given thread_create opens b's thread and names an alias #when it runs #then the alias is held by that thread", async () => {

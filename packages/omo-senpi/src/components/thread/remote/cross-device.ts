@@ -57,7 +57,7 @@ export async function planCreate(
         "Create the thread without fork_from and hand it the source's context with thread_send; thread_read reads the source.",
         {
           reason: "fork_unsupported",
-          source: plan.request.forkFrom,
+          thread: plan.request.forkFrom,
           ...(plan.host.device === undefined ? {} : { device: plan.host.device }),
         },
       ),

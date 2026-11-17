@@ -353,7 +353,6 @@ describe("thread tools over a terminal (tui) endpoint", () => {
       kind: "ok",
       thread: "dur-tui",
       delivery: { kind: "queued" },
-      endpoint: { kind: "tui" },
     })
     for (const result of results) expect(result).toMatchObject({ kind: "error", error: { code: "unsupported" } })
     expect(renamed).toMatchObject({ kind: "ok", name: "renamed-tui" })

@@ -471,7 +471,7 @@ async function lookupAcross(
     return { kind: "ok", entry: relayAddressEntry(endedRow(only.device, only.key, address)), resolution: "id" }
   if (holders.length > 1) {
     const candidates = holders.map((holder) => ({
-      id: address,
+      thread: address,
       name: "",
       cwd: "",
       preview: "",

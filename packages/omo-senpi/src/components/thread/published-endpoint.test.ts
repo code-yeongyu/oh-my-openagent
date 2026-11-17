@@ -190,7 +190,7 @@ test("a row only a delivery created keeps legacy discovery for the next send", a
   expect(await w.store.sessionOwner("target")).toBeNull()
   // The target is still busy with the first message: the live endpoint takes the second into that turn (the default steers).
   const second = await w.send()
-  expect(second).toMatchObject({ kind: "ok", delivery: { kind: "steered" }, endpoint: { kind: "rpc_host" } })
+  expect(second).toMatchObject({ kind: "ok", delivery: { kind: "steered" } })
   expect(target.runtime.enqueueCalls).toHaveLength(2)
 }, 15000)
 

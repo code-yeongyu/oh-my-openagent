@@ -31,7 +31,7 @@ describe("replyTargetMismatch compares the device as well as the session id", ()
       replyTargetMismatch(repliesTo([{ session_id: "dur-sender", device: "b" }]), "dur-sender", entry("c"), "here"),
     ).toMatchObject({
       code: "reply_target_mismatch",
-      details: { resolved_thread: "dur-sender", device: "c" },
+      details: { thread: "dur-sender", device: "c" },
     })
   })
 

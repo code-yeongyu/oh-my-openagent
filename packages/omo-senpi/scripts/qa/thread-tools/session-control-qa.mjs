@@ -283,9 +283,10 @@ try {
   // Turn scope is the VALIDATED path: the wire applies it to the active model immediately and
   // rejects a level that model cannot run. Session scope only records the remembered preference,
   // so it accepts levels the active model does not support - both steps below use turn scope.
-  const supported = await surface
-    .getAvailableThinkingLevels(createdA.thread.sessionId ?? threadA)
-    .catch(() => undefined)
+  const routingA =
+    (await surface.listSessions()).find((session) => (session.durableSessionId ?? session.sessionId) === threadA)
+      ?.sessionId ?? threadA
+  const supported = await surface.getAvailableThinkingLevels(routingA).catch(() => undefined)
 
   // 8. a level the active model DOES support is accepted and echoed with its scope
   if (supported === undefined || supported.length === 0) {

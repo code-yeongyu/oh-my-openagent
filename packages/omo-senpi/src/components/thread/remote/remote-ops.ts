@@ -56,13 +56,18 @@ export async function remoteReady(remote: RemoteThreadSurface): Promise<Failure 
   return { here: status.here }
 }
 
+/** An alias holder as a failure names it: the thread to pass back, and its device. */
+export function holderDetails(holder: AliasHolder): { readonly thread: string; readonly device: string } {
+  return { thread: holder.session_id, device: holder.device }
+}
+
 export function aliasFailure(error: AliasError): Failure {
   if (error.code === "alias_taken")
     return fail(
       "alias_taken",
       error.message,
       "Choose another alias; the holder is named in details.",
-      error.details?.holder === undefined ? undefined : { holder: error.details.holder },
+      error.details?.holder === undefined ? undefined : { holder: holderDetails(error.details.holder) },
     )
   if (error.code === "alias_invalid")
     return fail("invalid_arguments", error.message, "Use 1-64 visible characters that do not look like a session id.", {

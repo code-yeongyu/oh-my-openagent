@@ -7,8 +7,9 @@ import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
 
 // #14044 step 4a: one field names a session across the thread tools. Every input that names a session is `thread`, and
-// every result that names one carries `thread`, the exact string the verbs take back. The scan reads the schemas and the
-// text the model receives from real tool calls, so a new verb, field or result shape is covered without editing a list.
+// every answer that names one, success or failure, carries it as `thread`, the exact string the verbs take back. The scan
+// reads the schemas and the text the model receives from real tool calls, and judges every value it finds there: a
+// session's id under any other key, or an endpoint internal under any key, fails it, whatever the key is called.
 
 const directories: string[] = []
 const stores: GatewayStore[] = []
@@ -17,46 +18,28 @@ afterEach(async () => {
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
 })
 
-/** Keys that name a session, or reach it through an endpoint, under any name but `thread`. */
-const FOREIGN_ADDRESS_KEYS = new Set([
-  "thread_id",
-  "threadId",
-  "sessionId",
-  "session_id",
-  "durableSessionId",
-  "durable_session_id",
-  "durable_id",
-  "routing_id",
-  "socket",
-  "sessionPath",
-  "session_path",
-  "session_file",
-  "endpoint_kind",
-  "attachments",
-  "retain_on_disconnect",
-])
-
 /** An input name that looks like a session address: every one of them must be exactly `thread`. */
 const ADDRESS_INPUT = /^(thread|session|target|address)(_?id)?$/i
+const SOCKET = "/tmp/thread-field-test.sock"
+const PEER_FILE = "/tmp/peer.jsonl"
 
-function tools() {
-  const session: ThreadHostSession = {
-    sessionId: "route-peer",
-    durableSessionId: "dur-peer",
-    cwd: process.cwd(),
-    name: "peer",
-    status: "open",
-    sessionPath: "/tmp/peer.jsonl",
-    socket: "/tmp/thread-field-test.sock",
-  }
-  const sessions: ThreadHostSession[] = [
-    session,
-    { sessionId: "route-other", durableSessionId: "dur-other", cwd: process.cwd(), name: "other", status: "open" },
-  ]
+const session = (routing: string, durable: string, name: string): ThreadHostSession => ({
+  sessionId: routing,
+  durableSessionId: durable,
+  cwd: process.cwd(),
+  name,
+  status: "open",
+  sessionPath: PEER_FILE,
+  socket: SOCKET,
+})
+
+function tools(sessions: ThreadHostSession[]) {
+  const [first] = sessions
+  if (first === undefined) throw new Error("the scan needs a session")
   const host: ThreadHost = {
-    socket: "/tmp/thread-field-test.sock",
+    socket: SOCKET,
     listSessions: async () => sessions,
-    openSession: async () => session,
+    openSession: async () => first,
     getMessages: async () => [{ role: "user", content: "hello" }],
     getState: async () => ({ isStreaming: false }),
     prompt: async () => ({ turnId: "turn-1" }),
@@ -91,13 +74,23 @@ function tools() {
   }
 }
 
-function foreignAddresses(value: unknown, path = "$"): string[] {
-  if (Array.isArray(value)) return value.flatMap((item, index) => foreignAddresses(item, `${path}[${index}]`))
+/**
+ * Every place in `value` that names a session another way: a session id (durable or routing) held by any key but
+ * `thread` or standing bare in a list, an endpoint internal (socket, session file, endpoint kind) anywhere, or a
+ * `thread` that is not the string to pass back.
+ */
+function misnamed(value: unknown, sessionIds: ReadonlySet<string>, path = "$", key = ""): string[] {
+  if (Array.isArray(value)) return value.flatMap((item, index) => misnamed(item, sessionIds, `${path}[${index}]`, ""))
+  if (typeof value === "string") {
+    if (sessionIds.has(value) && key !== "thread") return [`${path} holds session id ${value}`]
+    if (value === SOCKET || value === PEER_FILE || value === "rpc_host")
+      return [`${path} holds endpoint internal ${value}`]
+    return []
+  }
   if (typeof value !== "object" || value === null) return []
-  return Object.entries(value).flatMap(([key, child]) => [
-    ...(FOREIGN_ADDRESS_KEYS.has(key) ? [`${path}.${key}`] : []),
-    ...(key === "thread" && typeof child !== "string" ? [`${path}.thread is ${typeof child}, not the address`] : []),
-    ...foreignAddresses(child, `${path}.${key}`),
+  return Object.entries(value).flatMap(([name, child]) => [
+    ...(name === "thread" && typeof child !== "string" ? [`${path}.thread is ${typeof child}, not the address`] : []),
+    ...misnamed(child, sessionIds, `${path}.${name}`, name),
   ])
 }
 
@@ -116,7 +109,9 @@ describe("one field names a session (#14044 4a)", () => {
 
   test("#given a thread_list row #when every session verb runs on its thread value #then each answer names the session as thread and only as thread", async () => {
     // given
-    const run = tools()
+    const sessions = [session("route-peer", "dur-peer", "peer"), session("route-other", "dur-other", "other")]
+    const ids = new Set(sessions.flatMap((entry) => [entry.sessionId, entry.durableSessionId ?? ""]))
+    const run = tools(sessions)
     const listed = await run("thread_list", {})
     const rows = listed["threads"] as readonly Record<string, unknown>[]
     const peer = rows.find((row) => row["name"] === "peer")
@@ -149,7 +144,7 @@ describe("one field names a session (#14044 4a)", () => {
         kind: "ok",
         error: undefined,
       })
-      expect({ name, foreign: foreignAddresses(answer) }).toEqual({ name, foreign: [] })
+      expect({ name, misnamed: misnamed(answer, ids) }).toEqual({ name, misnamed: [] })
       if (name !== "thread_list" && answer?.["thread"] !== undefined)
         expect({ name, accepts: inputNames(name as ThreadToolName).includes("thread") }).toEqual({
           name,
@@ -168,5 +163,48 @@ describe("one field names a session (#14044 4a)", () => {
     ] as const)
       expect({ name, thread: answers[name]?.["thread"] }).toEqual({ name, thread })
     expect(typeof answers.thread_create?.["thread"]).toBe("string")
+  })
+
+  test("#given two threads named peer #when a verb names peer or a create reuses another thread's name #then each candidate and conflict names its session as thread and only as thread", async () => {
+    // given
+    const sessions = [
+      session("route-peer", "dur-peer", "peer"),
+      session("route-twin", "dur-twin", "peer"),
+      session("route-other", "dur-other", "other"),
+    ]
+    const ids = new Set(sessions.flatMap((entry) => [entry.sessionId, entry.durableSessionId ?? ""]))
+    const run = tools(sessions)
+
+    // when
+    const failures = {
+      read: await run("thread_read", { thread: "peer" }),
+      send: await run("thread_send", { thread: "peer", message: "hi" }),
+      create: await run("thread_create", { name: "other" }),
+    }
+
+    // then: the refusals the model must act on, with the threads it may pass back
+    expect(
+      Object.fromEntries(
+        Object.entries(failures).map(([name, answer]) => {
+          const error = answer["error"] as {
+            readonly code?: string
+            readonly details?: { readonly candidates?: readonly Record<string, unknown>[] }
+          }
+          return [
+            name,
+            {
+              code: error.code,
+              threads: (error.details?.candidates ?? []).map((candidate) => candidate["thread"]).sort(),
+            },
+          ]
+        }),
+      ),
+    ).toEqual({
+      read: { code: "ambiguous_target", threads: ["dur-peer", "dur-twin"] },
+      send: { code: "ambiguous_target", threads: ["dur-peer", "dur-twin"] },
+      create: { code: "name_conflict", threads: ["dur-other"] },
+    })
+    for (const [name, answer] of Object.entries(failures))
+      expect({ name, misnamed: misnamed(answer, ids) }).toEqual({ name, misnamed: [] })
   })
 })

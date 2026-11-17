@@ -198,7 +198,7 @@ describe("thread send with no live endpoint anywhere", () => {
     expect((await store.list({ target_durable_id: "dur-gone" })).map((row) => row.state)).toEqual(["queued"])
   })
 
-  test("#given no endpoint answers #when a session's thread_send targets an exited terminal #then the tool answers queued_offline with endpoint null", async () => {
+  test("#given no endpoint answers #when a session's thread_send targets an exited terminal #then the tool answers queued_offline", async () => {
     const agentDir = agentDirectory()
     sessionFile(agentDir, "dur-gone", process.cwd(), "gone-tui")
     const host = createLiveThreadSurface(undefined, {
@@ -225,7 +225,6 @@ describe("thread send with no live endpoint anywhere", () => {
       kind: "ok",
       thread: "dur-gone",
       delivery: { kind: "queued_offline" },
-      endpoint: null,
     })
   })
 })
@@ -330,7 +329,6 @@ describe("thread send to a session this process never saw alive", () => {
       kind: "ok",
       thread: "dur-dead",
       delivery: { kind: "queued_offline" },
-      endpoint: null,
     })
   })
 
@@ -355,7 +353,6 @@ describe("thread send to a session this process never saw alive", () => {
       kind: "ok",
       thread: "dur-x",
       delivery: { kind: "queued_offline" },
-      endpoint: null,
     })
     const sdk = sdkOver(agentDir, host)
     expect(await sdk.send({ thread: "dur-x", text: "for x too" })).toMatchObject({

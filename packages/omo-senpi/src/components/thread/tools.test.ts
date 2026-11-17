@@ -829,14 +829,13 @@ function gatewayFixture() {
 }
 
 describe("thread_send through the session gateway", () => {
-  test("#given a host session and a terminal endpoint #when the host session sends to the terminal #then the result carries delivery_id and endpoint.kind tui and only a wake reached the terminal", async () => {
+  test("#given a host session and a terminal endpoint #when the host session sends to the terminal #then the result carries delivery_id, no endpoint internals, and only a wake reached the terminal", async () => {
     const g = gatewayFixture()
     const result = await g.run("thread_send", { thread: "my-tui", message: "hello terminal" }, "dur-host", "call-1")
     // The fixture's wake answers with nothing admitted and no drain behind it, so nothing will start the message (#12486).
     expect(result).toMatchObject({
       kind: "ok",
       thread: "dur-tui",
-      endpoint: { kind: "tui" },
       effective_mode: "auto",
       delivery: { kind: "queued_offline" },
       deduplicated: false,

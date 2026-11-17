@@ -88,14 +88,13 @@ export type ThreadDelivery =
   | { readonly kind: "queued_offline"; readonly queue_position: number; readonly reason?: "wake_unavailable" }
 
 /**
- * What a send through the session gateway adds to a delivery result: the durable `delivery_id`, the
- * lane the target used (`steer` / `follow_up`, or the requested mode while it waits), and the kind
- * of endpoint that serves the target (null when none answered).
+ * What a send through the session gateway adds to a delivery result: the durable `delivery_id` and the lane the target
+ * used (`steer` / `follow_up`, or the requested mode while it waits). The kind of endpoint that served the target is an
+ * endpoint internal (#14044): only the SDK's send (`endpoint_kind`, for `omo thread send` and connectors) reports it.
  */
 export type ThreadGatewayDeliveryFacts = {
   readonly delivery_id?: string
   readonly effective_mode?: "auto" | "steer" | "follow_up"
-  readonly endpoint?: { readonly kind: "rpc_host" | "tui" } | null
 }
 
 export type ThreadAddressResolution = "id" | "exact_name" | "fuzzy"

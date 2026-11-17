@@ -20,7 +20,7 @@ const approved = (address: string) => [
   { permission: "thread_send", patterns: [address], always: [address], autoApproveAsk: true as const },
 ]
 /** Known to exist on one leg only: a gateway row's sequence and endpoint kind here, the device there (contracts/results.ts). */
-const LEG_ONLY_KEYS: ReadonlySet<string> = new Set(["thread", "link", "message_seq", "endpoint", "device"])
+const LEG_ONLY_KEYS: ReadonlySet<string> = new Set(["thread", "link", "message_seq", "device"])
 const sharedKeys = (result: object) =>
   Object.keys(result)
     .filter((key) => !LEG_ONLY_KEYS.has(key))
@@ -171,9 +171,9 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
       const result = await run("thread_send", { thread: "twin", message: "which one" })
       expect(result).toMatchObject({ kind: "error", error: { code: "ambiguous_target" } })
       const candidates =
-        (result as { error: { details?: { candidates?: readonly { id: string; device?: string }[] } } }).error.details
-          ?.candidates ?? []
-      expect(candidates.map((candidate) => candidate.id).sort()).toEqual([...twins].sort())
+        (result as { error: { details?: { candidates?: readonly { thread: string; device?: string }[] } } }).error
+          .details?.candidates ?? []
+      expect(candidates.map((candidate) => candidate.thread).sort()).toEqual([...twins].sort())
       if (leg === "remote") expect(candidates.map((candidate) => candidate.device)).toEqual(["b", "b"])
       expect(admits()).toHaveLength(0)
     },

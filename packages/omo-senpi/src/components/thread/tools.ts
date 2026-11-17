@@ -485,16 +485,12 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
       }
     }
     if (sent.kind === "error") return { error: sent.error }
-    const { delivery, deduplicated, delivery_id, effective_mode, endpoint } = sent as Extract<
-      ThreadSendResult,
-      { kind: "ok" }
-    >
+    const { delivery, deduplicated, delivery_id, effective_mode } = sent as Extract<ThreadSendResult, { kind: "ok" }>
     return {
       delivery,
       deduplicated,
       ...(delivery_id === undefined ? {} : { delivery_id }),
       ...(effective_mode === undefined ? {} : { effective_mode }),
-      ...(endpoint === undefined ? {} : { endpoint }),
     }
   }
   /**
@@ -788,7 +784,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
  * The one send: the resolved target, the caller as the gateway names it (`session:<durable id>`, its name, turn and
  * cause), the text and mode go through the delivery pipeline, whose transport the target's kind picks. Both transports
  * answer the same result (#13006): the delivery outcome, its `delivery_id` and the lane it took (`effective_mode`) are
- * reported the same way whatever carried it; a gateway row's `message_seq` and `endpoint.kind` exist only for a session
+ * reported the same way whatever carried it; a gateway row's `message_seq` exists only for a session
  * this device holds (an unreachable one is `queued_offline`, the row is durable), and `device` only names another one.
  * A chain may come back to a session it passed; only a session sending to itself is refused `loop_detected`. Answers
  * may also travel through thread_read, thread_report and thread_answer.
@@ -837,7 +833,6 @@ async function deliverThrough(
       ...(sent.delivery_id === undefined ? {} : { delivery_id: sent.delivery_id }),
       ...(sent.effective_mode === undefined ? {} : { effective_mode: sent.effective_mode }),
       device: sent.device,
-      endpoint: null,
     }
     const row = target.kind === "remote" ? target.row : undefined
     const title = row?.title
@@ -873,7 +868,6 @@ async function deliverThrough(
   const facts = {
     delivery_id: sent.delivery_id,
     effective_mode: sent.effective_mode,
-    endpoint: sent.endpoint_kind === null ? null : { kind: sent.endpoint_kind },
   }
   if (resolvedBy === undefined) {
     const title = current.sessions.find((session) => (session.durableSessionId ?? session.sessionId) === threadId)?.name
@@ -964,7 +958,7 @@ function replySender(
     "Send to the intended thread as a normal send, by its id.",
     {
       candidates: found.map((sender) => ({
-        id: sender.session_id,
+        thread: sender.session_id,
         ...(sender.device === undefined ? {} : { device: sender.device }),
       })),
     },

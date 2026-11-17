@@ -86,7 +86,7 @@ describe("resolveTarget sessionId aliases", () => {
     )
     expect(result.kind === "error" ? result.message : "").toContain("dur-a")
     expect(result.kind === "error" ? result.message : "").toContain("dur-b")
-    expect(result.kind === "error" ? result.candidates?.map((candidate) => candidate.id) : []).toEqual([
+    expect(result.kind === "error" ? result.candidates?.map((candidate) => candidate.thread) : []).toEqual([
       "dur-a",
       "dur-b",
     ])
@@ -146,7 +146,7 @@ describe("resolveTarget exact ladder", () => {
 
     const error = expectError(result, "ambiguous_target")
     expect(error.candidates?.length).toBe(2)
-    const ids = (error.candidates ?? []).map((candidate) => candidate.id).sort()
+    const ids = (error.candidates ?? []).map((candidate) => candidate.thread).sort()
     expect(ids).toEqual(["t-1", "t-2"])
   })
 
@@ -160,8 +160,8 @@ describe("resolveTarget exact ladder", () => {
     const error = expectError(result, "ambiguous_target")
     const candidate: ThreadCandidate | undefined = error.candidates?.[0]
     if (candidate === undefined) throw new Error("expected a candidate")
-    expect(Object.keys(candidate).sort()).toEqual(["cwd", "id", "name", "preview", "state", "updatedAt"])
-    expect(candidate.id).toBe("t-2") // newest updated_at first
+    expect(Object.keys(candidate).sort()).toEqual(["cwd", "name", "preview", "state", "thread", "updatedAt"])
+    expect(candidate.thread).toBe("t-2") // newest updated_at first
     expect(candidate.name).toBe("fix  build")
     expect(candidate.cwd).toBe(CALLER)
     expect(candidate.preview).toBe("")
@@ -181,7 +181,7 @@ describe("resolveTarget exact ladder", () => {
 
     const error = expectError(result, "ambiguous_target")
     expect(error.candidates?.length).toBe(10)
-    const ids = (error.candidates ?? []).map((candidate) => candidate.id)
+    const ids = (error.candidates ?? []).map((candidate) => candidate.thread)
     expect(ids).not.toContain("t-01") // two oldest dropped
     expect(ids).not.toContain("t-02")
     expect(ids[0]).toBe("t-12") // newest first
@@ -490,7 +490,7 @@ describe("checkNameConflict", () => {
     const result = checkNameConflict(entries, "payments   lane")
 
     const error = expectError(result, "name_conflict")
-    expect(error.candidates?.[0]?.id).toBe("t-1")
+    expect(error.candidates?.[0]?.thread).toBe("t-1")
   })
 
   test("#given a decomposed name colliding with a composed stored name #when checked #then NFKC unifies them into a name_conflict", () => {

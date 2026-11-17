@@ -25,7 +25,7 @@ describe("a reply approved from a consumed delivery delivers only to that sender
     })
     expect(await run("thread_send", { thread: "local peer", message: "reply" })).toMatchObject({
       kind: "error",
-      error: { code: "reply_target_mismatch", details: { resolved_thread: "dur-local" } },
+      error: { code: "reply_target_mismatch", details: { thread: "dur-local" } },
     })
     expect(a.sent).toHaveLength(0)
   })

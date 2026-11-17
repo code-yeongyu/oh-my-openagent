@@ -49,7 +49,8 @@ export type ThreadAddressEntry = ThreadSummary & {
 
 /** The candidate payload every ambiguity error carries (up to ten). */
 export type ThreadCandidate = {
-  readonly id: string
+  /** The address to pass back as `thread`. */
+  readonly thread: string
   readonly name: string
   readonly cwd: string
   readonly preview: string
@@ -171,7 +172,7 @@ function addressError(
 
 function toCandidate(entry: ThreadAddressEntry): ThreadCandidate {
   return {
-    id: entry.thread_id,
+    thread: entry.thread_id,
     name: entry.name,
     cwd: entry.cwd,
     preview: entry.preview ?? "",

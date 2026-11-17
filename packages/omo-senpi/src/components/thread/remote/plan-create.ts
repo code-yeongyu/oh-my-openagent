@@ -6,7 +6,7 @@ import { threadToolFailure } from "../errors"
 import { openedResult } from "../tools/thread-row"
 import { type AliasError, type AliasRegistry, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
 import { accountDevices } from "./account"
-import { aliasFailure, deviceRefusal, remoteAvailable } from "./remote-ops"
+import { aliasFailure, deviceRefusal, holderDetails, remoteAvailable } from "./remote-ops"
 
 type LocalEntry = {
   readonly thread_id: string
@@ -206,7 +206,7 @@ export async function planCreate(
             "alias_taken",
             `The alias ${value.alias} is held by another thread.`,
             "Choose another alias; the holder is named in details.",
-            { holder: held.value },
+            { holder: holderDetails(held.value) },
           ),
         },
       }

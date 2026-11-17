@@ -93,11 +93,11 @@ describe("SessionHost: a new thread starts in its creator's approval mode on bot
     const { run, openSession } = surface({ ...a.remote, permissionPreset: () => "ask" })
     expect(await run("thread_create", { fork_from: "dur-local" })).toMatchObject({
       kind: "error",
-      error: { code: "unsupported", details: { source: "dur-local" } },
+      error: { code: "unsupported", details: { thread: "dur-local" } },
     })
     expect(await run("thread_create", { fork_from: "dur-on-b" })).toMatchObject({
       kind: "error",
-      error: { code: "unsupported", details: { source: "dur-on-b", device: "b" } },
+      error: { code: "unsupported", details: { thread: "dur-on-b", device: "b" } },
     })
     expect(localOpenFrames(openSession)).toEqual([])
     expect(openFrames(a.sent)).toEqual([])
@@ -177,11 +177,11 @@ describe("SessionHost: a name is checked against the device the thread lands on"
     const here = await run("thread_create", { name: "Local Peer" })
     expect(there).toMatchObject({
       kind: "error",
-      error: { code: "name_conflict", details: { candidates: [{ id: "dur-on-b", name: "on b" }] } },
+      error: { code: "name_conflict", details: { candidates: [{ thread: "dur-on-b", name: "on b" }] } },
     })
     expect(here).toMatchObject({
       kind: "error",
-      error: { code: "name_conflict", details: { candidates: [{ id: "dur-local", name: "local peer" }] } },
+      error: { code: "name_conflict", details: { candidates: [{ thread: "dur-local", name: "local peer" }] } },
     })
     expect(Object.keys(comparable(there) as object)).toEqual(Object.keys(comparable(here) as object))
     expect(openSession).not.toHaveBeenCalled()
