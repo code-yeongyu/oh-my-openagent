@@ -127,7 +127,23 @@ describe("thread_create with a first prompt (#13410)", () => {
     // A peer session's message is an admitted delivery on b, as thread_send makes it (#12882), never a raw prompt.
     const admitted = a.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message")
     expect(admitted).toEqual([expect.objectContaining({ via: "session", device: "b" })])
-    expect(JSON.stringify(admitted[0]?.rpc)).toContain("build it")
+    // #14045: the creator's brief is the new thread's own first message, not a relayed peer message under the gateway header.
+    const text = String(admitted[0]?.rpc?.["text"])
+    expect(text).toStartWith("build it")
+    expect(text).not.toContain("OMO_GATEWAY")
+    expect(admitted[0]?.rpc?.["displayText"]).toBe("build it")
+  })
+
+  test("#given a thread_send to a thread on b after a create there #when delivered #then it keeps the gateway header: only the create's prompt carries the creator's authority (#14045)", async () => {
+    const a = account()
+    const { run } = surface(a.remote)
+    await run("thread_create", { device: "studio", prompt: "build it" })
+    await run("thread_send", { thread: "dur-on-b", message: "and then this" })
+    const texts = a.sent
+      .filter((entry) => entry.rpc?.["type"] === "admit_external_message")
+      .map((entry) => String(entry.rpc?.["text"]))
+    expect(texts).toHaveLength(2)
+    expect(texts[1]).toContain("OMO_GATEWAY")
   })
 
   // Found by the two-device relay proof: b knows a session it opened a moment ago only by the relay key its open reply named.
@@ -145,11 +161,14 @@ describe("thread_create with a first prompt (#13410)", () => {
 
   test("#given a prompt #when created here #then the gateway takes one delivery for the new thread", async () => {
     const a = account()
-    const { run, enqueuedFor } = surface(a.remote)
+    const { run, enqueuedRequests } = surface(a.remote)
     const result = (await run("thread_create", { prompt: "build it" })) as { prompt?: Record<string, unknown> }
     expect(result).toMatchObject({ kind: "ok", thread: { thread_id: "dur-created-here" } })
     expect(result.prompt).toMatchObject({ delivery: { kind: expect.any(String) } })
-    expect(enqueuedFor("dur-created-here")).toBe(1)
+    // #14045: the row carries the creator's authority, so the new thread's drain admits it as its own first message;
+    // a later thread_send from the same session does not.
+    await run("thread_send", { thread: "dur-created-here", message: "and then this" })
+    expect(enqueuedRequests("dur-created-here").map((request) => request.authority)).toEqual(["creator", undefined])
   })
 
   test("#given one idempotency key #when the create with a prompt runs twice #then b opens once and is prompted once", async () => {

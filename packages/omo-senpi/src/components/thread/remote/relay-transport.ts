@@ -4,7 +4,7 @@ import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import { hashArgs } from "../gateway/bindings"
 import { decideDelivery } from "../gateway/decision"
 import { senderFacts } from "../gateway/envelope"
-import { deliveryProvenanceLine, renderDeliveryText } from "../gateway/provenance"
+import { renderDeliveryDisplayText, renderDeliveryText } from "../gateway/provenance"
 import { REFUSAL_CODES } from "../gateway/result"
 import type { GatewayStore } from "../gateway/store"
 import type { DeliveryOutcome, DeliveryTransport, OutboundDelivery, RelayDeliverySuccess } from "../gateway/transport"
@@ -404,6 +404,7 @@ export function createRelayTransport(
               root_id,
               hop,
               delivery_id,
+              ...(delivery.authority === undefined ? {} : { authority: delivery.authority }),
             },
             body: delivery.text,
             mode_requested: delivery.mode,
@@ -411,7 +412,13 @@ export function createRelayTransport(
             binding_id: null,
             binding_revision: null,
           }),
-          displayText: `${deliveryProvenanceLine(facts.provenance)}\n${delivery.text}`,
+          displayText: renderDeliveryDisplayText({
+            envelope: {
+              provenance: facts.provenance,
+              ...(delivery.authority === undefined ? {} : { authority: delivery.authority }),
+            },
+            body: delivery.text,
+          }),
           sender: {
             kind: "agent",
             session_id: delivery.caller_id,

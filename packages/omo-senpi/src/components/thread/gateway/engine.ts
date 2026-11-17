@@ -9,7 +9,10 @@ import { senderFacts } from "./envelope"
 import { resultFromRow } from "./result"
 import { resolveProvenance } from "./provenance-resolver"
 import type { GatewayStore } from "./store"
-import type { ExternalAuthor, GatewayDeliveryMode, GatewayDeliveryResult, GatewaySender, Provenance } from "./types"
+import type {
+  DeliveryAuthority,
+  ExternalAuthor,
+  GatewayDeliveryMode, GatewayDeliveryResult, GatewaySender, Provenance } from "./types"
 
 export type GatewayTarget = {
   readonly durable_id: string
@@ -39,6 +42,8 @@ export type GatewayDeliverRequest = {
   readonly root_id?: string
   /** The highest chain hop an input of the caller's current run arrived with from another device (K8): the row continues it. */
   readonly inbound_hop?: number
+  /** Set only by thread_create's first prompt to the thread it made (#14045). */
+  readonly authority?: DeliveryAuthority
 }
 
 export type GatewayEngine = {
@@ -166,6 +171,7 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
       sender_turn: facts.turn,
       cause_delivery_id: facts.cause,
       ...(request.inbound_hop === undefined ? {} : { inbound_hop: request.inbound_hop }),
+      ...(request.authority === undefined ? {} : { authority: request.authority }),
       claimed_root_id: request.root_id ?? null,
       origin: facts.origin(deliveryId),
       actor: facts.actor,
