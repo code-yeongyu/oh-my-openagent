@@ -1455,6 +1455,7 @@
     "packages/omo-senpi/src/components/skill-commands/bare-skill-command.ts",
     "packages/omo-senpi/src/components/skill-commands/index.ts",
     "packages/omo-senpi/src/components/skill-pointers/index.ts",
+    "packages/omo-senpi/src/components/skill-pointers/pointer-text.ts",
     "packages/omo-senpi/src/components/skill-pointers/strip-quoted-regions.ts",
     "packages/omo-senpi/src/components/task/category-config-generation.ts",
     "packages/omo-senpi/src/components/task/category-unavailable-warning.ts",
