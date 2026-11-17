@@ -65,6 +65,7 @@ const SPAWN_CALL_SITES = [
   "packages/device-service-core/src/local-api/dacl.ts: run(CURRENT_USER_SID_SCRIPT; {})",
   "packages/device-service-core/src/local-api/dacl.ts: run(DESCRIBE_DACL_SCRIPT; {LA_PATH})",
   "packages/device-service-core/src/local-api/dacl.ts: verifyExactDacl(path; userSid)",
+  'packages/memory-core/src/locks/process-identity.ts: execFileText("/bin/ps"; ["-o", "args=", "-p", String(pid)])',
   'packages/memory-core/src/locks/process-identity.ts: execFileText("/bin/ps"; ["-o", "lstart=", "-p", String(pid)])',
   'packages/memory-core/src/locks/process-identity.ts: execFileText("powershell.exe"; [ "-NoProfile", "-Command", `(Get-Process -Id ${pid} -ErrorAction SilentlyContinue).StartTime.ToUniversalTime().ToString(\'o\')`, ])',
   "packages/memory-core/src/locks/process-identity.ts: node:child_process#execFile(command; args)",
@@ -73,6 +74,8 @@ const SPAWN_CALL_SITES = [
   'packages/omo-native/bin/lib/process-list.js: node:child_process#spawnSync("ps"; ["-ww", "-axo", "pid=,ppid=,etime=,tty=,args="])',
   "packages/omo-native/remote-local.ts: packages/omo-native/remote-session-verbs.ts#runSession(service; parsed.session)",
   "packages/omo-native/remote-local.ts: runOn(service; parsed)",
+  "packages/omo-opencode/src/cli/service-auth/credential-lock.ts: credentialLockBusy(error; -)",
+  "packages/omo-opencode/src/cli/service-auth/credential-lock.ts: packages/memory-core/src/locks/process-identity.ts#getProcessCommandName(holder.ownerPid; -)",
   // omo#13748: `open --prompt` hands the new session its first message through the same person pipeline as `send`.
   "packages/omo-native/remote-session-verbs.ts: openOn(remote; args)",
   "packages/omo-native/remote-session-verbs.ts: packages/omo-senpi/src/components/thread/gateway/provenance-resolver.ts#resolveProvenance({cwd,env}; -)",
