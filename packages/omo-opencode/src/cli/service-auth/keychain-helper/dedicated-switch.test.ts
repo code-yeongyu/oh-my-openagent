@@ -56,6 +56,19 @@ describe("turning OmO's own keychain off (#13116)", () => {
     expect(fake.calls.some((call) => call.verb === "store-deactivate")).toBe(false)
   })
 
+  test.each([false, true])(
+    "#given an inactive store holding a leftover copy (discard %p) #when disabled #then the newer login sign-in is kept and the leftover is dropped",
+    async (discard) => {
+      const fake = dedicatedFake({ state: "inactive" })
+      fake.omo.put(A, "dummy-stale", "helper")
+      fake.login.put(A, "dummy-rotated", "helper")
+      expect(await switcherFor(fake).disable(discard)).toEqual({ moved: "none", erased: true })
+      expect(fake.login.items.get(A)?.value).toBe("dummy-rotated")
+      expect(fake.state()).toBe("absent")
+      expect(fake.calls.some((call) => call.store === "login" && call.verb === "write")).toBe(false)
+    },
+  )
+
   test("#given --discard #when a sign-in remains #then it refuses; #when signed out #then the store is erased", async () => {
     const fake = dedicatedFake({ state: "active" })
     fake.omo.put(A, "dummy-sign-in", "helper")

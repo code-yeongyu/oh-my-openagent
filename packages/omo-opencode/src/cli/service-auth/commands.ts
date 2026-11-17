@@ -15,6 +15,13 @@ import { resolveMemoryRoot, syncPinDir } from "@oh-my-opencode/memory-core/sync-
 import { createSession, type DeviceServiceHandoff, type Session } from "./session"
 import { retireSyncPinOnDiscard } from "./sync-pin-retire"
 import { terminalText } from "./terminal-text"
+import { dedicatedStoreState } from "./keychain-helper/dedicated-store"
+
+// #13116 design 7: a sign-in kept in OmO's own keychain says so; the login keychain default adds no line.
+function noteDedicatedStore(): void {
+  if (process.platform === "darwin" && dedicatedStoreState() === "active")
+    console.log("The sign-in is kept in OmO's own keychain on this Mac (omo account store status).")
+}
 
 // Probe the service before anything user-visible (a browser tab, a device code) so an
 // unreachable or unhealthy service fails at once instead of after a dead page and a wait.
@@ -129,6 +136,7 @@ async function run(
             : `Signed in to ${api} as ${terminalText(email)} (${terminalText(saved.device.name)}).`
           : "Not signed in.",
       )
+      noteDedicatedStore()
       return
     }
     // Local sign-in and the device service first, so an already-signed-in computer is told to log out
@@ -148,6 +156,7 @@ async function run(
           ? "Signed in to OmO. The account could not be read; run omo whoami to see it."
           : `Signed in to OmO as ${terminalText(email)}.`,
       )
+      noteDedicatedStore()
     }
     if (!options.device && options.browser !== false) {
       try {

@@ -77,10 +77,13 @@ export function storeSwitch(deps: StoreSwitchDeps) {
     },
 
     async disable(discard: boolean): Promise<DisableOutcome> {
-      if (deps.state() === "absent") return { moved: "none", erased: false }
-      const current = await call({ verb: "read", store: "omo-migrate" })
-      if (current.error !== undefined) throw refused(current, "read OmO's keychain")
+      const state = deps.state()
+      if (state === "absent") return { moved: "none", erased: false }
       let moved: DisableOutcome["moved"] = "none"
+      // An inactive store is never authoritative: whatever it holds is a leftover from an enable or disable that
+      // stopped early, older than the login keychain's sign-in, so it is dropped and never copied over it.
+      const current: HelperReply = state === "active" ? await call({ verb: "read", store: "omo-migrate" }) : {}
+      if (current.error !== undefined) throw refused(current, "read OmO's keychain")
       if (current.value !== undefined) {
         if (discard)
           throw new StoreSwitchError(

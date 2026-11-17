@@ -13,7 +13,7 @@ export function dedicatedFake(options: { readonly loginLocked?: boolean; readonl
   const login = fakeKeychain()
   const omo = fakeKeychain()
   let state: DedicatedStoreState = options.state ?? "absent"
-  let loginLocked = options.loginLocked === true
+  const loginLocked = options.loginLocked === true
   const calls: HelperCall[] = []
   const toLogin = (request: HelperCall, lease?: HelperLease): Promise<HelperReply> => {
     if (loginLocked && request.verb !== "remove") return Promise.resolve({ error: "locked" })
@@ -58,12 +58,6 @@ export function dedicatedFake(options: { readonly loginLocked?: boolean; readonl
     calls,
     access,
     state: () => state,
-    setState: (next: DedicatedStoreState) => {
-      state = next
-    },
-    unlockLogin: () => {
-      loginLocked = false
-    },
   }
 }
 

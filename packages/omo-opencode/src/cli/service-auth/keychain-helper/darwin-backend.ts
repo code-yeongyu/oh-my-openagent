@@ -168,7 +168,9 @@ function dedicatedOptions<O extends Parameters<typeof createDarwinBackend>[0]>(o
       set: async () => {
         throw new HelperReadError("dedicated", NO_LOGIN_KEYCHAIN)
       },
-      delete: async () => false,
+      delete: async () => {
+        throw new HelperReadError("dedicated", NO_LOGIN_KEYCHAIN)
+      },
     },
     silently: (run) => run(),
     handOff: async () => false,
