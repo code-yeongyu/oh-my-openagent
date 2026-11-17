@@ -6,6 +6,8 @@ mod ffi;
 mod observer;
 mod process_query;
 mod server;
+#[cfg(test)]
+mod tests;
 mod token;
 mod values;
 

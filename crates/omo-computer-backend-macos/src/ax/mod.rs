@@ -12,6 +12,7 @@ pub mod handles;
 pub mod menus;
 pub mod notifications;
 pub mod reader;
+pub mod registration;
 pub mod seam;
 pub mod settle;
 pub mod table;

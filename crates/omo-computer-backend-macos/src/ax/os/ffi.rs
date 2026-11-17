@@ -10,6 +10,9 @@ pub const AX_CANNOT_COMPLETE: i32 = -25204;
 pub const AX_ATTRIBUTE_UNSUPPORTED: i32 = -25205;
 pub const AX_ACTION_UNSUPPORTED: i32 = -25206;
 
+/// `kCFRunLoopRunFinished`: the mode has no source or timer to run.
+pub const RUN_LOOP_FINISHED: i32 = 1;
+
 pub const VALUE_CGPOINT: u32 = 1;
 pub const VALUE_CGSIZE: u32 = 2;
 pub const VALUE_CFRANGE: u32 = 4;
@@ -27,6 +30,7 @@ pub type ObserverCallback = unsafe extern "C" fn(CfRef, CfRef, CfRef, *mut c_voi
 #[link(name = "ApplicationServices", kind = "framework")]
 unsafe extern "C" {
     pub fn AXUIElementCreateApplication(pid: i32) -> CfRef;
+    pub fn AXUIElementGetTypeID() -> usize;
     pub fn AXUIElementCopyAttributeValue(
         element: CfRef,
         attribute: CfRef,
@@ -82,6 +86,7 @@ unsafe extern "C" {
         count: isize,
         callbacks: *const c_void,
     ) -> CfRef;
+    pub fn CFDataGetTypeID() -> usize;
     pub fn CFDataCreate(allocator: CfRef, bytes: *const u8, length: isize) -> CfRef;
     pub fn CFDataGetBytePtr(data: CfRef) -> *const u8;
     pub fn CFDataGetLength(data: CfRef) -> isize;

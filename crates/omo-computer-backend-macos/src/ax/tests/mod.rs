@@ -4,5 +4,6 @@ mod actions;
 mod kit;
 mod reads;
 mod refs;
+mod registration;
 mod settle;
 mod table;

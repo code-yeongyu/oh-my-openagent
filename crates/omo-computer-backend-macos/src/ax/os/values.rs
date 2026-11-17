@@ -159,6 +159,26 @@ pub fn strings(array: CfRef) -> Vec<String> {
         .collect()
 }
 
+/// The AXUIElements of an app-supplied array value, each retained; a non-array reads as none
+/// and a non-element entry is skipped.
+pub fn ax_elements(array: CfRef) -> Vec<Owned> {
+    // SAFETY: a plain type-id read.
+    let (array_type, element_type) =
+        unsafe { (ffi::CFArrayGetTypeID(), ffi::AXUIElementGetTypeID()) };
+    if type_of(array) != Some(array_type) {
+        return Vec::new();
+    }
+    // SAFETY: `array` is a CFArray (checked above).
+    let count = unsafe { cf::CFArrayGetCount(array) };
+    (0..count)
+        // SAFETY: `i` < the count; the array keeps each value alive for this read.
+        .map(|i| unsafe { cf::CFArrayGetValueAtIndex(array, i) })
+        .filter(|v| type_of(*v) == Some(element_type))
+        // SAFETY: an AXUIElement of the array (checked above); retained for the caller.
+        .filter_map(|v| Owned::new(unsafe { ffi::CFRetain(v) }))
+        .collect()
+}
+
 /// The CF value an attribute write carries.
 pub fn value(value: &AxValue) -> Option<Owned> {
     match value {

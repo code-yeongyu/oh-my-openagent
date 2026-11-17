@@ -1,9 +1,12 @@
 //! The AX thread: one `CFRunLoop` on which every target app's `AXObserver` fires (the eleven
 //! notifications), each callback attributed to its window by an `AXParent` walk of at most
 //! 128 hops inside a 250 ms budget, and handed to the server over a bounded channel. The server
-//! waits on that channel with the caller's deadline: no AX polling and no sleep. With no
-//! observer yet the thread blocks on the next registration; with observers it runs the run
-//! loop in short slices only so a new registration request is picked up.
+//! waits on that channel with the caller's deadline: no AX polling and no sleep. While the run
+//! loop has no live source (no observer kept yet, or every kept app's source invalidated) the
+//! thread blocks on the next registration; otherwise it runs the run loop in short slices only
+//! so a new registration request is picked up. A registration is settled through
+//! [`Registration`]: the caller's answer and the kept set always agree, each AX IPC it makes is
+//! bounded by the time the caller still waits, and an already-kept pid is not registered again.
 
 use std::ffi::{c_void, CString};
 use std::sync::mpsc::{
@@ -12,6 +15,7 @@ use std::sync::mpsc::{
 use std::time::{Duration, Instant};
 
 use super::ffi;
+use crate::ax::registration::{Kept, Registration};
 use crate::ax::seam::NOTIFICATIONS;
 use crate::capture::os::cf::{self, cf_string, CfRef, Owned};
 use crate::capture::os::symbols;
@@ -48,9 +52,10 @@ struct Refcon {
     events: SyncSender<Raw>,
 }
 
-/// One registration request and where its answer goes.
-type Request = (u32, Sender<bool>);
-type Kept = (Owned, Owned, Box<Refcon>);
+/// One registration request, settled through its shared [`Registration`].
+type Request = (u32, Registration);
+/// A kept observer, its application element and the refcon its callbacks read.
+type Observer = (Owned, Owned, Box<Refcon>);
 
 /// The AX thread's two channels.
 pub struct ObserverThread {
@@ -72,17 +77,17 @@ impl ObserverThread {
     /// Registers `pid`'s observer; `true` only when the AX thread created it and it took at
     /// least one notification.
     pub fn observe(&self, pid: u32) -> bool {
-        let (answer, answered) = channel();
-        self.register.send((pid, answer)).is_ok()
-            && matches!(answered.recv_timeout(REGISTER_WAIT), Ok(true))
+        let registration = Registration::new(Instant::now() + REGISTER_WAIT);
+        self.register.send((pid, registration.clone())).is_ok() && registration.wait()
     }
 }
 
 fn run(requests: &Receiver<Request>, sink: &SyncSender<Raw>) {
-    let mut kept: Vec<Kept> = Vec::new();
+    let mut kept = Kept::default();
+    let mut idle = true;
     loop {
-        if kept.is_empty() {
-            // No observer, no run-loop source: block on the next request instead of spinning.
+        if idle {
+            // No live run-loop source: block on the next request instead of spinning.
             match requests.recv() {
                 Ok(request) => register(&mut kept, request, sink),
                 Err(_) => return,
@@ -95,20 +100,35 @@ fn run(requests: &Receiver<Request>, sink: &SyncSender<Raw>) {
                 Err(TryRecvError::Disconnected) => return,
             }
         }
-        if !kept.is_empty() {
-            // SAFETY: the default mode constant; runs this thread's own run loop.
-            unsafe { ffi::CFRunLoopRunInMode(ffi::kCFRunLoopDefaultMode, RUN_LOOP_SLICE_S, false) };
-        }
+        idle = run_slice() == ffi::RUN_LOOP_FINISHED;
     }
 }
 
-fn register(kept: &mut Vec<Kept>, (pid, answer): Request, sink: &SyncSender<Raw>) {
-    let added = add(pid, sink);
-    let _ = answer.send(added.is_some());
-    kept.extend(added);
+/// Runs this thread's run loop for one slice; `kCFRunLoopRunFinished` when it has no source.
+pub(super) fn run_slice() -> i32 {
+    // SAFETY: the default mode constant; runs this thread's own run loop.
+    unsafe { ffi::CFRunLoopRunInMode(ffi::kCFRunLoopDefaultMode, RUN_LOOP_SLICE_S, false) }
 }
 
-fn add(pid: u32, sink: &SyncSender<Raw>) -> Option<Kept> {
+fn register(kept: &mut Kept<Observer>, (pid, registration): Request, sink: &SyncSender<Raw>) {
+    let Some((observer, _, _)) = kept.register(pid, &registration, |r| add(pid, r, sink)) else {
+        return;
+    };
+    // SAFETY: this thread's run loop and the kept observer's source; only a kept observer's
+    // source is added, so a discarded one never fires.
+    unsafe {
+        let source = ffi::AXObserverGetRunLoopSource(observer.get());
+        ffi::CFRunLoopAddSource(
+            ffi::CFRunLoopGetCurrent(),
+            source,
+            ffi::kCFRunLoopDefaultMode,
+        );
+    }
+}
+
+/// The observer of `pid` on the eleven notifications; `None` when none took or the caller
+/// stopped waiting. Each IPC is bounded by the time the caller still waits.
+fn add(pid: u32, registration: &Registration, sink: &SyncSender<Raw>) -> Option<Observer> {
     let raw_pid = i32::try_from(pid).ok()?;
     let mut observer: CfRef = std::ptr::null();
     // SAFETY: a valid pid and callback; a success returns a +1 observer.
@@ -127,26 +147,17 @@ fn add(pid: u32, sink: &SyncSender<Raw>) -> Option<Kept> {
         .cast::<c_void>();
     let mut taken = 0;
     for name in NOTIFICATIONS {
+        let left = registration.left()?;
         let name = cf_string(&CString::new(name).ok()?)?;
         // SAFETY: valid observer, element and name; `refcon` outlives the observer in `kept`.
+        // The messaging timeout bounds this IPC to the time the caller still waits.
         let code = unsafe {
+            ffi::AXUIElementSetMessagingTimeout(app.get(), left.as_secs_f32().max(0.001));
             ffi::AXObserverAddNotification(observer.get(), app.get(), name.get(), pointer)
         };
         taken += usize::from(code == ffi::AX_SUCCESS);
     }
-    if taken == 0 {
-        return None;
-    }
-    // SAFETY: this thread's run loop and the observer's source.
-    unsafe {
-        let source = ffi::AXObserverGetRunLoopSource(observer.get());
-        ffi::CFRunLoopAddSource(
-            ffi::CFRunLoopGetCurrent(),
-            source,
-            ffi::kCFRunLoopDefaultMode,
-        );
-    }
-    Some((observer, app, refcon))
+    (taken > 0).then_some((observer, app, refcon))
 }
 
 unsafe extern "C" fn callback(

@@ -10,7 +10,7 @@ use super::ffi;
 use super::observer::{window_of, ObserverThread};
 use super::process_query;
 use super::token::TokenSymbols;
-use super::values::{attributes, read_set, strings, value};
+use super::values::{attributes, ax_elements, read_set, strings, value};
 use crate::ax::seam::{
     Attributes, AxServer, AxStatus, AxValue, Element, Notified, RemoteToken, WindowOwner,
 };
@@ -85,13 +85,8 @@ impl Server {
     }
 
     fn elements_of(&mut self, array: &Owned) -> Vec<Element> {
-        // SAFETY: `array` is a CFArray of AXUIElements.
-        let count = unsafe { cf::CFArrayGetCount(array.get()) };
-        (0..count)
-            .filter_map(|i| {
-                // SAFETY: in bounds; retained for the table.
-                Owned::new(unsafe { ffi::CFRetain(cf::CFArrayGetValueAtIndex(array.get(), i)) })
-            })
+        ax_elements(array.get())
+            .into_iter()
             .map(|owned| self.insert(owned))
             .collect()
     }
