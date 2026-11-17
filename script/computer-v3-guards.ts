@@ -15,8 +15,8 @@
 //   --oracle                           imported fixtures unchanged, new cases v3-, ORACLE-DELTAS lines valid
 //   --stubs                            no unimplemented!, todo!(, .skip(, .only( or bare #[ignore] in new sources
 
-import { existsSync, lstatSync, readFileSync } from "node:fs"
-import { dirname, isAbsolute, join, posix, resolve } from "node:path"
+import { existsSync, lstatSync, readFileSync, readlinkSync } from "node:fs"
+import { dirname, isAbsolute, join, parse, posix, resolve, sep } from "node:path"
 
 import nameMap from "./computer-v3-name-map.json"
 
@@ -167,14 +167,51 @@ type EntryState =
  * a file means the path cannot exist (ENOTDIR); any other failure (no permission, a symlink loop) is reported as
  * unreadable, so one bad path never ends the run and every one of them is named.
  */
+const pathKey = (value: string): string => (process.platform === "win32" ? value.toLowerCase() : value)
+
+// Windows lstat of a path under a symlink cycle returns ENOENT or ENOTDIR instead of ELOOP, and
+// throwIfNoEntry then reports the path as absent. A cycle is not absence: the entry cannot be checked.
+function symlinkLoop(absolute: string): boolean {
+  const normalized = resolve(absolute)
+  const { root } = parse(normalized)
+  const rest = normalized.slice(root.length).split(sep).filter((part) => part !== "")
+  let current = root
+  const seen = new Set<string>()
+  for (const part of rest) {
+    current = current.endsWith(sep) ? `${current}${part}` : join(current, part)
+    let stat: ReturnType<typeof lstatSync> | undefined
+    try {
+      stat = lstatSync(current, { throwIfNoEntry: false })
+    } catch {
+      return false
+    }
+    if (stat === undefined) return false
+    if (!stat.isSymbolicLink()) continue
+    let target: string
+    try {
+      target = readlinkSync(current)
+    } catch {
+      return false
+    }
+    const here = pathKey(current)
+    const there = pathKey(resolve(dirname(current), target))
+    if (there === here || seen.has(there)) return true
+    seen.add(here)
+  }
+  return false
+}
+
 function entryState(absolute: string): EntryState {
   try {
-    return lstatSync(absolute, { throwIfNoEntry: false }) === undefined ? { kind: "absent" } : { kind: "present" }
+    if (lstatSync(absolute, { throwIfNoEntry: false }) !== undefined) return { kind: "present" }
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code
-    if (code === "ENOTDIR") return { kind: "absent" }
+    if (code === "ENOTDIR" && !symlinkLoop(absolute)) return { kind: "absent" }
+    if (symlinkLoop(absolute)) return { kind: "unreadable", code: "ELOOP" }
     return { kind: "unreadable", code: code ?? String(error) }
   }
+  if (symlinkLoop(absolute)) return { kind: "unreadable", code: "ELOOP" }
+  return { kind: "absent" }
 }
 
 // ---------------------------------------------------------------------------------------------------------

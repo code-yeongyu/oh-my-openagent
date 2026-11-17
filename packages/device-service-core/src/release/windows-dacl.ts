@@ -39,11 +39,17 @@ const runPowerShell: PowerShellRunner = async (script, env) => {
 }
 
 const firstErrorLine = (err: string | undefined): string => {
-  const line =
-    (err ?? "")
-      .split(/\r?\n/)
-      .find((text) => text.trim() !== "" && !text.startsWith("#< CLIXML"))
-      ?.trim() ?? ""
+  const lines = (err ?? "")
+    .split(/\r?\n/)
+    .map((text) => text.trim())
+    .filter((text) => text !== "" && !text.startsWith("#< CLIXML"))
+  // A redirected Windows PowerShell writes its progress record as CLIXML on the same stream as the
+  // real error. The progress object is not the failure.
+  const plain = lines.find((text) => !text.startsWith("<"))
+  const embedded = lines
+    .map((text) => /Exception[^<]{0,220}/.exec(text)?.[0])
+    .find((text): text is string => text !== undefined)
+  const line = plain ?? embedded ?? ""
   return line === "" ? "" : `: ${line.slice(0, 300)}`
 }
 

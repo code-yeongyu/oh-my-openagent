@@ -34,7 +34,15 @@ export const runPowerShell: PowerShellRunner = async (script, env) => {
 
 // The Set-Acl script applyExactDacl runs; the device-service guard runs the same text with its read-back in one process.
 export const APPLY_DACL_SCRIPT = String.raw`
+$ProgressPreference = 'SilentlyContinue'
 $ErrorActionPreference = 'Stop'
+# Set-Acl's SetOwner dies with "unauthorized operation" when SeRestorePrivilege is present but disabled,
+# which is the token GitHub's Windows runner hands out. The failure is easy to miss: the first stderr
+# line is the one-time "Preparing modules for first use" progress record. icacls enables the privilege
+# itself. The DACL stays the fresh protected one-ACE descriptor, because icacls /grant:r keeps every
+# other explicit ACE (LA17b).
+$ownerSet = & icacls.exe $env:LA_PATH /setowner "*$($env:LA_SID)" 2>&1
+if ($LASTEXITCODE -ne 0) { throw "setowner failed: $ownerSet" }
 $sid = New-Object System.Security.Principal.SecurityIdentifier($env:LA_SID)
 if ($env:LA_KIND -eq 'dir') {
   $acl = New-Object System.Security.AccessControl.DirectorySecurity
@@ -47,7 +55,6 @@ $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($sid,
   [System.Security.AccessControl.FileSystemRights]::FullControl, $inherit,
   [System.Security.AccessControl.PropagationFlags]::None, [System.Security.AccessControl.AccessControlType]::Allow)
 $acl.SetAccessRuleProtection($true, $false)
-$acl.SetOwner($sid)
 $acl.AddAccessRule($rule)
 Set-Acl -LiteralPath $env:LA_PATH -AclObject $acl
 Write-Output 'applied'

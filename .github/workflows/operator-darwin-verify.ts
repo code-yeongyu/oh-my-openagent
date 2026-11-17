@@ -284,6 +284,13 @@ export async function verifyOperatorDarwin(input: Input, tools: Tools): Promise<
   ]
 }
 
+const describeUnexpected = (error: unknown): string => {
+  if (!(error instanceof Error)) return String(error)
+  const code = (error as NodeJS.ErrnoException).code
+  if (code === undefined || error.message.includes(code)) return error.message
+  return `${code}: ${error.message}`
+}
+
 async function main(argv: readonly string[]): Promise<number> {
   const arg = (flag: string) => {
     const index = argv.indexOf(flag)
@@ -319,7 +326,7 @@ async function main(argv: readonly string[]): Promise<number> {
     const reason =
       error instanceof Refusal
         ? error.message
-        : `unexpected verifier error: ${error instanceof Error ? error.message : String(error)}`
+        : `unexpected verifier error: ${describeUnexpected(error)}`
     console.log(`::error::operator_darwin_artifacts refused: ${reason}`)
     return 1
   }
