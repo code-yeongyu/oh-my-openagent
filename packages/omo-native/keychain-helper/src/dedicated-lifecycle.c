@@ -1,0 +1,121 @@
+#define __STDC_WANT_LIB_EXT1__ 1
+#include <string.h>
+
+#include "dedicated.h"
+
+#include <CoreServices/CoreServices.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
+static void remove_partial(const char *dir) {
+  char path[DEDICATED_PATH_BYTES];
+  if (dedicated_join(path, sizeof path, dir, DEDICATED_KEYCHAIN_NAME)) unlink(path);
+  if (dedicated_join(path, sizeof path, dir, DEDICATED_KEY_NAME)) unlink(path);
+  rmdir(dir);
+}
+
+static const char *write_key(const char *dir, char key[DEDICATED_KEY_HEX]) {
+  unsigned char random[DEDICATED_KEY_BYTES];
+  if (SecRandomCopyBytes(kSecRandomDefault, sizeof random, random) != errSecSuccess) return "random";
+  static const char digits[] = "0123456789abcdef";
+  for (size_t i = 0; i < DEDICATED_KEY_BYTES; i++) {
+    key[i * 2] = digits[random[i] >> 4];
+    key[i * 2 + 1] = digits[random[i] & 0x0f];
+  }
+  memset_s(random, sizeof random, 0, sizeof random);
+  char path[DEDICATED_PATH_BYTES];
+  if (!dedicated_join(path, sizeof path, dir, DEDICATED_KEY_NAME)) return "path";
+  int fd = open(path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
+  if (fd < 0) return "key";
+  bool written = fchmod(fd, 0600) == 0 && write(fd, key, DEDICATED_KEY_HEX) == DEDICATED_KEY_HEX && fsync(fd) == 0;
+  close(fd);
+  return written ? NULL : "key";
+}
+
+static const char *create_keychain(const char *dir, const char key[DEDICATED_KEY_HEX], OSStatus *status) {
+  char path[DEDICATED_PATH_BYTES];
+  if (!dedicated_join(path, sizeof path, dir, DEDICATED_KEYCHAIN_NAME)) return "path";
+  SecKeychainRef keychain = NULL;
+  if ((*status = SecKeychainCreate(path, DEDICATED_KEY_HEX, key, false, NULL, &keychain)) != errSecSuccess) return "create";
+  // Locks on sleep and after five idle minutes; every request unlocks it again with the key.
+  SecKeychainSettings settings = {SEC_KEYCHAIN_SETTINGS_VERS1, true, true, 300};
+  *status = SecKeychainSetSettings(keychain, &settings);
+  CFRelease(keychain);
+  if (*status != errSecSuccess) return "settings";
+  return chmod(path, 0600) == 0 ? NULL : "mode";
+}
+
+// Built in a private sibling directory and moved into place by one rename: a crash leaves no half-made store.
+static const char *build_store(const char *partial, OSStatus *status) {
+  if (mkdir(partial, 0700) != 0 || chmod(partial, 0700) != 0) return "mkdir";
+  char key[DEDICATED_KEY_HEX];
+  const char *refusal = write_key(partial, key);
+  if (refusal == NULL) refusal = create_keychain(partial, key, status);
+  memset_s(key, sizeof key, 0, sizeof key);
+  if (refusal != NULL) return refusal;
+  // The key sits beside the keychain, so the pair is kept out of Time Machine (sticky: excludeByPath false).
+  CFURLRef url = CFURLCreateFromFileSystemRepresentation(NULL, (const UInt8 *)partial, (CFIndex)strlen(partial), true);
+  if (url == NULL || CSBackupSetItemExcluded(url, true, false) != noErr) refusal = "backup-exclude";
+  if (url != NULL) CFRelease(url);
+  return refusal;
+}
+
+static const char *ensure_parent(const char *root) {
+  char parent[DEDICATED_PATH_BYTES];
+  if ((size_t)snprintf(parent, sizeof parent, "%s", root) >= sizeof parent) return "path";
+  char *slash = strrchr(parent, '/');
+  if (slash == NULL || slash == parent) return "path";
+  *slash = '\0';
+  if (mkdir(parent, 0700) != 0 && errno != EEXIST) return "mkdir";
+  return dedicated_check_parent(root);
+}
+
+// `store-create`: idempotent over a valid store, refuses over anything else at that path. The store starts inactive.
+const char *dedicated_create(bool *created, OSStatus *status) {
+  char root[DEDICATED_PATH_BYTES], partial[DEDICATED_PATH_BYTES + 32];
+  *created = false;
+  *status = errSecSuccess;
+  if (!dedicated_root(root, sizeof root)) return "home";
+  struct stat info;
+  if (lstat(root, &info) == 0) return dedicated_open(status);
+  const char *refusal = ensure_parent(root);
+  if (refusal != NULL) return refusal;
+  snprintf(partial, sizeof partial, "%s.partial-%d", root, (int)getpid());
+  refusal = build_store(partial, status);
+  if (refusal == NULL && rename(partial, root) != 0) refusal = errno == EEXIST || errno == ENOTEMPTY ? "exists" : "rename";
+  if (refusal != NULL) {
+    remove_partial(partial);
+    return refusal;
+  }
+  *created = true;
+  return dedicated_open(status);
+}
+
+static bool present(const char *account) {
+  item_state state = {0};
+  bool found = lookup_attributes(account, &state) == errSecSuccess;
+  item_state_release(&state);
+  return found;
+}
+
+// `store-erase`: only an inactive store whose sign-in (<A>, <A>.staging) is gone is erased, so no sign-in is ever
+// dropped here; leftover retired slots go with the file (r2 finding 8). Runs after dedicated_open().
+const char *dedicated_erase(const char *account, OSStatus *status) {
+  char root[DEDICATED_PATH_BYTES], path[DEDICATED_PATH_BYTES], staging[ACCOUNT_NAME_BYTES];
+  *status = errSecSuccess;
+  if (!dedicated_root(root, sizeof root)) return "home";
+  if (dedicated_active()) return "active";
+  snprintf(staging, sizeof staging, "%s.staging", account);
+  if (present(account) || present(staging)) return "not-empty";
+  if ((*status = SecKeychainDelete(store.keychain)) != errSecSuccess) return "delete";
+  CFRelease(store.keychain);
+  store.keychain = NULL;
+  if (!dedicated_join(path, sizeof path, root, DEDICATED_KEY_NAME) || unlink(path) != 0) return "key";
+  if (rmdir(root) != 0) return "rmdir";
+  return NULL;
+}

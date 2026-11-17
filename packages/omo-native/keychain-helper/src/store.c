@@ -10,7 +10,7 @@
 
 #define CF_EPOCH_OFFSET 978307200.0
 
-store_options store = {NULL, false};
+store_options store = {NULL, false, false};
 
 static CFStringRef cf_string(const char *text) { return CFStringCreateWithCString(NULL, text, kCFStringEncodingUTF8); }
 
@@ -150,8 +150,28 @@ OSStatus unlock_holder(SecKeychainItemRef item) {
   return status;
 }
 
-// The decrypt list holds the helper's own designated requirement and nothing else; never an "any application" entry.
+// In OmO's own keychain (#13116 r2) the key file already hands every same-user process the keychain password, so an
+// item ACL there is no boundary: decrypt is open to any application, which keeps every helper copy prompt-free.
+static SecAccessRef any_application_access(OSStatus *status) {
+  CFStringRef description = cf_string(SERVICE);
+  SecAccessRef access = NULL;
+  *status = SecAccessCreate(description, NULL, &access);
+  CFArrayRef acls = *status == errSecSuccess ? SecAccessCopyMatchingACLList(access, kSecACLAuthorizationDecrypt) : NULL;
+  for (CFIndex i = 0; acls != NULL && i < CFArrayGetCount(acls) && *status == errSecSuccess; i++)
+    *status = SecACLSetContents((SecACLRef)CFArrayGetValueAtIndex(acls, i), NULL, description, 0);
+  if (acls != NULL) CFRelease(acls);
+  CFRelease(description);
+  if (*status != errSecSuccess && access != NULL) {
+    CFRelease(access);
+    access = NULL;
+  }
+  return access;
+}
+
+// The decrypt list holds the helper's own designated requirement and nothing else; never an "any application" entry
+// in the login keychain.
 static SecAccessRef owner_access(OSStatus *status) {
+  if (store.dedicated) return any_application_access(status);
   SecTrustedApplicationRef self = NULL;
   *status = SecTrustedApplicationCreateFromPath(NULL, &self);
   if (*status != errSecSuccess) return NULL;
