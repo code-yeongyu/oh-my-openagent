@@ -90,13 +90,15 @@ const answer = (() => {
 })()
 const briefs = fake.requests.filter((request) =>
   (Array.isArray(request.messages) ? request.messages : []).some(
-    (message) => message.role === "user" && textOf(message).includes("QA-14060-BRIEF") && message === request.messages.at(-1),
+    (message) =>
+      message.role === "user" && textOf(message).includes("QA-14060-BRIEF") && message === request.messages.at(-1),
   ),
 ).length
 report.log(`cell=${JSON.stringify(cell ?? null).slice(0, 400)} brief_requests=${briefs}`)
 report.assert(
   "create-uses-the-derived-id",
-  typeof answer?.a === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(answer.a),
+  typeof answer?.a === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(answer.a),
   `a=${answer?.a}`,
 )
 report.assert("same-key-answers-the-same-thread", answer?.b === answer?.a, `a=${answer?.a} b=${answer?.b}`)
