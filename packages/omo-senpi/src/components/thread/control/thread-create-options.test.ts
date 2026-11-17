@@ -20,10 +20,11 @@ describe("thread_create with a model and a reasoning level (#13409)", () => {
     const a = account()
     const { run, openSession } = surface(a.remote)
     const options = { model: "anthropic/claude-opus-5-5", reasoning: "high" }
-    expect(await run("thread_create", options)).toMatchObject({ kind: "ok", thread: { thread_id: "dur-created-here" } })
+    expect(await run("thread_create", options)).toMatchObject({ kind: "ok", thread: "dur-created-here" })
     expect(await run("thread_create", { device: "studio", ...options })).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-new-on-b", device: "b" },
+      thread: "dur-new-on-b",
+      device: "b",
     })
     const launch = { provider: "anthropic", modelId: "claude-opus-5-5", thinkingLevel: "high" }
     expect(localOpens(openSession)).toEqual([expect.objectContaining(launch)])
@@ -122,7 +123,7 @@ describe("thread_create with a first prompt (#13410)", () => {
       ThreadToolResult,
       { kind: "ok" }
     > & { prompt?: Record<string, unknown> }
-    expect(result).toMatchObject({ kind: "ok", thread: { thread_id: "dur-new-on-b", device: "b" } })
+    expect(result).toMatchObject({ kind: "ok", thread: "dur-new-on-b", device: "b" })
     expect(result.prompt).toMatchObject({ delivery: { kind: "started" }, deduplicated: false })
     // A peer session's message is an admitted delivery on b, as thread_send makes it (#12882), never a raw prompt.
     const admitted = a.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message")
@@ -147,7 +148,7 @@ describe("thread_create with a first prompt (#13410)", () => {
     const a = account()
     const { run, enqueuedFor } = surface(a.remote)
     const result = (await run("thread_create", { prompt: "build it" })) as { prompt?: Record<string, unknown> }
-    expect(result).toMatchObject({ kind: "ok", thread: { thread_id: "dur-created-here" } })
+    expect(result).toMatchObject({ kind: "ok", thread: "dur-created-here" })
     expect(result.prompt).toMatchObject({ delivery: { kind: expect.any(String) } })
     expect(enqueuedFor("dur-created-here")).toBe(1)
   })
@@ -170,7 +171,7 @@ describe("thread_create with a first prompt (#13410)", () => {
     const result = (await run("thread_create", { device: "studio", prompt: "build it" })) as {
       prompt?: Record<string, unknown>
     }
-    expect(result).toMatchObject({ kind: "ok", thread: { thread_id: "dur-new-on-b" } })
+    expect(result).toMatchObject({ kind: "ok", thread: "dur-new-on-b" })
     expect(result.prompt).toMatchObject({ error: { code: "internal_error" } })
   })
 
@@ -180,7 +181,7 @@ describe("thread_create with a first prompt (#13410)", () => {
     const result = (await run("thread_create", { device: "studio", prompt: "build it" })) as {
       prompt?: Record<string, unknown>
     }
-    expect(result).toMatchObject({ kind: "ok", thread: { thread_id: "dur-new-on-b" } })
+    expect(result).toMatchObject({ kind: "ok", thread: "dur-new-on-b" })
     expect(result.prompt).toMatchObject({ error: { code: expect.any(String) } })
   })
 })

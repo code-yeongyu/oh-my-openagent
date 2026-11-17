@@ -10,7 +10,7 @@ import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { FakeSessionRuntime } from "./gateway/testing/fake-runtime"
 import type { GatewayDeliveryResult } from "./gateway/types"
 import { createLiveThreadSurface, parseHostStatusAll } from "./live-surface"
-import { createThreadSdk, type ThreadSdk } from "./sdk"
+import { createThreadSdk, type ThreadSdk, type ThreadSdkSendResult } from "./sdk"
 import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
 import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
@@ -129,7 +129,7 @@ function otherLiveHost(name = "other lane", wakes: string[] = []): ThreadHost {
   }
 }
 
-function deliveryIdOf(result: GatewayDeliveryResult | ThreadToolResult): string {
+function deliveryIdOf(result: GatewayDeliveryResult | ThreadSdkSendResult | ThreadToolResult): string {
   if (result.kind !== "ok" || !("delivery_id" in result) || typeof result.delivery_id !== "string")
     throw new Error(`expected a delivery, got ${JSON.stringify(result)}`)
   return result.delivery_id
@@ -223,7 +223,7 @@ describe("thread send with no live endpoint anywhere", () => {
     )
     expect(output.details.result).toMatchObject({
       kind: "ok",
-      thread_id: "dur-gone",
+      thread: "dur-gone",
       delivery: { kind: "queued_offline" },
       endpoint: null,
     })
@@ -290,13 +290,13 @@ describe("thread send to a session this process never saw alive", () => {
     const byName = await sdk.send({ thread: "dead-tui", text: "by name" })
     expect(byId).toMatchObject({
       kind: "ok",
-      thread_id: "dur-dead",
+      thread: "dur-dead",
       delivery: { kind: "queued_offline" },
       endpoint_kind: null,
     })
     expect(byName).toMatchObject({
       kind: "ok",
-      thread_id: "dur-dead",
+      thread: "dur-dead",
       delivery: { kind: "queued_offline" },
       endpoint_kind: null,
     })
@@ -328,7 +328,7 @@ describe("thread send to a session this process never saw alive", () => {
     } as never)
     expect(output.details.result).toMatchObject({
       kind: "ok",
-      thread_id: "dur-dead",
+      thread: "dur-dead",
       delivery: { kind: "queued_offline" },
       endpoint: null,
     })
@@ -353,14 +353,14 @@ describe("thread send to a session this process never saw alive", () => {
     } as never)
     expect(output.details.result).toMatchObject({
       kind: "ok",
-      thread_id: "dur-x",
+      thread: "dur-x",
       delivery: { kind: "queued_offline" },
       endpoint: null,
     })
     const sdk = sdkOver(agentDir, host)
     expect(await sdk.send({ thread: "dur-x", text: "for x too" })).toMatchObject({
       kind: "ok",
-      thread_id: "dur-x",
+      thread: "dur-x",
       delivery: { kind: "queued_offline" },
       endpoint_kind: null,
     })
@@ -393,7 +393,7 @@ describe("thread send to a session this process never saw alive", () => {
     expect(await store.list()).toEqual([])
     expect(await sdk.send({ thread: "far-lane", text: "x", all_scope: true })).toMatchObject({
       kind: "ok",
-      thread_id: "dur-far",
+      thread: "dur-far",
       delivery: { kind: "queued_offline" },
     })
   })

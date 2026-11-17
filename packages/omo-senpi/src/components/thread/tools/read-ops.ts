@@ -13,6 +13,7 @@ import {
   summary,
   transcriptRole,
 } from "./internals"
+import { threadRow } from "./thread-row"
 import type { ThreadHostSession, ThreadHostView, ThreadToolSurfaceOptions } from "./ports"
 
 /**
@@ -40,13 +41,13 @@ export function listThreads(
     (entry) => entry.error_note !== undefined && entry.status !== "live" && inScope(entry.thread_id),
   )
   const order = new Map(book.map((entry, index) => [entry.thread_id, index]))
-  const threads = [
-    ...visible.map((session) => summary(session, entryOf(session))),
-    ...degraded.map(degradedSummary),
-  ].sort(
-    (left, right) =>
-      (order.get(left.thread_id) ?? Number.MAX_SAFE_INTEGER) - (order.get(right.thread_id) ?? Number.MAX_SAFE_INTEGER),
-  )
+  const threads = [...visible.map((session) => summary(session, entryOf(session))), ...degraded.map(degradedSummary)]
+    .sort(
+      (left, right) =>
+        (order.get(left.thread_id) ?? Number.MAX_SAFE_INTEGER) -
+        (order.get(right.thread_id) ?? Number.MAX_SAFE_INTEGER),
+    )
+    .map((thread) => threadRow(thread))
   return { kind: "ok", threads, scope: allScope === true ? "all" : "workspace" }
 }
 
@@ -103,7 +104,7 @@ export function liveReadResult(
   if (live.kind === "error") return { kind: "error", error: live.error }
   return {
     kind: "ok",
-    thread_id: threadId,
+    thread: threadId,
     link: threadLink(threadId, title),
     items: live.items.map((item, index) => ({
       seq: index + 1,
@@ -149,7 +150,7 @@ function readDegraded(
   }))
   return {
     kind: "ok",
-    thread_id: threadId,
+    thread: threadId,
     link: threadLink(threadId, entry.title),
     items,
     truncated: durable.truncated,

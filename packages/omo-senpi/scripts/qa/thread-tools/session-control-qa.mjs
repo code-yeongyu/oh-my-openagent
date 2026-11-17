@@ -212,12 +212,12 @@ try {
   const createdA = await call(tools, "thread_create", { cwd: scratch.cwd })
   record(2, "create-a", createdA.kind === "ok" ? "pass" : "fail", errorCode(createdA))
   if (createdA.kind !== "ok") throw new Error("thread_create A failed; the rest of the scenario needs it")
-  const threadA = createdA.thread.thread_id
+  const threadA = createdA.thread
 
   // 3. rename A, then prove the new label is what a fresh list reports
   const renamed = await call(tools, "thread_rename", { thread: threadA, name: ALPHA, all_scope: true })
   const afterRename = await call(tools, "thread_list", { all_scope: true })
-  const seenA = afterRename.kind === "ok" ? afterRename.threads.find((t) => t.thread_id === threadA) : undefined
+  const seenA = afterRename.kind === "ok" ? afterRename.threads.find((t) => t.thread === threadA) : undefined
   record(
     3,
     "rename-visible-in-fresh-list",
@@ -228,7 +228,7 @@ try {
   // 4. a second thread cannot take A's label
   const createdB = await call(tools, "thread_create", { cwd: scratch.cwd })
   if (createdB.kind !== "ok") throw new Error("thread_create B failed; the conflict check needs it")
-  const threadB = createdB.thread.thread_id
+  const threadB = createdB.thread
   await call(tools, "thread_rename", { thread: threadB, name: BETA, all_scope: true })
   const conflict = await call(tools, "thread_rename", { thread: threadB, name: ALPHA, all_scope: true })
   record(
@@ -340,8 +340,8 @@ try {
   record(
     10,
     "rename-self",
-    selfRenamed.kind === "ok" && selfRenamed.thread_id === threadA ? "pass" : "fail",
-    selfRenamed.kind === "ok" ? `thread_id=${selfRenamed.thread_id}` : errorCode(selfRenamed),
+    selfRenamed.kind === "ok" && selfRenamed.thread === threadA ? "pass" : "fail",
+    selfRenamed.kind === "ok" ? `thread=${selfRenamed.thread}` : errorCode(selfRenamed),
   )
   callerId = "unknown-caller"
 

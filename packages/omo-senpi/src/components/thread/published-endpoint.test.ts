@@ -216,8 +216,8 @@ async function listSendSteer(
   ])
   const listed =
     list.kind === "ok" && "threads" in list
-      ? (list.threads as ReadonlyArray<{ readonly thread_id: string; readonly alive?: boolean }>).find(
-          (thread) => thread.thread_id === "target",
+      ? (list.threads as ReadonlyArray<{ readonly thread: string; readonly alive?: boolean }>).find(
+          (thread) => thread.thread === "target",
         )
       : undefined
   return { listed, send, steer }
@@ -310,11 +310,11 @@ test("a terminal the engine still reports dead is offline to thread_list, send a
       throw new Error(`expected a thread list, got ${JSON.stringify(result)}`)
     return (
       result.threads as ReadonlyArray<{
-        readonly thread_id: string
+        readonly thread: string
         readonly alive?: boolean
         readonly error_note?: string
       }>
-    ).find((thread) => thread.thread_id === "target")
+    ).find((thread) => thread.thread === "target")
   }
   const before = await listed()
   const [send, steer] = await Promise.all([

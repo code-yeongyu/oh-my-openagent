@@ -25,7 +25,7 @@ describe("#12882: a send to another device is one admit_external_message, admitt
     const { run } = surface(a.remote, { callerName: () => "planner", env: ENV })
     expect(await run("thread_send", { thread: "dur-on-b", message: "do the thing" })).toMatchObject({
       kind: "ok",
-      thread_id: "dur-on-b",
+      thread: "dur-on-b",
       device: "b",
       delivery: { kind: "started", turn_id: "turn-b" },
       deduplicated: false,
@@ -324,7 +324,8 @@ describe("remote == local, round 2: send modes, handoff and the unknown caller",
     expect(await run("thread_handoff", { thread: "dur-on-b", message: "take this" })).toMatchObject({
       kind: "ok",
       resolved_by: "exact_name",
-      thread: { thread_id: "dur-on-b", device: "b" },
+      thread: "dur-on-b",
+      device: "b",
       delivery: { kind: "started" },
     })
     expect(admits(a.sent).map((record) => String(record["text"]).split("\n").at(-1))).toEqual([

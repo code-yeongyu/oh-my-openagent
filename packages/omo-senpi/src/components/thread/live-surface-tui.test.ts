@@ -279,7 +279,7 @@ function surfaceFor(
 
 type ListedThread = {
   controls?: readonly string[]
-  thread_id: string
+  thread: string
   name: string
   surface?: string
   alive?: boolean
@@ -295,7 +295,7 @@ function threadsOf(result: ThreadToolResult): readonly ListedThread[] {
 }
 
 describe("thread tools over a terminal (tui) endpoint", () => {
-  test("#given a live terminal endpoint and a host #when thread_list runs #then the terminal row carries endpoint.kind tui, surface tui, its real name and ISO timestamps, and was reached with its secret", async () => {
+  test("#given a live terminal endpoint and a host #when thread_list runs #then the terminal row carries surface tui, its real name and ISO timestamps, and was reached with its secret", async () => {
     // given
     const dir = tempDir("thr-tui-")
     const legacy = join(dir, "rpc.sock")
@@ -311,17 +311,15 @@ describe("thread tools over a terminal (tui) endpoint", () => {
     const threads = threadsOf(await w.run("thread_list", { all_scope: true }))
 
     // then
-    expect(threads.find((thread) => thread.thread_id === "dur-tui")).toMatchObject({
+    expect(threads.find((thread) => thread.thread === "dur-tui")).toMatchObject({
       name: "my-tui",
       surface: "tui",
       alive: true,
       status: "live",
       created_at: "2026-09-28T04:19:00.000Z",
-      endpoint: { kind: "tui", socket: tui, routing_id: "dur-tui", durable_session_id: "dur-tui" },
     })
-    expect(threads.find((thread) => thread.thread_id === "dur-host")).toMatchObject({
+    expect(threads.find((thread) => thread.thread === "dur-host")).toMatchObject({
       surface: "daemon",
-      endpoint: { kind: "rpc_host", socket: legacy, routing_id: "rpc-1", durable_session_id: "dur-host" },
     })
     expect(terminal.rejected.count).toBe(0)
     expect(terminal.frames.map((frame) => frame.type).sort()).toEqual(["get_protocol_info", "list_sessions"])
@@ -353,7 +351,7 @@ describe("thread tools over a terminal (tui) endpoint", () => {
     // then
     expect(sentMessage).toMatchObject({
       kind: "ok",
-      thread_id: "dur-tui",
+      thread: "dur-tui",
       delivery: { kind: "queued" },
       endpoint: { kind: "tui" },
     })
@@ -409,7 +407,7 @@ describe("thread tools over a terminal (tui) endpoint", () => {
     const olderRefused = await w.run("thread_set_model", { thread: "dur-old", model: "faux-plain", all_scope: true })
 
     // then
-    expect(listed.find((thread) => thread.thread_id === "dur-new")?.controls).toEqual([
+    expect(listed.find((thread) => thread.thread === "dur-new")?.controls).toEqual([
       "send",
       "read",
       "rename",
@@ -417,8 +415,8 @@ describe("thread tools over a terminal (tui) endpoint", () => {
       "set_reasoning",
       "interrupt",
     ])
-    expect(listed.find((thread) => thread.thread_id === "dur-old")?.controls).toEqual(["send", "read", "rename"])
-    expect(listed.find((thread) => thread.thread_id === "dur-host")?.controls).toEqual([
+    expect(listed.find((thread) => thread.thread === "dur-old")?.controls).toEqual(["send", "read", "rename"])
+    expect(listed.find((thread) => thread.thread === "dur-host")?.controls).toEqual([
       "send",
       "read",
       "rename",
@@ -427,7 +425,7 @@ describe("thread tools over a terminal (tui) endpoint", () => {
       "interrupt",
     ])
     expect(reasoning).toMatchObject({ kind: "ok", level: "high", scope: "turn" })
-    expect(interrupted).toMatchObject({ kind: "ok", thread_id: "dur-new", interrupted: true, turn_id: "3" })
+    expect(interrupted).toMatchObject({ kind: "ok", thread: "dur-new", interrupted: true, turn_id: "3" })
     expect(idle).toMatchObject({ kind: "ok", interrupted: false })
     expect(unknown).toMatchObject({ kind: "error", error: { code: "model_not_found" } })
     expect(switched).toMatchObject({ kind: "ok", model: { provider: "faux", id: "faux-plain" } })
@@ -480,7 +478,7 @@ describe("thread tools over a terminal (tui) endpoint", () => {
     const threads = threadsOf(await w.run("thread_list", { all_scope: true }))
 
     // then
-    expect(threads.find((thread) => thread.thread_id === "dur-tui")).toMatchObject({
+    expect(threads.find((thread) => thread.thread === "dur-tui")).toMatchObject({
       status: "resumable",
       alive: false,
       error_note: "live_unresponsive",
@@ -511,7 +509,7 @@ describe("thread tools over a terminal (tui) endpoint", () => {
     const threads = threadsOf(await w.run("thread_list", { all_scope: true }))
 
     // then
-    const gone = threads.find((thread) => thread.thread_id === "dur-gone")
+    const gone = threads.find((thread) => thread.thread === "dur-gone")
     expect(gone).toMatchObject({ status: "resumable", alive: false, error_note: "dead", surface: "tui" })
     expect(JSON.stringify(gone)).not.toContain("host_unavailable")
     expect(w.dialed).not.toContain(tui)
@@ -532,7 +530,7 @@ describe("thread tools over a terminal (tui) endpoint", () => {
     // every connection the listing opened (sessions and the protocol probe) was refused
     expect(terminal.rejected.count).toBeGreaterThan(0)
     expect(terminal.rejected.count).toBe(w.dialed.filter((path) => path === tui).length)
-    expect(threads.some((thread) => thread.thread_id === "dur-tui")).toBe(false)
+    expect(threads.some((thread) => thread.thread === "dur-tui")).toBe(false)
   })
 
   test("#given the gateway sender port #when a terminal and a host are woken #then wake carries the delivery ids (and the routing id only on a host), a terminal refuses release_session, and liveness follows the engine verdict", async () => {

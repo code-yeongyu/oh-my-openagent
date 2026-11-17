@@ -23,6 +23,6 @@ export function replyTargetMismatch(
     "reply_target_mismatch",
     `"${address}" was approved as a reply to a sender of this run's deliveries, but it resolves to ${entry.name} (${entry.thread_id}${entry.device === undefined ? "" : " on " + entry.device}), which is not that sender.`,
     "Reply with the sender's durable id from the delivery header, or send to the other thread by its id as a normal send.",
-    { resolved_thread_id: entry.thread_id, ...(entry.device === undefined ? {} : { device: entry.device }) },
+    { resolved_thread: entry.thread_id, ...(entry.device === undefined ? {} : { device: entry.device }) },
   )
 }

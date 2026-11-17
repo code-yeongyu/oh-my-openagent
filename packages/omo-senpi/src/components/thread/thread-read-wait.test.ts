@@ -12,7 +12,7 @@ describe("thread_read wait_ms (#13417)", () => {
     const read = await run("thread_read", { thread: "dur-on-b", wait_ms: 60_000 })
     expect(read).toMatchObject({
       kind: "ok",
-      thread_id: "dur-on-b",
+      thread: "dur-on-b",
       device: "b",
       wait: { outcome: "settled", status: "idle" },
     })
