@@ -580,10 +580,11 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
     parameters: threadToolParamSchemas.thread_close,
     execute: (id: string, args: ThreadCloseInput, _signal, _onUpdate, ectx) =>
       execute("thread_close", id, args, ectx, async (current, value, _operationId, callerId) => {
-        const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
+        const located = await locateControl(options, current, value.thread ?? "self", value.all_scope, callerId)
         if (located.kind === "error") return located.result
         // Nothing live holds it: there is nothing to close, and the thread stays resumable from its session file.
-        if (located.kind === "not_live") return { kind: "ok", ...controlIdentity(located), closed: false }
+        if (located.kind === "not_live")
+          return { kind: "ok", ...controlIdentity(located), closed: false, reason: "not_live" }
         return await closeThread(located.control)
       }),
   }
@@ -604,7 +605,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
           return failure("invalid_arguments", "Pass a new name, a new alias, or both.", "Retry with name or alias.")
         // Every refusal runs before the alias or the name changes anywhere: the target's own liveness first (locate:
         // a thread with no live owner, a device that is offline), then the name checks.
-        const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
+        const located = await locateControl(options, current, value.thread ?? "self", value.all_scope, callerId)
         if (located.kind === "error") return located.result
         const thread = located.kind === "control" ? located.control : located
         // #13066: the name is checked on the target device's own listing, and only when a live owner holds the thread.
