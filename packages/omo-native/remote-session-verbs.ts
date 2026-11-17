@@ -25,6 +25,7 @@ import { createdDeviceRow, namedDeviceRow } from "../omo-senpi/src/components/th
 import { stampThisDevice } from "../omo-senpi/src/components/thread/remote/this-device"
 import type { Provenance } from "../omo-senpi/src/components/thread/gateway/types"
 import { threadLink } from "../omo-senpi/src/components/thread/thread-link"
+import { openedResult } from "../omo-senpi/src/components/thread/tools/thread-row"
 import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { packageRoot } from "./bin/lib/package-paths.js"
 import {
@@ -194,15 +195,13 @@ async function openOn(
   if (open.kind !== "ok") return show(open, "")
   // --json keeps naming the model the session opened on, as it did when a set_model followed the open (#13748 review).
   const opened = {
-    kind: "ok",
-    thread: open.thread,
-    deduplicated: false,
+    ...openedResult(open.thread, false),
     ...(args.model === undefined ? {} : { model: { provider: args.model.provider, id: args.model.modelId } }),
-  } as ThreadToolResult & { readonly thread: typeof open.thread }
+  } as ThreadToolResult
   if (args.prompt === undefined) return show(opened, "")
   // The first prompt (#13410) goes to the session just opened, by its own id, as `omo remote send --no-wait` sends it.
-  const label = `${args.device}/${opened.thread.thread_id}`
-  const row = createdDeviceRow(args.device, opened.thread)
+  const label = `${args.device}/${open.thread.thread_id}`
+  const row = createdDeviceRow(args.device, open.thread)
   const delivery = personDelivery(remote, dependencies)
   let sent: ThreadToolResult
   try {
@@ -289,7 +288,7 @@ function personDelivery(remote: RemoteThreadSurface, dependencies: RemoteCommand
       }
     return {
       kind: "ok",
-      thread_id: rowThreadId(row),
+      thread: rowThreadId(row),
       link: threadLink(rowThreadId(row), row.title),
       delivery: sent.delivery,
       deduplicated: sent.deduplicated,
