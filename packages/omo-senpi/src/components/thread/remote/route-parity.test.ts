@@ -4,8 +4,11 @@ import { join } from "node:path"
 
 import { B_ROW, createRemoteThreadFixture, fakeRemoteClient } from "../thread-remote-fixture"
 import { createRemoteClient } from "../../remote/client"
-import { createDeviceServiceSessions } from "../../remote/port/device-service"
 import { createLazyRemoteSurface } from "../../remote/port/lazy-remote"
+import { closingPorts } from "./testing/closing-ports"
+
+// #13873: every port is closed after each test, so no idle detach timer outlives it.
+const sessionsPort = closingPorts()
 
 const { account, surface, cleanup } = createRemoteThreadFixture()
 afterEach(cleanup)
@@ -258,7 +261,7 @@ describe("#13012 route parity", () => {
               stateDir: join(tmpdir(), `omo-absent-device-service-${process.pid}`),
             }),
           remoteSessionsPort: () =>
-            createDeviceServiceSessions({
+            sessionsPort({
               version: "0.0.0",
               connect: async () => {
                 connects += 1
