@@ -52,7 +52,9 @@ const idOf = (entry: JsonObject | undefined): string | undefined =>
 function pageOf(data: JsonObject): Page {
   const listed = data["entries"]
   const entries = Array.isArray(listed)
-    ? listed.filter((entry): entry is JsonObject => typeof entry === "object" && entry !== null && !Array.isArray(entry))
+    ? listed.filter(
+        (entry): entry is JsonObject => typeof entry === "object" && entry !== null && !Array.isArray(entry),
+      )
     : []
   const leaf = data["leafId"]
   return { entries, leaf: typeof leaf === "string" ? leaf : null, more: data["hasMore"] === true }
@@ -108,7 +110,7 @@ export async function readContextTail(
   if (previous !== undefined && newest !== undefined) {
     entries = [...previous.entries]
     complete = previous.complete
-    for (let since = newest, more = true; more; ) {
+    for (let since = newest, more = true; more;) {
       const next = await page({ since })
       if ("kind" in next) {
         if (next.kind === "refused" && next.reason === ENTRY_GONE) {
