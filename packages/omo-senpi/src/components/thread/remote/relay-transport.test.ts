@@ -322,6 +322,18 @@ describe("a delivery the receiver's open draft holds is queued at once, like a s
     relay.dispose()
   })
 
+  test("#given b answers the admission queued and the get_state read after it fails #when the message is sent #then the queued admission is still the answer at position 1, never idempotency_uncertain", async () => {
+    const a = account({
+      engine: { ...ENGINE, streaming: true, currentTurnId: "0", pending: 0 },
+      stateRefusedAfterAdmit: "reply_lost",
+    })
+    const { relay } = transport(a.remote)
+    const sent = await relay.deliver({ ...delivery("after a lost state read", "k9"), mode: "follow_up" })
+    expect(sent).toMatchObject({ kind: "ok", device: "b", delivery: { kind: "queued", queue_position: 1 } })
+    expect(admits(a.sent)).toHaveLength(1)
+    relay.dispose()
+  })
+
   test("#given b already holds the delivery (a lost reply retried) #when the retry reaches b #then the send is deduplicated at b's real pending count, not an invented 1", async () => {
     const a = account({
       admitOutcome: {
