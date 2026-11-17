@@ -159,7 +159,7 @@ async function runSession(sandbox) {
         .join("\n")
       assert.match(text, /process\.exit\(1\) ran inside a JavaScript cell/)
       assert.match(text, /kernel stayed up/)
-      const out = await cellJson('print(JSON.stringify({ marker: globalThis.omoQaMarker }))')
+      const out = await cellJson("print(JSON.stringify({ marker: globalThis.omoQaMarker }))")
       assert.equal(out.marker, "kept")
     })
     await sdkClose(cellJson)

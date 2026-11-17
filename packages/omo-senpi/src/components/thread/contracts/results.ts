@@ -47,6 +47,9 @@ export type ThreadSummary = {
  * `thread` input (today the durable id); no other field names the session, and no endpoint internal (socket, session
  * file, routing id) is shown. `machine` is the display name of the device that holds it, when known. `link` is
  * `[title](omo-thread://v1/<thread>)` (`thread-link.ts`), pasted when telling the user about the thread.
+ * A result stored by an earlier build and replayed for the same idempotency key (30-day receipt retention) is answered
+ * in this shape too: `currentResult` (`tools/thread-row.ts`) maps its `thread_id` or nested `thread`, rows, candidates
+ * and endpoint kind, and rebuilds a missing `link`.
  */
 export type ThreadResultSummary = {
   readonly thread: string
