@@ -13,6 +13,7 @@ import type { SameDeviceWake } from "../gateway/same-device-wake"
 import type { GatewayStore } from "../gateway/store"
 import type { ThreadTranscriptEntry } from "../reader"
 import type { RemoteThreadSurface } from "../remote/ports"
+import type { SessionWatchHandlers, SessionWatchOutcome } from "../control/wait-settled"
 
 export type ThreadHostSession = {
   readonly sessionId: string
@@ -55,6 +56,7 @@ export type ThreadSessionPort = Pick<
   | "wake"
   | "releaseSession"
   | "closeSession"
+  | "watchSession"
 >
 
 /**
@@ -136,6 +138,15 @@ export type ThreadHost = {
     request: ReleaseSessionRequest,
     durable_session_id?: string,
   ) => Promise<ReleaseSessionReply>
+  /**
+   * Follows one session's status and run records on the endpoint's observing `subscribe_sessions` stream (never an
+   * attachment), until the watch is stopped or the session closes; `thread_read`'s `wait_ms` waits on it.
+   */
+  readonly watchSession?: (
+    sessionId: string,
+    handlers: SessionWatchHandlers,
+    durable_session_id?: string,
+  ) => Promise<SessionWatchOutcome>
   /** Ends one session on its host for every client that holds it; hosts only, a terminal keeps its own session. */
   readonly closeSession?: (sessionId: string, durable_session_id?: string) => Promise<ThreadCloseOutcome>
   /** Every endpoint at once; absent on a single-endpoint host, whose `listSessions` is the view. */

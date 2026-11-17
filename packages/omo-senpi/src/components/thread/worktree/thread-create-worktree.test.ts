@@ -50,9 +50,9 @@ describe("thread_create with worktree on this device", () => {
     const result = await run("thread_create", { cwd: repo, worktree: { branch: "feat/thread" } })
     expect(result).toMatchObject({
       kind: "ok",
-      thread: { worktree: { branch: "feat/thread", repository: kit.gitPath(repo) } },
+      worktree: { branch: "feat/thread", repository: kit.gitPath(repo) },
     })
-    const path = (result as unknown as { thread: { worktree: { path: string } } }).thread.worktree.path
+    const path = (result as unknown as { worktree: { path: string } }).worktree.path
     expect(path.startsWith(agentDir)).toBe(true)
     expect(openSession.mock.calls.map((call) => call[0])).toEqual([{ cwd: path }])
     expect(kit.git(path, "branch", "--show-current")).toBe("feat/thread")
@@ -80,9 +80,8 @@ describe("thread_create with worktree on another device", () => {
     const far = withFarWorktree(a.remote, kit.folder("thread-wt-far-"))
     const { run, openSession } = surface(far.remote)
     const result = await run("thread_create", { device: "studio", cwd: repo, worktree: { branch: "remote/x" } })
-    expect(result).toMatchObject({ kind: "ok", thread: { device: "b", worktree: { branch: "remote/x" } } })
-    const worktree = (result as unknown as { thread: { worktree: { path: string; setup_session_left_open?: string } } })
-      .thread.worktree
+    expect(result).toMatchObject({ kind: "ok", device: "b", worktree: { branch: "remote/x" } })
+    const worktree = (result as unknown as { worktree: { path: string; setup_session_left_open?: string } }).worktree
     expect(worktree.setup_session_left_open).toBeUndefined()
     expect(far.requests.map((rpc) => rpc["name"])).toEqual([THREAD_WORKTREE_RPC])
     const opens = a.sent.filter((entry) => entry.rpc?.["type"] === "open_session").map((entry) => entry.rpc?.["cwd"])
