@@ -3,9 +3,9 @@ import { deliverySender } from "./gateway/provenance"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { ThreadToolName, ThreadToolResult } from "./contracts"
+import { parseThreadParams, threadToolParamSchemas, type ThreadToolName, type ThreadToolResult } from "./contracts"
 import type { GatewayEndpointRef } from "./gateway/adapter"
-import { type BindInput, normalizeBindInput } from "./gateway/bindings"
+import { type BindInput, hashArgs, normalizeBindInput } from "./gateway/bindings"
 import { GATEWAY_RECEIPT_RETENTION_MS } from "./gateway/constants"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { parseThreadLinkUrl } from "./thread-link"
@@ -1220,5 +1220,65 @@ describe("tool receipts the store could not settle", () => {
     releaseRename()
     expect(await first).toEqual({ kind: "ok", thread: "dur-peer", name: "Renamed" })
     expect(f.setSessionName).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe("receipts stored before one field named a session (#14044 4a)", () => {
+  test("#given thread_create and thread_rename receipts stored in the old shape #when the same keys are retried #then each replays the current shape: thread is the address string and no endpoint internal comes back", async () => {
+    // given: receipts written by a build before #14044, under the keys the retries below use
+    const f = fixture()
+    const stored = async (operation: ThreadToolName, args: Record<string, unknown>, result: unknown) => {
+      const parsed = parseThreadParams(threadToolParamSchemas[operation], args)
+      if (parsed.kind !== "ok") throw new Error(`invalid ${operation} args`)
+      const scope = { principal: "session:caller", operation, idempotency_key: String(args["idempotency_key"]) }
+      expect(await f.store.toolReceiptBegin({ ...scope, now: Date.now(), args_hash: hashArgs(parsed.value) })).toEqual({
+        kind: "accepted",
+      })
+      await f.store.toolReceiptSettle({ ...scope, now: Date.now(), result: result as ThreadToolResult })
+    }
+    const created = { name: "old create", idempotency_key: "create-before-14044" }
+    const renamed = { thread: "peer", name: "Renamed", idempotency_key: "rename-before-14044" }
+    await stored("thread_create", created, {
+      kind: "ok",
+      thread: {
+        sessionId: "route-peer",
+        durableSessionId: "dur-peer",
+        thread_id: "dur-peer",
+        name: "old create",
+        status: "live",
+        cwd: "/w",
+        created_at: "2026-11-01T00:00:00.000Z",
+        updated_at: "2026-11-01T00:00:00.000Z",
+        socket: "/tmp/thread-tools-test.sock",
+        endpoint_kind: "rpc_host",
+        endpoint: { kind: "rpc_host", socket: "/tmp/thread-tools-test.sock", routing_id: "route-peer" },
+        requested_skills: ["lead"],
+      },
+      deduplicated: false,
+      prompt: { delivery: { kind: "started", turn_id: "1" }, deduplicated: false, endpoint: { kind: "rpc_host" } },
+    })
+    await stored("thread_rename", renamed, { kind: "ok", thread_id: "dur-peer", name: "Renamed" })
+
+    // when
+    const run = runner(f, "caller")
+    const replayedCreate = await run("thread_create", created, "caller")
+    const replayedRename = await run("thread_rename", renamed, "caller")
+
+    // then
+    expect(replayedCreate).toEqual({
+      kind: "ok",
+      thread: "dur-peer",
+      name: "old create",
+      status: "live",
+      cwd: "/w",
+      created_at: "2026-11-01T00:00:00.000Z",
+      updated_at: "2026-11-01T00:00:00.000Z",
+      link: "[old create](omo-thread://v1/dur-peer)",
+      requested_skills: ["lead"],
+      deduplicated: false,
+      prompt: { delivery: { kind: "started", turn_id: "1" }, deduplicated: false },
+    } as unknown as ThreadToolResult)
+    expect(replayedRename).toEqual({ kind: "ok", thread: "dur-peer", name: "Renamed" })
+    expect(f.setSessionName).not.toHaveBeenCalled()
   })
 })

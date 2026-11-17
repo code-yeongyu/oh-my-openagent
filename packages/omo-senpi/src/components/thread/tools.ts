@@ -76,7 +76,7 @@ import {
   replyOnDevice,
   resolveAcross,
 } from "./tools/internals"
-import { openedResult, threadRow } from "./tools/thread-row"
+import { currentResult, openedResult, threadRow } from "./tools/thread-row"
 
 /** How many keys a tool surface keeps for recovering receipts whose admission reply was lost. */
 export const RECEIPT_RECOVERY_MAX_KEYS = 4_096
@@ -220,7 +220,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
       if (admission.kind === "in_progress" && recoverable(key, at) && !running.has(key) && !unsettled.has(key))
         admission = { kind: "accepted" }
       unanswered.delete(key)
-      if (admission.kind === "replay") return output(admission.result as ThreadToolResult)
+      if (admission.kind === "replay") return output(currentResult(admission.result as ThreadToolResult))
       if (admission.kind === "conflict")
         return output(
           failure(
