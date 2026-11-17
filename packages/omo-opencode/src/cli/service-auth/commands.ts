@@ -10,6 +10,7 @@ import { refuseSecondMachineDevice } from "./machine-device"
 import { createCredentialStore, INTERACTIVE_READ_WAIT } from "./keystore"
 import { BrowserUnavailable, loginLoopback } from "./loopback"
 import { type ChooseDevice, type ListedDevice, RequestFailure, serviceOrigin, SignInError } from "./protocol"
+import { decideReplace } from "./replace-device"
 import { resolveMemoryRoot, syncPinDir } from "@oh-my-opencode/memory-core/sync-device-retire"
 
 import { createSession, type DeviceServiceHandoff, type Session } from "./session"
@@ -52,6 +53,7 @@ type Options = {
   readonly accounts?: string
   readonly device?: boolean
   readonly browser?: boolean
+  readonly replace?: boolean
   readonly help?: boolean
 }
 
@@ -165,10 +167,16 @@ async function run(
         if (!(error instanceof BrowserUnavailable)) throw error
       }
     }
-    await loginDevice(session, {
+    const { replacedDeviceId } = await loginDevice(session, {
       name,
       platform,
       chooseDevice,
+      replaceDevice: decideReplace({
+        replace: options.replace === true,
+        interactive: process.stdin.isTTY === true,
+        confirm: async (message) => (await confirm({ message, initialValue: false })) === true,
+        log: (line) => console.log(line),
+      }),
       ...digest,
       show: (code) => {
         console.log(`Open ${code.verificationUri}`)
@@ -176,6 +184,8 @@ async function run(
         console.log(`Matching code: ${code.matchingCode}`)
       },
     })
+    if (replacedDeviceId !== undefined)
+      console.log(`This computer's earlier OmO device (id ${terminalText(replacedDeviceId)}) was signed out.`)
     await signedIn()
   } catch (error) {
     console.error(
@@ -207,10 +217,14 @@ and the credential is stored in the OS credential store.
   omo login                 device-code sign-in (a computer without the OmO desktop app's sign-in)
   omo login --device        force the device-code route
   omo login --no-browser    the same, never opening a browser
+  omo login --replace       replace this computer's earlier device without asking
   omo login --api <url>     OmO API origin (or OMO_SERVICE_API_URL)
 
 The service's approval page decides who may sign in. A computer whose OmO desktop app or
-stored sign-in already has its device is refused instead of registering a second one.`
+stored sign-in already has its device is refused instead of registering a second one.
+When the service says this computer already has a device, omo login offers to replace it
+(an interactive terminal asks, default No; a script passes --replace). The replacement is
+approved on the service's page, which then signs the earlier device out.`
 
 const CLOSED_LOGOUT_HELP = `Sign out of OmO: revoke this machine's device and remove the stored credentials and device keys.
 
@@ -296,6 +310,7 @@ export function configureServiceAuthCommands(
     .description("Sign in to OmO using the OS credential store")
     .option("--device", "Use a device code instead of a browser callback")
     .option("--no-browser", "Sign in by device code without opening a browser")
+    .option("--replace", "Replace this computer's earlier device without asking, when the service reports one")
     .option("--api <url>", "OmO API origin (or OMO_SERVICE_API_URL)")
     .option("--accounts <url>", "OmO sign-in page origin (or OMO_SERVICE_ACCOUNTS_URL)")
     .action((options: Options) => run("login", options, hooks))
