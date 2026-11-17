@@ -1,15 +1,32 @@
-import type { JsonObject } from "./remote/ports"
+import { dirname, join } from "node:path"
+import { fileURLToPath, pathToFileURL } from "node:url"
+import type { JsonObject, SessionProjector } from "./remote/ports"
 import type { ThreadTranscriptEntry } from "./reader"
+
+// senpi's own session projection (what its engine's get_messages answers), loaded from the pinned dist like
+// senpi-test-runtime.ts loads its modules.
+const sessionManager = (await import(
+  pathToFileURL(join(dirname(fileURLToPath(import.meta.resolve("@code-yeongyu/senpi"))), "core", "session-manager.js"))
+    .href
+)) as Pick<typeof import("@code-yeongyu/senpi"), "buildSessionContext" | "buildSessionProjection">
+
+export const senpiProjector: SessionProjector = (entries, leafId) =>
+  sessionManager.buildSessionProjection(entries as never, leafId).entries
+
+/** `session.messages` of a session holding these entries at this leaf: what get_messages answers. */
+export const senpiContext = (entries: readonly ThreadTranscriptEntry[], leafId: string | null): ThreadTranscriptEntry[] =>
+  sessionManager.buildSessionContext(entries as never, leafId).messages as unknown as ThreadTranscriptEntry[]
 
 /**
  * A session's entries as senpi's `get_entries` answers them (senpi `get-entries-command.ts` / `get-entries-page.ts`):
- * `since`/`before` bound the range, `tail` pages backward from its end, `limit` forward from its start, `maxBytes` caps
- * a page (the first entry of a page always ships), `leafId` is the newest entry. `pages` counts the answers; `refuse`
- * makes the engine answer every page with that code (an engine that stopped paging).
+ * `since`/`before` bound the range in file order (every branch), `tail` pages backward from its end, `limit` forward,
+ * `maxBytes` caps a page (the first entry of a page always ships), `leafId` is the session's current leaf (`leaf`,
+ * else the newest entry). `pages` counts the answers; `refuse` makes every page answer that code.
  */
 export type FakeEntryLog = {
   readonly entries: ThreadTranscriptEntry[]
   pages: number
+  leaf?: string | null
   refuse?: string
 }
 
@@ -22,9 +39,8 @@ export function answerGetEntries(
   log.pages += 1
   if (log.refuse !== undefined) return { refused: log.refuse }
   let range = [...log.entries]
-  const indexOf = (id: unknown) => range.findIndex((entry) => entry["id"] === id)
   if (rpc["before"] !== undefined) {
-    const at = indexOf(rpc["before"])
+    const at = range.findIndex((entry) => entry["id"] === rpc["before"])
     if (at === -1) return { refused: "not_found" }
     range = range.slice(0, at)
   }
@@ -38,8 +54,7 @@ export function answerGetEntries(
   const limit = typeof rpc["limit"] === "number" ? rpc["limit"] : undefined
   const page: ThreadTranscriptEntry[] = []
   let bytes = 0
-  const ordered = tail === undefined ? range : [...range].reverse()
-  for (const entry of ordered) {
+  for (const entry of tail === undefined ? range : [...range].reverse()) {
     if ((tail ?? limit) !== undefined && page.length >= (tail ?? limit ?? 0)) break
     if (page.length > 0 && bytes + size(entry) > maxBytes) break
     page.push(entry)
@@ -47,27 +62,31 @@ export function answerGetEntries(
   }
   if (tail !== undefined) page.reverse()
   const hasMore = page.length < range.length
-  const leaf = log.entries.at(-1)?.["id"]
+  const newest = log.entries.at(-1)?.["id"]
+  const leaf = log.leaf !== undefined ? log.leaf : typeof newest === "string" ? newest : null
   return {
     data: {
       entries: page,
-      leafId: typeof leaf === "string" ? leaf : null,
+      leafId: leaf,
       hasMore,
       ...(hasMore && tail !== undefined && typeof page[0]?.["id"] === "string" ? { next_before: page[0]["id"] } : {}),
-      ...(hasMore && tail === undefined && typeof page.at(-1)?.["id"] === "string"
-        ? { nextSince: page.at(-1)?.["id"] ?? null }
-        : {}),
     },
   }
 }
 
-/** A session file's entries for these messages, with a model change every `every` messages (bookkeeping, not transcript). */
+/** A linear session: each message a child of the one before, with a model change every `every` messages. */
 export function sessionEntries(messages: readonly ThreadTranscriptEntry[], every = 7): ThreadTranscriptEntry[] {
   const entries: ThreadTranscriptEntry[] = []
+  let parent: string | null = null
   messages.forEach((message, index) => {
-    if (index % every === 0)
-      entries.push({ type: "model_change", id: `mc${index}`, provider: "anthropic", modelId: "claude-opus" })
-    entries.push({ type: "message", id: `e${index}`, timestamp: `2026-11-17T00:00:${index}Z`, message })
+    if (index % every === 0) {
+      entries.push({ type: "model_change", id: `mc${index}`, parentId: parent, timestamp: stamp(index), provider: "anthropic", modelId: "claude-opus" })
+      parent = `mc${index}`
+    }
+    entries.push({ type: "message", id: `e${index}`, parentId: parent, timestamp: stamp(index), message })
+    parent = `e${index}`
   })
   return entries
 }
+
+export const stamp = (index: number): string => new Date(Date.UTC(2026, 10, 17) + index * 1000).toISOString()

@@ -18,7 +18,7 @@ import type {
   RemoteWatchHandlers,
 } from "./remote/ports"
 import type { ThreadTranscriptEntry } from "./reader"
-import { answerGetEntries, type FakeEntryLog } from "./thread-remote-entries-fixture"
+import { answerGetEntries, senpiProjector, type FakeEntryLog } from "./thread-remote-entries-fixture"
 import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
 import type { ThreadCloseOutcome } from "./tools/ports"
 
@@ -342,7 +342,7 @@ export function createRemoteThreadFixture() {
         })
       if (rpc["type"] === "get_messages") return ok({ messages: [...engine.messages] })
       if (rpc["type"] === "get_entries") {
-        if (options.entries === undefined) return { kind: "refused", reason: "invalid_argument" }
+        if (options.entries === undefined) return { kind: "refused", reason: "unsupported" }
         const paged = answerGetEntries(options.entries, rpc)
         return "refused" in paged ? { kind: "refused", reason: paged.refused } : ok(paged.data)
       }
@@ -482,6 +482,7 @@ export function createRemoteThreadFixture() {
               },
     }
     const remote: RemoteThreadSurface = {
+      loadProjector: async () => senpiProjector,
       client: fakeRemoteClient({
         state: () => options.plan ?? "connected",
         // This device's own id comes from the same account read: unknown names no device, a failed read fails it.

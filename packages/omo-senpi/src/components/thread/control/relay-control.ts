@@ -4,7 +4,7 @@ import { relayAddressEntry } from "../remote/address-book"
 import { rowThreadId } from "../remote/ports"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "../remote/ports"
 import { outcomeFailure } from "../remote/outcome"
-import { readEntryWindow } from "../remote/transcript-tail"
+import { readContextTail } from "../remote/transcript-tail"
 import { selectEntryPage } from "../paged-reader"
 import { replyData } from "../remote/remote-ops"
 import type { ModelChoice } from "../tools/model-match"
@@ -122,10 +122,12 @@ export function createRelayControl(
       return Array.isArray(listed) ? (listed as ThreadTranscriptEntry[]) : []
     },
     readEntryPage: async (read) => {
-      const window = await readEntryWindow(remote.sessions, device, sessionId)
-      if (window.kind === "unsupported") return window
-      if (window.kind === "failed") return outcomeFailure(window.outcome, device)
-      return selectEntryPage(window.window, read)
+      const project = await remote.loadProjector?.().catch(() => undefined)
+      if (project === undefined) return { kind: "unsupported" }
+      const tail = await readContextTail(remote.sessions, device, sessionId, project)
+      if (tail.kind === "unsupported") return tail
+      if (tail.kind === "failed") return outcomeFailure(tail.outcome, device)
+      return selectEntryPage(tail.tail, read)
     },
     waitSettled: (timeoutMs, signal) => waitSettled(remote, row, timeoutMs, signal),
   }

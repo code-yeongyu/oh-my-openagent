@@ -1,12 +1,13 @@
 /**
- * thread_read over the newest entries of a session another device holds (#14047): the holder sends a page of its
- * session entries (`get_entries`), never the whole transcript. The transcript is the message entries among them, and
- * the window rules are the live reader's (`reader.ts`): a first read starts at the 60th message from the end and takes
- * messages forward until the byte budget is spent; a cursor continues forward after the last message it returned.
+ * thread_read over the context tail of a session another device holds (#14047): the holder sends pages of its session
+ * entries (`get_entries`), never the whole transcript, and this side projects them with the engine's own projector
+ * (`remote/transcript-tail.ts`), so the messages are the ones `get_messages` answers: the current leaf's path, with its
+ * compaction and branch summaries. The window rules are the live reader's (`reader.ts`): a first read starts at the
+ * 60th message from the end and takes messages forward until the byte budget is spent; a cursor continues forward after
+ * the last message it returned.
  *
- * A cursor names that message's entry by id and binds the transcript revision it was issued at: the session's leaf
- * and its newest entry, which every append or branch move changes. A changed revision is `cursor_stale`, as on every
- * other source. Every message a cursor can name lies in the newest window of its revision, so the window answers it.
+ * A cursor names that message by its projected entry and binds the revision it was issued at: the session's leaf, which
+ * every append, compaction and branch move changes. A changed revision is `cursor_stale`, as on every other source.
  */
 
 import { THREAD_READ_DEFAULT_BYTES } from "./contracts"
@@ -14,11 +15,11 @@ import { threadToolFailure, type ThreadToolFailure } from "./errors"
 import { takeWithinBudget } from "./read-budget"
 import { THREAD_TAIL_DEFAULT_ITEMS, type ThreadTranscriptEntry } from "./reader"
 
-/** The newest entries of a session, oldest first; `complete` when nothing older exists. */
-export type EntryWindow = {
-  readonly entries: readonly ThreadTranscriptEntry[]
-  readonly complete: boolean
-  readonly leaf: string | null
+/** The newest context messages of a session (at least the window's 60 unless it has fewer), oldest first. */
+export type ContextTail = {
+  /** `id` names the message: its projected entry and its position among that entry's messages. */
+  readonly messages: readonly { readonly id: string; readonly message: ThreadTranscriptEntry }[]
+  readonly revision: string
 }
 
 export type EntryPageRead =
@@ -30,25 +31,10 @@ export type EntryPageRead =
     }
   | { readonly kind: "error"; readonly error: ThreadToolFailure }
 
-/** How many newest messages a window must hold (unless the session has fewer) to answer every read. */
-export const ENTRY_WINDOW_MESSAGES = THREAD_TAIL_DEFAULT_ITEMS
+/** How many newest messages a tail must hold (unless the session has fewer) to answer every read. */
+export const CONTEXT_TAIL_MESSAGES = THREAD_TAIL_DEFAULT_ITEMS
 
 const CURSOR_VERSION = "t2"
-
-export const entryIdOf = (entry: ThreadTranscriptEntry | undefined): string | undefined =>
-  typeof entry?.["id"] === "string" ? entry["id"] : undefined
-
-/** A session entry that carries one transcript message (`get_messages` lists the same message objects). */
-export function messageOf(entry: ThreadTranscriptEntry): ThreadTranscriptEntry | undefined {
-  const message = entry["message"]
-  return entry["type"] === "message" && typeof message === "object" && message !== null && !Array.isArray(message)
-    ? message
-    : undefined
-}
-
-function revisionOf(window: EntryWindow): string {
-  return `${window.leaf ?? ""}.${entryIdOf(window.entries.at(-1)) ?? ""}`
-}
 
 function encodeCursor(revision: string, after: string): string {
   return Buffer.from(`${CURSOR_VERSION}\n${revision}\n${after}`, "utf8").toString("base64url")
@@ -76,17 +62,13 @@ export const staleEntryCursor = (): Extract<EntryPageRead, { readonly kind: "err
   ),
 })
 
-/** One bounded slice of the window; `cursor` must be undefined or an entry cursor (`isEntryCursor`). */
+/** One bounded slice of the tail; `cursor` must be undefined or an entry cursor (`isEntryCursor`). */
 export function selectEntryPage(
-  window: EntryWindow,
+  tail: ContextTail,
   read: { readonly max_bytes?: number; readonly cursor?: string },
 ): EntryPageRead {
-  const revision = revisionOf(window)
-  const messages = window.entries.flatMap((entry) => {
-    const message = messageOf(entry)
-    return message === undefined ? [] : [{ id: entryIdOf(entry), message }]
-  })
-  let start = Math.max(0, messages.length - ENTRY_WINDOW_MESSAGES)
+  const { messages, revision } = tail
+  let start = Math.max(0, messages.length - CONTEXT_TAIL_MESSAGES)
   if (read.cursor !== undefined) {
     const cursor = decodeCursor(read.cursor)
     if (cursor === null || cursor.revision !== revision) return staleEntryCursor()
