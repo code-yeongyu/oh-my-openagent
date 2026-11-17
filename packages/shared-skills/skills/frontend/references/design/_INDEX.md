@@ -37,7 +37,7 @@ From [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill).
 
 ### Image-generation skills (do NOT write code, only produce reference imagery)
 
-These files and `taste-skill.md` are upstream text and name a `generate_image` tool. Where your harness lists it as eval-only, call it as `tool.generate_image()` inside an eval cell.
+These files and `taste-skill.md` are upstream text: where they name a `generate_image` tool and your harness lists it as eval-only, call it as `tool.generate_image()` inside an eval cell.
 
 | File | Purpose | Load when |
 |---|---|---|
