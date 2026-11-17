@@ -3,12 +3,7 @@ import { threadToolFailure } from "./errors"
 import type { ThreadErrorCode, ThreadToolFailure } from "./errors"
 import { type Static } from "typebox"
 import { toThreadAddressEntries } from "./address-book"
-import {
-  checkNameConflict,
-  normalizeThreadName,
-  type ThreadAddressEntry,
-  type ThreadResolveResult,
-} from "./addressing"
+import { checkNameConflict, normalizeThreadName, type ThreadAddressEntry, type ThreadResolveResult } from "./addressing"
 import { createLocalSessionHost, workspaceNote } from "./control/local-session-host"
 import { checkInitialSkills } from "./initial-skills"
 import {
@@ -959,17 +954,15 @@ async function unattestedSenderAmbiguity(
   sessionId: string,
 ): Promise<ThreadToolFailure | undefined> {
   if (options.remote === undefined) return undefined
-  const book = await relayAddressBook(options.remote, sessionId).catch(
-    (error: unknown): RelayAddressBook => ({
-      entries: [],
-      unavailable: threadToolFailure(
-        "host_unavailable",
-        "The account's session listing could not be read again to confirm the sender's device.",
-        "Retry when the device service is reachable.",
-        { reason: error instanceof Error ? error.message : String(error) },
-      ),
-    }),
-  )
+  const book = await relayAddressBook(options.remote, sessionId).catch((error: unknown): RelayAddressBook => ({
+    entries: [],
+    unavailable: threadToolFailure(
+      "host_unavailable",
+      "The account's session listing could not be read again to confirm the sender's device.",
+      "Retry when the device service is reachable.",
+      { reason: error instanceof Error ? error.message : String(error) },
+    ),
+  }))
   if (book.unavailable !== undefined) return book.unavailable
   const devices = [
     ...new Set([...local, ...book.entries].filter((e) => e.thread_id === sessionId).map((e) => e.device ?? "")),
