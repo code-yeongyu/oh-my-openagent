@@ -11,9 +11,11 @@ const UNNAMED = "unnamed-machine"
 function machineHost(): string {
   if (process.platform !== "darwin") return hostname()
   try {
-    const local = execFileSync("scutil", ["--get", "LocalHostName"], {
+    const local = execFileSync("/usr/sbin/scutil", ["--get", "LocalHostName"], {
       encoding: "utf8",
       timeout: 2_000,
+      killSignal: "SIGKILL",
+      stdio: ["ignore", "pipe", "ignore"],
       windowsHide: true,
     }).trim()
     return local === "" ? hostname() : local
