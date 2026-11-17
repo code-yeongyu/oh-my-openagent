@@ -103,14 +103,8 @@ function callTail(name: ThreadToolName, args: Args): string {
         typeof args.level === "string" ? `-> ${args.level}` : undefined,
         args.scope === "turn" ? "(this turn)" : undefined,
       ])
-    case "thread_bind":
-      return joinRendererTokens([text(args.platform), text(args.chat_id), `-> ${label(args.session) ?? "this thread"}`])
-    case "thread_rebind":
-      return joinRendererTokens([
-        label(args.binding_id),
-        typeof args.session === "string" ? `-> ${label(args.session)}` : undefined,
-      ])
-    case "thread_unbind":
+    case "thread_close":
+      return target ?? "this thread"
     case "thread_outbox":
       return label(args.binding_id) ?? ""
     case "thread_outbox_ack":
@@ -118,8 +112,6 @@ function callTail(name: ThreadToolName, args: Args): string {
         label(args.binding_id),
         typeof args.cursor === "number" ? `through #${args.cursor}` : undefined,
       ])
-    case "thread_bindings":
-      return label(args.session) ?? ""
     case "thread_report":
       return joinRendererTokens([text(args.kind), quoted(args.text)])
     case "thread_answer":
@@ -139,7 +131,7 @@ function resultView(name: ThreadToolName, result: ThreadToolResult, args: Args):
     }
   }
   const r = result as Readonly<Record<string, unknown>>
-  const target = linkTitle(r.link) ?? label(args.thread) ?? label(r.thread_id) ?? "thread"
+  const target = linkTitle(r.link) ?? label(args.thread) ?? label(r.thread) ?? "thread"
   switch (name) {
     case "thread_send":
     case "thread_handoff":
@@ -149,13 +141,12 @@ function resultView(name: ThreadToolName, result: ThreadToolResult, args: Args):
     case "thread_list":
       return listView(r)
     case "thread_create": {
-      const thread = (r.thread ?? {}) as Readonly<Record<string, unknown>>
-      const title = linkTitle(thread.link) ?? (text(thread.name) || undefined) ?? label(thread.thread_id) ?? "thread"
-      const skills = (thread.requested_skills ?? thread.skills) as readonly string[] | undefined
+      const title = linkTitle(r.link) ?? (text(r.name) || undefined) ?? label(r.thread) ?? "thread"
+      const skills = (r.requested_skills ?? r.skills) as readonly string[] | undefined
       const details = [
         ...(skills === undefined || skills.length === 0 ? [] : [`skills: ${skills.join(", ")}`]),
-        ...(typeof thread.alias === "string" ? [`alias: ${thread.alias}`] : []),
-        ...(typeof thread.device === "string" ? [`on device ${thread.device}`] : []),
+        ...(typeof r.alias === "string" ? [`alias: ${r.alias}`] : []),
+        ...device(r),
       ]
       if (r.deduplicated === true) return { tone: "success", headline: `${title} is already open`, details }
       const verb =
@@ -188,52 +179,6 @@ function resultView(name: ThreadToolName, result: ThreadToolResult, args: Args):
         headline: `${target} reasoning: ${text(r.level)}${r.scope === "turn" ? " for this turn" : ""}`,
         details: device(r),
       }
-    case "thread_bind": {
-      const binding = bindingOf(r)
-      const direction =
-        binding.direction?.inbound === true && binding.direction.outbound === true
-          ? "inbound and outbound"
-          : binding.direction?.inbound === true
-            ? "inbound only"
-            : "outbound only"
-      return {
-        tone: "success",
-        headline: `bound ${chat(binding)} (${direction})`,
-        details: r.deduplicated === true ? ["already bound under this key"] : [],
-      }
-    }
-    case "thread_unbind": {
-      const inFlight = (r.in_flight as readonly string[] | undefined)?.length ?? 0
-      return {
-        tone: r.already_closed === true ? "muted" : "success",
-        headline:
-          r.already_closed === true ? `${chat(bindingOf(r))} was already unbound` : `unbound ${chat(bindingOf(r))}`,
-        details: inFlight === 0 ? [] : [`${plural(inFlight, "delivery", "deliveries")} still in flight`],
-      }
-    }
-    case "thread_rebind": {
-      const binding = bindingOf(r)
-      const closed = (r.closed as readonly string[] | undefined)?.length ?? 0
-      return {
-        tone: "success",
-        headline: `moved ${chat(binding)} to ${label(binding.session_durable_id) ?? "the session"}`,
-        details: closed === 0 ? [] : [`${plural(closed, "queued delivery", "queued deliveries")} closed`],
-      }
-    }
-    case "thread_bindings": {
-      const bindings = (r.bindings as readonly Binding[] | undefined) ?? []
-      return {
-        tone: "success",
-        headline: bindings.length === 0 ? "no bindings" : plural(bindings.length, "binding", "bindings"),
-        details: [
-          ...bindings
-            .slice(0, LIST_HEAD)
-            .map((binding) => `${text(binding.platform)} ${text(binding.chat_id)}  ${text(binding.status)}`),
-          ...more(bindings.length),
-          ...(typeof r.next_cursor === "string" ? ["more on the next page"] : []),
-        ],
-      }
-    }
     case "thread_report":
       return {
         tone: "success",
@@ -286,13 +231,8 @@ function queuedLine(delivery: {
 }
 
 function sendView(r: Readonly<Record<string, unknown>>, args: Args): ResultView {
-  const thread = r.thread as Readonly<Record<string, unknown>> | undefined
   const target =
-    linkTitle(r.link ?? thread?.link) ??
-    (text(thread?.name) || undefined) ??
-    label(args.thread) ??
-    label(r.thread_id) ??
-    "thread"
+    linkTitle(r.link) ?? (text(r.name) || undefined) ?? label(args.thread) ?? label(r.thread) ?? "thread"
   const delivery = (r.delivery ?? {}) as {
     readonly kind?: string
     readonly turn_id?: string
@@ -351,11 +291,11 @@ function listView(r: Readonly<Record<string, unknown>>): ResultView {
     headline,
     details: [
       ...threads.slice(0, LIST_HEAD).map((thread) => {
-        const name = (text(thread.name) || undefined) ?? label(thread.thread_id) ?? "thread"
+        const name = (text(thread.name) || undefined) ?? label(thread.thread) ?? "thread"
         const facts = [
           text(thread.status),
           text(thread.surface),
-          text(thread.device),
+          text(thread.machine) || text(thread.device),
           thread.alive === false ? "not answering" : "",
         ].filter((fact) => fact.length > 0)
         return `${excerptRendererText(name, LABEL_WIDTH)}  ${facts.join(", ")}`
@@ -371,22 +311,6 @@ function reportHeadline(r: Readonly<Record<string, unknown>>): string {
   if (r.event === "completion")
     return r.armed === true ? "completion armed; sent when this run settles" : "completion already written"
   return `${text(r.event)} posted`
-}
-
-type Binding = {
-  readonly platform?: string
-  readonly chat_id?: string
-  readonly status?: string
-  readonly session_durable_id?: string
-  readonly direction?: { readonly inbound: boolean; readonly outbound: boolean }
-}
-
-function bindingOf(r: Readonly<Record<string, unknown>>): Binding {
-  return (r.binding ?? {}) as Binding
-}
-
-function chat(binding: Binding): string {
-  return `${text(binding.platform)} chat ${text(binding.chat_id)}`
 }
 
 function device(r: Readonly<Record<string, unknown>>): string[] {

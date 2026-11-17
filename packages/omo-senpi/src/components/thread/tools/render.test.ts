@@ -69,18 +69,7 @@ describe("thread tool call lines", () => {
       { thread: "planner", level: "high", scope: "turn" },
       "thread_set_reasoning planner -> high (this turn)",
     ],
-    [
-      "thread_bind",
-      { platform: "discord", account_id: "bot", chat_id: "c-42" },
-      "thread_bind discord c-42 -> this thread",
-    ],
-    ["thread_unbind", { binding_id: DELIVERY, expected_revision: 2 }, "thread_unbind 9f6c2b1e"],
-    [
-      "thread_rebind",
-      { binding_id: "bnd-7", expected_revision: 1, session: "planner" },
-      "thread_rebind bnd-7 -> planner",
-    ],
-    ["thread_bindings", {}, "thread_bindings"],
+    ["thread_close", {}, "thread_close this thread"],
     ["thread_report", { kind: "question", text: "ship it?\nmore" }, 'thread_report question "ship it?"'],
     ["thread_outbox", { binding_id: "bnd-7" }, "thread_outbox bnd-7"],
     ["thread_outbox_ack", { binding_id: "bnd-7", cursor: 12 }, "thread_outbox_ack bnd-7 through #12"],
@@ -102,14 +91,13 @@ describe("thread_send / thread_handoff results", () => {
   const sent = (delivery: Record<string, unknown>, extra: Record<string, unknown> = {}): ThreadToolResult =>
     ({
       kind: "ok",
-      thread_id: PEER,
+      thread: PEER,
       link: threadLink(PEER, "planner"),
       delivery,
       message_seq: 62,
       deduplicated: false,
       delivery_id: DELIVERY,
       effective_mode: "follow_up",
-      endpoint: { kind: "tui" },
       ...extra,
     }) as ThreadToolResult
 
@@ -150,14 +138,13 @@ describe("thread_send / thread_handoff results", () => {
   test("#given an offline target #when it renders #then it says the message waits for the thread to start", () => {
     const offline = {
       kind: "ok",
-      thread_id: PEER,
+      thread: PEER,
       link: threadLink(PEER, undefined),
       delivery: { kind: "queued_offline", queue_position: 1 },
       message_seq: 3,
       deduplicated: true,
       delivery_id: DELIVERY,
       effective_mode: "auto",
-      endpoint: null,
     } as ThreadToolResult
     expect(result("thread_send", offline, { thread: "reviewer", message: "hi" })).toEqual([
       "-> reviewer  queued #1: thread is offline, delivers when it starts",
@@ -168,7 +155,7 @@ describe("thread_send / thread_handoff results", () => {
   test("#given a send to another device #when it renders #then the device is a detail line", () => {
     const remote = {
       kind: "ok",
-      thread_id: PEER,
+      thread: PEER,
       link: threadLink(PEER, "builder"),
       delivery: { kind: "started", turn_id: "4" },
       deduplicated: false,
@@ -187,15 +174,13 @@ describe("thread_send / thread_handoff results", () => {
   test("#given a fuzzy handoff #when it renders #then the matched thread and the match kind show", () => {
     const handed = {
       kind: "ok",
-      thread: {
-        thread_id: PEER,
-        name: "planner-2",
-        status: "live",
-        cwd: "/w",
-        created_at: "t",
-        updated_at: null,
-        link: threadLink(PEER, "planner-2"),
-      },
+      thread: PEER,
+      name: "planner-2",
+      status: "live",
+      cwd: "/w",
+      created_at: "t",
+      updated_at: null,
+      link: threadLink(PEER, "planner-2"),
       resolved_by: "fuzzy",
       delivery: { kind: "started", turn_id: "9" },
       message_seq: 1,
@@ -227,7 +212,7 @@ describe("thread_read / thread_list / thread_create results", () => {
   test("#given a transcript #when thread_read renders #then it counts messages and shows the latest one's first line", () => {
     const read = {
       kind: "ok",
-      thread_id: PEER,
+      thread: PEER,
       link: threadLink(PEER, "planner"),
       items: [
         { seq: 1, role: "user", content: "start" },
@@ -249,7 +234,7 @@ describe("thread_read / thread_list / thread_create results", () => {
   test("#given an empty transcript #when thread_read renders #then it says so", () => {
     const read = {
       kind: "ok",
-      thread_id: PEER,
+      thread: PEER,
       link: threadLink(PEER, undefined),
       items: [],
       truncated: false,
@@ -260,7 +245,7 @@ describe("thread_read / thread_list / thread_create results", () => {
 
   test("#given listed threads #when thread_list renders #then a count and the first few threads show", () => {
     const thread = (id: string, name: string, extra: Record<string, unknown> = {}) => ({
-      thread_id: id,
+      thread: id,
       name,
       status: "live",
       cwd: "/w",
@@ -275,7 +260,7 @@ describe("thread_read / thread_list / thread_create results", () => {
       threads: [
         thread("a", "planner", { surface: "tui" }),
         thread("b", "", { status: "resumable" }),
-        thread("c", "builder", { surface: "desktop", device: "laptop", alive: false }),
+        thread("c", "builder", { surface: "desktop", machine: "laptop", device: "dev-2", alive: false }),
         thread("d", "four"),
         thread("e", "five"),
         thread("f", "six"),
@@ -304,16 +289,14 @@ describe("thread_read / thread_list / thread_create results", () => {
   test("#given a created thread #when thread_create renders #then it names the thread and its skills", () => {
     const created = {
       kind: "ok",
-      thread: {
-        thread_id: PEER,
-        name: "scratch",
-        status: "live",
-        cwd: "/w",
-        created_at: "t",
-        updated_at: null,
-        link: threadLink(PEER, "scratch"),
-        requested_skills: ["git-master"],
-      },
+      thread: PEER,
+      name: "scratch",
+      status: "live",
+      cwd: "/w",
+      created_at: "t",
+      updated_at: null,
+      link: threadLink(PEER, "scratch"),
+      requested_skills: ["git-master"],
       deduplicated: false,
     } as ThreadToolResult
     expect(result("thread_create", created, { name: "scratch" })).toEqual(["created scratch", "  skills: git-master"])
@@ -322,15 +305,13 @@ describe("thread_read / thread_list / thread_create results", () => {
   test("#given an existing live thread #when thread_create opens it #then it says it was already open", () => {
     const opened = {
       kind: "ok",
-      thread: {
-        thread_id: PEER,
-        name: "scratch",
-        status: "live",
-        cwd: "/w",
-        created_at: "t",
-        updated_at: null,
-        link: threadLink(PEER, "scratch"),
-      },
+      thread: PEER,
+      name: "scratch",
+      status: "live",
+      cwd: "/w",
+      created_at: "t",
+      updated_at: null,
+      link: threadLink(PEER, "scratch"),
       deduplicated: true,
     } as ThreadToolResult
     expect(result("thread_create", opened, { thread: PEER })).toEqual(["scratch is already open"])
@@ -358,38 +339,43 @@ describe("control and relay results", () => {
   test.each([
     [
       "thread_interrupt",
-      { kind: "ok", thread_id: PEER, turn_id: "7", interrupted: true },
+      { kind: "ok", thread: PEER, turn_id: "7", interrupted: true, background: { status: "not_supported" } },
       { thread: "planner" },
       ["interrupted planner (turn 7)"],
     ],
     [
       "thread_interrupt",
-      { kind: "ok", thread_id: PEER, interrupted: false },
+      { kind: "ok", thread: PEER, interrupted: false, background: { status: "not_supported" } },
       { thread: PEER },
       ["01a1c470 was idle; nothing to interrupt"],
     ],
-    ["thread_close", { kind: "ok", thread_id: PEER, closed: true }, { thread: "planner" }, ["closed planner"]],
     [
       "thread_close",
-      { kind: "ok", thread_id: PEER, closed: false },
+      { kind: "ok", thread: PEER, closed: true, reason: "closed" },
+      { thread: "planner" },
+      ["closed planner"],
+    ],
+    [
+      "thread_close",
+      { kind: "ok", thread: PEER, closed: false, reason: "not_live" },
       { thread: "planner" },
       ["planner was not running; nothing to close"],
     ],
     [
       "thread_rename",
-      { kind: "ok", thread_id: PEER, name: "reviewer", alias: "rev" },
+      { kind: "ok", thread: PEER, name: "reviewer", alias: "rev" },
       { thread: "planner", name: "reviewer", alias: "rev" },
       ['renamed to "reviewer"', "  alias: rev"],
     ],
     [
       "thread_set_model",
-      { kind: "ok", thread_id: PEER, model: { provider: "openai", id: "gpt-x" } },
+      { kind: "ok", thread: PEER, model: { provider: "openai", id: "gpt-x" } },
       { thread: "planner", model: "gpt" },
       ["planner now uses openai/gpt-x"],
     ],
     [
       "thread_set_reasoning",
-      { kind: "ok", thread_id: PEER, level: "high", scope: "turn" },
+      { kind: "ok", thread: PEER, level: "high", scope: "turn" },
       { thread: "self", level: "high" },
       ["this thread reasoning: high for this turn"],
     ],
@@ -445,61 +431,6 @@ describe("control and relay results", () => {
     expect(result(name, value as ThreadToolResult, args)).toEqual([...expected])
   })
 
-  const binding = (over: Record<string, unknown> = {}) => ({
-    schema_version: 1,
-    binding_id: "bnd-7",
-    revision: 2,
-    status: "active",
-    platform: "discord",
-    account_id: "bot",
-    chat_id: "c-42",
-    thread_id: "@chat",
-    root_message_id: null,
-    progress_message_id: null,
-    session_realm_id: "r",
-    session_durable_id: PEER,
-    direction: { inbound: true, outbound: true },
-    inbound_mode: "auto",
-    outbound_events: [],
-    policy_id: "default",
-    created_at: "t",
-    updated_at: "t",
-    lease_started_at: "t",
-    ttl_seconds: null,
-    expires_at: null,
-    ...over,
-  })
-
-  test("#given relay binding results #when they render #then they name the chat, never the binding uuid", () => {
-    expect(result("thread_bind", { kind: "ok", binding: binding(), deduplicated: false } as ThreadToolResult)).toEqual([
-      "bound discord chat c-42 (inbound and outbound)",
-    ])
-    expect(
-      result("thread_unbind", {
-        kind: "ok",
-        binding: binding({ status: "detached" }),
-        already_closed: false,
-        in_flight: ["d1", "d2"],
-        deduplicated: false,
-      } as ThreadToolResult),
-    ).toEqual(["unbound discord chat c-42", "  2 deliveries still in flight"])
-    expect(
-      result("thread_rebind", {
-        kind: "ok",
-        binding: binding({ revision: 3 }),
-        closed: ["d1"],
-        deduplicated: false,
-      } as ThreadToolResult),
-    ).toEqual(["moved discord chat c-42 to 01a1c470", "  1 queued delivery closed"])
-    expect(
-      result("thread_bindings", {
-        kind: "ok",
-        bindings: [binding(), binding({ chat_id: "c-9", status: "expired", platform: "slack" })],
-        next_cursor: "n",
-      } as ThreadToolResult),
-    ).toEqual(["2 bindings", "  discord c-42  active", "  slack c-9  expired", "  more on the next page"])
-  })
-
   test("#given outbox rows #when thread_outbox renders #then it counts pending rows and shows the newest heads", () => {
     const row = (cursor: number, event: string, text: string, state: string) => ({
       cursor,
@@ -534,7 +465,7 @@ describe("control and relay results", () => {
   })
 
   test("#given a result the details do not carry #when it renders #then the content text is parsed instead", () => {
-    const value = { kind: "ok", thread_id: PEER, closed: true } as ThreadToolResult
+    const value = { kind: "ok", thread: PEER, closed: true, reason: "closed" } as ThreadToolResult
     const lines = trimmed(
       renderThreadResult("thread_close")(
         { content: [{ type: "text", text: JSON.stringify(value) }], details: undefined } as never,
