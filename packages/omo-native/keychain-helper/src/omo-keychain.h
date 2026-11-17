@@ -17,7 +17,14 @@
 #define MAX_LINE_BYTES (MAX_VALUE_BYTES * 6 + 1024)
 #define ACCOUNT_NAME_BYTES 80
 
-enum exit_code { EXIT_DONE = 0, EXIT_REFUSED_ARGV = 2, EXIT_REFUSED_REQUEST = 3, EXIT_CLIENT_GONE = 4 };
+enum exit_code { EXIT_DONE = 0, EXIT_REFUSED_ARGV = 2, EXIT_REFUSED_REQUEST = 3, EXIT_CLIENT_GONE = 4, EXIT_DEADLINE = 5 };
+
+// How long one helper run may live, and how long a mutating verb may keep going after its client is gone (session.c).
+typedef struct {
+  long lifetime_ms;
+  long grace_ms;
+} helper_limits;
+extern helper_limits limits;
 
 typedef struct {
   char *bytes;
