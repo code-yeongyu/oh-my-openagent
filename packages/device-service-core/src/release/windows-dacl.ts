@@ -2,7 +2,7 @@ import { spawn } from "node:child_process"
 
 import { LocalApiError } from "../local-api/errors.ts"
 import type { SecureFile } from "../local-api/access.ts"
-import { APPLY_DACL_SCRIPT, type DaclDescription, describeDacl, exactDaclVerdict } from "../local-api/dacl.ts"
+import { type DaclDescription, describeDacl, exactDaclVerdict } from "../local-api/dacl.ts"
 
 // omo's Windows exact-DACL writer for the files it installs (#12023), over the vendored dacl.ts. The vendored verdict
 // compares against the literal SID only, but SDDL prints some users by an alias (the built-in Administrator, RID 500,
@@ -38,18 +38,22 @@ const runPowerShell: PowerShellRunner = async (script, env) => {
   return { code, out: Buffer.concat(chunks).toString("utf8"), err: Buffer.concat(errChunks).toString("utf8") }
 }
 
+const decodePowerShellText = (text: string): string =>
+  text.replace(/_x([0-9A-Fa-f]{4})_/g, (_match, hex: string) => String.fromCharCode(Number.parseInt(hex, 16)))
+
 const firstErrorLine = (err: string | undefined): string => {
-  const lines = (err ?? "")
+  const decoded = decodePowerShellText(err ?? "")
+  const lines = decoded
     .split(/\r?\n/)
     .map((text) => text.trim())
-    .filter((text) => text !== "" && !text.startsWith("#< CLIXML"))
+    .filter((text) => text !== "" && text !== "Exception" && !text.startsWith("#< CLIXML") && !text.startsWith("<Objs"))
   // A redirected Windows PowerShell writes its progress record as CLIXML on the same stream as the
-  // real error. The progress object is not the failure.
+  // real error. The progress object is not the failure. Encoded newlines (_x000D__x000A_) are decoded first.
   const plain = lines.find((text) => !text.startsWith("<"))
-  const embedded = lines
-    .map((text) => /Exception[^<]{0,220}/.exec(text)?.[0])
-    .find((text): text is string => text !== undefined)
-  const line = plain ?? embedded ?? ""
+  const tagged = [...decoded.matchAll(/<S[^>]*>([^<]+)<\/S>/g)]
+    .map((match) => match[1]?.trim() ?? "")
+    .find((text) => text !== "" && text !== "Exception")
+  const line = plain ?? tagged ?? ""
   return line === "" ? "" : `: ${line.slice(0, 300)}`
 }
 
@@ -79,22 +83,34 @@ export const aliasedDaclVerdict = (
   )
 }
 
-// The vendored script's SetOwner is refused on the GitHub runner: SeRestorePrivilege is present and
-// disabled, and the progress record is the first stderr line. icacls enables the privilege. The DACL
-// written afterwards is still the vendored one-ACE descriptor. dacl.ts stays byte-pinned.
-const OWNER_LINE = "$acl.SetOwner($sid)\n"
-const RUNNER_PREFIX = String.raw`$ProgressPreference = 'SilentlyContinue'
+// A fresh FileSecurity passed to Set-Acl is refused on the GitHub runner, and the Get-Acl/Set-Acl
+// cmdlets often cannot load Microsoft.PowerShell.Security there. icacls sets the owner, then the
+// item's own GetAccessControl/SetAccessControl edits that live descriptor down to one protected ACE.
+// The vendored dacl.ts stays byte-pinned.
+const RUNNER_APPLY_SCRIPT = String.raw`
+$ProgressPreference = 'SilentlyContinue'
+$ErrorActionPreference = 'Continue'
+$ownerOut = & icacls.exe $env:LA_PATH /setowner "*$($env:LA_SID)" 2>&1 | Out-String
+$ownerCode = $LASTEXITCODE
 $ErrorActionPreference = 'Stop'
-$ownerSet = & icacls.exe $env:LA_PATH /setowner "*$($env:LA_SID)" 2>&1
-if ($LASTEXITCODE -ne 0) { throw "setowner failed: $ownerSet" }
-`
-if (!APPLY_DACL_SCRIPT.includes(OWNER_LINE)) {
-  throw new Error("the vendored DACL script no longer sets the owner on its own line")
+if ($ownerCode -ne 0) { throw "setowner failed: $ownerOut" }
+$sid = New-Object System.Security.Principal.SecurityIdentifier($env:LA_SID)
+$item = Get-Item -LiteralPath $env:LA_PATH
+$acl = $item.GetAccessControl()
+$acl.SetAccessRuleProtection($true, $false)
+foreach ($rule in @($acl.Access)) { [void]$acl.RemoveAccessRule($rule) }
+if ($env:LA_KIND -eq 'dir') {
+  $inherit = [System.Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
+} else {
+  $inherit = [System.Security.AccessControl.InheritanceFlags]::None
 }
-const RUNNER_APPLY_SCRIPT = APPLY_DACL_SCRIPT.replace("$ErrorActionPreference = 'Stop'\n", RUNNER_PREFIX).replace(
-  OWNER_LINE,
-  "",
-)
+$grant = New-Object System.Security.AccessControl.FileSystemAccessRule($sid,
+  [System.Security.AccessControl.FileSystemRights]::FullControl, $inherit,
+  [System.Security.AccessControl.PropagationFlags]::None, [System.Security.AccessControl.AccessControlType]::Allow)
+$acl.AddAccessRule($grant)
+$item.SetAccessControl($acl)
+Write-Output 'applied'
+`
 
 export const applyExactDacl = async (
   path: string,
