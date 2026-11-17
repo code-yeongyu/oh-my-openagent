@@ -3,9 +3,9 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { delimiter, join } from "node:path"
 
 import { bashPath, forBash, windowsProcessEnv } from "./publish-operator-darwin-windows-env"
 
@@ -39,6 +39,18 @@ const tempDir = (prefix: string) => {
   return dir
 }
 
+// The step hashes the manifest with `shasum -a 256` because macOS runners have no `sha256sum`. Git bash (Windows
+// runners) has no `shasum`, so this forwards to sha256sum exactly where the platform lacks it — the same shim
+// release-assets-verify-workflow.test.ts ships.
+const shasumShimDir = (() => {
+  if (spawnSync("bash", ["-c", "command -v shasum"], { timeout: 5_000 }).status === 0) return ""
+  const bin = mkdtempSync(join(tmpdir(), "operator-darwin-bin-"))
+  writeFileSync(join(bin, "shasum"), '#!/bin/bash\n[ "$1" = -a ] && [ "$2" = 256 ] || exit 2\nshift 2\nexec sha256sum "$@"\n')
+  chmodSync(join(bin, "shasum"), 0o755)
+  return bin
+})()
+const stepPath = (): string => (shasumShimDir === "" ? bashPath() : `${shasumShimDir}${delimiter}${bashPath()}`)
+
 describe("Verify operator darwin artifacts step", () => {
   const run = (pin: string) => {
     const root = tempDir("operator-darwin-pin-")
@@ -58,7 +70,7 @@ describe("Verify operator darwin artifacts step", () => {
     const result = spawnSync("bash", ["-c", `${stubs.join("\n")}\n${stepRun("Verify operator darwin artifacts")}`], {
       env: {
         ...windowsProcessEnv(),
-        PATH: bashPath(),
+        PATH: stepPath(),
         CALLS: forBash(calls),
         GITHUB_WORKSPACE: forBash(root),
         OPERATOR_DARWIN_VERIFIER: forBash(pinned),
@@ -121,7 +133,7 @@ describe("Verify operator darwin artifacts step with the real bun", () => {
         encoding: "utf8",
         env: {
           ...windowsProcessEnv(),
-          PATH: bashPath(),
+          PATH: stepPath(),
           HOME: forBash(process.env.HOME ?? root),
           // A runner whose environment carries interception settings must not pass them to the verifier.
           HTTPS_PROXY: "http://127.0.0.1:9",
