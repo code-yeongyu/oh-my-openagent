@@ -1,7 +1,10 @@
 #include "omo-keychain.h"
 
 #include <Security/AuthSession.h>
+#include <errno.h>
 #include <string.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
@@ -220,4 +223,31 @@ OSStatus delete_item(const char *account) {
   OSStatus status = SecItemDelete(query);
   CFRelease(query);
   return status;
+}
+
+// The item ACL can name one helper path. A later copy is refused on decrypt, and SecItemDelete then returns
+// errSecAuthFailed even though the keychain is unlocked. `security` deletes by attributes as the keychain owner.
+bool security_delete_generic_password(const char *account) {
+  char keychain_path[1024];
+  UInt32 length = sizeof keychain_path;
+  // A throwaway --keychain must not fall through to the login keychain when its path cannot be read.
+  if (store.keychain != NULL &&
+      (SecKeychainGetPath(store.keychain, &length, keychain_path) != errSecSuccess || length == 0 ||
+       (size_t)length >= sizeof keychain_path))
+    return false;
+  pid_t pid = fork();
+  if (pid < 0) return false;
+  if (pid == 0) {
+    if (store.keychain != NULL)
+      execl("/usr/bin/security", "security", "delete-generic-password", "-s", SERVICE, "-a", account, "-k",
+            keychain_path, (char *)NULL);
+    else
+      execl("/usr/bin/security", "security", "delete-generic-password", "-s", SERVICE, "-a", account, (char *)NULL);
+    _exit(127);
+  }
+  int status = 0;
+  while (waitpid(pid, &status, 0) < 0) {
+    if (errno != EINTR) return false;
+  }
+  return WIFEXITED(status) && WEXITSTATUS(status) == 0;
 }
