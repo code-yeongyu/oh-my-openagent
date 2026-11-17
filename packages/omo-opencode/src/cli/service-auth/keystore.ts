@@ -9,7 +9,7 @@ import {
   HelperMissingForOwnedItem,
   type KeychainHelperOptions,
 } from "./keychain-helper/darwin-backend"
-import { HelperOldSlotsFull, type WriteIntent } from "./keychain-helper/darwin-store"
+import { HelperItemNotOwned, HelperOldSlotsFull, type WriteIntent } from "./keychain-helper/darwin-store"
 import { bindKeychainHelper, type LockedStore, lockedStoreView } from "./keychain-helper/store-binding"
 import { probeSecretServiceLock, type SecretServiceLockProbe } from "./secret-service-lock"
 import { heldCredentialLease, withCredentialLock } from "./credential-lock"
@@ -42,6 +42,8 @@ export type CredentialStore = SealedStore<Credentials>
 
 export class CredentialStoreError extends SignInError {}
 export class KeychainLockedError extends CredentialStoreError {}
+/** The keychain item's access list belongs to another program: unlocking does not help (#13757). */
+export class KeychainItemNotOwnedError extends CredentialStoreError {}
 export class SecretServiceUnavailableError extends CredentialStoreError {}
 /** OmO's own keychain (#13116) refused or cannot be reached; its message names the fix and is never generalized. */
 export class DedicatedStoreError extends CredentialStoreError {}
@@ -359,6 +361,8 @@ export function createSealedStore<T>(
   const lockedFailure = (error: unknown): unknown => {
     const mapped = asKeystoreError(error, (message) => new KeychainApprovalPendingError(message))
     if (error instanceof HelperOldSlotsFull) return new CredentialStoreError(error.message)
+    if (error instanceof HelperItemNotOwned)
+      return isLocked(error.cause) ? unavailable(error.cause) : new KeychainItemNotOwnedError(error.message)
     if (mapped instanceof KeychainApprovalPendingError || mapped instanceof SignInError) return mapped
     if (mapped instanceof Error && mapped.name === "LockLeaseLostError") return mapped
     return unavailable(mapped)

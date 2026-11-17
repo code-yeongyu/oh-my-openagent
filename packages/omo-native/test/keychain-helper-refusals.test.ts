@@ -89,6 +89,9 @@ describe.skipIf(!isDarwin)("omo-keychain helper refusals (#11262 design 1, Refus
       "--hold-before-reply",
       "--as-root",
       "--classify-partition",
+      "--stall-mutation",
+      "--lifetime-ms",
+      "--grace-ms",
       "--store-root",
     ])
       expect(bytes.includes(flag)).toBe(false)
