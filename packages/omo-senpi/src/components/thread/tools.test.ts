@@ -560,6 +560,35 @@ describe("thread session controls", () => {
     expect(f.setSessionName).not.toHaveBeenCalled()
   })
 
+  test("#given the caller is dur-peer #when thread_rename omits thread #then this session is renamed", async () => {
+    const f = fixture()
+    expect(await runner(f, "dur-peer")("thread_rename", { name: "릴레이 테스트" })).toEqual({
+      kind: "ok",
+      thread_id: "dur-peer",
+      name: "릴레이 테스트",
+    })
+    expect(f.setSessionName.mock.calls).toEqual([["route-peer", "릴레이 테스트", "dur-peer"]])
+  })
+
+  test("#given the live session id is route-peer #when thread_rename names that sessionId #then the durable thread is renamed", async () => {
+    const f = fixture()
+    expect(await runner(f)("thread_rename", { thread: "route-peer", name: "릴레이 테스트" })).toEqual({
+      kind: "ok",
+      thread_id: "dur-peer",
+      name: "릴레이 테스트",
+    })
+  })
+
+  test("#given rpc-9 is not a listed sessionId #when thread_rename names it #then not_found suggests the durable thread_id", async () => {
+    const f = fixture()
+    const result = await runner(f)("thread_rename", { thread: "rpc-9", name: "릴레이 테스트" })
+    expect(result).toMatchObject({ kind: "error", error: { code: "not_found" } })
+    if (result.kind !== "error") throw new Error("expected not_found")
+    expect(result.error.message).toContain("dur-peer")
+    expect(result.error.next_action).toContain("thread_id")
+    expect(f.setSessionName).not.toHaveBeenCalled()
+  })
+
   test("self uses the callerSessionId fallback when no execution context is supplied", async () => {
     const f = fixture()
     expect(await runner(f, "dur-peer")("thread_rename", { thread: "self", name: "New Name" })).toEqual({

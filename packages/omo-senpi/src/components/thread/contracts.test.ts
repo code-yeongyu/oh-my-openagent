@@ -105,9 +105,14 @@ describe("thread_rename params", () => {
     expect(outcome.kind).toBe("ok")
   })
 
-  test("#given a rename payload missing thread #when parsed #then it returns invalid_arguments as data", () => {
+  test("#given a rename payload missing thread #when parsed #then it is accepted so the tool can rename this session", () => {
     const outcome = parseThreadParams(threadToolParamSchemas.thread_rename, { name: "x" })
-    expect(outcome).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+    expect(outcome).toMatchObject({ kind: "ok", value: { name: "x" } })
+  })
+
+  test("#given a close payload missing thread #when parsed #then it is accepted so the tool can close this session", () => {
+    const outcome = parseThreadParams(threadToolParamSchemas.thread_close, {})
+    expect(outcome).toMatchObject({ kind: "ok", value: {} })
   })
 })
 
