@@ -63,6 +63,7 @@ const legacy = [
   ["plugin-surface", "plugin-surface.mjs"],
   ["session-control", "session-control-qa.mjs"],
   ["reopen-exited", "reopen-exited.mjs"],
+  ["create-atomic", "create-atomic.mjs"],
 ]
 
 function option(name) {
