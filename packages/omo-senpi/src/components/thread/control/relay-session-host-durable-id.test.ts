@@ -14,7 +14,7 @@ describe("thread_create on another device names the new thread by its durable id
     const a = account({ openData: ENGINE_OPEN_REPLY, relayKeys: RELAY_KEYS })
     const { run } = surface(a.remote)
 
-    const result = await run("thread_create", { device: "studio" })
+    const result = await run("thread_create", { name: "relay-session-host-durable-id-17", device: "studio" })
 
     expect(result).toMatchObject({
       kind: "ok",
