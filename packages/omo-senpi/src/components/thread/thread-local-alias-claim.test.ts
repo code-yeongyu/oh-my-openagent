@@ -101,7 +101,9 @@ describe("an alias whose claim asks for a sign-in", () => {
         .map((entry) => [entry.via, entry.device, entry.session, entry.rpc?.["name"]])
     expect(await run("thread_create", { device: "b", alias: "about-me" })).toMatchObject({
       kind: "ok",
-      thread: { thread_id: CREATED_ON_B, device: "b", name: "about-me" },
+      thread: CREATED_ON_B,
+      device: "b",
+      name: "about-me",
       alias_scope: "local",
       alias_unavailable: "sign_in",
     })
@@ -117,12 +119,13 @@ describe("an alias whose claim asks for a sign-in", () => {
     const result = await run("thread_create", { device: "b", alias: "about-me" })
     expect(result).toMatchObject({
       kind: "ok",
-      thread: { thread_id: CREATED_ON_B, device: "b" },
+      thread: CREATED_ON_B,
+      device: "b",
       alias_scope: "local",
       alias_unavailable: "sign_in",
       local_name_unavailable: "not_found",
     })
-    expect(result.kind === "ok" && "thread" in result ? result.thread.name : "no thread").not.toBe("about-me")
+    expect(result.kind === "ok" ? (result as { name?: string }).name : "no thread").not.toBe("about-me")
     expect(a.sent.filter((entry) => entry.rpc?.["type"] === "set_session_name")).toStrictEqual([])
     expect(setSessionName.mock.calls).toStrictEqual([])
   })
@@ -138,14 +141,14 @@ describe("an alias whose claim asks for a sign-in", () => {
     const result = await run("thread_create", { alias: "about-me" })
     expect(result).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-created-here" },
+      thread: "dur-created-here",
       alias_scope: "local",
       alias_unavailable: "sign_in",
       local_name_unavailable: "host_unavailable",
       // #13185 review LOW: the untyped error's message is kept, so a rename-path bug is traceable.
       local_name_unavailable_reason: "thread RPC connection closed before the response arrived",
     })
-    expect(result.kind === "ok" && "thread" in result ? result.thread.name : "no thread").not.toBe("about-me")
+    expect(result.kind === "ok" ? (result as { name?: string }).name : "no thread").not.toBe("about-me")
     expect(setSessionName.mock.calls.map((call) => [call[0], call[1]])).toStrictEqual([["route-created", "about-me"]])
   })
 
