@@ -1,5 +1,5 @@
 import type { ThreadTranscriptEntry } from "../reader"
-import { escapeForDisplay } from "@oh-my-opencode/utils"
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { relayAddressEntry } from "../remote/address-book"
 import { rowThreadId } from "../remote/ports"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "../remote/ports"

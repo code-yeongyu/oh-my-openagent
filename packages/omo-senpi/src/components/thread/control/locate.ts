@@ -1,5 +1,5 @@
 import type { ThreadToolResult } from "../contracts"
-import { escapeForDisplay } from "@oh-my-opencode/utils"
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { toThreadAddressEntries } from "../address-book"
 import { workspaceEntries } from "../addressing"
 import { rowThreadId } from "../remote/ports"

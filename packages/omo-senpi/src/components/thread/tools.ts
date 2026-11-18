@@ -1,5 +1,5 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
-import { escapeForDisplay } from "@oh-my-opencode/utils"
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { threadToolFailure } from "./errors"
 import type { ThreadErrorCode, ThreadToolFailure } from "./errors"
 import { type Static } from "typebox"

@@ -1,5 +1,5 @@
 import type { ThreadSummary } from "../contracts"
-import { escapeForDisplay } from "@oh-my-opencode/utils"
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { rowLabel, rowStatus, rowThreadId } from "../remote/ports"
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import { INITIAL_SKILLS_CONTEXT_KEY } from "../initial-skills"
