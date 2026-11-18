@@ -178,7 +178,7 @@ const ThreadArchiveParams = Type.Object({
   archived: Type.Optional(
     Type.Boolean({
       description:
-        "true (the default) archives the thread, so thread_list hides it unless state includes archived; false unarchives it.",
+        "true (the default) archives the thread, so thread_list (tool.thread_list() in an eval cell) hides it unless state includes archived; false unarchives it.",
     }),
   ),
   all_scope: AllScope,
