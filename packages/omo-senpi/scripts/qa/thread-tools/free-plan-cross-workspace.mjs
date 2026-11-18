@@ -25,16 +25,18 @@ import {
 const report = createReport("free-plan-cross-workspace")
 installCleanupHooks()
 const scratch = makeScratch("free-plan-cross-workspace")
-const evalCall = (code) => ({ toolCalls: [{ name: "eval", args: { language: "js", summary: "QA: thread cell", code } }] })
+const evalCall = (code) => ({
+  toolCalls: [{ name: "eval", args: { language: "js", summary: "QA: thread cell", code } }],
+})
 const fake = await startFakeModelServer([
   evalCall(
-    'const v = JSON.parse((await tool.thread_list({})).text); print(JSON.stringify({kind: v.kind, scope: v.scope, ids: (v.threads ?? []).map(t => t.thread)}))',
+    "const v = JSON.parse((await tool.thread_list({})).text); print(JSON.stringify({kind: v.kind, scope: v.scope, ids: (v.threads ?? []).map(t => t.thread)}))",
   ),
   evalCall(
     'const r = JSON.parse((await tool.thread_send({ thread: "site build", message: "cross-project hello (scoped)" })).text); print(JSON.stringify({kind: r.kind, code: r.error?.code, next_action: r.error?.next_action}))',
   ),
   evalCall(
-    'const v = JSON.parse((await tool.thread_list({ all_scope: true })).text); print(JSON.stringify({kind: v.kind, ids: (v.threads ?? []).map(t => t.thread)}))',
+    "const v = JSON.parse((await tool.thread_list({ all_scope: true })).text); print(JSON.stringify({kind: v.kind, ids: (v.threads ?? []).map(t => t.thread)}))",
   ),
   evalCall(
     'const r = JSON.parse((await tool.thread_send({ thread: "site build", message: "cross-project hello", all_scope: true })).text); print(JSON.stringify({kind: r.kind, thread: r.thread, delivery: r.delivery?.kind}))',
@@ -58,12 +60,19 @@ scratch.env.SENPI_RPC_SOCKET = socketPath
 delete scratch.env.OMO_CODING_AGENT_DIR
 delete scratch.env.CODING_AGENT_DIR
 scratch.env.HOME = scratch.dir
-const host = await startRealHost(scratch, { socketPath, extraArgs: ["--provider", "mock", "--model", "mock-model", "--extension", extension] })
+const host = await startRealHost(scratch, {
+  socketPath,
+  extraArgs: ["--provider", "mock", "--model", "mock-model", "--extension", extension],
+})
 const client = await HostClient.connect(host.socket, "fpcw")
 const beta = await client.openSession({ cwd: betaProject })
 await client.request({ type: "set_session_name", sessionId: beta.routingId, name: "site build" })
 const alpha = await client.openSession({ cwd: alphaProject })
-const settled = client.waitFor((record) => record.type === "agent_settled" && record.sessionId === beta.routingId, client.mark(), 120_000)
+const settled = client.waitFor(
+  (record) => record.type === "agent_settled" && record.sessionId === beta.routingId,
+  client.mark(),
+  120_000,
+)
 await client.promptAndSettle(
   alpha.routingId,
   "List your workspace threads, message the site build session by name, list all threads, then message it by name with all_scope.",
@@ -117,7 +126,9 @@ const parsed = (text) => {
 const scopedList = parsed(cell("thread_list({})")?.text)
 const scopedSend = parsed(cell('thread_send({ thread: "site build", message: "cross-project hello (scoped)" })')?.text)
 const wideList = parsed(cell("thread_list({ all_scope: true })")?.text)
-const wideSend = parsed(cell('thread_send({ thread: "site build", message: "cross-project hello", all_scope: true })')?.text)
+const wideSend = parsed(
+  cell('thread_send({ thread: "site build", message: "cross-project hello", all_scope: true })')?.text,
+)
 const betaId = beta.state.durableSessionId
 const alphaId = alpha.state.durableSessionId
 report.assert(
@@ -135,7 +146,9 @@ report.assert(
 )
 report.assert(
   "scoped-name-send-answers-scope-hint",
-  scopedSend?.kind === "error" && scopedSend.code === "scope_denied" && String(scopedSend.next_action ?? "").includes("all_scope"),
+  scopedSend?.kind === "error" &&
+    scopedSend.code === "scope_denied" &&
+    String(scopedSend.next_action ?? "").includes("all_scope"),
   `scoped_send=${JSON.stringify(scopedSend)}`,
 )
 report.assert(
