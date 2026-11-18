@@ -1,4 +1,4 @@
-import { describe, expect, jest, spyOn, test } from "bun:test"
+import { describe, expect, jest, test } from "bun:test"
 import {
   connectDeviceService,
   LocalApiError,
@@ -309,7 +309,7 @@ describe("device-service adapter of the thread tools' account surface", () => {
         { device: "b", session_id: "s1", title: "t", project: "/p", path: "/p/s1.jsonl", state: "idle", updated_ms: 2 },
         { model: "a/m1" },
       ),
-    ).toEqual({ kind: "ok", thread_id: "", device: "b", model: { provider: "a", id: "m1" } })
+    ).toEqual({ kind: "ok", thread: "", device: "b", model: { provider: "a", id: "m1" } })
     expect(closed).toBe(false)
   })
 
@@ -1417,27 +1417,18 @@ describe("device-service adapter: an idle attach's detach timer", () => {
   test("#given a command released its attach #when the idle bound passes #then the attach is detached and the next command attaches again", async () => {
     jest.useFakeTimers()
     try {
-      const conn = fakeService([state({ state: "engine_applied" }, {}), state({ state: "engine_applied" }, {})], [])
-      // The double hands out one attach object; the spy counts the pool's detach of it and still runs its own detach.
-      const detach = spyOn(await conn.attach("b", "s1"), "detach")
-      let attaches = 0
-      const service = {
-        ...conn,
-        attach: async (device: string, sessionId: string) => {
-          attaches += 1
-          return await conn.attach(device, sessionId)
-        },
-      } as unknown as DeviceService
+      const detaches: string[] = []
+      const counted = counting(detaches)
       const port = sessionsPort({
         version: "0.0.0-test",
-        connect: async () => ({ conn: service, owned: true }),
+        connect: async () => ({ conn: counted.service, owned: true }),
         attachIdleMs: IDLE_MS,
       })
       expect((await port.sessionCommand("b", "s1", { type: "get_state" })).kind).toBe("ok")
       jest.advanceTimersByTime(IDLE_MS)
-      expect(detach).toHaveBeenCalledTimes(1)
+      expect(detaches).toEqual(["s1"])
       expect((await port.sessionCommand("b", "s1", { type: "get_state" })).kind).toBe("ok")
-      expect(attaches).toBe(2)
+      expect(counted.attaches()).toBe(2)
     } finally {
       jest.useRealTimers()
     }

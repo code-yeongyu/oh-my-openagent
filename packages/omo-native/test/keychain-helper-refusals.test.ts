@@ -83,7 +83,16 @@ describe.skipIf(!isDarwin)("omo-keychain helper refusals (#11262 design 1, Refus
     const malformed = await harness.run({ v: 2, verb: "read", account: ACCOUNT }, { binary: release, args: [] })
     expect(malformed.reply).toEqual(refused("unknown-v"))
     const bytes = readFileSync(release).toString("latin1")
-    for (const flag of ["--keychain", "--no-ui", "--hold-before-reply", "--as-root", "--classify-partition"])
+    for (const flag of [
+      "--keychain",
+      "--no-ui",
+      "--hold-before-reply",
+      "--as-root",
+      "--classify-partition",
+      "--stall-mutation",
+      "--lifetime-ms",
+      "--grace-ms",
+    ])
       expect(bytes.includes(flag)).toBe(false)
   })
 

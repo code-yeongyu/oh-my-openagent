@@ -337,7 +337,14 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
     // The mark rides only to a service that carries it; below that, every command keeps today's bytes.
     attach: async (device, sessionId) => {
       const attached = await openAttach(client, device, sessionId, timers)
-      return carriesWakeMark ? attached : { ...attached, command: (rpc) => attached.command(rpc) }
+      // Below that only the mark is dropped; the command's own wait still applies.
+      return carriesWakeMark
+        ? attached
+        : {
+            ...attached,
+            command: (rpc, options) =>
+              attached.command(rpc, options?.waitMs === undefined ? undefined : { waitMs: options.waitMs }),
+          }
     },
     endpointCommand: async (device, rpc, options) => {
       // The endpoint lookup runs before any session.command is written, so whatever fails it (a timeout, a closed

@@ -105,7 +105,7 @@ await runScenario("held-then-exit", async ({ report, scratch, install, startTui 
   report.assert(
     "listed-with-same-id",
     Array.isArray(listed.json?.threads) &&
-      listed.json.threads.some((thread) => thread.thread_id === endpoint.durableId && thread.surface === "tui"),
+      listed.json.threads.some((thread) => thread.thread === endpoint.durableId && thread.surface === "tui"),
     `threads=${Array.isArray(listed.json?.threads) ? listed.json.threads.length : listed.stdout.slice(0, 200)}`,
   )
 })
