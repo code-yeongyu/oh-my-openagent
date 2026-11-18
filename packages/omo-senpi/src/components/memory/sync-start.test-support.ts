@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process"
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -37,13 +38,10 @@ export function stubDevice(id: number, started: number[], onClose: () => void = 
  * the clock is a child process's exit.
  */
 export async function within<T>(work: Promise<T>, what: string, ms = 5_000): Promise<T> {
-  const clock = Bun.spawn([process.execPath, "-e", `setTimeout(() => {}, ${ms})`], {
-    stdout: "ignore",
-    stderr: "ignore",
-  })
+  const clock = spawn(process.execPath, ["-e", `setTimeout(() => {}, ${ms})`], { stdio: "ignore", windowsHide: true })
   let settled = false
   const breaker = new Promise<never>((_resolve, reject) => {
-    void clock.exited.then(() => {
+    clock.once("exit", () => {
       if (!settled) reject(new Error(`waited ${ms / 1000}s for ${what}, never happened`))
     })
   })
