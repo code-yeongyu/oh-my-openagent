@@ -6,7 +6,7 @@ import { createGatewayStore, type GatewayStore } from "../gateway/store"
 import type { OutboundDelivery } from "../gateway/transport"
 import { B_ROW, createRemoteThreadFixture, ENGINE } from "../thread-remote-fixture"
 import { createRelayTransport } from "./relay-transport"
-import { commandWaitMs, withCallDeadline } from "../../remote/call-deadline"
+import { commandWaitMs, withCallDeadline } from "../../call-budget/call-deadline"
 
 const { account, cleanup } = createRemoteThreadFixture()
 const directories: string[] = []

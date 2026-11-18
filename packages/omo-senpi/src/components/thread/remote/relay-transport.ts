@@ -13,7 +13,7 @@ import { UNKNOWN_CALLER } from "../tools/ports"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 import { deviceOnline, replyData } from "./remote-ops"
 import { outcomeFailure } from "./outcome"
-import { outsideCallDeadline } from "../../remote/index"
+import { outsideCallDeadline } from "../../call-budget/call-deadline"
 
 export type RelayTransportOptions = {
   readonly remote: RemoteThreadSurface

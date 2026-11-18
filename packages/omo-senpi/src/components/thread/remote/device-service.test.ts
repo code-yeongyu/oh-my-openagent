@@ -8,7 +8,7 @@ import {
   type RemoteAttach,
 } from "@oh-my-opencode/device-service-core"
 import { withContractHost } from "../../../../../senpi-task/src/runners/rpc-host/testing/contract-host"
-import { withCallDeadline } from "../../remote/call-deadline"
+import { withCallDeadline } from "../../call-budget/call-deadline"
 import type { ThreadReadInput } from "../contracts"
 import { answered, closeThread, interruptThread, setModelOn } from "../control/operations"
 import { createRelayControl } from "../control/relay-control"

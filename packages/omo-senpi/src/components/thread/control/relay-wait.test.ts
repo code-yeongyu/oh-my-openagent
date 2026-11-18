@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import type { RemoteSessionRow, RemoteThreadSurface, RemoteWatchOutcome } from "../remote/ports"
 import { createRelayControl } from "./relay-control"
-import { commandWaitMs, READ_RESERVE_MS, withCallDeadline } from "../../remote/call-deadline"
+import { commandWaitMs, READ_RESERVE_MS, withCallDeadline } from "../../call-budget/call-deadline"
 
 const ROW: RemoteSessionRow = {
   device: "b",

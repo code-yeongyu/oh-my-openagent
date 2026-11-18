@@ -11,7 +11,7 @@ import {
 import { CATALOG_RECORD, createAttachPool, type HeldAttach } from "../../thread/remote/attach-pool"
 import type { DeviceServiceDial, JsonObject, RemoteListing, RemoteSessionsPort } from "../../thread/remote/ports"
 import { openSessionWatch } from "../../thread/remote/remote-watch"
-import { commandWaitMs, withinCallBudget } from "../call-deadline"
+import { commandWaitMs, withinCallBudget } from "../../call-budget/call-deadline"
 
 export type DeviceServiceSessionsOptions = {
   readonly version: string
