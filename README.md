@@ -6,6 +6,9 @@
 > [![OmO Herdr DAG - live OmO workflow DAGs in a Herdr side pane](./.github/assets/omo-herdr-dag.png)](https://github.com/jc01rho/omo-herdr-dag)
 > *Just type "mass ulw" with your prompt - now you are the master of graph engineering. Multi-model ultracode, together with a better memory system. (The right panel is [omo-herdr-dag](https://github.com/jc01rho/omo-herdr-dag).)*
 
+> [![OmO running in a Neovim terminal split](https://raw.githubusercontent.com/DenisDupeyron/omo.nvim/main/doc/omo.nvim.png)](https://github.com/DenisDupeyron/omo.nvim)
+> *[omo.nvim](https://github.com/DenisDupeyron/omo.nvim) runs the OmO TUI in a toggleable Neovim split and sends selected code to the composer.*
+
 > **Sponsors**
 > These are our sponsors. They help keep OmO going as a personal side project.
 > | [<img alt="OpenGateway" src="./.github/assets/opengateway-logo.svg" width="156px" />](https://opengateway.ai/) | **[OpenGateway](https://opengateway.ai/)** sponsors OmO. An OpenAI-compatible gateway that puts many model providers behind one API. Thank you for backing open source. |
