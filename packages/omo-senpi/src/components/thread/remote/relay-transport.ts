@@ -379,8 +379,8 @@ export function createRelayTransport(
    * session the holder holds no file for, waits out the device's own deadline (about 60 s): no file is `not_found` at
    * once (as the refused reopen says); one it runs is addressed by the key its device locates it by now, never the
    * listing's (a reopen elsewhere can run it under a new key; #14179 reviews L4, M1); one on disk takes the wake path when
-   * this device has one, else `not_resumable` at once, as thread_read answers it. A holder that cannot say keeps the
-   * path a send took before (the wake path when there is one).
+   * this device has one, else `not_resumable` at once, as thread_read answers it. A holder that cannot say is treated as
+   * holding it on disk: an ended row takes the wake path when there is one, anything else is `not_resumable`.
    */
   async function addressOf(
     listed: RemoteSessionRow,

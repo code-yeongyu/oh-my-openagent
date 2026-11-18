@@ -1,3 +1,4 @@
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import type { ThreadToolResult } from "../contracts"
 import { threadToolFailure } from "../errors"
 import { outcomeFailure } from "./outcome"
@@ -33,7 +34,8 @@ export type HolderView = "running" | "on_disk" | "absent" | "unknown"
  * The holder's own answer for a row this surface reads as not live, asked before any send path is chosen (#14184): the
  * listing and this surface's closed mark lag a reopen made elsewhere (#14179 review L4), and a wake of a session the
  * holder holds no file for waits out its deadline. An engine without the lookup, or one that does not answer, is
- * `unknown`, and the send keeps the path it took before.
+ * `unknown`, which the send treats as on disk: an ended row is woken when this device can, anything else is
+ * `not_resumable`.
  */
 export async function holderView(remote: RemoteThreadSurface, row: RemoteSessionRow): Promise<HolderView> {
   const thread = rowThreadId(row)
@@ -75,7 +77,7 @@ export async function sessionFileOf(
       "unsupported",
       `Device ${row.device} cannot find the session file of closed thread ${thread} by its id (find_session), so it cannot be opened from here.`,
       "Update omo on that device, or open the thread there.",
-      { ...details, reason: outcome.reason },
+      { ...details, reason: escapeForDisplay(outcome.reason) },
     )
   if (outcome.kind !== "ok") return { result: outcomeFailure(outcome, row.device) }
   const data = replyData(outcome.response)

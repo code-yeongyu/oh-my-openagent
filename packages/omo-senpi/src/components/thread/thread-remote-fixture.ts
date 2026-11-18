@@ -262,6 +262,8 @@ export function createRemoteThreadFixture() {
        * answer ambiguous. Default: b's own session (`B_FILE`). `"none"`: b's engine predates find_session.
        */
       sessionFiles?: Readonly<Record<string, string | readonly [string, string]>> | "none"
+      /** The free text b's engine without find_session refuses it with. Default: `Unknown command: find_session`. */
+      findSessionRefuse?: string
       /** b knows a session it just opened only by its relay key (relayKeys), not by its durable id: a listing that has not caught up yet. */
       relayKeyOnly?: boolean
       /** The device service throws on b's admit_external_message (a lost connection mid-delivery). */
@@ -362,7 +364,8 @@ export function createRemoteThreadFixture() {
       )
         return { kind: "refused", reason: "open_failed: EISDIR: illegal operation on a directory, read" }
       if (rpc["type"] === "find_session") {
-        if (sessionFiles === "none") return { kind: "refused", reason: "Unknown command: find_session" }
+        if (sessionFiles === "none")
+          return { kind: "refused", reason: options.findSessionRefuse ?? "Unknown command: find_session" }
         const file = sessionFiles[String(rpc["durableSessionId"])]
         if (file === undefined) return ok({ unknown: true })
         if (typeof file !== "string") return ok({ ambiguous: true })
