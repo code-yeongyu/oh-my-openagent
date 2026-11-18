@@ -19,6 +19,14 @@ describe("the wake's engine minimum", () => {
     ["2026.11.16", true],
     ["2026.11.15-2+build.7", true],
     ["not-a-version", false],
+    // A compiled omo binary reports its own release version as the engine's (measured: 'engine 5.1.70').
+    ["5.1.70", false],
+    ["5.1.71", false],
+    ["5.1.72", true],
+    ["5.1.73-beta.1", true],
+    ["5.2.0", true],
+    // An omob dev build: 0.0.0-omob.<omo>.<senpi>+<build>.
+    ["0.0.0-omob.c072ae7.43bff8d+1794717661.43bff8d", true],
   ] as const)(
     "#given an engine reporting %s #when the shipped minimum is read #then the wake runs: %s",
     (version, runs) => {

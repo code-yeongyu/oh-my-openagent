@@ -44,8 +44,8 @@ export type World = {
   readonly listing: {
     readonly revisions: readonly WorldRevision[]
     readonly devices: { readonly [device: string]: RoundDeviceState }
-    // The newest sessions.list `rows` version the service knows (default 3); a newer one is refused invalid_request.
-    readonly rowsNewest?: 1 | 2 | 3
+    // The newest sessions.list `rows` version the service knows (default 4); a newer one is refused invalid_request.
+    readonly rowsNewest?: 1 | 2 | 3 | 4
   }
   readonly sessions: readonly WorldSession[]
   // Decision 0018: the engine endpoint keys of the devices whose host takes delegated commands; others answer unsupported.

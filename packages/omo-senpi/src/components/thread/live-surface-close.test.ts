@@ -74,6 +74,19 @@ describe("thread_close on this device's host: the session ends for every client 
     },
   )
 
+  // #14169: the refusal must say which blocker the engine hit (a turn, a bash command, an unwritten delivery), because
+  // the caller reads the message, not only `details`. The engine's detail is data the ladder passes through.
+  test("#given unload_session refused with a reason and a detail #when it is closed #then the unsupported message carries the engine's detail", async () => {
+    await withContractHost({ auth: true, unloadRefusal: "work_pending" }, async (host) => {
+      const refused = await close(host).then(
+        () => undefined,
+        (error: unknown) => controlRefusalOf(error),
+      )
+      expect(refused).toMatchObject({ code: "unsupported", details: { detail: "refused: work_pending" } })
+      expect(refused?.message).toContain("refused: work_pending")
+    })
+  })
+
   test("#given a session that already left the host #when it is closed #then nothing was live and nothing is mutated", async () => {
     await withContractHost({ auth: true, attachRefusal: "unknown_session" }, async (host) => {
       expect(await close(host)).toBe("not_live")
