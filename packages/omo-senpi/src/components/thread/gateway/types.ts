@@ -56,6 +56,12 @@ export type Provenance = {
 /** No device service is set up here, it did not answer, or it answered without a device id. */
 export type DeviceAbsentReason = "no_device_service" | "device_service_unavailable" | "no_device_id"
 
+/**
+ * `creator`: the first prompt of a thread_create, sent by the session that created the target (#14045). The target
+ * receives it as its own first user message, with the creator's authority, instead of a relayed peer message.
+ */
+export type DeliveryAuthority = "creator"
+
 export type DeliveryEnvelope = {
   readonly provenance: Provenance
   readonly origin: EnvelopeOrigin
@@ -64,6 +70,7 @@ export type DeliveryEnvelope = {
   readonly root_id: string
   readonly hop: number
   readonly delivery_id: string
+  readonly authority?: DeliveryAuthority
 }
 
 /** JSON written before provenance was recorded remains readable, never attributed to the receiver. */
@@ -179,6 +186,7 @@ export type EnqueueRequest = {
   readonly cause_delivery_id: string | null
   /** The highest hop an input of the sender's run arrived with from another device (no row here); the chain continues from it (K8). */
   readonly inbound_hop?: number
+  readonly authority?: DeliveryAuthority
   readonly claimed_root_id: string | null
   readonly origin: EnvelopeOrigin
   readonly actor: string

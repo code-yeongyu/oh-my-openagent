@@ -178,6 +178,10 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // budget = measured + 4 KiB (lead rule) = 1,489,433.
 // Remerged on dev 050c1879cb (dev ceiling 1,493,600): the regenerated train-top omo.js measures 1,497,747 B;
 // budget = measured + 4 KiB (lead rule) = 1,501,843.
+// Train omotrain2-20261118 (#14141, 10 thread cars) on dev e79f804ce0 (1,506,330 B): the train-top regen measures
+// 1,515,915 B (+9,585; linux/amd64, node 24.22 + bun 1.4.4); budget = measured + 4 KiB (lead rule) = 1,520,011.
+// A4 memory-sync train (#14097, 6 members) remerged on dev 9b94b6f3dd: the train-top regen measures 1,522,653 B
+// (linux/amd64, node 24.22 + bun 1.4.4); budget = measured + 4 KiB (lead rule) = 1,526,749.
 const BUDGET_BYTES = bundleBudget.omoJsBytes
 
 describe("omo-senpi bundle size budget", () => {

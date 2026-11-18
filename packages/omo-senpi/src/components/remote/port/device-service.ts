@@ -4,18 +4,11 @@ import {
   LocalApiError,
   NotSentError,
   WAKE_ACCEPTS,
-  type CommandResult,
   type DeviceService,
   type RemoteAttach,
 } from "@oh-my-opencode/device-service-core/device-service"
 import { CATALOG_RECORD, createAttachPool, type HeldAttach } from "../../thread/remote/attach-pool"
-import type {
-  DeviceServiceDial,
-  JsonObject,
-  RemoteCommandOutcome,
-  RemoteListing,
-  RemoteSessionsPort,
-} from "../../thread/remote/ports"
+import type { DeviceServiceDial, JsonObject, RemoteListing, RemoteSessionsPort } from "../../thread/remote/ports"
 import { openSessionWatch } from "../../thread/remote/remote-watch"
 
 export type DeviceServiceSessionsOptions = {
@@ -265,6 +258,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         path: row.path,
         state: row.state,
         updated_ms: row.updated_ms,
+        source: row.source,
       })),
       incomplete: listed.incomplete,
     }

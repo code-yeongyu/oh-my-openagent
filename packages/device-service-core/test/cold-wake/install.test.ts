@@ -267,13 +267,14 @@ describe("cold wake on macOS", () => {
     ])
   })
 
-  test("a second install only checks: the job is loaded and the entry is there", async () => {
+  test("a second install runs the loaded job's ensure again and checks the entry", async () => {
     const { host, runs, relayd } = fakeLaunchd()
     await installColdWake(host, LAUNCH)
     runs.length = 0
     expect(await installColdWake(host, LAUNCH)).toEqual({ kind: "installed", serviceRestarted: false })
     expect(runs).toEqual([
       "launchctl print gui/501/ai.omo.session-host",
+      "launchctl kickstart gui/501/ai.omo.session-host",
       `plutil -extract EnvironmentVariables.OMO_RELAYD_SERVICES raw -o - ${relayd}`,
     ])
   })

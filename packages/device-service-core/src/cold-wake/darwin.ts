@@ -70,6 +70,10 @@ export async function installDarwin(host: ColdWakeHost, launch: SessionHostLaunc
     await host.run(["launchctl", "enable", job])
     const loaded = await bootstrapJob(host, plist)
     if (loaded.exitCode !== 0) return failed("unit_load", loaded.output)
+  } else {
+    // Loaded and unchanged: run its ensure again (it reuses a running host), as Linux starts its oneshot unit.
+    const kicked = await host.run(["launchctl", "kickstart", job])
+    if (kicked.exitCode !== 0) return failed("unit_start", kicked.output)
   }
   return applyTable(host, (raw) => withColdWake(raw, "darwin"), "installed")
 }

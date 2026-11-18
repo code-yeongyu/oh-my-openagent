@@ -38,11 +38,11 @@ describe("gated category listing", () => {
 
       // then
       expect(low?.description).toContain(
-        "(requires gpt-6.1-sol or gpt-6.1-sol-fast or gpt-5.6-sol-fast or gpt-5.6-sol)",
+        "(requires gpt-6.2-sol or gpt-6.2-sol-fast or gpt-6.1-sol or gpt-6.1-sol-fast or gpt-5.6-sol-fast or gpt-5.6-sol)",
       )
       expect(low?.description).toContain(requiredAnnotation("deep-low"))
       expect(low?.description).not.toContain("gpt-6-sol")
-      expect(high?.description).toContain("(requires gpt-6-astra)")
+      expect(high?.description).toContain("(requires gpt-6.2-astra or gpt-6-astra)")
       expect(high?.description).toContain(requiredAnnotation("deep-high"))
     })
   })
