@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { olderRuntime } from "../release-version"
+import { olderRuntime, runtimeGate } from "../release-version"
 import { refreshColdWakeAtLaunch } from "../remote-cold-wake"
 
 // omo#14191 / #14194 review L1: the launch-time wrapper's own contract. Its version gate decides which installed unit a
@@ -51,6 +51,18 @@ describe("the launch-time version gate", () => {
     ["5.1.75", "dev", false],
   ])("%s installed under a %s launch is older: %p", (installed, version, older) => {
     expect(olderRuntime(installed, version)).toBe(older)
+  })
+
+  // #14194 delta review L1: a non-release launch (`dev`, a local build) gets no gate, so the launch never refreshes and
+  // never even reads the unit file; a release launch gets the older-runtime predicate for its own version.
+  test("a non-release launch gets no gate; a release launch gets its own older-runtime predicate", () => {
+    expect(runtimeGate("dev")).toBeUndefined()
+    expect(runtimeGate("")).toBeUndefined()
+    expect(["5.1.75", "5.1.77", "5.1.80"].map((installed) => runtimeGate("5.1.77")?.(installed))).toEqual([
+      true,
+      false,
+      false,
+    ])
   })
 })
 
