@@ -218,8 +218,9 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       return { kind: "refused", reason: "invalid_record" }
     }
     // `direct`: the device's service delivers the record to the session it lists under that key, with no attach here.
-    // No connection means nothing was sent, as when the attach path cannot attach; the core marks every refusal before
-    // sending NotSentError, and anything else may have run on the other device.
+    // No connection means nothing was sent, as when the attach path cannot attach. A refusal before sending (the core
+    // marks it NotSentError; a service older than #393 part B answers the `{session}` target `unsupported`) ran nothing,
+    // so the record goes the attach way instead. Anything else may have run on the other device and is never resent.
     if (commandOptions?.direct === true) {
       let connected: DeviceService
       try {
@@ -230,9 +231,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       try {
         return outcomeOf(await connected.sessionCommand(device, sessionId, record))
       } catch (error) {
-        return error instanceof NotSentError
-          ? { kind: "refused", reason: sessionReason(error.code) }
-          : { kind: "uncertain", reason: "reply_lost" }
+        if (!(error instanceof NotSentError)) return { kind: "uncertain", reason: "reply_lost" }
       }
     }
     try {

@@ -765,6 +765,8 @@ describe("device-service adapter: relay round trips per thread op", () => {
     const endpointsSent: string[] = []
     // The `<device>.<key>` of every command sent straight to a session (no attach).
     const sessionTargets: string[] = []
+    // A service older than #393 part B: it refuses the `{session}` target before sending, as the conformance owner does.
+    let sessionTargetRefused = false
     const endpointCommand = async (rpc: JsonObject, commandId: string, asked: boolean, endpoint: string) => {
       frames.push("session.command")
       locateAsked.push(asked)
@@ -857,7 +859,11 @@ describe("device-service adapter: relay round trips per thread op", () => {
         route?: { readonly locate?: true },
       ) => {
         if ("endpoint" in target) return await endpointCommand(rpc, commandId, route?.locate === true, target.endpoint)
-        if ("session" in target) sessionTargets.push(target.session)
+        if ("session" in target) {
+          sessionTargets.push(target.session)
+          if (sessionTargetRefused)
+            throw new LocalApiError("unsupported", "this service takes attach and endpoint commands only")
+        }
         frames.push("session.command")
         records.push(rpc)
         const scripted =
@@ -972,6 +978,9 @@ describe("device-service adapter: relay round trips per thread op", () => {
       },
       loseNextEndpointReply: () => {
         nextEndpointEnd = { state: "uncertain", reason: "reply_lost" }
+      },
+      refuseSessionTarget: () => {
+        sessionTargetRefused = true
       },
       engine,
       records,
@@ -1125,6 +1134,19 @@ describe("device-service adapter: relay round trips per thread op", () => {
     expect(w.records.map((record) => [record["type"], record["sessionId"], record["name"]])).toEqual([
       ["set_session_name", CREATED_KEY, "one"],
       ["set_session_name", CREATED_KEY, "two"],
+    ])
+  })
+
+  test("#given a device service older than #393 part B that refuses a command straight to a session #when a named create runs on b #then nothing ran, so the name goes over an attach and is applied, with no warning", async () => {
+    const w = relayWorld()
+    w.refuseSessionTarget()
+    const created = await createRelaySessionHost(w.surface, "b").open({ name: "one" })
+    if (created.kind !== "ok") throw new Error(`create failed: ${JSON.stringify(created)}`)
+    expect([created.thread.name, created.thread.warnings]).toEqual(["one", undefined])
+    expect(w.sessionTargets).toEqual([`b.${CREATED_KEY}`])
+    expect(w.take()).toEqual(["session.endpoints", "session.command", "session.attach", "session.command"])
+    expect(w.records.map((record) => [record["type"], record["sessionId"], record["name"]])).toEqual([
+      ["set_session_name", CREATED_KEY, "one"],
     ])
   })
 

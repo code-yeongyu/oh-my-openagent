@@ -170,7 +170,8 @@ export type RemoteSessionsPort = {
   /**
    * An engine record for one session on `device` (`prompt`, `abort`, `get_state`), through an attach. A read the
    * session's mirror holds is answered locally unless `fresh` is set. `direct` sends it to the session `device` lists
-   * under `sessionId` with no attach (one round trip instead of two), for a record that needs no session events back.
+   * under `sessionId` with no attach (one round trip instead of two), for a record that needs no session events back; a
+   * service that refuses that before sending (older than #393 part B) gets the record through an attach instead.
    */
   readonly sessionCommand: (
     device: string,
