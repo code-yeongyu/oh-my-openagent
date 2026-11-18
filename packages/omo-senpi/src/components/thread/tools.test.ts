@@ -115,6 +115,28 @@ function runner(
   }
 }
 
+describe("a gateway store newer than this binary (#13927)", () => {
+  test("#given a store whose schema version this binary does not know #when a receipted tool runs #then the refusal is typed, not internal_error", async () => {
+    const f = fixture()
+    const newer = new Error("Gateway schema 14 is newer than this binary's supported version 11.")
+    ;(newer as Error & { code?: string }).code = "gateway_schema_too_new"
+    const refusing: GatewayStore = {
+      ...f.store,
+      toolReceiptBegin: async () => {
+        throw newer
+      },
+    }
+    const tools = createThreadTools({ ...f, ...{ store: refusing }, callerSessionId: () => "unknown-caller", callerWorkspaceRoot: () => process.cwd() })
+    const tool = tools.find((candidate) => candidate.name === "thread_list")
+    const result = await tool!.execute("call-schema", {}, undefined, undefined, { sessionManager: { getSessionId: () => "caller" } } as never)
+    const failure = result.details.result as ThreadToolResult
+    expect(failure).toMatchObject({
+      kind: "error",
+      error: { code: "store_schema_too_new", next_action: "Update omo on this device, then retry." },
+    })
+  })
+})
+
 describe("thread tool registration", () => {
   test("#given a selected session #when model discovery observes a replacement #then the mutation retains the selected durable id", async () => {
     const f = fixture()

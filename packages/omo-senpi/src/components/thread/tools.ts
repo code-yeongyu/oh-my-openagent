@@ -95,6 +95,17 @@ const NOT_LIVE: ThreadToolResult = failure(
   "Retry when the target is live.",
 )
 
+// The store worker's error crosses as a plain Error whose code survives (gateway/store.ts); a schema this
+// binary does not know must refuse typed, never as internal_error with a retry that cannot succeed (#13927).
+const storeSchemaTooNew = (error: unknown): boolean =>
+  (error as { readonly code?: unknown } | null)?.code === "gateway_schema_too_new"
+const storeSchemaTooNewFailure = (message: string) =>
+  failure(
+    "store_schema_too_new",
+    `The gateway store on this device was written by a newer omo (${message})`,
+    "Update omo on this device, then retry.",
+  )
+
 export function createThreadTools(options: ThreadToolSurfaceOptions): readonly AnyTool[] {
   return buildThreadTools(options).tools
 }
@@ -180,7 +191,6 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
     // A send owns its idempotency: the gateway engine's receipt is written in the delivery's own
     // transaction and answers a lost ACK with `idempotency_uncertain` + the row state.
     const receipted = !(name === "thread_send" || name === "thread_handoff")
-    // An earlier run under this key failed after it may have acted: only thread_create may run again, and it decides (#14060).
     let retrying: { readonly error_note: string | null } | undefined
     if (receipted) {
       // Nothing has run yet, so a store that cannot admit the receipt fails the call as data: the store
@@ -204,6 +214,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
         admission = await store.toolReceiptBegin({ ...scope, now: at, args_hash: hashArgs(value) })
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
+        if (storeSchemaTooNew(error)) return output(storeSchemaTooNewFailure(message))
         if (isLockWaitExceeded(error))
           return output(
             failure(
@@ -295,11 +306,13 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
         )
       }
       return output(
-        failure(
-          "internal_error",
-          `Thread operation failed: ${message}`,
-          "Call thread_list and retry after checking the target.",
-        ),
+        storeSchemaTooNew(error)
+          ? storeSchemaTooNewFailure(message)
+          : failure(
+              "internal_error",
+              `Thread operation failed: ${message}`,
+              "Call thread_list and retry after checking the target.",
+            ),
       )
     }
     let result: ThreadToolResult
@@ -523,13 +536,21 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
         "creator",
       )
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
       return {
-        error: threadToolFailure(
-          "internal_error",
-          `The thread was created, but its first prompt was not delivered: ${error instanceof Error ? error.message : String(error)}.`,
-          `Send it with thread_send to ${thread.thread_id}; read the thread first if the prompt may have arrived.`,
-          { thread: thread.thread_id },
-        ),
+        error: storeSchemaTooNew(error)
+          ? threadToolFailure(
+              "store_schema_too_new",
+              `The thread was created, but its first prompt was not delivered: the gateway store on this device was written by a newer omo (${message})`,
+              "Update omo on this device, then send the prompt with thread_send.",
+              { thread: thread.thread_id },
+            )
+          : threadToolFailure(
+              "internal_error",
+              `The thread was created, but its first prompt was not delivered: ${message}.`,
+              `Send it with thread_send to ${thread.thread_id}; read the thread first if the prompt may have arrived.`,
+              { thread: thread.thread_id },
+            ),
       }
     }
     if (sent.kind === "error") return { error: sent.error }
