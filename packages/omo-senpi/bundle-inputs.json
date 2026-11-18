@@ -1401,7 +1401,6 @@
     "packages/omo-senpi/src/components/remote/follow.ts",
     "packages/omo-senpi/src/components/remote/port/device-service.ts",
     "packages/omo-senpi/src/components/remote/port/lazy-remote.ts",
-    "packages/omo-senpi/src/components/remote/port/listing-round.ts",
     "packages/omo-senpi/src/components/remote/port/thread-runtime.ts",
     "packages/omo-senpi/src/components/remote/resolve.ts",
     "packages/omo-senpi/src/components/remote/seams.ts",
