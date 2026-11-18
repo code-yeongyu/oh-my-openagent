@@ -7,7 +7,8 @@ import { createRemoteThreadFixture } from "./thread-remote-fixture"
 const { account, surface, cleanup } = createRemoteThreadFixture()
 // A relative cwd resolves under the caller's workspace root, which defaults to the process cwd: a
 // test that leans on that default passes only when the suite runs from the repo root (#14238). Tests
-// that need a relative path to resolve own their folder instead.
+// that need a relative path to resolve own their folder instead, and this file removes what it owns
+// alongside the fixture cleanup (bun:test already awaits an async hook, so cleanup stays awaited).
 const ownedFolders: string[] = []
 afterEach(async () => {
   await cleanup()
