@@ -188,11 +188,37 @@ describe("resolveTarget exact ladder", () => {
     expect(ids).toContain("t-03")
   })
 
-  test("#given a name that only a thread outside the default scope carries #when resolved #then the answer is not_found because scope_denied is reserved for id hits", () => {
+  test("#given a name that only a thread outside the default scope carries #when resolved #then the answer is scope_denied naming all_scope, because a same-device thread must not read as absent", () => {
     const entries = [thread({ thread_id: "t-out", name: "ghost lane", cwd: OTHER })]
     const result = resolveTarget(entries, "ghost lane", { callerWorkspaceRoot: CALLER })
 
-    expectError(result, "not_found")
+    const error = expectError(result, "scope_denied")
+    expect(error.next_action).toContain("all_scope")
+    expect(error.candidates?.map((candidate) => candidate.thread)).toEqual(["t-out"])
+  })
+
+  test("#given a name two same-device threads outside the scope carry #when resolved scoped #then scope_denied carries both candidates and the all_scope recovery", () => {
+    const entries = [
+      thread({ thread_id: "t-out-1", name: "ghost lane", cwd: OTHER }),
+      thread({ thread_id: "t-out-2", name: "ghost lane", cwd: OTHER }),
+    ]
+    const error = expectError(resolveTarget(entries, "ghost lane", { callerWorkspaceRoot: CALLER }), "scope_denied")
+    expect(error.candidates?.map((candidate) => candidate.thread).sort()).toEqual(["t-out-1", "t-out-2"])
+    expect(error.next_action).toContain("all_scope")
+  })
+
+  test("#given a name nothing on this device carries #when resolved scoped #then the answer stays not_found", () => {
+    const entries = [thread({ thread_id: "t-1", name: "unrelated lane" })]
+    expectError(resolveTarget(entries, "ghost lane", { callerWorkspaceRoot: CALLER }), "not_found")
+  })
+
+  test("#given an 8-hex target that an out-of-workspace name and another thread's id prefix both match #when resolved scoped #then the id-prefix ladder answers before the name scope hint", () => {
+    const entries = [
+      thread({ thread_id: "t-name", name: "0123abcd", cwd: OTHER }),
+      thread({ thread_id: "0123abcd-1234", name: "elsewhere lane" }),
+    ]
+    const result = resolveTarget(entries, "0123abcd", { callerWorkspaceRoot: CALLER })
+    expect(result).toMatchObject({ kind: "ok", resolution: "id_prefix", entry: { thread_id: "0123abcd-1234" } })
   })
 
   test("#given no entries at all #when an address is resolved #then it is not_found, never a throw", () => {

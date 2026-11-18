@@ -5,7 +5,7 @@
 import type { Principal } from "../crypto/parse.ts"
 import { AccountHttpError, type AccountHttpOptions } from "./http.ts"
 import { admitSyncOperation, syncOperationSignal, type SyncOperationOptions } from "../operation-authority.ts"
-import { syncHeaders } from "../contract-version.ts"
+import { syncRequestHeaders } from "../contract-version.ts"
 
 export interface PendingApproval {
   readonly id: string
@@ -15,6 +15,12 @@ export interface PendingApproval {
   readonly reveal: { readonly principal: Principal; readonly joining_nonce: string } | null
   readonly expires_at: number
 }
+
+/**
+ * Whether the service turned a device's sync off. A refusal keeps the service's closed error code for the log; it is
+ * never shown to a person.
+ */
+export type DeviceSyncOff = { readonly ok: true } | { readonly ok: false; readonly code: string }
 
 export interface PairingHttp {
   openPending(account: string, commitment: string, operation?: SyncOperationOptions): Promise<PendingApproval>
@@ -34,6 +40,12 @@ export interface PairingHttp {
   ): Promise<PendingApproval>
   setAccountSync(enabled: boolean, operation?: SyncOperationOptions): Promise<void>
   setDeviceSync(deviceId: string, enabled: boolean, operation?: SyncOperationOptions): Promise<void>
+  /**
+   * Turns one device's sync off (omo #14093). The service gates this behind its typed confirmation: the confirmation
+   * answers the refusal the switch would meet, or a single-use token bound to this action and device, which the
+   * switch then spends. Both requests are this one call, so the token never leaves the transport.
+   */
+  disableDeviceSync(deviceId: string, operation?: SyncOperationOptions): Promise<DeviceSyncOff>
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -80,7 +92,7 @@ export function createPairingHttp(options: AccountHttpOptions): PairingHttp {
     body: unknown,
     operation: SyncOperationOptions = options,
   ): Promise<unknown> => {
-    const headers: Record<string, string> = { ...syncHeaders(), authorization: `Bearer ${await options.token()}` }
+    const headers = syncRequestHeaders(await options.token())
     if (body !== undefined) headers["content-type"] = "application/json"
     const signal = syncOperationSignal(operation)
     const response = await admitSyncOperation(operation, () =>
@@ -148,6 +160,34 @@ export function createPairingHttp(options: AccountHttpOptions): PairingHttp {
     },
     async setDeviceSync(deviceId, enabled, operation) {
       await send("PUT", `/v1/devices/${encodeURIComponent(deviceId)}/sync`, { enabled }, operation)
+    },
+    async disableDeviceSync(deviceId, operation) {
+      try {
+        const confirmation = await send(
+          "POST",
+          "/v1/confirm",
+          { action: "sync.disable_device", target: deviceId },
+          operation,
+        )
+        if (!isRecord(confirmation) || typeof confirmation["ready"] !== "boolean")
+          throw new AccountHttpError("malformed_reply", 200)
+        if (!confirmation["ready"])
+          return { ok: false, code: typeof confirmation["code"] === "string" ? confirmation["code"] : "unknown" }
+        const confirmToken = confirmation["token"]
+        if (typeof confirmToken !== "string" || confirmToken === "") throw new AccountHttpError("malformed_reply", 200)
+        await send(
+          "PUT",
+          `/v1/devices/${encodeURIComponent(deviceId)}/sync`,
+          { enabled: false, confirmToken },
+          operation,
+        )
+        return { ok: true }
+      } catch (error) {
+        // The service answered and said no: a refusal. Anything else (5xx, the network, a malformed reply) is thrown.
+        if (error instanceof AccountHttpError && error.status >= 400 && error.status < 500)
+          return { ok: false, code: error.code }
+        throw error
+      }
     },
   }
 }

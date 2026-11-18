@@ -13,7 +13,11 @@
  *      same-named thread is visible, because the id already names one thread.
  *   2. Otherwise the target is matched against NFKC-normalized names over the
  *      visible entries: one match resolves as a name, two or more are
- *      `ambiguous_target` with candidates.
+ *      `ambiguous_target` with candidates. With no visible match, same-device
+ *      entries outside the caller's workspace that carry the name make the miss
+ *      `scope_denied` with the all_scope recovery, never `not_found`: a thread
+ *      this device holds must not read as absent, or the relay leg answers for
+ *      it (on a plan without a relay, with a paid-plan refusal).
  *   3. With no name match, an address of at least 8 hex characters (hyphens
  *      allowed) that starts exactly one entry's durable id resolves to it as
  *      `id_prefix`, scoped like an id hit; two or more are `ambiguous_target`
@@ -464,6 +468,26 @@ export function resolveTarget(
         toCandidates(prefixed),
       )
     }
+  }
+  // Ladder step 2b (after the prefix, which an 8-hex name can also satisfy): the name matched nothing visible,
+  // but same-device threads outside the caller's workspace carry it. The id ladder answers `scope_denied` for the
+  // same fact; a name must not read as absent while the thread sits on this device.
+  if (opts.all_scope !== true && hasCallerRoot && matches.length === 0) {
+    const outOfScope = entries.filter(
+      (entry) =>
+        entry.transport === undefined &&
+        !sameWorkspace(entry.cwd, callerRoot, rootResolver) &&
+        normalizeThreadName(entry.name) === guard.normalized,
+    )
+    if (outOfScope.length > 0)
+      return addressError(
+        "scope_denied",
+        outOfScope.length === 1
+          ? `A thread named "${target}" exists on this device outside this workspace.`
+          : `${outOfScope.length} threads named "${target}" exist on this device outside this workspace.`,
+        "Call thread_list with all_scope to see it, then retry with all_scope set, or target a thread in this workspace.",
+        toCandidates(outOfScope),
+      )
   }
   return notFound(target, opts.all_scope === true ? "the daemon-wide scope" : "this workspace", visible)
 }

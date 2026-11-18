@@ -1,6 +1,7 @@
 import { createHash, createPrivateKey, sign } from "node:crypto"
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
+import { syncRequestHeaders } from "@oh-my-opencode/memory-core/sync-capabilities"
 import { z } from "zod"
 import { deviceName, isGeneratedDeviceName } from "./device-name"
 import { readMachineDigest } from "./machine-digest"
@@ -102,7 +103,7 @@ export async function reconcileDevice(options: {
   const log = (line: string) => {
     if (!signal.aborted) options.log(line)
   }
-  const auth = { authorization: `Bearer ${credentials.accessToken}` }
+  const auth = syncRequestHeaders(credentials.accessToken)
   let own: z.infer<typeof ownDeviceSchema>
   try {
     const listed = deviceListSchema.safeParse(await request("/v1/devices", { headers: auth }))
@@ -144,7 +145,7 @@ export async function reconcileDevice(options: {
 
 async function bindOnce(
   options: Parameters<typeof reconcileDevice>[0],
-  auth: { readonly authorization: string },
+  auth: Readonly<Record<string, string>>,
   log: (line: string) => void,
 ): Promise<void> {
   const { credentials, signal } = options

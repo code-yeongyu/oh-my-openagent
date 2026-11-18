@@ -3,7 +3,9 @@ import { caseFold, loadLoroRuntime } from "@oh-my-opencode/memory-core/sync-engi
 export {
   deviceKeyringFromMaterial,
   GitSpaceConfig,
+  isDeviceSyncOff,
   listRemotes,
+  loadTrustAnchor,
   openAccountSession,
   openDeviceSync,
   repoHasCommit,
@@ -11,10 +13,12 @@ export {
 } from "@oh-my-opencode/memory-core/sync-engine"
 export {
   acknowledgePhraseVoid,
+  disableSync,
   enableSync,
   joinAccount,
   approveDevice,
   phraseNoticeStatus,
+  readServiceFloor,
   verifiedPhraseNoticeStatus,
 } from "@oh-my-opencode/memory-core/sync-engine"
 // A freeze status exists only while the engine runs, so its words ship with the engine, not the eager bundle.

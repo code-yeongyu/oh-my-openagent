@@ -145,8 +145,6 @@
     "packages/memory-core/src/sync/account/verifier.ts": ["hexOfB64url", "spaceItems"],
     // pre-existing at origin dev 4686e425b5: unused export(s) MAX_CANONICAL_DEPTH
     "packages/memory-core/src/sync/canonical-json.ts": ["MAX_CANONICAL_DEPTH"],
-    // A3 recovery-phrase stack (#13335): SYNC_CONTRACT_VERSION is used inside contract-version.ts and re-exported by sync/engine/index.ts; nothing imports it from here
-    "packages/memory-core/src/sync/contract-version.ts": ["SYNC_CONTRACT_VERSION"],
     // pre-existing at origin dev 4686e425b5: unused export(s) sealToPort, keyMaterial
     "packages/memory-core/src/sync/crypto/testing/hpke-seal.ts": ["sealToPort", "keyMaterial"],
     // pre-existing at origin dev 4686e425b5: unused export(s) strictEd25519Key, strictEd25519Precheck, strictEd25519Verify, strictX25519Key, checkSharedSecret
