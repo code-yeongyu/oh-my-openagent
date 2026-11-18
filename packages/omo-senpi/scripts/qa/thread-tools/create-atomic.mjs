@@ -36,7 +36,7 @@ const textOf = (message) =>
       : ""
 const CREATE = evalCall(
   "QA: create twice under one idempotency key",
-  `const args = { name: "qa-14060-child", prompt: ${JSON.stringify(BRIEF)}, idempotency_key: "qa-14060-key" }; const a = JSON.parse((await tool.thread_create(args)).text); const b = JSON.parse((await tool.thread_create(args)).text); const list = JSON.parse((await tool.thread_list({ all_scope: true })).text); print(JSON.stringify({ a: a.thread?.thread_id ?? a.error?.code, b: b.thread?.thread_id ?? b.error?.code, named: list.threads.filter((t) => t.name === "qa-14060-child").length }))`,
+  `const args = { name: "qa-14060-child", prompt: ${JSON.stringify(BRIEF)}, idempotency_key: "qa-14060-key" }; const a = JSON.parse((await tool.thread_create(args)).text); const b = JSON.parse((await tool.thread_create(args)).text); const list = JSON.parse((await tool.thread_list({ all_scope: true })).text); print(JSON.stringify({ a: a.thread ?? a.error?.code, b: b.thread ?? b.error?.code, named: list.threads.filter((t) => t.name === "qa-14060-child").length }))`,
 )
 let fake
 const choose = () => {

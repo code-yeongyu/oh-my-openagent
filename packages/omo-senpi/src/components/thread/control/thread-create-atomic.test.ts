@@ -10,7 +10,7 @@ const { surface, cleanup } = createRemoteThreadFixture()
 afterEach(cleanup)
 
 type Created = Extract<ThreadToolResult, { kind: "ok" }> & {
-  thread: { thread_id: string }
+  thread: string
   prompt?: Record<string, unknown>
 }
 
@@ -23,7 +23,7 @@ describe("thread_create survives a lost open reply (#14060)", () => {
       idempotency_key: "atomic-1",
     })) as Created
     const id = createdThreadId("dur-caller", "atomic-1")
-    expect(result).toMatchObject({ kind: "ok", thread: { thread_id: id } })
+    expect(result).toMatchObject({ kind: "ok", thread: id })
     expect(result.prompt).toMatchObject({ delivery: { kind: expect.any(String) } })
     expect(openSession).toHaveBeenCalledTimes(1)
     expect(enqueuedFor(id)).toBe(1)
@@ -37,12 +37,12 @@ describe("thread_create survives a lost open reply (#14060)", () => {
     const id = createdThreadId("dur-caller", "atomic-2")
     expect(enqueuedFor(id)).toBe(0)
     const retry = (await run("thread_create", args)) as Created
-    expect(retry).toMatchObject({ kind: "ok", thread: { thread_id: id } })
+    expect(retry).toMatchObject({ kind: "ok", thread: id })
     expect(openSession).toHaveBeenCalledTimes(1)
     expect(enqueuedFor(id)).toBe(1)
     const again = (await run("thread_create", args)) as Created
     // A third run under the key finds the same thread; the prompt's own receipt answers it as already delivered.
-    expect(again).toMatchObject({ kind: "ok", thread: { thread_id: id }, prompt: { deduplicated: true } })
+    expect(again).toMatchObject({ kind: "ok", thread: id, prompt: { deduplicated: true } })
     expect(openSession).toHaveBeenCalledTimes(1)
   })
 
