@@ -737,11 +737,12 @@ describe("thread SDK: session controls (#13413)", () => {
       socket: HOST_SOCKET,
       endpoint_kind: "rpc_host",
     }
+    const openSession: NonNullable<ThreadHost["openSession"]> = async (request) => {
+      calls.push(["openSession", request])
+      return opened
+    }
     const controls: Partial<ThreadHost> = {
-      openSession: async (request) => {
-        calls.push(["openSession", request])
-        return opened
-      },
+      openSession,
       interrupt: async (...args) => {
         calls.push(["interrupt", ...args])
         return { interrupted: true, turnId: "turn-7" }
@@ -762,7 +763,7 @@ describe("thread SDK: session controls (#13413)", () => {
         return { provider: args[1], id: args[2] }
       },
     }
-    return { calls, controls }
+    return { calls, controls, openSession }
   }
 
   test("#given a host session here #when a script interrupts it #then the host's interrupt runs on that session and the result names the stopped turn", async () => {
@@ -848,15 +849,14 @@ describe("thread SDK: session controls (#13413)", () => {
   })
 
   test("#given this device's host #when a script creates a thread with a first prompt #then the thread opens and the prompt is delivered to it as the script's own message", async () => {
-    const { calls, controls } = controlled()
+    const { calls, controls, openSession } = controlled()
     // The host lists the session it opened, as a real one does once open_session answers.
     let listed: ThreadHostSession[] = []
-    const openSession = controls.openSession
     const { sdk, store } = fixture({
       controls: {
         ...controls,
         openSession: async (request) => {
-          const session = await openSession!(request)
+          const session = await openSession(request)
           listed = [session]
           return session
         },
