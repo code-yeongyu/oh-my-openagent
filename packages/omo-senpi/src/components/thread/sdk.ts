@@ -6,7 +6,7 @@ import { classifyWarmReply, type WarmAnswer } from "../../../../senpi-task/src/r
 
 import { toThreadAddressEntries, type AddressEntry } from "./address-book"
 import type { ThreadToolResult } from "./contracts"
-import { threadToolFailure, type ThreadToolFailure } from "./errors"
+import { gatewaySchemaRefusal, threadToolFailure, type ThreadToolFailure } from "./errors"
 import type { ReleaseSessionReply, ReleaseSessionRequest } from "./gateway/adapter"
 import { isUiRequestKind, UI_REQUEST_KINDS } from "./gateway/answer-shape"
 import { type BindInput, OUTBOUND_EVENTS, type OutboundEvent } from "./gateway/bindings"
@@ -225,6 +225,8 @@ function fail(
 
 /** The same mapping the tools apply to a thrown surface failure, so a script sees data, never a stack. */
 function thrown(error: unknown): Failure {
+  const schema = gatewaySchemaRefusal(error)
+  if (schema !== undefined) return { kind: "error", error: schema }
   const message = error instanceof Error ? error.message : String(error)
   if (message.startsWith("host_unavailable:"))
     return fail(
