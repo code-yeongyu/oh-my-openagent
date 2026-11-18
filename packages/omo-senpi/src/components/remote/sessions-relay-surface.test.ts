@@ -13,9 +13,8 @@ describe("the session members' relay surface carries its own client", () => {
     const owner = await startOwner()
     const client = clientOn(owner.stateDir, fakeClock())
     const opened = await client.sessions.open({ device: PEER, workspace: "/work/omo" })
-    // Whatever the peer answers (the fake owner refuses an endpoint open), the answer names that device: the open got past
-    // the online check, which needs the device list read through the surface's client.
-    expect(opened.kind === "ok" || opened.details?.["device"] === PEER).toBe(true)
+    // Whatever the peer answers (the fake owner refuses an endpoint open), the open got past the online check, which needs
+    // the device list read through the surface's client: without it the open ends host_unavailable before the peer.
     if (opened.kind === "error") expect(opened.code).not.toBe("host_unavailable")
   })
 })

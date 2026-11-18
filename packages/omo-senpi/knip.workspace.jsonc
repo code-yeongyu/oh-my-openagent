@@ -355,6 +355,8 @@
         "scripts/qa/thread-tools/desktop-to-cli.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/draft-preservation.mjs",
+        // run by path as the free-plan cross-workspace thread-tools QA driver (#14201)
+        "scripts/qa/thread-tools/free-plan-cross-workspace.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/held-then-exit.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
@@ -387,6 +389,8 @@
         "scripts/qa/thread-tools/reopen-exited.mjs",
         // a QA scenario that run-all.mjs runs by name (#14066), like its siblings
         "scripts/qa/thread-tools/create-atomic.mjs",
+        // run by run-all.mjs as a child process (legacy suite), never imported
+        "scripts/qa/thread-tools/free-plan-cross-workspace.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/report-origin-steer.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
@@ -648,8 +652,6 @@
     "packages/omo-senpi/src/components/memory/commands/sleeptime.ts": ["SLEEPTIME_OVERRIDE_MARK"],
     // pre-existing at origin dev 4686e425b5: unused export(s) identityFor
     "packages/omo-senpi/src/components/memory/commands/types.ts": ["identityFor"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) getMemoryRepo
-    "packages/omo-senpi/src/components/memory/context.ts": ["getMemoryRepo"],
     // pre-existing at origin dev 4686e425b5: unused export(s) FakeScheduler
     "packages/omo-senpi/src/components/memory/dream-trigger.test-support.ts": ["FakeScheduler"],
     // pre-existing at origin dev 4686e425b5: unused export(s) factsAgreementContract
@@ -836,8 +838,8 @@
     "packages/omo-senpi/src/components/thread/contracts/index.ts": ["THREAD_MESSAGE_MAX_BYTES", "THREAD_SUMMARY_MAX_LENGTH"],
     // pre-existing at origin dev 4686e425b5: unused export(s) ThreadListParams, ThreadReadParams, ThreadInterruptParams, ThreadHandoffParams, ThreadRenameParams, ThreadSetModelParams, ThreadSetReasoningParams, ThreadReportParams, ThreadOutboxParams, ThreadOutboxAckParams and 1 more
     "packages/omo-senpi/src/components/thread/contracts/params.ts": ["ThreadListParams", "ThreadReadParams", "ThreadInterruptParams", "ThreadHandoffParams", "ThreadRenameParams", "ThreadSetModelParams", "ThreadSetReasoningParams", "ThreadReportParams", "ThreadOutboxParams", "ThreadOutboxAckParams", "ThreadAnswerParams"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) ENDPOINT_REGISTRY_LAYOUT, canonicalEndpointPath, socketNamesDirectory
-    "packages/omo-senpi/src/components/thread/endpoint-registry.ts": ["ENDPOINT_REGISTRY_LAYOUT", "canonicalEndpointPath", "socketNamesDirectory"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ENDPOINT_REGISTRY_LAYOUT, socketNamesDirectory
+    "packages/omo-senpi/src/components/thread/endpoint-registry.ts": ["ENDPOINT_REGISTRY_LAYOUT", "socketNamesDirectory"],
     // pre-existing at origin dev 4686e425b5: unused export(s) isBlankAnswer
     "packages/omo-senpi/src/components/thread/gateway/answer-shape.ts": ["isBlankAnswer"],
     // pre-existing at origin dev 4686e425b5: unused export(s) AUTHOR_ID_MAX_LENGTH, AUTHOR_DISPLAY_MAX_LENGTH
@@ -867,7 +869,8 @@
     // pre-existing at origin dev 4686e425b5: unused export(s) registerIncarnation, clearEndpoint, sessionOwner
     "packages/omo-senpi/src/components/thread/gateway/store-ownership.ts": ["registerIncarnation", "clearEndpoint", "sessionOwner"],
     // pre-existing at origin dev 4686e425b5: unused export(s) toolReceiptBegin, toolReceiptSettle, registerIncarnation, pendingCompletionArms, latestCompletionArm, closeQuestion
-    "packages/omo-senpi/src/components/thread/gateway/store-relay-ops.ts": ["toolReceiptBegin", "toolReceiptSettle", "toolReceiptRevise", "registerIncarnation", "pendingCompletionArms", "latestCompletionArm", "closeQuestion"],
+    // #12925: toolReceiptRelease is called only by store-worker.ts, which runs as a worker thread knip does not reach (same as toolReceiptBegin/Settle)
+    "packages/omo-senpi/src/components/thread/gateway/store-relay-ops.ts": ["toolReceiptBegin", "toolReceiptSettle", "toolReceiptRevise", "toolReceiptRelease", "registerIncarnation", "pendingCompletionArms", "latestCompletionArm", "closeQuestion"],
     // pre-existing at origin dev 4686e425b5: unused export(s) sweepRetention
     "packages/omo-senpi/src/components/thread/gateway/store-retention.ts": ["sweepRetention"],
     // pre-existing at origin dev 4686e425b5: unused export(s) matcherAwaits

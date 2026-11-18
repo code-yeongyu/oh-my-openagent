@@ -68,14 +68,24 @@ describe("thread_create survives a lost open reply (#14060)", () => {
     expect(await store.toolReceiptBegin({ ...scope, now: Date.now(), args_hash: hashArgs(args) })).toEqual({
       kind: "accepted",
     })
-    await store.toolReceiptSettle({ ...scope, now: Date.now(), error_note: "the call failed after b opened the session" })
+    await store.toolReceiptSettle({
+      ...scope,
+      now: Date.now(),
+      error_note: "the call failed after b opened the session",
+    })
     expect(await run("thread_create", args)).toMatchObject({ kind: "error", error: { code: "idempotency_uncertain" } })
     expect(a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")).toEqual([])
   })
 
   test("#given the earlier run named the thread it made before failing #when the named create is retried under the same key #then it answers that thread, not name_conflict", async () => {
     const sessions: ThreadHostSession[] = [
-      { sessionId: "route-local", durableSessionId: "dur-local", cwd: process.cwd(), name: "local peer", status: "open" },
+      {
+        sessionId: "route-local",
+        durableSessionId: "dur-local",
+        cwd: process.cwd(),
+        name: "local peer",
+        status: "open",
+      },
     ]
     const { run, openSession, enqueuedFor } = surface(undefined, {
       sessions,
@@ -88,7 +98,10 @@ describe("thread_create survives a lost open reply (#14060)", () => {
     const made = sessions.findIndex((session) => session.durableSessionId === id)
     expect(made).toBeGreaterThan(-1)
     // The engine names the session after its open (set_session_name), before a later step of the first run failed.
-    sessions[made] = { ...sessions[made]!, name: "named-retry" }
+    const existing = sessions[made]
+    expect(existing).toBeDefined()
+    if (!existing) throw new Error(`created session ${id} missing from sessions`)
+    sessions[made] = { ...existing, name: "named-retry" }
     expect(await run("thread_create", args)).toMatchObject({ kind: "ok", thread: id })
     expect(openSession).toHaveBeenCalledTimes(1)
     expect(enqueuedFor(id)).toBe(1)

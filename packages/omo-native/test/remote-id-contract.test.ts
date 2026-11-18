@@ -38,6 +38,7 @@ async function owner(duplicate = false) {
         devices: { [PEER]: "answered" },
       },
       endpoints: { [PEER]: [SESSION_ID] },
+      primary: { [PEER]: SESSION_ID },
       located: { [PEER]: { [DURABLE]: SESSION_ID } },
       endpointCommand: { data: { state: { durableSessionId: DURABLE } }, outcome: applied },
       sessions: [

@@ -43,7 +43,9 @@ describe("#13037 the sender half reaches a session on another device that is not
         delivery: { kind: "queued", waiting_on: { kind: "wake", device: "b" } },
       })
       expect(a.lookups).toEqual([{ device: "b", durable_id: GONE }])
+      // #14184: b is asked first whether it holds the session (find_session, a read); it is on disk there, so it is woken.
       expect(a.sent.map((entry) => [entry.via, entry.device, entry.session, entry.rpc?.["type"]])).toEqual([
+        ["endpoint", "b", undefined, "find_session"],
         ["wake", "b", GONE, "admit_external_message"],
       ])
       expect(wakes(a)[0]?.rpc).toMatchObject({ sessionId: GONE, deliverAs: "followUp" })
@@ -100,8 +102,8 @@ describe("#13037 the sender half reaches a session on another device that is not
       expect(wakes(a).map((entry) => [entry.device, entry.session])).toEqual([["c", GONE]])
     })
 
-    test("#given such an alias #when thread_read, thread_interrupt and thread_create name it #then no engine command and no open is sent", async () => {
-      const a = account({ rows: [B_ROW], aliases: aliases(), ended: { c: { [GONE]: GONE } } })
+    test("#given such an alias #when thread_read, thread_interrupt and thread_create name it #then no open is sent: only the create asks c which file carries the id (find_session, a read; #14170), which c's engine predates", async () => {
+      const a = account({ rows: [B_ROW], aliases: aliases(), ended: { c: { [GONE]: GONE } }, sessionFiles: "none" })
       const { run } = fixture.surface(a.remote)
       for (const [tool, args] of [
         ["thread_read", { thread: "bee" }],
@@ -111,7 +113,9 @@ describe("#13037 the sender half reaches a session on another device that is not
         const result = await run(tool, args)
         expect({ tool, kind: result.kind }).toEqual({ tool, kind: "error" })
       }
-      expect(a.sent.filter((entry) => entry.via !== "read")).toEqual([])
+      expect(a.sent.filter((entry) => entry.via !== "read")).toEqual([
+        { via: "endpoint", device: "c", rpc: { type: "find_session", durableSessionId: GONE } },
+      ])
     })
   })
 
@@ -218,6 +222,33 @@ describe("#13037 the sender half reaches a session on another device that is not
     })
   })
 
+  // #13238 review: one rule for every probe that may build an `ended` row - only while this device's service can carry
+  // the wake. With the single probe on and the wake off, a probe-built row would go down the live path instead.
+  describe("lookup on with wake off: no probe builds an ended row", () => {
+    test("#given a reply to a sender on b that b no longer lists #when the run replies by id #then it is not_found naming b, with no probe and nothing sent", async () => {
+      const a = account({ rows: [B_ROW], ended: { b: { [GONE]: "rk-gone" } }, noWake: true })
+      const { run } = fixture.surface(a.remote, {
+        callerReplyTargets: () => [GONE],
+        callerReplySenders: () => [{ session_id: GONE, device: "b" }],
+      })
+      expect(await run("thread_send", { thread: GONE, message: "reply" })).toMatchObject({
+        kind: "error",
+        error: { code: "not_found", details: { device: "b" } },
+      })
+      expect({ lookups: a.lookups, sent: a.sent }).toEqual({ lookups: [], sent: [] })
+    })
+
+    test("#given a session id no listing holds and c holds it ended #when it is sent to #then the answer is today's not_found, with no probe and nothing sent", async () => {
+      const a = account({ rows: [B_ROW, C_ROW], ended: { c: { [GONE]: "rk-c-gone" } }, noWake: true })
+      const { run } = fixture.surface(a.remote)
+      expect(await run("thread_send", { thread: GONE, message: "hi" })).toMatchObject({
+        kind: "error",
+        error: { code: "not_found" },
+      })
+      expect({ lookups: a.lookups, sent: a.sent }).toEqual({ lookups: [], sent: [] })
+    })
+  })
+
   describe("5.4 the relay transport for an ended row", () => {
     const endedOnC = (extra: Parameters<Fixture["account"]>[0] = {}) =>
       account({ rows: [B_ROW, C_ROW], ended: { c: { [GONE]: "rk-c-gone" } }, ...extra })
@@ -232,13 +263,16 @@ describe("#13037 the sender half reaches a session on another device that is not
       expect(a.sent.some((entry) => entry.rpc?.["type"] === "get_state")).toBe(false)
     })
 
-    test("#given an ended row #when it is steered #then it is turn_conflict and nothing is sent", async () => {
+    test("#given an ended row #when it is steered #then it is turn_conflict and nothing but the holder's read is sent", async () => {
       const a = endedOnC()
       const { run } = fixture.surface(a.remote)
       expect(
         await run("thread_send", { thread: GONE, message: "hi", delivery: "steer", expected_turn_id: "3" }),
       ).toMatchObject({ kind: "error", error: { code: "turn_conflict" } })
-      expect(a.sent).toEqual([])
+      // #14184: c is asked whether it runs the session before any path is chosen; it has it on disk only, so no steer goes.
+      expect(a.sent.map((entry) => [entry.via, entry.device, entry.rpc?.["type"]])).toEqual([
+        ["endpoint", "c", "find_session"],
+      ])
     })
 
     test("#given this device's service cannot carry the wake #when an ended row is sent to #then no wake is sent", async () => {
@@ -289,13 +323,31 @@ describe("#13037 the sender half reaches a session on another device that is not
       ["not_wakeable", "not_resumable", {}],
       ["sender_not_admitted", "not_resumable", {}],
       ["sender_not_allowed", "unsupported", {}],
-      ["chain_count_limit", "unsupported", { reason: "chain_count_limit" }],
+      ["chain_count_limit", "chain_count_limit", { reason: "chain_count_limit", setting: "threads.chainCountLimit" }],
       ["queue_full", "queue_full", {}],
       ["wake_limit_reached", "overloaded", { reason: "wake_limit_reached" }],
     ] as const)("#given the receiver refused it with %s #then the tool answers %s", async (reason, code, details) => {
       expect(await answered(queuedEnvelope({ kind: "refused", reason }))).toMatchObject({
         kind: "error",
         error: { code, details: { device: "c", ...details } },
+      })
+    })
+
+    test("#given the receiving store refused it past its chain limit #then the tool answers chain_count_limit with the store's counts, the same code the running engine's refusal answers", async () => {
+      expect(
+        await answered(queuedEnvelope({ kind: "refused", reason: "chain_count_limit", chain_count: 4, limit: 3 })),
+      ).toMatchObject({
+        kind: "error",
+        error: {
+          code: "chain_count_limit",
+          details: {
+            device: "c",
+            reason: "chain_count_limit",
+            setting: "threads.chainCountLimit",
+            chain_count: 4,
+            limit: 3,
+          },
+        },
       })
     })
 
@@ -373,7 +425,8 @@ describe("#13037 the sender half reaches a session on another device that is not
     const cases: Readonly<Record<string, readonly [Case, ReturnType<typeof count>]>> = {
       "reply, not running": [
         { rows: [B_ROW], options: { ended: { b: { [GONE]: "rk-gone" } } }, surface: replyFrom(GONE), thread: GONE },
-        { listings: { all: 0, device: 1 }, lookups: 1, commands: 1 },
+        // #14184: the holder's find_session read, then the wake.
+        { listings: { all: 0, device: 1 }, lookups: 1, commands: 2 },
       ],
       "reply, live": [
         { rows: [B_ROW], surface: replyFrom("dur-on-b"), thread: "dur-on-b" },
@@ -385,7 +438,7 @@ describe("#13037 the sender half reaches a session on another device that is not
           options: { aliases: new Map([["bee", { session_id: GONE, device: "c" }]]), ended: { c: { [GONE]: GONE } } },
           thread: "bee",
         },
-        { listings: { all: 1, device: 0 }, lookups: 0, commands: 1 },
+        { listings: { all: 1, device: 0 }, lookups: 0, commands: 2 },
       ],
       "alias, live": [
         {
@@ -397,7 +450,7 @@ describe("#13037 the sender half reaches a session on another device that is not
       ],
       "bare id, not running, held": [
         { rows: [B_ROW, C_ROW], options: { ended: { c: { [GONE]: "rk-c-gone" } } }, thread: GONE },
-        { listings: { all: 1, device: 0 }, lookups: 2, commands: 1 },
+        { listings: { all: 1, device: 0 }, lookups: 2, commands: 2 },
       ],
       "bare id, held nowhere": [
         { rows: [B_ROW, C_ROW], thread: GONE },
@@ -508,6 +561,31 @@ describe("#13037 the sender half reaches a session on another device that is not
       const error = await refusalOf(reason)
       expect(error.details?.reason).toBe("unrecognised")
       expect(error.message).toBe("Device c refused the message (unrecognised reason).")
+    })
+
+    // #13277 review: the device service's own refusal of the wake (not the consumer's envelope) goes through outcomeFailure,
+    // and its reason can be the other device's free-form response.error. The same allowlist applies there.
+    const serviceRefusalOf = async (reason: string) => {
+      const a = account({
+        rows: [B_ROW, C_ROW],
+        ended: { c: { [GONE]: "rk-c-gone" } },
+        wakeOutcome: { kind: "refused", reason },
+      })
+      const result = await fixture.surface(a.remote).run("thread_send", { thread: GONE, message: "hi" })
+      if (result.kind !== "error") throw new Error(JSON.stringify(result))
+      return result.error
+    }
+
+    test("#given the device service refuses the wake with free-form text #then the reason is the constant and the text is shown nowhere", async () => {
+      const raw = "Error: ENOENT /home/someone/private/session.jsonl"
+      const error = await serviceRefusalOf(raw)
+      expect(error.details?.reason).toBe("unrecognised")
+      expect(JSON.stringify(error).includes(raw)).toBe(false)
+    })
+
+    test("unchanged: #given the device service refuses the wake with a machine code #then that code keeps its own mapping", async () => {
+      const error = await serviceRefusalOf("host_detached")
+      expect([error.code, error.details?.reason]).toEqual(["host_unavailable", "host_detached"])
     })
   })
 })

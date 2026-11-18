@@ -193,6 +193,7 @@ describe("thread_send / thread_handoff results", () => {
       thread: PEER,
       name: "planner-2",
       status: "live",
+      state: "idle",
       cwd: "/w",
       created_at: "t",
       updated_at: null,
@@ -264,6 +265,7 @@ describe("thread_read / thread_list / thread_create results", () => {
       thread: id,
       name,
       status: "live",
+      state: "idle",
       cwd: "/w",
       created_at: "t",
       updated_at: null,
@@ -275,8 +277,8 @@ describe("thread_read / thread_list / thread_create results", () => {
       scope: "workspace",
       threads: [
         thread("a", "planner", { surface: "tui" }),
-        thread("b", "", { status: "resumable" }),
-        thread("c", "builder", { surface: "desktop", machine: "laptop", device: "dev-2", alive: false }),
+        thread("b", "", { status: "resumable", state: "inactive" }),
+        thread("c", "builder", { surface: "desktop", machine: "laptop", device: "dev-2", state: "inactive" }),
         thread("d", "four"),
         thread("e", "five"),
         thread("f", "six"),
@@ -286,11 +288,11 @@ describe("thread_read / thread_list / thread_create results", () => {
     } as ThreadToolResult
     expect(result("thread_list", listed)).toEqual([
       "7 threads in this workspace",
-      "  planner  live, tui",
-      "  b  resumable",
-      "  builder  live, desktop, laptop, not answering",
-      "  four  live",
-      "  five  live",
+      "  planner  idle, tui",
+      "  b  inactive",
+      "  builder  inactive, desktop, laptop",
+      "  four  idle",
+      "  five  idle",
       "  ... 2 more",
       "  other devices unavailable: relay_requires_paid_plan",
     ])

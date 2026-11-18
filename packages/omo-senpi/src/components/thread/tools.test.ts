@@ -1,3 +1,4 @@
+import { Database } from "bun:sqlite"
 import { afterEach, describe, expect, mock, test } from "bun:test"
 import { deliverySender } from "./gateway/provenance"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
@@ -7,7 +8,10 @@ import { parseThreadParams, threadToolParamSchemas, type ThreadToolName, type Th
 import type { GatewayEndpointRef } from "./gateway/adapter"
 import { type BindInput, hashArgs, normalizeBindInput } from "./gateway/bindings"
 import { GATEWAY_RECEIPT_RETENTION_MS } from "./gateway/constants"
+import { gatewayDatabasePath } from "./gateway/paths"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
+import { storeMigratedByNewerBuild } from "./gateway/testing/newer-schema"
+import type { ThreadToolFailure } from "./errors"
 import { parseThreadLinkUrl } from "./thread-link"
 import {
   createThreadTools,
@@ -128,7 +132,7 @@ describe("thread tool registration", () => {
     expect(f.setModel.mock.calls[0]).toEqual(["route-peer", "openai", "gpt-x", "dur-peer"])
   })
 
-  test("registers exactly the fourteen contract tools with eval exposure", () => {
+  test("registers exactly the fifteen contract tools with eval exposure", () => {
     const tools: Record<string, unknown>[] = []
     const f = fixture()
     registerThreadTools(
@@ -146,6 +150,7 @@ describe("thread tool registration", () => {
       "thread_rename",
       "thread_set_model",
       "thread_set_reasoning",
+      "thread_archive",
       "thread_report",
       "thread_outbox",
       "thread_outbox_ack",
@@ -242,7 +247,7 @@ describe("thread tool registration", () => {
     })
   })
 
-  test("#given a live transcript longer than one byte window #when thread_read follows next_cursor #then each read returns the next slice until the end", async () => {
+  test("#given a live transcript longer than one byte window #when thread_read follows next_cursor #then the first read ends at the newest message and each next one returns the slice before it until the start", async () => {
     // given
     const f = fixture()
     const transcript = Array.from({ length: 12 }, (_, index) => ({
@@ -271,7 +276,10 @@ describe("thread tool registration", () => {
 
     // then
     expect(pages.length).toBeGreaterThan(1)
-    expect(pages.flatMap((page) => page.contents)).toEqual(transcript.map((message) => JSON.stringify(message.content)))
+    expect(pages[0]?.contents.at(-1)).toBe(JSON.stringify(transcript.at(-1)?.content))
+    expect(pages.reverse().flatMap((page) => page.contents)).toEqual(
+      transcript.map((message) => JSON.stringify(message.content)),
+    )
   })
 })
 
@@ -771,7 +779,7 @@ const TUI_SOCKET = "/tmp/t-0123456789abcdef.sock"
 const HOST_SOCKET = "/tmp/i-0123456789abcdef.sock"
 
 /** A host session (the caller) and a terminal session, each on its own endpoint, with a recording gateway port. */
-function gatewayFixture() {
+function gatewayFixture(store?: GatewayStore) {
   const f = fixture()
   const hostSession: ThreadHostSession = {
     sessionId: "rpc-1",
@@ -832,7 +840,7 @@ function gatewayFixture() {
       host,
       stateDirectory: f.stateDirectory,
       sessionsDirectory: () => join(f.stateDirectory, "sessions"),
-      store: f.store,
+      store: store ?? f.store,
       callerSessionId: () => callerId,
       callerWorkspaceRoot: () => process.cwd(),
       callerName: () => callerName,
@@ -1249,6 +1257,73 @@ describe("tool receipts the store could not settle", () => {
   })
 })
 
+describe("thread tools over a gateway store a newer omo build migrated", () => {
+  function newerStore(ahead: number) {
+    const agentDir = mkdtempSync(join(tmpdir(), "thread-tools-newer-schema-"))
+    directories.push(agentDir)
+    const versions = storeMigratedByNewerBuild(agentDir, ahead)
+    const store = createGatewayStore({ agentDir })
+    stores.push(store)
+    return { store, agentDir, ...versions }
+  }
+
+  test.each([1, 3])(
+    "#given the agent dir's store is %i schema version(s) past this binary's #when thread_send and a receipted tool run #then each answers gateway_schema_too_new naming both schemas and the update command, and the store keeps its schema",
+    async (ahead) => {
+      // given: the old-binary fixture, a store a newer build migrated past every schema this build knows (N+1 is the next schema)
+      const n = newerStore(ahead)
+      const g = gatewayFixture(n.store)
+      const refusal = {
+        kind: "error",
+        error: {
+          code: "gateway_schema_too_new",
+          details: { gateway_schema: n.gateway, binary_schema: n.binary, update_command: "omo update" },
+        },
+      }
+
+      // when
+      const sent = await g.run("thread_send", { thread: "my-tui", message: "hello" }, "dur-host", "call-1")
+      const renamed = await g.run("thread_rename", { thread: "my-tui", name: "renamed" }, "dur-host", "call-2")
+
+      // then
+      // the hint carries the command (read before toMatchObject, which writes its asymmetric matchers into the received object)
+      for (const result of [sent, renamed]) {
+        const error = (result as { readonly error: ThreadToolFailure }).error
+        expect(error.next_action).toContain(String(error.details?.update_command))
+      }
+      expect(sent).toMatchObject(refusal)
+      expect(renamed).toMatchObject(refusal)
+      // A read-write connection: the refused store closed its WAL connection, which removed -wal and -shm, and a
+      // read-only connection cannot recreate them (macOS's system SQLite answers SQLITE_CANTOPEN). It only reads.
+      const db = new Database(gatewayDatabasePath(n.agentDir))
+      try {
+        expect(db.query("PRAGMA user_version").get()).toEqual({ user_version: n.gateway })
+      } finally {
+        db.close()
+      }
+    },
+  )
+
+  test.each([
+    ["thread_outbox_ack", { binding_id: "bnd-1", cursor: 3, provider_message_id: "m-1" }],
+    ["thread_report", { kind: "milestone", text: "done step 1" }],
+    ["thread_outbox", { binding_id: "bnd-1", after_cursor: 0 }],
+  ] as const)(
+    "#given the agent dir's store is one schema version past this binary's #when the relay tool %s runs #then it answers gateway_schema_too_new naming both schemas and omo update",
+    async (name, args) => {
+      const n = newerStore(1)
+      const g = gatewayFixture(n.store)
+      expect(await g.run(name, args, "dur-host", "call-relay")).toMatchObject({
+        kind: "error",
+        error: {
+          code: "gateway_schema_too_new",
+          details: { gateway_schema: n.gateway, binary_schema: n.binary, update_command: "omo update" },
+        },
+      })
+    },
+  )
+})
+
 describe("receipts stored before one field named a session (#14044 4a)", () => {
   /** Writes a settled receipt through the real store under the key a retry of `args` uses, as an earlier build would. */
   async function stored(
@@ -1329,7 +1404,7 @@ describe("receipts stored before one field named a session (#14044 4a)", () => {
       updated_at: "2026-11-01T00:00:00.000Z",
       link: "[old create](omo-thread://v1/dur-peer)",
       surface: "daemon",
-      alive: true,
+      state: "idle",
     }
     const candidates = oldCandidates.map(({ id, ...rest }) => ({ thread: id, ...rest }))
     expect(replayed).toStrictEqual({
@@ -1368,7 +1443,7 @@ describe("receipts stored before one field named a session (#14044 4a)", () => {
       updated_at: null,
       link: "[peer](omo-thread://v1/dur-peer)",
       surface: "daemon",
-      alive: true,
+      state: "idle",
       controls: ["send", "read"],
     }
     const receipts = [

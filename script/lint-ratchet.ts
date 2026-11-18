@@ -5,23 +5,26 @@ import * as NodeProcess from "node:process"
 
 import { parseSync } from "oxc-parser"
 
-// The three strictness rules every repo enforces. This repo still has hundreds of old sites, so
-// they ratchet: each file's count must match the baseline exactly. A rise fails, and so does a drop
-// until the baseline is lowered in the same change, so a removed site cannot come back. The old sites
-// are rewritten package by package later, each reviewed as a behaviour change.
+// The strictness rules every repo enforces, plus the two landmines testing rules (ported from
+// interfere-inc/landmines, MIT). This repo still has hundreds of old sites, so they ratchet: each
+// file's count must match the baseline exactly. A rise fails, and so does a drop until the baseline
+// is lowered in the same change, so a removed site cannot come back. The old sites are rewritten
+// package by package later, each reviewed as a behaviour change.
 export const RATCHET_RULES = [
   "typescript/no-explicit-any",
   "typescript/ban-ts-comment",
   "typescript/no-non-null-assertion",
+  "omo-testing/no-fixed-sleep",
+  "omo-testing/no-flake-masking",
 ] as const
 
-// A disable comment hides a finding from the linter, so it is counted as a fourth value: one that
-// names one of the three rules, or a bare one that turns every rule off for its line or file.
+// A disable comment hides a finding from the linter, so it is counted as an extra value: one that
+// names one of the ratcheted rules, or a bare one that turns every rule off for its line or file.
 export const SUPPRESSION = "disable-directive"
 // A directive is a comment whose text starts with the directive word, as oxlint reads it. The
 // comments come from the parser's tokens, so a directive inside a string or template never counts.
 const DIRECTIVE = /^[\s*]*(?:oxlint|eslint)-disable(?:-next-line|-line)?(?:\s|$)([\s\S]*)$/
-const NAMES_A_RULE = /\b(?:no-explicit-any|ban-ts-comment|no-non-null-assertion)\b/
+const NAMES_A_RULE = /\b(?:no-explicit-any|ban-ts-comment|no-non-null-assertion|no-fixed-sleep|no-flake-masking)\b/
 
 export const countSuppressions = (file: string, source: string): number => {
   let count = 0
@@ -90,6 +93,16 @@ const SOURCE = /\.(?:[cm]?[jt]s|tsx)$/
 const GENERATED = /(?:_pb|\.generated)\.(?:[cm]?[jt]s|tsx)$/
 export const ratchetedFiles = (files: readonly string[]): string[] =>
   files.filter((file) => SOURCE.test(file) && !GENERATED.test(file))
+// #14220: minified bundle output is not a test source, but the bundler's short function names collide
+// with the test API names the two omo-testing rules key on, so every bundle regeneration moved their
+// counts between files (train #14196 had to hand-edit the baseline for exactly that). Bundle output
+// therefore never counts for the test rules; every other rule keeps counting everywhere.
+const BUNDLE_OUTPUT = /packages[/\\][^/\\]+[/\\]plugin[/\\](?:extensions|runtime)[/\\]/
+export const countsTowardRatchet = (code: string, filename: string): boolean =>
+  // oxlint emits plugin rules as "omo-testing(rule)" before the ratchet normalizes them to
+  // "omo-testing/rule", so the namespace prefix matches both shapes.
+  !(code.startsWith("omo-testing") && BUNDLE_OUTPUT.test(filename))
+
 const CONFIG = "script/lint-ratchet.oxlintrc.json"
 
 const run = (root: string, command: string, args: readonly string[]) =>
@@ -119,9 +132,9 @@ const lint = (root: string): Lint => {
     const parsed: { readonly diagnostics: readonly Diagnostic[] } = JSON.parse(result.stdout)
     diagnostics.push(...parsed.diagnostics)
   }
-  const ruled = diagnostics.flatMap((diagnostic) =>
-    typeof diagnostic.code === "string" ? [{ ...diagnostic, code: diagnostic.code }] : [],
-  )
+  const ruled = diagnostics
+    .flatMap((diagnostic) => (typeof diagnostic.code === "string" ? [{ ...diagnostic, code: diagnostic.code }] : []))
+    .filter((diagnostic) => countsTowardRatchet(diagnostic.code, diagnostic.filename ?? ""))
   const unparsed = diagnostics
     .filter((diagnostic) => typeof diagnostic.code !== "string")
     .map((diagnostic) => `${diagnostic.filename}: ${diagnostic.message ?? "parse error"}`)

@@ -1,3 +1,16 @@
+## 2026-11-17 - omo sync disable (#14093)
+
+- `sync-cli.ts`: `omo sync disable` turns memory sync off for this device through `disableSync`; exit 0 with the off line, exit 1 when the service refuses or the device is signed out. `bin/lib/service-auth.generated.js` is rebuilt.
+
+## 2026-11-17 - opt-in OmO keychain for Macs whose login keychain stays locked (#14033)
+
+`keychain-helper`:
+- New `store` request field and the `store-create` / `store-activate` / `store-deactivate` / `store-erase` verbs (`dedicated.c`, `dedicated-lifecycle.c`, `store-select.c`).
+- The store is `~/Library/Application Support/OmO/credential-keychain` (`0700`) with a `0600` keychain and key.
+- Store-less requests are refused while it is active. Items there get an any-application ACL.
+
+`account-store.ts` adds `omo account store`. `keychain-helper-doctor.js` adds a `credential store` line. The service-auth `store-binding` chooses the store per call and has no helper-less path while it is active (#13116).
+
 ## 2026-11-17 - omo thread and omo remote print the thread field (#14056)
 
 - `bin/lib/thread-output.js`, `remote-render.ts`, `remote-session-verbs.ts`: `omo thread list|send` and `omo remote open|send` read and print `thread`; `omo remote open --json` answers the flat `thread_create` shape.

@@ -1,19 +1,21 @@
 import { AMBIGUOUS_CANDIDATE_LIMIT, normalizeThreadName, type ThreadCandidate } from "../addressing"
 import type { ThreadLocalAliasNote, ThreadStatus, ThreadToolResult } from "../contracts"
-import { createRelaySessionHost, listedThread } from "../control/relay-session-host"
+import { createRelaySessionHost, displayedThread } from "../control/relay-session-host"
 import type { HostedThread, SessionHost, SessionOpenRequest } from "../control/session-host"
-import { threadToolFailure } from "../errors"
+import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import { openedResult } from "../tools/thread-row"
 import {
   rowStatus,
   type AliasError,
+  type AliasHolder,
   type AliasRegistry,
   type RemoteDevice,
   type RemoteSessionRow,
   type RemoteThreadSurface,
 } from "./ports"
 import { accountDevices } from "./account"
-import { aliasFailure, holderDetails, remoteAvailable } from "./remote-ops"
+import { sessionFileOf } from "./find-session"
+import { aliasFailure, deviceOnline, holderDetails, remoteAvailable } from "./remote-ops"
 
 type LocalEntry = {
   readonly thread_id: string
@@ -53,13 +55,15 @@ const DEVICE_PREFIX_MIN = 6
 const deviceCandidates = (rows: readonly RemoteDevice[]) =>
   rows.slice(0, AMBIGUOUS_CANDIDATE_LIMIT).map((row) => ({ device: row.device, name: row.label, online: row.online }))
 
+type DeviceRefusal = { readonly kind: "error"; readonly error: ThreadToolFailure }
+
 const deviceFailure = (
   code: "not_found" | "ambiguous_target" | "device_offline",
   message: string,
   next: string,
   device: string,
   rows: readonly RemoteDevice[],
-): { readonly result: ThreadToolResult } => ({
+): { readonly result: DeviceRefusal } => ({
   result: {
     kind: "error",
     error: threadToolFailure(code, message, next, { device, candidates: deviceCandidates(rows) }),
@@ -70,12 +74,13 @@ const deviceFailure = (
  * The account device a create names (#14072): its exact id, else its display name (the machine name thread_list shows as
  * `machine`, compared as thread names are), else a unique id prefix. Of the rows sharing a name the online ones count, so
  * an offline twin a re-registered machine left behind never shadows the live device; several online is ambiguous_target,
- * only offline ones device_offline. A name or prefix nothing matches is not_found listing the account's devices.
+ * only offline ones device_offline. A name or prefix nothing matches is not_found listing the account's devices. The one
+ * device resolver: `omo remote`'s session verbs take a device through it too (#13432).
  */
-function resolveDevice(
+export function resolveDevice(
   devices: readonly RemoteDevice[],
   address: string,
-): { readonly row: RemoteDevice } | { readonly result: ThreadToolResult } {
+): { readonly row: RemoteDevice } | { readonly result: DeviceRefusal } {
   const byId = devices.find((row) => row.device === address)
   if (byId !== undefined) return { row: byId }
   const wanted = normalizeThreadName(address)
@@ -114,7 +119,7 @@ function resolveDevice(
   return deviceFailure(
     "not_found",
     `No device named ${address} is signed in to this account.`,
-    "Pass a device name or id from candidates, or call thread_list with all_scope.",
+    "Pass a device name or id from candidates, or call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell).",
     address,
     devices,
   )
@@ -254,6 +259,28 @@ export async function planCreate(
   }
   // An alias no account can hold is the new thread's local name (#13104); opening an existing thread by it still needs the account.
   let localAlias: LocalAliasReason | undefined
+  // The thread an open names, located once: the alias check below and the open both need it.
+  let located: CrossTarget | undefined
+  const locateThread = async (thread: string): Promise<CrossTarget> => (located ??= await local.locate(thread))
+  // The holder is a session on ONE device (#14175 review L1): a copy of its session file on another device carries the
+  // same durable id but is not the holder, so the device is compared too. When this device's id cannot be read the
+  // open goes on and the alias claim after it still refuses a thread that is not the holder.
+  const opensHolder = async (thread: string, holder: AliasHolder): Promise<boolean> => {
+    if (thread === value.alias) return true
+    const target = await locateThread(thread)
+    if (target.kind === "error") return thread === holder.session_id
+    if (target.kind === "remote")
+      return (
+        target.row.device === holder.device &&
+        (target.row.durable_id === holder.session_id || target.row.session_id === holder.session_id)
+      )
+    if (target.address !== holder.session_id) return false
+    const here = await accountDevices(remote.client).then(
+      (devices) => devices.here,
+      () => undefined,
+    )
+    return here === undefined || here === holder.device
+  }
   const scoped = (plan: CreatePlan): CreatePlan =>
     localAlias === undefined || plan.kind !== "open" ? plan : { ...plan, localAlias }
   if (value.alias !== undefined && remote.aliases === undefined) {
@@ -270,7 +297,9 @@ export async function planCreate(
           details: { reason: "resolve_failed" },
         },
       }))
-    if (held.kind === "ok")
+    // Opening the thread that already holds the alias, by that alias, its id or any address that locates it, keeps the
+    // alias it has (#12641): only another thread holding it is alias_taken.
+    if (held.kind === "ok" && !(value.thread !== undefined && (await opensHolder(value.thread, held.value))))
       return {
         kind: "done",
         result: {
@@ -283,24 +312,28 @@ export async function planCreate(
           ),
         },
       }
-    if (held.error.code !== "alias_not_found") {
+    if (held.kind === "error" && held.error.code !== "alias_not_found") {
       if (value.thread !== undefined || !signedOut(held.error))
         return { kind: "done", result: aliasFailure(held.error) }
       localAlias = "sign_in"
     }
   }
   if (value.thread !== undefined) {
-    const target = await local.locate(value.thread)
+    const target = await locateThread(value.thread)
     if (target.kind === "error") return { kind: "done", result: target.result }
     if (target.kind === "local") return openHere(target.address)
     // Only a row its device listed live this round is answered as already live (B's engine holds it). An ended row, or a
-    // cached snapshot of a device that did not answer (#14043), is opened again from its file; the relay host refuses
-    // that open device_offline while the device stays offline.
-    if (rowStatus(target.row) === "live") return alreadyLive(listedThread(target.row), target.row.device)
+    // cached snapshot of a device that did not answer (#14043), is opened again from its session file, which no listing
+    // row names (#14170: its path is the session's folder); an offline device refuses before anything is asked.
+    if (rowStatus(target.row) === "live") return alreadyLive(displayedThread(target.row), target.row.device)
+    const offline = await deviceOnline(remote, target.row.device)
+    if (offline !== undefined) return { kind: "done", result: offline }
+    const file = await sessionFileOf(remote, target.row)
+    if ("result" in file) return { kind: "done", result: file.result, device: target.row.device }
     return {
       kind: "open",
       host: createRelaySessionHost(remote, target.row.device, target.row),
-      request: { sessionPath: target.row.path },
+      request: { sessionPath: file.path },
       creates: false,
     }
   }
