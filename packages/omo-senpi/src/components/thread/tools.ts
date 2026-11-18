@@ -1,20 +1,13 @@
-import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import { threadToolFailure } from "./errors"
-import type { ThreadErrorCode, ThreadToolFailure } from "./errors"
+import type { ThreadToolFailure } from "./errors"
 import { type Static } from "typebox"
 import { toThreadAddressEntries } from "./address-book"
-import { checkNameConflict, normalizeThreadName, type ThreadAddressEntry, type ThreadResolveResult } from "./addressing"
-import { createLocalSessionHost, workspaceNote } from "./control/local-session-host"
-import { createdThreadId, type SessionOpenOutcome } from "./control/session-host"
-import { checkInitialSkills } from "./initial-skills"
+import { type ThreadAddressEntry, type ThreadResolveResult } from "./addressing"
 import {
   parseThreadParams,
   threadToolParamSchemas,
   type ThreadCloseInput,
   type ThreadCreateInput,
-  type ThreadCreatePrompt,
-  type ThreadCreateResult,
-  type ThreadSendResult,
   type ThreadHandoffInput,
   type ThreadInterruptInput,
   type ThreadListInput,
@@ -23,13 +16,11 @@ import {
   type ThreadSendInput,
   type ThreadSetModelInput,
   type ThreadSetReasoningInput,
-  type ThreadSummary,
   type ThreadToolName,
   type ThreadToolResult,
 } from "./contracts"
 import { THREAD_FAMILY_PROMPT_GUIDELINES } from "./metadata"
-import { createLaunch } from "./control/create-launch"
-import { createdDeviceRow, relayAddressBook, type RelayAddressBook } from "./remote/address-book"
+import { relayAddressBook, type RelayAddressBook } from "./remote/address-book"
 import { threadLink } from "./thread-link"
 export type { ThreadTranscriptEntry } from "./reader"
 import { hashArgs } from "./gateway/bindings"
@@ -46,26 +37,17 @@ import { withThreadRenderers } from "./tools/render"
 import { consumedSendersOf, threadSendPermission } from "./tools/reply-permission"
 import { otherDevice, replyTargetFailure, replyTargetMismatch } from "./tools/reply-target"
 import { accountDevices } from "./remote/account"
-import { claimCreatedAlias, listAcross, planCreate, renameAlias, withAlias } from "./remote/lazy-ops"
+import { listAcross } from "./remote/lazy-ops"
 import { locateControl } from "./control/locate"
 import { createThread } from "./control/create"
-import {
-  closeThread,
-  interruptThread,
-  NOT_LIVE,
-  renameThread,
-  setModelOn,
-  setThinkingLevelOn,
-} from "./control/operations"
+import { closeThread, interruptThread, NOT_LIVE, setModelOn, setThinkingLevelOn } from "./control/operations"
+import { renameThread } from "./control/rename"
 import { controlIdentity, controlRefusalOf } from "./control/port"
-import type { LocalAliasReason, LocalExisting } from "./remote/cross-device"
-import type { HostedThread } from "./control/session-host"
-import { recordThreadCreator, registerExtensionTools, type ExtensionToolHost } from "./tools/extension-tools"
+import { registerExtensionTools, type ExtensionToolHost } from "./tools/extension-tools"
 export type { ThreadHost, ThreadHostSession, ThreadToolSurfaceOptions } from "./tools/ports"
 export { UNKNOWN_CALLER } from "./tools/ports"
 import {
   UNKNOWN_CALLER,
-  type ThreadHost,
   type ThreadHostView,
   type ThreadHostViewRequest,
   type ThreadToolSurfaceOptions,
@@ -78,9 +60,7 @@ import {
   output,
   resolution,
   resolveEntries,
-  routingId,
   sendAddressBook,
-  sessionPort,
   summary,
   targetSession,
   type AnyTool,
@@ -89,7 +69,7 @@ import {
   resolveAcross,
   uncertainFailure,
 } from "./tools/internals"
-import { currentResult, openedResult, threadRow } from "./tools/thread-row"
+import { currentResult, threadRow } from "./tools/thread-row"
 
 /** How many keys a tool surface keeps for recovering receipts whose admission reply was lost. */
 export const RECEIPT_RECOVERY_MAX_KEYS = 4_096
