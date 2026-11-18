@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { BroadcastChannel, parentPort, threadId, type Worker } from "node:worker_threads"
+import { BroadcastChannel, parentPort, threadId, Worker as ThreadWorker } from "node:worker_threads"
 import { z } from "zod"
 
 const Registration = z.object({
@@ -7,6 +7,8 @@ const Registration = z.object({
   incarnation: z.string(),
   challenge: z.string(),
 })
+/** Bun reports both node:worker_threads Workers and global Web Workers through process "worker". */
+type Worker = ThreadWorker | Bun.Worker
 const Message = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("query"), id: z.string(), incarnation: z.string(), record: z.string() }),
   z.object({ kind: z.literal("answer"), id: z.string(), released: z.boolean() }),
@@ -114,17 +116,33 @@ function attachWorker(worker: Worker): void {
   state.observing.set(id, { worker, challenge })
   const incarnations = new Set<string>()
   let exited = false
-  worker.on("message", (message: unknown) => {
-    const parsed = Registration.safeParse(message)
-    if (!parsed.success || parsed.data.challenge !== challenge) return
-    incarnations.add(parsed.data.incarnation)
-    if (exited) state.exited.add(parsed.data.incarnation)
+  onWorkerLifetime(
+    worker,
+    (message) => {
+      const parsed = Registration.safeParse(message)
+      if (!parsed.success || parsed.data.challenge !== challenge) return
+      incarnations.add(parsed.data.incarnation)
+      if (exited) state.exited.add(parsed.data.incarnation)
+    },
+    () => {
+      exited = true
+      if (state.observing.get(id)?.worker === worker) state.observing.delete(id)
+      for (const incarnation of incarnations) state.exited.add(incarnation)
+    },
+  )
+}
+
+/** A Web Worker is an EventTarget: messages arrive as MessageEvent data and its exit is the "close" event. */
+function onWorkerLifetime(worker: Worker, onMessage: (message: unknown) => void, onExit: () => void): void {
+  if (worker instanceof ThreadWorker) {
+    worker.on("message", onMessage)
+    worker.once("exit", onExit)
+    return
+  }
+  worker.addEventListener("message", (event: Event) => {
+    if (event instanceof MessageEvent) onMessage(event.data)
   })
-  worker.once("exit", () => {
-    exited = true
-    if (state.observing.get(id)?.worker === worker) state.observing.delete(id)
-    for (const incarnation of incarnations) state.exited.add(incarnation)
-  })
+  worker.addEventListener("close", onExit, { once: true })
 }
 
 /** Install before creating workers; late-loaded hosts can observe an existing handle explicitly. */
