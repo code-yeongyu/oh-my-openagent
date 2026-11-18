@@ -2,7 +2,12 @@
 // (see runtime-loader.ts); the generator and collectors never ship in the entry bundle.
 
 import type { SenpiExtensionAPI } from "../../../extension/types"
-import { reportPalace, type PalaceCommandContext, type PalaceContextResolver, type PalacePeopleResolver } from "./report"
+import {
+  reportPalace,
+  type PalaceCommandContext,
+  type PalaceContextResolver,
+  type PalacePeopleResolver,
+} from "./report"
 import { loadPalaceRuntime, palaceRuntimeLoadFailure, type PalaceRuntimeLoader } from "./runtime-loader"
 
 export type { PalaceCommandContext, PalaceCommandUi, PalaceContextResolver, PalacePeopleResolver } from "./report"

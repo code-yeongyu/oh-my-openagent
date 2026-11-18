@@ -19,7 +19,11 @@ export async function startCancelLane(worlds: HostWorld[], slots: number): Promi
   const world = await startHostWorld({ sessionProcesses: true, transcripts: true })
   worlds.push(world)
   const clock = manualRecoveryClock()
-  const options: ParentOptions = { settings: { default_concurrency: slots }, reattachDelaysMs: [0, 0], recoveryClock: clock }
+  const options: ParentOptions = {
+    settings: { default_concurrency: slots },
+    reattachDelaysMs: [0, 0],
+    recoveryClock: clock,
+  }
   return { world, parent: world.connect("parent-a", options), clock, options }
 }
 
@@ -74,5 +78,6 @@ export async function cutWithReopenHeld(world: HostWorld): Promise<void> {
 export async function cancelUnreachable(lane: CancelLane, record: TaskRecord): Promise<void> {
   await cutWithReopenHeld(lane.world)
   const cancelled = await bounded(runTaskCancel(lane.parent.manager, { task_id: record.task_id }), "task_cancel")
-  if (cancelled.details.kind !== "cancel_pending") throw new Error(`expected cancel_pending, got ${cancelled.details.kind}`)
+  if (cancelled.details.kind !== "cancel_pending")
+    throw new Error(`expected cancel_pending, got ${cancelled.details.kind}`)
 }

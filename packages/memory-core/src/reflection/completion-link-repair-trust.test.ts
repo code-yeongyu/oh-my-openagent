@@ -2,7 +2,18 @@ import { afterEach, describe, expect, it, setDefaultTimeout } from "bun:test"
 import { readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { validateCompletion } from "./completion-validation"
-import { LINK_TEST_TIMEOUT_MS, cleanupLinkFixtures, INVALID, PEM, commitAll, git, linkFixture as fixture, note, put, read } from "./completion-links.test-support"
+import {
+  LINK_TEST_TIMEOUT_MS,
+  cleanupLinkFixtures,
+  INVALID,
+  PEM,
+  commitAll,
+  git,
+  linkFixture as fixture,
+  note,
+  put,
+  read,
+} from "./completion-links.test-support"
 import { finalizeReflectionWorktree } from "./worktree"
 
 setDefaultTimeout(LINK_TEST_TIMEOUT_MS)
@@ -19,8 +30,16 @@ describe("only the gate's own link repair is exempt from a targeted run's scope 
     await commitAll(worktree.dir, "chore(dream): maintain the target")
     await put(worktree.dir, "system/persona.md", note("Persona", "rewritten\n"))
     await git(worktree.dir, "add", "-A")
-    await git(worktree.dir, "-c", "user.email=fixture@example.com", "-c", "user.name=fixture", "commit", "-qm",
-      "chore(memory): repoint links to removed notes\n\nOmo-Link-Repair: 1")
+    await git(
+      worktree.dir,
+      "-c",
+      "user.email=fixture@example.com",
+      "-c",
+      "user.name=fixture",
+      "commit",
+      "-qm",
+      "chore(memory): repoint links to removed notes\n\nOmo-Link-Repair: 1",
+    )
 
     // when
     const result = await finalizeReflectionWorktree(worktree, {
@@ -59,8 +78,15 @@ describe("only the gate's own link repair is exempt from a targeted run's scope 
 
   it("#given a non-UTF-8 note and a UTF-8 note linking a removed note #when validated #then only the UTF-8 note is repaired and the other keeps its bytes", async () => {
     // given
-    const worktree = await fixture({ "reference/x.md": note("X", "x\n"), "reference/user.md": note("User", "[[reference/x.md|x]]\n") })
-    const latin1 = Buffer.concat([Buffer.from(note("Legacy", "Caf")), Buffer.from([0xe9]), Buffer.from(" see [[reference/x.md|x]].\n")])
+    const worktree = await fixture({
+      "reference/x.md": note("X", "x\n"),
+      "reference/user.md": note("User", "[[reference/x.md|x]]\n"),
+    })
+    const latin1 = Buffer.concat([
+      Buffer.from(note("Legacy", "Caf")),
+      Buffer.from([0xe9]),
+      Buffer.from(" see [[reference/x.md|x]].\n"),
+    ])
     await writeFile(join(worktree.dir, "reference/legacy.md"), latin1)
     await git(worktree.dir, "rm", "-q", "reference/x.md")
     await commitAll(worktree.dir, "chore(dream): retire x")
@@ -78,7 +104,10 @@ describe("only the gate's own link repair is exempt from a targeted run's scope 
 
   it("#given a run whose link repair commit exists #when the same branch is validated twice #then both results are equal and name the repair", async () => {
     // given
-    const worktree = await fixture({ "reference/x.md": note("X", "x\n"), "reference/user.md": note("User", "[[reference/x.md|x]]\n") })
+    const worktree = await fixture({
+      "reference/x.md": note("X", "x\n"),
+      "reference/user.md": note("User", "[[reference/x.md|x]]\n"),
+    })
     await git(worktree.dir, "rm", "-q", "reference/x.md")
     await commitAll(worktree.dir, "chore(dream): retire x")
 
@@ -95,7 +124,10 @@ describe("only the gate's own link repair is exempt from a targeted run's scope 
 
   it("#given a run with a link repair and a dropped entry #when the same branch is validated twice #then both results keep the repair and the drop", async () => {
     // given
-    const worktree = await fixture({ "reference/x.md": note("X", "x\n"), "reference/user.md": note("User", "[[reference/x.md|x]]\n") })
+    const worktree = await fixture({
+      "reference/x.md": note("X", "x\n"),
+      "reference/user.md": note("User", "[[reference/x.md|x]]\n"),
+    })
     await git(worktree.dir, "rm", "-q", "reference/x.md")
     await put(worktree.dir, "reference/bad.md", note(INVALID, "bad\n"))
     await commitAll(worktree.dir, "chore(dream): retire x")

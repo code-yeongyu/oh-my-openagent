@@ -11,7 +11,9 @@ export async function resolveAutomationPR({ github, context, core }) {
     return pr
   }
   const { data: run } = await github.rest.actions.getWorkflowRun({
-    owner, repo, run_id: context.payload.workflow_run.id,
+    owner,
+    repo,
+    run_id: context.payload.workflow_run.id,
   })
   if (
     run.path !== ".github/workflows/pr-automation-signal.yml" ||
@@ -24,24 +26,30 @@ export async function resolveAutomationPR({ github, context, core }) {
   }
   // Fork runs can have an empty pull_requests array. The server-side head query
   // is only discovery; repository ID, current SHA, and base are checked below.
-  const candidates = run.pull_requests.length > 0
-    ? run.pull_requests
-    : await github.paginate(github.rest.pulls.list, {
-      owner, repo, state: "open",
-      head: `${run.head_repository.owner.login}:${run.head_branch}`,
-      per_page: 100,
-    })
+  const candidates =
+    run.pull_requests.length > 0
+      ? run.pull_requests
+      : await github.paginate(github.rest.pulls.list, {
+          owner,
+          repo,
+          state: "open",
+          head: `${run.head_repository.owner.login}:${run.head_branch}`,
+          per_page: 100,
+        })
   const current = []
   for (const candidate of candidates) {
     const { data: pr } = await github.rest.pulls.get({
-      owner, repo, pull_number: candidate.number,
+      owner,
+      repo,
+      pull_number: candidate.number,
     })
     if (
       pr.state === "open" &&
       pr.base.repo.full_name === `${owner}/${repo}` &&
       pr.head.repo?.id === run.head_repository.id &&
       pr.head.sha === run.head_sha
-    ) current.push(pr)
+    )
+      current.push(pr)
   }
   if (current.length === 0) {
     core.info("The PR closed or advanced; ignoring the stale signal.")
@@ -58,7 +66,9 @@ export async function prepareCLAEvent({ github, context, core, eventPath }) {
   // Hand API-derived PR metadata to the trusted signature-check step.
   // The issue_comment signing action uses its real GitHub event separately.
   const payload = {
-    action: "synchronize", number: pr.number, pull_request: pr,
+    action: "synchronize",
+    number: pr.number,
+    pull_request: pr,
     repository: pr.base.repo,
   }
   await writeFile(eventPath, JSON.stringify(payload), { mode: 0o600 })

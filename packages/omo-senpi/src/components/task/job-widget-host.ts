@@ -61,8 +61,8 @@ export interface JobWidgetSourcesApi {
 }
 
 export interface JobWidgetHostApi {
-    readonly setAuthorResolver?: (resolver: JobWidgetAuthorResolver | undefined) => () => void
-    readonly sources?: JobWidgetSourcesApi
+  readonly setAuthorResolver?: (resolver: JobWidgetAuthorResolver | undefined) => () => void
+  readonly sources?: JobWidgetSourcesApi
 }
 
 type TextTapConstructor = new (id: string, label: string) => JobWidgetTextTap
@@ -86,7 +86,10 @@ function buildJobWidgetHost(module: object): JobWidgetHostApi {
   const textTap: unknown = Reflect.get(module, "TextTap")
   return {
     ...(typeof setAuthorResolver === "function"
-      ? { setAuthorResolver: (resolver: JobWidgetAuthorResolver | undefined) => setAuthorResolver(resolver) as () => void }
+      ? {
+          setAuthorResolver: (resolver: JobWidgetAuthorResolver | undefined) =>
+            setAuthorResolver(resolver) as () => void,
+        }
       : {}),
     ...(typeof register === "function" && typeof textTap === "function"
       ? {

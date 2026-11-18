@@ -6,17 +6,20 @@ test("default skill HTTP client sends modern routing headers and terminates inpu
   const server = Bun.serve({
     port: 0,
     async fetch(request) {
-      const message = await request.json() as {
-        id: number | string; method: string; params?: Record<string, unknown>
+      const message = (await request.json()) as {
+        id: number | string
+        method: string
+        params?: Record<string, unknown>
       }
       requests.push({ ...message, headers: request.headers })
-      const result = message.method === "server/discover"
-        ? { resultType: "complete", supportedVersions: ["2026-07-28"], capabilities: { tools: {}, resources: {} } }
-        : message.method === "tools/list"
-          ? { resultType: "complete", tools: [] }
-          : message.method === "resources/read"
-            ? { resultType: "complete", contents: [] }
-          : { resultType: "input_required", inputRequests: {}, requestState: "opaque" }
+      const result =
+        message.method === "server/discover"
+          ? { resultType: "complete", supportedVersions: ["2026-07-28"], capabilities: { tools: {}, resources: {} } }
+          : message.method === "tools/list"
+            ? { resultType: "complete", tools: [] }
+            : message.method === "resources/read"
+              ? { resultType: "complete", contents: [] }
+              : { resultType: "input_required", inputRequests: {}, requestState: "opaque" }
       return Response.json({ jsonrpc: "2.0", id: message.id, result })
     },
   })
@@ -27,7 +30,12 @@ test("default skill HTTP client sends modern routing headers and terminates inpu
     expect(await manager.listTools(info, context)).toEqual([])
     expect(await manager.readResource(info, context, "file:///example")).toEqual([])
     await expect(manager.callTool(info, context, " \uC774\uB984 ", {})).rejects.toThrow("operation was terminated")
-    expect(requests.map((request) => request.method)).toEqual(["server/discover", "tools/list", "resources/read", "tools/call"])
+    expect(requests.map((request) => request.method)).toEqual([
+      "server/discover",
+      "tools/list",
+      "resources/read",
+      "tools/call",
+    ])
     for (const request of requests) {
       expect(request.headers.get("MCP-Protocol-Version")).toBe("2026-07-28")
       expect(request.headers.get("Mcp-Method")).toBe(request.method)
@@ -51,33 +59,49 @@ test("HTTP 400 UnsupportedProtocolVersion falls back to legacy initialization", 
     port: 0,
     async fetch(request) {
       if (request.method === "GET") return new Response(null, { status: 405 })
-      const message = await request.json() as {
-        id: number | string; method: string; params?: { _meta?: Record<string, unknown> }
+      const message = (await request.json()) as {
+        id: number | string
+        method: string
+        params?: { _meta?: Record<string, unknown> }
       }
       methods.push(message.method)
       if (message.method === "notifications/initialized") return new Response(null, { status: 202 })
       if (message.method === "server/discover") {
-        return Response.json({ jsonrpc: "2.0", id: message.id, result: {
-          resultType: "complete", supportedVersions: ["2026-07-28"], capabilities: { tools: {} },
-        } })
+        return Response.json({
+          jsonrpc: "2.0",
+          id: message.id,
+          result: {
+            resultType: "complete",
+            supportedVersions: ["2026-07-28"],
+            capabilities: { tools: {} },
+          },
+        })
       }
       if (message.params?._meta) {
-        return Response.json({ jsonrpc: "2.0", id: message.id,
-          error: { code: -32022, message: "Unsupported protocol version", data: { supported: ["2025-03-26"] } },
-        }, { status: 400 })
+        return Response.json(
+          {
+            jsonrpc: "2.0",
+            id: message.id,
+            error: { code: -32022, message: "Unsupported protocol version", data: { supported: ["2025-03-26"] } },
+          },
+          { status: 400 },
+        )
       }
-      const result = message.method === "initialize"
-        ? { protocolVersion: "2025-03-26", capabilities: { tools: {} }, serverInfo: { name: "legacy", version: "1" } }
-        : { tools: [] }
+      const result =
+        message.method === "initialize"
+          ? { protocolVersion: "2025-03-26", capabilities: { tools: {} }, serverInfo: { name: "legacy", version: "1" } }
+          : { tools: [] }
       return Response.json({ jsonrpc: "2.0", id: message.id, result })
     },
   })
   const manager = new SkillMcpManager()
   try {
-    expect(await manager.listTools(
-      { serverName: "fallback", skillName: "test", sessionID: "http" },
-      { skillName: "test", config: { url: server.url.href } },
-    )).toEqual([])
+    expect(
+      await manager.listTools(
+        { serverName: "fallback", skillName: "test", sessionID: "http" },
+        { skillName: "test", config: { url: server.url.href } },
+      ),
+    ).toEqual([])
     expect(methods).toEqual(["server/discover", "tools/list", "initialize", "notifications/initialized", "tools/list"])
   } finally {
     await manager.disconnectAll()

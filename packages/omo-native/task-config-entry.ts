@@ -46,7 +46,10 @@ export function resolveGlobalMemorySettings(input: { readonly env: OmoConfigEnv 
     cwd: directory,
     env: input.env,
     harness: "senpi",
-    fileSystem: { existsSync: (path) => userFiles.has(path) && existsSync(path), readFileSync: (path, encoding) => readFileSync(path, encoding) },
+    fileSystem: {
+      existsSync: (path) => userFiles.has(path) && existsSync(path),
+      readFileSync: (path, encoding) => readFileSync(path, encoding),
+    },
   })
   if (!loaded.sources.some((source) => source.loaded)) return undefined
   const memory = loaded.config.memory ?? OmoMemorySettingsSchema.parse({})
@@ -63,18 +66,32 @@ export type MemoryRuntimeCaps = {
 }
 
 /** Consumed by member access on the bundled task-config runtime (bin/lib/doctor-memory-runtime.js), which knip cannot trace. @public */
-export function resolveMemoryRuntimeCaps(input: { readonly cwd: string; readonly env: OmoConfigEnv }): MemoryRuntimeCaps {
-  const memory = loadOmoConfig({ cwd: input.cwd, env: input.env, harness: "senpi" }).config.memory ?? OmoMemorySettingsSchema.parse({})
+export function resolveMemoryRuntimeCaps(input: {
+  readonly cwd: string
+  readonly env: OmoConfigEnv
+}): MemoryRuntimeCaps {
+  const memory =
+    loadOmoConfig({ cwd: input.cwd, env: input.env, harness: "senpi" }).config.memory ??
+    OmoMemorySettingsSchema.parse({})
   const agents: Record<string, number> = {}
   const discardAgents: Record<string, boolean> = {}
   for (const [id, override] of Object.entries(memory.agents)) {
     if (override.runtime?.max_bytes !== undefined) agents[id] = override.runtime.max_bytes
-    if (override.runtime?.discard_unreflected_journals !== undefined) discardAgents[id] = override.runtime.discard_unreflected_journals
+    if (override.runtime?.discard_unreflected_journals !== undefined)
+      discardAgents[id] = override.runtime.discard_unreflected_journals
   }
-  return { maxBytes: memory.runtime.max_bytes, agents, discardUnreflectedJournals: memory.runtime.discard_unreflected_journals, discardAgents }
+  return {
+    maxBytes: memory.runtime.max_bytes,
+    agents,
+    discardUnreflectedJournals: memory.runtime.discard_unreflected_journals,
+    discardAgents,
+  }
 }
 
-export function resolveDaemonTaskSettings(input: { readonly cwd: string; readonly env: OmoConfigEnv }): DaemonTaskSettings {
+export function resolveDaemonTaskSettings(input: {
+  readonly cwd: string
+  readonly env: OmoConfigEnv
+}): DaemonTaskSettings {
   // The same config view the extension's task runner loads (omo-senpi config-resolution: harness "senpi").
   const loaded = loadOmoConfig({ cwd: input.cwd, env: input.env, harness: "senpi" })
   // `loaded.config` fills schema defaults, so whether a layer SET a key is read from the loaded layers

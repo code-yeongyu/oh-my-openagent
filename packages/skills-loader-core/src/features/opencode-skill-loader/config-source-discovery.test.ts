@@ -13,10 +13,7 @@ let TEST_DIR = ""
 
 function writeSkill(path: string, name: string, description: string): void {
   mkdirSync(path, { recursive: true })
-  writeFileSync(
-    join(path, "SKILL.md"),
-    `---\nname: ${name}\ndescription: ${description}\n---\nBody\n`,
-  )
+  writeFileSync(join(path, "SKILL.md"), `---\nname: ${name}\ndescription: ${description}\n---\nBody\n`)
 }
 
 describe("config source discovery", () => {
@@ -82,7 +79,10 @@ describe("config source discovery", () => {
     })
     // A ~/ source only comes from the user's own config file; config validation tags it the same way (#10693).
     setSkillSourceProvenance(config, {
-      kind: "user", selectedRoot: join(TEST_DIR, "config"), projectRoot: TEST_DIR, userRoots: [homeSkillsDir],
+      kind: "user",
+      selectedRoot: join(TEST_DIR, "config"),
+      projectRoot: TEST_DIR,
+      userRoots: [homeSkillsDir],
     })
 
     try {

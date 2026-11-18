@@ -26,7 +26,11 @@ function toRunning(harness: SteeringHarness, record: TaskRecord): void {
 
 function toCompleted(harness: SteeringHarness, record: TaskRecord): void {
   toRunning(harness, record)
-  harness.store.transition(record.task_id, { type: "complete", timestamp: new Date().toISOString(), final_response: "first pass" })
+  harness.store.transition(record.task_id, {
+    type: "complete",
+    timestamp: new Date().toISOString(),
+    final_response: "first pass",
+  })
 }
 
 const flavors: RunnerFlavor[] = ["in-process", "rpc"]
@@ -41,7 +45,11 @@ describe.each(flavors)("steering engine over the %s runner fake", (flavor) => {
     harness.setLive(record.task_id, fake.handle)
 
     // when
-    const outcome = await harness.engine.sendToTask({ idOrName: record.task_id, message: "keep going", deliverAs: "steer" })
+    const outcome = await harness.engine.sendToTask({
+      idOrName: record.task_id,
+      message: "keep going",
+      deliverAs: "steer",
+    })
 
     // then
     expect(outcome.kind).toBe("steered")
@@ -58,7 +66,11 @@ describe.each(flavors)("steering engine over the %s runner fake", (flavor) => {
     harness.setLive(record.task_id, fake.handle)
     harness.setEvicting(record.task_id, true)
 
-    const outcome = await harness.engine.sendToTask({ idOrName: record.task_id, message: "too late", deliverAs: "steer" })
+    const outcome = await harness.engine.sendToTask({
+      idOrName: record.task_id,
+      message: "too late",
+      deliverAs: "steer",
+    })
 
     expect(outcome.kind).toBe("not_continuable")
     expect(fake.steerCalls).toEqual([])
@@ -84,18 +96,27 @@ describe.each(flavors)("steering engine over the %s runner fake", (flavor) => {
   test("#given two overlapping sends #when the first settles #then pending state remains true until the second settles", async () => {
     let releaseFirst!: () => void
     let releaseSecond!: () => void
-    const firstGate = new Promise<void>((resolve) => { releaseFirst = resolve })
-    const secondGate = new Promise<void>((resolve) => { releaseSecond = resolve })
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve
+    })
+    const secondGate = new Promise<void>((resolve) => {
+      releaseSecond = resolve
+    })
     const harness = makeHarness()
     const record = harness.seedRecord()
     toRunning(harness, record)
     let started = 0
     let bothStarted!: () => void
-    const startedSignal = new Promise<void>((resolve) => { bothStarted = resolve })
-    const fake = makeFakeHandle(record.task_id, flavor, { followUpGates: [firstGate, secondGate], onFollowUpStart: () => {
-      started += 1
-      if (started === 2) bothStarted()
-    } })
+    const startedSignal = new Promise<void>((resolve) => {
+      bothStarted = resolve
+    })
+    const fake = makeFakeHandle(record.task_id, flavor, {
+      followUpGates: [firstGate, secondGate],
+      onFollowUpStart: () => {
+        started += 1
+        if (started === 2) bothStarted()
+      },
+    })
     harness.setLive(record.task_id, fake.handle)
     const first = harness.engine.sendToTask({ idOrName: record.task_id, message: "one" })
     const second = harness.engine.sendToTask({ idOrName: record.task_id, message: "two" })
@@ -251,7 +272,11 @@ describe("steering engine scope + resolution guards", () => {
     harness.setLive(record.task_id, makeFakeHandle(record.task_id, "in-process").handle)
 
     // when
-    const outcome = await harness.engine.sendToTask({ idOrName: record.task_id, message: "hi", callerSessionId: "parent-2" })
+    const outcome = await harness.engine.sendToTask({
+      idOrName: record.task_id,
+      message: "hi",
+      callerSessionId: "parent-2",
+    })
 
     // then
     if (outcome.kind !== "scope_denied") throw new Error("expected scope_denied")
@@ -267,7 +292,12 @@ describe("steering engine scope + resolution guards", () => {
     harness.setLive(record.task_id, fake.handle)
 
     // when
-    const outcome = await harness.engine.sendToTask({ idOrName: record.task_id, message: "hi", callerSessionId: "parent-2", allScope: true })
+    const outcome = await harness.engine.sendToTask({
+      idOrName: record.task_id,
+      message: "hi",
+      callerSessionId: "parent-2",
+      allScope: true,
+    })
 
     // then
     expect(outcome.kind).toBe("steered")

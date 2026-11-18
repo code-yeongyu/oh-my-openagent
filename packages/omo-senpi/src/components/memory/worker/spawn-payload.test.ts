@@ -16,20 +16,35 @@ async function payload(dream: boolean) {
   const root = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-audit-payload-")))
   roots.push(root)
   const repo = new GitMemoryRepo({ dir: join(root, "repo"), agentId: "audit-fixture" })
-  await repo.init({ seedFiles: [{ relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\nFixture persona.\n" }] })
+  await repo.init({
+    seedFiles: [{ relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\nFixture persona.\n" }],
+  })
   const worktree = await createReflectionWorktree(repo, "audit-fixture", join(root, "worktrees"))
   await mkdir(join(worktree.dir, "reference"))
-  await writeFile(join(worktree.dir, "reference/only-worktree.md"), "---\ndescription: Legacy target\n---\n[[notes/token=abc123456.md]]\n")
+  await writeFile(
+    join(worktree.dir, "reference/only-worktree.md"),
+    "---\ndescription: Legacy target\n---\n[[notes/token=abc123456.md]]\n",
+  )
   try {
     const prepared = await prepareReflectionSpawn({
-      run: { runId: dream ? "dream-audit" : "reflection-audit", request: dream
-        ? { trigger: "dream", origin: "manual", conversationIds: [], snapshots: [] }
-        : { trigger: "manual", conversationIds: [], snapshots: [] } },
-      worktree, reflectionSessionsDir: join(root, "sessions"), category: "quick", model: "fixture/model",
-      env: {}, mergePolicy: "auto", skillsUsageSource: join(root, "skills.json"),
-      memoryUsageSource: join(root, "usage.json"), dreamStateSource: join(root, "dream.json"),
+      run: {
+        runId: dream ? "dream-audit" : "reflection-audit",
+        request: dream
+          ? { trigger: "dream", origin: "manual", conversationIds: [], snapshots: [] }
+          : { trigger: "manual", conversationIds: [], snapshots: [] },
+      },
+      worktree,
+      reflectionSessionsDir: join(root, "sessions"),
+      category: "quick",
+      model: "fixture/model",
+      env: {},
+      mergePolicy: "auto",
+      skillsUsageSource: join(root, "skills.json"),
+      memoryUsageSource: join(root, "usage.json"),
+      dreamStateSource: join(root, "dream.json"),
       peoplePolicy: { enabled: false, max_entries: 40, max_entry_chars: 200 },
-      systemTokenBudget: 30000, systemTokenTarget: 24000,
+      systemTokenBudget: 30000,
+      systemTokenTarget: 24000,
     })
     return { prepared, parentRepo: repo.dir }
   } finally {

@@ -1,6 +1,11 @@
 import { existsSync } from "node:fs"
 
-import { getBoulderFilePath, getWorkForSession, readBoulderState, type BoulderWorkStatus } from "@oh-my-opencode/boulder-state"
+import {
+  getBoulderFilePath,
+  getWorkForSession,
+  readBoulderState,
+  type BoulderWorkStatus,
+} from "@oh-my-opencode/boulder-state"
 
 /**
  * Tells the engine's session lifecycle (senpi#3864) when this session's own ulw-execute work reaches its stop

@@ -22,7 +22,14 @@ export const ADOPTION_MARKER = ".adopted-from-omo-flat"
  * configuration files: sessions, caches and logs stay where they are, so startup never turns into
  * an unbounded copy.
  */
-export const ADOPTED_STATE_FILES = ["settings.json", "auth.json", "models.json", "models-store.json", "mcp.json", "trust.json"]
+export const ADOPTED_STATE_FILES = [
+  "settings.json",
+  "auth.json",
+  "models.json",
+  "models-store.json",
+  "mcp.json",
+  "trust.json",
+]
 
 /** Windows launches carry the runtime home in the environment, which must outrank os.homedir. */
 export function runtimeHome(env = process.env) {
@@ -91,6 +98,18 @@ function backfillSettings(source, target) {
  */
 /** @typedef {{ adopted: boolean, copied: string[], backfilled: string[] }} AdoptionResult */
 
+/**
+ * Creates the agent dir the engine will use when it does not exist yet, owner-only (0700), so a
+ * group-writable umask (002, common on shared and default-group Linux setups) cannot leave it open.
+ * The engine refuses to publish its keys under a dir any group or other user can write
+ * (unsafe_key_record), so a dir created under the umask stopped a fresh install's first boot (#13958).
+ * An EXISTING dir is never changed: one the user opened up is still refused, which is the safety check.
+ */
+export function ensureAgentDir(agentDir) {
+  if (existsSync(agentDir)) return
+  mkdirSync(agentDir, { recursive: true, mode: 0o700 })
+}
+
 /** @returns {AdoptionResult} */
 export function adoptLegacyFlatState(env = process.env, home = runtimeHome(env)) {
   /** @type {AdoptionResult} */
@@ -108,7 +127,7 @@ export function adoptLegacyFlatState(env = process.env, home = runtimeHome(env))
     if (!existsSync(source)) continue
     const target = join(canonical, file)
     if (!existsSync(target)) {
-      mkdirSync(canonical, { recursive: true })
+      ensureAgentDir(canonical)
       copyFileSync(source, target)
       result.copied.push(file)
       continue
@@ -121,7 +140,7 @@ export function adoptLegacyFlatState(env = process.env, home = runtimeHome(env))
 
   result.adopted = result.copied.length > 0 || result.backfilled.length > 0
   if (!parseFailed && (result.adopted || existsSync(canonical))) {
-    mkdirSync(canonical, { recursive: true })
+    ensureAgentDir(canonical)
     writeFileSync(join(canonical, ADOPTION_MARKER), `${flat}\n`)
   }
   return result

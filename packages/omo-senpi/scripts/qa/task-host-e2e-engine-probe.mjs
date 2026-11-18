@@ -34,7 +34,9 @@ export async function probeSessionContext(socketPath) {
     }
     socket.setEncoding("utf8")
     socket.on("error", (error) => finish({ probe: `unavailable: ${error.message}` }))
-    socket.on("connect", () => socket.write(`${JSON.stringify({ id: "qa-census", type: "list_sessions", include_workers: true })}\n`))
+    socket.on("connect", () =>
+      socket.write(`${JSON.stringify({ id: "qa-census", type: "list_sessions", include_workers: true })}\n`),
+    )
     socket.on("data", (chunk) => {
       buffer += chunk
       let newline
@@ -42,7 +44,11 @@ export async function probeSessionContext(socketPath) {
         const line = buffer.slice(0, newline)
         buffer = buffer.slice(newline + 1)
         let row
-        try { row = JSON.parse(line) } catch { continue }
+        try {
+          row = JSON.parse(line)
+        } catch {
+          continue
+        }
         if (row.id !== "qa-census") continue
         if (row.success !== true) return finish({ probe: `unavailable: ${row.error ?? "census rejected"}` })
         const data = row.data

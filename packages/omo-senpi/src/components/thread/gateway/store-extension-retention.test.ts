@@ -11,7 +11,10 @@ const DAY = 24 * 60 * 60 * 1000
 const moduleUrl = new URL("./testing/store-extension.mjs", import.meta.url).href
 
 let harness: GatewayHarness | undefined
-afterEach(async () => { await harness?.dispose(); harness = undefined })
+afterEach(async () => {
+  await harness?.dispose()
+  harness = undefined
+})
 
 function insertDelivery(db: Database, id: string, seq: number, updatedAt: number): void {
   db.run(
@@ -28,11 +31,31 @@ function insertBinding(db: Database, id: string, session: string, updatedAt: num
 }
 
 function ids(db: Database, sql: string): string[] {
-  return db.query(sql).all().map((row) => String(Object.values(row as Record<string, unknown>)[0]))
+  return db
+    .query(sql)
+    .all()
+    .map((row) => String(Object.values(row as Record<string, unknown>)[0]))
 }
 
 async function bindSomething(store: GatewayStore, now: number, chat: string) {
-  const bound = await store.bind({ now, receipt: null, binding: { platform: "custom", account_id: "bot", chat_id: chat, thread_id: "@chat", root_message_id: null, progress_message_id: null, session_durable_id: "C", direction: { inbound: true, outbound: true }, inbound_mode: "auto", outbound_events: ["report"], policy_id: "default", ttl_seconds: null } })
+  const bound = await store.bind({
+    now,
+    receipt: null,
+    binding: {
+      platform: "custom",
+      account_id: "bot",
+      chat_id: chat,
+      thread_id: "@chat",
+      root_message_id: null,
+      progress_message_id: null,
+      session_durable_id: "C",
+      direction: { inbound: true, outbound: true },
+      inbound_mode: "auto",
+      outbound_events: ["report"],
+      policy_id: "default",
+      ttl_seconds: null,
+    },
+  })
   if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
   return bound.binding
 }
@@ -53,29 +76,74 @@ test("#given extension rows and the core rows an extension still acts on #when t
   h.phantom("target")
   const t0 = h.clock.now
   const store = h.store()
-  expect(await store.registerStoreExtension({
-    name: "alpha",
-    moduleUrl,
-    migrations: [[
-      "CREATE TABLE alpha_items (id INTEGER PRIMARY KEY, value TEXT)",
-      "CREATE TABLE alpha_refs (id INTEGER PRIMARY KEY, binding_id TEXT REFERENCES bindings ON DELETE CASCADE)",
-    ]],
-  })).toEqual({ kind: "ok", value: { version: 1 } })
+  expect(
+    await store.registerStoreExtension({
+      name: "alpha",
+      moduleUrl,
+      migrations: [
+        [
+          "CREATE TABLE alpha_items (id INTEGER PRIMARY KEY, value TEXT)",
+          "CREATE TABLE alpha_refs (id INTEGER PRIMARY KEY, binding_id TEXT REFERENCES bindings ON DELETE CASCADE)",
+        ],
+      ],
+    }),
+  ).toEqual({ kind: "ok", value: { version: 1 } })
   const bindChat = async (chat: string) => {
-    const bound = await core<{ kind: string; binding: { binding_id: string; revision: number } }>(store, "bind", { principal: "test", binding: { platform: "custom", account_id: "bot", chat_id: chat, session_durable_id: "target", ttl_seconds: null } })
+    const bound = await core<{ kind: string; binding: { binding_id: string; revision: number } }>(store, "bind", {
+      principal: "test",
+      binding: {
+        platform: "custom",
+        account_id: "bot",
+        chat_id: chat,
+        session_durable_id: "target",
+        ttl_seconds: null,
+      },
+    })
     if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
     return bound.binding
   }
   // Closed, but the extension still has a pending outbox row to post and ack (the row's own
   // lifetime is the outbox retention; the sweep keeps its binding while it exists).
   const closed = await bindChat("closed")
-  expect((await store.report({ now: t0, receipt: null, origin_delivery_ids: [], session_durable_id: "target", binding_id: closed.binding_id, event: "report", text: "pending report", ui_request_id: null, ui_request_kind: null })).kind).toBe("ok")
-  expect(await core(store, "unbind", { principal: "test", binding_id: closed.binding_id, expected_revision: closed.revision })).toMatchObject({ kind: "ok", binding: { status: "detached" } })
+  expect(
+    (
+      await store.report({
+        now: t0,
+        receipt: null,
+        origin_delivery_ids: [],
+        session_durable_id: "target",
+        binding_id: closed.binding_id,
+        event: "report",
+        text: "pending report",
+        ui_request_id: null,
+        ui_request_kind: null,
+      })
+    ).kind,
+  ).toBe("ok")
+  expect(
+    await core(store, "unbind", {
+      principal: "test",
+      binding_id: closed.binding_id,
+      expected_revision: closed.revision,
+    }),
+  ).toMatchObject({ kind: "ok", binding: { status: "detached" } })
   // Active, with nothing else pointing at it.
   const idle = await bindChat("idle")
   // Active, with an undelivered message the extension enqueued.
-  const made = await store.extensionCall<{ bound: { binding: { binding_id: string } }; sent: { kind: string; delivery_id?: string } }>("alpha", "bindThenEnqueue", {
-    bind: { principal: "test", binding: { platform: "custom", account_id: "bot", chat_id: "busy", session_durable_id: "target", ttl_seconds: null } },
+  const made = await store.extensionCall<{
+    bound: { binding: { binding_id: string } }
+    sent: { kind: string; delivery_id?: string }
+  }>("alpha", "bindThenEnqueue", {
+    bind: {
+      principal: "test",
+      binding: {
+        platform: "custom",
+        account_id: "bot",
+        chat_id: "busy",
+        session_durable_id: "target",
+        ttl_seconds: null,
+      },
+    },
     address: { platform: "custom", account_id: "bot", chat_id: "busy", thread_id: "@chat" },
     send: { event_id: "evt-1", text: "hello" },
   })
@@ -87,7 +155,12 @@ test("#given extension rows and the core rows an extension still acts on #when t
   // which the extension does not own: no extension row can hold one, so the sweep can neither
   // cascade into extension rows nor be blocked by them.
   for (const value of [idle.binding_id, null]) {
-    expect(await store.extensionCall("alpha", "sql", { sql: "INSERT INTO alpha_refs (binding_id) VALUES (?)", params: [value] })).toMatchObject({ kind: "refused", code: "extension_schema_violation" })
+    expect(
+      await store.extensionCall("alpha", "sql", {
+        sql: "INSERT INTO alpha_refs (binding_id) VALUES (?)",
+        params: [value],
+      }),
+    ).toMatchObject({ kind: "refused", code: "extension_schema_violation" })
   }
   const db = new Database(gatewayDatabasePath(h.agentDir))
   try {
@@ -102,8 +175,13 @@ test("#given extension rows and the core rows an extension still acts on #when t
   const check = new Database(gatewayDatabasePath(h.agentDir))
   try {
     expect({
-      deliveries: check.query("SELECT state FROM deliveries WHERE delivery_id IN (?, 'd-old')").all(made.value.sent.delivery_id ?? ""),
-      bindings: ids(check, `SELECT binding_id FROM bindings WHERE binding_id IN ('${kept.join("', '")}', 'bnd-old') ORDER BY binding_id`),
+      deliveries: check
+        .query("SELECT state FROM deliveries WHERE delivery_id IN (?, 'd-old')")
+        .all(made.value.sent.delivery_id ?? ""),
+      bindings: ids(
+        check,
+        `SELECT binding_id FROM bindings WHERE binding_id IN ('${kept.join("', '")}', 'bnd-old') ORDER BY binding_id`,
+      ),
       alpha_items: check.query("SELECT value FROM alpha_items ORDER BY id").all(),
       alpha_refs: check.query("SELECT id FROM alpha_refs").all(),
       closed_outbox: check.query("SELECT state FROM outbox WHERE binding_id = ?").all(closed.binding_id),
@@ -117,7 +195,9 @@ test("#given extension rows and the core rows an extension still acts on #when t
   } finally {
     check.close()
   }
-  expect(await core(store, "bindingFor", { platform: "custom", account_id: "bot", chat_id: "idle", thread_id: "@chat" })).toMatchObject({ binding_id: idle.binding_id, status: "active" })
+  expect(
+    await core(store, "bindingFor", { platform: "custom", account_id: "bot", chat_id: "idle", thread_id: "@chat" }),
+  ).toMatchObject({ binding_id: idle.binding_id, status: "active" })
 })
 
 test("#given more expired receipts than one batch, an old detached binding holding the newest key, and an extension's own rows #when extension operations sweep through the joined context #then each call deletes at most one receipt batch, the next call sweeps again at once, the extension's rows stay, and a later binding takes a key above the deleted one", async () => {
@@ -125,7 +205,15 @@ test("#given more expired receipts than one batch, an old detached binding holdi
   h.phantom("target")
   const t0 = h.clock.now
   const store = h.store()
-  expect((await store.registerStoreExtension({ name: "alpha", moduleUrl, migrations: [["CREATE TABLE alpha_items (id INTEGER PRIMARY KEY, value TEXT)"]] })).kind).toBe("ok")
+  expect(
+    (
+      await store.registerStoreExtension({
+        name: "alpha",
+        moduleUrl,
+        migrations: [["CREATE TABLE alpha_items (id INTEGER PRIMARY KEY, value TEXT)"]],
+      })
+    ).kind,
+  ).toBe("ok")
   const binding = await bindSomething(store, t0, "first")
   await sql(store, "INSERT INTO alpha_items (id, value) VALUES (1, 'kept'), (2, 'also kept')")
   const total = RETENTION_SWEEP_BATCH + 44
@@ -135,7 +223,10 @@ test("#given more expired receipts than one batch, an old detached binding holdi
     db.run("PRAGMA busy_timeout = 5000")
     db.transaction(() => {
       for (let index = 0; index < total; index++) {
-        db.run("INSERT INTO receipts (principal, operation, idempotency_key, args_hash, status, delivery_id, owner_instance, created_at, updated_at, expires_at) VALUES ('session:A', 'thread_rename', ?, 'h', 'completed', NULL, 'i', ?, ?, ?)", [`k-${index}`, t0, t0, t0 + DAY])
+        db.run(
+          "INSERT INTO receipts (principal, operation, idempotency_key, args_hash, status, delivery_id, owner_instance, created_at, updated_at, expires_at) VALUES ('session:A', 'thread_rename', ?, 'h', 'completed', NULL, 'i', ?, ?, ?)",
+          [`k-${index}`, t0, t0, t0 + DAY],
+        )
       }
     })()
     insertBinding(db, "bnd-old", "S-old", t0)
@@ -148,7 +239,9 @@ test("#given more expired receipts than one batch, an old detached binding holdi
     const read = new Database(gatewayDatabasePath(h.agentDir))
     try {
       return {
-        expired: Number((read.query("SELECT COUNT(*) AS n FROM receipts WHERE expires_at <= ?").get(h.clock.now) as { n: number }).n),
+        expired: Number(
+          (read.query("SELECT COUNT(*) AS n FROM receipts WHERE expires_at <= ?").get(h.clock.now) as { n: number }).n,
+        ),
         maxSeq: Number((read.query("SELECT MAX(seq) AS n FROM bindings").get() as { n: number }).n),
         old: read.query("SELECT binding_id FROM bindings WHERE binding_id = 'bnd-old'").all().length,
       }
@@ -157,21 +250,40 @@ test("#given more expired receipts than one batch, an old detached binding holdi
     }
   }
   const page = async () => {
-    expect(await store.extensionCall("alpha", "core", { op: "outboxPending", request: { binding_id: binding.binding_id } })).toMatchObject({ kind: "ok", value: { kind: "ok" } })
+    expect(
+      await store.extensionCall("alpha", "core", { op: "outboxPending", request: { binding_id: binding.binding_id } }),
+    ).toMatchObject({ kind: "ok", value: { kind: "ok" } })
   }
   await page()
   const afterFirst = check()
   await page()
   const afterSecond = check()
-  expect({ afterFirst: afterFirst.expired, afterSecond: afterSecond.expired, oldBindingLeft: afterFirst.old }).toEqual({ afterFirst: total - RETENTION_SWEEP_BATCH, afterSecond: 0, oldBindingLeft: 0 })
+  expect({ afterFirst: afterFirst.expired, afterSecond: afterSecond.expired, oldBindingLeft: afterFirst.old }).toEqual({
+    afterFirst: total - RETENTION_SWEEP_BATCH,
+    afterSecond: 0,
+    oldBindingLeft: 0,
+  })
   // The deleted binding held the newest key, so only AUTOINCREMENT keeps the next key above it.
   expect(afterSecond.maxSeq).toBeLessThan(oldSeq)
-  const bound = await core<{ kind: string; binding: { binding_id: string } }>(store, "bind", { principal: "test", binding: { platform: "custom", account_id: "bot", chat_id: "later", session_durable_id: "target", ttl_seconds: null } })
+  const bound = await core<{ kind: string; binding: { binding_id: string } }>(store, "bind", {
+    principal: "test",
+    binding: {
+      platform: "custom",
+      account_id: "bot",
+      chat_id: "later",
+      session_durable_id: "target",
+      ttl_seconds: null,
+    },
+  })
   expect(bound.kind).toBe("ok")
   const read = new Database(gatewayDatabasePath(h.agentDir))
   try {
     expect({
-      laterSeq: Number((read.query("SELECT seq FROM bindings WHERE binding_id = ?").get(bound.binding.binding_id) as { seq: number }).seq) > oldSeq,
+      laterSeq:
+        Number(
+          (read.query("SELECT seq FROM bindings WHERE binding_id = ?").get(bound.binding.binding_id) as { seq: number })
+            .seq,
+        ) > oldSeq,
       alpha_items: read.query("SELECT value FROM alpha_items ORDER BY id").all(),
     }).toEqual({ laterSeq: true, alpha_items: [{ value: "kept" }, { value: "also kept" }] })
   } finally {
@@ -183,7 +295,15 @@ test("#given a sweep that just ran #when an extension operation reads the outbox
   const h = (harness = createGatewayHarness())
   const t0 = h.clock.now
   const store = h.store()
-  expect((await store.registerStoreExtension({ name: "alpha", moduleUrl, migrations: [["CREATE TABLE alpha_items (id INTEGER PRIMARY KEY, value TEXT)"]] })).kind).toBe("ok")
+  expect(
+    (
+      await store.registerStoreExtension({
+        name: "alpha",
+        moduleUrl,
+        migrations: [["CREATE TABLE alpha_items (id INTEGER PRIMARY KEY, value TEXT)"]],
+      })
+    ).kind,
+  ).toBe("ok")
   const binding = await bindSomething(store, t0, "first")
   const db = new Database(gatewayDatabasePath(h.agentDir))
   try {
@@ -193,12 +313,19 @@ test("#given a sweep that just ran #when an extension operation reads the outbox
     db.close()
   }
   const page = async () => {
-    const result = await store.extensionCall("alpha", "core", { op: "outboxPending", request: { binding_id: binding.binding_id } })
+    const result = await store.extensionCall("alpha", "core", {
+      op: "outboxPending",
+      request: { binding_id: binding.binding_id },
+    })
     expect(result).toMatchObject({ kind: "ok", value: { kind: "ok" } })
   }
   const remaining = () => {
     const check = new Database(gatewayDatabasePath(h.agentDir))
-    try { return ids(check, "SELECT delivery_id FROM deliveries") } finally { check.close() }
+    try {
+      return ids(check, "SELECT delivery_id FROM deliveries")
+    } finally {
+      check.close()
+    }
   }
   await page()
   expect(remaining()).toEqual(["d-expired"])

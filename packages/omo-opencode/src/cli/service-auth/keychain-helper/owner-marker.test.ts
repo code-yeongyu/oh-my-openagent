@@ -1,5 +1,10 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { createHarness, type Harness, isDarwin, userSearchList } from "../../../../../omo-native/test/keychain-helper.test-support"
+import {
+  createHarness,
+  type Harness,
+  isDarwin,
+  userSearchList,
+} from "../../../../../omo-native/test/keychain-helper.test-support"
 import { probeOwnerMarker } from "./owner-marker"
 
 const OWNED = "e".repeat(64)
@@ -20,7 +25,10 @@ describe.skipIf(!isDarwin)("owner-marker probe without the helper (#11262 addend
   })
 
   test("#given a helper-owned item, a foreign item and no item #when probed by attributes only #then each is told apart and no secret is read", async () => {
-    expect((await harness.run({ v: 1, verb: "write", account: OWNED, value: "dummy-owned" })).reply).toEqual({ ok: true, created: true })
+    expect((await harness.run({ v: 1, verb: "write", account: OWNED, value: "dummy-owned" })).reply).toEqual({
+      ok: true,
+      created: true,
+    })
     expect(await harness.fixture("add", FOREIGN, "dummy-foreign")).toContain("status 0")
 
     expect(await probeOwnerMarker("omo-cli", OWNED, harness.keychain)).toBe("helper-owned")

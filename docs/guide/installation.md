@@ -556,7 +556,7 @@ After OpenCode sees the provider, reference models with the OpenCode provider pr
 ```json
 {
   "agents": {
-    "plan-consultant": { "model": "amazon-bedrock/us.anthropic.claude-fable-5-1", "reasoning": "max" },
+    "plan-consultant": { "model": "amazon-bedrock/us.anthropic.claude-fable-5-2", "reasoning": "max" },
     "plan-reviewer": { "model": "amazon-bedrock/us.anthropic.claude-opus-5-5" }
   },
   "categories": {
@@ -601,7 +601,7 @@ When OpenCode Zen is the best available provider, common examples:
 
 | Agent / category      | Model                                                |
 | --------------------- | ---------------------------------------------------- |
-| **plan-consultant**   | `opencode/claude-fable-5-1` (max)                    |
+| **plan-consultant**   | `opencode/claude-fable-5-2` (max)                    |
 | **plan-reviewer**     | `opencode/gpt-6-astra` (high)                        |
 | **deep** (category)   | `opencode/gpt-6-astra` (high)                        |
 | main agent (session)  | `opencode/claude-opus-5-5` or `opencode-go/kimi-k3.1-pro` |
@@ -634,13 +634,15 @@ Not all models behave the same way. Understanding "similar" families helps you m
 
 | Model             | Provider(s)                      | Notes                                                                                                       |
 | ----------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| **GPT-6 Astra**   | openai, chatgpt-subscription, github-copilot, opencode | OpenAI's most capable model and the recommended GPT flagship. Default for the Plan Reviewer (xhigh, high on Copilot), `ultrabrain` (max), and `deep-high` (high). `gpt-6-astra-fast` is the Fast-mode variant. Manual override option for the main agent and the `architect` category. |
+| **GPT-6.2 Astra** | openai, chatgpt-subscription, opencode | OpenAI's most capable model and the recommended GPT flagship. Default for the Plan Reviewer (xhigh), `ultrabrain` (max), `deep-high` (high) and both Obsessive profiles. Accepts reasoning effort `low` through `max` (no `none` or `minimal`), no temperature, 1.05M context. `gpt-6.2-astra-fast` is the Fast-mode variant. |
+| **GPT-6 Astra**   | openai, chatgpt-subscription, github-copilot, opencode | The previous flagship, kept right behind every GPT-6.2 Astra rung: it serves those lanes on GitHub Copilot (which does not serve 6.2) and on an engine without the 6.2 rows. `gpt-6-astra-fast` is the Fast-mode variant. |
 | **GPT-6 Sol**     | openai, chatgpt-subscription, github-copilot, opencode | The GPT-6 workhorse tier and the default for Hephaestus (medium), with GPT-5.6 Sol kept as its fallback rung. Accepts reasoning effort `none` through `max`, no temperature, 1.05M context. `gpt-6-sol-fast` is the Fast-mode variant. |
-| **GPT-6.1 Sol**   | openai, chatgpt-subscription | The `deep-low` category model (medium), then its Fast tier `gpt-6.1-sol-fast`, with GPT-5.6 Sol kept behind both. It is also the `unspecified-low` GPT rung (medium, ahead of GPT-5.6 Terra). Its Fast tier is the first Sol rung on the Obsessive · Normal model profile, with plain GPT-6.1 Sol right behind it. Accepts reasoning effort `low` through `max` (no `none` or `minimal`), no temperature, 400K context. |
+| **GPT-6.2 Sol**   | openai, chatgpt-subscription | The `deep-low` category model (medium), then its Fast tier `gpt-6.2-sol-fast`. It is also the `unspecified-low` GPT rung (medium). Its Fast tier is the first Sol rung on the Obsessive · Normal model profile, with plain GPT-6.2 Sol right behind it. Accepts reasoning effort `low` through `max` (no `none` or `minimal`), no temperature. |
+| **GPT-6.1 Sol**   | openai, chatgpt-subscription | The previous Sol: kept right behind the GPT-6.2 Sol rungs in `deep-low`, `unspecified-low` and Obsessive · Normal, with GPT-5.6 Sol behind it. Accepts reasoning effort `low` through `max` (no `none` or `minimal`), no temperature, 400K context. |
 | **GPT-6 Luna**    | openai, chatgpt-subscription             | The GPT-6 light tier. `gpt-6-luna-fast` (low) is the OpenAI rung for `explore`, `librarian` and the `quick` category. Same effort ladder and limits as GPT-6 Sol. |
 | **GPT-5.6 Sol**   | openai, chatgpt-subscription, github-copilot, opencode | The `deep-low` fallback under GPT-6.1 Sol (medium), and the only `deep-low` rung GitHub Copilot and OpenCode Zen serve; its Fast tier `gpt-5.6-sol-fast` is the last rung on the OpenAI lanes. Also the fallback rung under GPT-6 Sol for Hephaestus, and under GPT-6 Astra for `ultrabrain` (max). |
 | **GPT-5.6 Terra** | openai, chatgpt-subscription, github-copilot | GPT-5.6 mid-tier. No longer a default for any agent; an optional balanced override.                    |
-| **GPT-5.6 Luna**  | openai, chatgpt-subscription             | GPT-5.6 light tier. Not the `unspecified-low` default: that category starts at `claude-sonnet-5-5 (medium)`, then `xiaomi\|opencode-go/mimo-v2.6-pro (max)`, then `grok-4.7 (xhigh)`, then `glm-5.3 (high)`, then `gpt-6.1-sol (medium)` on the OpenAI lanes, then `gpt-5.6-sol (medium)`. |
+| **GPT-5.6 Luna**  | openai, chatgpt-subscription             | GPT-5.6 light tier. Not the `unspecified-low` default: that category starts at `claude-sonnet-5-5 (medium)`, then `xiaomi\|opencode-go/mimo-v2.6-pro (max)`, then `grok-4.7 (xhigh)`, then `glm-5.3 (high)`, then `gpt-6.2-sol` and `gpt-6.1-sol (medium)` on the OpenAI lanes, then `gpt-5.6-sol (medium)`. |
 | **GPT-5.6 Sol override paths** | openai, chatgpt-subscription, github-copilot, opencode | The first GPT-5.6 Sol-family fallback for the Plan Consultant and `ultrabrain`. |
 | **GPT 5.6 Luna Fast**  | openai, chatgpt-subscription | Fast + strong reasoning. Utility fallback after the Kimi high-speed quick default.                  |
 | **GPT-5-Nano**    | openai, chatgpt-subscription, github-copilot, opencode | Ultra-cheap, fast. Good for simple utility tasks.                                                           |
@@ -673,8 +675,8 @@ Not all models behave the same way. Understanding "similar" families helps you m
 
 | Agent               | Role                                       | Default Chain                                                          |
 | ------------------- | ------------------------------------------ | ---------------------------------------------------------------------- |
-| **plan-consultant** | Pre-planning gap analysis for `/ulw-plan`  | anthropic\|github-copilot\|opencode/claude-fable-5-1 (max) → anthropic\|github-copilot\|opencode/claude-opus-5-5 (max) → opencode-go\|kimi-for-coding\|moonshotai/kimi-k3.1-pro (max) → opencode/kimi-k3 (max) |
-| **plan-reviewer**   | High-accuracy plan review gate             | openai\|chatgpt-subscription/gpt-6-astra (xhigh) → github-copilot/gpt-6-astra (high) → openai\|chatgpt-subscription\|opencode/gpt-6-astra (high) → anthropic\|github-copilot\|opencode/claude-opus-5-5 (max) → … (full chain in source) |
+| **plan-consultant** | Pre-planning gap analysis for `/ulw-plan`  | anthropic\|github-copilot\|opencode/claude-fable-5-2 (max) → anthropic\|github-copilot\|opencode/claude-fable-5-1 (max) → anthropic\|github-copilot\|opencode/claude-opus-5-5 (max) → opencode-go\|kimi-for-coding\|moonshotai/kimi-k3.1-pro (max) → opencode/kimi-k3 (max) |
+| **plan-reviewer**   | High-accuracy plan review gate             | openai\|chatgpt-subscription/gpt-6.2-astra (xhigh) → openai\|chatgpt-subscription/gpt-6-astra (xhigh) → github-copilot/gpt-6-astra (high) → openai\|chatgpt-subscription\|opencode/gpt-6.2-astra (high) → openai\|chatgpt-subscription\|opencode/gpt-6-astra (high) → anthropic\|github-copilot\|opencode/claude-opus-5-5 (max) → … (full chain in source) |
 | **explore**         | Fast codebase grep                         | kimi-coding\|kimi-for-coding/kimi-for-coding-highspeed (off) → openai\|chatgpt-subscription/gpt-6-luna-fast (low) → anthropic\|github-copilot/claude-haiku-5-5 (medium) → deepseek/deepseek-flash (max) → opencode-go\|bailian-coding-plan/qwen3.7-plus → opencode-go/minimax-m2.7 |
 | **librarian**       | Docs/code search                           | (same chain as `explore`)                                              |
 
@@ -696,8 +698,8 @@ If the user wants to override which model a curated agent or category uses, edit
 ```jsonc
 {
   "agents": {
-    "plan-consultant": { "model": "anthropic/claude-fable-5-1", "reasoning": "max" },
-    "plan-reviewer": { "model": "openai/gpt-6-astra" }, // the plan gate; keep it on a strong reasoning model
+    "plan-consultant": { "model": "anthropic/claude-fable-5-2", "reasoning": "max" },
+    "plan-reviewer": { "model": "openai/gpt-6.2-astra" }, // the plan gate; keep it on a strong reasoning model
   },
   "categories": {
     "deep-low": { "model": "openai/gpt-6-sol" },
@@ -705,7 +707,7 @@ If the user wants to override which model a curated agent or category uses, edit
 }
 ```
 
-**Lower-risk overrides** (compatible behavior): main agent Opus 5.5 → Fable 5.1/Kimi K3/GLM 5.3 (each is on the Recommended list and has a tuned prompt preset); Plan Consultant Fable 5.1 → Opus 5.5/Kimi K3; Plan Reviewer GPT-6 Astra → Opus 5.5 (max).
+**Lower-risk overrides** (compatible behavior): main agent Opus 5.5 → Fable 5.1/Kimi K3/GLM 5.3 (each is on the Recommended list and has a tuned prompt preset); Plan Consultant Fable 5.2 → Fable 5.1/Opus 5.5/Kimi K3; Plan Reviewer GPT-6 Astra → Opus 5.5 (max).
 
 **GLM 5.2 as the session model:** GLM 5.2 gets the GLM-calibrated prompt preset because its model ID is recognized as GLM. It still has less maintainer validation than Claude or Kimi.
 

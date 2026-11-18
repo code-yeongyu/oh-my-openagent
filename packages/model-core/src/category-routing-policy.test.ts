@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
 import { CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
-import { FABLE_55_RELEASED } from "./fable-55-launch"
 
 describe("category routing policy", () => {
   test("visual-engineering prioritizes Argon low, Fable 5.1 max, Opus max, then Kimi K3.1 Pro max and Kimi K3 max", () => {
@@ -18,11 +17,11 @@ describe("category routing policy", () => {
         model: "gemini-4-argon",
         variant: "low",
       },
-      ...(FABLE_55_RELEASED ? [{
+      {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
-        model: "claude-fable-5-5",
+        model: "claude-fable-5-2",
         variant: "max",
-      }] : []),
+      },
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-fable-5-1",
@@ -42,7 +41,7 @@ describe("category routing policy", () => {
         providers: ["opencode"],
         model: "kimi-k3",
         variant: "max",
-      }
+      },
     ])
   })
 
@@ -53,6 +52,7 @@ describe("category routing policy", () => {
 
     // then
     expect(high.fallbackChain).toEqual([
+      { providers: ["openai", "chatgpt-subscription", "opencode"], model: "gpt-6.2-astra", variant: "high" },
       {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
         model: "gpt-6-astra",
@@ -60,6 +60,8 @@ describe("category routing policy", () => {
       },
     ])
     expect(low.fallbackChain).toEqual([
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.2-sol", variant: "medium" },
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.2-sol-fast", variant: "medium" },
       { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol", variant: "medium" },
       { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol-fast", variant: "medium" },
       {
@@ -67,7 +69,7 @@ describe("category routing policy", () => {
         model: "gpt-5.6-sol",
         variant: "medium",
       },
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-5.6-sol-fast", variant: "medium" }
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-5.6-sol-fast", variant: "medium" },
     ])
   })
 
@@ -115,7 +117,7 @@ describe("category routing policy", () => {
         model: "grok-4.20-0309-non-reasoning",
       },
       { providers: ["zai-coding-plan"], model: "glm-5.3-flash", variant: "low" },
-      { providers: ["xiaomi"], model: "mimo-v2.6-flash", variant: "low" }
+      { providers: ["xiaomi"], model: "mimo-v2.6-flash", variant: "low" },
     ])
   })
 
@@ -151,6 +153,11 @@ describe("category routing policy", () => {
       },
       {
         providers: ["openai", "chatgpt-subscription"],
+        model: "gpt-6.2-sol",
+        variant: "medium",
+      },
+      {
+        providers: ["openai", "chatgpt-subscription"],
         model: "gpt-6.1-sol",
         variant: "medium",
       },
@@ -178,7 +185,7 @@ describe("category routing policy", () => {
         providers: ["xiaomi", "opencode-go"],
         model: "mimo-v2.5-pro",
         variant: "max",
-      }
+      },
     ])
   })
 
@@ -214,14 +221,14 @@ describe("category routing policy", () => {
         providers: ["opencode"],
         model: "kimi-k3",
         variant: "max",
-      }
+      },
     ])
     expect(artistryChain).toEqual([
-      ...(FABLE_55_RELEASED ? [{
+      {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
-        model: "claude-fable-5-5",
+        model: "claude-fable-5-2",
         variant: "max",
-      }] : []),
+      },
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-fable-5-1",
@@ -241,7 +248,7 @@ describe("category routing policy", () => {
         providers: ["opencode"],
         model: "kimi-k3",
         variant: "max",
-      }
+      },
     ])
     expect(writingChain).toEqual([
       {
@@ -258,7 +265,7 @@ describe("category routing policy", () => {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-opus-4-6",
         variant: "max",
-      }
+      },
     ])
   })
 })

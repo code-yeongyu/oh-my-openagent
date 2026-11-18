@@ -1,13 +1,6 @@
-import type {
-  TuiPluginApi,
-  TuiPromptRef,
-} from "@opencode-ai/plugin/tui"
+import type { TuiPluginApi, TuiPromptRef } from "@opencode-ai/plugin/tui"
 
-import type {
-  BtwCreateSessionInput,
-  BtwPromptRef,
-  BtwSideControllerDependencies,
-} from "./tui-controller-types"
+import type { BtwCreateSessionInput, BtwPromptRef, BtwSideControllerDependencies } from "./tui-controller-types"
 
 export function unwrapTuiData<T>(
   response: {
@@ -31,10 +24,7 @@ export function currentTuiSessionID(api: TuiPluginApi): string | undefined {
   return typeof sessionID === "string" ? sessionID : undefined
 }
 
-export function isCurrentTuiSession(
-  api: TuiPluginApi,
-  sessionID: string | undefined,
-): boolean {
+export function isCurrentTuiSession(api: TuiPluginApi, sessionID: string | undefined): boolean {
   return currentTuiSessionID(api) === sessionID
 }
 
@@ -58,24 +48,17 @@ export function adaptTuiPromptRef(promptRef: TuiPromptRef): BtwPromptRef {
   }
 }
 
-export function parentTuiStatusLabel(
-  api: TuiPluginApi,
-  parentSessionID: string,
-): string {
+export function parentTuiStatusLabel(api: TuiPluginApi, parentSessionID: string): string {
   if (api.state.session.permission(parentSessionID).length > 0) {
     return "main needs permission"
   }
   if (api.state.session.question(parentSessionID).length > 0) {
     return "main needs input"
   }
-  return api.state.session.status(parentSessionID)?.type === "busy"
-    ? "main working"
-    : "main ready"
+  return api.state.session.status(parentSessionID)?.type === "busy" ? "main working" : "main ready"
 }
 
-export function createBtwControllerDependencies(
-  api: TuiPluginApi,
-): BtwSideControllerDependencies {
+export function createBtwControllerDependencies(api: TuiPluginApi): BtwSideControllerDependencies {
   return {
     getCurrentSessionID: () => currentTuiSessionID(api),
     getSession: (sessionID) => {
@@ -152,4 +135,3 @@ export function createBtwControllerDependencies(
     requestRender: () => api.renderer.requestRender(),
   }
 }
-

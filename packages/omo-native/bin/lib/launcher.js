@@ -15,7 +15,11 @@ import { runThreadCommand } from "./thread.js"
 import { isHostStatusAll, runHostStatusAll, sessionActivityReader } from "./host-status.js"
 import { runDoctor } from "./doctor.js"
 import { reflectionLockFix, reflectionLockReport } from "./doctor-reflection-lock.js"
-import { memoryRuntimeDiscardResolver, memoryRuntimeMaxBytesResolver, memoryRuntimeReport } from "./doctor-memory-runtime.js"
+import {
+  memoryRuntimeDiscardResolver,
+  memoryRuntimeMaxBytesResolver,
+  memoryRuntimeReport,
+} from "./doctor-memory-runtime.js"
 import { ensureEnginePrepared, preparePluginLaunchSpec } from "./engine-prepare.js"
 import { migrateLegacyBunGlobalManifest } from "./legacy-bun-global-migration.js"
 import { removeLegacyServiceCredentials } from "./legacy-service-credentials.js"
@@ -61,16 +65,16 @@ async function bootsWithMemorySyncClaim(args, env) {
     return launchClaimsMemorySyncAtBoot(args, env, claimsMemorySyncAtBoot, { execArgv: [], versions: process.versions })
   } catch (error) {
     // Without the sidecar the memory component's registration still selects once when the first session opens.
-    process.stderr.write(`omo: memory sync could not start at boot: ${error instanceof Error ? error.message : String(error)}\n`)
+    process.stderr.write(
+      `omo: memory sync could not start at boot: ${error instanceof Error ? error.message : String(error)}\n`,
+    )
     return false
   }
 }
 
 async function spawnSenpi(args, withExtension) {
   const senpi = preparedSenpi()
-  const finalArgs = withExtension
-    ? ["--extension", join(packageRoot, "plugin"), ...args]
-    : args
+  const finalArgs = withExtension ? ["--extension", join(packageRoot, "plugin"), ...args] : args
   const env = senpiEnvironment(senpi.packageRoot)
   if (withExtension) withHerdrAgentHint(env, args)
   const handoff = privateFdHandoff(env)
@@ -82,7 +86,7 @@ async function spawnSenpi(args, withExtension) {
       // A failed replacement still uses the signal-aware child path below.
     }
   }
-  if (handoff !== undefined && await bootsWithMemorySyncClaim(finalArgs, handoff.env)) {
+  if (handoff !== undefined && (await bootsWithMemorySyncClaim(finalArgs, handoff.env))) {
     await spawnNode(ENGINE_BOOT_ENTRY, [senpi.cliPath, ...finalArgs], handoff)
     return
   }
@@ -172,7 +176,9 @@ export async function runLauncher(args = process.argv.slice(2)) {
   // The toolkit CLI is no longer part of the Native payload; the loop is driven in-process by the
   // eval SDK the extension publishes. Report that plainly instead of failing on a missing file.
   if (command === "ulw-loop") {
-    console.error('omo ulw-loop is unavailable in this build: use the agent toolkit SDK from an eval js cell: const { agentToolkit } = await import(`${env("OMO_AGENT_TOOLKIT_SDK_ROOT")}/sdk.js`); print(await agentToolkit.status()) (Codex keeps the standalone CLI).')
+    console.error(
+      'omo ulw-loop is unavailable in this build: use the agent toolkit SDK from an eval js cell: const { agentToolkit } = await import(`${env("OMO_AGENT_TOOLKIT_SDK_ROOT")}/sdk.js`); print(await agentToolkit.status()) (Codex keeps the standalone CLI).',
+    )
     process.exitCode = 2
     return
   }
@@ -231,18 +237,24 @@ export async function runLauncher(args = process.argv.slice(2)) {
       process.exitCode = result.failed ? 1 : 0
       return
     }
-    const [categoryCoverage, computerUse, configDiagnostics, reflectionLock, memoryRuntime] = args[1] === "--reap"
-      ? [[], [], [], [], []]
-      : await Promise.all([
-          doctorCoverageLines({ agentDir: canonicalAgentDir() }),
-          doctorComputerUseLines(),
-          doctorConfigLines(),
-          reflectionLockReport(),
-          memoryRuntimeReport({
-            maxBytesFor: memoryRuntimeMaxBytesResolver({ pluginRoot: join(packageRoot, "plugin") }),
-            discardFor: memoryRuntimeDiscardResolver({ pluginRoot: join(packageRoot, "plugin") }),
-          }).then((report) => report.lines, (error) => [`WARN memory runtime: unavailable: ${error instanceof Error ? error.message : String(error)}`]),
-        ])
+    const [categoryCoverage, computerUse, configDiagnostics, reflectionLock, memoryRuntime] =
+      args[1] === "--reap"
+        ? [[], [], [], [], []]
+        : await Promise.all([
+            doctorCoverageLines({ agentDir: canonicalAgentDir() }),
+            doctorComputerUseLines(),
+            doctorConfigLines(),
+            reflectionLockReport(),
+            memoryRuntimeReport({
+              maxBytesFor: memoryRuntimeMaxBytesResolver({ pluginRoot: join(packageRoot, "plugin") }),
+              discardFor: memoryRuntimeDiscardResolver({ pluginRoot: join(packageRoot, "plugin") }),
+            }).then(
+              (report) => report.lines,
+              (error) => [
+                `WARN memory runtime: unavailable: ${error instanceof Error ? error.message : String(error)}`,
+              ],
+            ),
+          ])
     runDoctor(await detectHarnesses(), args.slice(1), {
       daemonEngine: { run: engineHostCall },
       categoryCoverage,

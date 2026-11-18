@@ -22,11 +22,7 @@ export interface CommandDiscoveryOptions {
 
 const NESTED_COMMAND_SEPARATOR = "/"
 
-function discoverCommandsFromDir(
-  commandsDir: string,
-  scope: CommandScope,
-  prefix = "",
-): CommandInfo[] {
+function discoverCommandsFromDir(commandsDir: string, scope: CommandScope, prefix = ""): CommandInfo[] {
   if (!existsSync(commandsDir)) return []
   if (!statSync(commandsDir).isDirectory()) {
     log(`[command-discovery] Skipping non-directory path: ${commandsDir}`)
@@ -40,12 +36,8 @@ function discoverCommandsFromDir(
     if (entry.isDirectory()) {
       if (EXCLUDED_DIRS.has(entry.name)) continue
       if (entry.name.startsWith(".")) continue
-      const nestedPrefix = prefix
-        ? `${prefix}${NESTED_COMMAND_SEPARATOR}${entry.name}`
-        : entry.name
-      commands.push(
-        ...discoverCommandsFromDir(join(commandsDir, entry.name), scope, nestedPrefix),
-      )
+      const nestedPrefix = prefix ? `${prefix}${NESTED_COMMAND_SEPARATOR}${entry.name}` : entry.name
+      commands.push(...discoverCommandsFromDir(join(commandsDir, entry.name), scope, nestedPrefix))
       continue
     }
 
@@ -53,9 +45,7 @@ function discoverCommandsFromDir(
 
     const commandPath = join(commandsDir, entry.name)
     const baseCommandName = basename(entry.name, ".md")
-    const commandName = prefix
-      ? `${prefix}${NESTED_COMMAND_SEPARATOR}${baseCommandName}`
-      : baseCommandName
+    const commandName = prefix ? `${prefix}${NESTED_COMMAND_SEPARATOR}${baseCommandName}` : baseCommandName
 
     try {
       const content = readFileSync(commandPath, "utf-8")
@@ -122,10 +112,7 @@ function deduplicateCommandInfosByName(commands: CommandInfo[]): CommandInfo[] {
   return deduplicatedCommands
 }
 
-export function discoverCommandsSync(
-  directory?: string,
-  options?: CommandDiscoveryOptions,
-): CommandInfo[] {
+export function discoverCommandsSync(directory?: string, options?: CommandDiscoveryOptions): CommandInfo[] {
   const userCommandsDir = join(getClaudeConfigDir(), "commands")
   const projectCommandsDir = join(directory ?? process.cwd(), ".claude", "commands")
   const opencodeGlobalDirs = getOpenCodeCommandDirs({ binary: "opencode" })
@@ -133,7 +120,7 @@ export function discoverCommandsSync(
 
   const userCommands = discoverCommandsFromDir(userCommandsDir, "user")
   const opencodeGlobalCommands = opencodeGlobalDirs.flatMap((commandsDir) =>
-    discoverCommandsFromDir(commandsDir, "opencode")
+    discoverCommandsFromDir(commandsDir, "opencode"),
   )
   const projectCommands = discoverCommandsFromDir(projectCommandsDir, "project")
   const opencodeProjectCommands = opencodeProjectDirs.flatMap((commandsDir) =>

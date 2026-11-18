@@ -38,7 +38,10 @@ function sourceFilesNamingLoro(): string[] {
     { cwd: REPO_ROOT },
   )
   expect(grep.exitCode, `git grep failed: ${grep.stderr.toString()}`).toBe(0)
-  return grep.stdout.toString().split("\0").filter((file) => SOURCE_EXTENSION.test(file))
+  return grep.stdout
+    .toString()
+    .split("\0")
+    .filter((file) => SOURCE_EXTENSION.test(file))
 }
 
 describe("loro runtime packaging", () => {
@@ -46,18 +49,21 @@ describe("loro runtime packaging", () => {
     const work = mkdtempSync(join(tmpdir(), "loro-bundle-"))
     try {
       const entry = join(work, "entry.ts")
-      writeFileSync(entry, [
-        `import { loadLoroRuntime } from ${JSON.stringify(LOADER_PATH)}`,
-        "const { LoroDoc } = await loadLoroRuntime()",
-        "const doc = new LoroDoc()",
-        "try {",
-        '  doc.getText("t").insert(0, "hi")',
-        "  doc.commit()",
-        '  console.log("bundle-loader-ok")',
-        "} finally {",
-        "  doc.free()",
-        "}",
-      ].join("\n"))
+      writeFileSync(
+        entry,
+        [
+          `import { loadLoroRuntime } from ${JSON.stringify(LOADER_PATH)}`,
+          "const { LoroDoc } = await loadLoroRuntime()",
+          "const doc = new LoroDoc()",
+          "try {",
+          '  doc.getText("t").insert(0, "hi")',
+          "  doc.commit()",
+          '  console.log("bundle-loader-ok")',
+          "} finally {",
+          "  doc.free()",
+          "}",
+        ].join("\n"),
+      )
       const outdir = join(work, "out")
       const build = Bun.spawnSync([process.execPath, "build", "--target=bun", entry, "--outdir", outdir], { cwd: work })
       expect(build.stderr.toString(), "bun build stderr").toBe("")
@@ -77,10 +83,7 @@ describe("loro runtime packaging", () => {
   }, 20000)
 
   test("no package source imports loro-crdt outside the loader", () => {
-    const sanctioned = new Set([
-      LOADER_PATH,
-      join(import.meta.dir, "loro-wasm.d.ts"),
-    ])
+    const sanctioned = new Set([LOADER_PATH, join(import.meta.dir, "loro-wasm.d.ts")])
     const candidates = sourceFilesNamingLoro().map((file) => join(REPO_ROOT, file))
     expect(candidates, "the loader itself must be in the scanned set").toContain(LOADER_PATH)
     const offenders = candidates

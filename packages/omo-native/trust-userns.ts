@@ -23,7 +23,11 @@ const INODE = /^\d+:\d+$/
 const readProc: ReadText = (path) => readFileSync(path, "utf8")
 
 function initialNamespace(read: ReadText): boolean | null {
-  try { return IDENTITY_MAP.test(read("/proc/self/uid_map")) } catch { return null }
+  try {
+    return IDENTITY_MAP.test(read("/proc/self/uid_map"))
+  } catch {
+    return null
+  }
 }
 
 const entryKey = (path: string, inode: string): string => `${path}\n${inode}`
@@ -38,9 +42,15 @@ function parseAttestation(text: string | undefined): Set<string> {
     for (const entry of entries) {
       if (!Array.isArray(entry) || entry.length !== 2) return new Set()
       const [path, inode] = entry as unknown[]
-      if (typeof path !== "string" || !posix.isAbsolute(path) || posix.normalize(path) !== path
-        || (path.length > 1 && path.endsWith("/"))
-        || typeof inode !== "string" || !INODE.test(inode)) return new Set()
+      if (
+        typeof path !== "string" ||
+        !posix.isAbsolute(path) ||
+        posix.normalize(path) !== path ||
+        (path.length > 1 && path.endsWith("/")) ||
+        typeof inode !== "string" ||
+        !INODE.test(inode)
+      )
+        return new Set()
       keys.add(entryKey(path, inode))
     }
     return keys
@@ -56,7 +66,11 @@ export function readUsernsView(env: NodeJS.ProcessEnv, read: ReadText = readProc
     const text = read("/proc/sys/kernel/overflowuid").trim()
     overflowUid = /^\d+$/.test(text) ? Number(text) : null
   } catch {}
-  return { namespaced: initialNamespace(read) === false, overflowUid, attested: parseAttestation(env[USERNS_ROOTS_ENV]) }
+  return {
+    namespaced: initialNamespace(read) === false,
+    overflowUid,
+    attested: parseAttestation(env[USERNS_ROOTS_ENV]),
+  }
 }
 
 /**
@@ -65,8 +79,12 @@ export function readUsernsView(env: NodeJS.ProcessEnv, read: ReadText = readProc
  * namespace, still naming the same st_dev:st_ino, is treated as root; the caller walks the whole chain.
  */
 export function attestedOverflowRoot(view: UsernsView, path: string, stat: InodeStat): boolean {
-  return view.namespaced && view.overflowUid !== null && stat.uid === view.overflowUid
-    && view.attested.has(entryKey(path, `${stat.dev}:${stat.ino}`))
+  return (
+    view.namespaced &&
+    view.overflowUid !== null &&
+    stat.uid === view.overflowUid &&
+    view.attested.has(entryKey(path, `${stat.dev}:${stat.ino}`))
+  )
 }
 
 export function attestUsernsRoots(paths: readonly string[], read: ReadText = readProc): string | undefined {
@@ -78,8 +96,13 @@ export function attestUsernsRoots(paths: readonly string[], read: ReadText = rea
       try {
         const stat = lstatSync(current, { bigint: true })
         const mode = Number(stat.mode)
-        if (stat.isDirectory() && !stat.isSymbolicLink() && stat.uid === 0n
-          && ((mode & 0o022) === 0 || (mode & 0o1000) !== 0)) entries.set(current, [current, `${stat.dev}:${stat.ino}`])
+        if (
+          stat.isDirectory() &&
+          !stat.isSymbolicLink() &&
+          stat.uid === 0n &&
+          ((mode & 0o022) === 0 || (mode & 0o1000) !== 0)
+        )
+          entries.set(current, [current, `${stat.dev}:${stat.ino}`])
       } catch {}
       const parent = dirname(current)
       if (parent === current) break
@@ -93,7 +116,9 @@ export function attestUsernsRoots(paths: readonly string[], read: ReadText = rea
 export function inheritedTrustPaths(marker: string | undefined): string[] {
   try {
     const parsed = JSON.parse(marker ?? "") as { file?: unknown; defaults?: { file?: unknown; dir?: unknown } | null }
-    return [parsed.file, parsed.defaults?.file, parsed.defaults?.dir].filter((path): path is string => typeof path === "string")
+    return [parsed.file, parsed.defaults?.file, parsed.defaults?.dir].filter(
+      (path): path is string => typeof path === "string",
+    )
   } catch {
     return []
   }

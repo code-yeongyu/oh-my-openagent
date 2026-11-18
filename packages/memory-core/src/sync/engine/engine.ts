@@ -7,6 +7,7 @@
 import { advance, applyVerified } from "./apply"
 import type { EngineDeps } from "./engine-deps"
 import type { SyncFailure } from "./failure"
+import { logCycleFailure, type SyncStage } from "./failure-cause"
 import { batchBound, heldShown, recordHeld } from "./held"
 import { type EngineState, SyncJournal } from "./journal"
 import { type CaptureHolds, capture } from "./local-capture"
@@ -50,6 +51,8 @@ export class SyncEngine {
   readonly journal: SyncJournal
   cyclesRun = 0
   private loaded = false
+  /** The step the running cycle is in, named by its failure (#13635). */
+  private stage: SyncStage = "load"
   private running: Promise<CycleReport> | null = null
   /** A local commit, poll or startup request arrived while a cycle ran: it always gets its own cycle. */
   private rerun = false
@@ -94,7 +97,8 @@ export class SyncEngine {
     const s = await this.journal.state()
     const held = s.held === null ? null : heldShown(s.held, batchBound(this.deps))
     // A refused entry is never hidden behind a held item (#12284 review L3); the pause carries the hold along.
-    if (s.paused !== null) return { kind: "paused", seq: s.paused.seq, code: s.paused.code, ...(held === null ? {} : { held }) }
+    if (s.paused !== null)
+      return { kind: "paused", seq: s.paused.seq, code: s.paused.code, ...(held === null ? {} : { held }) }
     if (held !== null) return { kind: "failing", ...held }
     if (s.lastSyncedAt === null) return { kind: "never_synced" }
     return { kind: "synced", at: s.lastSyncedAt, updatedWhileOffline: s.updatedWhileOffline }
@@ -145,10 +149,12 @@ export class SyncEngine {
   runCycle(): Promise<CycleReport> {
     const previous = this.running ?? Promise.resolve(null)
     let keyAtStart: string | null = null
-    const run = previous.catch(() => null).then(() => {
-      keyAtStart = this.statusKey()
-      return this.cycle()
-    })
+    const run = previous
+      .catch(() => null)
+      .then(() => {
+        keyAtStart = this.statusKey()
+        return this.cycle()
+      })
     this.running = run
     const waiters = this.waiters.splice(0)
     void run.then(
@@ -164,7 +170,8 @@ export class SyncEngine {
         if (rerun) this.request()
       },
       (error: unknown) => {
-        this.tracker.failed(error)
+        const stage = this.stage
+        const shownChanged = this.tracker.failed(error, stage)
         this.announceIfChanged(keyAtStart)
         for (const w of waiters) w.reject(error)
         if (this.running === run) this.running = null
@@ -173,6 +180,8 @@ export class SyncEngine {
         this.rerun = false
         this.rerunOnEvent = false
         if (rerun) this.request()
+        // Logged last, once the cycle is settled: nothing the log does can leave it running.
+        logCycleFailure(this.deps.log, stage, error, shownChanged)
       },
     )
     return run
@@ -189,7 +198,9 @@ export class SyncEngine {
     try {
       this.deps.onStatusChange?.()
     } catch (error) {
-      this.deps.log?.(`sync status listener failed: ${error instanceof Error ? error.message : "a non-Error value was thrown"}`)
+      this.deps.log?.(
+        `sync status listener failed: ${error instanceof Error ? error.message : "a non-Error value was thrown"}`,
+      )
     }
   }
 
@@ -200,21 +211,8 @@ export class SyncEngine {
       else this.rerun = true
       return
     }
-    void this.runCycle().catch((error: unknown) => this.deps.log?.(`sync cycle failed: ${String(error)}`))
-  }
-
-  /**
-   * A journal names the device peer it was created under. One from another peer arrived with a
-   * copied repo: its pending ops are that device's to push, so it is retired, never resumed.
-   */
-  private async claimJournal(): Promise<void> {
-    const peer = this.deps.store.peer()
-    const owner = (await this.journal.state()).peer
-    if (owner !== null && owner !== peer) {
-      this.deps.log?.(`sync: journal belongs to peer ${owner}, this device is ${peer}; retiring it`)
-      await this.journal.retire()
-    }
-    if (owner !== peer) await this.journal.updateState({ peer })
+    // runCycle logs and reports every failure itself.
+    void this.runCycle().catch(() => undefined)
   }
 
   private sleep(ms: number): Promise<void> {
@@ -237,20 +235,22 @@ export class SyncEngine {
 
   private async cycle(): Promise<CycleReport> {
     const { deps, journal } = this
+    this.stage = "load"
     if (!this.loaded) {
       await deps.store.load()
-      await this.claimJournal()
+      if (await journal.claim(deps.store.peer(), deps.space, deps.legacySpace, deps.log)) await deps.store.load()
       this.loaded = true
     }
     const before = await journal.updateState({ eventHead: Math.max(this.eventHead, (await journal.state()).eventHead) })
-    let holds: CaptureHolds = { held: new Map(), withheld: new Set() }
+    let holds: CaptureHolds = { held: new Map(), withheld: new Set(), joining: new Set() }
     if (before.cycle !== null) {
+      this.stage = "resume"
       const resumed = before.cycle
       await deps.lock.withLock(async () => {
         // A cycle resumed at merged re-renders its keys over the working files: capture any edit made
         // since the crash first, so it merges into the doc instead of being overwritten.
         if (resumed.stage === "merged") holds = await capture(deps, journal, resumed)
-        await advance(deps, journal, resumed, new Set(holds.held.keys()))
+        await advance(deps, journal, resumed, notRenderedNow(holds))
       })
     }
     let applied = 0
@@ -258,12 +258,21 @@ export class SyncEngine {
     let refused = 0
     let snapshot: number | null = null
     const inbound = async () => {
+      this.stage = "receive"
       const got = await receive(deps, journal)
       refused += got.refused
       snapshot = got.snapshot ?? snapshot
+      this.stage = "capture"
       const done = await deps.lock.withLock(async () => {
         holds = await capture(deps, journal)
-        return applyVerified(deps, journal, new Set(holds.held.keys()))
+        this.stage = "apply"
+        const appliedNow = await applyVerified(deps, journal, notRenderedNow(holds))
+        // A joining file adopts the space's state in this same cycle, so its edit goes out with this push.
+        if (holds.joining.size > 0) {
+          this.stage = "capture"
+          holds = await capture(deps, journal)
+        }
+        return appliedNow
       })
       applied += done.batches
       memories += done.memories
@@ -271,10 +280,21 @@ export class SyncEngine {
     await inbound()
     const settleFirst = this.settleNext
     this.settleNext = false
+    this.stage = "push"
     const pushedCycle = await pushCycle({
-      deps, journal, inbound, sleep: (ms) => this.sleep(ms), settleFirst, frozen: this.tracker.frozen, withheld: () => holds.withheld,
+      deps,
+      journal,
+      inbound: async () => {
+        await inbound()
+        this.stage = "push"
+      },
+      sleep: (ms) => this.sleep(ms),
+      settleFirst,
+      frozen: this.tracker.frozen,
+      withheld: () => holds.withheld,
     })
     this.tracker.frozen = pushedCycle.frozen
+    this.stage = "finish"
     const pushed = pushedCycle.pushed
     const heldKeys = await recordHeld(deps, journal, holds.held, holds.withheld)
     const heldNow = (await journal.state()).held
@@ -288,3 +308,6 @@ export class SyncEngine {
 }
 
 const failureKey = (failure: SyncFailure): string => `${failure.kind}\n${failure.action}`
+
+/** Keys whose render this cycle owes instead of landing: held edits, and files of keys the device is joining. */
+const notRenderedNow = (holds: CaptureHolds): Set<string> => new Set([...holds.held.keys(), ...holds.joining])

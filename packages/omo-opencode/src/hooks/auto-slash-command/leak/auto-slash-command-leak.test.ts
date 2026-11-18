@@ -11,12 +11,10 @@ import * as executorModule from "../executor"
 
 type AutoSlashCommandModule = typeof import("../hook")
 
-const executeSlashCommandMock = mock(
-  async (parsed: { command: string; args: string; raw: string }) => ({
-    success: true,
-    replacementText: parsed.raw,
-  })
-)
+const executeSlashCommandMock = mock(async (parsed: { command: string; args: string; raw: string }) => ({
+  success: true,
+  replacementText: parsed.raw,
+}))
 
 afterAll(async () => {
   mock.restore()
@@ -150,33 +148,25 @@ describe("createAutoSlashCommandHook leak prevention", () => {
     describe("#when dispose() is called", () => {
       it("#then both Sets are empty", async () => {
         const hook = createAutoSlashCommandHook()
-        await hook["chat.message"](
-          createChatInput("session-chat", "message-chat"),
-          createChatOutput("/leak-chat")
-        )
+        await hook["chat.message"](createChatInput("session-chat", "message-chat"), createChatOutput("/leak-chat"))
         await hook["command.execute.before"](
           createCommandInput("session-command", "leak-command"),
-          createCommandOutput("before")
+          createCommandOutput("before"),
         )
         executeSlashCommandMock.mockClear()
 
         hook.dispose()
         const chatOutputAfterDispose = createChatOutput("/leak-chat")
         const commandOutputAfterDispose = createCommandOutput("after")
-        await hook["chat.message"](
-          createChatInput("session-chat", "message-chat"),
-          chatOutputAfterDispose
-        )
+        await hook["chat.message"](createChatInput("session-chat", "message-chat"), chatOutputAfterDispose)
         await hook["command.execute.before"](
           createCommandInput("session-command", "leak-command"),
-          commandOutputAfterDispose
+          commandOutputAfterDispose,
         )
 
         expect(executeSlashCommandMock).toHaveBeenCalledTimes(2)
         expect(chatOutputAfterDispose.parts[0].text).toContain(AUTO_SLASH_COMMAND_TAG_OPEN)
-        expect(commandOutputAfterDispose.parts[0].text).toContain(
-          AUTO_SLASH_COMMAND_TAG_OPEN
-        )
+        expect(commandOutputAfterDispose.parts[0].text).toContain(AUTO_SLASH_COMMAND_TAG_OPEN)
       })
     })
   })
@@ -191,7 +181,7 @@ describe("createAutoSlashCommandHook leak prevention", () => {
         for (let index = 0; index < 10000; index += 1) {
           await hook["chat.message"](
             createChatInput(`session-${index}`, `message-${index}`),
-            createChatOutput(`/leak-${index}`)
+            createChatOutput(`/leak-${index}`),
           )
         }
 

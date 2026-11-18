@@ -1,9 +1,6 @@
 import { afterEach, describe, expect, it, mock, spyOn } from "bun:test"
 import * as shared from "../../shared/logger"
-import {
-  resetAdditionalAllowedMcpEnvVars,
-  setAdditionalAllowedMcpEnvVars,
-} from "./configure-allowed-env-vars"
+import { resetAdditionalAllowedMcpEnvVars, setAdditionalAllowedMcpEnvVars } from "./configure-allowed-env-vars"
 
 type EnvExpanderModule = typeof import("./env-expander")
 
@@ -77,14 +74,10 @@ describe("expandEnvVars", () => {
       const { expandEnvVars } = await importFreshEnvExpanderModule()
 
       // when
-      const expanded = expandEnvVars(
-        "${TMPDIR}|${TEMP}|${USERPROFILE}|${LANG}|${XDG_CONFIG_HOME}"
-      )
+      const expanded = expandEnvVars("${TMPDIR}|${TEMP}|${USERPROFILE}|${LANG}|${XDG_CONFIG_HOME}")
 
       // then
-      expect(expanded).toBe(
-        "/tmp/omo|C:\\Temp|C:\\Users\\tester|en_US.UTF-8|/Users/tester/.config"
-      )
+      expect(expanded).toBe("/tmp/omo|C:\\Temp|C:\\Users\\tester|en_US.UTF-8|/Users/tester/.config")
     })
   })
 
@@ -243,19 +236,13 @@ describe("expandEnvVarsInObject", () => {
             HOME_DIR: "${HOME}",
           },
         },
-        { trusted: true }
+        { trusted: true },
       )
 
       // then
       expect(expanded).toEqual({
         command: "npx",
-        args: [
-          "-y",
-          "mcp-remote",
-          "https://mcp.slack.com/mcp",
-          "--header",
-          "Authorization:Bearer xoxp-trusted-token",
-        ],
+        args: ["-y", "mcp-remote", "https://mcp.slack.com/mcp", "--header", "Authorization:Bearer xoxp-trusted-token"],
         env: {
           HOME_DIR: "/Users/tester",
         },
@@ -275,7 +262,7 @@ describe("expandEnvVarsInObject", () => {
             Authorization: "Bearer ${SLACK_USER_TOKEN}",
           },
         },
-        { trusted: true }
+        { trusted: true },
       )
 
       // then

@@ -4,19 +4,25 @@ import { describe, expect, test } from "bun:test"
 
 import { DesktopEngineAbiMismatchError, DesktopLaunchContextError } from "@oh-my-opencode/senpi-desktop-engine"
 import { DesktopEngineUnavailableError, DesktopServiceError } from "@oh-my-opencode/senpi-desktop-service"
-import { fakeEngineFactory } from "../../../../senpi-desktop-service/test/harness"
+import { fakeEngineFactory } from "@oh-my-opencode/senpi-desktop-service/testing"
 import { TrackedDesktopService } from "./engine-status"
 
 describe("tracked desktop service error coverage", () => {
   for (const failure of [
     new DesktopEngineAbiMismatchError("/fixture", { abi: "wrong", protocolVersion: "wrong" }),
     new DesktopEngineUnavailableError({
-      code: "native-unavailable", host: "darwin-arm64", attemptedPaths: ["/fixture"],
-      message: "missing engine", cause: "fixture",
+      code: "native-unavailable",
+      host: "darwin-arm64",
+      attemptedPaths: ["/fixture"],
+      message: "missing engine",
+      cause: "fixture",
     }),
     new DesktopEngineUnavailableError({
-      code: "quarantined", host: "darwin-arm64", attemptedPaths: ["/fixture"],
-      message: "quarantined engine", cause: "fixture",
+      code: "quarantined",
+      host: "darwin-arm64",
+      attemptedPaths: ["/fixture"],
+      message: "quarantined engine",
+      cause: "fixture",
     }),
   ]) {
     test(`#given activation succeeded #when ${failure.name} is reported #then later replies keep the hard diagnostic`, async () => {

@@ -1,0 +1,31 @@
+[package]
+name = "omo-computer-safety"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+omo-computer-core = { path = "../omo-computer-core" }
+serde.workspace = true
+serde_json.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { workspace = true, features = [
+    "Wdk_Storage_FileSystem",
+    "Wdk_System_SystemServices",
+    "Win32_Foundation",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+] }
+
+[dev-dependencies]
+omo-computer-backend-fake = { path = "../omo-computer-backend-fake" }
+omo-computer-session = { path = "../omo-computer-session" }
+sha2.workspace = true
+tempfile.workspace = true

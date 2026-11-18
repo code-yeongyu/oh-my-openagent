@@ -37,9 +37,13 @@ export interface Applied {
   readonly memories: number
 }
 
-const itemPathsOnDisk = async (root: string): Promise<ItemPaths> => itemPaths((await scanWorkingTree(diskLister(root))).files)
+const itemPathsOnDisk = async (root: string): Promise<ItemPaths> =>
+  itemPaths((await scanWorkingTree(diskLister(root))).files)
 
-const textHash = (text: string | null): string => createHash("sha256").update(text === null ? "\u0000absent" : `t:${text}`).digest("hex")
+const textHash = (text: string | null): string =>
+  createHash("sha256")
+    .update(text === null ? "\u0000absent" : `t:${text}`)
+    .digest("hex")
 
 /** Who a cycle's commit names: its batches' authors and, for owed renders, the peers whose edit lands. */
 const cyclePrincipals = (cycle: CycleRecord): string[] =>
@@ -52,7 +56,12 @@ const latestByKey = (records: readonly RenderRecord[]): Map<string, RenderRecord
 }
 
 /** Invariant 5: a landed render becomes the baseline only while the doc is still at its frontier. */
-export async function adoptLandedRenders(deps: EngineDeps, journal: SyncJournal, cycle: CycleRecord, paths: ItemPaths): Promise<void> {
+export async function adoptLandedRenders(
+  deps: EngineDeps,
+  journal: SyncJournal,
+  cycle: CycleRecord,
+  paths: ItemPaths,
+): Promise<void> {
   const latest = latestByKey(await journal.renders(cycle.id))
   for (const record of latest.values()) {
     // A record an older build wrote for a key the grammar refuses must not revive that key's baseline.
@@ -61,11 +70,17 @@ export async function adoptLandedRenders(deps: EngineDeps, journal: SyncJournal,
     if ((await deps.store.version(record.key)) !== record.frontier) continue
     await deps.store.markMaterialized(record.key, record.text)
   }
-  await adoptLegacyRenders(deps, cycle, new Set(latest.keys()), (key) => readWorking(deps.repo.root, landingPath(paths, key) ?? key))
+  await adoptLegacyRenders(deps, cycle, new Set(latest.keys()), (key) =>
+    readWorking(deps.repo.root, landingPath(paths, key) ?? key),
+  )
 }
 
 /** `held`: keys capture held back this cycle, whose working files must not be rendered over. */
-export async function applyVerified(deps: EngineDeps, journal: SyncJournal, held: ReadonlySet<string> = new Set()): Promise<Applied> {
+export async function applyVerified(
+  deps: EngineDeps,
+  journal: SyncJournal,
+  held: ReadonlySet<string> = new Set(),
+): Promise<Applied> {
   const resumed = (await journal.state()).cycle
   if (resumed !== null) {
     await advance(deps, journal, resumed, held)
@@ -81,7 +96,10 @@ export async function applyVerified(deps: EngineDeps, journal: SyncJournal, held
   const keys = new Set<string>(owed.map((o) => o.key))
   for (const record of records) {
     // Re-checked on read-back: a record journaled by an older build may carry any key.
-    const items = (await acceptedItems(deps, journal, "apply", record.items)).map((i) => ({ key: i.key, ops: fromBase64(i.ops) }))
+    const items = (await acceptedItems(deps, journal, "apply", record.items)).map((i) => ({
+      key: i.key,
+      ops: fromBase64(i.ops),
+    }))
     if (record.snapshot) await deps.store.applySnapshot({ items })
     else for (const item of items) await deps.store.apply(item.key, item.ops)
     for (const item of items) keys.add(item.key)
@@ -106,7 +124,13 @@ export async function applyVerified(deps: EngineDeps, journal: SyncJournal, held
 }
 
 /** Move a staged render into place (or the working file aside, for a delete), durably. */
-async function land(journal: SyncJournal, root: string, cycleId: string, record: RenderRecord, path: string): Promise<void> {
+async function land(
+  journal: SyncJournal,
+  root: string,
+  cycleId: string,
+  record: RenderRecord,
+  path: string,
+): Promise<void> {
   const target = join(root, path)
   const staged = journal.stagedPath(cycleId, record.seq)
   if (record.text === null) {
@@ -123,7 +147,12 @@ async function land(journal: SyncJournal, root: string, cycleId: string, record:
   await syncJournalDirectory(dirname(staged))
 }
 
-export async function advance(deps: EngineDeps, journal: SyncJournal, start: CycleRecord, held: ReadonlySet<string> = new Set()): Promise<void> {
+export async function advance(
+  deps: EngineDeps,
+  journal: SyncJournal,
+  start: CycleRecord,
+  held: ReadonlySet<string> = new Set(),
+): Promise<void> {
   let cycle = start
   // A cycle an older build journaled may list a key the grammar refuses; it is dropped durably
   // before any stage runs, so every replay sees the same key set (invariant 6).
@@ -139,7 +168,11 @@ export async function advance(deps: EngineDeps, journal: SyncJournal, start: Cyc
   const save = async (next: CycleRecord, point: "rendered" | "committed" | "checkpointed") => {
     cycle = next
     // Every key the cycle rendered no longer owes a render (#12284 review H1); same write as the checkpoint.
-    await journal.updateState(point === "checkpointed" ? { cycle, applied: cycle.last, owed: dischargeOwed((await journal.state()).owed, cycle.keys) } : { cycle })
+    await journal.updateState(
+      point === "checkpointed"
+        ? { cycle, applied: cycle.last, owed: dischargeOwed((await journal.state()).owed, cycle.keys) }
+        : { cycle },
+    )
     deps.fault?.(point)
   }
   if (cycle.stage === "merged") {
@@ -172,7 +205,13 @@ export async function advance(deps: EngineDeps, journal: SyncJournal, start: Cyc
       const frontier = await deps.store.version(key)
       const prior = latest.get(key)
       // Invariant 6: this (key, frontier) already rendered, landed and untouched.
-      if (prior !== undefined && prior.frontier === frontier && journal.renderLanded(cycle.id, prior) && textHash(working) === prior.hash) continue
+      if (
+        prior !== undefined &&
+        prior.frontier === frontier &&
+        journal.renderLanded(cycle.id, prior) &&
+        textHash(working) === prior.hash
+      )
+        continue
       const text = deps.store.render(key, working)
       seq += 1
       const record: RenderRecord = { seq, key, frontier, hash: textHash(text), text }
@@ -196,7 +235,10 @@ export async function advance(deps: EngineDeps, journal: SyncJournal, start: Cyc
     if (changed && !(await deps.repo.hasSyncCommit(range))) {
       const principals = cyclePrincipals(cycle).join(", ")
       const count = cycle.keys.length
-      await deps.repo.commit(onDisk(cycle.keys), `sync: ${count} memories updated\n\nSync-Seq: ${range}\nSync-Principals: ${principals}`)
+      await deps.repo.commit(
+        onDisk(cycle.keys),
+        `sync: ${count} memories updated\n\nSync-Seq: ${range}\nSync-Principals: ${principals}`,
+      )
       deps.fault?.("git-commit")
     }
     await save({ ...cycle, stage: "committed" }, "committed")

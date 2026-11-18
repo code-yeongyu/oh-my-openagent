@@ -1,5 +1,14 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -22,7 +31,17 @@ function tempRoot(): string {
 function seedLegacyRollups(stateDir: string): string {
   const dir = legacyRollupDir(stateDir)
   mkdirSync(dir, { recursive: true })
-  const rollup = JSON.stringify({ v: 1, pid: 4242, sessionHash: "hashed:old", sessionRole: "main", nextSeq: 3, window: { turns: 2 }, updatedAt: 1, consent: "enabled", scope: { cwd: "/repo" } })
+  const rollup = JSON.stringify({
+    v: 1,
+    pid: 4242,
+    sessionHash: "hashed:old",
+    sessionRole: "main",
+    nextSeq: 3,
+    window: { turns: 2 },
+    updatedAt: 1,
+    consent: "enabled",
+    scope: { cwd: "/repo" },
+  })
   writeFileSync(join(dir, "hashed_old.json"), rollup)
   writeFileSync(join(dir, "hashed_old.json.4242.tmp"), rollup)
   writeFileSync(join(dir, "hashed_gone.json.claimed-4242"), rollup)
@@ -104,7 +123,13 @@ describe("pre-#10225 rollups are removed", () => {
       mkdirSync(join(dir, "nested"))
       const diagnostics: Array<{ readonly event: string; readonly source?: string; readonly count?: number }> = []
 
-      await registerProcess({ agentDir, recorder: createTransportRecorder(), env: {}, cwd: "/repo", options: { isConfigEnabled: () => true, stateDir, diagnostics: (input) => diagnostics.push(input) } })
+      await registerProcess({
+        agentDir,
+        recorder: createTransportRecorder(),
+        env: {},
+        cwd: "/repo",
+        options: { isConfigEnabled: () => true, stateDir, diagnostics: (input) => diagnostics.push(input) },
+      })
 
       expect(readdirSync(dir)).toEqual(["nested"])
       expect(diagnostics.filter(({ event }) => event === "telemetry_activity_state_write_failed")).toEqual([])
@@ -123,11 +148,19 @@ describe("pre-#10225 rollups are removed", () => {
         const dir = seedLegacyRollups(stateDir)
         const diagnostics: Array<{ readonly event: string; readonly source?: string; readonly count?: number }> = []
 
-        await registerProcess({ agentDir, recorder: createTransportRecorder(), env: setup.env, cwd: "/repo", options: { ...setup.options, stateDir, diagnostics: (input) => diagnostics.push(input) } })
+        await registerProcess({
+          agentDir,
+          recorder: createTransportRecorder(),
+          env: setup.env,
+          cwd: "/repo",
+          options: { ...setup.options, stateDir, diagnostics: (input) => diagnostics.push(input) },
+        })
 
         expect(existsSync(dir)).toBe(false)
         const logged = diagnostics.filter(({ event }) => event === "telemetry_legacy_rollups_removed")
-        expect(logged).toEqual([{ event: "telemetry_legacy_rollups_removed", source: "omo-native-component", count: 3 }])
+        expect(logged).toEqual([
+          { event: "telemetry_legacy_rollups_removed", source: "omo-native-component", count: 3 },
+        ])
         expect(JSON.stringify(diagnostics)).not.toContain("hashed_")
       })
     })

@@ -22,7 +22,7 @@ beforeEach(() => {
 afterEach(() => {
   loadMcpConfigsSpy.mockRestore()
   createBuiltinMcpsSpy.mockRestore()
-  ;(unsafeTestValue(shared.log))?.mockRestore?.()
+  unsafeTestValue(shared.log)?.mockRestore?.()
 })
 
 function createPluginConfig(overrides: Partial<OhMyOpenCodeConfig> = {}): OhMyOpenCodeConfig {
@@ -182,5 +182,4 @@ describe("applyMcpConfig", () => {
     //#then
     expect(createBuiltinMcpsSpy).toHaveBeenCalledWith([], pluginConfig, { cwd: TEST_CTX.directory })
   })
-
 })

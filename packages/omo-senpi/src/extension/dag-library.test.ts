@@ -13,7 +13,10 @@ type DagCall = Record<string, unknown>
 
 type DagLibraryModule = {
   load: (name: string, options?: { suffix?: string }) => Promise<Record<string, unknown>>
-  start: (name: string, options?: { suffix?: string }) => Promise<{
+  start: (
+    name: string,
+    options?: { suffix?: string },
+  ) => Promise<{
     readonly run_id: string
     readonly done: () => Promise<unknown>
     readonly cancel: (reason?: string) => Promise<unknown>
@@ -225,9 +228,7 @@ describe("dag definition library", () => {
       }))
       const library = await loadLibrary()
 
-      await expect(library.start("nightly", { suffix: "t1" })).rejects.toThrow(
-        /the dag engine is not wired up/,
-      )
+      await expect(library.start("nightly", { suffix: "t1" })).rejects.toThrow(/the dag engine is not wired up/)
     })
   })
 
@@ -237,9 +238,7 @@ describe("dag definition library", () => {
       installGlobals(envMap, () => ({ details: { kind: "started" } }))
       const library = await loadLibrary()
 
-      await expect(library.start("nightly", { suffix: "t1" })).rejects.toThrow(
-        /did not include a run_id/,
-      )
+      await expect(library.start("nightly", { suffix: "t1" })).rejects.toThrow(/did not include a run_id/)
     })
   })
 })

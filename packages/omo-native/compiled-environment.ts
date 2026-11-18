@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs"
 import { delimiter, join } from "node:path"
 import { buildLabel, parseBuildInfo } from "./build-info"
-import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
+import { canonicalAgentDir, ensureAgentDir } from "./bin/lib/agent-dir.js"
 import { OMO_BRAND_LOGO } from "./bin/lib/brand-logo.generated.js"
 import { nearestNodeBin, readJson } from "./bin/lib/package-paths.js"
 
@@ -10,6 +10,7 @@ export function remapSenpiEnvironment(source: NodeJS.ProcessEnv = process.env, e
   delete env.OMO_BIN
   delete env.SENPI_BIN
   const agentDir = canonicalAgentDir(env)
+  ensureAgentDir(agentDir)
   env.OMO_CODING_AGENT_DIR = agentDir
   env.SENPI_CODING_AGENT_DIR = agentDir
   // The engine resolves its package dir from PACKAGE_DIR before falling back to
@@ -37,15 +38,29 @@ export function remapSenpiEnvironment(source: NodeJS.ProcessEnv = process.env, e
       const pluginManifest = readJson(join(execDir, "plugin", "package.json")) as { version?: string }
       changelogVersion = typeof pluginManifest.version === "string" ? pluginManifest.version : undefined
     }
-  } catch { /* test fixtures may omit the sibling manifest */ }
+  } catch {
+    /* test fixtures may omit the sibling manifest */
+  }
   env.SENPI_BRAND = JSON.stringify({
-    name: "OmO", logo: OMO_BRAND_LOGO, command: devCommand ?? "omo", displayVersion,
-    configDir: ".omo", flatLayout: false, envPrefix: "OMO", userAgent: "omo", originator: "omo",
+    name: "OmO",
+    logo: OMO_BRAND_LOGO,
+    command: devCommand ?? "omo",
+    displayVersion,
+    configDir: ".omo",
+    flatLayout: false,
+    envPrefix: "OMO",
+    userAgent: "omo",
+    originator: "omo",
     changelog: {
       path: join(execDir, "plugin", "CHANGELOG.md"),
       ...(changelogVersion === undefined ? {} : { version: changelogVersion }),
     },
-    update: { packageName: "omo-ai", distTag: displayVersion.includes("-") ? "beta" : "latest", command: devUpdateCommand ?? "omo update", changelogUrl: "https://github.com/code-yeongyu/oh-my-openagent/releases" },
+    update: {
+      packageName: "omo-ai",
+      distTag: displayVersion.includes("-") ? "beta" : "latest",
+      command: devUpdateCommand ?? "omo update",
+      changelogUrl: "https://github.com/code-yeongyu/oh-my-openagent/releases",
+    },
   })
   const binDir = nearestNodeBin(execDir)
   if (binDir) {

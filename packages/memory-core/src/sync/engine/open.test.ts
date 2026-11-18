@@ -5,7 +5,7 @@ import { join } from "node:path"
 
 import { createHttpTransport } from "./adapters/http-transport"
 import { startWireServer, type WireServer } from "./adapters/wire-server.test-support"
-import { FakeSealer, FakeVerifier } from "./fake-crypto.test-support"
+import { FAKE_SPACE, FakeSealer, FakeVerifier } from "./fake-crypto.test-support"
 import { gitRepo } from "./engine-harness.test-support"
 import { openDeviceSync } from "./open"
 
@@ -28,6 +28,7 @@ function session(server: WireServer, device: string) {
     transport: createHttpTransport({ baseUrl: server.url, token: () => server.tokenOf(device) }),
     verifier: new FakeVerifier("acct"),
     sealer: new FakeSealer("acct"),
+    space: FAKE_SPACE,
   }
 }
 
@@ -35,7 +36,13 @@ test("one device runs one engine: a second open on the same repo is refused unti
   const server = startWireServer({ token: "t", devices: { a: "dev-a" } })
   cleanup.push(() => server.stop())
   const dirs = await deviceDirs("a")
-  const options = { repoDir: dirs.repo, stateDir: dirs.state, locksDir: dirs.locks, session: session(server, "a"), machineId: "m-a" }
+  const options = {
+    repoDir: dirs.repo,
+    stateDir: dirs.state,
+    locksDir: dirs.locks,
+    session: session(server, "a"),
+    machineId: "m-a",
+  }
   const first = await openDeviceSync(options)
   if (first === null) throw new Error("the first open was refused")
   expect(await openDeviceSync(options)).toBeNull()
@@ -49,10 +56,25 @@ test("two devices over HTTP converge through the production adapters, and the st
   const server = startWireServer({ token: "t", devices: { a: "dev-a", b: "dev-b" } })
   cleanup.push(() => server.stop())
   const [da, db] = [await deviceDirs("a"), await deviceDirs("b")]
-  const a = await openDeviceSync({ repoDir: da.repo, stateDir: da.state, locksDir: da.locks, session: session(server, "a"), machineId: "m-a" })
-  const b = await openDeviceSync({ repoDir: db.repo, stateDir: db.state, locksDir: db.locks, session: session(server, "b"), machineId: "m-b" })
+  const a = await openDeviceSync({
+    repoDir: da.repo,
+    stateDir: da.state,
+    locksDir: da.locks,
+    session: session(server, "a"),
+    machineId: "m-a",
+  })
+  const b = await openDeviceSync({
+    repoDir: db.repo,
+    stateDir: db.state,
+    locksDir: db.locks,
+    session: session(server, "b"),
+    machineId: "m-b",
+  })
   if (a === null || b === null) throw new Error("open refused")
-  cleanup.push(() => a.close(), () => b.close())
+  cleanup.push(
+    () => a.close(),
+    () => b.close(),
+  )
   await Bun.write(join(da.repo, "note.md"), "---\ndescription: n\n---\nhello\n")
   await a.engine.runCycle()
   await b.engine.runCycle()
@@ -64,7 +86,13 @@ test("retiring the journal directory does not release the live engine lease", as
   const server = startWireServer({ token: "t", devices: { a: "dev-a" } })
   cleanup.push(() => server.stop())
   const dirs = await deviceDirs("a")
-  const options = { repoDir: dirs.repo, stateDir: dirs.state, locksDir: dirs.locks, session: session(server, "a"), machineId: "m-a" }
+  const options = {
+    repoDir: dirs.repo,
+    stateDir: dirs.state,
+    locksDir: dirs.locks,
+    session: session(server, "a"),
+    machineId: "m-a",
+  }
   const first = await openDeviceSync(options)
   if (first === null) throw new Error("the first open was refused")
   cleanup.push(() => first.close())

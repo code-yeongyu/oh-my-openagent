@@ -31,9 +31,7 @@ export function _setLogImplementationForTesting(logImplementation: LogImplementa
   logImplementationForTesting = logImplementation
 }
 
-export function _setServerBasicAuthHeaderResolverForTesting(
-  resolver: ServerBasicAuthHeaderResolver | undefined,
-): void {
+export function _setServerBasicAuthHeaderResolverForTesting(resolver: ServerBasicAuthHeaderResolver | undefined): void {
   serverBasicAuthHeaderResolverForTesting = resolver
 }
 
@@ -90,7 +88,7 @@ export async function patchPart(
   sessionID: string,
   messageID: string,
   partID: string,
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
 ): Promise<boolean> {
   const baseUrl = getServerBaseUrl(client)
   if (!baseUrl) {
@@ -111,7 +109,7 @@ export async function patchPart(
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": auth,
+        Authorization: auth,
       },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(10_000),
@@ -134,7 +132,7 @@ export async function deletePart(
   client: unknown,
   sessionID: string,
   messageID: string,
-  partID: string
+  partID: string,
 ): Promise<boolean> {
   const baseUrl = getServerBaseUrl(client)
   if (!baseUrl) {
@@ -154,7 +152,7 @@ export async function deletePart(
     const response = await getFetchImplementation()(url, {
       method: "DELETE",
       headers: {
-        "Authorization": auth,
+        Authorization: auth,
       },
       signal: AbortSignal.timeout(10_000),
     })

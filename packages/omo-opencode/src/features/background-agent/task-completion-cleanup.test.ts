@@ -113,9 +113,7 @@ function createManager(
     $: {} as PluginInput["$"],
   }
 
-  const manager = new BackgroundManager(
-    { pluginContext: ctx, config: undefined, enableParentSessionNotifications }
-  )
+  const manager = new BackgroundManager({ pluginContext: ctx, config: undefined, enableParentSessionNotifications })
 
   return { manager, promptAsyncCalls }
 }
@@ -129,7 +127,11 @@ function installFakeTimers(): FakeTimers {
   const dueTimes = new Map<ReturnType<typeof setTimeout>, number>()
   let now = Date.now()
 
-  globalThis.setTimeout = ((handler: Parameters<typeof setTimeout>[0], delay?: number, ...args: unknown[]): ReturnType<typeof setTimeout> => {
+  globalThis.setTimeout = ((
+    handler: Parameters<typeof setTimeout>[0],
+    delay?: number,
+    ...args: unknown[]
+  ): ReturnType<typeof setTimeout> => {
     if (typeof handler !== "function") {
       throw new Error("Expected function timeout handler")
     }
@@ -174,7 +176,8 @@ function installFakeTimers(): FakeTimers {
       while (true) {
         const nextTimer = nextTimerDueBefore(target)
         if (!nextTimer) break
-        if (++fired > 10_000) throw new Error("fake clock fired more than 10000 timers in one advance: a timer keeps rescheduling itself")
+        if (++fired > 10_000)
+          throw new Error("fake clock fired more than 10000 timers in one advance: a timer keeps rescheduling itself")
         await this.run(nextTimer)
       }
       now = target
@@ -278,7 +281,11 @@ async function waitForRequeuedParentWake(manager: BackgroundManager, sessionID: 
     throw new Error("Fake timers must be installed before waiting for parent wakes")
   }
 
-  for (let attempts = 0; attempts < 12 && (getPendingParentWakes(manager).get(sessionID)?.notifications.length ?? 0) === 0; attempts += 1) {
+  for (
+    let attempts = 0;
+    attempts < 12 && (getPendingParentWakes(manager).get(sessionID)?.notifications.length ?? 0) === 0;
+    attempts += 1
+  ) {
     await flushParentWake(manager, sessionID)
     if ((getPendingParentWakes(manager).get(sessionID)?.notifications.length ?? 0) > 0) break
     await fakeTimers.runNext()
@@ -306,7 +313,13 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       const { manager } = createManager(false)
       managerUnderTest = manager
       fakeTimers = installFakeTimers()
-      const taskA = createTask({ id: "task-a", parentSessionId: "parent-1", description: "task A", status: "completed", completedAt: new Date() })
+      const taskA = createTask({
+        id: "task-a",
+        parentSessionId: "parent-1",
+        description: "task A",
+        status: "completed",
+        completedAt: new Date(),
+      })
       const taskB = createTask({ id: "task-b", parentSessionId: "parent-1", description: "task B", status: "running" })
       const taskC = createTask({ id: "task-c", parentSessionId: "parent-1", description: "task C", status: "pending" })
       getTasks(manager).set(taskA.id, taskA)
@@ -347,7 +360,13 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       // given
       const { manager, promptAsyncCalls } = createManager(true)
       managerUnderTest = manager
-      const taskA = createTask({ id: "task-a", parentSessionId: "parent-1", description: "task A", status: "completed", completedAt: new Date("2026-03-11T00:01:00.000Z") })
+      const taskA = createTask({
+        id: "task-a",
+        parentSessionId: "parent-1",
+        description: "task A",
+        status: "completed",
+        completedAt: new Date("2026-03-11T00:01:00.000Z"),
+      })
       const taskB = createTask({ id: "task-b", parentSessionId: "parent-1", description: "task B", status: "running" })
       getTasks(manager).set(taskA.id, taskA)
       getTasks(manager).set(taskB.id, taskB)
@@ -382,13 +401,15 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       const { manager, promptAsyncCalls } = createManager(true)
       managerUnderTest = manager
       const taskIds = ["task-1", "task-2", "task-3", "task-4", "task-5"]
-      const tasks = taskIds.map((id, index) => createTask({
-        id,
-        parentSessionId: "parent-1",
-        description: `description ${id}`,
-        status: "completed",
-        completedAt: new Date(`2026-03-11T00:01:0${index}.000Z`),
-      }))
+      const tasks = taskIds.map((id, index) =>
+        createTask({
+          id,
+          parentSessionId: "parent-1",
+          description: `description ${id}`,
+          status: "completed",
+          completedAt: new Date(`2026-03-11T00:01:0${index}.000Z`),
+        }),
+      )
       for (const task of tasks) {
         getTasks(manager).set(task.id, task)
       }
@@ -422,7 +443,13 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       }
       const { manager, promptAsyncCalls } = createManager(true, sessionStatuses)
       managerUnderTest = manager
-      const task = createTask({ id: "task-a", parentSessionId: "parent-1", description: "task A", status: "completed", completedAt: new Date("2026-03-11T00:01:00.000Z") })
+      const task = createTask({
+        id: "task-a",
+        parentSessionId: "parent-1",
+        description: "task A",
+        status: "completed",
+        completedAt: new Date("2026-03-11T00:01:00.000Z"),
+      })
       getTasks(manager).set(task.id, task)
       getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
 
@@ -440,7 +467,13 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       }
       const { manager, promptAsyncCalls } = createManager(true, sessionStatuses)
       managerUnderTest = manager
-      const taskA = createTask({ id: "task-a", parentSessionId: "parent-1", description: "task A", status: "completed", completedAt: new Date("2026-03-11T00:01:00.000Z") })
+      const taskA = createTask({
+        id: "task-a",
+        parentSessionId: "parent-1",
+        description: "task A",
+        status: "completed",
+        completedAt: new Date("2026-03-11T00:01:00.000Z"),
+      })
       const taskB = createTask({ id: "task-b", parentSessionId: "parent-1", description: "task B", status: "running" })
       getTasks(manager).set(taskA.id, taskA)
       getTasks(manager).set(taskB.id, taskB)
@@ -472,7 +505,13 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       }
       const { manager, promptAsyncCalls } = createManager(true, sessionStatuses)
       managerUnderTest = manager
-      const taskA = createTask({ id: "task-a", parentSessionId: "parent-1", description: "task A", status: "completed", completedAt: new Date("2026-03-11T00:01:00.000Z") })
+      const taskA = createTask({
+        id: "task-a",
+        parentSessionId: "parent-1",
+        description: "task A",
+        status: "completed",
+        completedAt: new Date("2026-03-11T00:01:00.000Z"),
+      })
       const taskB = createTask({ id: "task-b", parentSessionId: "parent-1", description: "task B", status: "running" })
       getTasks(manager).set(taskA.id, taskA)
       getTasks(manager).set(taskB.id, taskB)
@@ -788,7 +827,13 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       const { manager, promptAsyncCalls } = createManager(true)
       managerUnderTest = manager
       const directory = Reflect.get(manager, "directory") as string
-      const task = createTask({ id: "task-a", parentSessionId: "parent-1", description: "task A", status: "completed", completedAt: new Date("2026-03-11T00:01:00.000Z") })
+      const task = createTask({
+        id: "task-a",
+        parentSessionId: "parent-1",
+        description: "task A",
+        status: "completed",
+        completedAt: new Date("2026-03-11T00:01:00.000Z"),
+      })
       getTasks(manager).set(task.id, task)
       getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
 
@@ -809,7 +854,13 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       }
       const { manager, promptAsyncCalls } = createManager(true, sessionStatuses)
       managerUnderTest = manager
-      const task = createTask({ id: "task-a", parentSessionId: "parent-1", description: "task A", status: "completed", completedAt: new Date("2026-03-11T00:01:00.000Z") })
+      const task = createTask({
+        id: "task-a",
+        parentSessionId: "parent-1",
+        description: "task A",
+        status: "completed",
+        completedAt: new Date("2026-03-11T00:01:00.000Z"),
+      })
       getTasks(manager).set(task.id, task)
       getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
       await notifyParentSessionForTest(manager, task)
@@ -835,7 +886,13 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       }
       const { manager, promptAsyncCalls } = createManager(true, sessionStatuses)
       managerUnderTest = manager
-      const task = createTask({ id: "task-a", parentSessionId: "parent-1", description: "task A", status: "completed", completedAt: new Date("2026-03-11T00:01:00.000Z") })
+      const task = createTask({
+        id: "task-a",
+        parentSessionId: "parent-1",
+        description: "task A",
+        status: "completed",
+        completedAt: new Date("2026-03-11T00:01:00.000Z"),
+      })
       getTasks(manager).set(task.id, task)
       getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
 
@@ -863,7 +920,13 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
         throw promptError
       })
       managerUnderTest = manager
-      const task = createTask({ id: "task-a", parentSessionId: "parent-1", description: "task A", status: "completed", completedAt: new Date("2026-03-11T00:01:00.000Z") })
+      const task = createTask({
+        id: "task-a",
+        parentSessionId: "parent-1",
+        description: "task A",
+        status: "completed",
+        completedAt: new Date("2026-03-11T00:01:00.000Z"),
+      })
       getTasks(manager).set(task.id, task)
       getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
 
@@ -890,7 +953,13 @@ describe("BackgroundManager.notifyParentSession cleanup scheduling", () => {
       const { manager } = createManager(false)
       managerUnderTest = manager
       fakeTimers = installFakeTimers()
-      const task = createTask({ id: "task-a", parentSessionId: "parent-1", description: "task A", status: "completed", completedAt: new Date("2026-03-11T00:01:00.000Z") })
+      const task = createTask({
+        id: "task-a",
+        parentSessionId: "parent-1",
+        description: "task A",
+        status: "completed",
+        completedAt: new Date("2026-03-11T00:01:00.000Z"),
+      })
       getTasks(manager).set(task.id, task)
       getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
 

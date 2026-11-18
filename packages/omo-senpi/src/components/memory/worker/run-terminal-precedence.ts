@@ -1,17 +1,10 @@
 import { existsSync } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
-import {
-  readRunJson,
-  runOutcomeMatchesLedger,
-  type RunOutcome,
-} from "./run-artifacts"
+import { readRunJson, runOutcomeMatchesLedger, type RunOutcome } from "./run-artifacts"
 import { classifyRunProcess, type RunLivenessSeams } from "./run-liveness"
 import { claimRunTerminal, runTerminalClaimMatches } from "./run-terminal-claim"
-import {
-  parseReservationRunLedger,
-  type ReservationRunLedger,
-} from "./reservation-run-ledger"
+import { parseReservationRunLedger, type ReservationRunLedger } from "./reservation-run-ledger"
 
 interface RunPublicationPending {
   readonly version: 1
@@ -37,9 +30,7 @@ async function readTerminalPublication(
   const publishingPath = join(runDir, "publishing.json")
   if (!existsSync(publishingPath)) return undefined
   const publishing = await readRunJson<RunPublicationPending>(publishingPath)
-  return publishing.version === 1
-    && publishing.runId === ledger.runId
-    && publishing.attempt === ledger.attempt
+  return publishing.version === 1 && publishing.runId === ledger.runId && publishing.attempt === ledger.attempt
     ? "veto"
     : undefined
 }

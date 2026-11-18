@@ -41,7 +41,11 @@ async function orphanedCommitParkedInCommitMsg(): Promise<OrphanFixture> {
   await mkdir(paths.locks, { recursive: true })
   await git(paths.repo, ["init", "-b", "main"])
   disableFixtureAutoMaintenance(paths.repo)
-  for (const [key, value] of [["commit.gpgsign", "false"], ["user.name", "Orphan Owner"], ["user.email", "orphan@omo.local"]] as const) {
+  for (const [key, value] of [
+    ["commit.gpgsign", "false"],
+    ["user.name", "Orphan Owner"],
+    ["user.email", "orphan@omo.local"],
+  ] as const) {
     await git(paths.repo, ["config", key, value])
   }
   await writeFile(join(paths.repo, "notes.md"), "first\n", "utf8")
@@ -51,7 +55,11 @@ async function orphanedCommitParkedInCommitMsg(): Promise<OrphanFixture> {
   const sentinel = join(root, "commit-msg-started")
   const releasePath = join(root, "commit-msg-release")
   const hookPath = join(paths.repo, ".git", "hooks", "commit-msg")
-  await writeFile(hookPath, ["#!/bin/sh", `: > "${sentinel}"`, `while [ ! -f "${releasePath}" ]; do sleep 0.05; done`, "exit 0", ""].join("\n"), "utf8")
+  await writeFile(
+    hookPath,
+    ["#!/bin/sh", `: > "${sentinel}"`, `while [ ! -f "${releasePath}" ]; do sleep 0.05; done`, "exit 0", ""].join("\n"),
+    "utf8",
+  )
   await chmod(hookPath, 0o755)
   await writeFile(join(paths.repo, "notes.md"), "second\n", "utf8")
 
@@ -59,20 +67,26 @@ async function orphanedCommitParkedInCommitMsg(): Promise<OrphanFixture> {
   // Its pid becomes the dead owner recorded in the memory-write lock, exactly like a SIGKILLed
   // memory writer whose git child keeps running.
   const gitPidFile = join(root, "git.pid")
-  const owner = spawn("sh", ["-c", `git -C "${paths.repo}" commit -a -m orphaned & echo $! > "${gitPidFile}"; wait`], { stdio: "ignore" })
+  const owner = spawn("sh", ["-c", `git -C "${paths.repo}" commit -a -m orphaned & echo $! > "${gitPidFile}"; wait`], {
+    stdio: "ignore",
+  })
   const ownerExit = new Promise<void>((resolve) => owner.once("exit", () => resolve()))
   expect(await probeUntil(() => existsSync(sentinel) && existsSync(gitPidFile), 10_000)).toBe(true)
   const ownerPid = owner.pid
   if (ownerPid === undefined) throw new Error("owner has no pid")
   const writerLockPath = memoryWriterLockPath(paths.locks)
-  await writeFile(writerLockPath, JSON.stringify({
-    pid: ownerPid,
-    process_start: "unavailable",
-    hostname: hostname(),
-    nonce: randomUUID(),
-    created_at: new Date().toISOString(),
-    purpose: "memory-write",
-  }), "utf8")
+  await writeFile(
+    writerLockPath,
+    JSON.stringify({
+      pid: ownerPid,
+      process_start: "unavailable",
+      hostname: hostname(),
+      nonce: randomUUID(),
+      created_at: new Date().toISOString(),
+      purpose: "memory-write",
+    }),
+    "utf8",
+  )
   owner.kill("SIGKILL")
   await ownerExit
 
@@ -101,48 +115,60 @@ async function expectOrphanCommitLanded(repoDir: string): Promise<void> {
 }
 
 describe("stranded git lock sweep vs an ORPHANED live git child of a proven-dead owner (omo #10199 r5 HIGH 1)", () => {
-  test.skipIf(process.platform === "win32")("#given the writer lock taken over from a SIGKILLed owner whose git commit still runs #when the sweep runs #then the orphan's lock survives as repo-in-use and its commit lands", async () => {
-    // #given
-    const fixture = await orphanedCommitParkedInCommitMsg()
-    const record = await createLockRecord("memory-write")
-    await acquireLock(fixture.writerLockPath, record, { waitTimeoutMs: 5_000, retryDelayMs: 5 })
-    try {
-      // #when
-      const report = await sweepStrandedGitLockFiles(fixture.repoDir, 50)
+  test.skipIf(process.platform === "win32")(
+    "#given the writer lock taken over from a SIGKILLed owner whose git commit still runs #when the sweep runs #then the orphan's lock survives as repo-in-use and its commit lands",
+    async () => {
+      // #given
+      const fixture = await orphanedCommitParkedInCommitMsg()
+      const record = await createLockRecord("memory-write")
+      await acquireLock(fixture.writerLockPath, record, { waitTimeoutMs: 5_000, retryDelayMs: 5 })
+      try {
+        // #when
+        const report = await sweepStrandedGitLockFiles(fixture.repoDir, 50)
+
+        // #then
+        expect(report.removed).toEqual([])
+        expect(existsSync(fixture.lockPath)).toBe(true)
+        expect(report.kept).toEqual([{ path: fixture.lockPath, reason: "repo-in-use" }])
+      } finally {
+        await fixture.release()
+        await releaseLock(fixture.writerLockPath, record)
+      }
+      await expectOrphanCommitLanded(fixture.repoDir)
+    },
+    30_000,
+  )
+
+  test.skipIf(process.platform === "win32")(
+    "#given the same orphan #when a memory write hits its lock #then the write fails with the repo-in-use reason and the orphan's commit lands",
+    async () => {
+      // #given
+      const fixture = await orphanedCommitParkedInCommitMsg()
+      const record = await createLockRecord("memory-write")
+      await acquireLock(fixture.writerLockPath, record, { waitTimeoutMs: 5_000, retryDelayMs: 5 })
+      let failure: unknown
+      try {
+        await writeFile(join(fixture.repoDir, "later.md"), "later\n", "utf8")
+        // #when: the same recovery wrapper every GitMemoryRepo index/ref mutation runs through
+        failure = await withStrandedGitLockRecovery(fixture.repoDir, () =>
+          git(fixture.repoDir, ["add", "--", "later.md"]),
+        ).then(
+          () => undefined,
+          (error: unknown) => error,
+        )
+      } finally {
+        await fixture.release()
+        await releaseLock(fixture.writerLockPath, record)
+      }
 
       // #then
-      expect(report.removed).toEqual([])
-      expect(existsSync(fixture.lockPath)).toBe(true)
-      expect(report.kept).toEqual([{ path: fixture.lockPath, reason: "repo-in-use" }])
-    } finally {
-      await fixture.release()
-      await releaseLock(fixture.writerLockPath, record)
-    }
-    await expectOrphanCommitLanded(fixture.repoDir)
-  }, 30_000)
-
-  test.skipIf(process.platform === "win32")("#given the same orphan #when a memory write hits its lock #then the write fails with the repo-in-use reason and the orphan's commit lands", async () => {
-    // #given
-    const fixture = await orphanedCommitParkedInCommitMsg()
-    const record = await createLockRecord("memory-write")
-    await acquireLock(fixture.writerLockPath, record, { waitTimeoutMs: 5_000, retryDelayMs: 5 })
-    let failure: unknown
-    try {
-      await writeFile(join(fixture.repoDir, "later.md"), "later\n", "utf8")
-      // #when: the same recovery wrapper every GitMemoryRepo index/ref mutation runs through
-      failure = await withStrandedGitLockRecovery(fixture.repoDir, () => git(fixture.repoDir, ["add", "--", "later.md"]))
-        .then(() => undefined, (error: unknown) => error)
-    } finally {
-      await fixture.release()
-      await releaseLock(fixture.writerLockPath, record)
-    }
-
-    // #then
-    expect(failure).toBeInstanceOf(StrandedGitLockError)
-    expect(String((failure as Error).message)).toContain("still working in the repository")
-    expect(String((failure as Error).message)).not.toContain("cannot be proven dead")
-    await expectOrphanCommitLanded(fixture.repoDir)
-  }, 30_000)
+      expect(failure).toBeInstanceOf(StrandedGitLockError)
+      expect(String((failure as Error).message)).toContain("still working in the repository")
+      expect(String((failure as Error).message)).not.toContain("cannot be proven dead")
+      await expectOrphanCommitLanded(fixture.repoDir)
+    },
+    30_000,
+  )
 })
 
 describe("StrandedGitLockError names the reason each lock was kept (omo #10199 r5 LOW 6)", () => {

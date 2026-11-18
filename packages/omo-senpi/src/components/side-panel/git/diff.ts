@@ -87,9 +87,7 @@ export async function readGitDiff(exec: PanelExec, root: string, file: PanelGitE
   }
   let result = await exec("git", gitDiffArgs(file), options).catch(() => undefined)
   if (result?.code === 128 && result.stdout === "" && file.xy[0] !== " ") {
-    result = await exec("git", ["diff", "--no-index", "--", "/dev/null", file.path], options).catch(
-      () => undefined,
-    )
+    result = await exec("git", ["diff", "--no-index", "--", "/dev/null", file.path], options).catch(() => undefined)
   }
   if (result === undefined) return [{ text: "git diff could not be run", color: "error" }]
   // `--no-index` exits 1 whenever the files differ, which is the normal case here.

@@ -39,7 +39,7 @@ Want more control? Run `/ulw-plan` for interview-based planning, then `/ulw-exec
 
 You don't have to know model names to get a good main agent. Pick a profile by intent and omo picks the model:
 
-- **Capable**: the strongest generalist you have. Claude Fable 5.1, then Claude Opus 5.5, then Kimi K3, then GLM 5.3.
+- **Capable**: the strongest generalist you have. Claude Fable 5.2, then Claude Fable 5.1, then Claude Opus 5.5, then Kimi K3, then GLM 5.3.
 - **Deep work**: maximum reasoning for hard problems. GPT-6 Astra, then GPT-6 Sol.
 
 Set one key in `omo.json`:
@@ -60,7 +60,7 @@ We used to call this "Claude Code on steroids." That was wrong.
 
 This isn't about making Claude Code better. It's about breaking free from the idea that one model, one provider, one way of working is enough. Anthropic wants you locked in. OpenAI wants you locked in. Everyone wants you locked in.
 
-Oh My OpenAgent doesn't play that game. It orchestrates across models, picking the right brain for the right job. Your session model for orchestration. Visual work uses `claude-fable-5-1` max, then `claude-opus-5-5` max, then `kimi-k3` max. GPT-6 Astra for deep reasoning, with GPT-5.6 Sol behind it. GPT-6 Luna Fast for quick tasks, Kimi high-speed for codebase search. All working together, automatically.
+Oh My OpenAgent doesn't play that game. It orchestrates across models, picking the right brain for the right job. Your session model for orchestration. Visual work uses `claude-fable-5-2` max, then `claude-fable-5-1` max, then `claude-opus-5-5` max, then `kimi-k3` max. GPT-6 Astra for deep reasoning, with GPT-5.6 Sol behind it. GPT-6 Luna Fast for quick tasks, Kimi high-speed for codebase search. All working together, automatically.
 
 ---
 
@@ -162,7 +162,7 @@ Override specific categories or curated agents in `omo.json`:
   "agents": {
     // Planning helpers: Claude for the gap analysis, GPT for the review
     "plan-consultant": { "model": "anthropic/claude-opus-5-5", "reasoning": "high" },
-    "plan-reviewer": { "model": "openai/gpt-6-astra", "reasoning": "xhigh" },
+    "plan-reviewer": { "model": "openai/gpt-6.2-astra", "reasoning": "xhigh" },
 
     // Research agents: cheap and fast is the point
     "explore": { "model": "openai/gpt-6-luna-fast", "reasoning": "low" },
@@ -170,20 +170,20 @@ Override specific categories or curated agents in `omo.json`:
   },
 
   "categories": {
-    // Design consultation: Fable 5 max
-    "architect": { "model": "anthropic/claude-fable-5-1", "reasoning": "max" },
+    // Design consultation: Fable 5 xhigh
+    "architect": { "model": "anthropic/claude-fable-5-2", "reasoning": "xhigh" },
 
     // Frontend/UI work: Fable 5 max, then Opus 5 max, then Kimi K3.1 Pro max
-    "visual-engineering": { "model": "anthropic/claude-fable-5-1", "reasoning": "max" },
+    "visual-engineering": { "model": "anthropic/claude-fable-5-2", "reasoning": "max" },
 
     // Hard logic: GPT-6 Astra max, then GPT-5.6 Sol max
-    "ultrabrain": { "model": "openai/gpt-6-astra", "reasoning": "max" },
+    "ultrabrain": { "model": "openai/gpt-6.2-astra", "reasoning": "max" },
 
     // Autonomous research and execution: GPT-6 Astra high, then GPT-5.6 Sol medium
-    "deep-high": { "model": "openai/gpt-6-astra", "reasoning": "high" },
+    "deep-high": { "model": "openai/gpt-6.2-astra", "reasoning": "high" },
 
     // Creative and design work
-    "artistry": { "model": "anthropic/claude-fable-5-1", "reasoning": "max" },
+    "artistry": { "model": "anthropic/claude-fable-5-2", "reasoning": "max" },
 
     // Quick tasks: fast and cheap
     "quick": { "model": "openai/gpt-6-luna-fast", "reasoning": "low" },
@@ -210,8 +210,8 @@ Override specific categories or curated agents in `omo.json`:
 
 **GPT models** (explicit reasoning, principle-driven):
 
-- GPT-6 Astra: OpenAI's most capable model; default for `plan-reviewer` (xhigh, high on Copilot), `ultrabrain` (max), and `deep-high` (high), with `gpt-6-astra-fast` as the Fast-mode variant
-- GPT-6.1 Sol: `deep-low` runs it at medium on the OpenAI lanes, then its Fast (priority) tier `gpt-6.1-sol-fast`, then GPT-5.6 Sol and `gpt-5.6-sol-fast`; it is also the fifth `unspecified-low` rung (medium, OpenAI lanes); its Fast tier is also the first Sol rung on Obsessive · Normal, with plain GPT-6.1 Sol right behind it
+- GPT-6.2 Astra: OpenAI's most capable model; default for `plan-reviewer` (xhigh), `ultrabrain` (max), `deep-high` (high) and both Obsessive profiles, with `gpt-6.2-astra-fast` as the Fast-mode variant. GPT-6 Astra stays right behind it (it is what GitHub Copilot serves)
+- GPT-6.2 Sol: `deep-low` runs it at medium on the OpenAI lanes, then its Fast (priority) tier `gpt-6.2-sol-fast`, then GPT-6.1 Sol and its Fast tier, then GPT-5.6 Sol and `gpt-5.6-sol-fast`; it is also the fifth `unspecified-low` rung (medium, OpenAI lanes); its Fast tier is also the first Sol rung on Obsessive · Normal, with plain GPT-6.2 Sol right behind it
 - GPT-5.6 Sol: the GPT-recommended main-agent configuration; the fallback rung under Astra for `ultrabrain` (max)
 - GPT-5.6 Terra: balanced mid-tier; an optional override, not part of any default chain
 - GPT 5.6 Luna Fast: fast and cheap; default for `explore` and `librarian`

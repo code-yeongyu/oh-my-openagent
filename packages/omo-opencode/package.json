@@ -23,14 +23,15 @@
   },
   "dependencies": {
     "@clack/prompts": "^1.8.1",
-    "@code-yeongyu/senpi": "2026.11.5-1",
-    "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.5-1",
+    "@code-yeongyu/senpi": "2026.11.18",
+    "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.18",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@oh-my-opencode/agents-md-core": "workspace:*",
     "@oh-my-opencode/boulder-state": "workspace:*",
     "@oh-my-opencode/claude-code-compat-core": "workspace:*",
     "@oh-my-opencode/comment-checker-core": "workspace:*",
     "@oh-my-opencode/delegate-core": "workspace:*",
+    "@oh-my-opencode/device-service-core": "workspace:*",
     "@oh-my-opencode/hashline-core": "workspace:*",
     "@oh-my-opencode/mcp-client-core": "workspace:*",
     "@oh-my-opencode/model-core": "workspace:*",
@@ -51,6 +52,6 @@
     "commander": "^15.0.0",
     "jsonc-parser": "^3.3.1",
     "picocolors": "^1.1.1",
-    "zod": "^4.6.5"
+    "zod": "^4.6.6"
   }
 }

@@ -43,7 +43,7 @@
     "docs/guide/install.md: command -v omo",
     "docs/guide/migrating-from-opencode.md: /bin/omo",
     "docs/guide/migrating-from-opencode.md: omo doctor x4",
-    "docs/reference/cli.md: omo doctor",
+    "docs/reference/cli.md: omo doctor x2",
     "docs/reference/configuration.md: omo doctor x5",
     "docs/reference/omo-ai-publishing.md: /bin/omo x2",
     "docs/reference/omo-ai-publishing.md: omo doctor",
@@ -72,7 +72,7 @@
     "packages/omo-native/test/bun-runtime.test.ts: /bin/omo",
     "packages/omo-native/test/compile-entry.test.ts: /bin/omo x2",
     "packages/omo-native/test/compiled-setup-doctor.test.ts: omo doctor x2",
-    "packages/omo-native/test/compiled-update-package-owner.test.ts: /bin/omo x5",
+    "packages/omo-native/test/compiled-update-package-owner.test.ts: /bin/omo x6",
     "packages/omo-native/test/config-doctor.test.ts: omo doctor",
     "packages/omo-native/test/doctor-edition.test.ts: omo doctor",
     "packages/omo-native/test/doctor-migration.test.ts: omo doctor",
@@ -129,15 +129,18 @@
     "packages/omo-senpi/src/components/memory/commands/doctor-reservation.ts: omo doctor x2",
     "packages/memory-core/src/retention/host-step.ts: omo doctor",
     "packages/omo-native/test/doctor-retention-fix.test.ts: omo doctor x2",
-    "knip.jsonc: omo doctor",
+    "packages/omo-native/knip.workspace.jsonc: omo doctor",
     "packages/memory-core/src/retention/cap.ts: omo doctor",
     "packages/memory-core/src/retention/pass.ts: omo doctor",
     "packages/memory-core/src/retention/size.ts: omo doctor"
   ],
   "literal-label": [
     "packages/omo-opencode/src/cli/account-keys/keystore.ts: =omo",
+    "packages/device-service-core/test/cold-wake/session-host-unit.test.ts: /bin/omo x8",
     "packages/device-service-core/test/local-api/conformance/fixtures/refresher.register.json: /bin/omo x2",
-    "packages/omo-native/test/remote-cli.test.ts: /bin/omo",
+    "packages/omo-native/test/remote-background.test.ts: /bin/omo x2",
+    "packages/omo-native/test/remote-bootstrap-published-release.test.ts: /bin/omo",
+    "packages/omo-native/test/remote-cli-harness.ts: /bin/omo",
     "packages/omo-senpi/src/components/device-service/index.test.ts: /bin/omo"
   ]
 }

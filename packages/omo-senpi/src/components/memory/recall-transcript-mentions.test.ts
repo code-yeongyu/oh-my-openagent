@@ -108,7 +108,10 @@ function branchEntries(): Record<string, unknown>[] {
     }
     if (index % 25 === 23) {
       // an entry without a usable id: it can never be cached and must still be scanned
-      entries.push({ type: "message", message: { role: "assistant", content: [{ type: "text", text: `${FILLER} ${path(index)}, noted.` }] } })
+      entries.push({
+        type: "message",
+        message: { role: "assistant", content: [{ type: "text", text: `${FILLER} ${path(index)}, noted.` }] },
+      })
       continue
     }
     entries.push(assistantEntry(id, `${FILLER} nothing to see here ${index}. ${FILLER}`))
@@ -220,7 +223,13 @@ describe("createTranscriptMentionIndex", () => {
   test("#given a cached window #when memory HEAD moves without adding a path #then no cached entry is serialized or scanned again", () => {
     // given: every serialization of an entry goes through its toJSON, so the count is the scan work
     let serialized = 0
-    const entries = branchEntries().map((entry) => ({ ...entry, toJSON: () => { serialized += 1; return entry } }))
+    const entries = branchEntries().map((entry) => ({
+      ...entry,
+      toJSON: () => {
+        serialized += 1
+        return entry
+      },
+    }))
     const index = createTranscriptMentionIndex()
     const first = index.excludedPaths({ sessionId: SESSION_ID, entries, documents: corpusDocuments() })
     serialized = 0
@@ -238,18 +247,27 @@ describe("createTranscriptMentionIndex", () => {
 
   test("#given a cached window #when memory HEAD moves and adds a mentioned path #then the result equals the whole-window scan", () => {
     // given
-    const entries = [...branchEntries(), userEntry("late", "later I wrote notes/added-later.md"), assistantEntry("tail", "ok")]
+    const entries = [
+      ...branchEntries(),
+      userEntry("late", "later I wrote notes/added-later.md"),
+      assistantEntry("tail", "ok"),
+    ]
     const index = createTranscriptMentionIndex()
     index.excludedPaths({ sessionId: SESSION_ID, entries, documents: corpusDocuments() })
 
     // when: the new HEAD adds a note the window already mentions and drops another mentioned one
-    const moved = [...corpusDocuments().filter((document) => document.path !== path(53)), { path: "notes/added-later.md" }]
+    const moved = [
+      ...corpusDocuments().filter((document) => document.path !== path(53)),
+      { path: "notes/added-later.md" },
+    ]
     const excluded = index.excludedPaths({ sessionId: SESSION_ID, entries, documents: moved })
 
     // then
     expect(excluded.has("notes/added-later.md")).toBe(true)
     expect(excluded.has(path(53))).toBe(false)
-    expect([...excluded].sort()).toEqual([...excludedPathsByWindowScan(entries.slice(-RECALL_PATH_ENTRY_WINDOW), moved)].sort())
+    expect([...excluded].sort()).toEqual(
+      [...excludedPathsByWindowScan(entries.slice(-RECALL_PATH_ENTRY_WINDOW), moved)].sort(),
+    )
   }, 30_000)
 
   test("#given a window that drops old entries #when collection repeats #then evicted ids are recomputed, not remembered", () => {

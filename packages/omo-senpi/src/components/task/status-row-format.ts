@@ -56,14 +56,16 @@ function optionalRendererText(value: string | undefined): string | undefined {
 // One target for every row shape: the shared status-line grammar (`category:<n>(<model>:<effort>)`
 // | `agent:<n>(<model>:<effort>)`), so agent-routed rows read exactly like category-routed rows.
 function recordStatusTarget(record: TaskRecord): string {
-  return formatStatusTarget({
-    category: record.category,
-    agentType: record.agent_type,
-    resolvedModel: record.resolved_model,
-    effectiveModel: record.effective_model,
-    model: record.model,
-    fallbackCount: record.fallback_attempts?.length,
-  }) ?? "task"
+  return (
+    formatStatusTarget({
+      category: record.category,
+      agentType: record.agent_type,
+      resolvedModel: record.resolved_model,
+      effectiveModel: record.effective_model,
+      model: record.model,
+      fallbackCount: record.fallback_attempts?.length,
+    }) ?? "task"
+  )
 }
 
 function progressHead(record: TaskRecord): string | undefined {
@@ -73,7 +75,12 @@ function progressHead(record: TaskRecord): string | undefined {
 }
 
 export function formatTaskRow(record: TaskRecord): string {
-  const identity = taskIdentityLabel({ taskId: record.task_id, name: record.name, description: record.description, taskSummary: record.task_summary })
+  const identity = taskIdentityLabel({
+    taskId: record.task_id,
+    name: record.name,
+    description: record.description,
+    taskSummary: record.task_summary,
+  })
   const parts = [identity]
   if (identity !== normalizeRendererText(record.task_id)) parts.push(`(${normalizeRendererText(record.task_id)})`)
   parts.push(recordStatusTarget(record))
@@ -136,7 +143,7 @@ function formatLiveBackgroundRow(
   const elapsed = still ? undefined : formatElapsed(record.created_at, now)
   const frame = still
     ? SUSPENDED_MARK
-    : SPINNER_FRAMES[Math.floor(now / LIVE_STATUS_REFRESH_MS) % SPINNER_FRAMES.length] ?? SPINNER_FRAMES[0]
+    : (SPINNER_FRAMES[Math.floor(now / LIVE_STATUS_REFRESH_MS) % SPINNER_FRAMES.length] ?? SPINNER_FRAMES[0])
   const fullIdentity = liveTaskIdentity(record)
   const fullTarget = recordStatusTarget(record)
   const fullActivity = still
@@ -180,10 +187,12 @@ function formatLiveBackgroundRow(
 }
 
 export function taskStatusDescription(record: TaskRecord): string {
-  return optionalRendererText(record.task_summary)
-    ?? optionalRendererText(record.description)
-    ?? optionalRendererText(record.name)
-    ?? normalizeRendererText(record.task_id)
+  return (
+    optionalRendererText(record.task_summary) ??
+    optionalRendererText(record.description) ??
+    optionalRendererText(record.name) ??
+    normalizeRendererText(record.task_id)
+  )
 }
 
 function liveTaskIdentity(record: TaskRecord): string {
@@ -207,12 +216,15 @@ export function backgroundWidgetRows(
 ): string[] {
   const selected = selectWidgetRecords(records)
   if (selected.length === 0) return []
-  const boundedWidth = Number.isFinite(maxWidth) && maxWidth > 0
-    ? Math.min(LIVE_WIDGET_LINE_MAX, Math.floor(maxWidth))
-    : LIVE_WIDGET_LINE_MAX
-  const shown = selected.slice(0, MAX_WIDGET_ROWS).map((record) =>
-    formatLiveBackgroundRow(record, activity.get(record.task_id), now, boundedWidth, liveStats?.(record.task_id)),
-  )
+  const boundedWidth =
+    Number.isFinite(maxWidth) && maxWidth > 0
+      ? Math.min(LIVE_WIDGET_LINE_MAX, Math.floor(maxWidth))
+      : LIVE_WIDGET_LINE_MAX
+  const shown = selected
+    .slice(0, MAX_WIDGET_ROWS)
+    .map((record) =>
+      formatLiveBackgroundRow(record, activity.get(record.task_id), now, boundedWidth, liveStats?.(record.task_id)),
+    )
   const overflow = selected.length - MAX_WIDGET_ROWS
   if (overflow > 0) shown.push(`+${overflow} more`)
   return shown
@@ -229,7 +241,12 @@ function formatCompactTaskRow(record: TaskRecord, maxWidth: number, includeName:
 function compactTaskIdentity(record: TaskRecord, maxWidth: number, includeName: boolean): string {
   if (!includeName) return excerptRendererText(record.task_id, maxWidth)
   return excerptRendererText(
-    taskIdentityLabel({ taskId: record.task_id, name: record.name, description: record.description, taskSummary: record.task_summary }),
+    taskIdentityLabel({
+      taskId: record.task_id,
+      name: record.name,
+      description: record.description,
+      taskSummary: record.task_summary,
+    }),
     maxWidth,
   )
 }
@@ -239,5 +256,7 @@ function compactTaskContext(record: TaskRecord): string {
     excerptRendererText(recordStatusTarget(record), 46),
     excerptRendererText(record.execution_mode, 10),
     excerptRendererText(statusLabel(record), 9),
-  ].filter((part): part is string => part !== undefined).join(" ")
+  ]
+    .filter((part): part is string => part !== undefined)
+    .join(" ")
 }

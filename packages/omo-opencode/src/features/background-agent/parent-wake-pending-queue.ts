@@ -54,8 +54,9 @@ export class ParentWakePendingQueue {
     if (pendingWake) {
       pendingWake.queuedAt ??= now
       const mergedNotifications = mergeParentWakeNotifications(pendingWake.notifications, notification)
-      const notificationsChanged = mergedNotifications.length !== pendingWake.notifications.length
-        || mergedNotifications.some((merged, index) => merged !== pendingWake.notifications[index])
+      const notificationsChanged =
+        mergedNotifications.length !== pendingWake.notifications.length ||
+        mergedNotifications.some((merged, index) => merged !== pendingWake.notifications[index])
       pendingWake.notifications = mergedNotifications
       pendingWake.promptContext = resolvedPromptContext
       pendingWake.shouldReply = pendingWake.shouldReply || shouldReply

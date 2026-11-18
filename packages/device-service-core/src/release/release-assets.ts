@@ -11,10 +11,18 @@ export const CHECKSUMS_MAX_BYTES = 64 * 1024
 export const MANIFEST_MAX_BYTES = 4 * 1024
 export const BINARY_MAX_BYTES = 512 * 1024 * 1024
 
-const DEVICE_SERVICE_HOSTS = ["darwin-arm64", "darwin-x64", "linux-x64", "linux-arm64", "windows-x64", "windows-arm64"] as const
+const DEVICE_SERVICE_HOSTS = [
+  "darwin-arm64",
+  "darwin-x64",
+  "linux-x64",
+  "linux-arm64",
+  "windows-x64",
+  "windows-arm64",
+] as const
 export type DeviceServiceHost = (typeof DEVICE_SERVICE_HOSTS)[number]
 
-const isDeviceServiceHost = (value: string): value is DeviceServiceHost => DEVICE_SERVICE_HOSTS.some(host => host === value)
+const isDeviceServiceHost = (value: string): value is DeviceServiceHost =>
+  DEVICE_SERVICE_HOSTS.some((host) => host === value)
 
 /** The release host of this platform and architecture, or undefined where no device service release exists. */
 export const deviceServiceHost = (platform: NodeJS.Platform, arch: string): DeviceServiceHost | undefined => {
@@ -67,6 +75,7 @@ export const parseManifest = (bytes: Uint8Array): ReleaseManifest | undefined =>
   if (Object.keys(value).toSorted().join(",") !== "min_engine_version,version") return undefined
   const version: unknown = Reflect.get(value, "version")
   const engine: unknown = Reflect.get(value, "min_engine_version")
-  if (typeof version !== "string" || typeof engine !== "string" || !isSemver(version) || !isSemver(engine)) return undefined
+  if (typeof version !== "string" || typeof engine !== "string" || !isSemver(version) || !isSemver(engine))
+    return undefined
   return { version, min_engine_version: engine }
 }

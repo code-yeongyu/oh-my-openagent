@@ -1,5 +1,10 @@
 import { isGpt6AstraModel } from "@oh-my-opencode/model-core"
-import { ASTRA_DAG_VERIFICATION_DIRECTIVE, buildCompletionMessage, type ParentNotifier, type ParentNotifierMessage } from "@oh-my-opencode/senpi-task"
+import {
+  ASTRA_DAG_VERIFICATION_DIRECTIVE,
+  buildCompletionMessage,
+  type ParentNotifier,
+  type ParentNotifierMessage,
+} from "@oh-my-opencode/senpi-task"
 
 import { IdleInjectionRetiredError, type IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
 import type { SenpiExtensionAPI } from "../../extension/types"
@@ -32,21 +37,31 @@ export function createParentNotifier(
 ): ParentNotifier {
   return {
     enqueue(message: ParentNotifierMessage): void {
-      const content = (): string => message.details.some((detail) => detail.dag !== undefined)
-        ? buildCompletionMessage(message.details, isGpt6AstraModel(getReceiverModel?.()) ? ASTRA_DAG_VERIFICATION_DIRECTIVE : undefined).content
-        : message.content
+      const content = (): string =>
+        message.details.some((detail) => detail.dag !== undefined)
+          ? buildCompletionMessage(
+              message.details,
+              isGpt6AstraModel(getReceiverModel?.()) ? ASTRA_DAG_VERIFICATION_DIRECTIVE : undefined,
+            ).content
+          : message.content
       if (coordinator !== undefined) {
         for (const detail of message.details) {
           const accepted = coordinator.enqueue({
             key: `task-completion:${detail.task_id}`,
             source: "task-completion",
-            runRef: detail.runRef ?? (detail.dag === undefined
-              ? { kind: "task", id: detail.task_id }
-              : { kind: "dag", id: detail.dag.run_id }),
+            runRef:
+              detail.runRef ??
+              (detail.dag === undefined
+                ? { kind: "task", id: detail.task_id }
+                : { kind: "dag", id: detail.dag.run_id }),
             customType: message.customType,
             get content() {
-              return message.details.length === 1 && detail.dag === undefined ? message.content
-                : buildCompletionMessage([detail], isGpt6AstraModel(getReceiverModel?.()) ? ASTRA_DAG_VERIFICATION_DIRECTIVE : undefined).content
+              return message.details.length === 1 && detail.dag === undefined
+                ? message.content
+                : buildCompletionMessage(
+                    [detail],
+                    isGpt6AstraModel(getReceiverModel?.()) ? ASTRA_DAG_VERIFICATION_DIRECTIVE : undefined,
+                  ).content
             },
             display: message.display,
             details: [detail],

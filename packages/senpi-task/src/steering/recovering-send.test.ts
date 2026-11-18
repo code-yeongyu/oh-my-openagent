@@ -15,10 +15,13 @@ describe("steering a recovering child (#9861)", () => {
     h.store.transition(record.task_id, { type: "start", timestamp: new Date(h.now()).toISOString() })
     const attempted: string[] = []
     const child = makeFakeHandle(record.task_id, "rpc")
-    h.setLive(record.task_id, { ...child.handle, steer: async (message) => {
-      attempted.push(message)
-      if (message === "first") throw new Error("ordinary delivery failure")
-    } })
+    h.setLive(record.task_id, {
+      ...child.handle,
+      steer: async (message) => {
+        attempted.push(message)
+        if (message === "first") throw new Error("ordinary delivery failure")
+      },
+    })
     await h.engine.notifyStarted(record.task_id)
     expect(attempted).toEqual(["first", "second"])
     expect(h.store.load(record.task_id)?.pending_steering).toBeUndefined()
@@ -32,7 +35,12 @@ describe("steering a recovering child (#9861)", () => {
       const record = h.seedRecord({ execution_mode: "process" })
       h.store.transition(record.task_id, { type: "start", timestamp: new Date(h.now()).toISOString() })
       const child = makeFakeHandle(record.task_id, "rpc")
-      h.setLive(record.task_id, { ...child.handle, steer: async () => { throw error } })
+      h.setLive(record.task_id, {
+        ...child.handle,
+        steer: async () => {
+          throw error
+        },
+      })
 
       const sent = await h.engine.sendToTask({ idOrName: record.task_id, message: "updated scope", deliverAs: "steer" })
       expect(sent.kind).toBe("queued")
@@ -54,7 +62,12 @@ describe("steering a recovering child (#9861)", () => {
     await h.engine.sendToTask({ idOrName: record.task_id, message: "second", deliverAs: "steer" })
     h.store.transition(record.task_id, { type: "start", timestamp: new Date(h.now()).toISOString() })
     const child = makeFakeHandle(record.task_id, "rpc")
-    h.setLive(record.task_id, { ...child.handle, steer: async () => { throw new HostSessionDetachedError("steer") } })
+    h.setLive(record.task_id, {
+      ...child.handle,
+      steer: async () => {
+        throw new HostSessionDetachedError("steer")
+      },
+    })
     await h.engine.notifyStarted(record.task_id)
     expect(h.store.load(record.task_id)?.pending_steering?.map((entry) => entry.message)).toEqual(["first", "second"])
     h.setLive(record.task_id, child.handle)
@@ -83,14 +96,22 @@ describe("steering a recovering child (#9861)", () => {
     h.store.transition(record.task_id, { type: "start", timestamp: new Date(h.now()).toISOString() })
     const child = makeFakeHandle(record.task_id, "rpc")
     const delivered: string[] = []
-    h.setLive(record.task_id, { ...child.handle, steer: async (message) => {
-      delivered.push(message)
-      // Sends that land while a drain delivers are persisted, as a parked window or revival does.
-      if (delivered.length <= 40) {
-        h.store.mutate(record.task_id, (fresh) => ({ ...fresh, pending_steering: [...(fresh.pending_steering ?? []),
-          { id: `more-${delivered.length}`, message: `more ${delivered.length}`, deliver_as: "steer" as const }] }))
-      }
-    } })
+    h.setLive(record.task_id, {
+      ...child.handle,
+      steer: async (message) => {
+        delivered.push(message)
+        // Sends that land while a drain delivers are persisted, as a parked window or revival does.
+        if (delivered.length <= 40) {
+          h.store.mutate(record.task_id, (fresh) => ({
+            ...fresh,
+            pending_steering: [
+              ...(fresh.pending_steering ?? []),
+              { id: `more-${delivered.length}`, message: `more ${delivered.length}`, deliver_as: "steer" as const },
+            ],
+          }))
+        }
+      },
+    })
     const empty = queueEmptied(h, record.task_id)
     await h.engine.notifyStarted(record.task_id)
     await empty
@@ -103,9 +124,13 @@ describe("steering a recovering child (#9861)", () => {
     const h = makeHarness()
     const record = h.seedRecord()
     h.store.transition(record.task_id, { type: "start", timestamp: new Date(h.now()).toISOString() })
-    h.store.mutate(record.task_id, (fresh) => ({ ...fresh, pending_steering: [
-      { id: "left-1", message: "left over 1", deliver_as: "steer" as const },
-      { id: "left-2", message: "left over 2", deliver_as: "steer" as const }] }))
+    h.store.mutate(record.task_id, (fresh) => ({
+      ...fresh,
+      pending_steering: [
+        { id: "left-1", message: "left over 1", deliver_as: "steer" as const },
+        { id: "left-2", message: "left over 2", deliver_as: "steer" as const },
+      ],
+    }))
     const child = makeFakeHandle(record.task_id, "rpc")
     h.setLive(record.task_id, child.handle)
     const empty = queueEmptied(h, record.task_id)
@@ -127,10 +152,16 @@ describe("steering a recovering child (#9861)", () => {
     const child = makeFakeHandle(record.task_id, "rpc")
     // "second" is refused before delivery (the drain stops and keeps it); "third" must still be queued.
     let refusedOnce = false
-    h.setLive(record.task_id, { ...child.handle, steer: async (message) => {
-      if (message === "second" && !refusedOnce) { refusedOnce = true; return }
-      child.steerCalls.push(message)
-    } })
+    h.setLive(record.task_id, {
+      ...child.handle,
+      steer: async (message) => {
+        if (message === "second" && !refusedOnce) {
+          refusedOnce = true
+          return
+        }
+        child.steerCalls.push(message)
+      },
+    })
     const empty = queueEmptied(h, record.task_id)
     await h.engine.notifyStarted(record.task_id)
     await empty
@@ -141,8 +172,13 @@ describe("steering a recovering child (#9861)", () => {
     const h = makeHarness()
     const record = h.seedRecord()
     h.store.transition(record.task_id, { type: "start", timestamp: new Date(h.now()).toISOString() })
-    h.store.transition(record.task_id, { type: "fail", timestamp: new Date(h.now()).toISOString(),
-      error_message: "suspended_unresumable:host_draining", failure_kind: "suspended_unresumable", killed: true })
+    h.store.transition(record.task_id, {
+      type: "fail",
+      timestamp: new Date(h.now()).toISOString(),
+      error_message: "suspended_unresumable:host_draining",
+      failure_kind: "suspended_unresumable",
+      killed: true,
+    })
     h.store.mutate(record.task_id, (fresh) => ({ ...fresh, final_response: "retained work" }))
     const sent = await h.engine.sendToTask({ idOrName: record.task_id, message: "continue" })
     expect(sent.kind).toBe("not_continuable")
@@ -159,10 +195,13 @@ describe("steering a recovering child (#9861)", () => {
     h.store.transition(record.task_id, { type: "start", timestamp: new Date(h.now()).toISOString() })
     const child = makeFakeHandle(record.task_id, "rpc")
     const lateDelivered = Promise.withResolvers<void>()
-    h.setLive(record.task_id, { ...child.handle, steer: async (message) => {
-      child.steerCalls.push(message)
-      if (message === "late") lateDelivered.resolve()
-    } })
+    h.setLive(record.task_id, {
+      ...child.handle,
+      steer: async (message) => {
+        child.steerCalls.push(message)
+        if (message === "late") lateDelivered.resolve()
+      },
+    })
     let inject = true
     let joined: Promise<void> | undefined
     const load = h.store.load.bind(h.store)
@@ -170,9 +209,10 @@ describe("steering a recovering child (#9861)", () => {
       const fresh = load(id)
       if (inject && id === record.task_id && fresh !== null && fresh.pending_steering === undefined) {
         inject = false
-        h.store.mutate(id, current => ({ ...current, pending_steering: [
-          { id: "after-final-read", message: "late", deliver_as: "steer" },
-        ] }))
+        h.store.mutate(id, (current) => ({
+          ...current,
+          pending_steering: [{ id: "after-final-read", message: "late", deliver_as: "steer" }],
+        }))
         joined = h.engine.notifyStarted(id)
       }
       return fresh

@@ -1,4 +1,10 @@
-import { resolveTaskHostSocket, TASK_HOST_SOCKET_ENV_NAMES } from "../../../../senpi-task/src/runners/rpc-host/daemon-contract"
+import { realpathSync } from "node:fs"
+import { basename, dirname, join } from "node:path"
+
+import {
+  resolveTaskHostSocket,
+  TASK_HOST_SOCKET_ENV_NAMES,
+} from "../../../../senpi-task/src/runners/rpc-host/daemon-contract"
 import { resolveProjectStateDirectory } from "../../../../senpi-task/src/store/project-state-directory"
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
@@ -16,4 +22,25 @@ export function resolveThreadSocket(env: Readonly<Record<string, string | undefi
   return resolveTaskHostSocket(env, resolveAgentHome({ env }))
 }
 
-export function defaultThreadStateDirectory(pi: SenpiExtensionAPI): string { return resolveProjectStateDirectory(pi.cwd ?? process.cwd(), "thread-tools") }
+/**
+ * Whether `hostSocket` (a host's own `host_socket`, which senpi realpath-canonicalizes) is the host `thread_create`
+ * opens sessions on: the operator daemon a woken session is opened on.
+ */
+export function isThreadSocket(
+  hostSocket: string,
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  return canonicalSocket(hostSocket) === canonicalSocket(resolveThreadSocket(env))
+}
+
+function canonicalSocket(path: string): string {
+  try {
+    return join(realpathSync(dirname(path)), basename(path))
+  } catch {
+    return path
+  }
+}
+
+export function defaultThreadStateDirectory(pi: SenpiExtensionAPI): string {
+  return resolveProjectStateDirectory(pi.cwd ?? process.cwd(), "thread-tools")
+}

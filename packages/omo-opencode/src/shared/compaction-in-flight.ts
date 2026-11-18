@@ -43,11 +43,7 @@ function recordCompactionMessageStart(sessionID: string, messageID?: string): vo
   }
 }
 
-export function recordCompactionEnd(
-  sessionID: string,
-  expectedGeneration?: number,
-  expectedMessageID?: string,
-): void {
+export function recordCompactionEnd(sessionID: string, expectedGeneration?: number, expectedMessageID?: string): void {
   const entry = compactions.get(sessionID)
   if (!entry) return
   if (expectedGeneration !== undefined && entry.gen !== expectedGeneration) return
@@ -81,24 +77,25 @@ export function isCompactionInFlight(sessionID: string): boolean {
   return entry !== undefined && entry.endedAt === undefined
 }
 
-export function observeCompactionEvent(
-  event: { type: string; properties?: unknown },
-): void {
-  const properties = typeof event.properties === "object" && event.properties !== null
-    ? event.properties as Record<string, unknown>
-    : undefined
-  const info = typeof properties?.info === "object" && properties.info !== null
-    ? properties.info as Record<string, unknown>
-    : undefined
-  const sessionID = typeof properties?.sessionID === "string"
-    ? properties.sessionID
-    : typeof info?.sessionID === "string"
-      ? info.sessionID
-      : typeof info?.id === "string"
-        ? info.id
-      : typeof properties?.id === "string"
-      ? properties.id
+export function observeCompactionEvent(event: { type: string; properties?: unknown }): void {
+  const properties =
+    typeof event.properties === "object" && event.properties !== null
+      ? (event.properties as Record<string, unknown>)
       : undefined
+  const info =
+    typeof properties?.info === "object" && properties.info !== null
+      ? (properties.info as Record<string, unknown>)
+      : undefined
+  const sessionID =
+    typeof properties?.sessionID === "string"
+      ? properties.sessionID
+      : typeof info?.sessionID === "string"
+        ? info.sessionID
+        : typeof info?.id === "string"
+          ? info.id
+          : typeof properties?.id === "string"
+            ? properties.id
+            : undefined
   if (!sessionID) return
 
   if (event.type === "session.created") {
@@ -109,16 +106,21 @@ export function observeCompactionEvent(
     recordCompactionMessageStart(sessionID)
     return
   }
-  if (event.type === "session.compacted" || event.type === "session.compaction.ended" || event.type === "session.compaction.failed") {
+  if (
+    event.type === "session.compacted" ||
+    event.type === "session.compaction.ended" ||
+    event.type === "session.compaction.failed"
+  ) {
     // Accepted SDK limitation: real session-level end events carry only { sessionID }, so gen, generation and
     // messageID are normally absent and an uncorrelated end closes whichever entry is current. Only
     // message-correlated ends are generation-safe; the exposure is bounded by serial per-session compaction,
     // the watchdog budget and the registry TTL.
-    const generation = typeof properties?.gen === "number"
-      ? properties.gen
-      : typeof properties?.generation === "number"
-        ? properties.generation
-        : undefined
+    const generation =
+      typeof properties?.gen === "number"
+        ? properties.gen
+        : typeof properties?.generation === "number"
+          ? properties.generation
+          : undefined
     const messageID = typeof properties?.messageID === "string" ? properties.messageID : undefined
     recordCompactionEnd(sessionID, generation, messageID)
     return
@@ -132,9 +134,10 @@ export function observeCompactionEvent(
   const messageInfo = info ?? properties
   const messageID = typeof messageInfo?.id === "string" ? messageInfo.id : undefined
   const entry = getCompaction(sessionID)
-  const time = typeof messageInfo?.time === "object" && messageInfo.time !== null
-    ? messageInfo.time as Record<string, unknown>
-    : undefined
+  const time =
+    typeof messageInfo?.time === "object" && messageInfo.time !== null
+      ? (messageInfo.time as Record<string, unknown>)
+      : undefined
   const hasCompletion = time?.completed !== undefined
   const hasError = messageInfo?.error !== undefined
   if (entry?.messageID && entry.messageID === messageID && (hasError || hasCompletion)) {
@@ -142,15 +145,17 @@ export function observeCompactionEvent(
     return
   }
 
-  if (messageInfo?.role === "assistant" && !hasError && !hasCompletion
-    && (isCompactionAgent(messageInfo.agent)
-      || messageInfo.mode === "compaction"
-      || messageInfo.summary === true
-      || hasCompactionPart(
-        Array.isArray(properties?.parts) && properties.parts.length > 0
-          ? properties.parts
-          : messageInfo.parts,
-      ))) {
+  if (
+    messageInfo?.role === "assistant" &&
+    !hasError &&
+    !hasCompletion &&
+    (isCompactionAgent(messageInfo.agent) ||
+      messageInfo.mode === "compaction" ||
+      messageInfo.summary === true ||
+      hasCompactionPart(
+        Array.isArray(properties?.parts) && properties.parts.length > 0 ? properties.parts : messageInfo.parts,
+      ))
+  ) {
     recordCompactionMessageStart(sessionID, messageID)
   }
 }

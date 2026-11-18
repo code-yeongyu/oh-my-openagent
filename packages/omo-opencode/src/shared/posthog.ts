@@ -34,9 +34,7 @@ function resolveTransportFactory(): TelemetryTransportFactory {
 }
 
 /** @internal test-only */
-export function __setActivityStateProviderForTesting(
-  provider: typeof getPostHogActivityCaptureState,
-): void {
+export function __setActivityStateProviderForTesting(provider: typeof getPostHogActivityCaptureState): void {
   activityStateProviderOverride = provider
 }
 

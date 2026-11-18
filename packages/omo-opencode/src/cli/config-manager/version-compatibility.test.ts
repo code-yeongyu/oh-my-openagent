@@ -1,8 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import {
-  checkVersionCompatibility,
-  extractVersionFromPluginEntry,
-} from "./version-compatibility"
+import { checkVersionCompatibility, extractVersionFromPluginEntry } from "./version-compatibility"
 
 describe("checkVersionCompatibility", () => {
   it("allows fresh install when no current version", () => {
@@ -64,9 +61,7 @@ describe("checkVersionCompatibility", () => {
     expect(result.canUpgrade).toBe(true)
     expect(result.isDowngrade).toBe(false)
     expect(result.requiresMigration).toBe(false)
-    expect(result.reason).toBe(
-      "Unable to compare versions not-a-version and 3.16.0 - proceeding with caution",
-    )
+    expect(result.reason).toBe("Unable to compare versions not-a-version and 3.16.0 - proceeding with caution")
   })
 })
 

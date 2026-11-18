@@ -6,15 +6,9 @@
 
 export type PromptRoutePolicy = "answer-here" | "leave-to-own-client" | "auto-cancel"
 
-export type PromptRouteError =
-  | "prompt_route_locked"
-  | "prompt_response_not_authorized"
-  | "prompt_not_found"
+export type PromptRouteError = "prompt_route_locked" | "prompt_response_not_authorized" | "prompt_not_found"
 
-export type PromptRouteResponse =
-  | { readonly ok: true }
-  | { readonly ok: false; readonly code: PromptRouteError }
-
+export type PromptRouteResponse = { readonly ok: true } | { readonly ok: false; readonly code: PromptRouteError }
 
 export type RoutedPrompt<TRequest, TResponse> = {
   readonly id: string
@@ -57,7 +51,8 @@ export class PromptRouter<TRequest, TResponse extends { readonly type: "extensio
 
   constructor(options: PromptRouterOptions & { readonly cancellation?: (id: string) => TResponse } = {}) {
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
-    this.cancellation = options.cancellation ?? ((id) => ({ type: "extension_ui_response", id, cancelled: true }) as unknown as TResponse)
+    this.cancellation =
+      options.cancellation ?? ((id) => ({ type: "extension_ui_response", id, cancelled: true }) as unknown as TResponse)
   }
 
   route(input: PromptRouteInput<TRequest & { readonly id: string }>): RoutedPrompt<TRequest, TResponse> {

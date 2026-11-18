@@ -11,32 +11,23 @@ let testConfigDir: string
 let originalConfigDir: string | undefined
 
 function writeOpenCodeConfig(plugins: string[]): void {
-  writeFileSync(
-    join(testConfigDir, "opencode.json"),
-    JSON.stringify({ plugin: plugins }, null, 2) + "\n",
-    "utf-8",
-  )
+  writeFileSync(join(testConfigDir, "opencode.json"), JSON.stringify({ plugin: plugins }, null, 2) + "\n", "utf-8")
 }
 
 function writeTuiConfig(plugins: readonly unknown[]): void {
-  writeFileSync(
-    join(testConfigDir, "tui.json"),
-    JSON.stringify({ plugin: plugins }, null, 2) + "\n",
-    "utf-8",
-  )
+  writeFileSync(join(testConfigDir, "tui.json"), JSON.stringify({ plugin: plugins }, null, 2) + "\n", "utf-8")
 }
 
-function createPackageJson(packageName: string, exportsValue: Record<string, unknown> = { ".": "./dist/index.js" }): string {
+function createPackageJson(
+  packageName: string,
+  exportsValue: Record<string, unknown> = { ".": "./dist/index.js" },
+): string {
   return JSON.stringify({ name: packageName, exports: exportsValue }, null, 2) + "\n"
 }
 
 function writeFilePluginPackage(dir: string, packageName: string, exportsValue?: Record<string, unknown>): string {
   mkdirSync(dir, { recursive: true })
-  writeFileSync(
-    join(dir, "package.json"),
-    createPackageJson(packageName, exportsValue),
-    "utf-8",
-  )
+  writeFileSync(join(dir, "package.json"), createPackageJson(packageName, exportsValue), "utf-8")
   return `file:${dir}`
 }
 
@@ -49,10 +40,7 @@ function writeInstalledPackage(packageName: string, exportsValue?: Record<string
 describe("tui-plugin-config check", () => {
   beforeEach(() => {
     originalConfigDir = process.env.OPENCODE_CONFIG_DIR
-    testConfigDir = join(
-      tmpdir(),
-      `omo-doctor-tui-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    )
+    testConfigDir = join(tmpdir(), `omo-doctor-tui-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     mkdirSync(testConfigDir, { recursive: true })
     process.env.OPENCODE_CONFIG_DIR = testConfigDir
   })

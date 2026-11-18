@@ -25,7 +25,9 @@ export function renderMemoryNotice(inputs: MemoryNoticeInputs): string | undefin
   const lines = [
     ...(compactedMessageCount === 0
       ? []
-      : [`- ${compactedMessageCount} earlier messages were compacted out of the live context; what still matters from them arrives on its own as <recalled-memory> blocks`]),
+      : [
+          `- ${compactedMessageCount} earlier messages were compacted out of the live context; what still matters from them arrives on its own as <recalled-memory> blocks`,
+        ]),
     ...(nudgeTurns === undefined
       ? []
       : [`- ${nudgeTurns} ${MEMORY_NUDGE_METADATA_TOKEN}. Save durable facts now, or decide nothing qualifies.`]),
@@ -34,8 +36,10 @@ export function renderMemoryNotice(inputs: MemoryNoticeInputs): string | undefin
       : [`- ${MEMORY_SOUL_METADATA_TOKEN} reflection ${soulNotice.sha.slice(0, 7)} since your last run`]),
     ...(turn.changes === undefined ? [] : [renderProjectedChangesLine(turn.changes, turn.revision, turn.sources)]),
     ...(expired.length === 0 ? [] : [renderExpiredLine(expired)]),
-    ...flaggedAgreements.map((item) =>
-      `- ${MEMORY_AGREEMENT_METADATA_TOKEN} (broken x${item.n}): "${item.text}" Do not break it again this session; if the task needs it, stop and ask your person.`),
+    ...flaggedAgreements.map(
+      (item) =>
+        `- ${MEMORY_AGREEMENT_METADATA_TOKEN} (broken x${item.n}): "${item.text}" Do not break it again this session; if the task needs it, stop and ask your person.`,
+    ),
   ]
   if (lines.length === 0) return undefined
   return ["<memory_notice>", ...lines, "</memory_notice>"].join("\n")

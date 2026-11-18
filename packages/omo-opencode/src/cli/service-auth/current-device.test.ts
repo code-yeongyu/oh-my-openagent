@@ -2,7 +2,12 @@ import { describe, expect, test } from "bun:test"
 import { currentServiceDevice } from "./protocol"
 
 // Device binding for memory sync (account-transport-api v8 section 3): the token's device is the one unrevoked current row.
-const row = (id: string, current: boolean, revokedAt: string | null = null) => ({ id, name: "fixture", current, revokedAt })
+const row = (id: string, current: boolean, revokedAt: string | null = null) => ({
+  id,
+  name: "fixture",
+  current,
+  revokedAt,
+})
 
 describe("the current service device", () => {
   const cases: readonly [string, unknown, string | null][] = [

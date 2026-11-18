@@ -27,9 +27,11 @@ describe("omo daemon drain wait ownership evidence", () => {
       }),
       generations: [],
     }
-    const engine = scriptedEngine((args) => args.includes("--all")
-      ? { exitCode: 0, stdout: JSON.stringify({ endpoints: [drained] }) }
-      : { exitCode: 3, stdout: JSON.stringify({ action: "refuse", reason: "drain_unsupported" }) })
+    const engine = scriptedEngine((args) =>
+      args.includes("--all")
+        ? { exitCode: 0, stdout: JSON.stringify({ endpoints: [drained] }) }
+        : { exitCode: 3, stdout: JSON.stringify({ action: "refuse", reason: "drain_unsupported" }) },
+    )
     const stdout = capture()
 
     const exitCode = runDaemonCommand(["stop", "--drain", "--all", "--wait"], {

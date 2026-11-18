@@ -10,19 +10,34 @@ import { pathToFileURL } from "node:url"
 import { runBlock } from "./release-workflow-test-steps"
 
 const repoRoot = join(import.meta.dir, "..")
-const buildCore: unknown = await import(pathToFileURL(join(repoRoot, "packages/omo-senpi/plugin/scripts/build-extension-core.mjs")).href)
+const buildCore: unknown = await import(
+  pathToFileURL(join(repoRoot, "packages/omo-senpi/plugin/scripts/build-extension-core.mjs")).href
+)
 
 function bundleOutputs(): string[] {
-  if (typeof buildCore !== "object" || buildCore === null || !("resolveOutputs" in buildCore) || typeof buildCore.resolveOutputs !== "function") {
+  if (
+    typeof buildCore !== "object" ||
+    buildCore === null ||
+    !("resolveOutputs" in buildCore) ||
+    typeof buildCore.resolveOutputs !== "function"
+  ) {
     throw new Error("build-extension-core.mjs no longer exports resolveOutputs")
   }
   const outputs: unknown = buildCore.resolveOutputs({})
   if (typeof outputs !== "object" || outputs === null) throw new Error("resolveOutputs returned no output map")
-  return Object.values(outputs).filter((path): path is string => typeof path === "string").map((path) => relative(repoRoot, path).split(sep).join("/"))
+  return Object.values(outputs)
+    .filter((path): path is string => typeof path === "string")
+    .map((path) => relative(repoRoot, path).split(sep).join("/"))
 }
 const workflow = readFileSync(join(repoRoot, ".github", "workflows", "publish.yml"), "utf8")
-const prepareStep = runBlock(workflow, "      - name: Prepare release state (generation)\n", "      - name: Publish prepared release state\n")
-const senpiStaging = prepareStep.split("\n").filter((line) => /^git add .*packages\/omo-senpi\/plugin\/(extensions|runtime)/.test(line))
+const prepareStep = runBlock(
+  workflow,
+  "      - name: Prepare release state (generation)\n",
+  "      - name: Publish prepared release state\n",
+)
+const senpiStaging = prepareStep
+  .split("\n")
+  .filter((line) => /^git add .*packages\/omo-senpi\/plugin\/(extensions|runtime)/.test(line))
 
 const git = (cwd: string, ...args: string[]) => {
   const result = spawnSync("git", args, { cwd, encoding: "utf8" })

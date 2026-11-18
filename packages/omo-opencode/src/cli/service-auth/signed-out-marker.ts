@@ -28,7 +28,9 @@ export async function readSignedOutMarker(path: string): Promise<SignedOutMarker
 export async function writeSignedOutMarker(path: string, device: string | null): Promise<void> {
   await mkdir(dirname(path), { recursive: true, mode: 0o700 })
   const staging = `${path}.${process.pid}.tmp`
-  await writeFile(staging, JSON.stringify({ device, at: new Date().toISOString() } satisfies SignedOutMarker), { mode: 0o600 })
+  await writeFile(staging, JSON.stringify({ device, at: new Date().toISOString() } satisfies SignedOutMarker), {
+    mode: 0o600,
+  })
   await rename(staging, path)
 }
 

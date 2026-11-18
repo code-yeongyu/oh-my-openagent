@@ -20,7 +20,9 @@ async function makeStagedEntry(): Promise<string> {
   return entry
 }
 
-function recordingLogger(): ComponentLogger & { readonly entries: Array<{ level: string; message: string; details?: unknown }> } {
+function recordingLogger(): ComponentLogger & {
+  readonly entries: Array<{ level: string; message: string; details?: unknown }>
+} {
   const entries: Array<{ level: string; message: string; details?: unknown }> = []
   return {
     entries,
@@ -51,33 +53,36 @@ describe("createAstGrepComponent", () => {
   it.each([
     { context: "parent", env: {} },
     { context: "child", env: { SENPI_CODING_AGENT_SESSION_DIR: "/tmp/senpi-child" } },
-  ])("#given a staged runtime in a $context session #when registered #then declares the lazy Anthropic-safe _ast_grep MCP server", async ({ env }) => {
-    const entry = await makeStagedEntry()
-    const pi = new FakeExtensionAPI()
-    const component = createAstGrepComponent({
-      env,
-      nodeExecutable: "/usr/local/bin/node",
-      resolveCwd: () => "/workspace/project",
-      resolveEntry: () => entry,
-    })
+  ])(
+    "#given a staged runtime in a $context session #when registered #then declares the lazy Anthropic-safe _ast_grep MCP server",
+    async ({ env }) => {
+      const entry = await makeStagedEntry()
+      const pi = new FakeExtensionAPI()
+      const component = createAstGrepComponent({
+        env,
+        nodeExecutable: "/usr/local/bin/node",
+        resolveCwd: () => "/workspace/project",
+        resolveEntry: () => entry,
+      })
 
-    await component.register(pi, fakeContext())
+      await component.register(pi, fakeContext())
 
-    expect(pi.mcpServers).toEqual([
-      {
-        name: "_ast_grep",
-        config: {
-          type: "stdio",
-          command: "/usr/local/bin/node",
-          args: [entry, "mcp"],
-          env: { OMO_AST_GREP_PROJECT_CWD: "/workspace/project", BUN_BE_BUN: "1" },
-          enabled: true,
-          lifecycle: "lazy",
-          exposure: "search",
+      expect(pi.mcpServers).toEqual([
+        {
+          name: "_ast_grep",
+          config: {
+            type: "stdio",
+            command: "/usr/local/bin/node",
+            args: [entry, "mcp"],
+            env: { OMO_AST_GREP_PROJECT_CWD: "/workspace/project", BUN_BE_BUN: "1" },
+            enabled: true,
+            lifecycle: "lazy",
+            exposure: "search",
+          },
         },
-      },
-    ])
-  })
+      ])
+    },
+  )
 
   it("#given OMO_AST_GREP_PROJECT_CWD #when registered #then passes the explicit project cwd through", async () => {
     const entry = await makeStagedEntry()

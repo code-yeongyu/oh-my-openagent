@@ -15,7 +15,13 @@
 // hook of a bound session whose `memory.recall.enabled` is on; that switch is the only way to keep
 // it from existing.
 
-import { GitMemoryRepo, PendingNudges, RecallCorpusCache, RecallLedger, type RecallNudge } from "@oh-my-opencode/memory-core"
+import {
+  GitMemoryRepo,
+  PendingNudges,
+  RecallCorpusCache,
+  RecallLedger,
+  type RecallNudge,
+} from "@oh-my-opencode/memory-core"
 import type { ChildModelRegistry } from "@oh-my-opencode/senpi-task"
 
 import type { IdleInjectionCoordinator } from "../../../extension/idle-injection-coordinator"
@@ -41,7 +47,10 @@ import { createKibitzerSidecarTools } from "./tools"
 import { createKibitzerWakeSlot } from "./wake-slot"
 
 /** QA seams of the resident child starter: the runner, the session construction, the persona and the task runtime. */
-export type KibitzerChildStarterSeams = Pick<KibitzerSidecarChildStarterOptions, "createRunner" | "createSession" | "loadPersona" | "loadTaskRuntime">
+export type KibitzerChildStarterSeams = Pick<
+  KibitzerSidecarChildStarterOptions,
+  "createRunner" | "createSession" | "loadPersona" | "loadTaskRuntime"
+>
 
 export interface KibitzerCompositionOptions {
   readonly env: Readonly<Record<string, string | undefined>>
@@ -134,14 +143,21 @@ export function createKibitzerComposition(options: KibitzerCompositionOptions): 
     if (existing !== undefined) return existing
     const context = options.resolveContext(sessionId)
     if (context === undefined) return undefined
-    const recall = resolveAgentRecallSettings(options.loadConfig({ cwd: options.cwd() }).config.memory, context.identity)
+    const recall = resolveAgentRecallSettings(
+      options.loadConfig({ cwd: options.cwd() }).config.memory,
+      context.identity,
+    )
     if (!recall.enabled) return undefined
     const created = createSessionSidecar(sessionId, context, resolveKibitzerSidecarSettings(recall))
     sidecars.set(sessionId, created)
     return created
   }
 
-  function createSessionSidecar(sessionId: string, context: MemoryIdentityContext, settings: KibitzerSidecarSettings): SessionSidecar {
+  function createSessionSidecar(
+    sessionId: string,
+    context: MemoryIdentityContext,
+    settings: KibitzerSidecarSettings,
+  ): SessionSidecar {
     const cwd = options.cwd()
     const captured: CapturedSession = { branch: [], registry: undefined }
     const repo = new GitMemoryRepo({ dir: context.identityPaths.repo, agentId: context.identity })
@@ -158,25 +174,31 @@ export function createKibitzerComposition(options: KibitzerCompositionOptions): 
     const sidecar = createKibitzerSidecar({
       sessionId,
       startChild,
-      createTools: (binding) => createKibitzerSidecarTools({
-        workspaceRoot: cwd,
-        session: { entries: () => captured.branch },
-        memory: {
-          repo,
-          cache: corpusCache,
-          queryExpansion: settings.queryExpansion,
-          ...(options.projectScope === undefined ? {} : { projectCorpora: () => options.projectScope?.recallCorpora(sessionId) ?? Promise.resolve([]) }),
-        },
-        nudge: binding.nudge,
-        budget: binding.budget,
-      }),
+      createTools: (binding) =>
+        createKibitzerSidecarTools({
+          workspaceRoot: cwd,
+          session: { entries: () => captured.branch },
+          memory: {
+            repo,
+            cache: corpusCache,
+            queryExpansion: settings.queryExpansion,
+            ...(options.projectScope === undefined
+              ? {}
+              : { projectCorpora: () => options.projectScope?.recallCorpora(sessionId) ?? Promise.resolve([]) }),
+          },
+          nudge: binding.nudge,
+          budget: binding.budget,
+        }),
       deliver: (nudges: readonly RecallNudge[]) => delivery.accept(sessionId, context, nudges),
       onWake: (outcome) => {
         observe.onWake(outcome, context, { category: settings.category })
         sharedKibitzerTelemetryObservers().notify(kibitzerWakeSignal(outcome))
         options.onWake?.(outcome, context)
       },
-      wakeSlot: createKibitzerWakeSlot({ locksDirectory: context.identityPaths.locks, maxConcurrent: settings.maxConcurrentWakes }),
+      wakeSlot: createKibitzerWakeSlot({
+        locksDirectory: context.identityPaths.locks,
+        maxConcurrent: settings.maxConcurrentWakes,
+      }),
       toolBudget: settings.toolBudget,
       sidecarMaxTokens: settings.sidecarMaxTokens,
       eventCaps: settings.eventCaps,
@@ -218,10 +240,18 @@ export function createKibitzerComposition(options: KibitzerCompositionOptions): 
   }
 
   /** Detached: touches nothing but the plain snapshot, then lets the sidecar decide whether to wake. */
-  async function offer(record: SessionSidecar, snapshot: RecallSessionSnapshot, extraTexts: readonly string[]): Promise<void> {
+  async function offer(
+    record: SessionSidecar,
+    snapshot: RecallSessionSnapshot,
+    extraTexts: readonly string[],
+  ): Promise<void> {
     const collected = await options.recall.collectCandidatesFromSnapshot(snapshot, extraTexts)
     if (collected === undefined || collected.sessionId !== record.sessionId) return
-    const result = await record.sidecar.offer({ candidates: collected.candidates, surfaced: collected.surfaced, maxItems: collected.maxItems })
+    const result = await record.sidecar.offer({
+      candidates: collected.candidates,
+      surfaced: collected.surfaced,
+      maxItems: collected.maxItems,
+    })
     sharedKibitzerTelemetryObservers().notify(kibitzerOfferSignal(record.sessionId, result))
   }
 
@@ -278,7 +308,9 @@ function promptTexts(payload: unknown): readonly string[] {
   return isRecord(payload) && typeof payload.prompt === "string" ? [payload.prompt] : []
 }
 
-function isToolCallPayload(value: unknown): value is { readonly toolName: string; readonly input: Record<string, unknown> } {
+function isToolCallPayload(
+  value: unknown,
+): value is { readonly toolName: string; readonly input: Record<string, unknown> } {
   return isRecord(value) && typeof value.toolName === "string" && isRecord(value.input)
 }
 

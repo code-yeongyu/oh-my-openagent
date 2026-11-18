@@ -40,7 +40,7 @@ function isExcludedEnvKey(key: string): boolean {
 
 export function createCleanMcpEnvironment(
   customEnv: Record<string, string> = {},
-  ambientEnv: Record<string, string | undefined> = process.env
+  ambientEnv: Record<string, string | undefined> = process.env,
 ): Record<string, string> {
   const cleanEnv: Record<string, string> = {}
 

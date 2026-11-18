@@ -1,3 +1,4 @@
+// Vendored from sisyphuslabs/omo-relay-daemon@edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6 packages/local-api/src/client-connection.ts
 import { LocalApiError } from "./errors.ts";
 import { encodeLine, LineDecoder, parseLine } from "./framing.ts";
 import { lineBytes, LOCAL_INLINE_MAX } from "./limits.ts";
@@ -127,14 +128,8 @@ export class ClientConnection {
             throw error;
           }
           if (!response.ok) {
-            const { code, reason, action, limit_chars, path_refusal } = response.error;
-            reject(
-              new LocalApiError(code, reason, {
-                action,
-                ...(limit_chars === undefined ? {} : { limit_chars }),
-                ...(path_refusal === undefined ? {} : { path_refusal }),
-              }),
-            );
+            const { code, reason, ...extra } = response.error;
+            reject(new LocalApiError(code, reason, extra));
             return;
           }
           onAnswer?.(response.data);

@@ -58,7 +58,12 @@ export function createChildProgress(
 
   const activity = (stats: ReturnType<typeof tracker.snapshot>): string =>
     composeStatusLine({
-      identity: taskIdentityLabel({ taskId, name: target.name, description: target.description, taskSummary: target.taskSummary }),
+      identity: taskIdentityLabel({
+        taskId,
+        name: target.name,
+        description: target.description,
+        taskSummary: target.taskSummary,
+      }),
       target: formatStatusTarget({
         category: target.category,
         agentType: target.agentType,
@@ -67,7 +72,13 @@ export function createChildProgress(
         fallbackCount,
       }),
       stats,
-      verb: selectLiveActivityVerb({ tool: currentTool, turns: stats.turns, failedTurns: stats.failed_turns, turnResumed, awaitingInput }),
+      verb: selectLiveActivityVerb({
+        tool: currentTool,
+        turns: stats.turns,
+        failedTurns: stats.failed_turns,
+        turnResumed,
+        awaitingInput,
+      }),
     })
 
   return {
@@ -192,7 +203,12 @@ function readTokens(message: unknown): number | undefined {
 }
 
 function lastNonEmptyLine(text: string): string {
-  return text.split(/\r?\n/).findLast((line) => line.trim().length > 0)?.trim() ?? ""
+  return (
+    text
+      .split(/\r?\n/)
+      .findLast((line) => line.trim().length > 0)
+      ?.trim() ?? ""
+  )
 }
 
 function truncate(text: string, maximum: number): string {

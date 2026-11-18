@@ -21,7 +21,10 @@ describe("parseExtraCaCertificates", () => {
     const forms = [
       ca.replaceAll("\n", "\r\n"),
       ca.replaceAll("\n", "\r\r\n"),
-      ca.split("\n").map((line, index) => line + (index % 2 === 0 ? "\r\n" : "\n")).join(""),
+      ca
+        .split("\n")
+        .map((line, index) => line + (index % 2 === 0 ? "\r\n" : "\n"))
+        .join(""),
     ]
     for (const form of forms) expect(parseExtraCaCertificates(form)).toEqual(lf)
   })
@@ -48,33 +51,51 @@ describe("engine entry", () => {
 
   // Security contract (#10236): a bad trust value fails closed for every argv except the exact
   // `--version` and `--help`, so no engine code (extension loading, package installs) runs under it.
-  test.each([
-    { args: ["doctor"] },
-    { args: ["-h"] },
-    { args: ["-v"] },
-    { args: ["--help", "x"] },
-    { args: ["--version", "doctor"] },
-    { args: ["--version", "--help"] },
-    { args: ["setup", "--help"] },
-  ].map((row) => [row.args.join(" "), row] as const))("#given an invalid OMO_EXTRA_CA_CERTIFICATES #then `%s` refuses to start", (_argv, { args }) => {
-    const run = runEntry(args)
-    expect({ status: run.status, named: run.stderr.includes("OMO_EXTRA_CA_CERTIFICATES") }).toEqual({ status: 78, named: true })
-  }, 60_000)
+  test.each(
+    [
+      { args: ["doctor"] },
+      { args: ["-h"] },
+      { args: ["-v"] },
+      { args: ["--help", "x"] },
+      { args: ["--version", "doctor"] },
+      { args: ["--version", "--help"] },
+      { args: ["setup", "--help"] },
+    ].map((row) => [row.args.join(" "), row] as const),
+  )(
+    "#given an invalid OMO_EXTRA_CA_CERTIFICATES #then `%s` refuses to start",
+    (_argv, { args }) => {
+      const run = runEntry(args)
+      expect({ status: run.status, named: run.stderr.includes("OMO_EXTRA_CA_CERTIFICATES") }).toEqual({
+        status: 78,
+        named: true,
+      })
+    },
+    60_000,
+  )
 
   // The answer comes from static local data before anything else runs: an empty HOME stays empty,
   // where the engine's help path would run migrations and write its state there.
-  test.each([
-    { args: ["--version"], output: /^omo \S+ \(engine: / },
-    { args: ["--help"], output: /^Usage: omo / },
-  ].map((row) => [row.args.join(" "), row] as const))("#given an invalid OMO_EXTRA_CA_CERTIFICATES #then `%s` answers without starting anything", (_argv, { args, output }) => {
-    const home = mkdtempSync(join(tmpdir(), "omo-trust-home-"))
-    try {
-      const run = runEntry(args, home)
-      expect({ status: run.status, warned: run.stderr.includes("OMO_EXTRA_CA_CERTIFICATES") }).toEqual({ status: 0, warned: true })
-      expect(run.stdout).toMatch(output)
-      expect(readdirSync(home)).toEqual([])
-    } finally {
-      rmSync(home, { recursive: true, force: true })
-    }
-  }, 60_000)
+  test.each(
+    [
+      { args: ["--version"], output: /^omo \S+ \(engine: / },
+      { args: ["--help"], output: /^Usage: omo / },
+    ].map((row) => [row.args.join(" "), row] as const),
+  )(
+    "#given an invalid OMO_EXTRA_CA_CERTIFICATES #then `%s` answers without starting anything",
+    (_argv, { args, output }) => {
+      const home = mkdtempSync(join(tmpdir(), "omo-trust-home-"))
+      try {
+        const run = runEntry(args, home)
+        expect({ status: run.status, warned: run.stderr.includes("OMO_EXTRA_CA_CERTIFICATES") }).toEqual({
+          status: 0,
+          warned: true,
+        })
+        expect(run.stdout).toMatch(output)
+        expect(readdirSync(home)).toEqual([])
+      } finally {
+        rmSync(home, { recursive: true, force: true })
+      }
+    },
+    60_000,
+  )
 })

@@ -1,11 +1,7 @@
 import { existsSync, readFileSync } from "fs"
 import { log } from "../../shared/logger"
 import { getInstalledPluginsPath } from "./discovery-paths"
-import type {
-  InstalledPluginEntryV3,
-  InstalledPluginsDatabase,
-  PluginInstallation,
-} from "./types"
+import type { InstalledPluginEntryV3, InstalledPluginsDatabase, PluginInstallation } from "./types"
 
 export function loadInstalledPlugins(pluginsBaseDir?: string): InstalledPluginsDatabase | null {
   const dbPath = getInstalledPluginsPath(pluginsBaseDir)
@@ -47,16 +43,11 @@ function isValidV3Entry(entry: unknown): entry is InstalledPluginEntryV3 {
   )
 }
 
-export function extractPluginEntries(
-  db: InstalledPluginsDatabase,
-): Array<[string, PluginInstallation | undefined]> {
+export function extractPluginEntries(db: InstalledPluginsDatabase): Array<[string, PluginInstallation | undefined]> {
   if (Array.isArray(db)) {
     return db
       .filter(isValidV3Entry)
-      .map((entry) => [
-        `${entry.name}@${entry.marketplace}`,
-        v3EntryToInstallation(entry),
-      ])
+      .map((entry) => [`${entry.name}@${entry.marketplace}`, v3EntryToInstallation(entry)])
   }
   if (db.version === 1) {
     return Object.entries(db.plugins).map(([key, installation]) => [key, installation])

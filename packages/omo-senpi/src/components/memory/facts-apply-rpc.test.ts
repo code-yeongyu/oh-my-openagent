@@ -4,12 +4,21 @@ import { mkdtemp, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { GitMemoryRepo, buildDefaultSeedFiles, buildIdentityPaths, type FactsPeopleRouting } from "@oh-my-opencode/memory-core"
+import {
+  GitMemoryRepo,
+  buildDefaultSeedFiles,
+  buildIdentityPaths,
+  type FactsPeopleRouting,
+} from "@oh-my-opencode/memory-core"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { snapshotTree } from "../onboarding/understand.test-support"
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
-import { MEMORY_FACTS_APPLY_RPC_METHOD, createSessionFactsApplier, type MemoryFactsApplyResponse } from "./facts-apply-rpc"
+import {
+  MEMORY_FACTS_APPLY_RPC_METHOD,
+  createSessionFactsApplier,
+  type MemoryFactsApplyResponse,
+} from "./facts-apply-rpc"
 import { applyMemoryFacts } from "./facts-apply-runtime"
 import { createMemoryRpcBridge } from "./memory-rpc-bridge"
 
@@ -31,12 +40,27 @@ async function boundIdentity(): Promise<{ readonly context: MemoryIdentityContex
 
 function rpcHost() {
   const handlers = new Map<string, (request: unknown) => unknown>()
-  const pi = { rpc: { emit() {}, handle(name: string, handler: (request: unknown) => unknown) { handlers.set(name, handler) } } }
-  return { pi: pi as unknown as SenpiExtensionAPI, call: async (name: string, request: unknown) => handlers.get(name)?.(request) }
+  const pi = {
+    rpc: {
+      emit() {},
+      handle(name: string, handler: (request: unknown) => unknown) {
+        handlers.set(name, handler)
+      },
+    },
+  }
+  return {
+    pi: pi as unknown as SenpiExtensionAPI,
+    call: async (name: string, request: unknown) => handlers.get(name)?.(request),
+  }
 }
 
 const PROJECT = { scope: "project", text: "The project runs tests with bun.", date: "2026-10-18" }
-const PERSON = { scope: "person", person: { name: "Mina", aliases: ["Min"] }, text: "Mina prefers concise reviews.", date: "2026-10-18" }
+const PERSON = {
+  scope: "person",
+  person: { name: "Mina", aliases: ["Min"] },
+  text: "Mina prefers concise reviews.",
+  date: "2026-10-18",
+}
 
 describe("omo.memory.facts.apply", () => {
   test("#given a bound memory session #when the RPC applies a project and a person fact #then they land as one facts-extractor commit with person routing", async () => {
@@ -49,13 +73,17 @@ describe("omo.memory.facts.apply", () => {
     })
     bridge.attach("s1")
 
-    const response = await host.call(MEMORY_FACTS_APPLY_RPC_METHOD, { records: [PROJECT, PERSON] }) as MemoryFactsApplyResponse
+    const response = (await host.call(MEMORY_FACTS_APPLY_RPC_METHOD, {
+      records: [PROJECT, PERSON],
+    })) as MemoryFactsApplyResponse
 
     expect(response).toMatchObject({ outcome: "committed" })
     if (!("outcome" in response) || response.outcome !== "committed") throw new Error("not committed")
-    expect(response.sha).toBe(await repo.head() ?? "")
+    expect(response.sha).toBe((await repo.head()) ?? "")
     expect(response.affectedPaths).toContain("people/mina/observations.md")
-    expect(await readFile(join(context.identityPaths.repo, "people", "mina", "observations.md"), "utf8")).toContain("Mina prefers concise reviews.")
+    expect(await readFile(join(context.identityPaths.repo, "people", "mina", "observations.md"), "utf8")).toContain(
+      "Mina prefers concise reviews.",
+    )
     const [commit] = await repo.log()
     expect(commit?.trailers["Omo-Facts-Batch"]).toBe(response.batchId)
     expect(commit?.trailers["Generated-By"]).toBe("facts-extractor")
@@ -73,15 +101,24 @@ describe("omo.memory.facts.apply", () => {
 
     const response = await applier({ records: [PROJECT] }, "s1")
 
-    expect(response).toEqual({ kind: "unavailable", reason: expect.stringContaining("omo-onboarding-scan.js is missing") })
+    expect(response).toEqual({
+      kind: "unavailable",
+      reason: expect.stringContaining("omo-onboarding-scan.js is missing"),
+    })
     expect(await repo.head()).toBe(head)
     expect(await snapshotTree(context.identityPaths.root)).toEqual(before)
   }, 60_000)
 
   test("#given no bound session #when the RPC is called #then it answers unavailable", async () => {
     const host = rpcHost()
-    createMemoryRpcBridge(host.pi, { resolveContext: () => undefined, activeRun: () => undefined, applyFacts: async () => ({ kind: "unavailable", reason: "x" }) })
-    expect(await host.call(MEMORY_FACTS_APPLY_RPC_METHOD, { records: [PROJECT] })).toMatchObject({ kind: "unavailable" })
+    createMemoryRpcBridge(host.pi, {
+      resolveContext: () => undefined,
+      activeRun: () => undefined,
+      applyFacts: async () => ({ kind: "unavailable", reason: "x" }),
+    })
+    expect(await host.call(MEMORY_FACTS_APPLY_RPC_METHOD, { records: [PROJECT] })).toMatchObject({
+      kind: "unavailable",
+    })
   })
 
   test("#given a record memory-core's extraction validator rejects #when applied #then nothing is written and the reason names the record", async () => {
@@ -92,7 +129,9 @@ describe("omo.memory.facts.apply", () => {
     const response = await applyMemoryFacts({
       context,
       people: PEOPLE,
-      request: { records: [PROJECT, { scope: "project", text: "x", date: "2026-10-18", person: { name: "A", aliases: [] } }] },
+      request: {
+        records: [PROJECT, { scope: "project", text: "x", date: "2026-10-18", person: { name: "A", aliases: [] } }],
+      },
     })
 
     expect(response).toMatchObject({ kind: "invalid" })
@@ -104,7 +143,10 @@ describe("omo.memory.facts.apply", () => {
   test("#given an empty records list #when applied #then it is no_facts and writes nothing", async () => {
     const { context } = await boundIdentity()
     const before = await snapshotTree(context.identityPaths.root)
-    expect(await applyMemoryFacts({ context, people: PEOPLE, request: { records: [] } })).toEqual({ outcome: "no_facts", affectedPaths: [] })
+    expect(await applyMemoryFacts({ context, people: PEOPLE, request: { records: [] } })).toEqual({
+      outcome: "no_facts",
+      affectedPaths: [],
+    })
     expect(await snapshotTree(context.identityPaths.root)).toEqual(before)
   }, 60_000)
 
@@ -136,7 +178,18 @@ describe("omo.memory.facts.apply", () => {
     const source = await readFile(new URL("./facts-apply-runtime.ts", import.meta.url), "utf8")
     expect(source).toContain("applyFactsWithRetries")
     expect(source).toContain("parseFactsExtractionRecord")
-    for (const writer of ["writeFile", "appendFile", "mkdir", "rename", "unlink", "rmSync", "commitPrepared", ".commit(", "applyFactsRecovery", "applyFactsBatch"]) {
+    for (const writer of [
+      "writeFile",
+      "appendFile",
+      "mkdir",
+      "rename",
+      "unlink",
+      "rmSync",
+      "commitPrepared",
+      ".commit(",
+      "applyFactsRecovery",
+      "applyFactsBatch",
+    ]) {
       expect(source).not.toContain(writer)
     }
   })

@@ -183,19 +183,23 @@ describe("createDagJournal WAL ordering and replay", () => {
     const nodeId = "node-a" as DagNodeId
 
     // when
-    journal.append(dagNodeTransitionedEvent({
-      nodeId,
-      from: "scheduled",
-      to: "scheduled",
-      reason: { kind: "task_queued", queuePosition: 3 },
-    }))
+    journal.append(
+      dagNodeTransitionedEvent({
+        nodeId,
+        from: "scheduled",
+        to: "scheduled",
+        reason: { kind: "task_queued", queuePosition: 3 },
+      }),
+    )
 
     // then
-    expect(store.readEvents(runId, 0, { limit: 10 }).events).toContainEqual(expect.objectContaining({
-      type: "dag.node.transitioned",
-      nodeId,
-      reason: { kind: "task_queued", queuePosition: 3 },
-    }))
+    expect(store.readEvents(runId, 0, { limit: 10 }).events).toContainEqual(
+      expect.objectContaining({
+        type: "dag.node.transitioned",
+        nodeId,
+        reason: { kind: "task_queued", queuePosition: 3 },
+      }),
+    )
   })
 
   test("#given a durable checkpoint and WAL #when reopened #then sequence numbers continue from the greater persisted tail", () => {
@@ -407,13 +411,15 @@ describe("createDagJournal new event replay", () => {
     journal.append(dagRunStartedEvent({ generation: 1 }))
     journal.append(dagNodeRetriedEvent({ nodeId: nodeA, execAttempt: 1, promptChanged: false }))
     journal.append(dagNodeSteeredEvent({ nodeId: nodeB, taskId: "task-b", delivery: "steer" }))
-    journal.append(dagDefinitionAmendedEvent({
-      previousFingerprint: "fp-old",
-      fingerprint: "fp-new",
-      changedNodeIds: [nodeA],
-      addedNodeIds: [],
-      invalidatedNodeIds: [nodeB],
-    }))
+    journal.append(
+      dagDefinitionAmendedEvent({
+        previousFingerprint: "fp-old",
+        fingerprint: "fp-new",
+        changedNodeIds: [nodeA],
+        addedNodeIds: [],
+        invalidatedNodeIds: [nodeB],
+      }),
+    )
     journal.append(dagRunStartedEvent({ generation: 2 }))
 
     const expected = journal.snapshot()
@@ -456,7 +462,9 @@ describe("createDagJournal new event replay", () => {
     })
 
     journal.append(dagRunStartedEvent({ generation: 1 }))
-    expect(() => journal.append(dagNodeRetriedEvent({ nodeId: nodeA, execAttempt: 1, promptChanged: false }))).toThrow("injected checkpoint crash")
+    expect(() => journal.append(dagNodeRetriedEvent({ nodeId: nodeA, execAttempt: 1, promptChanged: false }))).toThrow(
+      "injected checkpoint crash",
+    )
 
     const reopened = createDagJournal({
       store: crashingStore,

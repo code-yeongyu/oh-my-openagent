@@ -112,7 +112,9 @@ describe("omo-senpi win32 console suppression", () => {
       })
 
       test("#then the gate still reaches the spawn sites it exists for", () => {
-        const audited = productionSources().flatMap(collectChildProcessCalls).map((call) => call.file)
+        const audited = productionSources()
+          .flatMap(collectChildProcessCalls)
+          .map((call) => call.file)
 
         for (const required of [
           "components/memory/worker/spawn-supervisor.ts",
@@ -149,8 +151,8 @@ describe("omo-senpi win32 console suppression", () => {
       })
 
       test("#then an exemption is honoured only when its marker is written at the call", () => {
-        const exempted = ['// windowsHide-exempt: inherits the caller console', 'spawn(cli, args, {})'].join("\n")
-        const bare = ['// ordinary comment', 'spawn(cli, args, {})'].join("\n")
+        const exempted = ["// windowsHide-exempt: inherits the caller console", "spawn(cli, args, {})"].join("\n")
+        const bare = ["// ordinary comment", "spawn(cli, args, {})"].join("\n")
         const callOffset = (text: string) => text.indexOf("spawn(cli")
 
         expect(isExempt(exempted, callOffset(exempted))).toBe(true)

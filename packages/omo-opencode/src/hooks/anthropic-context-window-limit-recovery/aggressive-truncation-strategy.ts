@@ -5,18 +5,9 @@ import type { Client } from "./client"
 import { clearSessionState } from "./state"
 import { formatBytes } from "./message-builder"
 import { log } from "../../shared/logger"
-import {
-  getMessageDir,
-  resolveInheritedPromptTools,
-} from "../../shared"
-import {
-  getSessionAgent,
-  resolveRegisteredAgentName,
-} from "../../features/claude-code-session-state/state"
-import {
-  findNearestMessageWithFields,
-  findNearestMessageWithFieldsFromSDK,
-} from "../../features/hook-message-injector"
+import { getMessageDir, resolveInheritedPromptTools } from "../../shared"
+import { getSessionAgent, resolveRegisteredAgentName } from "../../features/claude-code-session-state/state"
+import { findNearestMessageWithFields, findNearestMessageWithFieldsFromSDK } from "../../features/hook-message-injector"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
 import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
 
@@ -79,16 +70,19 @@ export async function runAggressiveTruncationStrategy(params: {
     setTimeout(async () => {
       try {
         const sdkMessage = await findNearestMessageWithFieldsFromSDK(params.client, params.sessionID)
-        const previousMessage = sdkMessage ?? (() => {
-          const messageDir = getMessageDir(params.sessionID)
-          return messageDir ? findNearestMessageWithFields(messageDir) : null
-        })()
+        const previousMessage =
+          sdkMessage ??
+          (() => {
+            const messageDir = getMessageDir(params.sessionID)
+            return messageDir ? findNearestMessageWithFields(messageDir) : null
+          })()
 
         const agentName = getSessionAgent(params.sessionID) ?? previousMessage?.agent
         const launchAgent = resolveRegisteredAgentName(agentName)
-        const launchModel = previousMessage?.model?.providerID && previousMessage.model.modelID
-          ? { providerID: previousMessage.model.providerID, modelID: previousMessage.model.modelID }
-          : undefined
+        const launchModel =
+          previousMessage?.model?.providerID && previousMessage.model.modelID
+            ? { providerID: previousMessage.model.providerID, modelID: previousMessage.model.modelID }
+            : undefined
         const launchVariant = previousMessage?.model?.variant
         const inheritedTools = resolveInheritedPromptTools(params.sessionID, previousMessage?.tools)
 

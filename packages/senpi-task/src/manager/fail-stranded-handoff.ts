@@ -17,9 +17,14 @@ export function failStrandedHandoff(store: TaskRecordStore, timestamp: string, i
   log("senpi-task runtime fallback teardown rejected", { taskId: input.taskId, error: reason })
   let owned = false
   let undelivered = 0
-  store.mutate(input.taskId, fresh => {
-    if (!isFallbackHandoff(fresh) || fresh.status !== "running"
-      || fresh.notification.run_epoch !== input.epoch || fresh.host_pid !== input.owner) return fresh
+  store.mutate(input.taskId, (fresh) => {
+    if (
+      !isFallbackHandoff(fresh) ||
+      fresh.status !== "running" ||
+      fresh.notification.run_epoch !== input.epoch ||
+      fresh.host_pid !== input.owner
+    )
+      return fresh
     owned = true
     undelivered = fresh.pending_steering?.length ?? 0
     // Keep the closing child's identity until its cleanup owner takes over. The queue ends here, inside
@@ -33,10 +38,15 @@ export function failStrandedHandoff(store: TaskRecordStore, timestamp: string, i
     undelivered,
   )
   const failed = store.transition(input.taskId, { type: "fail", timestamp, error_message: message })
-  if (undelivered > 0) store.appendEvent(input.taskId, { type: "steer_dropped", payload: { count: undelivered, reason: "fallback_failed" } })
+  if (undelivered > 0)
+    store.appendEvent(input.taskId, {
+      type: "steer_dropped",
+      payload: { count: undelivered, reason: "fallback_failed" },
+    })
   if (failed.applied) {
     store.appendEvent(input.taskId, {
-      type: "task_fallback_teardown_failed", payload: { error_message: reason, next_model: input.nextModel },
+      type: "task_fallback_teardown_failed",
+      payload: { error_message: reason, next_model: input.nextModel },
     })
   }
 }

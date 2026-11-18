@@ -16,10 +16,7 @@ export interface ContinuableWork {
   readonly checklist: PlanChecklist
 }
 
-export function findContinuableBoulderWork(
-  cwd: string,
-  sessionId: string,
-): ContinuableWork | null {
+export function findContinuableBoulderWork(cwd: string, sessionId: string): ContinuableWork | null {
   // The record is read here anyway, so this is where a work abandoned by a dead session gets
   // repaired: a session that never completed its work leaves it `active` forever otherwise (#8413).
   reconcileStaleWorks(cwd, {
@@ -43,4 +40,3 @@ export function findContinuableBoulderWork(
 
   return { work, planPath, checklist }
 }
-

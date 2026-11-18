@@ -1,5 +1,18 @@
-import { dagRunStartedEvent, dagRunFailedEvent, dagRunCompletedEvent, dagWaveStartedEvent, dagWaveCompletedEvent } from "./events"
-import { countNodes, nodeError, nodeById, transition, TERMINAL_NODE_STATES, type SchedulerContext } from "./scheduler-context"
+import {
+  dagRunStartedEvent,
+  dagRunFailedEvent,
+  dagRunCompletedEvent,
+  dagWaveStartedEvent,
+  dagWaveCompletedEvent,
+} from "./events"
+import {
+  countNodes,
+  nodeError,
+  nodeById,
+  transition,
+  TERMINAL_NODE_STATES,
+  type SchedulerContext,
+} from "./scheduler-context"
 import { cancelledSnapshot } from "./scheduler-cancellation"
 import { admitFrontier } from "./scheduler-admission"
 import { settleOne } from "./scheduler-task-attachment"
@@ -22,7 +35,7 @@ export async function runFrontier(context: SchedulerContext): Promise<DagRunReco
     // Completions are reported before the next admission pass so a finishing wave reads as
     // settled before later-wave nodes it unblocked start interleaving their own events.
     emitCompletedWaves(context)
-    if (!await admitFrontier(context) || context.suspended) return cancelledSnapshot(context)
+    if (!(await admitFrontier(context)) || context.suspended) return cancelledSnapshot(context)
     const current = context.journal.snapshot()
     if (current.nodes.every((node) => TERMINAL_NODE_STATES.has(node.state))) break
     if (context.attachedTasks.size === 0 && !context.infrastructureRetries.pending()) {
@@ -35,7 +48,7 @@ export async function runFrontier(context: SchedulerContext): Promise<DagRunReco
       if (hasCascadableDependent(current)) continue
       throw new Error(`DAG run "${current.runId}" cannot terminalize while nodes are active`)
     }
-    if (!await settleOne(context)) return cancelledSnapshot(context)
+    if (!(await settleOne(context))) return cancelledSnapshot(context)
   }
 
   const snapshot = context.journal.snapshot()
