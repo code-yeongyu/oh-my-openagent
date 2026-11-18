@@ -41,6 +41,29 @@ static int decrypt_apps(SecKeychainRef keychain, const char *account) {
   return 0;
 }
 
+// Deletes every omo-cli item in the throwaway keychain, whoever owns it, so each test starts from an empty keychain
+// even after an earlier test failed midway. SecKeychainItemDelete on the found refs, because SecItemDelete refuses
+// items whose decrypt list does not name this binary (-25244).
+static OSStatus purge(SecKeychainRef keychain) {
+  CFMutableDictionaryRef query =
+      CFDictionaryCreateMutable(NULL, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+  CFDictionarySetValue(query, kSecClass, kSecClassGenericPassword);
+  CFDictionarySetValue(query, kSecAttrService, CFSTR("omo-cli"));
+  CFArrayRef list = CFArrayCreate(NULL, (const void **)&keychain, 1, &kCFTypeArrayCallBacks);
+  CFDictionarySetValue(query, kSecMatchSearchList, list);
+  CFDictionarySetValue(query, kSecReturnRef, kCFBooleanTrue);
+  CFDictionarySetValue(query, kSecMatchLimit, kSecMatchLimitAll);
+  CFTypeRef items = NULL;
+  OSStatus status = SecItemCopyMatching(query, &items);
+  CFRelease(list);
+  CFRelease(query);
+  if (status == errSecItemNotFound) return errSecSuccess;
+  for (CFIndex i = 0; status == errSecSuccess && i < CFArrayGetCount(items); i++)
+    status = SecKeychainItemDelete((SecKeychainItemRef)CFArrayGetValueAtIndex(items, i));
+  if (items != NULL) CFRelease(items);
+  return status;
+}
+
 int main(int argc, char **argv) {
   if (argc < 3) return fprintf(stderr, "usage: keychain-fixture <op> <keychain> [account] [value]\n"), 2;
   const char *op = argv[1], *path = argv[2], *account = argc > 3 ? argv[3] : "";
@@ -71,6 +94,7 @@ int main(int argc, char **argv) {
     if (status == errSecSuccess)
       printf("value %.*s\n", (int)CFDataGetLength(data), (const char *)CFDataGetBytePtr(data));
   } else if (strcmp(op, "delete") == 0) status = SecItemDelete(item_query(keychain, account, 1));
+  else if (strcmp(op, "purge") == 0) status = purge(keychain);
   else if (strcmp(op, "delete-interactive") == 0) {
     SecKeychainSetUserInteractionAllowed(true);
     status = SecItemDelete(item_query(keychain, account, 1));

@@ -9,6 +9,7 @@ import {
   readlinkSync,
   realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs"
 import { tmpdir } from "node:os"
@@ -18,7 +19,7 @@ import {
   dropTimestampOffsets,
   goldenHostLeaks,
   pinEnginePackage,
-  dropEvalProgressSnapshots,
+  resolveTmpdirSymlinks,
   splitStatusChannels,
   statusCounts,
   stopSandboxProcesses,
@@ -55,79 +56,6 @@ describe("splitStatusChannels", () => {
     const O6 = [splitStatusChannels({ turn: [status("memory", "a"), status("goal", "g"), status("memory", "b")] })]
 
     expect(statusCounts({ O6 })).toEqual([{ "setStatus:memory": 2, "setStatus:goal": 1 }])
-  })
-})
-
-describe("dropEvalProgressSnapshots", () => {
-  const update = (status, text, toolCalls = []) => ({
-    type: "tool_execution_update",
-    toolCallId: "call_1",
-    toolName: "eval",
-    args: {},
-    partialResult: {
-      content: [{ type: "text", text }],
-      details: { cells: [{ status, output: text }], toolCallCount: toolCalls.length, toolCalls },
-    },
-  })
-
-  test("#given a cell that streamed two mid-run snapshots #when dropped #then the queued, first running and complete transitions remain", () => {
-    const client = {
-      turn: [
-        { type: "tool_execution_start", toolName: "eval" },
-        update("queued", "1/1 cells queued"),
-        update("running", "1/1 cells running"),
-        update("running", "1/1 cells running\n↳ last: CHILD-DONE"),
-        update("complete", "1/1 cells complete"),
-        { type: "tool_execution_end", toolName: "eval" },
-      ],
-    }
-
-    const kept = dropEvalProgressSnapshots(client).turn
-
-    expect(kept.map((event) => event.partialResult?.details?.cells?.[0]?.status ?? event.type)).toEqual([
-      "tool_execution_start",
-      "queued",
-      "running",
-      "complete",
-      "tool_execution_end",
-    ])
-    expect(kept[2]).toEqual({
-      type: "tool_execution_update",
-      toolCallId: "call_1",
-      toolName: "eval",
-      partialResult: {
-        content: [{ type: "text", text: "1/1 cells running" }],
-        details: { cells: [{ status: "running" }] },
-      },
-    })
-  })
-
-  test("#given another tool's running update #when dropped #then it is untouched", () => {
-    const other = { ...update("running", "x"), toolName: "computer" }
-
-    expect(dropEvalProgressSnapshots({ turn: [other] }).turn).toEqual([other])
-  })
-
-  test("#given two runs that differ only in how many mid-run snapshots fired #when dropped #then their turn lists are equal", () => {
-    const one = { turn: [update("queued", "q"), update("running", "r1"), update("complete", "c")] }
-    const two = {
-      turn: [update("queued", "q"), update("running", "r1"), update("running", "r2"), update("complete", "c")],
-    }
-
-    expect(dropEvalProgressSnapshots(one)).toEqual(dropEvalProgressSnapshots(two))
-  })
-
-  test("#given two runs whose first snapshot fired before and after the cell's first tool call #when dropped #then their turn lists are equal", () => {
-    const early = { turn: [update("queued", "q"), update("running", "1/1 cells running"), update("complete", "c")] }
-    const late = {
-      turn: [
-        update("queued", "q"),
-        update("running", "1/1 cells running\n↳ last: CHILD-DONE", [{ name: "task" }]),
-        update("complete", "c"),
-      ],
-    }
-
-    expect(dropEvalProgressSnapshots(early)).toEqual(dropEvalProgressSnapshots(late))
   })
 })
 
@@ -240,6 +168,29 @@ describe("pinEnginePackage", () => {
       writeFileSync(`${root}.lock`, `${process.ppid}\n`)
 
       expect(() => pinEnginePackage(join(modules, "@code-yeongyu/senpi"), { root })).toThrow(/owns/)
+    } finally {
+      rmSync(base, { recursive: true, force: true })
+    }
+  })
+})
+
+describe("resolveTmpdirSymlinks", () => {
+  test("#given a TMPDIR that is a symlink #when resolved #then TMPDIR names the directory behind it", () => {
+    // given: macOS spells its temp dir through a symlink into /private
+    const base = realpathSync(mkdtempSync(join(tmpdir(), "eq-tmpdir-test-")))
+    try {
+      const physical = join(base, "physical")
+      const link = join(base, "link")
+      mkdirSync(physical)
+      symlinkSync(physical, link, "junction")
+      const env = { TMPDIR: link }
+
+      // when
+      const resolved = resolveTmpdirSymlinks(env)
+
+      // then
+      expect(resolved).toBe(physical)
+      expect(env.TMPDIR).toBe(physical)
     } finally {
       rmSync(base, { recursive: true, force: true })
     }

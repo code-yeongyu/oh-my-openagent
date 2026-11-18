@@ -56,12 +56,12 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
     {
       providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
       model: LATEST_MODEL_BY_FAMILY.claudeFable,
-      variant: "max",
+      variant: "xhigh",
     },
     {
       providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
       model: "claude-fable-5-1",
-      variant: "max",
+      variant: "xhigh",
     },
   ],
   ultrabrain: [

@@ -5,7 +5,7 @@ import { copyRepo, runKnip, unusedExports } from "./knip-run.ts"
 
 // Next.js route-segment config exports are read by the framework from the app directory's special files, so knip must
 // not report them, while a genuinely unused export of the same file must still be reported. The recognition is scoped
-// (script/knip-next-route-segment-exports.ts, configured in knip.jsonc preprocessorOptions.nextRouteSegmentExports), so
+// (script/knip-next-route-segment-exports.ts, configured in knip.base.jsonc preprocessorOptions.nextRouteSegmentExports), so
 // these probes are NEW files added to a repo copy rather than files named in any ignore list.
 
 const KNIP_TIMEOUT_MS = 600_000

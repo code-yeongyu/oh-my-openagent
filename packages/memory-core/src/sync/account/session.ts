@@ -102,6 +102,7 @@ export async function openAccountSession(options: AccountSessionOptions): Promis
     ok: true,
     session: {
       ...(freeze === undefined ? {} : { freeze }),
+      space: Buffer.from(options.spaceId).toString("hex"),
       transport:
         options.transport ??
         createHttpTransport({
