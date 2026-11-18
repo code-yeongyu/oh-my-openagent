@@ -61,6 +61,7 @@ const legacy = [
   ["terminal-to-ui", "terminal-to-ui.mjs"],
   ["desktop-to-cli", "desktop-to-cli.mjs"],
   ["plugin-surface", "plugin-surface.mjs"],
+  ["local-approvals", "local-approvals.mjs"],
   ["session-control", "session-control-qa.mjs"],
   ["reopen-exited", "reopen-exited.mjs"],
   ["create-atomic", "create-atomic.mjs"],
