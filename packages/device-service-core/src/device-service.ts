@@ -18,7 +18,7 @@ import type {
 import { type CommandResult, openAttach, PROGRESS_STATES, type RemoteAttach } from "./remote-attach.ts"
 import { followDelegatedChannel } from "./delegated-channel.ts"
 import { LocalApiError } from "./local-api/errors.ts"
-import { REFUSED_BEFORE_SENDING } from "./local-api/refused-before-sending.ts"
+import { REFUSED_BEFORE_SENDING } from "./refused-before-sending.ts"
 import { newestRowsListing } from "./listing-rows.ts"
 import type { CommandRpc } from "./local-api/protocol.ts"
 import type { SessionCandidate } from "./local-api/protocol-command.ts"
@@ -103,7 +103,7 @@ function followDelegatedCommand(
 
 export type { ListingResult, ListingRevision, ReadPage, ReadPageEntry } from "./local-api/client-assembly.ts"
 export { LocalApiError } from "./local-api/errors.ts"
-export { REFUSED_BEFORE_SENDING } from "./local-api/refused-before-sending.ts"
+export { REFUSED_BEFORE_SENDING } from "./refused-before-sending.ts"
 export { NotSentError } from "./not-sent-error.ts"
 export type {
   Capability,

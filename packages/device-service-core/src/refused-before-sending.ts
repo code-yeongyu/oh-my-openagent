@@ -1,4 +1,4 @@
-import type { LocalApiError } from "./errors.ts"
+import type { LocalApiError } from "./local-api/errors.ts"
 
 // The local API codes that answer a session.command before anything leaves this device: the owner's error responses
 // (dispatch outcomes arrive as session.command_state, never as an error response) and the client's own size check.

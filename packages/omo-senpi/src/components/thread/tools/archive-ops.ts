@@ -21,7 +21,7 @@ export async function archiveThread(
     return failure(
       "not_resumable",
       `Thread ${located.thread_id} has no engine holding it, so its session file cannot be ${archived ? "archived" : "unarchived"} now.`,
-      "Open it with thread_create { thread }, then retry.",
+      "Open it with thread_create (tool.thread_create({ thread }) in an eval cell), then retry.",
     )
   const { control } = located
   if (archived && control.device === undefined && control.thread_id === callerId && (await control.running()))

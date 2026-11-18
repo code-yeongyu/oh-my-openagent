@@ -396,16 +396,17 @@ describe("live thread surface endpoint cache", () => {
       expect(keys.filter((key) => key.includes("/tmp/omo-enum-env-b"))).toHaveLength(1)
     })
 
-    test("#given two surfaces with the real engine runner whose envs launch different engines #when both list over one shared map #then each engine gets its own entry", async () => {
-      // given (L4: no statusAll, so the key carries the engine launch; SENPI_BIN names it without any engine installed)
+    test("#given surfaces over one shared map #when they list #then the same agent dir and legacy socket share one entry and another agent dir gets its own", async () => {
+      // given (L4 after #13452: no engine runs by default, so the key is the agent dir whose registry is read and the
+      // legacy socket merged into it; the engine an env would launch no longer changes the answer)
       const enumerations = new Map<string, never>()
-      const surfaceFor = (engine: string) =>
+      const surfaceFor = (agentDir: string, engine: string) =>
         createLiveThreadSurface(
           {} as never,
           {
             env: {
               SENPI_RPC_SOCKET: "/tmp/omo-enum-cache-missing.sock",
-              OMO_CODING_AGENT_DIR: "/tmp/omo-enum-engine",
+              OMO_CODING_AGENT_DIR: agentDir,
               SENPI_BIN: engine,
             },
             exists: () => false,
@@ -417,11 +418,16 @@ describe("live thread surface endpoint cache", () => {
         )
 
       // when
-      await within(surfaceFor("/bin/true").listView({ offline: true }), "a view enumerated by /bin/true")
-      await within(surfaceFor("/bin/false").listView({ offline: true }), "a view enumerated by /bin/false")
+      await within(surfaceFor("/tmp/omo-enum-a", "/bin/true").listView({ offline: true }), "a view of agent dir a")
+      await within(
+        surfaceFor("/tmp/omo-enum-a", "/bin/false").listView({ offline: true }),
+        "a second view of agent dir a",
+      )
+      const shared = enumerations.size
+      await within(surfaceFor("/tmp/omo-enum-b", "/bin/true").listView({ offline: true }), "a view of agent dir b")
 
       // then
-      expect(enumerations.size).toBe(2)
+      expect([shared, enumerations.size]).toEqual([1, 2])
     })
   })
 })

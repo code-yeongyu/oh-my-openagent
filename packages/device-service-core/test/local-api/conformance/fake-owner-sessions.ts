@@ -180,11 +180,35 @@ const answerCommand = (
   for (const sent of outcome) conn.send(eventOf("session.command_state", { command_id, ...sent }))
 }
 
+// #393 part B: `session: "<device>.<key>"` names a session its device lists, delegated with no attach on this connection.
+const sessionTarget = (state: OwnerState, address: string): WorldSession | undefined => {
+  const dot = address.lastIndexOf(".")
+  const device = address.slice(0, dot)
+  const key = address.slice(dot + 1)
+  return dot <= 0 ? undefined : state.world.sessions.find((s) => s.device === device && s.session_id === key)
+}
+
 const command = (state: OwnerState, conn: Conn, request: SessionCommand): Outcome => {
   if ("device" in request) return endpointCommand(state, conn, request)
-  if (!("attach" in request)) return refuse("unsupported", "this test owner takes attach and endpoint commands only")
+  if ("session" in request) {
+    const target = sessionTarget(state, request.session)
+    if (target === undefined) return refuse("session_not_found", "no such session on that device")
+    return commandOn(state, conn, request, target, target.delegated)
+  }
+  if (!("attach" in request))
+    return refuse("unsupported", "this test owner takes attach, session and endpoint commands only")
   const session = state.attaches.get(request.attach)
   if (session === undefined || !conn.attaches.has(request.attach)) return refuse("not_attached", "attach first")
+  return commandOn(state, conn, request, session, request.delegated === true ? session.delegated : undefined)
+}
+
+const commandOn = (
+  state: OwnerState,
+  conn: Conn,
+  request: SessionCommand,
+  session: WorldSession,
+  delegated: WorldSession["delegated"],
+): Outcome => {
   const resolved = commandOf(state, request)
   if ("refused" in resolved) return resolved.refused
   const command_id = request.command_id ?? state.mint()
@@ -198,7 +222,6 @@ const command = (state: OwnerState, conn: Conn, request: SessionCommand): Outcom
   if (bound !== undefined) return ok({ command_id })
   state.bindings.set(command_id, binding)
   state.commands.push(resolved.rpc)
-  const delegated = request.delegated === true ? session.delegated : undefined
   return ok({ command_id }, () =>
     answerCommand(state, conn, session.device, command_id, resolved.rpc, delegated, session.outcome),
   )
