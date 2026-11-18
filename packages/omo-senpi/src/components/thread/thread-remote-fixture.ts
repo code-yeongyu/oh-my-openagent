@@ -199,6 +199,7 @@ export function createRemoteThreadFixture() {
       promptOutcome?: RemoteCommandOutcome
       admitRefuse?: string
       admitOutcome?: RemoteCommandOutcome
+      stateOutcomes?: readonly RemoteCommandOutcome[]
       heldDraft?: number
       openData?: JsonObject
       failSessionsList?: boolean
@@ -222,6 +223,8 @@ export function createRemoteThreadFixture() {
       incomplete?: readonly string[]
       /** Extra devices the account lists beyond this one and b. */
       devices?: readonly RemoteDevice[]
+      /** Devices removed from the account: the listing still carries their cached rows, the roster no longer names them. */
+      removed?: readonly string[]
       /** The roster as relayd answers it: without this device (its row then comes from thisDeviceName). */
       rosterWithoutSelf?: boolean
       registryDown?: "refused" | "throws" | "signed_out"
@@ -265,6 +268,8 @@ export function createRemoteThreadFixture() {
     // admissions its user's open draft still holds (held_draft, taken by nothing).
     const admitted = new Set<string>()
     let heldDraft = options.heldDraft ?? 0
+    // How b's next get_state calls end before its engine answers them (a lost reply, a restarted hand), one per call.
+    const stateOutcomes = [...(options.stateOutcomes ?? [])]
     // The session's records a prompt makes it write, held until the follower first reads after the answer: the
     // engine's turn records follow its reply out over the wire, and the CLI's read is the first observable hop after
     // its own bookkeeping for that reply.
@@ -334,6 +339,7 @@ export function createRemoteThreadFixture() {
         for (const id of options.relayKeyOnly === true ? [key] : [opened, key]) live.add(id)
         return ok(options.openData ?? { sessionId: "rpc-9", state: { durableSessionId: opened } })
       }
+      if (rpc["type"] === "get_state" && stateOutcomes.length > 0) return stateOutcomes.shift() as RemoteCommandOutcome
       if (rpc["type"] === "get_state" && options.stateRefusedAfterAdmit !== undefined && admitted.size > 0)
         return { kind: "refused", reason: options.stateRefusedAfterAdmit }
       if (rpc["type"] === "get_state")
@@ -413,8 +419,11 @@ export function createRemoteThreadFixture() {
       ...Object.keys(options.ended ?? {}),
       ...(options.silent ?? []),
     ])
-      if (!devices.some((known) => known.device === device)) devices.push({ device, label: device, online: true })
+      if (!devices.some((known) => known.device === device) && !(options.removed ?? []).includes(device))
+        devices.push({ device, label: device, online: true })
     const registryCalls: string[] = []
+    /** Every session.locate probe the tools sent, by device. */
+    const located: { readonly device: string; readonly session: string }[] = []
     const accountReads: string[] = []
     const down = <T>(): Promise<AliasResult<T>> =>
       options.registryDown === "throws"
@@ -546,7 +555,8 @@ export function createRemoteThreadFixture() {
           return answer(rpc)
         },
         // This fake device lists a created session by the id its create reply names.
-        locate: async (_device, engineId) => {
+        locate: async (device, engineId) => {
+          located.push({ device, session: engineId })
           // A device's relay connector keys each session it lists by a relay key, kept beside the durable id (relayKeys).
           if (options.relayKeys === undefined) return { kind: "ok", sessionId: engineId }
           const key = options.relayKeys.get(engineId)
@@ -664,6 +674,7 @@ export function createRemoteThreadFixture() {
       watching,
       endWatches,
       accountReads,
+      located,
     }
   }
 
@@ -685,6 +696,8 @@ export function createRemoteThreadFixture() {
       caller?: string
       diskSessions?: readonly string[]
       closeOutcome?: ThreadCloseOutcome
+      /** How this device's engine takes `set_session_archived`: `absent` = a host port without it, `refused` = an older engine. */
+      archive?: "absent" | "refused"
       /** Look session files up where senpi writes them, `<agentDir>/sessions`, as the component does. */
       sessionsDirectory?: boolean
       /** This device's engine refuses every open_session with this error text, as its host client throws it. */
@@ -744,6 +757,11 @@ export function createRemoteThreadFixture() {
     // The interrupt records this device's endpoint received, as b's engine's arrive in `sent`.
     const interrupts: JsonObject[] = []
     const setSessionName = mock(async (_sessionId: string, _name: string) => {})
+    const archived: Array<readonly [string, boolean, string | undefined]> = []
+    const setSessionArchived = async (sessionId: string, value: boolean, durableId?: string) => {
+      if (extra.archive === "refused") throw new Error("unsupported:set_session_archived")
+      archived.push([sessionId, value, durableId])
+    }
     // How often this device's endpoints were listed (the local enumeration a send can cost).
     let localListings = 0
     // How often a session on this device was prompted directly (a delivery never prompts; this counts any leak).
@@ -788,6 +806,7 @@ export function createRemoteThreadFixture() {
         closed.push([sessionId, durableId])
         return extra.closeOutcome ?? "closed"
       },
+      ...(extra.archive === "absent" ? {} : { setSessionArchived }),
       watchSession: async (_sessionId, handlers) => {
         watchers.add(handlers)
         let end: (reason: string) => void = () => {}
@@ -873,6 +892,7 @@ export function createRemoteThreadFixture() {
       setSessionName,
       store,
       closed,
+      archived,
       interrupts,
       agentDir,
       listings: () => localListings,

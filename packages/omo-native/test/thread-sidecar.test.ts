@@ -31,7 +31,6 @@ function load(extra: Record<string, unknown>) {
     cwd: "/work",
     stderr,
     reinstall: "Reinstall omo, then retry.",
-    engine: { run: () => ({ exitCode: 0, stdout: "", stderr: "" }) },
     loadSqlite: async () => ({}),
     importSdk: async () => ({
       createThreadSdk: (options: Record<string, unknown>) => {

@@ -8,6 +8,8 @@ import {
 } from "@oh-my-opencode/omo-config-core"
 import { OMO_SENPI_TASK_RPC_CHILD } from "@oh-my-opencode/senpi-task/rpc-spawn"
 
+import { loadSenpiBarrel } from "../../../../../senpi-task/src/lazy/senpi-barrel"
+
 import { resolveAgentHome } from "../../agent-home/resolve-agent-home"
 import { isCi } from "../../device-service/registrant-start"
 import type { DeliveryConsumer } from "../consumer/consumer"
@@ -53,6 +55,8 @@ export type ThreadWakeOptions = {
   readonly deviceServiceStateDir?: string
   readonly engineVersion?: string
   readonly minimumEngine?: string | null
+  /** Replaces the engine's own `threads.chainCountLimit` read (`SettingsManager.getThreadChainCountLimit`) for a cwd. */
+  readonly chainCountLimit?: (cwd: string) => Promise<number | undefined>
   readonly schedule?: (run: () => void, ms: number) => () => void
   readonly onWake?: (durableId: string, outcome: CarrierWakeOutcome) => void
 }
@@ -330,6 +334,11 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart, scope:
       engineVersion: options.engineVersion ?? input.engineVersion,
       minimumEngine: options.minimumEngine,
       wake,
+      // The setting the running engine admits a live thread call against (senpi `admitInputChain`), read the same way,
+      // so a queued delivery past the user's limit is refused at the intake as a live one is at admission.
+      chainCountLimit:
+        options.chainCountLimit ??
+        (async (cwd) => (await loadSenpiBarrel()).SettingsManager.create(cwd, agentDir).getThreadChainCountLimit()),
       sameDevice: (cwd) => input.settings(cwd).sameDevice,
       log: reportConsumerFailure,
     }).catch((error: unknown) => {
