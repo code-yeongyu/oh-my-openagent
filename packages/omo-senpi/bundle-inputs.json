@@ -50,6 +50,7 @@
     "packages/device-service-core/src/cold-wake/linux.ts",
     "packages/device-service-core/src/cold-wake/pinned-host.ts",
     "packages/device-service-core/src/cold-wake/readback.ts",
+    "packages/device-service-core/src/cold-wake/refresh.ts",
     "packages/device-service-core/src/cold-wake/service-table.ts",
     "packages/device-service-core/src/cold-wake/session-host-unit.ts",
     "packages/device-service-core/src/delegated-channel.ts",
