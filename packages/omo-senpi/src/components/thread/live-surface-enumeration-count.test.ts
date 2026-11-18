@@ -107,6 +107,7 @@ describe("what one send to a thread on another device asks for, by path (#12989)
     }
     const account = fixture.account()
     const base = account.remote
+    const listing = base.sessions.listing
     const remote: RemoteThreadSurface = {
       ...base,
       sessions: {
@@ -115,9 +116,7 @@ describe("what one send to a thread on another device asks for, by path (#12989)
         devices: async () => (bump("device_list"), await base.sessions.devices()),
         sessions: async () => (bump("account_sessions"), await base.sessions.sessions()),
         // One account listing round (#14174's accountListing reads it through `listing` when the port has one).
-        ...(base.sessions.listing === undefined
-          ? {}
-          : { listing: async () => (bump("account_sessions"), await base.sessions.listing!()) }),
+        ...(listing === undefined ? {} : { listing: async () => (bump("account_sessions"), await listing()) }),
         sessionCommand: async (device, session, rpc, options) => (
           bump("session_commands"),
           await base.sessions.sessionCommand(device, session, rpc, options)
