@@ -1,5 +1,5 @@
 import { mock } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { DeviceRow, RemoteClient, RemoteFailure, ServiceStatus } from "../remote"
@@ -696,11 +696,16 @@ export function createRemoteThreadFixture() {
       status: "open",
     }
     const sessions = extra.sessions ?? [local]
-    const openSession = mock(async (_request: Parameters<ThreadHost["openSession"]>[0]) => {
+    const openSession = mock(async (request: Parameters<ThreadHost["openSession"]>[0]) => {
       if (extra.openThrows !== undefined) throw new Error(extra.openThrows)
+      // An engine opening a session file on disk resumes it under the id in that file's header, as senpi does.
+      const resumed =
+        "sessionPath" in request && typeof request.sessionPath === "string" && existsSync(request.sessionPath)
+          ? (JSON.parse(readFileSync(request.sessionPath, "utf8").split("\n")[0] ?? "{}") as { id?: string }).id
+          : undefined
       const created: ThreadHostSession = {
         sessionId: "route-created",
-        durableSessionId: "dur-created-here",
+        durableSessionId: resumed ?? "dur-created-here",
         cwd: process.cwd(),
         name: null,
         status: "open",
