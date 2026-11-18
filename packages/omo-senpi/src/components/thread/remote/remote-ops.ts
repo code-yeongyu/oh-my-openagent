@@ -100,13 +100,15 @@ export type RemoteTarget =
  * listing keys every session (terminal-held or rpc-host alike) by the relay key that device's connector assigned and names
  * only its project, so the row cannot be matched by durable id: the holding device maps it (session.locate, the same
  * lookup a create on another device uses). An offline holder device is device_offline; one that is online but cannot map
- * the holder to a session it lists is not_found.
+ * the holder to a session it lists is not_found. A holder device the account's roster no longer names (removed from the
+ * account, #13505) is not_found without that probe; with no roster (`undefined`) the account's device list is read here.
  */
 export async function holderTarget(
   remote: RemoteThreadSurface,
   holder: AliasHolder,
   here: string | null,
   rows: readonly RemoteSessionRow[],
+  roster: readonly RemoteDevice[] | undefined,
 ): Promise<RemoteTarget | Failure> {
   if (holder.device === here) return { where: "here", session_id: holder.session_id }
   // A holder is recorded by its durable id (claimed on its own device) or by its listing key: match either.
@@ -115,7 +117,16 @@ export async function holderTarget(
       row.device === holder.device && (row.durable_id === holder.session_id || row.session_id === holder.session_id),
   )
   if (listed !== undefined) return { where: "remote", row: listed }
-  const device = (await accountDevices(remote.client)).devices.find((candidate) => candidate.device === holder.device)
+  const device = (roster ?? (await accountDevices(remote.client)).devices).find(
+    (candidate) => candidate.device === holder.device,
+  )
+  if (roster !== undefined && device === undefined)
+    return fail(
+      "not_found",
+      `The alias names thread ${holder.session_id} on device ${holder.device}, which is no longer on this account.`,
+      "Call thread_list with all_scope to find the live thread, then claim the alias for it again with thread_rename.",
+      { device: holder.device, thread: holder.session_id },
+    )
   if (device !== undefined && !device.online)
     return fail(
       "device_offline",
