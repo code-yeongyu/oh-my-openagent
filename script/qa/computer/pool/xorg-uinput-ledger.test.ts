@@ -33,7 +33,7 @@ describe("xinput output readers", () => {
 })
 
 describe("ledger grading", () => {
-  test("runs that disagree are FLAKY, agreeing runs keep their verdict", () => {
+  test("[ADP-5] runs that disagree are FLAKY, agreeing runs keep their verdict", () => {
     expect(
       combine([
         { verdict: "CONFIRMS", observed: "a" },

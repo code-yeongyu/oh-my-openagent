@@ -15,7 +15,7 @@ import {
   type ThreadNameConflictResult,
   type ThreadResolveResult,
 } from "./addressing"
-import type { ThreadErrorCode, ThreadSummary } from "./index"
+import type { ThreadErrorCode } from "./index"
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -40,7 +40,7 @@ afterAll(() => {
   for (const dir of TEMP_DIRS) rmSync(dir, { recursive: true, force: true })
 })
 
-function thread(partial: Partial<ThreadSummary> & Pick<ThreadSummary, "thread_id">): ThreadAddressEntry {
+function thread(partial: Partial<ThreadAddressEntry> & Pick<ThreadAddressEntry, "thread_id">): ThreadAddressEntry {
   return {
     name: `thread-${partial.thread_id}`,
     status: "resumable",
@@ -65,6 +65,40 @@ function expectError(result: AnyAddressingResult, code: ThreadErrorCode) {
 // ---------------------------------------------------------------------------
 // resolveTarget: the exact-address ladder
 // ---------------------------------------------------------------------------
+
+describe("resolveTarget sessionId aliases", () => {
+  test("#given a thread listed under rpc-1 #when the sessionId is resolved #then the durable thread_id is the hit", () => {
+    const entries = [
+      thread({ thread_id: "01a1e7fb-5411-7000-8e3c-93cccc725011", session_ids: ["rpc-1"], name: "relay" }),
+    ]
+    const result = resolveTarget(entries, "rpc-1", { callerWorkspaceRoot: CALLER })
+    expect(result).toMatchObject({ kind: "ok", resolution: "id", entry: { thread_id: entries[0].thread_id } })
+  })
+
+  test("#given two threads share a short session id #when it is resolved #then the error lists both durable ids", () => {
+    const entries = [
+      thread({ thread_id: "dur-a", session_ids: ["PVL_WterwBWumsjon3bSUw"] }),
+      thread({ thread_id: "dur-b", session_ids: ["PVL_WterwBWumsjon3bSUw"] }),
+    ]
+    const result = expectError(
+      resolveTarget(entries, "PVL_WterwBWumsjon3bSUw", { callerWorkspaceRoot: CALLER }),
+      "ambiguous_target",
+    )
+    expect(result.kind === "error" ? result.message : "").toContain("dur-a")
+    expect(result.kind === "error" ? result.message : "").toContain("dur-b")
+    expect(result.kind === "error" ? result.candidates?.map((candidate) => candidate.thread) : []).toEqual([
+      "dur-a",
+      "dur-b",
+    ])
+  })
+
+  test("#given rpc-9 matches no sessionId #when resolved #then not_found names the visible durable thread_id", () => {
+    const entries = [thread({ thread_id: "01a1e7fb-5411-7000-8e3c-93cccc725011", session_ids: ["rpc-1"] })]
+    const result = expectError(resolveTarget(entries, "rpc-9", { callerWorkspaceRoot: CALLER }), "not_found")
+    expect(result.kind === "error" ? result.message : "").toContain("01a1e7fb-5411-7000-8e3c-93cccc725011")
+    expect(result.kind === "error" ? result.next_action : "").toContain("thread value")
+  })
+})
 
 describe("resolveTarget exact ladder", () => {
   test("#given a durable thread_id #when resolved in the caller's workspace #then it wins immediately as an id resolution", () => {
@@ -112,7 +146,7 @@ describe("resolveTarget exact ladder", () => {
 
     const error = expectError(result, "ambiguous_target")
     expect(error.candidates?.length).toBe(2)
-    const ids = (error.candidates ?? []).map((candidate) => candidate.id).sort()
+    const ids = (error.candidates ?? []).map((candidate) => candidate.thread).sort()
     expect(ids).toEqual(["t-1", "t-2"])
   })
 
@@ -126,8 +160,8 @@ describe("resolveTarget exact ladder", () => {
     const error = expectError(result, "ambiguous_target")
     const candidate: ThreadCandidate | undefined = error.candidates?.[0]
     if (candidate === undefined) throw new Error("expected a candidate")
-    expect(Object.keys(candidate).sort()).toEqual(["cwd", "id", "name", "preview", "state", "updatedAt"])
-    expect(candidate.id).toBe("t-2") // newest updated_at first
+    expect(Object.keys(candidate).sort()).toEqual(["cwd", "name", "preview", "state", "thread", "updatedAt"])
+    expect(candidate.thread).toBe("t-2") // newest updated_at first
     expect(candidate.name).toBe("fix  build")
     expect(candidate.cwd).toBe(CALLER)
     expect(candidate.preview).toBe("")
@@ -147,7 +181,7 @@ describe("resolveTarget exact ladder", () => {
 
     const error = expectError(result, "ambiguous_target")
     expect(error.candidates?.length).toBe(10)
-    const ids = (error.candidates ?? []).map((candidate) => candidate.id)
+    const ids = (error.candidates ?? []).map((candidate) => candidate.thread)
     expect(ids).not.toContain("t-01") // two oldest dropped
     expect(ids).not.toContain("t-02")
     expect(ids[0]).toBe("t-12") // newest first
@@ -456,7 +490,7 @@ describe("checkNameConflict", () => {
     const result = checkNameConflict(entries, "payments   lane")
 
     const error = expectError(result, "name_conflict")
-    expect(error.candidates?.[0]?.id).toBe("t-1")
+    expect(error.candidates?.[0]?.thread).toBe("t-1")
   })
 
   test("#given a decomposed name colliding with a composed stored name #when checked #then NFKC unifies them into a name_conflict", () => {
@@ -496,9 +530,15 @@ describe("error recovery wording (R7)", () => {
         "payments",
       ),
       checkNameConflict([thread({ thread_id: "t-1", name: "payments" })], "payments"),
+      resolveTarget([thread({ thread_id: "dur-out", name: "out", cwd: OTHER, session_ids: ["rpc-4"] })], "rpc-4", {
+        callerWorkspaceRoot: CALLER,
+      }),
+      resolveTarget([thread({ thread_id: "dur-peer", session_ids: ["rpc-1"] })], "rpc-9", {
+        callerWorkspaceRoot: CALLER,
+      }),
     ]
 
-    expect(errors.length).toBe(9)
+    expect(errors.length).toBe(11)
     for (const result of errors) {
       expect(result.kind).toBe("error")
       if (result.kind !== "error") throw new Error("expected error")

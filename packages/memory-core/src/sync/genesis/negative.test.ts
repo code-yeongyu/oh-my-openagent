@@ -1,4 +1,5 @@
 import { describe, expect, mock, test } from "bun:test"
+import { isPhraseKey } from "../crypto/parse.ts"
 import { recordPayload, taggedHash, verifyRecordSig } from "../crypto/signatures.ts"
 import { b64urlDecode, b64urlEncode, jcsBytes, sha256B64 } from "../crypto/vendor/sync-format/jcs.ts"
 import { signFramed } from "../crypto/vendor/sync-format/keys.ts"
@@ -125,6 +126,7 @@ describe("isolated genesis rejection vectors", () => {
     const bootstrap = v.prepared.body.bootstrap
     const first = bootstrap.first_device
     const recovery = bootstrap.recovery_key
+    if (isPhraseKey(recovery)) throw new Error("the vector carries a passkey recovery key")
     const changed = {
       ...bootstrap,
       ...(mutation === "account" ? { account: "another-account" } : {}),

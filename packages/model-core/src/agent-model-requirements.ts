@@ -146,12 +146,14 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   momus: {
     fallbackChain: [
       { providers: ["openai", "chatgpt-subscription"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "xhigh" },
-      { providers: ["github-copilot"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "high" },
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6-astra", variant: "xhigh" },
+      { providers: ["github-copilot"], model: "gpt-6-astra", variant: "high" },
       {
         providers: ["openai", "chatgpt-subscription", "opencode"],
         model: LATEST_MODEL_BY_FAMILY.gptAstra,
         variant: "high",
       },
+      { providers: ["openai", "chatgpt-subscription", "opencode"], model: "gpt-6-astra", variant: "high" },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
         model: LATEST_MODEL_BY_FAMILY.claudeOpus,

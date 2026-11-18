@@ -38,7 +38,7 @@ await runScenario("stopped-target", async ({ report, fake, scratch, install, sta
   report.assert(
     "sender-sees-target-live",
     listed?.kind === "ok" &&
-      listed.threads.some((thread) => thread.thread_id === target.durableId && thread.alive === true),
+      listed.threads.some((thread) => thread.thread === target.durableId && thread.alive === true),
     `threads=${listed?.threads?.length}`,
   )
 
@@ -54,7 +54,7 @@ await runScenario("stopped-target", async ({ report, fake, scratch, install, sta
     "fresh-cli-send-queued-offline",
     fresh.json?.kind === "ok" &&
       fresh.json.delivery?.kind === "queued_offline" &&
-      fresh.json.thread_id === target.durableId,
+      fresh.json.thread === target.durableId,
     `exit=${fresh.code} ${fresh.stdout.trim().slice(0, 300)}`,
   )
   deliveries.push({ id: fresh.json?.delivery_id, token: "QA-TOKEN-stopped-cli" })
