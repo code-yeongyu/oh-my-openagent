@@ -36,6 +36,7 @@ import { GATEWAY_RECEIPT_RETENTION_MS } from "./gateway/constants"
 import { isLockWaitExceeded } from "./gateway/lock-wait"
 import type { DeliveryPipeline } from "./gateway/pipeline"
 import type { DeliveryTarget } from "./gateway/transport"
+import type { DeliveryAuthority } from "./gateway/types"
 import { createGatewayServices } from "./tools/gateway-services"
 import { listThreads, readThread } from "./tools/read-ops"
 import { createRelayTools } from "./tools/relay-tools"
@@ -474,6 +475,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
         `${operationId}:prompt`,
         callerId,
         undefined,
+        "creator",
       )
     } catch (error) {
       return {
@@ -817,6 +819,7 @@ async function deliverThrough(
   idempotencyKey: string,
   callerId: string,
   resolvedBy: "exact_name" | "fuzzy" | undefined,
+  authority?: DeliveryAuthority,
 ): Promise<ThreadToolResult> {
   if (callerId === UNKNOWN_CALLER)
     return failure(
@@ -844,6 +847,7 @@ async function deliverThrough(
     idempotency_key: idempotencyKey,
     args: value,
     ...(inboundHop === undefined || inboundHop <= 0 ? {} : { inbound_hop: inboundHop }),
+    ...(authority === undefined ? {} : { authority }),
   })
   if (sent.kind === "error") return { kind: "error", error: sent.error }
   if ("device" in sent) {

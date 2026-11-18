@@ -62,6 +62,7 @@ const legacy = [
   ["desktop-to-cli", "desktop-to-cli.mjs"],
   ["plugin-surface", "plugin-surface.mjs"],
   ["session-control", "session-control-qa.mjs"],
+  ["create-prompt-authority", "create-prompt-authority.mjs"],
 ]
 
 function option(name) {
