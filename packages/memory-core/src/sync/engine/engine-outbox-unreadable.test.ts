@@ -50,7 +50,7 @@ test.skipIf(!canDenyRead)(
     await a.write("one.md", "one\n")
     await expect(a.engine.runCycle()).rejects.toMatchObject({ code: "EACCES" })
     expect(server.entries).toHaveLength(1)
-    expect(await a.engine.status()).toMatchObject({ kind: "failing", failure: { kind: "unknown" } })
+    expect(await a.engine.status()).toMatchObject({ kind: "failing", failure: { kind: "no_write_access", cause: { code: "EACCES", stage: "push" } } })
   },
   GIT_TEST_TIMEOUT,
 )
