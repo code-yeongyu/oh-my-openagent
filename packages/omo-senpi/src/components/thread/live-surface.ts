@@ -11,7 +11,7 @@ import {
 import { resolveThreadSocket } from "./live-surface-paths"
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
-import { readDiskSession, type AddressBookHost, type DiskSession } from "./address-book"
+import { readDiskSessionAsync, type AddressBookHost, type DiskSession } from "./address-book"
 import { INITIAL_SKILLS_CONTEXT_KEY } from "./initial-skills"
 import {
   claimedSessionPaths,
@@ -608,12 +608,16 @@ export function createLiveThreadSurface(
     error: unknown,
     reason: "live_unresponsive" | "dead" | null,
   ): Promise<EndpointListing> => {
-    const claimed = await Promise.all(endpoint.claimDirs.map((dir) => claimedSessionPaths(dir)))
-    const known = new Set([...endpoint.paths, ...claimed.flat(), ...(lastListed.get(endpoint.socket) ?? [])])
-    const disk = [...known].flatMap((path) => {
-      const session = readDiskSession(path, endpoint.socket)
-      return session === null ? [] : [session]
-    })
+    // One file at a time for this endpoint, off the event loop: a host that died holding many claims costs time, not file
+    // descriptors. listView lists endpoints concurrently, so open files are bounded by the endpoint count (#13579, #13584).
+    const known = new Set(endpoint.paths)
+    for (const dir of endpoint.claimDirs) for (const path of await claimedSessionPaths(dir)) known.add(path)
+    for (const path of lastListed.get(endpoint.socket) ?? []) known.add(path)
+    const disk: DiskSession[] = []
+    for (const path of known) {
+      const session = await readDiskSessionAsync(path, endpoint.socket)
+      if (session !== null) disk.push(session)
+    }
     return {
       host: {
         socket: endpoint.socket,
