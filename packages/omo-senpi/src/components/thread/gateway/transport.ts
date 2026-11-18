@@ -1,5 +1,6 @@
 import type { RemoteSessionRow } from "../remote/ports"
 import type {
+  DeliveryAuthority,
   EffectiveLane,
   GatewayDeliveryDelivery,
   GatewayDeliveryMode,
@@ -37,6 +38,8 @@ export type OutboundDelivery = {
   readonly args: unknown
   /** The highest chain hop an input of the caller's run arrived with from another device; both transports continue it (K8). */
   readonly inbound_hop?: number
+  /** thread_create's first prompt to the thread it made: both transports deliver it with the creator's authority (#14045). */
+  readonly authority?: DeliveryAuthority
 }
 
 /** A delivery to another device has no gateway row on this device, so it names the device it reached instead of a row sequence. */
