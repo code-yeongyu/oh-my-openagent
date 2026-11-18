@@ -324,12 +324,20 @@ function scopedIdHit(
 }
 
 const SESSION_ID_SHAPE = /^(?:rpc-\d+|[A-Za-z0-9_-]{16,})$/
+/** A durable session id is the thread_id itself: a miss on one is never a routing key passed by mistake (#14049). */
+const DURABLE_ID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /** The shortest address that may name a thread by a prefix of its durable id: 8 hex characters, hyphens allowed after. */
 const ID_PREFIX_SHAPE = /^[0-9a-f]{8}[0-9a-f-]*$/i
 
 function notFound(target: string, scope: string, visible: readonly ThreadAddressEntry[]): ThreadAddressError {
   const base = `No visible thread matches "${target}" in ${scope}.`
+  if (DURABLE_ID_SHAPE.test(target))
+    return addressError(
+      "not_found",
+      `${base} No reachable endpoint lists a thread with that thread_id.`,
+      "Call thread_list with all_scope to check the id; a thread on a device that is offline is found once it is online.",
+    )
   if (!SESSION_ID_SHAPE.test(target)) {
     return addressError(
       "not_found",
