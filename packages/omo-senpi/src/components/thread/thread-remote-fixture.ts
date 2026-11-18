@@ -692,6 +692,8 @@ export function createRemoteThreadFixture() {
       openLosesReply?: number
       /** With `openLosesReply`: the next listing after a lost reply fails too, so the create cannot recover on the spot. */
       listFailsAfterLostReply?: boolean
+      /** With `openLosesReply`: the host has no `durable_session_id` capability and creates under an id of its own. */
+      ignoresDurableSessionId?: boolean
     } = {},
   ) {
     const engine = extra.engine ?? ENGINE
@@ -716,7 +718,12 @@ export function createRemoteThreadFixture() {
       const created: ThreadHostSession = {
         sessionId: losing ? `route-created-${sessions.length}` : "route-created",
         durableSessionId:
-          resumed ?? (losing && request.durableSessionId !== undefined ? request.durableSessionId : "dur-created-here"),
+          resumed ??
+          (losing && extra.ignoresDurableSessionId !== true && request.durableSessionId !== undefined
+            ? request.durableSessionId
+            : losing
+              ? `dur-created-${sessions.length}`
+              : "dur-created-here"),
         cwd: process.cwd(),
         name: null,
         status: "open",
