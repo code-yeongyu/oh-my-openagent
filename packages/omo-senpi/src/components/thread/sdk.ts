@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 
+import { askHost } from "../../../../senpi-task/src/runners/rpc-host/host-request"
+import { classifyWarmReply, type WarmAnswer } from "../../../../senpi-task/src/runners/rpc-host/host-warm-reply"
+
 import { toThreadAddressEntries, type AddressEntry } from "./address-book"
 import type { ThreadToolResult } from "./contracts"
 import { threadToolFailure, type ThreadToolFailure } from "./errors"
@@ -22,8 +25,14 @@ export type {
   StoreExtensionRefusalCode,
 } from "./gateway/store-extensions"
 import type { DeliveryTarget } from "./gateway/transport"
-import type { ExternalAuthor, GatewayDeliveryMode, GatewayDeliveryResult } from "./gateway/types"
+import type {
+  ExternalAuthor,
+  GatewayDeliveryMode,
+  GatewayDeliveryResult,
+  GatewayDeliverySuccess,
+} from "./gateway/types"
 import { createLiveThreadSurface, parseHostStatusAll } from "./live-surface"
+import { resolveThreadSocket } from "./live-surface-paths"
 import { createGatewayResolver, createGatewayServices } from "./tools/gateway-services"
 import {
   addressBook,
@@ -66,6 +75,22 @@ export type ThreadSdkOptions = {
   readonly remote?: RemoteThreadSurface
 }
 
+/**
+ * The SDK's boundary check: a script that calls `createThreadSdk()` with no options, or without one of the four fields
+ * every operation reads, gets a TypeError naming the missing fields instead of a property read deep inside.
+ */
+export function assertThreadSdkOptions(options: unknown): asserts options is ThreadSdkOptions {
+  const given = typeof options === "object" && options !== null ? (options as Record<string, unknown>) : {}
+  const missing = [
+    ...(["agentDir", "cwd", "user"] as const).filter(
+      (field) => typeof given[field] !== "string" || (given[field] as string).length === 0,
+    ),
+    ...(typeof given["uid"] === "number" ? [] : ["uid"]),
+  ]
+  if (missing.length > 0)
+    throw new TypeError(`createThreadSdk needs { agentDir, cwd, uid, user }; missing or invalid: ${missing.join(", ")}`)
+}
+
 type Failure = { readonly kind: "error"; readonly error: ThreadToolFailure }
 type Scoped = { readonly all_scope?: boolean }
 type Keyed = { readonly idempotency_key?: string }
@@ -87,6 +112,11 @@ export type ArmWake =
 type Reported = Promise<
   RelayResult<Omit<ReportOpResult, "arm_seq"> & { readonly deduplicated: boolean; readonly wake?: ArmWake }> | Failure
 >
+
+/** A send's answer: the gateway's delivery facts, with the session named `thread`, the address `read` and `send` take back. */
+export type ThreadSdkSendResult =
+  | (Omit<GatewayDeliverySuccess, "thread_id"> & { readonly thread: string })
+  | Exclude<GatewayDeliveryResult, GatewayDeliverySuccess>
 
 /** Where a session lives right now, as `omo daemon adopt` needs it. */
 export type LocatedThread = Pick<
@@ -115,7 +145,7 @@ export type ThreadSdk = StoreExtensionApi & {
         readonly binding_id?: string
         readonly author?: ExternalAuthor
       },
-  ) => Promise<GatewayDeliveryResult>
+  ) => Promise<ThreadSdkSendResult>
   readonly bind: (
     request: Scoped & Keyed & { readonly session: string; readonly binding: Omit<BindInput, "session_durable_id"> },
   ) => Relayed<"bind">
@@ -173,8 +203,16 @@ export type ThreadSdk = StoreExtensionApi & {
     thread: LocatedThread,
     request: Omit<ReleaseSessionRequest, "reason">,
   ) => Promise<ReleaseSessionReply>
+  /**
+   * senpi's `warm` on the operator daemon (`omo daemon run`, after its ensure): the host loads omo with no session open,
+   * so its thread component starts the wake and declares the delivery consumer at once (#13037 cold wake).
+   */
+  readonly warmDaemon: () => Promise<WarmAnswer>
   readonly dispose: () => Promise<void>
 }
+
+// The first load compiles the extension graph; a loaded host answers in well under a second (the task host's bound).
+const DAEMON_WARM_TIMEOUT_MS = 60_000
 
 function fail(
   code: Parameters<typeof threadToolFailure>[0],
@@ -222,6 +260,7 @@ async function guarded<T>(body: () => Promise<T>): Promise<T | Failure> {
  * the engine enumerates and the gateway store under `agentDir`.
  */
 export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
+  assertThreadSdkOptions(options)
   const principal = `cli:${options.uid}`
   const env = { ...(options.env ?? process.env), OMO_CODING_AGENT_DIR: options.agentDir }
   const engineStatusAll = options.engineStatusAll
@@ -304,6 +343,12 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     return resolved.kind === "error" ? { kind: "error", error: resolved } : { id: resolved.entry.thread_id }
   }
 
+  function named(sent: GatewayDeliveryResult): ThreadSdkSendResult {
+    if (sent.kind !== "ok") return sent
+    const { thread_id, ...facts } = sent
+    return { ...facts, thread: thread_id }
+  }
+
   async function inbound(
     request: Parameters<ThreadSdk["send"]>[0] & { readonly binding_id: string },
   ): Promise<GatewayDeliveryResult> {
@@ -370,7 +415,8 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
       ),
     send: (request) =>
       guarded(async () => {
-        if (request.binding_id !== undefined) return await inbound({ ...request, binding_id: request.binding_id })
+        if (request.binding_id !== undefined)
+          return named(await inbound({ ...request, binding_id: request.binding_id }))
         if (request.thread === undefined)
           return fail(
             "invalid_arguments",
@@ -434,7 +480,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
             `A command-line send reached a session on device ${sent.device}, which the engine does not admit.`,
             "Report this: the relay transport must refuse a command-line sender before sending.",
           )
-        return sent
+        return named(sent)
       }),
     bind: (request) =>
       guarded(async () => {
@@ -558,6 +604,15 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
         return { success: false, error: failure.error.code, errorData: { hint: failure.error.message } }
       }
     },
+    warmDaemon: async () =>
+      classifyWarmReply(
+        await askHost(
+          resolveThreadSocket(env),
+          { id: `omo-daemon-warm-${randomUUID()}`, type: "warm" },
+          DAEMON_WARM_TIMEOUT_MS,
+          { agentDir: options.agentDir },
+        ),
+      ),
     dispose: async () => {
       relay.dispose()
       await options.remote?.sessions.close?.().catch(() => undefined)

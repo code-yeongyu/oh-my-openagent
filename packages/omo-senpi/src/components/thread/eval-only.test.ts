@@ -182,8 +182,8 @@ describe("thread tools are eval-only, like bash", () => {
 
     // then: the call reached the tool and listed the fixture peer
     expect(listed).toMatchObject({ kind: "ok", scope: "all" })
-    const threads = (listed as unknown as { threads: Array<{ thread_id: string; cwd: string }> }).threads
-    expect(threads.map((thread) => thread.thread_id)).toEqual(["dur-peer"])
+    const threads = (listed as unknown as { threads: Array<{ thread: string; cwd: string }> }).threads
+    expect(threads.map((thread) => thread.thread)).toEqual(["dur-peer"])
     expect(threads[0]?.cwd).toBe(root)
     // then: the eval path did not activate the tool
     expect(session.getActiveToolNames().filter((name) => THREAD_TOOL_NAMES.includes(name))).toEqual([])

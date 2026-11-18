@@ -502,7 +502,8 @@ Procedure (NON-NEGOTIABLE):
    remaining items are notes counts as approval.
 5. On approval, declare done. If criterion-cited blockers remain after
    two re-reviews, ask the user through the question tool
-   (request_user_input / ask_user_question) with the outstanding
+   (ask_user_question, or tool.request_user_input() inside eval when
+   that is the only question tool) with the outstanding
    blockers as options, mirroring the 2-attempt rule below — do not
    loop further.
 

@@ -39,7 +39,7 @@ impl<S: InputServer> X11Input<S> {
                 if !hold.keys.is_empty() {
                     self.background_window(id, "key")?;
                 }
-                let window = self.server.target_at(top, x, y)?;
+                let window = self.background_event_window(top, id, "click", x, y)?;
                 let route = Route::Window(window);
                 let at = Spot { root: (x, y), local: self.server.translate(window, x, y)? };
                 let button = HeldButton { route, detail: xtest::button_detail(hold.button), at };

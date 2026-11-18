@@ -29,6 +29,7 @@
 | Harness-neutral `omo.json` config reference | [docs/reference/omo-json.md](reference/omo-json.md) |
 | Native `computer` tool contract | [docs/reference/computer.md](reference/computer.md) |
 | `computer.run` QuickJS sandbox threat model and compatibility matrix | [docs/reference/computer-run-sandbox-threat-model.md](reference/computer-run-sandbox-threat-model.md) |
+| Computer-use eval (7 tasks, 3 arms) and latency bench baselines | [docs/reference/computer-use-eval.md](reference/computer-use-eval.md) |
 | Feature-by-feature reference | [docs/reference/features.md](reference/features.md) |
 | CLI command reference | [docs/reference/cli.md](reference/cli.md) |
 | Engine hosts per session, `omo daemon`, migration and rollback | [docs/reference/omo-daemon.md](reference/omo-daemon.md) |
@@ -36,11 +37,13 @@
 | `omo remote`: sessions on your other devices (verbs, states, command outcomes, device service install) | [docs/reference/remote-sessions.md](reference/remote-sessions.md) |
 | Engine trust under a user namespace (bwrap sandbox, inode attestation) | [docs/reference/engine-trust-user-namespaces.md](reference/engine-trust-user-namespaces.md) |
 | Desktop engine attach and `--serve` multi-connection threat model | [docs/reference/desktop-attach-threat-model.md](reference/desktop-attach-threat-model.md) |
+| macOS keychain helper custody threat model (where the helper runs, what the item's ACL trusts) | [docs/reference/keychain-helper-custody-threat-model.md](reference/keychain-helper-custody-threat-model.md) |
 | Known issues & workarounds | [docs/reference/known-issues.md](reference/known-issues.md) |
 | `prompt_async_gate` deep-dive | [docs/reference/prompt-async-gate-rfc.md](reference/prompt-async-gate-rfc.md) |
 | Shared core multi-PR extraction QA | [docs/reference/shared-core-multi-pr.md](reference/shared-core-multi-pr.md) |
 | Re-export shim inventory | [docs/reference/re-export-shim-inventory.md](reference/re-export-shim-inventory.md) |
 | Release process | [docs/reference/release-process.md](reference/release-process.md) |
+| Operator-built darwin release artifacts (replacing the hosted macOS legs, verification, provenance) | [docs/reference/operator-built-darwin-release.md](reference/operator-built-darwin-release.md) |
 | Changelog fragments (per-PR `changes/unreleased/<n>.md`, migration, batches) | [docs/reference/changelog-fragments.md](reference/changelog-fragments.md) |
 | GitHub PR evidence attachments | [docs/reference/github-attachment-upload.md](reference/github-attachment-upload.md) |
 | Claiming the lazycodex npm name | [docs/reference/lazycodex-npm-reservation.md](reference/lazycodex-npm-reservation.md) |
@@ -76,7 +79,7 @@ docs/
 
 ## CONVENTIONS
 
-- **CI matrix label:** adding `run-full-ci` or `ci:full-matrix` launches a separate run with optional `full-matrix / ...` checks that do not gate merge. Keep the label and push a commit or reopen the PR to run the full matrix in the required checks.
+- **CI matrix label:** pull requests run Linux only; adding `ci:full-matrix` (the one opt-in label; honored only for a platform-path diff or a PR body line `Platform-reason: <why>`) launches a separate run with optional `full-matrix / ...` checks that do not gate merge. Keep the label and push a commit or reopen the PR to run the full matrix in the required checks.
 - **User-facing language only in `guide/` and `reference/`.** No `OmO` internal jargon without explanation.
 - **Path links** use the `file://` scheme so OpenCode renders them in TUI. Use absolute paths.
 - **No HTML.** Markdown only. No `<details>` / `<summary>` (causes rendering issues in some terminals).
