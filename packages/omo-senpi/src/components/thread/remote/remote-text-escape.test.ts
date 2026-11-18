@@ -92,6 +92,17 @@ describe("text from another device in the thread tools' output (#13304)", () => 
     clean([String(error.message), String(error.details?.["reason"])])
   })
 
+  test("#given an engine on another device that refuses find_session with free text #when its closed thread is reopened #then details.reason shows it escaped (#14179 review L11)", async () => {
+    const a = fixture.account({
+      rows: [{ ...B_ROW, state: "ended" }],
+      sessionFiles: "none",
+      findSessionRefuse: `Unknown command: ${PAYLOAD}`,
+    })
+    const result = await fixture.surface(a.remote).run("thread_create", { thread: "dur-on-b" })
+    expect(result).toMatchObject({ kind: "error", error: { code: "unsupported" } })
+    clean([String(errorOf(result).details?.["reason"])])
+  })
+
   test("#given a thread on another device whose title carries the payload #when it is addressed by that exact title #then it is found: the data is not escaped", async () => {
     const row = poisoned("b", "rk-on-b", "dur-on-b", ADDRESSABLE)
     const a = fixture.account({ rows: [row], live: [row.session_id] })

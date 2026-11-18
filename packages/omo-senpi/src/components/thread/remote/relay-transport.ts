@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
-import { rowThreadId } from "./ports"
+import { rowStatus, rowThreadId } from "./ports"
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import { hashArgs } from "../gateway/bindings"
 import { decideDelivery } from "../gateway/decision"
@@ -14,6 +14,7 @@ import { UNKNOWN_CALLER } from "../tools/ports"
 import type { JsonObject, RemoteCommandOutcome, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 import { deviceOnline, replyData } from "./remote-ops"
 import { chainCountLimitFailure, outcomeFailure } from "./outcome"
+import { holderView } from "./find-session"
 
 export type RelayTransportOptions = {
   readonly remote: RemoteThreadSurface
@@ -372,17 +373,63 @@ export function createRelayTransport(
     }
   }
 
+  /**
+   * #14184: where a send to `listed` goes. A live row is sent to as listed. For a row that is not live (ended, or a
+   * cached snapshot) its holder is asked first (`find_session`), because a command to the listing key, or a wake of a
+   * session the holder holds no file for, waits out the device's own deadline (about 60 s): no file is `not_found` at
+   * once (as the refused reopen says); one it runs is addressed by the key its device locates it by now, never the
+   * listing's (a reopen elsewhere can run it under a new key; #14179 reviews L4, M1); one on disk takes the wake path when
+   * this device has one, else `not_resumable` at once, as thread_read answers it. A holder that cannot say is treated as
+   * holding it on disk: an ended row takes the wake path when there is one, anything else is `not_resumable`.
+   */
+  async function addressOf(
+    listed: RemoteSessionRow,
+  ): Promise<{ readonly row: RemoteSessionRow; readonly ended: boolean } | SendOutcome> {
+    if (rowStatus(listed) === "live") return { row: listed, ended: false }
+    const thread = rowThreadId(listed)
+    const details = { device: listed.device, thread }
+    const view = await holderView(remote, listed)
+    if (view === "absent")
+      return fail(
+        "not_found",
+        `Device ${listed.device} holds no session file for ${thread}.`,
+        "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell).",
+        details,
+      )
+    if (view !== "running") {
+      // omo#13037 5.4 / A4.5: a session no engine runs takes the wake path when this device's service can carry it.
+      if (listed.state === "ended" && (await remote.sessions.canWake?.()) === true) return { row: listed, ended: true }
+      return fail(
+        "not_resumable",
+        `${thread} on device ${listed.device} is not running, and this device cannot wake it there.`,
+        "Open it again with thread_create (tool.thread_create({ thread }) in an eval cell), then send.",
+        details,
+      )
+    }
+    const located = await remote.sessions.locate(listed.device, thread)
+    if (located.kind !== "ok")
+      return fail(
+        "not_resumable",
+        `Device ${listed.device} runs ${thread}, but the key it runs under cannot be found there (${escapeForDisplay(located.reason)}).`,
+        "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell), then send again.",
+        { ...details, reason: escapeForDisplay(located.reason) },
+      )
+    remote.sessions.reopened?.(listed, located.sessionId)
+    return { row: { ...listed, session_id: located.sessionId }, ended: false }
+  }
+
   async function send(
     delivery: OutboundDelivery,
-    row: RemoteSessionRow,
+    listed: RemoteSessionRow,
     later: Later,
     sending: () => void,
   ): Promise<SendOutcome> {
-    const offline = await deviceOnline(remote, row.device)
+    const offline = await deviceOnline(remote, listed.device)
     if (offline !== undefined) return offline
-    // omo#13037 5.4 / A4.5: a session no engine runs takes the wake path when this device's service can carry it: no lane
-    // probe (its state is offline in the decision table), so a steer is turn_conflict and nothing is sent.
-    const ended = row.state === "ended" && (await remote.sessions.canWake?.()) === true
+    const addressed = await addressOf(listed)
+    if (!("row" in addressed)) return addressed
+    // `ended`: the wake path (no lane probe; its state is offline in the decision table, so a steer is turn_conflict).
+    const { row, ended } = addressed
     if (ended && delivery.mode === "steer")
       return fail(
         REFUSAL_CODES.turn_conflict.code,

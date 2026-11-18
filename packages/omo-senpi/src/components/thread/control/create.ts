@@ -121,23 +121,8 @@ export async function createThread(
         const found = await resolveAcross(options, known, address, callerId, true, "exact", true)
         if (found.kind === "error")
           return { kind: "error", result: { kind: "error", error: found } as ThreadToolResult }
-        // A session found only by a probe (no file path: its device holds it but runs it nowhere) is no existing thread to
-        // open (omo#13037 A4.4): today's answer for a holder that cannot be reached, and no open is sent. A listed ended
-        // thread still opens from its file, as before.
-        if (
-          found.entry.transport?.kind === "relay" &&
-          found.entry.transport.row.state === "ended" &&
-          found.entry.transport.row.path === ""
-        )
-          return {
-            kind: "error",
-            result: failure(
-              "not_found",
-              `Thread ${found.entry.thread_id} on device ${found.entry.transport.row.device} is not running there.`,
-              "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to find the live thread.",
-              { device: found.entry.transport.row.device, thread: found.entry.thread_id },
-            ),
-          }
+        // A row with no file path (a probe's ended row, a snapshot, a session listed before its file existed) has its
+        // file found on its device by placement, whatever its state (#14170); it is never opened by an empty path.
         return found.entry.transport?.kind === "relay"
           ? { kind: "remote", row: found.entry.transport.row }
           : { kind: "local", address: found.entry.thread_id, accountWide: true }

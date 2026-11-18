@@ -23,6 +23,7 @@ import {
 } from "./contracts"
 import { THREAD_FAMILY_PROMPT_GUIDELINES } from "./metadata"
 import { relayAddressBook, type RelayAddressBook } from "./remote/address-book"
+import { withClosedRows } from "./remote/closed-rows"
 import { threadLink } from "./thread-link"
 export type { ThreadTranscriptEntry } from "./reader"
 import { hashArgs } from "./gateway/bindings"
@@ -85,10 +86,12 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
   return buildThreadTools(options).tools
 }
 
-function buildThreadTools(options: ThreadToolSurfaceOptions): {
+function buildThreadTools(surface: ThreadToolSurfaceOptions): {
   readonly tools: readonly AnyTool[]
   readonly dispose: () => void
 } {
+  // One ledger of the threads these tools closed on other devices, read by every tool through the remote surface (#14170).
+  const options = surface.remote === undefined ? surface : { ...surface, remote: withClosedRows(surface.remote) }
   const { store, relay, pipeline } = createGatewayServices(options, () => view({ offline: true }))
   const now = options.now ?? store.now
   async function view(request?: ThreadHostViewRequest): Promise<ThreadHostView> {

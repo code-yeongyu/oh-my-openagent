@@ -1192,12 +1192,12 @@ describe("device-service adapter: relay round trips per thread op", () => {
     expect(w.endpointsSent).toEqual(["e1", "e1", "e1", "e2", "e2"])
   })
 
-  test("#given an existing row of b #when it is opened #then the open does not ask for a located session and nothing is located", async () => {
+  test("#given an existing row of b #when it is opened again #then the open asks for the reopened session's key, which may differ from the row's, and is ok only once that key resolves (#14170)", async () => {
     const w = relayWorld()
     const opened = await createRelaySessionHost(w.surface, "b", row).open({ sessionPath: row.path })
     expect(opened.kind).toBe("ok")
     expect(w.take()).toEqual(["session.endpoints", "session.command"])
-    expect(w.locateAsked).toEqual([false])
+    expect(w.locateAsked).toEqual([true])
   })
 
   test("#given one remote session #when the thread ops run in turn #then the attach is opened once, status and the transcript are read from the device every time, an exact model in the held catalog is one set_model, and each command is one round trip", async () => {
