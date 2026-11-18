@@ -1,11 +1,15 @@
 // Space binding keys (sync-design §3): what a project IS, computed identically on every
 // device, so two devices that enable sync while offline land in one space. `named:` for a
-// named agent profile, `repo:` + the canonical remote URL for a project with a git remote,
-// `local:` + 128 random bits (stored in `omo.sync.binding`) for a remote-less project. The
-// space id is the binding key's sha-256 truncated to 128 bits; it only ever travels inside
-// the encrypted payload.
+// named agent profile, `repo:` + the canonical remote URL for a project with a git remote, and
+// the one account default space `default:account` for everything else: a remote-less folder
+// and a session outside any project (#13720, every memory syncs across the account's devices).
+// `local:` + 128 random bits is the per-device binding older builds minted for a remote-less
+// project; it is only read back now, so a repository that recorded one moves to the default
+// space. The space id is the binding key's sha-256 truncated to 128 bits; it only ever travels
+// inside the encrypted payload, and objects live under the account, so one constant default
+// binding is one space per account.
 
-import { createHash, getRandomValues } from "node:crypto"
+import { createHash } from "node:crypto"
 
 export type BindingKey = string
 
@@ -14,7 +18,10 @@ export interface Remote {
   readonly url: string
 }
 
-export type BindingKind = "named" | "repo" | "local"
+export type BindingKind = "named" | "repo" | "default" | "local"
+
+/** The account default space: every unnamed, remote-less memory on every device of the account. */
+export const ACCOUNT_DEFAULT_BINDING: BindingKey = "default:account"
 
 const LOCAL_HEX_RE = /^[0-9a-f]{32}$/
 const SPACE_ID_HEX = 32
@@ -71,22 +78,12 @@ export function repoBinding(remotes: readonly Remote[]): BindingKey | null {
   return null
 }
 
-export function localBinding(randomHex128: string): BindingKey {
-  if (!LOCAL_HEX_RE.test(randomHex128)) {
-    throw new TypeError("localBinding: entropy must be 128 bits as 32 lowercase hex characters")
-  }
-  return `local:${randomHex128}`
-}
-
-export function mintLocalBinding(): BindingKey {
-  return localBinding(Buffer.from(getRandomValues(new Uint8Array(16))).toString("hex"))
-}
-
 export function parseBinding(raw: string): { readonly kind: BindingKind; readonly value: string } | null {
   for (const kind of ["named", "repo"] as const) {
     const prefix = `${kind}:`
     if (raw.startsWith(prefix) && raw.length > prefix.length) return { kind, value: raw.slice(prefix.length) }
   }
+  if (raw === ACCOUNT_DEFAULT_BINDING) return { kind: "default", value: "account" }
   if (raw.startsWith("local:")) {
     const value = raw.slice("local:".length)
     return LOCAL_HEX_RE.test(value) ? { kind: "local", value } : null

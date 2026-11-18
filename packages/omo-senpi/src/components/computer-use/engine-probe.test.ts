@@ -4,7 +4,7 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { createInterface } from "node:readline"
-import { fileURLToPath } from "node:url"
+import { FAKE_ENGINE_PATH } from "@oh-my-opencode/senpi-desktop-service/testing"
 import {
   COMPUTER_USE_DOCTOR_TIMEOUT_MS,
   launchEngineBinary,
@@ -15,7 +15,7 @@ import {
 
 test("doctor accepts an older engine without cursorOverlay as unsupported", async () => {
   // Given: the same real NDJSON engine fixture used by the desktop service.
-  const engine = fileURLToPath(new URL("../../../../senpi-desktop-service/test/fake-engine.mjs", import.meta.url))
+  const engine = FAKE_ENGINE_PATH
   // When: startup/doctor reads the older capability payload.
   const result = await probeComputerUseEngine(
     engine,

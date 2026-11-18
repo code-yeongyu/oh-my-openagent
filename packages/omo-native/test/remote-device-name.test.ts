@@ -9,8 +9,8 @@ import { defaultWorld } from "../../device-service-core/test/local-api/conforman
 import { createRemoteThreadFixture } from "../../omo-senpi/src/components/thread/thread-remote-fixture"
 import { REMOTE_EXIT, runRemoteVerb } from "../remote-cli"
 
-// #13432: the session verbs take a device the way the device table prints it - its id, its NAME, or a unique prefix of
-// either - through the one device resolver the thread tools use; a name two devices share is ambiguous_device.
+// #13432: the session verbs take a device the way the device table prints it - its id, its NAME (compared as thread
+// names are), or a unique id prefix - through thread_create's one device resolver (thread/remote/plan-create.ts).
 
 const SIGNED_IN = {
   exitCode: 0,
@@ -49,6 +49,13 @@ async function run(args: readonly string[]) {
         refresher: { binaryPath: "/x", version: "0" },
         agentDir: "/x",
       },
+      coldWake: {
+        install: async () => ({ kind: "installed", serviceRestarted: false }),
+        uninstall: async () => ({ kind: "removed", serviceRestarted: false }),
+        status: async () => undefined,
+      },
+      linkDevice: async () => "linked",
+      optOut: { read: () => false, record: () => {}, clear: () => {} },
       remote: () => a.remote,
       localPermissionPreset: () => "workspace",
     },
@@ -63,8 +70,8 @@ describe("omo remote session verbs take the device the table prints", () => {
     expect(await run(["open", "studio"])).toMatchObject({ code: REMOTE_EXIT.ok, opened: ["b"] })
   })
 
-  test("#given a unique prefix of the name #when open runs #then it opens on that device", async () => {
-    expect(await run(["open", "stu"])).toMatchObject({ code: REMOTE_EXIT.ok, opened: ["b"] })
+  test("#given the name in another case #when open runs #then it opens on that device", async () => {
+    expect(await run(["open", "Studio"])).toMatchObject({ code: REMOTE_EXIT.ok, opened: ["b"] })
   })
 
   test("#given the device id #when open runs #then it still opens there", async () => {
@@ -83,10 +90,10 @@ describe("omo remote session verbs take the device the table prints", () => {
     expect(result.out).toEqual(["Closed b/dur-on-b."])
   })
 
-  test("#given a device no row matches #when open runs #then it fails with device_unknown and opens nothing", async () => {
+  test("#given a device no row matches #when open runs #then it fails with not_found and opens nothing", async () => {
     const result = await run(["open", "nowhere", "--json"])
     expect(result.code).toBe(REMOTE_EXIT.failed)
     expect(result.opened).toEqual([])
-    expect(JSON.parse(result.out[0] ?? "{}")).toMatchObject({ kind: "error", error: { code: "device_unknown" } })
+    expect(JSON.parse(result.out[0] ?? "{}")).toMatchObject({ kind: "error", error: { code: "not_found" } })
   })
 })

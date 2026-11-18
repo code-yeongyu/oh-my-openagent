@@ -2,8 +2,28 @@ import { writeFileSync } from "node:fs"
 import { join } from "node:path"
 import type { DeviceRef, LocalRequest, Status } from "../../../src/local-api/protocol.ts"
 import { assertNever } from "../../../src/local-api/validate-fields.ts"
+import { deliveryHandler } from "./fake-owner-deliveries.ts"
 import { sessionHandler } from "./fake-owner-sessions.ts"
 import { type Conn, eventOf, ok, type Outcome, type OwnerState, refuse } from "./fake-owner-state.ts"
+
+// The requests the vendored client added that no omo test drives: this owner refuses them unsupported.
+export const UNSERVED_REQUEST_TYPES: readonly string[] = [
+  "control.remote_commands.get",
+  "control.remote_commands.set",
+  "endpoints.list",
+  "machine.batch",
+  "machine.batch_part",
+  "machine.cancel",
+  "machine.credit",
+  "machine.describe",
+  "machine.events.subscribe",
+  "machine.list",
+  "machine.result_of",
+  "owner.update_committed",
+  "session.presenter_open",
+  "session.presenter_send",
+  "sessions.events.subscribe",
+]
 
 const setStatus = (state: OwnerState, status: Status): void => {
   state.status = status
@@ -49,9 +69,11 @@ export const dispatch = (state: OwnerState, conn: Conn, request: LocalRequest): 
     case "device.info":
       return ok({ device: state.status.device })
     case "endpoints.register":
+      if (!("agent_dir" in request)) return refuse("unsupported", "this test owner registers agent dirs only")
       state.endpoints.add(request.agent_dir)
       return ok()
     case "endpoints.unregister":
+      if (!("agent_dir" in request)) return refuse("unsupported", "this test owner registers agent dirs only")
       state.endpoints.delete(request.agent_dir)
       return ok()
     case "devices.list":
@@ -63,6 +85,19 @@ export const dispatch = (state: OwnerState, conn: Conn, request: LocalRequest): 
       const { id: _id, type: _type, ...report } = request
       state.reports.push(report)
       return ok()
+    }
+    case "control.session_wake.get":
+    case "control.session_wake.set": {
+      if (role !== "desktop" && role !== "omo")
+        return refuse("forbidden", "only the desktop and the CLI read or set the wake switch")
+      if (request.type === "control.session_wake.set")
+        state.sessionWake = {
+          enabled: request.enabled === true,
+          stored: request.enabled,
+          changedAt: new Date(state.now()).toISOString(),
+          overridden: state.sessionWake.overridden,
+        }
+      return ok(state.sessionWake)
     }
     case "control.attach.get":
     case "control.attach.set":
@@ -95,7 +130,14 @@ export const dispatch = (state: OwnerState, conn: Conn, request: LocalRequest): 
         ? refuse("session_not_found", "no session of that device has that engine id")
         : ok({ device: request.device, key, session: `${request.device}.${key}` })
     }
+    case "deliveries.serve":
+    case "delivery.answer":
+    case "delivery.held":
+    case "delivery.pending":
+    case "delivery.drained":
+    case "peer.admitted":
+      return deliveryHandler(state, conn, request)
     default:
-      return assertNever(request)
+      return refuse("unsupported", `this test owner does not serve ${request.type}`)
   }
 }
