@@ -143,6 +143,15 @@ export function outcomeFailure(
       "Call thread_list to see the thread's current state, then retry when it runs again.",
       { device, reason: outcome.reason },
     )
+  // senpi S32: the other device's engine refuses a thread call past its own user's `threads.chainCountLimit`. Nothing
+  // there needs updating and a retry is refused again; only that device's user can allow more hops.
+  if (outcome.reason === "chain_count_limit")
+    return fail(
+      "chain_count_limit",
+      `Device ${device} refused this thread call: the chain has made more hops than its user's thread chain limit (threads.chainCountLimit on device ${device}).`,
+      `Do not retry or extend this chain; finish with what you have. Only the user of device ${device} can allow more hops, by raising or unsetting threads.chainCountLimit there.`,
+      { device, reason: outcome.reason, setting: "threads.chainCountLimit" },
+    )
   if (outcome.reason === "record_too_large")
     return fail(
       "unsupported",
