@@ -87,7 +87,11 @@ describe("thread_close and the messages a thread has not read (#14234)", () => {
     const { run } = surface(a.remote)
     expect(await run("thread_close", { thread: "dur-on-b" })).toMatchObject({
       kind: "error",
-      error: { code: "turn_active", details: { pending_deliveries: UNREAD, retry_with: { force: true } } },
+      error: {
+        code: "turn_active",
+        // omo#14245: the engine's own reason, not a fixed one.
+        details: { reason: "turn_active", pending_deliveries: UNREAD, retry_with: { force: true } },
+      },
     })
     expect(a.live.has("rk-on-b")).toBe(true)
   })

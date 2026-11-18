@@ -101,7 +101,7 @@ export async function closeLadder(
         "Let it read them and retry, or close it with force: true to drop them (the result lists dropped_deliveries).",
         {
           command: "unload_session",
-          reason: "work_pending",
+          reason: refused["reason"],
           pending_deliveries: unread,
           retry_with: { force: true },
         },
