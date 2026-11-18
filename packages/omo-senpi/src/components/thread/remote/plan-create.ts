@@ -254,6 +254,15 @@ export async function planCreate(
   }
   // An alias no account can hold is the new thread's local name (#13104); opening an existing thread by it still needs the account.
   let localAlias: LocalAliasReason | undefined
+  // The thread an open names, located once: the alias check below and the open both need it.
+  let located: CrossTarget | undefined
+  const locateThread = async (thread: string): Promise<CrossTarget> => (located ??= await local.locate(thread))
+  const opensHolder = async (thread: string, holder: string): Promise<boolean> => {
+    if (thread === value.alias || thread === holder) return true
+    const target = await locateThread(thread)
+    if (target.kind === "local") return target.address === holder
+    return target.kind === "remote" && (target.row.durable_id === holder || target.row.session_id === holder)
+  }
   const scoped = (plan: CreatePlan): CreatePlan =>
     localAlias === undefined || plan.kind !== "open" ? plan : { ...plan, localAlias }
   if (value.alias !== undefined && remote.aliases === undefined) {
@@ -270,7 +279,9 @@ export async function planCreate(
           details: { reason: "resolve_failed" },
         },
       }))
-    if (held.kind === "ok")
+    // Opening the thread that already holds the alias, by that alias, its id or any address that locates it, keeps the
+    // alias it has (#12641): only another thread holding it is alias_taken.
+    if (held.kind === "ok" && !(value.thread !== undefined && (await opensHolder(value.thread, held.value.session_id))))
       return {
         kind: "done",
         result: {
@@ -283,14 +294,14 @@ export async function planCreate(
           ),
         },
       }
-    if (held.error.code !== "alias_not_found") {
+    if (held.kind === "error" && held.error.code !== "alias_not_found") {
       if (value.thread !== undefined || !signedOut(held.error))
         return { kind: "done", result: aliasFailure(held.error) }
       localAlias = "sign_in"
     }
   }
   if (value.thread !== undefined) {
-    const target = await local.locate(value.thread)
+    const target = await locateThread(value.thread)
     if (target.kind === "error") return { kind: "done", result: target.result }
     if (target.kind === "local") return openHere(target.address)
     // Only a row its device listed live this round is answered as already live (B's engine holds it). An ended row, or a
