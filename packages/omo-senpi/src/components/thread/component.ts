@@ -186,6 +186,17 @@ function callsTools(message: EngineMessage): boolean {
   )
 }
 
+/** A final answer was given: the next input starts a new group, and nothing of the earlier one survives. */
+function startGroup(run: RunContext): void {
+  run.cause = undefined
+  run.consumed = []
+  run.replyTo = []
+  run.replySenders = []
+  run.chainHop = 0
+  run.local = false
+  run.answered = false
+}
+
 /**
  * Decision 0027 section 6 (#13042): the reply allowance belongs to the consumed delivery and lasts for the work that
  * delivery started - the consuming turn and every later turn the engine starts on its own (a reminder, a goal
@@ -203,15 +214,7 @@ function noteInput(run: RunContext, message: EngineMessage): void {
   if (delivery === "malformed") {
     // Like a delivery it ends an answered group (nothing of the earlier group survives) and, unlike a valid one, adds
     // no sender; while work is running it joins it as a valid delivery would, adding nothing and keeping the hop.
-    if (run.answered) {
-      run.cause = undefined
-      run.consumed = []
-      run.replyTo = []
-      run.replySenders = []
-      run.chainHop = 0
-      run.local = false
-      run.answered = false
-    }
+    if (run.answered) startGroup(run)
     return
   }
   if (message.role === "custom" && delivery === undefined) {
@@ -219,15 +222,7 @@ function noteInput(run: RunContext, message: EngineMessage): void {
     run.answered = false
     return
   }
-  if (run.answered) {
-    run.cause = undefined
-    run.consumed = []
-    run.replyTo = []
-    run.replySenders = []
-    run.chainHop = 0
-    run.local = false
-    run.answered = false
-  }
+  if (run.answered) startGroup(run)
   if (message.role === "user") run.local = true
   if (delivery === undefined) return
   // Every consumed delivery is the cause of the run's next send, on either transport (decision 0027 section 3); one no row
