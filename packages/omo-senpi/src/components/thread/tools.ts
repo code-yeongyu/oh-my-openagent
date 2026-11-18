@@ -317,7 +317,8 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
           current = PUBLISHED_SEND_VIEW
         else {
           const route = sendTo === "" ? undefined : await replyRoute(options, sendTo)
-          current = route?.leaves === true ? { ...NO_LOCAL_VIEW } : await view(receipted ? undefined : { offline: true })
+          current =
+            route?.leaves === true ? { ...NO_LOCAL_VIEW } : await view(receipted ? undefined : { offline: true })
           if (route?.read === true) DEVICE_READ.set(current, route.here)
         }
         return await sideEffect(current, value, scope.idempotency_key, callerId, retrying)

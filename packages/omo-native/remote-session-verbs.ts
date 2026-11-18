@@ -422,8 +422,7 @@ async function sendTo(
     }
     if (end !== "settled") {
       if (json) dependencies.output(JSON.stringify({ ...sent, kind: "session_ended", end, ...queuedNoticeField }))
-      else
-        dependencies.error(`omo remote: the session on ${row.device} ended before its turn settled (${end}).`)
+      else dependencies.error(`omo remote: the session on ${row.device} ended before its turn settled (${end}).`)
       return REMOTE_EXIT.failed
     }
     return REMOTE_EXIT.ok

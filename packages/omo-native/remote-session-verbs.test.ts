@@ -265,5 +265,4 @@ describe("omo remote send bounded settle (#13425)", () => {
       await remoteFixture.cleanup()
     }
   })
-
 })

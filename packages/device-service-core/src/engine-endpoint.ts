@@ -3,7 +3,7 @@ import type { LocalApiClient } from "./local-api/client.ts"
 import { compareVersions } from "./release/version.ts"
 
 /** The first service version that answers session.endpoints with the host's primary engine endpoint (relay daemon 0.1.11). */
-export const ENDPOINT_PRIMARY_MIN_SERVICE_VERSION = "0.1.11"
+const ENDPOINT_PRIMARY_MIN_SERVICE_VERSION = "0.1.11"
 
 /**
  * omo#14195: the device names no engine endpoint as its own. Every create fails the same way until
