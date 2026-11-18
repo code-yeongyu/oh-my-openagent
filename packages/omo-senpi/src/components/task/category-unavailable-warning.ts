@@ -13,6 +13,7 @@ export type CategoryUnavailableWarningDeps = {
   readonly pi: SenpiExtensionAPI
   readonly runtime: TaskRuntimeContext
   readonly omoConfig: OmoConfig
+  readonly getOmoConfig?: () => OmoConfig
   readonly settings: OmoTaskSettings
 }
 
@@ -72,8 +73,9 @@ export function createCategoryUnavailableWarningPlanner(deps: CategoryUnavailabl
     const error = asDeadChainError(resolution)
     if (error === undefined) return resolution
     const category = error.category
-    if (hasUserModel(deps.omoConfig, category)) return resolution
-    if (warningSuppressed(deps.omoConfig, deps.settings, category)) return resolution
+    const config = deps.getOmoConfig?.() ?? deps.omoConfig
+    if (hasUserModel(config, category)) return resolution
+    if (warningSuppressed(config, deps.settings, category)) return resolution
     const sessionId = deps.runtime.sessionId() ?? "unknown-session"
     if (!warned(`${sessionId}:${category}`)) return resolution
 

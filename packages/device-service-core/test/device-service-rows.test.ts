@@ -50,7 +50,7 @@ describe("DeviceService.sessions asks the newest listing row version (#13045, pa
     expect(listCalls(owner)).toBe(1)
   })
 
-  test("#given a service that serves rows 3 #when sessions lists #then each row carries its durable_id and neither model nor archived", async () => {
+  test("#given a service that predates rows 4 #when sessions lists #then each row carries its durable_id and neither model nor archived", async () => {
     const { service } = await serviceFor(worldKnowing(3))
     const [row] = (await service.sessions()).rows
     expect(row?.durable_id).toBe(DURABLE_ID)

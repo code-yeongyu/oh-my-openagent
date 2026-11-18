@@ -115,7 +115,7 @@ test("#given mixed live and degraded rows with known and unknown activity #when 
   const result = listThreads(options(directory), current, true)
   if (result.kind === "error" || !("threads" in result)) throw new Error("thread list did not return rows")
 
-  expect(result.threads.map((row) => [row.thread_id, row.updated_at, row.status])).toEqual([
+  expect(result.threads.map((row) => [row.thread, row.updated_at, row.status])).toEqual([
     ["a-known", "2026-09-30T02:00:00.000Z", "live"],
     ["z-known", "2026-09-30T02:00:00.000Z", "live"],
     ["unknown-dead", null, "resumable"],

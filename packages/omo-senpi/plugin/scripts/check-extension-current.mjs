@@ -50,6 +50,7 @@ export async function checkExtensionCurrent(options = {}) {
     telemetryOtlpOutput,
     memorySyncOutput,
     threadClientOutput,
+    wakeOutput,
     telemetryRecoveryOutput,
     feedbackOutput,
     desktopToolkitOutput,
@@ -117,6 +118,8 @@ export async function checkExtensionCurrent(options = {}) {
     return { ok: false, reason: "missing-output", output: telemetryPosthogOutput }
   if (currentTelemetryOtlp === undefined) return { ok: false, reason: "missing-output", output: telemetryOtlpOutput }
   if (currentThreadClient === undefined) return { ok: false, reason: "missing-output", output: threadClientOutput }
+  const currentWake = await readBuiltEntry(wakeOutput)
+  if (currentWake === undefined) return { ok: false, reason: "missing-output", output: wakeOutput }
   const currentTelemetryRecovery = await readBuiltEntry(telemetryRecoveryOutput)
   if (currentTelemetryRecovery === undefined)
     return { ok: false, reason: "missing-output", output: telemetryRecoveryOutput }
@@ -167,6 +170,7 @@ export async function checkExtensionCurrent(options = {}) {
     telemetryOtlpOutputPath: join(tempRoot, "omo-telemetry-otlp.js"),
     memorySyncOutputPath: join(tempRoot, "omo-memory-sync.js"),
     threadClientOutputPath: join(tempRoot, "omo-thread-client.js"),
+    wakeOutputPath: join(tempRoot, "omo-wake.js"),
     telemetryRecoveryOutputPath: join(tempRoot, "omo-telemetry-recovery.js"),
     feedbackOutputPath: join(tempRoot, "omo-feedback.js"),
     desktopToolkitOutputPath: join(tempRoot, "omo-desktop-toolkit.js"),
@@ -200,6 +204,7 @@ export async function checkExtensionCurrent(options = {}) {
       [currentTelemetryOtlp, expected.telemetryOtlpOutputPath, telemetryOtlpOutput],
       [currentMemorySync, expected.memorySyncOutputPath, memorySyncOutput],
       [currentThreadClient, expected.threadClientOutputPath, threadClientOutput],
+      [currentWake, expected.wakeOutputPath, wakeOutput],
       [currentTelemetryRecovery, expected.telemetryRecoveryOutputPath, telemetryRecoveryOutput],
       [currentFeedback, expected.feedbackOutputPath, feedbackOutput],
       [currentDesktopToolkit, expected.desktopToolkitOutputPath, desktopToolkitOutput],
@@ -236,6 +241,7 @@ export async function checkExtensionCurrent(options = {}) {
       computerUseOutput,
       gatewayStoreWorkerOutput,
       threadSdkOutput,
+      wakeOutput,
     }
   } finally {
     if (ownsReproduction) await rm(tempRoot, { recursive: true, force: true })

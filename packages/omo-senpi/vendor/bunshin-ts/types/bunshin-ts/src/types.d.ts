@@ -1,4 +1,5 @@
 import type { HubPolicy, BridgeRoute as RoutePreference } from "../../protocol/src/index.ts";
+import type { MachineEditResult, MachineWriteResult } from "../../protocol/src/composed-tools.ts";
 import type { MachineFindQuery } from "../../protocol/src/machine-lookup.ts";
 import type { MachineToolDefinition } from "../../protocol/src/manifest-tools.ts";
 import type { OperationMetadata } from "../../protocol/src/op-id.ts";
@@ -213,7 +214,7 @@ export interface StandaloneMachine extends MachineDirectoryFields {
     }, callOptions?: MachineCallOptions): Promise<unknown>;
     write(path: string, content: string | Uint8Array | ReadHandle, options?: {
         readonly createParentDirs?: boolean;
-    }, callOptions?: MachineCallOptions): Promise<unknown>;
+    }, callOptions?: MachineCallOptions): Promise<MachineWriteResult>;
     glob(pattern: string, options?: {
         readonly limit?: number;
     }, callOptions?: MachineCallOptions): Promise<unknown>;
@@ -223,7 +224,7 @@ export interface StandaloneMachine extends MachineDirectoryFields {
     edit(path: string, spec: {
         readonly exact: string;
         readonly replacement: string;
-    }, callOptions?: MachineCallOptions): Promise<unknown>;
+    }, callOptions?: MachineCallOptions): Promise<MachineEditResult>;
     processInfo(args?: {
         readonly pid?: number;
         readonly handleId?: string;

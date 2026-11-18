@@ -21,6 +21,9 @@ export const refusal = (code: string, detail?: unknown, status = 400) =>
     { error: { code, message: "synthetic refusal", retryable: false, requestId: "test", detail } },
     { status },
   )
+/** A device list naming no device of this sign-in, so the post-refresh device fix-up (#13651) sends nothing more. */
+export const noOwnDevice = (request: Request): Response | undefined =>
+  new URL(request.url).pathname === "/v1/devices" ? Response.json({ devices: [], browsers: [] }) : undefined
 export const limitDetail = { reason: "device_limit", managementToken: "synthetic-management", used: 2, limit: 2 }
 
 export async function temporaryHome() {

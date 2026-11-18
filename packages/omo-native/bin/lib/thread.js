@@ -257,6 +257,8 @@ function validate(name, parsed) {
   for (const flag of REQUIRED[name] ?? []) if (parsed.options[flag] === undefined) return `${flag} is required`
   for (const flag of INTEGER_FLAGS)
     if (Number.isNaN(integerOption(parsed.options, flag) ?? 0)) return `${flag} must be a non-negative integer`
+  const unknownState = (stateOption(parsed.options) ?? []).find((state) => !THREAD_STATES.includes(state))
+  if (unknownState !== undefined) return `--state must be one of ${THREAD_STATES.join(", ")}, got '${unknownState}'`
   for (const [flag, choices] of Object.entries(CHOICE_FLAGS)) {
     const value = parsed.options[flag]
     if (value !== undefined && !choices.includes(value))
@@ -276,8 +278,6 @@ function validate(name, parsed) {
     if (author !== undefined) return author
   }
   if (name === "ack" && !/^\d+$/.test(parsed.positionals[1])) return "<cursor> must be a non-negative integer"
-  const unknownState = (stateOption(parsed.options) ?? []).find((state) => !THREAD_STATES.includes(state))
-  if (unknownState !== undefined) return `--state must be one of ${THREAD_STATES.join(", ")}, got '${unknownState}'`
   return undefined
 }
 
@@ -476,7 +476,7 @@ export async function runThreadCommand(args, options) {
       )
       return exitCode
     }
-    if (json) stdout.write(`${JSON.stringify(name === "list" ? result.threads : result)}\n`)
+    if (json) stdout.write(`${JSON.stringify(result)}\n`)
     else for (const line of humanLines(name, result)) stdout.write(`${line}\n`)
     return exitCode
   } finally {

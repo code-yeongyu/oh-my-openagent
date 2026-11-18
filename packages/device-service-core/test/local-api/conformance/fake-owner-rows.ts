@@ -8,7 +8,7 @@ export type RowsVersion = 1 | 2 | 3 | 4
 export const rowsRefused = (request: SessionsList, newest: RowsVersion): boolean => (request.rows ?? 1) > newest
 
 export const rowsAs = (row: ListingRow, rows: SessionsList["rows"]): ListingRow => {
-  const { kind, parent, parent_listed, durable_id, model, archived, ...base } = row
+  const { kind, parent, parent_listed, durable_id, model, archived, settled: _settled, settled_by: _by, ...base } = row
   const links = {
     ...(kind === undefined ? {} : { kind }),
     ...(parent === undefined || parent_listed === undefined ? {} : { parent, parent_listed }),

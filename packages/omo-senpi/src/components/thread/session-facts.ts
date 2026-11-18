@@ -21,7 +21,7 @@ export type SessionFacts = {
   readonly archived?: true
 }
 
-/** senpi's `custom` entry type that carries a session's archived flag (`core/session-archived.ts`). */
+/** senpi's `custom` entry type that carries a session's archived flag. */
 const SESSION_ARCHIVED_CUSTOM_TYPE = "session_archived"
 
 export type JsonRecord = Record<string, unknown>
@@ -138,8 +138,8 @@ function finalCompleteLine(fd: number, size: number, read: SessionRead): Buffer 
 /**
  * Name, timestamps and first user message of one session JSONL, read from its first and last
  * SESSION_FACTS_WINDOW_BYTES plus a bounded scan for the final complete line. A rename recorded only
- * in the unread middle of a very long file is missed here, and so is an archive flag; a live endpoint
- * reports the current name and flag itself. `updated_at` is null when the final line is partial, malformed, or larger than
+ * in the unread middle of a very long file is missed here; a live endpoint reports the current name
+ * itself. `updated_at` is null when the final line is partial, malformed, or larger than
  * SESSION_FACTS_LAST_LINE_MAX_BYTES, because an older timestamp must never be reported as newest.
  * `null` when the file is unreadable or has no session header.
  */
