@@ -755,20 +755,49 @@ describe("device-service adapter: relay round trips per thread op", () => {
           return {}
       }
     }
-    let close!: () => void
-    const closed = new Promise<void>((resolve) => {
-      close = resolve
-    })
-    const endpointCommand = async (rpc: JsonObject, commandId: string, asked: boolean) => {
+    // The key b's engine endpoint is listed under. A host restart moves it; a command to the old key is then refused
+    // before anything runs: `sync`, this device's service answers `unsupported` (the conformance owner's shape), or
+    // `async`, b answers `route_unlisted`.
+    let endpointKey = "e1"
+    let unlisted: "sync" | "async" = "async"
+    // How the next endpoint command ends instead of applying (a lost reply).
+    let nextEndpointEnd: { readonly state: "uncertain"; readonly reason: string } | undefined
+    const endpointsSent: string[] = []
+    // The `<device>.<key>` of every command sent straight to a session (no attach).
+    const sessionTargets: string[] = []
+    // A service older than #393 part B: it refuses the `{session}` target before sending, as the conformance owner does.
+    let sessionTargetRefused = false
+    const endpointCommand = async (rpc: JsonObject, commandId: string, asked: boolean, endpoint: string) => {
       frames.push("session.command")
       locateAsked.push(asked)
+      endpointsSent.push(endpoint)
       if (asked && relayd === "older-local") throw new LocalApiError("invalid_request", "request has an unknown field")
-      const response = {
-        type: "response",
-        command: rpc["type"],
-        success: true,
-        data: { state: { sessionId: CREATED_ENGINE_ID }, sessionId: CREATED_ENGINE_ID },
+      if (endpoint !== endpointKey && unlisted === "sync")
+        throw new LocalApiError("unsupported", "that endpoint takes no commands")
+      const end = endpoint !== endpointKey ? { state: "engine_refused", reason: "route_unlisted" } : nextEndpointEnd
+      if (endpoint === endpointKey) nextEndpointEnd = undefined
+      if (end !== undefined) {
+        queueMicrotask(() =>
+          emit({ type: "event", kind: "session.command_state", command_id: commandId, ...end, retryable: false }),
+        )
+        return commandId
       }
+      // b's engine runs an open in a folder it lacks and answers it failed.
+      const response =
+        rpc["cwd"] === "/gone"
+          ? {
+              type: "response",
+              command: rpc["type"],
+              success: false,
+              error: "no such folder",
+              errorCode: "cwd_not_found",
+            }
+          : {
+              type: "response",
+              command: rpc["type"],
+              success: true,
+              data: { state: { sessionId: CREATED_ENGINE_ID }, sessionId: CREATED_ENGINE_ID },
+            }
       const located =
         asked && relayd === "located" ? { located: { key: CREATED_KEY, session: `b.${CREATED_KEY}` } } : {}
       queueMicrotask(() => {
@@ -804,7 +833,7 @@ describe("device-service adapter: relay round trips per thread op", () => {
       request: async (type: string) => {
         frames.push(type)
         if (type === "session.attach") return { attach: "a1" }
-        if (type === "session.endpoints") return { endpoints: ["e1"] }
+        if (type === "session.endpoints") return { endpoints: [endpointKey] }
         if (type === "session.locate") return { device: "b", key: CREATED_KEY, session: `b.${CREATED_KEY}` }
         if (type === "status.get") return { state: "connected" }
         if (type === "devices.list")
@@ -821,12 +850,20 @@ describe("device-service adapter: relay round trips per thread op", () => {
         return () => listeners.delete(listener)
       },
       commandTo: async (
-        target: { readonly attach: string } | { readonly device: string; readonly endpoint: string },
+        target:
+          | { readonly attach: string }
+          | { readonly session: string }
+          | { readonly device: string; readonly endpoint: string },
         rpc: JsonObject,
         commandId: string,
         route?: { readonly locate?: true },
       ) => {
-        if ("endpoint" in target) return await endpointCommand(rpc, commandId, route?.locate === true)
+        if ("endpoint" in target) return await endpointCommand(rpc, commandId, route?.locate === true, target.endpoint)
+        if ("session" in target) {
+          sessionTargets.push(target.session)
+          if (sessionTargetRefused)
+            throw new LocalApiError("unsupported", "this service takes attach and endpoint commands only")
+        }
         frames.push("session.command")
         records.push(rpc)
         const scripted =
@@ -878,8 +915,14 @@ describe("device-service adapter: relay round trips per thread op", () => {
         return { query_id: "q", revision: 1, rows: [], incomplete: [], devices: {} }
       },
       oversizedLines: () => 0,
-      close: () => close(),
-      closed,
+    }
+    // One local API connection per dial over the same service: closing the open's own connection leaves the others up.
+    const dial = () => {
+      let close!: () => void
+      const closed = new Promise<void>((resolve) => {
+        close = resolve
+      })
+      return { ...client, close: () => close(), closed }
     }
     // The host re-established the attach: a new snapshot replaces the session's state.
     const snapshot = () =>
@@ -897,7 +940,7 @@ describe("device-service adapter: relay round trips per thread op", () => {
     const port = sessionsPort({
       version: "0.0.0-test",
       connect: () =>
-        connectDeviceService({ version: "0.0.0-test", stateDir: "/unused", connect: async () => client as never }).then(
+        connectDeviceService({ version: "0.0.0-test", stateDir: "/unused", connect: async () => dial() as never }).then(
           (conn) => ({ conn, owned: true }),
         ),
     })
@@ -927,6 +970,18 @@ describe("device-service adapter: relay round trips per thread op", () => {
       removeModel,
       addModel,
       locateAsked,
+      endpointsSent,
+      sessionTargets,
+      moveEndpoint: (key: string, refusal: "sync" | "async") => {
+        endpointKey = key
+        unlisted = refusal
+      },
+      loseNextEndpointReply: () => {
+        nextEndpointEnd = { state: "uncertain", reason: "reply_lost" }
+      },
+      refuseSessionTarget: () => {
+        sessionTargetRefused = true
+      },
       engine,
       records,
       setEnds: (end: NonNullable<typeof nextSet>) => {
@@ -1034,7 +1089,7 @@ describe("device-service adapter: relay round trips per thread op", () => {
     [
       "a relayd that answers the open with its located session",
       "located",
-      ["session.endpoints", "session.command", "session.attach"],
+      ["session.endpoints", "session.command"],
       [true],
     ],
     [
@@ -1060,6 +1115,82 @@ describe("device-service adapter: relay round trips per thread op", () => {
       expect(w.locateAsked).toEqual([...asked])
     },
   )
+
+  test("#given two named creates on b #when each opens and names its session #then b's endpoint is looked up once, nothing attaches, and each name goes straight to the session the open located", async () => {
+    const w = relayWorld()
+    for (const name of ["one", "two"]) {
+      const created = await createRelaySessionHost(w.surface, "b").open({ name })
+      if (created.kind !== "ok") throw new Error(`create failed: ${JSON.stringify(created)}`)
+      expect([created.thread.name, created.thread.warnings]).toEqual([name, undefined])
+    }
+    expect(w.take()).toEqual([
+      "session.endpoints",
+      "session.command",
+      "session.command",
+      "session.command",
+      "session.command",
+    ])
+    expect(w.sessionTargets).toEqual([`b.${CREATED_KEY}`, `b.${CREATED_KEY}`])
+    expect(w.records.map((record) => [record["type"], record["sessionId"], record["name"]])).toEqual([
+      ["set_session_name", CREATED_KEY, "one"],
+      ["set_session_name", CREATED_KEY, "two"],
+    ])
+  })
+
+  test("#given a device service older than #393 part B that refuses a command straight to a session #when a named create runs on b #then nothing ran, so the name goes over an attach and is applied, with no warning", async () => {
+    const w = relayWorld()
+    w.refuseSessionTarget()
+    const created = await createRelaySessionHost(w.surface, "b").open({ name: "one" })
+    if (created.kind !== "ok") throw new Error(`create failed: ${JSON.stringify(created)}`)
+    expect([created.thread.name, created.thread.warnings]).toEqual(["one", undefined])
+    expect(w.sessionTargets).toEqual([`b.${CREATED_KEY}`])
+    expect(w.take()).toEqual(["session.endpoints", "session.command", "session.attach", "session.command"])
+    expect(w.records.map((record) => [record["type"], record["sessionId"], record["name"]])).toEqual([
+      ["set_session_name", CREATED_KEY, "one"],
+    ])
+  })
+
+  test.each([
+    ["this device's service refuses the old key unsupported", "sync"],
+    ["b refuses the old key route_unlisted", "async"],
+  ] as const)(
+    "#given b's host restarted under a new endpoint key and %s #when the next creates open #then the refused open is sent once more on a fresh lookup, the create succeeds, and later opens go to the new key",
+    async (_label, refusal) => {
+      const w = relayWorld()
+      expect((await createRelaySessionHost(w.surface, "b").open({})).kind).toBe("ok")
+      w.take()
+      w.moveEndpoint("e2", refusal)
+      expect((await createRelaySessionHost(w.surface, "b").open({})).kind).toBe("ok")
+      expect((await createRelaySessionHost(w.surface, "b").open({})).kind).toBe("ok")
+      expect(w.take()).toEqual(["session.command", "session.endpoints", "session.command", "session.command"])
+      expect(w.endpointsSent).toEqual(["e1", "e1", "e2", "e2"])
+    },
+  )
+
+  test("#given b's engine runs an open and answers it failed #when the create is refused #then the open is not sent again and the endpoint key is kept", async () => {
+    const w = relayWorld()
+    expect((await createRelaySessionHost(w.surface, "b").open({})).kind).toBe("ok")
+    w.take()
+    expect((await createRelaySessionHost(w.surface, "b").open({ cwd: "/gone" })).kind).toBe("error")
+    expect((await createRelaySessionHost(w.surface, "b").open({})).kind).toBe("ok")
+    expect(w.take()).toEqual(["session.command", "session.command"])
+    expect(w.endpointsSent).toEqual(["e1", "e1", "e1"])
+  })
+
+  test("#given an open whose reply is lost #when it ends uncertain #then it is not sent again, and an uncertain resend after a moved key keeps the fresh key, not the stale one", async () => {
+    const w = relayWorld()
+    expect((await createRelaySessionHost(w.surface, "b").open({})).kind).toBe("ok")
+    w.take()
+    w.loseNextEndpointReply()
+    expect((await createRelaySessionHost(w.surface, "b").open({})).kind).toBe("error")
+    expect(w.take()).toEqual(["session.command"])
+    w.moveEndpoint("e2", "async")
+    w.loseNextEndpointReply()
+    expect((await createRelaySessionHost(w.surface, "b").open({})).kind).toBe("error")
+    expect((await createRelaySessionHost(w.surface, "b").open({})).kind).toBe("ok")
+    expect(w.take()).toEqual(["session.command", "session.endpoints", "session.command", "session.command"])
+    expect(w.endpointsSent).toEqual(["e1", "e1", "e1", "e2", "e2"])
+  })
 
   test("#given an existing row of b #when it is opened #then the open does not ask for a located session and nothing is located", async () => {
     const w = relayWorld()
@@ -1380,6 +1511,17 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
     await port.sessionCommand("b", "s1", { type: "abort" })
     expect(l.calls.attach).toBe(2)
   })
+})
+
+test("#given this device's service cannot be reached #when a record goes straight to a session (direct) #then it is refused as the attach path refuses it, never uncertain, since nothing was sent", async () => {
+  const port = sessionsPort({
+    version: "0.0.0-test",
+    connect: () => Promise.reject(new Error("the local api socket is gone")),
+  })
+  const rpc = { type: "set_session_name", sessionId: "s1", name: "n" }
+  const attached = await port.sessionCommand("b", "s1", rpc)
+  expect(attached.kind).toBe("refused")
+  expect(await port.sessionCommand("b", "s1", rpc, { direct: true })).toEqual(attached)
 })
 
 test("#given thread_list asks for this device's id and name together #when both run in parallel #then device.info is read once (#13394 review LOW)", async () => {

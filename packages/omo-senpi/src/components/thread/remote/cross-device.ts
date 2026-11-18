@@ -1,19 +1,19 @@
-import type { ThreadDevice, ThreadToolResult } from "../contracts"
+import type { ThreadDevice, ThreadState, ThreadToolResult } from "../contracts"
 import { threadToolFailure } from "../errors"
-import { listedThread } from "../control/relay-session-host"
+import { displayedThread } from "../control/relay-session-host"
 import { threadRow } from "../tools/thread-row"
+import { listedStates, rowState } from "../tools/thread-state"
 import {
   rowThreadId,
   type AliasRegistry,
   type RemoteDevice,
-  type RemoteListing,
   type RemoteSessionRow,
   type RemoteThreadSurface,
 } from "./ports"
-import { remoteNotSetUp } from "./address-book"
+import { accountListing, remoteNotSetUp } from "./address-book"
 import type { WorktreeRequest } from "../worktree/thread-worktree"
 import { placeFolder } from "./create-folder"
-import { accountDevices } from "./account"
+import { accountDevices, onAccount } from "./account"
 import { aliasFailure, remoteReady } from "./remote-ops"
 import {
   planCreate as placeCreate,
@@ -54,7 +54,7 @@ export async function planCreate(
       error: threadToolFailure(
         "unsupported",
         "fork_from cannot fork yet: the engine opens a blank session instead of a fork, so no thread was created.",
-        "Create the thread without fork_from and hand it the source's context with thread_send; thread_read reads the source.",
+        "Create the thread without fork_from and hand it the source's context with thread_send; thread_read reads the source (tool.thread_send() and tool.thread_read() in an eval cell).",
         {
           reason: "fork_unsupported",
           thread: plan.request.forkFrom,
@@ -160,11 +160,6 @@ export async function renameAlias(
   return signedOut(changed.error) ? { local: "sign_in" } : aliasFailure(changed.error)
 }
 
-async function accountListing(remote: RemoteThreadSurface): Promise<RemoteListing> {
-  if (remote.sessions.listing !== undefined) return await remote.sessions.listing()
-  return { rows: await remote.sessions.sessions(), incomplete: [] }
-}
-
 // `threads` counts the threads THIS result lists on the device, so it reads the same for every row: this device's are
 // the caller's scoped local threads, another device's are its rows merged into the result.
 function deviceRows(
@@ -208,12 +203,15 @@ function deviceRows(
 /**
  * thread_list: this device's threads (scoped by `all_scope` as before) merged with the account's other devices' threads
  * (each with its device, any workspace), with aliases, and the account's devices with their listing state. A device
- * whose rows this listing could not include is named `incomplete` in `devices`, never silently left out.
+ * whose rows this listing could not include is named `incomplete` in `devices`, never silently left out. `states` filters
+ * the other devices' rows as `listThreads` filters this device's (the default leaves archived threads out), and a device
+ * counts only the threads listed.
  */
 export async function listAcross(
   remote: RemoteThreadSurface | undefined,
   local: ThreadToolResult,
   allScope: boolean,
+  states?: readonly ThreadState[],
 ): Promise<ThreadToolResult> {
   if (remote === undefined || local.kind !== "ok" || !("threads" in local)) return local
   const ids = local.threads.map((thread) => thread.thread)
@@ -242,7 +240,11 @@ export async function listAcross(
   // Without this device's id its own rows cannot be told apart from another device's, so none are merged.
   if (!listed.ok || here === null) return withAliases(remote, { ...local, remote_unavailable: "host_unavailable" }, ids)
   const listing = listed.listing
-  const others = listing.rows.filter((row) => row.device !== here && !known.has(rowThreadId(row)))
+  const shown = listedStates(states)
+  // A device the account no longer lists contributes no rows (#13505); an offline one keeps its rows.
+  const others = onAccount(listing.rows, roster.ok ? roster.devices : undefined, here).filter(
+    (row) => row.device !== here && !known.has(rowThreadId(row)) && shown.has(rowState(row)),
+  )
   // Every row names the machine that holds it (#14044 step 4a): this device's name on its own rows, the roster's name on
   // another device's.
   const machines = new Map(roster.ok ? roster.devices.map((device) => [device.device, device.label]) : [])
@@ -250,7 +252,7 @@ export async function listAcross(
     ...local.threads.map((thread) =>
       hereName === null || thread.machine !== undefined ? thread : { ...thread, machine: hereName },
     ),
-    ...others.map((row) => threadRow(listedThread(row), machines.get(row.device))),
+    ...others.map((row) => threadRow(displayedThread(row), machines.get(row.device))),
   ]
   // A roster that fails is said, never silently dropped: the threads stay merged and remote_unavailable names it.
   const merged: ThreadToolResult = {

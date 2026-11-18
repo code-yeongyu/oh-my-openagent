@@ -1,6 +1,8 @@
 import type { ThreadAddressEntry } from "../addressing"
 import type { ThreadToolFailure } from "../errors"
-import { rowStatus, rowThreadId, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
+import { threadToolFailure } from "../errors"
+import { rowStatus, rowThreadId, type RemoteListing, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
+import { onAccount } from "./account"
 import { holderTarget, remoteReady } from "./remote-ops"
 
 // Decision 0027 section 1: the relay transport's address book. The account listing becomes entries of the SAME shape the
@@ -68,7 +70,54 @@ export type RelayAddressBook = {
   readonly unavailable?: ThreadToolFailure
   /** The alias named a holder the account cannot reach right now (device_offline / not_found): answered as is. */
   readonly aliasFailure?: ThreadToolFailure
+  /**
+   * The address is a thread an earlier round listed on a device this round could not include (#14172): its miss answers
+   * this retryable host_unavailable naming that device, never not_found.
+   */
+  readonly incomplete?: ThreadToolFailure
 }
+
+// The device each thread id (durable id and listing key) was last listed on, per sessions port, so a thread whose device
+// misses one round is still tied to it (#14172). A name is never remembered: names change and a typo must stay not_found.
+// Bounded; the id listed longest ago leaves first.
+const LAST_LISTED_MAX = 4096
+const lastListed = new WeakMap<object, Map<string, string>>()
+
+function rememberListed(port: object, rows: readonly RemoteSessionRow[]): void {
+  let ids = lastListed.get(port)
+  if (ids === undefined) {
+    ids = new Map()
+    lastListed.set(port, ids)
+  }
+  for (const row of rows)
+    for (const id of new Set([rowThreadId(row), row.session_id])) {
+      if (id.length === 0) continue
+      ids.delete(id)
+      ids.set(id, row.device)
+      if (ids.size > LAST_LISTED_MAX) {
+        const oldest = ids.keys().next()
+        if (oldest.done !== true) ids.delete(oldest.value)
+      }
+    }
+}
+
+/** One account listing round with the devices it could not include; a port without `listing` reports none missing. */
+export async function accountListing(remote: RemoteThreadSurface): Promise<RemoteListing> {
+  const listing =
+    remote.sessions.listing !== undefined
+      ? await remote.sessions.listing()
+      : { rows: await remote.sessions.sessions(), incomplete: [] }
+  rememberListed(remote.sessions, listing.rows)
+  return listing
+}
+
+const listingIncomplete = (device: string): ThreadToolFailure =>
+  threadToolFailure(
+    "host_unavailable",
+    `The thread was last listed on ${device}, which did not answer this listing round.`,
+    "Retry the call; call thread_list (tool.thread_list() in an eval cell) to see which devices answered.",
+    { reason: "listing_incomplete", devices: [device] },
+  )
 
 /**
  * This account's threads on OTHER devices as address entries, plus the holder of `address` when it is an account alias
@@ -79,10 +128,11 @@ export type RelayAddressBook = {
  * Device-service states in which no relay is set up for this account (`STATUS_STATES`, device-service-core vocabulary):
  * a local address miss stays a local miss. Every other non-connected state (offline, connecting, activation_pending,
  * keychain_locked, authorization_stale, service_degraded, update_required) means a configured relay is failing: the
- * typed `host_unavailable` answers before `not_found`. A missing device service (no state) is not set up.
+ * typed `host_unavailable` answers before `not_found`. No device service installed (no state) is not set up; a service
+ * that is installed but does not answer is an outage (`remoteReady` names its state `unreachable`).
  */
 const REMOTE_NOT_SET_UP: ReadonlySet<string> = new Set(["not_configured", "disabled", "signed_out", "sign_in_required"])
-/** No state at all = no device service answered (not installed or not running): the relay is not set up either. */
+/** No state at all = no device service is installed on this device: the relay is not set up either. */
 export const remoteNotSetUp = (state: unknown): boolean =>
   state === undefined || (typeof state === "string" && REMOTE_NOT_SET_UP.has(state))
 
@@ -94,15 +144,33 @@ export async function relayAddressBook(remote: RemoteThreadSurface, address: str
     return { entries: [], unavailable: ready.error }
   }
   const { here } = ready
-  const rows = await remote.sessions.sessions()
+  // Read before this round is remembered, so the device is the one an EARLIER round named for the address.
+  const listedOn = lastListed.get(remote.sessions)?.get(address)
+  // thread_list's rule: a removed device's cached rows address nothing; with no roster every row stays.
+  const [listing, roster] = await Promise.all([
+    accountListing(remote),
+    remote.sessions.devices().then(
+      (devices) => devices,
+      () => undefined,
+    ),
+  ])
+  const rows = onAccount(listing.rows, roster, here)
+  const missing = listing.incomplete
   const entries = rows.filter((row) => row.device !== here).map((row) => relayAddressEntry(row))
-  if (remote.aliases === undefined) return { entries }
+  const base = {
+    entries,
+    ...(listedOn !== undefined && listedOn !== here && missing.includes(listedOn)
+      ? { incomplete: listingIncomplete(listedOn) }
+      : {}),
+  }
+  if (remote.aliases === undefined) return base
   const alias = await remote.aliases.resolve(address).catch(() => undefined)
-  if (alias === undefined || alias.kind === "error") return { entries }
-  const holder = await holderTarget(remote, alias.value, here, rows)
-  if (!("where" in holder)) return { entries, aliasFailure: holder.error }
+  if (alias === undefined || alias.kind === "error") return base
+  const holder = await holderTarget(remote, alias.value, here, rows, roster)
+  if (!("where" in holder)) return { ...base, aliasFailure: holder.error }
   if (holder.where === "here")
     return {
+      ...base,
       entries: [
         ...entries,
         {
@@ -116,7 +184,10 @@ export async function relayAddressBook(remote: RemoteThreadSurface, address: str
         },
       ],
     }
-  if (holder.where !== "remote") return { entries }
+  if (holder.where !== "remote") return base
   const row = holder.row
-  return { entries: [...entries.filter((entry) => entry.transport?.row !== row), relayAddressEntry(row, [address])] }
+  return {
+    ...base,
+    entries: [...entries.filter((entry) => entry.transport?.row !== row), relayAddressEntry(row, [address])],
+  }
 }
