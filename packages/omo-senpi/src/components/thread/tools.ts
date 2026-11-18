@@ -39,6 +39,7 @@ import type { DeliveryTarget } from "./gateway/transport"
 import { createGatewayServices } from "./tools/gateway-services"
 import { listThreads, readThread } from "./tools/read-ops"
 import { createRelayTools } from "./tools/relay-tools"
+import { withThreadRenderers } from "./tools/render"
 import { consumedSendersOf, threadSendPermission } from "./tools/reply-permission"
 import { otherDevice, replyTargetFailure, replyTargetMismatch } from "./tools/reply-target"
 import { accountDevices } from "./remote/account"
@@ -690,7 +691,9 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
     relay.dispose()
   }
   return {
-    tools: [create, list, read, send, interrupt, close, handoff, rename, setModel, setReasoning, ...relayTools],
+    tools: [create, list, read, send, interrupt, close, handoff, rename, setModel, setReasoning, ...relayTools].map(
+      withThreadRenderers,
+    ),
     dispose,
   }
 
