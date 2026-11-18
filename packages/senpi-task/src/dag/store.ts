@@ -25,7 +25,11 @@ import {
 
 const SCHEMA_VERSION = 1
 const LOCK_RETRY_MS = 10
-const LOCK_WAIT_TIMEOUT_MS = 1_000
+// How long ONE live holder may keep a DAG lock before a waiter gives up. Holders run a few fsynced writes, which on a
+// starved host stall for seconds while the holder is still live and progressing; a 1 s bound turned that into a failed
+// dag start ("Timed out acquiring DAG lock") for the losing side of a same-key race (#9306, #14095). A live holder past
+// 30 s is stuck, not slow; a dead one is reclaimed at once regardless of this bound.
+const LOCK_WAIT_TIMEOUT_MS = 30_000
 const WINDOWS_CLEANUP_RETRIES = 8
 const WINDOWS_CLEANUP_RETRY_MS = 5
 const READ_BUFFER_BYTES = 64 * 1024
