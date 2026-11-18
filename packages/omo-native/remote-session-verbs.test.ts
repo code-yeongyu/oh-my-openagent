@@ -191,6 +191,43 @@ describe("omo remote session verbs close what they opened", () => {
 describe("omo remote send bounded settle (#13425)", () => {
   const remoteFixture = createRemoteThreadFixture()
 
+  test("#given the session closes before the turn settles #when the send waits under --json #then one JSON value answers session_ended", async () => {
+    const account = remoteFixture.account({
+      records: [{ type: "agent_settled", reason: "session_closed" }],
+    })
+    const out: string[] = []
+    const dependencies = {
+      connect: async () => {
+        throw new Error("the verb reaches the device through the injected surface")
+      },
+      output: (line: string) => out.push(line),
+      error: () => {},
+      write: () => {},
+      now: () => 0,
+      stateDir: connectedStateDir(),
+      accountShow: async () => {
+        throw new Error("account show is not part of a session verb")
+      },
+      remote: () => account.remote,
+    } as unknown as RemoteCommandDependencies
+    try {
+      const code = await runSession(
+        {} as DeviceService,
+        parseSession("send", ["--timeout", "5", "b/rk-on-b", "ping"]).session,
+        true,
+        dependencies,
+      )
+      const parsed = JSON.parse(out[0] ?? "{}")
+      expect({ code, kind: parsed.kind, end: parsed.end }).toEqual({
+        code: REMOTE_EXIT.failed,
+        kind: "session_ended",
+        end: "session_closed",
+      })
+    } finally {
+      await remoteFixture.cleanup()
+    }
+  })
+
   test("#given a turn that never settles #when a person waits with --timeout #then the send answers a typed timeout inside the bound", async () => {
     const account = remoteFixture.account()
     const out: string[] = []
