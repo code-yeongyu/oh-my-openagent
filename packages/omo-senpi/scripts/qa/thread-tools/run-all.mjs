@@ -63,7 +63,10 @@ const legacy = [
   ["plugin-surface", "plugin-surface.mjs"],
   ["local-approvals", "local-approvals.mjs"],
   ["session-control", "session-control-qa.mjs"],
+  ["create-prompt-authority", "create-prompt-authority.mjs"],
   ["reopen-exited", "reopen-exited.mjs"],
+  ["create-atomic", "create-atomic.mjs"],
+  ["free-plan-cross-workspace", "free-plan-cross-workspace.mjs"],
 ]
 
 function option(name) {

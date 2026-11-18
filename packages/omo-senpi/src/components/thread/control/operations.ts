@@ -3,6 +3,13 @@ import { failure } from "../tools/internals"
 import { exactModel, matchModel, modelPatternFailure } from "../tools/model-match"
 import { controlIdentity, controlRefusalOf, type SessionControl } from "./port"
 
+/** A control's answer for a thread no engine holds live, on this device or another. */
+export const NOT_LIVE: ThreadToolResult = failure(
+  "not_resumable",
+  "The thread has no live owner.",
+  "Retry when the target is live.",
+)
+
 /** Runs one control body and answers its typed refusal as data; every other throw stays the leg's transport failure. */
 export async function answered(body: () => Promise<ThreadToolResult>): Promise<ThreadToolResult> {
   try {
@@ -91,7 +98,7 @@ export async function setThinkingLevelOn(
   scope: ThreadSetReasoningInput["scope"],
 ): Promise<ThreadToolResult> {
   try {
-    await control.setThinkingLevel(level, scope === "turn" ? "turn" : undefined)
+    await control.setThinkingLevel(level)
   } catch (error) {
     if (controlRefusalOf(error)?.code !== "thinking_level_unsupported") throw error
     const supported = await control.getAvailableThinkingLevels()

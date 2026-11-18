@@ -123,6 +123,30 @@ describe("readTranscript tail mode", () => {
     expect(atCap.items.length).toBe(THREAD_TAIL_MAX_ITEMS)
   })
 
+  test("a budget smaller than the window returns the newest entries in file order, and next_cursor pages older ones until the window start", () => {
+    const dir = makeTempDir()
+    const entries = [sessionHeader(), ...Array.from({ length: 30 }, (_, i) => messageEntry(i, "y".repeat(400)))]
+    const path = writeJsonl(dir, "tail-budget.jsonl", entries)
+
+    const first = expectOk(readTranscript(jsonlSource(path), { mode: "tail", tail_items: 20, max_bytes: 2048 }))
+    expect(first.items.length).toBeGreaterThan(0)
+    expect(idOf(first.items[first.items.length - 1])).toBe("e29")
+    expect(first.truncated).toBe(true)
+
+    const pages: string[][] = [first.items.map(idOf)]
+    let cursor = first.next_cursor
+    while (cursor !== null) {
+      const page = expectOk(readTranscript(jsonlSource(path), { mode: "page", max_bytes: 2048, cursor }))
+      expect(page.items.length).toBeGreaterThan(0)
+      pages.push(page.items.map(idOf))
+      cursor = page.next_cursor
+      expect(page.truncated).toBe(cursor !== null)
+      expect(pages.length).toBeLessThan(100)
+    }
+    expect(pages.length).toBeGreaterThan(2)
+    expect(pages.reverse().flat()).toEqual(entries.slice(-20).map(idOf))
+  })
+
   test("a tail shorter than the transcript is not a truncation of the byte budget", () => {
     const dir = makeTempDir()
     const path = writeJsonl(dir, "short-tail.jsonl", [sessionHeader(), messageEntry(0), messageEntry(1)])

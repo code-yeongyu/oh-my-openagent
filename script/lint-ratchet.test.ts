@@ -1,6 +1,13 @@
 import { expect, it } from "bun:test"
 
-import { compare, countByFile, countSuppressions, ratchetedFiles, SUPPRESSION } from "./lint-ratchet.ts"
+import {
+  compare,
+  countByFile,
+  countsTowardRatchet,
+  countSuppressions,
+  ratchetedFiles,
+  SUPPRESSION,
+} from "./lint-ratchet.ts"
 
 const root = "/repo"
 
@@ -53,7 +60,7 @@ it("accepts counts that match the baseline exactly", () => {
   expect(compare(counts, counts)).toEqual({ increases: [], decreases: [] })
 })
 
-it("counts every disable comment that could hide one of the three rules, in both linters' forms", () => {
+it("counts every disable comment that could hide one of the ratcheted rules, in both linters' forms", () => {
   // Built at runtime so this file holds no directive of its own for the gate to count.
   const line = "/".repeat(2)
   const block = ["/", "*"].join("")
@@ -76,6 +83,17 @@ it("refuses a new disable comment like any other rise", () => {
   expect(increases).toEqual([{ file: "script/probe.ts", rule: SUPPRESSION, before: 0, after: 1 }])
 })
 
+it("counts a disable comment that names one of the omo-testing rules", () => {
+  // Built at runtime so this file holds no directive of its own for the gate to count.
+  const line = "/".repeat(2)
+  const source = [
+    `${line} oxlint-disable-next-line omo-testing/no-fixed-sleep`,
+    `${line} eslint-disable-next-line omo-testing/no-flake-masking -- unrelated rule, not counted`,
+    `${line} oxlint-disable-next-line eslint/no-console`,
+  ].join("\n")
+  expect(countSuppressions("probe.ts", source)).toBe(2)
+})
+
 it("skips generated sources by path, so only hand-written files are ratcheted", () => {
   expect(
     ratchetedFiles([
@@ -86,4 +104,29 @@ it("skips generated sources by path, so only hand-written files are ratcheted", 
       "README.md",
     ]),
   ).toEqual(["packages/telemetry-core/src/otlp-proto/handwritten.ts", "packages/web/lib/pb.ts"])
+})
+
+// #14220: minified bundle output is not a test source, but the bundler's short function names collide
+// with the test API names the two omo-testing rules key on, so the ratchet drops bundle paths for
+// them at counting time. The predicate is the contract: bundle output never counts for omo-testing;
+// everything else counts everywhere, on either path separator.
+it("never counts the omo-testing rules for minified bundle output", () => {
+  expect(
+    countsTowardRatchet("omo-testing/no-flake-masking", "packages/omo-senpi/plugin/extensions/omo-thread-client.js"),
+  ).toBe(false)
+  expect(
+    countsTowardRatchet("omo-testing/no-fixed-sleep", "packages/omo-senpi/plugin/runtime/rollback-migrate.js"),
+  ).toBe(false)
+  const windowsPath = ["packages", "omo-senpi", "plugin", "extensions", "bundle.js"].join(String.fromCharCode(92))
+  expect(countsTowardRatchet("omo-testing/no-flake-masking", windowsPath)).toBe(false)
+  expect(countsTowardRatchet("omo-testing(no-flake-masking)", "packages/omo-senpi/plugin/extensions/bundle.js")).toBe(
+    false,
+  )
+})
+
+it("still counts the omo-testing rules in real test files, and every other rule everywhere", () => {
+  expect(countsTowardRatchet("omo-testing/no-flake-masking", "packages/omo-senpi/src/x.test.ts")).toBe(true)
+  expect(countsTowardRatchet("omo-testing/no-fixed-sleep", "packages/omo-native/test/x.test.ts")).toBe(true)
+  expect(countsTowardRatchet("typescript/no-explicit-any", "packages/omo-senpi/plugin/extensions/omo.js")).toBe(true)
+  expect(countsTowardRatchet("typescript/no-non-null-assertion", "packages/omo-senpi/plugin/runtime/sdk.js")).toBe(true)
 })

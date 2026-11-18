@@ -4,8 +4,18 @@ import {
   type BuildDynamicSystemPromptOptions,
 } from "@code-yeongyu/senpi/prompt-presets"
 import { getBuiltinModels, getBuiltinProviders } from "@earendil-works/pi-ai/providers/all"
-import { frameNativePrompt, replaceNativePromptFrames, type NativePromptContext } from "./native-prompt-frame"
-import { assertHephaestusSupportedModel, isHephaestusSupportedModel } from "./hephaestus/model-support"
+import {
+  frameNativePrompt,
+  replaceNativePromptFrames,
+  type NativePromptContext,
+  type NativePromptParts,
+} from "./native-prompt-frame"
+import { REFUSAL_IS_FINAL_RULE, withoutRefusalRule } from "./refusal-rule"
+import {
+  assertHephaestusSupportedModel,
+  isHephaestusSupportedModel,
+  isStandaloneHephaestusPreset,
+} from "./hephaestus/model-support"
 
 const catalog = new Map<string, ReturnType<typeof getBuiltinModels>[number]>(
   getBuiltinProviders().flatMap((provider) =>
@@ -58,6 +68,50 @@ export function adaptNativePrompt(prompt: string, useTaskSystem = false): string
     .replaceAll("`todo`", useTaskSystem ? "`task_create` / `task_update` / `task_list` / `task_get`" : "`todowrite`")
 }
 
+type NativeAgentPromptInput = {
+  model: string | undefined
+  /** The role without the refusal rule. */
+  role: string
+  /** The agent carries the refusal rule: the frame states it once, whichever model serves. */
+  refusalRule: boolean
+  tools: readonly string[]
+  restriction?: "hephaestus"
+  useTaskSystem: boolean
+  toolSnippets?: Record<string, string>
+  toolPermissions?: NativePromptContext["toolPermissions"]
+}
+
+/** The framed model core and the role that follows it for this model ("" on a preset that stands alone). */
+function composeNativeAgentPrompt(input: NativeAgentPromptInput): NativePromptParts {
+  const { model, role, restriction } = input
+  if (restriction === "hephaestus") assertHephaestusSupportedModel(model)
+  const identity = resolveNativePromptModel(model)
+  const options = nativePromptOptions(input.tools, input.toolSnippets)
+  const preset = resolvePreset(identity, { promptPreset: "auto" }, options)
+  const core = preset?.prompt ?? buildDynamicSystemPrompt(options)
+  const modelIdentity = model
+    ? `Model: ${JSON.stringify({ provider: identity.provider, id: identity.id, preset: preset?.name ?? null })}`
+    : ""
+  // The rule sits in the frame, the one part a model switch rebuilds: a core that states it needs no second copy.
+  const refusalRule = input.refusalRule && !core.includes(REFUSAL_IS_FINAL_RULE) ? REFUSAL_IS_FINAL_RULE : ""
+  const body = [adaptNativePrompt(core, input.useTaskSystem), refusalRule, modelIdentity].filter(Boolean).join("\n\n")
+  // The Hephaestus role rides in the frame context, so a model switch can drop it for a standalone preset and restore it.
+  const hephaestusRole = restriction === "hephaestus" && role.length > 0
+  const standalone = hephaestusRole && isStandaloneHephaestusPreset(preset?.name)
+  const frame = frameNativePrompt(body, {
+    model: model ?? "",
+    tools: [...input.tools],
+    ...(input.toolSnippets ? { toolSnippets: input.toolSnippets } : {}),
+    ...(input.toolPermissions ? { toolPermissions: input.toolPermissions } : {}),
+    ...(restriction ? { restriction } : {}),
+    ...(input.useTaskSystem ? { useTaskSystem: true } : {}),
+    ...(input.refusalRule ? { refusalRule: true } : {}),
+    ...(hephaestusRole ? { role } : {}),
+    ...(standalone ? { standalone: true } : {}),
+  })
+  return { frame, role: standalone ? "" : role }
+}
+
 export function buildNativeAgentPrompt(
   model: string | undefined,
   role: string,
@@ -67,24 +121,19 @@ export function buildNativeAgentPrompt(
   toolSnippets?: Record<string, string>,
   toolPermissions?: NativePromptContext["toolPermissions"],
 ): string {
-  if (restriction === "hephaestus") assertHephaestusSupportedModel(model)
-  const identity = resolveNativePromptModel(model)
-  const options = nativePromptOptions(selectedTools, toolSnippets)
-  const preset = resolvePreset(identity, { promptPreset: "auto" }, options)
-  const core = preset?.prompt ?? buildDynamicSystemPrompt(options)
-  const modelIdentity = model
-    ? `Model: ${JSON.stringify({ provider: identity.provider, id: identity.id, preset: preset?.name ?? null })}`
-    : ""
-  const body = [adaptNativePrompt(core, useTaskSystem), modelIdentity].filter(Boolean).join("\n\n")
-  const framed = frameNativePrompt(body, {
-    model: model ?? "",
-    tools: [...selectedTools],
-    ...(toolSnippets ? { toolSnippets } : {}),
-    ...(toolPermissions ? { toolPermissions } : {}),
-    ...(restriction ? { restriction } : {}),
-    ...(useTaskSystem ? { useTaskSystem } : {}),
+  // A role that ends with the refusal rule hands the rule to the frame and follows it without the copy.
+  const bareRole = withoutRefusalRule(role)
+  const parts = composeNativeAgentPrompt({
+    model,
+    role: bareRole,
+    refusalRule: bareRole !== role,
+    tools: selectedTools,
+    restriction,
+    useTaskSystem,
+    toolSnippets,
+    toolPermissions,
   })
-  return role ? `${framed}\n\n${role}` : framed
+  return parts.role ? `${parts.frame}\n\n${parts.role}` : parts.frame
 }
 
 export function reconcileNativeModelPrompts(
@@ -129,15 +178,16 @@ export function reconcileNativeModelPrompts(
               .filter((entry): entry is [string, string] => entry[1] !== undefined),
           )
         : undefined
-      return buildNativeAgentPrompt(
-        context.model,
-        "",
-        selected,
-        context.restriction,
-        context.useTaskSystem,
-        selectedSnippets,
-        rules,
-      )
+      return composeNativeAgentPrompt({
+        model: context.model,
+        role: context.role ?? "",
+        refusalRule: context.refusalRule === true,
+        tools: selected,
+        restriction: context.restriction,
+        useTaskSystem: context.useTaskSystem === true,
+        toolSnippets: selectedSnippets,
+        toolPermissions: rules,
+      })
     },
     toolSnippets !== undefined,
   )

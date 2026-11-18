@@ -15,8 +15,9 @@ describe("thread_create: the folder a new thread starts in", () => {
     expect(await run("thread_create", { name: "thread-create-folder-15", cwd: "packages" })).toMatchObject({
       kind: "ok",
     })
+    // A create here asks for the id its call derives (#14060).
     expect(openSession.mock.calls.map((call) => call[0])).toEqual([
-      { cwd: join(process.cwd(), "packages"), name: "thread-create-folder-15" },
+      { cwd: join(process.cwd(), "packages"), name: "thread-create-folder-15", durableSessionId: expect.any(String) },
     ])
   })
 

@@ -14,7 +14,7 @@ export function isGpt6AstraModel(model: string | undefined): boolean {
   if (!model) return false
   const { modelID, variant } = parseVariantFromModelID(model.toLowerCase(), { allowMaxSuffix: true })
   if (variant !== undefined && !isReasoningLevelOrAuto(variant)) return false
-  return /^(?:gpt-6-astra|gpt-6-astra-fast)$/.test(extractModelName(modelID))
+  return /^gpt-6(?:\.2)?-astra(?:-fast)?$/.test(extractModelName(modelID))
 }
 
 export function isClaudeOpus46Model(model: string): boolean {

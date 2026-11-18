@@ -23,10 +23,22 @@ const REPO_NOT_CREATED = "the memory repository is not created yet; sync starts 
 export interface DeviceSessionRuntime {
   readonly openAccountSession: (options: AccountSessionOptions) => Promise<AccountSessionOutcome>
   readonly deviceKeyringFromMaterial: (material: DeviceKeyMaterial) => Promise<DeviceKeyring>
+  readonly isDeviceSyncOff: (pinDir: string, account: string) => Promise<boolean>
   readonly GitSpaceConfig: typeof GitSpaceConfig
   readonly listRemotes: typeof listRemotes
   readonly repoHasCommit: typeof repoHasCommit
   readonly resolveSpace: typeof resolveSpace
+}
+
+/**
+ * omo#14094 (LEAD ruling, option A with limits): a device that has joined the account (its trust pin exists, read from
+ * the pin directory with no credential) gets its memory repository from the first-write seam, so the account's memory
+ * arrives without a write here. The runner calls the resolver only while sync is on; a device that has not joined, and
+ * every read, still create no identity storage (#13493).
+ */
+export interface JoinedRepoCreation {
+  readonly joined: (account: string) => Promise<boolean>
+  readonly create: (request: SyncSessionRequest) => Promise<void>
 }
 
 export function createDeviceSessionResolver(options: {
@@ -35,18 +47,31 @@ export function createDeviceSessionResolver(options: {
   readonly pinDir: string
   readonly loadRuntime: () => Promise<DeviceSessionRuntime>
   readonly fetch?: typeof fetch
+  readonly joinedRepo?: JoinedRepoCreation
 }): (request: SyncSessionRequest) => Promise<SyncSessionResolution> {
-  // Repos whose last pass deferred because the memory repository had no first commit yet, with the lifetime signal of
-  // the account that pass resolved.
-  const awaitingRepo = new Map<string, AbortSignal>()
-  return async ({ paths, space }) => {
+  // Repos whose last pass deferred because the memory repository had no first commit yet, with the lifetime signal and
+  // id of the account that pass resolved.
+  const awaitingRepo = new Map<string, { readonly signal: AbortSignal; readonly account: string }>()
+  // A joined device creates its repository; a failed creation (another writer holds the lock) is left to the retry.
+  const createIfJoined = async (request: SyncSessionRequest, account: string): Promise<void> => {
+    const joinedRepo = options.joinedRepo
+    if (joinedRepo === undefined || !(await joinedRepo.joined(account))) return
+    await joinedRepo.create(request).catch(() => undefined)
+  }
+  return async (request) => {
+    const { paths, space } = request
     // The account was resolved on the pass that deferred; while the repository is still missing and that account is
     // still live, a retry asks no credential and makes no request (a keychain "Allow", not "Always Allow", would
     // otherwise prompt every time). Its signal aborting (signed out, channel closed, #13624) ends the wait: the account
-    // is read again, so a signed-out device goes idle and an unavailable one reports why.
+    // is read again, so a signed-out device goes idle and an unavailable one reports why. A device that joined during
+    // the wait creates its repository here (#14094), and the pass goes on to read the account and open the session.
     const waiting = awaitingRepo.get(paths.repo)
-    if (waiting !== undefined && !waiting.aborted && !(await options.loadRuntime()).repoHasCommit(paths.repo))
-      throw new SyncSessionDeferredError(REPO_NOT_CREATED, undefined, waiting)
+    if (waiting !== undefined && !waiting.signal.aborted) {
+      const runtime = await options.loadRuntime()
+      if (!runtime.repoHasCommit(paths.repo)) await createIfJoined(request, waiting.account)
+      if (!runtime.repoHasCommit(paths.repo))
+        throw new SyncSessionDeferredError(REPO_NOT_CREATED, undefined, waiting.signal)
+    }
     awaitingRepo.delete(paths.repo)
     const account = await options.source()
     if (account === null) return null
@@ -56,8 +81,10 @@ export function createDeviceSessionResolver(options: {
     // The space binding lives in the repository's git config, and the repository is created at the first memory write,
     // never by a read or a session start (#13486). Until its first commit lands, the creation may still be writing that
     // config, so the session is deferred and the runner retries it.
+    const accountId = account.kind === "desktop" ? account.descriptor.accountId : account.accountId
+    if (!runtime.repoHasCommit(paths.repo)) await createIfJoined(request, accountId)
     if (!runtime.repoHasCommit(paths.repo)) {
-      awaitingRepo.set(paths.repo, account.signal)
+      awaitingRepo.set(paths.repo, { signal: account.signal, account: accountId })
       throw new SyncSessionDeferredError(REPO_NOT_CREATED, undefined, account.signal)
     }
     const resolved = runtime.resolveSpace(new runtime.GitSpaceConfig(paths.repo), {
@@ -82,6 +109,7 @@ export function createDeviceSessionResolver(options: {
       return {
         ...opened.session,
         ...legacy,
+        turnedOff: () => runtime.isDeviceSyncOff(options.pinDir, account.descriptor.accountId),
         onEnded: (notify) => {
           if (account.signal.aborted) notify()
           else account.signal.addEventListener("abort", notify, { once: true })
@@ -114,6 +142,7 @@ export function createDeviceSessionResolver(options: {
     return {
       ...opened.session,
       ...legacy,
+      turnedOff: () => runtime.isDeviceSyncOff(options.pinDir, account.accountId),
       onEnded: (notify) => {
         ended.add(notify)
       },

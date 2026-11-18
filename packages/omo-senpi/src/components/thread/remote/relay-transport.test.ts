@@ -6,6 +6,7 @@ import { createGatewayStore, type GatewayStore } from "../gateway/store"
 import type { OutboundDelivery } from "../gateway/transport"
 import { B_ROW, createRemoteThreadFixture, ENGINE } from "../thread-remote-fixture"
 import { createRelayTransport } from "./relay-transport"
+import { commandWaitMs, withCallDeadline } from "../../call-budget/call-deadline"
 
 const { account, cleanup } = createRemoteThreadFixture()
 const directories: string[] = []
@@ -70,6 +71,27 @@ async function admitted(sent: readonly Sent[], count: number): Promise<void> {
 }
 
 describe("a delivery the receiver's open draft holds is queued at once, like a same-device one, and re-sent in the background", () => {
+  // omo#14130 review H1: the call's budget bounds the call, never the background re-sends it queued.
+  test("#given a held delivery sent inside a call whose budget is already spent #when it is re-sent in the background #then the re-send carries no inherited deadline and still goes out", async () => {
+    const a = account({ heldDraft: 1, engine: { ...ENGINE, pending: 1 } })
+    const admitWaits: number[] = []
+    const remote = {
+      ...a.remote,
+      sessions: {
+        ...a.remote.sessions,
+        sessionCommand: (...args: Parameters<typeof a.remote.sessions.sessionCommand>) => {
+          if (args[2]["type"] === "admit_external_message") admitWaits.push(commandWaitMs(45_000))
+          return a.remote.sessions.sessionCommand(...args)
+        },
+      },
+    }
+    const { relay } = transport(remote)
+    const sent = await withCallDeadline(Date.now() - 1, () => relay.deliver(delivery("held past budget", "k-h1")))
+    expect(sent).toMatchObject({ kind: "ok", delivery: { kind: "queued" } })
+    await admitted(a.sent, 2)
+    expect(admitWaits.slice(1)).toEqual([45_000])
+  })
+
   test("#given b's user has a draft open that holds two admissions #when a message is sent #then the send answers queued at b's pending count at once, the same record reaches b three times, and the third is taken", async () => {
     const a = account({ heldDraft: 2, engine: { ...ENGINE, pending: 2 } })
     const { relay, log } = transport(a.remote)
@@ -301,6 +323,35 @@ describe("a delivery the receiver's open draft holds is queued at once, like a s
       device: "b",
       delivery: { kind: "queued", queue_position: 1, waiting_on: { kind: "approval", device: "b" } },
     })
+    expect(admits(a.sent)).toHaveLength(1)
+    relay.dispose()
+  })
+
+  test("#given b is mid-turn and its get_state counts no admitted delivery (senpi enqueues one straight to the agent's follow-up queue, outside pendingMessageCount) #when a follow_up message is sent #then the engine's queued admission is the answer: queued with its delivery id, never idempotency_uncertain", async () => {
+    const a = account({ engine: { ...ENGINE, streaming: true, currentTurnId: "0", pending: 0 } })
+    const { relay } = transport(a.remote)
+    const sent = await relay.deliver({ ...delivery("then reply SECOND_OK", "k8"), mode: "follow_up" })
+    const deliveryId = admits(a.sent)[0]?.["deliveryId"]
+    expect(typeof deliveryId).toBe("string")
+    expect(sent).toMatchObject({
+      kind: "ok",
+      device: "b",
+      delivery_id: deliveryId,
+      effective_mode: "follow_up",
+      delivery: { kind: "queued", queue_position: 1 },
+    })
+    expect(admits(a.sent)).toHaveLength(1)
+    relay.dispose()
+  })
+
+  test("#given b answers the admission queued and the get_state read after it fails #when the message is sent #then the queued admission is still the answer at position 1, never idempotency_uncertain", async () => {
+    const a = account({
+      engine: { ...ENGINE, streaming: true, currentTurnId: "0", pending: 0 },
+      stateRefusedAfterAdmit: "reply_lost",
+    })
+    const { relay } = transport(a.remote)
+    const sent = await relay.deliver({ ...delivery("after a lost state read", "k9"), mode: "follow_up" })
+    expect(sent).toMatchObject({ kind: "ok", device: "b", delivery: { kind: "queued", queue_position: 1 } })
     expect(admits(a.sent)).toHaveLength(1)
     relay.dispose()
   })

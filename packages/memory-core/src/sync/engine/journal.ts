@@ -97,8 +97,11 @@ export interface EngineState {
   /** The entry the pull stopped at; cleared once a later pull verifies past it. */
   readonly paused: { readonly seq: number; readonly code: RefusalCode } | null
   readonly lastSyncedAt: number | null
-  /** Memories the last refusal-free cycle updated on this device. */
-  readonly updatedWhileOffline: number
+  /**
+   * The memories the catch-up after this device's latest offline gap updated (engine.ts says what a gap is); null
+   * when the latest entries it received came in with no gap before them, or it has received none.
+   */
+  readonly updatedWhileOffline: number | null
   /** The device peer this journal was created under. */
   readonly peer: string | null
   /**
@@ -118,7 +121,7 @@ const EMPTY_STATE: EngineState = {
   cycle: null,
   paused: null,
   lastSyncedAt: null,
-  updatedWhileOffline: 0,
+  updatedWhileOffline: null,
   peer: null,
   space: null,
 }
