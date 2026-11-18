@@ -26,6 +26,7 @@ import { randomBytes } from "node:crypto"
 import { minimumInEffect, type MinimumsOption } from "./minimum-in-effect.ts"
 import { compareVersions } from "./release/version.ts"
 import { deviceServiceStateDir } from "./state-dir.ts"
+import { engineEndpointOf } from "./engine-endpoint.ts"
 import { deadlineTimerOf, realTimers, type Timers } from "./timers.ts"
 
 // A host sends no command state at all for a route it does not list toward a sender it does not grant (docs/local-api.md
@@ -113,6 +114,7 @@ export type { ListingResult, ListingRevision, ReadPage, ReadPageEntry } from "./
 export { LocalApiError } from "./local-api/errors.ts"
 export { REFUSED_BEFORE_SENDING } from "./refused-before-sending.ts"
 export { NotSentError } from "./not-sent-error.ts"
+export { NoPrimaryEndpointError } from "./engine-endpoint.ts"
 export type {
   Capability,
   CommandRpc,
@@ -231,9 +233,11 @@ export type DeviceService = {
   readonly attach: (device: string, sessionId: string) => Promise<RemoteAttach>
   /**
    * Sends one session-less engine record (`open_session`, `list_sessions`, ...) to `device`'s engine endpoint with no
-   * attach: relay daemon #393's `session.command {device, endpoint, rpc}`, on the key `session.endpoints` lists first.
+   * attach: relay daemon #393's `session.command {device, endpoint, rpc}`, on the device's primary engine endpoint
+   * (`engineEndpointOf`, omo#14195); only behind a service older than 0.1.11, which cannot ask, its lone endpoint.
    * Settles like an attach's command: the first command state that is not a progress state, plus the engine's reply.
-   * Rejects with the local API's refusal (`unsupported` when the device lists no endpoint, before anything is sent), or
+   * Rejects with the local API's refusal (`unsupported` when the device lists no endpoint, `NoPrimaryEndpointError`
+   * when it names none as its own; both before anything is sent), or
    * when the connection closes or no final state arrives within ENDPOINT_COMMAND_WAIT_MS. Every failure before
    * `session.command` is written (the `session.endpoints` lookup, whatever its code) is a `NotSentError` (a
    * `LocalApiError` with `not_sent: true`); a `session.command` that times out after sending carries its `command_id` instead.
@@ -437,7 +441,7 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
       const started = timers.now()
       let endpoint = options?.endpoint
       if (endpoint === undefined) {
-        const lookup = client.request("session.endpoints", { device })
+        const lookup = engineEndpointOf(client, device)
         // omo#14130 review round 5 (L1): a caller's waitMs bounds the lookup itself, not only what follows it.
         const waitMs = options?.waitMs
         const bounded =
@@ -464,7 +468,7 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
                 )
               })
         try {
-          endpoint = (await bounded).endpoints[0]
+          endpoint = await bounded
         } catch (error) {
           throw markNotSent(error)
         }

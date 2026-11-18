@@ -835,7 +835,7 @@ describe("device-service adapter: relay round trips per thread op", () => {
       request: async (type: string) => {
         frames.push(type)
         if (type === "session.attach") return { attach: "a1" }
-        if (type === "session.endpoints") return { endpoints: [endpointKey] }
+        if (type === "session.endpoints") return { endpoints: [endpointKey], primary: endpointKey }
         if (type === "session.locate") return { device: "b", key: CREATED_KEY, session: `b.${CREATED_KEY}` }
         if (type === "status.get") return { state: "connected" }
         if (type === "devices.list")

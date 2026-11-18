@@ -2,6 +2,7 @@ import { outcomeOf } from "../../thread/remote/outcome"
 import {
   connectDeviceService,
   LocalApiError,
+  NoPrimaryEndpointError,
   NotSentError,
   UnsettledCommandError,
   REFUSED_BEFORE_SENDING,
@@ -371,6 +372,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       } catch (error) {
         // The SDK marks a failure before session.command was written (the endpoint lookup timing out or the connection
         // closing during it) not_sent: nothing ran, so it is refused. The same codes after sending stay uncertain.
+        if (error instanceof NoPrimaryEndpointError) return { kind: "refused", reason: "no_primary_endpoint" }
         if (error instanceof NotSentError) return { kind: "refused", reason: error.code }
         if (error instanceof LocalApiError && error.command_id === undefined && REFUSED_BEFORE_SENDING.has(error.code))
           return { kind: "refused", reason: error.code }
