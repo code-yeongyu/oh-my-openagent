@@ -71,8 +71,8 @@ describe("omo thread: argv to SDK calls", () => {
       kind: "ok",
       scope: "workspace",
       threads: [
-        { thread_id: "dur-tui", surface: "tui", status: "live", name: "here", cwd: "/w" },
-        { thread_id: "dur-on-b", status: "resumable", name: "on b", cwd: "/b", device: "dev-b" },
+        { thread: "dur-tui", surface: "tui", status: "live", name: "here", cwd: "/w" },
+        { thread: "dur-on-b", status: "resumable", name: "on b", cwd: "/b", device: "dev-b" },
       ],
       devices: [
         {
@@ -124,8 +124,8 @@ describe("omo thread: argv to SDK calls", () => {
           kind: "ok",
           scope: "workspace",
           threads: [
-            { thread_id: "dur-tui", surface: "tui", status: "live", name: "here", cwd: "/w" },
-            { thread_id: "dur-on-b", status: "resumable", name: "on b", cwd: "/b", device: "dev-b" },
+            { thread: "dur-tui", surface: "tui", status: "live", name: "here", cwd: "/w" },
+            { thread: "dur-on-b", status: "resumable", name: "on b", cwd: "/b", device: "dev-b" },
           ],
           devices: [
             {
@@ -332,7 +332,7 @@ describe("omo thread: argv to SDK calls", () => {
     const fake = fakeSdk({
       read: {
         kind: "ok",
-        thread_id: "t",
+        thread: "t",
         items: [
           { seq: 1, role: "user", content: "a" },
           { seq: 2, role: "assistant", content: "b" },
