@@ -3,7 +3,8 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, describe, expect, test } from "bun:test"
 import { gatewayInboxDirectory } from "./gateway/paths"
-import { createRemoteThreadFixture, type ThreadHostSession } from "./thread-remote-fixture"
+import { createRemoteThreadFixture } from "./thread-remote-fixture"
+import type { ThreadHostSession } from "./tools"
 
 /**
  * A free plan (no relay on the account) messaging a same-device thread in ANOTHER project's workspace - the Desktop
