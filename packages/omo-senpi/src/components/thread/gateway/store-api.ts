@@ -13,6 +13,8 @@ import type {
   ToolReceiptBegin,
 } from "./store-relay-ops"
 import type { DeliveryReceipt } from "./store-ops"
+import type { IntakeMarkStore, SessionWaitStore } from "./session-wait-types"
+import type { WokenSessionStore } from "./woken-types"
 import type { ClearEndpointRequest, RegisterIncarnationRequest, SessionOwner } from "./store-ownership"
 import type {
   ClaimOutcome,
@@ -23,6 +25,8 @@ import type {
   ExternalAuthor,
   GatewayStoreEvent,
   GatewayStoreStats,
+  IntakeOutcome,
+  IntakeRequest,
   ProcessIdentity,
   ReconcileOutcome,
   ReconcileRequest,
@@ -54,6 +58,14 @@ export type GatewayStore = ExtensionFacade & {
   readonly now: () => number
   readonly identity: () => Promise<ProcessIdentity>
   readonly enqueue: (request: EnqueueRequest) => Promise<EnqueueOutcome>
+  /** A record another device's service attested, for a session here that is not running (#13037); nothing calls it in production yet. */
+  readonly intake: (request: IntakeRequest) => Promise<IntakeOutcome>
+  /** The record of woken sessions (#13037 A3.1); nothing calls it in production yet. */
+  readonly woken: WokenSessionStore
+  /** A session's held or waiting state, read by the carrier, the sweep and the row answers (#13037 A2.6, A3.2.8). */
+  readonly sessionWait: SessionWaitStore
+  /** The newest queued command per (sender device, session), for the device service's hand-over mark (#13037). */
+  readonly intakeMarks: IntakeMarkStore
   readonly reconcile: (request: ReconcileRequest) => Promise<ReconcileOutcome>
   readonly claim: (request: ClaimRequest) => Promise<ClaimOutcome>
   readonly recordOutcome: (request: RecordOutcomeRequest) => Promise<ClaimOutcome>

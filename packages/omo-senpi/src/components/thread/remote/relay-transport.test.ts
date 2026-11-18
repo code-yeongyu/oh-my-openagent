@@ -305,6 +305,35 @@ describe("a delivery the receiver's open draft holds is queued at once, like a s
     relay.dispose()
   })
 
+  test("#given b is mid-turn and its get_state counts no admitted delivery (senpi enqueues one straight to the agent's follow-up queue, outside pendingMessageCount) #when a follow_up message is sent #then the engine's queued admission is the answer: queued with its delivery id, never idempotency_uncertain", async () => {
+    const a = account({ engine: { ...ENGINE, streaming: true, currentTurnId: "0", pending: 0 } })
+    const { relay } = transport(a.remote)
+    const sent = await relay.deliver({ ...delivery("then reply SECOND_OK", "k8"), mode: "follow_up" })
+    const deliveryId = admits(a.sent)[0]?.["deliveryId"]
+    expect(typeof deliveryId).toBe("string")
+    expect(sent).toMatchObject({
+      kind: "ok",
+      device: "b",
+      delivery_id: deliveryId,
+      effective_mode: "follow_up",
+      delivery: { kind: "queued", queue_position: 1 },
+    })
+    expect(admits(a.sent)).toHaveLength(1)
+    relay.dispose()
+  })
+
+  test("#given b answers the admission queued and the get_state read after it fails #when the message is sent #then the queued admission is still the answer at position 1, never idempotency_uncertain", async () => {
+    const a = account({
+      engine: { ...ENGINE, streaming: true, currentTurnId: "0", pending: 0 },
+      stateRefusedAfterAdmit: "reply_lost",
+    })
+    const { relay } = transport(a.remote)
+    const sent = await relay.deliver({ ...delivery("after a lost state read", "k9"), mode: "follow_up" })
+    expect(sent).toMatchObject({ kind: "ok", device: "b", delivery: { kind: "queued", queue_position: 1 } })
+    expect(admits(a.sent)).toHaveLength(1)
+    relay.dispose()
+  })
+
   test("#given b already holds the delivery (a lost reply retried) #when the retry reaches b #then the send is deduplicated at b's real pending count, not an invented 1", async () => {
     const a = account({
       admitOutcome: {
@@ -325,5 +354,34 @@ describe("a delivery the receiver's open draft holds is queued at once, like a s
       deduplicated: true,
       delivery: { kind: "queued", queue_position: 3 },
     })
+  })
+})
+
+describe("a person's waiting send names its prompt so its follow can anchor on the stored entry (#13272 review)", () => {
+  const personSend = (key: string, clientMessageId?: string): OutboundDelivery => ({
+    sender: { kind: "person", uid: 1, user: "u" },
+    caller_id: "person:1",
+    target: { kind: "remote", row: B_ROW },
+    text: "/review the diff",
+    mode: "follow_up",
+    idempotency_key: key,
+    ...(clientMessageId === undefined ? {} : { client_message_id: clientMessageId }),
+    args: { target: "b", text: "/review the diff" },
+  })
+  const prompts = (sent: readonly Sent[]) =>
+    sent.filter((entry) => entry.rpc?.["type"] === "prompt").map((entry) => entry.rpc ?? {})
+
+  test("#given a delivery that carries a client message id #when it is sent #then the prompt record carries it as clientMessageId", async () => {
+    const a = account()
+    const { relay } = transport(a.remote)
+    expect(await relay.deliver(personSend("p1", "cm-1"))).toMatchObject({ kind: "ok" })
+    expect(prompts(a.sent).map((record) => record["clientMessageId"])).toEqual(["cm-1"])
+  })
+
+  test("#given a delivery without one #when it is sent #then the prompt record has no clientMessageId key at all", async () => {
+    const a = account()
+    const { relay } = transport(a.remote)
+    expect(await relay.deliver(personSend("p2"))).toMatchObject({ kind: "ok" })
+    expect(prompts(a.sent).map((record) => "clientMessageId" in record)).toEqual([false])
   })
 })

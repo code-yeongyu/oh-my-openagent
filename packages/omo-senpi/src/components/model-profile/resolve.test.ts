@@ -19,6 +19,7 @@ const SOL_56 = "chatgpt-subscription/gpt-5.6-sol"
 const SOL_56_COPILOT = "github-copilot/gpt-5.6-sol"
 const SOL_61 = "chatgpt-subscription/gpt-6.1-sol"
 const ASTRA = "chatgpt-subscription/gpt-6-astra"
+const ASTRA_62 = "chatgpt-subscription/gpt-6.2-astra"
 
 const DAILY_NORMAL = {
   id: "daily-normal",
@@ -38,7 +39,7 @@ describe("resolveModelProfile", () => {
       provider: "moonshotai",
       modelId: "kimi-k3.1-pro",
       reasoning: "max",
-      skipped: [OPUS_SUBSCRIPTION],
+      skipped: [OPUS_SUBSCRIPTION, "anthropic-subscription/claude-fable-5-2"],
     })
   })
 
@@ -144,7 +145,7 @@ describe("resolveModelProfile", () => {
     expect(result).toEqual({
       kind: "unavailable",
       profile: DAILY_NORMAL,
-      chain: [OPUS_SUBSCRIPTION, "kimi-coding/kimi-k3.1-pro", "zai/glm-5.3"],
+      chain: [OPUS_SUBSCRIPTION, "anthropic-subscription/claude-fable-5-2", "kimi-coding/kimi-k3.1-pro"],
     })
   })
 
@@ -176,7 +177,7 @@ describe("resolveModelProfile", () => {
 })
 
 describe("builtin chain routing", () => {
-  it("prefers Fable 5.2 at the existing effort without changing listed providers", () => {
+  it("prefers Fable 5.2 at high without changing listed providers", () => {
     // given
     const availableModels = ["opencode/claude-fable-5-2", "anthropic-subscription/claude-fable-5-2", FABLE]
     // when
@@ -186,7 +187,7 @@ describe("builtin chain routing", () => {
       kind: "resolved",
       provider: "anthropic-subscription",
       modelId: "claude-fable-5-2",
-      reasoning: "xhigh",
+      reasoning: "high",
     })
   })
 
@@ -270,6 +271,21 @@ describe("builtin chain routing", () => {
         known: ["daily-heavy", "daily-normal", "geeky-heavy", "geeky-normal"],
       })
     }
+  })
+
+  it("resolves geeky-normal and geeky-heavy to gpt-6.2-astra when the subscription serves it beside GPT-6 Astra", () => {
+    expect(resolveModelProfile({ active: "geeky-normal", availableModels: [ASTRA_62, ASTRA, SOL_61] })).toMatchObject({
+      kind: "resolved",
+      provider: "chatgpt-subscription",
+      modelId: "gpt-6.2-astra",
+      reasoning: "medium",
+    })
+    expect(resolveModelProfile({ active: "geeky-heavy", availableModels: [ASTRA_62, ASTRA] })).toMatchObject({
+      kind: "resolved",
+      provider: "chatgpt-subscription",
+      modelId: "gpt-6.2-astra",
+      reasoning: "high",
+    })
   })
 
   it("resolves geeky-normal to gpt-6-astra medium when the subscription serves it beside the Sol tiers", () => {
@@ -506,21 +522,11 @@ describe("builtin chain routing", () => {
     })
   })
 
-  it("picks zai/glm-5.3 on daily-normal when only a zai key serves glm", () => {
-    const result = resolveModelProfile({ active: "daily-normal", availableModels: ["zai/glm-5.3"] })
-
-    expect(result).toMatchObject({
-      kind: "resolved",
-      provider: "zai",
-      modelId: "glm-5.3",
-      reasoning: "max",
-    })
-  })
-
-  it("does not pick OpenCode zai-coding-plan on daily-normal", () => {
+  // Default contract (#13547): Daily · Normal runs only Opus 5.5, Fable 5.2 and Kimi K3.1 Pro, so GLM on any lane is not a rung.
+  it("leaves daily-normal unavailable when only GLM is served", () => {
     const result = resolveModelProfile({
       active: "daily-normal",
-      availableModels: ["zai-coding-plan/glm-5.3"],
+      availableModels: ["zai/glm-5.3", "zai-coding-plan/glm-5.3", "opencode-go/glm-5.3"],
     })
 
     expect(result.kind).toBe("unavailable")

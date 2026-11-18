@@ -1,8 +1,18 @@
 import { z } from "zod"
 import { createSyncRpcCoordinator } from "./sync-rpc-coordinator"
+import { syncErrorFields } from "./sync-rpc-operation"
 import type { SyncRpcOptions, SyncRpcRegistration } from "./sync-rpc-ports"
 
 const empty = z.object({}).strict()
+const enableRequest = z.object({ method: z.enum(["passkey", "phrase"]).optional() }).strict()
+const acknowledgeRequest = z
+  .object({
+    notice: z.literal("phrase_void"),
+    purpose: z.enum(["genesis", "enroll", "rotate"]),
+    credentialId: z.string().min(1).optional(),
+  })
+  .strict()
+const FEATURES = ["enable-method", "phrase-genesis", "acknowledge"] as const
 const approval = z.discriminatedUnion("action", [
   z.object({ action: z.literal("begin"), pendingId: z.string().min(1) }).strict(),
   z
@@ -26,7 +36,7 @@ const device = z.object({
 
 export function registerSyncRpc(rpc: SyncRpcRegistration, options: SyncRpcOptions) {
   const coordinator = createSyncRpcCoordinator(options)
-  for (const verb of ["enable", "pending", "approve", "status", "devices"] as const) {
+  for (const verb of ["enable", "pending", "approve", "status", "devices", "features", "acknowledge"] as const) {
     rpc.handle(`omo.memory.sync.${verb}`, async (data, context) => {
       if (!coordinator.check(context)) return { kind: "unavailable", reason: "A live trusted connection is required." }
       try {
@@ -35,10 +45,26 @@ export function registerSyncRpc(rpc: SyncRpcRegistration, options: SyncRpcOption
           if (!parsed.success) return { kind: "refused", reason: "Invalid approval request." }
           return await coordinator.approve(context, parsed.data)
         }
+        if (verb === "enable") {
+          const parsed = enableRequest.safeParse(data)
+          if (!parsed.success) return { kind: "refused", reason: "Invalid enable request." }
+          const { method } = parsed.data
+          return await coordinator.enable(context, method === undefined ? {} : { method })
+        }
+        if (verb === "acknowledge") {
+          const parsed = acknowledgeRequest.safeParse(data)
+          if (!parsed.success) return { kind: "refused", reason: "Invalid acknowledge request." }
+          const { credentialId, ...rest } = parsed.data
+          return await coordinator.acknowledge(context, credentialId === undefined ? rest : { ...rest, credentialId })
+        }
         if (!empty.safeParse(data).success) return { kind: "refused", reason: "This request takes no parameters." }
         switch (verb) {
-          case "enable":
-            return await coordinator.enable(context)
+          case "features":
+            // Phrase genesis is listed only while the client flag is on (amendment A1).
+            return {
+              features:
+                options.phraseGate?.enabled === true ? FEATURES : FEATURES.filter((f) => f !== "phrase-genesis"),
+            }
           case "status":
             return await coordinator.status(context)
           case "pending":
@@ -55,8 +81,13 @@ export function registerSyncRpc(rpc: SyncRpcRegistration, options: SyncRpcOption
               devices: z.array(device).parse(await ports.devices()),
             }))
         }
-      } catch {
-        return { kind: "unavailable", reason: "The sync operation could not complete." }
+      } catch (error) {
+        options.warn?.(`memory sync ${verb} unavailable`, {
+          path: verb,
+          code: "handler_failed",
+          ...syncErrorFields(error),
+        })
+        return { kind: "unavailable", reason: "The sync operation could not complete.", code: "handler_failed" }
       }
     })
   }

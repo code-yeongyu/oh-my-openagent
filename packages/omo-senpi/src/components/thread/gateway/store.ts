@@ -9,6 +9,7 @@ import { resolveProvenance } from "./provenance-resolver"
 import type { GatewayStore } from "./store-api"
 export type { Deduplicated, DeliveryView, GatewayStore, OutboxPage, ReceiptScope } from "./store-api"
 import { createExtensionFacade, type ExtensionRegisterReply, type RetainedRegistration } from "./store-extension-facade"
+import { createIntakeMarkFacade, createSessionWaitFacade, createWokenFacade } from "./store-woken-facade"
 export type {
   DeclaredSessionOp,
   SessionCallableOp,
@@ -347,6 +348,10 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     now,
     identity: () => track(async () => (await start()).self),
     enqueue: (request) => call("enqueue", request),
+    intake: (request) => call("intake", request),
+    woken: createWokenFacade(call, now),
+    sessionWait: createSessionWaitFacade(call, now),
+    intakeMarks: createIntakeMarkFacade(call, now),
     reconcile: (request) => call("reconcile", request),
     claim: (request) => call("claim", request),
     recordOutcome: (request) => call("record_outcome", request),

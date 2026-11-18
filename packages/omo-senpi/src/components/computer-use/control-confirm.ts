@@ -18,11 +18,20 @@ export function controlConfirmBody(reason: string): string {
 /** Fires `onTimeout` after `timeoutMs`; the return cancels it. Injected so tests never wait on a clock. */
 export type ControlTimeoutScheduler = (onTimeout: () => void, timeoutMs: number) => () => void
 
+/** The device's own remote-exec setting (C3(b)): off until the user enables it on that device. */
+export interface DeviceExecPolicy {
+  enabled(): boolean
+}
+
 export interface ControlConfirmOptions {
   readonly timeoutMs?: number
   readonly scheduleTimeout?: ControlTimeoutScheduler
   /** True when the session runs in full access: the grant needs no confirm (#10022). */
   readonly fullAccess?: () => boolean
+  /** Where the computer tool runs: a fused session (today) or the hand of a split session, which has no UI. */
+  readonly placement?: () => "fused" | "hand"
+  /** Decides a hand's grants; absent, a hand is treated as a device that never enabled exec. */
+  readonly deviceExec?: DeviceExecPolicy
 }
 
 /** The in-session note shown when full access grants foreground control without asking. */
@@ -46,6 +55,8 @@ export async function confirmComputerControl(
   request: ControlConfirmRequest,
   options: ControlConfirmOptions = {},
 ): Promise<boolean> {
+  // A hand has nobody to ask: the device's exec setting is the consent, for every session, with no per-session confirm.
+  if (options.placement?.() === "hand") return !request.signal.aborted && options.deviceExec?.enabled() === true
   if (request.context.hasUI === false || request.signal.aborted) return false
   const notify = request.context.ui?.notify
   if (options.fullAccess?.() === true && request.context.hasUI === true && notify !== undefined) {
