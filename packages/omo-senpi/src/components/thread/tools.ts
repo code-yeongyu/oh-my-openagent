@@ -84,6 +84,8 @@ import { currentResult, openedResult, threadRow } from "./tools/thread-row"
 
 /** How many keys a tool surface keeps for recovering receipts whose admission reply was lost. */
 export const RECEIPT_RECOVERY_MAX_KEYS = 4_096
+/** The longest untyped rename error kept as `local_name_unavailable_reason`, in code points; longer ones end in an ellipsis. */
+const RENAME_REASON_MAX_CHARS = 300
 /** A registered exact id needs no pre-engine view; the engine validates its one endpoint. */
 const PUBLISHED_SEND_VIEW: ThreadHostView = { sessions: [], hosts: [], disk: [] }
 /** A reply to a sender on another device resolves on that device alone and reads no view of this one. */
@@ -471,7 +473,12 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
           return (
             named === undefined
               ? { ...recorded, name: localName, link: threadLink(recorded.thread, localName), ...local }
-              : { ...recorded, ...local, local_name_unavailable: named }
+              : {
+                  ...recorded,
+                  ...local,
+                  local_name_unavailable: named.code,
+                  ...(named.reason === undefined ? {} : { local_name_unavailable_reason: named.reason }),
+                }
           ) as ThreadToolResult
         })()
         if (value.prompt === undefined || made.kind !== "ok" || opened === undefined) return made
@@ -544,29 +551,37 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
   /**
    * Names a thread thread_create already made, through the same path thread_rename takes (the create's name check against
    * the device's threads, then the located control's setName). Answers the refusing code instead of failing, because the
-   * thread exists either way.
+   * thread exists either way: a rename that fails with no typed refusal answers `host_unavailable` with the error's
+   * message as `reason`, so the result still names the created thread (withAlias's rule for every failure after the
+   * create) and a failure in the rename path stays traceable.
    */
   async function nameCreatedThread(
     threadId: string,
     name: string,
     visible: readonly ThreadSummary[],
     callerId: string,
-  ): Promise<ThreadErrorCode | undefined> {
+  ): Promise<{ readonly code: ThreadErrorCode; readonly reason?: string } | undefined> {
     const conflict = checkNameConflict(
       visible.filter((thread) => thread.thread_id !== threadId),
       name,
     )
-    if (conflict.kind === "error") return conflict.code
+    if (conflict.kind === "error") return { code: conflict.code }
     const located = await locateControl(options, await view(), threadId, true, callerId)
-    if (located.kind === "not_live") return "not_resumable"
+    if (located.kind === "not_live") return { code: "not_resumable" }
     if (located.kind === "error")
-      return located.result.kind === "error" ? located.result.error.code : "host_unavailable"
+      return { code: located.result.kind === "error" ? located.result.error.code : "host_unavailable" }
     try {
       await located.control.setName(name)
     } catch (error) {
       const refusal = controlRefusalOf(error)
-      if (refusal === undefined) throw error
-      return refusal.code
+      if (refusal !== undefined) return { code: refusal.code }
+      const message = [...(error instanceof Error ? error.message : String(error))]
+      // A failed RPC can carry a whole host reply frame (live-surface.ts), and the result is kept in the call's receipt.
+      const reason =
+        message.length > RENAME_REASON_MAX_CHARS
+          ? `${message.slice(0, RENAME_REASON_MAX_CHARS).join("")}…`
+          : message.join("")
+      return { code: "host_unavailable", reason }
     }
     return undefined
   }
