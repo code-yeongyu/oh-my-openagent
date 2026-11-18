@@ -45,20 +45,42 @@ test.skipIf(process.platform === "win32")(
 test.skipIf(process.platform === "win32")(
   "#given a reader waiting on EAGAIN #when it is destroyed #then it closes and no retry keeps the process alive",
   async () => {
-    // given
+    // given a reader whose first read answered EAGAIN, so its retry timer is armed (#14105 review L1: the destroy must
+    // happen in that state, or the test passes without a retry to clear)
     const { reader, writer } = fifoPair()
-    const stream = nonBlockingTtyReadable(reader, 60_000)
-    stream.resume()
-    const closed = new Promise<void>((resolve) => stream.once("close", () => resolve()))
+    const realSetTimeout = globalThis.setTimeout
+    const realClearTimeout = globalThis.clearTimeout
+    const RETRY_MS = 60_017
+    const armed = Promise.withResolvers<ReturnType<typeof setTimeout>>()
+    const cleared = new Set<unknown>()
+    globalThis.setTimeout = ((run: () => void, ms?: number) => {
+      const handle = realSetTimeout(run, ms)
+      if (ms === RETRY_MS) armed.resolve(handle)
+      return handle
+    }) as typeof setTimeout
+    globalThis.clearTimeout = ((handle?: ReturnType<typeof setTimeout>) => {
+      cleared.add(handle)
+      realClearTimeout(handle)
+    }) as typeof clearTimeout
+    try {
+      const stream = nonBlockingTtyReadable(reader, RETRY_MS)
+      stream.resume()
+      const retry = await armed.promise
+      const closed = new Promise<void>((resolve) => stream.once("close", () => resolve()))
 
-    // when
-    stream.destroy()
+      // when
+      stream.destroy()
 
-    // then
-    await closed
-    expect(stream.destroyed).toBe(true)
-    closeSync(writer)
-    closeSync(reader)
+      // then the armed retry was cleared, so no timer keeps the process alive
+      await closed
+      expect(stream.destroyed).toBe(true)
+      expect(cleared.has(retry)).toBe(true)
+    } finally {
+      globalThis.setTimeout = realSetTimeout
+      globalThis.clearTimeout = realClearTimeout
+      closeSync(writer)
+      closeSync(reader)
+    }
   },
 )
 
