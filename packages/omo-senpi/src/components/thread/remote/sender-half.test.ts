@@ -205,12 +205,16 @@ describe("#13037 the sender half reaches a session on another device that is not
       expect([...perDevice.values()].every((count) => count === 1)).toBe(true)
     })
 
-    test("A4.4: #given that id #when thread_read and thread_interrupt name it #then neither runs the lookup", async () => {
+    test("#13215 (decides A4.4): #given that id #when thread_read and thread_interrupt name it #then each runs the lookup, finds the ended row on c and answers not_resumable, sending c nothing", async () => {
       const a = account({ rows: [B_ROW, C_ROW], ended: { c: { [GONE]: "rk-c-gone" } } })
       const { run } = fixture.surface(a.remote)
-      await run("thread_read", { thread: GONE })
-      await run("thread_interrupt", { thread: GONE })
-      expect(a.lookups).toEqual([])
+      for (const tool of ["thread_read", "thread_interrupt"] as const)
+        expect(await run(tool, { thread: GONE })).toMatchObject({ kind: "error", error: { code: "not_resumable" } })
+      expect(a.lookups.filter((entry) => entry.device === "c")).toEqual([
+        { device: "c", durable_id: GONE },
+        { device: "c", durable_id: GONE },
+      ])
+      expect(a.sent.filter((entry) => entry.device === "c")).toEqual([])
     })
   })
 
