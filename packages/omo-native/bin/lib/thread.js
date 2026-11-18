@@ -11,7 +11,7 @@ export { THREAD_EXIT } from "./thread-args.js"
 /**
  * `omo thread` - the session gateway for scripts and connectors: every thread operation the agent
  * tools offer, run through the plugin's thread SDK (`plugin/runtime/thread-sdk/sdk.js`) as
- * `cli:<uid>`. It never starts a host: sessions are listed from what the engine enumerates, and
+ * `cli:<uid>`. It never starts a host: sessions are listed from the endpoints the engine's registry names, and
  * bindings, the outbox and receipts live in the gateway store. JSON shapes: docs/reference/omo-thread.md.
  */
 
@@ -302,7 +302,6 @@ export async function loadThreadSdk({
   agentDir,
   env,
   cwd,
-  engine,
   stderr,
   reinstall,
   loadSqlite,
@@ -330,9 +329,6 @@ export async function loadThreadSdk({
     }
   }
   const who = identity ?? { uid: process.getuid?.() ?? 0, user: userInfo().username }
-  const engineStatusAll = async () =>
-    engine.run(["host", "status", "--json", "--all", "--include-workers"], { env: { ...env, OMO_AGENT_DIR: agentDir } })
-      .stdout
   const remote = await cliRemoteSurface({ pluginRoot, env, cwd, stderr, reinstall, importThreadClient })
   return {
     sdk: module.createThreadSdk({
@@ -341,7 +337,6 @@ export async function loadThreadSdk({
       uid: who.uid,
       user: who.user,
       env,
-      engineStatusAll,
       ...(remote === undefined ? {} : { remote }),
     }),
   }
