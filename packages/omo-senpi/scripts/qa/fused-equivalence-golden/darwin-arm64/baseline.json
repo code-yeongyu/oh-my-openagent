@@ -6,7 +6,7 @@
  "platform": "darwin-arm64",
  "runtimes": {
   "harness": "node@26.13.1",
-  "child": "bun@1.4.4 @code-yeongyu/senpi@2026.11.18 (pinned)"
+  "child": "bun@1.4.4 @code-yeongyu/senpi@2026.11.18-2 (pinned)"
  },
  "hashes": {
   "driver": "sha256:641a42d1f3de87b4cf64b3486a03b6c39d9049e66f1d5776208b108883fe0428",
