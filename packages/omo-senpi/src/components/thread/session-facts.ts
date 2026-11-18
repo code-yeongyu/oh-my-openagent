@@ -18,7 +18,12 @@ export type SessionFacts = {
   /** The last `session_info` name (`/name`, `set_session_name`), or `null` when none was set or it was cleared. */
   readonly name: string | null
   readonly first_user_text: string | null
+  /** The newest `session_archived` entry (senpi `set_session_archived`) archived the thread. */
+  readonly archived?: true
 }
+
+/** senpi's `custom` entry type that carries a session's archived flag. */
+const SESSION_ARCHIVED_CUSTOM_TYPE = "session_archived"
 
 export type JsonRecord = Record<string, unknown>
 
@@ -69,6 +74,8 @@ export type SessionEntrySummary = {
   readonly first_user_text: string | null
   /** The newest entry timestamp, `""` when no entry carries one. */
   readonly newest_timestamp: string
+  /** The last `session_archived` entry's flag; false when none was written. */
+  readonly archived: boolean
 }
 
 /** One pass over session entries in file order: the rules every reader of a session file shares. */
@@ -77,7 +84,10 @@ export function summarizeSessionEntries(entries: readonly JsonRecord[]): Session
   let name: string | null = null
   let firstUserText: string | null = null
   let newest = ""
+  let archived = false
   for (const entry of entries) {
+    if (entry.type === "custom" && entry.customType === SESSION_ARCHIVED_CUSTOM_TYPE)
+      archived = isRecord(entry.data) && entry.data.archived === true
     if (header === null && entry.type === "session" && typeof entry.id === "string") header = entry
     if (entry.type === "session_info")
       name = typeof entry.name === "string" && entry.name.trim().length > 0 ? entry.name.trim() : null
@@ -92,7 +102,7 @@ export function summarizeSessionEntries(entries: readonly JsonRecord[]): Session
     }
     if (typeof entry.timestamp === "string" && entry.timestamp > newest) newest = entry.timestamp
   }
-  return { header, name, first_user_text: firstUserText, newest_timestamp: newest }
+  return { header, name, first_user_text: firstUserText, newest_timestamp: newest, archived }
 }
 
 function finalEntryTimestamp(line: Buffer | null): string | null {
@@ -168,6 +178,7 @@ function* sessionFactsSteps(size: number): Generator<WindowRequest, WindowFacts 
     created_at: first.timestamp,
     name: summary.name,
     first_user_text: summary.first_user_text,
+    ...(summary.archived ? { archived: true as const } : {}),
     finalLine: yield* finalCompleteLine(size),
   }
 }

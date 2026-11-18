@@ -798,10 +798,17 @@ export function sessionMembers(core: ClientCore): SessionMembers {
         return ok({ closed: "closed" in result && result.closed === true })
       })
     },
-    // No layer stores archive state: the listing (device-service-core), the engine (senpi) and the thread tools carry none.
-    archive: async () =>
-      remoteFailure("unsupported", "No layer stores a session's archive state yet.", nextActionFor("unsupported"), {
-        details: { feature: "archive" },
-      }),
+    // The thread tools' archive body: senpi set_session_archived on the session, which stays open and running.
+    archive: async (thread, archived, opts) =>
+      controlled(
+        thread,
+        opts,
+        async (control) => {
+          await control.setArchived(archived)
+          return { kind: "ok", ...(await control.listed(archived)), archived }
+        },
+        () => ({ archived }),
+        (target) => onThisDevice(target.device, (local) => local.archive(target, archived)),
+      ),
   }
 }

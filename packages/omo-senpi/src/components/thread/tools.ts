@@ -17,6 +17,7 @@ import {
   type ThreadSendInput,
   type ThreadSetModelInput,
   type ThreadSetReasoningInput,
+  type ThreadArchiveInput,
   type ThreadToolName,
   type ThreadToolResult,
 } from "./contracts"
@@ -32,6 +33,8 @@ import type { DeliveryTarget } from "./gateway/transport"
 import type { DeliveryAuthority } from "./gateway/types"
 import { createGatewayServices } from "./tools/gateway-services"
 import { listThreads, readThread } from "./tools/read-ops"
+import { archiveThread } from "./tools/archive-ops"
+import { rowState, threadModel } from "./tools/thread-state"
 import { createRelayTools } from "./tools/relay-tools"
 import { threadToolPermission } from "./tools/local-permission"
 import { withThreadRenderers } from "./tools/render"
@@ -346,7 +349,12 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
         args,
         ectx,
         async (current, value) =>
-          await listAcross(options.remote, listThreads(options, current, value.all_scope), value.all_scope === true),
+          await listAcross(
+            options.remote,
+            listThreads(options, current, value.all_scope, value.state),
+            value.all_scope === true,
+            value.state,
+          ),
       ),
   }
   const read: AnyTool = {
@@ -428,6 +436,14 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
         return await setThinkingLevelOn(located.control, value.level, value.scope)
       }),
   }
+  const archive: AnyTool = {
+    ...metadata("thread_archive"),
+    parameters: threadToolParamSchemas.thread_archive,
+    execute: (id: string, args: ThreadArchiveInput, _signal, _onUpdate, ectx) =>
+      execute("thread_archive", id, args, ectx, async (current, value, _operationId, callerId) =>
+        archiveThread(options, current, value, callerId),
+      ),
+  }
   const relayTools = createRelayTools({ options, relay, failure })
   const dispose = () => {
     pipeline.dispose()
@@ -435,12 +451,24 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
     relay.dispose()
   }
   return {
-    tools: [create, list, read, send, interrupt, close, handoff, rename, setModel, setReasoning, ...relayTools].map(
-      (tool) =>
-        withThreadRenderers({
-          ...tool,
-          permissionParser: tool.permissionParser ?? threadToolPermission(tool.name, options),
-        }),
+    tools: [
+      create,
+      list,
+      read,
+      send,
+      interrupt,
+      close,
+      handoff,
+      rename,
+      setModel,
+      setReasoning,
+      archive,
+      ...relayTools,
+    ].map((tool) =>
+      withThreadRenderers({
+        ...tool,
+        permissionParser: tool.permissionParser ?? threadToolPermission(tool.name, options),
+      }),
     ),
     dispose,
   }
@@ -623,6 +651,8 @@ async function deliverThrough(
         thread_id: sent.thread_id,
         name: escapeForDisplay(row.title),
         status: "live",
+        state: rowState(row),
+        ...threadModel(row.model),
         cwd: escapeForDisplay(row.project),
         created_at: seen,
         updated_at: seen,

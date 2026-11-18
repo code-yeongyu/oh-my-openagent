@@ -1,7 +1,8 @@
-import type { ThreadDevice, ThreadToolResult } from "../contracts"
+import type { ThreadDevice, ThreadState, ThreadToolResult } from "../contracts"
 import { threadToolFailure } from "../errors"
 import { displayedThread } from "../control/relay-session-host"
 import { threadRow } from "../tools/thread-row"
+import { listedStates, rowState } from "../tools/thread-state"
 import {
   rowThreadId,
   type AliasRegistry,
@@ -202,12 +203,15 @@ function deviceRows(
 /**
  * thread_list: this device's threads (scoped by `all_scope` as before) merged with the account's other devices' threads
  * (each with its device, any workspace), with aliases, and the account's devices with their listing state. A device
- * whose rows this listing could not include is named `incomplete` in `devices`, never silently left out.
+ * whose rows this listing could not include is named `incomplete` in `devices`, never silently left out. `states` filters
+ * the other devices' rows as `listThreads` filters this device's (the default leaves archived threads out), and a device
+ * counts only the threads listed.
  */
 export async function listAcross(
   remote: RemoteThreadSurface | undefined,
   local: ThreadToolResult,
   allScope: boolean,
+  states?: readonly ThreadState[],
 ): Promise<ThreadToolResult> {
   if (remote === undefined || local.kind !== "ok" || !("threads" in local)) return local
   const ids = local.threads.map((thread) => thread.thread)
@@ -236,7 +240,10 @@ export async function listAcross(
   // Without this device's id its own rows cannot be told apart from another device's, so none are merged.
   if (!listed.ok || here === null) return withAliases(remote, { ...local, remote_unavailable: "host_unavailable" }, ids)
   const listing = listed.listing
-  const others = listing.rows.filter((row) => row.device !== here && !known.has(rowThreadId(row)))
+  const shown = listedStates(states)
+  const others = listing.rows.filter(
+    (row) => row.device !== here && !known.has(rowThreadId(row)) && shown.has(rowState(row)),
+  )
   // Every row names the machine that holds it (#14044 step 4a): this device's name on its own rows, the roster's name on
   // another device's.
   const machines = new Map(roster.ok ? roster.devices.map((device) => [device.device, device.label]) : [])

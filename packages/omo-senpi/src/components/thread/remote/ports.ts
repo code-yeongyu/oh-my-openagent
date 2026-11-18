@@ -22,6 +22,12 @@ export type RemoteSessionRow = {
    * `state` is only what it was then (#14043). Absent (an older service, a row built here): treated as `live`.
    */
   readonly source?: "live" | "cache"
+  /** On a `cache` row: when the device's last snapshot was taken (epoch ms). */
+  readonly as_of?: number
+  /** Rows 4 (omo-relay-spec#295): the session's current model as its engine names it; absent when unknown. */
+  readonly model?: { readonly provider: string; readonly id: string }
+  /** Rows 4: the engine archived the session; absent means not archived. */
+  readonly archived?: true
 }
 
 export type RemoteDevice = {

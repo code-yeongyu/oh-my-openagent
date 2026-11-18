@@ -1,12 +1,16 @@
 import type { ThreadErrorCode, ThreadToolFailure } from "../errors"
 import type { BindingRecord, OutboxRow } from "../gateway/bindings"
 import type { ThreadWorktree } from "../worktree/thread-worktree"
+import type { ThreadModel, ThreadState } from "./state"
+
+export { THREAD_STATES, type ThreadModel, type ThreadState } from "./state"
 
 // Discriminated result unions. The error branch is shared data, never an exception: a caller
 // that sent a malformed payload receives { kind: "error", error: { code: "invalid_arguments" } }.
 
 export type ThreadDataError = { readonly kind: "error"; readonly error: ThreadToolFailure }
 
+/** Deprecated beside `state`, kept for one release: `resumable` when no engine holds the thread, else `live`. */
 export type ThreadStatus = "live" | "resumable"
 
 /**
@@ -30,8 +34,6 @@ export type ThreadSummary = {
     readonly durable_session_id: string
   } | null
   readonly surface?: "tui" | "desktop" | "child" | "daemon" | null
-  /** `false` when the endpoint is not answering; the fields then come from the session file. */
-  readonly alive?: boolean
   /** What a caller can do to this thread through its endpoint; an older terminal accepts only send, read and rename. */
   readonly controls?: readonly ("send" | "read" | "rename" | "set_model" | "set_reasoning" | "interrupt")[]
   /** `thread_create` only: the initial skills attached to the new thread (`initial-skills.ts`). */
@@ -65,8 +67,15 @@ export type ThreadResultSummary = {
   /** The thread's account-wide alias, usable instead of `thread` in every thread tool. */
   readonly alias?: string
   readonly surface?: ThreadSummary["surface"]
-  /** `false` when the endpoint is not answering; the fields then come from the session file. */
-  readonly alive?: boolean
+  /** What the thread is doing (`contracts/state.ts`); a thread has no online state, `online` is a device's. */
+  readonly state: ThreadState
+  /** The thread's current model; absent when its engine does not report one (an older engine, an inactive thread). */
+  readonly model?: ThreadModel
+  /**
+   * Set when the row comes from another device's cached listing (it did not answer this round): when that listing was
+   * taken. Such a row is the device's last word, so it reads `inactive` (or `archived`), never `running`.
+   */
+  readonly as_of?: string
   readonly controls?: ThreadSummary["controls"]
   /** Present only on a thread listed from disk because its endpoint stopped answering. */
   readonly error_note?: string
@@ -197,6 +206,8 @@ export type ThreadListResult =
        * plan has no relay (`plan_required`, a Free plan).
        */
       readonly aliases_unavailable?: "sign_in" | "host_unavailable" | "not_asked"
+      /** More session files were in scope than one list reads (newest first): older inactive threads are left out. */
+      readonly inactive_truncated?: true
     }
   | ThreadDataError
 
@@ -324,6 +335,10 @@ export type ThreadSetModelResult =
     }
   | ThreadDataError
 
+/** The thread as `thread_list` would list it now, with the state its archived flag gives it. */
+export type ThreadArchiveResult =
+  ({ readonly kind: "ok"; readonly archived: boolean } & ThreadResultSummary) | ThreadDataError
+
 export type ThreadSetReasoningResult =
   | {
       readonly kind: "ok"
@@ -387,3 +402,4 @@ export type ThreadToolResult =
   | ThreadRenameResult
   | ThreadSetModelResult
   | ThreadSetReasoningResult
+  | ThreadArchiveResult

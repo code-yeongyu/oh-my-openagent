@@ -13,6 +13,7 @@ import {
   type ThreadInterruptInput,
   type ThreadRenameInput,
   type ThreadSetModelInput,
+  type ThreadState,
   type ThreadToolResult,
 } from "./contracts"
 import { createThread } from "./control/create"
@@ -141,7 +142,8 @@ export type LocatedThread = Pick<
 export type ThreadSdk = StoreExtensionApi & {
   /** `cli:<uid>`: the principal every receipt, budget and bindingless send of this SDK is keyed by. */
   readonly principal: string
-  readonly list: (request: Scoped) => Promise<ThreadToolResult>
+  /** `state`: the thread states to list; the default lists every state but archived. */
+  readonly list: (request: Scoped & { readonly state?: readonly ThreadState[] }) => Promise<ThreadToolResult>
   readonly read: (
     request: Scoped & { readonly thread: string; readonly max_bytes?: number; readonly cursor?: string },
   ) => Promise<ThreadToolResult>
@@ -444,7 +446,12 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     principal,
     list: (request) =>
       guarded(async () =>
-        listAcross(options.remote, listThreads(surface, await view(), request.all_scope), request.all_scope === true),
+        listAcross(
+          options.remote,
+          listThreads(surface, await view(), request.all_scope, request.state),
+          request.all_scope === true,
+          request.state,
+        ),
       ),
     read: (request) =>
       guarded(async () =>

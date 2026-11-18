@@ -689,6 +689,8 @@ export function createRemoteThreadFixture() {
       caller?: string
       diskSessions?: readonly string[]
       closeOutcome?: ThreadCloseOutcome
+      /** How this device's engine takes `set_session_archived`: `absent` = a host port without it, `refused` = an older engine. */
+      archive?: "absent" | "refused"
       /** Look session files up where senpi writes them, `<agentDir>/sessions`, as the component does. */
       sessionsDirectory?: boolean
       /** This device's engine refuses every open_session with this error text, as its host client throws it. */
@@ -748,6 +750,11 @@ export function createRemoteThreadFixture() {
     // The interrupt records this device's endpoint received, as b's engine's arrive in `sent`.
     const interrupts: JsonObject[] = []
     const setSessionName = mock(async (_sessionId: string, _name: string) => {})
+    const archived: Array<readonly [string, boolean, string | undefined]> = []
+    const setSessionArchived = async (sessionId: string, value: boolean, durableId?: string) => {
+      if (extra.archive === "refused") throw new Error("unsupported:set_session_archived")
+      archived.push([sessionId, value, durableId])
+    }
     // How often this device's endpoints were listed (the local enumeration a send can cost).
     let localListings = 0
     // How often a session on this device was prompted directly (a delivery never prompts; this counts any leak).
@@ -792,6 +799,7 @@ export function createRemoteThreadFixture() {
         closed.push([sessionId, durableId])
         return extra.closeOutcome ?? "closed"
       },
+      ...(extra.archive === "absent" ? {} : { setSessionArchived }),
       watchSession: async (_sessionId, handlers) => {
         watchers.add(handlers)
         let end: (reason: string) => void = () => {}
@@ -877,6 +885,7 @@ export function createRemoteThreadFixture() {
       setSessionName,
       store,
       closed,
+      archived,
       interrupts,
       agentDir,
       listings: () => localListings,

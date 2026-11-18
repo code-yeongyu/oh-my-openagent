@@ -429,12 +429,15 @@ describe("sessions controls", () => {
     })
   })
 
-  test("#given no layer stores archive state #when sessions.archive runs #then unsupported{archive}", async () => {
-    const { owner } = await onWorld()
-    expect(failureOf(await clientOn(owner.stateDir, fakeClock()).sessions.archive(LIVE, true))).toMatchObject({
-      code: "unsupported",
-      details: { feature: "archive" },
-    })
+  test("#given the live session #when sessions.archive archives then unarchives it #then each sends set_session_archived to it and answers the flag", async () => {
+    const { owner, sent } = await onWorld()
+    const client = clientOn(owner.stateDir, fakeClock())
+    expect(await valueOf(client.sessions.archive(LIVE, true))).toEqual({ archived: true })
+    expect(await valueOf(client.sessions.archive(LIVE, false))).toEqual({ archived: false })
+    expect(sent("set_session_archived")).toEqual([
+      expect.objectContaining({ archived: true }),
+      expect.objectContaining({ archived: false }),
+    ])
   })
 })
 

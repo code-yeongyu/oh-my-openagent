@@ -132,7 +132,7 @@ describe("thread tool registration", () => {
     expect(f.setModel.mock.calls[0]).toEqual(["route-peer", "openai", "gpt-x", "dur-peer"])
   })
 
-  test("registers exactly the fourteen contract tools with eval exposure", () => {
+  test("registers exactly the fifteen contract tools with eval exposure", () => {
     const tools: Record<string, unknown>[] = []
     const f = fixture()
     registerThreadTools(
@@ -150,6 +150,7 @@ describe("thread tool registration", () => {
       "thread_rename",
       "thread_set_model",
       "thread_set_reasoning",
+      "thread_archive",
       "thread_report",
       "thread_outbox",
       "thread_outbox_ack",
@@ -1401,7 +1402,7 @@ describe("receipts stored before one field named a session (#14044 4a)", () => {
       updated_at: "2026-11-01T00:00:00.000Z",
       link: "[old create](omo-thread://v1/dur-peer)",
       surface: "daemon",
-      alive: true,
+      state: "idle",
     }
     const candidates = oldCandidates.map(({ id, ...rest }) => ({ thread: id, ...rest }))
     expect(replayed).toStrictEqual({
@@ -1440,7 +1441,7 @@ describe("receipts stored before one field named a session (#14044 4a)", () => {
       updated_at: null,
       link: "[peer](omo-thread://v1/dur-peer)",
       surface: "daemon",
-      alive: true,
+      state: "idle",
       controls: ["send", "read"],
     }
     const receipts = [
