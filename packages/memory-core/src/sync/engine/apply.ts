@@ -13,6 +13,8 @@
 //     and the item doc is still at that frontier; once a capture moved past it, it stays.
 //  6. Replaying advance from any durable state, any number of times, renders each key at most once
 //     per (key, frontier) and leaves the same working tree, docs and pending ops.
+//  7. A render record carries the on-disk spelling it landed at, so staging after a crash uses the
+//     spelling HEAD tracks even when the file is already gone (a delete that landed, #12158 item 2).
 // A person's edit made after a crash is therefore captured against exactly the text it was made
 // on: the landed render (inv. 5), or the old baseline when the render never landed.
 
@@ -164,7 +166,10 @@ export async function advance(
   // Each key is read, rendered, landed and staged at its file's on-disk spelling (a new file at the
   // key's own), resolved once here from the tree as it stands when the cycle (re)starts.
   const paths = await itemPathsOnDisk(deps.repo.root)
-  const onDisk = (keys: readonly string[]): string[] => keys.map((key) => landingPath(paths, key) ?? key)
+  // The path staging must use for a key: the spelling its latest render landed at, else the fresh
+  // tree resolution. The recorded spelling wins because a delete that already landed leaves no
+  // file for the tree to resolve (inv. 7); a record without one falls back to the fresh resolution.
+  const stagedPath = (rendered: ReadonlyMap<string, RenderRecord>, key: string): string => rendered.get(key)?.path ?? landingPath(paths, key) ?? key
   const save = async (next: CycleRecord, point: "rendered" | "committed" | "checkpointed") => {
     cycle = next
     // Every key the cycle rendered no longer owes a render (#12284 review H1); same write as the checkpoint.
@@ -175,6 +180,8 @@ export async function advance(
     )
     deps.fault?.(point)
   }
+  // Each key's latest render record, which carries the spelling staging uses (inv. 7).
+  let rendered: Map<string, RenderRecord> | undefined
   if (cycle.stage === "merged") {
     const records = await journal.renders(cycle.id)
     const latest = latestByKey(records)
@@ -214,20 +221,26 @@ export async function advance(
         continue
       const text = deps.store.render(key, working)
       seq += 1
-      const record: RenderRecord = { seq, key, frontier, hash: textHash(text), text }
+      const record: RenderRecord = { seq, key, frontier, hash: textHash(text), text, path: landing.path }
       // A crash at `staged` leaves a staged file with no record at this seq; it must not survive
       // into a delete record, where a present staged file means "landed" (invariant 4).
       await removeAtomic(journal.stagedPath(cycle.id, record.seq))
       if (text !== null) await writeAtomic(journal.stagedPath(cycle.id, record.seq), text)
       deps.fault?.("staged")
       await journal.appendRender(cycle.id, record)
+      latest.set(key, record)
       deps.fault?.("render-intent")
       await land(journal, deps.repo.root, cycle.id, record, landing.path)
       deps.fault?.("render-key")
     }
-    const treeId = await deps.repo.stageTree(onDisk(cycle.keys))
+    rendered = latest
+    const treeId = await deps.repo.stageTree(cycle.keys.map((key) => stagedPath(latest, key)))
     await save({ ...cycle, stage: "rendered", treeId }, "rendered")
   }
+  // Only a cycle resumed past `merged` reads its records here; the render loop above kept them in
+  // memory, so a fresh cycle reads each record a bounded number of times (#12285).
+  const recorded = rendered ?? latestByKey(await journal.renders(cycle.id))
+  const onDisk = (keys: readonly string[]): string[] => keys.map((key) => stagedPath(recorded, key))
   if (cycle.stage === "rendered") {
     // A render-only cycle covers no new seq: its marker is its own id, so it never matches another commit's.
     const range = cycle.batches.length === 0 ? `render-${cycle.id}` : `${cycle.first}-${cycle.last}`
