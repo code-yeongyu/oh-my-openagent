@@ -34,7 +34,14 @@ function record(deliveryId: string, sessionId = "t"): Record<string, unknown> {
   }
 }
 
-function setup(options: { readonly admitted?: boolean; readonly chainCountLimit?: number } = {}) {
+function setup(
+  options: {
+    readonly admitted?: boolean
+    readonly chainCountLimit?: number
+    readonly chainCountLimitFails?: Error
+    readonly errors?: unknown[]
+  } = {},
+) {
   const h = (harness = createGatewayHarness())
   const service: FakeDeliveryService = createFakeDeliveryService({ admitted: options.admitted ?? true })
   const sessions = join(h.agentDir, "sessions")
@@ -45,7 +52,11 @@ function setup(options: { readonly admitted?: boolean; readonly chainCountLimit?
     port: service.port,
     agentDir: h.agentDir,
     sessionsDirectory: sessions,
-    chainCountLimit: async () => options.chainCountLimit,
+    chainCountLimit: async () => {
+      if (options.chainCountLimitFails !== undefined) throw options.chainCountLimitFails
+      return options.chainCountLimit
+    },
+    ...(options.errors === undefined ? {} : { onError: (error: unknown) => options.errors?.push(error) }),
     wake: async (durableId) => {
       woken.push(durableId)
     },
@@ -277,6 +288,25 @@ describe("a handed delivery", () => {
       } else expect(woken).toEqual(["t"])
     },
   )
+
+  // #12766 review L2: a limit that cannot be read fails open, so the delivery is queued as before and the failure is reported.
+  test("#given the chain count limit cannot be read #when a record is handed in #then it is queued, the session woken and the failure reported", async () => {
+    const failure = new Error("settings barrel failed to load")
+    const errors: unknown[] = []
+    const { sessions, service, woken, consumer } = setup({ chainCountLimitFails: failure, errors })
+    writeSessionFile(sessions, "t")
+    await consumer.start()
+    const reply = await service.inbound({
+      command_id: "c-1",
+      sender_device: "dev-a",
+      durable_id: "t",
+      record: { ...record("d-1"), chainCount: 9 },
+    })
+    expect(reply.data).toMatchObject({ kind: "queued", delivery_id: "d-1" })
+    await consumer.idle()
+    expect(woken).toEqual(["t"])
+    expect(errors).toEqual([failure])
+  })
 
   test("#given two sender devices that use the same command id #when both hand a record in #then each gets its own answer, keyed by its own sender device", async () => {
     const { sessions, service, consumer } = setup()
