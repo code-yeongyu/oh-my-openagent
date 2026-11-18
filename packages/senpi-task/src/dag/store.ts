@@ -2,6 +2,7 @@
 import { createHash, randomUUID } from "node:crypto"
 import * as fs from "node:fs"
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
+import { setTimeout as delay } from "node:timers/promises"
 
 import { defaultSignaller } from "../lifecycle/context"
 import { resolveStateDir } from "../store/state-dir"
@@ -111,6 +112,8 @@ export type DagFileStore = {
   readonly readResult: (runId: DagRunId, nodeId: string) => string | null
   readonly withRunLock: <T>(runId: DagRunId, operation: () => T) => T
   readonly withKeyLock: <T>(parentSessionId: string, runKey: string, operation: () => T) => T
+  /** Waits asynchronously for a run key, then executes the synchronous critical section. */
+  readonly withAsyncKeyLock: <T>(parentSessionId: string, runKey: string, operation: () => T) => Promise<T>
   readonly withTaskOwnerLock: <T>(taskOwner: string, runId: DagRunId, operation: () => T) => T
   /** Runs `operation` under the session capacity lock once `runId` fits under the active-run cap (it is not counted). */
   readonly withSessionRunCapacity: <T>(parentSessionId: string, runId: DagRunId, operation: () => T) => T
@@ -287,6 +290,8 @@ export function createDagFileStore(config: DagStoreConfig, options: StoreOptions
     },
     withKeyLock: (parentSessionId, runKey, operation) =>
       withLock(paths.keyLock(parentSessionId, runKey), undefined, operation, isProcessAlive, now, fsyncWrites),
+    withAsyncKeyLock: (parentSessionId, runKey, operation) =>
+      withAsyncLock(paths.keyLock(parentSessionId, runKey), operation, isProcessAlive, now, fsyncWrites),
     withTaskOwnerLock: (taskOwner, runId, operation) =>
       withLock(paths.taskOwnerLock(taskOwner), runId, operation, isProcessAlive, now, fsyncWrites),
     withSessionRunCapacity: (parentSessionId, runId, operation) =>
@@ -630,6 +635,40 @@ function withLock<T>(
   now: () => number,
   fsyncWrites: boolean,
 ): T {
+  const acquisition = acquireLock(path, runId, isProcessAlive, now, fsyncWrites)
+  let attempt = acquisition.next()
+  while (!attempt.done) {
+    Atomics.wait(sleeper, 0, 0, LOCK_RETRY_MS)
+    attempt = acquisition.next()
+  }
+  return runWithOwnedLock(path, attempt.value, operation)
+}
+
+async function withAsyncLock<T>(
+  path: string,
+  operation: () => T,
+  isProcessAlive: (pid: number) => boolean,
+  now: () => number,
+  fsyncWrites: boolean,
+): Promise<T> {
+  const acquisition = acquireLock(path, undefined, isProcessAlive, now, fsyncWrites)
+  let attempt = acquisition.next()
+  while (!attempt.done) {
+    await delay(LOCK_RETRY_MS)
+    attempt = acquisition.next()
+  }
+  return runWithOwnedLock(path, attempt.value, operation)
+}
+
+// Both callers share the same ownership, reclaim, and per-holder deadline rules. A yield means
+// genuine contention; the caller chooses how to wait before retrying the on-disk lock.
+function* acquireLock(
+  path: string,
+  runId: DagRunId | undefined,
+  isProcessAlive: (pid: number) => boolean,
+  now: () => number,
+  fsyncWrites: boolean,
+): Generator<void, LockHolder, void> {
   assertSafeSegment(basename(path), "lock name")
   // LOCK_WAIT_TIMEOUT_MS bounds how long we sit behind ONE unchanged holder, not wall clock: a holder
   // that changes or vanishes is the system making progress, our own reclaim I/O on a slow host is
@@ -637,7 +676,6 @@ function withLock<T>(
   // the same class. Charging any of those to the deadline made a free lock look like a timeout.
   let stalledSince = now()
   let stalledBehind: LockHolder | undefined
-  let acquiredHolder: LockHolder | undefined
   for (;;) {
     const content = JSON.stringify({
       hostPid: process.pid,
@@ -646,8 +684,7 @@ function withLock<T>(
       createdAt: new Date(now()).toISOString(),
     })
     if (tryCreateLock(path, content, fsyncWrites)) {
-      acquiredHolder = { pid: process.pid, content }
-      break
+      return { pid: process.pid, content }
     }
     const observedHolder = readLockHolder(path)
     if (observedHolder === undefined) continue
@@ -657,21 +694,20 @@ function withLock<T>(
     }
     if (observedHolder.pid === undefined || !isProcessAlive(observedHolder.pid)) {
       const outcome = reclaimObservedLock(path, observedHolder, isProcessAlive, runId, now, fsyncWrites)
-      if (outcome.kind === "acquired") {
-        acquiredHolder = outcome.holder
-        break
-      }
+      if (outcome.kind === "acquired") return outcome.holder
       if (outcome.kind === "holder_changed") continue
       if (outcome.clearedStaleMutex) stalledSince = now()
     }
     if (now() - stalledSince >= LOCK_WAIT_TIMEOUT_MS) throw new Error(`Timed out acquiring DAG lock: ${path}`)
-    Atomics.wait(sleeper, 0, 0, LOCK_RETRY_MS)
+    yield
   }
-  if (acquiredHolder === undefined) throw new Error(`Failed to acquire DAG lock: ${path}`)
+}
+
+function runWithOwnedLock<T>(path: string, holder: LockHolder, operation: () => T): T {
   try {
     return operation()
   } finally {
-    removeObservedLock(path, acquiredHolder, () => true)
+    removeObservedLock(path, holder, () => true)
   }
 }
 

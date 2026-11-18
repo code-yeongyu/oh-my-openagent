@@ -151,6 +151,36 @@ async function raceStarts(projectDir: string, prompts: readonly string[]): Promi
 }
 
 describe("createDagManager start", () => {
+  test("#given a live same-key lock #when start waits #then the event loop can release the lock", async () => {
+    // given - advance the lock deadline deterministically if a broken waiter blocks the timer
+    let clock = 1_000_000
+    const { store, dag } = manager(tempProject(), { now: () => (clock += 1_000) })
+    const runDefinition = definition()
+    const lock = store.paths.keyLock(parentSessionId, runDefinition.key)
+    fs.mkdirSync(store.paths.locks, { recursive: true })
+    fs.writeFileSync(lock, JSON.stringify({ hostPid: process.pid, token: "live-holder" }))
+
+    let acquiredBeforeRelease = false
+    const released = new Promise<void>((resolve) => {
+      setTimeout(() => {
+        acquiredBeforeRelease = runFiles(store).length > 0
+        fs.rmSync(lock, { force: true })
+        resolve()
+      }, 0)
+    })
+
+    // when
+    const [started] = await Promise.all([
+      dag.start({ definition: runDefinition, parentSessionId, rootSessionId }),
+      released,
+    ])
+
+    // then
+    expect(acquiredBeforeRelease).toBe(false)
+    expect(started.reused).toBe(false)
+    expect(runFiles(store)).toEqual([started.snapshot.runId + ".json"])
+  })
+
   test("#given a valid two node definition #when started #then a run, a key file, and one created event are persisted", async () => {
     // given
     const { store, dag } = manager(tempProject())

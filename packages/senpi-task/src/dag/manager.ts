@@ -373,7 +373,7 @@ type StartContext = {
 
 type AmendContext = Omit<StartContext, "newRunId">
 
-function startRun(params: DagStartParams, context: StartContext): DagStartResult {
+async function startRun(params: DagStartParams, context: StartContext): Promise<DagStartResult> {
   const at = new Date(context.now()).toISOString()
   const definition = params.definition
 
@@ -392,7 +392,7 @@ function startRun(params: DagStartParams, context: StartContext): DagStartResult
   const definitionFingerprint = fingerprintDefinition(definition)
 
   // (3)+(4) under the key lock so a concurrent same-key start can never create a second run.
-  return context.store.withKeyLock(params.parentSessionId, definition.key, () => {
+  return context.store.withAsyncKeyLock(params.parentSessionId, definition.key, () => {
     const existingKey = context.store.readKey(params.parentSessionId, definition.key)
     // A key whose run record is gone (retention pruned it) is stale, not a conflict: the key is
     // rewritten by the fresh run below. Conflict is reserved for a key with a LIVE divergent run.
