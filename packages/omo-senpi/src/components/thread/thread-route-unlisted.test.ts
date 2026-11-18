@@ -17,6 +17,7 @@ describe("a session command refused route_unlisted by the device holding the thr
       thread: "dur-on-b",
       closed: false,
       reason: "not_live",
+      dropped_deliveries: [],
       device: "b",
     })
     expect(a.sent.map((entry) => entry.rpc?.["type"])).toEqual(["unload_session"])
