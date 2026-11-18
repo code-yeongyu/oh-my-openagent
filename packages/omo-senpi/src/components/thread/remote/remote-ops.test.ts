@@ -739,7 +739,7 @@ describe("holderTarget: an alias holder this device cannot locate because its ow
         locate: async () => ({ kind: "refused" as const, reason: "sign_in_required" }),
       },
     } as unknown as RemoteThreadSurface
-    expect(await holderTarget(remote, { device: "b", session_id: "dur-1" }, "a", [])).toMatchObject({
+    expect(await holderTarget(remote, { device: "b", session_id: "dur-1" }, "a", [], undefined)).toMatchObject({
       kind: "error",
       error: { code: "host_unavailable", details: { device: "b", reason: "sign_in_required" } },
     })
