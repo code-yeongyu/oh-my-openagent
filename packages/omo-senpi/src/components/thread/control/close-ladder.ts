@@ -9,9 +9,14 @@ import { refuse } from "./port"
 export type RecordAnswer =
   { readonly kind: "ok"; readonly data: JsonObject } | { readonly kind: "gone"; readonly reason: string }
 
-/** The engine's refusals that mean the session was not on it when the record arrived. */
+/**
+ * The refusals that mean the session was not on its host when the record arrived: the engine's, and the device service's
+ * `route_unlisted` (relay-spec 0018 section 5: the host lists no such session right now, so nothing was dispatched;
+ * it parked after it was listed, omo#14233).
+ */
 export const SESSION_GONE: ReadonlySet<string> = new Set([
   "unknown_session",
+  "route_unlisted",
   "session_identity_mismatch",
   "session_not_attached",
   "not_attached",
