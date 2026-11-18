@@ -1,7 +1,8 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
-import type { ThreadResolveResult } from "../addressing"
+import type { ThreadResolveOptions, ThreadResolveResult } from "../addressing"
 import { relayAddressBook, relayAddressEntry, type RelayAddressBook } from "../remote/address-book"
 import { endedRow, rowThreadId, type RemoteSessionRow } from "../remote/ports"
+import { accountDevices } from "../remote/account"
 import { remoteAvailable } from "../remote/remote-ops"
 import {
   assembleAddressBook,
@@ -236,24 +237,33 @@ export function resolution(
   target: string,
   callerId: string,
   allScope?: boolean,
+  idPrefix: ThreadResolveOptions["id_prefix"] = true,
 ) {
   if (target === "self") {
     // UNKNOWN_CALLER stands for an ABSENT identity, so it must never match an entry: a thread
     // that happened to carry it as its durable id would otherwise be renamed or re-modelled by
     // any caller whose host passes no execution context.
-    const caller = callerId === UNKNOWN_CALLER ? undefined : entries.find((entry) => entry.thread_id === callerId)
+    const caller =
+      callerId === UNKNOWN_CALLER
+        ? undefined
+        : (entries.find((entry) => entry.thread_id === callerId) ??
+          entries.find((entry) => entry.session_ids?.includes(callerId) === true))
     if (caller === undefined)
       return {
         kind: "error" as const,
         ...threadToolFailure(
           "caller_context_missing",
           "The caller's durable session id is not in the thread address book.",
-          "Call thread_list and pass an explicit thread_id, or retry from a session with caller context.",
+          "Call thread_list and pass an explicit thread, or retry from a session with caller context.",
         ),
       }
     target = caller.thread_id
   }
-  return resolveTarget(entries, target, { all_scope: allScope, callerWorkspaceRoot: options.callerWorkspaceRoot() })
+  return resolveTarget(entries, target, {
+    all_scope: allScope,
+    callerWorkspaceRoot: options.callerWorkspaceRoot(),
+    id_prefix: idPrefix,
+  })
 }
 
 export function routingId(session: ThreadHostSession): string {
@@ -287,7 +297,7 @@ export async function replyOnDevice(
         "not_found",
         `The sender ${sender.session_id} is not listed on device ${sender.device}, the device its delivery came from.`,
         "Retry when that session is running on its device, or send to another thread as a normal send.",
-        { thread_id: sender.session_id, device: sender.device },
+        { thread: sender.session_id, device: sender.device },
       ),
     }) as ThreadResolveResult
   const remote = options.remote
@@ -326,7 +336,7 @@ export async function replyOnDevice(
         "host_unavailable",
         `Device ${sender.device}, where the sender's delivery came from, did not answer whether it holds ${sender.session_id}.`,
         "Retry when that device answers.",
-        { thread_id: sender.session_id, device: sender.device, reason: probed.reason },
+        { thread: sender.session_id, device: sender.device, reason: probed.reason },
       ),
     } as ThreadResolveResult
   return missing()
@@ -348,6 +358,7 @@ export async function resolveAcross(
   allScope: boolean | undefined,
   match: "exact" | "fuzzy" = "exact",
   lookup = false,
+  idPrefix: ThreadResolveOptions["id_prefix"] = true,
 ): Promise<ThreadResolveResult & { readonly all_scope?: boolean | undefined }> {
   if (match === "fuzzy" && allScope !== true && options.callerWorkspaceRoot().trim() === "")
     return {
@@ -362,7 +373,7 @@ export async function resolveAcross(
     entries: readonly ThreadAddressEntry[],
     ranked: readonly ThreadAddressEntry[] = entries,
   ): ThreadResolveResult => {
-    const exact = resolution(options, entries, address, callerId, allScope)
+    const exact = resolution(options, entries, address, callerId, allScope, idPrefix)
     if (match === "exact") return exact
     // Exact first (#13141): an id, alias or name the exact path resolves is the answer, so fuzzy only ranks what exact
     // cannot reach. The caller stays excluded, as the fuzzy scan excludes it: a handoff never targets its own sender.
@@ -446,8 +457,8 @@ async function lookupAcross(
   if (probe === undefined || (await remote.sessions.canLookup?.().catch(() => false)) !== true) return undefined
   let online: readonly { readonly device: string; readonly online: boolean }[]
   try {
-    const here = await remote.sessions.thisDevice()
-    online = (await remote.sessions.devices()).filter((device) => device.online && device.device !== here)
+    const { here, devices } = await accountDevices(remote.client)
+    online = devices.filter((device) => device.online && device.device !== here)
   } catch {
     return undefined
   }
@@ -466,7 +477,7 @@ async function lookupAcross(
     return { kind: "ok", entry: relayAddressEntry(endedRow(only.device, only.key, address)), resolution: "id" }
   if (holders.length > 1) {
     const candidates = holders.map((holder) => ({
-      id: address,
+      thread: address,
       name: "",
       cwd: "",
       preview: "",
@@ -493,7 +504,7 @@ async function lookupAcross(
         "host_unavailable",
         `No device that answered holds session ${address}, and ${silent.join(", ")} did not answer.`,
         "Retry when that device answers.",
-        { thread_id: address, devices: silent },
+        { thread: address, devices: silent },
       ),
     } as ThreadResolveResult
   return {
@@ -502,7 +513,7 @@ async function lookupAcross(
       "not_found",
       `No online device of this account holds session ${address}.`,
       "The session may live on a device that is offline: retry when that device is online, or call thread_list.",
-      { thread_id: address },
+      { thread: address },
     ),
   } as ThreadResolveResult
 }

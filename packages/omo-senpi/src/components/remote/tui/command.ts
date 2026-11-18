@@ -212,16 +212,25 @@ function succeeded(ui: RemoteCommandUi, verb: string, target: string, answer: Om
     if (line !== undefined) ui.notify(line, "error")
     return false
   }
-  const failure = typedFailure(parsed(answer))
+  const value = parsed(answer)
+  const failure = typedFailure(value)
   if (answer.code === 0 && failure === undefined) return true
   const stderr = answer.stderr.trim()
-  ui.notify(failure ?? (stderr !== "" ? stderr : `omo remote exited with code ${String(answer.code)}`), "error")
+  // `enable` that stops prints {state, notice} on stdout and exits 3 (omo-native remote-bootstrap.ts): the notice says why.
+  const notice = isRecord(value) && typeof value["notice"] === "string" ? value["notice"] : undefined
+  ui.notify(
+    failure ?? notice ?? (stderr !== "" ? stderr : `omo remote exited with code ${String(answer.code)}`),
+    "error",
+  )
   return false
 }
 
 function show(ui: RemoteCommandUi, verb: string, target: string, answer: OmoRun): void {
   if (!succeeded(ui, verb, target, answer)) return
   ui.notify(rendered(verb, target, parsed(answer)).join("\n"), "info")
+  // A verb that succeeds can still say something on stderr (enable: device not linked, a session-host notice).
+  const stderr = answer.stderr.trim()
+  if (stderr !== "") ui.notify(stderr, "warning")
 }
 
 function rendered(verb: string, target: string, value: unknown): readonly string[] {
@@ -247,10 +256,9 @@ function unansweredOf(value: unknown): readonly string[] {
 }
 
 function sessionVerbLines(verb: string, target: string, result: Record<string, unknown>): readonly string[] {
-  if (verb === "open" && typeof result["thread"] === "string") return [`Opened ${result["thread"]}.`]
-  if (verb === "open" && isRecord(result["thread"])) {
-    const { device, thread_id: id } = result["thread"]
-    return [`Opened ${typeof device === "string" ? `${device}/` : ""}${String(id)}.`]
+  if (verb === "open" && typeof result["thread"] === "string") {
+    const device = result["device"]
+    return [`Opened ${typeof device === "string" ? `${device}/` : ""}${result["thread"]}.`]
   }
   if (verb === "send") {
     const reply = result["reply"]
@@ -263,6 +271,14 @@ function sessionVerbLines(verb: string, target: string, result: Record<string, u
   if (verb === "close") return [result["closed"] === true ? `Closed ${target}.` : `${target} was not open.`]
   if (verb === "model" && isRecord(result["model"]))
     return [`${target} now uses ${String(result["model"]["provider"])}/${String(result["model"]["id"])}.`]
+  if ((verb === "enable" || verb === "disable") && typeof result["enabled"] === "boolean")
+    return [`Remote sessions are ${result["enabled"] ? "on" : "off"} for this device.`]
+  if (verb === "control" && typeof result["attached"] === "boolean")
+    return [
+      result["attached"]
+        ? "Remote control is on: your other signed-in devices can view and command sessions on this device."
+        : "Remote control is off: your other devices cannot view or command sessions on this device.",
+    ]
   return [JSON.stringify(result)]
 }
 
