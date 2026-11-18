@@ -1,3 +1,181 @@
+## 2026-11-18 - Same-device cross-project messaging leaves the relay leg alone (#14199)
+
+- **A same-device thread in another workspace is never answered as cross-device**
+  - `src/components/thread/addressing.ts` `resolveTarget`: with no visible name match and same-device (`transport === undefined`) out-of-workspace entries carrying the name, the scoped answer is `scope_denied` (candidates when more than one) naming `all_scope`, after the `id_prefix` step - the name-ladder mirror of the id ladder's existing branch. A name a thread on this device holds must not read as absent, or `resolveAcross`'s relay leg answers for it: on a plan without a relay, with `relay_requires_paid_plan` for a thread one `all_scope` retry away (a Discord report: OmO Desktop, two project folders, one Mac).
+  - No change to the default workspace scope of `thread_list` (#8025 stands), none to the paid-plan refusal for addresses this device cannot hold (A5), none to delivery: the `all_scope` retry resolves the same entry and the local transport carries it, no relay round trip.
+  - Tests: `addressing.test.ts` (the scope answer, its candidates, the id-prefix precedence, the plain `not_found`), the new `thread-free-plan-cross-workspace.test.ts` (the free-plan fixture: scoped name send answers the scope hint, all_scope delivers locally with nothing sent to any other device, the all_scope listing keeps its `remote_unavailable` notice, a configured-but-failing relay still answers `host_unavailable`), and the live driver `scripts/qa/thread-tools/free-plan-cross-workspace.mjs` (one real rpc host, two project cwds, the eval-only cells).
+
+## 2026-11-18 - Release train 2 top: thread tool fixes (#14141)
+
+- **No hint for the removed chat-binding tools (#14042)**
+  - `src/components/thread/tools/relay-tools.ts`, `tools.ts`: `REMOVED_RELAY_TOOL_HINTS` and its registration are removed. The relay SDK, the gateway store and the `omo thread` CLI are unchanged.
+- **Replies reach a remote sender whose delivery names no device (#14052)**
+  - `src/components/thread/tools.ts` `locate`: a reply to a consumed sender without an attested device first resolves on this device as before. When that resolution is `not_found`, the reply runs `resolveAcross` instead. A row on another device is accepted only when its durable id is the sender's id, and is refused `reply_target_mismatch` otherwise. When this device's entries and the account listing together put that id on more than one device, the reply is refused `ambiguous_target` naming them, whatever order the listing returns (`unattestedSenderAmbiguity`). `tools/reply-target.ts` `replyTargetFailure` is the refusal `replyTargetMismatch` returns. Senders with an attested device (`device:<device>/<id>`) are unchanged.
+- **Thread_create's first prompt carries the creator's authority (#14058)**
+  - `src/components/thread/gateway/types.ts`: `DeliveryEnvelope.authority` (`"creator"`), stored in the envelope JSON.
+  - `src/components/thread/tools.ts`: only thread_create's first prompt to the thread it made sets it.
+  - `src/components/thread/gateway/{transport,local-transport,engine,store-ops}.ts`, `remote/relay-transport.ts`: both transports carry it.
+  - `src/components/thread/gateway/provenance.ts`: a creator delivery renders as the body, then one line naming the creator session; its display text is the body.
+- **Close the thread remote surface on session_shutdown (#14062)**
+  - A thread tool call that reaches the device service (`thread_list` with `all_scope`, any cross-device read or send) opened the default remote surface's own device-service connection, and nothing closed it. Its socket is referenced, so a print-mode engine stayed alive after its last session ended (#14054). `createThreadComponent` now closes the surface it built on `session_shutdown`, next to the gateway store it already disposes there. A later call reconnects lazily. A component test spawns an engine-shaped process against the conformance fake device-service owner and asserts it exits by itself after `thread_list` and `session_shutdown`.
+- **Read and controls find a session another device holds but runs nowhere (#14087)**
+  - `src/components/thread/control/locate.ts` `locateControl`: resolves with the account-wide session-id lookup (`resolveAcross(..., "exact", true)`, #13037 A4.3.3) that a send, a reply and a hand-off make. A session id that this device and the account listing both miss is probed once on each online device. The holder's `ended` row takes the existing `not_live` branch, so `thread_read`, `thread_interrupt`, `thread_rename`, `thread_set_model` and `thread_set_reasoning` answer `not_resumable`, and `thread_close` answers `{ closed: false, reason: "not_live" }`, on both legs (part of #13215). The tools never make the probe for a name or alias, or when this device's service lacks the capability.
+
+## 2026-11-17 - thread_create survives a lost open reply (#14066)
+
+- `src/components/thread/control/session-host.ts`: `createdThreadId` derives the id a create on this device opens its thread under, from the caller and the idempotency key.
+- `src/components/thread/tools.ts`: thread_create opens with `durableSessionId`, reuses or reopens a thread already under that id, looks again after a failed open, and re-runs a create whose earlier run under the key failed only when the thread the key derives is on this device; a named retry is not refused by its own thread's name.
+
+## 2026-11-17 - Release train top: thread tools, remote command deadline, paged and local thread_read (#14077)
+
+- **Thread tools: one field names a session (#14056)**
+  - `src/components/thread/contracts/results.ts`: `ThreadResultSummary` is the model-facing row (`thread`, no endpoint internals); every result type carries `thread`. `ThreadSummary` stays the address-book shape with `thread_id`.
+  - `src/components/thread/tools/thread-row.ts`: `threadRow` projects an address-book summary to that row; `openedResult` is `thread_create`'s flat answer. `thread_list`, `thread_create`, `thread_handoff` and the cross-device merge (`remote/cross-device.ts`, which adds `machine`) go through it.
+  - `src/components/thread/control/port.ts`: `controlIdentity` answers `thread`. `sdk.ts`: `send` answers `thread` (`ThreadSdkSendResult`).
+  - `src/components/thread/addressing.ts`: `ThreadCandidate` names the session `thread`; `remote/remote-ops.ts` `holderDetails` names an alias holder `{ thread, device }`; `gateway/engine.ts` `turn_conflict` details say `thread`. `contracts/results.ts`: `ThreadGatewayDeliveryFacts` has no `endpoint`.
+  - `src/components/thread/thread-field.test.ts`: scans every verb's schema, and every value in the model-facing text of real calls, successes and refusals: a session id under any key but `thread`, or an endpoint internal anywhere, fails.
+- **A remote command always settles (#14041)**
+  - `device-service-core` `src/remote-attach.ts`: `RemoteAttach.command` takes `waitMs` (default 120 s) and rejects `request_timeout` with its `command_id` when no final state arrives; it waited forever before. `src/device-service.ts` keeps `waitMs` when it drops the wake mark below the minimum.
+  - `src/components/remote/port/device-service.ts`: `get_state` and `get_messages` pass a 30 s `waitMs`.
+- **Paged thread_read for threads on other devices (#14053)**
+  - `src/components/thread/remote/transcript-tail.ts`: `readContextTail` reads the newest entries with `get_entries` (`tail`, then `before`, up to 256 entries / 512 KiB per page), keeps them per (port, device, session) under a byte bound (16 MiB per port, nothing above 4 MiB per session), and refreshes them with `since`. A device without `get_entries` reads `get_messages`; a page refused for its fields or size falls back for that read only.
+  - `src/components/thread/remote/context-tail.ts`: projects the fetched entries along the holder's leaf with senpi's `buildSessionProjection` and decides when they determine the context's tail (root reached, 60 messages after the latest fetched compaction, or that compaction's first kept entry fetched).
+  - `src/components/thread/remote/default-remote.ts`, `remote/ports.ts`, `remote/port/lazy-remote.ts`: the extension's remote surface carries the engine's projector (`loadProjector`); the CLI surface has none.
+  - `src/components/thread/paged-reader.ts`: `selectEntryPage` applies the live reader's window and byte budget; entry cursors bind the leaf.
+  - `src/components/thread/tools/read-ops.ts`: `readLive` tries the control's `readEntryPage` before `getMessages`.
+  - `src/components/thread/read-budget.ts`: the shared byte-budget rule, moved out of `reader.ts`.
+  - `src/components/remote/port/device-service.ts`: `get_entries` is a read-only record (failures are typed refusals).
+- **thread_read wait_ms on this device (#14061)**
+  - `src/components/thread/control/wait-settled.ts`: `waitForTurnEnd`, the #13417 wait (turn end observed, deadline and abort, 3 s quiet rule), moved out of `relay-control.ts` so both legs run one body over their own watch.
+  - `src/components/thread/live-surface.ts`: `watchSession` follows one session on the endpoint's observing `subscribe_sessions` stream (snapshot row, `session_status` deltas, mirrored `agent_start`/`turn_start`/`agent_settled`; never an attachment). While the session runs, one observing `get_state` reads `currentTurnId`, and the records held meanwhile carry it.
+  - `src/components/thread/control/local-control.ts`: `waitSettled` over `watchSession`; `read-ops.ts` drops the `unsupported` branch; `SessionControl.waitSettled` is required.
+  - `senpi-task` `withRpcSocket` takes `listen` (uncorrelated frames and the connection's end); the contract host answers `subscribe_sessions`.
+
+## 2026-11-17 - thread_create reopens an exited thread; an empty create is refused (#14063)
+
+- `src/components/thread/tools.ts`: thread_create's `locate` resolves over the send address book (session files an id or name names) and runs the A4.3.3 account probe. A create with no prompt, name or alias is refused before placement.
+- `src/components/thread/addressing.ts`: `notFound` answers a durable-id miss without the sessionId hint.
+
+## 2026-11-17 - dev fmt, knip, bundle-inputs and EQ.omo golden reds from #14023 and #14024 (#14026)
+
+`dev` at e060760dd2 had four reds. Three come from 10b8d36a54 (#14023) alone: `scripts/qa/bunshin-ts-eval-sdk-qa.mjs` was not formatted (`bun fmt --check`), `BUNSHIN_NODE_AGENT_ENTRY` in `src/extension/sdk-root-provisioning.ts` was an unused export (`knip:check`), and `bundle-inputs.json` lacked the two `src/components/js-kernel-guard` sources (`bundle-inputs:check`). The fourth, the stale linux-x64 EQ.omo goldens (`--compare` 0/4), comes from both #14023 (bunshin hint, `js_kernel_guard`) and #14024 (`thread_*` addressing text). The script is formatted, the constant is module-local, and `bundle-inputs.json` plus `plugin/extensions/omo.js` are regenerated on Linux (bun 1.4.4, node 24); `omo.js` is 1,499,760 B against the 1,501,843 B ceiling. The linux-x64 EQ.omo goldens (`scripts/qa/fused-equivalence-golden/linux-x64/E21-E24.json`, `baseline.json`) are re-recorded at `dev` e060760dd2 with CI's recipe (`fused-equivalence-e2e.mjs --record --repeat 2`, senpi harness 5ab795e339): with those texts recorded, `--compare` goes from 0/4 to 4/4. The darwin-arm64 goldens are not compared in CI and were already recorded at an older `dev`; they are left as they are.
+
+## 2026-11-17 - Thread rename and close accept this session and session ids (#14024)
+
+- `src/components/thread/addressing.ts`: after the durable `thread_id`, an exact `session_ids` hit resolves as an id. Two hits are `ambiguous_target` and list the durable ids. A session-shaped miss says the query is a `sessionId` and names visible durable ids.
+- `src/components/thread/address-book.ts` and `remote/address-book.ts`: a routing or listing id that differs from the durable id is kept on the address entry.
+- `src/components/thread/tools.ts`: `thread_rename` and `thread_close` treat a missing `thread` as `self`.
+- `src/components/thread/control/operations.ts`: a close that ran answers `reason: "closed"` or `reason: "not_live"` next to `closed`.
+
+## 2026-11-17 - JS cells survive process.exit and the bunshin-ts SDK path is quoted (#14023)
+
+- `src/components/js-kernel-guard/`: an eval-only prelude replaces `process.exit` for cell code. The kernel's own exit binding, captured at process start, is unchanged. A cell that exits throws `ProcessExitInCell` and the next cell still sees globals set before the call.
+- `src/extension/sdk-root-provisioning.ts`: the bunshin hint tells the model that bash inherits `OMO_BUNSHIN_TS_SDK_ROOT`, that the expansion must be `"$OMO_BUNSHIN_TS_SDK_ROOT"`, and that `scripts/node/bunshin-node.mjs` is the node-agent executable.
+
+## 2026-11-17 - Session-facing relay next actions name session tools, not the shell (#13972)
+
+- `src/components/thread/gateway/relay.ts`: the `scope_denied`, `not_found`, `idempotency_uncertain` and fallback next actions now point at `thread_report` without `binding_id` (the gateway's binding) or `thread_outbox`. The relay does not know its caller there, and a session reaches all of them. `binding_conflict` and `stale_revision`, which only the gateway's or the CLI's bind/rebind/unbind return, keep the CLI wording.
+- `tools/relay-tools.ts`: the relay tools' `internal_error` next action likewise.
+- `gateway/relay.ts`: refusals whose cause or caller the code alone does not tell carry their own next action through `fromStore` overrides. A `thread_answer` whose question has left the outbox says to read `thread_outbox` for a newer question. A `not_found` from unbind or rebind, which only the gateway or the CLI calls, keeps `omo thread bindings`. A connector's `inbound` through an unknown binding is told to deliver through the binding the gateway keeps for the chat now.
+
+## 2026-11-17 - The chat-binding tools leave the session tool list (#13942)
+
+- `src/components/thread/metadata.ts`, `contracts/params.ts`, `contracts/fields.ts`, `contracts/results.ts`, `tools/relay-tools.ts`: `thread_bind`, `thread_unbind`, `thread_rebind` and `thread_bindings` are removed, together with their schemas, result types and the session-address resolver only they used. The relay SDK (`gateway/relay.ts` `bind`/`unbind`/`rebind`/`bindings`), the store and the CLI are unchanged.
+- `gateway/relay.ts`: the `next_action` texts that named those tools now point at the binding the gateway keeps and at `omo thread bindings|bind`. The store receipt operation names are unchanged.
+- Why: the gateway owns chat routing (it writes bindings through the relay SDK as its own principal), and no session, skill or script called the tools.
+- `src/components/thread/tools/relay-tools.ts`: `REMOVED_RELAY_TOOL_HINTS`, registered by `registerThreadTools` (`tools.ts`) through `pi.registerRemovedToolHint` when the engine has it (`ExtensionToolHost`), the way `ulw-loop` and `task` hint their removed tools.
+- `gateway/relay.ts`: the `binding_inactive` next action, which a session gets back from `thread_report`, no longer tells it to bind the chat itself.
+- `knip.workspace.jsonc` and `script/knip-coverage-baseline.jsonc`: the `contracts/params.ts` entry no longer names the four removed param schemas.
+
+## 2026-11-16 - thread_create's first prompt failure keeps the created thread (#13825)
+
+Review L1 of #13748 at 0571de8: `tools.ts` `firstPrompt` caught only typed refusals; a delivery that threw (gateway store or settle error, `gateway/engine.ts`) reached `execute`'s catch, so a create that had opened a thread answered `internal_error` with no thread id and its receipt settled as an error (a same-key retry answered `idempotency_uncertain`, a new-key retry opened a second thread). It now catches the throw and answers it as the result's `prompt.error` (`internal_error`, `details.thread_id`). Test: `control/thread-create-options.test.ts` "the prompt's delivery throws" (fixture `admitThrows`).
+
+## 2026-11-16 - The bunshin SDK hint needs a device sense and carries the only-discussed guard (#13467, fixes #13446)
+
+`components/skill-pointers/index.ts`: the bunshin target's keyword `fleet` is replaced by two forms. The owner form is `(?:my|our)\s+fleets?`, and it counts only when followed by the end of the text, punctuation or a function word, so a modifier or a vehicle fleet ("our fleet management UI", "our fleet of delivery trucks") does not fire. The machine-noun form is `fleet[\s-]+(?:machines?|devices?|hosts?|nodes?|box(?:es)?)`; it allows a hyphenated host-name suffix such as `fleet-node-3`, and `hosts` before an article is read as the verb. `bunshin` and `machine mesh` are unchanged.
+
+The pointer text now opens with a conditional ("If the user of this session is asking to run work on their machines") and ends with the shared `ignoreWhenOnlyDiscussed` sentence. `skillPointer` and the conditional `companionPointer` now build from that sentence too, byte-identical to before; these pointer-text builders live in `skill-pointers/pointer-text.ts`.
+
+`Fleet status please`, and other fleet wording with no device sense, no longer inject the hint. `packages/omo-senpi/AGENTS.md` names these triggers and says a bare `fleet` does not fire. This folds in review follow-ups #13780 and #13863.
+
+## 2026-11-16 - /remote renders enable, disable and control (#13796)
+
+`components/remote/tui/command.ts`: `sessionVerbLines` renders `{enabled}` (enable, disable) and the control state `{attached}` as sentences; anything else still falls back to its JSON. `show` adds the CLI's stderr as a warning after a successful result; `succeeded` shows a failed answer's `notice` (enable exits 3 with `{state, notice}` on stdout, omo-native `remote-bootstrap.ts`) before stderr and the exit code. Tests assert note type, count and the deadline handed to the runner instead of pinning notice wording.
+
+## 2026-11-14 - `thread_interrupt` stops the interrupted turn's background jobs
+
+- `src/components/thread/control/interrupt.ts` (new): `interruptOver`, the one interrupt body of both legs. It sends the engine's `interrupt` record with `background: "stop"` and reads the reply into `{ interrupted, turn_id, background }`; a reply with no `background` (an engine before senpi's `interrupt { background }`) reads as `not_supported`.
+- `src/components/thread/control/local-control.ts` and `control/relay-control.ts`: `interrupt` is `interruptOver` over this device's endpoint (`port.interrupt`) and over the device service (`sessionCommand`) respectively; neither builds its own record or parses its own reply any more.
+- `src/components/thread/tools/ports.ts`, `live-surface.ts`, `lazy-live-surface.ts`: the endpoint port's `interrupt` takes the request fields and answers the engine's reply data.
+- `src/components/thread/contracts/results.ts`, `control/operations.ts`, `control/port.ts`: the `thread_interrupt` result carries the typed `background` (`ThreadInterruptBackground`).
+- Why: measured on a remote thread, the interrupted turn's auto-detached `sleep 60` kept running, its completion woke the thread about 60 s later and the thread replied anyway.
+
+## 2026-11-16 - bunshin-ts SDK: typed fanout-run errors and resultOf naming (#13813, follow-up to #13744)
+
+`typedClient` returns the fanout run behind a proxy that types the run's own failure (`fanout on the fleet`) and every per-target error the runner made, such as a `FanoutTimeoutError` (`fanout on <device>`), while an error the callback threw passes as thrown; the machines in its outcomes and result are typed too. `FanoutOptionsError` and `FanoutDuplicateTargetError` map to `invalid_arguments`, `FanoutTimeoutError` to `timeout`. Only device-addressed calls (`getMachine`, `listTools`, `getPolicy`, `setPolicy`) use their first argument as the device; `resultOf` reports the fleet and puts its argument in `details.request_id`. New test: `bunshin-ts-fanout-errors.test.ts` (unknown target awaited and iterated, duplicate target, invalid options, per-target timeout, a callback's own error, `resultOf`); `bunshin-ts-sdk.test.ts` checks that the relay transport's new surface is exposed and typed through the SDK entry.
+
+## 2026-11-11 - Remote open_session rides the endpoint dialer, and borrowed connections stay open (#13761, adopting #13075)
+
+`endpointCommand` in `device-service.ts` sends an `open_session` through `dialEndpoint` (a fresh owned connection per call by default) and closes it in `finally` only when owned; every other record rides the long-lived connection; a borrowed connection (the CLI's shared one, `owned: false`) is left open for its owner. The attach that follows still rides the long-lived connection, which then carries one copy per delta. `device-service.test.ts` pins the split: the open leaves a borrowed connection open for the model set that follows. `device-service-watch.test.ts` pins the duplicate: one copy with the per-call dialer, two without it.
+
+## 2026-11-16 - thread_create carries the launch profile and the first prompt (#13748)
+
+`contracts/create-params.ts`: `model` (exact provider/id), `reasoning`, `permission_preset`, `prompt`, `delivery`, all for a new thread only (`control/create-launch.ts` refuses them with `thread`, a `delivery` without `prompt`, a model that is not provider/id, and a `permission_preset` wider than the creator's, before anything opens). The model and level ride on the `open_session` frame as senpi's launch profile (`provider`, `modelId`, `thinkingLevel`) on both legs (`SessionOpenRequest`, `ThreadHost.openSession`), so senpi's `model_unavailable` refusal (open-session-model.ts) creates nothing; `control/open-reply.ts` `modelRefusal` maps it to `model_not_found` with `details.reason: "model_unavailable"` on the relay leg and from the local host's thrown text (worktree discarded first). `contracts/permission-presets.ts` holds senpi's preset list and `presetWithin`, the allows-no-more order (full-access > workspace > accept-edits > read-only > ask; auto only between full-access and ask; an unknown creator may ask only for ask). `tools.ts` `firstPrompt` delivers `prompt` through `deliverThrough` to the created thread itself (device + durable id, never a name lookup, #13001) under `<create key>:prompt`; a replayed create answers its stored result, so it is sent once per key. The result's `prompt` is the delivery or `{ error }`; the thread stays created. Test: `control/thread-create-options.test.ts`. `remote/device-service.ts` `attachAddressed`: a durable id (a UUID) is located first and never sent to `session.attach` (a device service refuses it `invalid_request` since relay-daemon#1350, and crashed on it before); any other address is attached as typed and located once when the attach refuses it (`session_not_found` or `invalid_request`), so every verb accepts the id `open` printed (omo#13707); the port and `omo remote attach` share it. `remote/address-book.ts` `createdDeviceRow` addresses a just-created remote session by its open reply's relay key. Tests: `remote/device-service.test.ts`.
+
+## 2026-11-16 - bunshin-ts SDK: typed device operation failures (#13744, fixes #13406)
+
+`bunshin-ts-errors.ts` holds `BunshinSessionError` (moved from `bunshin-ts-pick-transport.ts`, still exported under the same name) with the thread tools' failure shape plus `uncertain` and `details`, and `deviceOperationError`, which classifies a rejection by its wire code (relay op-result codes 1:1, hub and relay transport codes by recovery class) or by the vendored error class name. `bunshin-ts-typed-machine.ts` wraps the lazy client and every machine it hands out (fanout callbacks, `withToken` / `withTask` / `tool()` results included); `createLazyBunshinClient` classifies a connect failure as `host_unavailable`. New test: `bunshin-ts-device-errors.test.ts` (operation x bad argument / offline / denied / transport lost, every relay code, the fs.read decode error, connect, `no_transport`).
+
+## 2026-11-16 - Remote wake and wait (#13743)
+
+`remote/remote-watch.ts` (watch v2, from the closed #12725): `RemoteSessionsPort.watch(device, session, handlers, options)` follows a session across attach ends, device-service restarts and engine restarts (re-attach with 1 s to 30 s backoff, resync from a fresh `get_state`, re-locate by durable id), deduplicates by stream seq and turn id, and bounds its queue at 256 records. `remote/attach-pool.ts` refcounts the one attach per session and detaches it 600 s after its last holder. `remote/monitor-source.ts` serves senpi's `RpcRemoteSource` seam, registered by `remote/lazy-ops.ts` `registerRemoteMonitorTargets`. `control/relay-control.ts` `waitSettled` backs `thread_read` `wait_ms` and settles only on an observed turn end (or 3 s of no run at all); a thread on this device answers `unsupported`. `followRemote` (`omo remote send`) still ends on a gap with its reason. `device-service-core` carries optional per-record `seqs` on `session.records`.
+
+## 2026-11-16 - /remote in the TUI (#13412)
+
+`components/remote/tui/` registers `/remote` (component `remote`, after `device-service`). Each action runs one `$OMO_BIN remote <verb> --json` process through `run-omo.ts`, the only spawn helper, imported only by `command.ts` (design v8-core r2 B5, guard G4b), and renders the typed answer: a `{kind:"error"}` result shows its message and `next_action`, an exit without JSON shows the CLI's stderr. `send` puts the text after `--`. With no absolute `OMO_BIN` the command says so and spawns nothing. **Must not break:** no device-service client or local-API connection enters the engine bundle from this component.
+
+## 2026-11-13 - A replaced desktop account ends, and a begin that crosses a retirement owns nothing (#13327 review follow-up)
+
+- **An account that is no longer current ends.** `desktopSyncAccount.ts` `isCurrent()` ends the account (aborts its signal) when it answers false: main's describe or durable record moved on without a `retired` event. Its `retired` listener leaves the channel, and the resolver's `onEnded` ends sessions on it once; before, it stayed on the channel with a live signal until the next `retired` or the channel's end.
+- **Session Workers.** `workerPort.ts` counts main's `retired` events; an `operationBegin` whose reply arrives after a retirement it was sent before is refused to the Worker and its handle is never owned, so the host never forwards that dead handle to main.
+- The rollover test now asserts a refused describe reads signed out (`null`) on both threads exactly; on the main thread that is #13329's refusal mapping, which this follow-up merges.
+- **Must not break:** an account the account source has replaced must not keep listening on the channel; a handle begun for a retired account must never be owned.
+
+## 2026-11-14 - thread tools: one answer on this device and on another one
+
+`control/locate.ts` resolves a control tool's address against the send address book (`sendAddressBook`: the session files an address names are looked up when no endpoint lists it), so the control tools and `thread_send` find the same threads; `tools/read-ops.ts` reads any not-running thread that has a session file here, not only one whose endpoint died. `control/session-host.ts` `openedThread` is the one create summary both session hosts answer. `control/local-session-host.ts` `workspaceNote` adds the out-of-workspace note to a thread this device opened.
+
+## 2026-11-14 - thread_create: device, folder and worktree (#13393, #13408, #13400)
+
+`thread_create` on another device returns the durable id (`control/relay-session-host.ts` reads the engine's `state.sessionId`). Placement is split: `remote/plan-create.ts` (device and session) and `remote/create-folder.ts` (relative `cwd`, worktree preconditions). `worktree/` holds the worktree creation (`thread-worktree.ts`, typed reasons in `failures.ts`), the `omo.thread.worktree` extension request another device's thread_create sends (`worktree-rpc.ts`, registered with the initial skills in `create-receivers.ts`), and its client over the relay (`remote-worktree.ts`: a short-lived session in the repository folder, the request, the close ladder). `ThreadCreateParams` moved to `contracts/create-params.ts`.
+
+## 2026-11-13 - A desktop refusal on the main-thread channel reads as signed out (#13325 follow-up)
+
+- `desktop-sync/channel.ts` rejects a `{ok: false, reason: "refused"}` reply with `DesktopSyncRefused` (desktopSyncProtocol.ts), the class a session Worker's port already used. It used to reject with `DesktopSyncUnavailable`, so on the main thread `selected-account-source.ts` rethrew a signed-out desktop's refusal instead of reading it as signed out (null), and the sync runner saw an error.
+- Unchanged: a broken channel (disconnect, malformed or foreign frame, unknown reply id, more than 64 in flight, closed lifetime) still rejects with `DesktopSyncUnavailable`.
+- **Must not break:** a refusal must not close the channel; the account source maps only `DesktopSyncRefused` to signed out.
+
+## 2026-11-13 - An account rollover on the desktop's private channel no longer ends memory sync (#13325)
+
+- **`retired` ends the account, not the channel.** `desktop-sync/channel.ts` hands a `retired` event to its listeners and keeps the channel open; a closed stream (and a malformed or foreign frame) is still the only permanent end.
+- **The account owns the end.** `openDesktopSyncAccount` gives each account its own signal: the channel's signal plus main's next `retired` event, listened for before the descriptor request so an account whose describe raced its retirement ends too. Its boundary, operations, subscription and `isCurrent` use that signal, so the resolver's `onEnded` ends open sync sessions on the old account exactly once, and the selected account source's next resolve opens main's next account (or reads signed out while main refuses).
+- **Session Workers.** `workerPort.ts` forwards `retired` to every Worker port (other events stay scoped to the port's own handles) and forgets the port's handles, which died with the account.
+- **Mixed versions.** A desktop that still closes the stream on retirement leaves the engine as before (unavailable until restart). A desktop that keeps the stream and sends `retired` gets the new account on the next resolve; an engine before this change reads that `retired` as the end of the channel, as before.
+- **Must not break:** do not close the channel on `retired`; do not let an account outlive the channel.
+
+## 2026-11-12 - A fuzzy handoff resolves exact names first and ranks ended remote rows with every other candidate (#13141, follows #13066)
+
+`tools/internals.ts` `resolveAcross`: for `match: "fuzzy"` the exact ladder (`resolveTarget`: id, alias, name) runs first over local entries plus every account row, ended ones included, and its hit is the answer unless it is the caller. Otherwise `fuzzyMatch` ranks one set: local entries, the account's live rows and the ended rows `fuzzyContenders` (`addressing.ts`) keeps, those scoring at least the accept floor minus the margin (0.64), the only ones that can lead or block a leader. The 500-candidate cap applies to that set. Review fix at 54e5b128ab: ended rows were compared only when local plus live answered `not_found`, so a live row at or above 0.72 beat an ended row that matched better or exactly ("release planner" went to the live "release planner notes", while exact reached the ended "release planner"). Tests (`remote/route-parity.test.ts`): "600 ended remote rows + unique local" (non-contending ended rows stay out of the cap), "live remote exact title beats a local near-match", "only an ended remote row matches" (fuzzy and exact reach it through the same relay calls), "an ended row named exactly as the query and a live near-match" (RED at 54e5b128ab: sent to dur-on-b; fuzzy and exact relay calls now `toStrictEqual`), unequal scores in both directions (RED at 54e5b128ab for the better ended row), "a live and an ended row match equally" now `ambiguous_target` with no send (54e5b128ab sent to the live row; the exact path refuses two rows sharing a name), and exact/fuzzy parity on a local exact name with a remote near-match.
+
+## 2026-11-12 - A claim that asks for a sign-in after the create names the thread locally (#13179, follows #13112)
+
+`remote/cross-device.ts` `claimCreatedAlias` (the claim half of `withAlias`, exported through `live-surface.ts` and `remote/lazy-ops.ts`) answers `{ local: "sign_in" }` when the post-create claim answers `alias_registry_unavailable` with reason `sign_in`; `withAlias` keeps its old behaviour for an opened thread. `tools.ts` `thread_create` then names the created thread by the trimmed alias through `nameCreatedThread` (the create's `checkNameConflict` against the device's other threads, then the located control's `setName`), unless `name` was given; a refused name keeps the thread as created and adds `local_name_unavailable` with the refusing code (`contracts/results.ts` `ThreadLocalAliasNote`). `renameAlias` answers `{ local: "sign_in" }` when the claim or rename itself asks for a sign-in. The no-account create path trims the alias it uses as the name, as `thread_rename` does. Tests: `thread-local-alias-claim.test.ts` (fixture `claimDown`), the padded-alias cases, and an alias-only `thread_rename` on a relay target with no alias registry in `thread-local-alias.test.ts`.
+
+## 2026-11-11 - An alias no account can hold becomes the thread's local name (#13112, fixes #13104)
+
+`remote/cross-device.ts` `planCreate` no longer ends `thread_create` when the alias registry answers `alias_registry_unavailable` with reason `sign_in`, the remote surface has no alias registry, or there is no remote surface. A new thread is still placed, and the plan carries `localAlias` with the reason. `tools.ts` names the thread by the alias unless `name` is given, runs the normal `name_conflict` check, skips the claim, and adds `alias_scope: "local"` and `alias_unavailable: "sign_in" | "no_registry" | "no_remote"` (`contracts/results.ts` `ThreadLocalAliasNote`). `renameAlias` answers `{ local }` without changing anything, and `thread_rename` then makes the alias the name. Opening an existing thread with an alias, and every other registry failure, are unchanged. The desktop's own sign-in path for account-wide aliases is #13105.
+
 ## 2026-11-10 - The reply allowance lasts for the work a delivery started (#13042, part of #12996)
 
 `component.ts` `noteInput`: a custom message that is no delivery (an engine-started turn) keeps `replyTo`, `replySenders`, `chainHop` and `cause`; after a final answer, a user-role message or any delivery clears them (the new delivery re-adds its own sender; nothing of the earlier group survives), and an engine-started message after the answer clears `consumed` whether or not the settle ran first; `agent_settled` no longer clears them; it still clears `consumed` (a report without `binding_id` after the run must name its thread, as before) and sets `local = false`, `answered = true`. The same-account bound is not enforceable here: a delivery's details carry sender, remote_origin and chain_count, no account fact; it rests on the engine's admission letting no cross-account agent delivery through (not verified in this change). Tests: `peer-reply.test.ts` decision table gains after_settle (kept), the engine-started turn (kept) and the person's message (ends), per leg; a new case per leg for another sender's delivery starting new work (after the answer, only that sender is approved; the earlier group's other agent is not) versus joining running work; `report-origin.test.ts` proves a report without `binding_id` must name its thread in an engine-started turn before the settle too; `component.test.ts` K8 hop case now reads hop 3, 3, 1 across settle, engine turn, person's message.

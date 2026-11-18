@@ -1,6 +1,6 @@
 ---
 name: visualize
-description: "Builds a self-contained HTML page (chart, table, diagram, dashboard) to show inline in a thread. Use before calling show_html_page, html_preview or html_render, or whenever an answer reads better as a page than as prose."
+description: "Builds a self-contained HTML page (chart, table, diagram, dashboard) to show inline in a thread. Use before calling show_html_page or desktop_html_preview, or whenever an answer reads better as a page than as prose."
 ---
 
 # Visualize
@@ -15,8 +15,8 @@ Do these in order. Never show a page you have not looked at.
 2. **Design: load `frontend`.** Use it for hierarchy, type, spacing and states. `frontend` exempts an inline page from its `DESIGN.md` gate, Lighthouse audit and research lanes, and the constraints below replace them: the page brings no palette or fonts of its own and uses the theme the host injects.
 3. **Build one self-contained page** under the constraints below and the Draft guard in `frontend`. Give each role its own class name, prefixed or scoped under its chart's parent selector: a short global class such as `.k` that a KPI grid and a bar segment share styles both, and lifted every cache bar off its baseline in one shipped page.
 4. **Lint before you render.** Run `bun $SKILL_DIR/../frontend/scripts/perfection/check-draft-guard.ts <page file>`, where `$SKILL_DIR` is this skill's own directory, the folder containing this SKILL.md (the script ships with `frontend`, next to this skill; write a page you built as a string to a file first). Exit 1 means a coloured edge bar, an accent outline, promotional filler copy, an emoji icon, a hype badge, or a hard-coded vanity stat is in the page: remove it and rerun. Nothing is previewed or shown until it exits 0.
-5. **Preview and look.** Render with `html_preview` in dark and in light, at the reply's width and at 390 px: all four views every time, because a page checked in one theme or one width ships broken in another. In each view, measure two things on every chart: the largest bar's rendered height against value ÷ axis maximum × plot height, and each legend swatch's computed colour against its series' colour. Then check that the first and last axis labels are whole. The draft-guard lint cannot catch a misdrawn bar; only these measurements do. Read the screenshot and the console, fix what you see, and preview again. Where `html_preview` is not offered, open the page file in a browser through the `browser` skill and capture the same four views.
-6. **Show it** with `show_html_page` (OmO) or `html_render` (other hosts), with the height the preview measured. Then write only what the page does not already say.
+5. **Preview and look.** Render with `desktop_html_preview` (the OmO desktop's HTML preview, present in the session when the desktop grants it its HTML toolkit) in dark and in light, at the reply's width and at 390 px: all four views every time, because a page checked in one theme or one width ships broken in another. In each view, measure two things on every chart: the largest bar's rendered height against value ÷ axis maximum × plot height, and each legend swatch's computed colour against its series' colour. Then check that the first and last axis labels are whole. The draft-guard lint cannot catch a misdrawn bar; only these measurements do. Read the screenshot and the console, fix what you see, and preview again. Where `desktop_html_preview` is not offered, open the page file in a browser through the `browser` skill and capture the same four views.
+6. **Show it** with `show_html_page`, with the height the preview measured. Then write only what the page does not already say.
 
 ## Constraints of an inline page
 

@@ -52,6 +52,7 @@ const gateway = [
   ["binding-author", "binding-author.mjs"],
   ["report-origin", "report-origin.mjs"],
   ["report-origin-steer", "report-origin-steer.mjs"],
+  ["report-origin-auto-steer", "report-origin-auto-steer.mjs"],
 ]
 
 const legacy = [
@@ -60,7 +61,11 @@ const legacy = [
   ["terminal-to-ui", "terminal-to-ui.mjs"],
   ["desktop-to-cli", "desktop-to-cli.mjs"],
   ["plugin-surface", "plugin-surface.mjs"],
+  ["local-approvals", "local-approvals.mjs"],
   ["session-control", "session-control-qa.mjs"],
+  ["create-prompt-authority", "create-prompt-authority.mjs"],
+  ["reopen-exited", "reopen-exited.mjs"],
+  ["create-atomic", "create-atomic.mjs"],
 ]
 
 function option(name) {

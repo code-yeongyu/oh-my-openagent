@@ -41,7 +41,7 @@ export function owner(id: string) {
   }
 }
 
-export async function setup() {
+export async function setup(overrides: Partial<SyncRpcOptions> = {}) {
   const device = await newDevice()
   const accountAbort = new AbortController()
   const hostAbort = new AbortController()
@@ -73,6 +73,7 @@ export async function setup() {
       approvalDisplayed.resolve()
       return (await confirmation) ? { kind: "approved", seq: 2 } : { kind: "declined" }
     },
+    disableSync: async () => ({ kind: "off" }),
   }
   const http = {
     baseUrl: "https://unused.invalid",
@@ -136,6 +137,7 @@ export async function setup() {
     pinDir: "/unused",
     signal: hostAbort.signal,
     syncStatus: async () => ({ state: "paused" }),
+    ...overrides,
   }
   const coordinator = registerSyncRpc(
     {

@@ -36,6 +36,26 @@ on:
         description: "Internal: exact prepared source SHA for the provenance-bearing publish run."
         required: false
         type: string
+      ci_basis_receipt:
+        description: "Maintainer-only: id of an exact-head CI basis receipt that waives the hosted ci.yml wait in gate-reuse. Requires prepared_release_sha and ci_basis_head. Leave empty to wait for hosted CI."
+        required: false
+        type: string
+        default: ""
+      ci_basis_head:
+        description: "Maintainer-only: the 40-hex commit the ci_basis_receipt covers; must be prepared_release_sha or an ancestor of it that differs only under .github/workflows/."
+        required: false
+        type: string
+        default: ""
+      operator_darwin_artifacts:
+        description: "Maintainer-only: draft release operator-darwin-<12 hex> holding operator-built, signed and notarized darwin artifacts. Replaces the hosted macOS legs of publish-platform. Requires prepared_release_sha and operator_darwin_manifest_sha256. Leave empty for the hosted legs."
+        required: false
+        type: string
+        default: ""
+      operator_darwin_manifest_sha256:
+        description: "Maintainer-only: sha256 of that release's operator-darwin-manifest.json, as the operator printed it. The run refuses any other manifest, so a later edit of the draft cannot swap artifacts. Leave empty for the hosted legs."
+        required: false
+        type: string
+        default: ""
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
@@ -51,16 +71,165 @@ jobs:
     permissions:
       actions: read
       contents: read
+      issues: read
     steps:
       - uses: actions/checkout@v7
+
+      # Operator-built darwin artifacts (#13921) replace the hosted macOS legs only for a maintainer on the
+      # prepared-source run. An empty input never enters the block.
+      - name: Refuse inadmissible operator darwin artifacts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPERATOR_DARWIN_ARTIFACTS: ${{ inputs.operator_darwin_artifacts }}
+          OPERATOR_DARWIN_MANIFEST_SHA256: ${{ inputs.operator_darwin_manifest_sha256 }}
+          PREPARED_RELEASE_SHA: ${{ inputs.prepared_release_sha }}
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ -z "$OPERATOR_DARWIN_ARTIFACTS" ]; then
+            if [ -n "$OPERATOR_DARWIN_MANIFEST_SHA256" ]; then
+              echo "::error::operator_darwin_artifacts refused: operator_darwin_manifest_sha256 is set without operator_darwin_artifacts."
+              exit 1
+            fi
+            echo "operator_darwin_artifacts is empty; publish-platform uses the hosted macOS legs."
+            exit 0
+          fi
+          LC_ALL=C
+          if [ -z "$PREPARED_RELEASE_SHA" ]; then
+            echo "::error::operator_darwin_artifacts refused: prepared_release_sha is empty; operator-built darwin artifacts only apply to the prepared-source publish run."
+            exit 1
+          fi
+          if ! [[ "$PREPARED_RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::operator_darwin_artifacts refused: prepared_release_sha must be a full 40-character lowercase hex commit SHA."
+            exit 1
+          fi
+          if ! [[ "$OPERATOR_DARWIN_ARTIFACTS" =~ ^operator-darwin-[0-9a-f]{12}$ ]]; then
+            echo "::error::operator_darwin_artifacts refused: it must be operator-darwin-<12 lowercase hex of the source commit>."
+            exit 1
+          fi
+          if ! [[ "$OPERATOR_DARWIN_MANIFEST_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "::error::operator_darwin_artifacts refused: operator_darwin_manifest_sha256 must be the 64 lowercase hex sha256 of the staged operator-darwin-manifest.json."
+            exit 1
+          fi
+          for login in "$ACTOR" "$TRIGGERING_ACTOR"; do
+            if ! [[ "$login" =~ ^[A-Za-z0-9][A-Za-z0-9-]{0,38}$ ]]; then
+              echo "::error::operator_darwin_artifacts refused: actor '${login}' is not a GitHub user login and cannot be a maintainer."
+              exit 1
+            fi
+            if ! role="$(gh api "repos/${REPOSITORY}/collaborators/${login}/permission" --jq '.role_name')"; then
+              echo "::error::operator_darwin_artifacts refused: could not read the repository permission of ${login}."
+              exit 1
+            fi
+            if [ "$role" != "admin" ] && [ "$role" != "maintain" ]; then
+              echo "::error::operator_darwin_artifacts refused: ${login} has repository role '${role}'; only admin or maintain may replace the hosted macOS legs."
+              exit 1
+            fi
+          done
+          {
+            echo "### Darwin artifacts: OPERATOR-BUILT"
+            echo "- Staging release: \`${OPERATOR_DARWIN_ARTIFACTS}\` (manifest sha256 \`${OPERATOR_DARWIN_MANIFEST_SHA256}\`); prepared source: \`${PREPARED_RELEASE_SHA}\`."
+            echo "- Dispatched by \`${ACTOR}\` (triggered by \`${TRIGGERING_ACTOR}\`); publish-platform verifies every artifact before use."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "operator_darwin_artifacts ${OPERATOR_DARWIN_ARTIFACTS} admitted for ${ACTOR}."
+
+      # Pull requests run Linux only (#13802); a macOS/Windows job that fails on dev opens the ci:platform-red
+      # issue (platform-red-tracker.yml). Both the release cut and the publish run refuse while it is open.
+      - name: Refuse while a dev macOS/Windows job is red
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          open="$(gh issue list --label ci:platform-red --state open --json number,url --jq '.[] | "#\(.number) \(.url)"')"
+          if [ -n "$open" ]; then
+            echo "::error::A macOS/Windows job is red on dev; fix it (or close the issue with the reason) before releasing: $open"
+            exit 1
+          fi
+          echo "No open ci:platform-red issue."
 
       - name: Require successful CI for prepared release source
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PREPARED_RELEASE_SHA: ${{ inputs.prepared_release_sha }}
+          CI_BASIS_RECEIPT: ${{ inputs.ci_basis_receipt }}
+          CI_BASIS_HEAD: ${{ inputs.ci_basis_head }}
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
+
+          # Explicit, logged waiver of the hosted CI wait. An empty receipt keeps the default path below.
+          if [ -n "$CI_BASIS_RECEIPT" ]; then
+            LC_ALL=C # code-point ranges for the shape checks; this block always exits.
+            # An explicit space-to-tilde range, not [[:print:]]: Git Bash on Windows still classifies UTF-8 characters
+            # under LC_ALL=C, so [[:print:]] accepted a non-ASCII receipt there (#13955).
+            if [ "${#CI_BASIS_RECEIPT}" -gt 128 ] || [[ "$CI_BASIS_RECEIPT" == *[!\ -~]* ]]; then
+              echo "::error::ci_basis_receipt refused: it must be 1-128 printable ASCII characters with no newline or control character."
+              exit 1
+            fi
+            if [ -z "$PREPARED_RELEASE_SHA" ]; then
+              echo "::error::ci_basis_receipt refused: prepared_release_sha is empty; the waiver only applies to the prepared-source publish run."
+              exit 1
+            fi
+            if ! [[ "$PREPARED_RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::ci_basis_receipt refused: prepared_release_sha must be a full 40-character lowercase hex commit SHA."
+              exit 1
+            fi
+            if ! [[ "$CI_BASIS_HEAD" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::ci_basis_receipt refused: ci_basis_head must be a full 40-character lowercase hex commit SHA."
+              exit 1
+            fi
+            for login in "$ACTOR" "$TRIGGERING_ACTOR"; do
+              if ! [[ "$login" =~ ^[A-Za-z0-9][A-Za-z0-9-]{0,38}$ ]]; then
+                echo "::error::ci_basis_receipt refused: actor '${login}' is not a GitHub user login and cannot be a maintainer."
+                exit 1
+              fi
+              if ! role="$(gh api "repos/${REPOSITORY}/collaborators/${login}/permission" --jq '.role_name')"; then
+                echo "::error::ci_basis_receipt refused: could not read the repository permission of ${login}."
+                exit 1
+              fi
+              if [ "$role" != "admin" ] && [ "$role" != "maintain" ]; then
+                echo "::error::ci_basis_receipt refused: ${login} has repository role '${role}'; only admin or maintain may waive hosted CI."
+                exit 1
+              fi
+            done
+            # The receipt covers ci_basis_head; the prepared source may add workflow-only commits on top of it.
+            # The fetch depth bounds the ancestry search; an ancestor beyond it is refused, never assumed.
+            if ! git fetch --no-tags --depth=200 origin "$CI_BASIS_HEAD" "$PREPARED_RELEASE_SHA"; then
+              echo "::error::ci_basis_receipt refused: could not fetch ci_basis_head ${CI_BASIS_HEAD} and prepared_release_sha ${PREPARED_RELEASE_SHA}."
+              exit 1
+            fi
+            if ! git merge-base --is-ancestor "$CI_BASIS_HEAD" "$PREPARED_RELEASE_SHA"; then
+              echo "::error::ci_basis_receipt refused: ci_basis_head ${CI_BASIS_HEAD} is not an ancestor of prepared_release_sha ${PREPARED_RELEASE_SHA} within 200 commits."
+              exit 1
+            fi
+            delta="$(git diff --no-renames --name-only "$CI_BASIS_HEAD" "$PREPARED_RELEASE_SHA" --)"
+            outside="$(grep -v '^\.github/workflows/' <<< "$delta" || true)"
+            if [ -n "$outside" ]; then
+              echo "::error::ci_basis_receipt refused: ${CI_BASIS_HEAD}..${PREPARED_RELEASE_SHA} changes files outside .github/workflows/: $(tr '\n' ' ' <<< "$outside")"
+              exit 1
+            fi
+            {
+              echo "- ci_basis_receipt: ${CI_BASIS_RECEIPT}"
+              echo "- ci_basis_head: ${CI_BASIS_HEAD}"
+              echo "- prepared_release_sha: ${PREPARED_RELEASE_SHA}"
+              echo "- actor: ${ACTOR} (triggered by ${TRIGGERING_ACTOR})"
+              echo "- hosted CI wait waived by ci_basis_receipt"
+              echo ""
+              echo "Workflow-only delta (git diff --stat ${CI_BASIS_HEAD}..${PREPARED_RELEASE_SHA}):"
+              echo ""
+              echo '```'
+              git diff --no-renames --stat "${CI_BASIS_HEAD}..${PREPARED_RELEASE_SHA}" --
+              echo '```'
+            } | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
 
           if [ -z "$PREPARED_RELEASE_SHA" ]; then
             echo "Skipping duplicate gates on the release preparation dispatch."
@@ -147,6 +316,7 @@ jobs:
           JOB_SUMMARY_DETAILS: |
             - Skips release validation on the preparation dispatch, which cannot publish.
             - Waits for a successful CI push workflow run on the exact prepared SHA.
+            - A repository admin or maintainer may waive that wait with a ci_basis_receipt whose head differs from the prepared SHA only under .github/workflows/; the waiver and delta are logged.
             - Fails closed when CI fails, is cancelled, times out, or cannot be read.
           JOB_SUMMARY_NEXT: Rerun CI on the prepared SHA or fix its failed workflow before publishing.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
@@ -667,6 +837,8 @@ jobs:
       always() &&
       github.repository == 'code-yeongyu/oh-my-openagent' &&
       inputs.prepared_release_sha == '' &&
+      inputs.operator_darwin_artifacts == '' &&
+      inputs.operator_darwin_manifest_sha256 == '' &&
       needs.release-metadata.result == 'success' &&
       needs.prepare-release-state.result == 'success'
     permissions:
@@ -734,6 +906,73 @@ jobs:
           JOB_SUMMARY_NEXT: Resolve a source/tag mismatch before retrying release publication.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
+  tag-prepared-source:
+    # A run dispatched directly with prepared_release_sha (not from the tag the parent pushes) has no release tag
+    # yet, and `gh release create` would make GitHub create it from the default branch head. This job tags the
+    # prepared source, or refuses a tag that points elsewhere. publish-platform and publish-main both need it, so
+    # no package is published before the tag is right.
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9928.
+    runs-on: ubuntu-24.04
+    needs: [gate-reuse, preflight-trust, release-metadata, prepare-release-state]
+    if: >-
+      always() &&
+      github.repository == 'code-yeongyu/oh-my-openagent' &&
+      inputs.prepared_release_sha != '' &&
+      needs.gate-reuse.result == 'success' &&
+      needs.preflight-trust.result == 'success' &&
+      needs.release-metadata.result == 'success' &&
+      needs.prepare-release-state.result == 'success'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.prepare-release-state.outputs.release_sha }}
+
+      - run: git fetch --force --tags
+
+      - name: Tag prepared release source
+        env:
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          RELEASE_SHA: ${{ inputs.prepared_release_sha }}
+          LAZYCODEX_ONLY: ${{ inputs.lazycodex_only }}
+        run: |
+          set -euo pipefail
+
+          if [ "$(git rev-parse HEAD)" != "$RELEASE_SHA" ]; then
+            echo "::error::Checked-out source does not match prepared release SHA ${RELEASE_SHA}."
+            exit 1
+          fi
+
+          RELEASE_TAG="v${VERSION}"
+          if [ "${LAZYCODEX_ONLY:-}" = "true" ]; then
+            RELEASE_TAG="lazycodex-v${VERSION}"
+          fi
+
+          if git rev-parse -q --verify "refs/tags/${RELEASE_TAG}" >/dev/null; then
+            TAG_SHA="$(git rev-list --max-count=1 "${RELEASE_TAG}")"
+            if [ "$TAG_SHA" != "$RELEASE_SHA" ]; then
+              echo "::error::Existing tag ${RELEASE_TAG} points to ${TAG_SHA}, not prepared release SHA ${RELEASE_SHA}."
+              exit 1
+            fi
+          else
+            git tag "${RELEASE_TAG}" "$RELEASE_SHA"
+            git push origin "${RELEASE_TAG}"
+          fi
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Prepared source tag
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Creates the release tag at prepared_release_sha, or verifies an existing one points there.
+            - Runs before publish-platform and publish-main, so no package is published under a foreign tag.
+          JOB_SUMMARY_NEXT: If an existing tag points elsewhere, bump to an unused version or remove the stray tag before rerunning.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
   publish-main:
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9937.
     runs-on: ubuntu-24.04
@@ -741,7 +980,7 @@ jobs:
     # lazycodex publish decision has to cross the job boundary as an output.
     outputs:
       lazycodex_publish_skipped: ${{ steps.check-lazycodex.outputs.skip }}
-    needs: [gate-reuse, preflight-trust, release-metadata, prepare-release-state, publish-platform]
+    needs: [gate-reuse, preflight-trust, release-metadata, prepare-release-state, tag-prepared-source, publish-platform]
     if: >-
       always() &&
       github.repository == 'code-yeongyu/oh-my-openagent' &&
@@ -750,6 +989,7 @@ jobs:
       needs.preflight-trust.result == 'success' &&
       needs.release-metadata.result == 'success' &&
       needs.prepare-release-state.result == 'success' &&
+      needs.tag-prepared-source.result == 'success' &&
       (inputs.skip_platform == true || inputs.lazycodex_only == true || needs.publish-platform.result == 'success')
     steps:
       - uses: actions/checkout@v7
@@ -1150,7 +1390,7 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   publish-platform:
-    needs: [gate-reuse, preflight-trust, release-metadata, prepare-release-state, verify-release-notes]
+    needs: [gate-reuse, preflight-trust, release-metadata, prepare-release-state, tag-prepared-source, verify-release-notes]
     if: >-
       always() &&
       github.repository == 'code-yeongyu/oh-my-openagent' &&
@@ -1160,12 +1400,16 @@ jobs:
       needs.gate-reuse.result == 'success' &&
       needs.preflight-trust.result == 'success' &&
       needs.release-metadata.result == 'success' &&
-      needs.prepare-release-state.result == 'success'
+      needs.prepare-release-state.result == 'success' &&
+      needs.tag-prepared-source.result == 'success'
     uses: ./.github/workflows/publish-platform.yml
     with:
       version: ${{ needs.release-metadata.outputs.version }}
       dist_tag: ${{ needs.release-metadata.outputs.dist_tag }}
       omo_ai_version: ${{ needs.release-metadata.outputs.omo_ai_version }}
+      operator_darwin_artifacts: ${{ inputs.operator_darwin_artifacts }}
+      operator_darwin_manifest_sha256: ${{ inputs.operator_darwin_manifest_sha256 }}
+      prepared_release_sha: ${{ inputs.prepared_release_sha }}
     secrets: inherit
 
   release:
@@ -1341,12 +1585,22 @@ jobs:
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
           DIST_TAG: ${{ needs.release-metadata.outputs.dist_tag }}
+          RELEASE_SHA: ${{ inputs.prepared_release_sha }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # pipefail matters: an empty tag list is indistinguishable from "no releases
           # exist yet" and would resolve to --latest, so a failed `gh release list`
           # must fail the step instead of silently mis-assigning the badge.
           set -euo pipefail
+
+          # --target only applies when GitHub creates the tag, so an existing tag must already be the prepared source.
+          if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
+            TAG_SHA="$(git rev-list --max-count=1 "v${VERSION}")"
+            if [ "$TAG_SHA" != "$RELEASE_SHA" ]; then
+              echo "::error::Existing tag v${VERSION} points to ${TAG_SHA}, not prepared release SHA ${RELEASE_SHA}."
+              exit 1
+            fi
+          fi
 
           LATEST_FLAG="$(gh release list --exclude-drafts --limit 1000 --json tagName --jq '.[].tagName' | bun script/release-latest-flag.ts "$VERSION")"
           if gh release view "v${VERSION}" >/dev/null 2>&1; then
@@ -1357,7 +1611,7 @@ jobs:
               printf '%s\n' "$RECOVERY_NOTICE" >> "$GITHUB_STEP_SUMMARY"
             fi
           else
-            gh release create "v${VERSION}" "$LATEST_FLAG" --title "v${VERSION}" --notes-file /tmp/changelog.md
+            gh release create "v${VERSION}" "$LATEST_FLAG" --target "$RELEASE_SHA" --title "v${VERSION}" --notes-file /tmp/changelog.md
             echo "created=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -1571,6 +1825,22 @@ jobs:
       dry_run: false
     secrets: inherit
 
+  installer-mirror-beta:
+    needs: [release-metadata, installer-mirror]
+    # beta is the newer of the latest stable release and the newest prerelease (#12987): after a stable release moves
+    # channels/latest, this moves channels/beta to the same version. The mirror never moves a channel backwards, so a
+    # newer beta prerelease is kept. The assets are already mirrored; this run re-verifies them and moves the pointer.
+    if: >-
+      always() &&
+      needs.installer-mirror.result == 'success' &&
+      needs.release-metadata.outputs.omo_ai_dist_tag == 'latest'
+    uses: ./.github/workflows/installer-mirror.yml
+    with:
+      tag: v${{ needs.release-metadata.outputs.version }}
+      channel: beta
+      dry_run: false
+    secrets: inherit
+
   post-publish-verify:
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9940.
     runs-on: ubuntu-24.04
@@ -1674,6 +1944,90 @@ jobs:
             sleep "$READINESS_INTERVAL_SECONDS"
           done
 
+      - name: Move omo-ai beta up to the stable release
+        # beta is the newer of the latest stable release and the newest prerelease (#12987), so a stable release also
+        # moves beta unless beta already holds a newer prerelease. It runs here, after the registry serves the release
+        # and before the guard below, so a beta-tag hiccup can never fail publish-main and block the GitHub release of an
+        # already-published version: a failed dist-tag write only warns and the guard below reports it, while a read-back that
+        # finds beta older than the newest of latest and every prerelease fails this step with the repair command.
+        # Trusted publishing covers `npm publish` only, so the dist-tag write authenticates with the registry token, as
+        # npm-dist-tag-rollback.yml does.
+        if: >-
+          inputs.lazycodex_only != true &&
+          needs.release-metadata.outputs.omo_ai_dist_tag == 'latest'
+        env:
+          OMO_AI_VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # Read the whole dist-tags object, not dist-tags.beta: a failed lookup must never read as "no beta tag",
+          # or a registry hiccup would move beta DOWN over a newer prerelease. lookup=failed means: do not move.
+          for attempt in 1 2 3; do
+            DIST_TAGS=$(npm view --prefer-online --json omo-ai dist-tags 2>/dev/null) || DIST_TAGS=""
+            DECISION=$(node script/beta-follows-latest.mjs --dist-tags "$OMO_AI_VERSION" "$DIST_TAGS")
+            [ "$DECISION" = "lookup=failed" ] || break
+            [ "$attempt" = "3" ] || { echo "Retrying the omo-ai dist-tags lookup (attempt ${attempt}/3)"; sleep 15; }
+          done
+          if [ "$DECISION" = "lookup=failed" ]; then
+            echo "::warning::Could not read the omo-ai dist-tags, so beta was not moved; the dist-tag guard checks beta >= latest"
+            exit 0
+          fi
+          if [ "$DECISION" != "move=true" ]; then
+            echo "omo-ai beta stays: it is not older than $OMO_AI_VERSION"
+            exit 0
+          fi
+
+          echo "omo-ai beta is missing or older than $OMO_AI_VERSION; moving beta to $OMO_AI_VERSION"
+          # npm expands the variable reference itself, so the token never lands on disk.
+          NPMRC="$RUNNER_TEMP/omo-ai-dist-tag.npmrc"
+          # shellcheck disable=SC2016
+          printf '//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}\n' > "$NPMRC"
+          trap 'rm -f "$NPMRC"' EXIT
+          MOVED=false
+          for attempt in 1 2 3 4 5; do
+            if npm dist-tag add --userconfig "$NPMRC" "omo-ai@$OMO_AI_VERSION" beta; then
+              MOVED=true
+              break
+            fi
+            [ "$attempt" = "5" ] || { echo "Retrying omo-ai beta dist-tag (attempt ${attempt}/5)"; sleep 15; }
+          done
+          rm -f "$NPMRC"
+          if [ "$MOVED" != "true" ]; then
+            echo "::warning::Could not move omo-ai beta to $OMO_AI_VERSION; the dist-tag guard reports it. Fix: run 'npm dist-tag add omo-ai@$OMO_AI_VERSION beta' with a publish token"
+            exit 0
+          fi
+          echo "omo-ai beta -> $OMO_AI_VERSION"
+
+          # Re-read the whole dist-tags object after the write (#13149). The registry serves a dist-tag write with lag, so
+          # a stale read is retried (bounded). Beta newer than what we wrote means someone moved it forward: leave it.
+          # Beta older than the newest of latest and every prerelease seen in either read fails with the repair command.
+          # A read-back that cannot be read at all only warns; the dist-tag guard below re-reads it.
+          VERDICT="lookup=failed"
+          for attempt in 1 2 3 4 5; do
+            AFTER_TAGS=$(npm view --prefer-online --json omo-ai dist-tags 2>/dev/null) || AFTER_TAGS=""
+            VERDICT=$(node script/beta-follows-latest.mjs --verify "$OMO_AI_VERSION" "$DIST_TAGS" "$AFTER_TAGS")
+            case "$VERDICT" in
+              beta=ok:*)
+                echo "omo-ai beta reads ${VERDICT#beta=ok:} (attempt ${attempt}/5)"
+                exit 0
+                ;;
+              beta=ahead:*)
+                echo "omo-ai beta was moved forward to ${VERDICT#beta=ahead:}, newer than $OMO_AI_VERSION; leaving it"
+                exit 0
+                ;;
+            esac
+            [ "$attempt" = "5" ] || { echo "Waiting for omo-ai beta to settle after the move to $OMO_AI_VERSION (attempt ${attempt}/5, 15s)"; sleep 15; }
+          done
+          case "$VERDICT" in
+            beta=behind:*)
+              REPAIR_VERSION="${VERDICT#beta=behind:}"
+              echo "::error::omo-ai beta is still older than $REPAIR_VERSION after the move; run: npm dist-tag add omo-ai@$REPAIR_VERSION beta"
+              exit 1
+              ;;
+          esac
+          echo "::warning::Could not re-read the omo-ai dist-tags after the move to $OMO_AI_VERSION; the dist-tag guard re-reads it"
+
       - name: Guard omo-ai dist-tags
         if: inputs.lazycodex_only != true
         env:
@@ -1696,6 +2050,27 @@ jobs:
               echo "::error::omo-ai $OMO_AI_DIST_TAG points to ${TAGGED_VERSION:-missing}, expected $OMO_AI_VERSION"
               exit 1
             fi
+          fi
+
+          # beta is never older than latest or the newest prerelease on any dist-tag (#12987). The step above moved it with
+          # this stable release. The registry can serve that write with lag, so the read is retried (bounded, like the
+          # readiness wait) before it fails.
+          if [ "$OMO_AI_DIST_TAG" = "latest" ]; then
+            for attempt in 1 2 3 4 5; do
+              GUARD_TAGS=$(npm view --prefer-online --json omo-ai dist-tags 2>/dev/null) || GUARD_TAGS=""
+              BETA_DECISION=$(node script/beta-follows-latest.mjs --guard "$GUARD_TAGS" || true)
+              case "$BETA_DECISION" in beta=ok:*) break ;; esac
+              if [ "$attempt" = "5" ]; then
+                BEHIND="${BETA_DECISION#beta=behind:}"
+                FLOOR_VERSION="${BEHIND%%:*}"
+                BETA_VERSION="${BEHIND#*:}"
+                [ "$BETA_DECISION" != "$BEHIND" ] || { FLOOR_VERSION="$LATEST_VERSION"; BETA_VERSION=""; }
+                echo "::error::omo-ai beta points to ${BETA_VERSION:-missing}, older than latest ${LATEST_VERSION:-missing} or the newest prerelease (${FLOOR_VERSION:-missing}); move beta to ${FLOOR_VERSION:-$LATEST_VERSION}"
+                exit 1
+              fi
+              echo "Waiting for omo-ai beta to reach latest ${LATEST_VERSION:-missing} (attempt ${attempt}/5, 15s)"
+              sleep 15
+            done
           fi
 
       - name: Verify omo-ai live install
@@ -1912,7 +2287,7 @@ jobs:
           JOB_SUMMARY_TITLE: Post-publish verification
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
-            - Waits for omo-ai registry readiness and guards its dist-tags.
+            - Waits for omo-ai registry readiness, moves beta up to a stable release, and guards its dist-tags.
             - Verifies the omo-ai live install and smoke-tests the published LazyCodex package.
             - Runs after the GitHub release so propagation delays cannot strand a published release.
           JOB_SUMMARY_NEXT: Investigate the failing registry probe; the release itself already exists.

@@ -93,6 +93,8 @@ curl -fsSL https://get.omo.dev/install.sh | bash -s -- 5.1.1
 & ([scriptblock]::Create((irm https://get.omo.dev/install.ps1))) beta
 ```
 
+The beta channel is never older than `latest`: every stable release also moves `beta` to that release, unless `beta` already holds a newer prerelease.
+
 Settings, read from the environment:
 
 | Variable | Effect |
