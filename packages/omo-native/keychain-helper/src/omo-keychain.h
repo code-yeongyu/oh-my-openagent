@@ -81,8 +81,6 @@ OSStatus add_owned(const char *account, const buffer *value);
 OSStatus update_data(const char *account, const buffer *value);
 OSStatus rename_item(const char *from, const char *to);
 OSStatus delete_item(const char *account);
-// Deletes by attributes through `/usr/bin/security`. Used when this binary is not on the item ACL.
-bool security_delete_generic_password(const char *account);
 
 typedef enum { STORE_STEP_NONE, STORE_STEP_CREATE, STORE_STEP_ACTIVATE, STORE_STEP_DEACTIVATE, STORE_STEP_ERASE } store_step;
 // Selects the keychain for this request; false when it has already replied (a refusal or a store step's own answer).
