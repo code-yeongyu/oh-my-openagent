@@ -1,4 +1,6 @@
 import { Database } from "bun:sqlite"
+import { mkdirSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
 import { afterEach, describe, expect, test } from "bun:test"
 import type { ThreadToolResult } from "../contracts"
 import { gatewayDatabasePath } from "../gateway/paths"
@@ -106,8 +108,8 @@ describe("SessionHost: a new thread starts in its creator's approval mode on bot
   test("#given a creator that names no preset #when it creates on both legs #then neither frame carries permissionPreset", async () => {
     const a = account()
     const { run, openSession } = surface(a.remote)
-    await run("thread_create", {})
-    await run("thread_create", { device: "studio" })
+    await run("thread_create", { name: "session-host-103" })
+    await run("thread_create", { name: "session-host-104", device: "studio" })
     expect(localOpenFrames(openSession)).toEqual([expect.not.objectContaining({ permissionPreset: expect.anything() })])
     expect(openFrames(a.sent)).toEqual([expect.not.objectContaining({ permissionPreset: expect.anything() })])
   })
@@ -115,8 +117,8 @@ describe("SessionHost: a new thread starts in its creator's approval mode on bot
   test("#given a creator working in its own folder #when it creates here and on b with no cwd #then only the open here starts in the creator's folder", async () => {
     const a = account()
     const { run, openSession } = surface(a.remote)
-    await run("thread_create", {})
-    await run("thread_create", { device: "studio" })
+    await run("thread_create", { name: "session-host-112" })
+    await run("thread_create", { name: "session-host-113", device: "studio" })
     // b never sees this device's folders: its engine picks its own.
     expect(localOpenFrames(openSession)).toEqual([expect.objectContaining({ cwd: process.cwd() })])
     expect(openFrames(a.sent)).toEqual([expect.not.objectContaining({ cwd: expect.anything() })])
@@ -166,6 +168,65 @@ describe("SessionHost: opening an existing thread on both legs", () => {
         rpc: { type: "open_session", retain_on_disconnect: true, sessionPath: B_ROW.path },
       },
     ])
+  })
+})
+
+// #14050: a create with neither a first prompt nor a name would leave an empty live thread nobody asked for.
+describe("thread_create refuses an empty create (#14050)", () => {
+  test("#given no prompt and no name #when created here and on b #then invalid_arguments and nothing is opened", async () => {
+    const a = account()
+    const { run, openSession } = surface(a.remote)
+    for (const args of [{}, { device: "studio" }, { name: "   " }])
+      expect(await run("thread_create", args)).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+    expect(openSession).not.toHaveBeenCalled()
+    expect(openFrames(a.sent)).toEqual([])
+  })
+
+  test("#given a name, an alias or a prompt #when created #then each opens one thread", async () => {
+    const a = account()
+    const { run, openSession } = surface(a.remote)
+    expect(await run("thread_create", { name: "named" })).toMatchObject({ kind: "ok" })
+    expect(await run("thread_create", { prompt: "go" })).toMatchObject({ kind: "ok" })
+    expect(await run("thread_create", { device: "studio", alias: "aliased" })).toMatchObject({ kind: "ok" })
+    expect(openSession).toHaveBeenCalledTimes(2)
+    expect(openFrames(a.sent)).toHaveLength(1)
+  })
+})
+
+// #14049: a thread whose process exited is listed by no endpoint, but its session file is still on this device. Opening
+// it by id starts it again from that file with the same id, with an account signed in (the account-wide resolver) or not.
+describe("thread_create reopens a thread whose process exited (#14049)", () => {
+  const sessionFile = (agentDir: string, id: string): string => {
+    const dir = join(agentDir, "sessions", "--exited--")
+    mkdirSync(dir, { recursive: true })
+    const file = join(dir, `2026-11-17T10-29-13-026Z_${id}.jsonl`)
+    writeFileSync(
+      file,
+      `${JSON.stringify({ type: "session", version: 3, id, timestamp: "2026-11-17T10:29:13.026Z", cwd: process.cwd() })}\n`,
+    )
+    return file
+  }
+  const exited = "01a1e90d-b8c2-72c1-ac4a-036aebcfdcab"
+
+  for (const signedIn of [true, false])
+    test(`#given only the session file of an exited thread ${signedIn ? "with" : "without"} an account #when thread_create opens it by id #then it is opened from that file`, async () => {
+      const a = account()
+      const { run, openSession, agentDir } = surface(signedIn ? a.remote : undefined, { sessionsDirectory: true })
+      const file = sessionFile(agentDir, exited)
+      const result = await run("thread_create", { thread: exited })
+      expect(result).toMatchObject({ kind: "ok", thread: exited, deduplicated: false })
+      expect(localOpenFrames(openSession)).toEqual([{ sessionPath: file }])
+      expect(a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")).toEqual([])
+    })
+
+  test("#given an id no device holds #when thread_create opens it #then a typed not_found and nothing is opened", async () => {
+    const a = account()
+    const { run, openSession } = surface(a.remote, { sessionsDirectory: true })
+    expect(await run("thread_create", { thread: "01a1e90d-0000-7000-8000-000000000000" })).toMatchObject({
+      kind: "error",
+      error: { code: "not_found" },
+    })
+    expect(openSession).not.toHaveBeenCalled()
   })
 })
 
@@ -233,11 +294,15 @@ describe("SessionHost: the creator record and the alias follow the open on both 
   test("#given skills on a create #when it opens here and on b #then both results name the requested skills and both frames carry the initial-skills context", async () => {
     const a = account()
     const { run, openSession } = surface(a.remote)
-    const here = (await run("thread_create", { skills: ["programming"] })) as Extract<ThreadToolResult, { kind: "ok" }>
-    const there = (await run("thread_create", { device: "studio", skills: ["programming"] })) as Extract<
+    const here = (await run("thread_create", { name: "session-host-255", skills: ["programming"] })) as Extract<
       ThreadToolResult,
       { kind: "ok" }
     >
+    const there = (await run("thread_create", {
+      name: "session-host-256",
+      device: "studio",
+      skills: ["programming"],
+    })) as Extract<ThreadToolResult, { kind: "ok" }>
     expect(here).toMatchObject({ requested_skills: ["programming"] })
     expect(there).toMatchObject({ requested_skills: ["programming"] })
     expect(localOpenFrames(openSession)).toEqual([expect.objectContaining({ initialSkills: ["programming"] })])
