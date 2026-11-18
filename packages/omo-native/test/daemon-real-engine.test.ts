@@ -63,6 +63,12 @@ function sandbox() {
     OMO_CODING_AGENT_DIR: agentDir,
     SENPI_CODING_AGENT_DIR: agentDir,
     PI_CODING_AGENT_DIR: agentDir,
+    // The idle contracts this file observes need a transient shard. A runner whose own host is pinned
+    // (omo daemon run --pinned) leaks SENPI_RPC_HOST_COLD_START=persistent into every child, and a
+    // persistent shard never idle-exits: the observing-reads case then dies at its exit deadline
+    // ("shard pid still alive after N more status reads"). Pin the transient default here; each
+    // case's SENPI_RPC_HOST_IDLE_EXIT_MS override stays where it is observed.
+    SENPI_RPC_HOST_COLD_START: "transient",
   }
   return { agentDir, socket, env }
 }
