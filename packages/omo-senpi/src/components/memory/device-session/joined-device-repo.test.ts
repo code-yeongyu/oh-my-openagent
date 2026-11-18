@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { existsSync } from "node:fs"
-import { mkdtemp } from "node:fs/promises"
+import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -16,19 +16,14 @@ import { isSyncSessionDeferred } from "../sync-session-deferred"
 import type { CliDeviceAccount } from "./account-source"
 import { joinedDeviceRepoCreator } from "./joined-repo"
 import { createDeviceSessionResolver, type DeviceSessionRuntime } from "./resolver"
-import { rmWhenReleased } from "../teardown.test-support"
 
 // omo#14094 (LEAD ruling: option A with limits): a device that has sync on and has joined the account gets its memory
 // repository from the existing first-write seam, so the account's memory arrives with no write on this device. Every
 // other path keeps #13493's rule: reads, a sync-off device and a device that has not joined create no identity storage.
 
 const dirs: string[] = []
-// A child can still hold a handle inside its scratch root when teardown runs; on Windows that makes
-// a bare rm fail and leaks the root into the OS temp dir (the #9766 unnamed teardown red).
-// rmWhenReleased waits out those transient holders (30 s deadline) and then removes the root with
-// the house retry defaults.
 afterEach(async () => {
-  for (const dir of dirs.splice(0)) await rmWhenReleased(dir)
+  for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true })
 })
 
 async function freshDevice() {
