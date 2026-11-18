@@ -47,12 +47,17 @@ type ColdWakeOptions = {
   readonly env?: Readonly<Record<string, string | undefined>>
 }
 
-/** This device's service manager and the session host start for `binaryPath`; undefined off Linux and macOS. */
-function deviceColdWake(options: ColdWakeOptions) {
-  const platform = options.platform ?? process.platform
+/** This user's service manager; undefined off Linux and macOS. */
+function coldWakeHost(platform: NodeJS.Platform, home = homedir()) {
   const uid = typeof process.getuid === "function" ? process.getuid() : undefined
   if ((platform !== "linux" && platform !== "darwin") || uid === undefined) return undefined
-  const host = { platform, home: homedir(), uid, run: runCommand, pause }
+  return { platform, home, uid, run: runCommand, pause }
+}
+
+/** This device's service manager and the session host start for `binaryPath`; undefined off Linux and macOS. */
+function deviceColdWake(options: ColdWakeOptions) {
+  const host = coldWakeHost(options.platform ?? process.platform)
+  if (host === undefined) return undefined
   const launchOf = (): SessionHostLaunch | ColdWakeOutcome => {
     try {
       return SessionHostLaunch.from({
@@ -112,27 +117,31 @@ function coldWakeNotice(outcome: ColdWakeOutcome): string | undefined {
   }
 }
 
+/** Whether `installed` is a release older than `version` (both `RELEASE_VERSION`s); anything else is not older. */
+export const olderRuntime = (installed: string, version: string): boolean =>
+  RELEASE_VERSION.test(installed) && RELEASE_VERSION.test(version) && Bun.semver.order(installed, version) < 0
+
 /**
- * omo#14191: the first launch of a new runtime brings an installed session host unit to that runtime (its shape and its
- * program), as `omo remote enable` writes it; `omo update` cannot, because the new runtime copy only exists once the new
- * launcher has run. A failure is one line on `error` and never blocks the launch.
+ * omo#14191: a launch of `runtime` (release `version`) brings an installed session host unit an older runtime wrote to
+ * this runtime's program and shape; `omo update` cannot, because the new runtime copy only exists once the new launcher
+ * has run. Every other launch costs one file read. A failure is one line on `error` and never blocks the launch.
  */
 export async function refreshColdWakeAtLaunch(
-  options: ColdWakeOptions & { readonly version: string },
+  options: {
+    readonly runtime: string
+    readonly version: string
+    readonly platform?: NodeJS.Platform
+    readonly home?: string
+  },
   error: (line: string) => void,
 ): Promise<void> {
-  const device = deviceColdWake(options)
-  if (device === undefined || !RELEASE_VERSION.test(options.version)) return
-  const launch = device.launchOf()
+  const host = coldWakeHost(options.platform ?? process.platform, options.home)
+  if (host === undefined || !RELEASE_VERSION.test(options.version)) return
   try {
-    const outcome =
-      launch instanceof SessionHostLaunch
-        ? await refreshColdWake(
-            device.host,
-            launch,
-            (installed) => RELEASE_VERSION.test(installed) && Bun.semver.order(installed, options.version) > 0,
-          )
-        : launch
+    const outcome = await refreshColdWake(host, {
+      runtime: options.runtime,
+      isOlder: (installed) => olderRuntime(installed, options.version),
+    })
     const notice = outcome === undefined ? undefined : coldWakeNotice(outcome)
     if (notice !== undefined) error(notice)
   } catch (cause) {

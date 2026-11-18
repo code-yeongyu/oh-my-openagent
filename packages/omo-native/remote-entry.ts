@@ -36,11 +36,12 @@ function remoteDependencies(packageRoot?: string): RemoteVerbDependencies {
   }
 }
 
-/** A launch of runtime `version` brings this device's installed session host unit to it (omo#14191). */
+/**
+ * A launch of this runtime brings an installed session host unit an older runtime wrote to it (omo#14191). The runtime is
+ * the running executable itself, never `OMO_BIN` or the caller's agent dir (#14194 review H1).
+ */
 export const refreshSessionHostUnit = (version: string): Promise<void> =>
-  refreshColdWakeAtLaunch({ binaryPath: omoBinaryPath(), agentDir: canonicalAgentDir(), version }, (line) =>
-    process.stderr.write(`${line}\n`),
-  )
+  refreshColdWakeAtLaunch({ runtime: process.execPath, version }, (line) => process.stderr.write(`${line}\n`))
 
 /** The launchers' entry for `omo remote attach`: the engine argv to run in place of this command, or undefined (exit code set). */
 export async function runRemoteAttachCommand(args: readonly string[]): Promise<readonly string[] | undefined> {

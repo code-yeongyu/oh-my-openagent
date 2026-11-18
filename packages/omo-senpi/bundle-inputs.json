@@ -47,6 +47,7 @@
     "packages/device-service-core/src/cold-wake/darwin.ts",
     "packages/device-service-core/src/cold-wake/host.ts",
     "packages/device-service-core/src/cold-wake/index.ts",
+    "packages/device-service-core/src/cold-wake/installed-unit.ts",
     "packages/device-service-core/src/cold-wake/linux.ts",
     "packages/device-service-core/src/cold-wake/pinned-host.ts",
     "packages/device-service-core/src/cold-wake/readback.ts",
