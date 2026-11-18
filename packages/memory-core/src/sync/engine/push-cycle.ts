@@ -34,6 +34,8 @@ export interface PushCycleResult {
   readonly frozen: Frozen | null
 }
 
+const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error))
+
 const ended = (outcome: FreezeOutcome | null): boolean => outcome?.kind === "rotated" || outcome?.kind === "adopted"
 
 export async function pushCycle(input: PushCycleInput): Promise<PushCycleResult> {
@@ -45,14 +47,29 @@ export async function pushCycle(input: PushCycleInput): Promise<PushCycleResult>
     frozen = outcome.kind === "frozen" ? { reason: outcome.reason, since: frozen?.since ?? deps.clock.now() } : null
     return outcome
   }
+  // Drops every outbox file the index no longer names: a refused batch's sealed file (a freeze refuses
+  // every cycle, and each would otherwise leave one more batch behind) or a crash's leftovers. It runs
+  // once the freeze is known, so a failing sweep never hides it: while frozen its error is logged and
+  // the freeze stays the status; otherwise, or at the next sweep after the thaw, it fails the cycle.
+  const sweep = async (): Promise<void> => {
+    const pending = await journal.pending()
+    if (frozen === null) return journal.outbox.sweep(pending)
+    await journal.outbox
+      .sweep(pending)
+      .catch((error: unknown) =>
+        deps.log?.(`sync: cannot clean the outbox while pushes are frozen: ${errorText(error)}`),
+      )
+  }
   if (input.settleFirst && ended(await settle())) await input.inbound()
   for (let attempt = 0; attempt < PUSH_ATTEMPTS; attempt += 1) {
     const outcome = await push(deps, journal, deps.batchBytes, input.withheld())
     if (outcome !== "stale") {
       if (outcome === "pushed") frozen = null
+      else await sweep()
       return { pushed: outcome === "pushed", frozen }
     }
     const settled = await settle()
+    await sweep()
     if (settled?.kind === "frozen") return { pushed: false, frozen }
     if (!ended(settled)) await input.sleep(staleBackoffMs(attempt, deps.random))
     await input.inbound()
