@@ -473,7 +473,6 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
           throw markNotSent(error)
         }
       }
-      if (endpoint === undefined) throw new NotSentError("unsupported", "the device lists no engine endpoint")
       // omo#14130 review round 3 (M1): a caller's waitMs covers the lookup too; spent by it, nothing is sent.
       const waitMs = options?.waitMs === undefined ? undefined : options.waitMs - (timers.now() - started)
       if (waitMs !== undefined && waitMs <= 0)
