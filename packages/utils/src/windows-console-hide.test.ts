@@ -81,6 +81,14 @@ function importedEntryPoints(source: string): readonly string[] {
   return [...locals]
 }
 
+function namespaceImports(source: string): readonly string[] {
+  const namespaces = new Set<string>()
+  for (const [, name] of source.matchAll(/import\s*\*\s*as\s+([A-Za-z_$][\w$]*)\s+from\s*["']node:child_process["']/g)) {
+    namespaces.add((name ?? "").trim())
+  }
+  return [...namespaces]
+}
+
 function callText(source: string, openingParen: number): string {
   let depth = 0
   for (let index = openingParen; index < source.length; index += 1) {
@@ -112,6 +120,22 @@ function collectCalls(file: string, source: string): readonly ChildProcessCall[]
         callee: local,
         text: `${local}${callText(source, match.index + match[0].length - 1)}`,
       })
+    }
+  }
+  // Namespace imports (`import * as childProcess`) hide every call behind
+  // `childProcess.execFileSync(...)`, which the named-import walk above cannot
+  // see. Audit them too so the gate cannot be bypassed by the import style.
+  for (const namespace of namespaceImports(source)) {
+    for (const entry of ENTRY_POINTS) {
+      for (const match of source.matchAll(new RegExp(String.raw`(?<![\w$.])${namespace}\.${entry}\(`, "g"))) {
+        if (isCommentLine(source, match.index)) continue
+        calls.push({
+          file,
+          line: source.slice(0, match.index).split("\n").length,
+          callee: `${namespace}.${entry}`,
+          text: `${namespace}.${entry}${callText(source, match.index + match[0].length - 1)}`,
+        })
+      }
     }
   }
   // Bun's own spawn API (#9840): `Bun.spawn*` directly, or a runtime handle named `bun`. It accepts
@@ -208,6 +232,23 @@ describe("utils win32 console suppression", () => {
 
       // then
       expect(calls.map((call) => call.callee)).toEqual(["run"])
+      expect(calls[0]?.text.includes("windowsHide: true")).toBe(false)
+    })
+  })
+
+  describe("#given a namespace import without the flag", () => {
+    test("#when the source is audited #then the call is reported, not silently skipped", () => {
+      // given
+      const source = [
+        'import * as childProcess from "node:child_process"',
+        'childProcess.execFileSync("git", ["status"], { encoding: "utf8" })',
+      ].join("\n")
+
+      // when
+      const calls = collectCalls("fixture.ts", source)
+
+      // then
+      expect(calls.map((call) => call.callee)).toEqual(["childProcess.execFileSync"])
       expect(calls[0]?.text.includes("windowsHide: true")).toBe(false)
     })
   })
