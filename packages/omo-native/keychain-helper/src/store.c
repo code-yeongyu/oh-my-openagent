@@ -1,10 +1,7 @@
 #include "omo-keychain.h"
 
 #include <Security/AuthSession.h>
-#include <errno.h>
 #include <string.h>
-#include <sys/wait.h>
-#include <unistd.h>
 
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
@@ -217,37 +214,14 @@ OSStatus rename_item(const char *from, const char *to) {
   return status;
 }
 
+// Deletes the exact item the silent lookup found, so it is the one in the keychain that holds <account>. SecItemDelete
+// is not used: on a file keychain it first compares the caller's name with the item's decrypt list and answers
+// errSecInvalidOwnerEdit (-25244) itself, so a helper copy at another path (every launch copies the helper to a fresh
+// directory) could never sign out. SecKeychainItemDelete leaves the decision to the keychain, which allows it.
 OSStatus delete_item(const char *account) {
-  CFMutableDictionaryRef query = item_query(account, true);
-  scope_to_holder(query, account);
-  OSStatus status = SecItemDelete(query);
-  CFRelease(query);
+  item_state found = {0};
+  OSStatus status = lookup_attributes(account, &found);
+  if (status == errSecSuccess) status = found.item == NULL ? errSecItemNotFound : SecKeychainItemDelete(found.item);
+  item_state_release(&found);
   return status;
-}
-
-// The item ACL can name one helper path. A later copy is refused on decrypt, and SecItemDelete then returns
-// errSecAuthFailed even though the keychain is unlocked. `security` deletes by attributes as the keychain owner.
-bool security_delete_generic_password(const char *account) {
-  char keychain_path[1024];
-  UInt32 length = sizeof keychain_path;
-  // A throwaway --keychain must not fall through to the login keychain when its path cannot be read.
-  if (store.keychain != NULL &&
-      (SecKeychainGetPath(store.keychain, &length, keychain_path) != errSecSuccess || length == 0 ||
-       (size_t)length >= sizeof keychain_path))
-    return false;
-  pid_t pid = fork();
-  if (pid < 0) return false;
-  if (pid == 0) {
-    if (store.keychain != NULL)
-      execl("/usr/bin/security", "security", "delete-generic-password", "-s", SERVICE, "-a", account, "-k",
-            keychain_path, (char *)NULL);
-    else
-      execl("/usr/bin/security", "security", "delete-generic-password", "-s", SERVICE, "-a", account, (char *)NULL);
-    _exit(127);
-  }
-  int status = 0;
-  while (waitpid(pid, &status, 0) < 0) {
-    if (errno != EINTR) return false;
-  }
-  return WIFEXITED(status) && WEXITSTATUS(status) == 0;
 }
