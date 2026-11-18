@@ -2,7 +2,7 @@ import { AMBIGUOUS_CANDIDATE_LIMIT, normalizeThreadName, type ThreadCandidate } 
 import type { ThreadLocalAliasNote, ThreadStatus, ThreadToolResult } from "../contracts"
 import { createRelaySessionHost, listedThread } from "../control/relay-session-host"
 import type { HostedThread, SessionHost, SessionOpenRequest } from "../control/session-host"
-import { threadToolFailure } from "../errors"
+import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import { openedResult } from "../tools/thread-row"
 import {
   rowStatus,
@@ -53,13 +53,15 @@ const DEVICE_PREFIX_MIN = 6
 const deviceCandidates = (rows: readonly RemoteDevice[]) =>
   rows.slice(0, AMBIGUOUS_CANDIDATE_LIMIT).map((row) => ({ device: row.device, name: row.label, online: row.online }))
 
+type DeviceRefusal = { readonly kind: "error"; readonly error: ThreadToolFailure }
+
 const deviceFailure = (
   code: "not_found" | "ambiguous_target" | "device_offline",
   message: string,
   next: string,
   device: string,
   rows: readonly RemoteDevice[],
-): { readonly result: ThreadToolResult } => ({
+): { readonly result: DeviceRefusal } => ({
   result: {
     kind: "error",
     error: threadToolFailure(code, message, next, { device, candidates: deviceCandidates(rows) }),
@@ -76,7 +78,7 @@ const deviceFailure = (
 export function resolveDevice(
   devices: readonly RemoteDevice[],
   address: string,
-): { readonly row: RemoteDevice } | { readonly result: ThreadToolResult } {
+): { readonly row: RemoteDevice } | { readonly result: DeviceRefusal } {
   const byId = devices.find((row) => row.device === address)
   if (byId !== undefined) return { row: byId }
   const wanted = normalizeThreadName(address)

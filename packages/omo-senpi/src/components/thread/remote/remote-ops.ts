@@ -1,5 +1,6 @@
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import type { CommandResult } from "@oh-my-opencode/device-service-core"
+import type { RemoteClient } from "../../remote"
 import { accountDevices, accountState } from "./account"
 import { outcomeFailure, READ_UNCERTAIN } from "./outcome"
 import {
@@ -141,9 +142,17 @@ export async function holderTarget(
 
 /** A typed `device_offline` when the device is known and not online; nothing is ever queued for it (A3). */
 export async function deviceOnline(remote: RemoteThreadSurface, device: string): Promise<Failure | undefined> {
-  let devices: readonly RemoteDevice[]
+  const listed = await listedDevices(remote.client, device)
+  return "kind" in listed ? listed : deviceRefusal(listed.devices, device)
+}
+
+/** The account's devices, or a typed host_unavailable naming `device` when this device's service cannot list them. */
+export async function listedDevices(
+  client: RemoteClient,
+  device: string,
+): Promise<{ readonly devices: readonly RemoteDevice[] } | Failure> {
   try {
-    devices = (await accountDevices(remote.client)).devices
+    return { devices: (await accountDevices(client)).devices }
   } catch (error) {
     return fail(
       "host_unavailable",
@@ -152,7 +161,6 @@ export async function deviceOnline(remote: RemoteThreadSurface, device: string):
       { device, reason: error instanceof Error ? error.message : String(error) },
     )
   }
-  return deviceRefusal(devices, device)
 }
 
 /** deviceOnline over a device list the caller already read: not_found for an unknown id, device_offline for an offline one. */
