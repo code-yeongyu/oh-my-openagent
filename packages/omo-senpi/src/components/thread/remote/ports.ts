@@ -163,18 +163,21 @@ export type RemoteSessionsPort = {
   ) => Promise<RemoteCommandOutcome>
   /**
    * The id a session just created on `device` is addressed by (its listing row's `session_id`, the key an attach
-   * takes), from the durable engine session id the create reply names; settles once that id attaches.
+   * takes), from the durable engine session id the create reply names; settles once that id attaches. A `knownKey` the
+   * create reply already named is the answer as is: nothing is sent.
    */
   readonly locate: (device: string, engineId: string, knownKey?: string) => Promise<RemoteLocateOutcome>
   /**
    * An engine record for one session on `device` (`prompt`, `abort`, `get_state`), through an attach. A read the
-   * session's mirror holds is answered locally unless `fresh` is set.
+   * session's mirror holds is answered locally unless `fresh` is set. `direct` sends it to the session `device` lists
+   * under `sessionId` with no attach (one round trip instead of two), for a record that needs no session events back; a
+   * service that refuses that before sending (older than #393 part B) gets the record through an attach instead.
    */
   readonly sessionCommand: (
     device: string,
     sessionId: string,
     rpc: JsonObject,
-    options?: { readonly fresh?: boolean },
+    options?: { readonly fresh?: boolean; readonly direct?: boolean },
   ) => Promise<RemoteCommandOutcome>
   readonly read: (device: string, sessionId: string, tail: number) => Promise<RemoteCommandOutcome>
   /** omo#13037 A4.2/A4.3: one single-probe locate of `durableId` on `device`. Absent: no lookup is ever made. */

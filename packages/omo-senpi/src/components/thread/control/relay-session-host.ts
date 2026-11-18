@@ -126,11 +126,12 @@ export function createRelaySessionHost(
       }
       let applied = name
       if (name !== undefined) {
-        const named = await remote.sessions.sessionCommand(device, threadId, {
-          type: "set_session_name",
-          sessionId: threadId,
-          name,
-        })
+        const named = await remote.sessions.sessionCommand(
+          device,
+          threadId,
+          { type: "set_session_name", sessionId: threadId, name },
+          { direct: true },
+        )
         if (named.kind !== "ok") {
           applied = undefined
           const failed = outcomeFailure(named, device).error

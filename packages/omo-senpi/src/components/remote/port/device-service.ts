@@ -6,10 +6,17 @@ import {
   REFUSED_BEFORE_SENDING,
   WAKE_ACCEPTS,
   type DeviceService,
+  type EndpointCommandResult,
   type RemoteAttach,
 } from "@oh-my-opencode/device-service-core/device-service"
 import { CATALOG_RECORD, createAttachPool, type HeldAttach } from "../../thread/remote/attach-pool"
-import type { DeviceServiceDial, JsonObject, RemoteListing, RemoteSessionsPort } from "../../thread/remote/ports"
+import type {
+  DeviceServiceDial,
+  JsonObject,
+  RemoteCommandOutcome,
+  RemoteListing,
+  RemoteSessionsPort,
+} from "../../thread/remote/ports"
 import { openSessionWatch } from "../../thread/remote/remote-watch"
 
 export type DeviceServiceSessionsOptions = {
@@ -73,6 +80,12 @@ const MARKED_RECORDS: ReadonlySet<string> = new Set(["admit_external_message"])
 // A single-probe locate that ran and found nothing: the device answered and holds no such session. Any other failure
 // means the device did not answer within the bound (or could not be reached), so the lookup counts it as silent.
 const LOOKUP_NONE: ReadonlySet<string> = new Set(["session_not_found", "peer_not_found", "peer_not_session_client"])
+
+// A kept endpoint key the device no longer lists: its synchronous refusal (this device's service answers a command to an
+// endpoint key no listing names `unsupported`, with no command id: nothing was sent) or the device's `route_unlisted`.
+const UNLISTED_ENDPOINT: RemoteCommandOutcome = { kind: "refused", reason: "route_unlisted" }
+const unlistedEndpointError = (error: unknown): boolean =>
+  error instanceof LocalApiError && error.command_id === undefined && error.code === "unsupported"
 
 const recordKey = (record: WireRpc): string =>
   JSON.stringify(Object.entries(record).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
@@ -158,6 +171,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       },
     )).then((dialed) => dialed.conn)
   const pool = createAttachPool(svc, attachAddressed, options.attachIdleMs)
+  const endpoints = new Map<string, string>()
   const sessionCommand: RemoteSessionsPort["sessionCommand"] = async (device, sessionId, rpc, commandOptions) => {
     // Before the command goes out nothing can have run: an attach that fails (session_not_found, as unknown_session; peer_not_found,
     // host_not_answering, a lost connection) or a record that is not JSON is refused with its code, typed.
@@ -167,6 +181,23 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       record = wireRecord(rpc)
     } catch {
       return { kind: "refused", reason: "invalid_record" }
+    }
+    // `direct`: the device's service delivers the record to the session it lists under that key, with no attach here.
+    // No connection means nothing was sent, as when the attach path cannot attach. A refusal before sending (the core
+    // marks it NotSentError; a service older than #393 part B answers the `{session}` target `unsupported`) ran nothing,
+    // so the record goes the attach way instead. Anything else may have run on the other device and is never resent.
+    if (commandOptions?.direct === true) {
+      let connected: DeviceService
+      try {
+        connected = await svc()
+      } catch (error) {
+        return { kind: "refused", reason: sessionReason(notSentReason(error)) }
+      }
+      try {
+        return outcomeOf(await connected.sessionCommand(device, sessionId, record))
+      } catch (error) {
+        if (!(error instanceof NotSentError)) return { kind: "uncertain", reason: "reply_lost" }
+      }
     }
     try {
       held = await pool.hold(device, sessionId)
@@ -276,8 +307,31 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         return { kind: "refused", reason: notSentReason(error) }
       }
       const connected = dialed.conn
+      // The device's engine endpoint key, kept from the last command toward it, spares each later one its session.endpoints
+      // round trip. A key the device no longer lists (its host restarted) is refused before anything runs, as an
+      // `unsupported` error response from this device's service or a `route_unlisted` refusal from the device's; only
+      // that refusal of a KEPT key forgets it and sends the record once more on a fresh lookup. Every other outcome is
+      // the answer as is: an engine that ran the record and failed it, or an uncertain one, is never sent again.
+      const send = async (endpoint: string | undefined): Promise<RemoteCommandOutcome> => {
+        let sent: EndpointCommandResult
+        try {
+          sent = await connected.endpointCommand(device, record, { ...endpointOptions, endpoint })
+        } catch (error) {
+          if (endpoint !== undefined && unlistedEndpointError(error)) return UNLISTED_ENDPOINT
+          throw error
+        }
+        if (sent.outcome.state === "engine_refused" && sent.outcome.reason === "route_unlisted") {
+          endpoints.delete(device)
+          return endpoint === undefined ? outcomeOf(sent) : UNLISTED_ENDPOINT
+        }
+        endpoints.set(device, sent.endpoint)
+        return outcomeOf(sent)
+      }
       try {
-        return outcomeOf(await connected.endpointCommand(device, record, endpointOptions))
+        const outcome = await send(endpoints.get(device))
+        if (outcome !== UNLISTED_ENDPOINT) return outcome
+        endpoints.delete(device)
+        return await send(undefined)
       } catch (error) {
         // The SDK marks a failure before session.command was written (the endpoint lookup timing out or the connection
         // closing during it) not_sent: nothing ran, so it is refused. The same codes after sending stay uncertain.
@@ -390,15 +444,15 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       } catch (error) {
         return { kind: "refused", reason: notSentReason(error) }
       }
-      // A create reply that already names the session's listing key needs no session.locate round trip.
+      // A create reply that already names the session's listing key needs no session.locate round trip, and no attach
+      // either: a located session is attachable at once (CommandResult.located), so the next command attaches it itself.
+      if (knownKey !== undefined) return { kind: "ok", sessionId: knownKey }
       let key: string
-      if (knownKey !== undefined) key = knownKey
-      else
-        try {
-          key = (await connected.locate(device, engineId)).key
-        } catch (error) {
-          return { kind: "refused", reason: error instanceof LocalApiError ? error.code : "locate_failed" }
-        }
+      try {
+        key = (await connected.locate(device, engineId)).key
+      } catch (error) {
+        return { kind: "refused", reason: error instanceof LocalApiError ? error.code : "locate_failed" }
+      }
       // The session exists under `key` from here on; wait (bounded) until the listing names it so the next command's
       // attach finds it, and keep that attach for it.
       const deadline = Date.now() + CREATED_ATTACH_WAIT_MS
