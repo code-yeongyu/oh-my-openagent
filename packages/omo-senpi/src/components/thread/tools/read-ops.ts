@@ -53,8 +53,9 @@ export function listThreads(
 }
 
 /**
- * A first read takes the trailing window; a read that carries a cursor continues forward from it.
- * Tail mode ignores the cursor, so following next_cursor in tail mode returned the same slice again.
+ * A first read takes the newest entries of the trailing window that fit the budget; a read that carries a cursor
+ * pages from it (a first read's cursor names the older part of that window). Tail mode ignores the cursor, so following
+ * next_cursor in tail mode returned the same slice again.
  */
 function readWindow(value: ThreadReadInput): { mode: "tail" | "page"; max_bytes?: number; cursor?: string } {
   return { mode: value.cursor === undefined ? "tail" : "page", max_bytes: value.max_bytes, cursor: value.cursor }
