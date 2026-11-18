@@ -62,6 +62,7 @@ const legacy = [
   ["desktop-to-cli", "desktop-to-cli.mjs"],
   ["plugin-surface", "plugin-surface.mjs"],
   ["session-control", "session-control-qa.mjs"],
+  ["reopen-exited", "reopen-exited.mjs"],
 ]
 
 function option(name) {
