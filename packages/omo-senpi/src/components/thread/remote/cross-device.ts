@@ -1,6 +1,6 @@
 import type { ThreadDevice, ThreadToolResult } from "../contracts"
 import { threadToolFailure } from "../errors"
-import { listedThread } from "../control/relay-session-host"
+import { displayedThread } from "../control/relay-session-host"
 import { threadRow } from "../tools/thread-row"
 import {
   rowThreadId,
@@ -244,7 +244,7 @@ export async function listAcross(
     ...local.threads.map((thread) =>
       hereName === null || thread.machine !== undefined ? thread : { ...thread, machine: hereName },
     ),
-    ...others.map((row) => threadRow(listedThread(row), machines.get(row.device))),
+    ...others.map((row) => threadRow(displayedThread(row), machines.get(row.device))),
   ]
   // A roster that fails is said, never silently dropped: the threads stay merged and remote_unavailable names it.
   const merged: ThreadToolResult = {

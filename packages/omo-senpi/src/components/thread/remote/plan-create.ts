@@ -1,6 +1,6 @@
 import { AMBIGUOUS_CANDIDATE_LIMIT, normalizeThreadName, type ThreadCandidate } from "../addressing"
 import type { ThreadLocalAliasNote, ThreadStatus, ThreadToolResult } from "../contracts"
-import { createRelaySessionHost, listedThread } from "../control/relay-session-host"
+import { createRelaySessionHost, displayedThread } from "../control/relay-session-host"
 import type { HostedThread, SessionHost, SessionOpenRequest } from "../control/session-host"
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import { openedResult } from "../tools/thread-row"
@@ -310,7 +310,7 @@ export async function planCreate(
     // Only a row its device listed live this round is answered as already live (B's engine holds it). An ended row, or a
     // cached snapshot of a device that did not answer (#14043), is opened again from its file; the relay host refuses
     // that open device_offline while the device stays offline.
-    if (rowStatus(target.row) === "live") return alreadyLive(listedThread(target.row), target.row.device)
+    if (rowStatus(target.row) === "live") return alreadyLive(displayedThread(target.row), target.row.device)
     return {
       kind: "open",
       host: createRelaySessionHost(remote, target.row.device, target.row),

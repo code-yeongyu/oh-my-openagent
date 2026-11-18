@@ -1,3 +1,4 @@
+import { escapeForDisplay } from "@oh-my-opencode/utils"
 import { gatewaySchemaRefusal, threadToolFailure } from "./errors"
 import type { ThreadToolFailure } from "./errors"
 import { type Static } from "typebox"
@@ -604,7 +605,8 @@ async function deliverThrough(
       device: sent.device,
     }
     const row = target.kind === "remote" ? target.row : undefined
-    const title = row?.title
+    // #13304: another device's title and project are printed escaped.
+    const title = row === undefined ? undefined : escapeForDisplay(row.title)
     if (resolvedBy === undefined || row === undefined)
       return {
         kind: "ok",
@@ -619,13 +621,13 @@ async function deliverThrough(
       kind: "ok",
       ...threadRow({
         thread_id: sent.thread_id,
-        name: row.title,
+        name: escapeForDisplay(row.title),
         status: "live",
-        cwd: row.project,
+        cwd: escapeForDisplay(row.project),
         created_at: seen,
         updated_at: seen,
         device: row.device,
-        link: threadLink(sent.thread_id, row.title),
+        link: threadLink(sent.thread_id, escapeForDisplay(row.title)),
       }),
       resolved_by: resolvedBy,
       delivery: sent.delivery,

@@ -1,3 +1,4 @@
+import { escapeForDisplay } from "@oh-my-opencode/utils"
 import type { RpcRemoteSource, SenpiExtensionAPI } from "../../../extension/types"
 import type * as CrossDevice from "./cross-device"
 import type * as MonitorSource from "./monitor-source"
@@ -63,7 +64,8 @@ export const createRelayControl = (remote: RemoteThreadSurface, row: RemoteSessi
   return {
     thread_id: rowThreadId(row),
     device: row.device,
-    title: row.title,
+    // #13304: printed by thread_read; another device's own text.
+    title: escapeForDisplay(row.title),
     visible: async () => await (await built).visible(),
     interrupt: async (turnId) => await (await built).interrupt(turnId),
     close: async () => await (await built).close(),

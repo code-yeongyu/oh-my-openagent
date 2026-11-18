@@ -1,4 +1,5 @@
 import type { ThreadSummary } from "../contracts"
+import { escapeForDisplay } from "@oh-my-opencode/utils"
 import { rowLabel, rowStatus, rowThreadId } from "../remote/ports"
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import { INITIAL_SKILLS_CONTEXT_KEY } from "../initial-skills"
@@ -22,8 +23,19 @@ const nonEmpty = (value: unknown): string | undefined =>
 const recordOf = (value: unknown): JsonObject =>
   typeof value === "object" && value !== null && !Array.isArray(value) ? (value as JsonObject) : {}
 
-/** A listing row as the tools report a thread on another device (thread_list with all_scope shows the same). */
-export function listedThread(row: RemoteSessionRow): HostedThread {
+const remoteName = (text: string | undefined): string | null => (text === undefined ? null : escapeForDisplay(text))
+
+/**
+ * A listing row as the tools report a thread on another device (thread_list with all_scope shows the same): that
+ * device's title and project are printed escaped (#13304), while matching keeps listedThread's raw values.
+ */
+export function displayedThread(row: RemoteSessionRow): HostedThread {
+  const listed = listedThread(row)
+  const name = escapeForDisplay(listed.name)
+  return { ...listed, name, cwd: escapeForDisplay(listed.cwd), link: threadLink(listed.thread_id, name) }
+}
+
+function listedThread(row: RemoteSessionRow): HostedThread {
   const seen = new Date(row.updated_ms).toISOString()
   // D2 (decision 0027): the id a caller sees and may pass back is the durable id; the listing key stays inside sessionId
   // for the relay transport. A device that publishes no durable id lists an empty id: address its threads by name.
@@ -117,9 +129,9 @@ export function createRelaySessionHost(
           warnings.push(
             threadToolFailure(
               "unsupported",
-              `Device ${device} created the thread but did not name its relay key (${located.reason}).`,
+              `Device ${device} created the thread but did not name its relay key (${escapeForDisplay(located.reason)}).`,
               "Address it by its thread value once thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) lists it, or update omo on that device.",
-              { device, reason: located.reason },
+              { device, reason: escapeForDisplay(located.reason) },
             ),
           )
         threadId = located.kind === "ok" ? located.sessionId : engineId
@@ -163,8 +175,8 @@ export function createRelaySessionHost(
         ...facts,
         sessionId: threadId,
         ...(durable === undefined ? {} : { durableSessionId: durable }),
-        cwd: nonEmpty(state["cwd"]) ?? open.cwd ?? listed?.project ?? "",
-        name: applied ?? nonEmpty(state["sessionName"]) ?? listed?.title ?? null,
+        cwd: escapeForDisplay(nonEmpty(state["cwd"]) ?? open.cwd ?? listed?.project ?? ""),
+        name: applied ?? remoteName(nonEmpty(state["sessionName"]) ?? listed?.title),
       }
       const extras = {
         ...(made === undefined ? {} : { worktree: made.worktree }),
