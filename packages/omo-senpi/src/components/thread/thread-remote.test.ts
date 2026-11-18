@@ -332,6 +332,22 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     expect(a.sent.filter((entry) => entry.via === "session" || entry.via === "wake")).toEqual([])
   })
 
+  test("#given an online b that refuses the reopen of its listed thread (it holds no session file) #when thread_send names that thread next #then not_resumable at once, and no session command waits on b (#14184, re-probe 2)", async () => {
+    // A cached row of an online device that runs nothing under it: the reopen asks b, which holds no file; the send that
+    // follows asks b again and answers at once, instead of attaching to the row's old key until b's deadline.
+    const a = account({ rows: [{ ...B_ROW, source: "cache" }], live: [], sessionFiles: {} })
+    const { run } = surface(a.remote)
+    expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({
+      kind: "error",
+      error: { code: "not_found" },
+    })
+    expect(await run("thread_send", { thread: "dur-on-b", message: "still there?" })).toMatchObject({
+      kind: "error",
+      error: { code: "not_resumable", details: { device: "b", thread: "dur-on-b" } },
+    })
+    expect(a.sent.filter((entry) => entry.via === "session" || entry.via === "wake")).toEqual([])
+  })
+
   test("#given b's thread was closed here and then reopened from another device, while this device's listing still reads it closed #when thread_send names it #then b says it runs, and the send is delivered to it, never refused not_resumable (#14179 review L4)", async () => {
     const a = account({ rows: [B_ROW] })
     const { run } = surface(a.remote)

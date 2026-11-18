@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { rowThreadId } from "./ports"
+import { rowStatus, rowThreadId } from "./ports"
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import { hashArgs } from "../gateway/bindings"
 import { decideDelivery } from "../gateway/decision"
@@ -343,10 +343,11 @@ export function createRelayTransport(
     // omo#13037 5.4 / A4.5: a session no engine runs takes the wake path when this device's service can carry it: no lane
     // probe (its state is offline in the decision table), so a steer is turn_conflict and nothing is sent.
     const ended = row.state === "ended" && (await remote.sessions.canWake?.()) === true
-    // #14184: with no wake path, a session its holder does not run cannot take the record, and a command to its listing
-    // key waits out the device's own deadline (about 60 s) before failing: answered at once, as thread_read answers it.
-    // The holder is asked first, because the listing (and this surface's closed mark) lags a reopen made elsewhere.
-    if (row.state === "ended" && !ended) {
+    // #14184: a row that is not live (ended, or a cached snapshot) and takes no wake path is a session its holder may not
+    // run, and a command to its listing key waits out the device's own deadline (about 60 s) before failing. The holder
+    // is asked first (the listing and this surface's closed mark lag a reopen made elsewhere): a session it does not run
+    // is answered at once, as thread_read answers it.
+    if (rowStatus(row) !== "live" && !ended) {
       if (!(await runsNow(remote, row)))
         return fail(
           "not_resumable",
