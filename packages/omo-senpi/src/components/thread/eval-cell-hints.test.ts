@@ -33,8 +33,12 @@ function read(source: string): { code: string; sentences: string[] } {
 function hintProblems(sentences: readonly string[]): string[] {
   const problems: string[] = []
   for (const sentence of sentences) {
-    for (const [name] of sentence.matchAll(BARE_TOOL))
-      if (name in SCHEMAS && !sentence.includes(`tool.${name}(`)) problems.push(`bare ${name}`)
+    for (const [name] of sentence.matchAll(BARE_TOOL)) {
+      if (!(name in SCHEMAS)) continue
+      if (!sentence.includes(`tool.${name}(`)) problems.push(`bare ${name}`)
+      // #13240 review L2: the eval form alone does not say where to run it.
+      else if (!sentence.includes("eval cell")) problems.push(`${name} without the eval cell`)
+    }
     for (const [, name = "", args] of sentence.matchAll(EVAL_FORM)) {
       const schema = SCHEMAS[name]
       if (schema === undefined) problems.push(`no tool.${name}`)
@@ -58,9 +62,16 @@ describe("model-facing thread text names the eval cell", () => {
       "// a comment's lone quote must not hide the next line",
       "export const c = `Send it to ${session}; thread_read shows the reply.`",
       `export const d = 'Retry with mode set to "tail", then thread_rename it.'`,
+      'export const e = "Claim it again with thread_rename (tool.thread_rename())."',
     ])
 
-    expect(problems).toEqual(["bare thread_outbox", "bare thread_outbox", "bare thread_read", "bare thread_rename"])
+    expect(problems).toEqual([
+      "bare thread_outbox",
+      "bare thread_outbox",
+      "bare thread_read",
+      "bare thread_rename",
+      "thread_rename without the eval cell",
+    ])
   })
 
   test("#given names, scopes, comments, types and eval forms #when scanned #then nothing is reported", () => {

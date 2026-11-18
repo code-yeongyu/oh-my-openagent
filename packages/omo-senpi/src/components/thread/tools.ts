@@ -90,6 +90,13 @@ const RENAME_REASON_MAX_CHARS = 300
 const PUBLISHED_SEND_VIEW: ThreadHostView = { sessions: [], hosts: [], disk: [] }
 /** A reply to a sender on another device resolves on that device alone and reads no view of this one. */
 const NO_LOCAL_VIEW: ThreadHostView = { sessions: [], hosts: [], disk: [] }
+
+/**
+ * This device's id as one send already read it, keyed by the view that send took (#13483 review L1): the choice of view
+ * and the route in `locate` rest on the same read, so a read that fails and then succeeds cannot pick an empty view and
+ * then route a local reply into it.
+ */
+const DEVICE_READ = new WeakMap<ThreadHostView, string | undefined | ThreadToolFailure>()
 /** A control tool's answer for a thread no engine holds live, on this device or another. */
 const NOT_LIVE: ThreadToolResult = failure(
   "not_resumable",
@@ -295,7 +302,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
           failure(
             "unsupported",
             `The target's endpoint does not accept ${message.slice("unsupported:".length)}: that terminal runs an engine from before terminal session controls.`,
-            "Update omo where that terminal runs and restart it, or use thread_send and thread_read (tool.thread_send() and tool.thread_read() in an eval cell); thread_list (tool.thread_list()) shows each thread's controls.",
+            "Update omo where that terminal runs and restart it, or use thread_send and thread_read (tool.thread_send() and tool.thread_read() in an eval cell); thread_list (tool.thread_list() in an eval cell) shows each thread's controls.",
             { command: message.slice("unsupported:".length) },
           ),
         )
@@ -314,12 +321,14 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
       // A send takes nothing live as the offline case: its view never raises host_unavailable.
       // A reply whose sender is on another device resolves there alone (A4.3.1), so it takes no local listing.
       const sendTo = name === "thread_send" && "thread" in value && typeof value.thread === "string" ? value.thread : ""
-      const current =
-        sendTo !== "" && sendTo !== "self" && (await store.sessionOwner(sendTo)) !== null
-          ? PUBLISHED_SEND_VIEW
-          : sendTo !== "" && (await replyLeavesThisDevice(options, sendTo))
-            ? NO_LOCAL_VIEW
-            : await view(receipted ? undefined : { offline: true })
+      let current: ThreadHostView
+      if (sendTo !== "" && sendTo !== "self" && (await store.sessionOwner(sendTo)) !== null)
+        current = PUBLISHED_SEND_VIEW
+      else {
+        const route = sendTo === "" ? undefined : await replyRoute(options, sendTo)
+        current = route?.leaves === true ? { ...NO_LOCAL_VIEW } : await view(receipted ? undefined : { offline: true })
+        if (route?.read === true) DEVICE_READ.set(current, route.here)
+      }
       result = await sideEffect(current, value, scope.idempotency_key, callerId, retrying)
     } catch (error) {
       // A control's typed refusal is the call's answer, recorded like one: a retry under the same key replays it.
@@ -796,7 +805,8 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
     // Amendment A4.3.1 of #13037: a send approved as a reply resolves on the device the consumed delivery came from, before
     // this device's own entries and before any other listing match, whether the sender is named by id or by stated name.
     const senders = match === "exact" ? consumedSendersOf(options, address) : []
-    const here = await thisDeviceOf(options, senders)
+    const here =
+      match === "exact" && DEVICE_READ.has(current) ? DEVICE_READ.get(current) : await thisDeviceOf(options, senders)
     if (typeof here === "object") return refuse(here)
     const replyTo = replySender(address, senders, here)
     if (replyTo !== undefined && "code" in replyTo) return refuse(replyTo)
@@ -1078,15 +1088,25 @@ async function unattestedSenderAmbiguity(
   )
 }
 
-/** True when `address` is an approved reply to a consumed sender on another device, or names such senders ambiguously. */
-async function replyLeavesThisDevice(options: ThreadToolSurfaceOptions, address: string): Promise<boolean> {
+/**
+ * Whether `address` is an approved reply to a consumed sender on another device, or names such senders ambiguously
+ * (`leaves`), with this device's id as read for that decision (`here`, when `read`), which `locate` reuses.
+ */
+async function replyRoute(
+  options: ThreadToolSurfaceOptions,
+  address: string,
+): Promise<{
+  readonly leaves: boolean
+  readonly read: boolean
+  readonly here?: string | undefined | ThreadToolFailure
+}> {
   const senders = consumedSendersOf(options, address)
-  if (!senders.some((sender) => sender.device !== undefined)) return false
+  if (!senders.some((sender) => sender.device !== undefined)) return { leaves: false, read: false }
   const here = await thisDeviceOf(options, senders)
   // An unreadable device id takes no local listing either: the send answers that failure (sendTarget) before any route.
-  if (typeof here === "object") return true
+  if (typeof here === "object") return { leaves: true, read: true, here }
   const replyTo = replySender(address, senders, here)
-  return replyTo !== undefined && ("code" in replyTo || replyTo.device !== undefined)
+  return { leaves: replyTo !== undefined && ("code" in replyTo || replyTo.device !== undefined), read: true, here }
 }
 
 /**

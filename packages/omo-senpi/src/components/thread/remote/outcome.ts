@@ -140,7 +140,7 @@ export function outcomeFailure(
     return fail(
       "not_resumable",
       `The thread is not running on device ${device} (${outcome.reason}).`,
-      "Call thread_list to see the thread's current state, then retry when it runs again.",
+      "Call thread_list (tool.thread_list() in an eval cell) to see the thread's current state, then retry when it runs again.",
       { device, reason: outcome.reason },
     )
   // senpi S32: the other device's engine refuses a thread call past its own user's `threads.chainCountLimit`. Nothing

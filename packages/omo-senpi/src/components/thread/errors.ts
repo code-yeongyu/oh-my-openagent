@@ -86,8 +86,16 @@ export function threadToolFailure(
  * both versions and the remedy. Any other error answers undefined.
  */
 export function gatewaySchemaRefusal(error: unknown): ThreadToolFailure | undefined {
-  const { code, details } = (error ?? {}) as { code?: unknown; details?: { found?: unknown; supported?: unknown } }
-  if (code !== "gateway_schema_too_new" || typeof details?.found !== "number" || typeof details.supported !== "number")
+  const { code, details } = (error ?? {}) as {
+    code?: unknown
+    details?: { found?: unknown; supported?: unknown; extension?: unknown }
+  }
+  if (
+    code !== "gateway_schema_too_new" ||
+    typeof details?.found !== "number" ||
+    typeof details.supported !== "number" ||
+    details.extension !== undefined
+  )
     return undefined
   const command = UPDATE_COMMAND
   return threadToolFailure(
