@@ -73,7 +73,7 @@ describe("a listing key that differs from the durable id (decision 0027 D2)", ()
       relayKeys: new Map([[DURABLE, "rk-b-9"]]),
     })
     const { run } = fixture.surface(a.remote)
-    const created = await run("thread_create", { device: "b" })
+    const created = await run("thread_create", { name: "split-key-75", device: "b" })
     expect(created).toMatchObject({ kind: "ok", thread: DURABLE, device: "b" })
     // Round trip: the id handed back is the one the resolver takes (the new row is listed under rk-b-9 with that durable id).
     const b = fixture.account({
