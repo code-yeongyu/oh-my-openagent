@@ -10,7 +10,6 @@ import {
   TeamTaskInvalidTransitionError,
 } from "../../team"
 import { toolErrorResult, toolResult } from "../control"
-import { TASK_FAMILY_EXPOSURE } from "../exposure"
 import type { ToolExecutionResult } from "../control"
 import { isMissingStateError } from "./classify-error"
 import { renderTeamTaskCall, renderTeamTaskResult } from "./renderers"
@@ -162,13 +161,25 @@ export async function runTeamTaskUpdate(
   }
 }
 
-// The four lead tasklist tools are part of the eval-only task family (Q 2026-11-09): withheld from the
-// model's direct list while an eval tool exists and called as tool.task_create(...) etc. in a cell, so
-// they cost no prompt tokens there either. Each description leads with the situation that selects the tool.
-type TaskExposureMeta = Pick<ToolDefinition, "exposure">
+// The four lead tasklist tools only matter once a team exists, so they ride the
+// tool-search catalog (exposure "search") instead of the resident tool list:
+// zero prompt tokens until a tasklist operation is actually searched for. Each
+// description leads with the situation that selects the tool.
+const TEAM_TASK_SEARCH_GROUP = "team-tasklist" as const
 
-function taskExposure(): TaskExposureMeta {
-  return { exposure: TASK_FAMILY_EXPOSURE }
+type TaskSearchMeta = Pick<
+  ToolDefinition,
+  "exposure" | "searchText" | "searchKeywords" | "searchGroup" | "allowLazyActivation"
+>
+
+function taskSearchMeta(searchText: string, searchKeywords: readonly string[]): TaskSearchMeta {
+  return {
+    exposure: "search",
+    searchText,
+    searchKeywords,
+    searchGroup: TEAM_TASK_SEARCH_GROUP,
+    allowLazyActivation: true,
+  }
 }
 
 export function createTeamTaskCreateTool(
@@ -183,7 +194,10 @@ export function createTeamTaskCreateTool(
     execute: (_toolCallId: string, params: TeamTaskCreateInput) => runTeamTaskCreate(deps.service, params),
     renderCall: (args, theme) => renderTeamTaskCall("create", args, theme),
     renderResult: (result, options, theme) => renderTeamTaskResult("create", result, options, theme),
-    ...taskExposure(),
+    ...taskSearchMeta(
+      "add a task to the team board, register a work item for the team to claim, break work into claimable team tasks",
+      ["add team task", "claimable work item", "team tasklist entry"],
+    ),
   }
 }
 
@@ -199,7 +213,12 @@ export function createTeamTaskListTool(
     execute: (_toolCallId: string, params: TeamTaskListInput) => runTeamTaskList(deps.service, params),
     renderCall: (args, theme) => renderTeamTaskCall("list", args, theme),
     renderResult: (result, options, theme) => renderTeamTaskResult("list", result, options, theme),
-    ...taskExposure(),
+    ...taskSearchMeta("see the team task board, what work items are pending or claimed, who owns which team task", [
+      "team task list",
+      "task board",
+      "who owns a task",
+      "pending team tasks",
+    ]),
   }
 }
 
@@ -215,7 +234,11 @@ export function createTeamTaskGetTool(
     execute: (_toolCallId: string, params: TeamTaskGetInput) => runTeamTaskGet(deps.service, params),
     renderCall: (args, theme) => renderTeamTaskCall("get", args, theme),
     renderResult: (result, options, theme) => renderTeamTaskResult("get", result, options, theme),
-    ...taskExposure(),
+    ...taskSearchMeta("read one team task, check a work item's status or description by id", [
+      "read team task",
+      "task details",
+      "task by id",
+    ]),
   }
 }
 
@@ -231,6 +254,9 @@ export function createTeamTaskUpdateTool(
     execute: (_toolCallId: string, params: TeamTaskUpdateInput) => runTeamTaskUpdate(deps.service, params),
     renderCall: (args, theme) => renderTeamTaskCall("update", args, theme),
     renderResult: (result, options, theme) => renderTeamTaskResult("update", result, options, theme),
-    ...taskExposure(),
+    ...taskSearchMeta(
+      "mark a team task done or in progress, claim or release a work item, change a task's status on the team board",
+      ["mark task done", "claim task", "update task status", "task progress"],
+    ),
   }
 }

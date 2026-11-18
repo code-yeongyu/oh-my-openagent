@@ -120,7 +120,7 @@ export function outcomeFailure(
     return fail(
       "unsupported",
       `The thread on device ${device} is too large to send back in one relay record (record_too_large).`,
-      "Read it on that device, or ask that thread for a summary with tool.thread_send({ thread, message }) in an eval cell.",
+      "Read it on that device, or ask that thread for a summary with thread_send.",
       { device, reason: outcome.reason },
     )
   return fail(

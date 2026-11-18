@@ -257,10 +257,13 @@ describe("host turn reconciliation authority", () => {
       const f = scenario({ receipt, aborted: true, deadline: true })
       expect(await reconcileHostTurn(f.port, {}, f.path)).toBe("stopped_deadline")
       expect(f.outcomes).toEqual([{ status: "cancelled" }])
-      expect(f.notices).toHaveLength(1)
-      expect(f.notices[0]).toMatchObject({ kind: "interrupted", deadline: { kind: "inactivity" } })
-      expect(f.notices[0]?.reason).toContain("tool.task_output({ task_id })")
-      expect(f.notices[0]?.reason).toContain("tool.task_send")
+      expect(f.notices).toEqual([
+        {
+          kind: "interrupted",
+          reason: expect.any(String),
+          deadline: { kind: "inactivity" },
+        },
+      ])
     })
   }
 })

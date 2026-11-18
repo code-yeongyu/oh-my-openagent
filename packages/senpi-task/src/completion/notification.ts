@@ -123,7 +123,7 @@ function durationMs(record: TaskRecord): number {
 function continuationHint(record: TaskRecord): string {
   const mode = messageability(record.status, record.residency_state, record.execution_mode, record.killed)
   if (mode === "not-continuable") return ""
-  return `Continue in an eval cell: tool.task_send({ to: "${record.task_id}", message: "..." }).`
+  return `Use task_send({ to: "${record.task_id}", message: "..." }) to continue.`
 }
 
 function completionDetailLines(detail: CompletionDetails, width: number | undefined): readonly string[] {

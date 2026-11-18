@@ -7,7 +7,6 @@ import type { Static, TSchema } from "typebox"
 
 import type { PersistedTaskEvent } from "../../store"
 import { toolResult } from "../../tools/control/tool-result"
-import { TASK_FAMILY_EXPOSURE } from "../../tools/exposure"
 import { buildTeamMessage } from "../messaging/message"
 import { TEAM_LEAD_SENTINEL } from "../normalize"
 
@@ -98,7 +97,6 @@ export function createMemberTaskSendTool(
     name: "task_send",
     label: "Task Send",
     description: "Send a durable message to another team member or the team lead.",
-    exposure: TASK_FAMILY_EXPOSURE,
     parameters: MemberTaskSendParams,
     execute: (_toolCallId, params) => runMemberTaskSend(deps, params),
   }

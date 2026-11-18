@@ -4,7 +4,6 @@ import { Type } from "typebox"
 import type { Static } from "typebox"
 
 import { shouldNotifyStatus } from "../../completion/routing"
-import { TASK_FAMILY_EXPOSURE } from "../exposure"
 import type { ListScope, ListedTask } from "../../manager"
 import type { TaskRecord } from "../../state"
 import { hostLivenessText } from "../../state/host-liveness"
@@ -235,7 +234,6 @@ export function createTaskOutputTool(deps: TaskOutputDeps): TaskOutputTool {
     name: "task_output",
     label: "Task Output",
     description: DESCRIPTION,
-    exposure: TASK_FAMILY_EXPOSURE,
     parameters: TaskOutputParams,
     execute: (_toolCallId, params, _signal, _onUpdate, ctx) =>
       runTaskOutput(deps, params, resolveCaller(ctx), statusReads),
