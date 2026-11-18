@@ -102,6 +102,47 @@ describe("B1: a thread no engine runs answers every tool the same way, and never
   })
 })
 
+describe("#13215: a session another device holds but lists nowhere answers read and controls as it does on its own device", () => {
+  // The account listing carries only sessions an engine serves: b's closed session is found only by the id probe (A4.3.3).
+  const CLOSED = "0195f0c2-1a2b-7c3d-8e4f-00000000d001"
+  const unlisted = (leg: Leg) => {
+    if (leg === "local") {
+      const local = surface(undefined, { sessions: [], sessionsDirectory: true })
+      writeSessionFile(local.agentDir, CLOSED)
+      return { run: local.run, lookups: [] as readonly unknown[] }
+    }
+    const b = account({ wakeFeature: true, ended: { b: { [CLOSED]: "rk-closed" } } })
+    return { run: surface(b.remote).run, lookups: b.lookups }
+  }
+
+  test("#given a closed session on b that b lists nowhere #when thread_read names it by session id on device a #then the id probe finds it on b and it answers not_resumable, never not_found", async () => {
+    const remote = unlisted("remote")
+    expect(errorOf(await remote.run("thread_read", { thread: CLOSED }))).toMatchObject({ code: "not_resumable" })
+    expect(remote.lookups).toEqual([{ device: "b", durable_id: CLOSED }])
+  })
+
+  test("#given a closed session by session id on each leg #when every control tool names it #then both legs answer the same refusal", async () => {
+    const local = unlisted("local")
+    const remote = unlisted("remote")
+    for (const [tool, args] of [
+      ["thread_interrupt", {}],
+      ["thread_rename", { name: "renamed" }],
+      ["thread_set_model", { model: "opus" }],
+      ["thread_set_reasoning", { level: "low" }],
+    ] as const) {
+      const here = errorOf(await local.run(tool, { thread: CLOSED, ...args }))
+      const there = errorOf(await remote.run(tool, { thread: CLOSED, ...args }))
+      expect(here?.code).toBe("not_resumable")
+      expect(there).toEqual(here)
+    }
+    const withoutDevice = ({ device: _device, ...rest }: Record<string, unknown>) => rest
+    const closedHere = (await local.run("thread_close", { thread: CLOSED })) as Record<string, unknown>
+    const closedThere = (await remote.run("thread_close", { thread: CLOSED })) as Record<string, unknown>
+    expect(closedHere).toMatchObject({ kind: "ok", closed: false, reason: "not_live" })
+    expect(withoutDevice(closedThere)).toEqual(withoutDevice(closedHere))
+  })
+})
+
 const ENGINE_STATE = {
   lifecycle: { state: "done", seq: 0, epoch: 0 },
   paused: false,
@@ -137,8 +178,11 @@ describe("B2: thread_create answers one summary shape on both legs", () => {
     const b = account({
       openData: { sessionId: "rpc-9", state: { durableSessionId: "dur-new-on-b", ...ENGINE_STATE } },
     })
-    const here = await local.run("thread_create", {})
-    const there = await surface(b.remote).run("thread_create", { device: "studio" })
+    const here = await local.run("thread_create", { name: "thread-local-remote-parity-150" })
+    const there = await surface(b.remote).run("thread_create", {
+      name: "thread-local-remote-parity-151",
+      device: "studio",
+    })
     expect(here).toMatchObject({ kind: "ok", thread: "dur-created-here" })
     expect(there).toMatchObject({ kind: "ok", thread: "dur-new-on-b", device: "b" })
     expect(threadKeys(here)).toEqual(SUMMARY_KEYS)
@@ -163,7 +207,7 @@ describe("B3: a thread created outside the caller's workspace says how to addres
       sessions.push(opened)
       return opened
     })
-    const created = await local.run("thread_create", { cwd: folder })
+    const created = await local.run("thread_create", { name: "thread-local-remote-parity-176", cwd: folder })
     expect(created).toMatchObject({
       kind: "ok",
       thread: "dur-away",
@@ -183,8 +227,11 @@ describe("B3: a thread created outside the caller's workspace says how to addres
     async (leg) => {
       const created =
         leg === "local"
-          ? await surface(undefined).run("thread_create", {})
-          : await surface(account().remote).run("thread_create", { device: "studio" })
+          ? await surface(undefined).run("thread_create", { name: "thread-local-remote-parity-195" })
+          : await surface(account().remote).run("thread_create", {
+              name: "thread-local-remote-parity-196",
+              device: "studio",
+            })
       expect(created).toMatchObject({ kind: "ok" })
       expect(created).not.toHaveProperty("workspace_scope")
       expect(created).not.toHaveProperty("scope_next_action")

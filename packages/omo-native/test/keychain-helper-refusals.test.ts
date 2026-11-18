@@ -92,8 +92,19 @@ describe.skipIf(!isDarwin)("omo-keychain helper refusals (#11262 design 1, Refus
       "--stall-mutation",
       "--lifetime-ms",
       "--grace-ms",
+      "--store-root",
     ])
       expect(bytes.includes(flag)).toBe(false)
+    // OmO's own keychain (#13116 r2 finding 7): a release build serves it only when HOME is the password-database home,
+    // and refuses before any keychain call otherwise.
+    const environments: readonly Readonly<Record<string, string>>[] = [{}, { HOME: harness.dir }]
+    for (const env of environments) {
+      const store = await harness.run(
+        { v: 1, verb: "read", account: ACCOUNT, store: "omo" },
+        { binary: release, args: [], env },
+      )
+      expect(store.reply).toEqual({ error: "store-refused", reason: "home" })
+    }
   })
 
   test("Q5 switch: the default build serves root; the refuse-root build refuses it", async () => {

@@ -33,6 +33,18 @@ export function deviceName(host: string = machineHost()): string {
   return bounded === "" ? UNNAMED : bounded
 }
 
+/** The label every CLI device was registered under before #14044. */
+const LEGACY_PREFIX = "omo CLI on "
+
+/**
+ * Whether omo generated this device name itself (#13651): the pre-#14044 `omo CLI on <host>` label, the unnamed
+ * fallback, or the name built from the kernel hostname a Mac registered under before LocalHostName. Any other name is
+ * one the person chose, and omo never replaces it.
+ */
+export function isGeneratedDeviceName(name: string): boolean {
+  return name.startsWith(LEGACY_PREFIX) || name === UNNAMED || name === deviceName(hostname())
+}
+
 export function devicePlatform(): Platform {
   switch (process.platform) {
     case "darwin":
