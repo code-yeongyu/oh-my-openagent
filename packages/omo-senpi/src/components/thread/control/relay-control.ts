@@ -12,7 +12,7 @@ import { closeLadder, SESSION_GONE, type RecordAnswer } from "./close-ladder"
 import { interruptOver } from "./interrupt"
 import { ControlRefusal, refuse, SESSION_ONLY_THINKING_SCOPE, type SessionControl } from "./port"
 import { waitForTurnEnd } from "./wait-settled"
-import { listedThread } from "./relay-session-host"
+import { displayedThread } from "./relay-session-host"
 import { threadRow } from "../tools/thread-row"
 
 const isObject = (value: unknown): value is JsonObject =>
@@ -146,7 +146,7 @@ export function createRelayControl(
     },
     listed: async (archived) => {
       const { archived: _was, ...rest } = row
-      return threadRow(listedThread(archived ? { ...rest, archived: true } : rest))
+      return threadRow(displayedThread(archived ? { ...rest, archived: true } : rest))
     },
   }
 }
