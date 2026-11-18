@@ -94,6 +94,8 @@ export type DagStorePaths = {
   readonly event: (runId: DagRunId) => string
   readonly result: (runId: DagRunId, nodeId: string) => string
   readonly runLock: (runId: DagRunId) => string
+  readonly journalLock: (runId: DagRunId) => string
+  readonly runCoordinationLock: (runId: DagRunId) => string
   readonly keyLock: (parentSessionId: string, runKey: string) => string
   readonly taskOwnerLock: (taskOwner: string) => string
 }
@@ -110,10 +112,18 @@ export type DagFileStore = {
   readonly readKey: (parentSessionId: string, runKey: string) => DagKeyRecord | null
   readonly writeResult: (runId: DagRunId, nodeId: string, result: string) => string
   readonly readResult: (runId: DagRunId, nodeId: string) => string | null
+  /** Legacy name for the journal lock, including its original on-disk path. */
   readonly withRunLock: <T>(runId: DagRunId, operation: () => T) => T
+  readonly withRunCoordinationLock: <T>(runId: DagRunId, operation: () => T | Promise<T>) => Promise<T>
+  readonly withJournalLock: <T>(runId: DagRunId, operation: () => T) => T
+  readonly withAsyncJournalLock: <T>(runId: DagRunId, operation: () => T) => T | Promise<T>
+  readonly withAsyncJournalAndSessionLock: <T>(
+    runId: DagRunId,
+    parentSessionId: string,
+    operation: () => T,
+  ) => Promise<T>
   readonly withKeyLock: <T>(parentSessionId: string, runKey: string, operation: () => T) => T
-  /** Waits asynchronously for a run key, then executes the synchronous critical section. */
-  readonly withAsyncKeyLock: <T>(parentSessionId: string, runKey: string, operation: () => T) => Promise<T>
+  readonly withAsyncKeyLock: <T>(parentSessionId: string, runKey: string, operation: () => T | Promise<T>) => Promise<T>
   readonly withTaskOwnerLock: <T>(taskOwner: string, runId: DagRunId, operation: () => T) => T
   /** Runs `operation` under the session capacity lock once `runId` fits under the active-run cap (it is not counted). */
   readonly withSessionRunCapacity: <T>(parentSessionId: string, runId: DagRunId, operation: () => T) => T
@@ -179,6 +189,17 @@ export function createDagFileStore(config: DagStoreConfig, options: StoreOptions
 
   inspectExistingEventLogs(paths, diagnosticLog, recoveredPaths, now)
 
+  const heldJournalLocks = new Set<DagRunId>()
+  const heldSessionLocks = new Set<string>()
+  const withHeldJournalLock = <T>(runId: DagRunId, operation: () => T): T => {
+    heldJournalLocks.add(runId)
+    try {
+      return operation()
+    } finally {
+      heldJournalLocks.delete(runId)
+    }
+  }
+
   const store: DagFileStore = {
     stateDir,
     paths,
@@ -243,6 +264,7 @@ export function createDagFileStore(config: DagStoreConfig, options: StoreOptions
         fsyncWrites,
         isProcessAlive,
         now,
+        heldSessionLocks,
       )
     },
     readCheckpoint<T extends object>(runId: DagRunId): T | null {
@@ -284,28 +306,84 @@ export function createDagFileStore(config: DagStoreConfig, options: StoreOptions
         throw error
       }
     },
-    withRunLock(runId, operation) {
+    withRunLock: (runId, operation) => store.withJournalLock(runId, operation),
+    withRunCoordinationLock(runId, operation) {
       assertSafeSegment(runId, "run id")
-      return withLock(paths.runLock(runId), runId, operation, isProcessAlive, now, fsyncWrites)
+      return withAsyncLock(paths.runCoordinationLock(runId), runId, operation, isProcessAlive, now, fsyncWrites)
+    },
+    withJournalLock(runId, operation) {
+      assertSafeSegment(runId, "run id")
+      if (heldJournalLocks.has(runId)) return operation()
+      return withLock(
+        paths.journalLock(runId),
+        runId,
+        () => withHeldJournalLock(runId, operation),
+        isProcessAlive,
+        now,
+        fsyncWrites,
+      )
+    },
+    withAsyncJournalLock(runId, operation) {
+      assertSafeSegment(runId, "run id")
+      if (heldJournalLocks.has(runId)) return operation()
+      return withDeferredLock(
+        paths.journalLock(runId),
+        runId,
+        () => withHeldJournalLock(runId, operation),
+        isProcessAlive,
+        now,
+        fsyncWrites,
+      )
+    },
+    withAsyncJournalAndSessionLock(runId, parentSessionId, operation) {
+      assertSafeSegment(runId, "run id")
+      // Use the same journal-before-capacity order as replay of a missing checkpoint.
+      return withAsyncLock(
+        paths.journalLock(runId),
+        runId,
+        () =>
+          withAsyncLock(
+            sessionCapacityLock(paths, parentSessionId),
+            undefined,
+            () =>
+              withHeldJournalLock(runId, () => {
+                heldSessionLocks.add(parentSessionId)
+                try {
+                  return operation()
+                } finally {
+                  heldSessionLocks.delete(parentSessionId)
+                }
+              }),
+            isProcessAlive,
+            now,
+            fsyncWrites,
+          ),
+        isProcessAlive,
+        now,
+        fsyncWrites,
+      )
     },
     withKeyLock: (parentSessionId, runKey, operation) =>
       withLock(paths.keyLock(parentSessionId, runKey), undefined, operation, isProcessAlive, now, fsyncWrites),
     withAsyncKeyLock: (parentSessionId, runKey, operation) =>
-      withAsyncLock(paths.keyLock(parentSessionId, runKey), operation, isProcessAlive, now, fsyncWrites),
+      withAsyncLock(paths.keyLock(parentSessionId, runKey), undefined, operation, isProcessAlive, now, fsyncWrites),
     withTaskOwnerLock: (taskOwner, runId, operation) =>
       withLock(paths.taskOwnerLock(taskOwner), runId, operation, isProcessAlive, now, fsyncWrites),
-    withSessionRunCapacity: (parentSessionId, runId, operation) =>
-      withLock(
+    withSessionRunCapacity(parentSessionId, runId, operation) {
+      const checkCapacity = () => {
+        assertSessionRunCapacity(paths, parentSessionId, runId, maxRunsPerSession, now)
+        return operation()
+      }
+      if (heldSessionLocks.has(parentSessionId)) return checkCapacity()
+      return withLock(
         sessionCapacityLock(paths, parentSessionId),
         undefined,
-        () => {
-          assertSessionRunCapacity(paths, parentSessionId, runId, maxRunsPerSession, now)
-          return operation()
-        },
+        checkCapacity,
         isProcessAlive,
         now,
         fsyncWrites,
-      ),
+      )
+    },
     pruneExpired(pruneNow = now()) {
       const cutoff = pruneNow - retentionDays * 24 * 60 * 60 * 1000
       const pruned: DagRunId[] = []
@@ -368,6 +446,9 @@ function createPaths(stateDir: string): DagStorePaths {
       return outputPath
     },
     runLock: (runId) => join(locks, `${runId}.lock`),
+    runCoordinationLock: (runId) => join(locks, `run-${sha256(runId)}.lock`),
+    // Older hosts take this name for WAL and checkpoint writes too.
+    journalLock: (runId) => join(locks, `${runId}.lock`),
     keyLock: (parentSessionId, runKey) => join(locks, `key-${dagKeyHash(parentSessionId, runKey)}.lock`),
     taskOwnerLock: (taskOwner) => join(locks, `task-owner-${sha256(taskOwner)}.lock`),
   }
@@ -382,6 +463,7 @@ function writeCheckpointWithinSessionLimit(
   fsyncWrites: boolean,
   isProcessAlive: (pid: number) => boolean,
   now: () => number,
+  heldSessionLocks: ReadonlySet<string>,
 ): void {
   const path = paths.run(runId)
   const parentSessionId = readOptionalString(checkpoint, "parentSessionId")
@@ -389,22 +471,22 @@ function writeCheckpointWithinSessionLimit(
     writeJsonAtomic(path, checkpoint, platform, fsyncWrites)
     return
   }
-  withLock(
-    sessionCapacityLock(paths, parentSessionId),
-    undefined,
-    () => {
-      if (fs.existsSync(path)) {
-        writeJsonAtomic(path, checkpoint, platform, fsyncWrites)
-        return
-      }
+  const verifyCapacityAndWrite = (): void => {
+    if (!fs.existsSync(path)) {
       try {
         assertSessionRunCapacity(paths, parentSessionId, runId, maxRunsPerSession, now)
       } catch (error) {
         fs.rmSync(join(paths.root, "skills", `${runId}.json`), { force: true })
         throw error
       }
-      writeJsonAtomic(path, checkpoint, platform, fsyncWrites)
-    },
+    }
+    writeJsonAtomic(path, checkpoint, platform, fsyncWrites)
+  }
+  if (heldSessionLocks.has(parentSessionId)) return verifyCapacityAndWrite()
+  withLock(
+    sessionCapacityLock(paths, parentSessionId),
+    undefined,
+    verifyCapacityAndWrite,
     isProcessAlive,
     now,
     fsyncWrites,
@@ -646,18 +728,51 @@ function withLock<T>(
 
 async function withAsyncLock<T>(
   path: string,
-  operation: () => T,
+  runId: DagRunId | undefined,
+  operation: () => T | Promise<T>,
   isProcessAlive: (pid: number) => boolean,
   now: () => number,
   fsyncWrites: boolean,
 ): Promise<T> {
-  const acquisition = acquireLock(path, undefined, isProcessAlive, now, fsyncWrites)
+  const acquisition = acquireLock(path, runId, isProcessAlive, now, fsyncWrites)
   let attempt = acquisition.next()
   while (!attempt.done) {
     await delay(LOCK_RETRY_MS)
     attempt = acquisition.next()
   }
-  return runWithOwnedLock(path, attempt.value, operation)
+  const holder = attempt.value
+  try {
+    const result = operation()
+    return result instanceof Promise ? await result : result
+  } finally {
+    removeObservedLock(path, holder, () => true)
+  }
+}
+
+function withDeferredLock<T>(
+  path: string,
+  runId: DagRunId | undefined,
+  operation: () => T,
+  isProcessAlive: (pid: number) => boolean,
+  now: () => number,
+  fsyncWrites: boolean,
+): T | Promise<T> {
+  const acquisition = acquireLock(path, runId, isProcessAlive, now, fsyncWrites)
+  const first = acquisition.next()
+  if (first.done) return runWithOwnedLock(path, first.value, operation)
+  return waitForLock(path, acquisition, operation)
+}
+
+async function waitForLock<T>(
+  path: string,
+  acquisition: Generator<void, LockHolder, void>,
+  operation: () => T,
+): Promise<T> {
+  for (;;) {
+    await delay(LOCK_RETRY_MS)
+    const attempt = acquisition.next()
+    if (attempt.done) return runWithOwnedLock(path, attempt.value, operation)
+  }
 }
 
 // Both callers share the same ownership, reclaim, and per-holder deadline rules. A yield means

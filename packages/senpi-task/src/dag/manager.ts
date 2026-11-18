@@ -392,7 +392,7 @@ async function startRun(params: DagStartParams, context: StartContext): Promise<
   const definitionFingerprint = fingerprintDefinition(definition)
 
   // (3)+(4) under the key lock so a concurrent same-key start can never create a second run.
-  return context.store.withAsyncKeyLock(params.parentSessionId, definition.key, () => {
+  return context.store.withAsyncKeyLock<DagStartResult>(params.parentSessionId, definition.key, () => {
     const existingKey = context.store.readKey(params.parentSessionId, definition.key)
     // A key whose run record is gone (retention pruned it) is stale, not a conflict: the key is
     // rewritten by the fresh run below. Conflict is reserved for a key with a LIVE divergent run.
@@ -443,38 +443,40 @@ async function startRun(params: DagStartParams, context: StartContext): Promise<
       diagnostics: [...compiled.diagnostics, ...(materialized?.diagnostics ?? [])],
     }
 
-    // Journal skeleton first: the checkpoint must exist before the key file can point at it, so a
-    // crash between the two leaves an unkeyed run rather than a key pointing at nothing.
-    context.store.writeCheckpoint(runId, record)
-    context.store.writeKey({
-      schemaVersion: 1,
-      parentSessionId: params.parentSessionId,
-      runKey: definition.key,
-      runId,
-      definitionFingerprint,
-    })
-    const journal = createDagJournal<DagRunRecordV1>({
-      store: context.store,
-      runId,
-      initialCheckpoint: record,
-      applyEvent: applyRunEvent,
-      now: context.now,
-      skipDuplicate: skipDuplicateTerminalTransition,
-    })
-    journal.append(
-      dagRunCreatedEvent({
+    return context.store.withAsyncJournalAndSessionLock(runId, params.parentSessionId, () => {
+      // Journal skeleton first: the checkpoint must exist before the key file can point at it, so a
+      // crash between the two leaves an unkeyed run rather than a key pointing at nothing.
+      context.store.writeCheckpoint(runId, record)
+      context.store.writeKey({
+        schemaVersion: 1,
+        parentSessionId: params.parentSessionId,
         runKey: definition.key,
-        name: definition.name,
+        runId,
         definitionFingerprint,
-        nodeCount: compiled.nodes.length,
-        edgeCount: compiled.edges.length,
-      }),
-    )
-    return { reused: false, snapshot: projectSnapshot(journal.snapshot(), context.store.stateDir) }
+      })
+      const journal = createDagJournal<DagRunRecordV1>({
+        store: context.store,
+        runId,
+        initialCheckpoint: record,
+        applyEvent: applyRunEvent,
+        now: context.now,
+        skipDuplicate: skipDuplicateTerminalTransition,
+      })
+      journal.append(
+        dagRunCreatedEvent({
+          runKey: definition.key,
+          name: definition.name,
+          definitionFingerprint,
+          nodeCount: compiled.nodes.length,
+          edgeCount: compiled.edges.length,
+        }),
+      )
+      return { reused: false, snapshot: projectSnapshot(journal.snapshot(), context.store.stateDir) }
+    })
   })
 }
 
-function amendRun(params: DagAmendParams, context: AmendContext): DagRunRecordV1 {
+function amendRun(params: DagAmendParams, context: AmendContext): DagRunRecordV1 | Promise<DagRunRecordV1> {
   if ((params.runId === undefined) === (params.key === undefined)) {
     throw new DagManagerError({ code: "invalid_arguments", message: "amend requires exactly one of runId or key" })
   }
@@ -601,39 +603,41 @@ function amendRun(params: DagAmendParams, context: AmendContext): DagRunRecordV1
     bottlenecks: compiled.bottlenecks,
     diagnostics: materializedDefinition.diagnostics,
   }
-  const journal = createDagJournal<DagRunRecordV1>({
-    store: context.store,
-    runId: selectedRunId,
-    initialCheckpoint: oldRecord,
-    applyEvent: applyDagRunMutation,
-    now: context.now,
-    skipDuplicate: skipDuplicateTerminalTransition,
-  })
-  journal.append(mutation)
-  context.store.writeKey({
-    schemaVersion: 1,
-    parentSessionId: oldRecord.parentSessionId,
-    runKey: oldRecord.runKey,
-    runId: selectedRunId,
-    definitionFingerprint,
-  })
-  const amended = context.store.readCheckpoint<DagRunRecordV1>(selectedRunId)
-  if (amended === null)
-    throw new DagManagerError({
-      code: "run_not_found",
-      message: `unknown dag run "${selectedRunId}"`,
+  return context.store.withAsyncJournalLock(selectedRunId, () => {
+    const journal = createDagJournal<DagRunRecordV1>({
+      store: context.store,
       runId: selectedRunId,
+      initialCheckpoint: oldRecord,
+      applyEvent: applyDagRunMutation,
+      now: context.now,
+      skipDuplicate: skipDuplicateTerminalTransition,
     })
-  // The reducer no-ops instead of throwing (see applyDagRunMutation), so an unadvanced fingerprint is
-  // how a lost race surfaces. Report it here, where the WAL is already durable and consistent.
-  if (amended.definitionFingerprint !== definitionFingerprint) {
-    throw new DagManagerError({
-      code: "run_still_active",
-      message: `dag run "${selectedRunId}" changed before the amendment could be applied`,
+    journal.append(mutation)
+    context.store.writeKey({
+      schemaVersion: 1,
+      parentSessionId: oldRecord.parentSessionId,
+      runKey: oldRecord.runKey,
       runId: selectedRunId,
+      definitionFingerprint,
     })
-  }
-  return amended
+    const amended = context.store.readCheckpoint<DagRunRecordV1>(selectedRunId)
+    if (amended === null)
+      throw new DagManagerError({
+        code: "run_not_found",
+        message: `unknown dag run "${selectedRunId}"`,
+        runId: selectedRunId,
+      })
+    // The reducer no-ops instead of throwing (see applyDagRunMutation), so an unadvanced fingerprint is
+    // how a lost race surfaces. Report it here, where the WAL is already durable and consistent.
+    if (amended.definitionFingerprint !== definitionFingerprint) {
+      throw new DagManagerError({
+        code: "run_still_active",
+        message: `dag run "${selectedRunId}" changed before the amendment could be applied`,
+        runId: selectedRunId,
+      })
+    }
+    return amended
+  })
 }
 
 function applyRunEvent(record: DagRunRecordV1, event: DagRunEvent): DagRunRecordV1 {

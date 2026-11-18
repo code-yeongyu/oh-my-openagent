@@ -361,10 +361,12 @@ describe("DAG crash recovery", () => {
       taskManager: manager,
       hostPid: 101,
       isProcessAlive: (pid) => pid === 101,
-      reattach: (_claimedRunId, taskId) => reattached.push(taskId),
+      reattach: (_claimedRunId, taskId) => {
+        reattached.push(taskId)
+        queueMicrotask(() => manager.complete(taskId))
+      },
       now: () => Date.parse("2026-08-14T00:00:04.000Z"),
     })
-    queueMicrotask(() => manager.complete("task-running"))
 
     // when
     const outcomes = await recovery.resumePausedRuns(parentSessionId)
@@ -1272,8 +1274,8 @@ describe("DAG crash recovery", () => {
         }
         baseStore.writeCheckpoint(resultRunId, checkpoint)
       },
-      withRunLock(resultRunId, operation) {
-        return baseStore.withRunLock(resultRunId, () => {
+      withJournalLock(resultRunId, operation) {
+        return baseStore.withJournalLock(resultRunId, () => {
           runLockDepth += 1
           try {
             return operation()
@@ -1334,7 +1336,7 @@ describe("DAG crash recovery", () => {
     })
   })
 
-  test("#given a live run #when shutdown pause starts #then admission stops before pause persistence and its lease is released", () => {
+  test("#given a live run #when shutdown pause starts #then admission stops before pause persistence and its lease is released", async () => {
     // given
     const projectDir = tempProject()
     const store = createDagFileStore({ project_dir: projectDir })
@@ -1358,7 +1360,7 @@ describe("DAG crash recovery", () => {
     })
 
     // when
-    const paused = recovery.pauseRunsForShutdown(parentSessionId)
+    const paused = await recovery.pauseRunsForShutdown(parentSessionId)
 
     // then
     const checkpoint = store.readCheckpoint<
@@ -1636,7 +1638,7 @@ describe("DAG recovery state directory loss", () => {
     const recovery = createDagRecovery({ store, taskManager: new RecoveryTaskManager(), hostPid: 101 })
 
     // when
-    const paused = recovery.pauseRunsForShutdown(parentSessionId)
+    const paused = await recovery.pauseRunsForShutdown(parentSessionId)
     const outcomes = await recovery.resumePausedRuns(parentSessionId)
 
     // then

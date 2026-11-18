@@ -208,16 +208,37 @@ const newestRetiredRoot = async (stateDir: string, account: string): Promise<str
   return null
 }
 
+/** The root-change notice a ceremony reports with the pin it just wrote (#12280, #12382). */
+export interface RootChangeNotice {
+  /** The pinned root differs from the one this device held before its keys were discarded. */
+  readonly rootChanged?: true
+  /** The retired pins could not be read, so whether the root changed is unknown; `reason` is the error code. */
+  readonly rootCheck?: { readonly kind: "skipped"; readonly reason: string }
+}
+
+// Only an identifier-shaped errno code leaves this module: the notice reaches logs and the desktop, and an error
+// message would carry local paths.
+const ERROR_CODE = /^[A-Z0-9_]{1,32}$/
+
 /**
  * Whether a ceremony that just pinned `genesisDigest` moved the account to a different root than the
  * one this device last held (#12280): a non-blocking notice, never a refusal. Only local retired pins
  * are read; nothing a server says enters the comparison.
+ *
+ * It runs after the pin is written, so it never throws (#12382): retired pins that cannot be read come
+ * back as a skipped check for the caller to show, and the pin stands.
  */
-export const rootChangedSinceRetired = async (
+export const rootChangeNotice = async (
   stateDir: string,
   account: string,
   genesisDigest: string,
-): Promise<boolean> => {
-  const retired = await newestRetiredRoot(stateDir, account)
-  return retired !== null && retired !== genesisDigest
+): Promise<RootChangeNotice> => {
+  let retired: string | null
+  try {
+    retired = await newestRetiredRoot(stateDir, account)
+  } catch (error) {
+    const code = error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : ""
+    return { rootCheck: { kind: "skipped", reason: ERROR_CODE.test(code) ? code : "unknown" } }
+  }
+  return retired !== null && retired !== genesisDigest ? { rootChanged: true } : {}
 }

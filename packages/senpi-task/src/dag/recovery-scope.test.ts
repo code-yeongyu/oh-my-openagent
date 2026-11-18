@@ -6,6 +6,7 @@ import { join, relative } from "node:path"
 import type { ListScope, ManagerStartSpec, TaskManager } from "../manager/types"
 import type { TaskRecord } from "../state"
 import { createDagManager, type DagRunRecordV1 } from "./manager"
+import { controlJournal } from "./node-control-context"
 import type { DagTaskOwner, OwnedStartResult } from "./owner"
 import { createDagRecovery } from "./recovery"
 import { createDagFileStore, type DagFileStore } from "./store"
@@ -145,6 +146,55 @@ function recovery(store: DagFileStore, taskManager = new SettledTasks()) {
 }
 
 describe("automatic recovery candidate scope", () => {
+  test("#given the old holder changes while checking liveness #when recovery claims #then it preserves the workspace journal and declines the new live lease", async () => {
+    // given
+    const store = fixture()
+    const runId = await seed(store, "A", 9001)
+    const initialRecord = store.readCheckpoint<DagRunRecordV1>(runId)
+    if (initialRecord === null) throw new Error("missing initial checkpoint")
+    const peer = createDagFileStore(
+      { project_dir: store.stateDir, task: { state_dir: store.stateDir } },
+      { fsync: false },
+    )
+    const taskManager = new SettledTasks()
+    const checked: number[] = []
+    const journal = controlJournal({ store: peer, taskManager, initialRecord }, initialRecord)
+
+    // when
+    const outcomes = await createDagRecovery({
+      store,
+      taskManager,
+      hostPid: 101,
+      isProcessAlive(pid) {
+        checked.push(pid)
+        if (pid !== 9001) return pid === 202
+        peer.withJournalLock(runId, () => {
+          journal.append({
+            type: "dag.diagnostic.added",
+            diagnostic: {
+              kind: "node_flag",
+              nodeId: initialRecord.nodes[0]!.id,
+              message: "peer checkpoint update",
+              at: initialRecord.createdAt,
+            },
+          })
+          peer.writeCheckpoint(runId, { ...journal.snapshot(), leaseHolderPid: 202 })
+        })
+        return false
+      },
+    }).resumePausedRuns("A")
+
+    // then
+    expect(checked).toEqual([9001, 202])
+    expect(outcomes).toEqual([{ kind: "skipped", runId, reason: "live_lease", holderPid: 202 }])
+    expect(taskManager.starts).toEqual([])
+    expect(store.readCheckpoint<DagRunRecordV1>(runId)).toMatchObject({
+      checkpointSeq: initialRecord.checkpointSeq + 1,
+      leaseHolderPid: 202,
+    })
+    expect(store.readEvents(runId, initialRecord.checkpointSeq, { limit: 10 }).events).toHaveLength(1)
+  })
+
   test.each([9001, 101, 202, undefined])(
     "#given foreign holder %s #when ordinary B opens #then only B executes and A bytes/tasks stay untouched",
     async (holder) => {
@@ -156,9 +206,9 @@ describe("automatic recovery candidate scope", () => {
       const locks: DagRunId[] = []
       const observedStore: DagFileStore = {
         ...store,
-        withRunLock(id, action) {
+        withAsyncJournalLock(id, action) {
           locks.push(id)
-          return store.withRunLock(id, action)
+          return store.withAsyncJournalLock(id, action)
         },
       }
       const outcomes = await recovery(observedStore, tasks).resumePausedRuns("B")
@@ -201,8 +251,8 @@ describe("automatic recovery candidate scope", () => {
       let afterRace: ReturnType<typeof bytes> | undefined
       const racingStore: DagFileStore = {
         ...store,
-        withRunLock(id, action) {
-          return store.withRunLock(id, () => {
+        withAsyncJournalLock(id, action) {
+          return store.withAsyncJournalLock(id, () => {
             if (!changed && id === runId) {
               const record = store.readCheckpoint<DagRunRecordV1>(id)
               if (record === null) throw new Error("missing race fixture")

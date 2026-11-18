@@ -33,13 +33,17 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   ultrabrain: {
     fallbackChain: [
+      // Each GPT-6.2 rung keeps GPT-6 Astra right behind it, so a registry without 6.2 (an older engine
+      // catalog) resolves what it did before; Copilot does not serve 6.2 and keeps its GPT-6 Astra rung.
       { providers: ["openai", "chatgpt-subscription"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "max" },
-      { providers: ["github-copilot"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "max" },
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6-astra", variant: "max" },
+      { providers: ["github-copilot"], model: "gpt-6-astra", variant: "max" },
       {
         providers: ["openai", "chatgpt-subscription", "opencode"],
         model: LATEST_MODEL_BY_FAMILY.gptAstra,
         variant: "max",
       },
+      { providers: ["openai", "chatgpt-subscription", "opencode"], model: "gpt-6-astra", variant: "max" },
       { providers: ["openai", "chatgpt-subscription"], model: "gpt-5.6-sol", variant: "max" },
       { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "max" },
       { providers: ["openai", "chatgpt-subscription", "opencode"], model: "gpt-5.6-sol", variant: "max" },
@@ -47,11 +51,13 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   "deep-low": {
     fallbackChain: [
-      // GPT-6.1 Sol leads at the same medium effort: it matches GPT-6 Sol's price with near-Astra
-      // quality, but only the OpenAI lanes serve it (plain, then the Fast tier). GPT-5.6 Sol stays
-      // behind it so Copilot, OpenCode Zen and a registry without 6.1 still resolve the lane.
+      // GPT-6.2 Sol leads at the same medium effort on the OpenAI lanes (plain, then the Fast tier),
+      // then GPT-6.1 Sol for a registry without 6.2. GPT-5.6 Sol stays behind them so Copilot,
+      // OpenCode Zen and a registry without either still resolve the lane.
       { providers: ["openai", "chatgpt-subscription"], model: LATEST_MODEL_BY_FAMILY.gptSol, variant: "medium" },
       { providers: ["openai", "chatgpt-subscription"], model: LATEST_MODEL_BY_FAMILY.gptSolFast, variant: "medium" },
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol", variant: "medium" },
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol-fast", variant: "medium" },
       {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
         model: "gpt-5.6-sol",
@@ -63,8 +69,13 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   "deep-high": {
     fallbackChain: [
       {
-        providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
+        providers: ["openai", "chatgpt-subscription", "opencode"],
         model: LATEST_MODEL_BY_FAMILY.gptAstra,
+        variant: "high",
+      },
+      {
+        providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
+        model: "gpt-6-astra",
         variant: "high",
       },
     ],
@@ -127,9 +138,10 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["xai", "github-copilot", "opencode-go"], model: "grok-4.7", variant: "xhigh" },
       // GLM 5.3 sits ahead of the GPT rungs so a Claude + Z.ai user does not fall from Sonnet to GPT (#10306).
       { providers: ["zai-coding-plan", "opencode-go"], model: LATEST_MODEL_BY_FAMILY.glm, variant: "high" },
-      // GPT-6.1 Sol is the current GPT default, served only by the OpenAI lanes; GPT-5.6 Sol stays
-      // behind it so Copilot, OpenCode Zen and a registry without 6.1 still resolve the lane (#9844).
+      // GPT-6.2 Sol is the current GPT default, served only by the OpenAI lanes; GPT-6.1 Sol and then
+      // GPT-5.6 Sol stay behind it so Copilot, OpenCode Zen and an older registry still resolve the lane (#9844).
       { providers: ["openai", "chatgpt-subscription"], model: LATEST_MODEL_BY_FAMILY.gptSol, variant: "medium" },
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol", variant: "medium" },
       {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
         model: "gpt-5.6-sol",

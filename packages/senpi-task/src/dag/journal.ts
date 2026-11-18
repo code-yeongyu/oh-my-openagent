@@ -19,7 +19,7 @@ export type DagJournalOptions<TCheckpoint extends DagJournalCheckpoint> = {
   readonly applyEvent: (checkpoint: TCheckpoint, event: DagRunEvent) => TCheckpoint
   readonly subscriberRing?: number
   readonly now?: () => number
-  /** Evaluated against the freshly recovered checkpoint inside the run lock: returning true drops
+  /** Evaluated against the freshly recovered checkpoint inside the journal lock: returning true drops
    * the append as an idempotent duplicate - nothing is journaled and no subscriber is notified
    * (the dag_923ad20e completed->completed WAL class, #7412). */
   readonly skipDuplicate?: (checkpoint: TCheckpoint, payload: DagRunEventPayload) => boolean
@@ -28,7 +28,9 @@ export type DagJournalOptions<TCheckpoint extends DagJournalCheckpoint> = {
 export type DagJournal<TCheckpoint extends DagJournalCheckpoint> = {
   readonly append: (payload: DagRunEventPayload) => DagRunEvent | undefined
   readonly snapshot: () => TCheckpoint
-  /** Re-recovers the durable checkpoint under the run lock, replacing this instance's cache: the
+  /** Wait asynchronously to make a synchronous group of journal operations atomic. */
+  readonly transact: <T>(operation: () => T) => T | Promise<T>
+  /** Re-recovers the durable checkpoint under the journal lock, replacing this instance's cache: the
    * read path for state another journal instance committed (#7412). */
   readonly refresh: () => TCheckpoint
   readonly subscribe: (listener: DagJournalListener) => () => void
@@ -47,7 +49,7 @@ type Subscriber = {
   running: boolean
   lastDeliveredSeq: number
   overflow?: OverflowState
-  readonly commitOverflow: (overflow: OverflowState) => DagRunEvent | undefined
+  readonly commitOverflow: (overflow: OverflowState) => DagRunEvent | Promise<DagRunEvent | undefined> | undefined
   drainPromise: Promise<void>
 }
 
@@ -81,12 +83,12 @@ export function createDagJournal<TCheckpoint extends DagJournalCheckpoint>(
   }
   const now = options.now ?? Date.now
   const subscribers = new Set<Subscriber>()
-  let checkpoint = options.store.withRunLock(options.runId, () => recoverCheckpoint(options))
+  let checkpoint = options.store.withJournalLock(options.runId, () => recoverCheckpoint(options))
 
   const appendPayload = (payload: DagRunEventPayload, directSubscriber?: Subscriber): DagRunEvent | undefined => {
     let durableEvent: DagRunEvent | undefined
     let skipped = false
-    checkpoint = options.store.withRunLock(options.runId, () => {
+    checkpoint = options.store.withJournalLock(options.runId, () => {
       const recovered = recoverCheckpoint(options)
       if (options.skipDuplicate?.(recovered, payload) === true) {
         skipped = true
@@ -130,8 +132,9 @@ export function createDagJournal<TCheckpoint extends DagJournalCheckpoint>(
   return {
     append: appendPayload,
     snapshot: () => checkpoint,
+    transact: (operation) => options.store.withAsyncJournalLock(options.runId, operation),
     refresh: () => {
-      checkpoint = options.store.withRunLock(options.runId, () => recoverCheckpoint(options))
+      checkpoint = options.store.withJournalLock(options.runId, () => recoverCheckpoint(options))
       return checkpoint
     },
     subscribe(listener) {
@@ -141,7 +144,10 @@ export function createDagJournal<TCheckpoint extends DagJournalCheckpoint>(
         active: true,
         running: false,
         lastDeliveredSeq: checkpoint.checkpointSeq,
-        commitOverflow: (overflow) => appendPayload(dagStreamOverflowEvent(overflow), subscriber),
+        commitOverflow: (overflow) =>
+          options.store.withAsyncJournalLock(options.runId, () =>
+            appendPayload(dagStreamOverflowEvent(overflow), subscriber),
+          ),
         drainPromise: Promise.resolve(),
       }
       subscribers.add(subscriber)
@@ -224,7 +230,8 @@ async function drain(subscriber: Subscriber): Promise<void> {
       const overflow = subscriber.overflow
       if (overflow !== undefined) {
         subscriber.overflow = undefined
-        const overflowEvent = subscriber.commitOverflow(overflow)
+        const committed = subscriber.commitOverflow(overflow)
+        const overflowEvent = committed instanceof Promise ? await committed : committed
         if (overflowEvent !== undefined) await deliver(subscriber.listener, overflowEvent)
         continue
       }

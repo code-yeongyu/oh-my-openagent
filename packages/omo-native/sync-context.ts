@@ -8,6 +8,7 @@ import {
 } from "../memory-core/src/sync/account/index.ts"
 import type { DeviceKeyring } from "../memory-core/src/sync/keyring-port"
 import type { SyncOperationAuthority } from "../memory-core/src/sync/operation-authority"
+import { syncRequestHeaders } from "../memory-core/src/sync/contract-version"
 import { syncPinDir } from "../memory-core/src/sync/pin-dir"
 
 import { signInHint } from "../omo-opencode/src/cli/service-auth/accounts-gate"
@@ -64,7 +65,7 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
   })
   const token = () => session.accessToken()
   const doFetch = options.fetch ?? fetch
-  const me = await doFetch(`${api}/v1/me`, { headers: { authorization: `Bearer ${await token()}` } })
+  const me = await doFetch(`${api}/v1/me`, { headers: syncRequestHeaders(await token()) })
   if (!me.ok) {
     const body: unknown = await me.json().catch(() => null)
     const code = isRecord(body) && isRecord(body["error"]) ? body["error"]["code"] : undefined

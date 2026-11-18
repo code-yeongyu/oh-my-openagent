@@ -50,7 +50,9 @@ export async function sendToDagNode(
     })
   }
   if (record.status === "paused" && record.pause?.reason === "user_stop") {
-    const guidance = guidePausedDag(options, runId, message, nodeId)
+    const guidance = await options.store.withAsyncJournalLock(runId, () =>
+      guidePausedDag(options, runId, message, nodeId),
+    )
     return {
       nodeId,
       delivery: "guidance",
@@ -96,7 +98,9 @@ export async function sendToDagNode(
     callerSessionId: record.parentSessionId,
     allScope: true,
   })
-  return foldSendOutcome(options, record, node, taskId, outcome, watchRevived)
+  const fold = () => foldSendOutcome(options, record, node, taskId, outcome, watchRevived)
+  if (outcome.kind === "steered" || outcome.kind === "revived") return options.store.withAsyncJournalLock(runId, fold)
+  return fold()
 }
 
 function foldSendOutcome(
@@ -201,24 +205,25 @@ async function watchRevivedTask(options: DagSchedulerOptions, nodeId: DagNodeId,
   try {
     task = await options.taskManager.waitFor(taskId)
   } catch (error) {
-    failRevivedNode(options, nodeId, "task_error", controlErrorMessage(error), now)
-    return
+    return failRevivedNode(options, nodeId, "task_error", controlErrorMessage(error), now)
   }
   if (task.status === "pending" || task.status === "running" || task.status === "paused") {
-    failRevivedNode(options, nodeId, "task_error", `revived task ${taskId} settled nonterminal`, now)
-    return
+    return failRevivedNode(options, nodeId, "task_error", `revived task ${taskId} settled nonterminal`, now)
   }
   if (task.status !== "completed") {
     const failure = revivedTaskFailure(task.status, task.error_message)
-    failRevivedNode(options, nodeId, failure.code, failure.message, now)
-    return
+    return failRevivedNode(options, nodeId, failure.code, failure.message, now)
   }
   // Persist before the transition: the reducer rebuilds artifact metadata and run stats from the
   // durable copy, so a crash between the two still replays into an identical checkpoint.
-  const persisted = persistDagNodeResult({ store: options.store, runId, nodeId, record: task, now })
-  if (persisted.kind === "failed") throw new Error(persisted.diagnostic.message)
-  const journal = controlJournal(options, currentRecord(options, runId))
-  journal.append(dagNodeTransitionedEvent({ nodeId, from: "running", to: "completed", reason: { kind: "succeeded" } }))
+  return options.store.withAsyncJournalLock(runId, () => {
+    const persisted = persistDagNodeResult({ store: options.store, runId, nodeId, record: task, now })
+    if (persisted.kind === "failed") throw new Error(persisted.diagnostic.message)
+    const journal = controlJournal(options, currentRecord(options, runId))
+    journal.append(
+      dagNodeTransitionedEvent({ nodeId, from: "running", to: "completed", reason: { kind: "succeeded" } }),
+    )
+  })
 }
 
 function failRevivedNode(
@@ -227,13 +232,15 @@ function failRevivedNode(
   code: DagNodeErrorCode,
   message: string,
   now: () => number,
-): void {
+): void | Promise<void> {
   const runId = options.initialRecord.runId
   const pendingErrors = new Map<DagNodeId, DagNodeError>([
     [nodeId, { code, message, nodeId, at: new Date(now()).toISOString() }],
   ])
-  const journal = controlJournal(options, currentRecord(options, runId), pendingErrors)
-  journal.append(dagNodeTransitionedEvent({ nodeId, from: "running", to: "failed", reason: { kind: "failed" } }))
+  return options.store.withAsyncJournalLock(runId, () => {
+    const journal = controlJournal(options, currentRecord(options, runId), pendingErrors)
+    journal.append(dagNodeTransitionedEvent({ nodeId, from: "running", to: "failed", reason: { kind: "failed" } }))
+  })
 }
 
 function revivedTaskFailure(
