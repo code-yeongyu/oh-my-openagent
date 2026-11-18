@@ -747,8 +747,12 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
     relay.dispose()
   }
   return {
-    tools: [create, list, read, send, interrupt, close, handoff, rename, setModel, setReasoning, ...relayTools].map((tool) =>
-      withThreadRenderers({ ...tool, permissionParser: tool.permissionParser ?? threadToolPermission(tool.name, options) }),
+    tools: [create, list, read, send, interrupt, close, handoff, rename, setModel, setReasoning, ...relayTools].map(
+      (tool) =>
+        withThreadRenderers({
+          ...tool,
+          permissionParser: tool.permissionParser ?? threadToolPermission(tool.name, options),
+        }),
     ),
     dispose,
   }
