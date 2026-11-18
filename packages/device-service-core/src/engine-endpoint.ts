@@ -12,9 +12,13 @@ export const ENDPOINT_PRIMARY_MIN_SERVICE_VERSION = "0.1.11"
  */
 export class NoPrimaryEndpointError extends NotSentError {
   constructor(device: string, listed: number) {
-    super("unsupported", `${device} lists ${listed} engine endpoint(s) and names none as its own engine; nothing was opened`, {
-      action: `Start or restart omo on ${device}; if that does not help, update the device service on both devices.`,
-    })
+    super(
+      "unsupported",
+      `${device} lists ${listed} engine endpoint(s) and names none as its own engine; nothing was opened`,
+      {
+        action: `Start or restart omo on ${device}; if that does not help, update the device service on both devices.`,
+      },
+    )
   }
 }
 
