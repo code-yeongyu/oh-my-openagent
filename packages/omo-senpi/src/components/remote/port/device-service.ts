@@ -324,9 +324,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       } catch {
         return { kind: "refused", reason: "invalid_record" }
       }
-      // omo#14130 review round 2 (L3): an endpoint command (a create on another device) shares the call's budget.
-      const waitMs = commandWaitMs(SEND_WAIT_MS)
-      if (waitMs <= 0) return { kind: "refused", reason: "request_timeout" }
+      if (commandWaitMs(SEND_WAIT_MS) <= 0) return { kind: "refused", reason: "request_timeout" }
       let dialed: { readonly conn: DeviceService; readonly owned: boolean }
       try {
         dialed = record["type"] === "open_session" ? await dialEndpoint() : { conn: await svc(), owned: false }
@@ -335,6 +333,10 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       }
       const connected = dialed.conn
       try {
+        // omo#14130 review rounds 2-3: an endpoint command (a create on another device) shares the call's budget, sized
+        // after the dial; the device service takes its endpoint lookup out of it before sending.
+        const waitMs = commandWaitMs(SEND_WAIT_MS)
+        if (waitMs <= 0) return { kind: "refused", reason: "request_timeout" }
         return outcomeOf(await connected.endpointCommand(device, record, { ...endpointOptions, waitMs }))
       } catch (error) {
         // The SDK marks a failure before session.command was written (the endpoint lookup timing out or the connection
@@ -456,7 +458,10 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       if (knownKey !== undefined) key = knownKey
       else
         try {
-          key = (await connected.locate(device, engineId)).key
+          // omo#14130 review round 3 (L1): an older service's post-create locate shares the call's budget.
+          const located = await withinCallBudget(connected.locate(device, engineId))
+          if (located === undefined) return { kind: "refused", reason: "request_timeout" }
+          key = located.key
         } catch (error) {
           return { kind: "refused", reason: error instanceof LocalApiError ? error.code : "locate_failed" }
         }

@@ -363,6 +363,7 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
     endpointCommand: async (device, rpc, options) => {
       // The endpoint lookup runs before any session.command is written, so whatever fails it (a timeout, a closed
       // connection, a refusal) dispatched nothing: it is marked not_sent, unlike a timeout after sending.
+      const started = timers.now()
       let endpoint: string | undefined
       try {
         endpoint = (await client.request("session.endpoints", { device })).endpoints[0]
@@ -370,7 +371,11 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
         throw markNotSent(error)
       }
       if (endpoint === undefined) throw new NotSentError("unsupported", "the device lists no engine endpoint")
-      return await sendToEndpoint(client, device, endpoint, rpc, options?.locate === true, timers, options?.waitMs)
+      // omo#14130 review round 3 (M1): a caller's waitMs covers the lookup too; spent by it, nothing is sent.
+      const waitMs = options?.waitMs === undefined ? undefined : options.waitMs - (timers.now() - started)
+      if (waitMs !== undefined && waitMs <= 0)
+        throw new NotSentError("request_timeout", "the wait ran out during the endpoint lookup; nothing was sent")
+      return await sendToEndpoint(client, device, endpoint, rpc, options?.locate === true, timers, waitMs)
     },
     close: () => client.close(),
     closed: client.closed,

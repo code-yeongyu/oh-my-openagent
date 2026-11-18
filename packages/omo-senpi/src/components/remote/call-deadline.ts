@@ -5,7 +5,11 @@ import { AsyncLocalStorage } from "node:async_hooks"
 // settles, typed, inside the 60 s a host-tool bridge (the eval kernel's) gives a tool call before dropping it untyped.
 export const TOOL_CALL_BUDGET_MS = 50_000
 
-/** What a wait inside a call leaves for the read after it (review round 2, M2): at least one read's own bound. */
+/**
+ * What a wait inside a call leaves for the read after it (review rounds 2-3). A read's own bound is 30 s (READ_WAIT_MS),
+ * longer than this reserve, so a slow paged read after a long wait can still end as a typed request_timeout; a full 30 s
+ * reserve would cap every wait at 20 s instead.
+ */
 export const READ_RESERVE_MS = 15_000
 
 const scope = new AsyncLocalStorage<number>()

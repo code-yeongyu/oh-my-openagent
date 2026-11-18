@@ -67,6 +67,23 @@ describe("device service clock seam", () => {
     expect(await sending).toMatch(/^no final state for endpoint command \S+ within 120000 ms$/)
   })
 
+  // omo#14130 review round 3 (M1): a caller's waitMs bounds an endpoint command, the lookup before it included.
+  test("an endpoint command with a waitMs fails at that bound on the given timers", async () => {
+    const clock = fakeClock()
+    const world: World = {
+      ...defaultWorld(),
+      endpoints: { [PEER]: ["ZW5kcG9pbnQta2V5LTAwMQ"] },
+      endpointCommand: { data: {}, outcome: defaultWorld().sessions[0]?.outcome ?? [] },
+    }
+    const { owner, withheld } = await startMode("ack-no-final", world)
+    const service = await serviceOn(owner, clock)
+    const sending = outcomeOf(service.endpointCommand(PEER, { type: "prompt", message: "hi" }, { waitMs: 5_000 }))
+    await withheld("final_state")
+    await service.status()
+    clock.advance(5_000)
+    expect(await sending).toMatch(/^no final state for endpoint command \S+ within \d+ ms$/)
+  })
+
   test("a wake command with no final state fails at its 120 s bound on the given timers", async () => {
     const clock = fakeClock()
     const { owner } = await startMode("ack-no-final")

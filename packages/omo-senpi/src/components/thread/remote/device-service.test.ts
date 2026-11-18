@@ -1453,6 +1453,36 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
     expect(waits[1]).toBeGreaterThan(10_000)
   })
 
+  // omo#14130 review round 3: the dial and the post-create locate count against the call's budget too.
+  test("#given a dial that takes 60 ms of a 100 ms budget #when an open is sent #then its wait is sized from what is left", async () => {
+    const waits: (number | undefined)[] = []
+    const service = endpointService(waits)
+    const port = sessionsPort({
+      version: "0.0.0-test",
+      connect: async () => ({ conn: service(), owned: true }),
+      dialEndpoint: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 60))
+        return { conn: service(), owned: true }
+      },
+    })
+    await withCallDeadline(Date.now() + 100, () => port.endpointCommand("b", { type: "open_session" }))
+    expect(waits).toHaveLength(1)
+    expect(waits[0]).toBeLessThanOrEqual(45)
+  })
+
+  test("#given a create reply that names no key and a locate that never answers #when locate runs inside a 50 ms budget #then it is refused request_timeout at the budget", async () => {
+    const service = () =>
+      ({
+        status: async () => ({ state: "connected" }),
+        locate: () => new Promise<never>(() => {}),
+        closed: new Promise<void>(() => {}),
+        close: () => {},
+      }) as unknown as DeviceService
+    const port = sessionsPort({ version: "0.0.0-test", connect: async () => ({ conn: service(), owned: true }) })
+    const located = await withCallDeadline(Date.now() + 50, () => port.locate("b", "engine-1"))
+    expect(located).toEqual({ kind: "refused", reason: "request_timeout" })
+  })
+
   test("#given a created session its device never lists #when locate waits for its attach inside a 100 ms budget #then it gives up with the budget, not after 20 s", async () => {
     const service = () =>
       ({
