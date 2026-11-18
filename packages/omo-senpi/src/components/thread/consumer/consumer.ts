@@ -141,7 +141,12 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
       await answer(pair, { kind: "refused", reason: reason ?? "invalid_record" })
       return
     }
-    const chainCountLimit = await options.chainCountLimit(target.cwd)
+    // A limit that cannot be read (the settings barrel failed to load) fails open: the delivery is queued as it was before
+    // the limit was wired, and the failure is reported, so the sender never waits on a delivery nobody answered.
+    const chainCountLimit = await options.chainCountLimit(target.cwd).catch((error: unknown) => {
+      options.onError?.(error)
+      return undefined
+    })
     const outcome = await store.intake({
       now: store.now(),
       attested_device: event.sender_device,
