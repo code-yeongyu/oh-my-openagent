@@ -23,7 +23,14 @@ type Step = {
   with?: Record<string, unknown>
   "continue-on-error"?: unknown
 }
-type Job = { if?: string; needs?: string[]; "runs-on"?: string; steps?: Step[]; with?: Record<string, string> }
+type Job = {
+  "timeout-minutes"?: number
+  if?: string
+  needs?: string[]
+  "runs-on"?: string
+  steps?: Step[]
+  with?: Record<string, string>
+}
 type Workflow = { on: { workflow_call?: { inputs: Record<string, unknown> } }; jobs: Record<string, Job> }
 
 const load = (file: string): Workflow =>
@@ -213,6 +220,8 @@ describe("operator darwin wiring", () => {
     expect(job(platform, "keychain-helper").if).toContain("inputs.operator_darwin_artifacts == ''")
     expect(job(platform, "operator-darwin").if).toContain("inputs.operator_darwin_artifacts != ''")
     expect(job(platform, "operator-darwin")["runs-on"]).toBe("ubuntu-24.04")
+    // LOW-3 (#13945 review): the job is capped well below the 6 h default; each lookup inside it is bounded too.
+    expect(job(platform, "operator-darwin")["timeout-minutes"]).toBe(30)
   })
 
   test("build waits for the verified operator artifacts and leaves macOS only for the hosted mode", () => {
@@ -223,6 +232,14 @@ describe("operator darwin wiring", () => {
     expect(build["runs-on"]).toContain(
       "startsWith(matrix.platform, 'darwin-') && inputs.operator_darwin_artifacts == '' && 'macos-latest'",
     )
+  })
+
+  test("#13964 L2: the pinned-verifier guard runs before any operator-supplied input is downloaded or read", () => {
+    const names = (job(platform, "operator-darwin").steps ?? []).map((step) => step.name ?? step.uses ?? "")
+    const guard = names.indexOf("Refuse operator darwin verifier code that differs from the default branch")
+    expect(guard).toBeGreaterThan(-1)
+    expect(guard).toBeLessThan(names.indexOf("Download operator darwin artifacts"))
+    expect(guard).toBeLessThan(names.indexOf("Verify operator darwin artifacts"))
   })
 
   test("no operator-darwin step can be skipped or soft-fail (only the job summary runs always)", () => {

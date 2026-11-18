@@ -2,7 +2,7 @@ import { expect, onTestFinished, spyOn, test } from "bun:test"
 import { inspect } from "node:util"
 import { createSession } from "./session"
 import { SignInError } from "./protocol"
-import { clock, fakeApi, grant, memorySecrets, privateKeys, refusal, temporaryHome } from "./test-support"
+import { clock, fakeApi, grant, memorySecrets, noOwnDevice, privateKeys, refusal, temporaryHome } from "./test-support"
 
 const expired = { ...grant, ...privateKeys, accessTokenExpiresAt: "2000-01-01T00:00:00Z" }
 const notSentCodes = [
@@ -93,8 +93,12 @@ for (const code of ["unauthorized", "account_deleted", "invalid_grant", "reauth_
 
 test("refresh 429 restores the original record and a later retry succeeds", async () => {
   let refreshes = 0
-  const api = fakeApi(() =>
-    ++refreshes === 1 ? refusal("rate_limited", undefined, 429) : Response.json({ ...grant, refreshToken: "rotated" }),
+  const api = fakeApi(
+    (request) =>
+      noOwnDevice(request) ??
+      (++refreshes === 1
+        ? refusal("rate_limited", undefined, 429)
+        : Response.json({ ...grant, refreshToken: "rotated" })),
   )
   const store = memorySecrets().store(api)
   await store.write(expired)

@@ -65,6 +65,9 @@ interface Dispatch {
   readonly triggeringActor?: string
   readonly permissionApiDown?: boolean
   readonly ciConclusion?: string
+  // Replaces the step's own LC_ALL=C. Git Bash on windows-latest keeps classifying UTF-8 characters under LC_ALL=C, so
+  // its [[:print:]] matches "\u00e9" (#13955); a UTF-8 locale reproduces that on any host.
+  readonly classLocale?: string
 }
 
 interface Outcome {
@@ -87,7 +90,12 @@ function dispatch(input: Dispatch): Outcome {
   const script = join(root, "step.sh")
   const summary = join(root, "summary.md")
   const ghCalls = join(root, "gh-calls")
-  writeFileSync(script, GH_STUB + stepRun())
+  const run = stepRun()
+  const localized =
+    input.classLocale === undefined ? run : run.replace(/^(\s*)LC_ALL=C\b/gm, `$1LC_ALL=${input.classLocale}`)
+  if (localized === run && input.classLocale !== undefined)
+    throw new Error("the waiver step sets no LC_ALL=C to replace")
+  writeFileSync(script, GH_STUB + localized)
   writeFileSync(summary, "")
   writeFileSync(ghCalls, "")
   const result = spawnSync("bash", ["-eo", "pipefail", script], {
@@ -219,6 +227,23 @@ describe("publish.yml gate-reuse ci_basis_receipt waiver", () => {
       for (const line of expected) expect(outcome.output).toContain(line)
       if (stat) expect(lines).toContain(stat)
       else expect(outcome.summary).not.toContain("file changed")
+    },
+    TEST_TIMEOUT_MS,
+  )
+
+  test(
+    "#given a non-ASCII receipt #when bash classifies characters as UTF-8 under LC_ALL=C (Git Bash) #then gate-reuse still refuses",
+    () => {
+      // The simulated locale must really make [[:print:]] accept the character, or this case proves nothing.
+      const probe = spawnSync("bash", ["-c", 'LC_ALL=C.UTF-8; [[ "$R" =~ ^[[:print:]]+$ ]]'], {
+        env: { ...process.env, R: "r\u00e9ceipt" },
+      })
+      expect(probe.status).toBe(0)
+      const outcome = dispatch({ receipt: "r\u00e9ceipt", head: fixture.sha.A, classLocale: "C.UTF-8" })
+      expect(outcome.status).not.toBe(0)
+      expect(outcome.output).toContain("::error::ci_basis_receipt refused: ")
+      expect(outcome.output).toContain("1-128 printable ASCII")
+      expect(outcome.summary).not.toContain(WAIVED)
     },
     TEST_TIMEOUT_MS,
   )

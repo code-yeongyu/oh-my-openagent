@@ -12,6 +12,7 @@ export type LazyRemoteOptions = {
   /** The account's alias registry, loaded on its first use; absent, the surface has no registry and aliases are refused typed. */
   readonly loadAliasRegistry?: () => Promise<AliasRegistry>
   readonly permissionPreset?: () => string | undefined
+  readonly loadProjector?: RemoteThreadSurface["loadProjector"]
 }
 
 /**
@@ -154,7 +155,10 @@ export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThrea
       if (loaded !== undefined) await (await loaded.catch(() => undefined))?.close?.()
     },
   }
-  const preset = options.permissionPreset === undefined ? {} : { permissionPreset: options.permissionPreset }
+  const preset = {
+    ...(options.permissionPreset === undefined ? {} : { permissionPreset: options.permissionPreset }),
+    ...(options.loadProjector === undefined ? {} : { loadProjector: options.loadProjector }),
+  }
   const loadAliasRegistry = options.loadAliasRegistry
   if (loadAliasRegistry === undefined) return { sessions, client, chain: { stamp: (record) => record }, ...preset }
   let registry: Promise<AliasRegistry> | undefined
