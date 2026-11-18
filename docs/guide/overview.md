@@ -162,7 +162,7 @@ Override specific categories or curated agents in `omo.json`:
   "agents": {
     // Planning helpers: Claude for the gap analysis, GPT for the review
     "plan-consultant": { "model": "anthropic/claude-opus-5-5", "reasoning": "high" },
-    "plan-reviewer": { "model": "openai/gpt-6-astra", "reasoning": "xhigh" },
+    "plan-reviewer": { "model": "openai/gpt-6.2-astra", "reasoning": "xhigh" },
 
     // Research agents: cheap and fast is the point
     "explore": { "model": "openai/gpt-6-luna-fast", "reasoning": "low" },
@@ -177,10 +177,10 @@ Override specific categories or curated agents in `omo.json`:
     "visual-engineering": { "model": "anthropic/claude-fable-5-2", "reasoning": "max" },
 
     // Hard logic: GPT-6 Astra max, then GPT-5.6 Sol max
-    "ultrabrain": { "model": "openai/gpt-6-astra", "reasoning": "max" },
+    "ultrabrain": { "model": "openai/gpt-6.2-astra", "reasoning": "max" },
 
     // Autonomous research and execution: GPT-6 Astra high, then GPT-5.6 Sol medium
-    "deep-high": { "model": "openai/gpt-6-astra", "reasoning": "high" },
+    "deep-high": { "model": "openai/gpt-6.2-astra", "reasoning": "high" },
 
     // Creative and design work
     "artistry": { "model": "anthropic/claude-fable-5-2", "reasoning": "max" },
@@ -210,8 +210,8 @@ Override specific categories or curated agents in `omo.json`:
 
 **GPT models** (explicit reasoning, principle-driven):
 
-- GPT-6 Astra: OpenAI's most capable model; default for `plan-reviewer` (xhigh, high on Copilot), `ultrabrain` (max), and `deep-high` (high), with `gpt-6-astra-fast` as the Fast-mode variant
-- GPT-6.1 Sol: `deep-low` runs it at medium on the OpenAI lanes, then its Fast (priority) tier `gpt-6.1-sol-fast`, then GPT-5.6 Sol and `gpt-5.6-sol-fast`; it is also the fifth `unspecified-low` rung (medium, OpenAI lanes); its Fast tier is also the first Sol rung on Obsessive · Normal, with plain GPT-6.1 Sol right behind it
+- GPT-6.2 Astra: OpenAI's most capable model; default for `plan-reviewer` (xhigh), `ultrabrain` (max), `deep-high` (high) and both Obsessive profiles, with `gpt-6.2-astra-fast` as the Fast-mode variant. GPT-6 Astra stays right behind it (it is what GitHub Copilot serves)
+- GPT-6.2 Sol: `deep-low` runs it at medium on the OpenAI lanes, then its Fast (priority) tier `gpt-6.2-sol-fast`, then GPT-6.1 Sol and its Fast tier, then GPT-5.6 Sol and `gpt-5.6-sol-fast`; it is also the fifth `unspecified-low` rung (medium, OpenAI lanes); its Fast tier is also the first Sol rung on Obsessive · Normal, with plain GPT-6.2 Sol right behind it
 - GPT-5.6 Sol: the GPT-recommended main-agent configuration; the fallback rung under Astra for `ultrabrain` (max)
 - GPT-5.6 Terra: balanced mid-tier; an optional override, not part of any default chain
 - GPT 5.6 Luna Fast: fast and cheap; default for `explore` and `librarian`
