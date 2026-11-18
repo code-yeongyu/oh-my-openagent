@@ -77,6 +77,7 @@ const world = (): World => {
   return {
     ...base,
     endpoints: { [PEER]: ["ZW5kcG9pbnQta2V5LTAwMD"] },
+    primary: { [PEER]: "ZW5kcG9pbnQta2V5LTAwMD" },
     endpointCommand: {
       data: { sessionId: "engine-routing-1", state: { sessionId: ENGINE_ID, cwd: "/work" } },
       outcome: [{ state: "engine_applied", retryable: false }],

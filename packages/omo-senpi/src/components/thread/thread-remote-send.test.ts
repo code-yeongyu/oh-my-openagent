@@ -155,15 +155,23 @@ describe("remote == local: the same call answers the same on b as on this device
     expect(commands(a.sent)).toEqual(["get_state", ADMIT, "get_state"])
   })
 
-  test("#given the record's reply is lost on the way back #when a message is sent #then the send is idempotency_uncertain naming the reason, and nothing else is sent", async () => {
-    const a = account({ admitOutcome: { kind: "uncertain", reason: "reply_lost" } })
-    const { run } = surface(a.remote)
-    expect(await run("thread_send", { thread: "dur-on-b", message: "x" })).toMatchObject({
-      kind: "error",
-      error: { code: "idempotency_uncertain", details: { device: "b", reason: "reply_lost" } },
-    })
-    expect(commands(a.sent)).toEqual(["get_state", ADMIT])
-  })
+  // omo#14130: a record that reached the device and lost its answer is delivered_unconfirmed (never resend it); one with
+  // no such evidence stays idempotency_uncertain.
+  test.each([
+    ["reply_lost", "idempotency_uncertain"],
+    ["delivered_unconfirmed", "delivered_unconfirmed"],
+  ] as const)(
+    "#given the record's reply is lost on the way back (%s) #when a message is sent #then the send answers %s naming the reason, and nothing else is sent",
+    async (reason, code) => {
+      const a = account({ admitOutcome: { kind: "uncertain", reason } })
+      const { run } = surface(a.remote)
+      expect(await run("thread_send", { thread: "dur-on-b", message: "x" })).toMatchObject({
+        kind: "error",
+        error: { code, details: { device: "b", reason } },
+      })
+      expect(commands(a.sent)).toEqual(["get_state", ADMIT])
+    },
+  )
 
   test.each([
     ["capability_missing", "scope_denied"],

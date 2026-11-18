@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { afterEach, describe, expect, test } from "bun:test"
 import type { ThreadToolResult } from "../contracts"
 import { gatewayDatabasePath } from "../gateway/paths"
-import { B_ROW, comparable, createRemoteThreadFixture } from "../thread-remote-fixture"
+import { B_FILE, B_ROW, comparable, createRemoteThreadFixture } from "../thread-remote-fixture"
 import type { ThreadHostSession } from "../tools"
 
 // #12884 (part of #12879): thread_create (new / open existing / fork) is one body over the SessionHost port. The same
@@ -162,11 +162,8 @@ describe("SessionHost: opening an existing thread on both legs", () => {
     expect(there).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b", deduplicated: false })
     expect(localOpenFrames(openSession)).toEqual([{ sessionPath: expect.stringContaining("dur-on-disk.jsonl") }])
     expect(a.sent).toEqual([
-      {
-        via: "endpoint",
-        device: "b",
-        rpc: { type: "open_session", retain_on_disconnect: true, sessionPath: B_ROW.path },
-      },
+      { via: "endpoint", device: "b", rpc: { type: "find_session", durableSessionId: "dur-on-b" } },
+      { via: "endpoint", device: "b", rpc: { type: "open_session", retain_on_disconnect: true, sessionPath: B_FILE } },
     ])
   })
 })

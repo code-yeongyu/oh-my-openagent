@@ -380,19 +380,49 @@ async function sendTo(
     // The ok send always carries its delivery; without one the attach's own end still settles the follow below.
     if ("delivery" in sent)
       follow.aim(sent.delivery.kind === "started" ? "started" : sent.delivery.kind === "steered" ? "steered" : "queued")
-    // A send that waits behind a running turn says so at once (#13268); stdout stays the answer alone, so this is stderr.
+    // A send that waits behind a running turn says so at once (#13268); under --json the notice rides the final
+    // JSON value instead of stderr, so one JSON value always carries it (#13425).
     const waitNotice = sendWaitNotice(label, sent)
     if (waitNotice !== null && !json) dependencies.error(waitNotice)
-    const end = await follow.settled
+    // #13425: the settle wait is bounded (--timeout seconds, default 120); a turn that never settles answers a
+    // typed timeout instead of hanging the person at this terminal.
+    const waitMs = args.timeout_seconds !== undefined ? args.timeout_seconds * 1000 : 120_000
+    let settleTimer: ReturnType<typeof setTimeout> | undefined
+    const timedOut = new Promise<"__omo_send_timeout__">((resolve) => {
+      settleTimer = setTimeout(() => resolve("__omo_send_timeout__"), waitMs)
+      settleTimer.unref?.()
+    })
+    const end = await Promise.race([follow.settled, timedOut]).finally(() => {
+      if (settleTimer !== undefined) clearTimeout(settleTimer)
+    })
+    const queuedNoticeField = waitNotice === null ? {} : { queued_notice: waitNotice }
     if (!json && reply.length > 0 && !reply.endsWith("\n")) dependencies.write("\n")
     // --json: the send's typed result, with the answer it streamed.
-    if (json && end === "settled") dependencies.output(JSON.stringify({ ...sent, reply }))
+    if (json && end === "settled") dependencies.output(JSON.stringify({ ...sent, reply, ...queuedNoticeField }))
+    if (end === "__omo_send_timeout__") {
+      if (json)
+        dependencies.output(
+          JSON.stringify({
+            ...sent,
+            kind: "timeout",
+            waited_ms: waitMs,
+            ...queuedNoticeField,
+            next_action: "The message was delivered; read the thread to see its answer when the turn settles.",
+          }),
+        )
+      else
+        dependencies.error(
+          `omo remote: the turn on ${label} did not settle within ${Math.round(waitMs / 1000)} s; read the thread later.`,
+        )
+      return REMOTE_EXIT.failed
+    }
     if (end === "interrupted") {
       dependencies.error(`omo remote: the turn on ${label} was interrupted before it finished.`)
       return REMOTE_EXIT.failed
     }
     if (end !== "settled") {
-      dependencies.error(`omo remote: the session on ${row.device} ended before its turn settled (${end}).`)
+      if (json) dependencies.output(JSON.stringify({ ...sent, kind: "session_ended", end, ...queuedNoticeField }))
+      else dependencies.error(`omo remote: the session on ${row.device} ended before its turn settled (${end}).`)
       return REMOTE_EXIT.failed
     }
     return REMOTE_EXIT.ok
