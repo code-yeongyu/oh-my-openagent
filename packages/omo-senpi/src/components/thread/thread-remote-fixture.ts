@@ -255,6 +255,8 @@ export function createRemoteThreadFixture() {
       relayKeyOnly?: boolean
       /** The device service throws on b's admit_external_message (a lost connection mid-delivery). */
       admitThrows?: string
+      /** Every get_state after b admitted a delivery is refused with this reason (the read after the admission fails). */
+      stateRefusedAfterAdmit?: string
     } = {},
   ) {
     const engine = options.engine ?? ENGINE
@@ -332,6 +334,8 @@ export function createRemoteThreadFixture() {
         for (const id of options.relayKeyOnly === true ? [key] : [opened, key]) live.add(id)
         return ok(options.openData ?? { sessionId: "rpc-9", state: { durableSessionId: opened } })
       }
+      if (rpc["type"] === "get_state" && options.stateRefusedAfterAdmit !== undefined && admitted.size > 0)
+        return { kind: "refused", reason: options.stateRefusedAfterAdmit }
       if (rpc["type"] === "get_state")
         return ok({
           isStreaming: engine.streaming,
