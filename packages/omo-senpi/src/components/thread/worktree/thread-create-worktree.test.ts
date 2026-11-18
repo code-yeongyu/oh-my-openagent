@@ -47,20 +47,28 @@ describe("thread_create with worktree on this device", () => {
   test("#given a repository #when thread_create asks for a worktree #then the worktree is created under the agent dir and the thread opens in it", async () => {
     const repo = kit.repository()
     const { run, openSession } = surface(account().remote)
-    const result = await run("thread_create", { cwd: repo, worktree: { branch: "feat/thread" } })
+    const result = await run("thread_create", {
+      name: "thread-create-worktree-50",
+      cwd: repo,
+      worktree: { branch: "feat/thread" },
+    })
     expect(result).toMatchObject({
       kind: "ok",
       worktree: { branch: "feat/thread", repository: kit.gitPath(repo) },
     })
     const path = (result as unknown as { worktree: { path: string } }).worktree.path
     expect(path.startsWith(agentDir)).toBe(true)
-    expect(openSession.mock.calls.map((call) => call[0])).toEqual([{ cwd: path }])
+    expect(openSession.mock.calls.map((call) => call[0])).toEqual([{ cwd: path, name: "thread-create-worktree-50" }])
     expect(kit.git(path, "branch", "--show-current")).toBe("feat/thread")
   })
 
   test("#given the branch already exists #when thread_create asks for it #then name_conflict branch_exists and no thread opens", async () => {
     const { run, openSession } = surface(account().remote)
-    const result = await run("thread_create", { cwd: kit.repository(), worktree: { branch: "main" } })
+    const result = await run("thread_create", {
+      name: "thread-create-worktree-63",
+      cwd: kit.repository(),
+      worktree: { branch: "main" },
+    })
     expect(failure(result)).toMatchObject({ code: "name_conflict", details: { reason: "branch_exists" } })
     expect(openSession).not.toHaveBeenCalled()
   })
@@ -79,7 +87,12 @@ describe("thread_create with worktree on another device", () => {
     const a = account()
     const far = withFarWorktree(a.remote, kit.folder("thread-wt-far-"))
     const { run, openSession } = surface(far.remote)
-    const result = await run("thread_create", { device: "studio", cwd: repo, worktree: { branch: "remote/x" } })
+    const result = await run("thread_create", {
+      name: "thread-create-worktree-82",
+      device: "studio",
+      cwd: repo,
+      worktree: { branch: "remote/x" },
+    })
     expect(result).toMatchObject({ kind: "ok", device: "b", worktree: { branch: "remote/x" } })
     const worktree = (result as unknown as { worktree: { path: string; setup_session_left_open?: string } }).worktree
     expect(worktree.setup_session_left_open).toBeUndefined()
@@ -95,7 +108,12 @@ describe("thread_create with worktree on another device", () => {
     const older = { kind: "refused", reason: `Unknown extension RPC request: ${THREAD_WORKTREE_RPC}` } as const
     const far = withFarWorktree(a.remote, kit.folder("thread-wt-far-"), older)
     const { run } = surface(far.remote)
-    const result = await run("thread_create", { device: "studio", cwd: "/repo/on/b", worktree: {} })
+    const result = await run("thread_create", {
+      name: "thread-create-worktree-99",
+      device: "studio",
+      cwd: "/repo/on/b",
+      worktree: {},
+    })
     expect(failure(result)).toMatchObject({ code: "unsupported", details: { device: "b" } })
     expect(a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")).toHaveLength(1)
   })
@@ -105,7 +123,12 @@ describe("thread_create with worktree on another device", () => {
     const a = account()
     const far = withFarWorktree(a.remote, kit.folder("thread-wt-far-"))
     const { run } = surface(far.remote)
-    const result = await run("thread_create", { device: "studio", cwd: repo, worktree: { branch: "main" } })
+    const result = await run("thread_create", {
+      name: "thread-create-worktree-109",
+      device: "studio",
+      cwd: repo,
+      worktree: { branch: "main" },
+    })
     expect(failure(result)).toMatchObject({ code: "name_conflict", details: { reason: "branch_exists", device: "b" } })
     expect(a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")).toHaveLength(1)
   })
@@ -113,7 +136,9 @@ describe("thread_create with worktree on another device", () => {
   test("#given no cwd #when a worktree is asked for on b #then invalid_arguments relative_path and nothing reaches b", async () => {
     const a = account()
     const { run } = surface(a.remote)
-    expect(failure(await run("thread_create", { device: "studio", worktree: {} }))).toMatchObject({
+    expect(
+      failure(await run("thread_create", { name: "thread-create-worktree-117", device: "studio", worktree: {} })),
+    ).toMatchObject({
       code: "invalid_arguments",
       details: { reason: "relative_path", device: "b" },
     })
@@ -123,7 +148,16 @@ describe("thread_create with worktree on another device", () => {
   test("#given b has no such repository folder #when a worktree is asked for there #then invalid_arguments folder_missing naming b", async () => {
     const a = account({ refuse: "missing_session_cwd" })
     const { run } = surface(a.remote)
-    expect(failure(await run("thread_create", { device: "studio", cwd: "/gone", worktree: {} }))).toMatchObject({
+    expect(
+      failure(
+        await run("thread_create", {
+          name: "thread-create-worktree-127",
+          device: "studio",
+          cwd: "/gone",
+          worktree: {},
+        }),
+      ),
+    ).toMatchObject({
       code: "invalid_arguments",
       details: { reason: "folder_missing", device: "b" },
     })
