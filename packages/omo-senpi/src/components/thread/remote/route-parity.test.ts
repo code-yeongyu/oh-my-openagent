@@ -225,7 +225,8 @@ describe("#13012 route parity", () => {
     const a = account({ rows: [DRAFT_ENDED, MIGRATION_LIVE] })
     expect(await surface(a.remote).run("thread_handoff", migrationHandoff)).toMatchObject({
       kind: "ok",
-      thread: { thread_id: B_ROW.durable_id, device: B_ROW.device },
+      thread: B_ROW.durable_id,
+      device: B_ROW.device,
       resolved_by: "fuzzy",
     })
     expect(admits(a.sent)).toStrictEqual([[B_ROW.device, B_ROW.session_id]])
@@ -236,9 +237,9 @@ describe("#13012 route parity", () => {
     const result = await surface(a.remote).run("thread_handoff", migrationHandoff)
     expect(result).toMatchObject({ kind: "error", error: { code: "ambiguous_target" } })
     const candidates =
-      (result as { error: { details?: { candidates?: readonly { id: string; device?: string }[] } } }).error.details
+      (result as { error: { details?: { candidates?: readonly { thread: string; device?: string }[] } } }).error.details
         ?.candidates ?? []
-    expect(candidates.map((candidate) => [candidate.id, candidate.device])).toStrictEqual([
+    expect(candidates.map((candidate) => [candidate.thread, candidate.device])).toStrictEqual([
       ["dur-local", "here"],
       ["dur-cutover", "b"],
       [B_ROW.durable_id, "b"],
