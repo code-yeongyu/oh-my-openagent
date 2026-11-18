@@ -37,11 +37,18 @@ describe("cold wake on Linux", () => {
     ])
   })
 
-  // systemd refuses a group- or world-writable unit; Windows has no POSIX modes (and no session host unit).
-  test.skipIf(process.platform === "win32")("writes the unit 0644", async () => {
-    const { host, home } = fakeSystemd()
-    await installColdWake(host, LAUNCH)
-    expect(statSync(join(UNIT_DIR(home), "omo-session-host.service")).mode & 0o777).toBe(0o644)
+  // systemd refuses a group- or world-writable unit, and a 0600 one is unreadable to a manager running as another user;
+  // Windows has no POSIX modes (and no session host unit). The install runs in a child that sets umask 077 itself, so
+  // the mode cannot come from the runner's umask (omo#14247: a creation mode is ANDed with ~umask).
+  test.skipIf(process.platform === "win32")("writes the unit 0644 even under umask 077", () => {
+    const { home } = fakeSystemd()
+    const unit = join(UNIT_DIR(home), "omo-session-host.service")
+    const writer = new URL("../../src/cold-wake/host.ts", import.meta.url).pathname
+    const script = `process.umask(0o077); const { writeIfChanged } = await import(${JSON.stringify(writer)}); writeIfChanged(${JSON.stringify(unit)}, "[Unit]\\n")`
+    const child = Bun.spawnSync([process.execPath, "-e", script], { stderr: "pipe" })
+    expect(child.stderr.toString()).toBe("")
+    expect(child.exitCode).toBe(0)
+    expect(statSync(unit).mode & 0o777).toBe(0o644)
   })
 
   test("starts a unit that is not running without rewriting anything else", async () => {

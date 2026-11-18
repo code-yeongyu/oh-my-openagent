@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs"
 import { dirname } from "node:path"
 
 import type { RunCommand } from "../install.ts"
@@ -27,12 +27,16 @@ export const failed = (step: string, output: string): ColdWakeOutcome => ({
   detail: output.trim().split(/\r?\n/)[0] ?? "",
 })
 
-/** Writes `text` through a temp file and a rename (mode 0644: a service manager refuses a group-writable unit). */
+/**
+ * Writes `text` through a temp file and a rename, mode 0644: a service manager refuses a group-writable unit. The mode is
+ * set by chmod before the rename because a creation mode is ANDed with ~umask (umask 077 would leave 0600).
+ */
 export const writeIfChanged = (path: string, text: string): boolean => {
   if (existsSync(path) && readFileSync(path, "utf8") === text) return false
   mkdirSync(dirname(path), { recursive: true })
   const temp = `${path}.${process.pid}.tmp`
   writeFileSync(temp, text, { mode: 0o644 })
+  chmodSync(temp, 0o644)
   renameSync(temp, path)
   return true
 }
