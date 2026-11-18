@@ -7,13 +7,19 @@ afterEach(disposeSyncRpcFixtures)
 /** A host whose sync runner counts how often it was told to stop the engines of a device that was turned off. */
 async function host(overrides: Parameters<typeof setup>[0] = {}) {
   let stops = 0
+  const resumed = Promise.withResolvers<void>()
+  let resumes = 0
   const f = await setup({
     stopSync: async () => {
       stops += 1
     },
+    resumeSync: async () => {
+      resumes += 1
+      resumed.resolve()
+    },
     ...overrides,
   })
-  return { ...f, stops: () => stops }
+  return { ...f, stops: () => stops, resumes: () => resumes, resumed: resumed.promise }
 }
 
 test("#given sync on for this device #when disable is called #then this device is turned off through its own account, running engines are stopped and the answer is off", async () => {
@@ -85,4 +91,21 @@ test("#given this engine #when features is asked #then disable is listed so the 
   const f = await host()
   const answer = (await f.call("features", owner("a").context)) as { readonly features: readonly string[] }
   expect(answer.features).toContain("disable")
+})
+
+test("#given a device that was turned off #when enable turns sync on again #then the engines this process parked are resumed", async () => {
+  const f = await host()
+  const a = owner("a")
+  expect(await f.call("disable", a.context)).toEqual({ kind: "off" })
+  f.runtime.enableSync = async () => ({ kind: "joined" })
+  await f.call("enable", a.context)
+  await f.resumed
+  expect(f.resumes()).toBe(1)
+})
+
+test("#given enable does not end with sync on #when it settles #then nothing is resumed", async () => {
+  const f = await host()
+  f.runtime.enableSync = async () => ({ kind: "method_required", methods: ["passkey"] })
+  expect(await f.call("enable", owner("a").context)).toMatchObject({ kind: "method_required" })
+  expect(f.resumes()).toBe(0)
 })

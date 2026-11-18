@@ -203,6 +203,7 @@ describe("memory identity with auto_identity git (#9659)", () => {
       },
       release: async () => {},
       idleTurnedOff: async () => {},
+      resumeIdle: async () => {},
       status: async () => null,
       deviceName: () => undefined,
     }

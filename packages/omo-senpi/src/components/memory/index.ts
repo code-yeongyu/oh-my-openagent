@@ -116,6 +116,7 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
                 return repo === undefined ? undefined : readMemoryRpcSync((path) => syncRunner.status(path), repo)
               },
               stopSync: () => syncRunner.idleTurnedOff(),
+              resumeSync: () => syncRunner.resumeIdle(),
               warn: (message, fields) => ctx.logger.warn(message, fields),
             })
       primeMemoryPersonaAssets({ logger: ctx.logger })

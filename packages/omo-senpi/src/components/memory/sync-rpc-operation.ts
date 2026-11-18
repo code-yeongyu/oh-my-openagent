@@ -325,4 +325,7 @@ export async function runSyncRpcOperation(
       }
     }
   }
+  // Sync is on for this device again (after a Turn off, or for the first time): engines this process parked for its
+  // repos start now instead of waiting for every session to release and rebind (#14093).
+  if (record.enable?.kind === "joined" || record.enable?.kind === "first_device_created") await options.resumeSync?.()
 }

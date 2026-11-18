@@ -97,6 +97,7 @@ export const idleSyncRunner: SyncRunner = {
   acquire: async () => {},
   release: async () => {},
   idleTurnedOff: async () => {},
+  resumeIdle: async () => {},
   status: async () => null,
   deviceName: () => undefined,
 }

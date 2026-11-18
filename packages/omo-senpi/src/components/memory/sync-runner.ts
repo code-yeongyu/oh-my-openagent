@@ -161,6 +161,8 @@ interface Running {
 
 interface Held {
   readonly identity: string
+  readonly paths: MemoryIdentityPaths
+  readonly space: SyncSpaceInputs
   users: number
   readonly ready: Promise<Running | SyncUnavailableStatus | SyncConfigInvalidStatus | null>
 }
@@ -179,6 +181,11 @@ export interface SyncRunner {
    * back on.
    */
   idleTurnedOff(): Promise<void>
+  /**
+   * Starts a fresh engine for every held repo that runs none (turned off, not joined, signed out), after sync was
+   * turned on again on this device; a repo that still cannot sync stays idle. Each restarted repo is a status change.
+   */
+  resumeIdle(): Promise<void>
   status(repo: string): Promise<EngineStatus | SyncUnavailableStatus | SyncConfigInvalidStatus | null>
   /** A sync principal's device name, from the account sessions this runner resolved; undefined when unknown. */
   deviceName(principal: string): string | undefined
@@ -201,7 +208,7 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
   // Closes a running engine and keeps its repo held but idle, so the sessions bound to it release normally and
   // the next bind starts fresh.
   const closeIdle = async (repo: string, held: Held, running: Running): Promise<void> => {
-    repos.set(repo, { identity: held.identity, users: held.users, ready: Promise.resolve(null) })
+    repos.set(repo, { ...held, ready: Promise.resolve(null) })
     running.unwatch()
     await running.device.close()
   }
@@ -379,7 +386,7 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
       logger.error("memory sync failed to start", { identity, error: String(error) })
       return null
     })
-    const held: Held = { identity, users, ready }
+    const held: Held = { identity, paths, space, users, ready }
     void ready.then(() => {
       if (!deferred) return
       const retry = () => {
@@ -464,6 +471,16 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
         [...repos.keys()].map(async (repo) => {
           // A stopped engine is a status change too: the footer and the desktop snapshot drop its last status.
           if (await idleIfTurnedOff(repo)) options.onStatusChange?.(repo)
+        }),
+      )
+    },
+    async resumeIdle() {
+      await Promise.all(
+        [...repos.entries()].map(async ([repo, held]) => {
+          if ((await held.ready) !== null || repos.get(repo) !== held) return
+          const resumed = launch(held.identity, held.paths, held.space, held.users)
+          repos.set(repo, resumed)
+          if ((await resumed.ready) !== null) options.onStatusChange?.(repo)
         }),
       )
     },

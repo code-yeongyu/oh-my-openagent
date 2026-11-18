@@ -135,6 +135,8 @@ export interface SyncRpcOptions {
   readonly syncStatus: () => Promise<MemoryRpcSync | undefined>
   /** Closes the sync engines this process runs for a device that was just turned off; absent on a host with none. */
   readonly stopSync?: () => Promise<void>
+  /** Starts the engines this process parked once sync is on for the device again; absent on a host with none. */
+  readonly resumeSync?: () => Promise<void>
   readonly clock?: CeremonyClock
   /** Releases recovery-phrase key creation (amendment A1); absent means off. */
   readonly phraseGate?: PhraseGate

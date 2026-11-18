@@ -72,6 +72,7 @@ function recordingSyncRunner(calls: SyncCall[]): SyncRunner {
       calls.push({ kind: "release", repo })
     },
     idleTurnedOff: async () => {},
+    resumeIdle: async () => {},
     status: async () => null,
     deviceName: () => undefined,
   }
