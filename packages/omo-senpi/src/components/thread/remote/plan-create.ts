@@ -4,7 +4,13 @@ import { createRelaySessionHost, listedThread } from "../control/relay-session-h
 import type { HostedThread, SessionHost, SessionOpenRequest } from "../control/session-host"
 import { threadToolFailure } from "../errors"
 import { openedResult } from "../tools/thread-row"
-import { type AliasError, type AliasRegistry, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
+import {
+  rowStatus,
+  type AliasError,
+  type AliasRegistry,
+  type RemoteSessionRow,
+  type RemoteThreadSurface,
+} from "./ports"
 import { accountDevices } from "./account"
 import { aliasFailure, deviceRefusal, holderDetails, remoteAvailable } from "./remote-ops"
 
@@ -220,8 +226,10 @@ export async function planCreate(
     const target = await local.locate(value.thread)
     if (target.kind === "error") return { kind: "done", result: target.result }
     if (target.kind === "local") return openHere(target.address)
-    // A device's listing names its ended sessions too; only those are opened again, from their file (B's engine holds a live one).
-    if (target.row.state !== "ended") return alreadyLive(listedThread(target.row), target.row.device)
+    // Only a row its device listed live this round is answered as already live (B's engine holds it). An ended row, or a
+    // cached snapshot of a device that did not answer (#14043), is opened again from its file; the relay host refuses
+    // that open device_offline while the device stays offline.
+    if (rowStatus(target.row) === "live") return alreadyLive(listedThread(target.row), target.row.device)
     return {
       kind: "open",
       host: createRelaySessionHost(remote, target.row.device, target.row),
