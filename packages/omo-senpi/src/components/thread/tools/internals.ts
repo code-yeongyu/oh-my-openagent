@@ -434,6 +434,15 @@ export async function resolveAcross(
     const looked = await lookupAcross(options.remote, address)
     if (looked !== undefined) return looked.kind === "ok" ? { ...looked, all_scope: true } : looked
   }
+  // A device that missed this listing round may hold the thread (#14172): retryable, never a confident not_found. The
+  // single probe above, when this service makes one, already asked every online device and answered for them.
+  if (
+    book.incomplete !== undefined &&
+    across.code === "not_found" &&
+    here.kind === "error" &&
+    here.code === "not_found"
+  )
+    return { kind: "error", ...book.incomplete } as ThreadResolveResult
   return across
 }
 

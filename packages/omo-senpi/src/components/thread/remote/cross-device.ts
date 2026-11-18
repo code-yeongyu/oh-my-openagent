@@ -6,11 +6,10 @@ import {
   rowThreadId,
   type AliasRegistry,
   type RemoteDevice,
-  type RemoteListing,
   type RemoteSessionRow,
   type RemoteThreadSurface,
 } from "./ports"
-import { remoteNotSetUp } from "./address-book"
+import { accountListing, remoteNotSetUp } from "./address-book"
 import type { WorktreeRequest } from "../worktree/thread-worktree"
 import { placeFolder } from "./create-folder"
 import { accountDevices } from "./account"
@@ -158,11 +157,6 @@ export async function renameAlias(
   if (changed.kind !== "error") return undefined
   // The account can be gone by the claim or rename even when aliasesOf answered (a token that expired in between).
   return signedOut(changed.error) ? { local: "sign_in" } : aliasFailure(changed.error)
-}
-
-async function accountListing(remote: RemoteThreadSurface): Promise<RemoteListing> {
-  if (remote.sessions.listing !== undefined) return await remote.sessions.listing()
-  return { rows: await remote.sessions.sessions(), incomplete: [] }
 }
 
 // `threads` counts the threads THIS result lists on the device, so it reads the same for every row: this device's are

@@ -3,6 +3,7 @@ import { hostname } from "node:os"
 import {
   connectDeviceService,
   deviceServiceEndpointPath,
+  deviceServiceIdentityPath,
   deviceServiceStateDir,
   realTimers,
   type DeviceService,
@@ -184,7 +185,17 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
 
   // A cold connect is bounded by the handshake plus CONNECT_SLACK_MS before the member's own clock starts.
   const connected = async (opts: Opts | undefined): Promise<Outcome<DeviceService> | "not_installed"> => {
-    if (!existsSync(deviceServiceEndpointPath(stateDir))) return "not_installed"
+    if (!existsSync(deviceServiceEndpointPath(stateDir)))
+      // A signed-in device keeps its identity while the service is between processes (an update swap, a restart): that is
+      // a service not serving right now, retryable like a refused socket, never "not installed" (#14172).
+      return existsSync(deviceServiceIdentityPath(stateDir))
+        ? remoteFailure(
+            "host_unavailable",
+            "The device service is restarting; its endpoint is not up yet.",
+            nextActionFor("host_unavailable"),
+            { details: { phase: "connect", reason: "service_restarting" } },
+          )
+        : "not_installed"
     const outcome = await withinDeadline(
       timers,
       opts?.signal === undefined ? undefined : { signal: opts.signal },

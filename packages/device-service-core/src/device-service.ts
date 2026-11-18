@@ -132,6 +132,15 @@ export function deviceServiceEndpointPath(stateDir: string, platform: NodeJS.Pla
   return join(stateDir, platform === "win32" ? ENDPOINT_FILE : SOCKET_FILE)
 }
 
+/**
+ * The adopted device identity the service keeps in its state dir (relayd owner-core `IDENTITY_FILE`). It outlives the
+ * service process (an update swap, a restart) and only a sign-out (`forget`) erases it, so its presence with no endpoint
+ * means a configured service between processes, not one that was never set up (#14172).
+ */
+export function deviceServiceIdentityPath(stateDir: string): string {
+  return join(stateDir, "device-identity.json")
+}
+
 export type DeviceService = {
   readonly serviceVersion: string
   /** omo#13037: this service carries the wake mark and the `wake` target (WAKE_MARK_MIN_SERVICE_VERSION). */

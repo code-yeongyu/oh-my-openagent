@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { OFFLINE_PEER, PEER, SESSION_ID } from "../../../../device-service-core/test/local-api/conformance/world.ts"
@@ -103,6 +103,21 @@ describe("conformance rows: devices.*", () => {
     expect(failureOf(await client.service.status())).toMatchObject({
       code: "host_unavailable",
       details: { reason: "service_not_installed" },
+    })
+  })
+
+  test("#given a signed-in device whose service is between processes (no endpoint, adopted identity kept, #14172) #when the service is read #then it answers a retryable restart, not 'not installed'", async () => {
+    const stateDir = mkdtempSync(join(tmpdir(), "rm-"))
+    emptyDirs.push(stateDir)
+    writeFileSync(join(stateDir, "device-identity.json"), "{}")
+    const client = clientOn(stateDir, fakeClock())
+    expect(failureOf(await client.service.status())).toMatchObject({
+      code: "host_unavailable",
+      details: { reason: "service_restarting", phase: "connect" },
+    })
+    expect(failureOf(await client.devices.list())).toMatchObject({
+      code: "host_unavailable",
+      details: { reason: "service_restarting" },
     })
   })
 })

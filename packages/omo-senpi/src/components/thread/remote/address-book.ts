@@ -1,6 +1,7 @@
 import type { ThreadAddressEntry } from "../addressing"
 import type { ThreadToolFailure } from "../errors"
-import { rowStatus, rowThreadId, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
+import { threadToolFailure } from "../errors"
+import { rowStatus, rowThreadId, type RemoteListing, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
 import { holderTarget, remoteReady } from "./remote-ops"
 
 // Decision 0027 section 1: the relay transport's address book. The account listing becomes entries of the SAME shape the
@@ -68,7 +69,28 @@ export type RelayAddressBook = {
   readonly unavailable?: ThreadToolFailure
   /** The alias named a holder the account cannot reach right now (device_offline / not_found): answered as is. */
   readonly aliasFailure?: ThreadToolFailure
+  /**
+   * Devices whose rows this listing round could not include (#14172): a miss may be a thread on one of them, so it answers
+   * this retryable host_unavailable naming them, never not_found.
+   */
+  readonly incomplete?: ThreadToolFailure
 }
+
+/** One account listing round with the devices it could not include; a port without `listing` reports none missing. */
+export async function accountListing(remote: RemoteThreadSurface): Promise<RemoteListing> {
+  if (remote.sessions.listing !== undefined) return await remote.sessions.listing()
+  return { rows: await remote.sessions.sessions(), incomplete: [] }
+}
+
+const listingIncomplete = (devices: readonly string[]): ThreadToolFailure | undefined =>
+  devices.length === 0
+    ? undefined
+    : threadToolFailure(
+        "host_unavailable",
+        `The account listing did not include ${devices.join(", ")} this round; the thread may be there.`,
+        "Retry the call; call thread_list to see which devices answered.",
+        { reason: "listing_incomplete", devices },
+      )
 
 /**
  * This account's threads on OTHER devices as address entries, plus the holder of `address` when it is an account alias
@@ -94,15 +116,18 @@ export async function relayAddressBook(remote: RemoteThreadSurface, address: str
     return { entries: [], unavailable: ready.error }
   }
   const { here } = ready
-  const rows = await remote.sessions.sessions()
+  const { rows, incomplete: missing } = await accountListing(remote)
   const entries = rows.filter((row) => row.device !== here).map((row) => relayAddressEntry(row))
-  if (remote.aliases === undefined) return { entries }
+  const incomplete = listingIncomplete(missing.filter((device) => device !== here))
+  const base = { entries, ...(incomplete === undefined ? {} : { incomplete }) }
+  if (remote.aliases === undefined) return base
   const alias = await remote.aliases.resolve(address).catch(() => undefined)
-  if (alias === undefined || alias.kind === "error") return { entries }
+  if (alias === undefined || alias.kind === "error") return base
   const holder = await holderTarget(remote, alias.value, here, rows)
-  if (!("where" in holder)) return { entries, aliasFailure: holder.error }
+  if (!("where" in holder)) return { ...base, aliasFailure: holder.error }
   if (holder.where === "here")
     return {
+      ...base,
       entries: [
         ...entries,
         {
@@ -116,7 +141,10 @@ export async function relayAddressBook(remote: RemoteThreadSurface, address: str
         },
       ],
     }
-  if (holder.where !== "remote") return { entries }
+  if (holder.where !== "remote") return base
   const row = holder.row
-  return { entries: [...entries.filter((entry) => entry.transport?.row !== row), relayAddressEntry(row, [address])] }
+  return {
+    ...base,
+    entries: [...entries.filter((entry) => entry.transport?.row !== row), relayAddressEntry(row, [address])],
+  }
 }
