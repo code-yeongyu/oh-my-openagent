@@ -90,7 +90,12 @@ type WorkerMessage =
       readonly type: "response"
       readonly id: number
       readonly ok: false
-      readonly error: { readonly message: string; readonly stack?: string; readonly code?: string }
+      readonly error: {
+        readonly message: string
+        readonly stack?: string
+        readonly code?: string
+        readonly details?: Readonly<Record<string, unknown>>
+      }
     }
   | { readonly type: "event"; readonly event: GatewayStoreEvent }
 
@@ -226,6 +231,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
           Object.assign(new Error(message.error.message), {
             workerStack: message.error.stack,
             ...(message.error.code === undefined ? {} : { code: message.error.code }),
+            ...(message.error.details === undefined ? {} : { details: message.error.details }),
           }),
         )
     })

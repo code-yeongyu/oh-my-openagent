@@ -1,5 +1,5 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
-import { threadToolFailure } from "./errors"
+import { gatewaySchemaRefusal, threadToolFailure } from "./errors"
 import type { ThreadErrorCode, ThreadToolFailure } from "./errors"
 import { type Static } from "typebox"
 import { toThreadAddressEntries } from "./address-book"
@@ -214,6 +214,8 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
               "Wait a few seconds, then retry the call.",
             ),
           )
+        const schema = gatewaySchemaRefusal(error)
+        if (schema !== undefined) return output({ kind: "error", error: schema })
         unanswered.set(key, at + GATEWAY_RECEIPT_RETENTION_MS)
         return output(
           failure(
@@ -277,6 +279,8 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
           .toolReceiptSettle({ ...scope, now: now(), error_note: message })
           .catch(unrecorded(`the call failed (${message})`))
       running.delete(receiptKey(scope))
+      const schema = gatewaySchemaRefusal(error)
+      if (schema !== undefined) return output({ kind: "error", error: schema })
       if (message.startsWith("host_unavailable:")) {
         return output(
           failure(

@@ -10,7 +10,7 @@ import {
   type ThreadToolName,
   type ThreadToolResult,
 } from "../contracts"
-import type { ThreadErrorCode } from "../errors"
+import { gatewaySchemaRefusal, type ThreadErrorCode } from "../errors"
 import type { GatewayRelay } from "../gateway/relay"
 import { metadata, output, type AnyTool, type ToolOutput } from "./internals"
 import { UNKNOWN_CALLER, type ThreadToolSurfaceOptions } from "./ports"
@@ -69,6 +69,8 @@ export function createRelayTools(context: RelayToolsContext): AnyTool[] {
       )
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
+      const schema = gatewaySchemaRefusal(error)
+      if (schema !== undefined) return output({ kind: "error", error: schema })
       if (message.startsWith("host_unavailable:"))
         return output(
           failure(
