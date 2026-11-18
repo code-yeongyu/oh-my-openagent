@@ -3,7 +3,7 @@ import { SOCKET_FILE } from "./local-api/access.ts"
 import { connectLocalApi, type ConnectOptions, type LocalApiClient } from "./local-api/client.ts"
 import { ENDPOINT_FILE } from "./local-api/transport.ts"
 import { connectLocalBackground } from "./background-transport.ts"
-import { markNotSent, NotSentError, olderThanWakeMinimum } from "./not-sent-error.ts"
+import { markNotSent, olderThanWakeMinimum } from "./not-sent-error.ts"
 import type { ListingResult, ListingRevision } from "./local-api/client-assembly.ts"
 import type {
   Capability,
@@ -24,6 +24,7 @@ import { randomBytes } from "node:crypto"
 import { minimumInEffect, type MinimumsOption } from "./minimum-in-effect.ts"
 import { compareVersions } from "./release/version.ts"
 import { deviceServiceStateDir } from "./state-dir.ts"
+import { engineEndpointOf } from "./engine-endpoint.ts"
 import { deadlineTimerOf, realTimers, type Timers } from "./timers.ts"
 
 // A host sends no command state at all for a route it does not list toward a sender it does not grant (docs/local-api.md
@@ -349,13 +350,12 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
     endpointCommand: async (device, rpc, options) => {
       // The endpoint lookup runs before any session.command is written, so whatever fails it (a timeout, a closed
       // connection, a refusal) dispatched nothing: it is marked not_sent, unlike a timeout after sending.
-      let endpoint: string | undefined
+      let endpoint: string
       try {
-        endpoint = (await client.request("session.endpoints", { device })).endpoints[0]
+        endpoint = await engineEndpointOf(client, device)
       } catch (error) {
         throw markNotSent(error)
       }
-      if (endpoint === undefined) throw new NotSentError("unsupported", "the device lists no engine endpoint")
       return await sendToEndpoint(client, device, endpoint, rpc, options?.locate === true, timers)
     },
     close: () => client.close(),
