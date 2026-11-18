@@ -880,6 +880,56 @@ describe("memory rpc bridge sync field (omo #10637)", () => {
         },
       },
     ],
+    [
+      "failing on a service refusal, which the desktop reads as unknown with its cause (#13635)",
+      async () => ({
+        kind: "failing",
+        since: Date.parse("2026-10-22T10:00:00.000Z"),
+        attempts: 1,
+        failure: {
+          kind: "service_refused",
+          reason: "r",
+          action: "a",
+          cause: { errorClass: "SyncHttpError", code: "payload_too_large", httpStatus: 413, stage: "push" },
+        },
+      }),
+      {
+        state: "failing",
+        failure: {
+          kind: "unknown",
+          reason: "r",
+          action: "a",
+          sinceISO: "2026-10-22T10:00:00.000Z",
+          attempts: 1,
+          cause: { errorClass: "SyncHttpError", code: "payload_too_large", httpStatus: 413, stage: "push" },
+        },
+      },
+    ],
+    [
+      "failing on an unexpected error (#13635)",
+      async () => ({
+        kind: "failing",
+        since: Date.parse("2026-10-22T10:00:00.000Z"),
+        attempts: 3,
+        failure: {
+          kind: "unknown",
+          reason: "r",
+          action: "a",
+          cause: { errorClass: "GitCommandError", exitCode: 128, stage: "apply" },
+        },
+      }),
+      {
+        state: "failing",
+        failure: {
+          kind: "unknown",
+          reason: "r",
+          action: "a",
+          sinceISO: "2026-10-22T10:00:00.000Z",
+          attempts: 3,
+          cause: { errorClass: "GitCommandError", exitCode: 128, stage: "apply" },
+        },
+      },
+    ],
     ["not syncing on this device", async () => null, undefined],
     ["a reader that throws", async () => Promise.reject(new Error("runner gone")), undefined],
   ]

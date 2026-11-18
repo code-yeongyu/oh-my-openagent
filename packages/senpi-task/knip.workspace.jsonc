@@ -1,0 +1,259 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/senpi-task": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+      ],
+      "ignoreFiles": [
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/manual-agents-qa.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/manual-category-qa.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/manual-output-qa.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/manual-qa.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/manual-routing-policy-qa.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/lifecycle/__fixtures__/batch-admission-race-child.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/lifecycle/__fixtures__/reconcile-race-worker.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/manager/__fixtures__/hanging-child.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/manager/__fixtures__/seed-floor-child.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/runners/in-process/__fixtures__/bridge-run.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/runners/in-process/__fixtures__/print-run.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/runners/rpc-host/__fixtures__/register-stores.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/state/__fixtures__/id-child.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/store/__fixtures__/claim-floor-child.ts",
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/store/__fixtures__/claim-race-child.ts",
+      ],
+      "ignoreDependencies": [
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "typebox",
+      ],
+      // pre-existing at origin dev 4686e425b5: executables this package runs that it does not declare
+      "ignoreBinaries": ["taskkill.exe"],
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) hostKill, daemonRestart, idleEvict, handoff
+    "packages/senpi-task/src/__adversarial__/chaos-host-actions.ts": ["hostKill", "daemonRestart", "idleEvict", "handoff"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) HOST_CHAOS_SOCKET, ChaosDaemon, ChaosHostRegistry
+    "packages/senpi-task/src/__adversarial__/chaos-host-harness.ts": ["HOST_CHAOS_SOCKET", "ChaosDaemon", "ChaosHostRegistry"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) CURATED_READONLY_AGENT_DEFAULTS, ULW_REVIEWER_AGENT_DEFAULTS, ULW_REVIEWER_AGENT_NAMES, AGENT_INVOCATION_CONDITIONS, agentToolPolicy, loadAgents, defineAgent, registerAgent, resolveToolRule
+    "packages/senpi-task/src/agents/index.ts": ["CURATED_READONLY_AGENT_DEFAULTS", "ULW_REVIEWER_AGENT_DEFAULTS", "ULW_REVIEWER_AGENT_NAMES", "AGENT_INVOCATION_CONDITIONS", "agentToolPolicy", "loadAgents", "defineAgent", "registerAgent", "resolveToolRule"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) OmoAgentOverlaySchema
+    "packages/senpi-task/src/agents/schema.ts": ["OmoAgentOverlaySchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ToolRuleEntrySchema
+    "packages/senpi-task/src/agents/tools.ts": ["ToolRuleEntrySchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isCategoryChainRungResolvable, isCategoryChainViable, isCategoryGateSatisfied, resolveCategoryCoverage
+    "packages/senpi-task/src/category/index.ts": ["isCategoryChainRungResolvable", "isCategoryChainViable", "isCategoryGateSatisfied", "resolveCategoryCoverage"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) formatModel
+    "packages/senpi-task/src/category/registry-models.ts": ["formatModel"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) routeCompletion, shouldNotifyStatus
+    "packages/senpi-task/src/completion/index.ts": ["routeCompletion", "shouldNotifyStatus"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) FINAL_RESPONSE_TRANSPORT_LIMIT
+    "packages/senpi-task/src/completion/notification.ts": ["FINAL_RESPONSE_TRANSPORT_LIMIT"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DAG_COMPILE_ERROR_CODES
+    "packages/senpi-task/src/dag/graph.ts": ["DAG_COMPILE_ERROR_CODES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DAG_WAIT_ERROR_CODES
+    "packages/senpi-task/src/dag/handle.ts": ["DAG_WAIT_ERROR_CODES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DAG_ACTIVITY_CHANNEL, DAG_EVENT_LANES, DAG_NODE_ERROR_CODES, DAG_NODE_OUTPUT_PREVIEW_CHARS, DAG_NODE_STATES, DAG_NODE_TRANSITION_REASONS, DAG_ROUTE_KINDS, DAG_RUN_EVENT_TYPES, DAG_RUN_STATUSES, DAG_SETTINGS_DEFAULTS and 35 more
+    "packages/senpi-task/src/dag/index.ts": ["DAG_ACTIVITY_CHANNEL", "DAG_EVENT_LANES", "DAG_NODE_ERROR_CODES", "DAG_NODE_OUTPUT_PREVIEW_CHARS", "DAG_NODE_STATES", "DAG_NODE_TRANSITION_REASONS", "DAG_ROUTE_KINDS", "DAG_RUN_EVENT_TYPES", "DAG_RUN_STATUSES", "DAG_SETTINGS_DEFAULTS", "compileDag", "DAG_COMPILE_ERROR_CODES", "dagDefinitionFingerprint", "dagFingerprint", "nodeFingerprintInput", "dagDefinitionAmendedEvent", "dagDiagnosticAddedEvent", "dagEventLane", "dagNodeRetriedEvent", "dagNodeReusedEvent", "dagNodeSteeredEvent", "dagNodeTaskAttachedEvent", "dagNodeTransitionedEvent", "dagRunCancelledEvent", "dagRunCompletedEvent", "dagRunCreatedEvent", "dagRunFailedEvent", "dagRunPausedEvent", "dagRunResumedEvent", "dagRunStartedEvent", "dagStreamOverflowEvent", "dagWaveCompletedEvent", "dagWaveStartedEvent", "dagKeyHash", "DagJournalCorruptError", "createDagJournal", "DAG_MANAGER_ERROR_CODES", "DAG_WAIT_ERROR_CODES", "DagWaitError", "DAG_LEASE_WATCH_INTERVAL_MS", "resolveDagNodeExecutionMode", "applyDagSchedulerEvent", "createDagScheduler", "persistDagNodeResult", "readDagNodeResult"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isInfrastructureFailure
+    "packages/senpi-task/src/dag/infrastructure-retry.ts": ["isInfrastructureFailure"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DAG_MANAGER_ERROR_CODES
+    "packages/senpi-task/src/dag/manager.ts": ["DAG_MANAGER_ERROR_CODES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DAG_NODE_CONTROL_ERROR_CODES
+    "packages/senpi-task/src/dag/node-control-context.ts": ["DAG_NODE_CONTROL_ERROR_CODES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) HeldRunner
+    "packages/senpi-task/src/dag/node-projection.test-harness.ts": ["HeldRunner"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DAG_LEASE_WATCH_INTERVAL_MS
+    "packages/senpi-task/src/dag/recovery-lease-watch.ts": ["DAG_LEASE_WATCH_INTERVAL_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DAG_NODE_CONTROL_ERROR_CODES
+    "packages/senpi-task/src/dag/scheduler.ts": ["DAG_NODE_CONTROL_ERROR_CODES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) dagKeyHash
+    "packages/senpi-task/src/dag/store.ts": ["dagKeyHash"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) EvalHandleHostError
+    "packages/senpi-task/src/eval-handles/index.ts": ["EvalHandleHostError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) createWorkpoolWorkerTool, buildWorkpoolExecute, WorkpoolParams, WorkpoolYieldParams, WorkpoolCommandSchema, WorkpoolCreateSchema, createWorkpoolStore, WORKPOOL_ERROR_CODES, childInvokeScope, escalatingHostTools and 130 more
+    "packages/senpi-task/src/index.ts": ["createWorkpoolWorkerTool", "buildWorkpoolExecute", "WorkpoolParams", "WorkpoolYieldParams", "WorkpoolCommandSchema", "WorkpoolCreateSchema", "createWorkpoolStore", "WORKPOOL_ERROR_CODES", "childInvokeScope", "escalatingHostTools", "isWriteCapableHostTool", "KERNEL_TOOL_ERROR_CODES", "KernelToolError", "createKernelToolWrappers", "isReservedKernelToolName", "kernelToolKey", "normalizeKernelToolName", "readKernelToolsCapability", "resolveKernelToolGrant", "supportsInvokeScope", "BACKGROUND_MODES", "COST_REPORT_STATUSES", "DURATION_SOURCE_STATUSES", "isSpawnSpecV1", "RESOLVED_MODEL_SOURCES", "TOKEN_COVERAGE_STATUSES", "isolationBackends", "resolveProjectStateDirectory", "formatLiveSpend", "formatRunSpend", "formatTargetIdentity", "toolCountSuffix", "TASK_SUMMARY_MAX_LENGTH", "clampTaskSummary", "MEMBER_IDENTITY_ENV", "ensureTeamRuntimeDirs", "resolveProjectTeamSpecPath", "CATEGORY_DESCRIPTIONS", "CATEGORY_PROMPT_APPENDS", "resolveAvailableCategoryNames", "DEFAULT_MAX_CHILD_DEPTH", "buildSubagentPrompt", "childVisibleToolNames", "createChildResourceLoader", "isTaskOrTeamFamilyTool", "SENPI_SESSION_BUILTIN_NAMES", "isHostSessionHandle", "readMemberSessionIdentity", "HOST_WARMUP_CONTEXT", "HOST_WARMUP_TASK_ID", "HostWarmRefusedError", "resolveTaskHostSocket", "RpcCommandError", "RpcProtocolClient", "buildAutoUiResponse", "buildChildArgs", "classifyChildExit", "createRpcChildHandle", "detectBunBinary", "detectCompiledEngine", "mapExitOutcomeToError", "resolveChildSessionDir", "resolveSenpiExecutable", "resolveSenpiLauncher", "tailStderr", "terminateRpcChild", "resolveInheritedExtensionList", "TASK_AWAITING_INPUT_EVENT", "NameRegistry", "TaskConcurrency", "adaptInProcessHandle", "adaptRpcHandle", "decideDepthPolicy", "resolveExecutionMode", "AGENT_INVOCATION_CONDITIONS", "ULW_REVIEWER_AGENT_NAMES", "EMPTY_SKILL_INVOCATIONS", "PLAN_GATED_AGENT_NAMES", "defineAgent", "invocationConditionForAgent", "loadAgents", "registerAgent", "resolveToolRule", "buildNoticeBox", "noticeTone", "buildCompletionDetails", "completionMessageLines", "routeCompletion", "shouldNotifyStatus", "AgentLimitReached", "getLifecycleDetachedRevivalRollback", "getLifecycleReattachPorts", "registerLifecycleDetachedRevivalRollback", "registerLifecycleReattachPorts", "deferralOutlookFor", "DEFAULT_SEND_DELIVERY", "createSteeringEngine", "TASK_PROMPT_GUIDELINES", "TASK_PROMPT_SNIPPET", "TaskToolParams", "buildTaskExecute", "resolvePromptCacheSafeWaitSeconds", "excerptRendererPromptText", "joinRendererTokens", "listTaskAgents", "listTaskCategories", "statusThemeColor", "taskCallLines", "taskResultLines", "waitForForegroundTask", "TaskCancelParams", "MemberScopedTaskSendParams", "TaskSendParams", "clampWaitTimeout", "createMemberScopedTaskSendTool", "finalResponseHead", "isTerminalStatus", "toolResult", "TRANSCRIPT_MAX_CHARS", "TaskOutputParams", "childSessionDir", "parseSessionTranscript", "readEventLogTranscript", "readSessionDirTranscript", "buildPeerMessageEnvelope", "buildTeamMessage", "DEFAULT_STALE_RESERVATION_TTL_MS", "MEMBER_EXTENSION_BUNDLE_NAME", "parseMemberExtensionEnv", "reclaimStaleTeamReservations", "TeamMemberRespawnLaunchError", "canClaimTeamTask", "DELETABLE_MEMBER_STATUSES", "isMemberDeletable", "SenpiShutdownError", "TeamTaskAlreadyClaimedError", "TeamTaskBlockedByError", "TeamTaskCrossOwnerUpdateError", "TeamTaskInvalidTransitionError", "SenpiTeamRuntimeError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isolationArtifactsDir, baselinePath
+    "packages/senpi-task/src/isolation/baseline-store.ts": ["isolationArtifactsDir", "baselinePath"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) sweepRootsFor
+    "packages/senpi-task/src/isolation/salvage.ts": ["sweepRootsFor"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) KERNEL_TOOL_ERROR_CODES, KernelToolError
+    "packages/senpi-task/src/kernel-tools/contract.ts": ["KERNEL_TOOL_ERROR_CODES", "KernelToolError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) KERNEL_TOOL_ERROR_CODES, KernelToolError, isKernelToolDescriptor, kernelToolErrorCode, kernelToolErrorMessage, parseDescribeResults, readKernelToolsCapability, supportsInvokeScope, KERNEL_TOOL_NAME_MAX_LENGTH, RESERVED_KERNEL_TOOL_ALIASES and 13 more
+    "packages/senpi-task/src/kernel-tools/index.ts": ["KERNEL_TOOL_ERROR_CODES", "KernelToolError", "isKernelToolDescriptor", "kernelToolErrorCode", "kernelToolErrorMessage", "parseDescribeResults", "readKernelToolsCapability", "supportsInvokeScope", "KERNEL_TOOL_NAME_MAX_LENGTH", "RESERVED_KERNEL_TOOL_ALIASES", "isReservedKernelToolName", "kernelToolKey", "normalizeKernelToolName", "sanitizeKernelToolNamePart", "childEffectiveToolNames", "childInvokeScope", "escalatingHostTools", "isWriteCapableHostTool", "nestedHostScopeMessage", "resolveKernelToolGrant", "createKernelToolWrappers", "createUnavailableKernelToolStubs", "kernelToolErrorResult"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) KERNEL_TOOL_NAME_MAX_LENGTH, RESERVED_KERNEL_TOOL_ALIASES, sanitizeKernelToolNamePart
+    "packages/senpi-task/src/kernel-tools/names.ts": ["KERNEL_TOOL_NAME_MAX_LENGTH", "RESERVED_KERNEL_TOOL_ALIASES", "sanitizeKernelToolNamePart"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) kernelToolErrorResult
+    "packages/senpi-task/src/kernel-tools/wrapper.ts": ["kernelToolErrorResult"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) FakeDaemon
+    "packages/senpi-task/src/lifecycle/__fixtures__/host-session-fakes.ts": ["FakeDaemon"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) resolveAdmissionLeaseTiming
+    "packages/senpi-task/src/lifecycle/admission-lease.ts": ["resolveAdmissionLeaseTiming"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) defaultIdleReclaimerScheduler
+    "packages/senpi-task/src/lifecycle/context.ts": ["defaultIdleReclaimerScheduler"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) AgentLimitReached, DEFAULT_HOST_SESSION_RETRY_POLICY, isHostSessionRecord, getLifecycleDetachedRevivalRollback, getLifecycleReattachPorts, registerLifecycleDetachedRevivalRollback, registerLifecycleReattachPorts
+    "packages/senpi-task/src/lifecycle/index.ts": ["AgentLimitReached", "DEFAULT_HOST_SESSION_RETRY_POLICY", "isHostSessionRecord", "getLifecycleDetachedRevivalRollback", "getLifecycleReattachPorts", "registerLifecycleDetachedRevivalRollback", "registerLifecycleReattachPorts"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) REVIVABLE_STATUSES
+    "packages/senpi-task/src/lifecycle/reconcile-reclamation.ts": ["REVIVABLE_STATUSES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ACTIVE_REVIVE_DRIFT_POLICY
+    "packages/senpi-task/src/lifecycle/revive-policy.ts": ["ACTIVE_REVIVE_DRIFT_POLICY"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) HOST_PID
+    "packages/senpi-task/src/manager/__fixtures__/fallback-launch-fakes.ts": ["HOST_PID"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) holdsInChild
+    "packages/senpi-task/src/manager/held-send.ts": ["holdsInChild"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) TaskConcurrency, decideDepthPolicy, NameRegistry, AUTO_HOST_CAPABILITIES, adaptInProcessHandle, adaptRpcHandle, TASK_AWAITING_INPUT_EVENT, TRANSCRIPT_ASSISTANT_EVENT, TRANSCRIPT_TOOL_EVENT, logTranscriptEvent and 1 more
+    "packages/senpi-task/src/manager/index.ts": ["TaskConcurrency", "decideDepthPolicy", "NameRegistry", "AUTO_HOST_CAPABILITIES", "adaptInProcessHandle", "adaptRpcHandle", "TASK_AWAITING_INPUT_EVENT", "TRANSCRIPT_ASSISTANT_EVENT", "TRANSCRIPT_TOOL_EVENT", "logTranscriptEvent", "subscribeTranscriptLog"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) readObservedModel, observeChildEffectiveModel
+    "packages/senpi-task/src/manager/observed-model.ts": ["readObservedModel", "observeChildEffectiveModel"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) PausedChildLostError, PausedChildOwnedElsewhereError
+    "packages/senpi-task/src/manager/paused-restore.ts": ["PausedChildLostError", "PausedChildOwnedElsewhereError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) UNEXPECTED_EXIT_CONFIRMATION_MS
+    "packages/senpi-task/src/manager/provisional-exit.ts": ["UNEXPECTED_EXIT_CONFIRMATION_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) spillCandidates
+    "packages/senpi-task/src/manager/spill-admission.ts": ["spillCandidates"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) NativeResumeRefusedError
+    "packages/senpi-task/src/pause/native-child-pause.ts": ["NativeResumeRefusedError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) tokensPerSecond
+    "packages/senpi-task/src/run-stats.ts": ["tokensPerSecond"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) makeSessionDir
+    "packages/senpi-task/src/runners/in-process-child-spec.test-support.ts": ["makeSessionDir"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) childVisibleToolNames, isTaskOrTeamFamilyTool, DEFAULT_MAX_CHILD_DEPTH
+    "packages/senpi-task/src/runners/in-process.ts": ["childVisibleToolNames", "isTaskOrTeamFamilyTool", "DEFAULT_MAX_CHILD_DEPTH"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) CuratedReadonlyBashParams
+    "packages/senpi-task/src/runners/in-process/curated-readonly-bash.ts": ["CuratedReadonlyBashParams"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) CHILD_HOST_TOOLS
+    "packages/senpi-task/src/runners/in-process/host-tools.ts": ["CHILD_HOST_TOOLS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) CHILD_DIRECT_EXPOSURE_TOOL_NAMES, childVisibleToolNames
+    "packages/senpi-task/src/runners/in-process/shared-tool-filter.ts": ["CHILD_DIRECT_EXPOSURE_TOOL_NAMES", "childVisibleToolNames"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_MAX_CHILD_DEPTH, childVisibleToolNames, isTaskOrTeamFamilyTool, SENPI_SESSION_BUILTIN_NAMES, buildSubagentPrompt, createChildResourceLoader, isHostSessionHandle, resolveTaskHostSocket, TASK_DAEMON_REQUIRED_CAPABILITIES, TASK_HOST_SOCKET_ENV_NAMES and 19 more
+    "packages/senpi-task/src/runners/index.ts": ["DEFAULT_MAX_CHILD_DEPTH", "childVisibleToolNames", "isTaskOrTeamFamilyTool", "SENPI_SESSION_BUILTIN_NAMES", "buildSubagentPrompt", "createChildResourceLoader", "isHostSessionHandle", "resolveTaskHostSocket", "TASK_DAEMON_REQUIRED_CAPABILITIES", "TASK_HOST_SOCKET_ENV_NAMES", "HOST_WARMUP_CONTEXT", "readMemberSessionIdentity", "SESSION_ROLES", "HOST_WARMUP_TASK_ID", "HostWarmRefusedError", "buildChildArgs", "detectBunBinary", "detectCompiledEngine", "resolveChildSessionDir", "resolveSenpiExecutable", "resolveSenpiLauncher", "classifyChildExit", "mapExitOutcomeToError", "tailStderr", "terminateRpcChild", "RpcProtocolClient", "createRpcChildHandle", "RpcCommandError", "buildAutoUiResponse"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) cutWithReopenHeld
+    "packages/senpi-task/src/runners/rpc-host/__fixtures__/cancel-lane.ts": ["cutWithReopenHeld"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DAEMON_LAUNCH_SPEC_FIXTURE, DAEMON_LAUNCH_PARENT_ENV_FIXTURE
+    "packages/senpi-task/src/runners/rpc-host/__fixtures__/daemon-launch.ts": ["DAEMON_LAUNCH_SPEC_FIXTURE", "DAEMON_LAUNCH_PARENT_ENV_FIXTURE"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) BUSY_HOST_BACKOFF_MS
+    "packages/senpi-task/src/runners/rpc-host/busy-host.ts": ["BUSY_HOST_BACKOFF_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) shardIdentityMissing
+    "packages/senpi-task/src/runners/rpc-host/child-endpoint.ts": ["shardIdentityMissing"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) daemonLaunchProfileId, TASK_DAEMON_CACHE_TTL_MS
+    "packages/senpi-task/src/runners/rpc-host/daemon.ts": ["daemonLaunchProfileId", "TASK_DAEMON_CACHE_TTL_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) readTextIfPresent, readTextIfPresentAsync, writeTextDurablyAsync
+    "packages/senpi-task/src/runners/rpc-host/durable-json.ts": ["readTextIfPresent", "readTextIfPresentAsync", "writeTextDurablyAsync"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) HOST_UNRESPONSIVE_DEADLINE_MS
+    "packages/senpi-task/src/runners/rpc-host/handle-heartbeat.ts": ["HOST_UNRESPONSIVE_DEADLINE_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) socketNamesHostDaemonDir
+    "packages/senpi-task/src/runners/rpc-host/host-daemon-dir.ts": ["socketNamesHostDaemonDir"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) HostWarmRefusedError
+    "packages/senpi-task/src/runners/rpc-host/host-warmup.ts": ["HostWarmRefusedError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DAEMON_LAUNCH_SPEC_ERROR_CODES
+    "packages/senpi-task/src/runners/rpc-host/launch-spec.ts": ["DAEMON_LAUNCH_SPEC_ERROR_CODES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) HOST_SOCKET_CONTEXT
+    "packages/senpi-task/src/runners/rpc-host/own-endpoint.ts": ["HOST_SOCKET_CONTEXT"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DEADLINE_REASON
+    "packages/senpi-task/src/runners/rpc-host/reconcile-turn.ts": ["DEADLINE_REASON"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) SESSION_ROLES
+    "packages/senpi-task/src/runners/rpc-host/session-role.ts": ["SESSION_ROLES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) shardSidecarPath, readShardSidecar
+    "packages/senpi-task/src/runners/rpc-host/shard-sidecar.ts": ["shardSidecarPath", "readShardSidecar"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) TASK_STORE_INDEX_VERSION
+    "packages/senpi-task/src/runners/rpc-host/store-index.ts": ["TASK_STORE_INDEX_VERSION"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ATTACH_GATE_EXEMPT
+    "packages/senpi-task/src/runners/rpc-host/testing/contract-host.ts": ["ATTACH_GATE_EXEMPT"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) TRANSPORT_RECOVERY_BOUND_MS
+    "packages/senpi-task/src/runners/rpc-host/transport-recovery.ts": ["TRANSPORT_RECOVERY_BOUND_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isUnexpectedChildDeath
+    "packages/senpi-task/src/runners/rpc/crash-record.ts": ["isUnexpectedChildDeath"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) PROBE_TIMEOUT_MS
+    "packages/senpi-task/src/runners/rpc/model-admission.ts": ["PROBE_TIMEOUT_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) PROBE_TIMEOUT_MS
+    "packages/senpi-task/src/runners/rpc/model-catalog-probe.ts": ["PROBE_TIMEOUT_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) buildModelCatalogArgs
+    "packages/senpi-task/src/runners/rpc/spawn.ts": ["buildModelCatalogArgs"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) AWAITING_INPUT_REASONS, createTaskId, TRANSPORT_LOST_REASON, MODEL_START_FAILURE_REASONS, HOST_START_FAILURE_REASONS
+    "packages/senpi-task/src/state/index.ts": ["AWAITING_INPUT_REASONS", "createTaskId", "TRANSPORT_LOST_REASON", "MODEL_START_FAILURE_REASONS", "HOST_START_FAILURE_REASONS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) MODEL_START_FAILURE_REASONS
+    "packages/senpi-task/src/state/start-failure.ts": ["MODEL_START_FAILURE_REASONS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) formatLiveSpend, formatCostUsd, formatCacheHitPercent, toolCountSuffix
+    "packages/senpi-task/src/status-line.ts": ["formatLiveSpend", "formatCostUsd", "formatCacheHitPercent", "toolCountSuffix"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) CANCEL_PENDING_REASON
+    "packages/senpi-task/src/steering/controls.ts": ["CANCEL_PENDING_REASON"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_SEND_DELIVERY
+    "packages/senpi-task/src/steering/index.ts": ["DEFAULT_SEND_DELIVERY"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) R0_FAILURE_KINDS, R0_MODEL_START_FAILURE_REASONS, R0_HOST_START_FAILURE_REASONS, R0_SESSION_START_FAILURE_REASONS
+    "packages/senpi-task/src/store/__fixtures__/r0-ebd01f84e-reasons.ts": ["R0_FAILURE_KINDS", "R0_MODEL_START_FAILURE_REASONS", "R0_HOST_START_FAILURE_REASONS", "R0_SESSION_START_FAILURE_REASONS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) expungeOwnerPath
+    "packages/senpi-task/src/store/expunge-owner.ts": ["expungeOwnerPath"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) migrateHostSessionSockets, planHostSessionSocketMigration, resolveProjectStateDirectory
+    "packages/senpi-task/src/store/index.ts": ["migrateHostSessionSockets", "planHostSessionSocketMigration", "resolveProjectStateDirectory"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) IN_PROJECT_STORE_MARKER
+    "packages/senpi-task/src/store/project-state-directory.ts": ["IN_PROJECT_STORE_MARKER"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ensureTeamRuntimeDirs, resolveProjectTeamSpecPath, toTeamCoreSpecSource, memberTaskMapPath, writeMemberTaskMap, projectMemberStatus, memberTaskName, TeamMemberRespawnLaunchError, buildPeerMessageEnvelope, buildTeamMessage and 8 more
+    "packages/senpi-task/src/team/index.ts": ["ensureTeamRuntimeDirs", "resolveProjectTeamSpecPath", "toTeamCoreSpecSource", "memberTaskMapPath", "writeMemberTaskMap", "projectMemberStatus", "memberTaskName", "TeamMemberRespawnLaunchError", "buildPeerMessageEnvelope", "buildTeamMessage", "DEFAULT_STALE_RESERVATION_TTL_MS", "reclaimStaleTeamReservations", "MEMBER_EXTENSION_BUNDLE_NAME", "MEMBER_IDENTITY_ENV", "parseMemberExtensionEnv", "canClaimTeamTask", "DELETABLE_MEMBER_STATUSES", "isMemberDeletable"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) sessionJsonlContainsMessage
+    "packages/senpi-task/src/team/member-extension/self-poller.ts": ["sessionJsonlContainsMessage"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) UnknownMemberRecipientError
+    "packages/senpi-task/src/team/member-extension/tools.ts": ["UnknownMemberRecipientError"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) appendWaitedEvent
+    "packages/senpi-task/src/team/messaging/delivery-events.ts": ["appendWaitedEvent"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) buildPeerMessageEnvelope, buildTeamMessage, reclaimStaleTeamReservations, DEFAULT_STALE_RESERVATION_TTL_MS
+    "packages/senpi-task/src/team/messaging/index.ts": ["buildPeerMessageEnvelope", "buildTeamMessage", "reclaimStaleTeamReservations", "DEFAULT_STALE_RESERVATION_TTL_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_STALE_RESERVATION_TTL_MS
+    "packages/senpi-task/src/team/messaging/session-start-reconcile.ts": ["DEFAULT_STALE_RESERVATION_TTL_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) clampWaitTimeout, finalResponseHead, isTerminalStatus, MemberScopedTaskSendParams, TaskSendParams, TaskCancelParams
+    "packages/senpi-task/src/tools/control/index.ts": ["clampWaitTimeout", "finalResponseHead", "isTerminalStatus", "MemberScopedTaskSendParams", "TaskSendParams", "TaskCancelParams"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) scopeDenied
+    "packages/senpi-task/src/tools/control/send-results.ts": ["scopeDenied"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isTerminalStatus, finalResponseHead
+    "packages/senpi-task/src/tools/control/tool-result.ts": ["isTerminalStatus", "finalResponseHead"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) TaskOutputParams, TRANSCRIPT_MAX_CHARS, TRANSCRIPT_ASSISTANT_EVENT, TRANSCRIPT_TOOL_EVENT, childSessionDir, parseSessionTranscript, readEventLogTranscript, readSessionDirTranscript
+    "packages/senpi-task/src/tools/output/index.ts": ["TaskOutputParams", "TRANSCRIPT_MAX_CHARS", "TRANSCRIPT_ASSISTANT_EVENT", "TRANSCRIPT_TOOL_EVENT", "childSessionDir", "parseSessionTranscript", "readEventLogTranscript", "readSessionDirTranscript"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) TRANSCRIPT_ASSISTANT_EVENT, TRANSCRIPT_ERROR_EVENT, TRANSCRIPT_TOOL_EVENT
+    "packages/senpi-task/src/tools/output/transcript/event-log.ts": ["TRANSCRIPT_ASSISTANT_EVENT", "TRANSCRIPT_ERROR_EVENT", "TRANSCRIPT_TOOL_EVENT"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) TRANSCRIPT_ASSISTANT_EVENT, TRANSCRIPT_TOOL_EVENT, readEventLogTranscript, readEventLogTranscriptResult, MAX_TRANSCRIPT_SOURCE_BYTES, readBoundedFileText, readSessionDirTranscript, readSessionDirTranscriptResult, parseSessionTranscript
+    "packages/senpi-task/src/tools/output/transcript/index.ts": ["TRANSCRIPT_ASSISTANT_EVENT", "TRANSCRIPT_TOOL_EVENT", "readEventLogTranscript", "readEventLogTranscriptResult", "MAX_TRANSCRIPT_SOURCE_BYTES", "readBoundedFileText", "readSessionDirTranscript", "readSessionDirTranscriptResult", "parseSessionTranscript"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) OMO_CONFIG
+    "packages/senpi-task/src/tools/task/__fixtures__/task-tool-fakes.ts": ["OMO_CONFIG"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) formatTaskTarget
+    "packages/senpi-task/src/tools/task/call-renderer.ts": ["formatTaskTarget"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) MAX_FOREGROUND_WAIT_SECONDS
+    "packages/senpi-task/src/tools/task/foreground-wait.ts": ["MAX_FOREGROUND_WAIT_SECONDS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) listTaskAgents, listTaskCategories, TASK_PROMPT_GUIDELINES, TASK_PROMPT_SNIPPET, buildTaskExecute, resolvePromptCacheSafeWaitSeconds, waitForForegroundTask, TaskToolParams, excerptRendererPromptText, joinRendererTokens and 3 more
+    "packages/senpi-task/src/tools/task/index.ts": ["listTaskAgents", "listTaskCategories", "TASK_PROMPT_GUIDELINES", "TASK_PROMPT_SNIPPET", "buildTaskExecute", "resolvePromptCacheSafeWaitSeconds", "waitForForegroundTask", "TaskToolParams", "excerptRendererPromptText", "joinRendererTokens", "statusThemeColor", "taskCallLines", "taskResultLines"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) extractPlanPaths, resolvePlanReviewTarget, buildPlanReviewPrompt
+    "packages/senpi-task/src/tools/task/plan-review-contract.ts": ["extractPlanPaths", "resolvePlanReviewTarget", "buildPlanReviewPrompt"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) formatTaskStatus, formatTaskMode, formatTaskTarget
+    "packages/senpi-task/src/tools/task/renderers.ts": ["formatTaskStatus", "formatTaskMode", "formatTaskTarget"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) fakeSummary, fakeSendResult
+    "packages/senpi-task/src/tools/team/__fixtures__/team-tool-fakes.ts": ["fakeSummary", "fakeSendResult"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) classifyMailboxError, isMissingStateError, TeamCreateParams, TeamDeleteParams, createTeamCreateTool, createTeamDeleteTool, runTeamCreate, runTeamDelete, runTeamSend, TeamTaskCreateParams and 14 more
+    "packages/senpi-task/src/tools/team/index.ts": ["classifyMailboxError", "isMissingStateError", "TeamCreateParams", "TeamDeleteParams", "createTeamCreateTool", "createTeamDeleteTool", "runTeamCreate", "runTeamDelete", "runTeamSend", "TeamTaskCreateParams", "TeamTaskGetParams", "TeamTaskListParams", "TeamTaskUpdateParams", "createTeamTaskCreateTool", "createTeamTaskGetTool", "createTeamTaskListTool", "createTeamTaskUpdateTool", "runTeamTaskCreate", "runTeamTaskGet", "runTeamTaskList", "runTeamTaskUpdate", "runTeamApproveShutdown", "runTeamRejectShutdown", "runTeamShutdownRequest"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) aggregateResults
+    "packages/senpi-task/src/workpool/aggregate.ts": ["aggregateResults"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) MEASUREMENT_MODES
+    "packages/senpi-task/src/workpool/measurement.ts": ["MEASUREMENT_MODES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) WORKPOOL_ERROR_CODES
+    "packages/senpi-task/src/workpool/types.ts": ["WORKPOOL_ERROR_CODES"]
+  }
+}

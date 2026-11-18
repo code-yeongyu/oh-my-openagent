@@ -6,7 +6,12 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
-import type { DeviceSync, EngineStatus, SyncSession } from "@oh-my-opencode/memory-core/sync-engine"
+import type {
+  DeviceSync,
+  EngineStatus,
+  OpenDeviceSyncOptions,
+  SyncSession,
+} from "@oh-my-opencode/memory-core/sync-engine"
 
 import { selectedDeviceAccountSource } from "./device-session/account-runtime-loader"
 import { createDeviceSessionResolver } from "./device-session/resolver"
@@ -407,4 +412,31 @@ test("the runner reports a status change with the repository it belongs to (omo 
   forwarded?.()
   expect(changed).toEqual([paths.repo])
   await runner.release(paths.repo)
+})
+
+test("a failed sync cycle the engine logs at warn reaches the logger's warn; routine engine lines stay at info (#13635)", async () => {
+  const paths = await identity()
+  const fake = fakeOpen()
+  const lines: string[] = []
+  let engineLog: OpenDeviceSyncOptions["log"]
+  const runner = createSyncRunner({
+    logger: {
+      info: (message: string) => lines.push(`info ${message}`),
+      warn: (message: string) => lines.push(`warn ${message}`),
+      error: () => undefined,
+    },
+    resolveSession: async () => session,
+    open: async (options) => {
+      engineLog = options.log
+      return fake.open(options)
+    },
+    watchHead: () => () => undefined,
+  })
+  await runner.acquire("agent", paths, { enabled: true })
+
+  engineLog?.("sync cycle failed during push: SyncHttpError", "warn")
+  engineLog?.("sync: journal retired")
+
+  expect(lines).toContain("warn sync cycle failed during push: SyncHttpError")
+  expect(lines).toContain("info sync: journal retired")
 })
