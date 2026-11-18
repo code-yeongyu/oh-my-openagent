@@ -291,7 +291,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
           failure(
             "unsupported",
             `The target's endpoint does not accept ${message.slice("unsupported:".length)}: that terminal runs an engine from before terminal session controls.`,
-            "Update omo where that terminal runs and restart it, or use thread_send and thread_read; thread_list shows each thread's controls.",
+            "Update omo where that terminal runs and restart it, or use thread_send and thread_read (tool.thread_send() and tool.thread_read() in an eval cell); thread_list (tool.thread_list()) shows each thread's controls.",
             { command: message.slice("unsupported:".length) },
           ),
         )
@@ -300,7 +300,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
         failure(
           "internal_error",
           `Thread operation failed: ${message}`,
-          "Call thread_list and retry after checking the target.",
+          "Call thread_list (tool.thread_list() in an eval cell) and retry after checking the target.",
         ),
       )
     }
@@ -348,7 +348,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
         if (value.thread === undefined && value.fork_from === undefined && value.prompt === undefined && !named)
           return failure(
             "invalid_arguments",
-            "thread_create makes a new thread only with a prompt or a name; neither was given, so nothing was created.",
+            "thread_create (tool.thread_create() in an eval cell) makes a new thread only with a prompt or a name; neither was given, so nothing was created.",
             "Pass prompt (the new thread's first message) or name, or pass thread to open an existing thread.",
           )
         // #14060: an earlier run under this key failed after it may have made a thread. It is re-run only when the thread
@@ -399,7 +399,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
                   result: failure(
                     "not_found",
                     `Thread ${found.entry.thread_id} on device ${found.entry.transport.row.device} is not running there.`,
-                    "Call thread_list with all_scope to find the live thread.",
+                    "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to find the live thread.",
                     { device: found.entry.transport.row.device, thread: found.entry.thread_id },
                   ),
                 }
@@ -534,7 +534,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
         error: threadToolFailure(
           "internal_error",
           `The thread was created, but its first prompt was not delivered: ${error instanceof Error ? error.message : String(error)}.`,
-          `Send it with thread_send to ${thread.thread_id}; read the thread first if the prompt may have arrived.`,
+          `Send it with thread_send to ${thread.thread_id} (tool.thread_send({ thread, message }) in an eval cell); read the thread first if the prompt may have arrived.`,
           { thread: thread.thread_id },
         ),
       }
@@ -675,7 +675,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
             : failure(
                 "name_conflict",
                 `A thread named "${existing.name}" already exists.`,
-                "Call thread_list and choose another name.",
+                "Call thread_list (tool.thread_list() in an eval cell) and choose another name.",
               )
         }
         let name = value.name?.trim()
@@ -750,7 +750,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
         result: failure(
           "not_resumable",
           "The thread has no session file on this device to open.",
-          "Call thread_list and pick a thread it lists.",
+          "Call thread_list (tool.thread_list() in an eval cell) and pick a thread it lists.",
         ),
       }
     return { kind: "file", sessionPath: entry.session_path }
@@ -983,7 +983,11 @@ async function deliverThrough(
   const thread =
     session !== undefined ? summary(session, entry) : entry !== undefined ? degradedSummary(entry) : undefined
   if (thread === undefined)
-    return failure("not_found", `Thread ${threadId} is not in the address book.`, "Call thread_list and retry.")
+    return failure(
+      "not_found",
+      `Thread ${threadId} is not in the address book.`,
+      "Call thread_list (tool.thread_list() in an eval cell) and retry.",
+    )
   return {
     kind: "ok",
     ...threadRow(thread),

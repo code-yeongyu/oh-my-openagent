@@ -243,7 +243,7 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
     return fail(
       "invalid_arguments",
       `Unknown read mode "${String(mode)}".`,
-      'Retry with mode set to "status", "tail", or "page", or call thread_list to confirm the thread first.',
+      'Retry with mode set to "status", "tail", or "page", or call thread_list (tool.thread_list() in an eval cell) to confirm the thread first.',
     )
   }
 
@@ -291,7 +291,7 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
       return fail(
         "cursor_invalid",
         "The cursor is not a cursor this reader issued.",
-        "Re-read the thread without a cursor to get a fresh next_cursor, or call thread_list to confirm the thread address.",
+        "Re-read the thread without a cursor to get a fresh next_cursor, or call thread_list (tool.thread_list() in an eval cell) to confirm the thread address.",
       )
     }
   }
@@ -312,7 +312,7 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
       return fail(
         "not_found",
         `No session transcript exists at ${source.path}.`,
-        "Call thread_list to get a current thread value, then read that thread instead.",
+        "Call thread_list (tool.thread_list() in an eval cell) to get a current thread value, then read that thread instead.",
       )
     }
     loaded = file

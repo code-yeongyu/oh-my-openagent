@@ -59,7 +59,7 @@ export function resultFromRow(
   if (row.state === "refused") {
     const mapped = REFUSAL_CODES[row.reason ?? ""] ?? {
       code: "internal_error" as const,
-      next: "Call thread_list and check the target.",
+      next: "Call thread_list (tool.thread_list() in an eval cell) and check the target.",
     }
     return {
       kind: "error",

@@ -54,7 +54,7 @@ export async function planCreate(
       error: threadToolFailure(
         "unsupported",
         "fork_from cannot fork yet: the engine opens a blank session instead of a fork, so no thread was created.",
-        "Create the thread without fork_from and hand it the source's context with thread_send; thread_read reads the source.",
+        "Create the thread without fork_from and hand it the source's context with thread_send; thread_read reads the source (tool.thread_send() and tool.thread_read() in an eval cell).",
         {
           reason: "fork_unsupported",
           thread: plan.request.forkFrom,
