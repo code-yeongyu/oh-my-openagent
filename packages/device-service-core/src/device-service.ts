@@ -1,7 +1,9 @@
 import { join } from "node:path"
 import { SOCKET_FILE } from "./local-api/access.ts"
 import { connectLocalApi, type ConnectOptions, type LocalApiClient } from "./local-api/client.ts"
-import { connectLocal, ENDPOINT_FILE } from "./local-api/transport.ts"
+import { ENDPOINT_FILE } from "./local-api/transport.ts"
+import { connectLocalBackground } from "./background-transport.ts"
+import { markNotSent, NotSentError, olderThanWakeMinimum } from "./not-sent-error.ts"
 import type { ListingResult, ListingRevision } from "./local-api/client-assembly.ts"
 import type {
   Capability,
@@ -17,11 +19,12 @@ import { followDelegatedChannel } from "./delegated-channel.ts"
 import { LocalApiError } from "./local-api/errors.ts"
 import { newestRowsListing } from "./listing-rows.ts"
 import type { CommandRpc } from "./local-api/protocol.ts"
-import type { SessionCandidate } from "./local-api/protocol-delegated.ts"
+import type { SessionCandidate } from "./local-api/protocol-command.ts"
 import { randomBytes } from "node:crypto"
 import { minimumInEffect, type MinimumsOption } from "./minimum-in-effect.ts"
 import { compareVersions } from "./release/version.ts"
 import { deviceServiceStateDir } from "./state-dir.ts"
+import { deadlineTimerOf, realTimers, type Timers } from "./timers.ts"
 
 // A host sends no command state at all for a route it does not list toward a sender it does not grant (docs/local-api.md
 // "Delegated commands"), so the client bounds its own wait.
@@ -33,13 +36,14 @@ function sendToEndpoint(
   endpoint: string,
   rpc: CommandRpc,
   locate: boolean,
+  timers: Timers,
 ): Promise<CommandResult> {
   // A service before decision 0018's 2026-11-06 amendment refuses the unknown `locate` field with invalid_request
   // before routing anything, so the command id is still unbound and the same command goes again without it; its
   // reply then names no `located` and the caller locates as before.
-  return followDelegatedCommand(client, device, (commandId) => {
+  return followDelegatedCommand(client, device, timers, (commandId) => {
     const send = (asked: boolean): Promise<unknown> =>
-      client.endpointCommand(device, endpoint, rpc, commandId, { locate: asked })
+      client.commandTo({ device, endpoint }, rpc, commandId, asked ? { locate: true } : {})
     return send(locate).catch((error: unknown) =>
       locate && error instanceof LocalApiError && error.code === "invalid_request"
         ? send(false)
@@ -55,6 +59,7 @@ function sendToEndpoint(
 function followDelegatedCommand(
   client: LocalApiClient,
   device: string,
+  timers: Timers,
   send: (commandId: string) => Promise<unknown>,
 ): Promise<CommandResult> {
   return new Promise<CommandResult>((resolve, reject) => {
@@ -66,7 +71,7 @@ function followDelegatedCommand(
       done = true
       stop()
       channel.stop()
-      clearTimeout(timer)
+      cancelTimer()
     }
     const fail = (error: unknown): void => {
       if (done) return
@@ -86,28 +91,17 @@ function followDelegatedCommand(
         ...(located === undefined ? {} : { located }),
       })
     })
-    const timer = setTimeout(
-      () => fail(new Error(`no final state for endpoint command ${commandId} within ${ENDPOINT_COMMAND_WAIT_MS} ms`)),
-      ENDPOINT_COMMAND_WAIT_MS,
+    const cancelTimer = timers.after(ENDPOINT_COMMAND_WAIT_MS, () =>
+      fail(new Error(`no final state for endpoint command ${commandId} within ${ENDPOINT_COMMAND_WAIT_MS} ms`)),
     )
-    timer.unref?.()
     void client.closed.then(() => fail(new Error("the connection closed before the endpoint command settled")))
     send(commandId).catch(fail)
   })
 }
 
-const markNotSent = (error: unknown): unknown =>
-  error instanceof LocalApiError
-    ? new LocalApiError(error.code, error.reason, {
-        action: error.action,
-        ...(error.limit_chars === undefined ? {} : { limit_chars: error.limit_chars }),
-        ...(error.path_refusal === undefined ? {} : { path_refusal: error.path_refusal }),
-        not_sent: true,
-      })
-    : error
-
 export type { ListingResult, ListingRevision, ReadPage, ReadPageEntry } from "./local-api/client-assembly.ts"
 export { LocalApiError } from "./local-api/errors.ts"
+export { NotSentError } from "./not-sent-error.ts"
 export type {
   Capability,
   CommandRpc,
@@ -130,6 +124,8 @@ export { SESSION_ROW_STATES } from "./local-api/protocol.ts"
 export type { AttachEnd, CommandResult, RemoteAttach, RemoteAttachEvent } from "./remote-attach.ts"
 
 export { DEVICE_SERVICE_STATE_DIR_ENV, deviceServiceStateDir } from "./state-dir.ts"
+// The clock seam, here too so a local-only caller takes it without the package barrel (which reaches the release fetch).
+export { realTimers, type Timers } from "./timers.ts"
 
 /** The file a running service publishes in its state dir: the socket on POSIX, the port file on Windows. */
 export function deviceServiceEndpointPath(stateDir: string, platform: NodeJS.Platform = process.platform): string {
@@ -179,8 +175,8 @@ export type DeviceService = {
    * Settles like an attach's command: the first command state that is not a progress state, plus the engine's reply.
    * Rejects with the local API's refusal (`unsupported` when the device lists no endpoint, before anything is sent), or
    * when the connection closes or no final state arrives within ENDPOINT_COMMAND_WAIT_MS. Every failure before
-   * `session.command` is written (the `session.endpoints` lookup, whatever its code) is a `LocalApiError` with
-   * `not_sent: true`; a `session.command` that times out after sending carries its `command_id` instead.
+   * `session.command` is written (the `session.endpoints` lookup, whatever its code) is a `NotSentError` (a
+   * `LocalApiError` with `not_sent: true`); a `session.command` that times out after sending carries its `command_id` instead.
    */
   readonly endpointCommand: (
     device: string,
@@ -266,6 +262,11 @@ export type ConnectDeviceServiceOptions = {
   readonly background?: boolean
   /** Test seam: the local API connection (the vendored v1 client by default). */
   readonly connect?: (options: ConnectOptions) => Promise<LocalApiClient>
+  /**
+   * Test seam: the clock every wait of this connection runs on, the local API's handshake and request bounds included.
+   * Real timers by default; the local API then keeps its own.
+   */
+  readonly timers?: Timers
   /** Test seam: the two omo#13037 minimum versions (WAKE_MARK_MIN_SERVICE_VERSION, LOCATE_SINGLE_MIN_SERVICE_VERSION). */
   readonly minimums?: MinimumsOption
 }
@@ -273,10 +274,13 @@ export type ConnectDeviceServiceOptions = {
 /** Opens a proven connection to this device's service (mutual proof before any request) and returns the typed SDK. */
 export async function connectDeviceService(options: ConnectDeviceServiceOptions): Promise<DeviceService> {
   const stateDir = options.stateDir ?? deviceServiceStateDir()
+  const timers = options.timers ?? realTimers
+  const deadline = options.timers === undefined ? undefined : deadlineTimerOf(options.timers)
   const client = await (options.connect ?? connectLocalApi)({
     stateDir,
     client: { name: "omo", version: options.version },
-    ...(options.background === true ? { transport: () => connectLocal(stateDir, { background: true }) } : {}),
+    ...(deadline === undefined ? {} : { handshakeTimer: deadline, requestTimer: deadline }),
+    ...(options.background === true ? { transport: () => connectLocalBackground(stateDir) } : {}),
   })
   const wakeMarkMinimum = minimumInEffect(options.minimums, "wakeMark", WAKE_MARK_MIN_SERVICE_VERSION)
   const carriesWakeMark = serviceAtLeast(client.welcome.service_version, wakeMarkMinimum)
@@ -332,8 +336,15 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
     sessions: newestRowsListing(client),
     // The mark rides only to a service that carries it; below that, every command keeps today's bytes.
     attach: async (device, sessionId) => {
-      const attached = await openAttach(client, device, sessionId)
-      return carriesWakeMark ? attached : { ...attached, command: (rpc) => attached.command(rpc) }
+      const attached = await openAttach(client, device, sessionId, timers)
+      // Below that only the mark is dropped; the command's own wait still applies.
+      return carriesWakeMark
+        ? attached
+        : {
+            ...attached,
+            command: (rpc, options) =>
+              attached.command(rpc, options?.waitMs === undefined ? undefined : { waitMs: options.waitMs }),
+          }
     },
     endpointCommand: async (device, rpc, options) => {
       // The endpoint lookup runs before any session.command is written, so whatever fails it (a timeout, a closed
@@ -344,9 +355,8 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
       } catch (error) {
         throw markNotSent(error)
       }
-      if (endpoint === undefined)
-        throw new LocalApiError("unsupported", "the device lists no engine endpoint", { not_sent: true })
-      return await sendToEndpoint(client, device, endpoint, rpc, options?.locate === true)
+      if (endpoint === undefined) throw new NotSentError("unsupported", "the device lists no engine endpoint")
+      return await sendToEndpoint(client, device, endpoint, rpc, options?.locate === true, timers)
     },
     close: () => client.close(),
     closed: client.closed,
@@ -357,10 +367,9 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
         ...(options?.single === true && takesSingleLocate ? { single: true as const } : {}),
       }),
     wakeCommand: async (device, durableId, rpc) => {
-      if (!carriesWakeMark)
-        throw new LocalApiError("unsupported", "this device service does not carry the wake target", { not_sent: true })
-      return await followDelegatedCommand(client, device, (commandId) =>
-        client.wakeCommand(device, durableId, rpc, commandId).catch((error: unknown) => {
+      if (!carriesWakeMark) throw olderThanWakeMinimum(client.welcome.service_version, wakeMarkMinimum)
+      return await followDelegatedCommand(client, device, timers, (commandId) =>
+        client.commandTo({ wake: { device, durable_id: durableId } }, rpc, commandId).catch((error: unknown) => {
           throw error instanceof LocalApiError && error.command_id === undefined ? markNotSent(error) : error
         }),
       )

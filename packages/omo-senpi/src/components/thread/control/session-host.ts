@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 import type { ThreadDataError, ThreadSummary } from "../contracts"
 import type { ThreadToolFailure } from "../errors"
 import { summary, type ThreadToolSummary } from "../tools/internals"
@@ -7,8 +8,9 @@ import type { ThreadWorktree, WorktreeRequest } from "../worktree/thread-worktre
 /**
  * One `open_session` as thread_create asks for it, on whichever device the host stands for: a new session (`cwd`),
  * an existing session's file (`sessionPath`), or a fork (`forkFrom`); `initialSkills` ride on the frame's context and
- * `permissionPreset` is the approval mode the new session starts in (its creator's). Every field crosses the wire
- * unchanged on both legs.
+ * `permissionPreset` is the approval mode the new session starts in (its creator's, or one it narrowed to);
+ * `provider` + `modelId` and `thinkingLevel` are the engine's launch profile (a model it cannot resolve refuses the open
+ * with `model_unavailable`). Every field crosses the wire unchanged on both legs.
  */
 export type SessionOpenRequest = {
   readonly cwd?: string
@@ -17,8 +19,24 @@ export type SessionOpenRequest = {
   readonly name?: string
   readonly initialSkills?: readonly string[]
   readonly permissionPreset?: string
+  readonly provider?: string
+  readonly modelId?: string
+  readonly thinkingLevel?: string
   /** A new git worktree to create from the repository at `cwd` on the opening device; the session starts in it. */
   readonly worktree?: WorktreeRequest
+  /** The id a new session is created under (`createdThreadId`); a host without `durable_session_id` ignores it. */
+  readonly durableSessionId?: string
+}
+
+/**
+ * The id thread_create creates a thread on this device under (#14060): derived from the caller and the call's
+ * idempotency key, UUID-shaped (version 8), so a create whose reply was lost, and a retry under the same key, find the
+ * thread it made instead of making another.
+ */
+export function createdThreadId(callerId: string, idempotencyKey: string): string {
+  const hex = createHash("sha256").update(`thread_create\0${callerId}\0${idempotencyKey}`).digest("hex")
+  const variant = ((Number.parseInt(hex.charAt(16), 16) & 0x3) | 0x8).toString(16)
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-8${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`
 }
 
 /** A thread as the tools report it, with `device` when it is on another of the account's devices. */

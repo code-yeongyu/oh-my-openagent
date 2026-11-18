@@ -1,4 +1,5 @@
 import type { AddressBookHost, DiskSession } from "../address-book"
+import type { InterruptRequest } from "../control/interrupt"
 import type { ThreadControl } from "../endpoint-controls"
 import type { EndpointKind } from "../endpoint-registry"
 import type {
@@ -12,6 +13,7 @@ import type { SameDeviceWake } from "../gateway/same-device-wake"
 import type { GatewayStore } from "../gateway/store"
 import type { ThreadTranscriptEntry } from "../reader"
 import type { RemoteThreadSurface } from "../remote/ports"
+import type { SessionWatchHandlers, SessionWatchOutcome } from "../control/wait-settled"
 
 export type ThreadHostSession = {
   readonly sessionId: string
@@ -54,6 +56,7 @@ export type ThreadSessionPort = Pick<
   | "wake"
   | "releaseSession"
   | "closeSession"
+  | "watchSession"
 >
 
 /**
@@ -87,6 +90,12 @@ export type ThreadHost = {
     readonly forkFrom?: string
     readonly initialSkills?: readonly string[]
     readonly permissionPreset?: string
+    /** The engine's launch profile: the model (`provider` + `modelId`) and thinking level the new session starts on. */
+    readonly provider?: string
+    readonly modelId?: string
+    readonly thinkingLevel?: string
+    /** The id a NEW session is created under (host capability `durable_session_id`; ignored on resume, #14060). */
+    readonly durableSessionId?: string
   }) => Promise<ThreadHostSession>
   readonly getMessages: (sessionId: string) => Promise<readonly ThreadTranscriptEntry[]>
   readonly getState: (sessionId: string) => Promise<{ readonly isStreaming?: boolean; readonly activeTurnId?: string }>
@@ -96,11 +105,12 @@ export type ThreadHost = {
     options?: { readonly streamingBehavior?: "steer" | "followUp" },
     durable_session_id?: string,
   ) => Promise<{ readonly turnId?: string }>
+  /** The engine's `interrupt` record with `request`'s fields (`control/interrupt.ts`); answers the engine's reply data. */
   readonly interrupt: (
     sessionId: string,
-    turnId?: string,
+    request: InterruptRequest,
     durable_session_id?: string,
-  ) => Promise<{ readonly interrupted?: boolean; readonly turnId?: string }>
+  ) => Promise<Readonly<Record<string, unknown>>>
   readonly setSessionName: (sessionId: string, name: string, durable_session_id?: string) => Promise<void>
   readonly setModel: (
     sessionId: string,
@@ -130,6 +140,15 @@ export type ThreadHost = {
     request: ReleaseSessionRequest,
     durable_session_id?: string,
   ) => Promise<ReleaseSessionReply>
+  /**
+   * Follows one session's status and run records on the endpoint's observing `subscribe_sessions` stream (never an
+   * attachment), until the watch is stopped or the session closes; `thread_read`'s `wait_ms` waits on it.
+   */
+  readonly watchSession?: (
+    sessionId: string,
+    handlers: SessionWatchHandlers,
+    durable_session_id?: string,
+  ) => Promise<SessionWatchOutcome>
   /** Ends one session on its host for every client that holds it; hosts only, a terminal keeps its own session. */
   readonly closeSession?: (sessionId: string, durable_session_id?: string) => Promise<ThreadCloseOutcome>
   /** Every endpoint at once; absent on a single-endpoint host, whose `listSessions` is the view. */

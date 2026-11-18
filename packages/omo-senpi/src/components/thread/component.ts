@@ -24,6 +24,7 @@ import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { registerThreadTools, UNKNOWN_CALLER, type ThreadToolSurfaceOptions } from "./tools"
 import { createLazyLiveThreadSurface } from "./lazy-live-surface"
 import { createDefaultRemoteSurface } from "./remote/default-remote"
+import { registerRemoteMonitorTargets } from "./remote/lazy-ops"
 import { createOmoNativeProductConfig } from "../telemetry/product-identity"
 import { defaultThreadStateDirectory, isThreadSocket } from "./live-surface-paths"
 import { stampThisDevice } from "./remote/this-device"
@@ -158,7 +159,9 @@ function deliveryOf(message: EngineMessage):
 
 /**
  * The device a delivery came from, as the receiving side attested it in the delivery's id: `device:<device>/<id>` names
- * it (URI-encoded); `rpc:local/<id>` and a bare row id mean this device (amendment A4.3.1 of #13037).
+ * it (URI-encoded); `rpc:local/<id>` and a bare row id name no device (amendment A4.3.1 of #13037). Those are this
+ * device's deliveries, or another device's admitted on a connection that declared no remote origin (#14048), so a reply
+ * that finds no such session here resolves account-wide (`tools.ts` `locate`).
  */
 function deliveryDevice(id: string): string | undefined {
   if (!id.startsWith("device:")) return undefined
@@ -362,9 +365,12 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         options.remote ??
         createDefaultRemoteSurface({
           version: createOmoNativeProductConfig().packageVersion,
+          // One surface serves every session of this engine, so its client acts as the engine's host instance.
+          sender: { kind: "session", id: runtimeInstance ?? UNKNOWN_CALLER },
           log: (line) => ctx.logger.warn(line),
           permissionPreset: () => pi.getPermissionPreset?.(),
         })
+      registerRemoteMonitorTargets(pi, remote)
       const store =
         options.store ??
         createGatewayStore({
@@ -656,6 +662,9 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
             ),
           )
         if (options.store === undefined) await store.dispose().catch(() => undefined)
+        // The surface this component built holds the device-service connection a thread tool opened; left open it keeps
+        // the engine alive after its last session ends (#14054: `omo -p` never exited). A later call reconnects lazily.
+        if (options.remote === undefined) await remote.sessions.close?.().catch(() => undefined)
       })
     },
   }
