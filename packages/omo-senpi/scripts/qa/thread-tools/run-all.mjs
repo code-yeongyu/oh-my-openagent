@@ -64,6 +64,7 @@ const legacy = [
   ["local-approvals", "local-approvals.mjs"],
   ["session-control", "session-control-qa.mjs"],
   ["reopen-exited", "reopen-exited.mjs"],
+  ["create-atomic", "create-atomic.mjs"],
 ]
 
 function option(name) {
