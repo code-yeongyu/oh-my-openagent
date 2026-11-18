@@ -1424,6 +1424,91 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
     expect(answer).toEqual({ kind: "refused", reason: "request_timeout" })
   })
 
+  // omo#14130 review round 2 (L3): a create on another device shares the call's budget too.
+  const endpointService = (waits: (number | undefined)[]) => () =>
+    ({
+      status: async () => ({ state: "connected" }),
+      endpointCommand: async (_device: string, _rpc: unknown, options?: { readonly waitMs?: number }) => {
+        waits.push(options?.waitMs)
+        return state({ state: "engine_applied" }, { sessionId: "made" })
+      },
+      closed: new Promise<void>(() => {}),
+      close: () => {},
+    }) as unknown as DeviceService
+  test("#given no enclosing call, then 20 s left, then a spent budget #when an endpoint command is sent #then its wait is 45 s, then cut, then nothing is sent", async () => {
+    const waits: (number | undefined)[] = []
+    const service = endpointService(waits)
+    const port = sessionsPort({
+      version: "0.0.0-test",
+      connect: async () => ({ conn: service(), owned: true }),
+      dialEndpoint: async () => ({ conn: service(), owned: true }),
+    })
+    const open = () => port.endpointCommand("b", { type: "open_session" })
+    await open()
+    await withCallDeadline(Date.now() + 20_000, open)
+    expect(await withCallDeadline(Date.now() - 1, open)).toEqual({ kind: "refused", reason: "request_timeout" })
+    expect(waits).toHaveLength(2)
+    expect(waits[0]).toBe(45_000)
+    expect(waits[1]).toBeLessThanOrEqual(20_000)
+    expect(waits[1]).toBeGreaterThan(10_000)
+  })
+
+  test("#given a created session its device never lists #when locate waits for its attach inside a 100 ms budget #then it gives up with the budget, not after 20 s", async () => {
+    const service = () =>
+      ({
+        status: async () => ({ state: "connected" }),
+        attach: async () => {
+          throw new LocalApiError("session_not_found", "not listed yet")
+        },
+        closed: new Promise<void>(() => {}),
+        close: () => {},
+      }) as unknown as DeviceService
+    const port = sessionsPort({
+      version: "0.0.0-test",
+      connect: async () => ({ conn: service(), owned: true }),
+      retryDelay: async () => {},
+    })
+    const started = Date.now()
+    const located = await withCallDeadline(Date.now() + 100, () => port.locate("b", "engine-1", "rk-made"))
+    expect(located).toEqual({ kind: "ok", sessionId: "rk-made" })
+    expect(Date.now() - started).toBeLessThan(5_000)
+  })
+
+  // omo#14130 review round 2 (L4): an attach that settles after the budget ran out is released, so the pool detaches it.
+  test("#given an attach that settles after the call's budget ran out #when it settles #then its hold is released and the pool detaches it", async () => {
+    let settle!: (attached: RemoteAttach) => void
+    const attaching = new Promise<RemoteAttach>((resolve) => {
+      settle = resolve
+    })
+    let detached!: () => void
+    const detachedOnce = new Promise<void>((resolve) => {
+      detached = resolve
+    })
+    const service = () =>
+      ({
+        status: async () => ({ state: "connected" }),
+        attach: () => attaching,
+        closed: new Promise<void>(() => {}),
+        close: () => {},
+      }) as unknown as DeviceService
+    const port = sessionsPort({
+      version: "0.0.0-test",
+      connect: async () => ({ conn: service(), owned: true }),
+      attachIdleMs: 0,
+    })
+    const refused = await withCallDeadline(Date.now() + 20, () =>
+      port.sessionCommand("b", "s1", { type: "prompt", message: "x" }),
+    )
+    expect(refused).toEqual({ kind: "refused", reason: "request_timeout" })
+    settle({
+      detached: new Promise(() => {}),
+      onEvent: () => () => {},
+      detach: async () => detached(),
+    } as unknown as RemoteAttach)
+    const timeout = new Promise<string>((resolve) => setTimeout(() => resolve("never detached"), 2_000))
+    expect(await Promise.race([detachedOnce.then(() => "detached"), timeout])).toBe("detached")
+  })
+
   test("#given a record that is not JSON #when it is commanded #then it is refused before any attach or send", async () => {
     const l = lifecycle()
     const port = sessionsPort({ version: "0.0.0-test", connect: l.connect })

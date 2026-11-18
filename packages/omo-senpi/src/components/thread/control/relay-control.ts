@@ -1,3 +1,4 @@
+import { waitWithinCallBudget } from "../../remote/call-deadline"
 import type { ThreadTranscriptEntry } from "../reader"
 import { relayAddressEntry } from "../remote/address-book"
 import { rowThreadId } from "../remote/ports"
@@ -133,7 +134,8 @@ export function createRelayControl(
       waitForTurnEnd(
         (handlers) => remote.sessions.watch(device, sessionId, handlers, { baseline: true }),
         (reason) => new ControlRefusal(outcomeFailure({ kind: "refused", reason }, device).error),
-        timeoutMs,
+        // omo#14130 review round 2 (M2): inside a tool call the wait leaves the transcript read after it its share.
+        waitWithinCallBudget(timeoutMs),
         signal,
       ),
   }

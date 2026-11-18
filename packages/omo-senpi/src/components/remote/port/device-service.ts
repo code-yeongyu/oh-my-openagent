@@ -324,6 +324,9 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       } catch {
         return { kind: "refused", reason: "invalid_record" }
       }
+      // omo#14130 review round 2 (L3): an endpoint command (a create on another device) shares the call's budget.
+      const waitMs = commandWaitMs(SEND_WAIT_MS)
+      if (waitMs <= 0) return { kind: "refused", reason: "request_timeout" }
       let dialed: { readonly conn: DeviceService; readonly owned: boolean }
       try {
         dialed = record["type"] === "open_session" ? await dialEndpoint() : { conn: await svc(), owned: false }
@@ -332,7 +335,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       }
       const connected = dialed.conn
       try {
-        return outcomeOf(await connected.endpointCommand(device, record, endpointOptions))
+        return outcomeOf(await connected.endpointCommand(device, record, { ...endpointOptions, waitMs }))
       } catch (error) {
         // The SDK marks a failure before session.command was written (the endpoint lookup timing out or the connection
         // closing during it) not_sent: nothing ran, so it is refused. The same codes after sending stay uncertain.
@@ -459,10 +462,19 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         }
       // The session exists under `key` from here on; wait (bounded) until the listing names it so the next command's
       // attach finds it, and keep that attach for it.
-      const deadline = Date.now() + CREATED_ATTACH_WAIT_MS
+      // omo#14130 review round 2 (L3): inside a tool call the wait for the listing ends with the call's budget.
+      const deadline = Date.now() + Math.max(0, commandWaitMs(CREATED_ATTACH_WAIT_MS))
       for (let wait = 250; ; wait = Math.min(wait * 2, 2_000)) {
         try {
-          const held = await pool.hold(device, key)
+          const holding = pool.hold(device, key)
+          const held = await withinCallBudget(holding)
+          if (held === undefined) {
+            void holding.then(
+              (late) => late.release(),
+              () => undefined,
+            )
+            break
+          }
           held.release()
           break
         } catch (error) {

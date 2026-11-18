@@ -37,19 +37,26 @@ function sendToEndpoint(
   rpc: CommandRpc,
   locate: boolean,
   timers: Timers,
+  waitMs?: number,
 ): Promise<CommandResult> {
   // A service before decision 0018's 2026-11-06 amendment refuses the unknown `locate` field with invalid_request
   // before routing anything, so the command id is still unbound and the same command goes again without it; its
   // reply then names no `located` and the caller locates as before.
-  return followDelegatedCommand(client, device, timers, (commandId) => {
-    const send = (asked: boolean): Promise<unknown> =>
-      client.commandTo({ device, endpoint }, rpc, commandId, asked ? { locate: true } : {})
-    return send(locate).catch((error: unknown) =>
-      locate && error instanceof LocalApiError && error.code === "invalid_request"
-        ? send(false)
-        : Promise.reject(error),
-    )
-  })
+  return followDelegatedCommand(
+    client,
+    device,
+    timers,
+    (commandId) => {
+      const send = (asked: boolean): Promise<unknown> =>
+        client.commandTo({ device, endpoint }, rpc, commandId, asked ? { locate: true } : {})
+      return send(locate).catch((error: unknown) =>
+        locate && error instanceof LocalApiError && error.code === "invalid_request"
+          ? send(false)
+          : Promise.reject(error),
+      )
+    },
+    waitMs,
+  )
 }
 
 /**
@@ -215,7 +222,7 @@ export type DeviceService = {
  * `locate`: an `open_session`/`new_session` asks for its new session on the reply (`CommandResult.located`), sparing the
  * session.locate round trip toward a host that names it (decision 0018 amendment 2026-11-06, relay daemon #698).
  */
-export type EndpointCommandOptions = { readonly locate?: boolean }
+export type EndpointCommandOptions = { readonly locate?: boolean; readonly waitMs?: number }
 
 export type DeviceCredential = {
   readonly device: DeviceRef
@@ -363,7 +370,7 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
         throw markNotSent(error)
       }
       if (endpoint === undefined) throw new NotSentError("unsupported", "the device lists no engine endpoint")
-      return await sendToEndpoint(client, device, endpoint, rpc, options?.locate === true, timers)
+      return await sendToEndpoint(client, device, endpoint, rpc, options?.locate === true, timers, options?.waitMs)
     },
     close: () => client.close(),
     closed: client.closed,
