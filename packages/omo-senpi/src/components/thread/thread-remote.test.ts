@@ -332,6 +332,22 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     expect(a.sent.filter((entry) => entry.via === "session" || entry.via === "wake")).toEqual([])
   })
 
+  test("#given b's thread was closed here and reopened elsewhere under a new relay key, while this device's listing still names the old key #when thread_send names it #then the send is delivered to the key the session runs under now, never the old one (#14179 review M1)", async () => {
+    const a = account({ rows: [B_ROW], relayKeys: new Map([["dur-on-b", "rk-reopened"]]) })
+    const { run } = surface(a.remote)
+    expect(await run("thread_close", { thread: "dur-on-b" })).toMatchObject({ kind: "ok", closed: true })
+    // Another device reopens it: b's engine now holds it under a new key; the listing here still names rk-on-b.
+    a.live.add("rk-reopened")
+    expect(await run("thread_send", { thread: "dur-on-b", message: "still there?" })).toMatchObject({
+      kind: "ok",
+      thread: "dur-on-b",
+      delivery: { kind: "started" },
+    })
+    expect(
+      a.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message").map((entry) => entry.session),
+    ).toEqual(["rk-reopened"])
+  })
+
   test("#given an online b that refuses the reopen of its listed thread (it holds no session file) #when thread_send names that thread next #then not_resumable at once, and no session command waits on b (#14184, re-probe 2)", async () => {
     // A cached row of an online device that runs nothing under it: the reopen asks b, which holds no file; the send that
     // follows asks b again and answers at once, instead of attaching to the row's old key until b's deadline.

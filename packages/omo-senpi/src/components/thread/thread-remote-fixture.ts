@@ -362,7 +362,9 @@ export function createRemoteThreadFixture() {
         const keys = [B_ROW, ...(options.rows ?? [])]
           .filter((row) => row.durable_id === durable)
           .map((row) => row.session_id)
-        const open = live.has(durable) || keys.some((key) => live.has(key))
+        const relayKey = options.relayKeys?.get(durable)
+        const open =
+          live.has(durable) || keys.some((key) => live.has(key)) || (relayKey !== undefined && live.has(relayKey))
         return ok({ found: { sessionPath: file, cwd: B_ROW.project, open } })
       }
       if (rpc["type"] === "open_session") {
@@ -591,7 +593,13 @@ export function createRemoteThreadFixture() {
         // This fake device lists a created session by the id its create reply names.
         locate: async (_device, engineId) => {
           // A device's relay connector keys each session it lists by a relay key, kept beside the durable id (relayKeys).
-          if (options.relayKeys === undefined) return { kind: "ok", sessionId: engineId }
+          // Without relay keys, the key the engine holds the session under now: a listed key it runs, else the id itself.
+          if (options.relayKeys === undefined) {
+            const listedKeys = [B_ROW, ...(options.rows ?? [])]
+              .filter((row) => row.durable_id === engineId)
+              .map((row) => row.session_id)
+            return { kind: "ok", sessionId: listedKeys.find((key) => live.has(key)) ?? engineId }
+          }
           const key = options.relayKeys.get(engineId)
           return key === undefined ? { kind: "refused", reason: "session_not_found" } : { kind: "ok", sessionId: key }
         },

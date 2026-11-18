@@ -337,26 +337,43 @@ export function createRelayTransport(
     }
   }
 
-  async function send(delivery: OutboundDelivery, row: RemoteSessionRow, later: Later): Promise<SendOutcome> {
-    const offline = await deviceOnline(remote, row.device)
+  /**
+   * #14184: a row that is not live (ended, or a cached snapshot) and takes no wake path is a session its holder may not
+   * run, and a command to its listing key waits out the device's own deadline (about 60 s) before failing. The holder is
+   * asked first (the listing and this surface's closed mark lag a reopen made elsewhere): a session it does not run is
+   * answered at once, as thread_read answers it. One it runs is addressed by the key its device locates it by now, never
+   * the listing's (a reopen elsewhere can run it under a new key; #14179 review M1).
+   */
+  async function runningRow(listed: RemoteSessionRow): Promise<RemoteSessionRow | SendOutcome> {
+    const thread = rowThreadId(listed)
+    if (!(await runsNow(remote, listed)))
+      return fail(
+        "not_resumable",
+        `${thread} on device ${listed.device} is not running, and this device cannot wake it there.`,
+        "Open it again with thread_create({ thread }), then send.",
+        { device: listed.device, thread },
+      )
+    const located = await remote.sessions.locate(listed.device, thread)
+    if (located.kind !== "ok")
+      return fail(
+        "not_resumable",
+        `Device ${listed.device} runs ${thread}, but the key it runs under cannot be found there (${located.reason}).`,
+        "Call thread_list with all_scope, then send again.",
+        { device: listed.device, thread, reason: located.reason },
+      )
+    remote.sessions.reopened?.(listed, located.sessionId)
+    return { ...listed, session_id: located.sessionId }
+  }
+
+  async function send(delivery: OutboundDelivery, listed: RemoteSessionRow, later: Later): Promise<SendOutcome> {
+    const offline = await deviceOnline(remote, listed.device)
     if (offline !== undefined) return offline
     // omo#13037 5.4 / A4.5: a session no engine runs takes the wake path when this device's service can carry it: no lane
     // probe (its state is offline in the decision table), so a steer is turn_conflict and nothing is sent.
-    const ended = row.state === "ended" && (await remote.sessions.canWake?.()) === true
-    // #14184: a row that is not live (ended, or a cached snapshot) and takes no wake path is a session its holder may not
-    // run, and a command to its listing key waits out the device's own deadline (about 60 s) before failing. The holder
-    // is asked first (the listing and this surface's closed mark lag a reopen made elsewhere): a session it does not run
-    // is answered at once, as thread_read answers it.
-    if (rowStatus(row) !== "live" && !ended) {
-      if (!(await runsNow(remote, row)))
-        return fail(
-          "not_resumable",
-          `${rowThreadId(row)} on device ${row.device} is not running, and this device cannot wake it there.`,
-          "Open it again with thread_create({ thread }), then send.",
-          { device: row.device, thread: rowThreadId(row) },
-        )
-      remote.sessions.reopened?.(row, row.session_id)
-    }
+    const ended = listed.state === "ended" && (await remote.sessions.canWake?.()) === true
+    const addressed = rowStatus(listed) !== "live" && !ended ? await runningRow(listed) : listed
+    if ("kind" in addressed) return addressed
+    const row = addressed
     if (ended && delivery.mode === "steer")
       return fail(
         REFUSAL_CODES.turn_conflict.code,
