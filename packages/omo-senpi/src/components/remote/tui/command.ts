@@ -186,8 +186,6 @@ function parsed(answer: OmoRun): unknown {
   }
 }
 
-// Two CLI generations answer: today's session verbs nest the failure (`{kind:"error", error:{...}}`), the one-module CLI
-// (#13414 part 4c) prints a flat RemoteFailure. The TUI's omo may be either, so both are read.
 /**
  * The picker's close (omo#14245): a close the engine refused because the thread has messages it has not read offers a
  * forced close, which drops them and lists them.
@@ -212,6 +210,8 @@ function unreadOf(value: unknown): readonly string[] | "unavailable" | undefined
   return Array.isArray(pending) ? pending.map(String) : undefined
 }
 
+// Two CLI generations answer: today's session verbs nest the failure (`{kind:"error", error:{...}}`), the one-module CLI
+// (#13414 part 4c) prints a flat RemoteFailure. The TUI's omo may be either, so both are read.
 function typedFailure(value: unknown, verb?: string, target?: string): string | undefined {
   if (!isRecord(value) || value["kind"] !== "error") return undefined
   const unread = verb === "close" ? unreadOf(value) : undefined
