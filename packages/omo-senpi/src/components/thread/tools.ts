@@ -3,8 +3,9 @@ import { threadToolFailure } from "./errors"
 import type { ThreadErrorCode, ThreadToolFailure } from "./errors"
 import { type Static } from "typebox"
 import { toThreadAddressEntries } from "./address-book"
-import { checkNameConflict, normalizeThreadName, type ThreadResolveResult } from "./addressing"
+import { checkNameConflict, normalizeThreadName, type ThreadAddressEntry, type ThreadResolveResult } from "./addressing"
 import { createLocalSessionHost, workspaceNote } from "./control/local-session-host"
+import { createdThreadId, type SessionOpenOutcome } from "./control/session-host"
 import { checkInitialSkills } from "./initial-skills"
 import {
   parseThreadParams,
@@ -28,7 +29,7 @@ import {
 } from "./contracts"
 import { THREAD_FAMILY_PROMPT_GUIDELINES } from "./metadata"
 import { createLaunch } from "./control/create-launch"
-import { createdDeviceRow } from "./remote/address-book"
+import { createdDeviceRow, relayAddressBook, type RelayAddressBook } from "./remote/address-book"
 import { threadLink } from "./thread-link"
 export type { ThreadTranscriptEntry } from "./reader"
 import { hashArgs } from "./gateway/bindings"
@@ -36,12 +37,14 @@ import { GATEWAY_RECEIPT_RETENTION_MS } from "./gateway/constants"
 import { isLockWaitExceeded } from "./gateway/lock-wait"
 import type { DeliveryPipeline } from "./gateway/pipeline"
 import type { DeliveryTarget } from "./gateway/transport"
+import type { DeliveryAuthority } from "./gateway/types"
 import { createGatewayServices } from "./tools/gateway-services"
 import { listThreads, readThread } from "./tools/read-ops"
-import { createRelayTools, REMOVED_RELAY_TOOL_HINTS } from "./tools/relay-tools"
+import { createRelayTools } from "./tools/relay-tools"
 import { threadToolPermission } from "./tools/local-permission"
+import { withThreadRenderers } from "./tools/render"
 import { consumedSendersOf, threadSendPermission } from "./tools/reply-permission"
-import { otherDevice, replyTargetMismatch } from "./tools/reply-target"
+import { otherDevice, replyTargetFailure, replyTargetMismatch } from "./tools/reply-target"
 import { accountDevices } from "./remote/account"
 import { claimCreatedAlias, listAcross, planCreate, renameAlias, withAlias } from "./remote/lazy-ops"
 import { locateControl } from "./control/locate"
@@ -158,6 +161,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
       value: Static<(typeof threadToolParamSchemas)[T]>,
       operationId: string,
       callerId: string,
+      retrying: { readonly error_note: string | null } | undefined,
     ) => Promise<ThreadToolResult>,
   ): Promise<ToolOutput> {
     const callerId =
@@ -176,6 +180,8 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
     // A send owns its idempotency: the gateway engine's receipt is written in the delivery's own
     // transaction and answers a lost ACK with `idempotency_uncertain` + the row state.
     const receipted = !(name === "thread_send" || name === "thread_handoff")
+    // An earlier run under this key failed after it may have acted: only thread_create may run again, and it decides (#14060).
+    let retrying: { readonly error_note: string | null } | undefined
     if (receipted) {
       // Nothing has run yet, so a store that cannot admit the receipt fails the call as data: the store
       // lock held past its wait bound is `overloaded`, any other store failure `internal_error`.
@@ -249,15 +255,12 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
           ),
         )
       }
-      if (admission.kind === "uncertain")
-        return output(
-          failure(
-            "idempotency_uncertain",
-            "The earlier operation may have been delivered.",
-            "Read the target transcript before deciding whether to retry.",
-            admission.error_note === null ? undefined : { error_note: admission.error_note },
-          ),
-        )
+      // #14060: a thread_create that failed after the host made its thread may recover by re-running it; the create
+      // itself refuses unless it finds that thread (see thread_create).
+      if (admission.kind === "uncertain") {
+        if (name !== "thread_create") return output(uncertainFailure(admission.error_note))
+        retrying = { error_note: admission.error_note }
+      }
     }
     const unrecorded = (what: string) => (settleError: unknown) => {
       unsettled.set(
@@ -311,7 +314,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
           : sendTo !== "" && (await replyLeavesThisDevice(options, sendTo))
             ? NO_LOCAL_VIEW
             : await view(receipted ? undefined : { offline: true })
-      result = await sideEffect(current, value, scope.idempotency_key, callerId)
+      result = await sideEffect(current, value, scope.idempotency_key, callerId, retrying)
     } catch (error) {
       // A control's typed refusal is the call's answer, recorded like one: a retry under the same key replays it.
       const refusal = controlRefusalOf(error)
@@ -335,7 +338,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
     parameters: threadToolParamSchemas.thread_create,
     promptGuidelines: [THREAD_FAMILY_PROMPT_GUIDELINES],
     execute: (id: string, args: ThreadCreateInput, _signal, _onUpdate, ectx) =>
-      execute("thread_create", id, args, ectx, async (current, value, operationId, callerId) => {
+      execute("thread_create", id, args, ectx, async (current, value, operationId, callerId, retrying) => {
         const launch = createLaunch(value, options.remote?.permissionPreset?.())
         if ("kind" in launch) return launch
         // #14050: a new thread with no first prompt and no name is an empty session nobody asked for; refuse it as data.
@@ -346,6 +349,13 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
             "thread_create makes a new thread only with a prompt or a name; neither was given, so nothing was created.",
             "Pass prompt (the new thread's first message) or name, or pass thread to open an existing thread.",
           )
+        // #14060: an earlier run under this key failed after it may have made a thread. It is re-run only when the thread
+        // the key derives is on this device; otherwise (a create on another device, a host that ignored the derived id)
+        // a thread may exist that nothing here can find, so the retry is refused as any other uncertain operation is.
+        if (retrying !== undefined) {
+          const derived = existingHere(current, createdThreadId(callerId, operationId), callerId)
+          if (derived.kind !== "live" && derived.kind !== "file") return uncertainFailure(retrying.error_note)
+        }
         // The session the open answered, with its listing key: a first prompt to a thread on another device needs it.
         let opened: HostedThread | undefined
         const made = await (async (): Promise<ThreadToolResult> => {
@@ -401,18 +411,42 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
           // An alias no account holds names the thread on its device instead (#13104); a given name wins.
           // Trimmed like thread_rename's alias-as-name, so " x " and "x" name the thread the same way.
           const name = plan.localAlias === undefined ? value.name : (value.name ?? value.alias?.trim())
-          if (name !== undefined) {
+          // #14060: a new thread on this device is created under an id derived from this call's idempotency key, so a
+          // create whose reply was lost (the connection closed after the host made the session) is found again: on the
+          // spot, and by a retry under the same key, which reopens or reuses that thread and admits its prompt once.
+          const createdId =
+            plan.creates && plan.host.device === undefined ? createdThreadId(callerId, operationId) : undefined
+          const earlier = createdId === undefined ? undefined : existingHere(current, createdId, callerId)
+          // The thread an earlier run made may already carry this name: it is this create's own thread, not a conflict.
+          if (name !== undefined && earlier?.kind !== "live" && earlier?.kind !== "file") {
             const conflict = checkNameConflict(await plan.host.visible(), name)
             if (conflict.kind === "error") return { kind: "error", error: conflict } as ThreadToolResult
           }
           const preset = plan.creates ? launch.permissionPreset : undefined
-          const outcome = await plan.host.open({
-            ...plan.request,
-            ...(plan.creates && name !== undefined ? { name } : {}),
-            ...(plan.creates && loaded !== undefined ? { initialSkills: loaded } : {}),
-            ...(preset === undefined ? {} : { permissionPreset: preset }),
-            ...(plan.creates ? launch.profile : {}),
-          })
+          const reopened = async (): Promise<SessionOpenOutcome | undefined> => {
+            if (createdId === undefined) return undefined
+            const found = existingHere(await view(), createdId, callerId)
+            if (found.kind === "live") return { kind: "ok", thread: found.thread }
+            return found.kind === "file" ? await plan.host.open({ sessionPath: found.sessionPath }) : undefined
+          }
+          let outcome: SessionOpenOutcome
+          if (earlier?.kind === "live") outcome = { kind: "ok", thread: earlier.thread }
+          else if (earlier?.kind === "file") outcome = await plan.host.open({ sessionPath: earlier.sessionPath })
+          else
+            try {
+              outcome = await plan.host.open({
+                ...plan.request,
+                ...(plan.creates && name !== undefined ? { name } : {}),
+                ...(plan.creates && loaded !== undefined ? { initialSkills: loaded } : {}),
+                ...(preset === undefined ? {} : { permissionPreset: preset }),
+                ...(plan.creates ? launch.profile : {}),
+                ...(createdId === undefined ? {} : { durableSessionId: createdId }),
+              })
+            } catch (error) {
+              const found = await reopened()
+              if (found === undefined) throw error
+              outcome = found
+            }
           if (outcome.kind === "error") return outcome
           opened = outcome.thread
           const created: ThreadToolResult = {
@@ -486,6 +520,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
         `${operationId}:prompt`,
         callerId,
         undefined,
+        "creator",
       )
     } catch (error) {
       return {
@@ -677,6 +712,15 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
       }),
   }
   /** An existing thread this device is asked to open: live in the view, a session file the address book names, or neither. */
+  /** The answer to an operation whose earlier run under the same key may have acted: read before retrying. */
+  function uncertainFailure(note: string | null): ThreadToolResult {
+    return failure(
+      "idempotency_uncertain",
+      "The earlier operation may have been delivered.",
+      "Read the target transcript before deciding whether to retry.",
+      note === null ? undefined : { error_note: note },
+    )
+  }
   function existingHere(current: ThreadHostView, address: string, callerId: string): LocalExisting {
     const book = sendAddressBook(options, current, address, true)
     const resolved = resolution(options, toThreadAddressEntries(book), address, callerId, true)
@@ -703,8 +747,8 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
     relay.dispose()
   }
   return {
-    tools: [create, list, read, send, interrupt, close, handoff, rename, setModel, setReasoning, ...relayTools].map(
-      (tool) => ({ ...tool, permissionParser: tool.permissionParser ?? threadToolPermission(tool.name, options) }),
+    tools: [create, list, read, send, interrupt, close, handoff, rename, setModel, setReasoning, ...relayTools].map((tool) =>
+      withThreadRenderers({ ...tool, permissionParser: tool.permissionParser ?? threadToolPermission(tool.name, options) }),
     ),
     dispose,
   }
@@ -768,10 +812,24 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
     // A reply to a sender on this device resolves among this device's entries only (A4.3.1), and only by the sender's
     // exact id or stated name: an id prefix never turns an approved reply into a send to another thread. A send never
     // targets its own caller, so an id prefix is resolved without it (UUIDv7 ids share 8 hex characters for ~65 s).
-    const resolved: ThreadResolveResult & { readonly all_scope?: boolean | undefined } =
+    let resolved: ThreadResolveResult & { readonly all_scope?: boolean | undefined } =
       replyTo === undefined
         ? await resolveAcross(options, entries, address, callerId, scope, match, true, { exclude: callerId })
         : resolution(options, entries, address, callerId, scope, false)
+    // #14048: a delivery id without a device part (`rpc:local/<id>`, a bare row id) proves no device: another device's
+    // delivery arrives that way when the connection that admitted it declared no remote origin. A sender this device does
+    // not hold is then looked up account-wide (exact id or name only, never an id prefix), and the reply goes only to the
+    // session its durable id names, on the one device that lists it: with no device to pin, a copy of that id on a second
+    // device makes the sender ambiguous.
+    if (replyTo !== undefined && resolved.kind === "error" && resolved.code === "not_found") {
+      resolved = await resolveAcross(options, entries, address, callerId, scope, match, true, false)
+      if (resolved.kind === "ok" && resolved.entry.transport?.kind === "relay") {
+        if (resolved.entry.thread_id !== replyTo.session_id) return refuse(replyTargetFailure(address, resolved.entry))
+        const ambiguous = await unattestedSenderAmbiguity(options, entries, replyTo.session_id)
+        if (ambiguous !== undefined) return refuse(ambiguous)
+        return { kind: "remote", row: resolved.entry.transport.row }
+      }
+    }
     if (resolved.kind === "error")
       return { kind: "error", result: { kind: "error", error: resolved } as ThreadToolResult }
     // The allowance approved this send as a reply to a consumed delivery's sender (by id or stated name): deliver only when
@@ -815,6 +873,7 @@ async function deliverThrough(
   idempotencyKey: string,
   callerId: string,
   resolvedBy: "exact_name" | "fuzzy" | undefined,
+  authority?: DeliveryAuthority,
 ): Promise<ThreadToolResult> {
   if (callerId === UNKNOWN_CALLER)
     return failure(
@@ -842,6 +901,7 @@ async function deliverThrough(
     idempotency_key: idempotencyKey,
     args: value,
     ...(inboundHop === undefined || inboundHop <= 0 ? {} : { inbound_hop: inboundHop }),
+    ...(authority === undefined ? {} : { authority }),
   })
   if (sent.kind === "error") return { kind: "error", error: sent.error }
   if ("device" in sent) {
@@ -928,7 +988,6 @@ export function registerThreadTools(
   const built = buildThreadTools(options)
   // Thread tools run on the loop side of a split session (engine `ToolDefinition.runs`).
   for (const tool of built.tools) pi.registerTool({ ...tool, runs: "brain" })
-  for (const [name, hint] of Object.entries(REMOVED_RELAY_TOOL_HINTS)) pi.registerRemovedToolHint?.(name, hint)
   if (pi.on !== undefined)
     registerExtensionTools(pi as ExtensionToolHost & Required<Pick<ExtensionToolHost, "on">>, options, log)
   return { dispose: built.dispose }
@@ -943,6 +1002,38 @@ async function thisDeviceOf(
 ): Promise<string | undefined> {
   if (options.remote === undefined || !senders.some((sender) => sender.device !== undefined)) return undefined
   return (await accountDevices(options.remote.client).catch(() => undefined))?.here ?? undefined
+}
+
+/**
+ * #14048: the refusal of a reply to an unattested sender whose durable id more than one device lists (this device's entries
+ * and the account listing), as the account-wide lookup answers several holders; undefined when one device lists it.
+ */
+async function unattestedSenderAmbiguity(
+  options: ThreadToolSurfaceOptions,
+  local: readonly ThreadAddressEntry[],
+  sessionId: string,
+): Promise<ThreadToolFailure | undefined> {
+  if (options.remote === undefined) return undefined
+  const book = await relayAddressBook(options.remote, sessionId).catch((error: unknown): RelayAddressBook => ({
+    entries: [],
+    unavailable: threadToolFailure(
+      "host_unavailable",
+      "The account's session listing could not be read again to confirm the sender's device.",
+      "Retry when the device service is reachable.",
+      { reason: error instanceof Error ? error.message : String(error) },
+    ),
+  }))
+  if (book.unavailable !== undefined) return book.unavailable
+  const devices = [
+    ...new Set([...local, ...book.entries].filter((e) => e.thread_id === sessionId).map((e) => e.device ?? "")),
+  ]
+  if (devices.length <= 1) return undefined
+  return threadToolFailure(
+    "ambiguous_target",
+    `Session ${sessionId} is listed on more than one device and this run's delivery names none; nothing was sent.`,
+    "Address the session on one device with <device>/<session id>.",
+    { candidates: devices.map((device) => ({ id: sessionId, ...(device === "" ? {} : { device }) })) },
+  )
 }
 
 /** True when `address` is an approved reply to a consumed sender on another device, or names such senders ambiguously. */

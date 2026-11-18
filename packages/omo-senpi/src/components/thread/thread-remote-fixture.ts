@@ -255,6 +255,8 @@ export function createRemoteThreadFixture() {
       relayKeyOnly?: boolean
       /** The device service throws on b's admit_external_message (a lost connection mid-delivery). */
       admitThrows?: string
+      /** Every get_state after b admitted a delivery is refused with this reason (the read after the admission fails). */
+      stateRefusedAfterAdmit?: string
     } = {},
   ) {
     const engine = options.engine ?? ENGINE
@@ -332,6 +334,8 @@ export function createRemoteThreadFixture() {
         for (const id of options.relayKeyOnly === true ? [key] : [opened, key]) live.add(id)
         return ok(options.openData ?? { sessionId: "rpc-9", state: { durableSessionId: opened } })
       }
+      if (rpc["type"] === "get_state" && options.stateRefusedAfterAdmit !== undefined && admitted.size > 0)
+        return { kind: "refused", reason: options.stateRefusedAfterAdmit }
       if (rpc["type"] === "get_state")
         return ok({
           isStreaming: engine.streaming,
@@ -685,6 +689,15 @@ export function createRemoteThreadFixture() {
       sessionsDirectory?: boolean
       /** This device's engine refuses every open_session with this error text, as its host client throws it. */
       openThrows?: string
+      /**
+       * #14060: the first N opens CREATE the session (under the asked `durableSessionId`, as a host with that capability
+       * does) and then lose the reply: the connection closes before the response arrives.
+       */
+      openLosesReply?: number
+      /** With `openLosesReply`: the next listing after a lost reply fails too, so the create cannot recover on the spot. */
+      listFailsAfterLostReply?: boolean
+      /** With `openLosesReply`: the host has no `durable_session_id` capability and creates under an id of its own. */
+      ignoresDurableSessionId?: boolean
     } = {},
   ) {
     const engine = extra.engine ?? ENGINE
@@ -696,6 +709,8 @@ export function createRemoteThreadFixture() {
       status: "open",
     }
     const sessions = extra.sessions ?? [local]
+    let lostReplies = extra.openLosesReply ?? 0
+    let listFails = false
     const openSession = mock(async (request: Parameters<ThreadHost["openSession"]>[0]) => {
       if (extra.openThrows !== undefined) throw new Error(extra.openThrows)
       // An engine opening a session file on disk resumes it under the id in that file's header, as senpi does.
@@ -703,14 +718,26 @@ export function createRemoteThreadFixture() {
         "sessionPath" in request && typeof request.sessionPath === "string" && existsSync(request.sessionPath)
           ? (JSON.parse(readFileSync(request.sessionPath, "utf8").split("\n")[0] ?? "{}") as { id?: string }).id
           : undefined
+      const losing = extra.openLosesReply !== undefined
       const created: ThreadHostSession = {
-        sessionId: "route-created",
-        durableSessionId: resumed ?? "dur-created-here",
+        sessionId: losing ? `route-created-${sessions.length}` : "route-created",
+        durableSessionId:
+          resumed ??
+          (losing && extra.ignoresDurableSessionId !== true && request.durableSessionId !== undefined
+            ? request.durableSessionId
+            : losing
+              ? `dur-created-${sessions.length}`
+              : "dur-created-here"),
         cwd: process.cwd(),
         name: null,
         status: "open",
       }
       sessions.push(created)
+      if (lostReplies > 0) {
+        lostReplies -= 1
+        listFails = extra.listFailsAfterLostReply === true
+        throw new Error("thread RPC connection closed before the response arrived")
+      }
       return created
     })
     const closed: Array<readonly [string, string | undefined]> = []
@@ -732,6 +759,10 @@ export function createRemoteThreadFixture() {
       socket: "/tmp/thread-remote-test.sock",
       listSessions: async () => {
         localListings += 1
+        if (listFails) {
+          listFails = false
+          throw new Error("thread RPC connection closed before the response arrived")
+        }
         return sessions
       },
       openSession,
@@ -794,12 +825,12 @@ export function createRemoteThreadFixture() {
     }))
     const caller = extra.caller ?? "dur-caller"
     // Every delivery the gateway takes for a session on this device, by target: a local thread_send's real call.
-    const enqueued: string[] = []
+    const enqueued: Array<Parameters<GatewayStore["enqueue"]>[0]> = []
     const countedStore = new Proxy(store, {
       get: (target, property, receiver) =>
         property === "enqueue"
           ? (request: Parameters<GatewayStore["enqueue"]>[0]) => {
-              enqueued.push(request.target_durable_id)
+              enqueued.push(request)
               return target.enqueue(request)
             }
           : Reflect.get(target, property, receiver),
@@ -851,7 +882,8 @@ export function createRemoteThreadFixture() {
       endWatches: (reason: string) => {
         for (const end of [...ends]) end(reason)
       },
-      enqueuedFor: (durableId: string) => enqueued.filter((target) => target === durableId).length,
+      enqueuedFor: (durableId: string) => enqueued.filter((request) => request.target_durable_id === durableId).length,
+      enqueuedRequests: (durableId: string) => enqueued.filter((request) => request.target_durable_id === durableId),
     }
   }
 

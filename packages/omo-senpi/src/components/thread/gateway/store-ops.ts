@@ -724,6 +724,7 @@ export async function enqueue(
         root_id: placement.root_id,
         hop: placement.hop,
         delivery_id: request.delivery_id,
+        ...(request.authority === undefined ? {} : { authority: request.authority }),
       },
       body: request.body,
       bytes,
