@@ -196,3 +196,22 @@ export function outcomeFailure(
     { device, reason },
   )
 }
+
+/**
+ * A refused record sent to another device's engine endpoint (`endpointCommand`: an open, a `find_session`). There a
+ * `route_unlisted` that survived the fresh endpoint lookup names the endpoint, not a session: the engine the device named
+ * went away before the record reached it (its host restarted). Nothing ran, and no omo update helps (omo#14233).
+ */
+export function endpointOutcomeFailure(
+  outcome: Exclude<RemoteCommandOutcome, { readonly kind: "ok" }>,
+  device: string,
+): Failure {
+  if (outcome.kind === "refused" && outcome.reason === "route_unlisted")
+    return fail(
+      "host_unavailable",
+      `Device ${device} no longer lists the engine it named (route_unlisted); nothing was sent there.`,
+      "Retry; if it repeats, restart omo on that device.",
+      { device, reason: "route_unlisted" },
+    )
+  return outcomeFailure(outcome, device)
+}

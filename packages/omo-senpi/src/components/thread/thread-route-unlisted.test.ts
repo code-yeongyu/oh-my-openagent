@@ -51,4 +51,15 @@ describe("a session command refused route_unlisted by the device holding the thr
     })
     expect(JSON.stringify(result)).not.toContain("Update omo")
   })
+
+  test("#given b's closed thread and an engine endpoint b no longer lists for the file lookup #when thread_create reopens it #then it is host_unavailable naming b and route_unlisted, not not_resumable (#14237 review L1)", async () => {
+    const a = account({ rowState: "ended", sessionFiles: "none", findSessionRefuse: "route_unlisted" })
+    const { run } = surface(a.remote)
+    const result = await run("thread_create", { thread: "dur-on-b" })
+    expect(result).toMatchObject({
+      kind: "error",
+      error: { code: "host_unavailable", details: { device: "b", reason: "route_unlisted" } },
+    })
+    expect(a.sent.map((entry) => entry.rpc?.["type"])).not.toContain("open_session")
+  })
 })

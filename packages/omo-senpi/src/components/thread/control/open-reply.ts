@@ -1,7 +1,7 @@
 import type { ThreadDataError } from "../contracts"
 import { threadToolFailure } from "../errors"
 import type { JsonObject, RemoteCommandOutcome } from "../remote/ports"
-import { outcomeFailure } from "../remote/outcome"
+import { endpointOutcomeFailure } from "../remote/outcome"
 import { folderFailure } from "../worktree/failures"
 
 const nonEmpty = (value: unknown): string | undefined =>
@@ -59,17 +59,5 @@ export function openRefusal(
       device,
       ...(cwd === undefined ? {} : { path: cwd }),
     })
-  // An open refused route_unlisted even on a fresh endpoint lookup (device-service.ts endpointCommand): the engine endpoint
-  // the device named went away before the open reached it (its host restarted). Nothing was opened; no omo update helps.
-  if (outcome.kind === "refused" && outcome.reason === "route_unlisted")
-    return {
-      kind: "error",
-      error: threadToolFailure(
-        "host_unavailable",
-        `Device ${device} no longer lists the engine it named for this open (route_unlisted); nothing was opened.`,
-        "Retry; if it repeats, restart omo on that device.",
-        { device, reason: "route_unlisted" },
-      ),
-    }
-  return outcomeFailure(outcome, device)
+  return endpointOutcomeFailure(outcome, device)
 }
