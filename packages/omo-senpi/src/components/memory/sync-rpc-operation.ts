@@ -8,6 +8,7 @@ import type {
   SyncRpcOperation,
   SyncRpcOptions,
 } from "./sync-rpc-ports"
+import { serviceRefusal } from "./sync-service-refusal"
 
 export const unavailable = (code?: SyncUnavailableCode): SyncRpcProblem => ({
   kind: "unavailable",
@@ -25,7 +26,7 @@ export function serviceProblem(error: unknown): SyncRpcProblem {
     typeof error.status === "number" &&
     error.status >= 400 &&
     error.status < 500
-    ? { kind: "refused", reason: "The service refused this sync request." }
+    ? serviceRefusal("code" in error && typeof error.code === "string" ? error.code : "")
     : unavailable(error instanceof RetiredSyncOperation ? error.code : "operation_failed")
 }
 
