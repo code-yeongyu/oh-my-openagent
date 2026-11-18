@@ -8,5 +8,9 @@ export type ThreadState = "running" | "idle" | "inactive" | "archived"
 
 export const THREAD_STATES: readonly ThreadState[] = ["running", "idle", "inactive", "archived"]
 
+/** The engine's finer activity of a held thread (senpi#6688); `state` folds it to running or idle. */
+export const THREAD_ACTIVITIES = ["idle", "running", "awaiting_approval", "queued", "errored"] as const
+export type ThreadActivity = (typeof THREAD_ACTIVITIES)[number]
+
 /** The model a thread runs, as its engine names it. */
 export type ThreadModel = { readonly provider: string; readonly id: string }

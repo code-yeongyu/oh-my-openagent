@@ -1,9 +1,9 @@
 import type { ThreadErrorCode, ThreadToolFailure } from "../errors"
 import type { BindingRecord, OutboxRow } from "../gateway/bindings"
 import type { ThreadWorktree } from "../worktree/thread-worktree"
-import type { ThreadModel, ThreadState } from "./state"
+import type { ThreadActivity, ThreadModel, ThreadState } from "./state"
 
-export { THREAD_STATES, type ThreadModel, type ThreadState } from "./state"
+export { THREAD_ACTIVITIES, THREAD_STATES, type ThreadActivity, type ThreadModel, type ThreadState } from "./state"
 
 // Discriminated result unions. The error branch is shared data, never an exception: a caller
 // that sent a malformed payload receives { kind: "error", error: { code: "invalid_arguments" } }.
@@ -71,6 +71,12 @@ export type ThreadResultSummary = {
   readonly state: ThreadState
   /** The thread's current model; absent when its engine does not report one (an older engine, an inactive thread). */
   readonly model?: ThreadModel
+  /** A held thread's finer activity when its engine reports one (an older engine reports none). */
+  readonly activity?: ThreadActivity
+  /** With `activity: "errored"`: the failed turn's category. */
+  readonly error_code?: string
+  /** The current or most recent turn's id, as the prompt response names it. */
+  readonly turn_id?: string
   /**
    * Set when the row comes from another device's cached listing (it did not answer this round): when that listing was
    * taken. Such a row is the device's last word, so it reads `inactive` (or `archived`), never `running`.

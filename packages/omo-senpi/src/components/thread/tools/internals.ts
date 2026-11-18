@@ -21,7 +21,14 @@ import {
   workspaceEntries,
   type ThreadAddressEntry,
 } from "../addressing"
-import type { ThreadModel, ThreadState, ThreadToolName, ThreadToolResult, ThreadTranscriptItem } from "../contracts"
+import type {
+  ThreadActivity,
+  ThreadModel,
+  ThreadState,
+  ThreadToolName,
+  ThreadToolResult,
+  ThreadTranscriptItem,
+} from "../contracts"
 import { threadToolFailure, type ThreadErrorCode } from "../errors"
 import { THREAD_TOOL_EXPOSURE, THREAD_TOOL_METADATA } from "../metadata"
 import { readSessionFacts, threadTitle } from "../session-facts"
@@ -35,7 +42,7 @@ import {
   type ThreadToolSurfaceOptions,
 } from "./ports"
 import { sendView } from "./send-view"
-import { threadModel, threadState } from "./thread-state"
+import { activityDetail, threadModel, threadState } from "./thread-state"
 
 // biome-ignore lint/suspicious/noExplicitAny: the tool definitions are heterogeneous by design.
 export type AnyTool = ToolDefinition<any, any>
@@ -60,13 +67,29 @@ export function output(result: ThreadToolResult): ToolOutput {
 
 export type ThreadToolSummary = Omit<
   ThreadHostSession,
-  "name" | "status" | "createdAt" | "updatedAt" | "created_at" | "updated_at" | "archived" | "activity" | "model"
+  | "name"
+  | "status"
+  | "createdAt"
+  | "updatedAt"
+  | "created_at"
+  | "updated_at"
+  | "archived"
+  | "activity"
+  | "error_code"
+  | "turn_id"
+  | "model"
 > & {
   readonly thread_id: string
   readonly name: string
   /** Deprecated beside `state`: `resumable` when no engine holds the thread, else `live`. */
   readonly status: "live" | "resumable"
   readonly state: ThreadState
+  /** The engine's finer activity of a held thread (senpi#6688); `state` folds it. */
+  readonly activity?: ThreadActivity
+  /** With `errored`: the failed turn's category. */
+  readonly error_code?: string
+  /** The current or most recent turn's id. */
+  readonly turn_id?: string
   readonly model?: ThreadModel
   readonly created_at: string
   readonly updated_at: string | null
@@ -104,6 +127,8 @@ export function summary(session: ThreadHostSession, entry?: AddressEntry): Threa
     updated_at: _updated,
     archived,
     activity,
+    error_code,
+    turn_id,
     model,
     ...rest
   } = session
@@ -116,6 +141,7 @@ export function summary(session: ThreadHostSession, entry?: AddressEntry): Threa
     status: held ? "live" : "resumable",
     state: threadState({ archived, held, activity }),
     ...threadModel(model),
+    ...activityDetail(held && archived !== true, activity, error_code, turn_id),
     created_at: created,
     updated_at: entry === undefined ? (session.updated_at ?? session.updatedAt ?? created) : entry.updated_at,
     ...(entry === undefined ? {} : { endpoint: entry.endpoint, surface: entry.surface }),
