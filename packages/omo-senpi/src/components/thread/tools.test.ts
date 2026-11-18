@@ -246,7 +246,7 @@ describe("thread tool registration", () => {
     })
   })
 
-  test("#given a live transcript longer than one byte window #when thread_read follows next_cursor #then each read returns the next slice until the end", async () => {
+  test("#given a live transcript longer than one byte window #when thread_read follows next_cursor #then the first read ends at the newest message and each next one returns the slice before it until the start", async () => {
     // given
     const f = fixture()
     const transcript = Array.from({ length: 12 }, (_, index) => ({
@@ -275,7 +275,10 @@ describe("thread tool registration", () => {
 
     // then
     expect(pages.length).toBeGreaterThan(1)
-    expect(pages.flatMap((page) => page.contents)).toEqual(transcript.map((message) => JSON.stringify(message.content)))
+    expect(pages[0]?.contents.at(-1)).toBe(JSON.stringify(transcript.at(-1)?.content))
+    expect(pages.reverse().flatMap((page) => page.contents)).toEqual(
+      transcript.map((message) => JSON.stringify(message.content)),
+    )
   })
 })
 

@@ -96,6 +96,7 @@ export type ThreadTranscriptReadResult =
 
 const READ_CHUNK_BYTES = 65536
 const CURSOR_VERSION = "t1"
+const OLDER_CURSOR_VERSION = "t1o"
 
 function fail(code: ThreadErrorCode, message: string, nextAction: string): ThreadTranscriptReadResult {
   return { kind: "error", error: threadToolFailure(code, message, nextAction) }
@@ -201,10 +202,20 @@ function revisionOf(entries: readonly ThreadTranscriptEntry[]): string {
   return `${entries.length}.${(hash >>> 0).toString(36)}`
 }
 
-type Cursor = { readonly revision: string; readonly offset: number }
+/**
+ * `forward` continues after `offset` (page mode); `older` pages the entries of a tail window before `before`, down to
+ * the window's first entry `floor` (the cursor a tail read issues, #14173).
+ */
+type Cursor =
+  | { readonly direction: "forward"; readonly revision: string; readonly offset: number }
+  | { readonly direction: "older"; readonly revision: string; readonly before: number; readonly floor: number }
 
 function encodeCursor(cursor: Cursor): string {
-  return Buffer.from(`${CURSOR_VERSION}:${cursor.revision}:${cursor.offset}`, "utf8").toString("base64url")
+  const text =
+    cursor.direction === "forward"
+      ? `${CURSOR_VERSION}:${cursor.revision}:${cursor.offset}`
+      : `${OLDER_CURSOR_VERSION}:${cursor.revision}:${cursor.before}:${cursor.floor}`
+  return Buffer.from(text, "utf8").toString("base64url")
 }
 
 function decodeCursor(raw: string): Cursor | null {
@@ -215,14 +226,15 @@ function decodeCursor(raw: string): Cursor | null {
   } catch {
     return null
   }
-  const parts = decoded.split(":")
-  if (parts.length !== 3) return null
-  const [version, revision, rawOffset] = parts
-  if (version !== CURSOR_VERSION) return null
+  const [version, revision = "", ...positions] = decoded.split(":")
   if (!/^\d+\.[0-9a-z]+$/.test(revision)) return null
-  const offset = Number(rawOffset)
-  if (!Number.isSafeInteger(offset) || offset < 0) return null
-  return { revision, offset }
+  const offsets = positions.map(Number)
+  if (offsets.some((offset) => !Number.isSafeInteger(offset) || offset < 0)) return null
+  const [first = 0, second = 0] = offsets
+  if (version === CURSOR_VERSION && offsets.length === 1) return { direction: "forward", revision, offset: first }
+  if (version === OLDER_CURSOR_VERSION && offsets.length === 2 && second <= first)
+    return { direction: "older", revision, before: first, floor: second }
+  return null
 }
 
 // ---------------------------------------------------------------------------
@@ -232,10 +244,11 @@ function decodeCursor(raw: string): Cursor | null {
 /**
  * Read one bounded slice of a session transcript.
  *
- * `status` returns metadata only, `tail` returns the last N entries, and
- * `page` walks forward from an opaque cursor. Truncation is a budget outcome,
- * not a failure: the payload comes back with `truncated: true` and a
- * `next_cursor` that resumes exactly after the last returned entry.
+ * `status` returns metadata only, `tail` returns the newest of the last N
+ * entries that fit the budget, and `page` continues from an opaque cursor:
+ * forward after the last returned entry, or, from a tail read's cursor, the
+ * older entries of its window. Truncation is a budget outcome, not a failure:
+ * the payload comes back with `truncated: true` and a `next_cursor`.
  */
 export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOptions = {}): ThreadTranscriptReadResult {
   const mode: ThreadReadMode = opts.mode ?? "tail"
@@ -343,18 +356,33 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
     return { ...base, items: [], truncated: false, next_cursor: null, encoded_bytes: 0 }
   }
 
-  // tail selects the trailing window and then applies the same byte budget
-  // forward through it, so a huge trailing entry still truncates cleanly.
-  const start = mode === "tail" ? Math.max(0, entries.length - tailItems) : (cursor?.offset ?? 0)
-  const { selected, encodedBytes } = takeWithinBudget(entries.slice(start), maxBytes)
+  const older = mode === "page" && cursor?.direction === "older" ? cursor : undefined
+  if (mode === "page" && older === undefined) {
+    const start = cursor?.direction === "forward" ? cursor.offset : 0
+    const { selected, encodedBytes } = takeWithinBudget(entries.slice(start), maxBytes)
+    const nextOffset = start + selected.length
+    const truncated = nextOffset < entries.length
+    return {
+      ...base,
+      items: selected,
+      truncated,
+      next_cursor: truncated ? encodeCursor({ direction: "forward", revision, offset: nextOffset }) : null,
+      encoded_bytes: encodedBytes,
+    }
+  }
 
-  const nextOffset = start + selected.length
-  const truncated = nextOffset < entries.length
+  // A tail window, or the older part of one, filled from its newest entry backward, so a first read always ends at the
+  // latest entry whatever the budget (#14173).
+  const floor = older?.floor ?? Math.max(0, entries.length - tailItems)
+  const end = older?.before ?? entries.length
+  const { selected, encodedBytes } = takeWithinBudget(entries.slice(floor, end), maxBytes, "end")
+  const start = end - selected.length
+  const truncated = start > floor
   return {
     ...base,
     items: selected,
     truncated,
-    next_cursor: truncated ? encodeCursor({ revision, offset: nextOffset }) : null,
+    next_cursor: truncated ? encodeCursor({ direction: "older", revision, before: start, floor }) : null,
     encoded_bytes: encodedBytes,
   }
 }

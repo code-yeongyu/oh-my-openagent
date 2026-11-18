@@ -35,7 +35,7 @@ export const ThreadReadParams = Type.Object({
   cursor: Type.Optional(
     Type.String({
       description:
-        "Opaque cursor from an earlier thread_read (tool.thread_read() in an eval cell) to continue a truncated transcript; a transcript revision that moved past it returns cursor_stale.",
+        "Opaque cursor from an earlier thread_read (tool.thread_read() in an eval cell) to page the older messages of a truncated read (a read without one returns the newest messages that fit max_bytes); a transcript revision that moved past it returns cursor_stale.",
     }),
   ),
   max_bytes: Type.Optional(
