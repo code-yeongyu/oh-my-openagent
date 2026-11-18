@@ -1,9 +1,23 @@
-import { describe, expect, test } from "bun:test"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { dirname, join } from "node:path"
+import { deviceServiceEndpointPath } from "../device-service-core/src/index.ts"
+import { describe, expect, test, onTestFinished } from "bun:test"
 import type { DeviceService } from "../device-service-core/src/index.ts"
-import { createRemoteThreadFixture } from "../omo-senpi/src/components/thread/thread-remote-fixture"
+import { createRemoteThreadFixture, fakeRemoteClient } from "../omo-senpi/src/components/thread/thread-remote-fixture"
 import type { RemoteCommandDependencies } from "./remote-cli"
 import { REMOTE_EXIT } from "./remote-exit"
+import { parseSession } from "./remote-session-args"
 import { personSenderProvenance, runSession } from "./remote-session-verbs"
+
+// The command reaches its client through the state dir it is connected on; a connected device service has its endpoint file there.
+const connectedStateDir = (): string => {
+  const dir = mkdtempSync(join(tmpdir(), "omo-remote-open-"))
+  mkdirSync(dirname(deviceServiceEndpointPath(dir)), { recursive: true })
+  writeFileSync(deviceServiceEndpointPath(dir), "")
+  onTestFinished(() => rmSync(dir, { recursive: true, force: true }))
+  return dir
+}
 
 const ENV = { OMO_PROVENANCE_WORKSPACE: "Owner workspace", OMO_PROVENANCE_PROJECT: "sender-project" }
 
@@ -26,7 +40,10 @@ describe("omo remote send sender provenance", () => {
 
   test("#given the device service answers without a device id #when a person sends #then the delivery names why it carries none", async () => {
     const account = remoteFixture.account()
-    const unnamed = { ...account.remote, sessions: { ...account.remote.sessions, thisDevice: async () => null } }
+    const unnamed = {
+      ...account.remote,
+      client: fakeRemoteClient({ state: () => "connected", here: null, devices: () => [] }),
+    }
     try {
       const provenance = await personSenderProvenance(unnamed, process.cwd(), ENV)()
       expect({ device: provenance.device, device_absent: provenance.device_absent }).toEqual({
@@ -59,13 +76,15 @@ describe("omo remote open connection", () => {
           calls.push(`${name}:status`)
           return { state: "connected" }
         },
+        thisDevice: async () => null,
+        capabilities: [],
         devices: async () => {
           calls.push(`${name}:devices`)
           return [{ device: "b", label: "studio", kind: "desktop", platform: "darwin", last_seen_ms: 1, online: true }]
         },
         attach: async () => {
           calls.push(`${name}:attach`)
-          return { onEvent: () => () => {}, detached: new Promise(() => {}) }
+          return { onEvent: () => () => {}, detached: new Promise(() => {}), detach: async () => {} }
         },
         endpointCommand: async () => {
           calls.push(`${name}:endpoint`)
@@ -97,7 +116,7 @@ describe("omo remote open connection", () => {
       },
       write: () => {},
       now: () => 0,
-      stateDir: "/unused",
+      stateDir: connectedStateDir(),
       accountShow: async () => {
         throw new Error("account show is not part of open")
       },
@@ -112,11 +131,58 @@ describe("omo remote open connection", () => {
     expect({ code, errors, calls, dialed: dialed.length, sharedClosed: shared.wasClosed() }).toEqual({
       code: REMOTE_EXIT.ok,
       errors: [],
-      calls: ["shared:status", "shared:devices", "dialed:endpoint", "dialed:close", "shared:attach"],
+      // The readiness check reads the state; the client's device list reads it again in its own round.
+      calls: ["shared:status", "shared:devices", "shared:status", "dialed:endpoint", "dialed:close", "shared:attach"],
       dialed: 1,
       sharedClosed: false,
     })
     expect(dialed[0]?.wasClosed()).toBe(true)
     expect(lines.length).toBeGreaterThan(0)
+  })
+})
+
+// #14074: the sessions port owns the attach pool; a verb that left it open kept an idle-detach timer armed after the
+// command returned, and in one test process that timer fired into a later test.
+describe("omo remote session verbs close what they opened", () => {
+  const remoteFixture = createRemoteThreadFixture()
+
+  test("#given a session verb ran over the device-service surface #when it returns #then its sessions port was closed once (#14074)", async () => {
+    const account = remoteFixture.account()
+    let closes = 0
+    const sessions = new Proxy(account.remote.sessions, {
+      get: (target, key) =>
+        key === "close"
+          ? async () => {
+              closes += 1
+              await target.close?.()
+            }
+          : Reflect.get(target, key, target),
+    })
+    const lines: string[] = []
+    const dependencies = {
+      connect: async () => {
+        throw new Error("the verb reaches the device through the injected surface")
+      },
+      output: (line: string) => lines.push(line),
+      error: (line: string) => lines.push(line),
+      write: () => {},
+      now: () => 0,
+      stateDir: connectedStateDir(),
+      accountShow: async () => {
+        throw new Error("account show is not part of a session verb")
+      },
+      remote: () => ({ ...account.remote, sessions }),
+    } as unknown as RemoteCommandDependencies
+    try {
+      await runSession(
+        {} as DeviceService,
+        parseSession("interrupt", ["b/no-such-session"]).session,
+        true,
+        dependencies,
+      )
+      expect({ closes, answered: lines.length > 0 }).toEqual({ closes: 1, answered: true })
+    } finally {
+      await remoteFixture.cleanup()
+    }
   })
 })

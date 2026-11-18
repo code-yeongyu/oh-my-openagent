@@ -23,8 +23,19 @@ export const MANIFEST = "operator-darwin-manifest.json"
 //   certificate leaf[subject.OU] = "523JNR86LZ"
 // This is the sha256 of its compiled requirements blob, read from three independently built helpers (#13943).
 const KEYCHAIN_REQUIREMENT_SHA256 = "6a3393d33529133e6c5a6c83886fc44e68297bc89170375aeca6ef7695fb98c1"
-const CPU_X86_64 = 0x01000007
-const CPU_ARM64 = 0x0100000c
+// [cputype, cpusubtype]: x86_64 (CPU_SUBTYPE_X86_ALL) and arm64 (CPU_SUBTYPE_ARM64_ALL), what lipo -archs reports
+// as "x86_64 arm64" on the hosted path. arm64e (subtype 2) is a different architecture and is refused.
+const X86_64: Architecture = [0x01000007, 3]
+const ARM64: Architecture = [0x0100000c, 0]
+type Architecture = readonly [cpuType: number, cpuSubtype: number]
+
+function parseJson(text: string, refusal: string): unknown {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return refuse(refusal)
+  }
+}
 
 type Artifact = {
   readonly identifier: string
@@ -32,7 +43,7 @@ type Artifact = {
   readonly engine?: { readonly host: string; readonly rustTarget: string }
   readonly contains?: readonly string[]
   /** Exact requirements blob, slice architectures and no entitlements, as the hosted keychain-helper job checks. */
-  readonly keychain?: { readonly requirementsSha256: string; readonly cpuTypes: readonly number[] }
+  readonly keychain?: { readonly requirementsSha256: string; readonly architectures: readonly Architecture[] }
 }
 
 // The hosted darwin legs this replaces: desktop-engine (engine + trust helper per host), keychain-helper, and the
@@ -54,7 +65,7 @@ export const ARTIFACTS: Readonly<Record<string, Artifact>> = {
   "omo-keychain-darwin-universal": {
     identifier: "com.mengmota.omo-keychain-helper",
     notarized: true,
-    keychain: { requirementsSha256: KEYCHAIN_REQUIREMENT_SHA256, cpuTypes: [CPU_X86_64, CPU_ARM64] },
+    keychain: { requirementsSha256: KEYCHAIN_REQUIREMENT_SHA256, architectures: [X86_64, ARM64] },
   },
   "omo-darwin-arm64": {
     identifier: "ai.sisyphuslabs.omo",
@@ -95,6 +106,7 @@ export type SliceFacts = {
   readonly signerTeam: string
   readonly runtime: boolean
   readonly cpuType: number
+  readonly cpuSubtype: number
   readonly requirementsSha256: string
   readonly entitlements: boolean
   readonly cdhash: string
@@ -121,6 +133,7 @@ export function inspectSignatures(bytes: Uint8Array, anchors?: TrustAnchors): Sl
     signerTeam: verifyDeveloperIdSigner(slice.codeDirectory, slice.cms, anchors).team,
     runtime: slice.runtime,
     cpuType: slice.cpuType,
+    cpuSubtype: slice.cpuSubtype,
     requirementsSha256: slice.requirementsSha256,
     entitlements: slice.entitlements,
     cdhash: slice.cdhash,
@@ -154,14 +167,6 @@ export async function verifyOperatorDarwin(input: Input, tools: Tools): Promise<
   if (!/^operator-darwin-[0-9a-f]{12}$/.test(input.tag)) refuse(`tag ${input.tag} is not operator-darwin-<12 hex>`)
   if (!/^[0-9a-f]{40}$/.test(input.preparedSha)) refuse("prepared_release_sha must be a full 40-character hex SHA")
   if (!/^[0-9a-f]{64}$/.test(input.manifestSha256)) refuse("operator_darwin_manifest_sha256 must be a 64-hex sha256")
-  if (input.actors.length === 0) refuse("no dispatching actor")
-  for (const login of input.actors) {
-    const role = /^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/.test(login) ? await tools.role(login) : "not a user login"
-    if (role !== "admin" && role !== "maintain")
-      refuse(
-        `${login} has repository role '${role ?? "unreadable"}'; only admin or maintain may use operator darwin artifacts`,
-      )
-  }
 
   const expected = [MANIFEST, ...Object.keys(ARTIFACTS).flatMap((name) => [name, `${name}.sha256`])].sort()
   const present = readdirSync(input.dir).sort()
@@ -174,7 +179,15 @@ export async function verifyOperatorDarwin(input: Input, tools: Tools): Promise<
     refuse(
       `${MANIFEST} sha256 ${sha256(manifestBytes)} is not the pinned operator_darwin_manifest_sha256 ${input.manifestSha256}`,
     )
-  const manifest = record(JSON.parse(manifestBytes.toString("utf8")))
+  if (input.actors.length === 0) refuse("no dispatching actor")
+  for (const login of input.actors) {
+    const role = /^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/.test(login) ? await tools.role(login) : "not a user login"
+    if (role !== "admin" && role !== "maintain")
+      refuse(
+        `${login} has repository role '${role ?? "unreadable"}'; only admin or maintain may use operator darwin artifacts`,
+      )
+  }
+  const manifest = record(parseJson(manifestBytes.toString("utf8"), `${MANIFEST} is not valid JSON`))
   const sourceSha = String(manifest.source_sha ?? "")
   if (!/^[0-9a-f]{40}$/.test(sourceSha)) refuse("manifest source_sha is not a 40-hex SHA")
   if (input.tag !== `operator-darwin-${sourceSha.slice(0, 12)}`)
@@ -222,13 +235,14 @@ export async function verifyOperatorDarwin(input: Input, tools: Tools): Promise<
     }
     const cdhashes = slices.map((slice) => slice.cdhash)
     if (artifact.keychain) {
-      const { requirementsSha256, cpuTypes } = artifact.keychain
+      const { requirementsSha256, architectures: expected } = artifact.keychain
       if (slices.some((slice) => slice.requirementsSha256 !== requirementsSha256))
         refuse(`${name}: designated requirement differs from the keychain helper contract`)
       if (slices.some((slice) => slice.entitlements))
         refuse(`${name}: carries entitlements; the keychain helper contract has none`)
-      const architectures = slices.map((slice) => slice.cpuType).sort((a, b) => a - b)
-      if (JSON.stringify(architectures) !== JSON.stringify([...cpuTypes].sort((a, b) => a - b)))
+      const key = ([cpuType, cpuSubtype]: Architecture) => `${cpuType}/${cpuSubtype}`
+      const actual = slices.map((slice) => key([slice.cpuType, slice.cpuSubtype])).sort()
+      if (JSON.stringify(actual) !== JSON.stringify(expected.map(key).sort()))
         refuse(`${name}: slices are not exactly x86_64 + arm64`)
     }
 
@@ -237,7 +251,7 @@ export async function verifyOperatorDarwin(input: Input, tools: Tools): Promise<
       if (stamp === null) refuse(`${name}: no __OMO_META,__build section`)
       if (!slices.some((slice) => stamp.end <= slice.hashedEnd))
         refuse(`${name}: __OMO_META,__build lies outside the signed bytes`)
-      const meta = record(JSON.parse(stamp.text))
+      const meta = record(parseJson(stamp.text, `${name}: __OMO_META,__build is not valid JSON`))
       if (meta.source_sha !== sourceSha)
         refuse(`${name}: embedded source_sha ${String(meta.source_sha)} is not ${sourceSha}`)
       if (meta.host !== artifact.engine.host || meta.rust_target !== artifact.engine.rustTarget)
@@ -268,6 +282,13 @@ export async function verifyOperatorDarwin(input: Input, tools: Tools): Promise<
     "| --- | --- | --- |",
     ...rows,
   ]
+}
+
+const describeUnexpected = (error: unknown): string => {
+  if (!(error instanceof Error)) return String(error)
+  const code = (error as NodeJS.ErrnoException).code
+  if (code === undefined || error.message.includes(code)) return error.message
+  return `${code}: ${error.message}`
 }
 
 async function main(argv: readonly string[]): Promise<number> {
@@ -301,8 +322,9 @@ async function main(argv: readonly string[]): Promise<number> {
     await Bun.write(arg("--summary"), `${rows.join("\n")}\n`)
     return 0
   } catch (error) {
-    if (!(error instanceof Refusal)) throw error
-    console.log(`::error::operator_darwin_artifacts refused: ${error.message}`)
+    // Anything the checks did not anticipate still ends as the one typed line, never a stack trace.
+    const reason = error instanceof Refusal ? error.message : `unexpected verifier error: ${describeUnexpected(error)}`
+    console.log(`::error::operator_darwin_artifacts refused: ${reason}`)
     return 1
   }
 }

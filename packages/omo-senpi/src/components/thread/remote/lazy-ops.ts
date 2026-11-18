@@ -73,6 +73,7 @@ export const createRelayControl = (remote: RemoteThreadSurface, row: RemoteSessi
     getAvailableThinkingLevels: async () => await (await built).getAvailableThinkingLevels(),
     setThinkingLevel: async (level, scope) => await (await built).setThinkingLevel(level, scope),
     getMessages: async () => await (await built).getMessages(),
+    readEntryPage: async (read) => await (await built).readEntryPage(read),
     waitSettled: async (timeoutMs, signal) => await (await built).waitSettled(timeoutMs, signal),
   }
 }

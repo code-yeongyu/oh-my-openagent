@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from "node:fs"
-import { join, relative } from "node:path"
+import { join, relative, sep } from "node:path"
 import type { RequestType } from "../../src/local-api/protocol.ts"
 import { isRequestType } from "../../src/local-api/validate.ts"
 
@@ -65,7 +65,8 @@ export const scanSentRequestTypes = (root: string = SRC): SentScan => {
   for (const file of sourceFiles(root)) {
     const text = readFileSync(file, "utf8")
     for (const [, type] of text.matchAll(LITERAL_SEND)) if (isRequestType(type)) sent.add(type)
-    for (const [, argument] of text.matchAll(OTHER_SEND)) unscanned.push(`${relative(root, file)}: ${argument}`)
+    for (const [, argument] of text.matchAll(OTHER_SEND))
+      unscanned.push(`${relative(root, file).split(sep).join("/")}: ${argument}`)
   }
   // readdir order differs between file systems, so both lists are sorted.
   return { sent: [...sent].toSorted(), unscanned: unscanned.toSorted() }
