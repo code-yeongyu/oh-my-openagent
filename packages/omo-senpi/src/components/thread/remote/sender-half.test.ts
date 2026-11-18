@@ -222,6 +222,33 @@ describe("#13037 the sender half reaches a session on another device that is not
     })
   })
 
+  // #13238 review: one rule for every probe that may build an `ended` row - only while this device's service can carry
+  // the wake. With the single probe on and the wake off, a probe-built row would go down the live path instead.
+  describe("lookup on with wake off: no probe builds an ended row", () => {
+    test("#given a reply to a sender on b that b no longer lists #when the run replies by id #then it is not_found naming b, with no probe and nothing sent", async () => {
+      const a = account({ rows: [B_ROW], ended: { b: { [GONE]: "rk-gone" } }, noWake: true })
+      const { run } = fixture.surface(a.remote, {
+        callerReplyTargets: () => [GONE],
+        callerReplySenders: () => [{ session_id: GONE, device: "b" }],
+      })
+      expect(await run("thread_send", { thread: GONE, message: "reply" })).toMatchObject({
+        kind: "error",
+        error: { code: "not_found", details: { device: "b" } },
+      })
+      expect({ lookups: a.lookups, sent: a.sent }).toEqual({ lookups: [], sent: [] })
+    })
+
+    test("#given a session id no listing holds and c holds it ended #when it is sent to #then the answer is today's not_found, with no probe and nothing sent", async () => {
+      const a = account({ rows: [B_ROW, C_ROW], ended: { c: { [GONE]: "rk-c-gone" } }, noWake: true })
+      const { run } = fixture.surface(a.remote)
+      expect(await run("thread_send", { thread: GONE, message: "hi" })).toMatchObject({
+        kind: "error",
+        error: { code: "not_found" },
+      })
+      expect({ lookups: a.lookups, sent: a.sent }).toEqual({ lookups: [], sent: [] })
+    })
+  })
+
   describe("5.4 the relay transport for an ended row", () => {
     const endedOnC = (extra: Parameters<Fixture["account"]>[0] = {}) =>
       account({ rows: [B_ROW, C_ROW], ended: { c: { [GONE]: "rk-c-gone" } }, ...extra })
@@ -296,13 +323,31 @@ describe("#13037 the sender half reaches a session on another device that is not
       ["not_wakeable", "not_resumable", {}],
       ["sender_not_admitted", "not_resumable", {}],
       ["sender_not_allowed", "unsupported", {}],
-      ["chain_count_limit", "unsupported", { reason: "chain_count_limit" }],
+      ["chain_count_limit", "chain_count_limit", { reason: "chain_count_limit", setting: "threads.chainCountLimit" }],
       ["queue_full", "queue_full", {}],
       ["wake_limit_reached", "overloaded", { reason: "wake_limit_reached" }],
     ] as const)("#given the receiver refused it with %s #then the tool answers %s", async (reason, code, details) => {
       expect(await answered(queuedEnvelope({ kind: "refused", reason }))).toMatchObject({
         kind: "error",
         error: { code, details: { device: "c", ...details } },
+      })
+    })
+
+    test("#given the receiving store refused it past its chain limit #then the tool answers chain_count_limit with the store's counts, the same code the running engine's refusal answers", async () => {
+      expect(
+        await answered(queuedEnvelope({ kind: "refused", reason: "chain_count_limit", chain_count: 4, limit: 3 })),
+      ).toMatchObject({
+        kind: "error",
+        error: {
+          code: "chain_count_limit",
+          details: {
+            device: "c",
+            reason: "chain_count_limit",
+            setting: "threads.chainCountLimit",
+            chain_count: 4,
+            limit: 3,
+          },
+        },
       })
     })
 
@@ -516,6 +561,31 @@ describe("#13037 the sender half reaches a session on another device that is not
       const error = await refusalOf(reason)
       expect(error.details?.reason).toBe("unrecognised")
       expect(error.message).toBe("Device c refused the message (unrecognised reason).")
+    })
+
+    // #13277 review: the device service's own refusal of the wake (not the consumer's envelope) goes through outcomeFailure,
+    // and its reason can be the other device's free-form response.error. The same allowlist applies there.
+    const serviceRefusalOf = async (reason: string) => {
+      const a = account({
+        rows: [B_ROW, C_ROW],
+        ended: { c: { [GONE]: "rk-c-gone" } },
+        wakeOutcome: { kind: "refused", reason },
+      })
+      const result = await fixture.surface(a.remote).run("thread_send", { thread: GONE, message: "hi" })
+      if (result.kind !== "error") throw new Error(JSON.stringify(result))
+      return result.error
+    }
+
+    test("#given the device service refuses the wake with free-form text #then the reason is the constant and the text is shown nowhere", async () => {
+      const raw = "Error: ENOENT /home/someone/private/session.jsonl"
+      const error = await serviceRefusalOf(raw)
+      expect(error.details?.reason).toBe("unrecognised")
+      expect(JSON.stringify(error).includes(raw)).toBe(false)
+    })
+
+    test("unchanged: #given the device service refuses the wake with a machine code #then that code keeps its own mapping", async () => {
+      const error = await serviceRefusalOf("host_detached")
+      expect([error.code, error.details?.reason]).toEqual(["host_unavailable", "host_detached"])
     })
   })
 })

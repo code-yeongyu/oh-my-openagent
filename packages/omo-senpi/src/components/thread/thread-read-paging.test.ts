@@ -223,6 +223,25 @@ describe("#14047: thread_read of a thread on another device costs its slice, not
     },
   )
 
+  test("#given a short transcript (a long preamble, then the reply) #when thread_read takes 1500 bytes on b and on this device #then both end at the reply, and next_cursor pages the older messages", async () => {
+    const preamble = (index: number): ThreadTranscriptEntry => ({
+      role: "user",
+      content: `preamble ${index} ${"p".repeat(1200)}`,
+      timestamp: Date.UTC(2026, 10, 17) + index * 1000,
+    })
+    const reply: ThreadTranscriptEntry = { role: "assistant", content: "READY", timestamp: Date.UTC(2026, 10, 18) }
+    const { run, localAt, log } = pagingAccount(sessionEntries([preamble(0), preamble(1), reply]))
+    const there = await run({ max_bytes: 1500 })
+    const here = await localAt(String(log.entries.at(-1)?.["id"]), { max_bytes: 1500 })
+    for (const result of [there, here]) {
+      expect(result).toMatchObject({ kind: "ok", truncated: true })
+      expect(itemsOf(result).at(-1)?.content).toBe(JSON.stringify("READY"))
+    }
+    expect(withoutCursor(there)).toEqual(withoutCursor(here))
+    const older = await run({ cursor: cursorOf(there), max_bytes: 1500 })
+    expect(itemsOf(older).map((item) => item.content)).toEqual([JSON.stringify(preamble(0).content)])
+  })
+
   test("#given an engine on b without get_entries #when thread_read runs twice #then it reads the whole transcript as before and asks for a page only once", async () => {
     const a = fixture.account()
     const { run } = fixture.surface(a.remote, { sessions: [LOCAL] })

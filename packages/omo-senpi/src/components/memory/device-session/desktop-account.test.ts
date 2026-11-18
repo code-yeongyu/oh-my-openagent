@@ -76,6 +76,7 @@ function fixture() {
       },
       setAccountSync: async () => undefined,
       setDeviceSync: async () => undefined,
+      disableDeviceSync: async () => ({ ok: true }),
     },
     transport: {
       pull: async () => ({ snapshot: null, entries: [], head: 0, more: false }),

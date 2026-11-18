@@ -382,8 +382,8 @@ Four builtin lanes ship (`packages/omo-senpi/src/components/model-profile/builti
 |----|--------------|-------|
 | `daily-normal` | Daily · Normal | `claude-opus-5-5` (medium) -> `claude-fable-5-2` (medium) -> `kimi-k3.1-pro` (max) |
 | `daily-heavy` | Daily · Heavy | `claude-fable-5-2` (high) -> `claude-fable-5-1` (xhigh) |
-| `geeky-normal` | Obsessive · Normal | `gpt-6-astra` (medium, ChatGPT subscription/API/Copilot/OpenCode), then `gpt-6.1-sol-fast` (medium, ChatGPT subscription/API), then `gpt-6.1-sol` (medium, ChatGPT subscription/API), then `gpt-5.6-sol` (medium, ChatGPT subscription/API/Copilot/OpenCode) |
-| `geeky-heavy` | Obsessive · Heavy | `gpt-6-astra` (high) |
+| `geeky-normal` | Obsessive · Normal | `gpt-6.2-astra` (medium, ChatGPT subscription/API/OpenCode), then `gpt-6-astra` (medium, ChatGPT subscription/API/Copilot/OpenCode), then `gpt-6.2-sol-fast` and `gpt-6.2-sol` (medium, ChatGPT subscription/API), then `gpt-6.1-sol-fast` (medium, ChatGPT subscription/API), then `gpt-6.1-sol` (medium, ChatGPT subscription/API), then `gpt-5.6-sol` (medium, ChatGPT subscription/API/Copilot/OpenCode) |
+| `geeky-heavy` | Obsessive · Heavy | `gpt-6.2-astra` (high), then `gpt-6-astra` (high) |
 
 GPT profiles use the same provider coverage as the corresponding task lanes:
 ChatGPT subscription takes priority over the `openai` API/proxy lane. A user

@@ -1,3 +1,31 @@
+## 2026-11-18 - Same-device cross-project messaging leaves the relay leg alone (#14199)
+
+- **A same-device thread in another workspace is never answered as cross-device**
+  - `src/components/thread/addressing.ts` `resolveTarget`: with no visible name match and same-device (`transport === undefined`) out-of-workspace entries carrying the name, the scoped answer is `scope_denied` (candidates when more than one) naming `all_scope`, after the `id_prefix` step - the name-ladder mirror of the id ladder's existing branch. A name a thread on this device holds must not read as absent, or `resolveAcross`'s relay leg answers for it: on a plan without a relay, with `relay_requires_paid_plan` for a thread one `all_scope` retry away (a Discord report: OmO Desktop, two project folders, one Mac).
+  - No change to the default workspace scope of `thread_list` (#8025 stands), none to the paid-plan refusal for addresses this device cannot hold (A5), none to delivery: the `all_scope` retry resolves the same entry and the local transport carries it, no relay round trip.
+  - Tests: `addressing.test.ts` (the scope answer, its candidates, the id-prefix precedence, the plain `not_found`), the new `thread-free-plan-cross-workspace.test.ts` (the free-plan fixture: scoped name send answers the scope hint, all_scope delivers locally with nothing sent to any other device, the all_scope listing keeps its `remote_unavailable` notice, a configured-but-failing relay still answers `host_unavailable`), and the live driver `scripts/qa/thread-tools/free-plan-cross-workspace.mjs` (one real rpc host, two project cwds, the eval-only cells).
+
+## 2026-11-18 - Release train 2 top: thread tool fixes (#14141)
+
+- **No hint for the removed chat-binding tools (#14042)**
+  - `src/components/thread/tools/relay-tools.ts`, `tools.ts`: `REMOVED_RELAY_TOOL_HINTS` and its registration are removed. The relay SDK, the gateway store and the `omo thread` CLI are unchanged.
+- **Replies reach a remote sender whose delivery names no device (#14052)**
+  - `src/components/thread/tools.ts` `locate`: a reply to a consumed sender without an attested device first resolves on this device as before. When that resolution is `not_found`, the reply runs `resolveAcross` instead. A row on another device is accepted only when its durable id is the sender's id, and is refused `reply_target_mismatch` otherwise. When this device's entries and the account listing together put that id on more than one device, the reply is refused `ambiguous_target` naming them, whatever order the listing returns (`unattestedSenderAmbiguity`). `tools/reply-target.ts` `replyTargetFailure` is the refusal `replyTargetMismatch` returns. Senders with an attested device (`device:<device>/<id>`) are unchanged.
+- **Thread_create's first prompt carries the creator's authority (#14058)**
+  - `src/components/thread/gateway/types.ts`: `DeliveryEnvelope.authority` (`"creator"`), stored in the envelope JSON.
+  - `src/components/thread/tools.ts`: only thread_create's first prompt to the thread it made sets it.
+  - `src/components/thread/gateway/{transport,local-transport,engine,store-ops}.ts`, `remote/relay-transport.ts`: both transports carry it.
+  - `src/components/thread/gateway/provenance.ts`: a creator delivery renders as the body, then one line naming the creator session; its display text is the body.
+- **Close the thread remote surface on session_shutdown (#14062)**
+  - A thread tool call that reaches the device service (`thread_list` with `all_scope`, any cross-device read or send) opened the default remote surface's own device-service connection, and nothing closed it. Its socket is referenced, so a print-mode engine stayed alive after its last session ended (#14054). `createThreadComponent` now closes the surface it built on `session_shutdown`, next to the gateway store it already disposes there. A later call reconnects lazily. A component test spawns an engine-shaped process against the conformance fake device-service owner and asserts it exits by itself after `thread_list` and `session_shutdown`.
+- **Read and controls find a session another device holds but runs nowhere (#14087)**
+  - `src/components/thread/control/locate.ts` `locateControl`: resolves with the account-wide session-id lookup (`resolveAcross(..., "exact", true)`, #13037 A4.3.3) that a send, a reply and a hand-off make. A session id that this device and the account listing both miss is probed once on each online device. The holder's `ended` row takes the existing `not_live` branch, so `thread_read`, `thread_interrupt`, `thread_rename`, `thread_set_model` and `thread_set_reasoning` answer `not_resumable`, and `thread_close` answers `{ closed: false, reason: "not_live" }`, on both legs (part of #13215). The tools never make the probe for a name or alias, or when this device's service lacks the capability.
+
+## 2026-11-17 - thread_create survives a lost open reply (#14066)
+
+- `src/components/thread/control/session-host.ts`: `createdThreadId` derives the id a create on this device opens its thread under, from the caller and the idempotency key.
+- `src/components/thread/tools.ts`: thread_create opens with `durableSessionId`, reuses or reopens a thread already under that id, looks again after a failed open, and re-runs a create whose earlier run under the key failed only when the thread the key derives is on this device; a named retry is not refused by its own thread's name.
+
 ## 2026-11-17 - Release train top: thread tools, remote command deadline, paged and local thread_read (#14077)
 
 - **Thread tools: one field names a session (#14056)**

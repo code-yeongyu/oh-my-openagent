@@ -19,7 +19,15 @@ import type {
 
 import type { ComponentLogger } from "../../extension/types"
 import { isSyncConfigError, SYNC_CONFIG_INVALID } from "./sync-config-error"
-import { isSyncSessionDeferred, SYNC_SESSION_DEFERRED } from "./sync-session-deferred"
+import { isSyncSessionDeferred } from "./sync-session-deferred"
+import { raceDeadline } from "./sync-deadline"
+import {
+  type AbandonedStarts,
+  abandonedStartsOf,
+  type HeldStart,
+  launchStart,
+  type StartPassHooks,
+} from "./sync-start-launch"
 
 /** The one line a runner logs when this device has no session to sync with (no network, no state). */
 export const SYNC_IDLE_NO_DEVICE_SESSION = "sync idle: no device session"
@@ -27,12 +35,6 @@ export const SYNC_IDLE_NO_DEVICE_SESSION = "sync idle: no device session"
 /** The error code a runner logs when a previous engine for the repo did not close within the bound. */
 export const SYNC_CLOSE_WAIT_EXCEEDED = "sync-close-wait-exceeded"
 const CLOSE_WAIT_MS = 10_000
-// Deferred passes join any native read still parked behind the keychain dialog or find the memory repository's first
-// commit; retries back off to five minutes.
-const DEFERRED_RETRY_MS = 15_000
-const DEFERRED_RETRY_MAX_MS = 300_000
-const DEFERRED_RETRY_MIN_MS = 1_000
-const DEFERRED_STILL_WAITING_MS = 900_000
 
 /** The status of a repo whose sync engine could not be loaded (the packaged sidecar is missing or broken). */
 export const SYNC_UNAVAILABLE = "sync-unavailable"
@@ -72,6 +74,8 @@ export interface DeviceSyncSession extends SyncSession {
   readonly deviceName?: (principal: string) => string | undefined
   /** Registers a callback for the moment this device's sign-in ends (signed out, or revoked). */
   readonly onEnded?: (notify: () => void) => void
+  /** Whether memory sync was turned off on this device since the session opened (#14093). */
+  readonly turnedOff?: () => Promise<boolean>
 }
 
 /** What makes a memory one space on every device (sync-design section 3). */
@@ -93,6 +97,9 @@ export type SyncSessionResolver = (request: SyncSessionRequest) => Promise<SyncS
 
 /** The line a runner logs when the device is signed in but has not joined the account's memory. */
 export const SYNC_IDLE_NOT_JOINED = "sync idle: this device has not joined the account's memory"
+
+/** The line a runner logs when memory sync is turned off on this device (#14093). */
+export const SYNC_IDLE_TURNED_OFF = "sync idle: memory sync is turned off on this device"
 
 /** A resolver for a client with no device sign-in at all. */
 export const noAccountSession: SyncSessionResolver = async () => null
@@ -134,6 +141,8 @@ export interface SyncRunnerOptions {
   readonly closeWaitMs?: number
   /** Initial retry delay for a deferred session (keychain dialog, memory repo not created); default 15 s, doubling to a five-minute cap. */
   readonly deferredRetryMs?: number
+  /** How long one start pass may run before it is replaced by a retry; default 120 s. */
+  readonly startPassDeadlineMs?: number
   /** The runner's own timers (retry delay, close wait); the process's timers by default. Tests count these, not every timer. */
   readonly timers?: SyncRunnerTimers
 }
@@ -151,12 +160,19 @@ const PROCESS_TIMERS: SyncRunnerTimers = {
 interface Running {
   readonly device: DeviceSync
   readonly unwatch: () => void
+  readonly turnedOff: (() => Promise<boolean>) | undefined
 }
 
-interface Held {
-  users: number
-  readonly ready: Promise<Running | SyncUnavailableStatus | SyncConfigInvalidStatus | null>
+type HeldOutcome = Running | SyncUnavailableStatus | SyncConfigInvalidStatus
+
+/** What relaunching a repo's start needs (#14093 resumeIdle). */
+interface RepoStart {
+  readonly identity: string
+  readonly paths: MemoryIdentityPaths
+  readonly space: SyncSpaceInputs
 }
+
+type Held = HeldStart<HeldOutcome> & RepoStart
 
 export interface SyncRunner {
   acquire(
@@ -166,6 +182,17 @@ export interface SyncRunner {
     space?: SyncSpaceInputs,
   ): Promise<void>
   release(repo: string): Promise<void>
+  /**
+   * Closes the engine of every repo whose device was turned off (#14093), reports each as a status change, and keeps
+   * the repo held but idle, so its sessions release normally; sync starts again on the first bind after it is turned
+   * back on.
+   */
+  idleTurnedOff(): Promise<void>
+  /**
+   * Starts a fresh engine for every held repo that runs none (turned off, not joined, signed out), after sync was
+   * turned on again on this device; a repo that still cannot sync stays idle. Each restarted repo is a status change.
+   */
+  resumeIdle(): Promise<void>
   status(repo: string): Promise<EngineStatus | SyncUnavailableStatus | SyncConfigInvalidStatus | null>
   /** A sync principal's device name, from the account sessions this runner resolved; undefined when unknown. */
   deviceName(principal: string): string | undefined
@@ -184,33 +211,63 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
   const nameLookups = new Map<string, (principal: string) => string | undefined>()
   // A repo whose last session released it, until its engine has closed and dropped the device lease.
   const closing = new Map<string, Promise<void>>()
+  // Starts replaced at their deadline outlive the chain that launched them, so they are counted per repo.
+  const abandoned = new Map<string, AbandonedStarts>()
 
-  // The device's sign-in ended under a running engine: close it and keep the repo held but idle, so
-  // the sessions bound to it release normally and a later sign-in starts fresh on the next bind.
+  // Closes a running engine and keeps its repo held but idle, so the sessions bound to it release normally and
+  // the next bind starts fresh.
+  const closeIdle = async (repo: string, held: Held, running: Running): Promise<void> => {
+    repos.set(repo, { ...held, ready: Promise.resolve(null) })
+    running.unwatch()
+    await running.device.close()
+  }
+
+  // The device's sign-in ended under a running engine: a later sign-in starts fresh on the next bind.
   const endSession = async (identity: string, repo: string): Promise<void> => {
     const held = repos.get(repo)
     if (held === undefined) return
     const running = await held.ready
     if (running === null || !("device" in running) || repos.get(repo) !== held) return
-    repos.set(repo, { users: held.users, ready: Promise.resolve(null) })
     nameLookups.delete(identity)
-    running.unwatch()
-    await running.device.close()
+    await closeIdle(repo, held, running)
     logger.info(SYNC_IDLE_NO_DEVICE_SESSION, { identity })
+  }
+
+  // Memory sync was turned off on this device under a running engine (the desktop's Turn off, or `omo sync
+  // disable` in any OmO process here): the engine stops like one whose sign-in ended. Answers whether it stopped
+  // one; never rejects.
+  const idleIfTurnedOff = async (repo: string): Promise<boolean> => {
+    const held = repos.get(repo)
+    if (held === undefined) return false
+    try {
+      const running = await held.ready
+      if (running === null || !("device" in running) || running.turnedOff === undefined) return false
+      if (!(await running.turnedOff()) || repos.get(repo) !== held) return false
+      await closeIdle(repo, held, running)
+      logger.info(SYNC_IDLE_TURNED_OFF, { identity: held.identity })
+      return true
+    } catch (error) {
+      logger.warn("memory sync: a running engine could not be stopped after sync was turned off on this device", {
+        identity: held.identity,
+        error: String(error),
+      })
+      return false
+    }
   }
 
   const start = async (
     identity: string,
     paths: MemoryIdentityPaths,
     space: SyncSpaceInputs,
-    onDeferred: (message: string, wake: AbortSignal | undefined) => void,
+    hooks: StartPassHooks,
   ): Promise<Running | SyncUnavailableStatus | SyncConfigInvalidStatus | null> => {
     let resolved: SyncSessionResolution
+    hooks.stage("account read")
     try {
       resolved = await resolveSession({ identity, paths, space })
     } catch (error) {
       if (isSyncSessionDeferred(error)) {
-        onDeferred(error.message, error.wake)
+        hooks.deferred(error.message, error.wake)
         return null
       }
       if (isSyncConfigError(error)) {
@@ -234,11 +291,14 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
       return null
     }
     if ("idle" in resolved) {
-      logger.info(SYNC_IDLE_NOT_JOINED, { identity, reason: resolved.idle })
+      if (resolved.idle === "sync_off") logger.info(SYNC_IDLE_TURNED_OFF, { identity })
+      else logger.info(SYNC_IDLE_NOT_JOINED, { identity, reason: resolved.idle })
       return null
     }
     const session = resolved
     if (session.deviceName !== undefined) nameLookups.set(identity, session.deviceName)
+    hooks.stage("engine open")
+    if (hooks.replaced()) return null
     if (options.open === undefined) {
       // A missing or unloadable sidecar is an install defect, not a sync failure: report it as a
       // typed status and keep the session running without sync.
@@ -262,10 +322,34 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
       session,
       // A failed cycle comes at warn so it shows where the person and a harness look; routine lines stay at info.
       log: (line, level) => (level === "warn" ? logger.warn(line, { identity }) : logger.info(line, { identity })),
-      ...(options.onStatusChange === undefined ? {} : { onStatusChange: () => options.onStatusChange?.(paths.repo) }),
+      // After this device is turned off by another OmO process, the first thing its running engine reports is a
+      // status change (the service starts refusing it): go idle first, so readers see a device that does not sync
+      // instead of a failure.
+      ...(session.turnedOff === undefined
+        ? options.onStatusChange === undefined
+          ? {}
+          : { onStatusChange: () => options.onStatusChange?.(paths.repo) }
+        : {
+            onStatusChange: () =>
+              void idleIfTurnedOff(paths.repo)
+                .then(() => options.onStatusChange?.(paths.repo))
+                .catch((error: unknown) =>
+                  logger.warn("memory sync: the status listener failed", { identity, error: String(error) }),
+                ),
+          }),
     })
     if (device === null) {
+      // The lease may be held by this process's own replaced start, which is still finishing: retry, never idle.
+      if (hooks.ownStartInFlight()) {
+        hooks.deferred("an earlier start of this memory's sync is still finishing.")
+        return null
+      }
       logger.info("memory sync idle: another OmO process on this device is syncing this memory", { identity })
+      return null
+    }
+    // A pass replaced at its deadline that opens its engine late never starts it: the fresh pass owns the repo.
+    if (hooks.replaced()) {
+      await device.close()
       return null
     }
     device.engine.start()
@@ -279,77 +363,34 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
     // missed 9 times in 30, every later one delivered). One debounced local-commit cycle covers a
     // commit that landed in that window.
     device.notifyLocalCommit()
-    return { device, unwatch }
+    return { device, unwatch, turnedOff: session.turnedOff }
   }
 
-  // A deferred pass is replaced by a fresh one after the retry delay, or as soon as its wake signal aborts, while the
-  // repo is still held by the same sessions.
-  const launch = (
-    identity: string,
-    paths: MemoryIdentityPaths,
-    space: SyncSpaceInputs,
-    users: number,
-    retryMs = Math.max(
-      Math.min(options.deferredRetryMs ?? DEFERRED_RETRY_MS, DEFERRED_RETRY_MAX_MS),
-      DEFERRED_RETRY_MIN_MS,
-    ),
-    previousRetryMs = 0,
-    quietMs = 0,
-  ): Held => {
-    let deferred = false
-    let wake: AbortSignal | undefined
-    let nextQuietMs = 0
-    const ready = start(identity, paths, space, (message, signal) => {
-      deferred = true
-      wake = signal
-      if (retryMs !== previousRetryMs) {
-        logger.warn(`memory sync is waiting: ${message} Sync retries on its own.`, {
+  const launch = (identity: string, paths: MemoryIdentityPaths, space: SyncSpaceInputs, users: number): Held => {
+    // Every pass launchStart puts in the registry carries its start, so resumeIdle can relaunch it (#14093).
+    const withStart = (held: HeldStart<HeldOutcome>): Held => Object.assign(held, { identity, paths, space })
+    return withStart(
+      launchStart(
+        {
+          logger,
           identity,
-          code: SYNC_SESSION_DEFERRED,
-          retryMs,
-        })
-        return
-      }
-      // At the cap every pass is silent; one reminder per 15 minutes says what sync still waits for.
-      nextQuietMs = quietMs + retryMs
-      if (nextQuietMs >= DEFERRED_STILL_WAITING_MS) {
-        nextQuietMs = 0
-        logger.warn(`memory sync is still waiting: ${message}`, {
-          identity,
-          code: SYNC_SESSION_DEFERRED,
-          retryMs,
-        })
-      }
-    }).catch((error: unknown) => {
-      logger.error("memory sync failed to start", { identity, error: String(error) })
-      return null
-    })
-    const held: Held = { users, ready }
-    void ready.then(() => {
-      if (!deferred) return
-      const retry = () => {
-        timers.clearTimeout(timer)
-        wake?.removeEventListener("abort", retry)
-        if (repos.get(paths.repo) === held)
-          repos.set(
-            paths.repo,
-            launch(
-              identity,
-              paths,
-              space,
-              held.users,
-              Math.min(retryMs * 2, DEFERRED_RETRY_MAX_MS),
-              retryMs,
-              nextQuietMs,
-            ),
-          )
-      }
-      const timer = timers.setTimeout(retry, retryMs)
-      timer.unref?.()
-      if (wake?.aborted) retry()
-      else wake?.addEventListener("abort", retry, { once: true })
-    })
-    return held
+          start: (hooks) => start(identity, paths, space, hooks),
+          running: (outcome) => "device" in outcome,
+          discard: async (outcome) => {
+            if (!("device" in outcome)) return
+            outcome.unwatch()
+            await outcome.device.close()
+          },
+          current: (held) => repos.get(paths.repo) === held,
+          replace: (next) => repos.set(paths.repo, withStart(next)),
+          abandoned: abandonedStartsOf(abandoned, paths.repo),
+          deferredRetryMs: options.deferredRetryMs,
+          startPassDeadlineMs: options.startPassDeadlineMs,
+          timers,
+        },
+        users,
+      ),
+    )
   }
 
   return {
@@ -358,23 +399,12 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
       // A session rebinding the repo right after the previous one released it would otherwise race
       // the old engine's lease and stay idle; wait for that close first.
       const pending = closing.get(paths.repo)
-      if (pending !== undefined) {
-        const waitMs = options.closeWaitMs ?? CLOSE_WAIT_MS
-        let timer: ReturnType<typeof setTimeout> | undefined
-        const closed = await Promise.race([
-          pending.then(() => true),
-          new Promise<false>((resolve) => {
-            timer = timers.setTimeout(() => resolve(false), waitMs)
-          }),
-        ])
-        timers.clearTimeout(timer)
-        if (!closed) {
-          logger.error(
-            `memory sync: the previous engine for this memory did not close within ${waitMs} ms; starting anyway, and this device may stay idle if it still holds its lease`,
-            { identity, code: SYNC_CLOSE_WAIT_EXCEEDED },
-          )
-        }
-      }
+      const waitMs = options.closeWaitMs ?? CLOSE_WAIT_MS
+      if (pending !== undefined && (await raceDeadline(pending, waitMs, timers)) === "timeout")
+        logger.error(
+          `memory sync: the previous engine for this memory did not close within ${waitMs} ms; starting anyway, and this device may stay idle if it still holds its lease`,
+          { identity, code: SYNC_CLOSE_WAIT_EXCEEDED },
+        )
       const held = repos.get(paths.repo)
       if (held !== undefined) {
         held.users += 1
@@ -403,6 +433,24 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
       } finally {
         if (closing.get(repo) === settled) closing.delete(repo)
       }
+    },
+    async idleTurnedOff() {
+      await Promise.all(
+        [...repos.keys()].map(async (repo) => {
+          // A stopped engine is a status change too: the footer and the desktop snapshot drop its last status.
+          if (await idleIfTurnedOff(repo)) options.onStatusChange?.(repo)
+        }),
+      )
+    },
+    async resumeIdle() {
+      await Promise.all(
+        [...repos.entries()].map(async ([repo, held]) => {
+          if ((await held.ready) !== null || repos.get(repo) !== held) return
+          const resumed = launch(held.identity, held.paths, held.space, held.users)
+          repos.set(repo, resumed)
+          if ((await resumed.ready) !== null) options.onStatusChange?.(repo)
+        }),
+      )
     },
     deviceName(principal) {
       for (const lookup of nameLookups.values()) {

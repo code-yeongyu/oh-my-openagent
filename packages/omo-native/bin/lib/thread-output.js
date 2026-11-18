@@ -28,7 +28,7 @@ const RENDER = {
         ? [`no threads in ${result.scope === "all" ? "any workspace" : "this workspace"} (try --all-scope)`]
         : result.threads.map(
             (thread) =>
-              `${thread.thread}  ${thread.surface ?? "?"}  ${thread.status}  ${thread.name || "(unnamed)"}  ${thread.cwd}${
+              `${thread.thread}  ${thread.surface ?? "?"}  ${thread.state ?? thread.status}  ${thread.name || "(unnamed)"}  ${thread.cwd}${
                 thread.device === undefined ? "" : `  on ${nameOf.get(thread.device) ?? thread.device}`
               }`,
           )),

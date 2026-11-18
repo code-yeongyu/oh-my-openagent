@@ -1,60 +1,79 @@
-import { workspaceEntries } from "../addressing"
-import type { ThreadReadInput, ThreadToolResult, ThreadWaitOutcome } from "../contracts"
+import { toThreadAddressEntries } from "../address-book"
+import { workspaceDirectories, workspaceEntries } from "../addressing"
+import type { ThreadReadInput, ThreadState, ThreadToolResult, ThreadWaitOutcome } from "../contracts"
+import { listDiskSessions } from "../disk-list"
 import { locateControl } from "../control/locate"
 import { controlIdentity, controlRefusalOf, type SessionControl } from "../control/port"
 import { isEntryCursor, staleEntryCursor } from "../paged-reader"
 import { readTranscript, type ThreadTranscriptEntry } from "../reader"
 import { threadLink } from "../thread-link"
-import {
-  addressBook,
-  degradedSummary,
-  failure,
-  resolveEntries,
-  sendAddressBook,
-  summary,
-  transcriptRole,
-} from "./internals"
+import { addressBook, degradedSummary, failure, sendAddressBook, summary, transcriptRole } from "./internals"
 import { threadRow } from "./thread-row"
+import { listedStates } from "./thread-state"
 import type { ThreadHostSession, ThreadHostView, ThreadToolSurfaceOptions } from "./ports"
 
 /**
  * `thread_list` over one host view. Default scope is the caller's workspace, the same test
  * thread_send applies before it delivers; the address book itself spans every workspace the host
- * knows. A session whose endpoint stopped answering is still a thread: it is listed from its JSONL
- * as resumable, with the endpoint's failure in error_note, instead of silently vanishing.
+ * knows. A session no engine holds is still a thread, listed `inactive` from its JSONL: one whose
+ * endpoint stopped answering (with the endpoint's failure in error_note), and one whose session file
+ * is in the scanned session directories (the caller's workspace, every workspace with `all_scope`;
+ * the newest files only, `inactive_truncated` when more were there) after its engine closed it.
+ * `states` filters the rows; the default lists every state but archived.
  */
 export function listThreads(
   options: ThreadToolSurfaceOptions,
   current: ThreadHostView,
   allScope: boolean | undefined,
+  states?: readonly ThreadState[],
 ): ThreadToolResult {
-  const scoped = workspaceEntries(resolveEntries(options, current), options.callerWorkspaceRoot())
+  const root = options.callerWorkspaceRoot()
+  const sessionsDirectory = options.sessionsDirectory?.()
+  const scanned =
+    sessionsDirectory === undefined
+      ? { sessions: [], truncated: false }
+      : listDiskSessions(sessionsDirectory, { all_scope: allScope, workspaceRoots: workspaceDirectories(root) })
+  const book = addressBook(options, current, scanned.sessions)
+  const scoped = workspaceEntries(toThreadAddressEntries(book), root)
   const inScope = (threadId: string) => allScope === true || scoped.some((entry) => entry.thread_id === threadId)
   const visible = current.sessions.filter((session) => inScope(session.durableSessionId ?? session.sessionId))
-  const book = addressBook(options, current)
+  const listed = new Set(visible.map((session) => session.durableSessionId ?? session.sessionId))
   const entryOf = (session: ThreadHostSession) =>
     book.find(
       (entry) =>
         entry.thread_id === (session.durableSessionId ?? session.sessionId) &&
         entry.source_host === (session.socket ?? entry.source_host),
     )
-  const degraded = book.filter(
-    (entry) => entry.error_note !== undefined && entry.status !== "live" && inScope(entry.thread_id),
+  const scannedIds = new Set(scanned.sessions.map((session) => session.durable_id))
+  const inactive = book.filter(
+    (entry) =>
+      entry.status !== "live" &&
+      (entry.error_note !== undefined || scannedIds.has(entry.thread_id)) &&
+      !listed.has(entry.thread_id) &&
+      inScope(entry.thread_id),
   )
   const order = new Map(book.map((entry, index) => [entry.thread_id, index]))
-  const threads = [...visible.map((session) => summary(session, entryOf(session))), ...degraded.map(degradedSummary)]
+  const shown = listedStates(states)
+  const threads = [...visible.map((session) => summary(session, entryOf(session))), ...inactive.map(degradedSummary)]
+    .filter((thread) => shown.has(thread.state))
     .sort(
       (left, right) =>
         (order.get(left.thread_id) ?? Number.MAX_SAFE_INTEGER) -
         (order.get(right.thread_id) ?? Number.MAX_SAFE_INTEGER),
     )
     .map((thread) => threadRow(thread))
-  return { kind: "ok", threads, scope: allScope === true ? "all" : "workspace" }
+  return {
+    kind: "ok",
+    threads,
+    scope: allScope === true ? "all" : "workspace",
+    ...(scanned.truncated ? { inactive_truncated: true as const } : {}),
+  }
 }
 
 /**
- * A first read takes the trailing window; a read that carries a cursor continues forward from it.
- * Tail mode ignores the cursor, so following next_cursor in tail mode returned the same slice again.
+ * A first read takes the newest entries of the trailing window that fit the budget; a read that carries a cursor
+ * pages from it (a first read's cursor names the older part of that window). Tail mode ignores the cursor, so following
+ * next_cursor in tail mode returned the same slice again.
  */
 function readWindow(value: ThreadReadInput): { mode: "tail" | "page"; max_bytes?: number; cursor?: string } {
   return { mode: value.cursor === undefined ? "tail" : "page", max_bytes: value.max_bytes, cursor: value.cursor }

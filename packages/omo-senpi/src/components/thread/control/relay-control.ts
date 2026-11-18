@@ -1,4 +1,5 @@
 import type { ThreadTranscriptEntry } from "../reader"
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { relayAddressEntry } from "../remote/address-book"
 import { rowThreadId } from "../remote/ports"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "../remote/ports"
@@ -11,6 +12,8 @@ import { closeLadder, SESSION_GONE, type RecordAnswer } from "./close-ladder"
 import { interruptOver } from "./interrupt"
 import { ControlRefusal, refuse, SESSION_ONLY_THINKING_SCOPE, type SessionControl } from "./port"
 import { waitForTurnEnd } from "./wait-settled"
+import { displayedThread } from "./relay-session-host"
+import { threadRow } from "../tools/thread-row"
 
 const isObject = (value: unknown): value is JsonObject =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -55,7 +58,8 @@ export function createRelayControl(
   return {
     thread_id: rowThreadId(row),
     device,
-    title: row.title,
+    // #13304: printed by thread_read; another device's own text.
+    title: escapeForDisplay(row.title),
     visible: async () => {
       try {
         return (await remote.sessions.sessions())
@@ -145,5 +149,13 @@ export function createRelayControl(
         timeoutMs,
         signal,
       ),
+    running: async () => row.state === "running" || (await command({ type: "get_state" }))["isStreaming"] === true,
+    setArchived: async (archived) => {
+      await command({ type: "set_session_archived", archived })
+    },
+    listed: async (archived) => {
+      const { archived: _was, ...rest } = row
+      return threadRow(displayedThread(archived ? { ...rest, archived: true } : rest))
+    },
   }
 }

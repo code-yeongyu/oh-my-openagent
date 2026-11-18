@@ -516,6 +516,36 @@ describe("A3: an existing thread is named by id or alias only; a device only to 
     expect(openSession).not.toHaveBeenCalled()
   })
 
+  test.each([
+    ["its alias", "taken"],
+    ["its id", "dur-on-b"],
+    ["its relay key", "rk-on-b"],
+  ])(
+    "#given b's thread holds an alias #when thread_create opens it by %s with that same alias #then it opens and keeps the alias, not alias_taken (#12641)",
+    async (_label, thread) => {
+      const a = account({ aliases: new Map([["taken", { session_id: "dur-on-b", device: "b" }]]) })
+      const { run } = surface(a.remote)
+      expect(await run("thread_create", { thread, alias: "taken" })).toMatchObject({
+        kind: "ok",
+        thread: "dur-on-b",
+        device: "b",
+        alias: "taken",
+      })
+      expect(a.aliases.get("taken")).toMatchObject({ session_id: "dur-on-b" })
+    },
+  )
+
+  test("#given b's thread holds an alias #when thread_create opens a different thread with that alias #then it is still alias_taken and nothing is opened (#12641)", async () => {
+    const a = account({ aliases: new Map([["taken", { session_id: "dur-on-b", device: "b" }]]) })
+    const { run, openSession } = surface(a.remote)
+    expect(await run("thread_create", { thread: "dur-local", alias: "taken" })).toMatchObject({
+      kind: "error",
+      error: { code: "alias_taken", details: { holder: { thread: "dur-on-b", device: "b" } } },
+    })
+    expect(openSession).not.toHaveBeenCalled()
+    expect(a.sent).toEqual([])
+  })
+
   test("#given a free alias #when thread_create sets it and thread_rename moves it #then the alias resolves to the new thread, the old alias is freed, and a duplicate rename is alias_taken", async () => {
     const a = account({ aliases: new Map([["other", { session_id: "dur-on-b", device: "b" }]]) })
     const { run } = surface(a.remote)
@@ -546,6 +576,18 @@ describe("A3: an existing thread is named by id or alias only; a device only to 
     expect(await run("thread_read", { thread: "dur-on-b" })).toMatchObject({
       kind: "error",
       error: { code: "host_unavailable", details: { device: "b", reason: "closed" } },
+    })
+  })
+
+  test("#given b's engine refuses a thread_send past its user's chain count limit #when it runs #then the refusal is typed chain_count_limit, names device b and b's own setting, never unsupported (the update-omo answer)", async () => {
+    const a = account({ refuse: "chain_count_limit" })
+    const { run } = surface(a.remote)
+    expect(await run("thread_send", { thread: "dur-on-b", message: "next hop" })).toMatchObject({
+      kind: "error",
+      error: {
+        code: "chain_count_limit",
+        details: { device: "b", reason: "chain_count_limit", setting: "threads.chainCountLimit" },
+      },
     })
   })
 
@@ -742,6 +784,31 @@ describe("#12833: a name reaches a thread on another device by its title", () =>
       error: { code: "device_offline", details: { device: "b" } },
     })
     expect([...online.sent, ...offline.sent]).toEqual([])
+  })
+
+  // #13539 review L1: a holder device the account's roster no longer names is not probed through the relay.
+  test("#given an alias whose holder device was removed from the account #when a tool names it #then it is not_found without a locate probe to that device, while a listed device is still probed", async () => {
+    const removed = account({
+      rows: [titled("c", "dur-on-c", "cached")],
+      aliases: new Map([["stale-c", { session_id: "dur-gone", device: "c" }]]),
+      removed: ["c"],
+    })
+    expect(await surface(removed.remote).run("thread_send", { thread: "stale-c", message: "x" })).toMatchObject({
+      kind: "error",
+      error: { code: "not_found", details: { device: "c", thread: "dur-gone" } },
+    })
+    expect(removed.located).toEqual([])
+    expect(removed.sent).toEqual([])
+    const listed = account({
+      rows: [titled("b", "dur-on-b", "other")],
+      aliases: new Map([["stale-b", { session_id: "dur-gone", device: "b" }]]),
+      relayKeys: new Map(),
+    })
+    expect(await surface(listed.remote).run("thread_send", { thread: "stale-b", message: "x" })).toMatchObject({
+      kind: "error",
+      error: { code: "not_found", details: { device: "b", thread: "dur-gone" } },
+    })
+    expect(listed.located).toContainEqual({ device: "b", session: "dur-gone" })
   })
 
   test("#given remote sessions are off on this device #when thread_list runs in the workspace scope #then the alias registry is never asked", async () => {

@@ -169,7 +169,7 @@ describe("resolveAgent category stage", () => {
     const result = expectUnavailable(resolveAgent("categorized", agents, undefined))
 
     // then
-    expect(result.attemptedModel).toBe("chatgpt-subscription/gpt-6-astra")
+    expect(result.attemptedModel).toBe("chatgpt-subscription/gpt-6.2-astra")
   })
 
   test("#given the ulw reviewer builtins #when reading their definitions #then each declares its ordered model-policy categories", () => {

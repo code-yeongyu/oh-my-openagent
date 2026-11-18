@@ -63,7 +63,7 @@ export async function sessionFileOf(
     return refusal(
       "not_found",
       `Device ${row.device} lists this thread with neither a session file nor a thread id, so it cannot be opened again.`,
-      "Call thread_list with all_scope and open the thread by the id it lists.",
+      "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) and open the thread by the id it lists.",
       details,
     )
   const outcome = await remote.sessions.endpointCommand(row.device, { type: "find_session", durableSessionId: thread })
@@ -91,7 +91,7 @@ export async function sessionFileOf(
   return refusal(
     "not_found",
     `Device ${row.device} holds no session file for thread ${thread}.`,
-    "Call thread_list with all_scope to find where the thread lives now.",
+    "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to find where the thread lives now.",
     details,
   )
 }

@@ -5,7 +5,7 @@ import { normalizeThreadName, type ThreadAddressEntry } from "./addressing"
 import type { ThreadStatus } from "./contracts"
 import type { EndpointKind } from "./endpoint-registry"
 import type { GatewayAddressEntry } from "./gateway/engine"
-import { readSessionFacts, threadTitle, type SessionFacts } from "./session-facts"
+import { readSessionFacts, readSessionFactsAsync, threadTitle, type SessionFacts } from "./session-facts"
 
 export type HostSessionStatus = "opening" | "open" | "closing" | "closed"
 
@@ -86,6 +86,8 @@ export type DiskSession = {
   readonly source_host: string | null
   /** Text of the first user message, when the session has one; the title of an unnamed thread. */
   readonly first_user_text?: string
+  /** The session file's archived flag, read like its name (`readSessionFacts`). */
+  readonly archived?: true
 }
 
 /**
@@ -109,10 +111,15 @@ export type AddressEntry = {
   /** The endpoint that serves (or last served) the thread; `null` for a session no endpoint names. */
   readonly endpoint: AddressEndpoint | null
   readonly surface: ThreadSurface | null
-  /** The endpoint's liveness verdict: `true` only while an endpoint that answered lists the session. */
+  /**
+   * The endpoint's liveness verdict: `true` only while an endpoint that answered lists the session. Internal to routing
+   * (the gateway's `liveness`, `omo daemon adopt`); a listed thread reports `state` instead.
+   */
   readonly alive: boolean
   /** What a listing shows: the name, else the first user message's opening, never the durable id. */
   readonly title: string | null
+  /** Only on an entry read from its session file: that file's archived flag. */
+  readonly archived?: true
 }
 
 export type AssembleAddressBookOptions = {
@@ -191,6 +198,7 @@ function fromDisk(session: DiskSession, host: AddressBookHost | undefined, failu
     surface: endpoint === null ? null : deriveSurface(endpoint.kind, undefined, endpoint.socket),
     alive: false,
     title: threadTitle(session.name, session.first_user_text),
+    ...(session.archived === true ? { archived: true as const } : {}),
   }
 }
 
@@ -332,6 +340,12 @@ export function readDiskSession(path: string, sourceHost: string | null): DiskSe
   return session === null ? null : { ...session, source_host: sourceHost }
 }
 
+/** `readDiskSession` through the async reader, for a listing that runs on the event loop (a dead endpoint's, #13579). */
+export async function readDiskSessionAsync(path: string, sourceHost: string | null): Promise<DiskSession | null> {
+  const session = diskSessionOf(path, await readSessionFactsAsync(path))
+  return session === null ? null : { ...session, source_host: sourceHost }
+}
+
 export type FindDiskSessionsOptions = {
   /** Match a name in every workspace; otherwise only the session directories of `workspaceRoots` are read. */
   readonly all_scope?: boolean
@@ -342,14 +356,17 @@ export type FindDiskSessionsOptions = {
 }
 
 /** senpi's session directory name for a cwd (`getDefaultSessionDirPath`), without the closing `--`: every cwd under `root` starts with it. */
-function sessionDirectoryPrefix(root: string): string {
+export function sessionDirectoryPrefix(root: string): string {
   return `--${resolve(root)
     .replace(/^[/\\]/, "")
     .replace(/[/\\:]/g, "-")}-`
 }
 
 function diskSessionFromFacts(path: string): DiskSession | null {
-  const facts = readSessionFacts(path)
+  return diskSessionOf(path, readSessionFacts(path))
+}
+
+function diskSessionOf(path: string, facts: SessionFacts | null): DiskSession | null {
   if (facts === null) return null
   return {
     durable_id: facts.durable_id,
@@ -360,6 +377,7 @@ function diskSessionFromFacts(path: string): DiskSession | null {
     session_path: path,
     source_host: null,
     ...(facts.first_user_text === null ? {} : { first_user_text: facts.first_user_text }),
+    ...(facts.archived === true ? { archived: true as const } : {}),
   }
 }
 

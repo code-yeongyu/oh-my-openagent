@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { syncRequestHeaders } from "../memory-core/src/sync/contract-version"
 import { ApiRefusal } from "../omo-opencode/src/cli/service-auth/protocol"
 import type { Session } from "../omo-opencode/src/cli/service-auth/session"
 import { sessionFailure, type SessionOutcomeDependencies } from "./account-session-outcome"
@@ -50,7 +51,7 @@ const view = (device: Listed) => ({
 
 async function liveDevices(session: Session): Promise<Listed[]> {
   const access = await session.accessToken()
-  const body = await session.request("/v1/devices", { headers: { authorization: `Bearer ${access}` } })
+  const body = await session.request("/v1/devices", { headers: syncRequestHeaders(access) })
   return listedSchema.parse(body).devices.filter((device) => device.revokedAt === null)
 }
 
@@ -70,7 +71,7 @@ async function revoke(dependencies: AccountDevicesDependencies, session: Session
   try {
     await session.request(`/v1/devices/${encodeURIComponent(id)}`, {
       method: "DELETE",
-      headers: { authorization: `Bearer ${access}` },
+      headers: syncRequestHeaders(access),
     })
   } catch (error) {
     // Another caller revoked it between the list and the delete: the account answers 404 for a device it no longer has.
