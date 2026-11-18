@@ -97,6 +97,7 @@ function composeNativeAgentPrompt(input: NativeAgentPromptInput): NativePromptPa
   const body = [adaptNativePrompt(core, input.useTaskSystem), refusalRule, modelIdentity].filter(Boolean).join("\n\n")
   // The Hephaestus role rides in the frame context, so a model switch can drop it for a standalone preset and restore it.
   const hephaestusRole = restriction === "hephaestus" && role.length > 0
+  const standalone = hephaestusRole && isStandaloneHephaestusPreset(preset?.name)
   const frame = frameNativePrompt(body, {
     model: model ?? "",
     tools: [...input.tools],
@@ -106,8 +107,9 @@ function composeNativeAgentPrompt(input: NativeAgentPromptInput): NativePromptPa
     ...(input.useTaskSystem ? { useTaskSystem: true } : {}),
     ...(input.refusalRule ? { refusalRule: true } : {}),
     ...(hephaestusRole ? { role } : {}),
+    ...(standalone ? { standalone: true } : {}),
   })
-  return { frame, role: hephaestusRole && isStandaloneHephaestusPreset(preset?.name) ? "" : role }
+  return { frame, role: standalone ? "" : role }
 }
 
 export function buildNativeAgentPrompt(

@@ -49,23 +49,29 @@ describe("Native prompt frame boundary", () => {
   test.each([
     [
       "swaps the role the old build put after the frame",
-      "OLD_ROLE",
+      false,
       "\n\nOLD_ROLE\nUSER_APPEND",
       "\n\nNEW_ROLE\nUSER_APPEND",
     ],
-    ["adds the role when the old build put none after the frame", "", "\nUSER_APPEND", "\n\nNEW_ROLE\nUSER_APPEND"],
+    ["adds the role when the old build put none after the frame", true, "\nUSER_APPEND", "\n\nNEW_ROLE\nUSER_APPEND"],
     [
       "swaps only the frame when other text sits where the role was",
-      "OLD_ROLE",
+      false,
       "\n\nEDITED\nUSER_APPEND",
       "\n\nEDITED\nUSER_APPEND",
     ],
-  ])("a rebuild of a role-bearing frame %s", (_case, oldRole, after, expectedAfter) => {
-    const before = frameNativePrompt("CORE_SENTINEL", { model: "old/model", tools: [], role: "ROLE_SOURCE" })
+  ])("a rebuild of a role-bearing frame %s", (_case, standalone, after, expectedAfter) => {
+    const before = frameNativePrompt("CORE_SENTINEL", {
+      model: "old/model",
+      tools: [],
+      role: "OLD_ROLE",
+      ...(standalone ? { standalone: true as const } : {}),
+    })
     const system = ["BEFORE\n" + before + after]
     replaceNativePromptFrames(system, "new/model", (context) => {
-      expect(context.role).toBe("ROLE_SOURCE")
-      return { frame: "REBUILT_SENTINEL", role: context.model === "old/model" ? oldRole : "NEW_ROLE" }
+      expect(context.model).toBe("new/model")
+      expect(context.role).toBe("OLD_ROLE")
+      return { frame: "REBUILT_SENTINEL", role: "NEW_ROLE" }
     })
     expect(system).toEqual(["BEFORE\nREBUILT_SENTINEL" + expectedAfter])
   })

@@ -20,6 +20,8 @@ export const NativePromptContext = z.object({
   refusalRule: z.literal(true).optional(),
   /** The Hephaestus role; it follows the frame unless the preset stands alone, so a rebuild replaces both (#14186). */
   role: z.string().optional(),
+  /** This frame's preset stands alone: the role was not put after it. */
+  standalone: z.literal(true).optional(),
 })
 
 export type NativePromptContext = z.infer<typeof NativePromptContext>
@@ -72,9 +74,8 @@ export function replaceNativePromptFrames(
       const frameEnd = match.index + match[0].length
       // The role the old build put after the frame is rebuilt with it. When other text sits there, something
       // else rewrote the prompt: only the frame is swapped, so a role is never added next to an edited one.
-      const previous = context.role === undefined || target === context.model ? next : render(context)
-      const appended = previous?.role ? `\n\n${previous.role}` : ""
-      const ownsRole = previous !== undefined && part.startsWith(appended, frameEnd)
+      const appended = context.role && !context.standalone ? `\n\n${context.role}` : ""
+      const ownsRole = part.startsWith(appended, frameEnd)
       rebuilt += part.slice(consumed, match.index) + next.frame + (ownsRole && next.role ? `\n\n${next.role}` : "")
       consumed = ownsRole ? frameEnd + appended.length : frameEnd
     }
