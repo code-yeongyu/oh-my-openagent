@@ -3,7 +3,7 @@ import { userInfo } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 
-import { integerOption, parseArgs, THREAD_EXIT } from "./thread-args.js"
+import { integerOption, parseArgs, stateOption, THREAD_EXIT, THREAD_STATES } from "./thread-args.js"
 import { humanLines } from "./thread-output.js"
 
 export { THREAD_EXIT } from "./thread-args.js"
@@ -11,14 +11,14 @@ export { THREAD_EXIT } from "./thread-args.js"
 /**
  * `omo thread` - the session gateway for scripts and connectors: every thread operation the agent
  * tools offer, run through the plugin's thread SDK (`plugin/runtime/thread-sdk/sdk.js`) as
- * `cli:<uid>`. It never starts a host: sessions are listed from what the engine enumerates, and
+ * `cli:<uid>`. It never starts a host: sessions are listed from the endpoints the engine's registry names, and
  * bindings, the outbox and receipts live in the gateway store. JSON shapes: docs/reference/omo-thread.md.
  */
 
 const USAGE = [
   "usage: omo thread <list|send|read|bind|unbind|rebind|bindings|report|answer|outbox|ack> [options] [--json]",
   "",
-  "  list      [--all-scope]",
+  "  list      [--all-scope] [--state running|idle|inactive|archived[,...]]  (repeatable; default: all but archived)",
   "  send      <target> <text> [--mode auto|steer|follow_up] [--expected-turn <n>] [--idempotency-key <k>]",
   "  send      --binding <id> [<target>] <text> [--idempotency-key <event-id>] [--mode auto|follow_up]",
   "            [--author-id <platform-user-id> --author-name <display> [--author-user-id <id>]]",
@@ -43,7 +43,16 @@ const COMMON = ["--json", "--all-scope"]
 const AUTHOR_FLAGS = ["--author-id", "--author-name", "--author-user-id"]
 
 const COMMANDS = {
-  list: { values: [], booleans: [], arity: [0, 0], call: (sdk, _p, _o, scope) => sdk.list(scope) },
+  list: {
+    values: ["--state"],
+    repeatable: ["--state"],
+    booleans: [],
+    arity: [0, 0],
+    call: (sdk, _p, o, scope) => {
+      const state = stateOption(o)
+      return sdk.list(state === undefined ? scope : { ...scope, state })
+    },
+  },
   send: {
     values: ["--mode", "--expected-turn", "--binding", "--idempotency-key", ...AUTHOR_FLAGS],
     booleans: [],
@@ -248,6 +257,8 @@ function validate(name, parsed) {
   for (const flag of REQUIRED[name] ?? []) if (parsed.options[flag] === undefined) return `${flag} is required`
   for (const flag of INTEGER_FLAGS)
     if (Number.isNaN(integerOption(parsed.options, flag) ?? 0)) return `${flag} must be a non-negative integer`
+  const unknownState = (stateOption(parsed.options) ?? []).find((state) => !THREAD_STATES.includes(state))
+  if (unknownState !== undefined) return `--state must be one of ${THREAD_STATES.join(", ")}, got '${unknownState}'`
   for (const [flag, choices] of Object.entries(CHOICE_FLAGS)) {
     const value = parsed.options[flag]
     if (value !== undefined && !choices.includes(value))
@@ -302,7 +313,6 @@ export async function loadThreadSdk({
   agentDir,
   env,
   cwd,
-  engine,
   stderr,
   reinstall,
   loadSqlite,
@@ -330,9 +340,6 @@ export async function loadThreadSdk({
     }
   }
   const who = identity ?? { uid: process.getuid?.() ?? 0, user: userInfo().username }
-  const engineStatusAll = async () =>
-    engine.run(["host", "status", "--json", "--all", "--include-workers"], { env: { ...env, OMO_AGENT_DIR: agentDir } })
-      .stdout
   const remote = await cliRemoteSurface({ pluginRoot, env, cwd, stderr, reinstall, importThreadClient })
   return {
     sdk: module.createThreadSdk({
@@ -341,7 +348,6 @@ export async function loadThreadSdk({
       uid: who.uid,
       user: who.user,
       env,
-      engineStatusAll,
       ...(remote === undefined ? {} : { remote }),
     }),
   }
@@ -416,7 +422,11 @@ export async function runThreadCommand(args, options) {
     return THREAD_EXIT.unsupported
   }
   const command = COMMANDS[name]
-  const parsed = parseArgs(args.slice(1), { booleans: [...COMMON, ...command.booleans], values: command.values })
+  const parsed = parseArgs(args.slice(1), {
+    booleans: [...COMMON, ...command.booleans],
+    values: command.values,
+    repeatable: command.repeatable ?? [],
+  })
   const problem = parsed.error ?? validate(name, parsed)
   if (problem !== undefined) {
     refuse(

@@ -1,3 +1,10 @@
+## 2026-11-18 - Same-device cross-project messaging leaves the relay leg alone (#14199)
+
+- **A same-device thread in another workspace is never answered as cross-device**
+  - `src/components/thread/addressing.ts` `resolveTarget`: with no visible name match and same-device (`transport === undefined`) out-of-workspace entries carrying the name, the scoped answer is `scope_denied` (candidates when more than one) naming `all_scope`, after the `id_prefix` step - the name-ladder mirror of the id ladder's existing branch. A name a thread on this device holds must not read as absent, or `resolveAcross`'s relay leg answers for it: on a plan without a relay, with `relay_requires_paid_plan` for a thread one `all_scope` retry away (a Discord report: OmO Desktop, two project folders, one Mac).
+  - No change to the default workspace scope of `thread_list` (#8025 stands), none to the paid-plan refusal for addresses this device cannot hold (A5), none to delivery: the `all_scope` retry resolves the same entry and the local transport carries it, no relay round trip.
+  - Tests: `addressing.test.ts` (the scope answer, its candidates, the id-prefix precedence, the plain `not_found`), the new `thread-free-plan-cross-workspace.test.ts` (the free-plan fixture: scoped name send answers the scope hint, all_scope delivers locally with nothing sent to any other device, the all_scope listing keeps its `remote_unavailable` notice, a configured-but-failing relay still answers `host_unavailable`), and the live driver `scripts/qa/thread-tools/free-plan-cross-workspace.mjs` (one real rpc host, two project cwds, the eval-only cells).
+
 ## 2026-11-18 - Release train 2 top: thread tool fixes (#14141)
 
 - **No hint for the removed chat-binding tools (#14042)**

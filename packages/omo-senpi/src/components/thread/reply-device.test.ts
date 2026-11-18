@@ -74,16 +74,25 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
   async function consumed(
     deliveries: readonly Delivery[],
     rows: readonly RemoteSessionRow[],
-    { listingReads }: { readonly listingReads?: number } = {},
+    { listingReads, selfDevice }: { readonly listingReads?: number; readonly selfDevice?: "throws" } = {},
   ) {
     const agentDir = mkdtempSync(join(tmpdir(), "thr-reply-device-"))
     directories.push(agentDir)
     const store = createGatewayStore({ agentDir })
     stores.push(store)
-    const account = fixture.account({ rows, live: rows.map((row) => row.session_id) })
+    const account = fixture.account({
+      rows,
+      live: rows.map((row) => row.session_id),
+      ...(selfDevice ? { selfDevice } : {}),
+    })
     // `listingReads`: how many reads of the account session listing answer before every later one throws.
+    // The rows (`sessions`) and the round with its missing devices (`listing`) are the same account listing read.
     let reads = 0
     const listing = account.remote.sessions
+    const read = () => {
+      reads += 1
+      if (listingReads !== undefined && reads > listingReads) throw new Error("account list failed")
+    }
     const remote =
       listingReads === undefined
         ? account.remote
@@ -92,9 +101,12 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
             sessions: {
               ...listing,
               sessions: async (...args: Parameters<typeof listing.sessions>) => {
-                reads += 1
-                if (reads > listingReads) throw new Error("account list failed")
+                read()
                 return await listing.sessions(...args)
+              },
+              listing: async () => {
+                read()
+                return { rows: await listing.sessions(), incomplete: [] }
               },
             },
           }
@@ -220,6 +232,19 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
     expect(prompts()).toBe(0)
     expect(listings() - listedBefore).toBe(0)
     expect(reachedLocally("dur-local")).toBe(false)
+  })
+
+  test("#given a delivery from this device's own id and this device's id cannot be read #when the run replies #then it is host_unavailable naming why, and nothing is sent anywhere", async () => {
+    const { reply, admittedOn, prompts, reachedLocally } = await consumed(
+      [{ id: "device:here/d-1", session_id: "dur-local", name: "local peer" }],
+      [B_ROW],
+      { selfDevice: "throws" },
+    )
+    expect(await reply("dur-local")).toMatchObject({
+      kind: "error",
+      error: { code: "host_unavailable", details: { reason: "device.info failed", devices: ["here"] } },
+    })
+    expect([admittedOn(), prompts(), reachedLocally("dur-local")]).toEqual([[], 0, false])
   })
 
   test("#given deliveries from b and from c that state one session id #when the run replies by that id #then it is ambiguous_target and nothing is sent", async () => {
