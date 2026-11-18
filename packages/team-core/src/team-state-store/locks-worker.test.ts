@@ -234,6 +234,40 @@ test("an exact release in a live worker permits reclaim after a failed unlink", 
   }
 })
 
+test("host-observed web Worker exit allows its lock to be reclaimed", async () => {
+  // given
+  const f = await fixture()
+  const owner = new globalThis.Worker(new URL("./lock-worker-exit.fixture.ts", import.meta.url).href, {
+    workerData: f.lockPath,
+  })
+  const events = new Set<string>()
+  const ready = new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`web worker sent only ${[...events].join(", ")}`)), 10_000)
+    owner.addEventListener("message", ({ data }: MessageEvent<unknown>) => {
+      if (typeof data === "object" && data !== null && "event" in data && data.event === "ready") events.add("ready")
+      if (typeof data === "object" && data !== null && "kind" in data && data.kind === "omo-team-lock-register-v1")
+        events.add("registered")
+      if (events.size === 2) {
+        clearTimeout(timer)
+        resolve()
+      }
+    })
+  })
+  try {
+    await ready
+    const closed = new Promise((resolve) => owner.addEventListener("close", resolve, { once: true }))
+    // when
+    owner.terminate()
+    await closed
+    // then
+    expect(await detectStaleLock(f.lockPath, Infinity)).toBe(true)
+    expect(await reapStaleLock(f.lockPath, Infinity)).toBe("removed")
+  } finally {
+    owner.terminate()
+    await f.close()
+  }
+}, 30_000)
+
 test("lock observation does not keep a finished worker alive", async () => {
   const f = await fixture()
   const owner = new Worker(new URL("./lock-worker-exit.fixture.ts", import.meta.url), { workerData: f.lockPath })
