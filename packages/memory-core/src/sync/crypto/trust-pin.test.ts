@@ -266,6 +266,42 @@ describe("a pin retired when its principal's keys are discarded (#12280)", () =>
     },
   )
 
+  // #14098 (#13641 review L1): an unreadable newest retired pin must not let the check fall back to an older one and
+  // report "unchanged": the notice says the check was skipped.
+  test.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "#given the newest retired pin cannot be read #when a ceremony pins the same root as an older retired pin #then the check is reported skipped, not unchanged",
+    async () => {
+      // given
+      const dir = stateDir()
+      const candidate = await provenCandidate()
+      await pinTrustAnchor(dir, ACCOUNT, candidate)
+      await retireSyncDevice({ pinDir: dir, account: ACCOUNT })
+      const other = await otherCandidate()
+      await pinTrustAnchor(dir, ACCOUNT, other)
+      await retireSyncDevice({ pinDir: dir, account: ACCOUNT })
+      await pinTrustAnchor(dir, ACCOUNT, candidate)
+      const root = join(dir, "trust-anchor")
+      const newest = readdirSync(root)
+        .filter((name) => name.includes(".retired-"))
+        .sort(
+          (a, b) => Number(b.split(".retired-")[1]?.split("-")[0]) - Number(a.split(".retired-")[1]?.split("-")[0]),
+        )[0]
+      const unreadable = join(root, newest ?? "", "pin.json")
+      chmodSync(unreadable, 0o000)
+
+      // when
+      let notice: Awaited<ReturnType<typeof rootChangeNotice>>
+      try {
+        notice = await rootChangeNotice(dir, ACCOUNT, candidate.genesisDigest)
+      } finally {
+        chmodSync(unreadable, 0o600)
+      }
+
+      // then
+      expect(notice).toEqual({ rootCheck: { kind: "skipped", reason: "EACCES" } })
+    },
+  )
+
   test("the retire seam stays out of the crypto barrel", () => {
     expect(Object.keys(cryptoIndex)).not.toContain("retireSyncDevice")
   })
