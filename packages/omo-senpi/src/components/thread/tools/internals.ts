@@ -254,7 +254,7 @@ export function resolution(
         ...threadToolFailure(
           "caller_context_missing",
           "The caller's durable session id is not in the thread address book.",
-          "Call thread_list and pass an explicit thread, or retry from a session with caller context.",
+          "Call thread_list (tool.thread_list() in an eval cell) and pass an explicit thread, or retry from a session with caller context.",
         ),
       }
     target = caller.thread_id
@@ -516,7 +516,7 @@ async function lookupAcross(
     ...threadToolFailure(
       "not_found",
       `No online device of this account holds session ${address}.`,
-      "The session may live on a device that is offline: retry when that device is online, or call thread_list.",
+      "The session may live on a device that is offline: retry when that device is online, or call thread_list (tool.thread_list() in an eval cell).",
       { thread: address },
     ),
   } as ThreadResolveResult

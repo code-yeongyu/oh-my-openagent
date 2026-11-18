@@ -128,7 +128,7 @@ function wakeRefusal(received: string, device: string, data: JsonObject = {}): F
       return fail(
         "not_found",
         `Device ${device} holds no session file for that id.`,
-        "Call thread_list with all_scope.",
+        "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell).",
         details,
       )
     case "ambiguous_session":
@@ -368,7 +368,7 @@ export function createRelayTransport(
         const reason = decision.kind === "refuse" ? decision.reason : "turn_conflict"
         const mapped = REFUSAL_CODES[reason] ?? {
           code: "internal_error" as const,
-          next: "Call thread_list and check the target.",
+          next: "Call thread_list (tool.thread_list() in an eval cell) and check the target.",
         }
         return fail(
           mapped.code,

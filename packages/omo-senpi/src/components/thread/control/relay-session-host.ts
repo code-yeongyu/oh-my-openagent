@@ -107,7 +107,7 @@ export function createRelaySessionHost(
           return fail(
             "internal_error",
             `Device ${device} opened a session but did not name it.`,
-            "Call thread_list with all_scope to find the new thread.",
+            "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to find the new thread.",
             { device },
           )
         // The session exists on b from here on: a later step that fails is a warning on the created thread, never an
@@ -118,7 +118,7 @@ export function createRelaySessionHost(
             threadToolFailure(
               "unsupported",
               `Device ${device} created the thread but did not name its relay key (${located.reason}).`,
-              "Address it by its thread value once thread_list with all_scope lists it, or update omo on that device.",
+              "Address it by its thread value once thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) lists it, or update omo on that device.",
               { device, reason: located.reason },
             ),
           )
