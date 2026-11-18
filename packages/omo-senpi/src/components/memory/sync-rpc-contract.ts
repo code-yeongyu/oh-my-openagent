@@ -21,6 +21,16 @@ export type SyncDevicesRequest = Readonly<Record<string, never>>
 export type PendingId = string
 export type PairingCode = string
 
+/** Service refusals a client can act on; `refused` carries one only for these (#12123). */
+export type SyncServiceCode =
+  | "not_available"
+  | "entitlement_required"
+  | "access_not_open"
+  | "device_revoked"
+  | "reauth_required"
+  | "account_deleted"
+  | "client_update_required"
+
 /** Why sync authority is unavailable: machine-readable, so a field report names its cause (#13153). */
 export type SyncUnavailableCode =
   | "no_account"
@@ -34,7 +44,7 @@ export type SyncUnavailableCode =
   | "retired"
 
 export type SyncRpcProblem =
-  | { readonly kind: "refused"; readonly reason: string }
+  | { readonly kind: "refused"; readonly reason: string; readonly code?: SyncServiceCode }
   | { readonly kind: "unavailable"; readonly reason: string; readonly code?: SyncUnavailableCode }
 
 export interface JoinProgress {
@@ -85,11 +95,17 @@ export type SyncApproveRequest =
   | { readonly action: "confirm"; readonly pendingId: PendingId; readonly code: PairingCode }
   | { readonly action: "decline"; readonly pendingId: PendingId }
 
+/**
+ * How an approval ended. memory-core's outcome never names a service code: a service refusal reaches the adapter as an
+ * error, so a code from the contract's list rides on the same `refused` shape the other verbs answer with (#13659).
+ */
+export type SyncApproveOutcome = ApproveOutcome | Extract<SyncRpcProblem, { readonly kind: "refused" }>
+
 export interface ApprovalProgress {
   readonly pendingId: PendingId
   readonly expiresAt: number
   readonly code: PairingCode | null
-  readonly outcome: ApproveOutcome | null
+  readonly outcome: SyncApproveOutcome | null
 }
 
 export type SyncApproveResponse = ApprovalProgress | SyncRpcProblem

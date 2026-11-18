@@ -18,7 +18,7 @@ import type {
 } from "@oh-my-opencode/memory-core/sync-engine"
 
 import type { ComponentLogger } from "../../extension/types"
-import { isSyncConfigError, SYNC_CONFIG_INVALID } from "./sync-config-error"
+import { isSyncConfigError, SYNC_CONFIG_INVALID, type SyncConfigVariable } from "./sync-config-error"
 import { isSyncSessionDeferred, SYNC_SESSION_DEFERRED } from "./sync-session-deferred"
 
 /** The one line a runner logs when this device has no session to sync with (no network, no state). */
@@ -47,7 +47,7 @@ export { SYNC_CONFIG_INVALID } from "./sync-config-error"
 /** The status of a repo whose sync is off because a configuration value the user set is invalid. */
 export interface SyncConfigInvalidStatus {
   readonly kind: typeof SYNC_CONFIG_INVALID
-  readonly variable: string
+  readonly variable: SyncConfigVariable
   readonly reason: string
 }
 

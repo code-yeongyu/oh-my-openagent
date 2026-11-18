@@ -14,7 +14,7 @@ import { type CaptureHolds, capture } from "./local-capture"
 import { pushCycle } from "./push-cycle"
 import type { FreezeReason, RefusalCode } from "./ports"
 import { receive } from "./receive"
-import { StatusTracker } from "./status-tracker"
+import { failureKey, StatusTracker } from "./status-tracker"
 
 export { CrashInjected, type EngineFault, INBOUND_POINTS, OUTBOUND_POINTS } from "./engine-deps"
 export type { SyncFailure, SyncFailureKind } from "./failure"
@@ -241,7 +241,10 @@ export class SyncEngine {
       if (await journal.claim(deps.store.peer(), deps.space, deps.legacySpace, deps.log)) await deps.store.load()
       this.loaded = true
     }
-    const before = await journal.updateState({ eventHead: Math.max(this.eventHead, (await journal.state()).eventHead) })
+    const current = await journal.state()
+    const eventHead = Math.max(this.eventHead, current.eventHead)
+    // An unchanged event cursor is not written again: an idle poll costs no state write for it (#12393).
+    const before = eventHead === current.eventHead ? current : await journal.updateState({ eventHead })
     let holds: CaptureHolds = { held: new Map(), withheld: new Set(), joining: new Set() }
     if (before.cycle !== null) {
       this.stage = "resume"
@@ -296,18 +299,17 @@ export class SyncEngine {
     this.tracker.frozen = pushedCycle.frozen
     this.stage = "finish"
     const pushed = pushedCycle.pushed
-    const heldKeys = await recordHeld(deps, journal, holds.held, holds.withheld)
+    const settled = refused === 0 ? { lastSyncedAt: deps.clock.now(), updatedWhileOffline: memories } : {}
+    // A refused entry was recorded in the state this cycle (receive.ts), so the hold is written with it.
+    const heldKeys = await recordHeld(deps, journal, holds.held, holds.withheld, settled, refused > 0)
     const heldNow = (await journal.state()).held
     this.nextHeldKey = heldNow === null ? null : failureKey(heldShown(heldNow, batchBound(deps)).failure)
-    if (refused === 0) await journal.updateState({ lastSyncedAt: deps.clock.now(), updatedWhileOffline: memories })
     this.appliedMirror = (await journal.state()).applied
     this.cyclesRun += 1
     const rejectedItems = (await journal.state()).rejectedItems - before.rejectedItems
     return { applied, refused, rejectedItems, pushed, snapshot, held: heldKeys }
   }
 }
-
-const failureKey = (failure: SyncFailure): string => `${failure.kind}\n${failure.action}`
 
 /** Keys whose render this cycle owes instead of landing: held edits, and files of keys the device is joining. */
 const notRenderedNow = (holds: CaptureHolds): Set<string> => new Set([...holds.held.keys(), ...holds.joining])

@@ -3,7 +3,8 @@
 // the batch id is the append's idempotency key, so a crash after the server accepted the batch
 // re-sends the same id and gets the original seq back instead of a second entry.
 // The journal keeps an index of pending items with their ops in segment files (outbox.ts), so
-// each step reads and writes one batch's worth, never the whole backlog (#12286).
+// each step reads and writes one batch's ops, never the whole backlog's (#12286). The index is
+// rewritten whole at each step, so that write grows with the number of pending items.
 
 import { createHash, randomBytes } from "node:crypto"
 
@@ -89,10 +90,8 @@ async function pushOne(
     for (const key of new Set(plan.held.map((item) => item.key)))
       deps.log?.(`sync.item.held side=push len=${Buffer.byteLength(key, "utf8")}`)
     const first = plan.batches[0]
-    if (first === undefined) {
-      await journal.outbox.sweep(pending)
-      return "idle"
-    }
+    // Nothing to send: pushCycle sweeps the outbox once the freeze is known.
+    if (first === undefined) return "idle"
     out = await seal(deps, journal, first, randomBytes(16).toString("base64url"))
   }
   const bytes = await journal.outbox.readBatch(out)
@@ -117,11 +116,8 @@ async function pushOne(
     recordSig: out.recordSig,
   })
   if (!result.ok) {
-    // The refused batch leaves the index, so its sealed file goes too: a freeze refuses every
-    // cycle, and each would otherwise leave one more batch behind.
-    const dropped: PendingOps = { items: (await journal.pending()).items, outgoing: null }
-    await journal.setPending(dropped)
-    await journal.outbox.sweep(dropped)
+    // The refused batch leaves the index; pushCycle removes its sealed file once the freeze is settled.
+    await journal.setPending({ items: (await journal.pending()).items, outgoing: null })
     return "stale"
   }
   deps.fault?.("append-landed")

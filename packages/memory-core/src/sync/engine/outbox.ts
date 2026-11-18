@@ -2,7 +2,10 @@
 // a digest, its size and where its ops sit, plus the metadata of the batch being sent. A capture
 // appends its items' ops to one segment file in `pending/` and makes it durable once (an fsync per
 // item would double a large capture's time); a sealed batch's bytes are a file of their own. So a
-// push reads and writes what one batch needs instead of the whole backlog. A file is durable before
+// push reads and writes one batch's ops instead of the whole backlog's. The index itself is not
+// constant: it holds an entry per pending item (about 150 bytes plus the key), and while a batch is
+// being sent a second copy of the entry of each item in it, under the outgoing batch. Every push step
+// rewrites it whole, so it grows with how many items are pending, never with their size. A file is durable before
 // the index names it and removed only after the index stops naming it: a crash leaves at most an
 // unnamed file, which `sweep` drops.
 
@@ -60,9 +63,14 @@ interface InlineItem {
   readonly ops: string
 }
 /**
- * An entry as stored. An older build running against a converted journal (a rollback, or two
- * versions taking turns on one repo) writes the index entries it read back untouched and appends
- * its own captures inline, so one journal can hold both kinds.
+ * An entry as stored. A build without this outbox (before 5.1.64) running against a converted
+ * journal (a rollback, or two versions taking turns on one repo) still captures: it writes the
+ * index entries it read back untouched and appends its own captures inline, so one journal can hold
+ * both kinds. Its push does not work on it: it reads every pending item's ops and an outgoing
+ * batch's bytes inline. The first read by a build with the outbox converts every pending item to an
+ * index entry, whoever captured it, so the older build's push fails every cycle while any item that
+ * was pending when a build with the outbox last ran is still unsent, and nothing is sent until a build
+ * with the outbox runs again. The entries stay pending meanwhile; once none is left, it pushes as before.
  */
 type StoredItem = PendingItem | InlineItem
 type StoredOutgoing = Omit<OutgoingBatch, "items"> & { readonly bytes?: string; readonly items: readonly StoredItem[] }
@@ -171,7 +179,12 @@ export class Outbox {
   async sweep(pending: PendingOps): Promise<void> {
     const keep = new Set([...pending.items, ...(pending.outgoing?.items ?? [])].map((i) => i.segment))
     if (pending.outgoing !== null) keep.add(`batch-${pending.outgoing.batchId}.bin`)
-    const names = await readdir(this.dir).catch(() => [] as string[])
+    // Only a missing directory means "nothing to clean"; any other failure (EACCES, EIO) surfaces, or every
+    // later cycle would silently skip cleanup and leak segment files again (#12506, as journal.ts does).
+    const names = await readdir(this.dir).catch((error: unknown) => {
+      if (error instanceof Error && "code" in error && error.code === "ENOENT") return [] as string[]
+      throw error
+    })
     for (const name of names) if (!keep.has(name)) await rm(join(this.dir, name), { force: true })
   }
 

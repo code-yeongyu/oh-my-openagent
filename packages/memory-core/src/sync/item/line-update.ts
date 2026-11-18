@@ -23,11 +23,12 @@ interface Hunk {
 }
 
 /**
- * Edit-distance bound of the Myers line diff. The diff costs O((N + M) * D) time and O(D^2) memory, so a
- * few edits spread over a long note stay cheap and stay separate hunks (review of #12295: measuring the
- * span between the first and last changed line instead merged a top edit and a bottom append into one
- * 2,000-line block). Past this many inserted plus deleted lines the body keeps the character merge it had
- * before #12279, which never duplicates or revives a line.
+ * Edit-distance bound of the Myers line diff. The diff costs O((N + M) * D) time, and it keeps one V array of
+ * 2 * min(N + M, MAX_EDITS) + 3 Int32 values per round for the backtrack, so O(D * min(N + M, MAX_EDITS))
+ * memory: about 32 MB just before it gives up (#12526). A few edits spread over a long note stay cheap and stay
+ * separate hunks (review of #12295: measuring the span between the first and last changed line instead merged a
+ * top edit and a bottom append into one 2,000-line block). Past this many inserted plus deleted lines the body
+ * keeps the character merge it had before #12279, which never duplicates or revives a line.
  */
 const MAX_EDITS = 2_000
 

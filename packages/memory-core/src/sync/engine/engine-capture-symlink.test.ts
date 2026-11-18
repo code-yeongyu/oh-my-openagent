@@ -1,4 +1,5 @@
-import { mkdir, symlink, writeFile } from "node:fs/promises"
+import { constants } from "node:fs"
+import { mkdir, open, rm, symlink, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import { afterEach, expect, test } from "bun:test"
 
@@ -43,6 +44,47 @@ test(
     expect(await b.engine.runCycle()).toMatchObject({ rejectedItems: 0 })
     expect(await b.workingFiles()).toEqual([".gitkeep", "real/x.md"])
     expect(await b.read("real/x.md")).toBe("two\n")
+  },
+  GIT_TEST_TIMEOUT,
+)
+
+// #12575: the walk skips non-regular entries, so a known key whose file was replaced by a FIFO reached a plain readFile
+// on capture and blocked the cycle until a writer opened the FIFO.
+test.skipIf(process.platform === "win32")(
+  "capture refuses a known key whose file was replaced by a FIFO instead of blocking on it",
+  async () => {
+    // given
+    const server = new FakeSyncServer()
+    const lines: string[] = []
+    const a = await makeDevice(server, "a", undefined, { log: (line) => lines.push(line) })
+    devices.push(a)
+    await a.write("notes/x.md", "one\n")
+    expect(await a.engine.runCycle()).toMatchObject({ pushed: true })
+    await rm(join(a.repo.root, "notes", "x.md"))
+    expect(await Bun.spawn(["mkfifo", join(a.repo.root, "notes", "x.md")]).exited).toBe(0)
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+    const timeout = new Promise<"timed-out">((resolve) => {
+      timeoutId = setTimeout(() => resolve("timed-out"), 10_000)
+    })
+
+    // when
+    try {
+      const settled = await Promise.race([a.engine.runCycle().then(() => "settled" as const), timeout])
+
+      // then
+      expect(settled).toBe("settled")
+      expect(
+        lines.filter((line) => line.startsWith("sync.item.rejected") && line.endsWith("rule=non-regular-file")).length,
+      ).toBeGreaterThan(0)
+    } finally {
+      if (timeoutId !== undefined) clearTimeout(timeoutId)
+      // A cycle the pre-fix code left blocked on the FIFO is released by opening its write end. Non-blocking, so with no
+      // reader waiting the open fails with ENXIO instead of blocking the test.
+      await open(join(a.repo.root, "notes", "x.md"), constants.O_WRONLY | constants.O_NONBLOCK).then(
+        (handle) => handle.close(),
+        () => undefined,
+      )
+    }
   },
   GIT_TEST_TIMEOUT,
 )
