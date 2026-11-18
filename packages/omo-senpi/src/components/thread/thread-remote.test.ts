@@ -287,7 +287,7 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
   test("#given b's engine answers open_session with its real envelope (ids under data) #when thread_create creates and forks on b #then the create succeeds with the durable id (data.sessionId when none is named) and the fork is refused", async () => {
     const a = account()
     const { run } = surface(a.remote)
-    expect(await run("thread_create", { device: "studio" })).toMatchObject({
+    expect(await run("thread_create", { name: "thread-remote-230", device: "studio" })).toMatchObject({
       kind: "ok",
       thread: "dur-new-on-b",
       device: "b",
@@ -297,7 +297,9 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
       error: { code: "unsupported", details: { reason: "fork_unsupported" } },
     })
     const bare = account({ openData: { sessionId: "bmV3LXNlc3Npb24tMDAwMQ" } })
-    expect(await surface(bare.remote).run("thread_create", { device: "studio" })).toMatchObject({
+    expect(
+      await surface(bare.remote).run("thread_create", { name: "thread-remote-239", device: "studio" }),
+    ).toMatchObject({
       kind: "ok",
       thread: "bmV3LXNlc3Npb24tMDAwMQ",
       device: "b",
@@ -319,7 +321,10 @@ describe("A3: an existing thread is named by id or alias only; a device only to 
   test("#given no id and no device #when thread_create runs #then the thread is created on this device exactly as before", async () => {
     const a = account()
     const { run, openSession } = surface(a.remote)
-    expect(await run("thread_create", {})).toMatchObject({ kind: "ok", thread: "dur-created-here" })
+    expect(await run("thread_create", { name: "thread-remote-260" })).toMatchObject({
+      kind: "ok",
+      thread: "dur-created-here",
+    })
     expect(openSession).toHaveBeenCalledTimes(1)
     expect(a.sent).toEqual([])
   })
@@ -638,7 +643,7 @@ describe("the device service is not connected, or the alias registry is not ther
       kind: "error",
       error: { code: "not_found" },
     })
-    expect(await run("thread_create", { device: "b" })).toMatchObject({
+    expect(await run("thread_create", { name: "thread-remote-578", device: "b" })).toMatchObject({
       kind: "error",
       error: { code: "host_unavailable", details: { state: "disabled" } },
     })
@@ -666,7 +671,7 @@ describe("A5: the relay is paid only", () => {
   test("#given a Free account #when a tool needs another device #then it is relay_requires_paid_plan, nothing is sent or queued, and this device's threads work as before", async () => {
     const a = account({ plan: "plan_required" })
     const { run, openSession, store } = surface(a.remote)
-    expect(await run("thread_create", { device: "b" })).toMatchObject({
+    expect(await run("thread_create", { name: "thread-remote-606", device: "b" })).toMatchObject({
       kind: "error",
       error: { code: "relay_requires_paid_plan" },
     })
@@ -680,7 +685,10 @@ describe("A5: the relay is paid only", () => {
     })
     expect(a.sent).toEqual([])
     expect(await store.list()).toEqual([])
-    expect(await run("thread_create", {})).toMatchObject({ kind: "ok", thread: "dur-created-here" })
+    expect(await run("thread_create", { name: "thread-remote-620" })).toMatchObject({
+      kind: "ok",
+      thread: "dur-created-here",
+    })
     expect(openSession).toHaveBeenCalledTimes(1)
   })
 })
@@ -823,7 +831,7 @@ describe("remote == local: the same call answers the same on b as on this device
   test("#given skills on a create on b #when it opens #then the same initial-skills context a local create sends reaches b", async () => {
     const a = account()
     const { run } = surface(a.remote)
-    await run("thread_create", { device: "studio", skills: ["programming"] })
+    await run("thread_create", { name: "thread-remote-763", device: "studio", skills: ["programming"] })
     expect(a.sent.find((entry) => entry.rpc?.["type"] === "open_session")?.rpc?.["context"]).toEqual({
       initial_skills: JSON.stringify(["programming"]),
     })
