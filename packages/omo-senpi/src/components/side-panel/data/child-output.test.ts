@@ -82,10 +82,7 @@ describe("childOutputRows over the engine's real transcript", () => {
 
     // then
     expect(result.source).toBe("event-log")
-    expect(rows.map((row) => row.text)).toEqual([
-      "assistant: read the file, nothing to change",
-      "tool: read",
-    ])
+    expect(rows.map((row) => row.text)).toEqual(["assistant: read the file, nothing to change", "tool: read"])
     expect(rows.map((row) => row.color)).toEqual(["text", "muted"])
   })
 
@@ -99,8 +96,6 @@ describe("childOutputRows over the engine's real transcript", () => {
 
     // then
     expect(result.source).toBe("none")
-    expect(childOutputRows(rendered.text, rendered.truncated).map((row) => row.text)).toEqual([
-      NO_OUTPUT_NOTICE,
-    ])
+    expect(childOutputRows(rendered.text, rendered.truncated).map((row) => row.text)).toEqual([NO_OUTPUT_NOTICE])
   })
 })

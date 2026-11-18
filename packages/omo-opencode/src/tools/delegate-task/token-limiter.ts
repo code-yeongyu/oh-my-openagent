@@ -50,7 +50,7 @@ function reduceSegmentToFitBudget(content: string, overflowTokens: number): stri
 
 export function buildSystemContentWithTokenLimit(
   input: BuildSystemContentInput,
-  maxTokens: number | undefined
+  maxTokens: number | undefined,
 ): string | undefined {
   const skillParts = input.skillContents?.length
     ? [...input.skillContents]

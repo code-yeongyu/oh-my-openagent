@@ -1,5 +1,19 @@
 import type { DeviceKeyring } from "@oh-my-opencode/memory-core/keyring"
-import type { AccountHttp, PairingHttp, CeremonyClock, ApproveOutcome, JoinOutcome, EnableOutcome, DesktopSyncAccount, DesktopSyncDescriptor, DesktopSyncOperation } from "@oh-my-opencode/memory-core/sync-engine"
+import type {
+  AccountHttp,
+  PairingHttp,
+  CeremonyClock,
+  ApproveOutcome,
+  JoinOutcome,
+  EnableMethod,
+  EnableOutcome,
+  PhraseGate,
+  PhraseNoticeStatus,
+  PhraseVoidNotice,
+  DesktopSyncAccount,
+  DesktopSyncDescriptor,
+  DesktopSyncOperation,
+} from "@oh-my-opencode/memory-core/sync-engine"
 import type { MemoryRpcSync } from "./memory-rpc-sync"
 
 /** The permanent upstream interface, including undefined on internal calls. */
@@ -22,7 +36,10 @@ export interface SyncRpcAuthority {
 export type SyncRpcIdentity = DesktopSyncDescriptor
 
 /** Selected source only: this port never reconstructs or falls back to CLI credentials. */
-export type SyncRpcAccount = Pick<DesktopSyncAccount, "descriptor" | "signal" | "isCurrent" | "boundary" | "forOperation">
+export type SyncRpcAccount = Pick<
+  DesktopSyncAccount,
+  "descriptor" | "signal" | "isCurrent" | "boundary" | "forOperation"
+>
 
 export type SyncRpcOperation = DesktopSyncOperation
 
@@ -37,24 +54,55 @@ export interface SyncRpcCeremonyInput {
 }
 
 export interface SyncRpcRuntime {
-  enableSync(input: SyncRpcCeremonyInput & {
-    readonly serviceDeviceId: string
-    readonly serviceOrigin: string
-    readonly rpId?: string
-    readonly userName?: string
-    readonly genesis?: DesktopSyncOperation["genesis"]
-  }): Promise<EnableOutcome & { readonly created?: true }>
-  joinAccount(input: SyncRpcCeremonyInput & {
-    readonly clock: CeremonyClock
-    readonly showCode: (code: string) => void
-    readonly onPending: (row: { readonly id: string; readonly expires_at: number }) => void
-  }): Promise<JoinOutcome>
-  approveDevice(input: SyncRpcCeremonyInput & {
-    readonly clock: CeremonyClock
-    readonly pendingId: string
-    readonly confirmCode: (code: string) => Promise<boolean>
-    readonly onAnswered: (row: { readonly id: string; readonly expires_at: number }) => void
-  }): Promise<ApproveOutcome>
+  enableSync(
+    input: SyncRpcCeremonyInput & {
+      readonly serviceDeviceId: string
+      readonly serviceOrigin: string
+      readonly rpId?: string
+      readonly userName?: string
+      readonly genesis?: DesktopSyncOperation["genesis"]
+      readonly method?: EnableMethod
+      readonly onCeremony?: (method: EnableMethod) => void
+      readonly phraseGate?: PhraseGate
+    },
+  ): Promise<EnableOutcome & { readonly created?: true }>
+  /** Absent when the host has not wired phrase notices: status then omits them. */
+  phraseNoticeStatus?(place: {
+    readonly pinDir: string
+    readonly account: string
+    readonly principalId: string
+  }): Promise<PhraseNoticeStatus>
+  /** Status with enroll/rotate markers resolved against the verified chain; used only when the local read is unresolved. */
+  verifiedPhraseNoticeStatus?(input: {
+    readonly pinDir: string
+    readonly account: string
+    readonly principalId: string
+    readonly chain: SyncRpcOperation["chain"]
+  }): Promise<PhraseNoticeStatus>
+  /** Absent when the host has not wired phrase notices: acknowledge then answers unavailable. */
+  acknowledgePhraseVoid?(
+    input: SyncRpcCeremonyInput & {
+      readonly serviceDeviceId: string
+      readonly serviceOrigin: string
+      readonly purpose: PhraseVoidNotice["purpose"]
+      readonly credentialId?: string
+    },
+  ): Promise<{ readonly ok: true }>
+  joinAccount(
+    input: SyncRpcCeremonyInput & {
+      readonly clock: CeremonyClock
+      readonly showCode: (code: string) => void
+      readonly onPending: (row: { readonly id: string; readonly expires_at: number }) => void
+    },
+  ): Promise<JoinOutcome>
+  approveDevice(
+    input: SyncRpcCeremonyInput & {
+      readonly clock: CeremonyClock
+      readonly pendingId: string
+      readonly confirmCode: (code: string) => Promise<boolean>
+      readonly onAnswered: (row: { readonly id: string; readonly expires_at: number }) => void
+    },
+  ): Promise<ApproveOutcome>
 }
 
 export interface SyncRpcClaim {
@@ -63,7 +111,12 @@ export interface SyncRpcClaim {
 }
 
 export interface SyncRpcClaims {
-  acquire(identity: SyncRpcIdentity, operation: "enable" | "approve", pendingId: string | undefined, authority: SyncRpcAuthority): Promise<SyncRpcClaim | null>
+  acquire(
+    identity: SyncRpcIdentity,
+    operation: "enable" | "approve",
+    pendingId: string | undefined,
+    authority: SyncRpcAuthority,
+  ): Promise<SyncRpcClaim | null>
 }
 
 export interface SyncRpcOptions {
@@ -74,4 +127,8 @@ export interface SyncRpcOptions {
   readonly signal: AbortSignal
   readonly syncStatus: () => Promise<MemoryRpcSync | undefined>
   readonly clock?: CeremonyClock
+  /** Releases recovery-phrase key creation (amendment A1); absent means off. */
+  readonly phraseGate?: PhraseGate
+  /** Receives one warning each time the status read's unavailable cause changes. */
+  readonly warn?: (message: string, fields: Record<string, unknown>) => void
 }

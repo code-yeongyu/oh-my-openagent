@@ -41,27 +41,27 @@ export function scoreDreamCandidate(input: DreamScoreInput): Pick<DreamScoredCon
     unreflectedSteps: Math.min(50, Math.max(0, input.stepsSinceLastSuccessfulReflection)) / 50,
     recency,
     sourceCount: Math.min(200, Math.max(0, input.distinctSourceCount)) / 200,
-    sizeFit: input.totalBytes <= input.targetBytes || input.totalBytes === 0
-      ? 1
-      : Math.min(1, input.targetBytes / input.totalBytes),
+    sizeFit:
+      input.totalBytes <= input.targetBytes || input.totalBytes === 0
+        ? 1
+        : Math.min(1, input.targetBytes / input.totalBytes),
     isCurrent: input.isCurrent ? 1 : 0,
     penalty: input.newestMessageCovered ? 1 : 0,
   }
   return {
     operands,
-    score: 50 * operands.searchHits
-      + operands.unreflectedSteps
-      + operands.recency
-      + operands.sourceCount
-      + operands.sizeFit
-      + operands.isCurrent
-      - operands.penalty,
+    score:
+      50 * operands.searchHits +
+      operands.unreflectedSteps +
+      operands.recency +
+      operands.sourceCount +
+      operands.sizeFit +
+      operands.isCurrent -
+      operands.penalty,
   }
 }
 
-export function rankDreamCandidates(
-  candidates: readonly DreamScoredConversation[],
-): DreamScoredConversation[] {
+export function rankDreamCandidates(candidates: readonly DreamScoredConversation[]): DreamScoredConversation[] {
   return [...candidates].sort((left, right) => {
     if (left.score !== right.score) return right.score - left.score
     if (left.operands.unreflectedSteps !== right.operands.unreflectedSteps) {

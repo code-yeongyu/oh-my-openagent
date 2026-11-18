@@ -20,7 +20,7 @@ function stalledSession(confirmClose: () => Promise<void> = () => Promise.resolv
   const aborted = Promise.withResolvers<undefined>()
   const closing = Promise.withResolvers<undefined>()
   const lifecycle: string[] = []
-  const port = fakeSessionPort(async command => {
+  const port = fakeSessionPort(async (command) => {
     if ("message" in command && command.message === "continue") delivered.resolve(undefined)
     if (command.type === "abort") {
       lifecycle.push("abort")
@@ -31,19 +31,34 @@ function stalledSession(confirmClose: () => Promise<void> = () => Promise.resolv
   const closed = Promise.withResolvers<undefined>()
   let closes = 0
   const handle = createHostSessionHandle({
-    client: { ...port, getState: () => state.promise, closeConfirmed: async () => {
-      closes++
-      lifecycle.push("close")
-      closing.resolve(undefined)
-      await closed.promise
-      await confirmClose()
-    } },
-    session: FAKE_SESSION, taskId: "st_00000001", heartbeatIntervalMs: 10_000,
-    now: clock.now, closeGraceMs: 100, openDisposition: "attached",
+    client: {
+      ...port,
+      getState: () => state.promise,
+      closeConfirmed: async () => {
+        closes++
+        lifecycle.push("close")
+        closing.resolve(undefined)
+        await closed.promise
+        await confirmClose()
+      },
+    },
+    session: FAKE_SESSION,
+    taskId: "st_00000001",
+    heartbeatIntervalMs: 10_000,
+    now: clock.now,
+    closeGraceMs: 100,
+    openDisposition: "attached",
   })
   return {
-    handle, port, state, closed, delivered: delivered.promise, closes: () => closes,
-    aborted: aborted.promise, closing: closing.promise, lifecycle,
+    handle,
+    port,
+    state,
+    closed,
+    delivered: delivered.promise,
+    closes: () => closes,
+    aborted: aborted.promise,
+    closing: closing.promise,
+    lifecycle,
   }
 }
 
@@ -62,16 +77,19 @@ test("missed state probes keep the original child nonterminal and recover steeri
   expect(h.handle.hasExited()).toBe(false)
   expect(manager.get(started.task_id)?.status).toBe("running")
   expect(h.port.detaches).toBe(0)
-  expect(await manager.sendToTask({ idOrName: started.task_id, message: "queued", deliverAs: "steer" }))
-    .toMatchObject({ kind: "queued" })
+  expect(await manager.sendToTask({ idOrName: started.task_id, message: "queued", deliverAs: "steer" })).toMatchObject({
+    kind: "queued",
+  })
   expect(h.port.sent).toHaveLength(0)
   h.state.resolve({ sessionId: "same-child", isStreaming: true })
   await clock.advance(0)
   const resumedSend = await manager.sendToTask({ idOrName: started.task_id, message: "continue", deliverAs: "steer" })
   expect(["steered", "queued"]).toContain(resumedSend.kind)
   await h.delivered
-  expect(h.port.sent.filter(command => command.type === "steer").map(command => command.message))
-    .toEqual(["queued", "continue"])
+  expect(h.port.sent.filter((command) => command.type === "steer").map((command) => command.message)).toEqual([
+    "queued",
+    "continue",
+  ])
   manager.forget(started.task_id, { path: "park" })
   await h.handle.dispose()
   expect(clock.pending()).toBe(0)
@@ -85,13 +103,15 @@ test("an overdue session is aborted and closed before reporting terminal", async
     confirming.resolve(undefined)
     return confirmation.promise
   })
-  const terminal = h.handle.waitForExit().then(() => { h.lifecycle.push("terminal") })
+  const terminal = h.handle.waitForExit().then(() => {
+    h.lifecycle.push("terminal")
+  })
   // When the bounded unresponsive period expires but host absence is not confirmed.
   await clock.advance(170_000)
   await h.aborted
   await h.closing
   expect(h.lifecycle).toEqual(["abort", "close"])
-  expect(h.port.sent.some(command => command.type === "abort")).toBe(true)
+  expect(h.port.sent.some((command) => command.type === "abort")).toBe(true)
   expect(h.closes()).toBeGreaterThan(0)
   expect(h.handle.hasExited()).toBe(false)
   // Then only the confirmed-close port's authoritative proof permits terminal settlement.
@@ -124,7 +144,9 @@ test("termination releases outcome waiters created before terminal-pending", asy
   clock = fakeClock()
   const h = stalledSession()
   let settled = false
-  const waiting = h.handle.waitForOutcome().then(() => { settled = true })
+  const waiting = h.handle.waitForOutcome().then(() => {
+    settled = true
+  })
   await clock.advance(170_000)
   expect(settled).toBe(false)
   // When another deliberate exit ends the handle.
@@ -160,8 +182,12 @@ test("the parent observes unresponsive then running without a terminal completio
   const options = {
     store: createTaskRecordStore({ project_dir: project }),
     runners: { "in-process": runner, process: runner },
-    planner: categoryPlanner(), config: settings(), cwd: project,
-    onChildLiveness: (_record: unknown, status: { state: string }) => { notices.push(status.state) },
+    planner: categoryPlanner(),
+    config: settings(),
+    cwd: project,
+    onChildLiveness: (_record: unknown, status: { state: string }) => {
+      notices.push(status.state)
+    },
   }
   const manager = createTaskManager(options)
   const started = await manager.start(baseSpec({ execution_mode: "process", run_in_background: true }))

@@ -7,15 +7,15 @@ import { GitMemoryRepo } from "../git"
 import { MemoryBlockCache, hashMemoryTemplate } from "./cache"
 import { removeTree } from "../../../../test-support/remove-tree"
 
-const WINDOWS_INTEGRATION_TEST_TIMEOUT = process.platform === "win32" ? 20_000 : 5_000
-
 const tempDirs: string[] = []
 
 async function createRepo() {
   const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-cache-")))
   tempDirs.push(dir)
   const repo = new GitMemoryRepo({ dir, agentId: "cache-agent" })
-  await repo.init({ seedFiles: [{ relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\nfirst\n" }] })
+  await repo.init({
+    seedFiles: [{ relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\nfirst\n" }],
+  })
   return { dir, repo }
 }
 
@@ -37,7 +37,7 @@ describe("MemoryBlockCache", () => {
     // then
     expect(second).toBe(first)
     expect(cache.size).toBe(1)
-  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
+  })
 
   it("#given either template content or HEAD changes #when compiled #then each stable key retains only its latest revision", async () => {
     // given
@@ -60,7 +60,7 @@ describe("MemoryBlockCache", () => {
     expect(headChanged).not.toBe(templateChanged)
     expect(headChanged).toContain("second")
     expect(cache.size).toBe(2)
-  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
+  })
 
   it("#given repeated calls for one stable projection #when compile runs many times #then the cache stays bounded to one entry", async () => {
     // given
@@ -88,7 +88,7 @@ describe("MemoryBlockCache", () => {
 
     // then
     expect(cache.size).toBe(1)
-  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
+  })
 
   it("#given a pinned revision #when HEAD moves #then the pinned compile keeps the pinned bytes and HEAD compile sees the new commit", async () => {
     // given
@@ -100,7 +100,10 @@ describe("MemoryBlockCache", () => {
 
     // when
     await writeFile(join(dir, "system/persona.md"), "---\ndescription: Persona\n---\nsecond\n")
-    await repo.commitWrite(["system/persona.md"], "change persona", { agentId: "cache-agent", authorName: "Cache Agent" })
+    await repo.commitWrite(["system/persona.md"], "change persona", {
+      agentId: "cache-agent",
+      authorName: "Cache Agent",
+    })
     const stillPinned = await cache.compile(repo, "template", options, pinned)
     const atHead = await cache.compile(repo, "template", options)
 
@@ -108,7 +111,7 @@ describe("MemoryBlockCache", () => {
     expect(stillPinned).toBe(atPin)
     expect(stillPinned).toContain("first")
     expect(atHead).toContain("second")
-  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
+  })
 
   it("#given two identities at the same HEAD #when compiled through one cache #then identity-stable projections remain isolated", async () => {
     // given
@@ -125,7 +128,7 @@ describe("MemoryBlockCache", () => {
     expect(second).not.toBe(first)
     expect(second).toContain("- AGENT_ID: other-agent")
     expect(cache.size).toBe(2)
-  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
+  })
 
   it("#given template content #when hashed #then the structure version participates in sha256", () => {
     // given / when / then

@@ -1,7 +1,13 @@
 import { access, open, unlink } from "node:fs/promises"
 import { dirname } from "node:path"
 
-import { errorCode, forgetLockRecord, isPathAbsenceError, markLockRecordHeld, markLockRecordReleased } from "./lock-record"
+import {
+  errorCode,
+  forgetLockRecord,
+  isPathAbsenceError,
+  markLockRecordHeld,
+  markLockRecordReleased,
+} from "./lock-record"
 
 type LockOpenErrorDeps = {
   readonly access?: typeof access

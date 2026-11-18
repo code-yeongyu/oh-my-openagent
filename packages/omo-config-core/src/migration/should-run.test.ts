@@ -32,7 +32,9 @@ describe("MigrationPlan.shouldRun", () => {
     expect(batch.results.map(({ status }) => status)).toEqual(["skipped"])
     expect(fileSystem.readFileSync(migrationFixture.targetPath, "utf-8")).toBe(original)
     expect(parseFile(fileSystem, migrationFixture.targetPath)["_migrations"]).toBeUndefined()
-    expect(fileSystem.operations.filter((operation) => operation.startsWith("write:") || operation.startsWith("rename:"))).toEqual([])
+    expect(
+      fileSystem.operations.filter((operation) => operation.startsWith("write:") || operation.startsWith("rename:")),
+    ).toEqual([])
   })
 
   test("#given a target the plan does have work for #when the batch runs #then it is rewritten and marked once", () => {
@@ -65,10 +67,12 @@ describe("MigrationPlan.shouldRun", () => {
     runMigrations({
       env: migrationFixture.env,
       fileSystem,
-      discover: () => [plan((target) => {
-        seen.push(target)
-        return false
-      })],
+      discover: () => [
+        plan((target) => {
+          seen.push(target)
+          return false
+        }),
+      ],
     })
 
     // then

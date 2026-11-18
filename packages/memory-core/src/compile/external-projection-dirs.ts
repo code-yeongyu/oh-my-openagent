@@ -19,7 +19,10 @@ export interface DirectoryGroup {
  * line; other leaf siblings holding exactly the same file names list as one `<parent>/{a, b, c}/` line. Lines keep
  * name order, the repository root first.
  */
-export function groupDirectories(paths: readonly string[], times: ReadonlyMap<string, number> | undefined): DirectoryGroup[] {
+export function groupDirectories(
+  paths: readonly string[],
+  times: ReadonlyMap<string, number> | undefined,
+): DirectoryGroup[] {
   const byDirectory = new Map<string, NamedFile[]>()
   for (const path of paths) {
     const parts = path.split("/").filter(Boolean)
@@ -39,7 +42,10 @@ export function groupDirectories(paths: readonly string[], times: ReadonlyMap<st
     .map(([directory, files]) => ({ ...labelled(directory), files, grouped: false }))
   for (const group of groups) lines.push(group.line)
   const root = lines.filter((line) => line.label === `${MEMORY_DIR}/`)
-  return [...root, ...lines.filter((line) => line.label !== `${MEMORY_DIR}/`).sort((a, b) => a.label.localeCompare(b.label))]
+  return [
+    ...root,
+    ...lines.filter((line) => line.label !== `${MEMORY_DIR}/`).sort((a, b) => a.label.localeCompare(b.label)),
+  ]
 }
 
 interface SiblingGroup {
@@ -78,7 +84,10 @@ function leafDirectories(directories: readonly string[]): Map<string, string[]> 
 
 const segment = (directory: string, parent: string): string => directory.slice(parent.length, -1)
 
-function idFamilies(byDirectory: ReadonlyMap<string, readonly NamedFile[]>, leaves: ReadonlyMap<string, readonly string[]>): SiblingGroup[] {
+function idFamilies(
+  byDirectory: ReadonlyMap<string, readonly NamedFile[]>,
+  leaves: ReadonlyMap<string, readonly string[]>,
+): SiblingGroup[] {
   const groups: SiblingGroup[] = []
   for (const [parent, siblings] of leaves) {
     const ids = generatedIds(siblings.map((directory) => segment(directory, parent)))
@@ -87,31 +96,48 @@ function idFamilies(byDirectory: ReadonlyMap<string, readonly NamedFile[]>, leav
     const { label, pointer } = labelled(parent)
     groups.push({
       members,
-      line: { label: `${parent === "" ? "" : label}<id>/ (${members.length} dirs)`, pointer, files: members.flatMap((directory) => byDirectory.get(directory) ?? []), grouped: true },
+      line: {
+        label: `${parent === "" ? "" : label}<id>/ (${members.length} dirs)`,
+        pointer,
+        files: members.flatMap((directory) => byDirectory.get(directory) ?? []),
+        grouped: true,
+      },
     })
   }
   return groups
 }
 
-function uniformSiblings(byDirectory: ReadonlyMap<string, readonly NamedFile[]>, leaves: ReadonlyMap<string, readonly string[]>): SiblingGroup[] {
+function uniformSiblings(
+  byDirectory: ReadonlyMap<string, readonly NamedFile[]>,
+  leaves: ReadonlyMap<string, readonly string[]>,
+): SiblingGroup[] {
   const groups: SiblingGroup[] = []
   for (const [parent, siblings] of leaves) {
     const ids = generatedIds(siblings.map((directory) => segment(directory, parent)))
     const byNames = new Map<string, string[]>()
     for (const directory of siblings) {
       if (ids.has(segment(directory, parent))) continue
-      const key = (byDirectory.get(directory) ?? []).map((file) => file.name).sort().join("\0")
+      const key = (byDirectory.get(directory) ?? [])
+        .map((file) => file.name)
+        .sort()
+        .join("\0")
       const same = byNames.get(key)
       if (same) same.push(directory)
       else byNames.set(key, [directory])
     }
     for (const members of byNames.values()) {
-      if (members.length < MIN_SIBLINGS || members.some((directory) => /[{}]|, /.test(segment(directory, parent)))) continue
+      if (members.length < MIN_SIBLINGS || members.some((directory) => /[{}]|, /.test(segment(directory, parent))))
+        continue
       const { label, pointer } = labelled(parent)
       const names = members.map((directory) => segment(directory, parent)).sort((a, b) => a.localeCompare(b))
       groups.push({
         members,
-        line: { label: `${parent === "" ? "" : label}{${names.join(", ")}}/`, pointer, files: members.flatMap((directory) => byDirectory.get(directory) ?? []), grouped: true },
+        line: {
+          label: `${parent === "" ? "" : label}{${names.join(", ")}}/`,
+          pointer,
+          files: members.flatMap((directory) => byDirectory.get(directory) ?? []),
+          grouped: true,
+        },
       })
     }
   }

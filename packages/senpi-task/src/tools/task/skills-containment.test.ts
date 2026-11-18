@@ -44,7 +44,11 @@ test("task discovery excludes nested references and README files beside and belo
   // when
   const result = loader(["inner", "deploy", "readme-beside", "readme-below", "readme-group", "top"], f.cwd)
   // then
-  expect(loadSkillsFromDir({ dir: skills, source: "project" }).skills.map((s) => s.name).sort()).toEqual(["inner", "top"])
+  expect(
+    loadSkillsFromDir({ dir: skills, source: "project" })
+      .skills.map((s) => s.name)
+      .sort(),
+  ).toEqual(["inner", "top"])
   expect(result.resolved).toEqual(["inner", "top"])
   expect(result.missing).toEqual(["deploy", "readme-beside", "readme-below", "readme-group"])
   expect(result.skills?.[0]?.location).toBe(join(inner, "SKILL.md"))
@@ -163,13 +167,24 @@ test("task tool result exposes a rejected skill's reason instead of reporting it
   const manager = createFakeManager({
     start: async () => ({ kind: "started", task_id: "st_00000016", status: "running", name: "fixture" }),
   })
-  const execute = buildTaskExecute(makeDeps(manager, {
-    loadSkills: createFsSkillLoader({ homeDir: f.homeDir, loadSkillsFromDir }),
-  }))
+  const execute = buildTaskExecute(
+    makeDeps(manager, {
+      loadSkills: createFsSkillLoader({ homeDir: f.homeDir, loadSkillsFromDir }),
+    }),
+  )
   // when
-  const result = await execute("blocked-skill", {
-    prompt: "synthetic task", category: "quick", load_skills: ["escape"], run_in_background: true,
-  }, undefined, undefined, { ...CTX, cwd: f.cwd })
+  const result = await execute(
+    "blocked-skill",
+    {
+      prompt: "synthetic task",
+      category: "quick",
+      load_skills: ["escape"],
+      run_in_background: true,
+    },
+    undefined,
+    undefined,
+    { ...CTX, cwd: f.cwd },
+  )
   // then
   const text = result.content[0]?.type === "text" ? result.content[0].text : ""
   expect(text).toContain("outside the project")

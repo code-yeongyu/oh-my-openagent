@@ -15,9 +15,10 @@ export const mockCwdMarker = (cwd) => `[[mock-cwd:${cwd}]]`
 function routedCwd(context) {
   for (const message of context.messages ?? []) {
     if (message.role !== "user") continue
-    const text = typeof message.content === "string"
-      ? message.content
-      : (message.content ?? []).map((part) => part.text ?? "").join("")
+    const text =
+      typeof message.content === "string"
+        ? message.content
+        : (message.content ?? []).map((part) => part.text ?? "").join("")
     const hit = MARKER.exec(text)
     if (hit !== null) return hit[1]
   }
@@ -25,19 +26,22 @@ function routedCwd(context) {
 }
 
 export default function registerShardCostMock(pi) {
-  registerTaskHostMock(new Proxy(pi, {
-    get(target, key) {
-      if (key === "registerProvider") {
-        return (id, provider) => target.registerProvider(id, {
-          ...provider,
-          streamSimple(model, context, options) {
-            const cwd = routedCwd(context)
-            return provider.streamSimple(model, cwd === undefined ? context : { ...context, cwd }, options)
-          },
-        })
-      }
-      const value = target[key]
-      return typeof value === "function" ? value.bind(target) : value
-    },
-  }))
+  registerTaskHostMock(
+    new Proxy(pi, {
+      get(target, key) {
+        if (key === "registerProvider") {
+          return (id, provider) =>
+            target.registerProvider(id, {
+              ...provider,
+              streamSimple(model, context, options) {
+                const cwd = routedCwd(context)
+                return provider.streamSimple(model, cwd === undefined ? context : { ...context, cwd }, options)
+              },
+            })
+        }
+        const value = target[key]
+        return typeof value === "function" ? value.bind(target) : value
+      },
+    }),
+  )
 }

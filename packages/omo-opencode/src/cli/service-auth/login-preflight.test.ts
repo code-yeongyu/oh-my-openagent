@@ -19,15 +19,29 @@ async function omo(args: string[], api: string) {
     {
       cwd: home,
       env: {
-        PATH: process.env.PATH, HOME: home, USERPROFILE: home, OMO_RUNTIME: "bun",
-        OMO_SERVICE_API_URL: api, OMO_SERVICE_ACCOUNTS_URL: api, OMO_TEST_KEYSTORE_URL: keystore,
+        PATH: process.env.PATH,
+        HOME: home,
+        USERPROFILE: home,
+        OMO_RUNTIME: "bun",
+        OMO_SERVICE_API_URL: api,
+        OMO_SERVICE_ACCOUNTS_URL: api,
+        OMO_TEST_KEYSTORE_URL: keystore,
+        // The child's own lock home: the test preload's account seam does not reach a child process (#12978).
+        OMO_TEST_CREDENTIAL_LOCK_HOME: home,
       },
-      stdin: "ignore", stdout: "pipe", stderr: "pipe",
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "pipe",
     },
   )
-  onTestFinished(async () => { if (child.exitCode === null) child.kill(); await child.exited })
+  onTestFinished(async () => {
+    if (child.exitCode === null) child.kill()
+    await child.exited
+  })
   const [stdout, stderr, code] = await Promise.all([
-    new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited,
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+    child.exited,
   ])
   return { stdout, stderr: stderr.trim(), code }
 }
@@ -35,16 +49,21 @@ async function omo(args: string[], api: string) {
 test("login against an unreachable service stops before any sign-in step and says it can't reach the service", async () => {
   const api = await unreachableOrigin()
   const result = await omo(["login"], api)
-  expect(result.stderr).toBe(`Can't reach OmO accounts at ${api}. The service may not be available yet, or your network, proxy or certificate settings are blocking it.`)
+  expect(result.stderr).toBe(
+    `Can't reach OmO accounts at ${api}. The service may not be available yet, or your network, proxy or certificate settings are blocking it.`,
+  )
   expect(result.stdout).toBe("")
   expect(result.code).toBe(1)
 })
 
 test("login against a service whose health check is refused stops before any sign-in step", async () => {
   const requests: string[] = []
-  const api = fakeApi(request => {
+  const api = fakeApi((request) => {
     requests.push(`${request.method} ${new URL(request.url).pathname}`)
-    return Response.json({ error: { code: "unavailable", message: "maintenance", retryable: true, requestId: "test" } }, { status: 503 })
+    return Response.json(
+      { error: { code: "unavailable", message: "maintenance", retryable: true, requestId: "test" } },
+      { status: 503 },
+    )
   })
   const result = await omo(["login"], api)
   expect(requests).toEqual(["GET /v1/health"])
@@ -54,11 +73,12 @@ test("login against a service whose health check is refused stops before any sig
 
 test("login against a reachable service checks health first, then signs in as before", async () => {
   const requests: string[] = []
-  const api = fakeApi(request => {
+  const api = fakeApi((request) => {
     const path = new URL(request.url).pathname
     requests.push(`${request.method} ${path}`)
     if (path === "/v1/health") return Response.json({ ok: true })
-    if (path === "/v1/device/code") return Response.json({ ...minted, intervalSeconds: 1, expiresAt: new Date(Date.now() - 1000).toISOString() })
+    if (path === "/v1/device/code")
+      return Response.json({ ...minted, intervalSeconds: 1, expiresAt: new Date(Date.now() - 1000).toISOString() })
     return new Response(null, { status: 404 })
   })
   const result = await omo(["login", "--device"], api)

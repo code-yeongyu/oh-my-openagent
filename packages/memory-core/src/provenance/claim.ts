@@ -77,7 +77,10 @@ export function quotedUserMessage(quote: string, userTexts: readonly string[]): 
 // digits, the plain ASCII space, an ASCII apostrophe between two letters, and one '.' or '!' right after the last word.
 // Any other code point fails closed, so no look-alike, invisible or combining character reaches the phrase match.
 const WORD_CHAR = "A-Za-z\\uAC00-\\uD7A3"
-const VERIFIABLE_MESSAGE = new RegExp(`^ *(?:[${WORD_CHAR}0-9 ]|(?<=[${WORD_CHAR}])'(?=[${WORD_CHAR}]))*[${WORD_CHAR}0-9][.!]? *$`, "u")
+const VERIFIABLE_MESSAGE = new RegExp(
+  `^ *(?:[${WORD_CHAR}0-9 ]|(?<=[${WORD_CHAR}])'(?=[${WORD_CHAR}]))*[${WORD_CHAR}0-9][.!]? *$`,
+  "u",
+)
 
 // The message with spaces collapsed, case folded and the final '.' or '!' dropped.
 function bareMessage(text: string): string {
@@ -91,18 +94,23 @@ function capQuote(text: string): string {
 
 export function renderClaimReceipt(receipt: ClaimReceipt): string {
   switch (receipt.source) {
-    case "user": return `user replied "${singleLine(receipt.userQuote)}" to proposal ${receipt.approves}; a record, not the user's approval`
-    case "agent": return receipt.downgraded === true
-      ? "agent suggestion, not a user decision (claimed as the user's, but no matching user words)"
-      : "agent suggestion, not a user decision"
-    case "inferred": return "inferred, not a user decision"
+    case "user":
+      return `user replied "${singleLine(receipt.userQuote)}" to proposal ${receipt.approves}; a record, not the user's approval`
+    case "agent":
+      return receipt.downgraded === true
+        ? "agent suggestion, not a user decision (claimed as the user's, but no matching user words)"
+        : "agent suggestion, not a user decision"
+    case "inferred":
+      return "inferred, not a user decision"
   }
 }
 
 export function claimReceiptTrailers(receipt: ClaimReceipt): string[] {
   const trailers = [`Omo-Claim-Source: ${receipt.source}`]
-  if (receipt.source === "user") trailers.push(`Omo-User-Quote: ${singleLine(receipt.userQuote)}`, `Omo-Claim-Approves: ${receipt.approves}`)
-  if (receipt.source === "agent" && receipt.downgraded === true) trailers.push("Omo-Claim-Downgraded: unverified-user-quote")
+  if (receipt.source === "user")
+    trailers.push(`Omo-User-Quote: ${singleLine(receipt.userQuote)}`, `Omo-Claim-Approves: ${receipt.approves}`)
+  if (receipt.source === "agent" && receipt.downgraded === true)
+    trailers.push("Omo-Claim-Downgraded: unverified-user-quote")
   return trailers
 }
 

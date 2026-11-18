@@ -18,7 +18,8 @@ const RESERVED_SYSTEM_TREE = "system/"
 export function normalizeMemoryPath(input: string): PathCheck {
   if (input.trim().length === 0) return { ok: false, code: "path_empty", message: "A memory path is required." }
   if (input.includes("\\")) return { ok: false, code: "path_separator", message: "Memory paths use '/' separators." }
-  if (input.startsWith("/")) return { ok: false, code: "path_absolute", message: "Memory paths are relative to the memory repo." }
+  if (input.startsWith("/"))
+    return { ok: false, code: "path_absolute", message: "Memory paths are relative to the memory repo." }
   const segments = input.split("/").filter((segment) => segment.length > 0 && segment !== ".")
   if (segments.some((segment) => segment === "..")) {
     return { ok: false, code: "path_traversal", message: "Memory paths cannot contain '..' segments." }

@@ -48,10 +48,13 @@ function makeZeroCapManager(): TaskManager {
   }
   const registry: ResidencyRegistry = {
     get: (taskId) => toResidentHandle(manager().getResidentHandle(taskId)),
-    entries: () => manager().residentTaskIds().flatMap((taskId) => {
-      const handle = toResidentHandle(manager().getResidentHandle(taskId))
-      return handle === undefined ? [] : [handle]
-    }),
+    entries: () =>
+      manager()
+        .residentTaskIds()
+        .flatMap((taskId) => {
+          const handle = toResidentHandle(manager().getResidentHandle(taskId))
+          return handle === undefined ? [] : [handle]
+        }),
     forget: (taskId, options) => manager().forget(taskId, options),
     hasPendingSends: () => false,
   }

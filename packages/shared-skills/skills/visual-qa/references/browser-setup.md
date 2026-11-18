@@ -65,14 +65,15 @@ cloning its profile:
 
 ```js
 const session = await omowright.connectBrowserSkill({ name: "visual-qa capture", focused: false })
+const sync = async () => (await session.cooperate("sync")).context_id   // BrowserSkill 0.4: one context per page action
 try {
-  await session.navigate(url, { waitUntil: "load" })
-  await session.resize(1440, 900)                                 // desktop column of the matrix
+  await session.navigate(url, { waitUntil: "load", context: await sync() })
+  await session.resize(1440, 900, { context: await sync() })     // desktop column of the matrix
   await Bun.write(`${outDir}/${route}-1440-top.png`, (await session.screenshot()).buffer)   // { buffer, width, height }
-  await session.emulate({ overrides: { width: 390, mobile: true } })  // phone column; `off: true` restores
+  await session.emulate({ overrides: { width: 390, mobile: true }, context: await sync() })  // phone column; `off: true` restores
   await Bun.write(`${outDir}/${route}-390-top.png`, (await session.screenshot()).buffer)
 } finally {
-  await session.emulate({ off: true })
+  await session.emulate({ off: true, context: await sync() })
   await session.stop()
 }
 ```
@@ -89,8 +90,10 @@ not fall back to the owned engine for an authenticated criterion.
 
 ## Capture at a fixed viewport
 
-Match CSS viewport AND PNG dimensions: pin `deviceScaleFactor` through `emulate` (owned) or
-`resize` (attached) instead of resizing the PNG to force a pass; a 390-wide capture at desktop
+Match CSS viewport AND PNG dimensions: pin `deviceScaleFactor` through `emulate` (owned engine).
+Attached `resize(width, height)` sets the window size only and leaves the device pixel ratio at the
+user's display, so on the attached engine record the capture's DPR (PNG width / CSS viewport width)
+and compare against a reference taken at that DPR. Never resize the PNG to force a pass; a 390-wide capture at desktop
 DPR with classic scrollbars is not a phone capture. Wait for the specific page state (a locator,
 a `waitForURL`, a `createNetworkSnoop(page).waitFor(...)`), not a sleep, then compare:
 

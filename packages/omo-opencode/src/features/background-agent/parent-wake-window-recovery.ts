@@ -14,9 +14,7 @@ type ParentWakeWindowRecoveryInput = {
   readonly scheduleFlush: () => void
 }
 
-export async function handleDispatchedParentWakeWindowElapsed(
-  input: ParentWakeWindowRecoveryInput,
-): Promise<void> {
+export async function handleDispatchedParentWakeWindowElapsed(input: ParentWakeWindowRecoveryInput): Promise<void> {
   const currentWake = input.dispatchedTracker.getWake(input.sessionID)
   if (!currentWake || currentWake.dispatchedAt !== input.wake.dispatchedAt) {
     return

@@ -21,13 +21,16 @@ describe("executeLegacyConfigMigrationPlan", () => {
 
     try {
       // when
-      const result = executeLegacyConfigMigrationPlan({
-        id: "already-migrated",
-        inspect: () => ({ diagnostics: [], document: {} }),
-        sources: [{ backupPath, path: sourcePath }],
-        targetPath,
-        transform: () => ({}),
-      }, { env: { HOME: homeDir } })
+      const result = executeLegacyConfigMigrationPlan(
+        {
+          id: "already-migrated",
+          inspect: () => ({ diagnostics: [], document: {} }),
+          sources: [{ backupPath, path: sourcePath }],
+          targetPath,
+          transform: () => ({}),
+        },
+        { env: { HOME: homeDir } },
+      )
 
       // then
       expect(result.status).toBe("skipped")

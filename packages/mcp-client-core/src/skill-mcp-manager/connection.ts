@@ -41,17 +41,25 @@ export async function getOrCreateClient(params: {
     let policy: Awaited<ReturnType<EnvironmentGrantPolicy["prepare"]>>
     if (params.info.revalidateDeclaration || usesProjectEnvironment(params.info)) {
       const refreshed = await params.info.revalidateDeclaration?.()
-      if (params.info.revalidateDeclaration && !refreshed) throw new Error("The MCP declaration is no longer available.")
-      info = refreshed ? { ...params.info, sourcePath: refreshed.sourcePath, sourceKind: refreshed.sourceKind } : params.info
+      if (params.info.revalidateDeclaration && !refreshed)
+        throw new Error("The MCP declaration is no longer available.")
+      info = refreshed
+        ? { ...params.info, sourcePath: refreshed.sourcePath, sourceKind: refreshed.sourceKind }
+        : params.info
       config = refreshed?.config ?? params.config
       state.environmentPolicy ??= new EnvironmentGrantPolicy(undefined, undefined, async (identity) => {
-        for (const key of state.clients.keys()) if (key.includes(`::identity=${identity}::`)) await forceReconnect(state, key)
+        for (const key of state.clients.keys())
+          if (key.includes(`::identity=${identity}::`)) await forceReconnect(state, key)
       })
       policy = await state.environmentPolicy.prepare(info, config, params.sessionEnv)
     }
-    const clientKey = policy ? `${params.clientKey}::identity=${policy.identity}::policy=${policy.digest}` : params.clientKey
-    if (state.shutdownGeneration !== shutdownGenAtEntry ||
-      (state.disconnectedSessions.get(info.sessionID) ?? 0) !== disconnectGenAtEntry) {
+    const clientKey = policy
+      ? `${params.clientKey}::identity=${policy.identity}::policy=${policy.digest}`
+      : params.clientKey
+    if (
+      state.shutdownGeneration !== shutdownGenAtEntry ||
+      (state.disconnectedSessions.get(info.sessionID) ?? 0) !== disconnectGenAtEntry
+    ) {
       throw new Error(`Session "${info.sessionID}" disconnected during MCP policy resolution.`)
     }
 
@@ -81,13 +89,21 @@ export async function getOrCreateClient(params: {
       const disconnectGenAtStart = disconnectGenAtEntry
       const shutdownGenAtStart = shutdownGenAtEntry
 
-      const client = await createClient({ state, clientKey, info, config: expandedConfig, environment: policy?.environment, policySignal: policy?.signal })
+      const client = await createClient({
+        state,
+        clientKey,
+        info,
+        config: expandedConfig,
+        environment: policy?.environment,
+        policySignal: policy?.signal,
+      })
       if (policy && state.environmentPolicy?.version(policy.identity) !== policy.version) {
         await forceReconnect(state, clientKey)
         throw new Error("MCP environment policy changed during connection; retry with the current grant snapshot.")
       }
 
-      const isStale = state.pendingConnections.has(clientKey) && state.pendingConnections.get(clientKey) !== currentConnectionPromise
+      const isStale =
+        state.pendingConnections.has(clientKey) && state.pendingConnections.get(clientKey) !== currentConnectionPromise
       if (isStale) {
         removeClientIfCurrent(state, clientKey, client)
         try {
@@ -177,21 +193,21 @@ async function createClient(params: {
   if (!connectionType) {
     throw new Error(
       `MCP server "${info.serverName}" has no valid connection configuration.\n\n` +
-      `The MCP configuration in skill "${info.skillName}" must specify either:\n` +
-      `  - A URL for HTTP connection (remote MCP server)\n` +
-      `  - A command for stdio connection (local MCP process)\n\n` +
-      `Examples:\n` +
-      `  HTTP:\n` +
-      `    mcp:\n` +
-      `      ${info.serverName}:\n` +
-      `        url: https://mcp.example.com/mcp\n` +
-      `        headers:\n` +
-      "          Authorization: Bearer ${API_KEY}\n\n" +
-      `  Stdio:\n` +
-      `    mcp:\n` +
-      `      ${info.serverName}:\n` +
-      `        command: npx\n` +
-      `        args: [-y, @some/mcp-server]`
+        `The MCP configuration in skill "${info.skillName}" must specify either:\n` +
+        `  - A URL for HTTP connection (remote MCP server)\n` +
+        `  - A command for stdio connection (local MCP process)\n\n` +
+        `Examples:\n` +
+        `  HTTP:\n` +
+        `    mcp:\n` +
+        `      ${info.serverName}:\n` +
+        `        url: https://mcp.example.com/mcp\n` +
+        `        headers:\n` +
+        "          Authorization: Bearer ${API_KEY}\n\n" +
+        `  Stdio:\n` +
+        `    mcp:\n` +
+        `      ${info.serverName}:\n` +
+        `        command: npx\n` +
+        `        args: [-y, @some/mcp-server]`,
     )
   }
 

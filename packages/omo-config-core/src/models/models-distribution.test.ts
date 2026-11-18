@@ -7,9 +7,7 @@ test("default and sequential do not consume turns or mutate the configured chain
   expect(distribute("category:one", entries)).toBe(entries)
   expect(distribute("category:one", entries, "sequential")).toBe(entries)
   expect(distribute("category:one", entries, "round_robin")).toEqual(entries)
-  expect(distribute("category:one", entries, "round_robin")).toEqual([
-    "provider/b", "provider/c", "provider/a",
-  ])
+  expect(distribute("category:one", entries, "round_robin")).toEqual(["provider/b", "provider/c", "provider/a"])
   expect(entries).toEqual(["provider/a", "provider/b", "provider/c"])
 })
 

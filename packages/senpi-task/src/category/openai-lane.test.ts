@@ -24,7 +24,9 @@ function registry(models: readonly FakeModel[]) {
   }
 }
 
-function expectResolved(result: ReturnType<typeof resolveCategory<FakeModel>>): Extract<typeof result, { readonly kind: "resolved" }> {
+function expectResolved(
+  result: ReturnType<typeof resolveCategory<FakeModel>>,
+): Extract<typeof result, { readonly kind: "resolved" }> {
   if (result.kind !== "resolved") throw new Error(`Expected resolved category, got ${result.kind}`)
   return result
 }
@@ -120,7 +122,8 @@ describe("openai lane policy", () => {
 
       // then
       expect(result.spec.provider).toBe("chatgpt-subscription")
-      expect(result.spec.requested_model?.display).toBe("chatgpt-subscription/gpt-6-astra")
+      expect(result.spec.modelId).toBe("gpt-6-astra")
+      expect(result.spec.requested_model?.display).toBe("chatgpt-subscription/gpt-6.2-astra")
     })
   })
 })

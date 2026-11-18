@@ -2,24 +2,20 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "bun:test"
 
-import {
-  UNCONFIGURED_POSTHOG_API_KEY,
-  type TelemetryDiagnosticInput,
-} from "@oh-my-opencode/telemetry-core"
+import { UNCONFIGURED_POSTHOG_API_KEY, type TelemetryDiagnosticInput } from "@oh-my-opencode/telemetry-core"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createOmoNativeNoticeRegistration } from "./omo-native-notice"
 import { getOmoNativeStateDir } from "./product-identity"
-import {
-  createEnabledEnv,
-  createSilentLogger,
-  withTempAgentDir,
-} from "./telemetry.test-support"
+import { createEnabledEnv, createSilentLogger, withTempAgentDir } from "./telemetry.test-support"
 
-function register(agentDir: string, options: {
-  readonly diagnostics?: (input: TelemetryDiagnosticInput) => void
-  readonly env?: Record<string, string | undefined>
-  readonly stateDir?: string
-} = {}): FakeExtensionAPI {
+function register(
+  agentDir: string,
+  options: {
+    readonly diagnostics?: (input: TelemetryDiagnosticInput) => void
+    readonly env?: Record<string, string | undefined>
+    readonly stateDir?: string
+  } = {},
+): FakeExtensionAPI {
   const pi = new FakeExtensionAPI()
   createOmoNativeNoticeRegistration({
     diagnostics: options.diagnostics,
@@ -60,7 +56,8 @@ describe("OmO Native telemetry notice", () => {
         "DO_NOT_TRACK=1",
         "~/.omo/omo.jsonc",
         "https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/legal/privacy-policy.md",
-      ]) expect(notifications[0]).toContain(token)
+      ])
+        expect(notifications[0]).toContain(token)
     })
   })
 
@@ -110,10 +107,14 @@ describe("OmO Native telemetry notice", () => {
       const notifications: string[] = []
 
       // when
-      await pi.dispatch("session_start", {}, {
-        cwd,
-        ui: { notify: (message: string) => notifications.push(message) },
-      })
+      await pi.dispatch(
+        "session_start",
+        {},
+        {
+          cwd,
+          ui: { notify: (message: string) => notifications.push(message) },
+        },
+      )
 
       // then
       expect(notifications).toEqual([])
@@ -131,8 +132,12 @@ describe("OmO Native telemetry notice", () => {
       const notifications: string[] = []
 
       // when
-      await expect(pi.dispatch("session_start", {}, { ui: { notify: (message: string) => notifications.push(message) } })).resolves.toBeDefined()
-      await expect(pi.dispatch("session_start", {}, { ui: { notify: (message: string) => notifications.push(message) } })).resolves.toBeDefined()
+      await expect(
+        pi.dispatch("session_start", {}, { ui: { notify: (message: string) => notifications.push(message) } }),
+      ).resolves.toBeDefined()
+      await expect(
+        pi.dispatch("session_start", {}, { ui: { notify: (message: string) => notifications.push(message) } }),
+      ).resolves.toBeDefined()
 
       // then
       expect(notifications).toEqual([])
@@ -166,10 +171,7 @@ describe("OmO Native telemetry notice", () => {
       const ctx = { ui: { notify: (message: string) => notifications.push(message) } }
 
       // when
-      await Promise.all([
-        pi.dispatch("session_start", {}, ctx),
-        pi.dispatch("session_start", {}, ctx),
-      ])
+      await Promise.all([pi.dispatch("session_start", {}, ctx), pi.dispatch("session_start", {}, ctx)])
 
       // then
       expect(notifications).toHaveLength(1)
@@ -183,12 +185,32 @@ describe("OmO Native telemetry notice", () => {
       let attempts = 0
 
       // when
-      await pi.dispatch("session_start", {}, { ui: { notify: () => { attempts += 1; throw new Error("ui closed") } } })
-      await pi.dispatch("session_start", {}, { ui: { notify: () => { attempts += 1 } } })
+      await pi.dispatch(
+        "session_start",
+        {},
+        {
+          ui: {
+            notify: () => {
+              attempts += 1
+              throw new Error("ui closed")
+            },
+          },
+        },
+      )
+      await pi.dispatch(
+        "session_start",
+        {},
+        {
+          ui: {
+            notify: () => {
+              attempts += 1
+            },
+          },
+        },
+      )
 
       // then
       expect(attempts).toBe(1)
     })
   })
-
 })

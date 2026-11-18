@@ -55,9 +55,7 @@ describe("handleNonIdleEvent", () => {
       properties: {
         sessionID,
         info: { role: "user" },
-        parts: [
-          { type: "text", text: `internal wake\n${OMO_INTERNAL_INITIATOR_MARKER}` },
-        ],
+        parts: [{ type: "text", text: `internal wake\n${OMO_INTERNAL_INITIATOR_MARKER}` }],
       },
       sessionStateStore,
     })

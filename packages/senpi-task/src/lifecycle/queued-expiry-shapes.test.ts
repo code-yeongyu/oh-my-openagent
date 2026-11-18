@@ -5,7 +5,10 @@ import { liveParentFixture } from "./__fixtures__/live-parent-fakes"
 import { resolveContext } from "./context"
 import { expireSuspendedChild } from "./suspended-expiry"
 
-afterEach(() => { cleanupProjects(); cleanupManagers() })
+afterEach(() => {
+  cleanupProjects()
+  cleanupManagers()
+})
 
 for (const mode of ["in-process", "child-process", "host-session"] as const) {
   for (const parked of [false, true]) {
@@ -23,8 +26,9 @@ for (const mode of ["in-process", "child-process", "host-session"] as const) {
         if (mode === "in-process") await handle.dispose()
         f.manager.forget(id, { path: "park" })
       }
-      f.store.mutate(id, record => ({
-        ...record, residency_state: mode === "in-process" ? "persisted_only" : "rpc_detached",
+      f.store.mutate(id, (record) => ({
+        ...record,
+        residency_state: mode === "in-process" ? "persisted_only" : "rpc_detached",
         recovery_deadline_at: 0,
         pending_steering: [{ id: "queued", message: "Q1", deliver_as: "steer" }],
       }))
@@ -42,10 +46,13 @@ for (const mode of ["in-process", "child-process", "host-session"] as const) {
       expect(f.store.load(id)?.pending_steering).toBeUndefined()
       expect(f.messages).toHaveLength(1)
       expect(f.messages[0]?.content).toContain("1 queued message was not delivered.")
-      expect(f.recordedEvents.filter(event => event.type === "steer_dropped").map(event => event.payload))
-        .toEqual([{ count: 1, reason: "target_gone" }])
-      expect(f.recordedEvents.find(event => event.type === "suspended_unresumable")?.payload)
-        .toMatchObject({ confirmed_stop: true, undelivered_messages: 1 })
+      expect(f.recordedEvents.filter((event) => event.type === "steer_dropped").map((event) => event.payload)).toEqual([
+        { count: 1, reason: "target_gone" },
+      ])
+      expect(f.recordedEvents.find((event) => event.type === "suspended_unresumable")?.payload).toMatchObject({
+        confirmed_stop: true,
+        undelivered_messages: 1,
+      })
       if (mode === "host-session") {
         expect(f.state.closes).toBe(1)
         expect(f.host.daemon.livePaths.size).toBe(0)
@@ -73,8 +80,10 @@ test("queued expiry counts a message queued after its read in the message and bo
   f.dispose()
   const id = await f.start()
   f.state.closeRefused = false
-  f.store.mutate(id, record => ({
-    ...record, residency_state: "persisted_only", recovery_deadline_at: 0,
+  f.store.mutate(id, (record) => ({
+    ...record,
+    residency_state: "persisted_only",
+    recovery_deadline_at: 0,
     pending_steering: [{ id: "queued", message: "Q1", deliver_as: "steer" }],
   }))
   const observed = f.store.load(id)
@@ -88,11 +97,19 @@ test("queued expiry counts a message queued after its read in the message and bo
       if (key === "mutate") {
         return (taskId: string, mutation: Parameters<typeof real.mutate>[1]) => {
           const current = target.load(taskId)
-          if (!injected && current !== null && (current.pending_steering?.length ?? 0) > 0 && mutation(current)?.pending_steering === undefined) {
+          if (
+            !injected &&
+            current !== null &&
+            (current.pending_steering?.length ?? 0) > 0 &&
+            mutation(current)?.pending_steering === undefined
+          ) {
             injected = true
-            target.mutate(taskId, record => ({
+            target.mutate(taskId, (record) => ({
               ...record,
-              pending_steering: [...(record.pending_steering ?? []), { id: "late", message: "Q2", deliver_as: "steer" as const }],
+              pending_steering: [
+                ...(record.pending_steering ?? []),
+                { id: "late", message: "Q2", deliver_as: "steer" as const },
+              ],
             }))
           }
           return target.mutate(taskId, mutation)
@@ -108,9 +125,11 @@ test("queued expiry counts a message queued after its read in the message and bo
   expect(injected).toBe(true)
   expect(f.store.load(id)?.pending_steering).toBeUndefined()
   expect(f.messages[0]?.content).toContain("2 queued messages were not delivered.")
-  expect(f.recordedEvents.filter(event => event.type === "steer_dropped").map(event => event.payload))
-    .toEqual([{ count: 2, reason: "target_gone" }])
-  expect(f.recordedEvents.find(event => event.type === "suspended_unresumable")?.payload)
-    .toMatchObject({ undelivered_messages: 2 })
+  expect(f.recordedEvents.filter((event) => event.type === "steer_dropped").map((event) => event.payload)).toEqual([
+    { count: 2, reason: "target_gone" },
+  ])
+  expect(f.recordedEvents.find((event) => event.type === "suspended_unresumable")?.payload).toMatchObject({
+    undelivered_messages: 2,
+  })
   f.manager.workpools.dispose()
 })

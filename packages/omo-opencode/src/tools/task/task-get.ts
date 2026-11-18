@@ -33,7 +33,7 @@ Returns null if the task does not exist or the file is invalid.`,
         const taskDir = getTaskDir(config)
         const taskPath = join(taskDir, `${taskId}.json`)
 
-         const task = readJsonSafe(taskPath, TaskObjectSchema)
+        const task = readJsonSafe(taskPath, TaskObjectSchema)
 
         return JSON.stringify({ task: task ?? null })
       } catch (error) {

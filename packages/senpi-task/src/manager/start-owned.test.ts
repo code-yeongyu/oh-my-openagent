@@ -8,7 +8,15 @@ import type { ManagedChildHandle } from "./child-handle"
 import type { DagNodeId, DagRunId } from "../dag/types"
 import { createTaskRecordStore } from "../store"
 import type { TaskRecordStore } from "../store"
-import { FakeRunner, baseSpec, categoryPlanner, cleanupProjects, makeManager, settings, tempProject } from "./__fixtures__/manager-fakes"
+import {
+  FakeRunner,
+  baseSpec,
+  categoryPlanner,
+  cleanupProjects,
+  makeManager,
+  settings,
+  tempProject,
+} from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
 import type { ManagedRunner, ManagedStartSpec, SpawnAdmission } from "./types"
 
@@ -23,7 +31,9 @@ afterEach(cleanupProjects)
 
 function deferred<T>() {
   let resolve = (_value: T): void => undefined
-  const promise = new Promise<T>((done) => { resolve = done })
+  const promise = new Promise<T>((done) => {
+    resolve = done
+  })
   return { promise, resolve }
 }
 
@@ -212,10 +222,11 @@ describe("TaskManager.startOwned", () => {
     const depthResult = await depth.manager.startOwned(baseSpec({ depth: 2 }), owner)
     const residencyResult = await residency.manager.startOwned(baseSpec(), owner)
     const running = await queued.manager.startOwned(baseSpec({ name: "running" }), owner)
-    const pending = await queued.manager.startOwned(
-      baseSpec({ name: "pending" }),
-      { ...owner, nodeId: "node-2" as DagNodeId, fingerprint: "fingerprint-2" },
-    )
+    const pending = await queued.manager.startOwned(baseSpec({ name: "pending" }), {
+      ...owner,
+      nodeId: "node-2" as DagNodeId,
+      fingerprint: "fingerprint-2",
+    })
 
     // then
     expect(depthResult.kind).toBe("depth_denied")

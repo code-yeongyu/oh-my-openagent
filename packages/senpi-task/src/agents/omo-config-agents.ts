@@ -34,7 +34,9 @@ function toAgentDefinition(name: string, def: OmoAgentDef): AgentDefinition {
     ...(def.models === undefined ? {} : { models: def.models }),
     ...(def.models_distribution === undefined ? {} : { models_distribution: def.models_distribution }),
     ...(def.variant === undefined ? {} : { variant: def.variant }),
-    ...(def.reasoning === undefined && def.reasoningEffort === undefined ? {} : { reasoningEffort: def.reasoning ?? def.reasoningEffort }),
+    ...(def.reasoning === undefined && def.reasoningEffort === undefined
+      ? {}
+      : { reasoningEffort: def.reasoning ?? def.reasoningEffort }),
     ...(def.temperature === undefined ? {} : { temperature: def.temperature }),
     ...(tools === undefined ? {} : { tools }),
     ...(def.disable === undefined ? {} : { disable: def.disable }),

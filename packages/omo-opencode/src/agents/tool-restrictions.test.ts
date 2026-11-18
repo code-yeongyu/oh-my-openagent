@@ -225,9 +225,7 @@ describe("read-only agent tool restrictions", () => {
       ]
 
       // when
-      const permissions = frontierAgents.map(
-        (agent) => (agent.permission ?? {}) as Record<string, string>,
-      )
+      const permissions = frontierAgents.map((agent) => (agent.permission ?? {}) as Record<string, string>)
 
       // then
       for (const permission of permissions) {
@@ -245,9 +243,7 @@ describe("read-only agent tool restrictions", () => {
       ]
 
       // when
-      const permissions = otherAgents.map(
-        (agent) => (agent.permission ?? {}) as Record<string, string>,
-      )
+      const permissions = otherAgents.map((agent) => (agent.permission ?? {}) as Record<string, string>)
 
       // then
       for (const permission of permissions) {

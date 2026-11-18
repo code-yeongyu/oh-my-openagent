@@ -18,10 +18,28 @@
 // reseed envelope in `sidecar-prompt-reseed`; this module renders the seed and wake envelopes and
 // is the public surface.
 
-import { escapeText, field, openTag, renderContract, renderTask, resolveCaps, singleLine, type KibitzerFieldCaps } from "./sidecar-prompt-blocks"
+import {
+  escapeText,
+  field,
+  openTag,
+  renderContract,
+  renderTask,
+  resolveCaps,
+  singleLine,
+  type KibitzerFieldCaps,
+} from "./sidecar-prompt-blocks"
 
-export { KIBITZER_FIELD_CAPS, KIBITZER_SIDECAR_TOOL_NAMES, type KibitzerFieldCaps, type KibitzerSidecarToolName } from "./sidecar-prompt-blocks"
-export { KIBITZER_RESEED_MAX_CHARS, renderKibitzerReseedPrompt, type KibitzerReseedInput } from "./sidecar-prompt-reseed"
+export {
+  KIBITZER_FIELD_CAPS,
+  KIBITZER_SIDECAR_TOOL_NAMES,
+  type KibitzerFieldCaps,
+  type KibitzerSidecarToolName,
+} from "./sidecar-prompt-blocks"
+export {
+  KIBITZER_RESEED_MAX_CHARS,
+  renderKibitzerReseedPrompt,
+  type KibitzerReseedInput,
+} from "./sidecar-prompt-reseed"
 
 /** Newest events carried whole by one envelope; everything older belongs to the folded digest. */
 export const KIBITZER_EVENT_WINDOW = 20
@@ -101,7 +119,12 @@ function renderEnvelope(tag: "kibitzer-seed" | "kibitzer-wake", input: KibitzerS
       ...(input.toolBudget === undefined ? [] : [["tool-budget", input.toolBudget] as const]),
       // The range spans every cursor the envelope knows about, including the ones whose bodies were
       // folded into the digest or dropped by the window: the child must still see the real span.
-      ...(cursors.length === 0 ? [] : ([["cursor-from", Math.min(...cursors)], ["cursor-to", Math.max(...cursors)]] as const)),
+      ...(cursors.length === 0
+        ? []
+        : ([
+            ["cursor-from", Math.min(...cursors)],
+            ["cursor-to", Math.max(...cursors)],
+          ] as const)),
     ]),
     renderContract(),
     ...(input.taskSummary === undefined ? [] : [renderTask(input.taskSummary, caps)]),
@@ -123,7 +146,10 @@ function renderDigest(digest: KibitzerSidecarDigest, caps: KibitzerFieldCaps): s
 }
 
 function renderEvents(events: readonly KibitzerSidecarEvent[], omitted: number, caps: KibitzerFieldCaps): string {
-  const open = openTag("events", [["count", events.length], ["omitted", omitted]])
+  const open = openTag("events", [
+    ["count", events.length],
+    ["omitted", omitted],
+  ])
   if (events.length === 0) return `${open}</events>`
   return [open, ...events.map((event) => renderEvent(event, caps)), "</events>"].join("\n")
 }
@@ -139,12 +165,20 @@ function renderEvent(event: KibitzerSidecarEvent, caps: KibitzerFieldCaps): stri
     body.push(`<text>${escapeText(field(event.text, event.kind === "prompt" ? caps.prompt : caps.assistant))}</text>`)
   }
   if (event.args !== undefined) body.push(`<args>${escapeText(field(event.args, caps.toolArgs))}</args>`)
-  if (event.resultHead !== undefined) body.push(`<result>${escapeText(field(event.resultHead, caps.resultHead))}</result>`)
+  if (event.resultHead !== undefined)
+    body.push(`<result>${escapeText(field(event.resultHead, caps.resultHead))}</result>`)
   return [open, ...body, "</event>"].join("\n")
 }
 
-function renderCandidates(candidates: readonly KibitzerSidecarCandidate[], maxItems: number, caps: KibitzerFieldCaps): string {
-  const open = openTag("candidates", [["count", candidates.length], ["max-items", maxItems]])
+function renderCandidates(
+  candidates: readonly KibitzerSidecarCandidate[],
+  maxItems: number,
+  caps: KibitzerFieldCaps,
+): string {
+  const open = openTag("candidates", [
+    ["count", candidates.length],
+    ["max-items", maxItems],
+  ])
   if (candidates.length === 0) return `${open}</candidates>`
   return [open, ...candidates.map((candidate) => renderCandidate(candidate, caps)), "</candidates>"].join("\n")
 }

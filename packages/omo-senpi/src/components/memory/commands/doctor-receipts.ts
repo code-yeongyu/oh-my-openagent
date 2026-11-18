@@ -2,7 +2,12 @@ import { existsSync } from "@oh-my-opencode/memory-core/fs"
 import { readdir, readFile } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
-import { QUARANTINE_FILENAME, readMemoryReceipts, type MemoryReceipt, type MemoryReceiptKind } from "@oh-my-opencode/memory-core"
+import {
+  QUARANTINE_FILENAME,
+  readMemoryReceipts,
+  type MemoryReceipt,
+  type MemoryReceiptKind,
+} from "@oh-my-opencode/memory-core"
 
 import type { DoctorCheck } from "./doctor-checks"
 
@@ -32,27 +37,42 @@ export interface QuarantinedRun {
   readonly evidence: readonly string[]
 }
 
-export async function checkReceipts(runtimeDir: string, now: number): Promise<{ readonly check: DoctorCheck; readonly receipts: ReceiptSummaries }> {
+export async function checkReceipts(
+  runtimeDir: string,
+  now: number,
+): Promise<{ readonly check: DoctorCheck; readonly receipts: ReceiptSummaries }> {
   const { receipts, skippedPartialLines } = await readMemoryReceipts(runtimeDir, {})
-  const summaries = Object.fromEntries(KINDS.map((kind) => {
-    const newest = receipts.find((receipt) => receipt.kind === kind && !NON_TERMINAL.has(receipt.event))
-    return [kind, newest === undefined ? null : summarize(newest)]
-  })) as ReceiptSummaries
+  const summaries = Object.fromEntries(
+    KINDS.map((kind) => {
+      const newest = receipts.find((receipt) => receipt.kind === kind && !NON_TERMINAL.has(receipt.event))
+      return [kind, newest === undefined ? null : summarize(newest)]
+    }),
+  ) as ReceiptSummaries
   const parts = KINDS.map((kind) => describe(kind, summaries[kind], now))
-  const skipped = skippedPartialLines === 0
-    ? ""
-    : ` (${skippedPartialLines} partial line${skippedPartialLines === 1 ? "" : "s"} skipped)`
+  const skipped =
+    skippedPartialLines === 0
+      ? ""
+      : ` (${skippedPartialLines} partial line${skippedPartialLines === 1 ? "" : "s"} skipped)`
   return {
-    check: { name: "receipts", level: skippedPartialLines === 0 ? "ok" : "warn", detail: `${parts.join("; ")}${skipped}` },
+    check: {
+      name: "receipts",
+      level: skippedPartialLines === 0 ? "ok" : "warn",
+      detail: `${parts.join("; ")}${skipped}`,
+    },
     receipts: summaries,
   }
 }
 
-export async function checkQuarantinedRuns(reflectionDir: string): Promise<{ readonly check: DoctorCheck; readonly runs: readonly QuarantinedRun[] }> {
+export async function checkQuarantinedRuns(
+  reflectionDir: string,
+): Promise<{ readonly check: DoctorCheck; readonly runs: readonly QuarantinedRun[] }> {
   const runsDir = join(reflectionDir, "runs")
   let names: string[]
   try {
-    names = (await readdir(runsDir, { withFileTypes: true })).filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort()
+    names = (await readdir(runsDir, { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .sort()
   } catch {
     names = []
   }
@@ -62,7 +82,8 @@ export async function checkQuarantinedRuns(reflectionDir: string): Promise<{ rea
     if (!existsSync(join(dir, QUARANTINE_FILENAME))) continue
     runs.push(await readQuarantine(dir, name))
   }
-  if (runs.length === 0) return { check: { name: "quarantined-runs", level: "ok", detail: "no quarantined runs" }, runs }
+  if (runs.length === 0)
+    return { check: { name: "quarantined-runs", level: "ok", detail: "no quarantined runs" }, runs }
   const listed = runs.map((run) => `${run.dir} (${run.reason})`).join("; ")
   const noun = runs.length === 1 ? "1 run needs" : `${runs.length} runs need`
   return { check: { name: "quarantined-runs", level: "warn", detail: `${noun} manual disposal: ${listed}` }, runs }
@@ -76,7 +97,9 @@ async function readQuarantine(dir: string, name: string): Promise<QuarantinedRun
       reason: typeof record.reason === "string" ? bound(record.reason) : "unknown",
       at: typeof record.quarantinedAt === "string" ? record.quarantinedAt : null,
       dir,
-      evidence: Array.isArray(record.evidence) ? record.evidence.filter((item): item is string => typeof item === "string") : [],
+      evidence: Array.isArray(record.evidence)
+        ? record.evidence.filter((item): item is string => typeof item === "string")
+        : [],
     }
   } catch {
     return { runId: name, reason: "unreadable_sentinel", at: null, dir, evidence: [] }
@@ -97,8 +120,9 @@ function summarize(receipt: MemoryReceipt): ReceiptSummary {
 
 function describe(kind: MemoryReceiptKind, summary: ReceiptSummary | null, now: number): string {
   if (summary === null) return `${kind} never`
-  const label = summary.reason
-    ?? (summary.runId === undefined ? `batch ${summary.batchId?.slice(0, 8)}` : `run ${summary.runId.slice(0, 8)}`)
+  const label =
+    summary.reason ??
+    (summary.runId === undefined ? `batch ${summary.batchId?.slice(0, 8)}` : `run ${summary.runId.slice(0, 8)}`)
   return `${kind} ${summary.event} ${age(summary.at, now)} (${label})`
 }
 

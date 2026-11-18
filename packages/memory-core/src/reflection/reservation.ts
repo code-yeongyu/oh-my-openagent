@@ -8,6 +8,7 @@ import { createLockRecord, reflectionSchedulerLockPath, withLock } from "../lock
 import {
   completeTransition,
   evaluateTransitions,
+  promoteTransition,
   reserveTransition,
   type CapturedConversation,
   type JournalSnapshot,
@@ -119,27 +120,33 @@ export class ReflectionReservationStore {
   async tryReserve(request: ReflectionRequest, signal?: AbortSignal): Promise<ReservationResult> {
     // Minting happens INSIDE the scheduler lock: a disk-scoped factory derives the next id from
     // persisted state, so two processes reserving concurrently must not observe the same state.
-    return this.locked(undefined, async () => {
-      signal?.throwIfAborted()
-      const now = this.now().toISOString()
-      const park = await this.parkFile.read()
-      const gate = gateReflectionRequest(park, request, now)
-      if (gate.kind === "parked") return { status: "parked", park, nextProbeAt: gate.nextProbeAt }
-      const runId = await this.createRunId()
-      signal?.throwIfAborted()
-      const current = await this.readStateUnlocked()
-      signal?.throwIfAborted()
-      const transition = reserveTransition(current, request, runId)
-      const state = transition.result === "active"
-        ? { ...transition.state, active: await this.withLaunchOwner(transition.state.active) }
-        : transition.state
-      signal?.throwIfAborted()
-      if (gate.kind === "probe" && transition.result === "active") await this.parkFile.write(markReflectionProbe(park, now))
-      await this.writeStateUnlocked(state)
-      const run = transition.result === "active" ? state.active : state.pending
-      if (!run) throw new Error("Reservation transition did not produce a run")
-      return { status: transition.result, run }
-    }, signal)
+    return this.locked(
+      undefined,
+      async () => {
+        signal?.throwIfAborted()
+        const now = this.now().toISOString()
+        const park = await this.parkFile.read()
+        const gate = gateReflectionRequest(park, request, now)
+        if (gate.kind === "parked") return { status: "parked", park, nextProbeAt: gate.nextProbeAt }
+        const runId = await this.createRunId()
+        signal?.throwIfAborted()
+        const current = await this.readStateUnlocked()
+        signal?.throwIfAborted()
+        const transition = reserveTransition(current, request, runId)
+        const state =
+          transition.result === "active"
+            ? { ...transition.state, active: await this.withLaunchOwner(transition.state.active) }
+            : transition.state
+        signal?.throwIfAborted()
+        if (gate.kind === "probe" && transition.result === "active")
+          await this.parkFile.write(markReflectionProbe(park, now))
+        await this.writeStateUnlocked(state)
+        const run = transition.result === "active" ? state.active : state.pending
+        if (!run) throw new Error("Reservation transition did not produce a run")
+        return { status: transition.result, run }
+      },
+      signal,
+    )
   }
 
   async complete(
@@ -147,62 +154,103 @@ export class ReflectionReservationStore {
     outcome: ReflectionOutcome,
     options?: ReflectionCompletionOptions,
   ): Promise<CompletionResult> {
-    return this.locked(runId, async () => {
-      const current = await this.readStateUnlocked()
-      const conversationIds = new Set([
-        ...(current.active?.request.conversationIds ?? []),
-        ...(current.pending?.request.conversationIds ?? []),
-      ])
-      const journals = new Map<string, TranscriptJournal>()
-      const snapshots = new Map<string, JournalSnapshot>()
-      for (const conversationId of conversationIds) {
-        const journal = await this.options.getJournal(conversationId)
-        journals.set(conversationId, journal)
-        snapshots.set(conversationId, {
-          conversationId,
-          state: await journal.getState(),
-          snapshot: null,
-        })
-      }
+    return this.locked(
+      runId,
+      async () => {
+        const current = await this.readStateUnlocked()
+        const conversationIds = new Set([
+          ...(current.active?.request.conversationIds ?? []),
+          ...(current.pending?.request.conversationIds ?? []),
+        ])
+        const journals = new Map<string, TranscriptJournal>()
+        const snapshots = new Map<string, JournalSnapshot>()
+        for (const conversationId of conversationIds) {
+          const journal = await this.options.getJournal(conversationId)
+          journals.set(conversationId, journal)
+          snapshots.set(conversationId, {
+            conversationId,
+            state: await journal.getState(),
+            snapshot: null,
+          })
+        }
 
-      const transition = completeTransition(
-        current,
-        runId,
-        outcome,
-        snapshots,
-        this.options.config,
-      )
-      const succeeded = outcome === "merged" || outcome === "no_changes"
-      if (!succeeded && current.active?.request.trigger !== "manual" && current.active?.request.trigger !== "dream") {
-        for (const id of current.active?.request.conversationIds ?? []) await journals.get(id)?.recordReflectionFailure()
-      }
-      for (const captured of transition.finalize) {
-        const journal = journals.get(captured.conversationId)
-        if (journal) await journal.finalizeReflection(captured.snapshot, true)
-      }
-      for (const conversationId of transition.clearPendingCompaction) {
-        const journal = journals.get(conversationId)
-        if (journal) await journal.setPendingCompaction(false)
-      }
-      if (succeeded && current.active?.request.trigger === "dream") {
-        await writeJsonAtomic(join(this.options.identity.paths.runtime, "dream", "state.json"), {
-          last_dream_at: this.now().toISOString(),
-          lastRunId: runId,
-        })
-      }
-      const park = await this.parkFile.transition(current.active, runId, outcome, options?.failure)
-      const launch = park.parked && transition.launch !== undefined && isAutomaticReflectionRequest(transition.launch.request)
-        ? undefined
-        : transition.launch
-      const promoted = launch === undefined ? undefined : await this.withLaunchOwner(launch)
-      const nextState = promoted === undefined ? { ...transition.state, active: undefined } : { ...transition.state, active: promoted }
-      await this.writeStateUnlocked(nextState)
-      return {
-        outcome,
-        ...(promoted === undefined ? {} : { launch: promoted }),
-        park,
-      }
-    }, undefined, options)
+        const transition = completeTransition(current, runId, outcome, snapshots, this.options.config)
+        const succeeded = outcome === "merged" || outcome === "no_changes"
+        if (!succeeded && current.active?.request.trigger !== "manual" && current.active?.request.trigger !== "dream") {
+          for (const id of current.active?.request.conversationIds ?? [])
+            await journals.get(id)?.recordReflectionFailure()
+        }
+        for (const captured of transition.finalize) {
+          const journal = journals.get(captured.conversationId)
+          if (journal) await journal.finalizeReflection(captured.snapshot, true)
+        }
+        for (const conversationId of transition.clearPendingCompaction) {
+          const journal = journals.get(conversationId)
+          if (journal) await journal.setPendingCompaction(false)
+        }
+        if (succeeded && current.active?.request.trigger === "dream") {
+          await writeJsonAtomic(join(this.options.identity.paths.runtime, "dream", "state.json"), {
+            last_dream_at: this.now().toISOString(),
+            lastRunId: runId,
+          })
+        }
+        const park = await this.parkFile.transition(current.active, runId, outcome, options?.failure)
+        const launch =
+          park.parked && transition.launch !== undefined && isAutomaticReflectionRequest(transition.launch.request)
+            ? undefined
+            : transition.launch
+        const promoted = launch === undefined ? undefined : await this.withLaunchOwner(launch)
+        const nextState =
+          promoted === undefined
+            ? { ...transition.state, active: undefined }
+            : { ...transition.state, active: promoted }
+        await this.writeStateUnlocked(nextState)
+        return {
+          outcome,
+          ...(promoted === undefined ? {} : { launch: promoted }),
+          park,
+        }
+      },
+      undefined,
+      options,
+    )
+  }
+
+  /**
+   * Promotes a lone `pending.json` (no `active.lock`) under THIS process as launcher. Only a release
+   * without promotion leaves that state (DESIGN.r2 4.1b); session reconcile calls this first.
+   */
+  async promotePending(lockOptions?: ReflectionReservationLockOptions): Promise<ReservedRun | undefined> {
+    return this.locked(
+      undefined,
+      async () => {
+        const current = await this.readStateUnlocked()
+        if (current.active !== undefined || current.pending === undefined) return undefined
+        const snapshots = new Map<string, JournalSnapshot>()
+        for (const conversationId of current.pending.request.conversationIds) {
+          const journal = await this.options.getJournal(conversationId)
+          snapshots.set(conversationId, { conversationId, state: await journal.getState(), snapshot: null })
+        }
+        const transition = promoteTransition(current, snapshots, this.options.config)
+        // The same park gate tryReserve applies (DESIGN.r3 c.17): a parked identity drops an automatic run.
+        const now = this.now().toISOString()
+        const park = await this.parkFile.read()
+        const gate =
+          transition.launch === undefined ? undefined : gateReflectionRequest(park, transition.launch.request, now)
+        if (gate?.kind === "parked") {
+          await this.writeStateUnlocked({})
+          return undefined
+        }
+        if (gate?.kind === "probe") await this.parkFile.write(markReflectionProbe(park, now))
+        const promoted = await this.withLaunchOwner(transition.launch)
+        await this.writeStateUnlocked(
+          promoted === undefined ? transition.state : { ...transition.state, active: promoted },
+        )
+        return promoted
+      },
+      undefined,
+      lockOptions,
+    )
   }
 
   async readState(lockOptions?: ReflectionReservationLockOptions): Promise<ReservationState> {

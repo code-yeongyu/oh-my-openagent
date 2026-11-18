@@ -31,6 +31,7 @@ pub(crate) fn request_for(harness: &mut Harness, action: MutatingAction) -> Op {
             target, text: "hello".to_owned(), opts: None,
         }),
         MutatingAction::KeyChord => Op::KeyChord(KeyChordParams {
+            force: false,
             target, keys: vec!["shift+a".to_owned()], opts: None,
         }),
         MutatingAction::HoldKeys => Op::HoldKeys(HoldKeysParams {

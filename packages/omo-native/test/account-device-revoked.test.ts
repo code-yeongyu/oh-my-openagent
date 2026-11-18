@@ -1,6 +1,13 @@
 import { expect, test } from "bun:test"
 import { join } from "node:path"
-import { fakeApi, grant, memorySecrets, privateKeys, refusal, temporaryHome } from "../../omo-opencode/src/cli/service-auth/test-support"
+import {
+  fakeApi,
+  grant,
+  memorySecrets,
+  privateKeys,
+  refusal,
+  temporaryHome,
+} from "../../omo-opencode/src/cli/service-auth/test-support"
 import { ACCOUNT_EXIT, runAccountVerb } from "../account-cli"
 
 for (const code of ["device_revoked", "unknown_refusal"]) {
@@ -43,14 +50,18 @@ for (const code of ["device_revoked", "unknown_refusal"]) {
     } else {
       expect(result).toBe(ACCOUNT_EXIT.ended)
       expect(output.map((line) => JSON.parse(line))).toEqual([{ ended: { code: "refresh_recovery_expired" } }])
-      expect(await store.read()).toEqual({ ...expired, refreshState: "uncertain", credentialGeneration: expect.any(String) })
+      expect(await store.read()).toEqual({
+        ...expired,
+        refreshState: "uncertain",
+        credentialGeneration: expect.any(String),
+      })
       output.length = 0
       expect(await runAccountVerb(dependencies, ["show"])).toBe(ACCOUNT_EXIT.ok)
       expect(output.map((line) => JSON.parse(line))).toEqual([
         {
           signedIn: true,
           device: grant.device,
-          refreshState: "uncertain",
+          refreshState: "expired",
         },
       ])
       expect(await runAccountVerb(dependencies, ["token"])).toBe(ACCOUNT_EXIT.ended)

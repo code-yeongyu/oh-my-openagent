@@ -21,7 +21,13 @@ export function takeoverTraceEnabled(): boolean {
 // Synchronous on purpose: a SIGKILLed writer must not lose the lines it wrote before the kill.
 export function traceTakeover(actor: string, event: string, detail?: Readonly<Record<string, unknown>>): void {
   if (TRACE_PATH === undefined || TRACE_PATH === "") return
-  const line: TakeoverTraceEvent = { t: performance.timeOrigin + performance.now(), pid: process.pid, actor, event, ...(detail === undefined ? {} : { detail }) }
+  const line: TakeoverTraceEvent = {
+    t: performance.timeOrigin + performance.now(),
+    pid: process.pid,
+    actor,
+    event,
+    ...(detail === undefined ? {} : { detail }),
+  }
   appendFileSync(TRACE_PATH, `${JSON.stringify(line)}\n`)
 }
 
@@ -37,7 +43,10 @@ export function readTakeoverTrace(path: string): TakeoverTraceEvent[] {
 export function formatTakeoverTimeline(events: readonly TakeoverTraceEvent[]): string {
   const start = events[0]?.t ?? 0
   return events
-    .map((event) => `+${(event.t - start).toFixed(1).padStart(9)}ms pid=${String(event.pid)} ${event.actor} ${event.event}${event.detail === undefined ? "" : ` ${JSON.stringify(event.detail)}`}`)
+    .map(
+      (event) =>
+        `+${(event.t - start).toFixed(1).padStart(9)}ms pid=${String(event.pid)} ${event.actor} ${event.event}${event.detail === undefined ? "" : ` ${JSON.stringify(event.detail)}`}`,
+    )
     .join("\n")
 }
 

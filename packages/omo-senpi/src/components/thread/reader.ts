@@ -30,6 +30,7 @@ import { StringDecoder } from "node:string_decoder"
 
 import { THREAD_READ_DEFAULT_BYTES, THREAD_READ_MAX_BYTES, type ThreadReadSource } from "./contracts"
 import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from "./errors"
+import { takeWithinBudget } from "./read-budget"
 
 /** Default number of trailing entries a tail read returns. */
 export const THREAD_TAIL_DEFAULT_ITEMS = 60
@@ -90,7 +91,8 @@ export type ThreadTranscriptReadOk = {
   readonly skipped_lines: number
 }
 
-export type ThreadTranscriptReadResult = ThreadTranscriptReadOk | { readonly kind: "error"; readonly error: ThreadToolFailure }
+export type ThreadTranscriptReadResult =
+  ThreadTranscriptReadOk | { readonly kind: "error"; readonly error: ThreadToolFailure }
 
 const READ_CHUNK_BYTES = 65536
 const CURSOR_VERSION = "t1"
@@ -310,7 +312,7 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
       return fail(
         "not_found",
         `No session transcript exists at ${source.path}.`,
-        "Call thread_list to get a current thread_id, then read that thread instead.",
+        "Call thread_list to get a current thread value, then read that thread instead.",
       )
     }
     loaded = file
@@ -344,22 +346,9 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
   // tail selects the trailing window and then applies the same byte budget
   // forward through it, so a huge trailing entry still truncates cleanly.
   const start = mode === "tail" ? Math.max(0, entries.length - tailItems) : (cursor?.offset ?? 0)
-  const window = entries.slice(start)
+  const { selected, encodedBytes } = takeWithinBudget(entries.slice(start), maxBytes)
 
-  const selected: ThreadTranscriptEntry[] = []
-  let encodedBytes = 0
-  let consumed = 0
-  for (const entry of window) {
-    const size = Buffer.byteLength(JSON.stringify(entry), "utf8")
-    // The first entry always ships even when it alone overruns the budget, so
-    // a page can never stall on an oversized entry.
-    if (selected.length > 0 && encodedBytes + size > maxBytes) break
-    selected.push(entry)
-    encodedBytes += size
-    consumed += 1
-  }
-
-  const nextOffset = start + consumed
+  const nextOffset = start + selected.length
   const truncated = nextOffset < entries.length
   return {
     ...base,

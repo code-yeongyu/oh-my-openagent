@@ -34,12 +34,12 @@ export type KibitzerWakeEnd =
   | { readonly status: "deadline" }
   /** The child turn failed or the child could not be started; the sidecar backs off. */
   | {
-    readonly status: "failed"
-    readonly cause: KibitzerWakeFailureCause
-    readonly reason?: string
-    /** Present when the start refusal is a configuration state, never a transient failure. */
-    readonly configuration?: KibitzerWakeConfiguration
-  }
+      readonly status: "failed"
+      readonly cause: KibitzerWakeFailureCause
+      readonly reason?: string
+      /** Present when the start refusal is a configuration state, never a transient failure. */
+      readonly configuration?: KibitzerWakeConfiguration
+    }
   /** The main session shut down under the turn. Nothing is delivered. */
   | { readonly status: "cancelled"; readonly cause: "shutdown" }
 
@@ -93,13 +93,22 @@ export interface KibitzerWakeOutcome {
  * the one-shot judge classified it, with the "empty response twice" rule keeping a silent child
  * out of the failure streak.
  */
-export function classifyWakeEnd(outcome: RunnerOutcome, abort: KibitzerWakeAbort | undefined, accepted: readonly RecallNudge[]): KibitzerWakeEnd {
+export function classifyWakeEnd(
+  outcome: RunnerOutcome,
+  abort: KibitzerWakeAbort | undefined,
+  accepted: readonly RecallNudge[],
+): KibitzerWakeEnd {
   switch (abort) {
-    case "tool_budget": return { status: "tool_budget_exceeded" }
-    case "deadline": return { status: "deadline" }
-    case "shutdown": return { status: "cancelled", cause: "shutdown" }
-    case undefined: break
-    default: abort satisfies never
+    case "tool_budget":
+      return { status: "tool_budget_exceeded" }
+    case "deadline":
+      return { status: "deadline" }
+    case "shutdown":
+      return { status: "cancelled", cause: "shutdown" }
+    case undefined:
+      break
+    default:
+      abort satisfies never
   }
   const classification = classifyJudgeTurn(outcome, accepted)
   switch (classification.status) {
@@ -107,7 +116,11 @@ export function classifyWakeEnd(outcome: RunnerOutcome, abort: KibitzerWakeAbort
     case "empty":
       return { status: "completed" }
     case "failed":
-      return { status: "failed", cause: classification.cause, ...(classification.reason === undefined ? {} : { reason: classification.reason }) }
+      return {
+        status: "failed",
+        cause: classification.cause,
+        ...(classification.reason === undefined ? {} : { reason: classification.reason }),
+      }
     case "dropped":
       // The engine cancelled a turn the sidecar did not abort: the child is gone from under us.
       return { status: "failed", cause: "child_failed", reason: "child turn was cancelled outside the sidecar" }
@@ -117,7 +130,10 @@ export function classifyWakeEnd(outcome: RunnerOutcome, abort: KibitzerWakeAbort
 }
 
 /** A child that never started: the same shape as a failed turn so the streak and backoff treat both alike - unless the refusal is a configuration state, which never feeds the streak. */
-export function startFailureEnd(error: unknown, configuration?: KibitzerWakeConfiguration): Extract<KibitzerWakeEnd, { readonly status: "failed" }> {
+export function startFailureEnd(
+  error: unknown,
+  configuration?: KibitzerWakeConfiguration,
+): Extract<KibitzerWakeEnd, { readonly status: "failed" }> {
   const reason = normalizeGateReason(error instanceof Error ? error.message : String(error))
   return {
     status: "failed",

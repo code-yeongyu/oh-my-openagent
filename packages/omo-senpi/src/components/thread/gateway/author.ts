@@ -13,7 +13,8 @@ function refusal(message: string): StoreRefusal {
 }
 
 function field(name: string, value: unknown, max: number): string | StoreRefusal {
-  if (typeof value !== "string" || value.trim().length === 0) return refusal(`author.${name} must be a non-empty string.`)
+  if (typeof value !== "string" || value.trim().length === 0)
+    return refusal(`author.${name} must be a non-empty string.`)
   if (value.length > max) return refusal(`author.${name} is longer than ${max} characters.`)
   if (LINE_BREAKING.test(value)) return refusal(`author.${name} carries a control character or line break.`)
   return value.trim()

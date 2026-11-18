@@ -10,12 +10,7 @@ function conversation(id: string, messages: SearchDocument[], hidden?: boolean):
   return hidden === undefined ? { id, messages } : { id, messages, hidden }
 }
 
-function message(input: {
-  id: string
-  conversationId?: string
-  content: string
-  date?: string
-}): SearchDocument {
+function message(input: { id: string; conversationId?: string; content: string; date?: string }): SearchDocument {
   const conversationId = input.conversationId ?? "c1"
   return input.date === undefined
     ? { id: input.id, conversationId, messageType: "user_message", content: input.content }
@@ -63,7 +58,11 @@ describe("searchTranscripts", () => {
   it("#given more matches than the limit #when searched #then the default limit is 100 and explicit limits truncate", () => {
     // given
     const messages = Array.from({ length: 120 }, (_, index) =>
-      message({ id: `m${index}`, content: "beta", date: `2026-01-01T00:00:${String(index % 60).padStart(2, "0")}.000Z` }),
+      message({
+        id: `m${index}`,
+        content: "beta",
+        date: `2026-01-01T00:00:${String(index % 60).padStart(2, "0")}.000Z`,
+      }),
     )
     const provider = fakeProvider([conversation("c1", messages)])
 

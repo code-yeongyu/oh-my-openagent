@@ -1,8 +1,22 @@
 import { X509Certificate } from "node:crypto"
 
 type Candidate = { readonly der: Buffer; readonly index: number }
-export type DropCause = "pem-noncanonical" | "pem-read-error" | "recognized-block-has-headers" | "aux-block-unverified"
-  | "ordinary-block-not-indexable" | "ordinary-block-unparseable"
+export type DropCause =
+  | "pem-noncanonical"
+  | "pem-read-error"
+  | "recognized-block-has-headers"
+  | "aux-block-unverified"
+  | "ordinary-block-not-indexable"
+  | "ordinary-block-unparseable"
+/** 4.4 item 6: whether dropping the whole file for this cause trusts less than plain Bun. */
+export const DROP_CAUSE_NARROWING: Readonly<Record<DropCause, boolean>> = {
+  "pem-noncanonical": true,
+  "pem-read-error": false,
+  "recognized-block-has-headers": false,
+  "ordinary-block-not-indexable": false,
+  "ordinary-block-unparseable": true,
+  "aux-block-unverified": true,
+}
 type DefaultFileCandidates =
   | { readonly kind: "kept"; readonly certificates: readonly Candidate[] }
   | { readonly kind: "dropped"; readonly cause: DropCause; readonly blockIndex: number; readonly narrowing: boolean }
@@ -11,15 +25,21 @@ type Element = { readonly tag: number; readonly bytes: Buffer }
 class DerReadError extends Error {}
 class BunRequiredError extends Error {
   readonly name = "BunRequiredError"
-  constructor() { super("The OpenSSL default-file importer requires Bun's BoringSSL parser") }
+  constructor() {
+    super("The OpenSSL default-file importer requires Bun's BoringSSL parser")
+  }
 }
 
 // A cursor is deliberately mutable: each read consumes exactly one definite, minimal TLV.
 class DerReader {
   private offset = 0
   private readonly bytes: Buffer
-  constructor(bytes: Buffer) { this.bytes = bytes }
-  get remaining(): number { return this.bytes.length - this.offset }
+  constructor(bytes: Buffer) {
+    this.bytes = bytes
+  }
+  get remaining(): number {
+    return this.bytes.length - this.offset
+  }
   private byte(): number {
     const value = this.bytes[this.offset++]
     if (value === undefined) throw new DerReadError()
@@ -62,8 +82,14 @@ class DerReader {
 
 function checkCodePoint(point: number | undefined): void {
   // BoringSSL 41bf9b59 crypto/bytestring/unicode.cc: is_valid_code_point.
-  if (point === undefined || point > 0x10ffff || (point >= 0xd800 && point <= 0xdfff)
-    || (point & 0xfffe) === 0xfffe || (point >= 0xfdd0 && point <= 0xfdef)) throw new DerReadError()
+  if (
+    point === undefined ||
+    point > 0x10ffff ||
+    (point >= 0xd800 && point <= 0xdfff) ||
+    (point & 0xfffe) === 0xfffe ||
+    (point >= 0xfdd0 && point <= 0xfdef)
+  )
+    throw new DerReadError()
 }
 
 function checkName(subject: Buffer): void {
@@ -97,7 +123,8 @@ function checkName(subject: Buffer): void {
           }
           break
         }
-        default: break
+        default:
+          break
       }
     }
   }
@@ -137,22 +164,28 @@ export function readDefaultFileCandidates(
   if (process.versions.bun === undefined) throw new BunRequiredError()
   // Bun's loader reads raw bytes; latin1 maps each byte to one character, so a BOM or any non-ASCII byte
   // reaches the canonical gate instead of being stripped by a text decoder.
-  const lines = Buffer.from(bytes).toString("latin1").split("\n").map((line) => line.replace(/\r$/, ""))
+  const lines = Buffer.from(bytes)
+    .toString("latin1")
+    .split("\n")
+    .map((line) => line.replace(/\r$/, ""))
   const certificates: Candidate[] = []
   let blockIndex = 0
   const drop = (cause: DropCause, index = blockIndex): DefaultFileCandidates => ({
-    kind: "dropped", cause, blockIndex: index,
-    narrowing: {
-      "pem-noncanonical": true, "pem-read-error": false, "recognized-block-has-headers": false,
-      "ordinary-block-not-indexable": false, "ordinary-block-unparseable": true, "aux-block-unverified": true,
-    }[cause],
+    kind: "dropped",
+    cause,
+    blockIndex: index,
+    narrowing: DROP_CAUSE_NARROWING[cause],
   })
   let label: string | undefined
   let headerEnd = -1
   for (let line = 0; line < lines.length; line++) {
     const current = lines[line] ?? ""
-    // ASCII makes characters equal bytes; the cap prevents BIO_gets' 253-byte splitting.
-    if (current.length > 200 || /[^\x20-\x7e]/.test(current)) return drop("pem-noncanonical")
+    // latin1 makes characters equal bytes, so the cap prevents BIO_gets' 253-byte splitting. PEM_read_bio skips
+    // text outside blocks, so bytes 0x80-0xff are allowed there (Fedora's bundle has UTF-8 comments); a block
+    // line, and control bytes anywhere, still drop the file.
+    if (current.length > 200 || (label === undefined ? /[\x00-\x1f\x7f]/ : /[^\x20-\x7e]/).test(current)) {
+      return drop("pem-noncanonical")
+    }
     const boundary = /^-----(BEGIN|END) ([A-Z0-9][A-Z0-9 ]*)-----$/.exec(current)
     if (label === undefined) {
       if (boundary?.[1] === "BEGIN") {
@@ -160,14 +193,21 @@ export function readDefaultFileCandidates(
         const separator = lines.indexOf("", line + 1)
         const end = lines.indexOf(`-----END ${label}-----`, line + 1)
         // Preserve cause (b) for short, printable recognized header sections and their separator.
-        headerEnd = ["CERTIFICATE", "X509 CERTIFICATE", "TRUSTED CERTIFICATE", "X509 CRL"].includes(label ?? "")
-          && separator > line + 1 && separator < end ? separator : -1
+        headerEnd =
+          ["CERTIFICATE", "X509 CERTIFICATE", "TRUSTED CERTIFICATE", "X509 CRL"].includes(label ?? "") &&
+          separator > line + 1 &&
+          separator < end
+            ? separator
+            : -1
       } else if (current.includes("-----")) return drop("pem-noncanonical")
     } else if (boundary?.[1] === "END" && boundary[2] === label) {
       label = undefined
       blockIndex++
-    } else if (current.includes("-----") || /^ +$/.test(current)
-      || (line > headerEnd && !/^[A-Za-z0-9+/=]+$/.test(current))) {
+    } else if (
+      current.includes("-----") ||
+      /^ +$/.test(current) ||
+      (line > headerEnd && !/^[A-Za-z0-9+/=]+$/.test(current))
+    ) {
       // A space-only line is a blank line to PEM_read_bio's right-strip but not to the header split below.
       return drop("pem-noncanonical")
     }
@@ -182,7 +222,10 @@ export function readDefaultFileCandidates(
     let ended = false
     for (line++; line < lines.length; line++) {
       const current = lines[line] ?? ""
-      if (current === `-----END ${label}-----`) { ended = true; break }
+      if (current === `-----END ${label}-----`) {
+        ended = true
+        break
+      }
       body.push(current)
     }
     if (!ended) return drop("pem-read-error")
@@ -209,7 +252,8 @@ export function readDefaultFileCandidates(
         // No exact d2i_X509_AUX / d2i_X509_CRL decoder is exposed, so a decodable block (which Bun keeps the
         // file for) cannot be told from cause (c). Drop the file and mark it a narrowing; never grant from it.
         return drop("aux-block-unverified")
-      default: break // Open PEM labels: skip only after their complete PEM decode succeeded.
+      default:
+        break // Open PEM labels: skip only after their complete PEM decode succeeded.
     }
     blockIndex++
   }

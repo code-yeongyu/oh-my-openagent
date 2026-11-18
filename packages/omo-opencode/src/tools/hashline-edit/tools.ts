@@ -22,18 +22,14 @@ export function createHashlineEditTool(ctx?: PluginContext): ToolDefinition {
         .array(
           tool.schema.object({
             op: tool.schema
-              .union([
-                tool.schema.literal("replace"),
-                tool.schema.literal("append"),
-                tool.schema.literal("prepend"),
-              ])
+              .union([tool.schema.literal("replace"), tool.schema.literal("append"), tool.schema.literal("prepend")])
               .describe("Hashline edit operation mode"),
             pos: tool.schema.string().optional().describe("Primary anchor in LINE#ID format"),
             end: tool.schema.string().optional().describe("Range end anchor in LINE#ID format"),
             lines: tool.schema
               .union([tool.schema.array(tool.schema.string()), tool.schema.string(), tool.schema.null()])
               .describe("Replacement or inserted lines as newline-delimited string. null deletes with replace"),
-          })
+          }),
         )
         .describe("Array of edit operations to apply (empty when delete=true)"),
     },

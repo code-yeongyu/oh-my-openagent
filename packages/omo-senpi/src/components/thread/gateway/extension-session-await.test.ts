@@ -7,11 +7,17 @@ import { awaitSessionRequest } from "./extension-session-await"
 import type { StoreExtensionResult } from "./store-extensions"
 
 const directories: string[] = []
-afterEach(() => { for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true }) })
+afterEach(() => {
+  for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
+})
 
 const ID = "tor_" + "5".repeat(32)
 const pending: StoreExtensionResult<unknown> = { kind: "ok", value: { status: "pending" } }
-const lockHeld: StoreExtensionResult<unknown> = { kind: "refused", code: "gateway_lock_wait_exceeded", message: "the store write lock is held" }
+const lockHeld: StoreExtensionResult<unknown> = {
+  kind: "refused",
+  code: "gateway_lock_wait_exceeded",
+  message: "the store write lock is held",
+}
 const refusedFinal: StoreExtensionResult<unknown> = { kind: "ok", value: { status: "refused" } }
 
 /** A wake file whose directory exists (a connector is running) or does not (none has started). */
@@ -26,22 +32,41 @@ function scripted(statuses: StoreExtensionResult<unknown>[], expire: () => Store
   const calls: string[] = []
   return {
     calls,
-    status: async () => { calls.push("status"); return statuses.shift() ?? pending },
-    expire: async () => { calls.push("expire"); return expire() },
+    status: async () => {
+      calls.push("status")
+      return statuses.shift() ?? pending
+    },
+    expire: async () => {
+      calls.push("expire")
+      return expire()
+    },
   }
 }
 
-test.each([[true], [false]])("#given a statusOp that refuses once (wake dir present: %p) #when the await runs #then the refusal does not end it, and the result is the status read after expireOp", async (dirPresent) => {
-  const final: StoreExtensionResult<unknown> = { kind: "ok", value: { status: "expired" } }
-  const ops = scripted([lockHeld, final], () => ({ kind: "ok", value: { expired: true } }))
-  const result = await awaitSessionRequest({ file: wakeFile(dirPresent), timeoutMs: 50, status: ops.status, expire: ops.expire })
-  expect(result).toEqual(final)
-  expect(ops.calls).toEqual(["status", "expire", "status"])
-})
+test.each([[true], [false]])(
+  "#given a statusOp that refuses once (wake dir present: %p) #when the await runs #then the refusal does not end it, and the result is the status read after expireOp",
+  async (dirPresent) => {
+    const final: StoreExtensionResult<unknown> = { kind: "ok", value: { status: "expired" } }
+    const ops = scripted([lockHeld, final], () => ({ kind: "ok", value: { expired: true } }))
+    const result = await awaitSessionRequest({
+      file: wakeFile(dirPresent),
+      timeoutMs: 50,
+      status: ops.status,
+      expire: ops.expire,
+    })
+    expect(result).toEqual(final)
+    expect(ops.calls).toEqual(["status", "expire", "status"])
+  },
+)
 
 test("#given the deadline passes and expireOp itself is refused #when the await ends #then it answers await_unresolved, saying the request may still complete, never a plain failure", async () => {
   const ops = scripted([pending], () => lockHeld)
-  const result = await awaitSessionRequest({ file: wakeFile(true), timeoutMs: 20, status: ops.status, expire: ops.expire })
+  const result = await awaitSessionRequest({
+    file: wakeFile(true),
+    timeoutMs: 20,
+    status: ops.status,
+    expire: ops.expire,
+  })
   expect(result).toMatchObject({ kind: "refused", code: "await_unresolved" })
   expect((result as { message: string }).message).toContain(ID)
   expect(ops.calls).toEqual(["status", "expire"])
@@ -50,12 +75,20 @@ test("#given the deadline passes and expireOp itself is refused #when the await 
 test.each([
   ["refused", lockHeld],
   ["still pending", pending],
-])("#given expireOp ran but the final status is %s #when the await ends #then it answers await_unresolved rather than a non-final status", async (_label, last) => {
-  const ops = scripted([pending, last], () => ({ kind: "ok", value: { expired: true } }))
-  const result = await awaitSessionRequest({ file: wakeFile(true), timeoutMs: 20, status: ops.status, expire: ops.expire })
-  expect(result).toMatchObject({ kind: "refused", code: "await_unresolved" })
-  expect(ops.calls).toEqual(["status", "expire", "status"])
-})
+])(
+  "#given expireOp ran but the final status is %s #when the await ends #then it answers await_unresolved rather than a non-final status",
+  async (_label, last) => {
+    const ops = scripted([pending, last], () => ({ kind: "ok", value: { expired: true } }))
+    const result = await awaitSessionRequest({
+      file: wakeFile(true),
+      timeoutMs: 20,
+      status: ops.status,
+      expire: ops.expire,
+    })
+    expect(result).toMatchObject({ kind: "refused", code: "await_unresolved" })
+    expect(ops.calls).toEqual(["status", "expire", "status"])
+  },
+)
 
 test("#given the open completes while expireOp runs (the connector won the race) #when the await ends #then the final status answers opened", async () => {
   const statuses: StoreExtensionResult<unknown>[] = [pending]
@@ -64,7 +97,12 @@ test("#given the open completes while expireOp runs (the connector won the race)
     statuses.push(opened)
     return { kind: "ok", value: { expired: false } }
   })
-  const result = await awaitSessionRequest({ file: wakeFile(true), timeoutMs: 1, status: ops.status, expire: ops.expire })
+  const result = await awaitSessionRequest({
+    file: wakeFile(true),
+    timeoutMs: 1,
+    status: ops.status,
+    expire: ops.expire,
+  })
   expect(result).toEqual(opened)
   expect(ops.calls).toEqual(["status", "expire", "status"])
 })
@@ -94,7 +132,9 @@ test("#given an expire call that throws #when the deadline passes #then the answ
     file: wakeFile(true),
     timeoutMs: 50,
     status: async () => pending,
-    expire: async () => { throw new Error("gateway lock wait exceeded") },
+    expire: async () => {
+      throw new Error("gateway lock wait exceeded")
+    },
   })
   expect(result).toMatchObject({ kind: "refused", code: "await_unresolved" })
 })
@@ -121,9 +161,19 @@ test("#given a watch that drops the wake touch made right after it was armed #wh
   const opened: StoreExtensionResult<unknown> = { kind: "ok", value: { status: "opened" } }
   const { calls, status, expire } = scripted([pending, opened], () => refusedFinal)
   // A watch that never reports anything: the dropped event macOS can lose right after arming.
-  const deaf = ((..._args: unknown[]) => ({ close: () => undefined, on: () => undefined })) as unknown as typeof import("node:fs").watch
+  const deaf = ((..._args: unknown[]) => ({
+    close: () => undefined,
+    on: () => undefined,
+  })) as unknown as typeof import("node:fs").watch
   const started = Date.now()
-  const waiting = awaitSessionRequest({ file, timeoutMs: 60_000, status, expire, watch: deaf, onArmed: () => writeFileSync(file, "") })
+  const waiting = awaitSessionRequest({
+    file,
+    timeoutMs: 60_000,
+    status,
+    expire,
+    watch: deaf,
+    onArmed: () => writeFileSync(file, ""),
+  })
   expect(await waiting).toEqual(opened)
   expect(calls).toEqual(["status", "status"])
   expect(Date.now() - started).toBeLessThan(5_000)

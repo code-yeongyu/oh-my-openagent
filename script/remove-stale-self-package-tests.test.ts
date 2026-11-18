@@ -19,11 +19,7 @@ describe("removeStaleSelfPackageTests", () => {
     const staleOpenCode = join(root, "packages", "adapter-a", "node_modules", "oh-my-opencode")
     const staleOpenAgent = join(root, "packages", "adapter-b", "node_modules", "oh-my-openagent")
     const unrelated = join(root, "packages", "adapter-b", "node_modules", "unrelated-package")
-    await Promise.all([
-      writeFixture(staleOpenCode),
-      writeFixture(staleOpenAgent),
-      writeFixture(unrelated),
-    ])
+    await Promise.all([writeFixture(staleOpenCode), writeFixture(staleOpenAgent), writeFixture(unrelated)])
 
     // when
     const removed = await removeStaleSelfPackageTests(root)

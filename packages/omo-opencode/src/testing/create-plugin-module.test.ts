@@ -86,7 +86,9 @@ const mockCreateFirstMessageVariantGate = mock(() => ({
   clear: () => {},
 }))
 
-function createTestPluginModule(overrides: Parameters<typeof createPluginModule>[0] = {}): ReturnType<typeof createPluginModule> {
+function createTestPluginModule(
+  overrides: Parameters<typeof createPluginModule>[0] = {},
+): ReturnType<typeof createPluginModule> {
   return createPluginModule({
     initConfigContext: mockInitConfigContext,
     detectExternalSkillPlugin: mockDetectExternalSkillPlugin,
@@ -243,10 +245,7 @@ describe("createPluginModule()", () => {
 
       // then
       const sourceArgs = mockCreateRuntimeSkillSourceServer.mock.calls.at(0)?.[0]
-      expect(sourceArgs?.skills.map((skill) => skill.name)).toEqual([
-        "security-research",
-        "security-review",
-      ])
+      expect(sourceArgs?.skills.map((skill) => skill.name)).toEqual(["security-research", "security-review"])
       expect(mockCreateManagers.mock.calls.at(0)?.[0]).toMatchObject({
         runtimeSkillSourceUrl: "http://127.0.0.1:49152/security-research,security-review",
       })
@@ -362,10 +361,7 @@ describe("createPluginModule()", () => {
     it("#then startup warns and returns no prompt-producing hooks", async () => {
       // given
       const pluginModule = createTestPluginModule()
-      const duplicatePlugins = [
-        sourcePlugin,
-        "oh-my-openagent@latest",
-      ]
+      const duplicatePlugins = [sourcePlugin, "oh-my-openagent@latest"]
       mockDetectDuplicateOmoPlugin.mockReturnValue({
         detected: true,
         pluginName: "oh-my-openagent",
@@ -455,7 +451,10 @@ describe("createPluginModule()", () => {
 
       // then
       expect(showToast.mock.calls[0]?.[0]).toMatchObject({
-        body: { title: "Configuration migration failed", message: expect.stringContaining("/home/alice/.omo/omo.jsonc.bak.kept") },
+        body: {
+          title: "Configuration migration failed",
+          message: expect.stringContaining("/home/alice/.omo/omo.jsonc.bak.kept"),
+        },
       })
     })
 
@@ -537,7 +536,9 @@ describe("createPluginModule()", () => {
 
         // then
         expect(hooks).toBeDefined()
-        expect(consoleWarn).toHaveBeenCalledWith(expect.stringContaining("legacy configuration changes were not applied"))
+        expect(consoleWarn).toHaveBeenCalledWith(
+          expect.stringContaining("legacy configuration changes were not applied"),
+        )
         expect(showToast).toHaveBeenCalledTimes(1)
         expect(showToast.mock.calls[0]?.[0]).toMatchObject({
           body: { title: "Configuration migration failed", variant: "error" },

@@ -79,7 +79,9 @@ const SPAWN_RESOLVED = {
   display: "anthropic/claude-sonnet-4-5",
 } as const
 
-function liveSwitchRecord(effectiveSource: TaskRecord["effective_model"] extends undefined ? never : NonNullable<TaskRecord["effective_model"]>): TaskRecord {
+function liveSwitchRecord(
+  effectiveSource: TaskRecord["effective_model"] extends undefined ? never : NonNullable<TaskRecord["effective_model"]>,
+): TaskRecord {
   return {
     ...makeRecord({
       task_id: "st_00000001",
@@ -102,25 +104,29 @@ function writeAndReadRaw(record: TaskRecord): Record<string, unknown> {
 
 describe("effective_model stored encoding (F12 rollback compatibility)", () => {
   test("#given a live operator set switch persisted by the new code #when an older build parses it #then the record still loads with provider and model intact", () => {
-    const stored = writeAndReadRaw(liveSwitchRecord({
-      provider: "anthropic",
-      model_id: "claude-opus-5-5",
-      display: "anthropic/claude-opus-5-5",
-      reasoning: "high",
-      source: "set",
-      switched_by_operator: true,
-    }))
+    const stored = writeAndReadRaw(
+      liveSwitchRecord({
+        provider: "anthropic",
+        model_id: "claude-opus-5-5",
+        display: "anthropic/claude-opus-5-5",
+        reasoning: "high",
+        source: "set",
+        switched_by_operator: true,
+      }),
+    )
     const parsed = baseParseOptionalResolvedModel(stored, "effective_model")
     expect(parsed).toMatchObject({ provider: "anthropic", model_id: "claude-opus-5-5" })
   })
 
   test("#given a live fallback-revert persisted by the new code #when an older build parses it #then the record still loads", () => {
-    const stored = writeAndReadRaw(liveSwitchRecord({
-      provider: "kimi-coding",
-      model_id: "kimi-for-coding-highspeed-unlocked",
-      display: "kimi-coding/kimi-for-coding-highspeed-unlocked",
-      source: "fallback-revert",
-    }))
+    const stored = writeAndReadRaw(
+      liveSwitchRecord({
+        provider: "kimi-coding",
+        model_id: "kimi-for-coding-highspeed-unlocked",
+        display: "kimi-coding/kimi-for-coding-highspeed-unlocked",
+        source: "fallback-revert",
+      }),
+    )
     const parsed = baseParseOptionalResolvedModel(stored, "effective_model")
     expect(parsed).toMatchObject({ provider: "kimi-coding", model_id: "kimi-for-coding-highspeed-unlocked" })
   })

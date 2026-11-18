@@ -7,7 +7,17 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { unsafeTestValue } from "../../../../test-support/unsafe-test-value"
 import lockfile from "proper-lockfile"
-import { addGrant, declarationDigest, GrantsLockLostError, list, observe, read, resolveGrantsStorePath, revoke, type GrantObservation } from "./env-grants-store"
+import {
+  addGrant,
+  declarationDigest,
+  GrantsLockLostError,
+  list,
+  observe,
+  read,
+  resolveGrantsStorePath,
+  revoke,
+  type GrantObservation,
+} from "./env-grants-store"
 import { createFileGrantStore } from "./env-grant-store"
 
 let root: string
@@ -19,7 +29,9 @@ const identity = declarationDigest({ command: "synthetic-probe" })
 const platformDescriptor = Object.getOwnPropertyDescriptor(process, "platform")
 if (platformDescriptor === undefined) throw new Error("process.platform has no property descriptor")
 const platform = platformDescriptor
-beforeEach(() => { root = fs.mkdtempSync(join(tmpdir(), "omo-10693-store-")) })
+beforeEach(() => {
+  root = fs.mkdtempSync(join(tmpdir(), "omo-10693-store-"))
+})
 afterEach(() => {
   Object.defineProperty(process, "platform", platform)
   stop?.()
@@ -31,15 +43,19 @@ afterEach(() => {
 })
 function observationStream() {
   const events: GrantObservation[] = []
-  const waiters = new Set<{ predicate: (event: GrantObservation) => boolean; resolve: (event: GrantObservation) => void }>()
+  const waiters = new Set<{
+    predicate: (event: GrantObservation) => boolean
+    resolve: (event: GrantObservation) => void
+  }>()
   return {
     events,
     listener(event: GrantObservation) {
       events.push(event)
-      for (const waiter of waiters) if (waiter.predicate(event)) {
-        waiters.delete(waiter)
-        waiter.resolve(event)
-      }
+      for (const waiter of waiters)
+        if (waiter.predicate(event)) {
+          waiters.delete(waiter)
+          waiter.resolve(event)
+        }
     },
     next(predicate: (event: GrantObservation) => boolean): Promise<GrantObservation> {
       return new Promise((resolve, reject) => {
@@ -49,9 +65,14 @@ function observationStream() {
           reject(new Error("Expected grant observation did not arrive"))
         }, 10_000)
         pendingTimers.add(timer)
-        const waiter = { predicate, resolve: (event: GrantObservation) => {
-          clearTimeout(timer); pendingTimers.delete(timer); resolve(event)
-        } }
+        const waiter = {
+          predicate,
+          resolve: (event: GrantObservation) => {
+            clearTimeout(timer)
+            pendingTimers.delete(timer)
+            resolve(event)
+          },
+        }
         waiters.add(waiter)
       })
     },
@@ -65,10 +86,7 @@ test("resolves under the caller's configured engine directory", () => {
 test("merges concurrent atomic writers and revokes only the selected identity", async () => {
   const path = resolveGrantsStorePath(root)
   const second = declarationDigest({ command: "synthetic-second" })
-  await Promise.all([
-    addGrant(path, identity, label, ["ODD_DSN"]),
-    addGrant(path, second, label, ["ODD_COOKIE"]),
-  ])
+  await Promise.all([addGrant(path, identity, label, ["ODD_DSN"]), addGrant(path, second, label, ["ODD_COOKIE"])])
   const snapshot = await read(path)
   expect(snapshot.generation).toBe(2)
   expect(snapshot.grants[identity]?.names).toEqual(["ODD_DSN"])
@@ -77,7 +95,9 @@ test("merges concurrent atomic writers and revokes only the selected identity", 
   expect((await read(path)).generation).toBe(3)
   expect((await list(path)).map((grant) => grant.digest)).toEqual([second])
   expect(JSON.parse(fs.readFileSync(path, "utf8"))).toEqual({
-    version: 1, generation: 3, grants: { [second]: { label, names: ["ODD_COOKIE"] } },
+    version: 1,
+    generation: 3,
+    grants: { [second]: { label, names: ["ODD_COOKIE"] } },
   })
   expect(fs.readdirSync(root)).toEqual(["mcp-env-grants.json"])
 })
@@ -108,7 +128,10 @@ for (const code of ["EPERM", "EACCES", "EBUSY"]) {
     const error = Object.assign(new Error("synthetic open handle"), { code })
     const rename = spyOn(fsPromises, "rename").mockRejectedValueOnce(error).mockRejectedValueOnce(error)
     const delay = spyOn(timers, "setTimeout").mockResolvedValue(undefined)
-    restorers.push(() => rename.mockRestore(), () => delay.mockRestore())
+    restorers.push(
+      () => rename.mockRestore(),
+      () => delay.mockRestore(),
+    )
     // when
     const snapshot = await addGrant(path, identity, label, ["NEW"])
     // then
@@ -149,7 +172,9 @@ test("a grant is not saved after its lock was lost", async () => {
   })
   restorers.push(() => lock.mockRestore())
   // when / then
-  await expect(addGrant(path, declarationDigest({ command: "synthetic-other" }), label, ["NEW"])).rejects.toBeInstanceOf(GrantsLockLostError)
+  await expect(
+    addGrant(path, declarationDigest({ command: "synthetic-other" }), label, ["NEW"]),
+  ).rejects.toBeInstanceOf(GrantsLockLostError)
   expect(fs.readFileSync(path, "utf8")).toBe(before)
   expect(fs.readdirSync(root)).toEqual(["mcp-env-grants.json"])
 })
@@ -162,9 +187,16 @@ test("refuses the next Windows replace attempt once the lock is lost during a ba
   const before = fs.readFileSync(path, "utf8")
   Object.defineProperty(process, "platform", { value: "win32" })
   const lock = loseLockOnDemand()
-  const rename = spyOn(fsPromises, "rename").mockRejectedValueOnce(Object.assign(new Error("synthetic open handle"), { code: "EPERM" }))
-  const delay = spyOn(timers, "setTimeout").mockImplementation((async () => { lock.lose() }) as unknown as typeof timers.setTimeout)
-  restorers.push(() => rename.mockRestore(), () => delay.mockRestore())
+  const rename = spyOn(fsPromises, "rename").mockRejectedValueOnce(
+    Object.assign(new Error("synthetic open handle"), { code: "EPERM" }),
+  )
+  const delay = spyOn(timers, "setTimeout").mockImplementation((async () => {
+    lock.lose()
+  }) as unknown as typeof timers.setTimeout)
+  restorers.push(
+    () => rename.mockRestore(),
+    () => delay.mockRestore(),
+  )
   // when / then
   await expect(addGrant(path, identity, label, ["NEW"])).rejects.toBeInstanceOf(GrantsLockLostError)
   expect(rename).toHaveBeenCalledTimes(1)
@@ -180,7 +212,10 @@ test("bounds Windows replace retries, preserves the old store and releases the l
   const error = Object.assign(new Error("synthetic open handle"), { code: "EPERM" })
   const rename = spyOn(fsPromises, "rename").mockRejectedValue(error)
   const delay = spyOn(timers, "setTimeout").mockResolvedValue(undefined)
-  restorers.push(() => rename.mockRestore(), () => delay.mockRestore())
+  restorers.push(
+    () => rename.mockRestore(),
+    () => delay.mockRestore(),
+  )
   // when / then
   await expect(addGrant(path, identity, label, ["NEW"])).rejects.toBe(error)
   expect(rename).toHaveBeenCalledTimes(6)
@@ -205,7 +240,10 @@ for (const [os, code] of [
     const error = Object.assign(new Error("synthetic rename failure"), { code })
     const rename = spyOn(fsPromises, "rename").mockRejectedValue(error)
     const delay = spyOn(timers, "setTimeout").mockResolvedValue(undefined)
-    restorers.push(() => rename.mockRestore(), () => delay.mockRestore())
+    restorers.push(
+      () => rename.mockRestore(),
+      () => delay.mockRestore(),
+    )
     // when / then
     await expect(addGrant(resolveGrantsStorePath(root), identity, label, ["NEW"])).rejects.toBe(error)
     expect(rename).toHaveBeenCalledTimes(1)
@@ -231,17 +269,29 @@ test("watches creation and atomic replacements from before the store exists", as
 }, 15_000)
 
 test("fallback reconciles skipped revoke/regrant and file recreation conservatively", async () => {
-  const watch = spyOn(fs, "watch").mockImplementation(() => { throw new Error("synthetic unavailable watch") })
-  let tick: () => void = () => { throw new Error("Fallback interval was not armed") }
+  const watch = spyOn(fs, "watch").mockImplementation(() => {
+    throw new Error("synthetic unavailable watch")
+  })
+  let tick: () => void = () => {
+    throw new Error("Fallback interval was not armed")
+  }
   let intervalMs: number | undefined
   const fakeSetInterval = (callback: TimerHandler, ms?: number) => {
-    tick = () => { if (typeof callback === "function") callback() }
+    tick = () => {
+      if (typeof callback === "function") callback()
+    }
     intervalMs = ms
     return unsafeTestValue<ReturnType<typeof setInterval>>({ unref() {} })
   }
-  const interval = spyOn(globalThis, "setInterval").mockImplementation(unsafeTestValue<typeof setInterval>(fakeSetInterval))
+  const interval = spyOn(globalThis, "setInterval").mockImplementation(
+    unsafeTestValue<typeof setInterval>(fakeSetInterval),
+  )
   const clear = spyOn(globalThis, "clearInterval").mockImplementation(() => {})
-  restorers.push(() => watch.mockRestore(), () => interval.mockRestore(), () => clear.mockRestore())
+  restorers.push(
+    () => watch.mockRestore(),
+    () => interval.mockRestore(),
+    () => clear.mockRestore(),
+  )
   const path = resolveGrantsStorePath(root)
   await addGrant(path, identity, label, ["ODD_DSN"])
   const stream = observationStream()
@@ -279,5 +329,7 @@ test("legacy store port writes exactly the shared schema and observes native wri
     await store.revoke(identity)
     expect((await read(path)).grants).toEqual({})
     expect(fs.readdirSync(root)).toEqual(["mcp-env-grants.json"])
-  } finally { clearTimeout(timeout) }
+  } finally {
+    clearTimeout(timeout)
+  }
 }, 15_000)

@@ -284,3 +284,55 @@ fn stop_path_rejection_converts_to_wire_error_with_reason_as_message() {
     assert_eq!(wire.code, ErrorCode::StopPathUnavailable);
     assert_eq!(wire.to_string(), "StopPathUnavailable: host-relay-not-allowed");
 }
+
+struct ObjectFrames {
+    lock: LockState,
+    refusal: Option<super::FrameRefusal>,
+    identity_changed: bool,
+}
+
+impl FrameContext for ObjectFrames {
+    fn screen_locked(&self) -> LockState {
+        self.lock
+    }
+
+    fn is_latest(&self, _frame: &FrameId) -> bool {
+        true
+    }
+
+    fn frame_refusal(&self, _frame: Option<&FrameId>) -> Option<super::FrameRefusal> {
+        self.refusal
+    }
+
+    fn identity_changed(&self) -> bool {
+        self.identity_changed
+    }
+}
+
+#[test]
+fn frame_refusals_precede_the_identity_check_and_follow_the_lock() {
+    // Given
+    let scene = Scene::live();
+    let check = |lock, refusal, identity_changed, action| {
+        let frames = ObjectFrames { lock, refusal, identity_changed };
+        gate(&action, &scene.supervisor, &scene.policy, &scene.perms, &frames, None)
+    };
+    let consumed = Some(super::FrameRefusal::Consumed);
+    // When / Then
+    assert_eq!(
+        check(LockState::Locked, consumed, true, MutatingAction::Click),
+        Err(GateError::ScreenLocked)
+    );
+    assert_eq!(
+        check(LockState::Unlocked, consumed, true, MutatingAction::Click),
+        Err(GateError::FrameRefused { reason: super::FrameRefusal::Consumed })
+    );
+    assert_eq!(
+        check(LockState::Unlocked, None, true, MutatingAction::Drag),
+        Err(GateError::IdentityChanged)
+    );
+    assert_eq!(check(LockState::Unlocked, consumed, true, MutatingAction::TypeText), Ok(()));
+    let identity = DesktopError::from(GateError::IdentityChanged);
+    assert_eq!(identity.code, ErrorCode::WindowNotFound);
+    assert_eq!(identity.report.and_then(|report| report.reason).as_deref(), Some("identity_changed"));
+}

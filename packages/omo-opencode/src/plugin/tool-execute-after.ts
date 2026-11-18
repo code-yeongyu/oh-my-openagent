@@ -3,11 +3,7 @@ import type { CreatedHooks } from "../create-hooks"
 import { log as defaultLog } from "../shared/logger"
 import type { PluginContext } from "./types"
 
-const METADATA_LINKED_TOOLS = new Set([
-  "background_output",
-  "edit",
-  "task",
-])
+const METADATA_LINKED_TOOLS = new Set(["background_output", "edit", "task"])
 
 type ToolExecuteAfterInput = {
   readonly tool: string
@@ -43,20 +39,14 @@ export function createToolExecuteAfterHandler(args: {
   ctx: PluginContext
   hooks: CreatedHooks
   log?: typeof defaultLog
-}): (
-  input: ToolExecuteAfterInput,
-  output: ToolExecuteAfterOutput | undefined,
-) => Promise<void> {
+}): (input: ToolExecuteAfterInput, output: ToolExecuteAfterOutput | undefined) => Promise<void> {
   const { hooks } = args
   const log = args.log ?? defaultLog
 
   // OpenCode injects tool call ids into execute() context and after-hook input via undocumented runtime fields.
   // We must treat their identity as a best-effort correlation key, not a guaranteed public contract.
 
-  return async (
-    input: ToolExecuteAfterInput,
-    output: ToolExecuteAfterOutput | undefined,
-  ): Promise<void> => {
+  return async (input: ToolExecuteAfterInput, output: ToolExecuteAfterOutput | undefined): Promise<void> => {
     if (!output) return
 
     const hookInput = {
@@ -74,12 +64,15 @@ export function createToolExecuteAfterHandler(args: {
       }
       if (stored.metadata) {
         if (nativeSessionId) {
-          log("[tool-execute-after] Native output metadata already includes session linkage; preserving native metadata precedence", {
-            tool: input.tool,
-            sessionID: input.sessionID,
-            callID: input.callID ?? input.callId ?? input.call_id,
-            nativeSessionId,
-          })
+          log(
+            "[tool-execute-after] Native output metadata already includes session linkage; preserving native metadata precedence",
+            {
+              tool: input.tool,
+              sessionID: input.sessionID,
+              callID: input.callID ?? input.callId ?? input.call_id,
+              nativeSessionId,
+            },
+          )
           output.metadata = { ...stored.metadata, ...output.metadata }
         } else {
           output.metadata = { ...output.metadata, ...stored.metadata }

@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Live manifest backfill: transforms actual GitHub release bodies into CHANGELOG entries.
- * 
+ *
  * Constraints:
  * - Validates manifest count (51), missing tags (beta.27, beta.41)
  * - Uses UTC ISO 8601 dates
@@ -106,7 +106,11 @@ export function extractUnreleasedSection(changelog: string): string {
  * Idempotent backfill: inserts backfill section after Unreleased, keyed by manifest timestamp.
  * Returns error on conflict (backfill marker already exists for this manifest).
  */
-export function backfillChangelog(changelog: string, backfillSection: string, manifestTimestamp: string): { changelog: string; error?: string } {
+export function backfillChangelog(
+  changelog: string,
+  backfillSection: string,
+  manifestTimestamp: string,
+): { changelog: string; error?: string } {
   const marker = `<!-- omo-live-backfill-${manifestTimestamp} -->`
   if (changelog.includes(marker)) {
     return { changelog, error: `backfill already applied for manifest ${manifestTimestamp}` }

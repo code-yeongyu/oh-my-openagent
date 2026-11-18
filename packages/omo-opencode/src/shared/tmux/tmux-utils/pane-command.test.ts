@@ -15,8 +15,8 @@ function createFakeOpencodeBin(tempDir: string): string {
     [
       "#!/bin/sh",
       "index=0",
-      "for arg in \"$@\"; do",
-      "  printf '%s\\t%s\\n' \"$index\" \"$arg\"",
+      'for arg in "$@"; do',
+      '  printf \'%s\\t%s\\n\' "$index" "$arg"',
       "  index=$((index + 1))",
       "done",
     ].join("\n"),
@@ -157,8 +157,13 @@ describe("buildTmuxPlaceholderCommand", () => {
           `expands \${OMO_TMUX_CANARY_VAR} and $OMO_TMUX_CANARY_VAR`,
         ]
         for (const description of cases) {
-          const lines = runPlaceholderUntilLoop(buildTmuxPlaceholderCommand(description), tempDir, { OMO_TMUX_CANARY_VAR: "LEAKED" })
-          expect(lines).toEqual([...`OMO subagent pane ready: ${description}`.split("\n"), "Focus this pane to attach."])
+          const lines = runPlaceholderUntilLoop(buildTmuxPlaceholderCommand(description), tempDir, {
+            OMO_TMUX_CANARY_VAR: "LEAKED",
+          })
+          expect(lines).toEqual([
+            ...`OMO subagent pane ready: ${description}`.split("\n"),
+            "Focus this pane to attach.",
+          ])
         }
         expect(existsSync(canary)).toBe(false)
       } finally {
@@ -188,21 +193,28 @@ describe("buildTmuxPlaceholderCommand", () => {
     },
   )
 
-  itWithUnixShell("#given a NUL byte in the description #when the placeholder runs #then it prints without the NUL instead of failing the spawn", () => {
-    const tempDir = mkdtempSync(join(tmpdir(), "omo-tmux-placeholder-"))
+  itWithUnixShell(
+    "#given a NUL byte in the description #when the placeholder runs #then it prints without the NUL instead of failing the spawn",
+    () => {
+      const tempDir = mkdtempSync(join(tmpdir(), "omo-tmux-placeholder-"))
 
-    try {
-      expect(runPlaceholderUntilLoop(buildTmuxPlaceholderCommand("before\0after"), tempDir)).toEqual([
-        "OMO subagent pane ready: beforeafter",
-        "Focus this pane to attach.",
-      ])
-    } finally {
-      rmSync(tempDir, { recursive: true, force: true })
-    }
-  })
+      try {
+        expect(runPlaceholderUntilLoop(buildTmuxPlaceholderCommand("before\0after"), tempDir)).toEqual([
+          "OMO subagent pane ready: beforeafter",
+          "Focus this pane to attach.",
+        ])
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true })
+      }
+    },
+  )
 })
 
-function runPlaceholderUntilLoop(command: string, tempDir: string, extraEnv: Record<string, string> = {}): readonly string[] {
+function runPlaceholderUntilLoop(
+  command: string,
+  tempDir: string,
+  extraEnv: Record<string, string> = {},
+): readonly string[] {
   // The placeholder idles in `while :; do sleep 86400; done`. A fake `sleep`
   // that terminates its parent shell ends the loop after the banner prints.
   const binDir = join(tempDir, "bin")

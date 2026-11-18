@@ -9,7 +9,7 @@ export const THREAD_READ_MAX_BYTES = 1048576
 
 export const ThreadAddress = Type.String({
   description:
-    "Recipient thread id or unique name as returned by thread_list; a name shared by several threads returns ambiguous_target with candidates.",
+    "Recipient thread: the thread value of a thread_list row (tool.thread_list() in an eval cell) or of any thread tool result, an alias, a unique name, or the first 8+ characters of a thread value when only one thread starts with them. A name or prefix shared by several threads returns ambiguous_target with candidates. self addresses the caller's own session.",
 })
 
 export const AllScope = Type.Optional(
@@ -45,11 +45,26 @@ export const Message = Type.String({
   description: `Instruction to deliver to the target thread; longer than ${THREAD_MESSAGE_MAX_BYTES} UTF-8 bytes returns message_too_large.`,
 })
 
-export const BindingId = Type.String({ minLength: 1, description: "Binding id as returned by thread_bind or thread_bindings." })
+export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const
+// Spelled out, not mapped from THINKING_LEVELS: a mapped array loses the literal types, and the level's static type then
+// reads as never wherever a parsed level is passed on (setThinkingLevelOn).
+export const thinkingLevel = (description: string) =>
+  Type.Union(
+    [
+      Type.Literal("off"),
+      Type.Literal("minimal"),
+      Type.Literal("low"),
+      Type.Literal("medium"),
+      Type.Literal("high"),
+      Type.Literal("xhigh"),
+      Type.Literal("max"),
+    ],
+    { description },
+  )
 
-export const ExpectedRevision = Type.Integer({
-  minimum: 1,
-  description: "Revision the caller last saw for this binding; a binding that moved since returns stale_revision.",
+export const BindingId = Type.String({
+  minLength: 1,
+  description: "Id of the chat binding the gateway keeps for the thread.",
 })
 
 // No schema maxLength: the cap is in UTF-8 bytes, and the relay enforces it as message_too_large

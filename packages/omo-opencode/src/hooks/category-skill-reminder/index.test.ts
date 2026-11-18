@@ -1,13 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import type { Message, Part } from "@opencode-ai/sdk"
 import type { AvailableSkill } from "../../agents/dynamic-agent-prompt-builder"
-import {
-  _resetForTesting,
-  updateSessionAgent,
-} from "../../features/claude-code-session-state"
+import { _resetForTesting, updateSessionAgent } from "../../features/claude-code-session-state"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import { createCategorySkillReminderHook } from "./index"
-
 
 function createHook(availableSkills: AvailableSkill[] = []) {
   return createCategorySkillReminderHook(
@@ -42,30 +38,32 @@ function createUserTurn(
       agent: "sisyphus",
       model: { providerID: "test", modelID: "test" },
     },
-    parts: [{
-      id: `prt_${messageID}`,
-      sessionID,
-      messageID,
-      type: "text",
-      text,
-      ...(options.synthetic === true ? { synthetic: true } : {}),
-    }],
+    parts: [
+      {
+        id: `prt_${messageID}`,
+        sessionID,
+        messageID,
+        type: "text",
+        text,
+        ...(options.synthetic === true ? { synthetic: true } : {}),
+      },
+    ],
   }
 }
 
 function findReminderParts(messages: MessageWithParts[]): Part[] {
-  return messages.flatMap((message) => message.parts).filter(
-    (part) => part.type === "text"
-      && part.synthetic === true
-      && part.synthetic === true
-      && part.id === `prt_category_skill_reminder_${part.messageID}`,
-  )
+  return messages
+    .flatMap((message) => message.parts)
+    .filter(
+      (part) =>
+        part.type === "text" &&
+        part.synthetic === true &&
+        part.synthetic === true &&
+        part.id === `prt_category_skill_reminder_${part.messageID}`,
+    )
 }
 
-async function transformMessages(
-  hook: ReturnType<typeof createHook>,
-  messages: MessageWithParts[],
-): Promise<void> {
+async function transformMessages(hook: ReturnType<typeof createHook>, messages: MessageWithParts[]): Promise<void> {
   await hook["experimental.chat.messages.transform"]({}, { messages })
 }
 
@@ -78,12 +76,15 @@ async function useTools(input: {
 }): Promise<ReturnType<typeof createOutput>> {
   const output = input.output ?? createOutput()
   for (const [index, tool] of input.tools.entries()) {
-    await input.hook["tool.execute.after"]({
-      tool,
-      sessionID: input.sessionID,
-      callID: String(index + 1),
-      ...(input.agent === undefined ? {} : { agent: input.agent }),
-    }, output)
+    await input.hook["tool.execute.after"](
+      {
+        tool,
+        sessionID: input.sessionID,
+        callID: String(index + 1),
+        ...(input.agent === undefined ? {} : { agent: input.agent }),
+      },
+      output,
+    )
   }
   return output
 }
@@ -261,8 +262,8 @@ describe("category-skill-reminder hook", () => {
     await transformMessages(hook, messages)
 
     const reminderIndex = latestTurn.parts.findIndex(
-      (part) => part.type === "text" && part.synthetic === true
-      && part.id === `prt_category_skill_reminder_${part.messageID}`,
+      (part) =>
+        part.type === "text" && part.synthetic === true && part.id === `prt_category_skill_reminder_${part.messageID}`,
     )
     const latestTextIndex = latestTurn.parts.findIndex(
       (part) => part.type === "text" && part.text === "latest real text",
@@ -341,7 +342,7 @@ describe("category-skill-reminder hook", () => {
         { name: "frontend", description: "Frontend UI/UX work", location: "plugin" },
         { name: "git-master", description: "Git operations", location: "plugin" },
       ] satisfies AvailableSkill[],
-      expected: ["**Built-in**:", "frontend", "load_skills=[\"frontend\""],
+      expected: ["**Built-in**:", "frontend", 'load_skills=["frontend"'],
     },
     {
       name: "user skills",
@@ -349,7 +350,7 @@ describe("category-skill-reminder hook", () => {
         { name: "frontend", description: "Frontend UI/UX work", location: "plugin" },
         { name: "react-19", description: "React expertise", location: "user" },
       ] satisfies AvailableSkill[],
-      expected: ["**⚡ YOUR SKILLS (PRIORITY)**", "react-19", "load_skills=[\"react-19\""],
+      expected: ["**⚡ YOUR SKILLS (PRIORITY)**", "react-19", 'load_skills=["react-19"'],
     },
     {
       name: "no skills",

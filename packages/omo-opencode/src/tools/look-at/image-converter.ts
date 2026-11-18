@@ -4,14 +4,7 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { log } from "../../shared"
 
-const SUPPORTED_FORMATS = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-  "image/bmp",
-  "image/tiff",
-])
+const SUPPORTED_FORMATS = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "image/bmp", "image/tiff"])
 
 const UNSUPPORTED_FORMATS = new Set([
   "image/heic",
@@ -40,11 +33,8 @@ function cleanupTemporaryFileAfterFailure(filePath: string): void {
       unlinkSync(filePath)
     }
   } catch (cleanupError) {
-    const cleanupErrorDescription =
-      cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
-    log(
-      `[image-converter] Ignored temporary cleanup failure for ${filePath}: ${cleanupErrorDescription}`
-    )
+    const cleanupErrorDescription = cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+    log(`[image-converter] Ignored temporary cleanup failure for ${filePath}: ${cleanupErrorDescription}`)
   }
 }
 
@@ -52,11 +42,11 @@ export function needsConversion(mimeType: string): boolean {
   if (SUPPORTED_FORMATS.has(mimeType)) {
     return false
   }
-  
+
   if (UNSUPPORTED_FORMATS.has(mimeType)) {
     return true
   }
-  
+
   return mimeType.startsWith("image/")
 }
 
@@ -78,14 +68,13 @@ export function convertImageToJpeg(inputPath: string, mimeType: string): string 
           encoding: "utf-8",
           timeout: CONVERSION_TIMEOUT_MS,
         })
-        
+
         if (existsSync(outputPath)) {
           log(`[image-converter] Converted using sips: ${outputPath}`)
           return outputPath
         }
       } catch (sipsError) {
-        const sipsErrorDescription =
-          sipsError instanceof Error ? sipsError.message : String(sipsError)
+        const sipsErrorDescription = sipsError instanceof Error ? sipsError.message : String(sipsError)
         log(`[image-converter] sips failed: ${sipsErrorDescription}`)
       }
     }
@@ -97,22 +86,21 @@ export function convertImageToJpeg(inputPath: string, mimeType: string): string 
         encoding: "utf-8",
         timeout: CONVERSION_TIMEOUT_MS,
       })
-      
+
       if (existsSync(outputPath)) {
         log(`[image-converter] Converted using ImageMagick: ${outputPath}`)
         return outputPath
       }
     } catch (convertError) {
-      const convertErrorDescription =
-        convertError instanceof Error ? convertError.message : String(convertError)
+      const convertErrorDescription = convertError instanceof Error ? convertError.message : String(convertError)
       log(`[image-converter] ImageMagick convert failed: ${convertErrorDescription}`)
     }
 
     throw new Error(
       `No image conversion tool available. Please install ImageMagick:\n` +
-      `  macOS: brew install imagemagick\n` +
-      `  Ubuntu/Debian: sudo apt install imagemagick\n` +
-      `  RHEL/CentOS: sudo yum install ImageMagick`
+        `  macOS: brew install imagemagick\n` +
+        `  Ubuntu/Debian: sudo apt install imagemagick\n` +
+        `  RHEL/CentOS: sudo yum install ImageMagick`,
     )
   } catch (error) {
     cleanupTemporaryFileAfterFailure(outputPath)
@@ -121,7 +109,7 @@ export function convertImageToJpeg(inputPath: string, mimeType: string): string 
       const conversionError = error as Error & { temporaryOutputPath?: string }
       conversionError.temporaryOutputPath = outputPath
     }
-    
+
     throw error
   }
 }
@@ -145,7 +133,7 @@ export function cleanupConvertedImage(filePath: string): void {
 
 export function convertBase64ImageToJpeg(
   base64Data: string,
-  mimeType: string
+  mimeType: string,
 ): { base64: string; tempFiles: string[] } {
   const tempDir = mkdtempSync(join(tmpdir(), "opencode-b64-"))
   const inputExt = mimeType.split("/")[1] || "bin"
@@ -158,7 +146,7 @@ export function convertBase64ImageToJpeg(
     writeFileSync(inputPath, buffer)
 
     log(`[image-converter] Converting Base64 ${mimeType} to JPEG`)
-    
+
     const outputPath = convertImageToJpeg(inputPath, mimeType)
     tempFiles.push(outputPath)
 
@@ -166,7 +154,7 @@ export function convertBase64ImageToJpeg(
     const convertedBase64 = convertedBuffer.toString("base64")
 
     log(`[image-converter] Base64 conversion successful`)
-    
+
     return { base64: convertedBase64, tempFiles }
   } catch (error) {
     for (const file of tempFiles) {

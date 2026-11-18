@@ -1,14 +1,6 @@
-import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { createHash } from "node:crypto"
-import {
-  lstatSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs"
+import { lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import { join, relative, resolve } from "node:path"
 import { type ChildProcess, spawn, spawnSync } from "node:child_process"
 
@@ -26,9 +18,25 @@ const runningChildren = new Set<ChildProcess>()
 // Headroom over any single status spawn, so the observing reads land inside the idle window on a loaded runner.
 const OBSERVED_IDLE_EXIT_MS = 8_000
 const REQUIRED_REACHABLE_READS = 2
+const IDLE_TEST_BUDGET_MS = OBSERVED_IDLE_EXIT_MS * 6
 
 const TEST_BUDGET_MS = 30_000
 setDefaultTimeout(TEST_BUDGET_MS)
+// Every run() waits for its child's own exit. The test's deadline is only a safety net, and it fires this long before
+// bun's timeout, so a child still running then fails the awaited test as a SpawnBudgetError naming the command and its
+// output. A net equal to the test budget fired after the test had timed out, as an unhandled rejection (#13980).
+const DEADLINE_MARGIN_MS = 2_000
+let testDeadline = 0
+
+class SpawnBudgetError extends Error {
+  override name = "SpawnBudgetError"
+}
+
+function startTestDeadline(budgetMs: number): void {
+  testDeadline = Date.now() + budgetMs - DEADLINE_MARGIN_MS
+}
+
+beforeEach(() => startTestDeadline(TEST_BUDGET_MS))
 
 afterEach(() => {
   for (const child of runningChildren) child.kill("SIGKILL")
@@ -43,7 +51,9 @@ function sandbox() {
   roots.push(agentDir)
   const socket = join(agentDir, "rpc", "shards", "p-aaaaaaaaaaaaaaaa.sock")
   expect(Buffer.byteLength(`${socket}.next-99`)).toBeLessThanOrEqual(103)
-  mkdirSync(join(agentDir, "rpc", "shards"), { recursive: true })
+  // The engine refuses an agent dir any group or other user can write (unsafe_key_record), as a real ~/.omo/agent never
+  // is; mkdirSync otherwise takes the process umask, so on a host with umask 002 every shard here failed to start.
+  mkdirSync(join(agentDir, "rpc", "shards"), { recursive: true, mode: 0o700 })
   const env = {
     ...process.env,
     TMPDIR: agentDir,
@@ -58,19 +68,30 @@ function sandbox() {
 }
 
 // A cold `node` start on a loaded host can take longer than any fixed per-spawn budget (#9679), so each child runs
-// until it closes; the only bound is the test's own budget, which names the command it was waiting on.
-function run(command: string, args: readonly string[], env: NodeJS.ProcessEnv, deadlineMs = TEST_BUDGET_MS) {
+// until it closes; the only bound is the test's deadline, which names the command it was waiting on.
+function run(command: string, args: readonly string[], env: NodeJS.ProcessEnv) {
   return new Promise<{ exitCode: number; stdout: string; stderr: string }>((resolvePromise, reject) => {
     const child = spawn(command, [...args], { env, stdio: ["ignore", "pipe", "pipe"] })
     runningChildren.add(child)
     let stdout = ""
     let stderr = ""
-    child.stdout.setEncoding("utf8").on("data", (chunk: string) => { stdout += chunk })
-    child.stderr.setEncoding("utf8").on("data", (chunk: string) => { stderr += chunk })
-    const deadline = setTimeout(() => {
-      child.kill("SIGKILL")
-      reject(new Error(`${command} ${args.join(" ")} did not exit within the ${deadlineMs} ms test budget`))
-    }, deadlineMs)
+    child.stdout.setEncoding("utf8").on("data", (chunk: string) => {
+      stdout += chunk
+    })
+    child.stderr.setEncoding("utf8").on("data", (chunk: string) => {
+      stderr += chunk
+    })
+    const deadline = setTimeout(
+      () => {
+        child.kill("SIGKILL")
+        reject(
+          new SpawnBudgetError(
+            `${command} ${args.join(" ")} was still running at the test deadline\nstdout: ${stdout}\nstderr: ${stderr}`,
+          ),
+        )
+      },
+      Math.max(0, testDeadline - Date.now()),
+    )
     child.on("error", (error) => {
       clearTimeout(deadline)
       runningChildren.delete(child)
@@ -85,19 +106,24 @@ function run(command: string, args: readonly string[], env: NodeJS.ProcessEnv, d
 }
 
 async function ensureShard(socket: string, env: NodeJS.ProcessEnv) {
-  const result = await run("node", [
-    resolveSenpi().cliPath,
-    "host",
-    "ensure",
-    "--json",
-    "--socket",
-    socket,
-    "--launch-spec",
-    LAUNCH_SPEC,
-    "--policy",
-    "upgrade",
-  ], env)
-  expect(result.exitCode).toBe(0)
+  const result = await run(
+    "node",
+    [
+      resolveSenpi().cliPath,
+      "host",
+      "ensure",
+      "--json",
+      "--socket",
+      socket,
+      "--launch-spec",
+      LAUNCH_SPEC,
+      "--policy",
+      "upgrade",
+    ],
+    env,
+  )
+  // On a refusal the engine names its reason (e.g. unsafe_key_record) in the ensure output; the assertion carries it.
+  expect(result.exitCode, `host ensure failed: ${result.stdout}${result.stderr}`).toBe(0)
   const payload = JSON.parse(result.stdout) as { pid: number }
   ownedPids.add(payload.pid)
   return payload.pid
@@ -226,59 +252,75 @@ if (process.platform !== "win32") {
       const { agentDir } = sandbox()
       mkdirSync(join(agentDir, "rpc-host-daemon"), { recursive: true })
 
-      await expect(assertReadOnlyState(agentDir, () => {
-        runProductionStatus({
-          engine: {
-            run: () => ({ exitCode: 3, stdout: JSON.stringify({ endpoints: [] }), stderr: "" }),
-          },
-          agentDir,
-          env: {},
-          json: true,
-          stdout: { write() {} },
-          stderr: { write() {} },
-          _test: {
-            afterRead: () => {
-              writeFileSync(join(agentDir, "rpc-host-daemon", "status-was-here"), "mutant\n")
+      await expect(
+        assertReadOnlyState(agentDir, () => {
+          runProductionStatus({
+            engine: {
+              run: () => ({ exitCode: 3, stdout: JSON.stringify({ endpoints: [] }), stderr: "" }),
             },
-          },
-        })
-      })).rejects.toThrow("daemon status changed state")
+            agentDir,
+            env: {},
+            json: true,
+            stdout: { write() {} },
+            stderr: { write() {} },
+            _test: {
+              afterRead: () => {
+                writeFileSync(join(agentDir, "rpc-host-daemon", "status-was-here"), "mutant\n")
+              },
+            },
+          })
+        }),
+      ).rejects.toThrow("daemon status changed state")
     })
 
-    test("#given a short idle shard #when status reads keep arriving #then observing reads do not keep it alive", async () => {
-      const { socket, env } = sandbox()
-      const supervisorPid = await ensureShard(socket, {
-        ...env,
-        SENPI_RPC_HOST_IDLE_EXIT_MS: String(OBSERVED_IDLE_EXIT_MS),
-      })
+    test(
+      "#given a short idle shard #when status reads keep arriving #then observing reads do not keep it alive",
+      async () => {
+        startTestDeadline(IDLE_TEST_BUDGET_MS)
+        const { socket, env } = sandbox()
+        const supervisorPid = await ensureShard(socket, {
+          ...env,
+          SENPI_RPC_HOST_IDLE_EXIT_MS: String(OBSERVED_IDLE_EXIT_MS),
+        })
 
-      let reachableReads = 0
-      while (reachableReads < REQUIRED_REACHABLE_READS) {
-        if (!pidAlive(supervisorPid)) {
-          throw new Error(`shard exited after ${reachableReads} of ${REQUIRED_REACHABLE_READS} status reads that saw it reachable`)
+        let reachableReads = 0
+        while (reachableReads < REQUIRED_REACHABLE_READS) {
+          if (!pidAlive(supervisorPid)) {
+            throw new Error(
+              `shard exited after ${reachableReads} of ${REQUIRED_REACHABLE_READS} status reads that saw it reachable`,
+            )
+          }
+          if (await statusSawReachableShard(env)) reachableReads += 1
         }
-        if (await statusSawReachableShard(env)) reachableReads += 1
-      }
 
-      // The supervisor is detached by `host ensure`, so there is no exit event to await: it is watched by pid.
-      // The backoff between reads only limits spawn load on a busy runner; it is not a timing assertion, and the
-      // reads keep arriving well inside the idle window.
-      const exitDeadline = Date.now() + OBSERVED_IDLE_EXIT_MS * 3
-      let readsAwaitingExit = 0
-      let backoffMs = 100
-      while (pidAlive(supervisorPid)) {
-        if (Date.now() > exitDeadline) {
-          throw new Error(`shard pid ${supervisorPid} still alive after ${readsAwaitingExit} more status reads; observing reads must not reset its idle timer`)
+        // The supervisor is detached by `host ensure`, so there is no exit event to await: it is watched by pid.
+        // The backoff between reads only limits spawn load on a busy runner; it is not a timing assertion, and the
+        // reads keep arriving well inside the idle window.
+        const exitDeadline = Date.now() + OBSERVED_IDLE_EXIT_MS * 3
+        let readsAwaitingExit = 0
+        let backoffMs = 100
+        while (pidAlive(supervisorPid)) {
+          if (Date.now() > exitDeadline) {
+            throw new Error(
+              `shard pid ${supervisorPid} still alive after ${readsAwaitingExit} more status reads; observing reads must not reset its idle timer`,
+            )
+          }
+          await runStatus(env)
+          readsAwaitingExit += 1
+          Atomics.wait(
+            new Int32Array(new SharedArrayBuffer(4)),
+            0,
+            0,
+            Math.min(backoffMs, Math.max(0, exitDeadline - Date.now())),
+          )
+          backoffMs = Math.min(backoffMs * 2, 500)
         }
-        await runStatus(env)
-        readsAwaitingExit += 1
-        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, Math.min(backoffMs, Math.max(0, exitDeadline - Date.now())))
-        backoffMs = Math.min(backoffMs * 2, 500)
-      }
 
-      expect(reachableReads).toBe(REQUIRED_REACHABLE_READS)
-      ownedPids.delete(supervisorPid)
-    }, OBSERVED_IDLE_EXIT_MS * 6)
+        expect(reachableReads).toBe(REQUIRED_REACHABLE_READS)
+        ownedPids.delete(supervisorPid)
+      },
+      IDLE_TEST_BUDGET_MS,
+    )
   })
 }
 

@@ -56,7 +56,7 @@ export function createLegacyPluginToastHook(ctx: PluginInput, deps: LegacyPlugin
           .showToast({
             body: {
               title: "Legacy Plugin Name Detected",
-               message: `Update your opencode.json: "${LEGACY_PLUGIN_NAME}" has been renamed to "${PLUGIN_NAME}".\nRun: bunx ${PUBLISHED_PACKAGE_NAME} install`,
+              message: `Update your opencode.json: "${LEGACY_PLUGIN_NAME}" has been renamed to "${PLUGIN_NAME}".\nRun: bunx ${PUBLISHED_PACKAGE_NAME} install`,
               variant: "warning" as const,
               duration: 10000,
             },

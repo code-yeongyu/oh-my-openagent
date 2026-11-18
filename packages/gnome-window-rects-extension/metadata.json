@@ -1,0 +1,7 @@
+{
+  "uuid": "senpi-desktop-window-rects@omo.dev",
+  "name": "OmO desktop window rects",
+  "description": "Read-only: tells the OmO desktop engine where windows are, so computer use can click inside a window on GNOME Wayland. Moves, focuses and types nothing.",
+  "shell-version": ["45", "46", "47", "48", "49"],
+  "url": "https://github.com/code-yeongyu/oh-my-openagent"
+}

@@ -1,3 +1,5 @@
+// Vendored from sisyphuslabs/omo-relay-daemon@edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6 packages/local-api/src/chunking.ts
+import { fromBase64 } from "./bytes-encoding.ts";
 import { protocolViolation } from "./errors.ts";
 import { chunkPayload, LOCAL_BLOB_MAX, LOCAL_CHUNK_MAX, sha256Hex } from "./limits.ts";
 import type { BlobAbort, BlobChunk, BlobDone, BlobOpen, BlobTarget } from "./protocol.ts";
@@ -58,7 +60,7 @@ export class LocalBlobAssembler {
         return undefined;
       case "session.blob_chunk": {
         const open = this.#current(event.id);
-        const data = Buffer.from(event.b, "base64");
+        const data = fromBase64(event.b);
         const end = this.#received + data.length;
         if (event.off !== this.#received || end > open.bytes)
           return protocolViolation("blob chunk out of order");

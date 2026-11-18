@@ -32,19 +32,23 @@ describe("createRuntimeTmuxConfig", () => {
         })
         expect(build.success).toBe(true)
 
-        const result = spawnSync(Bun.which("node") ?? "node", [
-          "--input-type=module",
-          "-e",
-          `import { pathToFileURL } from "node:url";
+        const result = spawnSync(
+          Bun.which("node") ?? "node",
+          [
+            "--input-type=module",
+            "-e",
+            `import { pathToFileURL } from "node:url";
 const mod = await import(pathToFileURL(process.env.MODULE_PATH).href);
 console.log(String(mod.isInteractiveBashEnabled()));`,
-        ], {
-          env: {
-            ...process.env,
-            MODULE_PATH: join(outdir, "interactive-bash-availability.js"),
+          ],
+          {
+            env: {
+              ...process.env,
+              MODULE_PATH: join(outdir, "interactive-bash-availability.js"),
+            },
+            encoding: "utf8",
           },
-          encoding: "utf8",
-        })
+        )
 
         expect(result.stderr).toBe("")
         expect(result.status).toBe(0)

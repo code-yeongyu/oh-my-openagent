@@ -3,12 +3,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
 import type { ManagedChildHandle } from "./child-handle"
-import {
-  FakeRunner,
-  baseSpec,
-  cleanupProjects,
-  makeManager,
-} from "./__fixtures__/manager-fakes"
+import { FakeRunner, baseSpec, cleanupProjects, makeManager } from "./__fixtures__/manager-fakes"
 import type { ManagedStartSpec } from "./types"
 
 afterEach(cleanupProjects)
@@ -194,15 +189,14 @@ describe("TaskManager configured runtime fallback", () => {
       model: "vendor-b/fallback-model",
       failure_kind: "model_chain_exhausted",
       fallback_models: [],
-      fallback_attempts: [
-        { display: "vendor-a/primary-model" },
-        { display: "vendor-b/fallback-model" },
-      ],
+      fallback_attempts: [{ display: "vendor-a/primary-model" }, { display: "vendor-b/fallback-model" }],
       model_refusals: [{ model: "vendor-a/primary-model", reason: "unavailable", detail: "primary unavailable" }],
     })
     expect(record.error_message?.split("\n")[0]).toBe("fallback unavailable")
     expect(record.error_message).toContain("- vendor-a/primary-model: overloaded or unavailable (primary unavailable)")
-    expect(record.error_message).toContain("- vendor-b/fallback-model: overloaded or unavailable (fallback unavailable)")
+    expect(record.error_message).toContain(
+      "- vendor-b/fallback-model: overloaded or unavailable (fallback unavailable)",
+    )
     expect(store.list().records).toHaveLength(1)
   })
 
@@ -249,10 +243,7 @@ describe("TaskManager configured runtime fallback", () => {
     expect(store.load(result.task_id)).toMatchObject({
       model: "vendor-b/fallback-one",
       fallback_models: [{ display: "vendor-c/fallback-two" }],
-      fallback_attempts: [
-        { display: "vendor-a/primary-model" },
-        { display: "vendor-b/fallback-one" },
-      ],
+      fallback_attempts: [{ display: "vendor-a/primary-model" }, { display: "vendor-b/fallback-one" }],
     })
     const fallbackStart = runner.nextStart()
 

@@ -113,9 +113,10 @@ describe("omo-senpi git-master attribution directive", () => {
 
   test("#given the footer on and the co-author off #when the example command runs #then the commit has the footer and no co-author", () => {
     // given
-    const directive = buildGitMasterAttributionDirective(
-      OmoGitMasterSettingsSchema.parse({ commit_footer: "Shipped with omo", include_co_authored_by: false }),
-    ) ?? ""
+    const directive =
+      buildGitMasterAttributionDirective(
+        OmoGitMasterSettingsSchema.parse({ commit_footer: "Shipped with omo", include_co_authored_by: false }),
+      ) ?? ""
     const repo = scratchRepo()
 
     // when
@@ -128,9 +129,8 @@ describe("omo-senpi git-master attribution directive", () => {
 
   test("#given the footer and the co-author on #when the example command runs #then the commit has the footer and one trailer", () => {
     // given
-    const directive = buildGitMasterAttributionDirective(
-      OmoGitMasterSettingsSchema.parse({ commit_footer: "Shipped with omo" }),
-    ) ?? ""
+    const directive =
+      buildGitMasterAttributionDirective(OmoGitMasterSettingsSchema.parse({ commit_footer: "Shipped with omo" })) ?? ""
     const repo = scratchRepo()
 
     // when

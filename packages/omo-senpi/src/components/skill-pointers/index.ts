@@ -1,10 +1,17 @@
-
 import { readSessionRole } from "@oh-my-opencode/senpi-task"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { getBuiltinSkillsRoot } from "../telemetry/product-identity"
 import { resolveUlwLoopSessionScope } from "../ulw-loop/session-scope"
+import { BUNSHIN_TS_CELL_HINT } from "../../extension/sdk-root-provisioning"
 import { NOT_AFTER_IDENTIFIER, NOT_BEFORE_PATH, NOT_INTO_IDENTIFIER, stripQuotedRegions } from "./strip-quoted-regions"
+import {
+  companionPointer,
+  ignoreWhenOnlyDiscussed,
+  skillPointer,
+  type SkillCompanion,
+  type SkillPointerTarget,
+} from "./pointer-text"
 
 export const MASS_ULW_CUSTOM_TYPE = "omo-mass-ulw:skill-pointer"
 export const ULW_PLAN_CUSTOM_TYPE = "omo-ulw-plan:skill-pointer"
@@ -12,37 +19,10 @@ export const ULW_LOOP_CUSTOM_TYPE = "omo-ulw-loop:skill-pointer"
 export const ULW_RESEARCH_CUSTOM_TYPE = "omo-ulw-research:skill-pointer"
 export const BROWSER_CUSTOM_TYPE = "omo-browser:skill-pointer"
 export const ULTIMATE_BROWSING_CUSTOM_TYPE = "omo-ultimate-browsing:skill-pointer"
+export const BUNSHIN_CUSTOM_TYPE = "omo-bunshin:skill-pointer"
 export const SKILL_POINTERS_DISABLED_FLAG = "omo-senpi-skill-pointers-disabled"
 
 const SKILL_COMMAND_PREFIX = "/skill:"
-
-interface SkillPointerTarget {
-  readonly skillName: string
-  readonly customType: string
-  readonly pattern: RegExp
-  readonly expandedBlockPattern: RegExp
-  readonly instruction: string
-  readonly extra?: (sessionScope: string | null) => string
-  readonly companions?: readonly SkillCompanion[]
-  // A binding target enters its mode instead of asking the model whether the user meant it: the
-  // conditional pointer let the model skip mass-ulw entirely (#10810). Binding is POSITIVE: only a
-  // fixed request form matches (`bindingForms`). Every other mention (a statement or a
-  // question about the skill, a relayed report, the plain-word alias `meth`) keeps the conditional
-  // pointer, because forcing a workflow run onto it is the wrong answer.
-  readonly bindingPattern?: RegExp
-}
-
-// A companion is a skill the parent workflow runs on. It has no keyword of its own: it rides on
-// every invocation of its parent, including the paths that dedup the parent's own pointer
-// (a raw `/skill:<parent>` command, an expanded `<skill name="<parent>">` block), and is skipped
-// only when the input already carries the companion itself.
-interface SkillCompanion {
-  readonly skillName: string
-  readonly customType: string
-  readonly expandedBlockPattern: RegExp
-  readonly role: string
-  readonly instruction: string
-}
 
 interface SkillPointerMessage {
   readonly customType: string
@@ -112,14 +92,16 @@ const bindingForms = (command: string, keyword: string): RegExp =>
 const MASS_KEYWORD = String.raw`(?:mass[\s-]*ulw|ulw[\s-]*mass|mulw)`
 // A skill name is a request only as a word of its own: not a segment of a longer identifier
 // (`mass-ulw-refactor`, `senpi-ulw-loop`) and not part of a path or file name (`.omo/ulw-plan/`).
-const skillNamePattern = (body: string): RegExp => new RegExp(String.raw`${NOT_AFTER_IDENTIFIER}\b${body}\b${NOT_INTO_IDENTIFIER}${NOT_BEFORE_PATH}`, "i")
+const skillNamePattern = (body: string): RegExp =>
+  new RegExp(String.raw`${NOT_AFTER_IDENTIFIER}\b${body}\b${NOT_INTO_IDENTIFIER}${NOT_BEFORE_PATH}`, "i")
 const TARGETS: readonly SkillPointerTarget[] = [
   {
     skillName: "mass-ulw",
     customType: MASS_ULW_CUSTOM_TYPE,
     pattern: skillNamePattern(MASS_ALIAS),
     expandedBlockPattern: /<skill\s+name="mass-ulw"/i,
-    instruction: "dispatch each phase's dependency-ordered lanes as one run of the workflow tool composed in an eval cell, start a new run per phase rather than one graph for the whole job, and when a ulw-loop or ulw-execute contract is active let it own the goal",
+    instruction:
+      "dispatch each phase's dependency-ordered lanes as one run of the workflow tool composed in an eval cell, start a new run per phase rather than one graph for the whole job, and when a ulw-loop or ulw-execute contract is active let it own the goal",
     // The trailing composite "... mass ulw research" invokes both skills.
     bindingPattern: bindingForms(String.raw`(?:mass-ulw|mulw)`, String.raw`${MASS_KEYWORD}(?:[\s-]*research)?`),
   },
@@ -145,7 +127,26 @@ const TARGETS: readonly SkillPointerTarget[] = [
     expandedBlockPattern: /<skill\s+name="ulw-research"/i,
     instruction: "orchestrate team-first maximum-saturation research",
     companions: [BROWSER_COMPANION, ULTIMATE_BROWSING_COMPANION],
-    bindingPattern: bindingForms(String.raw`(?:ulw-research|(?:mass-ulw|mulw)\s+research)`, String.raw`(?:ulw|${MASS_KEYWORD})[\s-]*research`),
+    bindingPattern: bindingForms(
+      String.raw`(?:ulw-research|(?:mass-ulw|mulw)\s+research)`,
+      String.raw`(?:ulw|${MASS_KEYWORD})[\s-]*research`,
+    ),
+  },
+  {
+    skillName: "bunshin",
+    customType: BUNSHIN_CUSTOM_TYPE,
+    // `fleet` alone is an ordinary word (a vehicle fleet, a "fleet dashboard"), so it counts only with a device
+    // sense: the user's fleet as the object of the request (`my fleet(s)`, `our fleet(s)` followed by the end, punctuation or a
+    // function word, so not `our fleet management UI` or `our fleet of delivery trucks`) or a fleet machine noun (`fleet hosts`,
+    // `fleet box`, a host name such as `fleet-node-3`; `hosts` before an article is the verb) (#13446, #13467 review L3).
+    pattern: skillNamePattern(
+      String.raw`(?:bunshin|(?:my|our)\s+fleets?(?=\s*(?:$|[,.;:!?)]|(?:and|or|now|then|today|please|is|are|up|down|via|with|from|to|on|in|for)\b))|fleet[\s-]+(?:machines?|devices?|hosts?(?!\s+(?:a|an|the)\b)|nodes?|box(?:es)?)(?:-[a-z0-9]+)*|machine[\s-]*mesh)`,
+    ),
+    expandedBlockPattern: /<skill\s+name="bunshin"/i,
+    instruction: "",
+    // The SDK ships inside the plugin, so the pointer teaches the eval import instead of a skill read; it carries
+    // the same only-discussed guard as every other conditional pointer.
+    pointer: `<omo-bunshin-pointer>This message mentions bunshin device operations. If the user of this session is asking to run work on their machines: ${BUNSHIN_TS_CELL_HINT} ${ignoreWhenOnlyDiscussed("bunshin")}</omo-bunshin-pointer>`,
   },
 ]
 
@@ -160,7 +161,9 @@ type SenpiInputEventResult = { action: "continue" } | { action: "transform"; tex
 
 export function matchedSkillPointerNames(text: string): string[] {
   const visible = stripQuotedRegions(text)
-  return TARGETS.filter((target) => target.pattern.test(visible) || target.bindingPattern?.test(visible) === true).map((target) => target.skillName)
+  return TARGETS.filter((target) => target.pattern.test(visible) || target.bindingPattern?.test(visible) === true).map(
+    (target) => target.skillName,
+  )
 }
 
 export function createSkillPointersComponent(): OmoSenpiComponent {
@@ -208,8 +211,7 @@ function handleInput(
   // command loads the skill body, but the mode block
   // (first reads, workflow-only dispatch) is not in it, so a bound target is never deduped; nor do its companions or
   // the composite research block fall back to conditional pointers.
-  const binds = (target: SkillPointerTarget): boolean =>
-    target.bindingPattern?.test(visible) === true
+  const binds = (target: SkillPointerTarget): boolean => target.bindingPattern?.test(visible) === true
   // A slash command ("/mass-ulw") is not a bare name, so it is invoked through its binding form.
   const invoked = TARGETS.filter((target) => target.pattern.test(visible) || binds(target))
   const massMode = invoked.some((target) => target.customType === MASS_ULW_CUSTOM_TYPE && binds(target))
@@ -217,7 +219,9 @@ function handleInput(
     .filter((target) => binds(target) || !alreadyLoaded(target.skillName, target.expandedBlockPattern))
     .map((target) => ({
       customType: target.customType,
-      content: binds(target) ? skillMode(target, massMode, sessionScope) : skillPointer(target, sessionScope),
+      content: binds(target)
+        ? skillMode(target, massMode, sessionScope)
+        : (target.pointer ?? skillPointer(target, sessionScope)),
     }))
   for (const parent of invoked) {
     for (const companion of parent.companions ?? []) {
@@ -252,16 +256,10 @@ function handleInput(
 // Native ships the loop as an eval SDK, not a tool or a CLI. The SDK binds the session from the
 // host env, so the scope here is informational: it tells the model where this session's state lives.
 function ulwLoopToolSentence(sessionScope: string | null): string {
-  const base = ' Drive every ulw-loop operation from a JS eval cell through the SDK: const { agentToolkit } = await import(`${env("OMO_AGENT_TOOLKIT_SDK_ROOT")}/sdk.js`); never call a tool named omo_agent_toolkit and never spawn a CLI.'
+  const base =
+    ' Drive every ulw-loop operation from a JS eval cell through the SDK: const { agentToolkit } = await import(`${env("OMO_AGENT_TOOLKIT_SDK_ROOT")}/sdk.js`); never call a tool named omo_agent_toolkit and never spawn a CLI.'
   if (sessionScope === null) return base
   return `${base} This session's state lives under .omo/ulw-loop/${sessionScope}/.`
-}
-
-// A keyword proves a mention, not a request to run the workflow.
-function skillPointer(target: SkillPointerTarget, sessionScope: string | null): string {
-  const skillsRoot = getBuiltinSkillsRoot()
-  const extra = target.extra?.(sessionScope) ?? ""
-  return `<omo-${target.skillName}-pointer>This message mentions ${target.skillName}. If the user of this session is asking to run ${target.skillName}, read the ${target.skillName} skill at ${skillsRoot}${target.skillName}/SKILL.md with the read tool and follow it: ${target.instruction}. If ${target.skillName} is only being discussed, quoted, or relayed from another session, ignore this pointer.${extra}</omo-${target.skillName}-pointer>`
 }
 
 // Reached only for a binding form (see `bindingForms`) in text that survived the quote, relay, negation,
@@ -284,21 +282,15 @@ function skillMode(target: SkillPointerTarget, massMode: boolean, sessionScope: 
   return `<${tag}>The user of this session invoked ${target.skillName} in their own words, so this turn runs in ${target.skillName} mode. This is binding: the block is produced only for the skill's slash command or a prompt that opens with a request to run it. Before any other tool call this turn, read ${reads} in full with the read tool, then follow the skill: ${target.instruction}.${dispatch}${extra}</${tag}>`
 }
 
-function companionPointer(parent: SkillPointerTarget, companion: SkillCompanion, binding: boolean): string {
-  const skillsRoot = getBuiltinSkillsRoot()
-  if (binding) {
-    return `<omo-${companion.skillName}-pointer>${parent.skillName} ${companion.role}. Read the ${companion.skillName} skill at ${skillsRoot}${companion.skillName}/SKILL.md with the read tool in the same turn as the ${parent.skillName} skill and ${companion.instruction}.</omo-${companion.skillName}-pointer>`
-  }
-  return `<omo-${companion.skillName}-pointer>${parent.skillName} ${companion.role}. If the user of this session is asking to run ${parent.skillName}, read the ${companion.skillName} skill at ${skillsRoot}${companion.skillName}/SKILL.md with the read tool in the same turn as the ${parent.skillName} skill and ${companion.instruction}. If ${parent.skillName} is only being discussed, quoted, or relayed from another session, ignore this pointer.</omo-${companion.skillName}-pointer>`
-}
-
 function skillCommandName(text: string): string | undefined {
   if (!text.startsWith(SKILL_COMMAND_PREFIX)) {
     return undefined
   }
 
   const spaceIndex = text.indexOf(" ")
-  return spaceIndex === -1 ? text.slice(SKILL_COMMAND_PREFIX.length) : text.slice(SKILL_COMMAND_PREFIX.length, spaceIndex)
+  return spaceIndex === -1
+    ? text.slice(SKILL_COMMAND_PREFIX.length)
+    : text.slice(SKILL_COMMAND_PREFIX.length, spaceIndex)
 }
 
 function isSenpiInputEvent(value: unknown): value is SenpiInputEvent {

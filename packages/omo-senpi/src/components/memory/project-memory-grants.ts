@@ -1,5 +1,9 @@
 import { lstatSync, realpath, realpathSync } from "@oh-my-opencode/memory-core/fs"
-import { containedRelativePath, isDarwinAutomountTriggerPath, type PathContainmentOptions } from "@oh-my-opencode/utils/path-containment"
+import {
+  containedRelativePath,
+  isDarwinAutomountTriggerPath,
+  type PathContainmentOptions,
+} from "@oh-my-opencode/utils/path-containment"
 import * as path from "node:path"
 
 import type { MemoryIdentityContext } from "./context"
@@ -22,7 +26,11 @@ export interface ProjectMemoryGrantOptions {
   readonly stillLive?: () => boolean
 }
 
-export async function grantProjectMemoryRead(context: MemoryIdentityContext, projectRepo: string, options: ProjectMemoryGrantOptions = {}): Promise<void> {
+export async function grantProjectMemoryRead(
+  context: MemoryIdentityContext,
+  projectRepo: string,
+  options: ProjectMemoryGrantOptions = {},
+): Promise<void> {
   const root = await (options.realPath ?? canonicalAsync)(projectRepo)
   if (root === undefined || options.stillLive?.() === false) return
   let roots = grants.get(context)
@@ -42,7 +50,11 @@ export interface ProjectMemoryReadCheckOptions extends PathContainmentOptions {
   readonly lstat?: (path: string) => { isDirectory(): boolean }
 }
 
-export function isGrantedProjectMemoryRead(context: MemoryIdentityContext, target: string, options: ProjectMemoryReadCheckOptions = {}): boolean {
+export function isGrantedProjectMemoryRead(
+  context: MemoryIdentityContext,
+  target: string,
+  options: ProjectMemoryReadCheckOptions = {},
+): boolean {
   const roots = grants.get(context)
   if (roots === undefined || roots.size === 0) return false
   const windows = (options.platform ?? process.platform) === "win32"
@@ -52,8 +64,13 @@ export function isGrantedProjectMemoryRead(context: MemoryIdentityContext, targe
   // ancestors are resolved, so a symlink on the way is still followed before the comparison.
   const lstat = options.lstat ?? lstatSync
   // A macOS automount trigger is never a granted repo note, and resolving it can park the host loop (#11545).
-  if (!windows && isDarwinAutomountTriggerPath(paths.resolve(target), { platform: options.platform ?? process.platform })) return false
-  const resolve = (input: string) => input === target ? canonicalAllowingMissing(input, canonicalPath, lstat, paths) : canonicalPath(input)
+  if (
+    !windows &&
+    isDarwinAutomountTriggerPath(paths.resolve(target), { platform: options.platform ?? process.platform })
+  )
+    return false
+  const resolve = (input: string) =>
+    input === target ? canonicalAllowingMissing(input, canonicalPath, lstat, paths) : canonicalPath(input)
   for (const root of roots) {
     try {
       // Roots are stored canonical; a root that now resolves elsewhere was replaced (for example by a
@@ -97,12 +114,14 @@ function canonicalAllowingMissing(
       if (missing.length === 0) return ancestor
       // A missing remainder can only live under a directory. POSIX reports a file ancestor as ENOTDIR, but
       // Windows reports ENOENT, so the walk would otherwise grant `<note>/missing.md` there.
-      if (!lstat(ancestor).isDirectory()) throw Object.assign(new Error(`not a directory: ${ancestor}`), { code: "ENOTDIR" })
+      if (!lstat(ancestor).isDirectory())
+        throw Object.assign(new Error(`not a directory: ${ancestor}`), { code: "ENOTDIR" })
       return (ancestor.endsWith(paths.sep) ? ancestor : ancestor + paths.sep) + missing.join(paths.sep)
     } catch (error) {
       // A dangling link is an entry, not a missing note: its target could appear outside the repo later.
       if (!isMissingPathError(error) || current.length <= root.length || isEntry(current, lstat)) throw error
-      const cut = paths.sep === "\\" ? Math.max(current.lastIndexOf("/"), current.lastIndexOf("\\")) : current.lastIndexOf("/")
+      const cut =
+        paths.sep === "\\" ? Math.max(current.lastIndexOf("/"), current.lastIndexOf("\\")) : current.lastIndexOf("/")
       const segment = current.slice(cut + 1)
       if (segment === "" || segment === "." || segment === "..") throw error
       missing.unshift(segment)

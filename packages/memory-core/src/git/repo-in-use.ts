@@ -2,8 +2,20 @@ import { join, resolve, sep } from "node:path"
 
 import { readlink, realpath, stat } from "../fs/resilient"
 
-import { LSOF_ANSWER_BOUND_MS, answerFromProcOrLsof, runLsofBounded, type HolderLookupOptions } from "./open-file-holders"
-import { classifyEntryError, errnoCode, scanEveryProcess, type EntryVerdict, type ProcScan, type ProcView } from "./proc-view"
+import {
+  LSOF_ANSWER_BOUND_MS,
+  answerFromProcOrLsof,
+  runLsofBounded,
+  type HolderLookupOptions,
+} from "./open-file-holders"
+import {
+  classifyEntryError,
+  errnoCode,
+  scanEveryProcess,
+  type EntryVerdict,
+  type ProcScan,
+  type ProcView,
+} from "./proc-view"
 
 // omo #10199 r5 HIGH 1: the dead-owner proof covers the process that held the memory-write lock,
 // not the git child that created the lock file. A SIGKILLed writer's git keeps running as an
@@ -23,7 +35,11 @@ async function repoTree(dir: string): Promise<RepoTree | null> {
   const identity = await stat(dir).catch(() => undefined)
   if (identity === undefined) return null
   const real = await realpath(dir).catch(() => undefined)
-  return { roots: [...new Set([resolve(dir), ...(real === undefined ? [] : [real])])], dev: identity.dev, ino: identity.ino }
+  return {
+    roots: [...new Set([resolve(dir), ...(real === undefined ? [] : [real])])],
+    dev: identity.dev,
+    ino: identity.ino,
+  }
 }
 
 async function cwdVerdict(view: ProcView, pid: number, tree: RepoTree): Promise<EntryVerdict> {
@@ -77,7 +93,14 @@ async function scanLsofCwdUsers(dir: string, boundMs: number): Promise<readonly 
 }
 
 /** Pids other than this process working inside `dir` right now, or null when that cannot be told. */
-export function findProcessesWorkingIn(dir: string, options: HolderLookupOptions = {}): Promise<readonly number[] | null> {
+export function findProcessesWorkingIn(
+  dir: string,
+  options: HolderLookupOptions = {},
+): Promise<readonly number[] | null> {
   const boundMs = options.lsofBoundMs ?? LSOF_ANSWER_BOUND_MS
-  return answerFromProcOrLsof((view) => scanProcCwdUsers(dir, view), () => scanLsofCwdUsers(dir, boundMs), boundMs)
+  return answerFromProcOrLsof(
+    (view) => scanProcCwdUsers(dir, view),
+    () => scanLsofCwdUsers(dir, boundMs),
+    boundMs,
+  )
 }

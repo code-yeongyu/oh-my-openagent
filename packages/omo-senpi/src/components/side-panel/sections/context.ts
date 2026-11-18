@@ -16,9 +16,7 @@ export function buildContextRows(usage: PanelContextUsage | undefined, width: nu
   const tokens = usage.tokens
   if (tokens === null) return [heading("CONTEXT"), field("window", "measuring", "dim")]
   const window = usage.contextWindow > 0 ? usage.contextWindow : undefined
-  const summary = window === undefined
-    ? compactTokens(tokens)
-    : `${compactTokens(tokens)}/${compactTokens(window)}`
+  const summary = window === undefined ? compactTokens(tokens) : `${compactTokens(tokens)}/${compactTokens(window)}`
   const rows: PanelRow[] = [heading("CONTEXT", summary)]
   if (window === undefined) return rows
   const percent = usage.percent ?? (tokens / window) * 100

@@ -24,7 +24,10 @@ describe("RpcProcessRunner child model resolution (#10863)", () => {
       }),
       buildSpawn: (input) => ({
         command: process.execPath,
-        args: ["-e", `process.stderr.write(${JSON.stringify(`\u001B[31m${SENPI_UNRESOLVED}\u001B[39m\n`)}); process.exit(1)`],
+        args: [
+          "-e",
+          `process.stderr.write(${JSON.stringify(`\u001B[31m${SENPI_UNRESOLVED}\u001B[39m\n`)}); process.exit(1)`,
+        ],
         cwd: input.cwd,
         env: process.env,
       }),
