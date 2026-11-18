@@ -817,22 +817,29 @@ export function createLiveThreadSurface(
       ),
     // Every rung of the ladder is sent attached (`durableId`), the `get_state` probe included although the host exempts
     // that read from its gate: the probe's attach itself answers whether the engine still holds the session.
-    closeSession: (sessionId, durableId) =>
-      closeLadder(sessionId, async ({ type, ...data }) => {
-        try {
-          return {
-            kind: "ok",
-            data:
-              type === "get_state"
-                ? await callOn<Record<string, unknown>>(socket ?? legacy, "get_state", data, undefined, durableId, true)
-                : await send<Record<string, unknown>>(String(type), data, durableId),
+    closeSession: (sessionId, durableId, options) =>
+      closeLadder(
+        sessionId,
+        async ({ type, ...data }) => {
+          try {
+            return {
+              kind: "ok",
+              data:
+                type === "get_state"
+                  ? await callOn<Record<string, unknown>>(socket ?? legacy, "get_state", data, undefined, durableId, true)
+                  : // The host's own capabilities, read the way every connection opens (an observing read, no fence).
+                    type === "get_protocol_info"
+                    ? await callOn<Record<string, unknown>>(socket ?? legacy, "get_protocol_info", { observe: true })
+                    : await send<Record<string, unknown>>(String(type), data, durableId),
+            }
+          } catch (error) {
+            const reason = error instanceof Error ? error.message.slice(0, Math.max(0, error.message.indexOf(":"))) : ""
+            if (SESSION_GONE.has(reason)) return { kind: "gone", reason }
+            throw error
           }
-        } catch (error) {
-          const reason = error instanceof Error ? error.message.slice(0, Math.max(0, error.message.indexOf(":"))) : ""
-          if (SESSION_GONE.has(reason)) return { kind: "gone", reason }
-          throw error
-        }
-      }),
+        },
+        options,
+      ),
   })
 
   const liveness = async (endpoint: GatewayEndpointRef): Promise<EndpointLiveness> => {

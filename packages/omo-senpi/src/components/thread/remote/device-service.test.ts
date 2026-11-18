@@ -1253,6 +1253,19 @@ describe("device-service adapter: relay round trips per thread op", () => {
     ])
   })
 
+  test("#given one remote session #when a close reads its engine's capabilities twice, and again after the host re-establishes the attach #then the attach holds the first answer and the third read goes to the device (#14234)", async () => {
+    const w = relayWorld()
+    const read = () =>
+      w.port.sessionCommand("b", row.session_id, { type: "get_protocol_info", sessionId: row.session_id, observe: true })
+    w.take()
+    expect((await read()).kind).toBe("ok")
+    expect((await read()).kind).toBe("ok")
+    expect(w.take()).toEqual(["session.attach", "session.command"])
+    w.snapshot()
+    expect((await read()).kind).toBe("ok")
+    expect(w.take()).toEqual(["session.command"])
+  })
+
   test("#given a held catalog #when the host re-establishes the attach, or does so while the catalog is being read #then the next exact model switch reads the catalog again", async () => {
     const w = relayWorld()
     await setModelRemote(w.surface, row, { model: "m2" })

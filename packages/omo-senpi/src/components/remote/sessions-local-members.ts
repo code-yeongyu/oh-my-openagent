@@ -79,7 +79,7 @@ export function localSessionMembers(hostOn: HostOn) {
               details: { feature: "close", device: target.device },
             },
           )
-        const outcome = await port.closeSession(routing, durable)
+        const { outcome, dropped_deliveries } = await port.closeSession(routing, durable)
         if (outcome === "held_elsewhere")
           return remoteFailure(
             "foreign_live_owner",
@@ -87,7 +87,7 @@ export function localSessionMembers(hostOn: HostOn) {
             "Close it from the client that holds it, or call sessions.send first so it can be closed for every holder.",
             { details: { device: target.device } },
           )
-        return ok({ closed: outcome === "closed" })
+        return ok({ closed: outcome === "closed", dropped_deliveries: [...dropped_deliveries] })
       }),
     interrupt: (target: LocalTarget, thread: ThreadHandle): Promise<Outcome<InterruptResult>> =>
       run(target, "interrupted the turn", async ({ port, routing, durable }) => {

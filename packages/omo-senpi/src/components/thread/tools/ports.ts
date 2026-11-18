@@ -168,7 +168,11 @@ export type ThreadHost = {
     durable_session_id?: string,
   ) => Promise<SessionWatchOutcome>
   /** Ends one session on its host for every client that holds it; hosts only, a terminal keeps its own session. */
-  readonly closeSession?: (sessionId: string, durable_session_id?: string) => Promise<ThreadCloseOutcome>
+  readonly closeSession?: (
+    sessionId: string,
+    durable_session_id?: string,
+    options?: ThreadCloseOptions,
+  ) => Promise<ThreadCloseAnswer>
   /** Every endpoint at once; absent on a single-endpoint host, whose `listSessions` is the view. */
   readonly listView?: (request?: ThreadHostViewRequest) => Promise<ThreadHostView>
   /** Fresh identity validation on exactly one published endpoint, without enumeration. */
@@ -247,3 +251,9 @@ export const UNKNOWN_CALLER = "unknown-caller"
 
 /** How a close ended: the session ended, no live session held it any more, or another client still holds it. */
 export type ThreadCloseOutcome = "closed" | "not_live" | "held_elsewhere"
+
+/** `force`: close even when the session has messages it has not read; they are dropped and listed (omo#14234). */
+export type ThreadCloseOptions = { readonly force?: boolean }
+
+/** A close's outcome and the deliveries the engine handed back unwritten (empty when none). */
+export type ThreadCloseAnswer = { readonly outcome: ThreadCloseOutcome; readonly dropped_deliveries: readonly string[] }
