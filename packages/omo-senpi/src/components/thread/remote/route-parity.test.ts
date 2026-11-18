@@ -85,6 +85,10 @@ describe("#13012 route parity", () => {
           listings += 1
           return ended
         },
+        listing: async () => {
+          listings += 1
+          return { rows: ended, incomplete: [] }
+        },
       },
     })
     expect(
@@ -349,6 +353,10 @@ describe("#13012 route parity", () => {
             listings += 1
             return [B_ROW]
           },
+          listing: async () => {
+            listings += 1
+            return { rows: [B_ROW], incomplete: [] }
+          },
         },
       })
       for (const tool of ["thread_read", "thread_send"] as const) {
@@ -401,9 +409,14 @@ describe("#13012 route parity", () => {
       ...a.remote,
       sessions: {
         ...a.remote.sessions,
+        // The send-side book reads the round (`listing`), the rename its device's rows (`sessions`): one listing count.
         sessions: async () => {
           if (++listings === 2) throw new Error("rename listing failed")
           return [B_ROW]
+        },
+        listing: async () => {
+          if (++listings === 2) throw new Error("rename listing failed")
+          return { rows: [B_ROW], incomplete: [] }
         },
       },
     })
