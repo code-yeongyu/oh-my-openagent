@@ -2,6 +2,8 @@
 // window was stamped when the enumeration started, so its answer arrived already expired: the next view enumerated
 // again, and a caller arriving while it ran started a second one. A send paid one enumeration per view.
 import { describe, expect, test } from "bun:test"
+import { resolve } from "node:path"
+
 import {
   createLiveThreadSurface,
   HOST_ENDPOINTS_CACHE_TTL_MS,
@@ -359,6 +361,60 @@ describe("live thread surface endpoint cache", () => {
       expect(secretReads).toEqual([socket])
     })
 
+    test("#given one surface waiting on an abandoned enumeration and another surface that ran the newer one #when the late answer names a socket the newer one recorded as another kind #then the waiting surface dials by the newer kind", async () => {
+      // given (#13236 review L1: the kinds map is per surface, the enumeration is shared by the process)
+      const socket = "/tmp/omo-enum-kind-two-surfaces.sock"
+      const enumerations = new Map<string, never>()
+      let clock = 1_000
+      let calls = 0
+      let releaseOld: () => void = () => {}
+      const statusAll = async (): Promise<readonly HostEndpointReport[]> => {
+        calls += 1
+        if (calls === 1) {
+          await new Promise<void>((done) => {
+            releaseOld = done
+          })
+          return [{ socket, reachable: false, session_paths: [], endpoint_kind: "rpc_host" }]
+        }
+        return [{ socket, reachable: false, session_paths: [], endpoint_kind: "tui" }]
+      }
+      const surfaceOf = (secretReads: string[]) =>
+        createLiveThreadSurface(
+          {} as never,
+          {
+            env: { SENPI_RPC_SOCKET: "/tmp/omo-enum-cache-missing.sock" },
+            exists: (path: string) => path === socket,
+            registry: async () => [],
+            now: () => clock,
+            monotonic: () => clock,
+            enumerations,
+            readSecret: (path: string) => {
+              secretReads.push(path)
+              throw new Error("no secret in this test")
+            },
+            statusAll,
+          } as never,
+        )
+      const waitingReads: string[] = []
+      const waiting = surfaceOf(waitingReads)
+      const old = waiting.listView({ offline: true })
+      for (let turn = 0; turn < 100 && calls === 0; turn++) await Promise.resolve()
+      clock += HOST_ENDPOINTS_ENUMERATION_DEADLINE_MS
+      await within(surfaceOf([]).listView({ offline: true }), "the other surface's newer enumeration")
+
+      // when
+      releaseOld()
+      await old
+      waitingReads.length = 0
+      await waiting
+        .endpoint(socket)
+        .getState("probe")
+        .catch(() => undefined)
+
+      // then
+      expect(waitingReads).toEqual([socket])
+    })
+
     test("#given a surface whose env moves to another agent dir between calls #when it lists again #then the new agent dir is enumerated under its own key and the old entry keeps the old answer", async () => {
       // given (L3)
       const enumerations = new Map<string, never>()
@@ -390,10 +446,9 @@ describe("live thread surface endpoint cache", () => {
 
       // then
       expect(calls).toBe(2)
-      const keys = [...enumerations.keys()]
-      expect(keys).toHaveLength(2)
-      expect(keys.filter((key) => key.includes("/tmp/omo-enum-env-a"))).toHaveLength(1)
-      expect(keys.filter((key) => key.includes("/tmp/omo-enum-env-b"))).toHaveLength(1)
+      // the key names the resolved agent dir (a drive-letter path on win32), so compare against the resolved form
+      const agentDirs = [...enumerations.keys()].map((key) => (JSON.parse(key) as readonly string[])[0])
+      expect(agentDirs.sort()).toEqual([resolve("/tmp/omo-enum-env-a"), resolve("/tmp/omo-enum-env-b")])
     })
 
     test("#given surfaces over one shared map #when they list #then the same agent dir and legacy socket share one entry and another agent dir gets its own", async () => {

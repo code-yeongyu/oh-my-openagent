@@ -120,6 +120,8 @@ const NEXT_ACTION: Partial<Record<RemoteCode, string>> = {
   transport_expired: "It may have run; read the session's current state before resending.",
   unconfirmed: "It may have run; read the session's current state before resending.",
   host_error: "It may have run; read the session's current state before resending.",
+  delivered_unconfirmed:
+    "The relay accepted it for the device, so it may have run or may still run; read the session's current state before resending.",
   invalid_arguments: "Fix the arguments and call it again.",
 }
 

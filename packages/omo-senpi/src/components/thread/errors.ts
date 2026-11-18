@@ -24,6 +24,7 @@ export const THREAD_ERROR_CODES = [
   "idempotency_conflict",
   "idempotency_in_progress",
   "idempotency_uncertain",
+  "delivered_unconfirmed",
   "approval_unavailable",
   "approval_route_locked",
   "partial_commit",
@@ -87,8 +88,16 @@ export function threadToolFailure(
  * both versions and the remedy. Any other error answers undefined.
  */
 export function gatewaySchemaRefusal(error: unknown): ThreadToolFailure | undefined {
-  const { code, details } = (error ?? {}) as { code?: unknown; details?: { found?: unknown; supported?: unknown } }
-  if (code !== "gateway_schema_too_new" || typeof details?.found !== "number" || typeof details.supported !== "number")
+  const { code, details } = (error ?? {}) as {
+    code?: unknown
+    details?: { found?: unknown; supported?: unknown; extension?: unknown }
+  }
+  if (
+    code !== "gateway_schema_too_new" ||
+    typeof details?.found !== "number" ||
+    typeof details.supported !== "number" ||
+    details.extension !== undefined
+  )
     return undefined
   const command = UPDATE_COMMAND
   return threadToolFailure(

@@ -2,11 +2,13 @@ import { describe, expect, jest, test } from "bun:test"
 import {
   connectDeviceService,
   LocalApiError,
+  UnsettledCommandError,
   type CommandResult,
   type DeviceService,
   type RemoteAttach,
 } from "@oh-my-opencode/device-service-core"
 import { withContractHost } from "../../../../../senpi-task/src/runners/rpc-host/testing/contract-host"
+import { withCallDeadline } from "../../call-budget/call-deadline"
 import type { ThreadReadInput } from "../contracts"
 import { answered, closeThread, interruptThread, setModelOn } from "../control/operations"
 import { createRelayControl } from "../control/relay-control"
@@ -833,7 +835,7 @@ describe("device-service adapter: relay round trips per thread op", () => {
       request: async (type: string) => {
         frames.push(type)
         if (type === "session.attach") return { attach: "a1" }
-        if (type === "session.endpoints") return { endpoints: [endpointKey] }
+        if (type === "session.endpoints") return { endpoints: [endpointKey], primary: endpointKey }
         if (type === "session.locate") return { device: "b", key: CREATED_KEY, session: `b.${CREATED_KEY}` }
         if (type === "status.get") return { state: "connected" }
         if (type === "devices.list")
@@ -1192,12 +1194,12 @@ describe("device-service adapter: relay round trips per thread op", () => {
     expect(w.endpointsSent).toEqual(["e1", "e1", "e1", "e2", "e2"])
   })
 
-  test("#given an existing row of b #when it is opened #then the open does not ask for a located session and nothing is located", async () => {
+  test("#given an existing row of b #when it is opened again #then the open asks for the reopened session's key, which may differ from the row's, and is ok only once that key resolves (#14170)", async () => {
     const w = relayWorld()
     const opened = await createRelaySessionHost(w.surface, "b", row).open({ sessionPath: row.path })
     expect(opened.kind).toBe("ok")
     expect(w.take()).toEqual(["session.endpoints", "session.command"])
-    expect(w.locateAsked).toEqual([false])
+    expect(w.locateAsked).toEqual([true])
   })
 
   test("#given one remote session #when the thread ops run in turn #then the attach is opened once, status and the transcript are read from the device every time, an exact model in the held catalog is one set_model, and each command is one round trip", async () => {
@@ -1318,6 +1320,7 @@ describe("device-service adapter: relay round trips per thread op", () => {
 describe("device-service adapter: lost replies and connection lifecycle", () => {
   const lifecycle = () => {
     const calls = { connect: 0, attach: 0, sent: 0 }
+    const waits: (number | undefined)[] = []
     let closeService: () => void = () => {}
     let detachAttach: () => void = () => {}
     let commandAnswer: () => Promise<CommandResult> = async () => state({ state: "engine_applied" }, {})
@@ -1330,8 +1333,9 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
           calls.attach += 1
           if (attachFailure !== undefined) throw attachFailure
           return {
-            command: async () => {
+            command: async (_rpc: unknown, options?: { readonly waitMs?: number }) => {
               calls.sent += 1
+              waits.push(options?.waitMs)
               return await commandAnswer()
             },
             read: async () => ({ entries: [], next_before: null }),
@@ -1350,6 +1354,7 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
     }
     return {
       calls,
+      waits,
       connect: async () => ({ conn: service(), owned: true }),
       close: () => closeService(),
       detach: () => detachAttach(),
@@ -1435,6 +1440,261 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
       expect(await port.sessionCommand("b", "s1", { type, sessionId: "s1" })).toEqual({ kind: "refused", reason })
     },
   )
+
+  // omo#14130: a command that left this device (transport_confirmed) and lost its final state is delivered_unconfirmed;
+  // one that never left keeps today's answers. A read stays a refusal either way: nothing can have run.
+  test.each([
+    ["prompt", true, { kind: "uncertain", reason: "delivered_unconfirmed" }],
+    ["get_state", true, { kind: "refused", reason: "delivered_unconfirmed" }],
+    ["prompt", false, { kind: "uncertain", reason: "reply_lost" }],
+    ["get_state", false, { kind: "refused", reason: "request_timeout" }],
+  ] as const)(
+    "#given a %s whose final state never came (delivered: %p) #when its wait ends #then it answers %o",
+    async (type, delivered, expected) => {
+      const l = lifecycle()
+      l.answer(() =>
+        Promise.reject(new UnsettledCommandError("c1", 45_000, delivered ? "transport_confirmed" : "queued")),
+      )
+      const port = sessionsPort({ version: "0.0.0-test", connect: l.connect })
+      expect(await port.sessionCommand("b", "s1", { type, sessionId: "s1", message: "x" })).toEqual(expected)
+      expect(l.calls.sent).toBe(1)
+    },
+  )
+
+  test("#given no enclosing tool call #when a send and a read are commanded #then each waits under the 60 s tool window", async () => {
+    const l = lifecycle()
+    const port = sessionsPort({ version: "0.0.0-test", connect: l.connect })
+    await port.sessionCommand("b", "s1", { type: "prompt", message: "x" })
+    await port.sessionCommand("b", "s1", { type: "get_state", sessionId: "s1" })
+    expect(l.waits).toEqual([45_000, 30_000])
+  })
+
+  test("#given a tool call with 20 s of its budget left #when a send is commanded #then its wait is cut to what is left", async () => {
+    const l = lifecycle()
+    const port = sessionsPort({ version: "0.0.0-test", connect: l.connect })
+    await withCallDeadline(Date.now() + 20_000, () => port.sessionCommand("b", "s1", { type: "prompt", message: "x" }))
+    const [wait] = l.waits
+    expect(wait).toBeLessThanOrEqual(20_000)
+    expect(wait).toBeGreaterThan(10_000)
+  })
+
+  test("#given a tool call whose budget is spent #when a send is commanded #then it is refused request_timeout and nothing is sent", async () => {
+    const l = lifecycle()
+    const port = sessionsPort({ version: "0.0.0-test", connect: l.connect })
+    const spent = await withCallDeadline(Date.now() - 1, () =>
+      port.sessionCommand("b", "s1", { type: "prompt", message: "x" }),
+    )
+    expect(spent).toEqual({ kind: "refused", reason: "request_timeout" })
+    expect(l.calls.sent).toBe(0)
+  })
+
+  // omo#14130 review M1: the wake path shares the call's budget like every other command.
+  const wakingService = (waits: (number | undefined)[]) => () =>
+    ({
+      status: async () => ({ state: "connected" }),
+      carriesWakeMark: true,
+      wakeCommand: async (
+        _device: string,
+        _durableId: string,
+        _rpc: unknown,
+        options?: { readonly waitMs?: number },
+      ) => {
+        waits.push(options?.waitMs)
+        return state({ state: "engine_applied" }, { kind: "queued" })
+      },
+      closed: new Promise<void>(() => {}),
+      close: () => {},
+    }) as unknown as DeviceService
+  test.each([
+    ["no enclosing tool call", undefined, (wait: number | undefined) => expect(wait).toBe(45_000)],
+    [
+      "a tool call with 20 s left",
+      20_000,
+      (wait: number | undefined) => {
+        expect(wait).toBeLessThanOrEqual(20_000)
+        expect(wait).toBeGreaterThan(10_000)
+      },
+    ],
+  ] as const)("#given %s #when a wake is sent #then its wait is bounded by it", async (_label, left, check) => {
+    const waits: (number | undefined)[] = []
+    const service = wakingService(waits)
+    const port = sessionsPort({ version: "0.0.0-test", connect: async () => ({ conn: service(), owned: true }) })
+    const send = port.wake
+    if (send === undefined) throw new Error("the device-service port has no wake")
+    const wake = () => send("b", "dur-1", { type: "admit_external_message", text: "x" })
+    await (left === undefined ? wake() : withCallDeadline(Date.now() + left, wake))
+    expect(waits).toHaveLength(1)
+    check(waits[0])
+  })
+
+  test("#given a tool call whose budget is spent #when a wake is sent #then it is refused request_timeout and nothing is sent", async () => {
+    const waits: (number | undefined)[] = []
+    const service = wakingService(waits)
+    const port = sessionsPort({ version: "0.0.0-test", connect: async () => ({ conn: service(), owned: true }) })
+    const spent = await withCallDeadline(Date.now() - 1, async () =>
+      port.wake?.("b", "dur-1", { type: "admit_external_message", text: "x" }),
+    )
+    expect(spent).toEqual({ kind: "refused", reason: "request_timeout" })
+    expect(waits).toEqual([])
+  })
+
+  // omo#14130 review L1: an attach that never settles cannot hold the call past its budget either.
+  test("#given an attach that never settles #when a command is sent inside a 50 ms budget #then it is refused request_timeout at the budget", async () => {
+    const service = () =>
+      ({
+        status: async () => ({ state: "connected" }),
+        attach: () => new Promise<never>(() => {}),
+        locate: () => new Promise<never>(() => {}),
+        closed: new Promise<void>(() => {}),
+        close: () => {},
+      }) as unknown as DeviceService
+    const port = sessionsPort({ version: "0.0.0-test", connect: async () => ({ conn: service(), owned: true }) })
+    const answer = await withCallDeadline(Date.now() + 50, () =>
+      port.sessionCommand("b", "s1", { type: "prompt", message: "x" }),
+    )
+    expect(answer).toEqual({ kind: "refused", reason: "request_timeout" })
+  })
+
+  // omo#14130 review round 2 (L3): a create on another device shares the call's budget too.
+  const endpointService = (waits: (number | undefined)[]) => () =>
+    ({
+      status: async () => ({ state: "connected" }),
+      endpointCommand: async (_device: string, _rpc: unknown, options?: { readonly waitMs?: number }) => {
+        waits.push(options?.waitMs)
+        return state({ state: "engine_applied" }, { sessionId: "made" })
+      },
+      closed: new Promise<void>(() => {}),
+      close: () => {},
+    }) as unknown as DeviceService
+  test("#given no enclosing call, then 20 s left, then a spent budget #when an endpoint command is sent #then its wait is 45 s, then cut, then nothing is sent", async () => {
+    const waits: (number | undefined)[] = []
+    const service = endpointService(waits)
+    const port = sessionsPort({
+      version: "0.0.0-test",
+      connect: async () => ({ conn: service(), owned: true }),
+      dialEndpoint: async () => ({ conn: service(), owned: true }),
+    })
+    const open = () => port.endpointCommand("b", { type: "open_session" })
+    await open()
+    await withCallDeadline(Date.now() + 20_000, open)
+    expect(await withCallDeadline(Date.now() - 1, open)).toEqual({ kind: "refused", reason: "request_timeout" })
+    expect(waits).toHaveLength(2)
+    expect(waits[0]).toBe(45_000)
+    expect(waits[1]).toBeLessThanOrEqual(20_000)
+    expect(waits[1]).toBeGreaterThan(10_000)
+  })
+
+  // omo#14130 review round 5 (M1): train 1's direct session command (a named create's set_session_name) shares the budget.
+  const directService = (waits: (number | undefined)[]) => () =>
+    ({
+      status: async () => ({ state: "connected" }),
+      sessionCommand: async (_device: string, _key: string, _rpc: unknown, options?: { readonly waitMs?: number }) => {
+        waits.push(options?.waitMs)
+        return state({ state: "engine_applied" }, { type: "response", success: true })
+      },
+      closed: new Promise<void>(() => {}),
+      close: () => {},
+    }) as unknown as DeviceService
+  test("#given no enclosing call, then 20 s left, then a spent budget #when a direct session command is sent #then its wait is 45 s, then cut, then nothing is sent", async () => {
+    const waits: (number | undefined)[] = []
+    const service = directService(waits)
+    const port = sessionsPort({ version: "0.0.0-test", connect: async () => ({ conn: service(), owned: true }) })
+    const rename = () =>
+      port.sessionCommand("b", "rk-1", { type: "set_session_name", sessionId: "rk-1", name: "n" }, { direct: true })
+    await rename()
+    await withCallDeadline(Date.now() + 20_000, rename)
+    expect(await withCallDeadline(Date.now() - 1, rename)).toEqual({ kind: "refused", reason: "request_timeout" })
+    expect(waits).toHaveLength(2)
+    expect(waits[0]).toBe(45_000)
+    expect(waits[1]).toBeLessThanOrEqual(20_000)
+    expect(waits[1]).toBeGreaterThan(10_000)
+  })
+
+  // omo#14130 review round 3: the dial and the post-create locate count against the call's budget too.
+  test("#given a dial that takes 60 ms of a 100 ms budget #when an open is sent #then its wait is sized from what is left", async () => {
+    const waits: (number | undefined)[] = []
+    const service = endpointService(waits)
+    const port = sessionsPort({
+      version: "0.0.0-test",
+      connect: async () => ({ conn: service(), owned: true }),
+      dialEndpoint: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 60))
+        return { conn: service(), owned: true }
+      },
+    })
+    await withCallDeadline(Date.now() + 100, () => port.endpointCommand("b", { type: "open_session" }))
+    expect(waits).toHaveLength(1)
+    expect(waits[0]).toBeLessThanOrEqual(45)
+  })
+
+  test("#given a create reply that names no key and a locate that never answers #when locate runs inside a 50 ms budget #then it is refused request_timeout at the budget", async () => {
+    const service = () =>
+      ({
+        status: async () => ({ state: "connected" }),
+        locate: () => new Promise<never>(() => {}),
+        closed: new Promise<void>(() => {}),
+        close: () => {},
+      }) as unknown as DeviceService
+    const port = sessionsPort({ version: "0.0.0-test", connect: async () => ({ conn: service(), owned: true }) })
+    const located = await withCallDeadline(Date.now() + 50, () => port.locate("b", "engine-1"))
+    expect(located).toEqual({ kind: "refused", reason: "request_timeout" })
+  })
+
+  test("#given a created session its device never lists #when locate waits for its attach inside a 100 ms budget #then it gives up with the budget, not after 20 s", async () => {
+    const service = () =>
+      ({
+        status: async () => ({ state: "connected" }),
+        attach: async () => {
+          throw new LocalApiError("session_not_found", "not listed yet")
+        },
+        closed: new Promise<void>(() => {}),
+        close: () => {},
+      }) as unknown as DeviceService
+    const port = sessionsPort({
+      version: "0.0.0-test",
+      connect: async () => ({ conn: service(), owned: true }),
+      retryDelay: async () => {},
+    })
+    const started = Date.now()
+    const located = await withCallDeadline(Date.now() + 100, () => port.locate("b", "engine-1", "rk-made"))
+    expect(located).toEqual({ kind: "ok", sessionId: "rk-made" })
+    expect(Date.now() - started).toBeLessThan(5_000)
+  })
+
+  // omo#14130 review round 2 (L4): an attach that settles after the budget ran out is released, so the pool detaches it.
+  test("#given an attach that settles after the call's budget ran out #when it settles #then its hold is released and the pool detaches it", async () => {
+    let settle!: (attached: RemoteAttach) => void
+    const attaching = new Promise<RemoteAttach>((resolve) => {
+      settle = resolve
+    })
+    let detached!: () => void
+    const detachedOnce = new Promise<void>((resolve) => {
+      detached = resolve
+    })
+    const service = () =>
+      ({
+        status: async () => ({ state: "connected" }),
+        attach: () => attaching,
+        closed: new Promise<void>(() => {}),
+        close: () => {},
+      }) as unknown as DeviceService
+    const port = sessionsPort({
+      version: "0.0.0-test",
+      connect: async () => ({ conn: service(), owned: true }),
+      attachIdleMs: 0,
+    })
+    const refused = await withCallDeadline(Date.now() + 20, () =>
+      port.sessionCommand("b", "s1", { type: "prompt", message: "x" }),
+    )
+    expect(refused).toEqual({ kind: "refused", reason: "request_timeout" })
+    settle({
+      detached: new Promise(() => {}),
+      onEvent: () => () => {},
+      detach: async () => detached(),
+    } as unknown as RemoteAttach)
+    const timeout = new Promise<string>((resolve) => setTimeout(() => resolve("never detached"), 2_000))
+    expect(await Promise.race([detachedOnce.then(() => "detached"), timeout])).toBe("detached")
+  })
 
   test("#given a record that is not JSON #when it is commanded #then it is refused before any attach or send", async () => {
     const l = lifecycle()

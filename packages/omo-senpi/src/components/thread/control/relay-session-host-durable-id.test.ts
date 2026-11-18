@@ -24,6 +24,24 @@ describe("thread_create on another device names the new thread by its durable id
     expect(JSON.stringify(result)).not.toContain("rk-new-on-b")
   })
 
+  // #14015 review L1: a locate refused because this device is not signed in names that remedy, never "update omo on b".
+  test.each(["sign_in_required", "signed_out"])(
+    "#given the locate after the open is refused %s #when thread_create runs on device b #then the created thread's warning is host_unavailable naming this device's sign-in",
+    async (reason) => {
+      const a = account({ openData: ENGINE_OPEN_REPLY, locateRefuse: reason })
+      const { run } = surface(a.remote)
+
+      const result = await run("thread_create", { device: "studio", name: `signed-out-${reason}` })
+
+      expect(result).toMatchObject({
+        kind: "ok",
+        thread: "dur-new-on-b",
+        warnings: [{ code: "host_unavailable", details: { device: "b", reason } }],
+      })
+      expect(JSON.stringify(result)).not.toContain("update omo")
+    },
+  )
+
   test("#given a named create on b #when the name is applied #then set_session_name goes to the listing key while the caller gets the durable id", async () => {
     const a = account({ openData: ENGINE_OPEN_REPLY, relayKeys: RELAY_KEYS })
     const { run } = surface(a.remote)

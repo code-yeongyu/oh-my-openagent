@@ -1,3 +1,4 @@
+import { waitWithinCallBudget } from "../../call-budget/call-deadline"
 import type { ThreadTranscriptEntry } from "../reader"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { relayAddressEntry } from "../remote/address-book"
@@ -77,7 +78,16 @@ export function createRelayControl(
     interrupt: (turnId) => interruptOver((request) => command({ type: "interrupt", ...request }), turnId),
     close: async () => {
       try {
-        return await closeLadder(sessionId, answer)
+        // The unload's reply names the session file: a reopen from this surface needs it while the listing lags (#14170).
+        let unloaded: string | undefined
+        const outcome = await closeLadder(sessionId, async (rpc) => {
+          const answered = await answer(rpc)
+          const path = answered.kind === "ok" ? answered.data["sessionPath"] : undefined
+          if (typeof path === "string" && path !== "") unloaded = path
+          return answered
+        })
+        if (outcome !== "held_elsewhere") remote.sessions.closed?.(row, unloaded)
+        return outcome
       } catch (error) {
         throw error instanceof ControlRefusal
           ? new ControlRefusal({ ...error.failure, details: { device, ...error.failure.details } })
@@ -137,7 +147,8 @@ export function createRelayControl(
       waitForTurnEnd(
         (handlers) => remote.sessions.watch(device, sessionId, handlers, { baseline: true }),
         (reason) => new ControlRefusal(outcomeFailure({ kind: "refused", reason }, device).error),
-        timeoutMs,
+        // omo#14130 review round 2 (M2): inside a tool call the wait leaves the transcript read after it its share.
+        waitWithinCallBudget(timeoutMs),
         signal,
       ),
     running: async () => row.state === "running" || (await command({ type: "get_state" }))["isStreaming"] === true,
