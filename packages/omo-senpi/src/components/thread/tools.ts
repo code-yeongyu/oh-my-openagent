@@ -38,7 +38,7 @@ import type { DeliveryPipeline } from "./gateway/pipeline"
 import type { DeliveryTarget } from "./gateway/transport"
 import { createGatewayServices } from "./tools/gateway-services"
 import { listThreads, readThread } from "./tools/read-ops"
-import { createRelayTools, REMOVED_RELAY_TOOL_HINTS } from "./tools/relay-tools"
+import { createRelayTools } from "./tools/relay-tools"
 import { consumedSendersOf, threadSendPermission } from "./tools/reply-permission"
 import { otherDevice, replyTargetMismatch } from "./tools/reply-target"
 import { accountDevices } from "./remote/account"
@@ -913,7 +913,6 @@ export function registerThreadTools(
   const built = buildThreadTools(options)
   // Thread tools run on the loop side of a split session (engine `ToolDefinition.runs`).
   for (const tool of built.tools) pi.registerTool({ ...tool, runs: "brain" })
-  for (const [name, hint] of Object.entries(REMOVED_RELAY_TOOL_HINTS)) pi.registerRemovedToolHint?.(name, hint)
   if (pi.on !== undefined)
     registerExtensionTools(pi as ExtensionToolHost & Required<Pick<ExtensionToolHost, "on">>, options, log)
   return { dispose: built.dispose }
