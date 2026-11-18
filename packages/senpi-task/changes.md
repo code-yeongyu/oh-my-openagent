@@ -1,3 +1,7 @@
+## 2026-11-15 - architect category defaults to Fable 5.2 at xhigh (#13543)
+
+`task(category: "architect")` with no user configuration now resolves `anthropic/claude-fable-5-2` at `xhigh` (was `max`). The Fable 5.1 rung stays the fallback, at the same effort. Pinning tests and docs updated; the catalog accepts `xhigh` for both Fable generations on every provider lane the chain lists.
+
 ## 2026-11-10 - A refused engine load names the restart it needs (#12991)
 
 `loadSenpiBarrel()` maps an engine import that fails with `code: "SENPI_REDACTION_SLOT_INCOMPATIBLE"` (senpi's `ConfigReferenceRedactionSlotError`, code-yeongyu/senpi#6334) to `SenpiEngineRestartRequiredError` (same `code`, the engine's error as `cause`); any other import failure is passed through unchanged. Every child start awaits that load, so the start fails with the remedy instead of the raw import error. Part of #12965.

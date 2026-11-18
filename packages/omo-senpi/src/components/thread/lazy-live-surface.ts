@@ -25,7 +25,7 @@ export function createLazyLiveThreadSurface(
         runtime = undefined
         throw new Error(`host_unavailable:${socket}`, { cause: error })
       }))
-  const sessionPort = (endpoint?: string): ThreadSessionPort => {
+  const sessionPort = (endpoint?: string): ThreadSessionPort & Required<Pick<ThreadSessionPort, "watchSession">> => {
     const target = async () => {
       const host = await load()
       return endpoint === undefined ? host : host.endpoint(endpoint)
@@ -43,9 +43,9 @@ export function createLazyLiveThreadSurface(
         const port = await target()
         return await port.prompt(sessionId, message, options, durableId)
       },
-      interrupt: async (sessionId, turnId, durableId) => {
+      interrupt: async (sessionId, request, durableId) => {
         const port = await target()
-        return await port.interrupt(sessionId, turnId, durableId)
+        return await port.interrupt(sessionId, request, durableId)
       },
       setSessionName: async (sessionId, name, durableId) => {
         const port = await target()
@@ -81,6 +81,11 @@ export function createLazyLiveThreadSurface(
         const port = await target()
         if (port.closeSession === undefined) throw new Error("unsupported:close_session")
         return await port.closeSession(sessionId, durableId)
+      },
+      watchSession: async (sessionId, handlers, durableId) => {
+        const port = await target()
+        if (port.watchSession === undefined) throw new Error("unsupported:subscribe_sessions")
+        return await port.watchSession(sessionId, handlers, durableId)
       },
     }
   }
