@@ -202,8 +202,11 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       } catch (error) {
         return { kind: "refused", reason: sessionReason(notSentReason(error)) }
       }
+      // omo#14130 review round 5 (M1): the direct record shares the call's budget like every other command.
+      const waitMs = commandWaitMs(SEND_WAIT_MS)
+      if (waitMs <= 0) return { kind: "refused", reason: "request_timeout" }
       try {
-        return outcomeOf(await connected.sessionCommand(device, sessionId, record))
+        return outcomeOf(await connected.sessionCommand(device, sessionId, record, { waitMs }))
       } catch (error) {
         if (!(error instanceof NotSentError)) return { kind: "uncertain", reason: "reply_lost" }
       }

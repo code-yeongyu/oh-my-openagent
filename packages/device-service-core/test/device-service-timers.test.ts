@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { connectDeviceService, type DeviceService, LocalApiError, UnsettledCommandError } from "../src/index.ts"
+import {
+  connectDeviceService,
+  type DeviceService,
+  LocalApiError,
+  NotSentError,
+  UnsettledCommandError,
+} from "../src/index.ts"
 import { connectLocalApi } from "../src/local-api/client.ts"
 import { type FakeClock, fakeClock } from "./local-api/conformance/fake-clock.ts"
 import type { FakeOwner } from "./local-api/conformance/fake-owner.ts"
@@ -65,6 +71,43 @@ describe("device service clock seam", () => {
     expect(clock.armed()).toBe(1)
     clock.advance(1)
     expect(await sending).toMatch(/^no final state for endpoint command \S+ within 120000 ms$/)
+  })
+
+  // omo#14130 review round 5 (L1): a lookup that never answers ends at the caller's waitMs, with nothing sent.
+  test("an endpoint command whose lookup never answers fails not_sent at the caller's waitMs", async () => {
+    const clock = fakeClock()
+    const { owner, withheld } = await startMode("silent-requests")
+    const service = await serviceOn(owner, clock)
+    const sending = service.endpointCommand(PEER, { type: "prompt", message: "hi" }, { waitMs: 5_000 }).then(
+      () => "settled",
+      (error: unknown) => error,
+    )
+    await withheld("response")
+    clock.advance(5_000)
+    const failed = await sending
+    expect(failed).toBeInstanceOf(NotSentError)
+    expect((failed as NotSentError).code).toBe("request_timeout")
+  })
+
+  // omo#14130 review round 5 (M1): a direct session command honors the caller's waitMs too.
+  test("a direct session command with a waitMs fails at that bound on the given timers", async () => {
+    const clock = fakeClock()
+    const { owner, withheld } = await startMode("ack-no-final")
+    const service = await serviceOn(owner, clock)
+    const listed = defaultWorld().sessions[0]
+    if (listed === undefined) throw new Error("the default world lists no session")
+    const sending = outcomeOf(
+      service.sessionCommand(
+        listed.device,
+        listed.session_id,
+        { type: "set_session_name", name: "n" },
+        { waitMs: 5_000 },
+      ),
+    )
+    await withheld("final_state")
+    await service.status()
+    clock.advance(5_000)
+    expect(await sending).toMatch(/^no final state for endpoint command \S+ within 5000 ms$/)
   })
 
   // omo#14130 review round 3 (M1): a caller's waitMs bounds an endpoint command, the lookup before it included.

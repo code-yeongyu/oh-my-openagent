@@ -248,7 +248,12 @@ export type DeviceService = {
    * under `key`, delegated by the device's service with no attach on this connection (one round trip, where an attach
    * then its command takes two). Settles like `endpointCommand`; a refusal before sending is a `NotSentError`.
    */
-  readonly sessionCommand: (device: string, key: string, rpc: CommandRpc) => Promise<CommandResult>
+  readonly sessionCommand: (
+    device: string,
+    key: string,
+    rpc: CommandRpc,
+    options?: { readonly waitMs?: number },
+  ) => Promise<CommandResult>
   readonly close: () => void
   readonly closed: Promise<void>
   /**
@@ -432,8 +437,34 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
       const started = timers.now()
       let endpoint = options?.endpoint
       if (endpoint === undefined) {
+        const lookup = client.request("session.endpoints", { device })
+        // omo#14130 review round 5 (L1): a caller's waitMs bounds the lookup itself, not only what follows it.
+        const waitMs = options?.waitMs
+        const bounded =
+          waitMs === undefined
+            ? lookup
+            : new Promise<Awaited<typeof lookup>>((resolve, reject) => {
+                const cancel = timers.after(waitMs, () =>
+                  reject(
+                    new NotSentError(
+                      "request_timeout",
+                      "the wait ran out during the endpoint lookup; nothing was sent",
+                    ),
+                  ),
+                )
+                lookup.then(
+                  (answer) => {
+                    cancel()
+                    resolve(answer)
+                  },
+                  (error: unknown) => {
+                    cancel()
+                    reject(error)
+                  },
+                )
+              })
         try {
-          endpoint = (await client.request("session.endpoints", { device })).endpoints[0]
+          endpoint = (await bounded).endpoints[0]
         } catch (error) {
           throw markNotSent(error)
         }
@@ -448,11 +479,17 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
         endpoint,
       }
     },
-    sessionCommand: (device, key, rpc) =>
-      followDelegatedCommand(client, device, timers, (commandId) =>
-        client.commandTo({ session: `${device}.${key}` }, rpc, commandId).catch((error: unknown) => {
-          throw error instanceof LocalApiError && error.command_id === undefined ? markNotSent(error) : error
-        }),
+    sessionCommand: (device, key, rpc, options) =>
+      followDelegatedCommand(
+        client,
+        device,
+        timers,
+        (commandId) =>
+          client.commandTo({ session: `${device}.${key}` }, rpc, commandId).catch((error: unknown) => {
+            throw error instanceof LocalApiError && error.command_id === undefined ? markNotSent(error) : error
+          }),
+        // omo#14130 review round 5 (M1): a caller's bound (a thread tool call's budget) caps the wait.
+        options?.waitMs,
       ),
     close: () => client.close(),
     closed: client.closed,

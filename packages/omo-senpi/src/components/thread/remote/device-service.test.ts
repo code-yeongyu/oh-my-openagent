@@ -1584,6 +1584,32 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
     expect(waits[1]).toBeGreaterThan(10_000)
   })
 
+  // omo#14130 review round 5 (M1): train 1's direct session command (a named create's set_session_name) shares the budget.
+  const directService = (waits: (number | undefined)[]) => () =>
+    ({
+      status: async () => ({ state: "connected" }),
+      sessionCommand: async (_device: string, _key: string, _rpc: unknown, options?: { readonly waitMs?: number }) => {
+        waits.push(options?.waitMs)
+        return state({ state: "engine_applied" }, { type: "response", success: true })
+      },
+      closed: new Promise<void>(() => {}),
+      close: () => {},
+    }) as unknown as DeviceService
+  test("#given no enclosing call, then 20 s left, then a spent budget #when a direct session command is sent #then its wait is 45 s, then cut, then nothing is sent", async () => {
+    const waits: (number | undefined)[] = []
+    const service = directService(waits)
+    const port = sessionsPort({ version: "0.0.0-test", connect: async () => ({ conn: service(), owned: true }) })
+    const rename = () =>
+      port.sessionCommand("b", "rk-1", { type: "set_session_name", sessionId: "rk-1", name: "n" }, { direct: true })
+    await rename()
+    await withCallDeadline(Date.now() + 20_000, rename)
+    expect(await withCallDeadline(Date.now() - 1, rename)).toEqual({ kind: "refused", reason: "request_timeout" })
+    expect(waits).toHaveLength(2)
+    expect(waits[0]).toBe(45_000)
+    expect(waits[1]).toBeLessThanOrEqual(20_000)
+    expect(waits[1]).toBeGreaterThan(10_000)
+  })
+
   // omo#14130 review round 3: the dial and the post-create locate count against the call's budget too.
   test("#given a dial that takes 60 ms of a 100 ms budget #when an open is sent #then its wait is sized from what is left", async () => {
     const waits: (number | undefined)[] = []
