@@ -94,6 +94,7 @@ export function cliServiceAccess(options: {
       session ??= createSession({
         api: origin,
         store: createCredentialStore(origin, { notice: quietNotice }),
+        log: warn,
         beforeKeysDiscarded: retireSyncPinOnDiscard({
           pinDir: () => syncPinDir(resolveMemoryRoot({ ...options.env }, options.cwd)),
           log: warn,
