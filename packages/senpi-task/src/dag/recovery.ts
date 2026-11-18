@@ -248,7 +248,9 @@ async function claimOrphanedRun(
     runId,
     (pid) => pid !== context.hostPid && context.isProcessAlive(pid),
     (fresh, holder, live) => {
-      if (fresh === null || fresh.status !== "paused") return { kind: "skipped", reason: "not_paused" }
+      if (fresh === null || fresh.status !== "paused" || fresh.pause?.reason === "user_stop") {
+        return { kind: "skipped", reason: "not_paused" }
+      }
       if (fresh.parentSessionId !== observed.parentSessionId || holder === undefined) {
         return { kind: "skipped", reason: "foreign_session" }
       }
@@ -275,7 +277,8 @@ async function claimPausedRun(
     (fresh, holder, live) => {
       if (fresh === null || fresh.status !== "paused") return { kind: "skipped", reason: "not_paused" }
       if (fresh.parentSessionId !== parentSessionId) return { kind: "skipped", reason: "foreign_session" }
-      if (expectedPauseSeq !== undefined && fresh.pause?.pauseSeq !== expectedPauseSeq) {
+      // Automatic recovery has no user-stop sequence. Explicit Resume must match the current one.
+      if (fresh.pause?.pauseSeq !== expectedPauseSeq) {
         return { kind: "skipped", reason: "not_paused" }
       }
       if (holder !== undefined && live) return { kind: "skipped", reason: "live_lease", holderPid: holder }

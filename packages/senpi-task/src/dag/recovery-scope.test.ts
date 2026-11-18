@@ -146,6 +146,41 @@ function recovery(store: DagFileStore, taskManager = new SettledTasks()) {
 }
 
 describe("automatic recovery candidate scope", () => {
+  test.each(["A", "B"])(
+    "#given a user stops the run during liveness verification #when %s automatically recovers #then it leaves the pause intact",
+    async (session) => {
+      // given
+      const store = fixture()
+      const runId = await seed(store, "A", 9001)
+      const initialRecord = store.readCheckpoint<DagRunRecordV1>(runId)
+      if (initialRecord === null) throw new Error("missing initial checkpoint")
+      const taskManager = new SettledTasks()
+      const journal = controlJournal({ store, taskManager, initialRecord }, initialRecord)
+      const pause = { reason: "user_stop", pauseSeq: 2 } as const
+
+      // when
+      const outcomes = await createDagRecovery({
+        store,
+        taskManager,
+        hostPid: 101,
+        isProcessAlive: () => {
+          journal.append({ type: "dag.run.paused", ...pause })
+          return false
+        },
+      }).resumePausedRuns(session, "A")
+
+      // then
+      expect(outcomes).toEqual([])
+      expect(taskManager.starts).toEqual([])
+      expect(store.readCheckpoint<DagRunRecordV1>(runId)).toMatchObject({
+        parentSessionId: "A",
+        checkpointSeq: initialRecord.checkpointSeq + 1,
+        status: "paused",
+        pause,
+      })
+    },
+  )
+
   test("#given the old holder changes while checking liveness #when recovery claims #then it preserves the workspace journal and declines the new live lease", async () => {
     // given
     const store = fixture()
