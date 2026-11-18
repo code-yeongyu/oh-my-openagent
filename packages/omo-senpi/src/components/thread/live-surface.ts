@@ -236,6 +236,19 @@ export function parseHostStatusAll(stdout: string | undefined): readonly HostEnd
   )
 }
 
+/** One endpoint enumeration, running (`expiresAt` undefined) or answered and reusable until `expiresAt`. */
+type SharedEnumeration = {
+  expiresAt: number | undefined
+  readonly abandonAt: number
+  readonly endpoints: Promise<readonly KnownEndpoint[]>
+}
+
+/**
+ * Enumerations every surface of this process shares, keyed by what decides the answer (#12989): a session that a
+ * delivery just created reuses the listing another session of the same agent dir took inside the window.
+ */
+const processEnumerations = new Map<string, SharedEnumeration>()
+
 export type LiveThreadSurfaceOptions = {
   readonly keyRoot?: string
   /** Socket already resolved by a synchronous registrar before the runtime is loaded. */
@@ -253,6 +266,16 @@ export type LiveThreadSurfaceOptions = {
   readonly readSecret?: (socket: string) => Uint8Array
   readonly connect?: ThreadSocketConnect
   readonly now?: () => number
+  /**
+   * The clock an in-flight enumeration's deadline is timed on. Monotonic (`performance.now`) by default, so a forward
+   * jump of the wall clock (sleep, NTP) never abandons an enumeration that is about to answer.
+   */
+  readonly monotonic?: () => number
+  /**
+   * Where enumerations are shared. Defaults to the process-wide map when the engine CLI and the registry on disk are
+   * the real ones; a surface given its own `statusAll` or `registry` keeps a private map unless it passes one here.
+   */
+  readonly enumerations?: Map<string, SharedEnumeration>
 }
 
 type EndpointVerdict = { readonly alive?: boolean; readonly reason?: "live_unresponsive" | "dead" | null }
@@ -298,16 +321,18 @@ export function createLiveThreadSurface(
   const exists = options.exists ?? existsSync
   const connect = options.connect ?? ((path: string) => createConnection(path))
   const now = options.now ?? Date.now
+  const monotonic = options.monotonic ?? (() => performance.now())
   const statusAll = options.statusAll ?? (async () => undefined)
   const registry = options.registry ?? (() => listRegistryEndpoints(resolveAgentHome({ env })))
   const readSecret = options.readSecret ?? ((socket: string) => readFileSync(controlSocketSecretPath(socket)))
   const legacy = options.socket ?? resolveThreadSocket(options.env)
-  type Enumeration = {
-    expiresAt: number | undefined
-    readonly abandonAt: number
-    readonly endpoints: Promise<readonly KnownEndpoint[]>
-  }
-  let enumeration: Enumeration | undefined
+  const enumerations: Map<string, SharedEnumeration> =
+    options.enumerations ??
+    (options.statusAll === undefined && options.registry === undefined ? processEnumerations : new Map())
+  // The answer depends on the agent dir whose registry is read and the legacy socket merged into it; surfaces agreeing
+  // on both share one enumeration. It is read from `env` on every call, as the registry reads it, so an env that moves
+  // never files a new answer under the old key.
+  const keyOfEnumeration = (): string => JSON.stringify([resolve(resolveAgentHome({ env })), resolve(legacy)])
   // Session files each endpoint listed on its last answer: a host that stopped cleanly released its
   // claims, and this is then the only record of which threads it held.
   const lastListed = new Map<string, readonly string[]>()
@@ -596,28 +621,39 @@ export function createLiveThreadSurface(
     // One enumeration at a time, and its window starts when it answers: an enumeration that takes longer than the
     // window (a slow registry read, or a supplied `status --all` report) is shared, not repeated per view (#12989).
     // One that has not answered by its deadline is abandoned: the next caller starts afresh and its late answer is dropped.
+    const key = keyOfEnumeration()
     const current = now()
+    const elapsed = monotonic()
+    let enumeration = enumerations.get(key)
     if (
       enumeration === undefined ||
-      (enumeration.expiresAt === undefined ? enumeration.abandonAt <= current : enumeration.expiresAt <= current)
+      (enumeration.expiresAt === undefined ? enumeration.abandonAt <= elapsed : enumeration.expiresAt <= current)
     ) {
-      const started: Enumeration = {
+      const started: SharedEnumeration = {
         expiresAt: undefined,
-        abandonAt: current + HOST_ENDPOINTS_ENUMERATION_DEADLINE_MS,
+        abandonAt: elapsed + HOST_ENDPOINTS_ENUMERATION_DEADLINE_MS,
         endpoints: enumerate(),
       }
       enumeration = started
+      enumerations.set(key, started)
       started.endpoints.then(
         () => {
           started.expiresAt = now() + HOST_ENDPOINTS_CACHE_TTL_MS
         },
         () => {
-          if (enumeration === started) enumeration = undefined
+          if (enumerations.get(key) === started) enumerations.delete(key)
         },
       )
     }
-    const known = await enumeration.endpoints
-    for (const endpoint of known) kinds.set(resolve(endpoint.socket), endpoint.kind)
+    const answered = enumeration
+    const known = await answered.endpoints
+    // A caller still waiting on an abandoned enumeration gets its whole list, but its late answer never replaces a
+    // kind the enumeration that took its place already recorded.
+    const stale = enumerations.get(key) !== answered
+    for (const endpoint of known) {
+      const socket = resolve(endpoint.socket)
+      if (!stale || !kinds.has(socket)) kinds.set(socket, endpoint.kind)
+    }
     return known
   }
 
@@ -878,10 +914,8 @@ export function createLiveThreadSurface(
       // the one a listing could have shown, so the send and the steer read the same liveness. A send
       // never starts an enumeration itself - a published durable id needs none - so with no fresh
       // listing the direct probe decides, exactly as a fresh listing would.
-      const fresh =
-        endpoint.kind === "tui" && enumeration?.expiresAt !== undefined && enumeration.expiresAt > now()
-          ? await enumeration.endpoints
-          : undefined
+      const shared = endpoint.kind === "tui" ? enumerations.get(keyOfEnumeration()) : undefined
+      const fresh = shared?.expiresAt !== undefined && shared.expiresAt > now() ? await shared.endpoints : undefined
       const cached = fresh?.find((candidate) => resolve(candidate.socket) === resolve(endpoint.socket))?.verdict
       const listed = await listEndpoint({
         socket: endpoint.socket,
