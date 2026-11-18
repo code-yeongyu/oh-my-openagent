@@ -14,6 +14,12 @@ export type DeliveryConsumerOptions = {
   readonly port: DeliveryServicePort
   readonly agentDir: string
   readonly sessionsDirectory: string
+  /**
+   * The user's `threads.chainCountLimit` for the target session's cwd, read at each intake as the running engine reads
+   * it at each admission (senpi `admitInputChain` over `SettingsManager.getThreadChainCountLimit`), so a queued delivery
+   * past the limit is refused like a live one. `undefined` means the user set no limit.
+   */
+  readonly chainCountLimit: (cwd: string) => Promise<number | undefined>
   /** Starts the session (the carrier's wake); called only after the sender passed the admission check. */
   readonly wake: (durableId: string) => Promise<void>
   /** A tracked step that failed (a wake, an answer, a held reply): reported here, never left as an unhandled rejection. */
@@ -131,16 +137,18 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
             : undefined
     const pair = { sender_device: event.sender_device, command_id: event.command_id }
     const record = intakeRecord(event)
-    if (reason !== undefined || record === undefined) {
+    if (target.kind !== "found" || reason !== undefined || record === undefined) {
       await answer(pair, { kind: "refused", reason: reason ?? "invalid_record" })
       return
     }
+    const chainCountLimit = await options.chainCountLimit(target.cwd)
     const outcome = await store.intake({
       now: store.now(),
       attested_device: event.sender_device,
       record,
       provenance: { workspace: "remote", project: "remote" },
       target_session_kind: "interactive",
+      ...(chainCountLimit === undefined ? {} : { chain_count_limit: chainCountLimit }),
     })
     if (outcome.kind === "busy") {
       await answer(pair, { kind: "refused", reason: "busy" })
