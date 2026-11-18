@@ -201,7 +201,12 @@ const newestRetiredRoot = async (stateDir: string, account: string): Promise<str
     .filter((name) => name.startsWith(prefix) && Number.isSafeInteger(stamp(name)))
     .sort((a, b) => stamp(b) - stamp(a))
   for (const name of retired) {
-    const raw = await readFile(join(rootDir(stateDir), name, PIN_FILE), "utf8").catch(() => null)
+    // Only a missing pin falls through to the next older one (#14098); any other read error propagates, so
+    // `rootChangeNotice` reports the check as skipped instead of comparing against an older root.
+    const raw = await readFile(join(rootDir(stateDir), name, PIN_FILE), "utf8").catch((error: unknown) => {
+      if (isMissing(error)) return null
+      throw error
+    })
     const anchor = raw === null ? null : parsePin(raw, account)
     if (anchor !== null) return anchor.genesisDigest
   }
