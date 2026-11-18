@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, relative, sep } from "node:path"
 import * as resilient from "../../fs/resilient"
@@ -12,13 +12,7 @@ import { createRejectionCounter } from "./rejection.ts"
 import { genesisEntry, newDeviceKeyring, newRecoveryCredential } from "./testing/genesis.ts"
 import { ACCOUNT, fixtureAnchor, mainChain, record } from "./testing/sync-v1.test-support.ts"
 import { retireSyncDevice } from "../device-retire.ts"
-import {
-  forgetTrustAnchor,
-  loadTrustAnchor,
-  pinTrustAnchor,
-  rootChangedSinceRetired,
-  TrustPinError,
-} from "./trust-pin.ts"
+import { forgetTrustAnchor, loadTrustAnchor, pinTrustAnchor, rootChangeNotice, TrustPinError } from "./trust-pin.ts"
 
 const dirs: string[] = []
 afterEach(() => {
@@ -228,7 +222,7 @@ describe("a pin retired when its principal's keys are discarded (#12280)", () =>
     await retireSyncDevice({ pinDir: dir, account: ACCOUNT })
     await expectNoAnchor(dir, "no_pin")
     await pinTrustAnchor(dir, ACCOUNT, candidate)
-    expect(await rootChangedSinceRetired(dir, ACCOUNT, candidate.genesisDigest)).toBe(false)
+    expect(await rootChangeNotice(dir, ACCOUNT, candidate.genesisDigest)).toEqual({})
   })
 
   test("#given a retired pin #when a ceremony pins a different root #then it is pinned, not refused, and the change is reported", async () => {
@@ -237,13 +231,40 @@ describe("a pin retired when its principal's keys are discarded (#12280)", () =>
     await retireSyncDevice({ pinDir: dir, account: ACCOUNT })
     const other = await otherCandidate()
     expect((await pinTrustAnchor(dir, ACCOUNT, other)).genesisDigest).toBe(other.genesisDigest)
-    expect(await rootChangedSinceRetired(dir, ACCOUNT, other.genesisDigest)).toBe(true)
+    expect(await rootChangeNotice(dir, ACCOUNT, other.genesisDigest)).toEqual({ rootChanged: true })
   })
 
   test("#given no pin ever retired #then no root change is reported", async () => {
     const dir = stateDir()
-    expect(await rootChangedSinceRetired(dir, ACCOUNT, (await provenCandidate()).genesisDigest)).toBe(false)
+    expect(await rootChangeNotice(dir, ACCOUNT, (await provenCandidate()).genesisDigest)).toEqual({})
   })
+
+  // #12382: the notice runs after a join or enable has pinned, so it is best-effort. Write and search permission without
+  // read on the anchor root makes its readdir fail EACCES while the pin itself still loads by path.
+  test.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "#given a pinned account whose anchor root cannot be listed #when the notice check runs #then it reports the check as skipped with the reason, and the pin still loads",
+    async () => {
+      // given
+      const dir = stateDir()
+      const candidate = await provenCandidate()
+      await pinTrustAnchor(dir, ACCOUNT, candidate)
+      const anchors = join(dir, "trust-anchor")
+      chmodSync(anchors, 0o300)
+
+      // when
+      let notice: Awaited<ReturnType<typeof rootChangeNotice>>
+      try {
+        notice = await rootChangeNotice(dir, ACCOUNT, candidate.genesisDigest)
+      } finally {
+        chmodSync(anchors, 0o700)
+      }
+
+      // then
+      expect(notice).toEqual({ rootCheck: { kind: "skipped", reason: "EACCES" } })
+      const loaded = await loadTrustAnchor(dir, ACCOUNT)
+      expect(loaded.ok && loaded.anchor.genesisDigest).toBe(candidate.genesisDigest)
+    },
+  )
 
   test("the retire seam stays out of the crypto barrel", () => {
     expect(Object.keys(cryptoIndex)).not.toContain("retireSyncDevice")

@@ -1,4 +1,4 @@
-import { loadTrustAnchor, TrustPinError } from "../crypto/trust-pin.ts"
+import { loadTrustAnchor, type RootChangeNotice, TrustPinError } from "../crypto/trust-pin.ts"
 import { creatorAnchor } from "../crypto/anchor.ts"
 import { LockContentionError } from "../../locks/acquire.ts"
 import type { DeviceKeyring } from "../keyring-port.ts"
@@ -26,12 +26,11 @@ import type { PhraseVoidNotice } from "./phrase-notice.ts"
 export type EnableMethod = "passkey" | "phrase"
 
 export type EnableOutcome =
-  | {
+  | ({
       readonly kind: "joined"
       readonly created?: true
-      readonly rootChanged?: true
       readonly phraseVoid?: PhraseVoidNotice
-    }
+    } & RootChangeNotice)
   | { readonly kind: "join_required"; readonly phraseVoid?: PhraseVoidNotice }
   | {
       readonly kind: "method_required"

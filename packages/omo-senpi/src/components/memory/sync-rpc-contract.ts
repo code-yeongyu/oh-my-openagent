@@ -54,11 +54,18 @@ export interface JoinProgress {
 
 /**
  * `rootChanged`: the ceremony pinned a different memory root than this device held before its keys
- * were discarded (#12280): a notice the desktop shows, never a refusal. Additive on the wire.
+ * were discarded (#12280): a notice the desktop shows, never a refusal. `rootCheck`: the device pinned,
+ * but its retired pins could not be read, so whether the root changed is unknown (#12382); `reason` is
+ * an errno-shaped code. Both are additive optional fields on the wire, never a new `kind`.
  */
+export interface SyncRootNotice {
+  readonly rootChanged?: true
+  readonly rootCheck?: { readonly kind: "skipped"; readonly reason: string }
+}
+
 export type SyncEnableResponse =
-  | { readonly kind: "joined"; readonly rootChanged?: true; readonly phraseVoid?: PhraseVoidNotice }
-  | { readonly kind: "first_device_created"; readonly rootChanged?: true }
+  | ({ readonly kind: "joined"; readonly phraseVoid?: PhraseVoidNotice } & SyncRootNotice)
+  | ({ readonly kind: "first_device_created" } & SyncRootNotice)
   /** Legacy: kept decodable for older engines; this engine never emits it. */
   | { readonly kind: "needs_first_device" }
   | {

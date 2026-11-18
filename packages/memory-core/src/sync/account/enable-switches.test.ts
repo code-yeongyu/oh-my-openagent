@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test"
+import { syncRequestHeaders } from "../contract-version.ts"
 import { creatorAnchor } from "../crypto/anchor.ts"
 import { appendEntries, emptyChain } from "../crypto/chain.ts"
 import { createRejectionCounter } from "../crypto/rejection.ts"
@@ -78,8 +79,7 @@ for (const member of ["pinned", "joiner", "resume", "creator"] as const) {
     ])
     expect(f.server.enabled("service-first")).toBe(true)
     expect(
-      (await fetch(`${f.server.url}/v1/sync/batches?after=0`, { headers: { authorization: `Bearer ${token}` } }))
-        .status,
+      (await fetch(`${f.server.url}/v1/sync/batches?after=0`, { headers: syncRequestHeaders(token) })).status,
     ).toBe(200)
   })
 }
