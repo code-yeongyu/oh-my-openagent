@@ -305,6 +305,35 @@ describe("a delivery the receiver's open draft holds is queued at once, like a s
     relay.dispose()
   })
 
+  test("#given b is mid-turn and its get_state counts no admitted delivery (senpi enqueues one straight to the agent's follow-up queue, outside pendingMessageCount) #when a follow_up message is sent #then the engine's queued admission is the answer: queued with its delivery id, never idempotency_uncertain", async () => {
+    const a = account({ engine: { ...ENGINE, streaming: true, currentTurnId: "0", pending: 0 } })
+    const { relay } = transport(a.remote)
+    const sent = await relay.deliver({ ...delivery("then reply SECOND_OK", "k8"), mode: "follow_up" })
+    const deliveryId = admits(a.sent)[0]?.["deliveryId"]
+    expect(typeof deliveryId).toBe("string")
+    expect(sent).toMatchObject({
+      kind: "ok",
+      device: "b",
+      delivery_id: deliveryId,
+      effective_mode: "follow_up",
+      delivery: { kind: "queued", queue_position: 1 },
+    })
+    expect(admits(a.sent)).toHaveLength(1)
+    relay.dispose()
+  })
+
+  test("#given b answers the admission queued and the get_state read after it fails #when the message is sent #then the queued admission is still the answer at position 1, never idempotency_uncertain", async () => {
+    const a = account({
+      engine: { ...ENGINE, streaming: true, currentTurnId: "0", pending: 0 },
+      stateRefusedAfterAdmit: "reply_lost",
+    })
+    const { relay } = transport(a.remote)
+    const sent = await relay.deliver({ ...delivery("after a lost state read", "k9"), mode: "follow_up" })
+    expect(sent).toMatchObject({ kind: "ok", device: "b", delivery: { kind: "queued", queue_position: 1 } })
+    expect(admits(a.sent)).toHaveLength(1)
+    relay.dispose()
+  })
+
   test("#given b already holds the delivery (a lost reply retried) #when the retry reaches b #then the send is deduplicated at b's real pending count, not an invented 1", async () => {
     const a = account({
       admitOutcome: {

@@ -37,6 +37,8 @@ From [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill).
 
 ### Image-generation skills (do NOT write code, only produce reference imagery)
 
+These files and `taste-skill.md` are upstream text: where they name a `generate_image` tool and your harness lists it as eval-only, call it as `tool.generate_image()` inside an eval cell.
+
 | File | Purpose | Load when |
 |---|---|---|
 | `imagegen-frontend-web.md` | Generates Awwwards-level website design reference *images*. Strong typography, generous spacing, anti-slop visual discipline. | "Generate a mockup", "design reference image", "show me what it could look like", before any code. Pair with `image-to-code-skill.md` for the full image-to-code flow. |

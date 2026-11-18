@@ -38,7 +38,7 @@ describe("#13037 the sender half reaches a session on another device that is not
       })
       expect(await run("thread_send", { thread: GONE, message: "reply" })).toMatchObject({
         kind: "ok",
-        thread_id: GONE,
+        thread: GONE,
         device: "b",
         delivery: { kind: "queued", waiting_on: { kind: "wake", device: "b" } },
       })
@@ -56,7 +56,7 @@ describe("#13037 the sender half reaches a session on another device that is not
       })
       expect(await run("thread_send", { thread: "planner", message: "reply" })).toMatchObject({
         kind: "ok",
-        thread_id: GONE,
+        thread: GONE,
         device: "b",
       })
       expect(wakes(a).map((entry) => entry.session)).toEqual([GONE])
@@ -94,7 +94,7 @@ describe("#13037 the sender half reaches a session on another device that is not
       const { run } = fixture.surface(a.remote)
       expect(await run("thread_send", { thread: "bee", message: "hi" })).toMatchObject({
         kind: "ok",
-        thread_id: GONE,
+        thread: GONE,
         device: "c",
       })
       expect(wakes(a).map((entry) => [entry.device, entry.session])).toEqual([["c", GONE]])
@@ -123,7 +123,7 @@ describe("#13037 the sender half reaches a session on another device that is not
       const { run } = fixture.surface(a.remote)
       expect(await run("thread_send", { thread: GONE, message: "hi" })).toMatchObject({
         kind: "ok",
-        thread_id: GONE,
+        thread: GONE,
         device: "c",
       })
       expect(a.lookups.map((entry) => entry.device).sort()).toEqual(["b", "c"])
@@ -205,12 +205,16 @@ describe("#13037 the sender half reaches a session on another device that is not
       expect([...perDevice.values()].every((count) => count === 1)).toBe(true)
     })
 
-    test("A4.4: #given that id #when thread_read and thread_interrupt name it #then neither runs the lookup", async () => {
+    test("#13215 (decides A4.4): #given that id #when thread_read and thread_interrupt name it #then each runs the lookup, finds the ended row on c and answers not_resumable, sending c nothing", async () => {
       const a = account({ rows: [B_ROW, C_ROW], ended: { c: { [GONE]: "rk-c-gone" } } })
       const { run } = fixture.surface(a.remote)
-      await run("thread_read", { thread: GONE })
-      await run("thread_interrupt", { thread: GONE })
-      expect(a.lookups).toEqual([])
+      for (const tool of ["thread_read", "thread_interrupt"] as const)
+        expect(await run(tool, { thread: GONE })).toMatchObject({ kind: "error", error: { code: "not_resumable" } })
+      expect(a.lookups.filter((entry) => entry.device === "c")).toEqual([
+        { device: "c", durable_id: GONE },
+        { device: "c", durable_id: GONE },
+      ])
+      expect(a.sent.filter((entry) => entry.device === "c")).toEqual([])
     })
   })
 

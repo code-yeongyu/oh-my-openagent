@@ -440,7 +440,7 @@ jobs:
           set -euo pipefail
           # Nothing reads the operator-supplied manifest before its sha256 matches the maintainer's dispatch pin.
           MANIFEST="$OPERATOR_DARWIN_DIR/operator-darwin-manifest.json"
-          if [ ! -f "$MANIFEST" ] || [ "$(sha256sum "$MANIFEST" | cut -d' ' -f1)" != "$MANIFEST_SHA256" ]; then
+          if [ ! -f "$MANIFEST" ] || [ "$(shasum -a 256 "$MANIFEST" | cut -d' ' -f1)" != "$MANIFEST_SHA256" ]; then
             echo "::error::operator_darwin_artifacts refused: operator-darwin-manifest.json does not match the pinned operator_darwin_manifest_sha256."
             exit 1
           fi
@@ -458,7 +458,23 @@ jobs:
           # proxy, TLS override, NODE_OPTIONS or BUN_* setting reaches it.
           RUN_DIR="$(mktemp -d "${RUNNER_TEMP}/operator-darwin-run.XXXXXX")"
           : > "${RUN_DIR}/empty-bunfig.toml"
-          (cd "$RUN_DIR" && env -i PATH="$PATH" HOME="$RUN_DIR" RUNNER_TEMP="$RUNNER_TEMP" GH_TOKEN="${GH_TOKEN:-}" \
+          # env -i drops the runner environment so a proxy, TLS override or NODE_OPTIONS cannot reach the
+          # verifier. Windows cannot create a process without its system root, so only those variables are forwarded.
+          # CLEAN_ENV always carries PATH, so its expansion stays safe under set -u even on bash 3.2 (macOS), where
+          # an empty array expansion is an unbound-variable error.
+          CLEAN_ENV=(PATH="$PATH" HOME="$RUN_DIR" RUNNER_TEMP="$RUNNER_TEMP" GH_TOKEN="${GH_TOKEN:-}")
+          if [ -n "${SYSTEMROOT:-}" ]; then
+            CLEAN_ENV+=(
+              "SYSTEMROOT=${SYSTEMROOT}"
+              "SYSTEMDRIVE=${SYSTEMDRIVE:-}"
+              "WINDIR=${WINDIR:-$SYSTEMROOT}"
+              "PATHEXT=${PATHEXT:-.COM;.EXE;.BAT;.CMD}"
+              "COMSPEC=${COMSPEC:-${SYSTEMROOT}\\system32\\cmd.exe}"
+              "TEMP=${TEMP:-}"
+              "TMP=${TMP:-}"
+            )
+          fi
+          (cd "$RUN_DIR" && env -i "${CLEAN_ENV[@]}" \
             bun --no-env-file --config="${RUN_DIR}/empty-bunfig.toml" "${OPERATOR_DARWIN_VERIFIER}/operator-darwin-verify.ts" \
             --dir "$OPERATOR_DARWIN_DIR" --tag "$TAG" \
             --manifest-sha256 "$MANIFEST_SHA256" --prepared-sha "$PREPARED_RELEASE_SHA" --version "$VERSION" --repo "$GITHUB_WORKSPACE" \

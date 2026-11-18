@@ -9,6 +9,7 @@ import {
 } from "../omo-senpi/src/components/thread/control/operations"
 import { createRelayControl } from "../omo-senpi/src/components/thread/control/relay-control"
 import { createDeviceServiceSessions } from "../omo-senpi/src/components/remote/port/device-service"
+import { type LocalSessions, remoteClientForPerson } from "../omo-senpi/src/components/remote/index"
 import { randomUUID } from "node:crypto"
 import { existsSync } from "node:fs"
 import { userInfo } from "node:os"
@@ -24,6 +25,7 @@ import { createdDeviceRow, namedDeviceRow } from "../omo-senpi/src/components/th
 import { stampThisDevice } from "../omo-senpi/src/components/thread/remote/this-device"
 import type { Provenance } from "../omo-senpi/src/components/thread/gateway/types"
 import { threadLink } from "../omo-senpi/src/components/thread/thread-link"
+import { openedResult } from "../omo-senpi/src/components/thread/tools/thread-row"
 import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { packageRoot } from "./bin/lib/package-paths.js"
 import {
@@ -54,14 +56,40 @@ export function gatewayWorkerAnchor(root: string = packageRoot): URL | undefined
 // (K8) starts at its first hop: a person at a terminal is no thread chain. The command's one connection is shared:
 // the port borrows it (never closes it); only `open_session` rides a fresh connection per call (#12777), so opening a
 // session never closes the CLI's only connection (#13075).
-const deviceServiceSurface = (service: DeviceService, dial: () => Promise<DeviceService>): RemoteThreadSurface => ({
+const deviceServiceSurface = (
+  service: DeviceService,
+  dial: () => Promise<DeviceService>,
+  stateDir: string,
+  localSessions: (() => Promise<LocalSessions>) | undefined,
+): RemoteThreadSurface => ({
   sessions: createDeviceServiceSessions({
     version: service.serviceVersion,
     connect: async () => ({ conn: service, owned: false }),
     dialEndpoint: async () => ({ conn: await dial(), owned: true }),
   }),
+  // `omo remote` is a person at this device; the account reads go through the one remote client (#13414).
+  client: remoteClientForPerson({
+    version: service.serviceVersion,
+    stateDir,
+    connect: async () => borrowedService(service),
+    // This device's own sessions come from its operator endpoint, injected from outside the local-only graph (#13968).
+    ...(localSessions === undefined ? {} : { localSessions }),
+  }),
   chain: { stamp: (record) => record },
 })
+
+/**
+ * The command's one device-service connection, lent to its remote client: the client's account reads ride it, and the
+ * client's close() leaves it open for the command, which closes it itself.
+ */
+export const borrowedService = (service: DeviceService): DeviceService =>
+  new Proxy(service, {
+    get: (target, key) => {
+      if (key === "close") return () => undefined
+      const value: unknown = Reflect.get(target, key, target)
+      return typeof value === "function" ? value.bind(target) : value
+    },
+  })
 
 type Show = (result: ThreadToolResult, label: string) => number
 
@@ -80,7 +108,28 @@ export async function runSession(
   json: boolean,
   dependencies: RemoteCommandDependencies,
 ): Promise<number> {
-  const remote = (dependencies.remote ?? ((service) => deviceServiceSurface(service, dependencies.connect)))(service)
+  const remote = (
+    dependencies.remote ??
+    ((service) =>
+      deviceServiceSurface(service, dependencies.connect, dependencies.stateDir, dependencies.localSessions))
+  )(service)
+  // The client holds its own device-service connection; a command that left it open would keep the process alive. The
+  // sessions port owns the attach pool: closing it clears the pool's idle-detach timers (#14074) and closes only a
+  // connection the port dialed itself, never the command's borrowed one.
+  try {
+    return await runSessionOn(remote, args, json, dependencies)
+  } finally {
+    remote.client.close()
+    await remote.sessions.close?.()
+  }
+}
+
+async function runSessionOn(
+  remote: RemoteThreadSurface,
+  args: SessionArgs,
+  json: boolean,
+  dependencies: RemoteCommandDependencies,
+): Promise<number> {
   const show: Show = (result, label) => {
     if (json) dependencies.output(JSON.stringify(result))
     if (result.kind === "error") {
@@ -146,15 +195,13 @@ async function openOn(
   if (open.kind !== "ok") return show(open, "")
   // --json keeps naming the model the session opened on, as it did when a set_model followed the open (#13748 review).
   const opened = {
-    kind: "ok",
-    thread: open.thread,
-    deduplicated: false,
+    ...openedResult(open.thread, false),
     ...(args.model === undefined ? {} : { model: { provider: args.model.provider, id: args.model.modelId } }),
-  } as ThreadToolResult & { readonly thread: typeof open.thread }
+  } as ThreadToolResult
   if (args.prompt === undefined) return show(opened, "")
   // The first prompt (#13410) goes to the session just opened, by its own id, as `omo remote send --no-wait` sends it.
-  const label = `${args.device}/${opened.thread.thread_id}`
-  const row = createdDeviceRow(args.device, opened.thread)
+  const label = `${args.device}/${open.thread.thread_id}`
+  const row = createdDeviceRow(args.device, open.thread)
   const delivery = personDelivery(remote, dependencies)
   let sent: ThreadToolResult
   try {
@@ -241,7 +288,7 @@ function personDelivery(remote: RemoteThreadSurface, dependencies: RemoteCommand
       }
     return {
       kind: "ok",
-      thread_id: rowThreadId(row),
+      thread: rowThreadId(row),
       link: threadLink(rowThreadId(row), row.title),
       delivery: sent.delivery,
       deduplicated: sent.deduplicated,

@@ -617,8 +617,22 @@ describe("omo remote session verbs", () => {
       read: (device, sessionId, tail) => note("read", port.read(device, sessionId, tail)),
       watch: (device, sessionId, handlers, options) => note("watch", port.watch(device, sessionId, handlers, options)),
     }
-    return { calls, remote: { ...remote, sessions } }
+    // The relay state and the device list are read through the remote client (#13414 U5): the same two account reads.
+    const client = {
+      ...remote.client,
+      service: { ...remote.client.service, status: () => note("status", remote.client.service.status()) },
+      devices: { ...remote.client.devices, list: () => note("devices", remote.client.devices.list()) },
+    }
+    return { calls, remote: { ...remote, sessions, client } }
   }
+
+  test("#given a session verb #when it returns #then the command has closed its remote client, so no device-service connection outlives it", async () => {
+    const a = fixture.account()
+    let closed = 0
+    const remote = { ...a.remote, client: { ...a.remote.client, close: () => void (closed += 1) } }
+    await run(["interrupt", "b/dur-on-b"], undefined, SIGNED_IN, testBootstrap(), remote)
+    expect(closed).toBe(1)
+  })
 
   test("open creates a session on the device in the project and prints <device>/<session>", async () => {
     const a = fixture.account()
@@ -647,7 +661,8 @@ describe("omo remote session verbs", () => {
     // Review LOW at c09a616: --json still names the model the session opened on, as it did before #13409.
     expect(JSON.parse(out.join(""))).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-new-on-b", device: "b" },
+      thread: "dur-new-on-b",
+      device: "b",
       model: { provider: "openai", id: "gpt-6" },
     })
     expect(types(a.sent, "open_session").map((entry) => [entry.rpc?.["provider"], entry.rpc?.["modelId"]])).toEqual([
@@ -932,7 +947,7 @@ describe("omo remote session verbs", () => {
     const { out } = await run(["interrupt", "b/dur-on-b", "--json"], undefined, SIGNED_IN, testBootstrap(), a.remote)
     expect(JSON.parse(out.join(""))).toEqual({
       kind: "ok",
-      thread_id: "dur-on-b",
+      thread: "dur-on-b",
       turn_id: "turn-b",
       interrupted: true,
       background: { status: "not_supported" },
@@ -972,7 +987,7 @@ describe("omo remote session verbs", () => {
   test.each([
     [
       ["send", "/session", "hi"],
-      "omo remote send: name the session as <device>/<session> (the SESSION column of omo remote sessions) or by the thread_id open printed",
+      "omo remote send: name the session as <device>/<session> (the SESSION column of omo remote sessions) or by the thread value open printed",
     ],
     [["send", "b/dur-on-b"], "omo remote send: the message text is required"],
     [["send", "b/dur-on-b", "hi", "--steer", "--follow-up"], "omo remote send: pass --steer or --follow-up, not both"],

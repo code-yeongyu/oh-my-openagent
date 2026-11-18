@@ -14,6 +14,7 @@ import { createFallbackArchitectComponent } from "../components/fallback-archite
 import { createFeedbackComponent } from "../components/feedback"
 import { createGitMasterAttributionComponent } from "../components/git-master"
 import { createInitDeepAdvisorComponent } from "../components/init-deep-advisor"
+import { createJsKernelGuardComponent } from "../components/js-kernel-guard"
 import { createLspComponent } from "../components/lsp"
 import { createMemoryComponent } from "../components/memory"
 import { createModelProfileComponent } from "../components/model-profile"
@@ -55,6 +56,7 @@ export function createOmoSenpiComponents(taskComponent: OmoSenpiComponent): OmoS
     createSkillPointersComponent(),
     createUlwExecuteContinuationComponent(),
     createUlwLoopComponent(),
+    createJsKernelGuardComponent(),
     createTodoFanoutReminderComponent(),
     createQuestionGatesComponent(),
     createClaimReceiptComponent(),

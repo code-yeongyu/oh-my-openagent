@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test"
 import type { CommandResult, DeviceService, RemoteAttach } from "@oh-my-opencode/device-service-core"
-import { createDeviceServiceSessions } from "../../remote/port/device-service"
+import { closingPorts } from "./testing/closing-ports"
 
 // omo#13037 A6 addendum 3: the wake mark follows the service this connection reached. A reconnect to an older service
 // (its welcome below the gate) stops the mark at once; nothing is remembered from the connection before.
+
+const sessionsPort = closingPorts()
 
 type Fake = { readonly service: DeviceService; readonly close: () => void; readonly marks: unknown[] }
 
@@ -20,6 +22,7 @@ function fakeService(carriesWakeMark: boolean): Fake {
   const attached = {
     detached: new Promise(() => {}),
     onEvent: () => () => {},
+    detach: async () => {},
     command: async (_rpc: unknown, options?: unknown) => {
       marks.push(options)
       return applied
@@ -40,7 +43,7 @@ describe("omo#13037: the wake gate is read per connection", () => {
   test("#given a connection to a service that carries the mark, then a reconnect to an older one #then the delivery is marked on the first and not on the second", async () => {
     const services = [fakeService(true), fakeService(false)]
     let next = 0
-    const port = createDeviceServiceSessions({
+    const port = sessionsPort({
       version: "5.1.70",
       connect: async () => {
         const fake = services[next]
