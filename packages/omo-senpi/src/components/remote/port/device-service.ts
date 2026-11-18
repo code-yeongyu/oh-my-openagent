@@ -4,18 +4,11 @@ import {
   LocalApiError,
   NotSentError,
   WAKE_ACCEPTS,
-  type CommandResult,
   type DeviceService,
   type RemoteAttach,
 } from "@oh-my-opencode/device-service-core/device-service"
 import { CATALOG_RECORD, createAttachPool, type HeldAttach } from "../../thread/remote/attach-pool"
-import type {
-  DeviceServiceDial,
-  JsonObject,
-  RemoteCommandOutcome,
-  RemoteListing,
-  RemoteSessionsPort,
-} from "../../thread/remote/ports"
+import type { DeviceServiceDial, JsonObject, RemoteListing, RemoteSessionsPort } from "../../thread/remote/ports"
 import { openSessionWatch } from "../../thread/remote/remote-watch"
 
 export type DeviceServiceSessionsOptions = {
@@ -101,9 +94,13 @@ const notSentReason = (error: unknown): string => (error instanceof LocalApiErro
 // read reports the engine's code, so a remote command answers exactly what the same command does locally (#12755).
 const sessionReason = (code: string): string => (code === "session_not_found" ? "unknown_session" : code)
 
-// The engine records the thread tools send that change nothing on the other device (thread_read, the pre-send probe).
-// Like the port's read, every failure of one is a typed refusal: there is nothing that may have run.
-const READ_ONLY_RECORDS: ReadonlySet<string> = new Set(["get_state", "get_messages"])
+// The engine records the thread tools send that change nothing on the other device (thread_read and its paged form,
+// the pre-send probe). Like the port's read, every failure of one is a typed refusal: there is nothing that may have run.
+const READ_ONLY_RECORDS: ReadonlySet<string> = new Set(["get_state", "get_messages", "get_entries"])
+
+// How long a read-only record waits for its final state before it is refused request_timeout (the local API's own request
+// bound). Every other record keeps the attach's default bound: a lost final state never holds a tool call forever.
+const READ_WAIT_MS = 30_000
 
 // omo#13037 A6: only a peer delivery carries the wake mark, and only through a service that carries it.
 const MARKED_RECORDS: ReadonlySet<string> = new Set(["admit_external_message"])
@@ -230,7 +227,9 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         MARKED_RECORDS.has(String(rpc["type"])) && (await svc().catch(() => undefined))?.carriesWakeMark === true
       const marked = carries ? { accepts: WAKE_ACCEPTS } : undefined
       try {
-        const outcome = outcomeOf(await attached.command(record, marked))
+        const outcome = outcomeOf(
+          await attached.command(record, readOnly ? { ...marked, waitMs: READ_WAIT_MS } : marked),
+        )
         if (isCatalog && outcome.kind === "ok") catalog.keep(key, outcome.response, sentAt)
         return readOnly && outcome.kind === "uncertain" ? { kind: "refused", reason: outcome.reason } : outcome
       } catch (error) {
@@ -259,6 +258,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         path: row.path,
         state: row.state,
         updated_ms: row.updated_ms,
+        source: row.source,
       })),
       incomplete: listed.incomplete,
     }

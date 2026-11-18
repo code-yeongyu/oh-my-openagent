@@ -28,21 +28,6 @@ export type RelayToolsContext = {
   ) => ThreadToolResult
 }
 
-/**
- * The chat-binding tools a session no longer has. senpi answers a call to one of them with its hint instead of a bare
- * unknown-tool error, so a session that remembers the tool from an older transcript learns why it is gone.
- */
-const GATEWAY_BINDS =
-  "the always-on gateway keeps this session's chat binding, so a session never binds, rebinds or unbinds a chat thread. Report to the bound chat with thread_report."
-
-export const REMOVED_RELAY_TOOL_HINTS: Readonly<Record<string, string>> = {
-  thread_bind: `thread_bind was removed: ${GATEWAY_BINDS}`,
-  thread_unbind: `thread_unbind was removed: ${GATEWAY_BINDS}`,
-  thread_rebind: `thread_rebind was removed: ${GATEWAY_BINDS}`,
-  thread_bindings:
-    "thread_bindings was removed: thread_report finds this session's chat binding on its own, and when that is ambiguous its refusal lists the candidate binding_ids.",
-}
-
 type Call<T extends RelayToolName> = {
   readonly value: Static<(typeof threadToolParamSchemas)[T]>
   readonly callerId: string

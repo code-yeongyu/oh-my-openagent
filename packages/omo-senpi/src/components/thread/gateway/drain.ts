@@ -2,7 +2,7 @@ import type { DrainWakeEvent, GatewayAdmissionKind, SessionRuntimePort, WakeReas
 import { decideDelivery } from "./decision"
 import { intakeAdmissionPass, type IntakeAdmission } from "./intake-admission"
 import { isLockWaitExceeded } from "./lock-wait"
-import { deliveryProvenanceLine, deliverySender, renderDeliveryText } from "./provenance"
+import { deliverySender, renderDeliveryDisplayText, renderDeliveryText } from "./provenance"
 import type { GatewayStore } from "./store"
 import type { DeliveryRow, ProcessIdentity } from "./types"
 
@@ -142,7 +142,7 @@ export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
           sender: deliverySender(claimed.row),
           display_text:
             ledgerId === null
-              ? `${deliveryProvenanceLine(claimed.row.envelope.provenance)}\n${claimed.row.body}`
+              ? renderDeliveryDisplayText(claimed.row)
               : (claimed.row.verbatim_display_text ?? claimed.row.body),
           deliverAs: decision.deliverAs,
           ...(decision.expected_turn_id === undefined ? {} : { expected_turn_id: decision.expected_turn_id }),

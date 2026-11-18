@@ -14,7 +14,13 @@ import type { CredentialStore } from "../../omo-opencode/src/cli/service-auth/ke
 import type { Credentials } from "../../omo-opencode/src/cli/service-auth/protocol"
 import { requestApi } from "../../omo-opencode/src/cli/service-auth/protocol-request"
 import { createSession } from "../../omo-opencode/src/cli/service-auth/session"
-import { fakeApi, grant, privateKeys, temporaryHome } from "../../omo-opencode/src/cli/service-auth/test-support"
+import {
+  fakeApi,
+  grant,
+  noOwnDevice,
+  privateKeys,
+  temporaryHome,
+} from "../../omo-opencode/src/cli/service-auth/test-support"
 import { cliDeviceServiceHandoff } from "../device-service-handoff"
 
 const dirs: string[] = []
@@ -65,7 +71,8 @@ async function refreshHarness() {
   } satisfies CredentialStore
   const session = createSession({
     beforeKeysDiscarded: async () => undefined,
-    api: fakeApi(refresh),
+    // The post-refresh device fix-up (#13651) reads the device list; only the refresh itself is counted.
+    api: fakeApi((request) => noOwnDevice(request) ?? refresh()),
     store,
     home: await temporaryHome(),
     now: () => NOW,

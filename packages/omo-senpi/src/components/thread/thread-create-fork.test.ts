@@ -22,7 +22,7 @@ describe("thread_create fork_from with an engine that cannot fork on open_sessio
         kind: "error",
         error: {
           code: "unsupported",
-          details: { reason: "fork_unsupported", source, ...(device === undefined ? {} : { device }) },
+          details: { reason: "fork_unsupported", thread: source, ...(device === undefined ? {} : { device }) },
         },
       })
       expect(openSession).not.toHaveBeenCalled()
