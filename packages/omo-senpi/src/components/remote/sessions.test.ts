@@ -357,7 +357,7 @@ describe("sessions controls", () => {
   test("#given an engine that reports no background jobs #when sessions.interrupt runs #then background is not_supported", async () => {
     const { owner, sent } = await onWorld()
     expect(await valueOf(clientOn(owner.stateDir, fakeClock()).sessions.interrupt(LIVE))).toEqual({
-      thread_id: LIVE,
+      thread: LIVE,
       turn_id: "7",
       interrupted: true,
       background: { status: "not_supported" },
@@ -472,6 +472,7 @@ describe("durable-id addressing", () => {
       member: () => Promise.reject(new Error("the listing alone resolves a listed durable id")),
       sessionsList: client.sessions.list,
       devicesList: client.devices.list,
+      self: () => client,
       localSessions: () => Promise.reject(new Error("the listing alone resolves a listed durable id")),
     } as const
     expect(await valueOf(resolveSessionTarget(core, PEER, ENGINE_ID))).toMatchObject({

@@ -1,11 +1,13 @@
 /// <reference types="bun-types" />
 
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, afterAll, describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { delimiter, join } from "node:path"
+
+import { bashPath, forBash, windowsProcessEnv } from "./publish-operator-darwin-windows-env"
 
 /**
  * Release security contract (#13943): two operator-darwin workflow steps, executed from the parsed
@@ -37,6 +39,26 @@ const tempDir = (prefix: string) => {
   return dir
 }
 
+// The step hashes the manifest with `shasum -a 256` because macOS runners have no `sha256sum`. Git bash (Windows
+// runners) has no `shasum`, so this forwards to sha256sum exactly where the platform lacks it; the same shim
+// release-assets-verify-workflow.test.ts ships.
+const shasumShimDir = (() => {
+  if (spawnSync("bash", ["-c", "command -v shasum"], { timeout: 5_000 }).status === 0) return ""
+  const bin = mkdtempSync(join(tmpdir(), "operator-darwin-bin-"))
+  writeFileSync(
+    join(bin, "shasum"),
+    '#!/bin/bash\n[ "$1" = -a ] && [ "$2" = 256 ] || exit 2\nshift 2\nexec sha256sum "$@"\n',
+  )
+  chmodSync(join(bin, "shasum"), 0o755)
+  return bin
+})()
+// The shim directory outlives the per-test scratch (every run()'s env references it), so it is swept once at the
+// end of the file instead of after each test.
+afterAll(() => {
+  if (shasumShimDir !== "") rmSync(shasumShimDir, { recursive: true, force: true })
+})
+const stepPath = (): string => (shasumShimDir === "" ? bashPath() : `${shasumShimDir}${delimiter}${bashPath()}`)
+
 describe("Verify operator darwin artifacts step", () => {
   const run = (pin: string) => {
     const root = tempDir("operator-darwin-pin-")
@@ -55,11 +77,12 @@ describe("Verify operator darwin artifacts step", () => {
     )
     const result = spawnSync("bash", ["-c", `${stubs.join("\n")}\n${stepRun("Verify operator darwin artifacts")}`], {
       env: {
-        PATH: process.env.PATH ?? "",
-        CALLS: calls,
-        GITHUB_WORKSPACE: root,
-        OPERATOR_DARWIN_VERIFIER: pinned,
-        OPERATOR_DARWIN_DIR: root,
+        ...windowsProcessEnv(),
+        PATH: stepPath(),
+        CALLS: forBash(calls),
+        GITHUB_WORKSPACE: forBash(root),
+        OPERATOR_DARWIN_VERIFIER: forBash(pinned),
+        OPERATOR_DARWIN_DIR: forBash(root),
         MANIFEST_SHA256: pin === "real" ? createHash("sha256").update(manifest).digest("hex") : pin,
         PREPARED_RELEASE_SHA: "2".repeat(40),
         TAG: "operator-darwin-111111111111",
@@ -67,8 +90,8 @@ describe("Verify operator darwin artifacts step", () => {
         ACTOR: "maintainer",
         TRIGGERING_ACTOR: "maintainer",
         REPOSITORY: "o/r",
-        RUNNER_TEMP: root,
-        GITHUB_STEP_SUMMARY: join(root, "summary"),
+        RUNNER_TEMP: forBash(root),
+        GITHUB_STEP_SUMMARY: forBash(join(root, "summary")),
       },
       encoding: "utf8",
     })
@@ -117,15 +140,16 @@ describe("Verify operator darwin artifacts step with the real bun", () => {
         cwd: root,
         encoding: "utf8",
         env: {
-          PATH: process.env.PATH ?? "",
-          HOME: process.env.HOME ?? root,
+          ...windowsProcessEnv(),
+          PATH: stepPath(),
+          HOME: forBash(process.env.HOME ?? root),
           // A runner whose environment carries interception settings must not pass them to the verifier.
           HTTPS_PROXY: "http://127.0.0.1:9",
           NODE_TLS_REJECT_UNAUTHORIZED: "0",
           NODE_OPTIONS: "--require /nonexistent",
-          GITHUB_WORKSPACE: root,
-          OPERATOR_DARWIN_DIR: root,
-          OPERATOR_DARWIN_VERIFIER: pinned,
+          GITHUB_WORKSPACE: forBash(root),
+          OPERATOR_DARWIN_DIR: forBash(root),
+          OPERATOR_DARWIN_VERIFIER: forBash(pinned),
           MANIFEST_SHA256: createHash("sha256").update(manifest).digest("hex"),
           PREPARED_RELEASE_SHA: "2".repeat(40),
           TAG: "operator-darwin-111111111111",
@@ -133,8 +157,8 @@ describe("Verify operator darwin artifacts step with the real bun", () => {
           ACTOR: "maintainer",
           TRIGGERING_ACTOR: "maintainer",
           REPOSITORY: "o/r",
-          RUNNER_TEMP: pinned,
-          GITHUB_STEP_SUMMARY: join(root, "summary"),
+          RUNNER_TEMP: forBash(pinned),
+          GITHUB_STEP_SUMMARY: forBash(join(root, "summary")),
         },
       },
     )

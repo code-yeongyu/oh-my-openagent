@@ -286,6 +286,8 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       dialEndpoint: async () => ({ conn: await core.dial(), owned: true }),
     })
     const remote: RemoteThreadSurface = {
+      // The thread bodies this member runs read the account through the client they belong to (#13414 U5).
+      client: core.self(),
       sessions: {
         ...port,
         // The account's device listing may leave out this device, which only thisDevice() names; a connected service's
@@ -719,7 +721,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
         const reply = replyData(outcome.response)
         const turn = text(reply["turnId"])
         return ok({
-          thread_id: thread,
+          thread,
           ...(turn === undefined ? {} : { turn_id: turn }),
           interrupted: reply["interrupted"] === true,
           background: backgroundOf(reply["background"]),
