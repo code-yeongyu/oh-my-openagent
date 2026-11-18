@@ -139,9 +139,14 @@ export function createSession(options: {
     )
   }
   const request = (path: string, init: RequestInit) => requestApi(api, path, init, signal)
-  /** The account a token's sign-in belongs to; undefined when the service does not say (never blocks logout). */
-  const accountOf = async (access: string): Promise<string | undefined> => {
-    const body = await request("/v1/me", { headers: { authorization: `Bearer ${access}` } }).catch(() => null)
+  /**
+   * The account a token's sign-in belongs to; undefined when the service does not say (never blocks logout). `stop`
+   * aborts the read: the session's signal unless a caller with a tighter bound (the post-refresh fix-up) names its own.
+   */
+  const accountOf = async (access: string, stop = signal): Promise<string | undefined> => {
+    const body = await requestApi(api, "/v1/me", { headers: { authorization: `Bearer ${access}` } }, stop).catch(
+      () => null,
+    )
     const id =
       typeof body === "object" &&
       body !== null &&
@@ -242,13 +247,15 @@ export function createSession(options: {
       machine,
       nowMs: now(),
       request: (path, init) => requestApi(api, path, init, stop),
-      accountOf,
+      accountOf: (access) => accountOf(access, stop),
+      signal: stop,
       refusalPath: machineRefusalPath(options.home ?? homedir(), credentialId(api)),
       log: options.log ?? (() => undefined),
       renamed: (name) =>
         locked(async () => {
           const stored = await store.readAuthoritative()
-          if (stored !== null && stored.device.id === credentials.device.id)
+          // The lock may come free only after the budget ran out; the caller has its token by then, so nothing is written.
+          if (!stop.aborted && stored !== null && stored.device.id === credentials.device.id)
             await store.write({ ...stored, device: { ...stored.device, name } })
         }),
     })

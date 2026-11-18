@@ -1,8 +1,10 @@
 import { describe, expect, onTestFinished, test } from "bun:test"
 import { createPublicKey, verify } from "node:crypto"
+import { join } from "node:path"
 import type { CredentialStore } from "./keystore"
 import { generateDeviceKeys } from "./device-keys"
-import type { Credentials } from "./protocol"
+import { reconcileDevice } from "./machine-reconcile"
+import { ApiRefusal, type Credentials } from "./protocol"
 import { createSession } from "./session"
 import { fakeApi, grant, refusal, temporaryHome } from "./test-support"
 
@@ -36,6 +38,10 @@ type Service = {
   others?: unknown[]
   /** When set, the device list answers only after this settles. */
   stall?: Promise<void>
+  /** Answers `/v1/me`; absent, the route is not found. */
+  me?: (request: Request) => Promise<Response>
+  /** Runs when a rename reaches the service. */
+  onRename?: () => void
 }
 
 function service(initial: Service) {
@@ -88,9 +94,11 @@ function service(initial: Service) {
       state.bound = true
       return Response.json({ deviceId: grant.device.id })
     }
+    if (request.method === "GET" && pathname === "/v1/me" && state.me !== undefined) return state.me(request)
     if (request.method === "PATCH" && pathname.startsWith("/v1/devices/")) {
       const body = (await request.json()) as { name: string }
       renames.push({ path: pathname, body })
+      state.onRename?.()
       state.name = body.name
       return new Response(null, { status: 204 })
     }
@@ -99,20 +107,28 @@ function service(initial: Service) {
   return { api, state, binds, renames }
 }
 
-async function signedIn(name: string, server: ReturnType<typeof service>, budgetMs?: number) {
+async function signedIn(
+  name: string,
+  server: ReturnType<typeof service>,
+  budgetMs?: number,
+  options: { readonly accountId?: string; readonly store?: (store: CredentialStore) => CredentialStore } = {
+    accountId: "acct_42",
+  },
+) {
   const stored: Credentials = {
     ...grant,
     ...expiredTokens,
     device: { id: grant.device.id, name },
     ...keys.private,
-    accountId: "acct_42",
+    ...(options.accountId === undefined ? {} : { accountId: options.accountId }),
   }
   const memory = memoryStore(stored)
+  const store = options.store?.(memory.store) ?? memory.store
   const lines: string[] = []
   const forgotten: string[] = []
   const session = createSession({
     api: server.api,
-    store: memory.store,
+    store,
     home: await temporaryHome(),
     now: () => Date.parse("2030-01-01T00:00:00Z"),
     beforeKeysDiscarded: async () => {
@@ -203,6 +219,159 @@ describe("a refresh binds an unbound device to its machine once (#13651)", () =>
       await m.session.accessToken()
       expect(server.binds).toHaveLength(0)
     }
+  })
+})
+
+describe("nothing in the post-refresh fix-up outlives its budget (#14081 review)", () => {
+  test("the account read for a sign-in that names no account is aborted when the budget runs out", async () => {
+    const meAborted = Promise.withResolvers<void>()
+    const server = service({
+      name: "build-box",
+      bound: false,
+      bindAnswer: "bound",
+      // Answers only once the caller gives up, so the read stays pending unless the budget aborts it.
+      me: (request) =>
+        new Promise((resolve) =>
+          request.signal.addEventListener("abort", () => {
+            meAborted.resolve()
+            resolve(new Response(null, { status: 499 }))
+          }),
+        ),
+    })
+    const m = await signedIn("build-box", server, 200, {})
+    expect(m.stored.accountId).toBeUndefined()
+
+    expect(await m.session.accessToken()).toBe("access-1")
+    await meAborted.promise
+    expect(server.binds).toEqual([])
+    expect(m.lines).toEqual([])
+  }, 10_000)
+
+  test("a rename that lands while the credential lock is held past the budget writes nothing", async () => {
+    const held = Promise.withResolvers<void>()
+    let renameSeen = false
+    const server = service({
+      name: "omo CLI on build-box",
+      bound: true,
+      bindAnswer: "bound",
+      onRename: () => {
+        renameSeen = true
+      },
+    })
+    const m = await signedIn("omo CLI on build-box", server, 200, {
+      accountId: "acct_42",
+      // After the service accepted the rename, the locked re-read waits until the test lets it go.
+      store: (inner) => ({
+        ...inner,
+        readAuthoritative: async () => {
+          if (renameSeen) await held.promise
+          return inner.readAuthoritative()
+        },
+      }),
+    })
+
+    expect(await m.session.accessToken()).toBe("access-1")
+    expect(server.renames).toHaveLength(1)
+    held.resolve()
+    // The same lock: this section runs only after the rename's section has finished.
+    await m.session.update(async () => undefined)
+    expect(m.memory.current()?.device.name).toBe("omo CLI on build-box")
+    expect(m.lines).toEqual([])
+  }, 10_000)
+})
+
+describe("reconcileDevice settles without a write or a log once its budget aborts (#14081 review)", () => {
+  const own = (fields: Record<string, unknown>) => ({
+    devices: [{ id: grant.device.id, current: true, revokedAt: null, ...fields }],
+  })
+
+  async function fixup(options: {
+    readonly answer: (path: string, init: RequestInit) => Promise<unknown>
+    readonly digest?: () => Promise<string | undefined>
+  }) {
+    const controller = new AbortController()
+    const refusalPath = join(await temporaryHome(), "machine-exists.json")
+    const requests: string[] = []
+    const renamed: string[] = []
+    const lines: string[] = []
+    const run = reconcileDevice({
+      api: "https://service.invalid",
+      credentials: {
+        ...grant,
+        device: { id: grant.device.id, name: "omo CLI on box" },
+        ...keys.private,
+        accountId: "acct_42",
+      },
+      machine: { digest: options.digest ?? (async () => DIGEST), name: () => "build-box" },
+      nowMs: Date.parse("2030-01-01T00:00:00Z"),
+      request: (path, init) => {
+        requests.push(`${init.method ?? "GET"} ${path}`)
+        return options.answer(path, init)
+      },
+      accountOf: async () => "acct_42",
+      renamed: async (name) => void renamed.push(name),
+      refusalPath,
+      log: (line) => lines.push(line),
+      signal: controller.signal,
+    })
+    return { controller, run, requests, renamed, lines, refusalPath }
+  }
+
+  test("a machine digest that never settles does not hold the fix-up past the budget", async () => {
+    const asked = Promise.withResolvers<void>()
+    const f = await fixup({
+      answer: async () => own({ name: "build-box", machineBound: false }),
+      digest: () => {
+        asked.resolve()
+        return new Promise<never>(() => undefined)
+      },
+    })
+
+    await asked.promise
+    f.controller.abort()
+    await f.run
+    expect(f.requests).toEqual(["GET /v1/devices"])
+    expect(f.lines).toEqual([])
+  })
+
+  test("a rename accepted right after the budget ran out is not recorded and not logged", async () => {
+    const asked = Promise.withResolvers<void>()
+    const reply = Promise.withResolvers<unknown>()
+    const f = await fixup({
+      answer: async (path, init) => {
+        if (init.method !== "PATCH") return own({ name: "omo CLI on box", machineBound: true })
+        asked.resolve()
+        return reply.promise
+      },
+    })
+
+    await asked.promise
+    f.controller.abort()
+    reply.resolve(null)
+    await f.run
+    expect(f.requests).toEqual(["GET /v1/devices", `PATCH /v1/devices/${grant.device.id}`])
+    expect(f.renamed).toEqual([])
+    expect(f.lines).toEqual([])
+  })
+
+  test("a machine_exists refusal landing right after the budget ran out is neither remembered nor logged", async () => {
+    const asked = Promise.withResolvers<void>()
+    const reply = Promise.withResolvers<unknown>()
+    const f = await fixup({
+      answer: async (path, init) => {
+        if (init.method !== "PUT") return own({ name: "build-box", machineBound: false })
+        asked.resolve()
+        return reply.promise
+      },
+    })
+
+    await asked.promise
+    f.controller.abort()
+    reply.reject(new ApiRefusal("machine_exists", 409))
+    await f.run
+    expect(f.requests).toEqual(["GET /v1/devices", "PUT /v1/devices/current/machine"])
+    expect(await Bun.file(f.refusalPath).exists()).toBe(false)
+    expect(f.lines).toEqual([])
   })
 })
 

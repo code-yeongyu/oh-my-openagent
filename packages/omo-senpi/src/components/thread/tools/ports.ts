@@ -94,6 +94,8 @@ export type ThreadHost = {
     readonly provider?: string
     readonly modelId?: string
     readonly thinkingLevel?: string
+    /** The id a NEW session is created under (host capability `durable_session_id`; ignored on resume, #14060). */
+    readonly durableSessionId?: string
   }) => Promise<ThreadHostSession>
   readonly getMessages: (sessionId: string) => Promise<readonly ThreadTranscriptEntry[]>
   readonly getState: (sessionId: string) => Promise<{ readonly isStreaming?: boolean; readonly activeTurnId?: string }>
