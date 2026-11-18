@@ -90,7 +90,12 @@ type WorkerMessage =
       readonly type: "response"
       readonly id: number
       readonly ok: false
-      readonly error: { readonly message: string; readonly stack?: string; readonly code?: string }
+      readonly error: {
+        readonly message: string
+        readonly stack?: string
+        readonly code?: string
+        readonly details?: Readonly<Record<string, unknown>>
+      }
     }
   | { readonly type: "event"; readonly event: GatewayStoreEvent }
 
@@ -226,6 +231,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
           Object.assign(new Error(message.error.message), {
             workerStack: message.error.stack,
             ...(message.error.code === undefined ? {} : { code: message.error.code }),
+            ...(message.error.details === undefined ? {} : { details: message.error.details }),
           }),
         )
     })
@@ -369,6 +375,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     toolReceiptBegin: (request) => call("tool_receipt_begin", request),
     toolReceiptSettle: (request) => call("tool_receipt_settle", request),
     toolReceiptRevise: (request) => call("tool_receipt_revise", request),
+    toolReceiptRelease: (request) => call("tool_receipt_release", request),
     bind: (request) => call("bind", request),
     unbind: (request) => call("unbind", request),
     rebind: (request) => call("rebind", request),

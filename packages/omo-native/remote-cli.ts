@@ -192,7 +192,7 @@ export async function prepareRemoteAttach(
         chain: { stamp: (record: JsonObject) => record },
       }))
     )(service)
-    // Only the resolve reads through the surface; its client's own connection must not outlive it.
+    // Only the resolve reads through the surface; its client (on the command's borrowed connection) is released after it.
     const resolved = await resolveSessionTarget(remote, parsedTarget).finally(() => remote.client.close())
     if (resolved.kind === "error") {
       service.close()

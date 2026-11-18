@@ -1,11 +1,25 @@
-import type { ThreadResultSummary, ThreadSummary, ThreadToolResult } from "../contracts"
+import type { ThreadResultSummary, ThreadState, ThreadSummary, ThreadToolResult } from "../contracts"
 import type { ThreadToolFailure } from "../errors"
 import type { ThreadWorktree } from "../worktree/thread-worktree"
 import { threadLink } from "../thread-link"
 
 type RowSource = Pick<ThreadSummary, "thread_id" | "name" | "status" | "cwd" | "created_at" | "updated_at"> &
+  Pick<ThreadResultSummary, "state"> &
   Partial<
-    Pick<ThreadResultSummary, "device" | "alias" | "surface" | "alive" | "controls" | "error_note" | "skills">
+    Pick<
+      ThreadResultSummary,
+      | "model"
+      | "activity"
+      | "error_code"
+      | "turn_id"
+      | "as_of"
+      | "device"
+      | "alias"
+      | "surface"
+      | "controls"
+      | "error_note"
+      | "skills"
+    >
   > & {
     readonly link: string
   }
@@ -16,11 +30,17 @@ type RowSource = Pick<ThreadSummary, "thread_id" | "name" | "status" | "cwd" | "
  * internals stay in the address book.
  */
 export function threadRow(thread: RowSource, machine?: string): ThreadResultSummary {
-  const { device, alias, surface, alive, controls, error_note, skills } = thread
+  const { model, activity, error_code, turn_id, as_of, device, alias, surface, controls, error_note, skills } = thread
   return {
     thread: thread.thread_id,
     name: thread.name,
     status: thread.status,
+    state: thread.state,
+    ...(model === undefined ? {} : { model: { provider: model.provider, id: model.id } }),
+    ...(activity === undefined ? {} : { activity }),
+    ...(error_code === undefined ? {} : { error_code }),
+    ...(turn_id === undefined ? {} : { turn_id }),
+    ...(as_of === undefined ? {} : { as_of }),
     ...(machine === undefined || machine === "" ? {} : { machine }),
     cwd: thread.cwd,
     created_at: thread.created_at,
@@ -29,7 +49,6 @@ export function threadRow(thread: RowSource, machine?: string): ThreadResultSumm
     ...(device === undefined ? {} : { device }),
     ...(alias === undefined ? {} : { alias }),
     ...(surface === undefined || surface === null ? {} : { surface }),
-    ...(alive === undefined ? {} : { alive }),
     ...(controls === undefined ? {} : { controls }),
     ...(error_note === undefined ? {} : { error_note }),
     ...(skills === undefined ? {} : { skills }),
@@ -64,13 +83,22 @@ function renamed(value: Loose, from: string, to: string): Loose {
   return Object.fromEntries(Object.entries(value).map(([key, child]) => [key === from ? to : key, child]))
 }
 
+/** A stored row's state: a build before #13469 stored `alive` and `status` only, never `state`. */
+const storedState = (row: Loose): ThreadState =>
+  row["status"] === "live" && row["alive"] !== false ? "idle" : "inactive"
+
 /** A row a build before #14044 stored (`thread_id`, routing ids, endpoint internals) as today's row; a current row as is. */
 function storedRow(row: Loose): Loose {
   const id = row["thread_id"]
-  if (typeof row["thread"] === "string" || typeof id !== "string") return row
+  if (typeof row["thread"] === "string" && typeof row["state"] === "string") return row
+  if (typeof row["thread"] === "string") {
+    const { alive: _alive, ...rest } = row
+    return { ...rest, state: storedState(row) }
+  }
+  if (typeof id !== "string") return row
   const name = typeof row["name"] === "string" ? row["name"] : ""
   const link = typeof row["link"] === "string" ? row["link"] : threadLink(id, name)
-  return threadRow({ ...(row as unknown as RowSource), name, link }) as unknown as Loose
+  return threadRow({ ...(row as unknown as RowSource), name, link, state: storedState(row) }) as unknown as Loose
 }
 
 function storedCandidates(value: unknown): unknown {
@@ -120,6 +148,8 @@ export function currentResult(result: ThreadToolResult): ThreadToolResult {
   } else if (typeof value["thread_id"] === "string" && value["thread"] === undefined) {
     value = renamed(value, "thread_id", "thread")
   }
+  // A flat row result (thread_create, a resolved send) a build before #13469 stored carries no state.
+  if (typeof value["thread"] === "string" && typeof value["status"] === "string") value = storedRow(value)
   if (Array.isArray(value["threads"]))
     value = { ...value, threads: value["threads"].map((row) => (isRecord(row) ? storedRow(row) : row)) }
   const { endpoint: _endpoint, ...withoutEndpoint } = value

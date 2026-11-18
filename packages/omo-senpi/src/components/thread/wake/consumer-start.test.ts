@@ -52,6 +52,7 @@ function input(h: GatewayHarness, deliveries: () => Promise<DeliveryServicePort 
     engineVersion: "2026.12.1",
     minimumEngine: "2026.12.1",
     wake: async () => undefined,
+    chainCountLimit: async () => undefined,
     sameDevice: () => false,
     log: () => undefined,
   }

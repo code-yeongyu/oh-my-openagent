@@ -187,6 +187,12 @@ function resultView(name: ThreadToolName, result: ThreadToolResult, args: Args):
         headline: `${target} reasoning: ${text(r.level)}${r.scope === "turn" ? " for this turn" : ""}`,
         details: device(r),
       }
+    case "thread_archive":
+      return {
+        tone: "success",
+        headline: `${r.archived === true ? "archived" : "unarchived"} ${target}`,
+        details: device(r),
+      }
     case "thread_report":
       return {
         tone: "success",
@@ -325,10 +331,9 @@ function listView(r: Readonly<Record<string, unknown>>): ResultView {
       ...threads.slice(0, LIST_HEAD).map((thread) => {
         const name = (text(thread.name) || undefined) ?? label(thread.thread) ?? "thread"
         const facts = [
-          text(thread.status),
+          text(thread.state) || text(thread.status),
           text(thread.surface),
           text(thread.machine) || text(thread.device),
-          thread.alive === false ? "not answering" : "",
         ].filter((fact) => fact.length > 0)
         return `${excerptRendererText(name, LABEL_WIDTH)}  ${facts.join(", ")}`
       }),

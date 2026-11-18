@@ -7,6 +7,9 @@ export type AnswerEnvelope = {
   readonly data: {
     readonly kind?: string
     readonly reason?: string
+    /** A `chain_count_limit` refusal's counts. */
+    readonly chain_count?: number
+    readonly limit?: number
     readonly delivery_id?: string
     readonly stored_command_id?: string
     readonly queue_position?: number

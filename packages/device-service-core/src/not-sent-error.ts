@@ -6,17 +6,18 @@ export class NotSentError extends LocalApiError {
   readonly not_sent = true as const
 }
 
-export const markNotSent = (error: unknown): unknown =>
-  error instanceof LocalApiError
-    ? new NotSentError(error.code, error.reason, {
-        action: error.action,
-        ...(error.limit_chars === undefined ? {} : { limit_chars: error.limit_chars }),
-        ...(error.path_refusal === undefined ? {} : { path_refusal: error.path_refusal }),
-        ...(error.candidates === undefined ? {} : { candidates: error.candidates }),
-        ...(error.incomplete === undefined ? {} : { incomplete: error.incomplete }),
-        ...(error.sign_in_reason === undefined ? {} : { sign_in_reason: error.sign_in_reason }),
-      })
-    : error
+export function markNotSent(error: unknown): unknown {
+  if (error instanceof NotSentError) return error
+  if (!(error instanceof LocalApiError)) return error
+  return new NotSentError(error.code, error.reason, {
+    action: error.action,
+    ...(error.limit_chars === undefined ? {} : { limit_chars: error.limit_chars }),
+    ...(error.path_refusal === undefined ? {} : { path_refusal: error.path_refusal }),
+    ...(error.candidates === undefined ? {} : { candidates: error.candidates }),
+    ...(error.incomplete === undefined ? {} : { incomplete: error.incomplete }),
+    ...(error.sign_in_reason === undefined ? {} : { sign_in_reason: error.sign_in_reason }),
+  })
+}
 
 /**
  * omo#13763: the refusal of a wake toward a device service below the wake minimum. It names the running version and the

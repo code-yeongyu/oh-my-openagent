@@ -93,6 +93,16 @@ const SOURCE = /\.(?:[cm]?[jt]s|tsx)$/
 const GENERATED = /(?:_pb|\.generated)\.(?:[cm]?[jt]s|tsx)$/
 export const ratchetedFiles = (files: readonly string[]): string[] =>
   files.filter((file) => SOURCE.test(file) && !GENERATED.test(file))
+// #14220: minified bundle output is not a test source, but the bundler's short function names collide
+// with the test API names the two omo-testing rules key on, so every bundle regeneration moved their
+// counts between files (train #14196 had to hand-edit the baseline for exactly that). Bundle output
+// therefore never counts for the test rules; every other rule keeps counting everywhere.
+const BUNDLE_OUTPUT = /packages[/\\][^/\\]+[/\\]plugin[/\\](?:extensions|runtime)[/\\]/
+export const countsTowardRatchet = (code: string, filename: string): boolean =>
+  // oxlint emits plugin rules as "omo-testing(rule)" before the ratchet normalizes them to
+  // "omo-testing/rule", so the namespace prefix matches both shapes.
+  !(code.startsWith("omo-testing") && BUNDLE_OUTPUT.test(filename))
+
 const CONFIG = "script/lint-ratchet.oxlintrc.json"
 
 const run = (root: string, command: string, args: readonly string[]) =>
@@ -122,9 +132,9 @@ const lint = (root: string): Lint => {
     const parsed: { readonly diagnostics: readonly Diagnostic[] } = JSON.parse(result.stdout)
     diagnostics.push(...parsed.diagnostics)
   }
-  const ruled = diagnostics.flatMap((diagnostic) =>
-    typeof diagnostic.code === "string" ? [{ ...diagnostic, code: diagnostic.code }] : [],
-  )
+  const ruled = diagnostics
+    .flatMap((diagnostic) => (typeof diagnostic.code === "string" ? [{ ...diagnostic, code: diagnostic.code }] : []))
+    .filter((diagnostic) => countsTowardRatchet(diagnostic.code, diagnostic.filename ?? ""))
   const unparsed = diagnostics
     .filter((diagnostic) => typeof diagnostic.code !== "string")
     .map((diagnostic) => `${diagnostic.filename}: ${diagnostic.message ?? "parse error"}`)
