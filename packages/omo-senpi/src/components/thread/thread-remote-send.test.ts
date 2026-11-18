@@ -168,6 +168,9 @@ describe("remote == local: the same call answers the same on b as on this device
   test.each([
     ["capability_missing", "scope_denied"],
     ["host_detached", "host_unavailable"],
+    // This device's relay sign-in lapsed (the device service answers sign_in_required at once): not attached, never "update omo".
+    ["sign_in_required", "host_unavailable"],
+    ["signed_out", "host_unavailable"],
   ])(
     "#given b refuses with %s #when a send reaches it #then the tool answers %s, as data, with the device named",
     async (reason, code) => {
