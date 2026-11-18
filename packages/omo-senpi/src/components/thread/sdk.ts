@@ -239,6 +239,13 @@ function thrown(error: unknown): Failure {
       "Use thread read to follow the session.",
       { command: message.slice("unsupported:".length) },
     )
+  // A store schema this binary does not know refuses typed here too (the CLI surface of #13927).
+  if ((error as { readonly code?: unknown } | null)?.code === "gateway_schema_too_new")
+    return fail(
+      "store_schema_too_new",
+      `The gateway store on this device was written by a newer omo (${message})`,
+      "Update omo on this device, then retry.",
+    )
   return fail(
     "internal_error",
     `Thread operation failed: ${message}`,
