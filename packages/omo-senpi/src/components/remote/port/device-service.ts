@@ -3,6 +3,7 @@ import {
   connectDeviceService,
   LocalApiError,
   NotSentError,
+  UnsettledCommandError,
   WAKE_ACCEPTS,
   type DeviceService,
   type RemoteAttach,
@@ -10,6 +11,7 @@ import {
 import { CATALOG_RECORD, createAttachPool, type HeldAttach } from "../../thread/remote/attach-pool"
 import type { DeviceServiceDial, JsonObject, RemoteListing, RemoteSessionsPort } from "../../thread/remote/ports"
 import { openSessionWatch } from "../../thread/remote/remote-watch"
+import { commandWaitMs } from "../call-deadline"
 
 export type DeviceServiceSessionsOptions = {
   readonly version: string
@@ -101,6 +103,10 @@ const READ_ONLY_RECORDS: ReadonlySet<string> = new Set(["get_state", "get_messag
 // How long a read-only record waits for its final state before it is refused request_timeout (the local API's own request
 // bound). Every other record keeps the attach's default bound: a lost final state never holds a tool call forever.
 const READ_WAIT_MS = 30_000
+
+// omo#14130: every other record's wait, below the 60 s a host-tool bridge gives a tool call (the attach's own default is
+// 120 s). A command that outlives it after it left this device answers delivered_unconfirmed, never a bare timeout.
+const SEND_WAIT_MS = 45_000
 
 // omo#13037 A6: only a peer delivery carries the wake mark, and only through a service that carries it.
 const MARKED_RECORDS: ReadonlySet<string> = new Set(["admit_external_message"])
@@ -226,13 +232,17 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       const carries =
         MARKED_RECORDS.has(String(rpc["type"])) && (await svc().catch(() => undefined))?.carriesWakeMark === true
       const marked = carries ? { accepts: WAKE_ACCEPTS } : undefined
+      // The enclosing tool call's budget (call-deadline.ts): spent before sending, nothing is sent.
+      const waitMs = commandWaitMs(readOnly ? READ_WAIT_MS : SEND_WAIT_MS)
+      if (waitMs <= 0) return { kind: "refused", reason: "request_timeout" }
       try {
-        const outcome = outcomeOf(
-          await attached.command(record, readOnly ? { ...marked, waitMs: READ_WAIT_MS } : marked),
-        )
+        const outcome = outcomeOf(await attached.command(record, { ...marked, waitMs }))
         if (isCatalog && outcome.kind === "ok") catalog.keep(key, outcome.response, sentAt)
         return readOnly && outcome.kind === "uncertain" ? { kind: "refused", reason: outcome.reason } : outcome
       } catch (error) {
+        // It left this device and its final state did not come back: the device has it, its answer was lost.
+        if (error instanceof UnsettledCommandError && error.delivered)
+          return { kind: readOnly ? "refused" : "uncertain", reason: "delivered_unconfirmed" }
         // The attach succeeded, so a failure without a local API code is a lost reply, not a failed attach.
         if (readOnly)
           return { kind: "refused", reason: error instanceof LocalApiError ? sessionReason(error.code) : "reply_lost" }

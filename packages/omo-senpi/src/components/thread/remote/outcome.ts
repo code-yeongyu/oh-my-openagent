@@ -76,6 +76,8 @@ const UNANSWERED: ReadonlySet<string> = new Set([
   "handshake_timeout",
   "attach_failed",
   "reply_lost",
+  // omo#14130: a read that reached the device and lost its answer changed nothing there either.
+  "delivered_unconfirmed",
   "host_not_answering",
   "peer_not_found",
   "engine_stale",
@@ -88,6 +90,13 @@ export function outcomeFailure(
   outcome: Exclude<RemoteCommandOutcome, { readonly kind: "ok" }>,
   device: string,
 ): Failure {
+  if (outcome.kind === "uncertain" && outcome.reason === "delivered_unconfirmed")
+    return fail(
+      "delivered_unconfirmed",
+      `The command reached device ${device}, but its answer did not come back in time (delivered_unconfirmed).`,
+      "Do not resend it: it may have run. Read the thread to see whether it did.",
+      { device, reason: outcome.reason },
+    )
   if (outcome.kind === "uncertain")
     return fail(
       "idempotency_uncertain",

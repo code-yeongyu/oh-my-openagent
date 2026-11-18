@@ -122,6 +122,7 @@ export type {
 } from "./local-api/protocol.ts"
 export { SESSION_ROW_STATES } from "./local-api/protocol.ts"
 export type { AttachEnd, CommandResult, RemoteAttach, RemoteAttachEvent } from "./remote-attach.ts"
+export { UnsettledCommandError } from "./unsettled-command.ts"
 
 export { DEVICE_SERVICE_STATE_DIR_ENV, deviceServiceStateDir } from "./state-dir.ts"
 // The clock seam, here too so a local-only caller takes it without the package barrel (which reaches the release fetch).

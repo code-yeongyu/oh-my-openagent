@@ -1,3 +1,4 @@
+import { TOOL_CALL_BUDGET_MS, withCallDeadline } from "../remote/call-deadline"
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import { threadToolFailure } from "./errors"
 import type { ThreadErrorCode, ThreadToolFailure } from "./errors"
@@ -314,7 +315,10 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
           : sendTo !== "" && (await replyLeavesThisDevice(options, sendTo))
             ? NO_LOCAL_VIEW
             : await view(receipted ? undefined : { offline: true })
-      result = await sideEffect(current, value, scope.idempotency_key, callerId, retrying)
+      // omo#14130: every command this call sends to another device settles inside one budget (call-deadline.ts).
+      result = await withCallDeadline(Date.now() + TOOL_CALL_BUDGET_MS, () =>
+        sideEffect(current, value, scope.idempotency_key, callerId, retrying),
+      )
     } catch (error) {
       // A control's typed refusal is the call's answer, recorded like one: a retry under the same key replays it.
       const refusal = controlRefusalOf(error)

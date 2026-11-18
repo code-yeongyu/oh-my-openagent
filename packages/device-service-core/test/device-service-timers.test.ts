@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { connectDeviceService, type DeviceService, LocalApiError } from "../src/index.ts"
+import { connectDeviceService, type DeviceService, LocalApiError, UnsettledCommandError } from "../src/index.ts"
 import { connectLocalApi } from "../src/local-api/client.ts"
 import { type FakeClock, fakeClock } from "./local-api/conformance/fake-clock.ts"
 import type { FakeOwner } from "./local-api/conformance/fake-owner.ts"
@@ -112,6 +112,33 @@ describe("device service clock seam", () => {
     expect(clock.armed()).toBe(1)
     clock.advance(1)
     expect(await outcomeOf(Promise.reject(await defaulted))).toBe("request_timeout")
+  })
+
+  // omo#14130: a timed-out command names the last progress state it saw, so a caller tells "delivered, reply lost" from
+  // "never left this device".
+  test.each([
+    ["transport_confirmed", ["queued", "transport_confirmed"], true],
+    ["queued", ["queued"], false],
+  ] as const)("a command whose last state was %s times out with delivered %p", async (last, states, delivered) => {
+    const clock = fakeClock()
+    const world: World = {
+      ...defaultWorld(),
+      sessions: defaultWorld().sessions.map((s) => ({
+        ...s,
+        outcome: states.map((state) => ({ state, retryable: false })),
+      })),
+    }
+    const { owner, withheld } = await startMode("ack-no-final", world)
+    const service = await serviceOn(owner, clock)
+    const attach = await service.attach(PEER, SESSION_ID)
+    await attach.snapshot
+    const sent = attach.command({ type: "get_state" }, { waitMs: 45_000 }).catch((error: unknown) => error)
+    await withheld("final_state")
+    await service.status()
+    clock.advance(45_000)
+    const timedOut = await sent
+    expect(timedOut).toBeInstanceOf(UnsettledCommandError)
+    expect(timedOut).toMatchObject({ code: "request_timeout", progress: last, delivered })
   })
 
   test("a command in flight when its attach ends waits 30 s on the given timers", async () => {

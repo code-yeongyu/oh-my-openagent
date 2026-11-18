@@ -46,6 +46,7 @@ import {
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "./tools/ports"
 import { listThreads, readThread } from "./tools/read-ops"
 import { listAcross } from "./remote/cross-device"
+import { TOOL_CALL_BUDGET_MS, withCallDeadline } from "../remote/call-deadline"
 import type { RemoteThreadSurface } from "./remote/ports"
 import { stampThisDevice } from "./remote/this-device"
 
@@ -246,9 +247,10 @@ function thrown(error: unknown): Failure {
   )
 }
 
+// omo#14130: every SDK operation runs inside one tool-call budget, as an agent's thread tool call does (tools.ts).
 async function guarded<T>(body: () => Promise<T>): Promise<T | Failure> {
   try {
-    return await body()
+    return await withCallDeadline(Date.now() + TOOL_CALL_BUDGET_MS, body)
   } catch (error) {
     return thrown(error)
   }

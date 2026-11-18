@@ -2,11 +2,13 @@ import { describe, expect, jest, test } from "bun:test"
 import {
   connectDeviceService,
   LocalApiError,
+  UnsettledCommandError,
   type CommandResult,
   type DeviceService,
   type RemoteAttach,
 } from "@oh-my-opencode/device-service-core"
 import { withContractHost } from "../../../../../senpi-task/src/runners/rpc-host/testing/contract-host"
+import { withCallDeadline } from "../../remote/call-deadline"
 import type { ThreadReadInput } from "../contracts"
 import { answered, closeThread, interruptThread, setModelOn } from "../control/operations"
 import { createRelayControl } from "../control/relay-control"
@@ -1187,6 +1189,7 @@ describe("device-service adapter: relay round trips per thread op", () => {
 describe("device-service adapter: lost replies and connection lifecycle", () => {
   const lifecycle = () => {
     const calls = { connect: 0, attach: 0, sent: 0 }
+    const waits: (number | undefined)[] = []
     let closeService: () => void = () => {}
     let detachAttach: () => void = () => {}
     let commandAnswer: () => Promise<CommandResult> = async () => state({ state: "engine_applied" }, {})
@@ -1199,8 +1202,9 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
           calls.attach += 1
           if (attachFailure !== undefined) throw attachFailure
           return {
-            command: async () => {
+            command: async (_rpc: unknown, options?: { readonly waitMs?: number }) => {
               calls.sent += 1
+              waits.push(options?.waitMs)
               return await commandAnswer()
             },
             read: async () => ({ entries: [], next_before: null }),
@@ -1219,6 +1223,7 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
     }
     return {
       calls,
+      waits,
       connect: async () => ({ conn: service(), owned: true }),
       close: () => closeService(),
       detach: () => detachAttach(),
@@ -1304,6 +1309,53 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
       expect(await port.sessionCommand("b", "s1", { type, sessionId: "s1" })).toEqual({ kind: "refused", reason })
     },
   )
+
+  // omo#14130: a command that left this device (transport_confirmed) and lost its final state is delivered_unconfirmed;
+  // one that never left keeps today's answers. A read stays a refusal either way: nothing can have run.
+  test.each([
+    ["prompt", true, { kind: "uncertain", reason: "delivered_unconfirmed" }],
+    ["get_state", true, { kind: "refused", reason: "delivered_unconfirmed" }],
+    ["prompt", false, { kind: "uncertain", reason: "reply_lost" }],
+    ["get_state", false, { kind: "refused", reason: "request_timeout" }],
+  ] as const)(
+    "#given a %s whose final state never came (delivered: %p) #when its wait ends #then it answers %o",
+    async (type, delivered, expected) => {
+      const l = lifecycle()
+      l.answer(() =>
+        Promise.reject(new UnsettledCommandError("c1", 45_000, delivered ? "transport_confirmed" : "queued")),
+      )
+      const port = sessionsPort({ version: "0.0.0-test", connect: l.connect })
+      expect(await port.sessionCommand("b", "s1", { type, sessionId: "s1", message: "x" })).toEqual(expected)
+      expect(l.calls.sent).toBe(1)
+    },
+  )
+
+  test("#given no enclosing tool call #when a send and a read are commanded #then each waits under the 60 s tool window", async () => {
+    const l = lifecycle()
+    const port = sessionsPort({ version: "0.0.0-test", connect: l.connect })
+    await port.sessionCommand("b", "s1", { type: "prompt", message: "x" })
+    await port.sessionCommand("b", "s1", { type: "get_state", sessionId: "s1" })
+    expect(l.waits).toEqual([45_000, 30_000])
+  })
+
+  test("#given a tool call with 20 s of its budget left #when a send is commanded #then its wait is cut to what is left", async () => {
+    const l = lifecycle()
+    const port = sessionsPort({ version: "0.0.0-test", connect: l.connect })
+    await withCallDeadline(Date.now() + 20_000, () => port.sessionCommand("b", "s1", { type: "prompt", message: "x" }))
+    const [wait] = l.waits
+    expect(wait).toBeLessThanOrEqual(20_000)
+    expect(wait).toBeGreaterThan(10_000)
+  })
+
+  test("#given a tool call whose budget is spent #when a send is commanded #then it is refused request_timeout and nothing is sent", async () => {
+    const l = lifecycle()
+    const port = sessionsPort({ version: "0.0.0-test", connect: l.connect })
+    const spent = await withCallDeadline(Date.now() - 1, () =>
+      port.sessionCommand("b", "s1", { type: "prompt", message: "x" }),
+    )
+    expect(spent).toEqual({ kind: "refused", reason: "request_timeout" })
+    expect(l.calls.sent).toBe(0)
+  })
 
   test("#given a record that is not JSON #when it is commanded #then it is refused before any attach or send", async () => {
     const l = lifecycle()
