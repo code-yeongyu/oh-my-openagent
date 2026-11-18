@@ -108,6 +108,33 @@ test(
 )
 
 test(
+  "a stable hold adds no engine state write: each further idle cycle writes the state once, for its sync time, and the hold still counts its cycles (#12393)",
+  async () => {
+    const held = await makeDevice(new FakeSyncServer(), "held", undefined, { batchBytes: 1024 })
+    devices.push(held)
+    await held.write("big.md", `${"q".repeat(4096)}\n`)
+    const heldAt = held.clock.now()
+    await held.engine.runCycle()
+    const writes = spyOn(held.engine.journal, "updateState")
+    for (let cycle = 0; cycle < 3; cycle += 1) {
+      held.clock.advance(10_000)
+      expect(await held.engine.runCycle()).toMatchObject({ held: ["big.md"] })
+    }
+    const count = writes.mock.calls.length
+    writes.mockRestore()
+    expect(count).toBe(3)
+    expect((await held.engine.state()).lastSyncedAt).toBe(held.clock.now())
+    expect(await held.engine.status()).toMatchObject({
+      kind: "failing",
+      since: heldAt,
+      attempts: 4,
+      failure: { kind: "oversized_item", keys: ["big.md"] },
+    })
+  },
+  SMALL_SET_TIMEOUT,
+)
+
+test(
   "a refused entry is never hidden behind a held file: the pause carries the hold, which shows on its own once the refusal clears",
   async () => {
     const server = new FakeSyncServer()
@@ -118,20 +145,53 @@ test(
     await a.engine.runCycle()
     b.verifier.failing.set(1, "signature")
     await b.write("big.md", `${"q".repeat(4096)}\n`)
+    const heldAt = b.clock.now()
     await b.engine.runCycle()
-    expect(await b.engine.status()).toMatchObject({
+    const pausedHolding = (attempts: number) => ({
       kind: "paused",
       seq: 1,
       code: "signature",
-      held: { failure: { kind: "oversized_item", keys: ["big.md"] } },
+      held: { since: heldAt, attempts, failure: { kind: "oversized_item", keys: ["big.md"] } },
     })
+    expect(await b.engine.status()).toMatchObject(pausedHolding(1))
+    // Each paused cycle writes its refusal, and the hold counts that cycle too (#13657 review).
+    b.clock.advance(10_000)
+    await b.engine.runCycle()
+    expect(await b.engine.status()).toMatchObject(pausedHolding(2))
     b.verifier.failing.clear()
+    b.clock.advance(10_000)
     await b.engine.runCycle()
     expect(await b.engine.status()).toMatchObject({
       kind: "failing",
+      since: heldAt,
+      attempts: 3,
       failure: { kind: "oversized_item", keys: ["big.md"] },
     })
     expect(await b.read("one.md")).toBe("one\n")
+  },
+  SMALL_SET_TIMEOUT,
+)
+
+test(
+  "a hold that begins and ends while sync is paused, with no sync time to ride on, is written to the journal then (#12393)",
+  async () => {
+    const server = new FakeSyncServer()
+    const a = await makeDevice(server, "a")
+    const b = await makeDevice(server, "b", undefined, { batchBytes: 1024 })
+    devices.push(a, b)
+    await a.write("one.md", "one\n")
+    await a.engine.runCycle()
+    b.verifier.failing.set(1, "signature")
+    await b.engine.runCycle()
+    expect(await b.engine.status()).toEqual({ kind: "paused", seq: 1, code: "signature" })
+    await b.write("big.md", `${"q".repeat(4096)}\n`)
+    await b.engine.runCycle()
+    expect((await b.engine.state()).held).toMatchObject({ keys: ["big.md"], cycles: 1 })
+    // The held edit was never journaled, so removing the file leaves nothing to push past the pause.
+    await b.write("big.md", null)
+    await b.engine.runCycle()
+    expect((await b.engine.state()).held).toBeNull()
+    expect(await b.engine.status()).toEqual({ kind: "paused", seq: 1, code: "signature" })
   },
   SMALL_SET_TIMEOUT,
 )
