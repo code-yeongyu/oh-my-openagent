@@ -31,6 +31,8 @@ export type SessionArgs =
       readonly text: string
       readonly delivery: "auto" | "steer" | "follow_up"
       readonly wait: boolean
+      /** #13425: how long a waiting send follows the turn it started, in seconds (1..600); default 120. */
+      readonly timeout_seconds?: number
     }
   | { readonly verb: "model"; readonly target: RemoteSessionTarget; readonly model: string }
   | { readonly verb: "interrupt" | "close"; readonly target: RemoteSessionTarget }
@@ -51,7 +53,7 @@ const SESSION_FLAGS: Readonly<
     values: ["--project", "--model", "--thinking", "--permission-preset", "--branch", "--base", "--prompt"],
     switches: ["--worktree", "--steer", "--follow-up"],
   },
-  send: { values: [], switches: ["--steer", "--follow-up", "--no-wait"] },
+  send: { values: ["--timeout"], switches: ["--steer", "--follow-up", "--no-wait"] },
   model: { values: [], switches: [] },
   interrupt: { values: [], switches: [] },
   close: { values: [], switches: [] },
@@ -136,7 +138,22 @@ export function parseSession(
     if (switches.has("--steer") && switches.has("--follow-up"))
       throw new UsageError("omo remote send: pass --steer or --follow-up, not both")
     const delivery = switches.has("--steer") ? "steer" : switches.has("--follow-up") ? "follow_up" : "auto"
-    return { json, session: { verb, target, text, delivery, wait: !switches.has("--no-wait") } }
+    const timeoutValue = values.get("--timeout")
+    if (timeoutValue !== undefined && !/^[1-9][0-9]{0,3}$/.test(timeoutValue))
+      throw new UsageError("omo remote send: --timeout is seconds, 1 to 600")
+    if (timeoutValue !== undefined && Number(timeoutValue) > 600)
+      throw new UsageError("omo remote send: --timeout is seconds, 1 to 600")
+    return {
+      json,
+      session: {
+        verb,
+        target,
+        text,
+        delivery,
+        wait: !switches.has("--no-wait"),
+        ...(timeoutValue === undefined ? {} : { timeout_seconds: Number(timeoutValue) }),
+      },
+    }
   }
   if (verb === "model") {
     const model = positional[1]
