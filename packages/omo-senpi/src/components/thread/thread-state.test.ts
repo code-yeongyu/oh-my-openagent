@@ -29,11 +29,23 @@ describe("threadState is the one state rule (thread_list and local control both 
 
 const directories: string[] = []
 const remoteFixture = createRemoteThreadFixture()
+// A gateway store's worker owns its database inside the scratch directory until dispose() closes it;
+// removing the directory first fails on Windows, where an open handle leaks the whole scratch root into
+// the OS temp dir (the #9766 unnamed teardown red). Dispose every store before removing anything.
+const stores: ReturnType<typeof createGatewayStore>[] = []
 
 afterEach(async () => {
   await remoteFixture.cleanup()
+  for (const store of stores.splice(0)) await store.dispose()
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
 })
+
+/** Tracks the store so afterEach disposes its worker before the scratch directories are removed. */
+function trackedStore(agentDir: string): ReturnType<typeof createGatewayStore> {
+  const store = createGatewayStore({ agentDir })
+  stores.push(store)
+  return store
+}
 
 function scratch(): string {
   const directory = mkdtempSync(join(tmpdir(), "omo-thread-state-"))
@@ -84,7 +96,7 @@ function surfaceOptions(directory: string): ThreadToolSurfaceOptions {
     callerSessionId: () => "caller",
     callerWorkspaceRoot: () => directory,
     stateDirectory: directory,
-    store: createGatewayStore({ agentDir: directory }),
+    store: trackedStore(directory),
   }
 }
 
@@ -393,7 +405,7 @@ describe("a thread its engine closed (t2pp, measured on omo 5.1.69: it vanished 
     }
     const tools = createThreadTools({
       host,
-      store: createGatewayStore({ agentDir: scratch() }),
+      store: trackedStore(scratch()),
       stateDirectory: scratch(),
       callerSessionId: () => "dur-caller",
       callerWorkspaceRoot: () => root,
