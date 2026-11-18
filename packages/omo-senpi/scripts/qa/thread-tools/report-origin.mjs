@@ -34,6 +34,10 @@ await runScenario("report-origin", async ({ report, fake, scratch, install, star
       chat,
       "--thread",
       "t1",
+      // follow_up, not the default auto: B must queue behind A's running answer, as the scenario states. Under auto the
+      // engine steers B into A's run (decision.ts: auto steers a running turn), which is a different scenario.
+      "--inbound-mode",
+      "follow_up",
       "--json",
     ])
   const a = (await bind("chat-a")).json?.binding?.binding_id
