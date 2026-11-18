@@ -127,10 +127,11 @@ const listingIncomplete = (device: string): ThreadToolFailure =>
  * Device-service states in which no relay is set up for this account (`STATUS_STATES`, device-service-core vocabulary):
  * a local address miss stays a local miss. Every other non-connected state (offline, connecting, activation_pending,
  * keychain_locked, authorization_stale, service_degraded, update_required) means a configured relay is failing: the
- * typed `host_unavailable` answers before `not_found`. A missing device service (no state) is not set up.
+ * typed `host_unavailable` answers before `not_found`. No device service installed (no state) is not set up; a service
+ * that is installed but does not answer is an outage (`remoteReady` names its state `unreachable`).
  */
 const REMOTE_NOT_SET_UP: ReadonlySet<string> = new Set(["not_configured", "disabled", "signed_out", "sign_in_required"])
-/** No state at all = no device service answered (not installed or not running): the relay is not set up either. */
+/** No state at all = no device service is installed on this device: the relay is not set up either. */
 export const remoteNotSetUp = (state: unknown): boolean =>
   state === undefined || (typeof state === "string" && REMOTE_NOT_SET_UP.has(state))
 

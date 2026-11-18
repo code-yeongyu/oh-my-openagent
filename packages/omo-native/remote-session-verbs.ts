@@ -120,8 +120,8 @@ export async function runSession(
         deviceServiceSurface(service, dependencies.connect, dependencies.stateDir, dependencies.localSessions))
     )(service),
   )
-  // The client holds its own device-service connection; a command that left it open would keep the process alive. The
-  // sessions port owns the attach pool: closing it clears the pool's idle-detach timers (#14074) and closes only a
+  // The client borrows the command's connection; closing it releases the client and leaves that connection to the command.
+  // The sessions port owns the attach pool: closing it clears the pool's idle-detach timers (#14074) and closes only a
   // connection the port dialed itself, never the command's borrowed one.
   try {
     return await runSessionOn(remote, args, json, dependencies)
