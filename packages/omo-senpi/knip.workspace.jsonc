@@ -486,8 +486,6 @@
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/extension/rollback-migrate-runtime.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "src/extension/thread-sdk.ts",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/install/cli-local.ts",
       ],
       "ignoreDependencies": [
@@ -894,6 +892,9 @@
     "packages/omo-senpi/src/extension/agent-toolkit-sdk.ts": ["agentToolkit", "toolkitContextFromEnv", "ULW_LOOP_MANIFEST", "ULW_LOOP_OPERATIONS", "SDK_VERSION"],
     // pre-existing at origin dev 4686e425b5: unused export(s) FIRST_PAINT_BACKSTOP_MS
     "packages/omo-senpi/src/extension/startup-deferral.ts": ["FIRST_PAINT_BACKSTOP_MS"],
+    // sdk.test.ts now imports this thread SDK entry (it was an unused file, #14067); readSessionFacts is read by
+    // `omo host status --all` (omo-native bin/lib/host-status.js) through the built plugin/runtime/thread-sdk/sdk.js
+    "packages/omo-senpi/src/extension/thread-sdk.ts": ["readSessionFacts"],
     // pre-existing at origin dev 4686e425b5: unused export(s) WAKE_QUEUE_STATE_EVENT
     "packages/omo-senpi/src/extension/wake-queue-source.ts": ["WAKE_QUEUE_STATE_EVENT"],
     // pre-existing at origin dev 4686e425b5: unused export(s) omoSenpiAdapterPackageName

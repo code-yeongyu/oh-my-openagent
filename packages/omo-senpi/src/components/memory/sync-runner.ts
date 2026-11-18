@@ -134,6 +134,18 @@ export interface SyncRunnerOptions {
   readonly closeWaitMs?: number
   /** Initial retry delay for a deferred session (keychain dialog, memory repo not created); default 15 s, doubling to a five-minute cap. */
   readonly deferredRetryMs?: number
+  /** The runner's own timers (retry delay, close wait); the process's timers by default. Tests count these, not every timer. */
+  readonly timers?: SyncRunnerTimers
+}
+
+export interface SyncRunnerTimers {
+  readonly setTimeout: (run: () => void, ms: number) => ReturnType<typeof setTimeout>
+  readonly clearTimeout: (handle: ReturnType<typeof setTimeout> | undefined) => void
+}
+
+const PROCESS_TIMERS: SyncRunnerTimers = {
+  setTimeout: (run, ms) => setTimeout(run, ms),
+  clearTimeout: (handle) => clearTimeout(handle),
 }
 
 interface Running {
@@ -161,6 +173,7 @@ export interface SyncRunner {
 
 export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
   const resolveSession = options.resolveSession ?? noAccountSession
+  const timers = options.timers ?? PROCESS_TIMERS
   // The engine (and the Loro wasm under it) loads only once a device has an account session.
   const loadRuntime = options.loadRuntime ?? (() => import("#omo-memory-sync-runtime"))
   const open = options.open ?? (async (o: OpenDeviceSyncOptions) => (await loadRuntime()).openDeviceSync(o))
@@ -190,14 +203,14 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
     identity: string,
     paths: MemoryIdentityPaths,
     space: SyncSpaceInputs,
-    onDeferred: (message: string) => void,
+    onDeferred: (message: string, wake: AbortSignal | undefined) => void,
   ): Promise<Running | SyncUnavailableStatus | SyncConfigInvalidStatus | null> => {
     let resolved: SyncSessionResolution
     try {
       resolved = await resolveSession({ identity, paths, space })
     } catch (error) {
       if (isSyncSessionDeferred(error)) {
-        onDeferred(error.message)
+        onDeferred(error.message, error.wake)
         return null
       }
       if (isSyncConfigError(error)) {
@@ -269,7 +282,8 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
     return { device, unwatch }
   }
 
-  // A deferred pass is replaced by a fresh one after the retry delay while the repo is still held by the same sessions.
+  // A deferred pass is replaced by a fresh one after the retry delay, or as soon as its wake signal aborts, while the
+  // repo is still held by the same sessions.
   const launch = (
     identity: string,
     paths: MemoryIdentityPaths,
@@ -283,9 +297,11 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
     quietMs = 0,
   ): Held => {
     let deferred = false
+    let wake: AbortSignal | undefined
     let nextQuietMs = 0
-    const ready = start(identity, paths, space, (message) => {
+    const ready = start(identity, paths, space, (message, signal) => {
       deferred = true
+      wake = signal
       if (retryMs !== previousRetryMs) {
         logger.warn(`memory sync is waiting: ${message} Sync retries on its own.`, {
           identity,
@@ -311,7 +327,9 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
     const held: Held = { users, ready }
     void ready.then(() => {
       if (!deferred) return
-      const retry = setTimeout(() => {
+      const retry = () => {
+        timers.clearTimeout(timer)
+        wake?.removeEventListener("abort", retry)
         if (repos.get(paths.repo) === held)
           repos.set(
             paths.repo,
@@ -325,8 +343,11 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
               nextQuietMs,
             ),
           )
-      }, retryMs)
-      retry.unref?.()
+      }
+      const timer = timers.setTimeout(retry, retryMs)
+      timer.unref?.()
+      if (wake?.aborted) retry()
+      else wake?.addEventListener("abort", retry, { once: true })
     })
     return held
   }
@@ -343,10 +364,10 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
         const closed = await Promise.race([
           pending.then(() => true),
           new Promise<false>((resolve) => {
-            timer = setTimeout(() => resolve(false), waitMs)
+            timer = timers.setTimeout(() => resolve(false), waitMs)
           }),
         ])
-        clearTimeout(timer)
+        timers.clearTimeout(timer)
         if (!closed) {
           logger.error(
             `memory sync: the previous engine for this memory did not close within ${waitMs} ms; starting anyway, and this device may stay idle if it still holds its lease`,

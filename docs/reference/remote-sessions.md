@@ -13,7 +13,7 @@ remote operation's typed result as one JSON line (`packages/omo-native/remote-se
 
 ```bash
 omo remote status [--json]       # the device service's connection state
-omo remote devices [--json]      # the devices on this account
+omo remote devices [--json]      # the devices on this account, this device first
 omo remote sessions [--device D] [--project P] [--state running|idle|ended] [--json]
 omo remote enable | disable [--json]   # set this device up and turn remote sessions on, or turn them off
 omo remote control [on|off]      # whether your other devices may view and command this device's sessions
@@ -30,6 +30,14 @@ omo remote interrupt <session> [--json]   # stop the session's running turn
 omo remote close <session> [--json]       # end the session on its device
 ```
 
+`devices` lists this device first. With `--json`, every row has `id`, `name`, `platform`, `online`,
+`last_seen_ms` and `caps` (`attach`, `machine`, `control`), and `kind` when one is reported (this device's row has
+none when the account roster does not list it). Only this device's row has `self: true`; the other rows have no
+`self` key. When the device service reports this device, its row reads online only while that service is
+connected; with no device service, or one that does not report this device, the row is a local one (`id: "local"`,
+`kind: "local"`) that reads online. While the device service answers, `sessions --device D` for a device that is
+neither this device nor on the account fails with exit 2 and names it.
+
 `open` runs the new session in `MODE` (default: this device's own setting, else full-access), on the
 model and thinking level given (default: that device's own); a model that device cannot run opens
 nothing and fails with `model_not_found`. `--worktree` starts the session in a new git worktree of the
@@ -40,13 +48,13 @@ open). The agent tool `thread_create` takes the same options as `model`, `reason
 `permission_preset`, `worktree`, `prompt` and `delivery`; there `permission_preset` may only keep or
 narrow the calling session's own mode.
 
-The canonical session identity is the durable `thread.thread_id` that `open --json` returns. Pass it
+The canonical session identity is the `thread` value that `open --json` returns. Pass it
 directly to `send`, `model`, `interrupt`, `close` or `attach`; the CLI finds its device in the account
 listing. All five also take `<device>/<session>`, with either the durable id or the listing key in the
 `SESSION` column; an explicit device skips the account listing, and a durable id that device has not
 listed yet (a session opened a moment ago) is located on that device. A bare id is found through the
 account listing, which can lag a session opened a moment ago: right after `open`, use
-`<device>/<thread_id>`.
+`<device>/<thread>`.
 
 `send`
 with `--steer` goes into the running turn, and `--no-wait` returns once the session took the message

@@ -92,7 +92,12 @@ async function terminateWindowsProcessTree(child: ChildProcess, pid: number): Pr
   if (!hasExited(child)) {
     child.kill("SIGKILL")
   }
-  await exited
+  // taskkill /T /F and the SIGKILL fallback both force OS-level termination, but the ChildProcess exit
+  // event is a runtime courtesy, not a guarantee: Bun on Windows can leave it undelivered when the
+  // stdio pipes outlive the process, and the unbounded wait held a cleanup hook for 46.8 s until its
+  // bound (hosted run 44169815547, job 134346049552). The POSIX path already races post-kill liveness
+  // against an observation window; Windows now matches: bounded observation, never an open-ended wait.
+  await waitForExitOrDelay(exited, PROCESS_EXIT_OBSERVATION_TIMEOUT_MS)
 }
 
 function childExit(child: ChildProcess): Promise<void> {

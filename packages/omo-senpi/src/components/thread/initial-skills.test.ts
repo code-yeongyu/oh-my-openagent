@@ -135,7 +135,8 @@ test("#given a skill the workspace loads #when a thread is created with it #then
   const c = creator()
   expect(await c.create({ name: "skills-gateway-lead", skills: ["gateway-lead"] })).toMatchObject({
     kind: "ok",
-    thread: { thread_id: "dur-new", requested_skills: ["gateway-lead"] },
+    thread: "dur-new",
+    requested_skills: ["gateway-lead"],
   })
   expect(c.opened).toHaveLength(1)
   expect(c.opened[0]?.initialSkills).toEqual(["gateway-lead"])
@@ -148,7 +149,7 @@ test("#given a skill only a root the creator cannot see holds (~/.agents/skills,
   // loads, so the creator checks names only and the session applies or skips (and logs) each one.
   const c = creator()
   const created = await c.create({ name: "skills-agents-root", skills: ["skill-from-agents-root"] })
-  expect(created).toMatchObject({ kind: "ok", thread: { requested_skills: ["skill-from-agents-root"] } })
+  expect(created).toMatchObject({ kind: "ok", requested_skills: ["skill-from-agents-root"] })
   expect(c.opened[0]?.initialSkills).toEqual(["skill-from-agents-root"])
 })
 
@@ -168,7 +169,7 @@ test("#given a thread created without skills #when it opens #then nothing about 
   const c = creator()
   const created = await c.create({ name: "skills-none" })
   expect(created).toMatchObject({ kind: "ok" })
-  expect((created as { thread: Record<string, unknown> }).thread.requested_skills).toBeUndefined()
+  expect((created as { requested_skills?: unknown }).requested_skills).toBeUndefined()
   expect(c.opened[0]?.initialSkills).toBeUndefined()
 })
 

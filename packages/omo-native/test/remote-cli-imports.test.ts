@@ -47,6 +47,7 @@ const OFFENDERS: readonly string[] = [
   "remote-session-verbs.ts -> ../omo-senpi/src/components/thread/remote/remote-ops",
   "remote-session-verbs.ts -> ../omo-senpi/src/components/thread/remote/this-device",
   "remote-session-verbs.ts -> ../omo-senpi/src/components/thread/thread-link",
+  "remote-session-verbs.ts -> ../omo-senpi/src/components/thread/tools/thread-row",
   "remote-session-verbs.ts -> ./bin/lib/agent-dir.js",
   "remote-session-verbs.ts -> ./bin/lib/package-paths.js",
   // 4c-3: the bootstrap internal entry takes service.bootstrap on the service client.
