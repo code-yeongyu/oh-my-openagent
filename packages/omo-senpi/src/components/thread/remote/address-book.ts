@@ -108,7 +108,7 @@ export async function relayAddressBook(remote: RemoteThreadSurface, address: str
   if (remote.aliases === undefined) return { entries }
   const alias = await remote.aliases.resolve(address).catch(() => undefined)
   if (alias === undefined || alias.kind === "error") return { entries }
-  const holder = await holderTarget(remote, alias.value, here, rows)
+  const holder = await holderTarget(remote, alias.value, here, rows, roster)
   if (!("where" in holder)) return { entries, aliasFailure: holder.error }
   if (holder.where === "here")
     return {

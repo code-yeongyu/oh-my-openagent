@@ -591,6 +591,31 @@ describe("#12833: a name reaches a thread on another device by its title", () =>
     expect([...online.sent, ...offline.sent]).toEqual([])
   })
 
+  // #13539 review L1: a holder device the account's roster no longer names is not probed through the relay.
+  test("#given an alias whose holder device was removed from the account #when a tool names it #then it is not_found without a locate probe to that device, while a listed device is still probed", async () => {
+    const removed = account({
+      rows: [titled("c", "dur-on-c", "cached")],
+      aliases: new Map([["stale-c", { session_id: "dur-gone", device: "c" }]]),
+      removed: ["c"],
+    })
+    expect(await surface(removed.remote).run("thread_send", { thread: "stale-c", message: "x" })).toMatchObject({
+      kind: "error",
+      error: { code: "not_found", details: { device: "c", thread: "dur-gone" } },
+    })
+    expect(removed.located).toEqual([])
+    expect(removed.sent).toEqual([])
+    const listed = account({
+      rows: [titled("b", "dur-on-b", "other")],
+      aliases: new Map([["stale-b", { session_id: "dur-gone", device: "b" }]]),
+      relayKeys: new Map(),
+    })
+    expect(await surface(listed.remote).run("thread_send", { thread: "stale-b", message: "x" })).toMatchObject({
+      kind: "error",
+      error: { code: "not_found", details: { device: "b", thread: "dur-gone" } },
+    })
+    expect(listed.located).toContainEqual({ device: "b", session: "dur-gone" })
+  })
+
   test("#given remote sessions are off on this device #when thread_list runs in the workspace scope #then the alias registry is never asked", async () => {
     const a = account({ plan: "disabled" })
     const { run } = surface(a.remote)

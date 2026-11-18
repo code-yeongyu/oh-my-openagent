@@ -418,6 +418,8 @@ export function createRemoteThreadFixture() {
       if (!devices.some((known) => known.device === device) && !(options.removed ?? []).includes(device))
         devices.push({ device, label: device, online: true })
     const registryCalls: string[] = []
+    /** Every session.locate probe the tools sent, by device. */
+    const located: { readonly device: string; readonly session: string }[] = []
     const accountReads: string[] = []
     const down = <T>(): Promise<AliasResult<T>> =>
       options.registryDown === "throws"
@@ -549,7 +551,8 @@ export function createRemoteThreadFixture() {
           return answer(rpc)
         },
         // This fake device lists a created session by the id its create reply names.
-        locate: async (_device, engineId) => {
+        locate: async (device, engineId) => {
+          located.push({ device, session: engineId })
           // A device's relay connector keys each session it lists by a relay key, kept beside the durable id (relayKeys).
           if (options.relayKeys === undefined) return { kind: "ok", sessionId: engineId }
           const key = options.relayKeys.get(engineId)
@@ -667,6 +670,7 @@ export function createRemoteThreadFixture() {
       watching,
       endWatches,
       accountReads,
+      located,
     }
   }
 
