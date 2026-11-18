@@ -61,6 +61,7 @@ function followDelegatedCommand(
   device: string,
   timers: Timers,
   send: (commandId: string) => Promise<unknown>,
+  waitMs: number = ENDPOINT_COMMAND_WAIT_MS,
 ): Promise<CommandResult> {
   return new Promise<CommandResult>((resolve, reject) => {
     // Minted before sending, so a state that arrives ahead of the answer is not missed.
@@ -91,8 +92,8 @@ function followDelegatedCommand(
         ...(located === undefined ? {} : { located }),
       })
     })
-    const cancelTimer = timers.after(ENDPOINT_COMMAND_WAIT_MS, () =>
-      fail(new Error(`no final state for endpoint command ${commandId} within ${ENDPOINT_COMMAND_WAIT_MS} ms`)),
+    const cancelTimer = timers.after(waitMs, () =>
+      fail(new Error(`no final state for endpoint command ${commandId} within ${waitMs} ms`)),
     )
     void client.closed.then(() => fail(new Error("the connection closed before the endpoint command settled")))
     send(commandId).catch(fail)
@@ -202,7 +203,12 @@ export type DeviceService = {
    * ambiguous_session) in the outcome's receipt. Rejects `unsupported` before sending toward a device that lacks the
    * feature. Settles like `endpointCommand`.
    */
-  readonly wakeCommand: (device: string, durableId: string, rpc: CommandRpc) => Promise<CommandResult>
+  readonly wakeCommand: (
+    device: string,
+    durableId: string,
+    rpc: CommandRpc,
+    options?: { readonly waitMs?: number },
+  ) => Promise<CommandResult>
 }
 
 /**
@@ -367,12 +373,17 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
         engine_id: engineId,
         ...(options?.single === true && takesSingleLocate ? { single: true as const } : {}),
       }),
-    wakeCommand: async (device, durableId, rpc) => {
+    wakeCommand: async (device, durableId, rpc, options) => {
       if (!carriesWakeMark) throw olderThanWakeMinimum(client.welcome.service_version, wakeMarkMinimum)
-      return await followDelegatedCommand(client, device, timers, (commandId) =>
-        client.commandTo({ wake: { device, durable_id: durableId } }, rpc, commandId).catch((error: unknown) => {
-          throw error instanceof LocalApiError && error.command_id === undefined ? markNotSent(error) : error
-        }),
+      return await followDelegatedCommand(
+        client,
+        device,
+        timers,
+        (commandId) =>
+          client.commandTo({ wake: { device, durable_id: durableId } }, rpc, commandId).catch((error: unknown) => {
+            throw error instanceof LocalApiError && error.command_id === undefined ? markNotSent(error) : error
+          }),
+        options?.waitMs,
       )
     },
   }

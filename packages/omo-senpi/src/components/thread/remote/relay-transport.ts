@@ -13,6 +13,7 @@ import { UNKNOWN_CALLER } from "../tools/ports"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 import { deviceOnline, replyData } from "./remote-ops"
 import { outcomeFailure } from "./outcome"
+import { outsideCallDeadline } from "../../remote/call-deadline"
 
 export type RelayTransportOptions = {
   readonly remote: RemoteThreadSurface
@@ -322,7 +323,8 @@ export function createRelayTransport(
       })
       if (!revised) log(`relay_receipt_unrevised: ${idempotencyKey}: no settled receipt of this process to revise.`)
     }
-    for (const task of tasks) void task(revise)
+    // omo#14130 review H1: a queued task (a held re-send) runs past this call, so never under its budget.
+    for (const task of tasks) void outsideCallDeadline(() => task(revise))
     return result
   }
 

@@ -11,7 +11,7 @@ import {
 import { CATALOG_RECORD, createAttachPool, type HeldAttach } from "../../thread/remote/attach-pool"
 import type { DeviceServiceDial, JsonObject, RemoteListing, RemoteSessionsPort } from "../../thread/remote/ports"
 import { openSessionWatch } from "../../thread/remote/remote-watch"
-import { commandWaitMs } from "../call-deadline"
+import { commandWaitMs, withinCallBudget } from "../call-deadline"
 
 export type DeviceServiceSessionsOptions = {
   readonly version: string
@@ -210,7 +210,17 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       return { kind: "refused", reason: "invalid_record" }
     }
     try {
-      held = await pool.hold(device, sessionId)
+      // omo#14130 review L1: the attach shares the call's budget; one that settles after it is released at once.
+      const holding = pool.hold(device, sessionId)
+      const reached = await withinCallBudget(holding)
+      if (reached === undefined) {
+        void holding.then(
+          (late) => late.release(),
+          () => undefined,
+        )
+        return { kind: "refused", reason: "request_timeout" }
+      }
+      held = reached
     } catch (error) {
       return { kind: "refused", reason: sessionReason(notSentReason(error)) }
     }
@@ -409,8 +419,11 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         return { kind: "refused", reason: notSentReason(error) }
       }
       if (!connected.carriesWakeMark) return { kind: "unavailable" }
+      // omo#14130 review M1: a wake shares the call's budget like every other command.
+      const waitMs = commandWaitMs(SEND_WAIT_MS)
+      if (waitMs <= 0) return { kind: "refused", reason: "request_timeout" }
       try {
-        return outcomeOf(await connected.wakeCommand(device, durableId, record))
+        return outcomeOf(await connected.wakeCommand(device, durableId, record, { waitMs }))
       } catch (error) {
         if (error instanceof NotSentError) return { kind: "refused", reason: error.code }
         if (error instanceof LocalApiError && error.command_id === undefined && REFUSED_BEFORE_SENDING.has(error.code))

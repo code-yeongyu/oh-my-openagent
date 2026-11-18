@@ -16,3 +16,26 @@ export function commandWaitMs(bound: number, now: number = Date.now()): number {
   const deadline = scope.getStore()
   return deadline === undefined ? bound : Math.min(bound, deadline - now)
 }
+
+/** Runs `work` outside any call's budget: a background task a call queued (a held re-send) outlives that call. */
+export const outsideCallDeadline = <T>(work: () => T): T => scope.exit(work)
+
+/** `work`, or undefined once the enclosing call's budget runs out first (no enclosing call: `work` as it is). */
+export function withinCallBudget<T>(work: Promise<T>, now: number = Date.now()): Promise<T | undefined> {
+  const deadline = scope.getStore()
+  if (deadline === undefined) return work
+  return new Promise<T | undefined>((resolve, reject) => {
+    const timer = setTimeout(() => resolve(undefined), Math.max(0, deadline - now))
+    timer.unref?.()
+    work.then(
+      (value) => {
+        clearTimeout(timer)
+        resolve(value)
+      },
+      (error: unknown) => {
+        clearTimeout(timer)
+        reject(error)
+      },
+    )
+  })
+}

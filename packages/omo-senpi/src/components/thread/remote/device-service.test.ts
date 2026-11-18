@@ -1357,6 +1357,73 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
     expect(l.calls.sent).toBe(0)
   })
 
+  // omo#14130 review M1: the wake path shares the call's budget like every other command.
+  const wakingService = (waits: (number | undefined)[]) => () =>
+    ({
+      status: async () => ({ state: "connected" }),
+      carriesWakeMark: true,
+      wakeCommand: async (
+        _device: string,
+        _durableId: string,
+        _rpc: unknown,
+        options?: { readonly waitMs?: number },
+      ) => {
+        waits.push(options?.waitMs)
+        return state({ state: "engine_applied" }, { kind: "queued" })
+      },
+      closed: new Promise<void>(() => {}),
+      close: () => {},
+    }) as unknown as DeviceService
+  test.each([
+    ["no enclosing tool call", undefined, (wait: number | undefined) => expect(wait).toBe(45_000)],
+    [
+      "a tool call with 20 s left",
+      20_000,
+      (wait: number | undefined) => {
+        expect(wait).toBeLessThanOrEqual(20_000)
+        expect(wait).toBeGreaterThan(10_000)
+      },
+    ],
+  ] as const)("#given %s #when a wake is sent #then its wait is bounded by it", async (_label, left, check) => {
+    const waits: (number | undefined)[] = []
+    const service = wakingService(waits)
+    const port = sessionsPort({ version: "0.0.0-test", connect: async () => ({ conn: service(), owned: true }) })
+    const send = port.wake
+    if (send === undefined) throw new Error("the device-service port has no wake")
+    const wake = () => send("b", "dur-1", { type: "admit_external_message", text: "x" })
+    await (left === undefined ? wake() : withCallDeadline(Date.now() + left, wake))
+    expect(waits).toHaveLength(1)
+    check(waits[0])
+  })
+
+  test("#given a tool call whose budget is spent #when a wake is sent #then it is refused request_timeout and nothing is sent", async () => {
+    const waits: (number | undefined)[] = []
+    const service = wakingService(waits)
+    const port = sessionsPort({ version: "0.0.0-test", connect: async () => ({ conn: service(), owned: true }) })
+    const spent = await withCallDeadline(Date.now() - 1, async () =>
+      port.wake?.("b", "dur-1", { type: "admit_external_message", text: "x" }),
+    )
+    expect(spent).toEqual({ kind: "refused", reason: "request_timeout" })
+    expect(waits).toEqual([])
+  })
+
+  // omo#14130 review L1: an attach that never settles cannot hold the call past its budget either.
+  test("#given an attach that never settles #when a command is sent inside a 50 ms budget #then it is refused request_timeout at the budget", async () => {
+    const service = () =>
+      ({
+        status: async () => ({ state: "connected" }),
+        attach: () => new Promise<never>(() => {}),
+        locate: () => new Promise<never>(() => {}),
+        closed: new Promise<void>(() => {}),
+        close: () => {},
+      }) as unknown as DeviceService
+    const port = sessionsPort({ version: "0.0.0-test", connect: async () => ({ conn: service(), owned: true }) })
+    const answer = await withCallDeadline(Date.now() + 50, () =>
+      port.sessionCommand("b", "s1", { type: "prompt", message: "x" }),
+    )
+    expect(answer).toEqual({ kind: "refused", reason: "request_timeout" })
+  })
+
   test("#given a record that is not JSON #when it is commanded #then it is refused before any attach or send", async () => {
     const l = lifecycle()
     const port = sessionsPort({ version: "0.0.0-test", connect: l.connect })
