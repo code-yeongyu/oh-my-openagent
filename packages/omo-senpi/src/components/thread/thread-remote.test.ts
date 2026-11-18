@@ -323,13 +323,29 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
   )
 
   test("#given b's thread is not running and this device cannot wake it there #when thread_send names it #then not_resumable at once naming the reopen, and no command waits on b (#14184)", async () => {
-    const a = account({ rows: [{ ...B_ROW, state: "ended" }] })
+    const a = account({ rows: [{ ...B_ROW, state: "ended" }], live: [] })
     const { run } = surface(a.remote)
     expect(await run("thread_send", { thread: "dur-on-b", message: "hi" })).toMatchObject({
       kind: "error",
       error: { code: "not_resumable", details: { device: "b", thread: "dur-on-b" } },
     })
     expect(a.sent.filter((entry) => entry.via === "session" || entry.via === "wake")).toEqual([])
+  })
+
+  test("#given b's thread was closed here and then reopened from another device, while this device's listing still reads it closed #when thread_send names it #then b says it runs, and the send is delivered to it, never refused not_resumable (#14179 review L4)", async () => {
+    const a = account({ rows: [B_ROW] })
+    const { run } = surface(a.remote)
+    expect(await run("thread_close", { thread: "dur-on-b" })).toMatchObject({ kind: "ok", closed: true })
+    // Another device reopens it: b's engine holds the session again under its key; the listing here has not moved.
+    a.live.add(B_ROW.session_id)
+    expect(await run("thread_send", { thread: "dur-on-b", message: "still there?" })).toMatchObject({
+      kind: "ok",
+      thread: "dur-on-b",
+      delivery: { kind: "started" },
+    })
+    expect(
+      a.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message").map((entry) => entry.session),
+    ).toEqual([B_ROW.session_id])
   })
 
   test("#given a closed session on b that b lists nowhere #when thread_create reopens it by session id #then the probe finds b, b names its file, and that file is opened on b (#14170)", async () => {

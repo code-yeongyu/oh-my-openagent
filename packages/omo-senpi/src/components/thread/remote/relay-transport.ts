@@ -13,6 +13,7 @@ import { UNKNOWN_CALLER } from "../tools/ports"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 import { deviceOnline, replyData } from "./remote-ops"
 import { outcomeFailure } from "./outcome"
+import { runsNow } from "./find-session"
 
 export type RelayTransportOptions = {
   readonly remote: RemoteThreadSurface
@@ -342,15 +343,19 @@ export function createRelayTransport(
     // omo#13037 5.4 / A4.5: a session no engine runs takes the wake path when this device's service can carry it: no lane
     // probe (its state is offline in the decision table), so a steer is turn_conflict and nothing is sent.
     const ended = row.state === "ended" && (await remote.sessions.canWake?.()) === true
-    // #14184: with no wake path, nothing on that device runs the session, and a command to its listing key waits out the
-    // device's own deadline (about 60 s) before failing. Answered at once, as thread_read answers it.
-    if (row.state === "ended" && !ended)
-      return fail(
-        "not_resumable",
-        `${rowThreadId(row)} on device ${row.device} is not running, and this device cannot wake it there.`,
-        "Open it again with thread_create({ thread }), then send.",
-        { device: row.device, thread: rowThreadId(row) },
-      )
+    // #14184: with no wake path, a session its holder does not run cannot take the record, and a command to its listing
+    // key waits out the device's own deadline (about 60 s) before failing: answered at once, as thread_read answers it.
+    // The holder is asked first, because the listing (and this surface's closed mark) lags a reopen made elsewhere.
+    if (row.state === "ended" && !ended) {
+      if (!(await runsNow(remote, row)))
+        return fail(
+          "not_resumable",
+          `${rowThreadId(row)} on device ${row.device} is not running, and this device cannot wake it there.`,
+          "Open it again with thread_create({ thread }), then send.",
+          { device: row.device, thread: rowThreadId(row) },
+        )
+      remote.sessions.reopened?.(row, row.session_id)
+    }
     if (ended && delivery.mode === "steer")
       return fail(
         REFUSAL_CODES.turn_conflict.code,

@@ -268,7 +268,15 @@ export function createRemoteThreadFixture() {
     } = {},
   ) {
     const engine = options.engine ?? ENGINE
-    const sessionFiles = options.sessionFiles ?? { "dur-on-b": B_FILE }
+    // Every session b's listing names has its file on b (B_FILE for b's own), unless a test says otherwise.
+    const sessionFiles =
+      options.sessionFiles ??
+      Object.fromEntries([
+        ["dur-on-b", B_FILE],
+        ...(options.rows ?? [])
+          .filter((row) => row.durable_id !== undefined && row.durable_id !== "dur-on-b")
+          .map((row) => [row.durable_id as string, `/home/b/.omo/agent/sessions/${row.durable_id}.jsonl`]),
+      ])
     const sent: Sent[] = []
     // b's engine ledger of admitted delivery ids (senpi external-admission: a repeated id is already_admitted), and how many
     // admissions its user's open draft still holds (held_draft, taken by nothing).
@@ -349,7 +357,13 @@ export function createRemoteThreadFixture() {
         const file = sessionFiles[String(rpc["durableSessionId"])]
         if (file === undefined) return ok({ unknown: true })
         if (typeof file !== "string") return ok({ ambiguous: true })
-        return ok({ found: { sessionPath: file, cwd: B_ROW.project, open: false } })
+        // `open`: an engine of b holds the session now, under the key its listing row names (or under its id).
+        const durable = String(rpc["durableSessionId"])
+        const keys = [B_ROW, ...(options.rows ?? [])]
+          .filter((row) => row.durable_id === durable)
+          .map((row) => row.session_id)
+        const open = live.has(durable) || keys.some((key) => live.has(key))
+        return ok({ found: { sessionPath: file, cwd: B_ROW.project, open } })
       }
       if (rpc["type"] === "open_session") {
         // A reopened file resumes under the id it carries, as senpi's does.

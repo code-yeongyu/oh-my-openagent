@@ -114,7 +114,7 @@ describe("#13012 route parity", () => {
     })
   })
 
-  test("#given only an ended remote row matches #when fuzzy and exact handoff run #then both resolve that row through the same relay calls and answer not_resumable at once (#14184)", async () => {
+  test("#given only an ended remote row matches #when fuzzy and exact handoff run #then both reach that resumable row through the same relay calls", async () => {
     const endedRow = { ...B_ROW, title: "release planner", state: "ended" as const }
     const fuzzy = account({ rows: [endedRow] })
     const exact = account({ rows: [endedRow] })
@@ -129,17 +129,19 @@ describe("#13012 route parity", () => {
       message: "continue",
       all_scope: true,
     })
-    // #14184: an ended row this device cannot wake answers not_resumable at once on both paths, naming that row.
-    const endedRefusal = {
-      kind: "error",
-      error: { code: "not_resumable", details: { device: B_ROW.device, thread: B_ROW.durable_id } },
-    }
-    expect(byFuzzy).toMatchObject(endedRefusal)
-    expect(byExact).toMatchObject(endedRefusal)
+    expect(byFuzzy).toMatchObject({
+      kind: "ok",
+      thread: B_ROW.durable_id,
+      device: B_ROW.device,
+      resolved_by: "fuzzy",
+    })
+    expect(byExact).toMatchObject({ kind: "ok", thread: B_ROW.durable_id, device: B_ROW.device })
     const calls = (sent: typeof fuzzy.sent) =>
       sent.map((call) => [call.via, call.device, call.session, call.rpc?.["type"]])
     expect(calls(fuzzy.sent)).toStrictEqual(calls(exact.sent))
-    expect(calls(fuzzy.sent).filter((call) => call[3] === "admit_external_message")).toStrictEqual([])
+    expect(calls(fuzzy.sent).filter((call) => call[3] === "admit_external_message")).toStrictEqual([
+      ["session", B_ROW.device, B_ROW.session_id, "admit_external_message"],
+    ])
   })
 
   // The exact path refuses two rows that share a name (ambiguous_target, no live preference), so fuzzy must not pick one of
@@ -155,7 +157,7 @@ describe("#13012 route parity", () => {
 
   // #13141 review: a live row that clears the accept floor must not beat an ended row that matches better. The query is the
   // ended row's exact name, so the exact path reaches dur-old; fuzzy has to land there too, never on dur-on-b.
-  test("#given an ended remote row named exactly as the query and a live near-match #when fuzzy and exact handoff run #then both resolve the ended row through the same relay calls and answer not_resumable at once (#14184)", async () => {
+  test("#given an ended remote row named exactly as the query and a live near-match #when fuzzy and exact handoff run #then both reach the ended row through the same relay calls", async () => {
     const rows = [endedPlanner("release planner"), { ...B_ROW, title: "release planner notes" }]
     const fuzzy = account({ rows, live: PLANNER_LIVE })
     const exact = account({ rows, live: PLANNER_LIVE })
@@ -170,44 +172,26 @@ describe("#13012 route parity", () => {
       message: "continue",
       all_scope: true,
     })
-    // #14184: an ended row this device cannot wake answers not_resumable at once on both paths, naming that row.
-    const endedRefusal = {
-      kind: "error",
-      error: { code: "not_resumable", details: { device: "b", thread: "dur-old" } },
-    }
-    expect(byFuzzy).toMatchObject(endedRefusal)
-    expect(byExact).toMatchObject(endedRefusal)
+    expect(byFuzzy).toMatchObject({ kind: "ok", thread: "dur-old", device: "b", resolved_by: "fuzzy" })
+    expect(byExact).toMatchObject({ kind: "ok", thread: "dur-old", device: "b" })
     expect(relayCalls(fuzzy.sent)).toStrictEqual(relayCalls(exact.sent))
-    expect(admits(fuzzy.sent)).toStrictEqual([])
+    expect(admits(fuzzy.sent)).toStrictEqual([["b", "rk-old"]])
   })
 
   // Unequal scores, both directions: the clearly better row wins whether it is live or ended. "release planne" scores
   // 0.960 against "release planner" and 0.774 against "release planner notes" (trigram Dice), a lead of 0.186.
   test.each([
-    {
-      better: "ended",
-      ended: "release planner",
-      live: "release planner notes",
-      // #14184: the ended row wins the match, and its answer is not_resumable at once (no wake path here).
-      answer: { kind: "error", error: { code: "not_resumable", details: { device: "b", thread: "dur-old" } } },
-      admitted: [],
-    },
-    {
-      better: "live",
-      ended: "release planner notes",
-      live: "release planner",
-      answer: { kind: "ok", thread: "dur-on-b", device: "b", resolved_by: "fuzzy" },
-      admitted: [["b", "rk-on-b"]],
-    },
+    { better: "ended", ended: "release planner", live: "release planner notes", target: ["dur-old", "rk-old"] },
+    { better: "live", ended: "release planner notes", live: "release planner", target: ["dur-on-b", "rk-on-b"] },
   ] as const)(
-    "#given the $better remote row matches clearly better #when fuzzy handoff runs #then it goes to that row only",
-    async ({ ended, live, answer, admitted }) => {
+    "#given the $better remote row matches clearly better #when fuzzy handoff runs #then it sends to that row only",
+    async ({ ended, live, target }) => {
       const a = account({ rows: [endedPlanner(ended), { ...B_ROW, title: live }], live: PLANNER_LIVE })
       const { run } = surface(a.remote)
       expect(
         await run("thread_handoff", { thread: "release planne", match: "fuzzy", message: "continue", all_scope: true }),
-      ).toMatchObject(answer)
-      expect(admits(a.sent)).toStrictEqual(admitted.map((call) => [...call]))
+      ).toMatchObject({ kind: "ok", thread: target[0], device: "b", resolved_by: "fuzzy" })
+      expect(admits(a.sent)).toStrictEqual([["b", target[1]]])
     },
   )
 

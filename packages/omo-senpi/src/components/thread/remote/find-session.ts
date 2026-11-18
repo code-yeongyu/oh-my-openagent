@@ -27,6 +27,18 @@ const recordOf = (value: unknown): JsonObject | undefined =>
   typeof value === "object" && value !== null && !Array.isArray(value) ? (value as JsonObject) : undefined
 
 /**
+ * Whether an engine on `row`'s device runs its session now, by the holder's own answer (`find_session`'s `open`), for a
+ * row this surface reads as ended: the listing and this surface's closed mark lag a reopen made elsewhere (#14179 review
+ * L4). A holder that cannot say counts as not running it.
+ */
+export async function runsNow(remote: RemoteThreadSurface, row: RemoteSessionRow): Promise<boolean> {
+  const thread = rowThreadId(row)
+  if (thread === "") return false
+  const outcome = await remote.sessions.endpointCommand(row.device, { type: "find_session", durableSessionId: thread })
+  return outcome.kind === "ok" && recordOf(replyData(outcome.response)["found"])?.["open"] === true
+}
+
+/**
  * The session file an open of `row`'s closed session takes on its own device (#14170). A listing row never names it: its
  * `path` is the session's working folder (or `"unknown"`), which the far engine opens as a directory (EISDIR). The file is
  * the one this surface's own close was told (`session_file`), else the one its holder names for the durable id

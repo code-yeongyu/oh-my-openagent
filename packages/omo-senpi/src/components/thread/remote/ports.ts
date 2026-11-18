@@ -212,7 +212,10 @@ export type RemoteSessionsPort = {
    * up it lists the row ended, carrying that file as `session_file`. Absent: the listing is read as it comes.
    */
   readonly closed?: (row: RemoteSessionRow, file: string | undefined) => void
-  /** #14170: this surface opened `row`'s session again, which its device now lists under `key`. */
+  /**
+   * #14170: `row`'s session runs again under `key` (this surface reopened it, or its holder says an engine runs it), so a
+   * closed mark no longer applies.
+   */
   readonly reopened?: (row: RemoteSessionRow, key: string) => void
   /** Closes the device-service connection this port opened, if any; a short-lived caller (the CLI) calls it at the end. */
   readonly close?: () => Promise<void>
