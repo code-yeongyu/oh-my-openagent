@@ -155,10 +155,12 @@ const DEEP_HIGH_CATEGORY_CALLER_GUIDANCE = `<Selection_Gate>Route here only when
 const DEEP_LOW_GATE_MODELS = [
   LATEST_MODEL_BY_FAMILY.gptSol,
   LATEST_MODEL_BY_FAMILY.gptSolFast,
+  "gpt-6.1-sol",
+  "gpt-6.1-sol-fast",
   "gpt-5.6-sol-fast",
   "gpt-5.6-sol",
 ] as const
-const DEEP_HIGH_GATE_MODEL = LATEST_MODEL_BY_FAMILY.gptAstra
+const DEEP_HIGH_GATE_MODELS = [LATEST_MODEL_BY_FAMILY.gptAstra, "gpt-6-astra"] as const
 
 export const OPENAI_CATEGORIES: BuiltinCategoryDefinition[] = [
   {
@@ -187,7 +189,7 @@ export const OPENAI_CATEGORIES: BuiltinCategoryDefinition[] = [
     callerGuidance: DEEP_HIGH_CATEGORY_CALLER_GUIDANCE,
     promptAppend: DEEP_HIGH_CATEGORY_PROMPT_APPEND,
     resolvePromptAppend: resolveDeepHighCategoryPromptAppend,
-    requiresModel: DEEP_HIGH_GATE_MODEL,
+    requiresModel: DEEP_HIGH_GATE_MODELS,
   },
   {
     name: "quick",
