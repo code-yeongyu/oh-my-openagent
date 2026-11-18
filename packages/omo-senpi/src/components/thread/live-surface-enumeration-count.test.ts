@@ -164,14 +164,17 @@ describe("what one send to a thread on another device asks for, by path (#12989)
     }
     // The fake registry counts a resolve for every address; the real client sends none for a session-id-shaped key
     // (remote/alias-registry.ts brokenRule), so on a device the by-id paths make one request fewer than the by-name ones.
-    const each = {
+    // A send resolves across devices from the account session list alone (no device status or roster read). A reply
+    // lists the account sessions and resolves the alias once more for its reply-allowance check.
+    const first = {
       enumerations: 1,
-      device_status: 1,
-      device_list: 1,
+      device_status: 0,
+      device_list: 0,
       account_sessions: 1,
       alias_resolve: 1,
       session_commands: 2,
     }
-    expect(counts).toEqual({ first_by_name: each, first_by_id: each, reply_by_name: each, reply_by_id: each })
+    const reply = { ...first, account_sessions: 2, alias_resolve: 2 }
+    expect(counts).toEqual({ first_by_name: first, first_by_id: first, reply_by_name: reply, reply_by_id: reply })
   })
 })
