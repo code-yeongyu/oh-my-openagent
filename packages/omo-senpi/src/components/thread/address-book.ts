@@ -5,7 +5,7 @@ import { normalizeThreadName, type ThreadAddressEntry } from "./addressing"
 import type { ThreadStatus } from "./contracts"
 import type { EndpointKind } from "./endpoint-registry"
 import type { GatewayAddressEntry } from "./gateway/engine"
-import { readSessionFacts, threadTitle, type SessionFacts } from "./session-facts"
+import { readSessionFacts, readSessionFactsAsync, threadTitle, type SessionFacts } from "./session-facts"
 
 export type HostSessionStatus = "opening" | "open" | "closing" | "closed"
 
@@ -332,6 +332,12 @@ export function readDiskSession(path: string, sourceHost: string | null): DiskSe
   return session === null ? null : { ...session, source_host: sourceHost }
 }
 
+/** `readDiskSession` through the async reader, for a listing that runs on the event loop (a dead endpoint's, #13579). */
+export async function readDiskSessionAsync(path: string, sourceHost: string | null): Promise<DiskSession | null> {
+  const session = diskSessionOf(path, await readSessionFactsAsync(path))
+  return session === null ? null : { ...session, source_host: sourceHost }
+}
+
 export type FindDiskSessionsOptions = {
   /** Match a name in every workspace; otherwise only the session directories of `workspaceRoots` are read. */
   readonly all_scope?: boolean
@@ -349,7 +355,10 @@ function sessionDirectoryPrefix(root: string): string {
 }
 
 function diskSessionFromFacts(path: string): DiskSession | null {
-  const facts = readSessionFacts(path)
+  return diskSessionOf(path, readSessionFacts(path))
+}
+
+function diskSessionOf(path: string, facts: SessionFacts | null): DiskSession | null {
   if (facts === null) return null
   return {
     durable_id: facts.durable_id,

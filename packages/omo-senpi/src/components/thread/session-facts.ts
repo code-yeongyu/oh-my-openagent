@@ -1,4 +1,5 @@
 import { closeSync, fstatSync, openSync, readSync } from "node:fs"
+import { open, type FileHandle } from "node:fs/promises"
 
 /** How many bytes each end of a session file is read for its facts: listing never reads a whole transcript. */
 export const SESSION_FACTS_WINDOW_BYTES = 64 * 1024
@@ -104,18 +105,27 @@ function finalEntryTimestamp(line: Buffer | null): string | null {
   }
 }
 
-function finalCompleteLine(fd: number, size: number, read: SessionRead): Buffer | null {
+/** One read the window rules need: `length` bytes at `position`. */
+type WindowRequest = { readonly position: number; readonly length: number }
+
+/** What a driver read for a WindowRequest: a zero-filled buffer of the requested length and how much of it was read. */
+type WindowBytes = { readonly buffer: Buffer; readonly bytesRead: number }
+
+/** Session facts before the activity check, plus the final complete line that check reads its timestamp from. */
+type WindowFacts = Omit<SessionFacts, "updated_at"> & { readonly finalLine: Buffer | null }
+
+function* finalCompleteLine(size: number): Generator<WindowRequest, Buffer | null, WindowBytes> {
   if (size === 0) return null
-  const finalByte = Buffer.allocUnsafe(1)
-  if (read(fd, finalByte, 0, 1, size - 1) !== 1 || finalByte[0] !== 0x0a) return null
+  const finalByte = yield { position: size - 1, length: 1 }
+  if (finalByte.bytesRead !== 1 || finalByte.buffer[0] !== 0x0a) return null
   let remaining = size - 1
   let scanned = 0
   const chunks: Buffer[] = []
   while (remaining > 0 && scanned < SESSION_FACTS_LAST_LINE_MAX_BYTES) {
     const length = Math.min(SESSION_FACTS_WINDOW_BYTES, remaining, SESSION_FACTS_LAST_LINE_MAX_BYTES - scanned)
     const start = remaining - length
-    const chunk = Buffer.allocUnsafe(length)
-    if (read(fd, chunk, 0, length, start) !== length) return null
+    const { buffer: chunk, bytesRead } = yield { position: start, length }
+    if (bytesRead !== length) return null
     const newline = chunk.lastIndexOf(0x0a)
     chunks.unshift(newline === -1 ? chunk : chunk.subarray(newline + 1))
     if (newline !== -1 || start === 0) return Buffer.concat(chunks)
@@ -123,6 +133,51 @@ function finalCompleteLine(fd: number, size: number, read: SessionRead): Buffer 
     remaining = start
   }
   return null
+}
+
+/**
+ * The bounded reads of one session file and the rules over them, as steps: each yield names the bytes it needs
+ * and receives them, so the synchronous reader and the async one (a dead endpoint's listing) share every rule.
+ */
+function* sessionFactsSteps(size: number): Generator<WindowRequest, WindowFacts | null, WindowBytes> {
+  const headLength = Math.min(size, SESSION_FACTS_WINDOW_BYTES)
+  const { buffer: head } = yield { position: 0, length: headLength }
+  const whole = size <= SESSION_FACTS_WINDOW_BYTES
+  const headEntries = parseSessionLines(head.toString("utf8"), false, !whole)
+  const first = headEntries[0]
+  if (
+    first === undefined ||
+    first.type !== "session" ||
+    typeof first.id !== "string" ||
+    typeof first.cwd !== "string" ||
+    typeof first.timestamp !== "string"
+  )
+    return null
+  let tailEntries: JsonRecord[] = []
+  if (!whole) {
+    const tailStart = Math.max(headLength, size - SESSION_FACTS_WINDOW_BYTES)
+    // One byte before the window says whether it starts on a whole line: only a line the window
+    // cut (the byte before is not a newline) is dropped.
+    const { buffer: tail } = yield { position: tailStart - 1, length: size - tailStart + 1 }
+    tailEntries = parseSessionLines(tail.subarray(1).toString("utf8"), tail[0] !== 0x0a, false)
+  }
+  const summary = summarizeSessionEntries([...headEntries, ...tailEntries])
+  return {
+    durable_id: first.id,
+    cwd: first.cwd,
+    created_at: first.timestamp,
+    name: summary.name,
+    first_user_text: summary.first_user_text,
+    finalLine: yield* finalCompleteLine(size),
+  }
+}
+
+type FileSnapshot = { readonly size: number; readonly mtimeMs: number }
+
+/** `updated_at` only when the file did not change while it was read: an older timestamp is never reported as newest. */
+function withActivity({ finalLine, ...facts }: WindowFacts, before: FileSnapshot, after: FileSnapshot): SessionFacts {
+  const unchanged = after.size === before.size && after.mtimeMs === before.mtimeMs
+  return { ...facts, updated_at: unchanged ? finalEntryTimestamp(finalLine) : null }
 }
 
 /**
@@ -142,46 +197,41 @@ export function readSessionFacts(path: string, read: SessionRead = readSync): Se
   }
   try {
     const before = fstatSync(fd)
-    const size = before.size
-    const headLength = Math.min(size, SESSION_FACTS_WINDOW_BYTES)
-    const head = Buffer.alloc(headLength)
-    read(fd, head, 0, headLength, 0)
-    const whole = size <= SESSION_FACTS_WINDOW_BYTES
-    const headEntries = parseSessionLines(head.toString("utf8"), false, !whole)
-    const first = headEntries[0]
-    if (
-      first === undefined ||
-      first.type !== "session" ||
-      typeof first.id !== "string" ||
-      typeof first.cwd !== "string" ||
-      typeof first.timestamp !== "string"
-    )
-      return null
-    let tailEntries: JsonRecord[] = []
-    if (!whole) {
-      const tailStart = Math.max(headLength, size - SESSION_FACTS_WINDOW_BYTES)
-      // One byte before the window says whether it starts on a whole line: only a line the window
-      // cut (the byte before is not a newline) is dropped.
-      const tail = Buffer.alloc(size - tailStart + 1)
-      read(fd, tail, 0, tail.length, tailStart - 1)
-      tailEntries = parseSessionLines(tail.subarray(1).toString("utf8"), tail[0] !== 0x0a, false)
+    const steps = sessionFactsSteps(before.size)
+    let step = steps.next()
+    while (!step.done) {
+      const buffer = Buffer.alloc(step.value.length)
+      step = steps.next({ buffer, bytesRead: read(fd, buffer, 0, buffer.length, step.value.position) })
     }
-    const summary = summarizeSessionEntries([...headEntries, ...tailEntries])
-    const finalLine = finalCompleteLine(fd, size, read)
-    const after = fstatSync(fd)
-    const updatedAt =
-      after.size === before.size && after.mtimeMs === before.mtimeMs ? finalEntryTimestamp(finalLine) : null
-    return {
-      durable_id: first.id,
-      cwd: first.cwd,
-      created_at: first.timestamp,
-      updated_at: updatedAt,
-      name: summary.name,
-      first_user_text: summary.first_user_text,
-    }
+    return step.value === null ? null : withActivity(step.value, before, fstatSync(fd))
   } catch {
     return null
   } finally {
     closeSync(fd)
+  }
+}
+
+/** `readSessionFacts` without blocking the event loop: the same bounded reads through a file handle. */
+export async function readSessionFactsAsync(path: string): Promise<SessionFacts | null> {
+  let handle: FileHandle
+  try {
+    handle = await open(path, "r")
+  } catch {
+    return null
+  }
+  try {
+    const before = await handle.stat()
+    const steps = sessionFactsSteps(before.size)
+    let step = steps.next()
+    while (!step.done) {
+      const buffer = Buffer.alloc(step.value.length)
+      const { bytesRead } = await handle.read(buffer, 0, buffer.length, step.value.position)
+      step = steps.next({ buffer, bytesRead })
+    }
+    return step.value === null ? null : withActivity(step.value, before, await handle.stat())
+  } catch {
+    return null
+  } finally {
+    await handle.close()
   }
 }
