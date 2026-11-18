@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { escapeForDisplay } from "@oh-my-opencode/utils"
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { rowThreadId } from "./ports"
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import { hashArgs } from "../gateway/bindings"

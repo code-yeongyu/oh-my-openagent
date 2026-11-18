@@ -1,4 +1,4 @@
-import { escapeForDisplay } from "@oh-my-opencode/utils"
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import type { RpcRemoteSource, SenpiExtensionAPI } from "../../../extension/types"
 import type * as CrossDevice from "./cross-device"
 import type * as MonitorSource from "./monitor-source"

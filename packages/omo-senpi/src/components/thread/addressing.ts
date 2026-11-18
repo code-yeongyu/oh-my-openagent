@@ -30,7 +30,7 @@
  * `all_scope: true` widens visibility to every entry the daemon knows.
  */
 
-import { escapeForDisplay } from "@oh-my-opencode/utils"
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { execFileSync } from "node:child_process"
 import type { RemoteSessionRow } from "./remote/ports"
 import { realpathSync } from "node:fs"
