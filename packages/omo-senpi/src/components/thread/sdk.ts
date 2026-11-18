@@ -46,7 +46,7 @@ import {
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "./tools/ports"
 import { listThreads, readThread } from "./tools/read-ops"
 import { listAcross } from "./remote/cross-device"
-import { TOOL_CALL_BUDGET_MS, withCallDeadline } from "../remote/call-deadline"
+import { TOOL_CALL_BUDGET_MS, withCallDeadline } from "../remote/index"
 import type { RemoteThreadSurface } from "./remote/ports"
 import { stampThisDevice } from "./remote/this-device"
 

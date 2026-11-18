@@ -1,4 +1,4 @@
-import { waitWithinCallBudget } from "../../remote/call-deadline"
+import { waitWithinCallBudget } from "../../remote/index"
 import type { ThreadTranscriptEntry } from "../reader"
 import { relayAddressEntry } from "../remote/address-book"
 import { rowThreadId } from "../remote/ports"

@@ -8,15 +8,19 @@ describe("remote module barrel", () => {
   test("#given the barrel #when its runtime exports are listed #then they are exactly the public values", () => {
     expect(Object.keys(remote).sort()).toEqual([
       "REMOTE_CODES",
+      "TOOL_CALL_BUDGET_MS",
       "canonicalizeThreadHandle",
       "describeThread",
       "exitCodeOf",
       "handleOf",
+      "outsideCallDeadline",
       "remoteClientForCli",
       "remoteClientForConnector",
       "remoteClientForPerson",
       "remoteClientForService",
       "remoteClientForSession",
+      "waitWithinCallBudget",
+      "withCallDeadline",
     ])
   })
 })

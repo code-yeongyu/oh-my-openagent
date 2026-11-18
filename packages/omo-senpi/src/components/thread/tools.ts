@@ -1,4 +1,4 @@
-import { TOOL_CALL_BUDGET_MS, withCallDeadline } from "../remote/call-deadline"
+import { TOOL_CALL_BUDGET_MS, withCallDeadline } from "../remote/index"
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import { threadToolFailure } from "./errors"
 import type { ThreadErrorCode, ThreadToolFailure } from "./errors"

@@ -3,6 +3,8 @@
 export type { RemoteClient } from "./client"
 export type { LocalSessions } from "./local-sessions"
 export { exitCodeOf, REMOTE_CODES, type RemoteCode } from "./codes"
+// omo#14130: one thread tool call's budget for every cross-device wait it makes (call-deadline.ts).
+export { outsideCallDeadline, TOOL_CALL_BUDGET_MS, waitWithinCallBudget, withCallDeadline } from "./call-deadline"
 export {
   remoteClientForCli,
   remoteClientForConnector,
