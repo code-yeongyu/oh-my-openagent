@@ -398,7 +398,7 @@ describe("a thread its engine closed (t2pp, measured on omo 5.1.69: it vanished 
       getAvailableThinkingLevels: unused,
       closeSession: async () => {
         sessions.splice(0)
-        return "closed"
+        return { outcome: "closed", dropped_deliveries: [] }
       },
     }
     const tools = createThreadTools({

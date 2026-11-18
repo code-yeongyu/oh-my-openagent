@@ -436,7 +436,11 @@ export type RemoteClient = {
     readonly setModel: (thread: ThreadHandle, model: string, opts?: Opts) => R<{ readonly model: string }>
     /** The session's own thinking level; never a device default. */
     readonly setReasoning: (thread: ThreadHandle, level: string, opts?: Opts) => R<{ readonly reasoning: string }>
-    readonly close: (thread: ThreadHandle, opts?: Opts) => R<{ readonly closed: boolean }>
+    /** `dropped_deliveries`: messages the session had not read that the close handed back to their senders (omo#14234). */
+    readonly close: (
+      thread: ThreadHandle,
+      opts?: Opts & { readonly force?: boolean },
+    ) => R<{ readonly closed: boolean; readonly dropped_deliveries: readonly string[] }>
     readonly archive: (thread: ThreadHandle, archived: boolean, opts?: Opts) => R<{ readonly archived: boolean }>
   }
   /** One session's live attach: its snapshot, records, pending UI requests and their answers. */
