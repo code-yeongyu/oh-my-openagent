@@ -13,6 +13,7 @@
 
 import { createHash, randomBytes } from "node:crypto"
 
+import { missesSyncContract } from "../../contract-version.ts"
 import type { KeyringEntry, SyncAuthor, SyncEntry } from "../../crypto/entry.ts"
 import { verifyRecordSig } from "../../crypto/signatures.ts"
 import { jcsBytes, sha256B64 } from "../../crypto/vendor/sync-format/jcs.ts"
@@ -151,6 +152,9 @@ export function startChainWireServer(
         capabilities: req.headers.get("omo-sync-capabilities"),
         version: req.headers.get("omo-contract-version"),
       })
+      // The service's client floor for a phrase account (#13691), on every request: a client that drops the
+      // contract headers fails every test that drives it through this server.
+      if (missesSyncContract(path, req.headers)) return refusal(426, "client_update_required")
       const token = (req.headers.get("authorization") ?? "").replace(/^Bearer /, "")
       const device = devices.get(token) ?? ""
       if (freeze.isRevokedDevice(device)) return freeze.revokedRefusal()

@@ -1,5 +1,5 @@
 import { PHRASE_RECOVERY_RP_ID } from "../crypto/parse.ts"
-import { rootChangedSinceRetired } from "../crypto/trust-pin.ts"
+import { rootChangeNotice } from "../crypto/trust-pin.ts"
 import { admitSyncOperation, checkSyncOperation, syncOperationSignal } from "../operation-authority.ts"
 import { type GenesisBridge, GenesisEnableError } from "../genesis/bridge.ts"
 import { buildGenesis } from "../genesis/build.ts"
@@ -49,9 +49,11 @@ export const commitIntent = async (captured: Captured, intent: GenesisIntent): P
       ? { kind: "join_required", phraseVoid: { purpose: "genesis" } }
       : { kind: "join_required" }
   if (isPhraseIntent(intent)) await deletePhraseGenesisMarker(placeOf(captured))
-  return (await rootChangedSinceRetired(captured.pinDir, captured.account, intent.genesisDigest))
-    ? { kind: "joined", created: true, rootChanged: true }
-    : { kind: "joined", created: true }
+  return {
+    kind: "joined",
+    created: true,
+    ...(await rootChangeNotice(captured.pinDir, captured.account, intent.genesisDigest)),
+  }
 }
 
 /**
