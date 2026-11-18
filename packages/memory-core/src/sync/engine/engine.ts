@@ -14,7 +14,7 @@ import { type CaptureHolds, capture } from "./local-capture"
 import { pushCycle } from "./push-cycle"
 import type { FreezeReason, RefusalCode } from "./ports"
 import { receive } from "./receive"
-import { StatusTracker } from "./status-tracker"
+import { failureKey, StatusTracker } from "./status-tracker"
 
 export { CrashInjected, type EngineFault, INBOUND_POINTS, OUTBOUND_POINTS } from "./engine-deps"
 export type { SyncFailure, SyncFailureKind } from "./failure"
@@ -310,8 +310,6 @@ export class SyncEngine {
     return { applied, refused, rejectedItems, pushed, snapshot, held: heldKeys }
   }
 }
-
-const failureKey = (failure: SyncFailure): string => `${failure.kind}\n${failure.action}`
 
 /** Keys whose render this cycle owes instead of landing: held edits, and files of keys the device is joining. */
 const notRenderedNow = (holds: CaptureHolds): Set<string> => new Set([...holds.held.keys(), ...holds.joining])
