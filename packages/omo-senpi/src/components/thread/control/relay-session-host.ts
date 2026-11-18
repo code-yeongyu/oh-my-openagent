@@ -9,6 +9,7 @@ import { prepareRemoteWorktree, removeRemoteWorktree } from "../worktree/remote-
 import { openedEngineId, openRefusal } from "./open-reply"
 import { threadLink } from "../thread-link"
 import type { ThreadHostSession } from "../tools/ports"
+import { rowState, threadModel } from "../tools/thread-state"
 import {
   openedThread,
   type HostedThread,
@@ -32,10 +33,13 @@ export function listedThread(row: RemoteSessionRow): HostedThread {
     thread_id: rowThreadId(row),
     name: rowLabel(row),
     status: rowStatus(row),
+    state: rowState(row),
+    ...threadModel(row.model),
     cwd: row.project,
     created_at: seen,
     updated_at: seen,
     device: row.device,
+    ...(row.source === "cache" && row.as_of !== undefined ? { as_of: new Date(row.as_of).toISOString() } : {}),
     link: threadLink(rowThreadId(row), rowLabel(row)),
   }
 }

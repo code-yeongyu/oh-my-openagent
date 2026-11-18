@@ -419,8 +419,8 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
   return built
 }
 
-// The listing carries one display name per session (its title); archive state has no layer yet (E-archive), so every
-// row is unarchived. The handle is the `<device>/<session>` form seam 1 parses.
+// The listing carries one display name per session (its title), and from rows 4 its model and archived flag (a service
+// before rows 4 lists neither: unarchived, model unknown). The handle is the `<device>/<session>` form seam 1 parses.
 const sessionRow = (row: ListingRow, device: DeviceRow): SessionRow => ({
   thread: handleOf(row.device, row.session_id),
   ...durableIdOf(row),
@@ -430,7 +430,8 @@ const sessionRow = (row: ListingRow, device: DeviceRow): SessionRow => ({
   project: row.project,
   path: row.path,
   state: row.state,
-  archived: false,
+  archived: row.archived === true,
+  ...(row.model === undefined ? {} : { model: `${row.model.provider}/${row.model.id}` }),
   updated_ms: row.updated_ms,
   source: row.source,
 })

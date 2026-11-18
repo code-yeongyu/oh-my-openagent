@@ -21,7 +21,7 @@ import {
   workspaceEntries,
   type ThreadAddressEntry,
 } from "../addressing"
-import type { ThreadToolName, ThreadToolResult, ThreadTranscriptItem } from "../contracts"
+import type { ThreadModel, ThreadState, ThreadToolName, ThreadToolResult, ThreadTranscriptItem } from "../contracts"
 import { threadToolFailure, type ThreadErrorCode } from "../errors"
 import { THREAD_TOOL_EXPOSURE, THREAD_TOOL_METADATA } from "../metadata"
 import { readSessionFacts, threadTitle } from "../session-facts"
@@ -35,6 +35,7 @@ import {
   type ThreadToolSurfaceOptions,
 } from "./ports"
 import { sendView } from "./send-view"
+import { threadModel, threadState } from "./thread-state"
 
 // biome-ignore lint/suspicious/noExplicitAny: the tool definitions are heterogeneous by design.
 export type AnyTool = ToolDefinition<any, any>
@@ -59,16 +60,18 @@ export function output(result: ThreadToolResult): ToolOutput {
 
 export type ThreadToolSummary = Omit<
   ThreadHostSession,
-  "name" | "status" | "createdAt" | "updatedAt" | "created_at" | "updated_at"
+  "name" | "status" | "createdAt" | "updatedAt" | "created_at" | "updated_at" | "archived" | "activity" | "model"
 > & {
   readonly thread_id: string
   readonly name: string
+  /** Deprecated beside `state`: `resumable` when no engine holds the thread, else `live`. */
   readonly status: "live" | "resumable"
+  readonly state: ThreadState
+  readonly model?: ThreadModel
   readonly created_at: string
   readonly updated_at: string | null
   readonly endpoint?: AddressEndpoint | null
   readonly surface?: ThreadSurface | null
-  readonly alive?: boolean
   /** `[title](omo-thread://v1/<thread_id>)` (`thread-link.ts`): paste it when telling the user about this thread. */
   readonly link: string
 }
@@ -99,17 +102,23 @@ export function summary(session: ThreadHostSession, entry?: AddressEntry): Threa
     updatedAt: _updatedAt,
     created_at: _created,
     updated_at: _updated,
+    archived,
+    activity,
+    model,
     ...rest
   } = session
   const created = entry?.created_at ?? session.created_at ?? session.createdAt ?? new Date().toISOString()
+  const held = session.status !== "closed" && entry?.alive !== false
   return {
     ...rest,
     thread_id: id,
     name: entry?.title ?? threadTitle(session.name, null) ?? "",
-    status: session.status === "closed" ? "resumable" : "live",
+    status: held ? "live" : "resumable",
+    state: threadState({ archived, held, activity }),
+    ...threadModel(model),
     created_at: created,
     updated_at: entry === undefined ? (session.updated_at ?? session.updatedAt ?? created) : entry.updated_at,
-    ...(entry === undefined ? {} : { endpoint: entry.endpoint, surface: entry.surface, alive: entry.alive }),
+    ...(entry === undefined ? {} : { endpoint: entry.endpoint, surface: entry.surface }),
     link: threadLink(id, entry?.title ?? threadTitle(session.name, null)),
   }
 }
@@ -210,11 +219,11 @@ export function degradedSummary(entry: AddressEntry): ThreadToolSummary & { read
     thread_id: entry.thread_id,
     name: entry.title ?? "",
     status: "resumable",
+    state: threadState({ archived: entry.archived, held: false }),
     created_at: entry.created_at,
     updated_at: entry.updated_at,
     endpoint: entry.endpoint,
     surface: entry.surface,
-    alive: entry.alive,
     link: threadLink(entry.thread_id, entry.title),
     ...(entry.error_note === undefined ? {} : { error_note: entry.error_note }),
   }

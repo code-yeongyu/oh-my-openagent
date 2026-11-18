@@ -1,4 +1,6 @@
-import { routingId, sessionPort } from "../tools/internals"
+import { threadLink } from "../thread-link"
+import { routingId, sessionPort, summary } from "../tools/internals"
+import { threadRow } from "../tools/thread-row"
 import type { ThreadHostSession, ThreadToolSurfaceOptions } from "../tools/ports"
 import type { ThreadSummary } from "../contracts"
 import { interruptOver } from "./interrupt"
@@ -6,6 +8,8 @@ import { refuse, SESSION_ONLY_THINKING_SCOPE, type SessionControl } from "./port
 import { waitForTurnEnd } from "./wait-settled"
 
 const THINKING_LEVEL_UNSUPPORTED = "thinking_level_unsupported:"
+
+const ARCHIVE_UNSUPPORTED = "unsupported:set_session_archived"
 
 /** A thread this device's endpoint holds, controlled through the endpoint that listed it (`sessionPort`). */
 export function createLocalControl(
@@ -82,5 +86,24 @@ export function createLocalControl(
         signal,
       )
     },
+    running: async () => session.activity === "running" || (await port.getState(routing)).isStreaming === true,
+    setArchived: async (archived) => {
+      const unsupported = () =>
+        refuse(
+          "unsupported",
+          `The engine holding thread ${threadId} does not know set_session_archived: it runs a senpi from before archived threads.`,
+          "Update omo on this device and restart the session's host or terminal, then retry.",
+          { command: "set_session_archived" },
+        )
+      if (port.setSessionArchived === undefined) throw unsupported()
+      try {
+        await port.setSessionArchived(routing, archived, threadId)
+      } catch (error) {
+        if (error instanceof Error && error.message === ARCHIVE_UNSUPPORTED) throw unsupported()
+        throw error
+      }
+    },
+    listed: async (archived) =>
+      threadRow({ ...summary({ ...session, archived }), name: title, link: threadLink(threadId, title) }),
   }
 }

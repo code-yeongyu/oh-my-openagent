@@ -11,6 +11,8 @@ import { closeLadder, SESSION_GONE, type RecordAnswer } from "./close-ladder"
 import { interruptOver } from "./interrupt"
 import { ControlRefusal, refuse, SESSION_ONLY_THINKING_SCOPE, type SessionControl } from "./port"
 import { waitForTurnEnd } from "./wait-settled"
+import { listedThread } from "./relay-session-host"
+import { threadRow } from "../tools/thread-row"
 
 const isObject = (value: unknown): value is JsonObject =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -136,5 +138,13 @@ export function createRelayControl(
         timeoutMs,
         signal,
       ),
+    running: async () => row.state === "running" || (await command({ type: "get_state" }))["isStreaming"] === true,
+    setArchived: async (archived) => {
+      await command({ type: "set_session_archived", archived })
+    },
+    listed: async (archived) => {
+      const { archived: _was, ...rest } = row
+      return threadRow(listedThread(archived ? { ...rest, archived: true } : rest))
+    },
   }
 }

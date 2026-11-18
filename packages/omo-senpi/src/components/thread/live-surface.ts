@@ -54,7 +54,20 @@ function dataRecord(frame: RpcFrame, command: unknown): Record<string, unknown> 
     throw new Error(`thinking_level_unsupported:${frame.error}`)
   }
   if (frame.success === false && frame.error === "unsupported") throw new Error(`unsupported:${String(command)}`)
-  if (frame.success && frame.data === undefined && (command === "set_session_name" || command === "set_thinking_level"))
+  // An engine from before senpi's archived flag answers set_session_archived as a command it does not know.
+  if (
+    frame.success === false &&
+    command === "set_session_archived" &&
+    (frame.errorCode === "unknown_command" ||
+      frame.error === "unknown_command" ||
+      (typeof frame.error === "string" && frame.error.startsWith("Unknown command:")))
+  )
+    throw new Error(`unsupported:${command}`)
+  if (
+    frame.success &&
+    frame.data === undefined &&
+    (command === "set_session_name" || command === "set_thinking_level" || command === "set_session_archived")
+  )
     return {}
   if (!frame.success || !record(frame.data))
     throw new Error(`thread RPC request failed: ${JSON.stringify(frame.error ?? frame)}`)
@@ -721,6 +734,9 @@ export function createLiveThreadSurface(
     interrupt: (sessionId, request, durableId) => send("interrupt", { sessionId, ...request }, durableId),
     setSessionName: async (sessionId, name, durableId) => {
       await send("set_session_name", { sessionId, name }, durableId)
+    },
+    setSessionArchived: async (sessionId, archived, durableId) => {
+      await send("set_session_archived", { sessionId, archived }, durableId)
     },
     // `scope: "session"` switches only this session; without it the engine persists the device's default model.
     setModel: (sessionId, provider, modelId, durableId) =>

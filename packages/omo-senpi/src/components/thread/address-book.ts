@@ -86,6 +86,8 @@ export type DiskSession = {
   readonly source_host: string | null
   /** Text of the first user message, when the session has one; the title of an unnamed thread. */
   readonly first_user_text?: string
+  /** The session file's archived flag, read like its name (`readSessionFacts`). */
+  readonly archived?: true
 }
 
 /**
@@ -109,10 +111,15 @@ export type AddressEntry = {
   /** The endpoint that serves (or last served) the thread; `null` for a session no endpoint names. */
   readonly endpoint: AddressEndpoint | null
   readonly surface: ThreadSurface | null
-  /** The endpoint's liveness verdict: `true` only while an endpoint that answered lists the session. */
+  /**
+   * The endpoint's liveness verdict: `true` only while an endpoint that answered lists the session. Internal to routing
+   * (the gateway's `liveness`, `omo daemon adopt`); a listed thread reports `state` instead.
+   */
   readonly alive: boolean
   /** What a listing shows: the name, else the first user message's opening, never the durable id. */
   readonly title: string | null
+  /** Only on an entry read from its session file: that file's archived flag. */
+  readonly archived?: true
 }
 
 export type AssembleAddressBookOptions = {
@@ -191,6 +198,7 @@ function fromDisk(session: DiskSession, host: AddressBookHost | undefined, failu
     surface: endpoint === null ? null : deriveSurface(endpoint.kind, undefined, endpoint.socket),
     alive: false,
     title: threadTitle(session.name, session.first_user_text),
+    ...(session.archived === true ? { archived: true as const } : {}),
   }
 }
 
@@ -342,7 +350,7 @@ export type FindDiskSessionsOptions = {
 }
 
 /** senpi's session directory name for a cwd (`getDefaultSessionDirPath`), without the closing `--`: every cwd under `root` starts with it. */
-function sessionDirectoryPrefix(root: string): string {
+export function sessionDirectoryPrefix(root: string): string {
   return `--${resolve(root)
     .replace(/^[/\\]/, "")
     .replace(/[/\\:]/g, "-")}-`
@@ -360,6 +368,7 @@ function diskSessionFromFacts(path: string): DiskSession | null {
     session_path: path,
     source_host: null,
     ...(facts.first_user_text === null ? {} : { first_user_text: facts.first_user_text }),
+    ...(facts.archived === true ? { archived: true as const } : {}),
   }
 }
 

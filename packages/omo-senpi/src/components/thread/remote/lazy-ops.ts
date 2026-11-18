@@ -75,6 +75,9 @@ export const createRelayControl = (remote: RemoteThreadSurface, row: RemoteSessi
     getMessages: async () => await (await built).getMessages(),
     readEntryPage: async (read) => await (await built).readEntryPage(read),
     waitSettled: async (timeoutMs, signal) => await (await built).waitSettled(timeoutMs, signal),
+    running: async () => await (await built).running(),
+    setArchived: async (archived) => await (await built).setArchived(archived),
+    listed: async (archived) => await (await built).listed(archived),
   }
 }
 

@@ -4,7 +4,7 @@ import type { ThreadTranscriptEntry } from "../reader"
 import type { InterruptOutcome } from "./interrupt"
 import type { ModelChoice } from "../tools/model-match"
 import type { ThreadCloseOutcome } from "../tools/ports"
-import type { ThreadSummary, ThreadWaitOutcome } from "../contracts"
+import type { ThreadResultSummary, ThreadSummary, ThreadWaitOutcome } from "../contracts"
 
 /**
  * One live thread's controls, wherever it is held: the session on this device's endpoint, or the session on another
@@ -53,6 +53,15 @@ export type SessionControl = {
    * `wait-settled.ts` over the remote watch on another device, over the endpoint's session subscription on this one.
    */
   readonly waitSettled: (timeoutMs: number, signal?: AbortSignal) => Promise<ThreadWaitOutcome>
+  /** Whether a turn is in flight: the listing's activity, else the engine's own `get_state`. */
+  readonly running: () => Promise<boolean>
+  /**
+   * senpi `set_session_archived`: the archived flag in the session file, nothing else (the desktop's `thread_organize`
+   * archive also unloads the session). Refuses `unsupported` when the engine does not know the command.
+   */
+  readonly setArchived: (archived: boolean) => Promise<void>
+  /** The thread as `thread_list` lists it, with the archived flag set to `archived`. */
+  readonly listed: (archived: boolean) => Promise<ThreadResultSummary>
 }
 
 /**
