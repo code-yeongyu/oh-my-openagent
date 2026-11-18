@@ -68,14 +68,24 @@ describe("thread_create survives a lost open reply (#14060)", () => {
     expect(await store.toolReceiptBegin({ ...scope, now: Date.now(), args_hash: hashArgs(args) })).toEqual({
       kind: "accepted",
     })
-    await store.toolReceiptSettle({ ...scope, now: Date.now(), error_note: "the call failed after b opened the session" })
+    await store.toolReceiptSettle({
+      ...scope,
+      now: Date.now(),
+      error_note: "the call failed after b opened the session",
+    })
     expect(await run("thread_create", args)).toMatchObject({ kind: "error", error: { code: "idempotency_uncertain" } })
     expect(a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")).toEqual([])
   })
 
   test("#given the earlier run named the thread it made before failing #when the named create is retried under the same key #then it answers that thread, not name_conflict", async () => {
     const sessions: ThreadHostSession[] = [
-      { sessionId: "route-local", durableSessionId: "dur-local", cwd: process.cwd(), name: "local peer", status: "open" },
+      {
+        sessionId: "route-local",
+        durableSessionId: "dur-local",
+        cwd: process.cwd(),
+        name: "local peer",
+        status: "open",
+      },
     ]
     const { run, openSession, enqueuedFor } = surface(undefined, {
       sessions,

@@ -5,12 +5,14 @@ import {
   asKeystoreError,
   createDarwinBackend,
   type DarwinBackend,
+  dedicatedHelperMissing,
   guardHelperlessRead,
   helperAccess,
   type KeychainHelperOptions,
 } from "./darwin-backend"
 import type { LockedDarwinStore, WriteIntent } from "./darwin-store"
 import { createCreatorHandOff, desktopRuntimeCandidates, HANDOFF_ENV } from "./creator-handoff"
+import { dedicatedStoreState } from "./dedicated-store"
 import { keychainProcessState } from "./process-state"
 import { gatedSecrets } from "./secrets-gate"
 
@@ -80,37 +82,49 @@ export function bindKeychainHelper(input: {
         set: (entry) => gatedSecrets(() => real.set(entry)),
         delete: (entry) => gatedSecrets(() => real.delete(entry)),
       }
-  const cacheKey = `${key.service}\n${key.name}\n${input.background ? "bounded" : "interactive"}`
-  let own: Promise<DarwinBackend | null> | undefined
+  // A store given helper options (a test) never reads the real marker unless it hands one in.
+  const dedicatedActive =
+    options?.dedicatedStore ?? (options === undefined ? () => dedicatedStoreState() === "active" : () => false)
+  const owned = new Map<boolean, Promise<DarwinBackend | null>>()
+  // The store is chosen on every call, before the helper-less branch (#13116 r2 finding 1), so a long-lived process
+  // follows an enable or disable made by another process.
   const backend = (): Promise<DarwinBackend | null> => {
     if (!eligible) return Promise.resolve(null)
-    const known = options === undefined ? backends.get(cacheKey) : own
+    const dedicated = dedicatedActive()
+    const cacheKey = `${key.service}\n${key.name}\n${input.background ? "bounded" : "interactive"}\n${dedicated ? "omo" : "login"}`
+    const known = options === undefined ? backends.get(cacheKey) : owned.get(dedicated)
     if (known !== undefined) return known
-    const created = (options?.access ?? helperAccess)().then((access) =>
-      access.kind !== "ready"
-        ? null
-        : createDarwinBackend({
-            access,
-            secrets: real,
-            service: key.service,
-            account: key.name,
-            background: input.background,
-            noDialog: options?.noDialog ?? process.env[HANDOFF_ENV] === "1",
-            notice: input.notice,
-            ...(options?.home === undefined ? {} : { home: options.home }),
-            ...(options?.row8b === undefined ? {} : { row8b: options.row8b }),
-            ...(options?.silently === undefined ? {} : { silently: options.silently }),
-            ...(options?.cache === undefined ? {} : { cache: options.cache }),
-            handOff: options === undefined ? processHandOff(input.origin) : (options.handOff ?? (async () => false)),
-          }),
-    )
+    const created = (options?.access ?? helperAccess)().then((access) => {
+      if (access.kind !== "ready") {
+        if (dedicated) throw dedicatedHelperMissing()
+        return null
+      }
+      return createDarwinBackend({
+        dedicated,
+        access,
+        secrets: real,
+        service: key.service,
+        account: key.name,
+        background: input.background,
+        noDialog: options?.noDialog ?? process.env[HANDOFF_ENV] === "1",
+        notice: input.notice,
+        ...(options?.home === undefined ? {} : { home: options.home }),
+        ...(options?.row8b === undefined ? {} : { row8b: options.row8b }),
+        ...(options?.silently === undefined ? {} : { silently: options.silently }),
+        ...(options?.cache === undefined ? {} : { cache: options.cache }),
+        handOff: options === undefined ? processHandOff(input.origin) : (options.handOff ?? (async () => false)),
+      })
+    })
     if (options === undefined) {
       backends.set(cacheKey, created)
       // No helper right now (none found, or a transient failure): the next call resolves again instead of keeping it.
+      const drop = () => {
+        if (backends.get(cacheKey) === created) backends.delete(cacheKey)
+      }
       void created.then((found) => {
-        if (found === null && backends.get(cacheKey) === created) backends.delete(cacheKey)
-      })
-    } else own = created
+        if (found === null) drop()
+      }, drop)
+    } else owned.set(dedicated, created)
     return created
   }
   const reader = (helper: DarwinBackend): SecretApi => {

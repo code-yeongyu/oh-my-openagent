@@ -77,6 +77,10 @@ const HELPER_FINISHING_MS = 60_000
 
 const helperArgv0 = /(^|-)omo-keychain(-test)?$/
 
+// Windows has no signals: `taskkill /F` is the one way to end a console process there.
+const endCommand = (pid: number, force: boolean): string =>
+  process.platform === "win32" ? `taskkill /PID ${pid} /F` : force ? `kill -9 ${pid}` : `kill ${pid}`
+
 function duration(ms: number): string {
   const units = [
     [86_400_000, "day"],
@@ -114,9 +118,9 @@ async function credentialLockBusy(error: LockWaitTimeoutError): Promise<SignInEr
     return new SignInError(
       age < HELPER_FINISHING_MS
         ? `An OmO keychain helper (pid ${pid}) ${held} and is finishing a keychain change. Try again in a minute.`
-        : `An OmO keychain helper (pid ${pid}) left behind by an earlier omo command ${held}. End it with \`kill -9 ${pid}\`, then run the command again.`,
+        : `An OmO keychain helper (pid ${pid}) left behind by an earlier omo command ${held}. End it with \`${endCommand(pid, true)}\`, then run the command again.`,
     )
   return new SignInError(
-    `Another process (pid ${pid}, ${name}) ${held}. Wait for it to finish, or end it with \`kill ${pid}\`, then run the command again.`,
+    `Another process (pid ${pid}, ${name}) ${held}. Wait for it to finish, or end it with \`${endCommand(pid, false)}\`, then run the command again.`,
   )
 }

@@ -1817,6 +1817,8 @@
         "scripts/qa/thread-tools/repeated-wake.mjs",
         // a QA scenario that run-all.mjs runs by name (#13396), like its siblings
         "scripts/qa/thread-tools/report-origin-auto-steer.mjs",
+        // a QA scenario that run-all.mjs runs by name (#14058), like its siblings
+        "scripts/qa/thread-tools/create-prompt-authority.mjs",
         // a QA scenario that run-all.mjs runs by name (#14063), like its siblings
         "scripts/qa/thread-tools/reopen-exited.mjs",
         // a QA scenario that run-all.mjs runs by name (#14066), like its siblings
