@@ -1727,6 +1727,7 @@
     "packages/omo-senpi/src/components/thread/tools/extension-tools.ts",
     "packages/omo-senpi/src/components/thread/tools/gateway-services.ts",
     "packages/omo-senpi/src/components/thread/tools/internals.ts",
+    "packages/omo-senpi/src/components/thread/tools/local-permission.ts",
     "packages/omo-senpi/src/components/thread/tools/model-match.ts",
     "packages/omo-senpi/src/components/thread/tools/ports.ts",
     "packages/omo-senpi/src/components/thread/tools/read-ops.ts",
