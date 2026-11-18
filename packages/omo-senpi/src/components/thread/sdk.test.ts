@@ -6,10 +6,12 @@ import { join } from "node:path"
 import type { GatewayEndpointRef, ReleaseSessionRequest } from "./gateway/adapter"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import type { RemoteThreadSurface } from "./remote/ports"
+import { createThreadSdk as createBundledThreadSdk } from "../../extension/thread-sdk"
 import { createThreadSdk, type ThreadSdk } from "./sdk"
-import { createRemoteThreadFixture } from "./thread-remote-fixture"
+import { createRemoteThreadFixture, fakeRemoteClient } from "./thread-remote-fixture"
 import type { ThreadHost, ThreadHostSession } from "./tools"
 import type { ThreadHostViewRequest } from "./tools/ports"
+import { startFakeEngineHost } from "./wake/testing/fake-engine-host"
 import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
 
 const TUI_SOCKET = "/tmp/t-0123456789abcdef.sock"
@@ -145,13 +147,13 @@ function countingRemote(remote: RemoteThreadSurface): {
   readonly calls: string[]
 } {
   const calls: string[] = []
-  const counted = <T extends object>(port: T): T =>
+  const counted = <T extends object>(port: T, prefix = ""): T =>
     new Proxy(port, {
       get: (target, key, receiver) => {
         const value: unknown = Reflect.get(target, key, receiver)
         if (typeof value !== "function") return value
         return (...args: unknown[]) => {
-          calls.push(String(key))
+          calls.push(`${prefix}${String(key)}`)
           return Reflect.apply(value, target, args)
         }
       },
@@ -160,27 +162,53 @@ function countingRemote(remote: RemoteThreadSurface): {
     remote: {
       ...remote,
       sessions: counted(remote.sessions),
+      client: {
+        ...remote.client,
+        service: counted(remote.client.service, "client.service."),
+        devices: counted(remote.client.devices, "client.devices."),
+        sessions: counted(remote.client.sessions, "client.sessions."),
+      },
       ...(remote.aliases === undefined ? {} : { aliases: counted(remote.aliases) }),
     },
     calls,
   }
 }
 
+describe("thread SDK: options are checked at the boundary", () => {
+  test.each([
+    ["the bundled entry", createBundledThreadSdk],
+    ["the component", createThreadSdk],
+  ] as const)(
+    "#given %s #when created without options or without agentDir #then it throws a TypeError naming the missing fields",
+    (_entry, create) => {
+      const call = create as (options?: unknown) => ThreadSdk
+      expect(() => call()).toThrow(
+        new TypeError(
+          "createThreadSdk needs { agentDir, cwd, uid, user }; missing or invalid: agentDir, cwd, user, uid",
+        ),
+      )
+      expect(() => call({ cwd: process.cwd(), uid: 501, user: "q" })).toThrow(
+        new TypeError("createThreadSdk needs { agentDir, cwd, uid, user }; missing or invalid: agentDir"),
+      )
+    },
+  )
+})
+
 describe("thread SDK: sessions", () => {
-  test("#given a host and a terminal session #when listed and read #then rows carry surface and endpoint and the live transcript comes from the session's endpoint", async () => {
+  test("#given a host and a terminal session #when listed and read #then rows carry surface and the live transcript comes from the session's endpoint", async () => {
     const { sdk } = fixture()
     const listed = await sdk.list({})
     expect(listed).toMatchObject({
       kind: "ok",
       scope: "workspace",
       threads: [
-        { thread_id: "dur-host", surface: "desktop", endpoint: { kind: "rpc_host", socket: HOST_SOCKET } },
-        { thread_id: "dur-tui", surface: "tui", endpoint: { kind: "tui" } },
+        { thread: "dur-host", surface: "desktop" },
+        { thread: "dur-tui", surface: "tui" },
       ],
     })
     expect(await sdk.read({ thread: "host lane" })).toMatchObject({
       kind: "ok",
-      thread_id: "dur-host",
+      thread: "dur-host",
       items: [{ seq: 1, role: "user", content: JSON.stringify("hello from the host") }],
     })
   })
@@ -230,6 +258,15 @@ describe("thread SDK: read reaches the account like the agent tools (#12833)", (
   const remoteFixture = createRemoteThreadFixture()
   afterEach(remoteFixture.cleanup)
 
+  test("#given a thread on b #when omo thread list runs #then b's thread is listed with its device beside this device's, as the agent's thread_list lists it", async () => {
+    const account = remoteFixture.account()
+    const { sdk } = fixture({ remote: account.remote })
+    const listed = await sdk.list({})
+    expect(listed.kind === "ok" && "threads" in listed && listed.threads.find((t) => t.device === "b")).toMatchObject({
+      thread: "dur-on-b",
+    })
+  })
+
   test("#given aliases held by a thread here and by one on b #when omo thread read names each alias #then the first reads this device's transcript and the second b's", async () => {
     const account = remoteFixture.account({
       aliases: new Map([
@@ -238,11 +275,14 @@ describe("thread SDK: read reaches the account like the agent tools (#12833)", (
       ]),
     })
     const { sdk } = fixture({ remote: account.remote })
-    expect(await sdk.read({ thread: "lane-here" })).toMatchObject({ kind: "ok", thread_id: "dur-host" })
-    expect(await sdk.read({ thread: "lane-b" })).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
+    expect(await sdk.read({ thread: "lane-here" })).toMatchObject({ kind: "ok", thread: "dur-host" })
+    expect(await sdk.read({ thread: "lane-b" })).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b" })
     expect(
       account.sent.filter((entry) => entry.via === "session").map((entry) => [entry.device, entry.rpc?.["type"]]),
-    ).toEqual([["b", "get_messages"]])
+    ).toEqual([
+      ["b", "get_entries"],
+      ["b", "get_messages"],
+    ])
   })
 
   test("#given an alias held by a thread on this device and omo thread run from another workspace #when read and send name the alias without all_scope #then both reach that thread; the raw id alone stays scope_denied", async () => {
@@ -250,7 +290,7 @@ describe("thread SDK: read reaches the account like the agent tools (#12833)", (
       aliases: new Map([["lane-here", { session_id: "dur-host", device: "here" }]]),
     })
     const { sdk, store } = fixture({ remote: account.remote, cwd: "/thread-sdk-other-workspace" })
-    expect(await sdk.read({ thread: "lane-here" })).toMatchObject({ kind: "ok", thread_id: "dur-host" })
+    expect(await sdk.read({ thread: "lane-here" })).toMatchObject({ kind: "ok", thread: "dur-host" })
     expect(await sdk.read({ thread: "dur-host" })).toMatchObject({ kind: "error", error: { code: "scope_denied" } })
     expect(await sdk.send({ thread: "lane-here", text: "ping" })).toMatchObject({ kind: "ok", deduplicated: false })
     expect((await store.list({ target_durable_id: "dur-host" })).map((row) => row.sender)).toEqual(["cli:501"])
@@ -275,7 +315,7 @@ describe("thread SDK: read reaches the account like the agent tools (#12833)", (
     ])
   })
 
-  test("#given a published thread id and the account surface set #when omo thread send names that id #then it is delivered with no host listing, no alias call and no listing, and its one device-service call is the thisDevice read that stamps its sender device (#12860, #13004)", async () => {
+  test("#given a published thread id and the account surface set #when omo thread send names that id #then it is delivered with no host listing, no alias call and no listing, and its one device-service call is the device read that stamps its sender device (#12860, #13004)", async () => {
     const account = remoteFixture.account({
       aliases: new Map([["lane-here", { session_id: "dur-host", device: "here" }]]),
     })
@@ -290,22 +330,22 @@ describe("thread SDK: read reaches the account like the agent tools (#12833)", (
     expect((await store.list({ target_durable_id: "dur-host" })).map((row) => row.sender)).toEqual(["cli:501"])
     expect(views).toEqual([])
     // Decision 0027 section 3: every delivery names its sender device, read once and kept for the process.
-    expect(counting.calls).toEqual(["thisDevice"])
+    expect(counting.calls).toEqual(["client.devices.list"])
     expect((await store.list({ target_durable_id: "dur-host" }))[0]?.envelope.provenance?.device).toBe("here")
     expect(await sdk.send({ thread: "dur-host", text: "again" })).toMatchObject({ kind: "ok" })
-    expect(counting.calls).toEqual(["thisDevice"])
+    expect(counting.calls).toEqual(["client.devices.list"])
   })
 
   test("#given the device service cannot answer #when omo thread send names a thread here #then the send still goes and its row names why it carries no sender device (#13004)", async () => {
     const account = remoteFixture.account()
     const down = {
       ...account.remote,
-      sessions: {
-        ...account.remote.sessions,
-        thisDevice: async () => {
-          throw new Error("device service down")
-        },
-      },
+      client: fakeRemoteClient({
+        state: () => "connected",
+        here: "here",
+        devices: () => [],
+        fail: { kind: "error", code: "host_unavailable", message: "device service down", next_action: "Retry." },
+      }),
     }
     const { sdk, store } = fixture({ remote: down })
     await store.registerIncarnation({
@@ -730,17 +770,23 @@ describe("thread SDK: session controls (#13413)", () => {
     const { sdk } = fixture({ controls })
     expect(await sdk.interrupt({ thread: "host lane" })).toEqual({
       kind: "ok",
-      thread_id: "dur-host",
+      thread: "dur-host",
       turn_id: "turn-7",
       interrupted: true,
+      background: { status: "not_supported" },
     })
-    expect(calls).toEqual([["interrupt", "rpc-1", undefined, "dur-host"]])
+    expect(calls).toEqual([["interrupt", "rpc-1", { background: "stop" }, "dur-host"]])
   })
 
   test("#given a host session and a terminal session here #when a script closes each #then the host closes its session and the terminal's refusal comes back as unsupported data with nothing called", async () => {
     const { calls, controls } = controlled()
     const { sdk } = fixture({ controls })
-    expect(await sdk.close({ thread: "host lane" })).toEqual({ kind: "ok", thread_id: "dur-host", closed: true })
+    expect(await sdk.close({ thread: "host lane" })).toEqual({
+      kind: "ok",
+      thread: "dur-host",
+      closed: true,
+      reason: "closed",
+    })
     expect(await sdk.close({ thread: "my-tui" })).toMatchObject({
       kind: "error",
       error: { code: "unsupported", details: { command: "close_session" } },
@@ -753,7 +799,7 @@ describe("thread SDK: session controls (#13413)", () => {
     const { sdk } = fixture({ controls })
     expect(await sdk.rename({ thread: "host lane", name: "  renamed lane " })).toEqual({
       kind: "ok",
-      thread_id: "dur-host",
+      thread: "dur-host",
       name: "renamed lane",
     })
     expect(await sdk.rename({ thread: "dur-host", name: "MY-TUI" })).toMatchObject({
@@ -772,7 +818,7 @@ describe("thread SDK: session controls (#13413)", () => {
     const { sdk } = fixture({ controls })
     expect(await sdk.set_model({ thread: "host lane", model: "opus" })).toEqual({
       kind: "ok",
-      thread_id: "dur-host",
+      thread: "dur-host",
       model: { provider: "anthropic", id: "claude-opus" },
     })
     expect(await sdk.set_model({ thread: "host lane", model: "no-such-model" })).toMatchObject({
@@ -787,11 +833,52 @@ describe("thread SDK: session controls (#13413)", () => {
     const { sdk } = fixture({ controls })
     expect(await sdk.create({ name: "fresh lane" })).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-new", name: "fresh lane" },
+      thread: "dur-new",
+      name: "fresh lane",
       deduplicated: false,
     })
     expect(await sdk.create({ name: "my-tui" })).toMatchObject({ kind: "error", error: { code: "name_conflict" } })
-    expect(calls).toEqual([["openSession", { cwd: process.cwd(), name: "fresh lane" }]])
+    expect(await sdk.create({})).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+    expect(calls).toEqual([
+      [
+        "openSession",
+        expect.objectContaining({ cwd: process.cwd(), name: "fresh lane", durableSessionId: expect.any(String) }),
+      ],
+    ])
+  })
+
+  test("#given this device's host #when a script creates a thread with a first prompt #then the thread opens and the prompt is delivered to it as the script's own message", async () => {
+    const { calls, controls } = controlled()
+    // The host lists the session it opened, as a real one does once open_session answers.
+    let listed: ThreadHostSession[] = []
+    const openSession = controls.openSession
+    const { sdk, store } = fixture({
+      controls: {
+        ...controls,
+        openSession: async (request) => {
+          const session = await openSession!(request)
+          listed = [session]
+          return session
+        },
+        listView: async () => ({
+          sessions: listed,
+          hosts: [{ socket: HOST_SOCKET, list_sessions: { sessions: listed }, endpoint_kind: "rpc_host", alive: true }],
+          disk: [],
+        }),
+      },
+    })
+    const created = await sdk.create({ prompt: "start the nightly build", idempotency_key: "nightly-1" })
+    expect(created).toMatchObject({
+      kind: "ok",
+      thread: "dur-new",
+      deduplicated: false,
+      prompt: { delivery: { kind: expect.any(String) }, deduplicated: false, delivery_id: expect.any(String) },
+    })
+    expect(calls.filter(([what]) => what === "openSession")).toHaveLength(1)
+    const rows = await store.list({ target_durable_id: "dur-new" })
+    expect(rows.map((row) => ({ sender: row.sender, authority: row.envelope.authority, body: row.body }))).toEqual([
+      { sender: "cli:501", authority: "creator", body: "start the nightly build" },
+    ])
   })
 
   test("#given a script with no session of its own #when it addresses self #then every control verb answers caller_context_missing and nothing runs", async () => {
@@ -800,7 +887,9 @@ describe("thread SDK: session controls (#13413)", () => {
     for (const result of [
       await sdk.interrupt({ thread: "self" }),
       await sdk.close({ thread: "self" }),
+      await sdk.close({}),
       await sdk.rename({ thread: "self", name: "mine" }),
+      await sdk.rename({ name: "mine" }),
       await sdk.set_model({ thread: "self", model: "opus" }),
     ])
       expect(result).toMatchObject({ kind: "error", error: { code: "caller_context_missing" } })
@@ -812,13 +901,14 @@ describe("thread SDK: session controls (#13413)", () => {
     const { sdk } = fixture({ remote: account.remote })
     expect(await sdk.interrupt({ thread: "lane-b" })).toEqual({
       kind: "ok",
-      thread_id: "dur-on-b",
+      thread: "dur-on-b",
       device: "b",
       interrupted: false,
+      background: { status: "not_supported" },
     })
     expect(await sdk.rename({ thread: "lane-b", name: "renamed on b", alias: "lane-b2" })).toEqual({
       kind: "ok",
-      thread_id: "dur-on-b",
+      thread: "dur-on-b",
       device: "b",
       name: "renamed on b",
       alias: "lane-b2",
@@ -826,15 +916,16 @@ describe("thread SDK: session controls (#13413)", () => {
     expect(account.aliases.get("lane-b2")).toEqual({ session_id: "dur-on-b", device: "b" })
     expect(await sdk.set_model({ thread: "lane-b2", model: "gpt-6" })).toEqual({
       kind: "ok",
-      thread_id: "dur-on-b",
+      thread: "dur-on-b",
       device: "b",
       model: { provider: "openai", id: "gpt-6" },
     })
     expect(await sdk.close({ thread: "lane-b2" })).toEqual({
       kind: "ok",
-      thread_id: "dur-on-b",
+      thread: "dur-on-b",
       device: "b",
       closed: true,
+      reason: "closed",
     })
     expect(
       account.sent
@@ -852,9 +943,10 @@ describe("thread SDK: session controls (#13413)", () => {
     const { sdk } = fixture({ remote: account.remote })
     expect(await sdk.close({ thread: "lane-b" })).toEqual({
       kind: "ok",
-      thread_id: "dur-on-b",
+      thread: "dur-on-b",
       device: "b",
       closed: false,
+      reason: "not_live",
     })
     expect(account.sent.filter((entry) => entry.via === "session")).toEqual([])
   })
@@ -862,11 +954,41 @@ describe("thread SDK: session controls (#13413)", () => {
   test("#given device b online #when a script creates a thread on b #then b's engine opens it and the result names device b", async () => {
     const account = remoteFixture.account()
     const { sdk } = fixture({ remote: account.remote })
-    expect(await sdk.create({ device: "b" })).toMatchObject({
+    expect(await sdk.create({ device: "b", name: "lane on b" })).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-new-on-b", device: "b" },
+      thread: "dur-new-on-b",
+      device: "b",
       deduplicated: false,
     })
     expect(account.sent.some((entry) => entry.device === "b" && entry.rpc?.["type"] === "open_session")).toBe(true)
   })
+})
+
+// #13037 cold wake: `omo daemon run` has the operator daemon load omo with no session open, so its thread component
+// declares the delivery consumer before any session runs. The SDK asks the host thread_create opens sessions on.
+describe("thread SDK: the operator daemon's warm", () => {
+  test.each([
+    ["warms its default profile", undefined, { kind: "warm", state: "warmed" }],
+    ["is draining", { success: false, error: "host_draining" }, { kind: "refused", code: "host_draining" }],
+    ["predates warm", { success: false, error: "unknown_command" }, { kind: "unsupported" }],
+  ] as const)(
+    "#given an operator daemon that %s #when the SDK warms it #then one session-less warm reaches that host and its answer is classified",
+    async (_what, reply, expected) => {
+      const host = await startFakeEngineHost(reply === undefined ? {} : { warm: () => reply })
+      try {
+        const warmSdk = createThreadSdk({
+          agentDir: mkdtempSync(join(tmpdir(), "thread-sdk-warm-")),
+          cwd: process.cwd(),
+          uid: 501,
+          user: "tester",
+          env: { OMO_RPC_SOCKET_PATH: host.socketPath },
+        })
+        sdks.push(warmSdk)
+        expect(await warmSdk.warmDaemon()).toEqual(expected)
+        expect(host.frames.filter((frame) => frame.type === "warm")).toEqual([{ id: expect.any(String), type: "warm" }])
+      } finally {
+        await host.close()
+      }
+    },
+  )
 })

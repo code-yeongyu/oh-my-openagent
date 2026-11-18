@@ -1,3 +1,4 @@
+import type { MachineWriteResult } from "../../protocol/src/composed-tools.ts";
 import type { MachineFindQuery } from "../../protocol/src/machine-lookup.ts";
 import type { MachineToolDefinition } from "../../protocol/src/manifest-tools.ts";
 import type { ShellResult } from "../../protocol/src/terminal.ts";
@@ -47,7 +48,7 @@ export declare class ConnectedMachineHub implements StandaloneMachineHub, Machin
     pushTree(call: PushTreeCall): Promise<unknown>;
     pullTree(call: PullTreeCall): Promise<unknown>;
     private requireTreeTransfer;
-    write(call: WriteCall): Promise<unknown>;
+    write(call: WriteCall): Promise<MachineWriteResult>;
     /** Bytes, always: a caller that persists this result gets the file, never a handle object it forgot to
      *  recognise. `readHandle()` is the explicit streaming door. */
     read(call: ReadCall): Promise<Uint8Array>;

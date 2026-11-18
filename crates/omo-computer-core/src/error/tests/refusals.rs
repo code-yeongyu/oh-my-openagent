@@ -1,7 +1,7 @@
 //! Row 12's backend default refusals through the table: each is a closed engine code with a
 //! reason that has a row, maps to the COMPUTER_* member the design names for it, and sent nothing.
 
-use super::super::{lookup, EngineCode, FailureKey, NothingSent, Source, UnknownFailure};
+use super::super::{lookup, EngineCode, FailureKey, NothingSent, Reason, Source, UnknownFailure};
 use crate::backend::{
     AxBackend, Backend, CaptureOptions, InputEvent, Ref, Refusal, Route, Semantic, SnapshotRequest,
     TaggedInput, Target, WindowFilter, PRESENCE_UNAVAILABLE,
@@ -68,7 +68,7 @@ fn backend_refusals_map_through_the_table() {
         println!(
             "{}{{{}}} -> {:?} -> {}",
             refusal.code.wire(),
-            refusal.reason.unwrap_or("-"),
+            refusal.reason.map_or("-", Reason::wire),
             row.key,
             row.computer.wire()
         );
@@ -104,11 +104,14 @@ fn a_bare_refusal_resolves_to_its_codes_bare_row() {
         println!("{}{{}} -> {resolved:?}", code.wire());
         assert_eq!(resolved, Ok(computer));
     }
-    let unlisted = Refusal::new(EngineCode::AmbiguousTarget, "budget");
+    let unlisted = Refusal::new(EngineCode::AmbiguousTarget, Reason::Budget);
     assert!(
         matches!(unlisted.row(), Err(UnknownFailure::Pair(_))),
         "a reason the code's rows do not list stays a typed UnknownFailure"
     );
-    let unknown = Refusal::new(EngineCode::Closed, "not_a_reason");
-    assert!(matches!(unknown.row(), Err(UnknownFailure::Reason { .. })));
+    assert_eq!(
+        Reason::from_wire("not_a_reason"),
+        None,
+        "a token outside the vocabulary has no Reason, so no Refusal can carry it"
+    );
 }

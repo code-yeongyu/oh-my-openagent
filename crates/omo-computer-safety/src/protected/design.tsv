@@ -1,0 +1,150 @@
+# The shipped protected-target tables as design-pin/design/d-safety.md '### The shipped table' lists them
+# (the JSON block at lines 381-398 and the per-OS table at lines 403-407), one cited row per entry.
+# The table test asserts both directions against src/protected/<os>.json: every row here is in the
+# JSON, and every JSON entry has a row here. Edit this file only together with the design.
+# os	column	entry	citation
+macos	protectedSurfaces	com.apple.SecurityAgent	d-safety.md:385 protectedSurfaces; :405 "SecurityAgent, loginwindow, open/save panel service"
+macos	protectedSurfaces	com.apple.loginwindow	d-safety.md:385 protectedSurfaces; :405 "SecurityAgent, loginwindow, open/save panel service"
+macos	protectedSurfaces	com.apple.appkit.xpc.openAndSavePanelService	d-safety.md:385 protectedSurfaces; :405 "SecurityAgent, loginwindow, open/save panel service"
+macos	protectedSurfaces	com.apple.PrivacySecurity.extension	d-safety.md:386 protectedSurfaces; :405 "PrivacySecurity extension, System Settings Privacy pane"
+macos	protectedSurfaces	com.apple.systempreferences:PrivacySecurity	d-safety.md:386 protectedSurfaces; :405 "PrivacySecurity extension, System Settings Privacy pane"
+macos	protectedSurfaces	com.apple.controlcenter:pane	d-safety.md:387 protectedSurfaces; :405 "Control Center panes and privacy toggles"
+macos	protectedSurfaces	com.apple.UserNotificationCenter	d-safety.md:388 protectedSurfaces; :405 "the owner process of the TCC consent alert" (candidate)
+macos	readOnlySurfaces	com.apple.dock	d-safety.md:389 readOnlySurfaces; :405 "Dock, Spotlight, the Control Center menu-bar items"
+macos	readOnlySurfaces	com.apple.Spotlight	d-safety.md:389 readOnlySurfaces; :405 "Dock, Spotlight, the Control Center menu-bar items"
+macos	readOnlySurfaces	com.apple.controlcenter:menubar	d-safety.md:389 readOnlySurfaces; :405 "Dock, Spotlight, the Control Center menu-bar items"
+macos	systemSurfaces	com.apple.finder:desktop	d-safety.md:390 systemSurfaces; :405 "the desktop", "Notification Center", "an app's own menu bar"
+macos	systemSurfaces	com.apple.notificationcenterui	d-safety.md:390 systemSurfaces; :405 "the desktop", "Notification Center", "an app's own menu bar"
+macos	systemSurfaces	surface:menubar	d-safety.md:390 systemSurfaces; :405 "the desktop", "Notification Center", "an app's own menu bar"
+macos	processes	com.apple.finder	d-safety.md:391 processes; :405 "Finder, Dock, Control Center, Notification Center, launchd, loginwindow, WindowServer"
+macos	processes	com.apple.dock	d-safety.md:391 processes; :405 "Finder, Dock, Control Center, Notification Center, launchd, loginwindow, WindowServer"
+macos	processes	com.apple.controlcenter	d-safety.md:391 processes; :405 "Finder, Dock, Control Center, Notification Center, launchd, loginwindow, WindowServer"
+macos	processes	com.apple.notificationcenterui	d-safety.md:391 processes; :405 "Finder, Dock, Control Center, Notification Center, launchd, loginwindow, WindowServer"
+macos	processes	launchd	d-safety.md:391 processes; :405 "Finder, Dock, Control Center, Notification Center, launchd, loginwindow, WindowServer"
+macos	processes	loginwindow	d-safety.md:391 processes; :405 "Finder, Dock, Control Center, Notification Center, launchd, loginwindow, WindowServer"
+macos	processes	WindowServer	d-safety.md:391 processes; :405 "Finder, Dock, Control Center, Notification Center, launchd, loginwindow, WindowServer"
+macos	deniedApps	com.1password.1password	d-safety.md:392-394 deniedApps; :405 "by bundle id"
+macos	deniedApps	com.bitwarden.desktop	d-safety.md:392-394 deniedApps; :405 "by bundle id"
+macos	deniedApps	com.dashlane.Dashlane	d-safety.md:392-394 deniedApps; :405 "by bundle id"
+macos	deniedApps	com.lastpass.LastPass	d-safety.md:392-394 deniedApps; :405 "by bundle id"
+macos	deniedApps	com.nordpass.macos	d-safety.md:392-394 deniedApps; :405 "by bundle id"
+macos	deniedApps	me.proton.pass.electron	d-safety.md:392-394 deniedApps; :405 "by bundle id"
+macos	deniedApps	org.keepassxc.keepassxc	d-safety.md:392-394 deniedApps; :405 "by bundle id"
+macos	deniedApps	com.apple.Passwords	d-safety.md:392-394 deniedApps; :405 "by bundle id"
+macos	deniedApps	com.apple.keychainaccess	d-safety.md:392-394 deniedApps; :405 "by bundle id"
+macos	dangerousChords	cmd+q	d-safety.md:395 dangerousChords; :405 dangerous chords
+macos	dangerousChords	cmd+opt+esc	d-safety.md:395 dangerousChords; :405 dangerous chords
+macos	dangerousChords	ctrl+cmd+q	d-safety.md:395 dangerousChords; :405 dangerous chords
+macos	chordsMatchSupersets	false	d-safety.md:405 dangerous chords "cmd+q", "cmd+opt+esc", "ctrl+cmd+q" (an exact list, unlike the Windows row, which adds modifier supersets)
+macos	secureInputSources	IsSecureEventInputEnabled	d-safety.md:397 secureInputSources; :405 secure focus sources: "IsSecureEventInputEnabled, kCGSSessionSecureInputPID, AXSecureTextField or unreadable subrole, the table's secureLabelRegex"
+macos	secureInputSources	kCGSSessionSecureInputPID	d-safety.md:397 secureInputSources; :405 secure focus sources: "IsSecureEventInputEnabled, kCGSSessionSecureInputPID, AXSecureTextField or unreadable subrole, the table's secureLabelRegex"
+macos	secureInputSources	AXSecureTextField	d-safety.md:397 secureInputSources; :405 secure focus sources: "IsSecureEventInputEnabled, kCGSSessionSecureInputPID, AXSecureTextField or unreadable subrole, the table's secureLabelRegex"
+macos	secureInputSources	label:secureLabelRegex	d-safety.md:397 secureInputSources; :405 secure focus sources: "IsSecureEventInputEnabled, kCGSSessionSecureInputPID, AXSecureTextField or unreadable subrole, the table's secureLabelRegex"
+linux	protectedSurfaces	polkit-gnome-authentication-agent-1	d-safety.md:406 protected surfaces: "polkit agents"
+linux	protectedSurfaces	polkit-kde-authentication-agent-1	d-safety.md:406 protected surfaces: "polkit agents"
+linux	protectedSurfaces	lxpolkit	d-safety.md:406 protected surfaces: "polkit agents"
+linux	protectedSurfaces	gnome-shell:modal	d-safety.md:406 protected surfaces: "the GNOME Shell's own security surfaces keyed by SURFACE"
+linux	protectedSurfaces	gnome-shell:unlock-dialog	d-safety.md:406 protected surfaces: "the GNOME Shell's own security surfaces keyed by SURFACE"
+linux	protectedSurfaces	gnome-shell:lock-screen	d-safety.md:406 protected surfaces: "the GNOME Shell's own security surfaces keyed by SURFACE"
+linux	protectedSurfaces	ksecretprompt	d-safety.md:406 protected surfaces: "keyring / ksecretprompt prompts" (KDE)
+linux	protectedSurfaces	gcr-prompter	d-safety.md:406 protected surfaces: "keyring / ksecretprompt prompts" (gnome-keyring's non-shell prompter)
+linux	protectedSurfaces	xdg-desktop-portal*	d-safety.md:406 protected surfaces: "portal consent dialogs" (every xdg-desktop-portal backend: -gnome, -kde, -gtk, -wlr, ...)
+linux	protectedSurfaces	org.freedesktop.impl.portal.desktop.*	d-safety.md:406 protected surfaces: "portal consent dialogs" (the Wayland app_id the portal backends' dialogs carry)
+linux	protectedSurfaces	swaylock	d-safety.md:406 protected surfaces: "the lock screen / locker"
+linux	protectedSurfaces	hyprlock	d-safety.md:406 protected surfaces: "the lock screen / locker"
+linux	protectedSurfaces	kscreenlocker_greet	d-safety.md:406 protected surfaces: "the lock screen / locker"
+linux	protectedSurfaces	i3lock	d-safety.md:406 protected surfaces: "the lock screen / locker"
+linux	protectedSurfaces	gnome-control-center:privacy	d-safety.md:406 protected surfaces: "gnome-control-center privacy panel"
+linux	systemSurfaces	gnome-shell:panel	d-safety.md:406 system surfaces: "gnome-shell:panel and gnome-shell:overview ONLY"
+linux	systemSurfaces	gnome-shell:overview	d-safety.md:406 system surfaces: "gnome-shell:panel and gnome-shell:overview ONLY"
+linux	systemSurfaces	plasmashell:panel	d-safety.md:406 system surfaces: "the plasmashell panel"
+linux	systemSurfaces	waybar	d-safety.md:406 system surfaces: "the sway / waybar bar"
+linux	systemSurfaces	swaybar	d-safety.md:406 system surfaces: "the sway / waybar bar"
+linux	processes	gnome-shell	d-safety.md:406 protected processes: "the compositor / WM (gnome-shell, kwin / kwin_wayland, sway, i3, xfwm4)"
+linux	processes	kwin	d-safety.md:406 protected processes: "the compositor / WM (gnome-shell, kwin / kwin_wayland, sway, i3, xfwm4)"
+linux	processes	kwin_wayland	d-safety.md:406 protected processes: "the compositor / WM (gnome-shell, kwin / kwin_wayland, sway, i3, xfwm4)"
+linux	processes	kwin_x11	d-safety.md:406 protected processes: "the compositor / WM (gnome-shell, kwin / kwin_wayland, sway, i3, xfwm4)"
+linux	processes	sway	d-safety.md:406 protected processes: "the compositor / WM (gnome-shell, kwin / kwin_wayland, sway, i3, xfwm4)"
+linux	processes	i3	d-safety.md:406 protected processes: "the compositor / WM (gnome-shell, kwin / kwin_wayland, sway, i3, xfwm4)"
+linux	processes	xfwm4	d-safety.md:406 protected processes: "the compositor / WM (gnome-shell, kwin / kwin_wayland, sway, i3, xfwm4)"
+linux	processes	plasmashell	d-safety.md:406 protected processes: "plasmashell"
+linux	processes	systemd	d-safety.md:406 protected processes: "systemd --user"
+linux	processes	gdm	d-safety.md:406 protected processes: "the session's display manager"
+linux	processes	sddm	d-safety.md:406 protected processes: "the session's display manager"
+linux	processes	lightdm	d-safety.md:406 protected processes: "the session's display manager"
+linux	deniedApps	1password	d-safety.md:406 denied apps: "by WM_CLASS (X11) / app_id (Wayland)"
+linux	deniedApps	Bitwarden	d-safety.md:406 denied apps: "by WM_CLASS (X11) / app_id (Wayland)"
+linux	deniedApps	keepassxc	d-safety.md:406 denied apps: "by WM_CLASS (X11) / app_id (Wayland)"
+linux	deniedApps	org.keepassxc.KeePassXC	d-safety.md:406 denied apps: "by WM_CLASS (X11) / app_id (Wayland)"
+linux	deniedApps	org.gnome.seahorse.Application	d-safety.md:406 denied apps: "by WM_CLASS (X11) / app_id (Wayland)"
+linux	deniedApps	kwalletmanager5	d-safety.md:406 denied apps: "by WM_CLASS (X11) / app_id (Wayland)"
+linux	deniedApps	gnome-keyring*	d-safety.md:406 denied apps: "the org.freedesktop.secrets prompters (gnome-keyring / kwalletd6 prompt windows)"
+linux	deniedApps	kwalletd6	d-safety.md:406 denied apps: "the org.freedesktop.secrets prompters (gnome-keyring / kwalletd6 prompt windows)"
+linux	deniedApps	org.kde.kwalletd6	d-safety.md:406 denied apps: "the org.freedesktop.secrets prompters (gnome-keyring / kwalletd6 prompt windows)"
+linux	dangerousChords	ctrl+alt+backspace	d-safety.md:406 dangerous chords
+linux	dangerousChords	ctrl+alt+del	d-safety.md:406 dangerous chords
+linux	dangerousChords	ctrl+alt+f1	d-safety.md:406 dangerous chords: "ctrl+alt+f1..f12"
+linux	dangerousChords	ctrl+alt+f2	d-safety.md:406 dangerous chords: "ctrl+alt+f1..f12"
+linux	dangerousChords	ctrl+alt+f3	d-safety.md:406 dangerous chords: "ctrl+alt+f1..f12"
+linux	dangerousChords	ctrl+alt+f4	d-safety.md:406 dangerous chords: "ctrl+alt+f1..f12"
+linux	dangerousChords	ctrl+alt+f5	d-safety.md:406 dangerous chords: "ctrl+alt+f1..f12"
+linux	dangerousChords	ctrl+alt+f6	d-safety.md:406 dangerous chords: "ctrl+alt+f1..f12"
+linux	dangerousChords	ctrl+alt+f7	d-safety.md:406 dangerous chords: "ctrl+alt+f1..f12"
+linux	dangerousChords	ctrl+alt+f8	d-safety.md:406 dangerous chords: "ctrl+alt+f1..f12"
+linux	dangerousChords	ctrl+alt+f9	d-safety.md:406 dangerous chords: "ctrl+alt+f1..f12"
+linux	dangerousChords	ctrl+alt+f10	d-safety.md:406 dangerous chords: "ctrl+alt+f1..f12"
+linux	dangerousChords	ctrl+alt+f11	d-safety.md:406 dangerous chords: "ctrl+alt+f1..f12"
+linux	dangerousChords	ctrl+alt+f12	d-safety.md:406 dangerous chords: "ctrl+alt+f1..f12"
+linux	chordsMatchSupersets	false	d-safety.md:405-407 only the Windows row adds "modifier supersets"
+linux	secureInputSources	ROLE_PASSWORD_TEXT	d-safety.md:406 secure focus sources: "AT-SPI ROLE_PASSWORD_TEXT, portal secure state, the table's secureLabelRegex"
+linux	secureInputSources	portal:secure	d-safety.md:406 secure focus sources: "AT-SPI ROLE_PASSWORD_TEXT, portal secure state, the table's secureLabelRegex"
+linux	secureInputSources	label:secureLabelRegex	d-safety.md:406 secure focus sources: "AT-SPI ROLE_PASSWORD_TEXT, portal secure state, the table's secureLabelRegex"
+windows	protectedSurfaces	consent.exe	d-safety.md:407 protected surfaces: "consent.exe (UAC), logonui, winlogon, lsass, LockApp, SecurityHealth*"
+windows	protectedSurfaces	logonui.exe	d-safety.md:407 protected surfaces: "consent.exe (UAC), logonui, winlogon, lsass, LockApp, SecurityHealth*"
+windows	protectedSurfaces	winlogon.exe	d-safety.md:407 protected surfaces: "consent.exe (UAC), logonui, winlogon, lsass, LockApp, SecurityHealth*"
+windows	protectedSurfaces	lsass.exe	d-safety.md:407 protected surfaces: "consent.exe (UAC), logonui, winlogon, lsass, LockApp, SecurityHealth*"
+windows	protectedSurfaces	LockApp.exe	d-safety.md:407 protected surfaces: "consent.exe (UAC), logonui, winlogon, lsass, LockApp, SecurityHealth*"
+windows	protectedSurfaces	SecurityHealth*	d-safety.md:407 protected surfaces: "consent.exe (UAC), logonui, winlogon, lsass, LockApp, SecurityHealth*"
+windows	protectedSurfaces	secure-desktop	d-safety.md:407 protected surfaces: "the secure desktop (OpenInputDesktop != Default)" (the key the Windows backend reports for it)
+windows	protectedSurfaces	SystemSettings.exe:privacy	d-safety.md:407 protected surfaces: "SystemSettings privacy pages"
+windows	systemSurfaces	Shell_TrayWnd	d-safety.md:407 system surfaces: "the taskbar and tray"
+windows	systemSurfaces	Shell_SecondaryTrayWnd	d-safety.md:407 system surfaces: "the taskbar and tray"
+windows	systemSurfaces	Progman	d-safety.md:407 system surfaces: "the desktop shell (Progman, WorkerW = the desktop target"
+windows	systemSurfaces	WorkerW	d-safety.md:407 system surfaces: "the desktop shell (Progman, WorkerW = the desktop target"
+windows	systemSurfaces	StartMenuExperienceHost.exe	d-safety.md:407 system surfaces: "the start menu", "action / notification center"
+windows	systemSurfaces	ShellExperienceHost.exe	d-safety.md:407 system surfaces: "the start menu", "action / notification center"
+windows	processes	explorer.exe	d-safety.md:407 protected processes: "explorer shell, csrss, lsaiso, winlogon, dwm, StartMenuExperienceHost, ShellExperienceHost"
+windows	processes	csrss.exe	d-safety.md:407 protected processes: "explorer shell, csrss, lsaiso, winlogon, dwm, StartMenuExperienceHost, ShellExperienceHost"
+windows	processes	lsaiso.exe	d-safety.md:407 protected processes: "explorer shell, csrss, lsaiso, winlogon, dwm, StartMenuExperienceHost, ShellExperienceHost"
+windows	processes	winlogon.exe	d-safety.md:407 protected processes: "explorer shell, csrss, lsaiso, winlogon, dwm, StartMenuExperienceHost, ShellExperienceHost"
+windows	processes	dwm.exe	d-safety.md:407 protected processes: "explorer shell, csrss, lsaiso, winlogon, dwm, StartMenuExperienceHost, ShellExperienceHost"
+windows	processes	StartMenuExperienceHost.exe	d-safety.md:407 protected processes: "explorer shell, csrss, lsaiso, winlogon, dwm, StartMenuExperienceHost, ShellExperienceHost"
+windows	processes	ShellExperienceHost.exe	d-safety.md:407 protected processes: "explorer shell, csrss, lsaiso, winlogon, dwm, StartMenuExperienceHost, ShellExperienceHost"
+windows	processes	omo-computer-*	d-safety.md:407 protected processes: "own helpers"
+windows	deniedApps	1Password.exe	d-safety.md:407 denied apps: "by image name + Authenticode signer"
+windows	deniedApps	Bitwarden.exe	d-safety.md:407 denied apps: "by image name + Authenticode signer"
+windows	deniedApps	KeePassXC.exe	d-safety.md:407 denied apps: "by image name + Authenticode signer"
+windows	deniedApps	KeePass.exe	d-safety.md:407 denied apps: "by image name + Authenticode signer"
+windows	deniedApps	Dashlane.exe	d-safety.md:407 denied apps: "by image name + Authenticode signer"
+windows	deniedApps	LastPass.exe	d-safety.md:407 denied apps: "by image name + Authenticode signer"
+windows	deniedApps	NordPass.exe	d-safety.md:407 denied apps: "by image name + Authenticode signer"
+windows	deniedApps	Proton Pass.exe	d-safety.md:407 denied apps: "by image name + Authenticode signer"
+windows	deniedApps	control.exe:Microsoft.CredentialManager	d-safety.md:407 denied apps: "the Credential Manager control panel (control.exe /name Microsoft.CredentialManager"
+windows	deniedApps	rundll32.exe:keymgr.dll	d-safety.md:407 denied apps: "/ keymgr.dll host)"
+windows	deniedApps	Agilebits.1Password_*	d-safety.md:407 denied apps: "the Microsoft Store AUMIDs of the same managers" (package-family prefix, any publisher id)
+windows	deniedApps	8bitSolutionsLLC.bitwardendesktop_*	d-safety.md:407 denied apps: "the Microsoft Store AUMIDs of the same managers" (package-family prefix, any publisher id)
+windows	dangerousChords	alt+f4	d-safety.md:407 dangerous chords
+windows	dangerousChords	win+l	d-safety.md:407 dangerous chords
+windows	dangerousChords	win+d	d-safety.md:407 dangerous chords
+windows	dangerousChords	alt+tab	d-safety.md:407 dangerous chords
+windows	dangerousChords	win+r	d-safety.md:407 dangerous chords
+windows	dangerousChords	win+x	d-safety.md:407 dangerous chords
+windows	dangerousChords	win+e	d-safety.md:407 dangerous chords
+windows	dangerousChords	ctrl+shift+esc	d-safety.md:407 dangerous chords
+windows	chordsMatchSupersets	true	d-safety.md:407 dangerous chords: "and modifier supersets"
+windows	secureInputSources	UIA:IsPassword	d-safety.md:407 secure focus sources: "UIA IsPassword, PasswordText control type, the table's secureLabelRegex"
+windows	secureInputSources	UIA:PasswordText	d-safety.md:407 secure focus sources: "UIA IsPassword, PasswordText control type, the table's secureLabelRegex"
+windows	secureInputSources	label:secureLabelRegex	d-safety.md:407 secure focus sources: "UIA IsPassword, PasswordText control type, the table's secureLabelRegex"
+macos	secureLabelRegex	\b(passw(or)?d|passcode|pin|otp|cvv|cvc|csc|ssn|card number)\b	d-safety.md:396 "ONE regex", loaded by every OS's table
+linux	secureLabelRegex	\b(passw(or)?d|passcode|pin|otp|cvv|cvc|csc|ssn|card number)\b	d-safety.md:396 "ONE regex", loaded by every OS's table
+windows	secureLabelRegex	\b(passw(or)?d|passcode|pin|otp|cvv|cvc|csc|ssn|card number)\b	d-safety.md:396 "ONE regex", loaded by every OS's table

@@ -1,3 +1,4 @@
+import { fakeRemoteClient } from "./thread-remote-fixture"
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { type ChildProcess, spawn } from "node:child_process"
 import { once } from "node:events"
@@ -256,6 +257,11 @@ describe.skipIf(process.platform === "win32")(
       }
       const remote: RemoteThreadSurface = {
         chain: { stamp: (record) => record },
+        client: fakeRemoteClient({
+          state: () => "connected",
+          here: "a",
+          devices: () => [{ device: "b", label: "b", online: true }],
+        }),
         sessions: {
           status: async () => ({ state: "connected" }),
           thisDevice: async () => "a",

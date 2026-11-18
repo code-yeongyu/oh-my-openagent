@@ -38,6 +38,7 @@ export async function interruptThread(control: SessionControl, turnId: string | 
     ...controlIdentity(control),
     ...(result.turn_id === undefined ? {} : { turn_id: result.turn_id }),
     interrupted: result.interrupted,
+    background: result.background,
   }
 }
 
@@ -50,7 +51,8 @@ export async function closeThread(control: SessionControl): Promise<ThreadToolRe
       "Close it from the client that holds it, or send it a message first so it can be closed for every holder.",
       control.device === undefined ? undefined : { device: control.device },
     )
-  return { kind: "ok", ...controlIdentity(control), closed: outcome === "closed" }
+  const closed = outcome === "closed"
+  return { kind: "ok", ...controlIdentity(control), closed, reason: closed ? "closed" : "not_live" }
 }
 
 /**
@@ -129,7 +131,7 @@ export async function renameThread(
 ): Promise<ThreadToolResult> {
   if (value.name === undefined && value.alias === undefined)
     return failure("invalid_arguments", "Pass a new name, a new alias, or both.", "Retry with name or alias.")
-  const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
+  const located = await locateControl(options, current, value.thread ?? "self", value.all_scope, callerId)
   if (located.kind === "error") return located.result
   const thread = located.kind === "control" ? located.control : located
   // #13066: the name is checked on the target device's own listing, and only when a live owner holds the thread.

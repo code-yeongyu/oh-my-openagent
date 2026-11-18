@@ -2,9 +2,15 @@ import { AsyncLocalStorage } from "node:async_hooks"
 import { createHash } from "node:crypto"
 import { mkdir } from "node:fs/promises"
 import { join } from "node:path"
-import { type LockLease, withLock } from "@oh-my-opencode/team-core/team-state-store/locks"
+import { getProcessCommandName } from "@oh-my-opencode/memory-core/process-identity"
+import {
+  type LockHolder,
+  type LockLease,
+  LockWaitTimeoutError,
+  withLock,
+} from "@oh-my-opencode/team-core/team-state-store/locks"
 import { accountHome, lockDirectoryIn } from "./account-home"
-import { serviceOrigin } from "./protocol"
+import { serviceOrigin, SignInError } from "./protocol"
 
 export { accountHome }
 
@@ -53,8 +59,68 @@ export async function withCredentialLock<T>(
   const outer = owned?.get(lock)
   if (outer !== undefined) return action(outer)
   await mkdir(directory, { recursive: true, mode: 0o700 })
-  return withLock(lock, (lease) => held.run(new Map([...(owned ?? []), [lock, lease]]), () => action(lease)), {
-    ownerTag,
-    staleAfterMs: CREDENTIAL_LOCK_STALE_AFTER_MS,
-  })
+  try {
+    return await withLock(lock, (lease) => held.run(new Map([...(owned ?? []), [lock, lease]]), () => action(lease)), {
+      ownerTag,
+      staleAfterMs: CREDENTIAL_LOCK_STALE_AFTER_MS,
+    })
+  } catch (error) {
+    // Only this acquire's own wait: a timeout raised inside `action` belongs to another lock and keeps its own error.
+    if (error instanceof LockWaitTimeoutError && error.lockPath === lock) throw await credentialLockBusy(error)
+    throw error
+  }
+}
+
+// A keychain helper finishes a mutation it already started within this long after its caller exits (helper session.c);
+// a helper holding the lock for longer is stuck on a call nobody will answer.
+const HELPER_FINISHING_MS = 60_000
+
+const helperArgv0 = /(^|-)omo-keychain(-test)?$/
+
+// Windows has no signals: `taskkill /F` is the one way to end a console process there.
+const endCommand = (pid: number, force: boolean): string =>
+  process.platform === "win32" ? `taskkill /PID ${pid} /F` : force ? `kill -9 ${pid}` : `kill ${pid}`
+
+function duration(ms: number): string {
+  const units = [
+    [86_400_000, "day"],
+    [3_600_000, "hour"],
+    [60_000, "minute"],
+    [1_000, "second"],
+  ] as const
+  for (const [size, unit] of units) {
+    const count = Math.floor(ms / size)
+    if (count >= 1) return `${count} ${unit}${count === 1 ? "" : "s"}`
+  }
+  return "under a second"
+}
+
+/**
+ * The credential lock stayed held for the whole wait (#14029). Name the holder and the one action that frees it: a
+ * keychain helper left behind by an earlier command holds it until it is killed (it ignores SIGTERM by design), so it
+ * gets `kill -9`; any other process is asked to finish or be ended. Never the generic "unexpected error".
+ */
+async function credentialLockBusy(error: LockWaitTimeoutError): Promise<SignInError> {
+  const holder: LockHolder | null = error.holder
+  const name = holder === null ? null : await getProcessCommandName(holder.ownerPid)
+  if (holder === null || name === null)
+    return new SignInError(
+      `OmO's sign-in lock stayed busy and its holder has exited or could not be read. Run the command again. If it keeps failing while no omo command is running, delete ${error.lockPath} and try again.`,
+    )
+  const pid = holder.ownerPid
+  const age = Math.max(0, Date.now() - holder.acquiredAtEpochMs)
+  const held = `has held OmO's sign-in lock (${error.lockPath}) for ${duration(age)}`
+  if (pid === process.pid)
+    return new SignInError(
+      `This omo process (pid ${pid}) ${held} in another part of the same command and did not release it. Run the command again, and report it with /bug if it keeps failing.`,
+    )
+  if (helperArgv0.test(name))
+    return new SignInError(
+      age < HELPER_FINISHING_MS
+        ? `An OmO keychain helper (pid ${pid}) ${held} and is finishing a keychain change. Try again in a minute.`
+        : `An OmO keychain helper (pid ${pid}) left behind by an earlier omo command ${held}. End it with \`${endCommand(pid, true)}\`, then run the command again.`,
+    )
+  return new SignInError(
+    `Another process (pid ${pid}, ${name}) ${held}. Wait for it to finish, or end it with \`${endCommand(pid, false)}\`, then run the command again.`,
+  )
 }
