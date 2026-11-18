@@ -25,7 +25,7 @@ describe("Native prompt frame boundary", () => {
     const system = ["BEFORE\n" + before + "\nAFTER"]
     replaceNativePromptFrames(system, "new/model", (context) => {
       expect(context).toEqual({ model: "new/model", tools: [tool] })
-      return "REBUILT_SENTINEL"
+      return { frame: "REBUILT_SENTINEL", role: "" }
     })
     expect(system).toEqual(["BEFORE\nREBUILT_SENTINEL\nAFTER"])
   })
@@ -40,10 +40,34 @@ describe("Native prompt frame boundary", () => {
     let calls = 0
     replaceNativePromptFrames(system, "new/model", () => {
       calls++
-      return "REBUILT"
+      return { frame: "REBUILT", role: "" }
     })
     expect(system).toEqual([input])
     expect(calls).toBe(0)
+  })
+
+  test.each([
+    [
+      "swaps the role the old build put after the frame",
+      "OLD_ROLE",
+      "\n\nOLD_ROLE\nUSER_APPEND",
+      "\n\nNEW_ROLE\nUSER_APPEND",
+    ],
+    ["adds the role when the old build put none after the frame", "", "\nUSER_APPEND", "\n\nNEW_ROLE\nUSER_APPEND"],
+    [
+      "swaps only the frame when other text sits where the role was",
+      "OLD_ROLE",
+      "\n\nEDITED\nUSER_APPEND",
+      "\n\nEDITED\nUSER_APPEND",
+    ],
+  ])("a rebuild of a role-bearing frame %s", (_case, oldRole, after, expectedAfter) => {
+    const before = frameNativePrompt("CORE_SENTINEL", { model: "old/model", tools: [], role: "ROLE_SOURCE" })
+    const system = ["BEFORE\n" + before + after]
+    replaceNativePromptFrames(system, "new/model", (context) => {
+      expect(context.role).toBe("ROLE_SOURCE")
+      return { frame: "REBUILT_SENTINEL", role: context.model === "old/model" ? oldRole : "NEW_ROLE" }
+    })
+    expect(system).toEqual(["BEFORE\nREBUILT_SENTINEL" + expectedAfter])
   })
 
   test("does not rebuild a frame already bound to the runtime model", () => {
@@ -52,7 +76,7 @@ describe("Native prompt frame boundary", () => {
     let calls = 0
     replaceNativePromptFrames(system, "same/model", () => {
       calls++
-      return "REBUILT"
+      return { frame: "REBUILT", role: "" }
     })
     expect(system).toEqual([input])
     expect(calls).toBe(0)
