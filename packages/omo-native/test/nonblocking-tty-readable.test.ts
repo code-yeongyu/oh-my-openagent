@@ -88,16 +88,22 @@ test.skipIf(process.platform === "win32")(
   "#given a descriptor whose read fails with something other than EAGAIN #when the reader reads #then it is destroyed with that error",
   async () => {
     // given
-    const { reader, writer } = fifoPair()
-    closeSync(writer)
-    closeSync(reader)
-    const stream = nonBlockingTtyReadable(reader, 1)
+    // A live descriptor that always fails the same way (#14157 item 2): a closed number can be reused by the
+    // runtime before the read runs.
+    const directoryPath = mkdtempSync(join(tmpdir(), "tty-readable-dir-"))
+    const directory = openSync(directoryPath, "r")
+    const stream = nonBlockingTtyReadable(directory, 1)
     const failed = new Promise<unknown>((resolve) => stream.once("error", resolve))
 
     // when
     stream.resume()
 
     // then
-    expect(await failed).toMatchObject({ code: "EBADF" })
+    try {
+      expect(await failed).toMatchObject({ code: "EISDIR" })
+    } finally {
+      closeSync(directory)
+      rmSync(directoryPath, { recursive: true, force: true })
+    }
   },
 )
