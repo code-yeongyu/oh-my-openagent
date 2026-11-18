@@ -1,5 +1,6 @@
+import { createHash } from "node:crypto"
 import { afterEach, describe, expect, test } from "bun:test"
-import { chmodSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { resolveHelperAccess } from "./access"
@@ -37,6 +38,10 @@ describe("pinned helper copies (#11586 review LOWs)", () => {
     expect(first.kind).toBe("pinned")
     expect(second).toEqual(first)
     expect(readdirSync(pins)).toHaveLength(1)
+    if (first.kind === "pinned") {
+      const digest = createHash("sha256").update(readFileSync(source)).digest("hex").slice(0, 32)
+      expect(first.path).toBe(join(pins, `${digest}-omo-keychain`))
+    }
 
     writeFileSync(source, "signed helper, new build")
     const third = await pinVerifiedCopy(source, alwaysValid, pins)
@@ -57,7 +62,7 @@ describe("pinned helper copies (#11586 review LOWs)", () => {
     },
   )
 
-  test("#given a reused pin that no longer verifies #when pinning again #then a fresh copy replaces it", async () => {
+  test("#given a pinned copy whose bytes no longer verify #when pinning again #then that same path is replaced from the source", async () => {
     const root = tempRoot()
     const source = join(root, "omo-keychain")
     const pins = join(root, "pins")
@@ -65,22 +70,33 @@ describe("pinned helper copies (#11586 review LOWs)", () => {
     writeFileSync(source, "signed helper")
     const first = await pinVerifiedCopy(source, alwaysValid, pins)
     if (first.kind !== "pinned") throw new Error(`expected pinned, got ${first.kind}`)
-    const second = await pinVerifiedCopy(source, async (path) => (path === first.path ? "invalid" : "valid"), pins)
-    expect(second.kind === "pinned" && second.path !== first.path).toBe(true)
+    chmodSync(first.path, 0o700)
+    writeFileSync(first.path, "tampered")
+    chmodSync(first.path, 0o500)
+    const matchesSource = async (path: string) =>
+      readFileSync(path, "utf8") === "signed helper" ? ("valid" as const) : ("invalid" as const)
+    const second = await pinVerifiedCopy(source, matchesSource, pins)
+    expect(second).toEqual({ kind: "pinned", path: first.path })
+    expect(readFileSync(first.path, "utf8")).toBe("signed helper")
   })
 
   test.skipIf(!posixPermissions)(
-    "#given TMPDIR does not exist #when pinning into the process directory #then unavailable, and a later attempt succeeds",
+    "#given a private TMPDIR #when pinning with no explicit directory #then the copy is content-stable under that temp dir",
     async () => {
       const root = tempRoot()
       const source = join(root, "omo-keychain")
       writeFileSync(source, "signed helper, tmpdir case")
+      const custom = join(root, "custom-tmp")
+      mkdirSync(custom)
       const previous = process.env.TMPDIR
-      process.env.TMPDIR = join(root, "missing")
+      process.env.TMPDIR = custom
       try {
-        expect((await pinVerifiedCopy(source, alwaysValid)).kind).toBe("unavailable")
-        mkdirSync(join(root, "missing"))
-        expect((await pinVerifiedCopy(source, alwaysValid)).kind).toBe("pinned")
+        const pinned = await pinVerifiedCopy(source, alwaysValid)
+        const again = await pinVerifiedCopy(source, alwaysValid)
+        expect(again).toEqual(pinned)
+        if (pinned.kind !== "pinned") throw new Error(`expected pinned, got ${pinned.kind}`)
+        const digest = createHash("sha256").update(readFileSync(source)).digest("hex").slice(0, 32)
+        expect(pinned.path).toBe(join(custom, "omo-keychain-stable", `${digest}-omo-keychain`))
       } finally {
         if (previous === undefined) delete process.env.TMPDIR
         else process.env.TMPDIR = previous

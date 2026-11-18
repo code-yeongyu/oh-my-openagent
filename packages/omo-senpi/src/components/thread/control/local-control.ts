@@ -1,7 +1,9 @@
 import { routingId, sessionPort } from "../tools/internals"
 import type { ThreadHostSession, ThreadToolSurfaceOptions } from "../tools/ports"
 import type { ThreadSummary } from "../contracts"
-import { refuse, type SessionControl } from "./port"
+import { interruptOver } from "./interrupt"
+import { refuse, SESSION_ONLY_THINKING_SCOPE, type SessionControl } from "./port"
+import { waitForTurnEnd } from "./wait-settled"
 
 const THINKING_LEVEL_UNSUPPORTED = "thinking_level_unsupported:"
 
@@ -19,13 +21,7 @@ export function createLocalControl(
     thread_id: threadId,
     title,
     visible: async () => visible(),
-    interrupt: async (turnId) => {
-      const result = await port.interrupt(routing, turnId, threadId)
-      return {
-        interrupted: result.interrupted === true,
-        ...(result.turnId === undefined ? {} : { turn_id: result.turnId }),
-      }
-    },
+    interrupt: (turnId) => interruptOver((request) => port.interrupt(routing, request, threadId), turnId),
     close: async () => {
       if (session.endpoint_kind === "tui")
         throw refuse(
@@ -50,9 +46,9 @@ export function createLocalControl(
       return { provider: selected.provider, id: selected.id }
     },
     getAvailableThinkingLevels: () => port.getAvailableThinkingLevels(routing),
-    setThinkingLevel: async (level, scope) => {
+    setThinkingLevel: async (level) => {
       try {
-        await port.setThinkingLevel(routing, level, scope, threadId)
+        await port.setThinkingLevel(routing, level, SESSION_ONLY_THINKING_SCOPE, threadId)
       } catch (error) {
         if (!(error instanceof Error) || !error.message.startsWith(THINKING_LEVEL_UNSUPPORTED)) throw error
         throw refuse(
@@ -64,5 +60,27 @@ export function createLocalControl(
       }
     },
     getMessages: () => port.getMessages(routing),
+    waitSettled: async (timeoutMs, signal) => {
+      const { watchSession } = port
+      if (watchSession === undefined)
+        throw refuse(
+          "unsupported",
+          `The host holding thread ${threadId} cannot report when its turn ends.`,
+          "Update omo on this device and restart its host.",
+          { command: "subscribe_sessions" },
+        )
+      return await waitForTurnEnd(
+        (handlers) => watchSession(routing, handlers, threadId),
+        (reason) =>
+          refuse(
+            "unsupported",
+            `The endpoint holding thread ${threadId} refused to report its status (${reason}).`,
+            "Update omo on this device and restart its host.",
+            { command: "subscribe_sessions", reason },
+          ),
+        timeoutMs,
+        signal,
+      )
+    },
   }
 }

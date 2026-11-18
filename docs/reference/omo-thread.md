@@ -1,7 +1,9 @@
 # omo thread - the session gateway from scripts and connectors
 
 `omo thread` runs every thread operation the agent tools offer (`thread_list`, `thread_send`,
-`thread_read`, `thread_bind` ... `thread_answer`) without an agent session. It is how a script,
+`thread_read`, `thread_report` ... `thread_answer`) without an agent session, plus the binding
+operations (`bind`, `unbind`, `rebind`, `bindings`) that are not session tools: the always-on
+gateway binds chat threads, and a script can do the same here. It is how a script,
 a cron job or a chat connector talks to running OmO sessions: terminal sessions (`tui`),
 Desktop threads and task children on their hosts (`rpc_host`).
 
@@ -48,6 +50,15 @@ omo thread outbox <binding-id> [--after <cursor>] [--limit <n>] [--ack]
 omo thread ack <binding-id> <cursor> [--provider-message-id <id>]
 ```
 
+`omo thread list` lists this device's threads (in this directory's workspace, or every workspace with `--all-scope`)
+together with the threads on the account's other devices, each with its `device`. With `--json` it prints the whole
+result as one object: `threads`, `devices` (each device's name, platform, kind, `online`, `last_seen`, `this_device`,
+its thread count and `listing`: `listed`, `incomplete` when it did not answer this listing, or `offline`) and
+`remote_unavailable` when other devices could not be listed, and `aliases_unavailable` when a thread listed without an
+alias may still hold one: `sign_in` or `host_unavailable` when the account's aliases could not be read, `not_asked` when
+the account's other devices cannot be reached from here: this device's device service is not connected, or it answered
+that the account's plan has no relay (a Free plan). Aliases are only read while other devices can be reached.
+
 `omo thread` does not create or resume sessions: session lifecycle belongs to the engine's host
 API, and a connector cannot start a session for a new chat thread through `omo thread` alone. To
 give a new chat thread its own session, a connector opens one on the operator endpoint
@@ -64,10 +75,15 @@ instead of acting twice (`deduplicated: true`); reusing a key with other argumen
 
 ## Sending
 
-A bindingless `send` delivers as `cli:<uid>`. `--mode auto` (the default) starts a turn on an idle
-session and otherwise queues behind the running turn, like `follow_up`; only `steer` enters a
-running turn, and it needs `--expected-turn` (the target's turn epoch): a missing epoch is
-`invalid_arguments`, a changed one `turn_conflict`. A target with no live endpoint gets
+A bindingless `send` delivers as `cli:<uid>`. `--mode auto` (the default) steers a running turn:
+the message enters the turn in flight, as typing into its terminal does, with that running turn as
+its expected turn (`delivery.kind: "steered"`, `effective_mode: "steer"`). On an idle session it
+starts a turn. It queues behind only what cannot be steered: a question the session waits on, a
+compaction, or a running turn whose epoch the engine does not report. If the turn ends before the
+steer reaches it, `auto` does not fail: it takes the lane the target has now (a new turn when idle,
+queued behind a turn that began since). `--mode follow_up` always queues behind the running turn.
+`--mode steer` steers only the turn you name with `--expected-turn` (the target's turn epoch): a
+missing epoch is `invalid_arguments`, a changed one `turn_conflict`. A target with no live endpoint gets
 `delivery.kind: "queued_offline"`: the row is durable and the session takes it when it runs again,
 exactly once. That holds whether its terminal exited, was killed or is stopped, and when no endpoint
 of the agent dir is running at all: for a send, nothing live is the offline case, never
@@ -88,7 +104,9 @@ message is admitted once. A target, when given, must be the binding's session.
   a `follow_up` binding is refused `invalid_arguments` (exit 1, `details: {binding_id, mode,
   inbound_mode}`). It is never silently downgraded. So one binding per thread can deliver the
   owner's messages as `auto` and everyone else's as `follow_up`. `--mode steer` and
-  `--expected-turn` are usage errors (exit 2): a binding message never steers.
+  `--expected-turn` are usage errors (exit 2): a binding message never names a turn to steer. An
+  `auto` message still steers a running turn, as an unbound `auto` send does; a `follow_up`
+  binding keeps every message queued behind it.
 - **Author.** `--author-id <platform-user-id> --author-name <display>` (plus an optional
   `--author-user-id <id>`, the omo user the connector mapped them to) names the human who wrote the
   message, as the connector authenticated them. Author flags are accepted only with `--binding`, and
@@ -108,7 +126,7 @@ What the receiving session does with a delivery depends on its state when its dr
 | State | `auto` | `steer` | `follow_up` |
 | --- | --- | --- | --- |
 | idle | starts a turn (`started`) | refused `not_steerable` | starts a turn (`started`) |
-| mid-turn | queued behind the turn (`queued`) | steered into the turn when `--expected-turn` is the current epoch (`steered`), else `turn_conflict` | queued behind the turn (`queued`) |
+| mid-turn | steered into the running turn (`steered`) | steered into the turn when `--expected-turn` is the current epoch (`steered`), else `turn_conflict` | queued behind the turn (`queued`) |
 | waiting on a question | queued (`queued`) | refused `not_steerable` | queued (`queued`) |
 | compacting | queued (`queued`) | refused `not_steerable` | queued (`queued`) |
 | offline (no live endpoint) | kept for the next run (`queued_offline`) | refused `turn_conflict` | kept for the next run (`queued_offline`) |
@@ -528,9 +546,9 @@ every other subcommand prints the full result.
 
 | Subcommand | `--json` on success |
 | --- | --- |
-| `list` | `[{thread_id, name, status: live\|resumable, cwd, created_at, updated_at: <ISO 8601 string>\|null, surface: tui\|desktop\|child\|daemon, endpoint: {kind: rpc_host\|tui, socket, routing_id}, alive, error_note?, ...}]`; live and degraded rows use the same bounded final-record policy, so `updated_at` is null rather than an older timestamp when the final complete valid entry's timestamp cannot be proved. After live and degraded rows are combined, the public list sorts known `updated_at` newest first, then unknown activity last, with `thread_id` ascending for ties. A live row also carries its endpoint's own `list_sessions` fields (`sessionId`, the routing handle; `durableSessionId`, `sessionPath`, `attachments`, `kind`, `socket`, `endpoint_kind`) |
-| `send` | `{kind:"ok", thread_id, delivery_id, message_seq, delivery: {kind: queued\|queued_offline\|started\|steered, ...}, effective_mode, endpoint_kind: rpc_host\|tui\|null, deduplicated}` |
-| `read` | `{kind:"ok", thread_id, items: [{seq, role: user\|assistant\|tool\|system, content}], truncated, next_cursor?, source, source_incomplete?, error_note?}` |
+| `list` | `[{thread, name, status: live\|resumable, machine?, cwd, created_at, updated_at: <ISO 8601 string>\|null, link, surface?: tui\|desktop\|child\|daemon, alive?, controls?, error_note?, device?, alias?}]`; `thread` is the address `read` and `send` take back. Live and degraded rows use the same bounded final-record policy, so `updated_at` is null rather than an older timestamp when the final complete valid entry's timestamp cannot be proved. After live and degraded rows are combined, the public list sorts known `updated_at` newest first, then unknown activity last, with `thread` ascending for ties. Routing ids, socket and session-file paths are not shown (#14044) |
+| `send` | `{kind:"ok", thread, delivery_id, message_seq, delivery: {kind: queued\|queued_offline\|started\|steered, ...}, effective_mode, endpoint_kind: rpc_host\|tui\|null, deduplicated}` |
+| `read` | `{kind:"ok", thread, link, items: [{seq, role: user\|assistant\|tool\|system, content}], truncated, next_cursor?, source, source_incomplete?, error_note?}` |
 | `bind` | `{kind:"ok", binding: <binding>, deduplicated}` |
 | `unbind` | `{kind:"ok", binding, already_closed, in_flight: [delivery ids], deduplicated}` |
 | `rebind` | `{kind:"ok", binding, closed: [delivery ids], deduplicated}` |
