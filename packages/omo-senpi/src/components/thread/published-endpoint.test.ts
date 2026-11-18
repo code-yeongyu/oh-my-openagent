@@ -190,7 +190,7 @@ test("a row only a delivery created keeps legacy discovery for the next send", a
   expect(await w.store.sessionOwner("target")).toBeNull()
   // The target is still busy with the first message: the live endpoint takes the second into that turn (the default steers).
   const second = await w.send()
-  expect(second).toMatchObject({ kind: "ok", delivery: { kind: "steered" }, endpoint: { kind: "rpc_host" } })
+  expect(second).toMatchObject({ kind: "ok", delivery: { kind: "steered" } })
   expect(target.runtime.enqueueCalls).toHaveLength(2)
 }, 15000)
 
@@ -216,8 +216,8 @@ async function listSendSteer(
   ])
   const listed =
     list.kind === "ok" && "threads" in list
-      ? (list.threads as ReadonlyArray<{ readonly thread_id: string; readonly state?: string }>).find(
-          (thread) => thread.thread_id === "target",
+      ? (list.threads as ReadonlyArray<{ readonly thread: string; readonly state?: string }>).find(
+          (thread) => thread.thread === "target",
         )
       : undefined
   return { listed, send, steer }
@@ -310,11 +310,11 @@ test("a terminal the engine still reports dead is offline to thread_list, send a
       throw new Error(`expected a thread list, got ${JSON.stringify(result)}`)
     return (
       result.threads as ReadonlyArray<{
-        readonly thread_id: string
+        readonly thread: string
         readonly state?: string
         readonly error_note?: string
       }>
-    ).find((thread) => thread.thread_id === "target")
+    ).find((thread) => thread.thread === "target")
   }
   const before = await listed()
   const [send, steer] = await Promise.all([

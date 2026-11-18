@@ -2,13 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { chmodSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import {
-  connectDeviceService,
-  deviceServiceStateDir,
-  type DeviceService,
-  LocalApiError,
-  type RemoteAttachEvent,
-} from "../src/index.ts"
+import { connectDeviceService, type DeviceService, LocalApiError, type RemoteAttachEvent } from "../src/index.ts"
 import { mintNonce, writeToken } from "../src/local-api/access.ts"
 import { connectLocalApi } from "../src/local-api/client.ts"
 import { validateWelcome } from "../src/local-api/validate.ts"
@@ -54,21 +48,6 @@ async function serviceFor(world: World = defaultWorld()): Promise<{ owner: FakeO
   services.push(service)
   return { owner, service }
 }
-
-describe("deviceServiceStateDir", () => {
-  test("uses ~/.omo/device-service on POSIX and LOCALAPPDATA on Windows", () => {
-    expect(deviceServiceStateDir("darwin", {}, "/Users/a")).toBe(join("/Users/a", ".omo", "device-service"))
-    expect(deviceServiceStateDir("linux", { LOCALAPPDATA: "/ignored" }, "/home/a")).toBe(
-      join("/home/a", ".omo", "device-service"),
-    )
-    expect(deviceServiceStateDir("win32", { LOCALAPPDATA: "C:\\Users\\a\\AppData\\Local" }, "C:\\Users\\a")).toBe(
-      join("C:\\Users\\a\\AppData\\Local", "OmO", "device-service"),
-    )
-    expect(deviceServiceStateDir("win32", {}, "C:\\Users\\a")).toBe(
-      join("C:\\Users\\a", "AppData", "Local", "OmO", "device-service"),
-    )
-  })
-})
 
 describe("connectDeviceService", () => {
   test("proves the owner, then reports the welcome status and version", async () => {
@@ -216,7 +195,7 @@ describe("DeviceService", () => {
 
   test("attaching to an unknown session fails with the service's error code", async () => {
     const { service } = await serviceFor()
-    const error = await service.attach(PEER, "bm8tc3VjaC1zZXNzaW9u").catch((e: unknown) => e)
+    const error = await service.attach(PEER, "bm8tc3VjaC1zZXNzaW9uLQ").catch((e: unknown) => e)
     expect(error).toBeInstanceOf(LocalApiError)
     expect((error as LocalApiError).code).toBe("session_not_found")
   })

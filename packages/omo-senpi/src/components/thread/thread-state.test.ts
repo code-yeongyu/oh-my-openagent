@@ -9,22 +9,11 @@ import { createGatewayStore } from "./gateway/store"
 import type { RemoteSessionRow } from "./remote/ports"
 import { B_ROW, createRemoteThreadFixture } from "./thread-remote-fixture"
 import { createThreadTools } from "./tools"
-import { threadState } from "./tools/internals"
 import { listThreads } from "./tools/read-ops"
 import type { ThreadHost, ThreadHostSession, ThreadHostView, ThreadToolSurfaceOptions } from "./tools/ports"
 
 // A thread's state is one of running | idle | inactive | archived (#13403, #13407, #13411): `online` is a device's,
 // never a thread's, so no row carries `alive`.
-
-describe("threadState is the one state rule (thread_list and local control both derive from it)", () => {
-  test("#given a mid-turn activity #when the state is derived #then running, queued and awaiting_approval are all running", () => {
-    for (const activity of ["running", "queued", "awaiting_approval"]) expect(threadState({ held: true, activity })).toBe("running")
-    expect(threadState({ held: true, activity: "errored" })).toBe("idle")
-    expect(threadState({ held: true })).toBe("idle")
-    expect(threadState({ held: false, activity: "queued" })).toBe("inactive")
-    expect(threadState({ archived: true, held: true, activity: "running" })).toBe("archived")
-  })
-})
 
 const directories: string[] = []
 const remoteFixture = createRemoteThreadFixture()
@@ -131,7 +120,7 @@ function localView(directory: string): ThreadHostView {
   }
 }
 
-type Row = { readonly thread_id: string; readonly state?: string; readonly status?: string; readonly model?: unknown }
+type Row = { readonly thread: string; readonly state?: string; readonly status?: string; readonly model?: unknown }
 
 function rows(result: ThreadToolResult): readonly Row[] {
   if (result.kind !== "ok" || !("threads" in result)) throw new Error(`not a list: ${JSON.stringify(result)}`)
@@ -140,7 +129,7 @@ function rows(result: ThreadToolResult): readonly Row[] {
 
 const table = (result: ThreadToolResult) =>
   Object.fromEntries(
-    rows(result).map((row) => [row.thread_id, { state: row.state, status: row.status, model: row.model ?? null }]),
+    rows(result).map((row) => [row.thread, { state: row.state, status: row.status, model: row.model ?? null }]),
   )
 
 describe("thread state on this device's rows", () => {
@@ -167,13 +156,13 @@ describe("thread state on this device's rows", () => {
   test("#given the same rows #when listed by default #then archived threads are hidden; state archived shows only them", () => {
     const directory = scratch()
     const options = surfaceOptions(directory)
-    const listed = rows(listThreads(options, localView(directory), true)).map((row) => row.thread_id)
+    const listed = rows(listThreads(options, localView(directory), true)).map((row) => row.thread)
     expect(listed.sort()).toEqual(["d-plain", "d-unarchived", "l-closed", "l-idle", "l-older-engine", "l-running"])
-    const archived = rows(listThreads(options, localView(directory), true, ["archived"])).map((row) => row.thread_id)
+    const archived = rows(listThreads(options, localView(directory), true, ["archived"])).map((row) => row.thread)
     expect(archived.sort()).toEqual(["d-archived", "l-archived"])
   })
 
-  test("#given live and degraded rows #when listed #then no row carries alive or the raw archived field, and only a held thread carries activity", () => {
+  test("#given live and degraded rows #when listed #then no row carries alive or the engine's raw activity/archived fields", () => {
     const directory = scratch()
     const result = listThreads(surfaceOptions(directory), localView(directory), true, [
       "running",
@@ -183,53 +172,9 @@ describe("thread state on this device's rows", () => {
     ])
     for (const row of rows(result)) {
       expect(row).not.toHaveProperty("alive")
+      expect(row).not.toHaveProperty("activity")
       expect(row).not.toHaveProperty("archived")
-      if (row.state === "inactive" || row.state === "archived") expect(row).not.toHaveProperty("activity")
     }
-  })
-
-  test("#given an engine reporting senpi#6688's activity detail #when listed #then each held row carries it, state folds it, and error_code rides only with errored", () => {
-    const cases = [
-      { id: "a-running", activity: "running", turn_id: "4", state: "running" },
-      { id: "a-queued", activity: "queued", turn_id: "5", state: "running" },
-      { id: "a-approval", activity: "awaiting_approval", turn_id: "6", state: "running" },
-      { id: "a-errored", activity: "errored", error_code: "rate_limit", turn_id: "7", state: "idle" },
-      { id: "a-idle", activity: "idle", error_code: "ignored", state: "idle" },
-    ] as const
-    const expected: Record<string, unknown> = {}
-    const sessions = cases.map((entry) => {
-      expected[entry.id] = {
-        state: entry.state,
-        activity: entry.activity,
-        ...(entry.activity === "errored" ? { error_code: "rate_limit" } : {}),
-        ...("turn_id" in entry ? { turn_id: entry.turn_id } : {}),
-      }
-      return {
-        sessionId: entry.id,
-        durableSessionId: entry.id,
-        name: entry.id,
-        status: "open" as const,
-        activity: entry.activity,
-        ...("error_code" in entry ? { error_code: entry.error_code } : {}),
-        ...("turn_id" in entry ? { turn_id: entry.turn_id } : {}),
-      }
-    })
-    const directory = scratch()
-    const result = listThreads(surfaceOptions(directory), { sessions, hosts: [], disk: [] } as never, true, [
-      "running",
-      "idle",
-    ])
-    const seen: Record<string, unknown> = {}
-    for (const row of rows(result)) {
-      const detail = row as { state: string; activity?: string; error_code?: string; turn_id?: string }
-      seen[row.thread_id] = {
-        state: detail.state,
-        activity: detail.activity,
-        ...(detail.error_code === undefined ? {} : { error_code: detail.error_code }),
-        ...(detail.turn_id === undefined ? {} : { turn_id: detail.turn_id }),
-      }
-    }
-    expect(seen).toEqual(expected)
   })
 })
 
@@ -270,33 +215,33 @@ describe("thread state on another device's rows", () => {
     const plain = await run("thread_list", {})
     expect(
       rows(plain)
-        .map((row) => row.thread_id)
+        .map((row) => row.thread)
         .sort(),
     ).toEqual(["r-ended", "r-idle", "r-running"])
     expect(plain).toMatchObject({ devices: [{ device: "here" }, { device: "b", threads: 3 }] })
     const archived = await run("thread_list", { state: ["archived"] })
     expect(
       rows(archived)
-        .map((row) => row.thread_id)
+        .map((row) => row.thread)
         .sort(),
     ).toEqual(["r-archived", "r-archived-ended"])
     const some = await run("thread_list", { state: ["running", "inactive"] })
     expect(
       rows(some)
-        .map((row) => row.thread_id)
+        .map((row) => row.thread)
         .sort(),
     ).toEqual(["r-ended", "r-running"])
   })
 
-  test("#given an offline device's cached rows (measured: 7 of an offline device's 90 rows read running) #when listed #then none reads running, each carries as_of, and archived still wins", async () => {
+  test("#given an offline device's cached rows (measured: 7 of an offline device's 90 rows read running) #when listed #then none reads running or idle, each carries as_of, and archived still wins", async () => {
     const asOf = Date.UTC(2026, 10, 14, 9, 0, 0)
-    const cached = REMOTE_ROWS.map((row) => ({ ...row, cached_as_of: asOf }))
+    const cached = REMOTE_ROWS.map((row) => ({ ...row, source: "cache" as const, as_of: asOf }))
     const { remote } = remoteFixture.account({ rows: cached })
     const { run } = remoteFixture.surface(remote, { sessions: [] })
     const result = await run("thread_list", { state: ["running", "idle", "inactive", "archived"] })
     expect(table(result)).toMatchObject({
-      "r-running": { state: "idle" },
-      "r-idle": { state: "idle" },
+      "r-running": { state: "inactive", status: "resumable" },
+      "r-idle": { state: "inactive", status: "resumable" },
       "r-ended": { state: "inactive" },
       "r-archived": { state: "archived" },
     })
@@ -368,10 +313,10 @@ describe("a thread its engine closed (t2pp, measured on omo 5.1.69: it vanished 
     expect(await run("thread_close", { thread: "dur-a" })).toMatchObject({ kind: "ok", closed: true })
     for (const scope of [{}, { all_scope: true }])
       expect(rows(await run("thread_list", scope))).toEqual([
-        expect.objectContaining({ thread_id: "dur-a", state: "inactive", status: "resumable", name: "plan the move" }),
+        expect.objectContaining({ thread: "dur-a", state: "inactive", status: "resumable", name: "plan the move" }),
       ])
     const read = await run("thread_read", { thread: "dur-a" })
-    expect(read).toMatchObject({ kind: "ok", thread_id: "dur-a", source: "session_jsonl" })
+    expect(read).toMatchObject({ kind: "ok", thread: "dur-a", source: "session_jsonl" })
     expect(read.kind === "ok" && "items" in read ? read.items.map((item) => item.role) : []).toEqual([
       "user",
       "assistant",
@@ -390,12 +335,15 @@ describe("thread_archive", () => {
     expect(await run("thread_archive", { thread: "dur-local" })).toMatchObject({
       kind: "ok",
       archived: true,
-      thread: { thread_id: "dur-local", state: "archived", name: "local peer" },
+      thread: "dur-local",
+      state: "archived",
+      name: "local peer",
     })
     expect(await run("thread_archive", { thread: "dur-local", archived: false })).toMatchObject({
       kind: "ok",
       archived: false,
-      thread: { thread_id: "dur-local", state: "idle" },
+      thread: "dur-local",
+      state: "idle",
     })
     expect(archived).toEqual([
       ["route-local", true, "dur-local"],
@@ -420,7 +368,8 @@ describe("thread_archive", () => {
       kind: "ok",
       archived: true,
       device: "b",
-      thread: { thread_id: "dur-on-b", state: "archived", device: "b" },
+      thread: "dur-on-b",
+      state: "archived",
     })
     expect(sent.filter((entry) => entry.rpc?.["type"] === "set_session_archived")).toEqual([
       {

@@ -1,9 +1,9 @@
 import type { ThreadToolResult } from "../contracts"
+import { toThreadAddressEntries } from "../address-book"
 import { workspaceEntries } from "../addressing"
 import { rowThreadId } from "../remote/ports"
 import { createRelayControl, deviceOnline } from "../remote/lazy-ops"
-import { toThreadAddressEntries } from "../address-book"
-import { resolution, sendAddressBook, targetSession, resolveAcross } from "../tools/internals"
+import { resolveAcross, sendAddressBook, targetSession } from "../tools/internals"
 import type { ThreadHostView, ThreadToolSurfaceOptions } from "../tools/ports"
 import { createLocalControl } from "./local-control"
 import type { SessionControl } from "./port"
@@ -27,10 +27,12 @@ export async function locateControl(
   allScope: boolean | undefined,
   callerId: string,
 ): Promise<LocatedControl> {
-  // Decision 0027: one resolver over this device's entries and the relay transport's address book. This device's entries
-  // include the session file the address names when no engine lists it (closed), so it resolves as not live.
+  // Decision 0027: one resolver over this device's entries and the relay transport's address book. The entries are the
+  // ones a send resolves against, session files no engine runs included, so every tool finds the thread a send finds.
+  // A session id both miss gets the send's account-wide lookup (A4.3.3, #13215): a session another device holds but
+  // runs nowhere is its ended row, so it answers not_live as it does on its own device, never not_found.
   const entries = toThreadAddressEntries(sendAddressBook(options, current, address, true))
-  const resolved = await resolveAcross(options, entries, address, callerId, allScope)
+  const resolved = await resolveAcross(options, entries, address, callerId, allScope, "exact", true)
   if (resolved.kind === "ok" && resolved.entry.transport?.kind === "relay" && options.remote !== undefined) {
     const row = resolved.entry.transport.row
     const offline = await deviceOnline(options.remote, row.device)
