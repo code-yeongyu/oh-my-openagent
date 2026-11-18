@@ -199,6 +199,7 @@ export function createRemoteThreadFixture() {
       promptOutcome?: RemoteCommandOutcome
       admitRefuse?: string
       admitOutcome?: RemoteCommandOutcome
+      stateOutcomes?: readonly RemoteCommandOutcome[]
       heldDraft?: number
       openData?: JsonObject
       failSessionsList?: boolean
@@ -265,6 +266,8 @@ export function createRemoteThreadFixture() {
     // admissions its user's open draft still holds (held_draft, taken by nothing).
     const admitted = new Set<string>()
     let heldDraft = options.heldDraft ?? 0
+    // How b's next get_state calls end before its engine answers them (a lost reply, a restarted hand), one per call.
+    const stateOutcomes = [...(options.stateOutcomes ?? [])]
     // The session's records a prompt makes it write, held until the follower first reads after the answer: the
     // engine's turn records follow its reply out over the wire, and the CLI's read is the first observable hop after
     // its own bookkeeping for that reply.
@@ -334,6 +337,7 @@ export function createRemoteThreadFixture() {
         for (const id of options.relayKeyOnly === true ? [key] : [opened, key]) live.add(id)
         return ok(options.openData ?? { sessionId: "rpc-9", state: { durableSessionId: opened } })
       }
+      if (rpc["type"] === "get_state" && stateOutcomes.length > 0) return stateOutcomes.shift() as RemoteCommandOutcome
       if (rpc["type"] === "get_state" && options.stateRefusedAfterAdmit !== undefined && admitted.size > 0)
         return { kind: "refused", reason: options.stateRefusedAfterAdmit }
       if (rpc["type"] === "get_state")
