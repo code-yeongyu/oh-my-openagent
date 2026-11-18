@@ -16,7 +16,8 @@ const TABLE_KEY = `EnvironmentVariables.${SERVICE_TABLE_ENV}`
 const BOOTSTRAP_ATTEMPTS = 5
 const BOOTSTRAP_RETRY_MS = 1_000
 
-const plistPath = (home: string, label: string): string => join(home, "Library", "LaunchAgents", `${label}.plist`)
+export const plistPath = (home: string, label: string): string =>
+  join(home, "Library", "LaunchAgents", `${label}.plist`)
 
 /** `launchctl bootstrap` right after a bootout can fail while launchd still tears the job down: retried, as the installer does. */
 async function bootstrapJob(host: ColdWakeHost, plist: string) {
