@@ -796,6 +796,7 @@
     "packages/omo-opencode/src/cli/service-auth/keychain-helper/darwin-backend.ts",
     "packages/omo-opencode/src/cli/service-auth/keychain-helper/darwin-read.ts",
     "packages/omo-opencode/src/cli/service-auth/keychain-helper/darwin-store.ts",
+    "packages/omo-opencode/src/cli/service-auth/keychain-helper/dedicated-store.ts",
     "packages/omo-opencode/src/cli/service-auth/keychain-helper/location.ts",
     "packages/omo-opencode/src/cli/service-auth/keychain-helper/migration.ts",
     "packages/omo-opencode/src/cli/service-auth/keychain-helper/owner-marker.ts",
