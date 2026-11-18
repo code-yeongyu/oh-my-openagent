@@ -124,7 +124,12 @@ function messageOf(event: unknown): EngineMessage | undefined {
 type DeliveryDetails = {
   readonly delivery_id?: unknown
   readonly chain_count?: unknown
-  readonly sender?: { readonly kind?: unknown; readonly session_id?: unknown; readonly name?: unknown }
+  readonly sender?: {
+    readonly kind?: unknown
+    readonly session_id?: unknown
+    readonly name?: unknown
+    readonly platform?: unknown
+  }
 }
 
 /** senpi `external-admission.js` `deliveryIdOf`: the delivery a `session_control_delivery` message carries. */
@@ -135,6 +140,7 @@ function deliveryOf(message: EngineMessage):
       readonly agentSender: string | undefined
       readonly senderName: string | undefined
       readonly device: string | undefined
+      readonly rpcInput: boolean
     }
   | "malformed"
   | undefined {
@@ -157,6 +163,9 @@ function deliveryOf(message: EngineMessage):
         ? details.sender.name.trim()
         : undefined,
     device: deliveryDevice(id),
+    // senpi admits a `prompt`/`steer`/`follow_up` sent over the session's RPC socket as this same message, under the
+    // client's `clientMessageId` and with this sender it stamps itself (`session-control-input-commands.js`).
+    rpcInput: details?.sender?.kind === "external" && details.sender.platform === "rpc",
   }
 }
 
@@ -225,6 +234,12 @@ function noteInput(run: RunContext, message: EngineMessage): void {
   if (run.answered) startGroup(run)
   if (message.role === "user") run.local = true
   if (delivery === undefined) return
+  // RPC input is typed input, never a delivery this session received: its id is the client's to choose, so it is no
+  // cause, no consumed origin and no reply sender, and a send from its run starts a new causal root (#12317).
+  if (delivery.rpcInput) {
+    run.local = true
+    return
+  }
   // Every consumed delivery is the cause of the run's next send, on either transport (decision 0027 section 3); one no row
   // here holds starts a new root there and its hop count continues the chain (K8).
   run.cause = delivery.id
