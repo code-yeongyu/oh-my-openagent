@@ -207,8 +207,12 @@ const newestRetiredRoot = async (stateDir: string, account: string): Promise<str
       if (isMissing(error)) return null
       throw error
     })
-    const anchor = raw === null ? null : parsePin(raw, account)
-    if (anchor !== null) return anchor.genesisDigest
+    if (raw === null) continue
+    // The newest pin that exists decides (#14157): one that does not parse (corrupt, truncated, another
+    // account's) makes the root unknown, so the check is skipped rather than compared with an older root.
+    const anchor = parsePin(raw, account)
+    if (anchor === null) throw Object.assign(new Error("retired pin does not parse"), { code: "PIN_UNREADABLE" })
+    return anchor.genesisDigest
   }
   return null
 }
