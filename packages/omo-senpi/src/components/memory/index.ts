@@ -16,6 +16,7 @@ import { createSessionBinder, readSessionSurface, releaseSession, type SessionSt
 import { finalizeIdentityRun } from "./transient-identity"
 import type { DeviceAccountSource } from "./device-session/account-source"
 import { selectedDeviceAccountSource } from "./device-session/account-runtime-loader"
+import { joinedDeviceRepoCreator } from "./device-session/joined-repo"
 import { createDeviceSessionResolver } from "./device-session/resolver"
 import { trackMemoryHooks } from "./hook-work"
 import { createSyncRunner, type SyncRunner } from "./sync-runner"
@@ -94,6 +95,11 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
             source: deviceAccount,
             pinDir,
             loadRuntime: () => import("#omo-memory-sync-runtime"),
+            joinedRepo: {
+              joined: async (account) =>
+                (await (await import("#omo-memory-sync-runtime")).loadTrustAnchor(pinDir, account)).ok,
+              create: joinedDeviceRepoCreator(ctx.logger),
+            },
           }),
         })
       const syncLifetime = new AbortController()
@@ -115,6 +121,8 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
                   syncSessionId === undefined ? undefined : sessions.get(syncSessionId)?.context?.identityPaths.repo
                 return repo === undefined ? undefined : readMemoryRpcSync((path) => syncRunner.status(path), repo)
               },
+              stopSync: () => syncRunner.idleTurnedOff(),
+              resumeSync: () => syncRunner.resumeIdle(),
               warn: (message, fields) => ctx.logger.warn(message, fields),
             })
       primeMemoryPersonaAssets({ logger: ctx.logger })

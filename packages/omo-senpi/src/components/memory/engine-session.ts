@@ -30,6 +30,8 @@ export interface MemoryEngineSession {
   readonly author: GitCommitAuthor
   /** Legacy-frontmatter repair outcome; only the first preparation per repository in this process runs it. */
   readonly normalization?: NormalizeFrontmatterResult
+  /** Set when this preparation created the repository (decided under the writer lock, so at most one caller sees it). */
+  readonly created?: true
 }
 
 const normalizedRepos = new Set<string>()
@@ -50,6 +52,7 @@ export async function prepareMemoryEngineSession(
   const repo = new GitMemoryRepo({ dir: identityPaths.repo, agentId: identity })
   const lock = createMemoryWriterLock(identity, identityPaths, options)
   const author: GitCommitAuthor = { agentId: identity, authorName: identity }
+  let created = false
   if (!existsSync(join(identityPaths.repo, ".git"))) {
     await lock("memory-write", async () => {
       if (!existsSync(join(identityPaths.repo, ".git"))) {
@@ -59,13 +62,15 @@ export async function prepareMemoryEngineSession(
             installHooks(dir, { checker: memoryHookChecker() })
           },
         })
+        created = true
       }
     })
   }
-  if (normalizedRepos.has(identityPaths.repo)) return { repo, lock, author }
+  const createdField = created ? ({ created: true } as const) : {}
+  if (normalizedRepos.has(identityPaths.repo)) return { repo, lock, author, ...createdField }
   if (!(await frontmatterNormalizationPending(repo))) {
     normalizedRepos.add(identityPaths.repo)
-    return { repo, lock, author }
+    return { repo, lock, author, ...createdField }
   }
   try {
     const normalization = await lock("memory-write", async () => {
@@ -73,11 +78,11 @@ export async function prepareMemoryEngineSession(
       return normalizeMemoryFrontmatter(repo, author)
     })
     normalizedRepos.add(identityPaths.repo)
-    return { repo, lock, author, normalization }
+    return { repo, lock, author, normalization, ...createdField }
   } catch (error) {
     // Another writer owns the repository right now. The tool's own lock acquisition reports the
     // contention to the caller, and the next preparation in this process retries the repair.
-    if (error instanceof LockContentionError) return { repo, lock, author }
+    if (error instanceof LockContentionError) return { repo, lock, author, ...createdField }
     throw error
   }
 }

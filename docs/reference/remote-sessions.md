@@ -48,13 +48,13 @@ open). The agent tool `thread_create` takes the same options as `model`, `reason
 `permission_preset`, `worktree`, `prompt` and `delivery`; there `permission_preset` may only keep or
 narrow the calling session's own mode.
 
-The canonical session identity is the durable `thread.thread_id` that `open --json` returns. Pass it
+The canonical session identity is the `thread` value that `open --json` returns. Pass it
 directly to `send`, `model`, `interrupt`, `close` or `attach`; the CLI finds its device in the account
 listing. All five also take `<device>/<session>`, with either the durable id or the listing key in the
 `SESSION` column; an explicit device skips the account listing, and a durable id that device has not
 listed yet (a session opened a moment ago) is located on that device. A bare id is found through the
 account listing, which can lag a session opened a moment ago: right after `open`, use
-`<device>/<thread_id>`.
+`<device>/<thread>`.
 
 `send`
 with `--steer` goes into the running turn, and `--no-wait` returns once the session took the message
@@ -228,11 +228,12 @@ not running (`packages/device-service-core/src/cold-wake/`).
 | --- | --- | --- |
 | Unit | systemd user unit `~/.config/systemd/user/omo-session-host.service`, enabled (`WantedBy=default.target`) | LaunchAgent `ai.omo.session-host`, `~/Library/LaunchAgents/ai.omo.session-host.plist` |
 | Runs | `<omo> daemon run --pinned` (an npm launcher script under the runtime that ran it), with `OMO_CODING_AGENT_DIR` set to the agent dir the bootstrap registers and `PATH` as it was at install | same |
-| Always on | `Restart=always`, `RestartSec=30`, `StartLimitIntervalSec=0`, `KillMode=process` | `RunAtLoad`, `KeepAlive`, `ThrottleInterval` 30, `AbandonProcessGroup` |
+| Runs when | `Type=oneshot`, `TimeoutStartSec=300` (a hung start ends as failed), `StartLimitIntervalSec=0`, `KillMode=process`: at login and on every start | `RunAtLoad`, `AbandonProcessGroup`: at load and on every `launchctl kickstart` |
 | Table entry | `OMO_RELAYD_SERVICES` entry `"omo": {"systemd_user": "omo-session-host.service", "senders": []}` in the drop-in `~/.config/systemd/user/omo-relay-daemon.service.d/50-omo-cold-wake.conf` | entry `"omo": {"launchd": "ai.omo.session-host", "senders": []}` in the device service's plist `EnvironmentVariables` |
 
-`omo daemon run` ensures the host, which detaches, and exits; the service manager runs it again after every
-exit, at most every 30 seconds, so a host that ended is started again and a running one is reused. Stopping or
+`omo daemon run` ensures the host, which detaches, and exits. The unit runs it once per start: at login, on
+every `omo remote bootstrap`, and on every cold wake (the device service starts the unit), so a host that ended is
+started again when it is needed and a running one is reused. Nothing re-runs it on a timer. Stopping or
 restarting the unit never ends the host or its sessions. `--pinned` makes the host it starts never idle-exit
 (see [`omo daemon`](omo-daemon.md)); a host another omo already started is reused as it is, and once it
 idles out the next run starts a pinned one.

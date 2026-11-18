@@ -721,7 +721,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
         const reply = replyData(outcome.response)
         const turn = text(reply["turnId"])
         return ok({
-          thread_id: thread,
+          thread,
           ...(turn === undefined ? {} : { turn_id: turn }),
           interrupted: reply["interrupted"] === true,
           background: backgroundOf(reply["background"]),

@@ -125,25 +125,27 @@ describe("category prompt append resolvers", () => {
 })
 
 describe("GPT builtin defaults and gates", () => {
-  it("#given the builtin definitions #then ultrabrain runs Astra max, deep-high Astra high, deep-low GPT-6.1 Sol medium, all on the chatgpt-subscription lane", () => {
-    expect(definition("ultrabrain").config).toEqual({ model: "chatgpt-subscription/gpt-6-astra", variant: "max" })
-    expect(definition("deep-high").config).toEqual({ model: "chatgpt-subscription/gpt-6-astra", variant: "high" })
-    expect(definition("deep-low").config).toEqual({ model: "chatgpt-subscription/gpt-6.1-sol", variant: "medium" })
+  it("#given the builtin definitions #then ultrabrain runs Astra max, deep-high Astra high, deep-low GPT-6.2 Sol medium, all on the chatgpt-subscription lane", () => {
+    expect(definition("ultrabrain").config).toEqual({ model: "chatgpt-subscription/gpt-6.2-astra", variant: "max" })
+    expect(definition("deep-high").config).toEqual({ model: "chatgpt-subscription/gpt-6.2-astra", variant: "high" })
+    expect(definition("deep-low").config).toEqual({ model: "chatgpt-subscription/gpt-6.2-sol", variant: "medium" })
   })
 
   it("#given unspecified-high #then its default is the Opus 5.5 rung its chain now leads with, not Astra", () => {
     expect(definition("unspecified-high").config).toEqual({ model: "anthropic/claude-opus-5-5", variant: "medium" })
   })
 
-  it("#given the gates #then ultrabrain opens on either flagship, deep-low on a GPT-6.1 Sol or GPT-5.6 Sol tier, deep-high on Astra alone, unspecified-high is ungated", () => {
-    expect(definition("ultrabrain").requiresModel).toEqual(["gpt-6-astra", "gpt-5.6-sol"])
+  it("#given the gates #then ultrabrain opens on any flagship, deep-low on a GPT-6.x or GPT-5.6 Sol tier, deep-high on Astra alone, unspecified-high is ungated", () => {
+    expect(definition("ultrabrain").requiresModel).toEqual(["gpt-6.2-astra", "gpt-6-astra", "gpt-5.6-sol"])
     expect(definition("deep-low").requiresModel).toEqual([
+      "gpt-6.2-sol",
+      "gpt-6.2-sol-fast",
       "gpt-6.1-sol",
       "gpt-6.1-sol-fast",
       "gpt-5.6-sol-fast",
       "gpt-5.6-sol",
     ])
-    expect(definition("deep-high").requiresModel).toBe("gpt-6-astra")
+    expect(definition("deep-high").requiresModel).toEqual(["gpt-6.2-astra", "gpt-6-astra"])
     expect(definition("unspecified-high").requiresModel).toBeUndefined()
   })
 })

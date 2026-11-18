@@ -39,7 +39,7 @@ export function parseTarget(verb: string, value: string | undefined): RemoteSess
   const slash = value?.indexOf("/") ?? -1
   if (value === undefined || value === "" || slash === 0 || slash === value.length - 1)
     throw new UsageError(
-      `omo remote ${verb}: name the session as <device>/<session> (the SESSION column of omo remote sessions) or by the thread_id open printed`,
+      `omo remote ${verb}: name the session as <device>/<session> (the SESSION column of omo remote sessions) or by the thread value open printed`,
     )
   return slash === -1 ? { session: value } : { device: value.slice(0, slash), session: value.slice(slash + 1) }
 }
