@@ -131,7 +131,12 @@ describe("thread_create with worktree on another device", () => {
       },
     }
     const { run } = surface(signedOut)
-    const result = await run("thread_create", { device: "studio", cwd: "/repo/on/b", worktree: {} })
+    const result = await run("thread_create", {
+      name: "thread-create-worktree-signed-out",
+      device: "studio",
+      cwd: "/repo/on/b",
+      worktree: {},
+    })
     expect(failure(result)).toMatchObject({
       code: "host_unavailable",
       details: { device: "b", reason: "sign_in_required" },

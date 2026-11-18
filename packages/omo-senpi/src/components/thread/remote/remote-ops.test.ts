@@ -726,8 +726,12 @@ describe("#13481 review: a started send prints its own turn, never an earlier id
 describe("holderTarget: an alias holder this device cannot locate because its own relay sign-in lapsed", () => {
   test("#given the locate answers sign_in_required #when the holder is resolved #then host_unavailable names the sign-in, not a re-claim", async () => {
     const remote = {
+      client: fakeRemoteClient({
+        state: () => "connected",
+        here: "a",
+        devices: () => [{ device: "b", label: "b", online: true }],
+      }),
       sessions: {
-        devices: async () => [{ device: "b", label: "b", online: true }],
         locate: async () => ({ kind: "refused" as const, reason: "sign_in_required" }),
       },
     } as unknown as RemoteThreadSurface
