@@ -13,11 +13,15 @@ export type ColdWakeHost = {
   readonly pause: (milliseconds: number) => Promise<void>
 }
 
-/** `serviceRestarted`: the device service was restarted (or its job reloaded) because its table changed. */
+/**
+ * `serviceRestarted`: the device service was restarted (or its job reloaded) because its table changed.
+ * `service_replaced`: another writer reinstalled the device service during its restart and dropped the table (macOS).
+ */
 export type ColdWakeOutcome =
   | { readonly kind: "installed" | "removed"; readonly serviceRestarted: boolean }
   | { readonly kind: "unsupported" }
   | { readonly kind: "service_not_installed" }
+  | { readonly kind: "service_replaced" }
   | { readonly kind: "table_invalid"; readonly reason: string }
   | { readonly kind: "failed"; readonly step: string; readonly detail: string }
 
