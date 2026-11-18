@@ -209,7 +209,7 @@ try {
   record(1, "list", listed.kind === "ok" ? "pass" : "fail", errorCode(listed))
 
   // 2. create A
-  const createdA = await call(tools, "thread_create", { cwd: scratch.cwd })
+  const createdA = await call(tools, "thread_create", { cwd: scratch.cwd, name: "session-control-a" })
   record(2, "create-a", createdA.kind === "ok" ? "pass" : "fail", errorCode(createdA))
   if (createdA.kind !== "ok") throw new Error("thread_create A failed; the rest of the scenario needs it")
   const threadA = createdA.thread
@@ -226,7 +226,7 @@ try {
   )
 
   // 4. a second thread cannot take A's label
-  const createdB = await call(tools, "thread_create", { cwd: scratch.cwd })
+  const createdB = await call(tools, "thread_create", { cwd: scratch.cwd, name: "session-control-b" })
   if (createdB.kind !== "ok") throw new Error("thread_create B failed; the conflict check needs it")
   const threadB = createdB.thread
   await call(tools, "thread_rename", { thread: threadB, name: BETA, all_scope: true })
