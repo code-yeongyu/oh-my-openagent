@@ -186,3 +186,47 @@ describe("omo remote session verbs close what they opened", () => {
     }
   })
 })
+
+// #13425: a waiting send settles typed inside a bound; the queue notice and session end reach --json too.
+describe("omo remote send bounded settle (#13425)", () => {
+  const remoteFixture = createRemoteThreadFixture()
+
+  test("#given a turn that never settles #when a person waits with --timeout #then the send answers a typed timeout inside the bound", async () => {
+    const account = remoteFixture.account()
+    const out: string[] = []
+    const errors: string[] = []
+    const started = Date.now()
+    const dependencies = {
+      connect: async () => {
+        throw new Error("the verb reaches the device through the injected surface")
+      },
+      output: (line: string) => out.push(line),
+      error: (line: string) => errors.push(line),
+      write: () => {},
+      now: () => 0,
+      stateDir: connectedStateDir(),
+      accountShow: async () => {
+        throw new Error("account show is not part of a session verb")
+      },
+      remote: () => account.remote,
+    } as unknown as RemoteCommandDependencies
+    try {
+      const code = await runSession(
+        {} as DeviceService,
+        parseSession("send", ["--timeout", "1", "b/rk-on-b", "ping"]).session,
+        true,
+        dependencies,
+      )
+      const waited = Date.now() - started
+      const parsed = JSON.parse(out[0] ?? "{}")
+      expect({ code, kind: parsed.kind, waitedUnderBound: waited < 10_000 }).toEqual({
+        code: REMOTE_EXIT.failed,
+        kind: "timeout",
+        waitedUnderBound: true,
+      })
+    } finally {
+      await remoteFixture.cleanup()
+    }
+  })
+
+})
