@@ -29,6 +29,19 @@ export const failed = (step: string, output: string): ColdWakeOutcome => ({
 
 const UNIT_MODE = 0o644
 
+// Unchanged content used to return without touching the file, so the mode repair must not turn a unit this user cannot
+// chmod (another owner's, a read-only filesystem) into a failed install; any other error is still raised.
+const UNREPAIRABLE = new Set(["EPERM", "EACCES", "EROFS"])
+
+const repairMode = (path: string): void => {
+  if ((statSync(path).mode & 0o777) === UNIT_MODE) return
+  try {
+    chmodSync(path, UNIT_MODE)
+  } catch (error) {
+    if (!(error instanceof Error && "code" in error && UNREPAIRABLE.has(String(error.code)))) throw error
+  }
+}
+
 /**
  * Writes `text` through a temp file and a rename, mode 0644: a service manager refuses a group-writable unit. The mode is
  * set by chmod before the rename because a creation mode is ANDed with ~umask (umask 077 would leave 0600). An unchanged
@@ -36,7 +49,7 @@ const UNIT_MODE = 0o644
  */
 export const writeIfChanged = (path: string, text: string): boolean => {
   if (existsSync(path) && readFileSync(path, "utf8") === text) {
-    if ((statSync(path).mode & 0o777) !== UNIT_MODE) chmodSync(path, UNIT_MODE)
+    repairMode(path)
     return false
   }
   mkdirSync(dirname(path), { recursive: true })

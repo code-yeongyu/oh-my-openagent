@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
+import * as fs from "node:fs"
 import { chmodSync, existsSync, readFileSync, statSync } from "node:fs"
 import { join } from "node:path"
 
@@ -68,6 +69,21 @@ describe("cold wake on Linux", () => {
     expect(await installColdWake(host, LAUNCH)).toEqual({ kind: "installed", serviceRestarted: false })
     expect(statSync(unit).mode & 0o777).toBe(0o644)
     expect(runs.filter((r) => !r.includes(" show "))).toEqual([])
+  })
+
+  // The repair is best effort: a unit this user cannot chmod (another owner's, a read-only filesystem) still installs.
+  test.skipIf(process.platform === "win32")("installs an unchanged unit whose mode cannot be repaired", async () => {
+    const { host, home } = fakeSystemd()
+    await installColdWake(host, LAUNCH)
+    chmodSync(join(UNIT_DIR(home), "omo-session-host.service"), 0o600)
+    const denied = spyOn(fs, "chmodSync").mockImplementation(() => {
+      throw Object.assign(new Error("EPERM: operation not permitted, chmod"), { code: "EPERM" })
+    })
+    try {
+      expect(await installColdWake(host, LAUNCH)).toEqual({ kind: "installed", serviceRestarted: false })
+    } finally {
+      denied.mockRestore()
+    }
   })
 
   test("starts a unit that is not running without rewriting anything else", async () => {
