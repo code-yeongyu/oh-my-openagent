@@ -1,6 +1,7 @@
 import { createHash, createPrivateKey, sign } from "node:crypto"
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises"
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
+import { syncRequestHeaders } from "@oh-my-opencode/memory-core/sync-capabilities"
 import { z } from "zod"
 import { deviceName, isGeneratedDeviceName } from "./device-name"
 import { readMachineDigest } from "./machine-digest"
@@ -45,8 +46,18 @@ const describe = (error: unknown): string => (error instanceof Error ? error.mes
 const refusalKey = (deviceId: string, digest: string): string =>
   createHash("sha256").update(`${deviceId}\n${digest}`, "utf8").digest("hex")
 
-async function refusedRecently(path: string, key: string, nowMs: number): Promise<boolean> {
-  const text = await readFile(path, "utf8").catch(() => null)
+/** Settles as `work` does, or rejects once `signal` aborts, so a step that cannot be cancelled is never waited past it. */
+function bounded<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(signal.reason)
+  return new Promise<T>((resolve, reject) => {
+    const stop = () => reject(signal.reason)
+    signal.addEventListener("abort", stop, { once: true })
+    work.then(resolve, reject).finally(() => signal.removeEventListener("abort", stop))
+  })
+}
+
+async function refusedRecently(path: string, key: string, nowMs: number, signal: AbortSignal): Promise<boolean> {
+  const text = await readFile(path, { encoding: "utf8", signal }).catch(() => null)
   if (text === null) return false
   let value: unknown
   try {
@@ -58,11 +69,13 @@ async function refusedRecently(path: string, key: string, nowMs: number): Promis
   return note.success && note.data.key === key && nowMs - note.data.at < MACHINE_EXISTS_RETRY_MS
 }
 
-async function rememberRefusal(path: string, key: string, nowMs: number): Promise<void> {
+async function rememberRefusal(path: string, key: string, nowMs: number, signal: AbortSignal): Promise<void> {
   await mkdir(dirname(path), { recursive: true, mode: 0o700 })
   const staging = `${path}.${process.pid}.tmp`
-  await writeFile(staging, JSON.stringify({ key, at: nowMs }), { mode: 0o600 })
-  await rename(staging, path)
+  await writeFile(staging, JSON.stringify({ key, at: nowMs }), { mode: 0o600, signal })
+  // The note only lands while the fix-up still runs; a budget that ran out meanwhile leaves no file behind.
+  if (signal.aborted) await rm(staging, { force: true })
+  else await rename(staging, path)
 }
 
 /**
@@ -70,6 +83,7 @@ async function rememberRefusal(path: string, key: string, nowMs: number): Promis
  * omo generated becomes the machine name once. The service's own device list says whether either is still owed, so a
  * later refresh sends nothing. Never throws and never ends, revokes or replaces the sign-in: a machine_exists refusal is
  * logged once and remembered locally, so later refreshes do not ask again until MACHINE_EXISTS_RETRY_MS has passed.
+ * Once `signal` aborts (the fix-up budget ran out) it settles at the next step and writes and logs nothing more.
  */
 export async function reconcileDevice(options: {
   readonly api: string
@@ -82,9 +96,14 @@ export async function reconcileDevice(options: {
   readonly renamed: (name: string) => Promise<void>
   readonly refusalPath: string
   readonly log: (line: string) => void
+  /** The fix-up budget: every request is expected to abort on it, and the uncancellable steps are raced against it. */
+  readonly signal: AbortSignal
 }): Promise<void> {
-  const { credentials, request, log } = options
-  const auth = { authorization: `Bearer ${credentials.accessToken}` }
+  const { credentials, request, signal } = options
+  const log = (line: string) => {
+    if (!signal.aborted) options.log(line)
+  }
+  const auth = syncRequestHeaders(credentials.accessToken)
   let own: z.infer<typeof ownDeviceSchema>
   try {
     const listed = deviceListSchema.safeParse(await request("/v1/devices", { headers: auth }))
@@ -109,16 +128,16 @@ export async function reconcileDevice(options: {
   }
   if (own.revokedAt !== null || own.current === false) return
   // A service that does not report machineBound predates the binding route; nothing is sent to it.
-  if (own.machineBound === false) await bindOnce(options, auth)
+  if (own.machineBound === false) await bindOnce(options, auth, log)
   const name = options.machine.name()
-  if (!isGeneratedDeviceName(own.name) || own.name === name) return
+  if (signal.aborted || !isGeneratedDeviceName(own.name) || own.name === name) return
   try {
     await request(`/v1/devices/${encodeURIComponent(own.id)}`, {
       method: "PATCH",
       headers: { ...auth, "content-type": "application/json" },
       body: JSON.stringify({ name }),
     })
-    await options.renamed(name)
+    if (!signal.aborted) await options.renamed(name)
   } catch (error) {
     log(`omo: could not rename this device to this computer's name (${describe(error)}).`)
   }
@@ -126,14 +145,15 @@ export async function reconcileDevice(options: {
 
 async function bindOnce(
   options: Parameters<typeof reconcileDevice>[0],
-  auth: { readonly authorization: string },
+  auth: Readonly<Record<string, string>>,
+  log: (line: string) => void,
 ): Promise<void> {
-  const { credentials, log } = options
+  const { credentials, signal } = options
   try {
-    const machineDigest = await options.machine.digest()
+    const machineDigest = await bounded(options.machine.digest(), signal)
     if (machineDigest === undefined) return
     const key = refusalKey(credentials.device.id, machineDigest)
-    if (await refusedRecently(options.refusalPath, key, options.nowMs)) return
+    if (await refusedRecently(options.refusalPath, key, options.nowMs, signal)) return
     const accountId =
       credentials.accountId ?? credentials.owner?.accountId ?? (await options.accountOf(credentials.accessToken))
     if (accountId === undefined) throw new Error("the service named no account for this sign-in")
@@ -163,7 +183,8 @@ async function bindOnce(
       log(
         "omo: another OmO device already holds this computer, so this sign-in was left as it is. Remove the duplicate device on the Devices page of your OmO account.",
       )
-      await rememberRefusal(options.refusalPath, key, options.nowMs).catch((cause: unknown) =>
+      if (signal.aborted) return
+      await rememberRefusal(options.refusalPath, key, options.nowMs, signal).catch((cause: unknown) =>
         log(`omo: could not remember that refusal (${describe(cause)}).`),
       )
     }
