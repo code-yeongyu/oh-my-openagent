@@ -43,6 +43,8 @@ export function createdThreadId(callerId: string, idempotencyKey: string): strin
 /** `warnings`: steps after the session was created that failed; the thread exists and is answered anyway. */
 export type HostedThread = ThreadToolSummary & {
   readonly device?: string
+  /** A row from another device's cached listing: when that listing was taken. */
+  readonly as_of?: string
   readonly worktree?: ThreadWorktree
   readonly warnings?: readonly ThreadToolFailure[]
 }

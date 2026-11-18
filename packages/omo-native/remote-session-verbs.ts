@@ -9,7 +9,7 @@ import {
 } from "../omo-senpi/src/components/thread/control/operations"
 import { createRelayControl } from "../omo-senpi/src/components/thread/control/relay-control"
 import { createDeviceServiceSessions } from "../omo-senpi/src/components/remote/port/device-service"
-import { type LocalSessions, remoteClientForPerson } from "../omo-senpi/src/components/remote/index"
+import { type LocalSessions, remoteClientForPerson, resolveTypedDevice } from "../omo-senpi/src/components/remote/index"
 import { randomUUID } from "node:crypto"
 import { existsSync } from "node:fs"
 import { userInfo } from "node:os"
@@ -34,7 +34,12 @@ import {
   type RemoteThreadSurface,
 } from "../omo-senpi/src/components/thread/remote/ports"
 import { resolveSessionTarget } from "./remote-session-target"
-import { deviceOnline, followRemote, remoteAvailable } from "../omo-senpi/src/components/thread/remote/remote-ops"
+import {
+  deviceOnline,
+  deviceRefusal,
+  followRemote,
+  remoteAvailable,
+} from "../omo-senpi/src/components/thread/remote/remote-ops"
 import type { RemoteCommandDependencies } from "./remote-local"
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
 import { sendWaitNotice, sessionVerbLines } from "./remote-render"
@@ -108,13 +113,15 @@ export async function runSession(
   json: boolean,
   dependencies: RemoteCommandDependencies,
 ): Promise<number> {
-  const remote = (
-    dependencies.remote ??
-    ((service) =>
-      deviceServiceSurface(service, dependencies.connect, dependencies.stateDir, dependencies.localSessions))
-  )(service)
-  // The client holds its own device-service connection; a command that left it open would keep the process alive. The
-  // sessions port owns the attach pool: closing it clears the pool's idle-detach timers (#14074) and closes only a
+  const remote = oneDeviceListing(
+    (
+      dependencies.remote ??
+      ((service) =>
+        deviceServiceSurface(service, dependencies.connect, dependencies.stateDir, dependencies.localSessions))
+    )(service),
+  )
+  // The client borrows the command's connection; closing it releases the client and leaves that connection to the command.
+  // The sessions port owns the attach pool: closing it clears the pool's idle-detach timers (#14074) and closes only a
   // connection the port dialed itself, never the command's borrowed one.
   try {
     return await runSessionOn(remote, args, json, dependencies)
@@ -122,6 +129,16 @@ export async function runSession(
     remote.client.close()
     await remote.sessions.close?.()
   }
+}
+
+/**
+ * The surface with the account's device list read once for the command (#13432): resolving the typed device and the
+ * verb's own online check then share one listing, so naming a device costs no extra round trip.
+ */
+function oneDeviceListing(remote: RemoteThreadSurface): RemoteThreadSurface {
+  let listing: ReturnType<RemoteThreadSurface["client"]["devices"]["list"]> | undefined
+  const devices = { ...remote.client.devices, list: () => (listing ??= remote.client.devices.list()) }
+  return { ...remote, client: { ...remote.client, devices } }
 }
 
 async function runSessionOn(
@@ -148,15 +165,21 @@ async function runSessionOn(
   const unavailable = await remoteAvailable(remote)
   if (unavailable !== undefined) return show(unavailable, "")
   if (args.verb === "open") return await openOn(remote, args, { json, show }, dependencies)
-  const label = args.target.device === undefined ? args.target.session : `${args.target.device}/${args.target.session}`
-  // `<device>/<session>` is addressed directly, as the SDK does (the port locates a durable id its listing lags on); a
-  // bare durable id is found in the account listing (omo#13707).
+  const typed = args.target.device === undefined ? args.target.session : `${args.target.device}/${args.target.session}`
+  // `<device>/<session>` is addressed directly, as the SDK does (the port locates a durable id its listing lags on), on
+  // the device its id, name or id prefix resolves to (#13432); a bare durable id is found in the account listing (omo#13707).
   const resolved = await resolveSessionTarget(remote, args.target)
-  if (resolved.kind === "error") return show(resolved, label)
+  if (resolved.kind === "error") return show(resolved, typed)
   const { row } = resolved
+  // The output names the device by its id, whatever the person typed for it.
+  const label = args.target.device === undefined ? typed : `${row.device}/${args.target.session}`
   if (args.verb === "send") return sendTo(remote, row, args, { label, json, show }, dependencies)
-  // The device is found online once, before its control is used, as the thread tools' locate does (A3).
-  const offline = await deviceOnline(remote, row.device)
+  // The device is found online once, before its control is used, as the thread tools' locate does (A3), from the listing
+  // the device was resolved on when there was one.
+  const offline =
+    resolved.devices === undefined
+      ? await deviceOnline(remote, row.device)
+      : deviceRefusal(resolved.devices, row.device)
   if (offline !== undefined) return show(offline, label)
   const control = createRelayControl(remote, row)
   switch (args.verb) {
@@ -185,7 +208,9 @@ async function openOn(
   }
   // One open through the shared create path (#13409): the model and thinking level are the engine's launch profile on the
   // open_session frame, so a model the device cannot run refuses the open and no session is left behind.
-  const open = await createRelaySessionHost(remote, args.device).open({
+  const device = await resolveTypedDevice(remote.client, args.device)
+  if (device.kind === "error") return show(device, "")
+  const open = await createRelaySessionHost(remote, device.device).open({
     permissionPreset: mode,
     ...(args.project === undefined ? {} : { cwd: args.project }),
     ...(args.model === undefined ? {} : { provider: args.model.provider, modelId: args.model.modelId }),
@@ -200,8 +225,8 @@ async function openOn(
   } as ThreadToolResult
   if (args.prompt === undefined) return show(opened, "")
   // The first prompt (#13410) goes to the session just opened, by its own id, as `omo remote send --no-wait` sends it.
-  const label = `${args.device}/${open.thread.thread_id}`
-  const row = createdDeviceRow(args.device, open.thread)
+  const label = `${device.device}/${open.thread.thread_id}`
+  const row = createdDeviceRow(device.device, open.thread)
   const delivery = personDelivery(remote, dependencies)
   let sent: ThreadToolResult
   try {

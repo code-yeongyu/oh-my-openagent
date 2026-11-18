@@ -29,6 +29,7 @@ const CHANGING: ReadonlySet<string> = new Set([
   "unload_session",
   "close_session",
   "set_thinking_level",
+  "set_session_archived",
 ])
 
 const text = (value: unknown): string | undefined => (typeof value === "string" && value !== "" ? value : undefined)
@@ -108,6 +109,24 @@ export function localSessionMembers(hostOn: HostOn) {
           )
         }
         return ok({ reasoning: level })
+      }),
+    archive: (target: LocalTarget, archived: boolean) =>
+      run(target, archived ? "archived the session" : "unarchived the session", async ({ port, routing, durable }) => {
+        const unsupported = () =>
+          remoteFailure(
+            "unsupported",
+            "This device's engine does not know set_session_archived: it runs a senpi from before archived sessions.",
+            nextActionFor("unsupported"),
+            { details: { feature: "archive", device: target.device } },
+          )
+        if (port.setSessionArchived === undefined) return unsupported()
+        try {
+          await port.setSessionArchived(routing, archived, durable)
+        } catch (error) {
+          if (error instanceof Error && error.message === "unsupported:set_session_archived") return unsupported()
+          throw error
+        }
+        return ok({ archived })
       }),
     get: (target: LocalTarget, thread: ThreadHandle, device: DeviceRow): Promise<Outcome<SessionDetail>> =>
       run(target, "read", async ({ port, routing }) => {

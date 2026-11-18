@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { OFFLINE_PEER, PEER, SESSION_ID } from "../../../../device-service-core/test/local-api/conformance/world.ts"
@@ -105,6 +105,57 @@ describe("conformance rows: devices.*", () => {
       details: { reason: "service_not_installed" },
     })
   })
+
+  // #14172: a signed-in device (adopted identity kept) with no endpoint is "restarting" only while a process holds its state
+  // or an update is in flight; a crashed, stopped or uninstalled service is "not running", never retried forever.
+  const MINUTE = 60_000
+  const exitedPid = async (): Promise<number> => {
+    const child = Bun.spawn(["true"])
+    await child.exited
+    return child.pid
+  }
+  test.each([
+    ["a live process holds the state (its endpoint not up yet)", { owner: "live" }, "service_restarting"],
+    ["an update is pending", { update: ["pending", 1] }, "service_restarting"],
+    ["an update is in trial", { update: ["trial", 2] }, "service_restarting"],
+    ["only the identity is left (a crash or a hand stop)", {}, "service_not_running"],
+    [
+      "the recorded process is gone and the last update committed",
+      { owner: "exited", update: ["committed", 1] },
+      "service_not_running",
+    ],
+    ["an update has been pending past its bound", { update: ["pending", 16] }, "service_not_running"],
+  ] as const)(
+    "#given a signed-in device with no endpoint where %s #when the service is read #then it answers host_unavailable with that reason",
+    async (_case, files, reason) => {
+      const stateDir = mkdtempSync(join(tmpdir(), "rm-"))
+      emptyDirs.push(stateDir)
+      const clock = fakeClock()
+      writeFileSync(join(stateDir, "device-identity.json"), "{}")
+      if ("owner" in files) {
+        const pid = files.owner === "live" ? process.pid : await exitedPid()
+        writeFileSync(
+          join(stateDir, "owner.info"),
+          JSON.stringify({ pid, since_ms: 0, owner: "service", version: "0.1.42" }),
+        )
+      }
+      if ("update" in files) {
+        const [status, minutesAgo] = files.update
+        mkdirSync(join(stateDir, "update"))
+        writeFileSync(
+          join(stateDir, "update", "update.json"),
+          JSON.stringify({ v: 2, status, started_ms: clock.now() - minutesAgo * MINUTE }),
+        )
+      }
+      const client = clientOn(stateDir, clock)
+      expect(failureOf(await client.service.status())).toMatchObject({
+        code: "host_unavailable",
+        details: { reason, phase: "connect" },
+      })
+      // Not the no-service self row: the device is set up, its service is what is missing.
+      expect(failureOf(await client.devices.list())).toMatchObject({ code: "host_unavailable", details: { reason } })
+    },
+  )
 })
 
 describe("conformance rows: sessions.list", () => {

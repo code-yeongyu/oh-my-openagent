@@ -2,12 +2,11 @@ import { PROVENANCE_MIGRATION } from "./provenance-record"
 
 export class GatewaySchemaVersionError extends Error {
   readonly code = "gateway_schema_too_new"
-  constructor(
-    readonly found: number,
-    readonly supported: number,
-    scope = "Gateway",
-  ) {
+  /** Both versions, carried across the store worker so a caller names them without reading the message. */
+  readonly details: { readonly found: number; readonly supported: number }
+  constructor(found: number, supported: number, scope = "Gateway") {
     super(`${scope} schema ${found} is newer than this binary's supported version ${supported}.`)
+    this.details = { found, supported }
   }
 }
 

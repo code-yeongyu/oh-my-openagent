@@ -915,11 +915,11 @@
   "packages/omo-senpi/plugin/extensions/gateway-store-worker.mjs": {
     "omo-testing/no-flake-masking": 1
   },
+  "packages/omo-senpi/plugin/extensions/omo-thread-client.js": {
+    "omo-testing/no-flake-masking": 1
+  },
   "packages/omo-senpi/plugin/runtime/rollback-migrate.js": {
     "omo-testing/no-flake-masking": 7
-  },
-  "packages/omo-senpi/plugin/runtime/thread-sdk/sdk.js": {
-    "omo-testing/no-flake-masking": 2
   },
   "packages/omo-senpi/plugin/scripts/bounded-stage.test.mjs": {
     "omo-testing/no-flake-masking": 3
