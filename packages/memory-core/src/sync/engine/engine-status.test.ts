@@ -381,7 +381,7 @@ test(
 )
 
 test(
-  "the status reports the last successful sync time and how many memories a catch-up updated",
+  "the status reports the last successful sync time, and no offline count for a device that was never away",
   async () => {
     const { a, b } = await pair()
     expect(await b.engine.status()).toEqual({ kind: "never_synced" })
@@ -391,10 +391,10 @@ test(
     }
     b.clock.advance(60_000)
     await b.engine.runCycle()
-    expect(await b.engine.status()).toEqual({ kind: "synced", at: b.clock.now(), updatedWhileOffline: 3 })
+    expect(await b.engine.status()).toEqual({ kind: "synced", at: b.clock.now() })
     b.clock.advance(1_000)
     await b.engine.runCycle()
-    expect(await b.engine.status()).toEqual({ kind: "synced", at: b.clock.now(), updatedWhileOffline: 0 })
+    expect(await b.engine.status()).toEqual({ kind: "synced", at: b.clock.now() })
   },
   GIT_TEST_TIMEOUT,
 )

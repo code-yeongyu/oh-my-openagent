@@ -56,15 +56,22 @@ class MachineNotFoundError extends Error {
     this.lookup = lookup;
   }
 }
+var describeCandidate = (candidate) => {
+  const lastSeen = candidate.lastSeenMs === undefined ? "" : `, last seen ${new Date(candidate.lastSeenMs).toISOString()}`;
+  return `${candidate.id.slice(0, 8)} (${candidate.state}${lastSeen})`;
+};
 
 class AmbiguousMachineLookupError extends Error {
   lookup;
   matches;
-  constructor(lookup, matches) {
-    super(`ambiguous machine lookup: ${lookup}`);
+  candidates;
+  constructor(lookup, matches, candidates) {
+    const listed = candidates === undefined ? "" : `; candidates: ${candidates.map(describeCandidate).join(", ")}`;
+    super(`ambiguous machine lookup: ${lookup}${listed}`);
     this.name = "AmbiguousMachineLookupError";
     this.lookup = lookup;
     this.matches = matches;
+    this.candidates = candidates;
   }
 }
 
@@ -2158,7 +2165,21 @@ var createMachineComposedTools = (dependencies) => ({
 });
 var readText = async (dependencies, path, options) => Buffer2.from(await readBinary(dependencies, path, options)).toString("utf8");
 var readBinary = async (dependencies, path, options) => decodeReadResult(await dependencies.invoke("fs.read", readPayload(path, options)));
-var writeContent = (dependencies, request) => dependencies.invoke("fs.write", writePayload(request.path, request.content, request.options));
+var writeContent = async (dependencies, request) => decodeWriteResult(await dependencies.invoke("fs.write", writePayload(request.path, request.content, request.options)));
+var decodeWriteResult = (result) => {
+  if (typeof result !== "object" || result === null || Array.isArray(result)) {
+    throw new ComposedToolResultError("fs.write", "result must be an object");
+  }
+  const path = Reflect.get(result, "path");
+  if (typeof path !== "string") {
+    throw new ComposedToolResultError("fs.write", "result must include a string path");
+  }
+  const bytesWritten = Reflect.get(result, "bytesWritten");
+  if (typeof bytesWritten !== "number" || !Number.isSafeInteger(bytesWritten)) {
+    throw new ComposedToolResultError("fs.write", "result must include a safe-integer bytesWritten");
+  }
+  return { path, bytesWritten };
+};
 var editText = async (dependencies, path, spec) => {
   dependencies.requireCapability("fs.read");
   dependencies.requireCapability("fs.write");
@@ -2809,6 +2830,41 @@ var computeOpId = (taskId, opSeq, op, args) => {
   ])).digest("hex");
 };
 
+// src/capability-routing.ts
+var routePreferenceOf = (capability, options) => {
+  const route = options?.route;
+  if (options?.bridgesEnabled === false) {
+    if (capability === "bridge.invoke" || route === "bridge" || typeof route === "object") {
+      throw new HubTransportError("bridge_disabled", "requester bridges are disabled");
+    }
+    return "direct";
+  }
+  return typeof route === "object" ? { ...route } : route;
+};
+var hasCapability = (machine, capability, preference = "auto") => {
+  const routes = machine.routes;
+  const direct = routes.find((route) => route.kind === "direct");
+  if (preference === "direct")
+    return direct?.capabilities.includes(capability) ?? false;
+  if (preference === "auto" && direct?.online && direct.capabilities.includes(capability))
+    return true;
+  const ssh = routes.find((route) => route.kind === "ssh" && route.online && route.enabled && !route.identityConflict && route.capabilities.includes(capability) && (typeof preference !== "object" || route.via === preference.via && (preference.target === undefined || route.target === preference.target)));
+  if (ssh !== undefined)
+    return true;
+  return preference === "auto" && (direct?.capabilities.includes(capability) ?? false);
+};
+var requireCapabilityOf = (machine, capability, preference, explainRouteRefusal) => {
+  if (hasCapability(machine, capability, preference))
+    return;
+  if (typeof preference === "object") {
+    const refusal = explainRouteRefusal?.(machine, capability, preference);
+    if (refusal !== undefined) {
+      throw new HubTransportError(refusal, `explicit route refused: ${refusal}`);
+    }
+  }
+  throw new CapabilityUnavailableError(machine.id, capability);
+};
+
 // src/read-handle.ts
 import { createHash as createHash2 } from "node:crypto";
 
@@ -2995,58 +3051,6 @@ var parseArtifactDownloadUrl = (value) => {
   return url.hash === "" ? url : undefined;
 };
 
-// src/artifact-write.ts
-var fsWritePayload = async (machine, path, content, options) => {
-  if (isReadHandle(content) && machine.protocolFeatures?.includes("artifact-write")) {
-    const artifact = parseArtifactRef(content.artifact);
-    if (artifact !== undefined) {
-      return { path, artifact, create_parent_dirs: options?.createParentDirs ?? false };
-    }
-  }
-  const resolved = isReadHandle(content) ? await drainReadHandle(content) : content;
-  const bytes = typeof resolved === "string" ? Buffer.from(resolved, "utf8") : resolved;
-  return {
-    path,
-    bytes: Buffer.from(bytes).toString("base64"),
-    create_parent_dirs: options?.createParentDirs ?? false
-  };
-};
-
-// src/capability-routing.ts
-var routePreferenceOf = (capability, options) => {
-  const route = options?.route;
-  if (options?.bridgesEnabled === false) {
-    if (capability === "bridge.invoke" || route === "bridge" || typeof route === "object") {
-      throw new HubTransportError("bridge_disabled", "requester bridges are disabled");
-    }
-    return "direct";
-  }
-  return typeof route === "object" ? { ...route } : route;
-};
-var hasCapability = (machine, capability, preference = "auto") => {
-  const routes = machine.routes;
-  const direct = routes.find((route) => route.kind === "direct");
-  if (preference === "direct")
-    return direct?.capabilities.includes(capability) ?? false;
-  if (preference === "auto" && direct?.online && direct.capabilities.includes(capability))
-    return true;
-  const ssh = routes.find((route) => route.kind === "ssh" && route.online && route.enabled && !route.identityConflict && route.capabilities.includes(capability) && (typeof preference !== "object" || route.via === preference.via && (preference.target === undefined || route.target === preference.target)));
-  if (ssh !== undefined)
-    return true;
-  return preference === "auto" && (direct?.capabilities.includes(capability) ?? false);
-};
-var requireCapabilityOf = (machine, capability, preference, explainRouteRefusal) => {
-  if (hasCapability(machine, capability, preference))
-    return;
-  if (typeof preference === "object") {
-    const refusal = explainRouteRefusal?.(machine, capability, preference);
-    if (refusal !== undefined) {
-      throw new HubTransportError(refusal, `explicit route refused: ${refusal}`);
-    }
-  }
-  throw new CapabilityUnavailableError(machine.id, capability);
-};
-
 // src/durable-result.ts
 var DURABLE_RESULT_MAX_BYTES = 64 * 1024 * 1024;
 
@@ -3121,6 +3125,89 @@ class FleetEventsError extends Error {
   }
 }
 
+// src/machine-errors.ts
+class MachineWireError extends HubTransportError {
+  disposition;
+  constructor(code, message, requestId = "", disposition, detail) {
+    super(code, message, requestId, detail);
+    this.name = new.target.name;
+    this.disposition = disposition;
+  }
+}
+
+class InvokeDeadlineError extends MachineWireError {
+  constructor(message, requestId = "", disposition) {
+    super("invoke_deadline", message, requestId, disposition);
+  }
+}
+
+class OpFailedError extends MachineWireError {
+  constructor(message, requestId = "", disposition) {
+    super("op_failed", message, requestId, disposition);
+  }
+}
+
+class BudgetExceededError extends MachineWireError {
+  constructor(message, requestId = "", disposition) {
+    super("budget_exceeded", message, requestId, disposition);
+  }
+}
+
+class MalformedFrameError extends MachineWireError {
+  constructor(message, requestId = "", disposition) {
+    super("malformed_frame", message, requestId, disposition);
+  }
+}
+
+class WrongKindError extends MachineWireError {
+  constructor(message, requestId = "", disposition) {
+    super("wrong_kind", message, requestId, disposition);
+  }
+}
+
+class AgentBusyRefreshError extends MachineWireError {
+  constructor(message, requestId = "", disposition) {
+    super("agent_busy_refresh", message, requestId, disposition);
+  }
+}
+
+class PersistenceFailedError extends MachineWireError {
+  constructor(message, requestId = "", disposition) {
+    super("persistence_failed", message, requestId, disposition);
+  }
+}
+
+class MachineOfflineSkippedError extends MachineWireError {
+  constructor(message, requestId = "", disposition) {
+    super("machine_offline_skipped", message, requestId, disposition);
+  }
+}
+var MACHINE_ERROR_CLASSES = {
+  invoke_deadline: InvokeDeadlineError,
+  op_failed: OpFailedError,
+  budget_exceeded: BudgetExceededError,
+  malformed_frame: MalformedFrameError,
+  wrong_kind: WrongKindError,
+  agent_busy_refresh: AgentBusyRefreshError,
+  persistence_failed: PersistenceFailedError,
+  machine_offline_skipped: MachineOfflineSkippedError
+};
+var isProtocolErrorCode = (code) => PROTOCOL_ERROR_CODES.includes(code);
+var machineErrorForCode = (code, message, requestId = "", disposition) => isProtocolErrorCode(code) ? new MACHINE_ERROR_CLASSES[code](message, requestId, disposition) : new HubTransportError(code, message, requestId);
+var typedTransportError = (error) => {
+  if (error instanceof HubTransportError || !(error instanceof Error))
+    return error;
+  const code = Reflect.get(error, "code");
+  if (typeof code !== "string")
+    return error;
+  const requestId = Reflect.get(error, "requestId");
+  const mapped = machineErrorForCode(code, error.message, typeof requestId === "string" ? requestId : "");
+  if (!(mapped instanceof MachineWireError))
+    return error;
+  Object.defineProperty(mapped, "cause", { value: error, configurable: true, writable: true });
+  return mapped;
+};
+
 // src/machine-lookup.ts
 var resolveMachineRecord = (machines, idOrAlias) => {
   const byId = machines.find((machine) => machine.id === idOrAlias);
@@ -3132,183 +3219,35 @@ var resolveMachineRecord = (machines, idOrAlias) => {
   const [match, ...rest] = candidates;
   if (match === undefined)
     throw new MachineNotFoundError(idOrAlias);
-  if (rest.length > 0) {
-    throw new AmbiguousMachineLookupError(idOrAlias, candidates.map((machine) => machine.id));
-  }
-  return match;
+  if (rest.length === 0)
+    return match;
+  const online = candidates.filter((machine) => machine.state === "online");
+  const [onlyOnline, ...otherOnline] = online;
+  if (onlyOnline !== undefined && otherOnline.length === 0)
+    return onlyOnline;
+  throw new AmbiguousMachineLookupError(idOrAlias, candidates.map((machine) => machine.id), candidates.map((machine) => ({
+    id: machine.id,
+    state: machine.state,
+    ...machine.lastSeenMs === undefined ? {} : { lastSeenMs: machine.lastSeenMs }
+  })));
 };
 
 // src/read-ops.ts
-import { Buffer as Buffer3 } from "node:buffer";
-import { createHash as createHash3 } from "node:crypto";
-var MAX_READ_LIMIT_BYTES = 10 * 1024 * 1024;
-
-class ReadLimitError extends Error {
-  limitBytes;
-  maxLimitBytes;
-  constructor(limitBytes, maxLimitBytes) {
-    super(`read limitBytes ${limitBytes} exceeds the ${maxLimitBytes}-byte ceiling; read in chunks instead`);
-    this.name = "ReadLimitError";
-    this.limitBytes = limitBytes;
-    this.maxLimitBytes = maxLimitBytes;
-  }
-}
-var assertReadLimit = (options) => {
-  const limitBytes = options?.limitBytes;
-  if (limitBytes === undefined)
-    return;
-  if (!Number.isSafeInteger(limitBytes) || limitBytes < 1 || limitBytes > MAX_READ_LIMIT_BYTES) {
-    throw new ReadLimitError(limitBytes, MAX_READ_LIMIT_BYTES);
-  }
-};
-var readPayload2 = (path, options) => options?.limitBytes === undefined ? { path } : { path, limit_bytes: options.limitBytes };
-var offloadedHandle = async (deps, raw) => {
-  if (isReadHandle(raw))
-    return raw;
-  const ref = parseArtifactRef(raw);
-  if (ref === undefined)
-    return;
-  const resolved = await deps.resolveArtifact(ref);
-  return createReadHandle(resolved.ref, deps.fetchFn(), resolved.signal);
-};
-var inlineBytes = (deps, call, raw) => createMachineComposedTools({
-  invoke: () => Promise.resolve(raw),
-  requireCapability: (capability) => deps.requireCapability(call.machineId, capability)
-}).readBytes(call.path, call.options);
-var inlineHandle = (bytes) => ({
-  sha256: createHash3("sha256").update(bytes).digest("hex"),
-  size: bytes.byteLength,
-  fetch: () => new ReadableStream({
-    start: (controller) => {
-      controller.enqueue(bytes);
-      controller.close();
-    }
-  })
-});
-var READ_FINISHERS = {
-  bytes: (handle, inline) => handle === undefined ? inline() : drainReadHandle(handle),
-  handle: async (handle, inline) => handle ?? inlineHandle(await inline()),
-  text: async (handle, inline) => handle === undefined ? Buffer3.from(await inline()).toString("utf8") : streamHandleToText(handle)
-};
-var readMachine = async (deps, kind, call) => {
-  assertReadLimit(call.options);
-  const raw = await deps.invoke({
-    machineId: call.machineId,
-    capability: "fs.read",
-    args: readPayload2(call.path, call.options),
-    callOptions: call.callOptions
-  });
-  const handle = await offloadedHandle(deps, raw);
-  const finish = READ_FINISHERS[kind];
-  return finish(handle, () => inlineBytes(deps, call, raw));
-};
-
-// src/task-context.ts
-var seedFromTaskId = (taskId) => {
-  let hash = 2166136261;
-  for (let index = 0;index < taskId.length; index += 1) {
-    hash ^= taskId.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
-};
-var createPinnedClock = (taskId) => {
-  let state = seedFromTaskId(taskId);
-  const nextUnit = () => {
-    state = state + 1831565813 >>> 0;
-    let mixed = state;
-    mixed = Math.imul(mixed ^ mixed >>> 15, mixed | 1);
-    mixed ^= mixed + Math.imul(mixed ^ mixed >>> 7, mixed | 61);
-    return ((mixed ^ mixed >>> 14) >>> 0) / 4294967296;
-  };
-  return {
-    now: () => Math.floor(nextUnit() * 1e9),
-    random: () => nextUnit()
-  };
-};
-
-class TaskContext {
-  taskId;
-  clock;
-  priorBySeq;
-  seqByName = new Map;
-  nextSeq = 0;
-  nextWireSeq = 0;
-  journal = [];
-  constructor(taskId, options) {
-    this.taskId = taskId;
-    this.clock = options?.clock ?? createPinnedClock(taskId);
-    this.priorBySeq = new Map;
-    if (options?.journal !== undefined) {
-      for (const entry of options.journal.values()) {
-        this.priorBySeq.set(entry.opSeq, entry.opId);
-      }
-    }
-  }
-  async runStep(name, fn) {
-    const opSeq = this.opSeqFor(name);
-    const draws = [];
-    const context = {
-      taskId: this.taskId,
-      stepName: name,
-      opSeq,
-      now: () => {
-        const value = this.clock.now();
-        draws.push({ kind: "now", value });
-        return value;
-      },
-      random: () => {
-        const value = this.clock.random();
-        draws.push({ kind: "random", value });
-        return value;
-      }
-    };
-    const result = await fn(context);
-    const opId = computeOpId(this.taskId, opSeq, "step", { name, draws });
-    this.assertJournalConsistent(name, opSeq, opId);
-    this.journal.push({ opId, opSeq });
-    return result;
-  }
-  snapshot() {
-    return this.journal.map((entry) => ({ opId: entry.opId, opSeq: entry.opSeq }));
-  }
-  nextWireOpSeq() {
-    const seq = this.nextWireSeq;
-    this.nextWireSeq += 1;
-    return seq;
-  }
-  opSeqFor(name) {
-    const existing = this.seqByName.get(name);
-    if (existing !== undefined) {
-      return existing;
-    }
-    const seq = this.nextSeq;
-    this.nextSeq += 1;
-    this.seqByName.set(name, seq);
-    return seq;
-  }
-  assertJournalConsistent(name, opSeq, opId) {
-    const recorded = this.priorBySeq.get(opSeq);
-    if (recorded !== undefined && recorded !== opId) {
-      throw new LedgerMismatchError({
-        taskId: this.taskId,
-        stepName: name,
-        opSeq,
-        expectedOpId: recorded,
-        actualOpId: opId
-      });
-    }
-  }
-}
-
-// src/tree-ops.ts
-import { createHash as createHash5 } from "node:crypto";
-
-// src/tree-archive.ts
+import { Buffer as Buffer5 } from "node:buffer";
 import { createHash as createHash4 } from "node:crypto";
-import { lstatSync as lstatSync2, readdirSync as readdirSync2, readFileSync, readlinkSync } from "node:fs";
-import { join as join2, resolve as resolve2 } from "node:path";
-import { gzipSync } from "node:zlib";
+
+// src/ship-guard.ts
+import { Buffer as Buffer4 } from "node:buffer";
+import { createHash as createHash3 } from "node:crypto";
+
+// src/ship-archive.ts
+import { Buffer as Buffer3 } from "node:buffer";
+import { gunzipSync as gunzipSync2 } from "node:zlib";
+
+// src/tree-archive-extract.ts
+import { chmodSync, lstatSync, mkdirSync, readdirSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { isAbsolute as isAbsolute2, join, resolve, sep } from "node:path";
+import { gunzipSync } from "node:zlib";
 
 // src/tree-archive-format.ts
 import { isAbsolute } from "node:path";
@@ -3400,9 +3339,6 @@ var linkTargetStaysInside = (entryName, link) => {
 };
 
 // src/tree-archive-extract.ts
-import { chmodSync, lstatSync, mkdirSync, readdirSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
-import { isAbsolute as isAbsolute2, join, resolve, sep } from "node:path";
-import { gunzipSync } from "node:zlib";
 var extractTree = async (archive, destDir, options = {}) => {
   const dest = resolve(destDir);
   prepareDestination(destDir, options);
@@ -3412,15 +3348,25 @@ var extractTree = async (archive, destDir, options = {}) => {
   } catch (error) {
     throw new TreeArchiveError("malformed_input", "malformed_input: invalid gzip", error);
   }
-  let offset = 0;
-  const longNames = { path: undefined, link: undefined };
   let fileCount = 0;
   let writtenBytes = 0;
+  for (const member of readTarMembers(bytes)) {
+    const written = applyMember(dest, member);
+    if (written !== undefined) {
+      fileCount++;
+      writtenBytes += written;
+    }
+  }
+  return { fileCount, writtenBytes };
+};
+function* readTarMembers(bytes) {
+  let offset = 0;
+  const longNames = { path: undefined, link: undefined };
   while (offset + BLOCK <= bytes.length) {
     const h = bytes.subarray(offset, offset + BLOCK);
     offset += BLOCK;
     if (h.every((v) => v === 0))
-      break;
+      return;
     const size = parseOctal(fieldBytes(h, "size"));
     const type = String.fromCharCode(h[156] || 0);
     const body = bytes.subarray(offset, offset + size);
@@ -3431,14 +3377,9 @@ var extractTree = async (archive, destDir, options = {}) => {
       continue;
     longNames.path = undefined;
     longNames.link = undefined;
-    const written = applyMember(dest, { name, type, link, block: h, body });
-    if (written !== undefined) {
-      fileCount++;
-      writtenBytes += written;
-    }
+    yield { name, type, link, block: h, body };
   }
-  return { fileCount, writtenBytes };
-};
+}
 var absorbLongNames = (type, body, longNames) => {
   if (type === "x") {
     const text = body.toString();
@@ -3540,7 +3481,510 @@ var validateLinkTarget = (entryName, link) => {
     throw new TreeArchiveError("path_escape", `path_escape: ${entryName} -> ${link}`);
 };
 
+// src/ship-archive.ts
+var MAX_ARCHIVE_DEPTH = 4;
+var INFLATE_BUDGET_BYTES = 128 * 1024 * 1024;
+var newInflateBudget = () => ({ remaining: INFLATE_BUDGET_BYTES });
+var UNREAD_FORMATS = [
+  ["zstd", [40, 181, 47, 253]],
+  ["xz", [253, 55, 122, 88, 90, 0]],
+  ["zip", [80, 75, 3, 4]],
+  ["7z", [55, 122, 188, 175, 39, 28]]
+];
+var GZIP = [31, 139];
+var startsWith = (bytes, signature) => bytes.length >= signature.length && signature.every((value, index) => bytes[index] === value);
+var isBzip2 = (bytes) => {
+  const level = bytes[3];
+  return startsWith(bytes, [66, 90, 104]) && level !== undefined && level >= 49 && level <= 57;
+};
+var isTarHeader = (bytes, offset = 0) => {
+  if (bytes.length < offset + BLOCK)
+    return false;
+  const block = bytes.subarray(offset, offset + BLOCK);
+  const expected = parseOctal(fieldBytes(block, "checksum"));
+  let sum = 0;
+  for (let index = 0;index < BLOCK; index++)
+    sum += index >= 148 && index < 156 ? 32 : block[index] ?? 0;
+  return Number.isFinite(expected) && expected === sum;
+};
+var KINDS = {
+  "0": "file",
+  "\x00": "file",
+  "7": "file",
+  "5": "dir",
+  "2": "symlink"
+};
+var normalizePath = (path) => path.replace(/^(\.\/)+/, "").replace(/\/+$/, "");
+var hasTarPastStart = (bytes) => {
+  for (let offset = BLOCK;offset + BLOCK <= bytes.length; offset += BLOCK)
+    if (isTarHeader(bytes, offset))
+      return true;
+  return false;
+};
+var readArchive = (bytes, budget) => {
+  const unread = UNREAD_FORMATS.find(([, signature]) => startsWith(bytes, signature));
+  if (unread !== undefined)
+    return { kind: "opaque", reason: `${unread[0]} content is not inspected` };
+  if (isBzip2(bytes))
+    return { kind: "opaque", reason: "bzip2 content is not inspected" };
+  let tar = Buffer3.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (startsWith(bytes, GZIP)) {
+    if (budget.remaining <= 0)
+      return { kind: "opaque", reason: "gzip content is past the request's inflate budget" };
+    try {
+      tar = gunzipSync2(tar, { maxOutputLength: budget.remaining });
+    } catch (error) {
+      if (error instanceof Error)
+        return { kind: "opaque", reason: `gzip content cannot be inflated within the budget: ${error.message}` };
+      throw error;
+    }
+    budget.remaining -= tar.length;
+  }
+  if (!isTarHeader(tar)) {
+    return hasTarPastStart(tar) ? { kind: "opaque", reason: "tar data follows leading bytes that are not a tar header" } : { kind: "plain" };
+  }
+  const members = [];
+  for (const member of readTarMembers(tar)) {
+    const path = normalizePath(member.name);
+    if (path === "" || path === ".")
+      continue;
+    const kind = KINDS[member.type] ?? "other";
+    members.push({
+      path,
+      kind,
+      ...kind === "file" ? { bytes: member.body } : {},
+      ...member.link === "" ? {} : { linkTarget: member.link }
+    });
+  }
+  return { kind: "archive", members };
+};
+var expandArchives = (entries, budget, depth = 0) => {
+  const archiveEntries = [];
+  const opaque = [];
+  for (const entry of entries) {
+    if (entry.kind !== "file" || entry.bytes === undefined)
+      continue;
+    const read = readArchive(entry.bytes, budget);
+    if (read.kind === "plain")
+      continue;
+    if (read.kind === "opaque") {
+      opaque.push(`${entry.path}: ${read.reason}`);
+      continue;
+    }
+    if (depth >= MAX_ARCHIVE_DEPTH) {
+      opaque.push(`${entry.path}: archives nested deeper than ${MAX_ARCHIVE_DEPTH} levels are not inspected`);
+      continue;
+    }
+    const members = read.members.map((member) => ({ ...member, path: `${entry.path}/${member.path}` }));
+    const nested = expandArchives(members, budget, depth + 1);
+    archiveEntries.push(...members, ...nested.archiveEntries);
+    opaque.push(...nested.opaque);
+  }
+  return { archiveEntries, opaque };
+};
+
+// src/ship-request.ts
+class ShipRefusedError extends Error {
+  code = "ship_refused";
+  capability;
+  remotePath;
+  reasons;
+  constructor(request, reasons) {
+    super(`ship refused (${request.capability} ${request.remotePath ?? "-"}): ${reasons.join("; ")}`);
+    this.name = "ShipRefusedError";
+    this.capability = request.capability;
+    this.remotePath = request.remotePath;
+    this.reasons = reasons;
+  }
+}
+
+class ShipValidatorError extends Error {
+  code = "ship_validator_unavailable";
+  validatorPath;
+  constructor(validatorPath, detail, cause) {
+    super(`ship validator unavailable [${validatorPath}]: ${detail}`, cause === undefined ? undefined : { cause });
+    this.name = "ShipValidatorError";
+    this.validatorPath = validatorPath;
+  }
+}
+
+// src/ship-validator-config.ts
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { isAbsolute as isAbsolute3, join as join2 } from "node:path";
+import { pathToFileURL } from "node:url";
+var SHIP_VALIDATOR_ENV = "BUNSHIN_SHIP_VALIDATOR";
+var messageOf = (error) => error instanceof Error ? error.message : String(error);
+var isMissingFile = (error) => {
+  const code = error instanceof Error ? Reflect.get(error, "code") : undefined;
+  return code === "ENOENT" || code === "ENOTDIR";
+};
+var absoluteModulePath = (configured, home, origin) => {
+  const path = configured.startsWith("~/") ? join2(home, configured.slice(2)) : configured;
+  if (!isAbsolute3(path))
+    throw new ShipValidatorError(origin, `validator path must be absolute, got ${configured}`);
+  return path;
+};
+var operatorFileValidator = (home) => {
+  const operatorPath = join2(home, ".bunshin", "operator.json");
+  let raw;
+  try {
+    raw = readFileSync(operatorPath, "utf8");
+  } catch (error) {
+    if (isMissingFile(error))
+      return;
+    throw new ShipValidatorError(operatorPath, `cannot read operator config: ${messageOf(error)}`, error);
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw new ShipValidatorError(operatorPath, "operator config is malformed JSON", error);
+  }
+  const configured = typeof parsed === "object" && parsed !== null ? Reflect.get(parsed, "shipValidator") : undefined;
+  if (configured === undefined)
+    return;
+  if (typeof configured !== "string" || configured.trim() === "")
+    throw new ShipValidatorError(operatorPath, "shipValidator must be a non-empty string");
+  return absoluteModulePath(configured, home, operatorPath);
+};
+var configuredShipValidators = () => {
+  const home = homedir();
+  const fromEnv = process.env[SHIP_VALIDATOR_ENV];
+  const fromFile = operatorFileValidator(home);
+  const paths = [
+    ...fromEnv === undefined || fromEnv === "" ? [] : [absoluteModulePath(fromEnv, home, SHIP_VALIDATOR_ENV)],
+    ...fromFile === undefined ? [] : [fromFile]
+  ];
+  return [...new Set(paths)];
+};
+var shipValidationConfigured = () => {
+  try {
+    return configuredShipValidators().length > 0;
+  } catch (error) {
+    if (error instanceof ShipValidatorError)
+      return true;
+    throw error;
+  }
+};
+var loaded = new Map;
+var isShipValidator = (value) => typeof value === "function";
+var loadShipValidator = (path) => {
+  const cached = loaded.get(path);
+  if (cached !== undefined)
+    return cached;
+  const pending = import(pathToFileURL(path).href).then((module) => {
+    const validate = typeof module === "object" && module !== null ? Reflect.get(module, "validateShip") : undefined;
+    if (!isShipValidator(validate))
+      throw new ShipValidatorError(path, "module does not export a validateShip function");
+    return validate;
+  }, (error) => {
+    throw new ShipValidatorError(path, `cannot load module: ${messageOf(error)}`, error);
+  });
+  loaded.set(path, pending);
+  pending.catch(() => loaded.delete(path));
+  return pending;
+};
+var isReasonList = (value) => Array.isArray(value) && value.every((reason) => typeof reason === "string");
+var runShipValidators = async (paths, request) => {
+  const reasons = [];
+  for (const path of paths) {
+    const validate = await loadShipValidator(path);
+    let verdict;
+    try {
+      verdict = await validate(request);
+    } catch (error) {
+      throw new ShipValidatorError(path, `validateShip threw: ${messageOf(error)}`, error);
+    }
+    if (!isReasonList(verdict))
+      throw new ShipValidatorError(path, "validateShip must return a list of refusal reasons");
+    reasons.push(...verdict);
+  }
+  return reasons;
+};
+
+// src/ship-guard.ts
+var checkShip = (build, alreadyAllowed = () => false) => {
+  let paths;
+  try {
+    paths = configuredShipValidators();
+  } catch (error) {
+    return Promise.reject(error);
+  }
+  if (paths.length === 0)
+    return;
+  const scope = paths.join("\x00");
+  if (alreadyAllowed(scope))
+    return;
+  return (async () => {
+    const budget = newInflateBudget();
+    const body = build(budget);
+    const expansion = expandArchives(body.entries, budget);
+    const request = {
+      ...body,
+      archiveEntries: expansion.archiveEntries,
+      opaque: [...body.opaque ?? [], ...expansion.opaque]
+    };
+    const reasons = await runShipValidators(paths, request);
+    if (reasons.length > 0)
+      throw new ShipRefusedError(request, reasons);
+    return scope;
+  })();
+};
+var APPROVAL_LIMIT = 4096;
+var approvals = new Set;
+var approve = (key) => {
+  approvals.delete(key);
+  approvals.add(key);
+  const oldest = approvals.values().next();
+  if (approvals.size > APPROVAL_LIMIT && oldest.done !== true)
+    approvals.delete(oldest.value);
+};
+var consume = (key) => approvals.delete(key);
+var uploadKey = (scope, sha256) => `${scope}\x00upload\x00${sha256}`;
+var placementKey = (scope, machineId, capability, path, sha256) => `${scope}\x00place\x00${machineId}\x00${capability}\x00${path}\x00${sha256}`;
+var sha256Of = (bytes) => createHash3("sha256").update(bytes).digest("hex");
+var approveUpload = (scope, sha256) => approve(uploadKey(scope, sha256));
+var approvePlacement = (scope, placement) => approve(placementKey(scope, placement.machineId, placement.capability, placement.path, placement.sha256));
+var selfGuardedTransports = new WeakSet;
+var isShipGuardedTransport = (transport) => selfGuardedTransports.has(transport);
+var handleIdentity = (handle) => JSON.stringify([
+  handle.sha256,
+  handle.size,
+  handle.artifact?.sha256 ?? null,
+  handle.artifact?.size ?? null,
+  handle.artifact?.url ?? null
+]);
+var handleSources = new WeakMap;
+var recordReadHandleSource = (handle, machineId, path) => {
+  handleSources.set(handle, { machineId, path, identity: handleIdentity(handle), fetch: handle.fetch });
+};
+var readHandleSource = (handle) => {
+  const recorded = handleSources.get(handle);
+  if (recorded === undefined || recorded.fetch !== handle.fetch || recorded.identity !== handleIdentity(handle))
+    return;
+  return { machineId: recorded.machineId, path: recorded.path };
+};
+var field2 = (value, key) => typeof value === "object" && value !== null ? Reflect.get(value, key) : undefined;
+var stringField2 = (value, key) => {
+  const found = field2(value, key);
+  return typeof found === "string" ? found : undefined;
+};
+var SHIP_CAPABILITIES = new Set(["fs.write", "fs.tree.apply"]);
+var shipCall = (capability, args) => {
+  if (SHIP_CAPABILITIES.has(capability))
+    return { capability, args };
+  if (capability !== "bridge.invoke")
+    return;
+  const op = stringField2(args, "op");
+  return op !== undefined && SHIP_CAPABILITIES.has(op) ? { capability: op, args: field2(args, "args") } : undefined;
+};
+var decodedBytes = (args) => {
+  const encoded = stringField2(args, "bytes");
+  return encoded === undefined ? undefined : Buffer4.from(encoded, "base64");
+};
+var checkInvokeShip = (machineId, capability, args) => {
+  const call = shipCall(capability, args);
+  if (call === undefined)
+    return;
+  const path = stringField2(call.args, "path");
+  const shipCapability = call.capability === "fs.write" ? "fs.write" : "fs.tree.apply";
+  const allowedAbove = (scope) => {
+    const bytes = decodedBytes(call.args);
+    const sha256 = bytes === undefined ? stringField2(field2(call.args, "artifact"), "sha256") : sha256Of(bytes);
+    return path !== undefined && sha256 !== undefined && consume(placementKey(scope, machineId, shipCapability, path, sha256));
+  };
+  return checkShip(() => {
+    const bytes = decodedBytes(call.args);
+    const file = shipCapability === "fs.write" && path !== undefined ? [{ path, kind: "file", ...bytes === undefined ? {} : { bytes } }] : [];
+    return {
+      capability: shipCapability,
+      machineId,
+      ...path === undefined ? {} : { remotePath: path },
+      entries: file,
+      opaque: bytes === undefined ? [`${shipCapability} content is an artifact this client did not check; its bytes are not visible here`] : []
+    };
+  }, allowedAbove);
+};
+
+// src/read-ops.ts
+var MAX_READ_LIMIT_BYTES = 10 * 1024 * 1024;
+
+class ReadLimitError extends Error {
+  limitBytes;
+  maxLimitBytes;
+  constructor(limitBytes, maxLimitBytes) {
+    super(`read limitBytes ${limitBytes} exceeds the ${maxLimitBytes}-byte ceiling; read in chunks instead`);
+    this.name = "ReadLimitError";
+    this.limitBytes = limitBytes;
+    this.maxLimitBytes = maxLimitBytes;
+  }
+}
+var assertReadLimit = (options) => {
+  const limitBytes = options?.limitBytes;
+  if (limitBytes === undefined)
+    return;
+  if (!Number.isSafeInteger(limitBytes) || limitBytes < 1 || limitBytes > MAX_READ_LIMIT_BYTES) {
+    throw new ReadLimitError(limitBytes, MAX_READ_LIMIT_BYTES);
+  }
+};
+var readPayload2 = (path, options) => options?.limitBytes === undefined ? { path } : { path, limit_bytes: options.limitBytes };
+var offloadedHandle = async (deps, raw) => {
+  if (isReadHandle(raw))
+    return raw;
+  const ref = parseArtifactRef(raw);
+  if (ref === undefined)
+    return;
+  const resolved = await deps.resolveArtifact(ref);
+  return createReadHandle(resolved.ref, deps.fetchFn(), resolved.signal);
+};
+var inlineBytes = (deps, call, raw) => createMachineComposedTools({
+  invoke: () => Promise.resolve(raw),
+  requireCapability: (capability) => deps.requireCapability(call.machineId, capability)
+}).readBytes(call.path, call.options);
+var inlineHandle = (bytes) => ({
+  sha256: createHash4("sha256").update(bytes).digest("hex"),
+  size: bytes.byteLength,
+  fetch: () => new ReadableStream({
+    start: (controller) => {
+      controller.enqueue(bytes);
+      controller.close();
+    }
+  })
+});
+var READ_FINISHERS = {
+  bytes: (handle, inline) => handle === undefined ? inline() : drainReadHandle(handle),
+  handle: async (handle, inline) => handle ?? inlineHandle(await inline()),
+  text: async (handle, inline) => handle === undefined ? Buffer5.from(await inline()).toString("utf8") : streamHandleToText(handle)
+};
+var readMachine = async (deps, kind, call) => {
+  assertReadLimit(call.options);
+  const raw = await deps.invoke({
+    machineId: call.machineId,
+    capability: "fs.read",
+    args: readPayload2(call.path, call.options),
+    callOptions: call.callOptions
+  });
+  const handle = await offloadedHandle(deps, raw);
+  const finish = READ_FINISHERS[kind];
+  const result = await finish(handle, () => inlineBytes(deps, call, raw));
+  if (isReadHandle(result)) {
+    if (shipValidationConfigured()) {
+      if (result.artifact !== undefined)
+        Object.freeze(result.artifact);
+      Object.freeze(result);
+    }
+    recordReadHandleSource(result, call.machineId, call.path);
+  }
+  return result;
+};
+
+// src/task-context.ts
+var seedFromTaskId = (taskId) => {
+  let hash = 2166136261;
+  for (let index = 0;index < taskId.length; index += 1) {
+    hash ^= taskId.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+};
+var createPinnedClock = (taskId) => {
+  let state = seedFromTaskId(taskId);
+  const nextUnit = () => {
+    state = state + 1831565813 >>> 0;
+    let mixed = state;
+    mixed = Math.imul(mixed ^ mixed >>> 15, mixed | 1);
+    mixed ^= mixed + Math.imul(mixed ^ mixed >>> 7, mixed | 61);
+    return ((mixed ^ mixed >>> 14) >>> 0) / 4294967296;
+  };
+  return {
+    now: () => Math.floor(nextUnit() * 1e9),
+    random: () => nextUnit()
+  };
+};
+
+class TaskContext {
+  taskId;
+  clock;
+  priorBySeq;
+  seqByName = new Map;
+  nextSeq = 0;
+  nextWireSeq = 0;
+  journal = [];
+  constructor(taskId, options) {
+    this.taskId = taskId;
+    this.clock = options?.clock ?? createPinnedClock(taskId);
+    this.priorBySeq = new Map;
+    if (options?.journal !== undefined) {
+      for (const entry of options.journal.values()) {
+        this.priorBySeq.set(entry.opSeq, entry.opId);
+      }
+    }
+  }
+  async runStep(name, fn) {
+    const opSeq = this.opSeqFor(name);
+    const draws = [];
+    const context = {
+      taskId: this.taskId,
+      stepName: name,
+      opSeq,
+      now: () => {
+        const value = this.clock.now();
+        draws.push({ kind: "now", value });
+        return value;
+      },
+      random: () => {
+        const value = this.clock.random();
+        draws.push({ kind: "random", value });
+        return value;
+      }
+    };
+    const result = await fn(context);
+    const opId = computeOpId(this.taskId, opSeq, "step", { name, draws });
+    this.assertJournalConsistent(name, opSeq, opId);
+    this.journal.push({ opId, opSeq });
+    return result;
+  }
+  snapshot() {
+    return this.journal.map((entry) => ({ opId: entry.opId, opSeq: entry.opSeq }));
+  }
+  nextWireOpSeq() {
+    const seq = this.nextWireSeq;
+    this.nextWireSeq += 1;
+    return seq;
+  }
+  opSeqFor(name) {
+    const existing = this.seqByName.get(name);
+    if (existing !== undefined) {
+      return existing;
+    }
+    const seq = this.nextSeq;
+    this.nextSeq += 1;
+    this.seqByName.set(name, seq);
+    return seq;
+  }
+  assertJournalConsistent(name, opSeq, opId) {
+    const recorded = this.priorBySeq.get(opSeq);
+    if (recorded !== undefined && recorded !== opId) {
+      throw new LedgerMismatchError({
+        taskId: this.taskId,
+        stepName: name,
+        opSeq,
+        expectedOpId: recorded,
+        actualOpId: opId
+      });
+    }
+  }
+}
+
+// src/tree-ops.ts
+import { realpathSync } from "node:fs";
+
 // src/tree-archive.ts
+import { createHash as createHash5 } from "node:crypto";
+import { lstatSync as lstatSync2, readdirSync as readdirSync2, readFileSync as readFileSync2, readlinkSync } from "node:fs";
+import { join as join3, resolve as resolve2 } from "node:path";
+import { gzipSync } from "node:zlib";
 var DEFAULT_TREE_EXCLUDES = new Set([".git", "node_modules", "target", ".DS_Store"]);
 var TYPE_CODES = { file: "0", dir: "5", symlink: "2" };
 var packTree = async (rootDir, options = {}) => {
@@ -3553,6 +3997,7 @@ var packTree = async (rootDir, options = {}) => {
     counts[entry.kind] += 1;
   return {
     bytes,
+    entries,
     fileCount: counts.file,
     dirCount: counts.dir,
     symlinkCount: counts.symlink,
@@ -3566,24 +4011,37 @@ var collectEntries = (root, options) => {
   const ignored = (path) => path.split("/").some((part) => DEFAULT_TREE_EXCLUDES.has(part)) || (options.ignore ?? []).some((pattern) => globMatch(pattern, path));
   const included = (path) => (options.include ?? []).length === 0 || (options.include ?? []).some((pattern) => globMatch(pattern, path) || globMatch(pattern, `${path}/`));
   const visit = (absolute, name) => {
-    if (name && (ignored(name) || !included(name) && ![...readdirSafe(absolute)].some((item) => included(`${name}/${item.name}`))))
-      return;
     let stat;
     try {
       stat = lstatSync2(absolute);
     } catch (error) {
       throw new TreeArchiveError("io_error", `io_error: ${absolute}`, error);
     }
+    if (name && ignored(name))
+      return;
+    if (name && !included(name)) {
+      if (!stat.isDirectory())
+        return;
+      let matchingChild = false;
+      for (const item of readdirSafe(absolute)) {
+        if (included(`${name}/${item.name}`)) {
+          matchingChild = true;
+          break;
+        }
+      }
+      if (!matchingChild)
+        return;
+    }
     const mode = stat.mode;
     if (stat.isDirectory()) {
       if (name)
         entries.push({ path: `${name}/`, kind: "dir", mode });
       for (const child of readdirSafe(absolute))
-        visit(join2(absolute, child.name), name ? `${name}/${child.name}` : child.name);
+        visit(join3(absolute, child.name), name ? `${name}/${child.name}` : child.name);
       return;
     }
     if (stat.isFile()) {
-      const data = readFileSync(absolute);
+      const data = readFileSync2(absolute);
       totalBytes += data.byteLength;
       entries.push({ path: name, kind: "file", mode, data });
       return;
@@ -3620,7 +4078,7 @@ var entryBlocks = (entry) => {
     longName ? paxRecord("path", entry.path) : Buffer.alloc(0),
     longLink ? paxRecord("linkpath", entry.link ?? "") : Buffer.alloc(0)
   ]);
-  const paxName = `PaxHeaders/${createHash4("sha256").update(entry.path).digest("hex").slice(0, 16)}`;
+  const paxName = `PaxHeaders/${createHash5("sha256").update(entry.path).digest("hex").slice(0, 16)}`;
   return [header({ name: paxName, mode: 420, size: paxData.length, type: "x" }), padded(paxData), ...body];
 };
 var readdirSafe = (path) => {
@@ -3641,7 +4099,7 @@ var globMatch = (pattern, path) => {
   const bun = Reflect.get(globalThis, "Bun");
   if (typeof bun?.Glob === "function")
     return new bun.Glob(pattern).match(path);
-  const escaped = pattern.replace(/[.+^${}()|[\\]\\]/g, "\\$&").replace(/\\\*\\\*/g, ".*").replace(/\\\*/g, "[^/]*").replace(/\\\?/g, "[^/]");
+  const escaped = pattern.replace(/[.+^${}()|[\]\\*?]/g, "\\$&").replace(/\\\*\\\*/g, ".*").replace(/\\\*/g, "[^/]*").replace(/\\\?/g, "[^/]");
   return new RegExp(`^${escaped}$`).test(path);
 };
 
@@ -3653,7 +4111,25 @@ var pushMachineTree = async (deps, call) => {
   });
   if (deps.transport.uploadArtifact === undefined)
     throw new TreeTransferUnsupportedError(call.machineId);
+  const checked = checkShip(() => ({
+    capability: "fs.tree.apply",
+    machineId: call.machineId,
+    remotePath: call.remotePath,
+    localDir: call.localDir,
+    localRealPath: realpathSync(call.localDir),
+    entries: packed.entries.map(shipEntryOf)
+  }));
+  const scope = checked === undefined ? undefined : await checked;
+  if (scope !== undefined)
+    approveUpload(scope, sha256Of(packed.bytes));
   const artifact = await deps.transport.uploadArtifact(packed.bytes);
+  if (scope !== undefined)
+    approvePlacement(scope, {
+      machineId: call.machineId,
+      capability: "fs.tree.apply",
+      path: call.remotePath,
+      sha256: artifact.sha256
+    });
   return deps.invoke({
     machineId: call.machineId,
     capability: "fs.tree.apply",
@@ -3677,15 +4153,81 @@ var pullMachineTree = async (deps, call) => {
   const artifact = parseArtifactRef(raw && typeof raw === "object" ? Reflect.get(raw, "artifact") : undefined);
   if (artifact === undefined)
     throw new HubTransportError("artifact_fetch_failed", "fs.tree.pack returned malformed artifact");
-  const response = await deps.fetchFn()(artifact.url);
+  const deadlineMs = deps.artifactDeadlineMs ?? TREE_TRANSFER_BUDGET_MS;
+  const signal = AbortSignal.timeout(deadlineMs);
+  let response;
+  try {
+    response = await deps.fetchFn()(artifact.url, { signal });
+  } catch (error) {
+    if (signal.aborted) {
+      throw new HubTransportError("artifact_fetch_failed", `artifact download timed out after ${deadlineMs}ms`);
+    }
+    throw error;
+  }
   if (!response.ok)
     throw new HubTransportError("artifact_fetch_failed", `artifact download responded ${response.status}`);
   const bytes = Buffer.from(await response.arrayBuffer());
-  if (bytes.length !== artifact.size || computeSha256(bytes) !== artifact.sha256)
+  if (bytes.length !== artifact.size || sha256Of(bytes) !== artifact.sha256)
     throw new HubTransportError("artifact_fetch_failed", "artifact digest or size mismatch");
   return extractTree(bytes, call.localDir, {});
 };
-var computeSha256 = (bytes) => createHash5("sha256").update(bytes).digest("hex");
+var shipEntryOf = (entry) => ({
+  path: entry.path.replace(/\/$/, ""),
+  kind: entry.kind,
+  ...entry.data === undefined ? {} : { bytes: entry.data },
+  ...entry.link === undefined ? {} : { linkTarget: entry.link }
+});
+
+// src/write-ops.ts
+import { Buffer as Buffer6 } from "node:buffer";
+
+// src/artifact-write.ts
+var fsWritePayload = async (machine, path, content, options) => {
+  if (isReadHandle(content) && machine.protocolFeatures?.includes("artifact-write")) {
+    const artifact = parseArtifactRef(content.artifact);
+    if (artifact !== undefined) {
+      return { path, artifact, create_parent_dirs: options?.createParentDirs ?? false };
+    }
+  }
+  const resolved = isReadHandle(content) ? await drainReadHandle(content) : content;
+  const bytes = typeof resolved === "string" ? Buffer.from(resolved, "utf8") : resolved;
+  return {
+    path,
+    bytes: Buffer.from(bytes).toString("base64"),
+    create_parent_dirs: options?.createParentDirs ?? false
+  };
+};
+
+// src/write-ops.ts
+var writeMachine = async (deps, machine, call) => {
+  const args = await fsWritePayload(machine, call.path, call.content, call.options);
+  const content = call.content;
+  if (isReadHandle(content)) {
+    const source = readHandleSource(content);
+    const bytes = "bytes" in args ? Buffer6.from(args.bytes, "base64") : undefined;
+    const checked = checkShip(() => ({
+      capability: "fs.write",
+      machineId: call.machineId,
+      remotePath: call.path,
+      ...source === undefined ? {} : { source },
+      entries: [{ path: call.path, kind: "file", ...bytes === undefined ? {} : { bytes } }],
+      opaque: [
+        ...bytes === undefined ? ["fs.write content is a machine-side artifact; its bytes are not visible here"] : [],
+        ...source === undefined ? ["read handle provenance is unknown: this client did not read it, or it changed since the read"] : []
+      ]
+    }));
+    if (checked !== undefined) {
+      const scope = await checked;
+      const seen = bytes === undefined ? undefined : sha256Of(bytes);
+      if (seen !== undefined && seen !== content.sha256)
+        throw new ArtifactDigestMismatchError(content.sha256, seen);
+      const sha256 = "artifact" in args ? args.artifact.sha256 : seen;
+      if (sha256 !== undefined)
+        approvePlacement(scope, { machineId: call.machineId, capability: "fs.write", path: call.path, sha256 });
+    }
+  }
+  return decodeWriteResult(await deps.invoke({ machineId: call.machineId, capability: "fs.write", args, callOptions: call.callOptions }));
+};
 
 // src/machine-hub.ts
 var connectMachineHub = async (options) => {
@@ -3832,9 +4374,8 @@ class ConnectedMachineHub {
     if (!this.resolve(machineId).protocolFeatures?.includes("tree-transfer") && !this.hasCapability(machineId, "fs.tree.pack") && !this.hasCapability(machineId, "fs.tree.apply"))
       throw new TreeTransferUnsupportedError(machineId);
   }
-  async write(call) {
-    const args = await fsWritePayload(this.resolve(call.machineId), call.path, call.content, call.options);
-    return this.invoke({ machineId: call.machineId, capability: "fs.write", args, callOptions: call.callOptions });
+  write(call) {
+    return writeMachine({ invoke: (invokeCall) => this.invoke(invokeCall) }, this.resolve(call.machineId), call);
   }
   read(call) {
     return readMachine(this.readDeps, "bytes", call);
@@ -3854,6 +4395,9 @@ class ConnectedMachineHub {
     const opSeq = context === undefined ? this.nextAdhocWireSeq() : context.nextWireOpSeq();
     const taskId = context === undefined ? callOptions?.taskId ?? this.connectionTaskId : context.taskId;
     const wireArgs = normalizeOperationArgs(args);
+    const shipCheck = isShipGuardedTransport(this.transport) ? undefined : checkInvokeShip(machineId, capability, wireArgs);
+    if (shipCheck !== undefined)
+      await shipCheck;
     const metadata = {
       ...route === undefined ? {} : { route },
       taskId,
@@ -3863,7 +4407,9 @@ class ConnectedMachineHub {
       ...callOptions?.capabilityToken === undefined ? {} : { capabilityToken: callOptions.capabilityToken }
     };
     const signal = callOptions?.signal;
-    const value = signal === undefined ? await this.transport.invoke(machineId, capability, wireArgs, metadata, callOptions?.terminalTimeoutMs) : await this.transport.invoke(machineId, capability, wireArgs, metadata, callOptions?.terminalTimeoutMs, signal);
+    const value = await (signal === undefined ? this.transport.invoke(machineId, capability, wireArgs, metadata, callOptions?.terminalTimeoutMs) : this.transport.invoke(machineId, capability, wireArgs, metadata, callOptions?.terminalTimeoutMs, signal)).catch((error) => {
+      throw typedTransportError(error);
+    });
     if (this.transport.normalizesDurableResults === true)
       return value;
     const resolver = this.resolveArtifact;
@@ -3930,89 +4476,32 @@ var connect = async (options) => {
   const session = transport.credentialRefresh;
   return options.createFacade?.(hub, session, options.operatorConfig) ?? new BunshinFacade(hub, session, options.operatorConfig, options.facade);
 };
-// src/machine-errors.ts
-class MachineWireError extends HubTransportError {
-  disposition;
-  constructor(code, message, requestId = "", disposition, detail) {
-    super(code, message, requestId, detail);
-    this.name = new.target.name;
-    this.disposition = disposition;
-  }
-}
-
-class InvokeDeadlineError extends MachineWireError {
-  constructor(message, requestId = "", disposition) {
-    super("invoke_deadline", message, requestId, disposition);
-  }
-}
-
-class OpFailedError extends MachineWireError {
-  constructor(message, requestId = "", disposition) {
-    super("op_failed", message, requestId, disposition);
-  }
-}
-
-class BudgetExceededError extends MachineWireError {
-  constructor(message, requestId = "", disposition) {
-    super("budget_exceeded", message, requestId, disposition);
-  }
-}
-
-class MalformedFrameError extends MachineWireError {
-  constructor(message, requestId = "", disposition) {
-    super("malformed_frame", message, requestId, disposition);
-  }
-}
-
-class WrongKindError extends MachineWireError {
-  constructor(message, requestId = "", disposition) {
-    super("wrong_kind", message, requestId, disposition);
-  }
-}
-
-class AgentBusyRefreshError extends MachineWireError {
-  constructor(message, requestId = "", disposition) {
-    super("agent_busy_refresh", message, requestId, disposition);
-  }
-}
-
-class PersistenceFailedError extends MachineWireError {
-  constructor(message, requestId = "", disposition) {
-    super("persistence_failed", message, requestId, disposition);
-  }
-}
-
-class MachineOfflineSkippedError extends MachineWireError {
-  constructor(message, requestId = "", disposition) {
-    super("machine_offline_skipped", message, requestId, disposition);
-  }
-}
 // src/result-shape.ts
 import { Value as Value2 } from "#bunshin-ts-dep/@sinclair/typebox/value";
 var isBridgeEnvelope = (value) => Value2.Check(meshOperationContracts.bridgeInvoke[1], value);
-var field2 = (value, key) => typeof value === "object" && value !== null ? Reflect.get(value, key) : undefined;
+var field3 = (value, key) => typeof value === "object" && value !== null ? Reflect.get(value, key) : undefined;
 var isString = (value) => typeof value === "string";
 var isInteger = (value) => typeof value === "number" && Number.isSafeInteger(value);
 var isShellResult = (value) => {
   if (typeof value !== "object" || value === null || Array.isArray(value))
     return false;
-  if (!isInteger(field2(value, "exitCode")) || !isString(field2(value, "stdout")) || !isString(field2(value, "stderr"))) {
+  if (!isInteger(field3(value, "exitCode")) || !isString(field3(value, "stdout")) || !isString(field3(value, "stderr"))) {
     return false;
   }
-  const timeout = field2(value, "timeout");
+  const timeout = field3(value, "timeout");
   return timeout === undefined || timeout === "deadline" || timeout === "exit-unconfirmed";
 };
 var isTerminalFrame = (value) => {
   if (typeof value !== "object" || value === null || Array.isArray(value))
     return false;
-  if (!isString(field2(value, "handleId")) || !isString(field2(value, "output")))
+  if (!isString(field3(value, "handleId")) || !isString(field3(value, "output")))
     return false;
-  const state = field2(value, "state");
+  const state = field3(value, "state");
   if (state !== "running" && state !== "completed")
     return false;
-  if (!isInteger(field2(value, "lastSeq")))
+  if (!isInteger(field3(value, "lastSeq")))
     return false;
-  const truncated = field2(value, "truncated");
+  const truncated = field3(value, "truncated");
   return truncated === undefined || typeof truncated === "boolean";
 };
 export {
@@ -4045,6 +4534,8 @@ export {
   OpFailedError,
   PersistenceFailedError,
   ReadLimitError,
+  ShipRefusedError,
+  ShipValidatorError,
   StdinActivityTimeoutError,
   TaskContextRequiredError,
   TerminalLifecycleUnsupportedError,

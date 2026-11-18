@@ -38,19 +38,30 @@ const runPowerShell: PowerShellRunner = async (script, env) => {
   return { code, out: Buffer.concat(chunks).toString("utf8"), err: Buffer.concat(errChunks).toString("utf8") }
 }
 
-const firstErrorLine = (err: string | undefined): string => {
+const XML_ENTITIES: { readonly [entity: string]: string } = { lt: "<", gt: ">", quot: '"', apos: "'", amp: "&" }
+
+// The text of a CLIXML line's <S> strings: a redirected Windows PowerShell writes its error record as several
+// <S S="Error"> elements whose line breaks are escaped as _x000D__x000A_. The progress object holds no <S> text.
+const clixmlText = (line: string): string =>
+  [...line.matchAll(/<S(?: S="[^"]*")?>([^<]*)<\/S>/g)]
+    .map((match) => match[1] ?? "")
+    .join("")
+    .replace(/_x([0-9A-Fa-f]{4})_/g, (_, hex: string) => String.fromCharCode(Number.parseInt(hex, 16)))
+    .replace(/&(lt|gt|quot|apos|amp);/g, (_, entity: string) => XML_ENTITIES[entity] ?? "")
+
+// PowerShell wraps a long message over several lines and then prints its position ("At line:", "+ ...").
+const POSITION_LINE = /^(?:At line:\d|At .*char:\d|\+ )/
+
+const errorMessage = (err: string | undefined): string => {
   const lines = (err ?? "")
     .split(/\r?\n/)
+    .filter((text) => !text.trim().startsWith("#< CLIXML"))
+    .flatMap((text) => (text.trim().startsWith("<") ? clixmlText(text).split(/\r?\n/) : [text]))
     .map((text) => text.trim())
-    .filter((text) => text !== "" && !text.startsWith("#< CLIXML"))
-  // A redirected Windows PowerShell writes its progress record as CLIXML on the same stream as the
-  // real error. The progress object is not the failure.
-  const plain = lines.find((text) => !text.startsWith("<"))
-  const embedded = lines
-    .map((text) => /Exception[^<]{0,220}/.exec(text)?.[0])
-    .find((text): text is string => text !== undefined)
-  const line = plain ?? embedded ?? ""
-  return line === "" ? "" : `: ${line.slice(0, 300)}`
+    .filter((text) => text !== "")
+  const end = lines.findIndex((text) => POSITION_LINE.test(text))
+  const message = lines.slice(0, end === -1 ? lines.length : end).join(" ")
+  return message === "" ? "" : `: ${message.slice(0, 300)}`
 }
 
 // The SDDL token for userSid on this machine (an alias such as "LA", or the SID itself); undefined when it cannot be
@@ -82,19 +93,23 @@ export const aliasedDaclVerdict = (
 // The vendored script's SetOwner is refused on the GitHub runner: SeRestorePrivilege is present and
 // disabled, and the progress record is the first stderr line. icacls enables the privilege. The DACL
 // written afterwards is still the vendored one-ACE descriptor. dacl.ts stays byte-pinned.
+// Set-Acl is not used either: its FileSystem provider first writes every section, the SACL among them
+// (SeSecurityPrivilege), and its fallback keeps that section whenever the existing DACL is protected.
+// SetAccessControl on the item persists only the sections the script changed: the protected DACL.
 const OWNER_LINE = "$acl.SetOwner($sid)\n"
+const SET_ACL_LINE = "Set-Acl -LiteralPath $env:LA_PATH -AclObject $acl\n"
+const SET_DACL_LINE = "(Get-Item -LiteralPath $env:LA_PATH -Force).SetAccessControl($acl)\n"
 const RUNNER_PREFIX = String.raw`$ProgressPreference = 'SilentlyContinue'
 $ErrorActionPreference = 'Stop'
 $ownerSet = & icacls.exe $env:LA_PATH /setowner "*$($env:LA_SID)" 2>&1
 if ($LASTEXITCODE -ne 0) { throw "setowner failed: $ownerSet" }
 `
-if (!APPLY_DACL_SCRIPT.includes(OWNER_LINE)) {
-  throw new Error("the vendored DACL script no longer sets the owner on its own line")
+if (!APPLY_DACL_SCRIPT.includes(OWNER_LINE) || !APPLY_DACL_SCRIPT.includes(SET_ACL_LINE)) {
+  throw new Error("the vendored DACL script no longer sets the owner and the ACL on their own lines")
 }
-const RUNNER_APPLY_SCRIPT = APPLY_DACL_SCRIPT.replace("$ErrorActionPreference = 'Stop'\n", RUNNER_PREFIX).replace(
-  OWNER_LINE,
-  "",
-)
+const RUNNER_APPLY_SCRIPT = APPLY_DACL_SCRIPT.replace("$ErrorActionPreference = 'Stop'\n", RUNNER_PREFIX)
+  .replace(OWNER_LINE, "")
+  .replace(SET_ACL_LINE, SET_DACL_LINE)
 
 export const applyExactDacl = async (
   path: string,
@@ -104,7 +119,7 @@ export const applyExactDacl = async (
 ): Promise<void> => {
   const { code, err } = await run(RUNNER_APPLY_SCRIPT, { LA_PATH: path, LA_SID: userSid, LA_KIND: kind })
   if (code !== 0)
-    throw new LocalApiError("insecure_state_dir", `the exact DACL could not be applied${firstErrorLine(err)}`)
+    throw new LocalApiError("insecure_state_dir", `the exact DACL could not be applied${errorMessage(err)}`)
 }
 
 // Fails closed: a DACL that cannot be read back is not exact.

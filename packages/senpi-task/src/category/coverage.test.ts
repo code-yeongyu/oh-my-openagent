@@ -46,6 +46,8 @@ const ANTHROPIC_MODELS = [
   "claude-sonnet-5-5",
 ]
 const GPT_PROVIDERS = ["chatgpt-subscription", "openai", "github-copilot", "opencode"]
+// deep-high's first rung is GPT-6.2 Astra, which Copilot does not serve, so Copilot first appears on its GPT-6 Astra rung.
+const DEEP_HIGH_PROVIDERS = ["chatgpt-subscription", "openai", "opencode", "github-copilot"]
 
 describe("resolveCategoryCoverage", () => {
   describe("#given a zai-only registry", () => {
@@ -71,7 +73,7 @@ describe("resolveCategoryCoverage", () => {
           "github-copilot",
           "opencode",
         ])
-        expect(providersOf("deep-high")).toEqual(GPT_PROVIDERS)
+        expect(providersOf("deep-high")).toEqual(DEEP_HIGH_PROVIDERS)
         expect(providersOf("writing")).not.toContain("zai")
       })
     })
@@ -92,7 +94,7 @@ describe("resolveCategoryCoverage", () => {
           "writing",
         ])
         expect(coverage.unusable).toEqual([
-          { name: "deep-high", providers: GPT_PROVIDERS },
+          { name: "deep-high", providers: DEEP_HIGH_PROVIDERS },
           { name: "deep-low", providers: GPT_PROVIDERS },
           { name: "ultrabrain", providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"] },
         ])
@@ -122,8 +124,8 @@ describe("resolveCategoryCoverage", () => {
 
         expect(coverage.unusable.find((gap) => gap.name === "deep-high")?.providers).toEqual([
           "chatgpt-subscription",
-          "github-copilot",
           "opencode",
+          "github-copilot",
         ])
       })
     })

@@ -1,14 +1,11 @@
 import type { ThreadAddressEntry } from "../addressing"
-import type { ThreadStatus } from "../contracts/results"
 import type { ThreadToolFailure } from "../errors"
-import { rowThreadId, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
+import { rowStatus, rowThreadId, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
 import { holderTarget, remoteReady } from "./remote-ops"
 
 // Decision 0027 section 1: the relay transport's address book. The account listing becomes entries of the SAME shape the
 // local book yields, so one resolver judges local and remote threads together: an exact durable id, then an account
 // alias, then the name ladder across every entry (two devices sharing a name are ambiguous_target naming each device).
-const statusOf = (state: string): ThreadStatus => (state === "ended" ? "resumable" : "live")
-
 export function relayAddressEntry(row: RemoteSessionRow, aliases?: readonly string[]): ThreadAddressEntry {
   const updated = new Date(row.updated_ms).toISOString()
   const thread_id = rowThreadId(row)
@@ -16,8 +13,10 @@ export function relayAddressEntry(row: RemoteSessionRow, aliases?: readonly stri
     thread_id.length > 0 && row.session_id.length > 0 && row.session_id !== thread_id ? [row.session_id] : undefined
   return {
     thread_id,
+    // The device's own title, never rowLabel's folder name: that label is display-only (thread_list), because folder
+    // names collide across threads and would turn into ambiguous addresses (#14043).
     name: row.title,
-    status: statusOf(row.state),
+    status: rowStatus(row),
     cwd: row.project,
     created_at: updated,
     updated_at: updated,

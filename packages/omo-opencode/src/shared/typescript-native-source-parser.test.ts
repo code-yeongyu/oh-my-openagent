@@ -10,6 +10,31 @@ import { TypeScriptSourceParser } from "./typescript-native-source-parser"
 // failed with "Connection is closed.". The parser starts a new native process when its connection is gone.
 
 const nativeChildren = (): number[] => {
+  // Windows has no pgrep; CIM lists this process's direct children there (ParentProcessId is stable, unlike a
+  // /proc ppid after exit). The querying PowerShell is itself a direct child of this process, so it is excluded
+  // by its own PID the way memory-core's windows-process-tree.mjs excludes its query process. PowerShell startup
+  // cost is fine here: the call sites are per-phase, not per poll.
+  if (process.platform === "win32") {
+    let out = ""
+    try {
+      out = execFileSync(
+        "powershell.exe",
+        [
+          "-NoProfile",
+          "-NonInteractive",
+          "-Command",
+          `(Get-CimInstance Win32_Process -Filter "ParentProcessId=${process.pid}") | Where-Object { $_.ProcessId -ne $PID } | ForEach-Object { $_.ProcessId }`,
+        ],
+        { encoding: "utf8", windowsHide: true, timeout: 5_000 },
+      )
+    } catch {
+      return []
+    }
+    return out
+      .split(/\s+/)
+      .map((line) => Number(line.trim()))
+      .filter((pid) => Number.isInteger(pid) && pid > 1)
+  }
   let out = ""
   try {
     out = execFileSync("pgrep", ["-P", String(process.pid)], { encoding: "utf8" })

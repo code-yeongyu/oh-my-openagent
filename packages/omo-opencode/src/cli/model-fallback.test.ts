@@ -286,7 +286,7 @@ describe("generateModelConfig", () => {
   })
 
   describe("Momus agent model resolution", () => {
-    test("Momus resolves to gpt-6-astra xhigh when OpenAI is available", () => {
+    test("Momus resolves to gpt-6.2-astra xhigh when OpenAI is available", () => {
       // #given
       const config = createConfig({ hasOpenAI: true })
 
@@ -294,11 +294,11 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.momus?.model).toBe("openai/gpt-6-astra")
+      expect(result.agents?.momus?.model).toBe("openai/gpt-6.2-astra")
       expect(result.agents?.momus?.variant).toBe("xhigh")
       expect(result.agents?.momus?.fallback_models?.[0]).toEqual({
         model: "openai/gpt-6-astra",
-        variant: "high",
+        variant: "xhigh",
       })
     })
   })

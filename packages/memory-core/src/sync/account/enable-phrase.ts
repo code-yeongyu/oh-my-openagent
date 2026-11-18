@@ -1,5 +1,5 @@
 import { PHRASE_RECOVERY_RP_ID } from "../crypto/parse.ts"
-import { rootChangedSinceRetired } from "../crypto/trust-pin.ts"
+import { rootChangeNotice } from "../crypto/trust-pin.ts"
 import { admitSyncOperation, checkSyncOperation, syncOperationSignal } from "../operation-authority.ts"
 import { type GenesisBridge, GenesisEnableError } from "../genesis/bridge.ts"
 import { buildGenesis } from "../genesis/build.ts"
@@ -12,6 +12,7 @@ import {
   type PhraseGenesisPlace,
   writePhraseGenesisMarker,
 } from "../genesis/phrase-marker.ts"
+import { turnDeviceSyncOn } from "./device-switch.ts"
 import type { EnableOutcome, EnableSyncInput } from "./enable.ts"
 import { principalOf } from "./join.ts"
 import type { PairingHttp } from "./pairing-http.ts"
@@ -49,9 +50,11 @@ export const commitIntent = async (captured: Captured, intent: GenesisIntent): P
       ? { kind: "join_required", phraseVoid: { purpose: "genesis" } }
       : { kind: "join_required" }
   if (isPhraseIntent(intent)) await deletePhraseGenesisMarker(placeOf(captured))
-  return (await rootChangedSinceRetired(captured.pinDir, captured.account, intent.genesisDigest))
-    ? { kind: "joined", created: true, rootChanged: true }
-    : { kind: "joined", created: true }
+  return {
+    kind: "joined",
+    created: true,
+    ...(await rootChangeNotice(captured.pinDir, captured.account, intent.genesisDigest)),
+  }
 }
 
 /**
@@ -118,7 +121,7 @@ export const createPhraseGenesis = async (
   }
   await storeGenesisIntent(captured, intent)
   await captured.pairing.setAccountSync(true)
-  await captured.pairing.setDeviceSync(captured.serviceDeviceId, true)
+  await turnDeviceSyncOn(captured)
   checkSyncOperation(captured)
   return commitIntent(captured, intent)
 }
