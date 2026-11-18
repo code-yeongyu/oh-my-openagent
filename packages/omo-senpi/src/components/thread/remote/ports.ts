@@ -202,6 +202,13 @@ export type RemoteSessionsPort = {
     handlers: RemoteWatchHandlers,
     options?: RemoteWatchOptions,
   ) => Promise<RemoteWatchOutcome>
+  /**
+   * #14170 (`closed-rows.ts`): this surface closed `row`'s session, whose unload named `path`. Until the listing catches
+   * up it lists the row ended with that file. Absent: the listing is read as it comes.
+   */
+  readonly closed?: (row: RemoteSessionRow, path: string | undefined) => void
+  /** #14170: this surface opened `row`'s session again, which its device now lists under `key`. */
+  readonly reopened?: (row: RemoteSessionRow, key: string) => void
   /** Closes the device-service connection this port opened, if any; a short-lived caller (the CLI) calls it at the end. */
   readonly close?: () => Promise<void>
 }

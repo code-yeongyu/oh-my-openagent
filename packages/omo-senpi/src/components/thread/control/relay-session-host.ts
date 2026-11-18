@@ -82,7 +82,7 @@ export function createRelaySessionHost(
         ...(permissionPreset === undefined ? {} : { permissionPreset }),
       }
       const reopens = request.sessionPath !== undefined
-      const outcome = await remote.sessions.endpointCommand(device, frame, reopens ? undefined : { locate: true })
+      const outcome = await remote.sessions.endpointCommand(device, frame, { locate: true })
       if (outcome.kind !== "ok") {
         const model = request.provider === undefined ? undefined : `${request.provider}/${request.modelId ?? ""}`
         const refused = openRefusal(outcome, device, open.cwd, model)
@@ -100,8 +100,25 @@ export function createRelaySessionHost(
       const state = recordOf(data["state"])
       let threadId: string
       const warnings: ThreadToolFailure[] = []
-      if (reopens && listed !== undefined) threadId = listed.session_id
-      else {
+      if (reopens) {
+        // #14170: a reopened session is addressed by the key its device lists it by NOW, never the cached row's key (a
+        // closed session's key is gone, and every later op there answers not_resumable). It is answered ok only once
+        // that key resolves; an open whose session cannot be reached is no resumed thread.
+        const engineId = openedEngineId(data, state) ?? listed?.durable_id
+        const located =
+          engineId === undefined
+            ? ({ kind: "refused", reason: "unnamed_session" } as const)
+            : await remote.sessions.locate(device, engineId, outcome.located)
+        if (located.kind !== "ok")
+          return fail(
+            "not_resumable",
+            `Device ${device} opened the thread's file, but the reopened session cannot be reached there (${located.reason}).`,
+            "Call thread_list with all_scope, then open the thread by the id it lists.",
+            { device, reason: located.reason },
+          )
+        threadId = located.sessionId
+        if (listed !== undefined) remote.sessions.reopened?.(listed, located.sessionId)
+      } else {
         const engineId = openedEngineId(data, state)
         if (engineId === undefined)
           return fail(

@@ -13,7 +13,8 @@ import {
   type RemoteThreadSurface,
 } from "./ports"
 import { accountDevices } from "./account"
-import { aliasFailure, holderDetails, remoteAvailable } from "./remote-ops"
+import { sessionFileOf } from "./find-session"
+import { aliasFailure, deviceOnline, holderDetails, remoteAvailable } from "./remote-ops"
 
 type LocalEntry = {
   readonly thread_id: string
@@ -295,12 +296,20 @@ export async function planCreate(
     if (target.kind === "local") return openHere(target.address)
     // Only a row its device listed live this round is answered as already live (B's engine holds it). An ended row, or a
     // cached snapshot of a device that did not answer (#14043), is opened again from its file; the relay host refuses
-    // that open device_offline while the device stays offline.
+    // that open device_offline while the device stays offline. A row that names no file has it found on its device first.
     if (rowStatus(target.row) === "live") return alreadyLive(listedThread(target.row), target.row.device)
+    let sessionPath = target.row.path
+    if (sessionPath === "") {
+      const offline = await deviceOnline(remote, target.row.device)
+      if (offline !== undefined) return { kind: "done", result: offline }
+      const file = await sessionFileOf(remote, target.row)
+      if ("result" in file) return { kind: "done", result: file.result, device: target.row.device }
+      sessionPath = file.path
+    }
     return {
       kind: "open",
       host: createRelaySessionHost(remote, target.row.device, target.row),
-      request: { sessionPath: target.row.path },
+      request: { sessionPath },
       creates: false,
     }
   }

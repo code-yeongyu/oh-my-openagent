@@ -30,6 +30,7 @@ import {
 import { THREAD_FAMILY_PROMPT_GUIDELINES } from "./metadata"
 import { createLaunch } from "./control/create-launch"
 import { createdDeviceRow, relayAddressBook, type RelayAddressBook } from "./remote/address-book"
+import { withClosedRows } from "./remote/closed-rows"
 import { threadLink } from "./thread-link"
 export type { ThreadTranscriptEntry } from "./reader"
 import { hashArgs } from "./gateway/bindings"
@@ -99,10 +100,12 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
   return buildThreadTools(options).tools
 }
 
-function buildThreadTools(options: ThreadToolSurfaceOptions): {
+function buildThreadTools(surface: ThreadToolSurfaceOptions): {
   readonly tools: readonly AnyTool[]
   readonly dispose: () => void
 } {
+  // One ledger of the threads these tools closed on other devices, read by every tool through the remote surface (#14170).
+  const options = surface.remote === undefined ? surface : { ...surface, remote: withClosedRows(surface.remote) }
   const { store, relay, pipeline } = createGatewayServices(options, () => view({ offline: true }))
   const now = options.now ?? store.now
   async function view(request?: ThreadHostViewRequest): Promise<ThreadHostView> {
@@ -384,23 +387,8 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
               const found = await resolveAcross(options, known, address, callerId, true, "exact", true)
               if (found.kind === "error")
                 return { kind: "error", result: { kind: "error", error: found } as ThreadToolResult }
-              // A session found only by a probe (no file path: its device holds it but runs it nowhere) is no existing thread to
-              // open (omo#13037 A4.4): today's answer for a holder that cannot be reached, and no open is sent. A listed ended
-              // thread still opens from its file, as before.
-              if (
-                found.entry.transport?.kind === "relay" &&
-                found.entry.transport.row.state === "ended" &&
-                found.entry.transport.row.path === ""
-              )
-                return {
-                  kind: "error",
-                  result: failure(
-                    "not_found",
-                    `Thread ${found.entry.thread_id} on device ${found.entry.transport.row.device} is not running there.`,
-                    "Call thread_list with all_scope to find the live thread.",
-                    { device: found.entry.transport.row.device, thread: found.entry.thread_id },
-                  ),
-                }
+              // A row with no file path (a probe's ended row, a snapshot, a session listed before its file existed) has its
+              // file found on its device by placement, whatever its state (#14170); it is never opened by an empty path.
               return found.entry.transport?.kind === "relay"
                 ? { kind: "remote", row: found.entry.transport.row }
                 : { kind: "local", address: found.entry.thread_id, accountWide: true }

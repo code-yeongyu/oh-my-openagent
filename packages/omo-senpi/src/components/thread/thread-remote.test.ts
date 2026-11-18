@@ -265,6 +265,103 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     ])
   })
 
+  test("#given a thread on b that b listed before its file existed #when it is closed and then reopened by id #then the close takes it off live, and the reopen opens the file the close named, never an empty path (#14170)", async () => {
+    const a = account({ rows: [{ ...B_ROW, path: "" }] })
+    const { run } = surface(a.remote)
+    expect(await run("thread_close", { thread: "dur-on-b" })).toMatchObject({ kind: "ok", closed: true })
+    const listed = await run("thread_list", { all_scope: true })
+    expect(listed.kind === "ok" && "threads" in listed && listed.threads.find((t) => t.device === "b")).toMatchObject({
+      thread: "dur-on-b",
+      status: "resumable",
+    })
+    expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({
+      kind: "ok",
+      thread: "dur-on-b",
+      device: "b",
+      deduplicated: false,
+    })
+    expect(
+      a.sent.filter((entry) => entry.rpc?.["type"] === "open_session").map((entry) => entry.rpc?.["sessionPath"]),
+    ).toEqual([B_ROW.path])
+    // The next op after that ok, while b's listing still names the closed session's key: it reaches the session b reopened,
+    // never answers not_resumable.
+    expect(await run("thread_send", { thread: "dur-on-b", message: "still there?" })).toMatchObject({
+      kind: "ok",
+      thread: "dur-on-b",
+      delivery: { kind: "started" },
+    })
+    expect(
+      a.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message").map((entry) => entry.session),
+    ).toEqual(["dur-on-b"])
+  })
+
+  test("#given b reopens a thread's file but cannot name the reopened session #when thread_create reopens it #then not_resumable, never an ok for a session nothing can reach (#14170)", async () => {
+    const a = account({ rowState: "ended", relayKeys: new Map() })
+    const { run } = surface(a.remote)
+    expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({
+      kind: "error",
+      error: { code: "not_resumable", details: { device: "b", reason: "session_not_found" } },
+    })
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message")).toEqual([])
+  })
+
+  test("#given b's thread is served from the cache with no file path #when thread_create reopens it #then b is asked which file carries its id and that file is opened, never an empty path (#14170)", async () => {
+    const a = account({ rows: [{ ...B_ROW, path: "", source: "cache" }], sessionFiles: { "dur-on-b": B_ROW.path } })
+    const { run } = surface(a.remote)
+    expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({
+      kind: "ok",
+      thread: "dur-on-b",
+      device: "b",
+      deduplicated: false,
+    })
+    expect(
+      a.sent.map((entry) => [
+        entry.via,
+        entry.rpc?.["type"],
+        entry.rpc?.["durableSessionId"] ?? entry.rpc?.["sessionPath"],
+      ]),
+    ).toEqual([
+      ["endpoint", "find_session", "dur-on-b"],
+      ["endpoint", "open_session", B_ROW.path],
+    ])
+  })
+
+  test.each([
+    ["predates find_session", undefined, "unsupported"],
+    ["holds no file for the id", {}, "not_found"],
+    ["holds two files for the id", { "dur-on-b": ["/b/one.jsonl", "/b/two.jsonl"] as const }, "ambiguous_target"],
+  ] as const)(
+    "#given b's cached row names no file and b's engine %s #when thread_create reopens it #then the typed refusal names b, and no open is sent (#14170)",
+    async (_engine, sessionFiles, code) => {
+      const a = account({
+        rows: [{ ...B_ROW, path: "", source: "cache" }],
+        ...(sessionFiles === undefined ? {} : { sessionFiles }),
+      })
+      const { run } = surface(a.remote)
+      expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({
+        kind: "error",
+        error: { code, details: { device: "b", thread: "dur-on-b" } },
+      })
+      expect(a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")).toEqual([])
+    },
+  )
+
+  test("#given a closed session on b that b lists nowhere #when thread_create reopens it by session id #then the probe finds b, b names its file, and that file is opened on b (#14170)", async () => {
+    const closed = "0195f0c2-1a2b-7c3d-8e4f-00000000d001"
+    const file = `/home/b/.omo/agent/sessions/${closed}.jsonl`
+    const a = account({ wakeFeature: true, ended: { b: { [closed]: "rk-closed" } }, sessionFiles: { [closed]: file } })
+    const { run } = surface(a.remote)
+    expect(await run("thread_create", { thread: closed })).toMatchObject({
+      kind: "ok",
+      thread: closed,
+      device: "b",
+      deduplicated: false,
+    })
+    expect(
+      a.sent.filter((entry) => entry.rpc?.["type"] === "open_session").map((entry) => entry.rpc?.["sessionPath"]),
+    ).toEqual([file])
+  })
+
   test("#given b lists a thread with an empty title #when it is listed and then addressed #then it is listed under its folder's name, yet resolves by its thread id only: the derived label is display-only, never an address (#14043)", async () => {
     const a = account({ rows: [{ ...B_ROW, title: "" }] })
     const { run } = surface(a.remote)

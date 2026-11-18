@@ -251,6 +251,11 @@ export function createRemoteThreadFixture() {
       liveState?: JsonObject
       /** b's engine refuses every open_session with this error text (senpi names an unresolvable model `model_unavailable: ...`). */
       openRefuse?: string
+      /**
+       * #14170: b's session files by durable id, as its engine's `find_session` (senpi#6429) answers them; two files for one id
+       * answer ambiguous. Absent: b's engine predates find_session and answers it as an unknown command.
+       */
+      sessionFiles?: Readonly<Record<string, string | readonly [string, string]>>
       /** b knows a session it just opened only by its relay key (relayKeys), not by its durable id: a listing that has not caught up yet. */
       relayKeyOnly?: boolean
       /** The device service throws on b's admit_external_message (a lost connection mid-delivery). */
@@ -328,8 +333,23 @@ export function createRemoteThreadFixture() {
       }
       if (rpc["type"] === "open_session" && options.openRefuse !== undefined)
         return { kind: "refused", reason: options.openRefuse }
+      // senpi resolves an empty sessionPath against its working folder and fails reading a directory (#14170).
+      if (rpc["type"] === "open_session" && rpc["sessionPath"] === "")
+        return { kind: "refused", reason: "open_failed: EISDIR: illegal operation on a directory, read" }
+      if (rpc["type"] === "find_session") {
+        if (options.sessionFiles === undefined) return { kind: "refused", reason: "Unknown command: find_session" }
+        const file = options.sessionFiles[String(rpc["durableSessionId"])]
+        if (file === undefined) return ok({ unknown: true })
+        if (typeof file !== "string") return ok({ ambiguous: true })
+        return ok({ found: { sessionPath: file, cwd: B_ROW.project, open: false } })
+      }
       if (rpc["type"] === "open_session") {
-        const opened = rpc["sessionPath"] === undefined ? "dur-new-on-b" : "dur-on-b"
+        // A reopened file resumes under the id it carries, as senpi's does.
+        const opened =
+          rpc["sessionPath"] === undefined
+            ? "dur-new-on-b"
+            : (Object.entries(options.sessionFiles ?? {}).find(([, file]) => file === rpc["sessionPath"])?.[0] ??
+              "dur-on-b")
         const key = options.relayKeys?.get(opened) ?? opened
         for (const id of options.relayKeyOnly === true ? [key] : [opened, key]) live.add(id)
         return ok(options.openData ?? { sessionId: "rpc-9", state: { durableSessionId: opened } })

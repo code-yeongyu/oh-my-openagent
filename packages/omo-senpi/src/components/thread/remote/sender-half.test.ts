@@ -100,7 +100,7 @@ describe("#13037 the sender half reaches a session on another device that is not
       expect(wakes(a).map((entry) => [entry.device, entry.session])).toEqual([["c", GONE]])
     })
 
-    test("#given such an alias #when thread_read, thread_interrupt and thread_create name it #then no engine command and no open is sent", async () => {
+    test("#given such an alias #when thread_read, thread_interrupt and thread_create name it #then no open is sent: only the create asks c which file carries the id (find_session, a read; #14170), which c's engine predates", async () => {
       const a = account({ rows: [B_ROW], aliases: aliases(), ended: { c: { [GONE]: GONE } } })
       const { run } = fixture.surface(a.remote)
       for (const [tool, args] of [
@@ -111,7 +111,9 @@ describe("#13037 the sender half reaches a session on another device that is not
         const result = await run(tool, args)
         expect({ tool, kind: result.kind }).toEqual({ tool, kind: "error" })
       }
-      expect(a.sent.filter((entry) => entry.via !== "read")).toEqual([])
+      expect(a.sent.filter((entry) => entry.via !== "read")).toEqual([
+        { via: "endpoint", device: "c", rpc: { type: "find_session", durableSessionId: GONE } },
+      ])
     })
   })
 
