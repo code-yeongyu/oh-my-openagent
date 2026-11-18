@@ -186,6 +186,7 @@ export function createCliAccountSource(options: {
       store,
       ...(options.home === undefined ? {} : { home: options.home }),
       beforeKeysDiscarded,
+      log: (line) => options.logger?.warn(line),
       // A sign-in the service ends on refresh is a local end of the sign-in: the device service forgets the device.
       ...(relay === undefined
         ? {}

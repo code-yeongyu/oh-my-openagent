@@ -138,6 +138,18 @@ export interface SyncRunnerOptions {
   readonly deferredRetryMs?: number
   /** How long one start pass may run before it is replaced by a retry; default 120 s. */
   readonly startPassDeadlineMs?: number
+  /** The runner's own timers (retry delay, close wait); the process's timers by default. Tests count these, not every timer. */
+  readonly timers?: SyncRunnerTimers
+}
+
+export interface SyncRunnerTimers {
+  readonly setTimeout: (run: () => void, ms: number) => ReturnType<typeof setTimeout>
+  readonly clearTimeout: (handle: ReturnType<typeof setTimeout> | undefined) => void
+}
+
+const PROCESS_TIMERS: SyncRunnerTimers = {
+  setTimeout: (run, ms) => setTimeout(run, ms),
+  clearTimeout: (handle) => clearTimeout(handle),
 }
 
 interface Running {
@@ -162,6 +174,7 @@ export interface SyncRunner {
 
 export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
   const resolveSession = options.resolveSession ?? noAccountSession
+  const timers = options.timers ?? PROCESS_TIMERS
   // The engine (and the Loro wasm under it) loads only once a device has an account session.
   const loadRuntime = options.loadRuntime ?? (() => import("#omo-memory-sync-runtime"))
   const open = options.open ?? (async (o: OpenDeviceSyncOptions) => (await loadRuntime()).openDeviceSync(o))
@@ -302,6 +315,7 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
         abandoned: abandonedStartsOf(abandoned, paths.repo),
         deferredRetryMs: options.deferredRetryMs,
         startPassDeadlineMs: options.startPassDeadlineMs,
+        timers,
       },
       users,
     )
@@ -313,7 +327,7 @@ export function createSyncRunner(options: SyncRunnerOptions): SyncRunner {
       // the old engine's lease and stay idle; wait for that close first.
       const pending = closing.get(paths.repo)
       const waitMs = options.closeWaitMs ?? CLOSE_WAIT_MS
-      if (pending !== undefined && (await raceDeadline(pending, waitMs)) === "timeout")
+      if (pending !== undefined && (await raceDeadline(pending, waitMs, timers)) === "timeout")
         logger.error(
           `memory sync: the previous engine for this memory did not close within ${waitMs} ms; starting anyway, and this device may stay idle if it still holds its lease`,
           { identity, code: SYNC_CLOSE_WAIT_EXCEEDED },
