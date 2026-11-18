@@ -50,6 +50,8 @@ export type World = {
   readonly sessions: readonly WorldSession[]
   // Decision 0018: the engine endpoint keys of the devices whose host takes delegated commands; others answer unsupported.
   readonly endpoints?: { readonly [device: string]: readonly string[] }
+  // 0.1.11: per device, the endpoint key its host names as its own engine, answered only to a request that asks.
+  readonly primary?: { readonly [device: string]: string }
   // #393 part B: per device, the session key a durable engine id locates; a device absent answers unsupported.
   readonly located?: { readonly [device: string]: { readonly [engineId: string]: string } }
   // #393: what a host engine endpoint answers to an attach-less session.command {device, endpoint, rpc}: the engine's

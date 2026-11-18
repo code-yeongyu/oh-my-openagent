@@ -99,9 +99,10 @@ describe("DeviceService.endpointCommand: opens on the device's primary engine en
     expect(calls.commandTo).toBe(0)
   })
 
-  test("#given a host listing exactly one endpoint and naming no primary #when an endpoint command is sent #then it opens on that endpoint", async () => {
-    const { calls } = await failure(async () => ({ endpoints: [OTHER_DIR] }), "0.1.42")
-    expect(calls.targets).toEqual([{ device: "peer", endpoint: OTHER_DIR }])
+  test("#given a 0.1.11+ service and a host listing only another agent dir's endpoint and naming no primary #when an endpoint command is sent #then it is refused NoPrimaryEndpointError and nothing is opened", async () => {
+    const { error, calls } = await failure(async () => ({ endpoints: [OTHER_DIR] }), "0.1.42")
+    expect(error).toBeInstanceOf(NoPrimaryEndpointError)
+    expect(calls.commandTo).toBe(0)
   })
 
   test("#given a service older than 0.1.11 #when an endpoint command is sent #then the lookup carries no primary field", async () => {

@@ -6,22 +6,22 @@ import { compareVersions } from "./release/version.ts"
 export const ENDPOINT_PRIMARY_MIN_SERVICE_VERSION = "0.1.11"
 
 /**
- * omo#14195: the device lists several engine endpoints and names none as its own. Every create fails the same way until
+ * omo#14195: the device names no engine endpoint as its own. Every create fails the same way until
  * omo runs on that device again, or its device service (or this one) is updated to name a primary, so it is its own
  * refusal, never a transient code a caller would simply retry.
  */
 export class NoPrimaryEndpointError extends NotSentError {
   constructor(device: string, listed: number) {
-    super("unsupported", `${device} lists ${listed} engine endpoints and names none as its own engine; nothing was opened`, {
+    super("unsupported", `${device} lists ${listed} engine endpoint(s) and names none as its own engine; nothing was opened`, {
       action: `Start or restart omo on ${device}; if that does not help, update the device service on both devices.`,
     })
   }
 }
 
 /**
- * omo#14195: the engine endpoint a remote create or open goes to: the host's primary, else its only endpoint. Several
- * endpoints and no primary means its own engine is unlisted; the rest are owner shards or other agent dirs' engines,
- * possibly too old to admit a later cross-device send, so nothing is opened there.
+ * omo#14195: the engine endpoint a remote create or open goes to: the host's primary. Asked and not named, the host's
+ * own engine is unlisted, and whatever it does list (owner shards, other agent dirs' engines, possibly too old to admit a
+ * later cross-device send) is never opened on, even alone. Only a service too old to ask falls back to a lone endpoint.
  */
 export async function engineEndpointOf(client: LocalApiClient, device: string): Promise<string> {
   const asksPrimary = compareVersions(client.welcome.service_version, ENDPOINT_PRIMARY_MIN_SERVICE_VERSION) >= 0
@@ -29,6 +29,6 @@ export async function engineEndpointOf(client: LocalApiClient, device: string): 
   if (listed.primary !== undefined) return listed.primary
   const [only, ...rest] = listed.endpoints
   if (only === undefined) throw new NotSentError("unsupported", "the device lists no engine endpoint")
-  if (rest.length === 0) return only
+  if (!asksPrimary && rest.length === 0) return only
   throw new NoPrimaryEndpointError(device, listed.endpoints.length)
 }

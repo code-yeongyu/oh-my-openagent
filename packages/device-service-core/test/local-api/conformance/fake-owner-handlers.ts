@@ -118,9 +118,10 @@ export const dispatch = (state: OwnerState, conn: Conn, request: LocalRequest): 
       return sessionHandler(state, conn, request)
     case "session.endpoints": {
       const endpoints = state.world.endpoints?.[request.device]
+      const primary = request.primary === true ? state.world.primary?.[request.device] : undefined
       return endpoints === undefined
         ? refuse("unsupported", "that device names no engine endpoints")
-        : ok({ endpoints: [...endpoints] })
+        : ok({ endpoints: [...endpoints], ...(primary === undefined ? {} : { primary }) })
     }
     case "session.locate": {
       const located = state.world.located?.[request.device]

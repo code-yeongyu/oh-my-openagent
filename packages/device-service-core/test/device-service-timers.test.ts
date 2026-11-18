@@ -54,6 +54,7 @@ describe("device service clock seam", () => {
     const world: World = {
       ...defaultWorld(),
       endpoints: { [PEER]: ["ZW5kcG9pbnQta2V5LTAwMQ"] },
+      primary: { [PEER]: "ZW5kcG9pbnQta2V5LTAwMQ" },
       endpointCommand: { data: {}, outcome: defaultWorld().sessions[0]?.outcome ?? [] },
     }
     const { owner, withheld } = await startMode("ack-no-final", world)
