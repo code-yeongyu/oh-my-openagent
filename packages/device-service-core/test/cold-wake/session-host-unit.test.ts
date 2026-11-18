@@ -25,7 +25,7 @@ describe("the cold-wake unit names", () => {
 })
 
 describe("the systemd user unit", () => {
-  test("runs the compiled omo's pinned daemon run for the agent dir, always on, never killing the host it started", () => {
+  test("runs the compiled omo's pinned daemon run once per start (oneshot, no rerun loop), never killing the host it started", () => {
     const launch = SessionHostLaunch.from({
       omoBin: "/home/u/.local/bin/omo",
       execPath: "/home/u/.local/bin/omo",
@@ -39,12 +39,11 @@ describe("the systemd user unit", () => {
         "StartLimitIntervalSec=0",
         "",
         "[Service]",
-        "Type=simple",
+        "Type=oneshot",
+        "TimeoutStartSec=300",
         'ExecStart="/home/u/.local/bin/omo" "daemon" "run" "--pinned"',
         'Environment="OMO_CODING_AGENT_DIR=/home/u/.omo/agent"',
         'Environment="PATH=/home/u/.local/bin:/usr/bin"',
-        "Restart=always",
-        "RestartSec=30",
         "KillMode=process",
         "",
         "[Install]",
@@ -83,7 +82,7 @@ describe("the systemd user unit", () => {
 })
 
 describe("the launchd LaunchAgent", () => {
-  test("runs at load, is kept alive with a throttle, and abandons the detached host to keep running", () => {
+  test("runs at load and on each kickstart, is never kept alive (no rerun loop), and abandons the detached host to keep running", () => {
     const launch = SessionHostLaunch.from({
       omoBin: "/Users/u/.local/bin/omo",
       execPath: "/Users/u/.local/bin/omo",
@@ -112,10 +111,6 @@ describe("the launchd LaunchAgent", () => {
   </dict>
   <key>RunAtLoad</key>
   <true/>
-  <key>KeepAlive</key>
-  <true/>
-  <key>ThrottleInterval</key>
-  <integer>30</integer>
   <key>AbandonProcessGroup</key>
   <true/>
   <key>ProcessType</key>

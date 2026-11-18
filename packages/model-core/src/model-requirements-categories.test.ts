@@ -6,10 +6,12 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(CATEGORY_MODEL_REQUIREMENTS["writing"].requiresAnyModel).toBe(true)
   })
 
-  test("ultrabrain routes GPT-6 Astra max before the existing Sol max fallbacks", () => {
+  test("ultrabrain routes GPT-6.2 Astra max, each rung backed by GPT-6 Astra max, before the existing Sol max fallbacks", () => {
     expect(CATEGORY_MODEL_REQUIREMENTS.ultrabrain.fallbackChain).toEqual([
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.2-astra", variant: "max" },
       { providers: ["openai", "chatgpt-subscription"], model: "gpt-6-astra", variant: "max" },
       { providers: ["github-copilot"], model: "gpt-6-astra", variant: "max" },
+      { providers: ["openai", "chatgpt-subscription", "opencode"], model: "gpt-6.2-astra", variant: "max" },
       { providers: ["openai", "chatgpt-subscription", "opencode"], model: "gpt-6-astra", variant: "max" },
       { providers: ["openai", "chatgpt-subscription"], model: "gpt-5.6-sol", variant: "max" },
       { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "max" },
@@ -44,8 +46,9 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     ])
   })
 
-  test("deep-high routes GPT-6 Astra high only", () => {
+  test("deep-high routes GPT-6.2 Astra high, then GPT-6 Astra high, and nothing else", () => {
     expect(CATEGORY_MODEL_REQUIREMENTS["deep-high"].fallbackChain).toEqual([
+      { providers: ["openai", "chatgpt-subscription", "opencode"], model: "gpt-6.2-astra", variant: "high" },
       {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
         model: "gpt-6-astra",
@@ -54,7 +57,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     ])
   })
 
-  test("deep-low leads with gpt-6.1-sol then gpt-6.1-sol-fast medium on the OpenAI lanes, keeps the gpt-5.6-sol rungs behind them, and carries no GPT-6 Sol rung", () => {
+  test("deep-low leads with the GPT-6.2 then GPT-6.1 Sol tiers medium on the OpenAI lanes, keeps the gpt-5.6-sol rungs behind them, and carries no GPT-6 Sol rung", () => {
     // given
     const requirement = CATEGORY_MODEL_REQUIREMENTS["deep-low"]
 
@@ -63,6 +66,8 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
 
     // then
     expect(chain).toEqual([
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.2-sol", variant: "medium" },
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.2-sol-fast", variant: "medium" },
       { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol", variant: "medium" },
       { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol-fast", variant: "medium" },
       {
@@ -76,12 +81,17 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
 
   test("neither deep lane carries the other lane's model, so they never substitute each other", () => {
     expect(CATEGORY_MODEL_REQUIREMENTS["deep-low"].fallbackChain.map(({ model }) => model)).toEqual([
+      "gpt-6.2-sol",
+      "gpt-6.2-sol-fast",
       "gpt-6.1-sol",
       "gpt-6.1-sol-fast",
       "gpt-5.6-sol",
       "gpt-5.6-sol-fast",
     ])
-    expect(CATEGORY_MODEL_REQUIREMENTS["deep-high"].fallbackChain.map(({ model }) => model)).toEqual(["gpt-6-astra"])
+    expect(CATEGORY_MODEL_REQUIREMENTS["deep-high"].fallbackChain.map(({ model }) => model)).toEqual([
+      "gpt-6.2-astra",
+      "gpt-6-astra",
+    ])
   })
 
   test("visual-engineering starts with Argon low (#10187)", () => {
@@ -210,6 +220,11 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         providers: ["zai-coding-plan", "opencode-go"],
         model: "glm-5.3",
         variant: "high",
+      },
+      {
+        providers: ["openai", "chatgpt-subscription"],
+        model: "gpt-6.2-sol",
+        variant: "medium",
       },
       {
         providers: ["openai", "chatgpt-subscription"],

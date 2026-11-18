@@ -86,7 +86,7 @@ describe("resolveTarget sessionId aliases", () => {
     )
     expect(result.kind === "error" ? result.message : "").toContain("dur-a")
     expect(result.kind === "error" ? result.message : "").toContain("dur-b")
-    expect(result.kind === "error" ? result.candidates?.map((candidate) => candidate.id) : []).toEqual([
+    expect(result.kind === "error" ? result.candidates?.map((candidate) => candidate.thread) : []).toEqual([
       "dur-a",
       "dur-b",
     ])
@@ -96,7 +96,7 @@ describe("resolveTarget sessionId aliases", () => {
     const entries = [thread({ thread_id: "01a1e7fb-5411-7000-8e3c-93cccc725011", session_ids: ["rpc-1"] })]
     const result = expectError(resolveTarget(entries, "rpc-9", { callerWorkspaceRoot: CALLER }), "not_found")
     expect(result.kind === "error" ? result.message : "").toContain("01a1e7fb-5411-7000-8e3c-93cccc725011")
-    expect(result.kind === "error" ? result.next_action : "").toContain("thread_id")
+    expect(result.kind === "error" ? result.next_action : "").toContain("thread value")
   })
 })
 
@@ -146,7 +146,7 @@ describe("resolveTarget exact ladder", () => {
 
     const error = expectError(result, "ambiguous_target")
     expect(error.candidates?.length).toBe(2)
-    const ids = (error.candidates ?? []).map((candidate) => candidate.id).sort()
+    const ids = (error.candidates ?? []).map((candidate) => candidate.thread).sort()
     expect(ids).toEqual(["t-1", "t-2"])
   })
 
@@ -160,8 +160,8 @@ describe("resolveTarget exact ladder", () => {
     const error = expectError(result, "ambiguous_target")
     const candidate: ThreadCandidate | undefined = error.candidates?.[0]
     if (candidate === undefined) throw new Error("expected a candidate")
-    expect(Object.keys(candidate).sort()).toEqual(["cwd", "id", "name", "preview", "state", "updatedAt"])
-    expect(candidate.id).toBe("t-2") // newest updated_at first
+    expect(Object.keys(candidate).sort()).toEqual(["cwd", "name", "preview", "state", "thread", "updatedAt"])
+    expect(candidate.thread).toBe("t-2") // newest updated_at first
     expect(candidate.name).toBe("fix  build")
     expect(candidate.cwd).toBe(CALLER)
     expect(candidate.preview).toBe("")
@@ -181,18 +181,44 @@ describe("resolveTarget exact ladder", () => {
 
     const error = expectError(result, "ambiguous_target")
     expect(error.candidates?.length).toBe(10)
-    const ids = (error.candidates ?? []).map((candidate) => candidate.id)
+    const ids = (error.candidates ?? []).map((candidate) => candidate.thread)
     expect(ids).not.toContain("t-01") // two oldest dropped
     expect(ids).not.toContain("t-02")
     expect(ids[0]).toBe("t-12") // newest first
     expect(ids).toContain("t-03")
   })
 
-  test("#given a name that only a thread outside the default scope carries #when resolved #then the answer is not_found because scope_denied is reserved for id hits", () => {
+  test("#given a name that only a thread outside the default scope carries #when resolved #then the answer is scope_denied naming all_scope, because a same-device thread must not read as absent", () => {
     const entries = [thread({ thread_id: "t-out", name: "ghost lane", cwd: OTHER })]
     const result = resolveTarget(entries, "ghost lane", { callerWorkspaceRoot: CALLER })
 
-    expectError(result, "not_found")
+    const error = expectError(result, "scope_denied")
+    expect(error.next_action).toContain("all_scope")
+    expect(error.candidates?.map((candidate) => candidate.thread)).toEqual(["t-out"])
+  })
+
+  test("#given a name two same-device threads outside the scope carry #when resolved scoped #then scope_denied carries both candidates and the all_scope recovery", () => {
+    const entries = [
+      thread({ thread_id: "t-out-1", name: "ghost lane", cwd: OTHER }),
+      thread({ thread_id: "t-out-2", name: "ghost lane", cwd: OTHER }),
+    ]
+    const error = expectError(resolveTarget(entries, "ghost lane", { callerWorkspaceRoot: CALLER }), "scope_denied")
+    expect(error.candidates?.map((candidate) => candidate.thread).sort()).toEqual(["t-out-1", "t-out-2"])
+    expect(error.next_action).toContain("all_scope")
+  })
+
+  test("#given a name nothing on this device carries #when resolved scoped #then the answer stays not_found", () => {
+    const entries = [thread({ thread_id: "t-1", name: "unrelated lane" })]
+    expectError(resolveTarget(entries, "ghost lane", { callerWorkspaceRoot: CALLER }), "not_found")
+  })
+
+  test("#given an 8-hex target that an out-of-workspace name and another thread's id prefix both match #when resolved scoped #then the id-prefix ladder answers before the name scope hint", () => {
+    const entries = [
+      thread({ thread_id: "t-name", name: "0123abcd", cwd: OTHER }),
+      thread({ thread_id: "0123abcd-1234", name: "elsewhere lane" }),
+    ]
+    const result = resolveTarget(entries, "0123abcd", { callerWorkspaceRoot: CALLER })
+    expect(result).toMatchObject({ kind: "ok", resolution: "id_prefix", entry: { thread_id: "0123abcd-1234" } })
   })
 
   test("#given no entries at all #when an address is resolved #then it is not_found, never a throw", () => {
@@ -490,7 +516,7 @@ describe("checkNameConflict", () => {
     const result = checkNameConflict(entries, "payments   lane")
 
     const error = expectError(result, "name_conflict")
-    expect(error.candidates?.[0]?.id).toBe("t-1")
+    expect(error.candidates?.[0]?.thread).toBe("t-1")
   })
 
   test("#given a decomposed name colliding with a composed stored name #when checked #then NFKC unifies them into a name_conflict", () => {

@@ -15,7 +15,7 @@ export const ThreadCreateParams = Type.Object({
     Type.String({
       minLength: 1,
       description:
-        "Account device to create the new thread on (from tool.thread_list({ all_scope: true })); leave unset to create it on this device. Only for a new thread.",
+        "Account device to create the new thread on (from thread_list with all_scope, which is tool.thread_list({ all_scope: true }) in an eval cell); leave unset to create it on this device. Only for a new thread.",
     }),
   ),
   alias: Type.Optional(
@@ -29,13 +29,13 @@ export const ThreadCreateParams = Type.Object({
   name: Type.Optional(
     Type.String({
       description:
-        "Display label for the new thread; an existing thread with the same normalized name returns name_conflict, and later renames change only the label while thread_id stays the address.",
+        "Display label for the new thread; an existing thread with the same normalized name returns name_conflict, and later renames change only the label while the thread value stays the address.",
     }),
   ),
   cwd: Type.Optional(
     Type.String({
       description:
-        "Working directory the new thread runs in; leaving it unset keeps the thread inside the caller's workspace. A relative path resolves against the caller's folder on this device; on another device pass an absolute path of that device (tool.thread_list({ all_scope: true }) shows its threads' folders). A folder that does not exist refuses the create with invalid_arguments.",
+        "Working directory the new thread runs in; leaving it unset keeps the thread inside the caller's workspace. A relative path resolves against the caller's folder on this device; on another device pass an absolute path of that device (thread_list with all_scope, which is tool.thread_list({ all_scope: true }) in an eval cell, shows its threads' folders). A folder that does not exist refuses the create with invalid_arguments.",
     }),
   ),
   worktree: Type.Optional(
@@ -66,7 +66,7 @@ export const ThreadCreateParams = Type.Object({
   fork_from: Type.Optional(
     Type.String({
       description:
-        "Durable id of an existing thread to fork. The engine does not fork on open yet (#13031), so this is refused with unsupported (details.reason fork_unsupported) and nothing is created; create a thread and hand it the context with tool.thread_send() instead.",
+        "Durable id of an existing thread to fork. The engine does not fork on open yet (#13031), so this is refused with unsupported (details.reason fork_unsupported) and nothing is created; create a thread and hand it the context with thread_send (tool.thread_send() in an eval cell) instead.",
     }),
   ),
   skills: Type.Optional(
@@ -81,7 +81,7 @@ export const ThreadCreateParams = Type.Object({
     Type.String({
       minLength: 3,
       description:
-        "Model the new thread runs on, as an exact provider/id of the device it is created on (tool.thread_set_model()'s list shows them); the session is created on it, and a model that device cannot run refuses the create with model_not_found and opens nothing. Default: that device's own default. Only for a new thread.",
+        "Model the new thread runs on, as an exact provider/id of the device it is created on (listed by thread_set_model, which is tool.thread_set_model() in an eval cell); the session is created on it, and a model that device cannot run refuses the create with model_not_found and opens nothing. Default: that device's own default. Only for a new thread.",
     }),
   ),
   reasoning: Type.Optional(
@@ -102,7 +102,7 @@ export const ThreadCreateParams = Type.Object({
     Type.String({
       minLength: 1,
       maxLength: THREAD_MESSAGE_MAX_BYTES,
-      description: `First message for the new thread, delivered as tool.thread_send() delivers it once the thread exists (delivery picks its mode); the result's prompt field names that delivery, or its failure while the thread stays created. Covered by the same idempotency_key as the create. Longer than ${THREAD_MESSAGE_MAX_BYTES} UTF-8 bytes returns message_too_large. Only for a new thread.`,
+      description: `First message for the new thread, delivered as thread_send (tool.thread_send() in an eval cell) delivers it once the thread exists (delivery picks its mode); the result's prompt field names that delivery, or its failure while the thread stays created. Covered by the same idempotency_key as the create. Longer than ${THREAD_MESSAGE_MAX_BYTES} UTF-8 bytes returns message_too_large. Only for a new thread.`,
     }),
   ),
   delivery: Type.Optional(ThreadDeliveryMode),
