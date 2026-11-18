@@ -68,7 +68,7 @@ export function localSessionMembers(hostOn: HostOn) {
   }
 
   return {
-    close: (target: LocalTarget) =>
+    close: (target: LocalTarget, force = false) =>
       run(target, "closed the session", async ({ port, routing, durable }) => {
         if (port.closeSession === undefined)
           return remoteFailure(
@@ -79,7 +79,7 @@ export function localSessionMembers(hostOn: HostOn) {
               details: { feature: "close", device: target.device },
             },
           )
-        const { outcome, dropped_deliveries } = await port.closeSession(routing, durable)
+        const { outcome, dropped_deliveries } = await port.closeSession(routing, durable, force ? { force } : {})
         if (outcome === "held_elsewhere")
           return remoteFailure(
             "foreign_live_owner",

@@ -17,7 +17,7 @@ export const SESSION_GONE: ReadonlySet<string> = new Set([
   "not_attached",
 ])
 
-/** senpi#7004: the engine takes `unload_session { deliveries: "refuse" }` and names unwritten deliveries it refuses on. */
+/** senpi#7006 (senpi#7004): the engine takes `unload_session { deliveries: "refuse" }` and names the unwritten deliveries it refuses on. */
 const UNLOAD_REFUSE_DELIVERIES = "unload_refuse_deliveries"
 
 const UNLOAD = { type: "unload_session", force: true, children: "detach" } as const
@@ -73,8 +73,10 @@ export async function closeLadder(
     if (pending === undefined && !(await refusesDeliveries(sessionId, send)))
       throw refuse(
         "turn_active",
-        `Thread ${sessionId} is still working (${describe(refused)}), and its host's engine cannot name the messages a forced close would drop.`,
-        "Wait for it to finish, or close it with force: true to stop it now (anything it has not read is dropped); update omo on that device to see those messages first.",
+        refused["reason"] === "turn_active"
+          ? `Thread ${sessionId} is still working (${describe(refused)}), and its host's engine cannot name the messages a forced close would drop.`
+          : `Thread ${sessionId} holds messages it has not read (${describe(refused)}), and its host's engine cannot name them.`,
+        "Wait for it to read them, or close it with force: true (anything it has not read is dropped); an engine that names them comes with a newer senpi on that device.",
         {
           command: "unload_session",
           reason: refused["reason"],
@@ -86,7 +88,8 @@ export async function closeLadder(
     if ("done" in second) return second.done
     refused = second.refused
     const unread = deliveriesOf(refused["pending"])
-    if (refused["reason"] === "work_pending" && unread !== undefined && unread.length > 0)
+    // Any refusal that names unread deliveries is answered by them, whichever blocker the engine named first.
+    if (unread !== undefined && unread.length > 0)
       throw refuse(
         "turn_active",
         `Thread ${sessionId} has ${unread.length} message(s) it has not read yet (${unread.join(", ")}); closing it now would drop them.`,

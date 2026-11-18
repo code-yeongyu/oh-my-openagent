@@ -439,7 +439,7 @@ export type RemoteClient = {
     /** `dropped_deliveries`: messages the session had not read that the close handed back to their senders (omo#14234). */
     readonly close: (
       thread: ThreadHandle,
-      opts?: Opts,
+      opts?: Opts & { readonly force?: boolean },
     ) => R<{ readonly closed: boolean; readonly dropped_deliveries: readonly string[] }>
     readonly archive: (thread: ThreadHandle, archived: boolean, opts?: Opts) => R<{ readonly archived: boolean }>
   }

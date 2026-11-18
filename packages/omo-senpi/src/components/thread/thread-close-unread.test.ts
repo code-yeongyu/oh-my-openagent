@@ -82,6 +82,16 @@ describe("thread_close and the messages a thread has not read (#14234)", () => {
     expect(a.sent.map((entry) => entry.rpc?.["type"])).toEqual(["unload_session"])
   })
 
+  test("#given an engine that names the unread deliveries on a turn_active refusal #when thread_close names the thread #then the answer is the same as for work_pending (#14242 review L2)", async () => {
+    const a = account({ busy: true, unread: UNREAD, unreadReason: "turn_active" })
+    const { run } = surface(a.remote)
+    expect(await run("thread_close", { thread: "dur-on-b" })).toMatchObject({
+      kind: "error",
+      error: { code: "turn_active", details: { pending_deliveries: UNREAD, retry_with: { force: true } } },
+    })
+    expect(a.live.has("rk-on-b")).toBe(true)
+  })
+
   test.each([
     ["an engine that ignores deliveries", { refusesDeliveries: false }],
     // Busy with nothing it names: only the capability read could allow an interrupt, and it never answers.

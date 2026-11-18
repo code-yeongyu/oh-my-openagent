@@ -215,8 +215,10 @@ export function createRemoteThreadFixture() {
       busy?: boolean
       /** Deliveries b's engine admitted and has not written; an interrupting unload hands them back. */
       unread?: readonly string[]
-      /** b's engine advertises unload_refuse_deliveries (senpi#7004); default true. false = an engine that ignores the field. */
+      /** b's engine advertises unload_refuse_deliveries (senpi#7006); default true. false = an engine that ignores the field. */
       refusesDeliveries?: boolean
+      /** The reason b's engine names when it refuses on unread deliveries (default work_pending). */
+      unreadReason?: "work_pending" | "turn_active"
       /** b's engine does not answer get_protocol_info (the read times out). */
       protocolInfoFails?: boolean
       terminal?: boolean
@@ -374,7 +376,7 @@ export function createRemoteThreadFixture() {
         if (busy && unread.length > 0 && capable && rpc["deliveries"] === "refuse")
           return ok({
             outcome: "refused",
-            reason: "work_pending",
+            reason: options.unreadReason ?? "work_pending",
             detail: "an admitted delivery not yet written",
             ...pending,
           })
