@@ -2,6 +2,8 @@
 // window was stamped when the enumeration started, so its answer arrived already expired: the next view enumerated
 // again, and a caller arriving while it ran started a second one. A send paid one enumeration per view.
 import { describe, expect, test } from "bun:test"
+import { resolve } from "node:path"
+
 import {
   createLiveThreadSurface,
   HOST_ENDPOINTS_CACHE_TTL_MS,
@@ -444,10 +446,9 @@ describe("live thread surface endpoint cache", () => {
 
       // then
       expect(calls).toBe(2)
-      const keys = [...enumerations.keys()]
-      expect(keys).toHaveLength(2)
-      expect(keys.filter((key) => key.includes("/tmp/omo-enum-env-a"))).toHaveLength(1)
-      expect(keys.filter((key) => key.includes("/tmp/omo-enum-env-b"))).toHaveLength(1)
+      // the key names the resolved agent dir (a drive-letter path on win32), so compare against the resolved form
+      const agentDirs = [...enumerations.keys()].map((key) => (JSON.parse(key) as readonly string[])[0])
+      expect(agentDirs.sort()).toEqual([resolve("/tmp/omo-enum-env-a"), resolve("/tmp/omo-enum-env-b")])
     })
 
     test("#given surfaces over one shared map #when they list #then the same agent dir and legacy socket share one entry and another agent dir gets its own", async () => {

@@ -5,7 +5,7 @@ import { join } from "node:path"
 
 import { readDiskSession } from "./address-book"
 import type { ThreadToolResult } from "./contracts"
-import { createGatewayStore } from "./gateway/store"
+import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import type { RemoteSessionRow } from "./remote/ports"
 import { B_ROW, createRemoteThreadFixture } from "./thread-remote-fixture"
 import { createThreadTools } from "./tools"
@@ -28,10 +28,20 @@ describe("threadState is the one state rule (thread_list and local control both 
 })
 
 const directories: string[] = []
+const stores: GatewayStore[] = []
 const remoteFixture = createRemoteThreadFixture()
+
+// A store holds its database open in a worker until disposed; Windows refuses to remove a directory with an open
+// file in it (EBUSY), so every store closes before its scratch directory goes.
+function gatewayStore(agentDir: string): GatewayStore {
+  const store = createGatewayStore({ agentDir })
+  stores.push(store)
+  return store
+}
 
 afterEach(async () => {
   await remoteFixture.cleanup()
+  await Promise.all(stores.splice(0).map((store) => store.dispose()))
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
 })
 
@@ -84,7 +94,7 @@ function surfaceOptions(directory: string): ThreadToolSurfaceOptions {
     callerSessionId: () => "caller",
     callerWorkspaceRoot: () => directory,
     stateDirectory: directory,
-    store: createGatewayStore({ agentDir: directory }),
+    store: gatewayStore(directory),
   }
 }
 
@@ -393,7 +403,7 @@ describe("a thread its engine closed (t2pp, measured on omo 5.1.69: it vanished 
     }
     const tools = createThreadTools({
       host,
-      store: createGatewayStore({ agentDir: scratch() }),
+      store: gatewayStore(scratch()),
       stateDirectory: scratch(),
       callerSessionId: () => "dur-caller",
       callerWorkspaceRoot: () => root,
