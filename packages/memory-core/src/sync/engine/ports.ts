@@ -180,6 +180,14 @@ export interface ItemStore {
   peer(): string
   /** Item keys the store knows, live or dead. */
   keys(): readonly string[]
+  /**
+   * Whether `ops` (this device's unsent ops for the key, oldest first) are its very first capture of the key, the only
+   * history-less copy a join may rewind (#13730 review L1): "first" when the oldest op starts from an empty version and
+   * the doc holds nothing but this device's ops; "rewound" when they start from an empty version but the doc holds no
+   * ops any more (a rewind that reached the store before the journal dropped them, review M1); "no" otherwise, e.g. a
+   * key this device created and already sent.
+   */
+  firstCapture(key: string, ops: readonly Uint8Array[]): Promise<"first" | "rewound" | "no">
   /** captureOnDevice: the working text against the item's materialised baseline; null = no edit. */
   capture(key: string, workingText: string | null): Promise<Uint8Array | null>
   /** Import a verified remote update (or this device's own captured ops). */
@@ -250,3 +258,9 @@ export interface SyncRepo {
   /** True when a commit reachable from HEAD carries `Sync-Seq: <range>`. */
   hasSyncCommit(range: string): Promise<boolean>
 }
+
+/**
+ * The engine's log line. A failed cycle is a warning a person or harness must see (#13635); every
+ * other line is routine and stays at info.
+ */
+export type SyncLog = (line: string, level?: "info" | "warn") => void
