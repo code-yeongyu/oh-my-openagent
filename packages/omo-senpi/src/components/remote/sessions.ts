@@ -256,6 +256,12 @@ function createReceipts(now: () => number): RelayTransportOptions["store"] {
       known.result = request.result
       return true
     },
+    // A send that wrote nothing drops its unsettled receipt, so the same key runs again (the gateway store's rule, #12925).
+    toolReceiptRelease: async (request) => {
+      const known = held.get(keyOf(request))
+      if (known === undefined || known.settled) return false
+      return held.delete(keyOf(request))
+    },
     deliveryView: async () => null,
   }
 }
