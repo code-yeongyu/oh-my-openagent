@@ -206,6 +206,24 @@ describe("a joined device with sync on and no memory repository (#14094)", () =>
     )
   })
 
+  test("#given a repository creation longer than a writer's lock wait #when two first writes reach the seam together #then both get the one repository", async () => {
+    // given: on Windows creating the repository (git init, hooks, the seed commit through the hook checker) takes
+    // longer than the default 5 s lock wait, so a caller that queued on the writer lock behind it timed out (#14188).
+    // A 1 ms wait budget is that ordering on any platform.
+    const { paths } = await freshDevice()
+    const options = { lockWaitTimeoutMs: 1 }
+
+    // when
+    const sessions = await Promise.all([
+      prepareMemoryEngineSession("agent", paths, options),
+      prepareMemoryEngineSession("agent", paths, options),
+    ])
+
+    // then
+    expect(commitCount(paths.repo)).toBe(1)
+    expect(sessions.filter((session) => session.created === true)).toHaveLength(1)
+  })
+
   test("#given two first syncs at the same moment #when both reach the seam #then exactly one creates and logs", async () => {
     // given
     const { paths } = await freshDevice()
