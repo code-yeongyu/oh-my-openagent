@@ -52,7 +52,7 @@ describe.skipIf(process.platform === "win32")("provisioned runtime handoff of a 
     try {
       const run = launch(root, `#!/bin/bash\nprintf 'startup:ok\\n' >&16\n`, undefined, [16])
       const startup = run.read(16)
-      const [code] = await once(run.child, "exit", { signal: AbortSignal.timeout(20_000) })
+      const [code] = await once(run.child, "close", { signal: AbortSignal.timeout(20_000) })
       expect(code, run.stderr()).toBe(0)
       expect(startup()).toBe("startup:ok\n")
     } finally {
@@ -66,7 +66,7 @@ describe.skipIf(process.platform === "win32")("provisioned runtime handoff of a 
       const script = `#!/bin/bash\nprintf 'engine:ok' >&5\nprintf 'startup:ok\\n' >&16\n`
       const run = launch(root, script, '{"memory-sync":5}', [5, 16])
       const [channel, startup] = [run.read(5), run.read(16)]
-      const [code] = await once(run.child, "exit", { signal: AbortSignal.timeout(20_000) })
+      const [code] = await once(run.child, "close", { signal: AbortSignal.timeout(20_000) })
       expect(code, run.stderr()).toBe(0)
       expect(channel()).toBe("engine:ok")
       expect(startup()).toBe("startup:ok\n")
@@ -75,22 +75,28 @@ describe.skipIf(process.platform === "win32")("provisioned runtime handoff of a 
     }
   }, 60_000)
 
-  test("#given a re-exec'd runtime waited on by the launcher #when the launcher gets SIGUSR1 #then the runtime receives it and the launcher lives", async () => {
-    const root = mkdtempSync(join(tmpdir(), "omo-handoff-startup-usr1-"))
-    try {
-      const script = `#!/bin/bash\ntrap 'printf "usr1\\n" >&16; exit 0' USR1\nprintf 'ready\\n' >&16\nsleep 30 &\nwait $!\n`
-      const run = launch(root, script, undefined, [16])
-      const startup = run.read(16)
-      const stream: unknown = (run.child.stdio as readonly unknown[])[16]
-      if (!(stream instanceof Socket)) throw new Error("no startup pipe")
-      const exited = once(run.child, "exit", { signal: AbortSignal.timeout(20_000) })
-      while (!startup().includes("ready")) await once(stream, "data", { signal: AbortSignal.timeout(20_000) })
-      run.child.kill("SIGUSR1")
-      const [code, signal] = await exited
-      expect({ code, signal }, run.stderr()).toEqual({ code: 0, signal: null })
-      expect(startup()).toBe("ready\nusr1\n")
-    } finally {
-      rmSync(root, { recursive: true, force: true })
-    }
-  }, 60_000)
+  test.each(["USR1", "USR2"] as const)(
+    "#given a re-exec'd runtime waited on by the launcher #when the launcher gets SIG%s #then the runtime receives it and the launcher lives",
+    async (name) => {
+      const root = mkdtempSync(join(tmpdir(), `omo-handoff-startup-${name.toLowerCase()}-`))
+      try {
+        const script = `#!/bin/bash\nsleep 30 &\nsleeper=$!\ntrap 'kill $sleeper; printf "${name}\\n" >&16; exit 0' ${name}\nprintf 'ready\\n' >&16\nwait $sleeper\n`
+        const run = launch(root, script, undefined, [16])
+        const startup = run.read(16)
+        const stream: unknown = (run.child.stdio as readonly unknown[])[16]
+        if (!(stream instanceof Socket)) throw new Error("no startup pipe")
+        const exited = once(run.child, "exit", { signal: AbortSignal.timeout(20_000) })
+        const closed = once(run.child, "close", { signal: AbortSignal.timeout(20_000) })
+        while (!startup().includes("ready")) await once(stream, "data", { signal: AbortSignal.timeout(20_000) })
+        run.child.kill(`SIG${name}`)
+        const [code, signal] = await exited
+        expect({ code, signal }, run.stderr()).toEqual({ code: 0, signal: null })
+        await closed
+        expect(startup()).toBe(`ready\n${name}\n`)
+      } finally {
+        rmSync(root, { recursive: true, force: true })
+      }
+    },
+    60_000,
+  )
 })

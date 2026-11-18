@@ -9,9 +9,27 @@ import {
   buildLockRecord,
   forgetLockRecord,
   isLockRecordStale,
+  type LockHolder,
   markLockRecordReleased,
+  parseLockHolder,
   readLockRecord,
 } from "./lock-record"
+
+export type { LockHolder } from "./lock-record"
+
+/**
+ * The lock stayed held for the whole wait. `holder` is the record seen at the moment the wait ran out (null when it
+ * was gone or unreadable), so a caller can name who holds the lock instead of reporting an unexplained failure.
+ */
+export class LockWaitTimeoutError extends Error {
+  constructor(
+    readonly lockPath: string,
+    readonly holder: LockHolder | null,
+  ) {
+    super(`Timed out acquiring lock: ${lockPath}`)
+    this.name = "LockWaitTimeoutError"
+  }
+}
 
 export { type LockLease, LockLeaseLostError } from "./lock-lease"
 export { assertRetryableLockOpenError } from "./lock-publish"
@@ -42,7 +60,8 @@ async function acquireLock(lockPath: string, ownerTag: string, staleAfterMs: num
   const startedAt = Date.now()
   for (;;) {
     if (Date.now() - startedAt > LOCK_WAIT_TIMEOUT_MS) {
-      throw new Error(`Timed out acquiring lock: ${lockPath}`)
+      const observed = await readLockRecord(lockPath)
+      throw new LockWaitTimeoutError(lockPath, observed === null ? null : parseLockHolder(observed.content))
     }
 
     const record = await buildLockRecord(ownerTag)
