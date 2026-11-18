@@ -7,7 +7,9 @@ export class NotSentError extends LocalApiError {
 }
 
 export const markNotSent = (error: unknown): unknown =>
-  error instanceof LocalApiError
+  error instanceof NotSentError
+    ? error
+    : error instanceof LocalApiError
     ? new NotSentError(error.code, error.reason, {
         action: error.action,
         ...(error.limit_chars === undefined ? {} : { limit_chars: error.limit_chars }),

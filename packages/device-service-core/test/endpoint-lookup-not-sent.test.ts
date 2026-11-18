@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { connectDeviceService, LocalApiError, NotSentError } from "../src/index.ts"
+import { connectDeviceService, LocalApiError, NoPrimaryEndpointError, NotSentError } from "../src/index.ts"
 import type { LocalApiClient } from "../src/local-api/client.ts"
 
 // An endpoint command looks the endpoint up with session.endpoints before it writes session.command. A failure of that
@@ -92,12 +92,10 @@ describe("DeviceService.endpointCommand: opens on the device's primary engine en
     expect(error.code).toBe("request_timeout")
   })
 
-  test("#given a host listing several endpoints and naming no primary #when an endpoint command is sent #then it is refused host_not_answering, not_sent, and nothing is opened", async () => {
+  test("#given a host listing several endpoints and naming no primary #when an endpoint command is sent #then it is refused NoPrimaryEndpointError, not_sent, and nothing is opened", async () => {
     const { error, calls } = await failure(async () => ({ endpoints: [OTHER_DIR, SHARD] }), "0.1.42")
-    expect(error).toBeInstanceOf(NotSentError)
-    expect(error.code).toBe("host_not_answering")
+    expect(error).toBeInstanceOf(NoPrimaryEndpointError)
     expect(error.not_sent).toBe(true)
-    expect(error.action).not.toBeNull()
     expect(calls.commandTo).toBe(0)
   })
 

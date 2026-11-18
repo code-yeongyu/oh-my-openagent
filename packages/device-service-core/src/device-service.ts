@@ -103,6 +103,7 @@ function followDelegatedCommand(
 export type { ListingResult, ListingRevision, ReadPage, ReadPageEntry } from "./local-api/client-assembly.ts"
 export { LocalApiError } from "./local-api/errors.ts"
 export { NotSentError } from "./not-sent-error.ts"
+export { NoPrimaryEndpointError } from "./engine-endpoint.ts"
 export type {
   Capability,
   CommandRpc,
@@ -172,9 +173,11 @@ export type DeviceService = {
   readonly attach: (device: string, sessionId: string) => Promise<RemoteAttach>
   /**
    * Sends one session-less engine record (`open_session`, `list_sessions`, ...) to `device`'s engine endpoint with no
-   * attach: relay daemon #393's `session.command {device, endpoint, rpc}`, on the key `session.endpoints` lists first.
+   * attach: relay daemon #393's `session.command {device, endpoint, rpc}`, on the device's primary engine endpoint
+   * (`engineEndpointOf`, omo#14195), or its only endpoint when it names none.
    * Settles like an attach's command: the first command state that is not a progress state, plus the engine's reply.
-   * Rejects with the local API's refusal (`unsupported` when the device lists no endpoint, before anything is sent), or
+   * Rejects with the local API's refusal (`unsupported` when the device lists no endpoint, `NoPrimaryEndpointError`
+   * when it lists several and names none as its own; both before anything is sent), or
    * when the connection closes or no final state arrives within ENDPOINT_COMMAND_WAIT_MS. Every failure before
    * `session.command` is written (the `session.endpoints` lookup, whatever its code) is a `NotSentError` (a
    * `LocalApiError` with `not_sent: true`); a `session.command` that times out after sending carries its `command_id` instead.
