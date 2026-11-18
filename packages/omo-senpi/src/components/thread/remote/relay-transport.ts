@@ -342,6 +342,15 @@ export function createRelayTransport(
     // omo#13037 5.4 / A4.5: a session no engine runs takes the wake path when this device's service can carry it: no lane
     // probe (its state is offline in the decision table), so a steer is turn_conflict and nothing is sent.
     const ended = row.state === "ended" && (await remote.sessions.canWake?.()) === true
+    // #14184: with no wake path, nothing on that device runs the session, and a command to its listing key waits out the
+    // device's own deadline (about 60 s) before failing. Answered at once, as thread_read answers it.
+    if (row.state === "ended" && !ended)
+      return fail(
+        "not_resumable",
+        `${rowThreadId(row)} on device ${row.device} is not running, and this device cannot wake it there.`,
+        "Open it again with thread_create({ thread }), then send.",
+        { device: row.device, thread: rowThreadId(row) },
+      )
     if (ended && delivery.mode === "steer")
       return fail(
         REFUSAL_CODES.turn_conflict.code,

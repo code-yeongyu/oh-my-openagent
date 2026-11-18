@@ -4,7 +4,7 @@ import { COMMAND_UNCERTAIN_REASONS } from "../../../../device-service-core/src/l
 import type { ThreadToolResult } from "./contracts"
 import { gatewayDatabasePath } from "./gateway/paths"
 import { type ThreadHostSession } from "./tools"
-import { B_ROW, comparable, createRemoteThreadFixture } from "./thread-remote-fixture"
+import { B_FILE, B_ROW, comparable, createRemoteThreadFixture } from "./thread-remote-fixture"
 
 const { account, surface, cleanup } = createRemoteThreadFixture()
 afterEach(cleanup)
@@ -223,7 +223,7 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     ])
   })
 
-  test("#given an ended thread on b #when thread_create names it by id #then b opens that session file; no device is passed or needed", async () => {
+  test("#given an ended thread on b this device never held #when thread_create names it by id #then b names the session file for its id and opens that file, never the listed folder; no device is passed or needed (#14170)", async () => {
     const a = account({ rowState: "ended" })
     const { run } = surface(a.remote)
     expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({
@@ -233,11 +233,8 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
       deduplicated: false,
     })
     expect(a.sent).toEqual([
-      {
-        via: "endpoint",
-        device: "b",
-        rpc: { type: "open_session", retain_on_disconnect: true, sessionPath: B_ROW.path },
-      },
+      { via: "endpoint", device: "b", rpc: { type: "find_session", durableSessionId: "dur-on-b" } },
+      { via: "endpoint", device: "b", rpc: { type: "open_session", retain_on_disconnect: true, sessionPath: B_FILE } },
     ])
   })
 
@@ -251,7 +248,7 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     expect(a.sent).toEqual([])
   })
 
-  test("#given b answered again but its row still came from the cache #when thread_create names it by id #then b is asked to open that session file, as for an ended thread (#14043)", async () => {
+  test("#given b answered again but its row still came from the cache #when thread_create names it by id #then b is asked which file carries its id and opens that file, as for an ended thread (#14043, #14170)", async () => {
     const a = account({ rows: [{ ...B_ROW, source: "cache" }] })
     const { run } = surface(a.remote)
     expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({
@@ -261,12 +258,13 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
       deduplicated: false,
     })
     expect(a.sent.map((entry) => [entry.via, entry.device, entry.rpc?.["type"], entry.rpc?.["sessionPath"]])).toEqual([
-      ["endpoint", "b", "open_session", B_ROW.path],
+      ["endpoint", "b", "find_session", undefined],
+      ["endpoint", "b", "open_session", B_FILE],
     ])
   })
 
-  test("#given a thread on b that b listed before its file existed #when it is closed and then reopened by id #then the close takes it off live, and the reopen opens the file the close named, never an empty path (#14170)", async () => {
-    const a = account({ rows: [{ ...B_ROW, path: "" }] })
+  test("#given a thread on b, listed as relayd lists it (path = its folder) #when it is closed and then reopened by id #then the close takes it off live, the reopen opens the file the close's unload named, never the folder, and the next send reaches the reopened session (#14170)", async () => {
+    const a = account({ rows: [B_ROW] })
     const { run } = surface(a.remote)
     expect(await run("thread_close", { thread: "dur-on-b" })).toMatchObject({ kind: "ok", closed: true })
     const listed = await run("thread_list", { all_scope: true })
@@ -281,8 +279,10 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
       deduplicated: false,
     })
     expect(
-      a.sent.filter((entry) => entry.rpc?.["type"] === "open_session").map((entry) => entry.rpc?.["sessionPath"]),
-    ).toEqual([B_ROW.path])
+      a.sent
+        .filter((entry) => entry.via === "endpoint")
+        .map((entry) => [entry.rpc?.["type"], entry.rpc?.["sessionPath"]]),
+    ).toEqual([["open_session", B_FILE]])
     // The next op after that ok, while b's listing still names the closed session's key: it reaches the session b reopened,
     // never answers not_resumable.
     expect(await run("thread_send", { thread: "dur-on-b", message: "still there?" })).toMatchObject({
@@ -305,38 +305,14 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     expect(a.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message")).toEqual([])
   })
 
-  test("#given b's thread is served from the cache with no file path #when thread_create reopens it #then b is asked which file carries its id and that file is opened, never an empty path (#14170)", async () => {
-    const a = account({ rows: [{ ...B_ROW, path: "", source: "cache" }], sessionFiles: { "dur-on-b": B_ROW.path } })
-    const { run } = surface(a.remote)
-    expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({
-      kind: "ok",
-      thread: "dur-on-b",
-      device: "b",
-      deduplicated: false,
-    })
-    expect(
-      a.sent.map((entry) => [
-        entry.via,
-        entry.rpc?.["type"],
-        entry.rpc?.["durableSessionId"] ?? entry.rpc?.["sessionPath"],
-      ]),
-    ).toEqual([
-      ["endpoint", "find_session", "dur-on-b"],
-      ["endpoint", "open_session", B_ROW.path],
-    ])
-  })
-
   test.each([
-    ["predates find_session", undefined, "unsupported"],
+    ["predates find_session", "none", "unsupported"],
     ["holds no file for the id", {}, "not_found"],
     ["holds two files for the id", { "dur-on-b": ["/b/one.jsonl", "/b/two.jsonl"] as const }, "ambiguous_target"],
   ] as const)(
-    "#given b's cached row names no file and b's engine %s #when thread_create reopens it #then the typed refusal names b, and no open is sent (#14170)",
+    "#given b's closed thread and b's engine %s #when thread_create reopens it #then the typed refusal names b, and no open is sent (#14170)",
     async (_engine, sessionFiles, code) => {
-      const a = account({
-        rows: [{ ...B_ROW, path: "", source: "cache" }],
-        ...(sessionFiles === undefined ? {} : { sessionFiles }),
-      })
+      const a = account({ rows: [{ ...B_ROW, state: "ended" }], sessionFiles })
       const { run } = surface(a.remote)
       expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({
         kind: "error",
@@ -345,6 +321,16 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
       expect(a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")).toEqual([])
     },
   )
+
+  test("#given b's thread is not running and this device cannot wake it there #when thread_send names it #then not_resumable at once naming the reopen, and no command waits on b (#14184)", async () => {
+    const a = account({ rows: [{ ...B_ROW, state: "ended" }] })
+    const { run } = surface(a.remote)
+    expect(await run("thread_send", { thread: "dur-on-b", message: "hi" })).toMatchObject({
+      kind: "error",
+      error: { code: "not_resumable", details: { device: "b", thread: "dur-on-b" } },
+    })
+    expect(a.sent.filter((entry) => entry.via === "session" || entry.via === "wake")).toEqual([])
+  })
 
   test("#given a closed session on b that b lists nowhere #when thread_create reopens it by session id #then the probe finds b, b names its file, and that file is opened on b (#14170)", async () => {
     const closed = "0195f0c2-1a2b-7c3d-8e4f-00000000d001"

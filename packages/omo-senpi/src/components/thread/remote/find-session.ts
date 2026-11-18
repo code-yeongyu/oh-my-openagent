@@ -4,8 +4,10 @@ import { outcomeFailure } from "./outcome"
 import { rowThreadId, type JsonObject, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
 import { replyData } from "./remote-ops"
 
-// What an engine that predates `find_session` (senpi#6429) answers it with.
+// What an engine that predates `find_session` (senpi#6429) answers it with; relayd refuses a record type the engine's
+// advertised method table lacks as `method_unclassified`.
 const NO_FIND_SESSION: ReadonlySet<string> = new Set([
+  "method_unclassified",
   "unknown_command",
   "unknown_type",
   "unsupported",
@@ -25,15 +27,16 @@ const recordOf = (value: unknown): JsonObject | undefined =>
   typeof value === "object" && value !== null && !Array.isArray(value) ? (value as JsonObject) : undefined
 
 /**
- * The session file an open of `row`'s closed session takes on its own device (#14170), for a row that names none (a session
- * listed before its file existed, a snapshot, a probe's ended row). Such a row is never opened by an empty path, which the
- * far engine reads as its working folder (EISDIR): its holder is asked which file carries the durable id (`find_session`,
- * senpi#6429), and a holder that cannot say is a typed refusal naming why.
+ * The session file an open of `row`'s closed session takes on its own device (#14170). A listing row never names it: its
+ * `path` is the session's working folder (or `"unknown"`), which the far engine opens as a directory (EISDIR). The file is
+ * the one this surface's own close was told (`session_file`), else the one its holder names for the durable id
+ * (`find_session`, senpi#6429); a holder that cannot say is a typed refusal naming why.
  */
 export async function sessionFileOf(
   remote: RemoteThreadSurface,
   row: RemoteSessionRow,
 ): Promise<{ readonly path: string } | { readonly result: ThreadToolResult }> {
+  if (row.session_file !== undefined && row.session_file !== "") return { path: row.session_file }
   const thread = rowThreadId(row)
   const details = { device: row.device, thread }
   if (thread === "")

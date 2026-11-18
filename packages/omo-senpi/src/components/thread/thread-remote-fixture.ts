@@ -25,13 +25,16 @@ import type { SessionWatchHandlers } from "./control/wait-settled"
 
 // The listing key (what b's connector assigned) deliberately differs from the durable id (audit class C8, #13017): a test
 // that passes with either id proves nothing about which one a tool path matched.
+// relayd lists a session's working folder as its `path` (connector catalog.ts: `cwd ?? sessionPath`), never its file
+// (#14170); the file is what b's engine names for itself (find_session, an unload's reply).
+export const B_FILE = "/home/b/.omo/agent/sessions/dur-on-b.jsonl"
 export const B_ROW: RemoteSessionRow = {
   device: "b",
   session_id: "rk-on-b",
   durable_id: "dur-on-b",
   title: "on b",
   project: "/work/b",
-  path: "/home/b/.omo/agent/sessions/dur-on-b.jsonl",
+  path: "/work/b",
   state: "idle",
   updated_ms: 1_700_000_000_000,
 }
@@ -253,9 +256,9 @@ export function createRemoteThreadFixture() {
       openRefuse?: string
       /**
        * #14170: b's session files by durable id, as its engine's `find_session` (senpi#6429) answers them; two files for one id
-       * answer ambiguous. Absent: b's engine predates find_session and answers it as an unknown command.
+       * answer ambiguous. Default: b's own session (`B_FILE`). `"none"`: b's engine predates find_session.
        */
-      sessionFiles?: Readonly<Record<string, string | readonly [string, string]>>
+      sessionFiles?: Readonly<Record<string, string | readonly [string, string]>> | "none"
       /** b knows a session it just opened only by its relay key (relayKeys), not by its durable id: a listing that has not caught up yet. */
       relayKeyOnly?: boolean
       /** The device service throws on b's admit_external_message (a lost connection mid-delivery). */
@@ -265,6 +268,7 @@ export function createRemoteThreadFixture() {
     } = {},
   ) {
     const engine = options.engine ?? ENGINE
+    const sessionFiles = options.sessionFiles ?? { "dur-on-b": B_FILE }
     const sent: Sent[] = []
     // b's engine ledger of admitted delivery ids (senpi external-admission: a repeated id is already_admitted), and how many
     // admissions its user's open draft still holds (held_draft, taken by nothing).
@@ -329,16 +333,20 @@ export function createRemoteThreadFixture() {
         if ((options.otherHolders ?? 0) > 0 && rpc["force"] !== true)
           return ok({ outcome: "refused", reason: "attached", detail: "1 other client(s) attached" })
         live.delete(attachedTo)
-        return ok({ outcome: "unloaded", sessionPath: B_ROW.path })
+        return ok({ outcome: "unloaded", sessionPath: B_FILE })
       }
       if (rpc["type"] === "open_session" && options.openRefuse !== undefined)
         return { kind: "refused", reason: options.openRefuse }
-      // senpi resolves an empty sessionPath against its working folder and fails reading a directory (#14170).
-      if (rpc["type"] === "open_session" && rpc["sessionPath"] === "")
+      // senpi reads a sessionPath that is a folder (or empty: its working folder) as a directory and fails (#14170).
+      if (
+        rpc["type"] === "open_session" &&
+        typeof rpc["sessionPath"] === "string" &&
+        !rpc["sessionPath"].endsWith(".jsonl")
+      )
         return { kind: "refused", reason: "open_failed: EISDIR: illegal operation on a directory, read" }
       if (rpc["type"] === "find_session") {
-        if (options.sessionFiles === undefined) return { kind: "refused", reason: "Unknown command: find_session" }
-        const file = options.sessionFiles[String(rpc["durableSessionId"])]
+        if (sessionFiles === "none") return { kind: "refused", reason: "Unknown command: find_session" }
+        const file = sessionFiles[String(rpc["durableSessionId"])]
         if (file === undefined) return ok({ unknown: true })
         if (typeof file !== "string") return ok({ ambiguous: true })
         return ok({ found: { sessionPath: file, cwd: B_ROW.project, open: false } })
@@ -348,8 +356,9 @@ export function createRemoteThreadFixture() {
         const opened =
           rpc["sessionPath"] === undefined
             ? "dur-new-on-b"
-            : (Object.entries(options.sessionFiles ?? {}).find(([, file]) => file === rpc["sessionPath"])?.[0] ??
-              "dur-on-b")
+            : ((sessionFiles === "none"
+                ? undefined
+                : Object.entries(sessionFiles).find(([, file]) => file === rpc["sessionPath"])?.[0]) ?? "dur-on-b")
         const key = options.relayKeys?.get(opened) ?? opened
         for (const id of options.relayKeyOnly === true ? [key] : [opened, key]) live.add(id)
         return ok(options.openData ?? { sessionId: "rpc-9", state: { durableSessionId: opened } })
