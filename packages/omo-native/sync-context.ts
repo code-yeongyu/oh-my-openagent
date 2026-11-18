@@ -57,6 +57,7 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
   const session = createSession({
     api,
     store,
+    log: (line) => process.stderr.write(`${line}\n`),
     beforeKeysDiscarded: retireSyncPinOnDiscard({
       pinDir: () => pinDir,
       log: (line) => process.stderr.write(`${line}\n`),

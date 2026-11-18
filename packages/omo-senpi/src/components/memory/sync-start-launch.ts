@@ -6,6 +6,7 @@
 
 import type { ComponentLogger } from "../../extension/types"
 import { raceDeadline } from "./sync-deadline"
+import type { SyncRunnerTimers } from "./sync-runner"
 import { SYNC_SESSION_DEFERRED } from "./sync-session-deferred"
 
 const DEFERRED_RETRY_MS = 15_000
@@ -64,6 +65,8 @@ export interface StartLaunch<T> {
   readonly abandoned: AbandonedStarts
   readonly deferredRetryMs: number | undefined
   readonly startPassDeadlineMs: number | undefined
+  /** The runner's own timers: every deadline and backoff here is one of them (#14001). */
+  readonly timers: SyncRunnerTimers
 }
 
 interface RetryState {
@@ -141,7 +144,7 @@ export function launchStart<T>(
   const deadlineMs = launch.startPassDeadlineMs ?? START_PASS_DEADLINE_MS
   // Every pass, a second stuck one included, settles `ready` by its deadline (#13706 review M2): status() and
   // release() wait on it.
-  const ready = raceDeadline(pass, deadlineMs).then((outcome): T | null => {
+  const ready = raceDeadline(pass, deadlineMs, launch.timers).then((outcome): T | null => {
     if (outcome !== "timeout") return finished(outcome)
     failures += 1
     waiting(
@@ -192,11 +195,11 @@ export function launchStart<T>(
   void ready.then(() => {
     if (!retrying) return
     const retry = (): void => {
-      clearTimeout(timer)
+      launch.timers.clearTimeout(timer)
       wake?.removeEventListener("abort", retry)
       relaunch()
     }
-    const timer = setTimeout(retry, state.retryMs)
+    const timer = launch.timers.setTimeout(retry, state.retryMs)
     timer.unref?.()
     if (wake?.aborted) retry()
     else wake?.addEventListener("abort", retry, { once: true })
