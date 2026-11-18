@@ -99,7 +99,9 @@ export const ratchetedFiles = (files: readonly string[]): string[] =>
 // therefore never counts for the test rules; every other rule keeps counting everywhere.
 const BUNDLE_OUTPUT = /packages[/\\][^/\\]+[/\\]plugin[/\\](?:extensions|runtime)[/\\]/
 export const countsTowardRatchet = (code: string, filename: string): boolean =>
-  !(code.startsWith("omo-testing/") && BUNDLE_OUTPUT.test(filename))
+  // oxlint emits plugin rules as "omo-testing(rule)" before the ratchet normalizes them to
+  // "omo-testing/rule", so the namespace prefix matches both shapes.
+  !(code.startsWith("omo-testing") && BUNDLE_OUTPUT.test(filename))
 
 const CONFIG = "script/lint-ratchet.oxlintrc.json"
 

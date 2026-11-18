@@ -117,7 +117,9 @@ it("never counts the omo-testing rules for minified bundle output", () => {
   expect(
     countsTowardRatchet("omo-testing/no-fixed-sleep", "packages/omo-senpi/plugin/runtime/rollback-migrate.js"),
   ).toBe(false)
-  expect(countsTowardRatchet("omo-testing/no-flake-masking", "packages\omo-senpi\plugin\extensions\bundle.js")).toBe(
+  const windowsPath = ["packages", "omo-senpi", "plugin", "extensions", "bundle.js"].join(String.fromCharCode(92))
+  expect(countsTowardRatchet("omo-testing/no-flake-masking", windowsPath)).toBe(false)
+  expect(countsTowardRatchet("omo-testing(no-flake-masking)", "packages/omo-senpi/plugin/extensions/bundle.js")).toBe(
     false,
   )
 })
