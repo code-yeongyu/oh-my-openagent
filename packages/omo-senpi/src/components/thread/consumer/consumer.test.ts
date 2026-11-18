@@ -228,6 +228,29 @@ describe("a handed delivery", () => {
     expect(woken).toEqual([])
   })
 
+  // The sender maps the receiving store's own reason (`relay-transport.ts` `wakeRefusal`; chain_count_limit included,
+  // #12766 review M1), so the answer carries the store's `details.reason`, and the coarse tool code only when it named none.
+  test.each([
+    ["a sender that is not an agent", { sender: { kind: "cli" } }, "sender_not_allowed"],
+    ["a steer", { deliverAs: "steer" }, "turn_conflict"],
+  ])(
+    "#given %s #when the intake refuses the record #then the answer names the store's reason and nothing is woken",
+    async (_label, change, reason) => {
+      const { sessions, service, woken, consumer } = setup()
+      writeSessionFile(sessions, "t")
+      await consumer.start()
+      const reply = await service.inbound({
+        command_id: "c-1",
+        sender_device: "dev-a",
+        durable_id: "t",
+        record: { ...record("d-1"), ...change },
+      })
+      expect(reply.data).toEqual({ kind: "refused", reason })
+      await consumer.idle()
+      expect(woken).toEqual([])
+    },
+  )
+
   test("#given two sender devices that use the same command id #when both hand a record in #then each gets its own answer, keyed by its own sender device", async () => {
     const { sessions, service, consumer } = setup()
     writeSessionFile(sessions, "t")

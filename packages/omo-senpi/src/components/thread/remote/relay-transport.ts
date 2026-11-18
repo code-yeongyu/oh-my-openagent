@@ -12,7 +12,7 @@ import type { DeliveryWait, EffectiveLane, GatewayDeliveryDelivery, Provenance }
 import { UNKNOWN_CALLER } from "../tools/ports"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 import { deviceOnline, replyData } from "./remote-ops"
-import { outcomeFailure } from "./outcome"
+import { chainCountLimitFailure, outcomeFailure } from "./outcome"
 
 export type RelayTransportOptions = {
   readonly remote: RemoteThreadSurface
@@ -169,6 +169,13 @@ function wakeRefusal(received: string, device: string, data: JsonObject = {}): F
         "Start omo once on that device, then retry.",
         details,
       )
+    case "chain_count_limit": {
+      // The receiving store's own chain limit (`store-worker.ts`): the same refusal the running engine answers.
+      const counts = Object.fromEntries(
+        ["chain_count", "limit"].flatMap((key) => (typeof data[key] === "number" ? [[key, data[key]]] : [])),
+      )
+      return chainCountLimitFailure(device, counts)
+    }
     case "wake_unsupported":
       return fail(
         "unsupported",
