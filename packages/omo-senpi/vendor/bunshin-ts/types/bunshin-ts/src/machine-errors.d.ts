@@ -47,3 +47,7 @@ export declare class MachineOfflineSkippedError extends MachineWireError {
 /** Reject with the 1:1 mapped class when `code` belongs to the closed protocol vocabulary; anything else
  *  (hub-internal codes like `machine_unavailable`) stays a plain {@link HubTransportError}. */
 export declare const machineErrorForCode: (code: string, message: string, requestId?: string, disposition?: ProtocolErrorDisposition) => HubTransportError;
+/** A transport not built on this package's error classes (the relay transport ships its own) may still reject with a
+ *  protocol-vocabulary `code`. Map it to the 1:1 typed class, so callers check `instanceof` (e.g. InvokeDeadlineError)
+ *  whatever transport they use; the original error is kept as `cause`. Anything else is returned unchanged. */
+export declare const typedTransportError: (error: unknown) => unknown;

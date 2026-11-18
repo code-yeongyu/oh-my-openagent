@@ -23,11 +23,11 @@ describe("an alias whose claim asks for a sign-in", () => {
     const result = await run("thread_create", { alias: "about-me" })
     expect(result).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-created-here" },
+      thread: "dur-created-here",
       alias_scope: "local",
       alias_unavailable: "sign_in",
     })
-    expect(result.kind === "ok" && "thread" in result ? result.thread.alias : "no thread").toBeUndefined()
+    expect(result.kind === "ok" ? (result as { alias?: string }).alias : "no thread").toBeUndefined()
     expect(openSession).toHaveBeenCalledTimes(1)
     expect(setSessionName.mock.calls.map((call) => [call[0], call[1]])).toEqual([["route-created", "about-me"]])
     expect(a.registryCalls).toEqual(["resolve", "claim"])
@@ -37,7 +37,7 @@ describe("an alias whose claim asks for a sign-in", () => {
     const a = account({ claimDown: "signed_out" })
     const { run, setSessionName } = surface(a.remote)
     const result = await run("thread_create", { alias: " about-me  " })
-    expect(result).toMatchObject({ kind: "ok", alias_scope: "local", thread: { name: "about-me" } })
+    expect(result).toMatchObject({ kind: "ok", alias_scope: "local", name: "about-me" })
     expect(setSessionName.mock.calls.map((call) => [call[0], call[1]])).toStrictEqual([["route-created", "about-me"]])
   })
 
@@ -46,7 +46,7 @@ describe("an alias whose claim asks for a sign-in", () => {
     const { run, openSession, setSessionName } = surface(a.remote)
     expect(await run("thread_create", { alias: "about-me", name: "notes" })).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-created-here" },
+      thread: "dur-created-here",
       alias_scope: "local",
       alias_unavailable: "sign_in",
     })
@@ -59,7 +59,7 @@ describe("an alias whose claim asks for a sign-in", () => {
     const { run, setSessionName } = surface(a.remote)
     expect(await run("thread_create", { alias: "Local Peer" })).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-created-here" },
+      thread: "dur-created-here",
       alias_scope: "local",
       alias_unavailable: "sign_in",
       local_name_unavailable: "name_conflict",
@@ -72,7 +72,7 @@ describe("an alias whose claim asks for a sign-in", () => {
     const { run, setSessionName } = surface(a.remote)
     expect(await run("thread_create", { alias: "about-me" })).toMatchObject({
       kind: "error",
-      error: { code: "host_unavailable", details: { reason: "network", thread_id: "dur-created-here" } },
+      error: { code: "host_unavailable", details: { reason: "network", thread: "dur-created-here" } },
     })
     expect(setSessionName).not.toHaveBeenCalled()
   })
@@ -82,7 +82,7 @@ describe("an alias whose claim asks for a sign-in", () => {
     const { run, setSessionName } = surface(a.remote)
     expect(await run("thread_rename", { thread: "local peer", alias: "about-me" })).toMatchObject({
       kind: "ok",
-      thread_id: "dur-local",
+      thread: "dur-local",
       name: "about-me",
       alias_scope: "local",
       alias_unavailable: "sign_in",

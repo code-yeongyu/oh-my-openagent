@@ -1,25 +1,28 @@
 import type { ThreadAddressEntry } from "../addressing"
-import type { ThreadStatus } from "../contracts/results"
 import type { ThreadToolFailure } from "../errors"
-import { rowThreadId, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
-import { holderTarget, remoteAvailable } from "./remote-ops"
+import { rowStatus, rowThreadId, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
+import { holderTarget, remoteReady } from "./remote-ops"
 
 // Decision 0027 section 1: the relay transport's address book. The account listing becomes entries of the SAME shape the
 // local book yields, so one resolver judges local and remote threads together: an exact durable id, then an account
 // alias, then the name ladder across every entry (two devices sharing a name are ambiguous_target naming each device).
-const statusOf = (state: string): ThreadStatus => (state === "ended" ? "resumable" : "live")
-
 export function relayAddressEntry(row: RemoteSessionRow, aliases?: readonly string[]): ThreadAddressEntry {
   const updated = new Date(row.updated_ms).toISOString()
+  const thread_id = rowThreadId(row)
+  const session_ids =
+    thread_id.length > 0 && row.session_id.length > 0 && row.session_id !== thread_id ? [row.session_id] : undefined
   return {
-    thread_id: rowThreadId(row),
+    thread_id,
+    // The device's own title, never rowLabel's folder name: that label is display-only (thread_list), because folder
+    // names collide across threads and would turn into ambiguous addresses (#14043).
     name: row.title,
-    status: statusOf(row.state),
+    status: rowStatus(row),
     cwd: row.project,
     created_at: updated,
     updated_at: updated,
     device: row.device,
     ...(aliases === undefined ? {} : { aliases }),
+    ...(session_ids === undefined ? {} : { session_ids }),
     transport: { kind: "relay", row },
   }
 }
@@ -39,6 +42,23 @@ export function namedDeviceRow(device: string, durableId: string): RemoteSession
     path: "",
     state: "idle",
     updated_ms: 0,
+  }
+}
+
+/**
+ * The session a create just made on another device (thread_create, `omo remote open`), addressed by the relay key its open
+ * reply named (`sessionId`) and only failing that by its durable id: the device has not listed the new session yet, so its
+ * service cannot resolve the durable id and answers unknown_session (measured over the relay, omo#13748).
+ */
+export function createdDeviceRow(
+  device: string,
+  thread: { readonly thread_id: string; readonly sessionId?: string; readonly name: string; readonly cwd: string },
+): RemoteSessionRow {
+  return {
+    ...namedDeviceRow(device, thread.thread_id),
+    session_id: thread.sessionId ?? thread.thread_id,
+    title: thread.name,
+    project: thread.cwd,
   }
 }
 
@@ -63,17 +83,17 @@ export type RelayAddressBook = {
  */
 const REMOTE_NOT_SET_UP: ReadonlySet<string> = new Set(["not_configured", "disabled", "signed_out", "sign_in_required"])
 /** No state at all = no device service answered (not installed or not running): the relay is not set up either. */
-const remoteNotSetUp = (state: unknown): boolean =>
+export const remoteNotSetUp = (state: unknown): boolean =>
   state === undefined || (typeof state === "string" && REMOTE_NOT_SET_UP.has(state))
 
 export async function relayAddressBook(remote: RemoteThreadSurface, address: string): Promise<RelayAddressBook> {
-  const unavailable = await remoteAvailable(remote)
-  if (unavailable !== undefined) {
-    if (unavailable.error.code === "host_unavailable" && remoteNotSetUp(unavailable.error.details?.["state"]))
+  const ready = await remoteReady(remote)
+  if ("kind" in ready) {
+    if (ready.error.code === "host_unavailable" && remoteNotSetUp(ready.error.details?.["state"]))
       return { entries: [] }
-    return { entries: [], unavailable: unavailable.error }
+    return { entries: [], unavailable: ready.error }
   }
-  const here = await remote.sessions.thisDevice()
+  const { here } = ready
   const rows = await remote.sessions.sessions()
   const entries = rows.filter((row) => row.device !== here).map((row) => relayAddressEntry(row))
   if (remote.aliases === undefined) return { entries }
