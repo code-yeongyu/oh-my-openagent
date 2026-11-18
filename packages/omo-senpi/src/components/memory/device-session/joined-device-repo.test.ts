@@ -16,7 +16,7 @@ import { isSyncSessionDeferred } from "../sync-session-deferred"
 import type { CliDeviceAccount } from "./account-source"
 import { joinedDeviceRepoCreator } from "./joined-repo"
 import { createDeviceSessionResolver, type DeviceSessionRuntime } from "./resolver"
-import { rmEfaultTolerant } from "../teardown.test-support"
+import { rmWhenReleased } from "../teardown.test-support"
 
 // omo#14094 (LEAD ruling: option A with limits): a device that has sync on and has joined the account gets its memory
 // repository from the existing first-write seam, so the account's memory arrives with no write on this device. Every
@@ -24,10 +24,11 @@ import { rmEfaultTolerant } from "../teardown.test-support"
 
 const dirs: string[] = []
 // A child can still hold a handle inside its scratch root when teardown runs; on Windows that makes
-// a bare rm fail and leaks the root into the OS temp dir (the #9766 unnamed teardown red). The
-// bounded, release-aware house helper rides out exactly those transient holders.
+// a bare rm fail and leaks the root into the OS temp dir (the #9766 unnamed teardown red).
+// rmWhenReleased waits out those transient holders (30 s deadline) and then removes the root with
+// the house retry defaults.
 afterEach(async () => {
-  for (const dir of dirs.splice(0)) await rmEfaultTolerant(dir, { recursive: true, force: true })
+  for (const dir of dirs.splice(0)) await rmWhenReleased(dir)
 })
 
 async function freshDevice() {
