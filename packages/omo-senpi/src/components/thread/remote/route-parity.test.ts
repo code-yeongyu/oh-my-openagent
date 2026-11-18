@@ -290,8 +290,9 @@ describe("#13012 route parity", () => {
   test("#given a signed-in device whose service endpoint is briefly gone (an update swap, #14172) #when a durable id is sent to #then host_unavailable, never not_found", async () => {
     const stateDir = mkdtempSync(join(tmpdir(), "omo-restarting-device-service-"))
     try {
-      // The adopted identity outlives the service process; only the per-boot socket is missing between processes.
+      // The adopted identity outlives the service process, and the new process holds the state before its per-boot socket is up.
       writeFileSync(join(stateDir, "device-identity.json"), "{}")
+      writeFileSync(join(stateDir, "owner.info"), JSON.stringify({ pid: process.pid, since_ms: 0, owner: "service" }))
       let connects = 0
       const remote = createLazyRemoteSurface({
         version: "0.0.0",
@@ -320,15 +321,46 @@ describe("#13012 route parity", () => {
     }
   })
 
-  test("#given the holder device missed this listing round (#14172) #when its thread is sent to by durable id #then host_unavailable names that device, never not_found", async () => {
-    const a = account({ rows: [], incomplete: [B_ROW.device] })
-    const { run } = surface(a.remote)
+  // #14172: b answered the first round (thread_list showed its thread) and missed the next; the account listing's rounds.
+  const missedSecondRound = () => {
+    const a = account()
+    let round = 0
+    const remote = {
+      ...a.remote,
+      sessions: {
+        ...a.remote.sessions,
+        listing: async () =>
+          ++round === 1 ? { rows: [B_ROW], incomplete: [] } : { rows: [], incomplete: [B_ROW.device] },
+      },
+    }
+    return { a, run: surface(remote).run }
+  }
+
+  test("#given a thread listed on b, then a round b missed (#14172) #when it is sent to by durable id #then host_unavailable names b, never not_found", async () => {
+    const { a, run } = missedSecondRound()
+    expect(await run("thread_list", {})).toMatchObject({ kind: "ok" })
     expect(await run("thread_send", { thread: B_ROW.durable_id ?? "", message: "continue" })).toMatchObject({
       kind: "error",
       error: { code: "host_unavailable", details: { reason: "listing_incomplete", devices: [B_ROW.device] } },
     })
     expect(admits(a.sent)).toEqual([])
   })
+
+  test.each([
+    ["a name no device ever listed (a typo)", "relase planer"],
+    ["a durable id no device ever listed", "0195f0c2-1a2b-7c3d-8e4f-0000000000ff"],
+  ])(
+    "#given b missed this round #when %s is sent to #then it stays not_found, since nothing ties it to b",
+    async (_case, thread) => {
+      const { a, run } = missedSecondRound()
+      expect(await run("thread_list", {})).toMatchObject({ kind: "ok" })
+      expect(await run("thread_send", { thread, message: "continue" })).toMatchObject({
+        kind: "error",
+        error: { code: "not_found" },
+      })
+      expect(admits(a.sent)).toEqual([])
+    },
+  )
 
   test("#given another device missed this listing round #when a thread on a listed device is sent to #then it still delivers there", async () => {
     const a = account({ incomplete: ["c"] })

@@ -70,27 +70,53 @@ export type RelayAddressBook = {
   /** The alias named a holder the account cannot reach right now (device_offline / not_found): answered as is. */
   readonly aliasFailure?: ThreadToolFailure
   /**
-   * Devices whose rows this listing round could not include (#14172): a miss may be a thread on one of them, so it answers
-   * this retryable host_unavailable naming them, never not_found.
+   * The address is a thread an earlier round listed on a device this round could not include (#14172): its miss answers
+   * this retryable host_unavailable naming that device, never not_found.
    */
   readonly incomplete?: ThreadToolFailure
 }
 
-/** One account listing round with the devices it could not include; a port without `listing` reports none missing. */
-export async function accountListing(remote: RemoteThreadSurface): Promise<RemoteListing> {
-  if (remote.sessions.listing !== undefined) return await remote.sessions.listing()
-  return { rows: await remote.sessions.sessions(), incomplete: [] }
+// The device each thread id (durable id and listing key) was last listed on, per sessions port, so a thread whose device
+// misses one round is still tied to it (#14172). A name is never remembered: names change and a typo must stay not_found.
+// Bounded; the id listed longest ago leaves first.
+const LAST_LISTED_MAX = 4096
+const lastListed = new WeakMap<object, Map<string, string>>()
+
+function rememberListed(port: object, rows: readonly RemoteSessionRow[]): void {
+  let ids = lastListed.get(port)
+  if (ids === undefined) {
+    ids = new Map()
+    lastListed.set(port, ids)
+  }
+  for (const row of rows)
+    for (const id of new Set([rowThreadId(row), row.session_id])) {
+      if (id.length === 0) continue
+      ids.delete(id)
+      ids.set(id, row.device)
+      if (ids.size > LAST_LISTED_MAX) {
+        const oldest = ids.keys().next()
+        if (oldest.done !== true) ids.delete(oldest.value)
+      }
+    }
 }
 
-const listingIncomplete = (devices: readonly string[]): ThreadToolFailure | undefined =>
-  devices.length === 0
-    ? undefined
-    : threadToolFailure(
-        "host_unavailable",
-        `The account listing did not include ${devices.join(", ")} this round; the thread may be there.`,
-        "Retry the call; call thread_list to see which devices answered.",
-        { reason: "listing_incomplete", devices },
-      )
+/** One account listing round with the devices it could not include; a port without `listing` reports none missing. */
+export async function accountListing(remote: RemoteThreadSurface): Promise<RemoteListing> {
+  const listing =
+    remote.sessions.listing !== undefined
+      ? await remote.sessions.listing()
+      : { rows: await remote.sessions.sessions(), incomplete: [] }
+  rememberListed(remote.sessions, listing.rows)
+  return listing
+}
+
+const listingIncomplete = (device: string): ThreadToolFailure =>
+  threadToolFailure(
+    "host_unavailable",
+    `The thread was last listed on ${device}, which did not answer this listing round.`,
+    "Retry the call; call thread_list to see which devices answered.",
+    { reason: "listing_incomplete", devices: [device] },
+  )
 
 /**
  * This account's threads on OTHER devices as address entries, plus the holder of `address` when it is an account alias
@@ -116,10 +142,16 @@ export async function relayAddressBook(remote: RemoteThreadSurface, address: str
     return { entries: [], unavailable: ready.error }
   }
   const { here } = ready
+  // Read before this round is remembered, so the device is the one an EARLIER round named for the address.
+  const listedOn = lastListed.get(remote.sessions)?.get(address)
   const { rows, incomplete: missing } = await accountListing(remote)
   const entries = rows.filter((row) => row.device !== here).map((row) => relayAddressEntry(row))
-  const incomplete = listingIncomplete(missing.filter((device) => device !== here))
-  const base = { entries, ...(incomplete === undefined ? {} : { incomplete }) }
+  const base = {
+    entries,
+    ...(listedOn !== undefined && listedOn !== here && missing.includes(listedOn)
+      ? { incomplete: listingIncomplete(listedOn) }
+      : {}),
+  }
   if (remote.aliases === undefined) return base
   const alias = await remote.aliases.resolve(address).catch(() => undefined)
   if (alias === undefined || alias.kind === "error") return base
