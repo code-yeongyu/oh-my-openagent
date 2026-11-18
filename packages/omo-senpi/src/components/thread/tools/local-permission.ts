@@ -33,6 +33,7 @@ const ADDRESSED: ReadonlySet<string> = new Set([
   "thread_rename",
   "thread_set_model",
   "thread_set_reasoning",
+  "thread_archive",
 ])
 
 /**
