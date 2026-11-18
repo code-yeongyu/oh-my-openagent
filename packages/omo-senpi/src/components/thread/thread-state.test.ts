@@ -312,6 +312,48 @@ describe("thread state on another device's rows", () => {
   })
 })
 
+describe("thread_list follows the account's device list (#13505)", () => {
+  const asOf = Date.UTC(2026, 10, 14, 9, 0, 0)
+  const every = ["running", "idle", "inactive", "archived"]
+  // b is offline but still in the account's list; c was removed from it, while the listing still carries c's cached rows.
+  const listing = [
+    ...REMOTE_ROWS.map((row) => ({ ...row, source: "cache" as const, as_of: asOf })),
+    remoteRow("c-cached", { device: "c", state: "running", source: "cache", as_of: asOf }),
+  ]
+  const listed = (result: ThreadToolResult) =>
+    rows(result)
+      .map((row) => row.thread)
+      .sort()
+
+  test("#given a device removed from the account whose cached rows the listing still carries #when listed and addressed #then its rows are dropped, an offline device keeps its rows, and nothing is sent to the removed one", async () => {
+    const kept = REMOTE_ROWS.map((row) => row.title).sort()
+    const account = remoteFixture.account({ rows: listing, online: false, removed: ["c"] })
+    const { run } = remoteFixture.surface(account.remote, { sessions: [] })
+    const result = await run("thread_list", { state: every })
+    expect(listed(result)).toEqual(kept)
+    for (const row of rows(result)) {
+      expect(row.state).not.toBe("running")
+      expect(row).toMatchObject({ as_of: new Date(asOf).toISOString() })
+    }
+    expect(result.kind === "ok" && "devices" in result && result.devices).toEqual([
+      expect.objectContaining({ device: "here", threads: 0 }),
+      expect.objectContaining({ device: "b", online: false, listing: "offline", threads: kept.length }),
+    ])
+    expect(await run("thread_create", { thread: "c-cached" })).toMatchObject({
+      kind: "error",
+      error: { code: "not_found" },
+    })
+    expect(account.sent.filter((entry) => entry.device === "c")).toEqual([])
+  })
+
+  test("#given the account device list cannot be read #when listed #then no row is judged and remote_unavailable says so", async () => {
+    const unread = remoteFixture.account({ rows: listing, online: false, removed: ["c"], devicesFail: true })
+    const fallback = await remoteFixture.surface(unread.remote, { sessions: [] }).run("thread_list", { state: every })
+    expect(listed(fallback)).toEqual([...REMOTE_ROWS.map((row) => row.title), "c-cached"].sort())
+    expect(fallback).toMatchObject({ remote_unavailable: "devices_unavailable" })
+  })
+})
+
 describe("a thread its engine closed (t2pp, measured on omo 5.1.69: it vanished from thread_list)", () => {
   test("#given a listed thread #when thread_close ends it #then thread_list keeps it as inactive from its session file, thread_read reads that file, and a control answers not_resumable instead of not_found", async () => {
     const root = realpathSync(scratch())
