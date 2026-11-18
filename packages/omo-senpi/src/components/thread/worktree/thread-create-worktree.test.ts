@@ -58,7 +58,9 @@ describe("thread_create with worktree on this device", () => {
     })
     const path = (result as unknown as { worktree: { path: string } }).worktree.path
     expect(path.startsWith(agentDir)).toBe(true)
-    expect(openSession.mock.calls.map((call) => call[0])).toEqual([{ cwd: path, name: "thread-create-worktree-50" }])
+    expect(openSession.mock.calls.map((call) => call[0])).toEqual([
+      { cwd: path, name: "thread-create-worktree-50", durableSessionId: expect.any(String) },
+    ])
     expect(kit.git(path, "branch", "--show-current")).toBe("feat/thread")
   })
 
