@@ -13,7 +13,7 @@ import {
 import { accountListing, remoteNotSetUp } from "./address-book"
 import type { WorktreeRequest } from "../worktree/thread-worktree"
 import { placeFolder } from "./create-folder"
-import { accountDevices } from "./account"
+import { accountDevices, onAccount } from "./account"
 import { aliasFailure, remoteReady } from "./remote-ops"
 import {
   planCreate as placeCreate,
@@ -241,7 +241,8 @@ export async function listAcross(
   if (!listed.ok || here === null) return withAliases(remote, { ...local, remote_unavailable: "host_unavailable" }, ids)
   const listing = listed.listing
   const shown = listedStates(states)
-  const others = listing.rows.filter(
+  // A device the account no longer lists contributes no rows (#13505); an offline one keeps its rows.
+  const others = onAccount(listing.rows, roster.ok ? roster.devices : undefined, here).filter(
     (row) => row.device !== here && !known.has(rowThreadId(row)) && shown.has(rowState(row)),
   )
   // Every row names the machine that holds it (#14044 step 4a): this device's name on its own rows, the roster's name on

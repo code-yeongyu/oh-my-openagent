@@ -2,6 +2,7 @@ import type { ThreadAddressEntry } from "../addressing"
 import type { ThreadToolFailure } from "../errors"
 import { threadToolFailure } from "../errors"
 import { rowStatus, rowThreadId, type RemoteListing, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
+import { onAccount } from "./account"
 import { holderTarget, remoteReady } from "./remote-ops"
 
 // Decision 0027 section 1: the relay transport's address book. The account listing becomes entries of the SAME shape the
@@ -145,7 +146,16 @@ export async function relayAddressBook(remote: RemoteThreadSurface, address: str
   const { here } = ready
   // Read before this round is remembered, so the device is the one an EARLIER round named for the address.
   const listedOn = lastListed.get(remote.sessions)?.get(address)
-  const { rows, incomplete: missing } = await accountListing(remote)
+  // thread_list's rule: a removed device's cached rows address nothing; with no roster every row stays.
+  const [listing, roster] = await Promise.all([
+    accountListing(remote),
+    remote.sessions.devices().then(
+      (devices) => devices,
+      () => undefined,
+    ),
+  ])
+  const rows = onAccount(listing.rows, roster, here)
+  const missing = listing.incomplete
   const entries = rows.filter((row) => row.device !== here).map((row) => relayAddressEntry(row))
   const base = {
     entries,
