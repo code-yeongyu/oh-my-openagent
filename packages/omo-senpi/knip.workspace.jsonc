@@ -387,6 +387,8 @@
         "scripts/qa/thread-tools/reopen-exited.mjs",
         // a QA scenario that run-all.mjs runs by name (#14066), like its siblings
         "scripts/qa/thread-tools/create-atomic.mjs",
+        // run by run-all.mjs as a child process (legacy suite), never imported
+        "scripts/qa/thread-tools/free-plan-cross-workspace.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/report-origin-steer.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs

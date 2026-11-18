@@ -63,9 +63,9 @@ describe("a free plan messaging a same-device thread in another workspace", () =
     const { run } = freePlan()
     const listed = await run("thread_list", { all_scope: true })
     expect(listed).toMatchObject({ kind: "ok", remote_unavailable: "relay_requires_paid_plan" })
-    expect(
-      listed.kind === "ok" && "threads" in listed ? listed.threads.map((thread) => thread.thread) : [],
-    ).toEqual(["dur-other"])
+    expect(listed.kind === "ok" && "threads" in listed ? listed.threads.map((thread) => thread.thread) : []).toEqual([
+      "dur-other",
+    ])
   })
 
   test("#given the same plan #when a scoped thread_send names a thread that exists nowhere #then the paid-plan refusal still answers, as it does for an id no device here holds (A5)", async () => {
