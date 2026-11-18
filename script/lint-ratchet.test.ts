@@ -53,7 +53,7 @@ it("accepts counts that match the baseline exactly", () => {
   expect(compare(counts, counts)).toEqual({ increases: [], decreases: [] })
 })
 
-it("counts every disable comment that could hide one of the three rules, in both linters' forms", () => {
+it("counts every disable comment that could hide one of the ratcheted rules, in both linters' forms", () => {
   // Built at runtime so this file holds no directive of its own for the gate to count.
   const line = "/".repeat(2)
   const block = ["/", "*"].join("")
@@ -74,6 +74,17 @@ it("counts every disable comment that could hide one of the three rules, in both
 it("refuses a new disable comment like any other rise", () => {
   const { increases } = compare({}, { "script/probe.ts": { [SUPPRESSION]: 1 } })
   expect(increases).toEqual([{ file: "script/probe.ts", rule: SUPPRESSION, before: 0, after: 1 }])
+})
+
+it("counts a disable comment that names one of the omo-testing rules", () => {
+  // Built at runtime so this file holds no directive of its own for the gate to count.
+  const line = "/".repeat(2)
+  const source = [
+    `${line} oxlint-disable-next-line omo-testing/no-fixed-sleep`,
+    `${line} eslint-disable-next-line omo-testing/no-flake-masking -- unrelated rule, not counted`,
+    `${line} oxlint-disable-next-line eslint/no-console`,
+  ].join("\n")
+  expect(countSuppressions("probe.ts", source)).toBe(2)
 })
 
 it("skips generated sources by path, so only hand-written files are ratcheted", () => {
