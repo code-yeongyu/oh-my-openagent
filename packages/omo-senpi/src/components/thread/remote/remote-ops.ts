@@ -124,7 +124,7 @@ export async function holderTarget(
     return fail(
       "not_found",
       `The alias names thread ${holder.session_id} on device ${holder.device}, which is no longer on this account.`,
-      "Call thread_list with all_scope to find the live thread, then claim the alias for it again with thread_rename.",
+      "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to find the live thread, then claim the alias for it again with thread_rename (tool.thread_rename()).",
       { device: holder.device, thread: holder.session_id },
     )
   if (device !== undefined && !device.online)
