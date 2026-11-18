@@ -3,8 +3,9 @@
 //! chosen class that this test thread owns, so every posted message lands in
 //! this thread's queue where the test reads it back.
 
-use senpi_desktop_core::backend::DeliveryMode;
-use senpi_desktop_core::error::ErrorCode;
+use senpi_desktop_core::backend::{DeliveryMode, MouseButton};
+use senpi_desktop_core::error::{DesktopError, ErrorCode};
+use senpi_desktop_core::holds::{HoldControl, MouseHold};
 use senpi_desktop_core::keys::KeyName;
 use senpi_desktop_core::types::Target;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse as kbm;
@@ -98,22 +99,90 @@ fn background_key_chord_releases_every_key_it_pressed() {
     // When
     let sent = input.key_chord(
         &Target::Window(window.id()),
-        &[KeyName::Ctrl, KeyName::F5],
+        &[KeyName::Escape, KeyName::F5],
         DeliveryMode::Background,
     );
     // Then: down in order, up in reverse, and nothing left held
     assert_eq!(sent, Ok(()));
     let f5 = usize::from(keys::VK_F1 + 4);
-    let ctrl = usize::from(keys::VK_CONTROL);
+    let escape = usize::from(keys::VK_ESCAPE);
     assert_eq!(
         window.drain(),
         [
-            (wm::WM_KEYDOWN, ctrl),
+            (wm::WM_KEYDOWN, escape),
             (wm::WM_KEYDOWN, f5),
             (wm::WM_KEYUP, f5),
-            (wm::WM_KEYUP, ctrl)
+            (wm::WM_KEYUP, escape)
         ]
     );
+    assert!(input.held.is_empty());
+}
+
+#[test]
+fn background_modifier_chord_is_refused_with_nothing_posted() {
+    // Given: a window of a class the matrix does not list
+    let window = ProbeWindow::new("SenpiModifierChordProbe");
+    let mut input = input();
+    // When: ctrl+k, whose Ctrl a posted WM_KEYDOWN can never set (omo#13297)
+    let error = input
+        .key_chord(
+            &Target::Window(window.id()),
+            &[KeyName::Ctrl, KeyName::Char('k')],
+            DeliveryMode::Background,
+        )
+        .unwrap_err();
+    // Then: refused before anything was posted, and nothing left held
+    println!("code={} message={}", error.code.as_str(), error.message);
+    assert_modifier_refusal(&error);
+    assert_eq!(window.drain(), []);
+    assert!(input.held.is_empty());
+}
+
+fn assert_modifier_refusal(error: &DesktopError) {
+    assert_eq!(error.code, ErrorCode::BackgroundUnavailable, "{}", error.message);
+    let reason = error.report.as_ref().and_then(|report| report.reason.as_deref());
+    assert_eq!(reason, Some("key_route_unproven"), "{}", error.message);
+}
+
+#[test]
+fn background_modifier_hold_is_refused_with_nothing_posted() {
+    // Given
+    let window = ProbeWindow::new("SenpiModifierHoldProbe");
+    let mut input = input();
+    let ready = || -> senpi_desktop_core::error::CoreResult<()> { Ok(()) };
+    let control = HoldControl { check: &ready, wait: &ready };
+    // When: ctrl+k held, the bounded-hold twin of the chord route
+    let error = input
+        .hold_keys(
+            &Target::Window(window.id()),
+            &[KeyName::Ctrl, KeyName::Char('k')],
+            DeliveryMode::Background,
+            &control,
+        )
+        .unwrap_err();
+    // Then
+    assert_modifier_refusal(&error);
+    assert_eq!(window.drain(), []);
+    assert!(input.held.is_empty());
+}
+
+#[test]
+fn background_mouse_hold_with_a_modifier_chord_is_refused_before_mapping_its_point() {
+    // Given: a mouse hold whose keys are ctrl+k; the session accepts any
+    // keys for a mouse hold, not only modifiers (review L1 on #13734)
+    let window = ProbeWindow::new("SenpiModifierMouseHoldProbe");
+    let mut input = input();
+    let ready = || -> senpi_desktop_core::error::CoreResult<()> { Ok(()) };
+    let control = HoldControl { check: &ready, wait: &ready };
+    let keys = [KeyName::Ctrl, KeyName::Char('k')];
+    let hold = MouseHold { x: 1.0, y: 1.0, button: MouseButton::Left, keys: &keys };
+    // When
+    let error = input
+        .hold_mouse(&Target::Window(window.id()), &hold, DeliveryMode::Background, &control)
+        .unwrap_err();
+    // Then: the chord refusal, not a point-mapping failure, and nothing posted
+    assert_modifier_refusal(&error);
+    assert_eq!(window.drain(), []);
     assert!(input.held.is_empty());
 }
 

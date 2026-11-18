@@ -214,10 +214,14 @@ OSStatus rename_item(const char *from, const char *to) {
   return status;
 }
 
+// Deletes the exact item the silent lookup found, so it is the one in the keychain that holds <account>. SecItemDelete
+// is not used: on a file keychain it first compares the caller's name with the item's decrypt list and answers
+// errSecInvalidOwnerEdit (-25244) itself, so a helper copy at another path (every launch copies the helper to a fresh
+// directory) could never sign out. SecKeychainItemDelete leaves the decision to the keychain, which allows it.
 OSStatus delete_item(const char *account) {
-  CFMutableDictionaryRef query = item_query(account, true);
-  scope_to_holder(query, account);
-  OSStatus status = SecItemDelete(query);
-  CFRelease(query);
+  item_state found = {0};
+  OSStatus status = lookup_attributes(account, &found);
+  if (status == errSecSuccess) status = found.item == NULL ? errSecItemNotFound : SecKeychainItemDelete(found.item);
+  item_state_release(&found);
   return status;
 }

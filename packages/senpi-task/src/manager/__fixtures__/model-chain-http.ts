@@ -4,8 +4,8 @@ export const ENGINE_MODELS: Readonly<Record<string, readonly string[]>> = {
   deepseek: ["deepseek-flash"],
   zai: ["glm-5.3"],
   moonshotai: ["kimi-k3"],
-  venice: ["claude-opus-5-5", "claude-opus-5"],
-  anthropic: ["claude-opus-5"],
+  venice: ["claude-opus-5-5", "claude-fable-5-2"],
+  anthropic: ["claude-fable-5-2"],
 }
 
 export type HttpProviders = {

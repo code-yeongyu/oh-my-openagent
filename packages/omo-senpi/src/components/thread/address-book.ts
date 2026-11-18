@@ -277,15 +277,31 @@ export function assembleAddressBook(
 }
 
 /** Convert nullable display names to the addressing layer's empty-name form. */
+function sessionIdsOf(threadId: string, routingId: string | null | undefined): readonly string[] | undefined {
+  if (
+    threadId.length === 0 ||
+    routingId === null ||
+    routingId === undefined ||
+    routingId === "" ||
+    routingId === threadId
+  )
+    return undefined
+  return [routingId]
+}
+
 export function toThreadAddressEntries(entries: readonly AddressEntry[]): ThreadAddressEntry[] {
-  return entries.map((entry) => ({
-    thread_id: entry.thread_id,
-    name: entry.name ?? "",
-    status: entry.status,
-    cwd: entry.cwd,
-    created_at: entry.created_at,
-    updated_at: entry.updated_at,
-  }))
+  return entries.map((entry) => {
+    const session_ids = sessionIdsOf(entry.thread_id, entry.endpoint?.routing_id)
+    return {
+      thread_id: entry.thread_id,
+      name: entry.name ?? "",
+      status: entry.status,
+      cwd: entry.cwd,
+      created_at: entry.created_at,
+      updated_at: entry.updated_at,
+      ...(session_ids === undefined ? {} : { session_ids }),
+    }
+  })
 }
 
 /**
