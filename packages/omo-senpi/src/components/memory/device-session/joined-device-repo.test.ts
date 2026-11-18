@@ -57,6 +57,7 @@ function realSpaceRuntime(opened: string[]): DeviceSessionRuntime {
     repoHasCommit,
     resolveSpace,
     deviceKeyringFromMaterial: async () => ({}) as DeviceKeyring,
+    isDeviceSyncOff: async () => false,
     openAccountSession: async (options) => {
       opened.push(Buffer.from(options.spaceId).toString("hex"))
       return { ok: false, reason: "not_member" } as never

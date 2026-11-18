@@ -11,12 +11,13 @@ import type { Transport } from "../engine/ports.ts"
 import type { DeviceKeyring } from "../keyring-port.ts"
 import { openAccountChain } from "./account-chain.ts"
 import { createFreezeSettler } from "./freeze-settler.ts"
+import { isDeviceSyncOff } from "./device-switch.ts"
 import { createAccountHttp, type AccountHttp } from "./http.ts"
 import { createRevocationView, type RevocationView } from "./revocation-view.ts"
 import { createChainSealer } from "./sealer.ts"
 import { createChainVerifier } from "./verifier.ts"
 
-export type AccountSessionIdle = "no_pin" | "corrupt_pin" | "not_member"
+export type AccountSessionIdle = "no_pin" | "corrupt_pin" | "not_member" | "sync_off"
 
 export type AccountSessionOutcome =
   { readonly ok: true; readonly session: SyncSession } | { readonly ok: false; readonly reason: AccountSessionIdle }
@@ -59,6 +60,8 @@ export type AccountSessionOptions = AccountSessionShared &
 
 export async function openAccountSession(options: AccountSessionOptions): Promise<AccountSessionOutcome> {
   if (options.spaceId.length !== 16) throw new TypeError("openAccountSession: a space id is 16 bytes")
+  // A device whose sync was turned off (device-switch.ts) stays idle before the pin or the network is read.
+  if (await isDeviceSyncOff(options.pinDir, options.account)) return { ok: false, reason: "sync_off" }
   const pin = await loadTrustAnchor(options.pinDir, options.account)
   if (!pin.ok) return { ok: false, reason: pin.reason }
   const http =
