@@ -155,7 +155,8 @@ export type GatewayRelayOptions = {
   readonly now?: () => number
 }
 
-const SELF = "thread_report without binding_id uses the chat binding the gateway keeps for this session."
+const SELF =
+  "thread_report (tool.thread_report() in an eval cell) without binding_id uses the chat binding the gateway keeps for this session."
 
 // The default next action per code. The relay does not know its caller here, and a session reaches every code below
 // through its relay tools except binding_conflict and stale_revision (only bind/rebind/unbind return them, and only the
@@ -176,11 +177,11 @@ const NEXT_ACTION: Partial<Record<ThreadErrorCode, string>> = {
     "Retry after a moment: another answer is still being handed to the session, and the question goes back to pending if that fails.",
   idempotency_conflict: "Retry with a new idempotency_key.",
   idempotency_uncertain:
-    "Read the binding's outbox with thread_outbox to see whether the earlier call took effect, then retry with a new idempotency_key.",
+    "Read the binding's outbox with thread_outbox (tool.thread_outbox() in an eval cell) to see whether the earlier call took effect, then retry with a new idempotency_key.",
   scope_denied: `That binding belongs to another session: ${SELF}`,
   unsupported: "Report only the events the binding subscribes to, through a binding with an outbound direction.",
   not_found: `No binding has that id: ${SELF}`,
-  cursor_invalid: "Read thread_outbox again and ack a cursor it returned.",
+  cursor_invalid: "Read thread_outbox (tool.thread_outbox() in an eval cell) again and ack a cursor it returned.",
   host_unavailable: "Retry when the session is running; the question stays pending.",
   invalid_arguments: "Fix the arguments and call again.",
 }
@@ -345,7 +346,7 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
       if (claim.kind !== "ok")
         return fromStore(claim, {
           not_found:
-            "The question this token belongs to is gone from the outbox: read thread_outbox for a newer question and answer that one.",
+            "The question this token belongs to is gone from the outbox: read thread_outbox (tool.thread_outbox() in an eval cell) for a newer question and answer that one.",
         })
       const own: AnswerClaimRef = { reply_token: request.reply_token, claimed_at: claim.claimed_at }
       const respond = options.endpoints.respondUi
@@ -427,7 +428,7 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
           { session: claim.session_durable_id, reason: reply.error },
           malformed
             ? `The session could not read this answer (${reply.error}); answer again with text it can take. The question stays pending.`
-            : `The session refused the answer (${reply.error}): it no longer waits on this question. Read thread_outbox for a newer question and answer that one.`,
+            : `The session refused the answer (${reply.error}): it no longer waits on this question. Read thread_outbox (tool.thread_outbox() in an eval cell) for a newer question and answer that one.`,
         )
       }
       await confirm({ ...own, answer: request.answer, answered_by: answeredBy })

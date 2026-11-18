@@ -6,8 +6,11 @@ export type SyncEnableMethod = "passkey" | "phrase"
 /** `{}` joins or resumes; creating a genesis needs an explicit `method` (D1). */
 export type SyncEnableRequest = { readonly method?: SyncEnableMethod }
 export type SyncFeaturesRequest = Readonly<Record<string, never>>
-/** The features this engine speaks; an engine older than recovery-phrase genesis answers it as an unknown verb. */
-export type SyncFeature = "enable-method" | "phrase-genesis" | "acknowledge"
+/**
+ * The features this engine speaks; an engine older than recovery-phrase genesis answers it as an unknown verb.
+ * `disable` (#14093): the engine answers `omo.memory.sync.disable`, so a client offers Turn off only when it is listed.
+ */
+export type SyncFeature = "enable-method" | "phrase-genesis" | "acknowledge" | "disable"
 export type SyncFeaturesResponse = { readonly features: readonly SyncFeature[] }
 export type SyncAcknowledgeRequest = {
   readonly notice: "phrase_void"
@@ -15,6 +18,12 @@ export type SyncAcknowledgeRequest = {
   readonly credentialId?: string
 }
 export type SyncAcknowledgeResponse = { readonly ok: true } | SyncRpcProblem
+export type SyncDisableRequest = Readonly<Record<string, never>>
+/**
+ * `off`: memory sync is off on this device, on the service and locally (#14093); a device that was already off
+ * answers it too. Memory on this device is not touched and the account's other devices keep syncing.
+ */
+export type SyncDisableResponse = { readonly kind: "off" } | SyncRpcProblem
 export type SyncPendingRequest = Readonly<Record<string, never>>
 export type SyncStatusRequest = Readonly<Record<string, never>>
 export type SyncDevicesRequest = Readonly<Record<string, never>>

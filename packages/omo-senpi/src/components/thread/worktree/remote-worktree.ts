@@ -3,7 +3,7 @@ import { closeLadder, SESSION_GONE, type RecordAnswer } from "../control/close-l
 import { openedEngineId, openRefusal } from "../control/open-reply"
 import { ControlRefusal } from "../control/port"
 import { isThreadErrorCode, threadToolFailure } from "../errors"
-import { outcomeFailure } from "../remote/outcome"
+import { notSignedInFailure, outcomeFailure } from "../remote/outcome"
 import type { JsonObject, RemoteThreadSurface } from "../remote/ports"
 import { replyData } from "../remote/remote-ops"
 import type { ThreadWorktree, WorktreeOutcome, WorktreeRequest } from "./thread-worktree"
@@ -71,10 +71,13 @@ async function farWorktreeRequest(
     )
   const located = await remote.sessions.locate(device, engineId, opened.located)
   if (located.kind !== "ok")
-    return unsupported(
-      device,
-      `Device ${device} could not address its worktree session (${located.reason}).`,
-      "Update omo on that device.",
+    return (
+      notSignedInFailure(located.reason, device) ??
+      unsupported(
+        device,
+        `Device ${device} could not address its worktree session (${located.reason}).`,
+        "Update omo on that device.",
+      )
     )
   const key = located.sessionId
   const answered = await remote.sessions.sessionCommand(device, key, {

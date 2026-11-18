@@ -1,5 +1,5 @@
 import type { RemoteClient, RemoteFailure } from "../../remote"
-import type { RemoteDevice } from "./ports"
+import type { RemoteDevice, RemoteSessionRow } from "./ports"
 
 const LOCAL_ONLY = "local"
 
@@ -24,6 +24,21 @@ export async function accountDevices(client: RemoteClient): Promise<AccountDevic
       .filter((row) => row.id !== LOCAL_ONLY)
       .map((row) => ({ device: row.id, label: row.name, online: row.online })),
   }
+}
+
+/**
+ * The listing rows whose device is still on the account: in its roster, or this device (the roster may leave this
+ * device out). A removed device's cached rows go (#13505); an offline one keeps its rows. With no roster (`undefined`)
+ * nothing can be judged, so every row stays.
+ */
+export function onAccount(
+  rows: readonly RemoteSessionRow[],
+  roster: readonly RemoteDevice[] | undefined,
+  here: string | null,
+): readonly RemoteSessionRow[] {
+  if (roster === undefined) return rows
+  const listed = new Set(roster.map((row) => row.device))
+  return rows.filter((row) => row.device === here || listed.has(row.device))
 }
 
 /**

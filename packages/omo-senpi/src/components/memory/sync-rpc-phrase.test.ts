@@ -8,12 +8,16 @@ const gate = (enabled: boolean): PhraseGate => ({ enabled, serviceFloor: async (
 
 test("#given the phrase flag off or on #when features is asked #then phrase-genesis is listed only while the flag is on (amendment A1)", async () => {
   const off = await setup({ phraseGate: gate(false) })
-  expect(await off.call("features", owner("a").context)).toEqual({ features: ["enable-method", "acknowledge"] })
+  expect(await off.call("features", owner("a").context)).toEqual({
+    features: ["enable-method", "acknowledge", "disable"],
+  })
   const absent = await setup()
-  expect(await absent.call("features", owner("a").context)).toEqual({ features: ["enable-method", "acknowledge"] })
+  expect(await absent.call("features", owner("a").context)).toEqual({
+    features: ["enable-method", "acknowledge", "disable"],
+  })
   const on = await setup({ phraseGate: gate(true) })
   expect(await on.call("features", owner("a").context)).toEqual({
-    features: ["enable-method", "phrase-genesis", "acknowledge"],
+    features: ["enable-method", "phrase-genesis", "acknowledge", "disable"],
   })
 })
 

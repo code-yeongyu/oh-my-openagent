@@ -1,6 +1,12 @@
 import { createInterface } from "node:readline/promises"
 
-import { approveDevice, type CeremonyClock, enableSync, joinAccount } from "../memory-core/src/sync/account/index.ts"
+import {
+  approveDevice,
+  type CeremonyClock,
+  disableSync,
+  enableSync,
+  joinAccount,
+} from "../memory-core/src/sync/account/index.ts"
 import { acknowledgePhraseVoid, type PhraseVoidNotice } from "../memory-core/src/sync/account/phrase-notice.ts"
 import { createRejectionCounter } from "../memory-core/src/sync/crypto/rejection.ts"
 import { createRecoveryBridge } from "../memory-core/src/sync/recovery/bridge.ts"
@@ -216,6 +222,20 @@ async function enable(dependencies: SyncCommandDependencies, context: SyncContex
   }
 }
 
+/** Turns sync off on this device only (#14093): its switch on the service, then the local one; memory stays. */
+async function disable(dependencies: SyncCommandDependencies, context: SyncContext): Promise<number> {
+  const outcome = await disableSync(context)
+  if (outcome.kind === "refused") {
+    dependencies.error("The service did not turn memory sync off for this device. Run `omo sync disable` again.")
+    return 1
+  }
+  dependencies.output(
+    "Memory sync is off for this device. Memory on this device stays as it is, and your other devices keep syncing.",
+  )
+  dependencies.output("Run `omo sync enable` to turn it on again.")
+  return 0
+}
+
 // The CLI has no passkey authenticator: phrase recovery is the only key source it can drive.
 const noPasskeys: PasskeyAuthenticator = {
   prfSupported: false,
@@ -354,6 +374,10 @@ export function configureSyncCommands(
     .command("enable")
     .description("Turn memory sync on for this device, joining your memory if needed")
     .action(() => run(dependencies, (context) => enable(dependencies, context)))
+  sync
+    .command("disable")
+    .description("Turn memory sync off for this device only; memory on this device stays")
+    .action(() => run(dependencies, (context) => disable(dependencies, context)))
   sync
     .command("approve [id]")
     .description("Approve a device that is waiting to join, after comparing the code on both screens")

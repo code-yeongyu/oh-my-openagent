@@ -40,13 +40,17 @@ export async function closeLadder(
       "Retry once that host has restarted.",
       { command: "unload_session", reason },
     )
-  if (reason !== "unsupported")
+  if (reason !== "unsupported") {
+    // The engine's detail names which blocker held the session (#14169): without it a caller cannot tell a turn, a
+    // bash command or an unwritten delivery apart.
+    const detail = typeof unload.data["detail"] === "string" ? `: ${unload.data["detail"]}` : ""
     throw refuse(
       "unsupported",
-      `The host holding thread ${sessionId} refused to close it (${String(reason)}).`,
+      `The host holding thread ${sessionId} refused to close it (${String(reason)}${detail}).`,
       "Read the thread and retry once its work settles.",
       { command: "unload_session", reason, detail: unload.data["detail"] },
     )
+  }
   const close = await send({ type: "close_session", sessionId })
   if (close.kind === "gone") return "not_live"
   const probe = await send({ type: "get_state", sessionId })

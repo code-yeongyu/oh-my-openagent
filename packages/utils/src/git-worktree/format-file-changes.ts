@@ -1,20 +1,15 @@
+import { escapeForDisplay } from "../escape-for-display"
 import type { GitFileStat } from "./types"
 
 function normalizePath(path: string): string {
   return path.replaceAll("\\", "/")
 }
 
-// `git ... -z` never quotes paths, so a name holding a newline or other control character would
-// otherwise print as extra lines inside a summary that is injected into an LLM prompt.
-const UNSAFE_DISPLAY_CHARACTER = /[\p{Cc}\u2028\u2029]/u
-const UNSAFE_DISPLAY_CHARACTERS = /[\p{Cc}\u2028\u2029]/gu
-
+// `git ... -z` never quotes paths, so a name holding a newline, another control character or a format character
+// would otherwise print as extra lines or reordered text inside a summary that is injected into an LLM prompt.
 function displayPath(path: string): string {
-  if (!UNSAFE_DISPLAY_CHARACTER.test(path)) return path
-  return JSON.stringify(path).replace(
-    UNSAFE_DISPLAY_CHARACTERS,
-    (character) => `\\u${character.charCodeAt(0).toString(16).padStart(4, "0")}`,
-  )
+  const escaped = escapeForDisplay(path)
+  return escaped === path ? path : escapeForDisplay(JSON.stringify(path))
 }
 
 export function formatFileChanges(stats: GitFileStat[], notepadPath?: string): string {
