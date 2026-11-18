@@ -249,6 +249,7 @@ describe("thread error taxonomy", () => {
       "idempotency_conflict",
       "idempotency_in_progress",
       "idempotency_uncertain",
+      "delivered_unconfirmed",
       "approval_unavailable",
       "approval_route_locked",
       "partial_commit",

@@ -254,6 +254,8 @@ type SharedEnumeration = {
   expiresAt: number | undefined
   readonly abandonAt: number
   readonly endpoints: Promise<readonly KnownEndpoint[]>
+  /** Each socket's kind as this enumeration answered it; absent until it answers. */
+  answered?: ReadonlyMap<string, EndpointKind>
 }
 
 /**
@@ -650,8 +652,9 @@ export function createLiveThreadSurface(
       enumeration = started
       enumerations.set(key, started)
       started.endpoints.then(
-        () => {
+        (found) => {
           started.expiresAt = now() + HOST_ENDPOINTS_CACHE_TTL_MS
+          started.answered = new Map(found.map((endpoint) => [resolve(endpoint.socket), endpoint.kind]))
         },
         () => {
           if (enumerations.get(key) === started) enumerations.delete(key)
@@ -661,11 +664,15 @@ export function createLiveThreadSurface(
     const answered = enumeration
     const known = await answered.endpoints
     // A caller still waiting on an abandoned enumeration gets its whole list, but its late answer never replaces a
-    // kind the enumeration that took its place already recorded.
-    const stale = enumerations.get(key) !== answered
+    // kind the enumeration that took its place recorded: this surface's own record, or, when another surface of the
+    // process ran that newer enumeration, the kind its answer names (#13236 review L1).
+    const latest = enumerations.get(key)
+    const stale = latest !== answered
     for (const endpoint of known) {
       const socket = resolve(endpoint.socket)
-      if (!stale || !kinds.has(socket)) kinds.set(socket, endpoint.kind)
+      const newer = stale ? latest?.answered?.get(socket) : undefined
+      if (newer !== undefined) kinds.set(socket, newer)
+      else if (!stale || !kinds.has(socket)) kinds.set(socket, endpoint.kind)
     }
     return known
   }

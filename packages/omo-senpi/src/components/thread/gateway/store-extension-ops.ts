@@ -136,8 +136,7 @@ export class StoreExtensions {
       const step = await transaction(this.ctx, "extension_migrate", () => {
         const row = this.ctx.sql.one(["version"], "SELECT version FROM extension_schema WHERE name = ?", [name])
         const version = Number(row?.version ?? 0)
-        if (version > migrations.length)
-          throw new GatewaySchemaVersionError(version, migrations.length, `Extension ${name}`)
+        if (version > migrations.length) throw new GatewaySchemaVersionError(version, migrations.length, name)
         const before = extensionSchema(this.ctx.sql)
         if (
           row === undefined &&
@@ -223,8 +222,7 @@ export class StoreExtensions {
         // Re-check under the call's own lock: a newer binary may have migrated the extension since.
         const row = this.ctx.sql.one(["version"], "SELECT version FROM extension_schema WHERE name = ?", [name])
         const locked = Number(row?.version ?? 0)
-        if (locked !== version)
-          throw new GatewaySchemaVersionError(locked, request.descriptor.migrations.length, `Extension ${name}`)
+        if (locked !== version) throw new GatewaySchemaVersionError(locked, request.descriptor.migrations.length, name)
         const before = extensionSchema(this.ctx.sql)
         const scope = extensionTransaction(
           { ...this.ctx, afterCommit: effects, afterRollback: compensations },

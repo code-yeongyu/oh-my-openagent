@@ -1293,7 +1293,9 @@ describe("thread tools over a gateway store a newer omo build migrated", () => {
       }
       expect(sent).toMatchObject(refusal)
       expect(renamed).toMatchObject(refusal)
-      const db = new Database(gatewayDatabasePath(n.agentDir), { readonly: true })
+      // A read-write connection: the refused store closed its WAL connection, which removed -wal and -shm, and a
+      // read-only connection cannot recreate them (macOS's system SQLite answers SQLITE_CANTOPEN). It only reads.
+      const db = new Database(gatewayDatabasePath(n.agentDir))
       try {
         expect(db.query("PRAGMA user_version").get()).toEqual({ user_version: n.gateway })
       } finally {

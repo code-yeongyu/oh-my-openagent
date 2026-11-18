@@ -2,7 +2,9 @@ import { outcomeOf } from "../../thread/remote/outcome"
 import {
   connectDeviceService,
   LocalApiError,
+  NoPrimaryEndpointError,
   NotSentError,
+  UnsettledCommandError,
   REFUSED_BEFORE_SENDING,
   WAKE_ACCEPTS,
   type DeviceService,
@@ -18,6 +20,7 @@ import type {
   RemoteSessionsPort,
 } from "../../thread/remote/ports"
 import { openSessionWatch } from "../../thread/remote/remote-watch"
+import { commandWaitMs, withinCallBudget } from "../../call-budget/call-deadline"
 import { createListingRound } from "./listing-round"
 
 export type DeviceServiceSessionsOptions = {
@@ -76,6 +79,10 @@ const READ_ONLY_RECORDS: ReadonlySet<string> = new Set(["get_state", "get_messag
 // How long a read-only record waits for its final state before it is refused request_timeout (the local API's own request
 // bound). Every other record keeps the attach's default bound: a lost final state never holds a tool call forever.
 const READ_WAIT_MS = 30_000
+
+// omo#14130: every other record's wait, below the 60 s a host-tool bridge gives a tool call (the attach's own default is
+// 120 s). A command that outlives it after it left this device answers delivered_unconfirmed, never a bare timeout.
+const SEND_WAIT_MS = 45_000
 
 // omo#13037 A6: only a peer delivery carries the wake mark, and only through a service that carries it.
 const MARKED_RECORDS: ReadonlySet<string> = new Set(["admit_external_message"])
@@ -196,14 +203,27 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       } catch (error) {
         return { kind: "refused", reason: sessionReason(notSentReason(error)) }
       }
+      // omo#14130 review round 5 (M1): the direct record shares the call's budget like every other command.
+      const waitMs = commandWaitMs(SEND_WAIT_MS)
+      if (waitMs <= 0) return { kind: "refused", reason: "request_timeout" }
       try {
-        return outcomeOf(await connected.sessionCommand(device, sessionId, record))
+        return outcomeOf(await connected.sessionCommand(device, sessionId, record, { waitMs }))
       } catch (error) {
         if (!(error instanceof NotSentError)) return { kind: "uncertain", reason: "reply_lost" }
       }
     }
     try {
-      held = await pool.hold(device, sessionId)
+      // omo#14130 review L1: the attach shares the call's budget; one that settles after it is released at once.
+      const holding = pool.hold(device, sessionId)
+      const reached = await withinCallBudget(holding)
+      if (reached === undefined) {
+        void holding.then(
+          (late) => late.release(),
+          () => undefined,
+        )
+        return { kind: "refused", reason: "request_timeout" }
+      }
+      held = reached
     } catch (error) {
       return { kind: "refused", reason: sessionReason(notSentReason(error)) }
     }
@@ -225,13 +245,17 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       const carries =
         MARKED_RECORDS.has(String(rpc["type"])) && (await svc().catch(() => undefined))?.carriesWakeMark === true
       const marked = carries ? { accepts: WAKE_ACCEPTS } : undefined
+      // The enclosing tool call's budget (call-deadline.ts): spent before sending, nothing is sent.
+      const waitMs = commandWaitMs(readOnly ? READ_WAIT_MS : SEND_WAIT_MS)
+      if (waitMs <= 0) return { kind: "refused", reason: "request_timeout" }
       try {
-        const outcome = outcomeOf(
-          await attached.command(record, readOnly ? { ...marked, waitMs: READ_WAIT_MS } : marked),
-        )
+        const outcome = outcomeOf(await attached.command(record, { ...marked, waitMs }))
         if (isCatalog && outcome.kind === "ok") catalog.keep(key, outcome.response, sentAt)
         return readOnly && outcome.kind === "uncertain" ? { kind: "refused", reason: outcome.reason } : outcome
       } catch (error) {
+        // It left this device and its final state did not come back: the device has it, its answer was lost.
+        if (error instanceof UnsettledCommandError && error.delivered)
+          return { kind: readOnly ? "refused" : "uncertain", reason: "delivered_unconfirmed" }
         // The attach succeeded, so a failure without a local API code is a lost reply, not a failed attach.
         if (readOnly)
           return { kind: "refused", reason: error instanceof LocalApiError ? sessionReason(error.code) : "reply_lost" }
@@ -308,6 +332,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       } catch {
         return { kind: "refused", reason: "invalid_record" }
       }
+      if (commandWaitMs(SEND_WAIT_MS) <= 0) return { kind: "refused", reason: "request_timeout" }
       let dialed: { readonly conn: DeviceService; readonly owned: boolean }
       try {
         dialed = record["type"] === "open_session" ? await dialEndpoint() : { conn: await svc(), owned: false }
@@ -321,9 +346,13 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       // that refusal of a KEPT key forgets it and sends the record once more on a fresh lookup. Every other outcome is
       // the answer as is: an engine that ran the record and failed it, or an uncertain one, is never sent again.
       const send = async (endpoint: string | undefined): Promise<RemoteCommandOutcome> => {
+        // omo#14130 review rounds 2-3: an endpoint command (a create on another device) shares the call's budget, sized
+        // after the dial; the device service takes its endpoint lookup out of it before sending.
+        const waitMs = commandWaitMs(SEND_WAIT_MS)
+        if (waitMs <= 0) return { kind: "refused", reason: "request_timeout" }
         let sent: EndpointCommandResult
         try {
-          sent = await connected.endpointCommand(device, record, { ...endpointOptions, endpoint })
+          sent = await connected.endpointCommand(device, record, { ...endpointOptions, endpoint, waitMs })
         } catch (error) {
           if (endpoint !== undefined && unlistedEndpointError(error)) return UNLISTED_ENDPOINT
           throw error
@@ -343,6 +372,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       } catch (error) {
         // The SDK marks a failure before session.command was written (the endpoint lookup timing out or the connection
         // closing during it) not_sent: nothing ran, so it is refused. The same codes after sending stay uncertain.
+        if (error instanceof NoPrimaryEndpointError) return { kind: "refused", reason: "no_primary_endpoint" }
         if (error instanceof NotSentError) return { kind: "refused", reason: error.code }
         if (error instanceof LocalApiError && error.command_id === undefined && REFUSED_BEFORE_SENDING.has(error.code))
           return { kind: "refused", reason: error.code }
@@ -426,8 +456,11 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         return { kind: "refused", reason: notSentReason(error) }
       }
       if (!connected.carriesWakeMark) return { kind: "unavailable" }
+      // omo#14130 review M1: a wake shares the call's budget like every other command.
+      const waitMs = commandWaitMs(SEND_WAIT_MS)
+      if (waitMs <= 0) return { kind: "refused", reason: "request_timeout" }
       try {
-        return outcomeOf(await connected.wakeCommand(device, durableId, record))
+        return outcomeOf(await connected.wakeCommand(device, durableId, record, { waitMs }))
       } catch (error) {
         if (error instanceof NotSentError) return { kind: "refused", reason: error.code }
         if (error instanceof LocalApiError && error.command_id === undefined && REFUSED_BEFORE_SENDING.has(error.code))
@@ -460,16 +493,28 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       if (knownKey !== undefined) return { kind: "ok", sessionId: knownKey }
       let key: string
       try {
-        key = (await connected.locate(device, engineId)).key
+        // omo#14130 review round 3 (L1): an older service's post-create locate shares the call's budget.
+        const located = await withinCallBudget(connected.locate(device, engineId))
+        if (located === undefined) return { kind: "refused", reason: "request_timeout" }
+        key = located.key
       } catch (error) {
         return { kind: "refused", reason: error instanceof LocalApiError ? error.code : "locate_failed" }
       }
       // The session exists under `key` from here on; wait (bounded) until the listing names it so the next command's
       // attach finds it, and keep that attach for it.
-      const deadline = Date.now() + CREATED_ATTACH_WAIT_MS
+      // omo#14130 review round 2 (L3): inside a tool call the wait for the listing ends with the call's budget.
+      const deadline = Date.now() + Math.max(0, commandWaitMs(CREATED_ATTACH_WAIT_MS))
       for (let wait = 250; ; wait = Math.min(wait * 2, 2_000)) {
         try {
-          const held = await pool.hold(device, key)
+          const holding = pool.hold(device, key)
+          const held = await withinCallBudget(holding)
+          if (held === undefined) {
+            void holding.then(
+              (late) => late.release(),
+              () => undefined,
+            )
+            break
+          }
           held.release()
           break
         } catch (error) {

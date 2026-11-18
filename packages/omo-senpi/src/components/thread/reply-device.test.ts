@@ -74,7 +74,10 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
   async function consumed(
     deliveries: readonly Delivery[],
     rows: readonly RemoteSessionRow[],
-    { listingReads, selfDevice }: { readonly listingReads?: number; readonly selfDevice?: "throws" } = {},
+    {
+      listingReads,
+      selfDevice,
+    }: { readonly listingReads?: number; readonly selfDevice?: "throws" | "fails_once" } = {},
   ) {
     const agentDir = mkdtempSync(join(tmpdir(), "thr-reply-device-"))
     directories.push(agentDir)
@@ -83,8 +86,30 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
     const account = fixture.account({
       rows,
       live: rows.map((row) => row.session_id),
-      ...(selfDevice ? { selfDevice } : {}),
+      ...(selfDevice === "throws" ? { selfDevice } : {}),
     })
+    // `fails_once`: this device's id read fails once, then answers (a device service that recovers mid-call).
+    let deviceListFailed = false
+    const deviceList = account.remote.client.devices.list
+    const client =
+      selfDevice === "fails_once"
+        ? {
+            ...account.remote.client,
+            devices: {
+              ...account.remote.client.devices,
+              list: async (...args: Parameters<typeof deviceList>) => {
+                if (deviceListFailed) return await deviceList(...args)
+                deviceListFailed = true
+                return {
+                  kind: "error",
+                  code: "host_unavailable",
+                  message: "device.info failed",
+                  next_action: "Retry.",
+                } as const
+              },
+            },
+          }
+        : account.remote.client
     // `listingReads`: how many reads of the account session listing answer before every later one throws.
     // The rows (`sessions`) and the round with its missing devices (`listing`) are the same account listing read.
     let reads = 0
@@ -95,9 +120,10 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
     }
     const remote =
       listingReads === undefined
-        ? account.remote
+        ? { ...account.remote, client }
         : {
             ...account.remote,
+            client,
             sessions: {
               ...listing,
               sessions: async (...args: Parameters<typeof listing.sessions>) => {
@@ -239,6 +265,21 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
       [{ id: "device:here/d-1", session_id: "dur-local", name: "local peer" }],
       [B_ROW],
       { selfDevice: "throws" },
+    )
+    expect(await reply("dur-local")).toMatchObject({
+      kind: "error",
+      error: { code: "host_unavailable", details: { reason: "device.info failed", devices: ["here"] } },
+    })
+    expect([admittedOn(), prompts(), reachedLocally("dur-local")]).toEqual([[], 0, false])
+  })
+
+  // #13483 review L1: the view a reply takes and its route rest on one read of this device's id, so a read that fails and
+  // then succeeds cannot pick the empty view for another device and then route the reply here into it.
+  test("#given this device's id read fails once and then answers #when the run replies to a sender on this device #then the reply answers that one failed read and nothing is sent", async () => {
+    const { reply, admittedOn, prompts, reachedLocally } = await consumed(
+      [{ id: "device:here/d-1", session_id: "dur-local", name: "local peer" }],
+      [B_ROW],
+      { selfDevice: "fails_once" },
     )
     expect(await reply("dur-local")).toMatchObject({
       kind: "error",

@@ -13,8 +13,13 @@ export type RemoteSessionRow = {
   readonly durable_id?: string
   readonly title: string
   readonly project: string
-  /** The session file on its own device; `open_session` on that device takes it. */
+  /**
+   * The session's place on its device as the device service lists it: relayd lists its working folder (`cwd`, else
+   * `"unknown"`), never its session file, so `open_session` never takes it (#14170: a folder opened is EISDIR).
+   */
   readonly path: string
+  /** The session file on its own device, known only from that device's own answer (an unload's reply, #14170). */
+  readonly session_file?: string
   readonly state: string
   readonly updated_ms: number
   /**
@@ -211,6 +216,16 @@ export type RemoteSessionsPort = {
     handlers: RemoteWatchHandlers,
     options?: RemoteWatchOptions,
   ) => Promise<RemoteWatchOutcome>
+  /**
+   * #14170 (`closed-rows.ts`): this surface closed `row`'s session, whose unload named `file`. Until the listing catches
+   * up it lists the row ended, carrying that file as `session_file`. Absent: the listing is read as it comes.
+   */
+  readonly closed?: (row: RemoteSessionRow, file: string | undefined) => void
+  /**
+   * #14170: `row`'s session runs again under `key` (this surface reopened it, or its holder says an engine runs it), so a
+   * closed mark no longer applies.
+   */
+  readonly reopened?: (row: RemoteSessionRow, key: string) => void
   /** Closes the device-service connection this port opened, if any; a short-lived caller (the CLI) calls it at the end. */
   readonly close?: () => Promise<void>
 }

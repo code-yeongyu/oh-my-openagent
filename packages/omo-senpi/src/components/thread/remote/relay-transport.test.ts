@@ -6,6 +6,7 @@ import { createGatewayStore, type GatewayStore } from "../gateway/store"
 import type { OutboundDelivery } from "../gateway/transport"
 import { B_ROW, createRemoteThreadFixture, ENGINE } from "../thread-remote-fixture"
 import { createRelayTransport } from "./relay-transport"
+import { commandWaitMs, withCallDeadline } from "../../call-budget/call-deadline"
 
 const { account, cleanup } = createRemoteThreadFixture()
 const directories: string[] = []
@@ -70,6 +71,27 @@ async function admitted(sent: readonly Sent[], count: number): Promise<void> {
 }
 
 describe("a delivery the receiver's open draft holds is queued at once, like a same-device one, and re-sent in the background", () => {
+  // omo#14130 review H1: the call's budget bounds the call, never the background re-sends it queued.
+  test("#given a held delivery sent inside a call whose budget is already spent #when it is re-sent in the background #then the re-send carries no inherited deadline and still goes out", async () => {
+    const a = account({ heldDraft: 1, engine: { ...ENGINE, pending: 1 } })
+    const admitWaits: number[] = []
+    const remote = {
+      ...a.remote,
+      sessions: {
+        ...a.remote.sessions,
+        sessionCommand: (...args: Parameters<typeof a.remote.sessions.sessionCommand>) => {
+          if (args[2]["type"] === "admit_external_message") admitWaits.push(commandWaitMs(45_000))
+          return a.remote.sessions.sessionCommand(...args)
+        },
+      },
+    }
+    const { relay } = transport(remote)
+    const sent = await withCallDeadline(Date.now() - 1, () => relay.deliver(delivery("held past budget", "k-h1")))
+    expect(sent).toMatchObject({ kind: "ok", delivery: { kind: "queued" } })
+    await admitted(a.sent, 2)
+    expect(admitWaits.slice(1)).toEqual([45_000])
+  })
+
   test("#given b's user has a draft open that holds two admissions #when a message is sent #then the send answers queued at b's pending count at once, the same record reaches b three times, and the third is taken", async () => {
     const a = account({ heldDraft: 2, engine: { ...ENGINE, pending: 2 } })
     const { relay, log } = transport(a.remote)

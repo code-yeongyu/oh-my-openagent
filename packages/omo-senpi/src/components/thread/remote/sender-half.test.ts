@@ -43,7 +43,9 @@ describe("#13037 the sender half reaches a session on another device that is not
         delivery: { kind: "queued", waiting_on: { kind: "wake", device: "b" } },
       })
       expect(a.lookups).toEqual([{ device: "b", durable_id: GONE }])
+      // #14184: b is asked first whether it holds the session (find_session, a read); it is on disk there, so it is woken.
       expect(a.sent.map((entry) => [entry.via, entry.device, entry.session, entry.rpc?.["type"]])).toEqual([
+        ["endpoint", "b", undefined, "find_session"],
         ["wake", "b", GONE, "admit_external_message"],
       ])
       expect(wakes(a)[0]?.rpc).toMatchObject({ sessionId: GONE, deliverAs: "followUp" })
@@ -100,8 +102,8 @@ describe("#13037 the sender half reaches a session on another device that is not
       expect(wakes(a).map((entry) => [entry.device, entry.session])).toEqual([["c", GONE]])
     })
 
-    test("#given such an alias #when thread_read, thread_interrupt and thread_create name it #then no engine command and no open is sent", async () => {
-      const a = account({ rows: [B_ROW], aliases: aliases(), ended: { c: { [GONE]: GONE } } })
+    test("#given such an alias #when thread_read, thread_interrupt and thread_create name it #then no open is sent: only the create asks c which file carries the id (find_session, a read; #14170), which c's engine predates", async () => {
+      const a = account({ rows: [B_ROW], aliases: aliases(), ended: { c: { [GONE]: GONE } }, sessionFiles: "none" })
       const { run } = fixture.surface(a.remote)
       for (const [tool, args] of [
         ["thread_read", { thread: "bee" }],
@@ -111,7 +113,9 @@ describe("#13037 the sender half reaches a session on another device that is not
         const result = await run(tool, args)
         expect({ tool, kind: result.kind }).toEqual({ tool, kind: "error" })
       }
-      expect(a.sent.filter((entry) => entry.via !== "read")).toEqual([])
+      expect(a.sent.filter((entry) => entry.via !== "read")).toEqual([
+        { via: "endpoint", device: "c", rpc: { type: "find_session", durableSessionId: GONE } },
+      ])
     })
   })
 
@@ -259,13 +263,16 @@ describe("#13037 the sender half reaches a session on another device that is not
       expect(a.sent.some((entry) => entry.rpc?.["type"] === "get_state")).toBe(false)
     })
 
-    test("#given an ended row #when it is steered #then it is turn_conflict and nothing is sent", async () => {
+    test("#given an ended row #when it is steered #then it is turn_conflict and nothing but the holder's read is sent", async () => {
       const a = endedOnC()
       const { run } = fixture.surface(a.remote)
       expect(
         await run("thread_send", { thread: GONE, message: "hi", delivery: "steer", expected_turn_id: "3" }),
       ).toMatchObject({ kind: "error", error: { code: "turn_conflict" } })
-      expect(a.sent).toEqual([])
+      // #14184: c is asked whether it runs the session before any path is chosen; it has it on disk only, so no steer goes.
+      expect(a.sent.map((entry) => [entry.via, entry.device, entry.rpc?.["type"]])).toEqual([
+        ["endpoint", "c", "find_session"],
+      ])
     })
 
     test("#given this device's service cannot carry the wake #when an ended row is sent to #then no wake is sent", async () => {
@@ -418,7 +425,8 @@ describe("#13037 the sender half reaches a session on another device that is not
     const cases: Readonly<Record<string, readonly [Case, ReturnType<typeof count>]>> = {
       "reply, not running": [
         { rows: [B_ROW], options: { ended: { b: { [GONE]: "rk-gone" } } }, surface: replyFrom(GONE), thread: GONE },
-        { listings: { all: 0, device: 1 }, lookups: 1, commands: 1 },
+        // #14184: the holder's find_session read, then the wake.
+        { listings: { all: 0, device: 1 }, lookups: 1, commands: 2 },
       ],
       "reply, live": [
         { rows: [B_ROW], surface: replyFrom("dur-on-b"), thread: "dur-on-b" },
@@ -430,7 +438,7 @@ describe("#13037 the sender half reaches a session on another device that is not
           options: { aliases: new Map([["bee", { session_id: GONE, device: "c" }]]), ended: { c: { [GONE]: GONE } } },
           thread: "bee",
         },
-        { listings: { all: 1, device: 0 }, lookups: 0, commands: 1 },
+        { listings: { all: 1, device: 0 }, lookups: 0, commands: 2 },
       ],
       "alias, live": [
         {
@@ -442,7 +450,7 @@ describe("#13037 the sender half reaches a session on another device that is not
       ],
       "bare id, not running, held": [
         { rows: [B_ROW, C_ROW], options: { ended: { c: { [GONE]: "rk-c-gone" } } }, thread: GONE },
-        { listings: { all: 1, device: 0 }, lookups: 2, commands: 1 },
+        { listings: { all: 1, device: 0 }, lookups: 2, commands: 2 },
       ],
       "bare id, held nowhere": [
         { rows: [B_ROW, C_ROW], thread: GONE },
