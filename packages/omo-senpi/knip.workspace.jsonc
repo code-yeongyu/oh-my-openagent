@@ -341,6 +341,8 @@
         "scripts/qa/telemetry-opt-out-env.d.mts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/telemetry-optout-purge-e2e.mjs",
+        // run by path from scripts/qa/thread-tools/run-all.mjs (#14079: local thread calls in an approved eval cell ask nothing)
+        "scripts/qa/thread-tools/local-approvals.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/adopt.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
@@ -379,6 +381,12 @@
         "scripts/qa/thread-tools/repeated-wake.mjs",
         // a QA scenario that run-all.mjs runs by name (#13396), like its siblings
         "scripts/qa/thread-tools/report-origin-auto-steer.mjs",
+        // a QA scenario that run-all.mjs runs by name (#14058), like its siblings
+        "scripts/qa/thread-tools/create-prompt-authority.mjs",
+        // a QA scenario that run-all.mjs runs by name (#14063), like its siblings
+        "scripts/qa/thread-tools/reopen-exited.mjs",
+        // a QA scenario that run-all.mjs runs by name (#14066), like its siblings
+        "scripts/qa/thread-tools/create-atomic.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/report-origin-steer.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
@@ -483,8 +491,6 @@
         "src/extension/bundled-index.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/extension/rollback-migrate-runtime.ts",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "src/extension/thread-sdk.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/install/cli-local.ts",
       ],
@@ -828,8 +834,8 @@
     "packages/omo-senpi/src/components/thread/contracts/fields.ts": ["THREAD_SUMMARY_MAX_LENGTH"],
     // pre-existing at origin dev 4686e425b5: unused export(s) THREAD_MESSAGE_MAX_BYTES, THREAD_SUMMARY_MAX_LENGTH
     "packages/omo-senpi/src/components/thread/contracts/index.ts": ["THREAD_MESSAGE_MAX_BYTES", "THREAD_SUMMARY_MAX_LENGTH"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) ThreadListParams, ThreadReadParams, ThreadInterruptParams, ThreadHandoffParams, ThreadRenameParams, ThreadSetModelParams, ThreadSetReasoningParams, ThreadBindParams, ThreadUnbindParams, ThreadRebindParams and 5 more
-    "packages/omo-senpi/src/components/thread/contracts/params.ts": ["ThreadListParams", "ThreadReadParams", "ThreadInterruptParams", "ThreadHandoffParams", "ThreadRenameParams", "ThreadSetModelParams", "ThreadSetReasoningParams", "ThreadBindParams", "ThreadUnbindParams", "ThreadRebindParams", "ThreadBindingsParams", "ThreadReportParams", "ThreadOutboxParams", "ThreadOutboxAckParams", "ThreadAnswerParams"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ThreadListParams, ThreadReadParams, ThreadInterruptParams, ThreadHandoffParams, ThreadRenameParams, ThreadSetModelParams, ThreadSetReasoningParams, ThreadReportParams, ThreadOutboxParams, ThreadOutboxAckParams and 1 more
+    "packages/omo-senpi/src/components/thread/contracts/params.ts": ["ThreadListParams", "ThreadReadParams", "ThreadInterruptParams", "ThreadHandoffParams", "ThreadRenameParams", "ThreadSetModelParams", "ThreadSetReasoningParams", "ThreadReportParams", "ThreadOutboxParams", "ThreadOutboxAckParams", "ThreadAnswerParams"],
     // pre-existing at origin dev 4686e425b5: unused export(s) ENDPOINT_REGISTRY_LAYOUT, canonicalEndpointPath, socketNamesDirectory
     "packages/omo-senpi/src/components/thread/endpoint-registry.ts": ["ENDPOINT_REGISTRY_LAYOUT", "canonicalEndpointPath", "socketNamesDirectory"],
     // pre-existing at origin dev 4686e425b5: unused export(s) isBlankAnswer
@@ -892,6 +898,9 @@
     "packages/omo-senpi/src/extension/agent-toolkit-sdk.ts": ["agentToolkit", "toolkitContextFromEnv", "ULW_LOOP_MANIFEST", "ULW_LOOP_OPERATIONS", "SDK_VERSION"],
     // pre-existing at origin dev 4686e425b5: unused export(s) FIRST_PAINT_BACKSTOP_MS
     "packages/omo-senpi/src/extension/startup-deferral.ts": ["FIRST_PAINT_BACKSTOP_MS"],
+    // sdk.test.ts now imports this thread SDK entry (it was an unused file, #14067); readSessionFacts is read by
+    // `omo host status --all` (omo-native bin/lib/host-status.js) through the built plugin/runtime/thread-sdk/sdk.js
+    "packages/omo-senpi/src/extension/thread-sdk.ts": ["readSessionFacts"],
     // pre-existing at origin dev 4686e425b5: unused export(s) WAKE_QUEUE_STATE_EVENT
     "packages/omo-senpi/src/extension/wake-queue-source.ts": ["WAKE_QUEUE_STATE_EVENT"],
     // pre-existing at origin dev 4686e425b5: unused export(s) omoSenpiAdapterPackageName

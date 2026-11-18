@@ -1,3 +1,119 @@
+## 2026-11-17 - Release train top: thread tools, remote command deadline, paged and local thread_read (#14077)
+
+- **Thread tools: one field names a session (#14056)**
+  - `src/components/thread/contracts/results.ts`: `ThreadResultSummary` is the model-facing row (`thread`, no endpoint internals); every result type carries `thread`. `ThreadSummary` stays the address-book shape with `thread_id`.
+  - `src/components/thread/tools/thread-row.ts`: `threadRow` projects an address-book summary to that row; `openedResult` is `thread_create`'s flat answer. `thread_list`, `thread_create`, `thread_handoff` and the cross-device merge (`remote/cross-device.ts`, which adds `machine`) go through it.
+  - `src/components/thread/control/port.ts`: `controlIdentity` answers `thread`. `sdk.ts`: `send` answers `thread` (`ThreadSdkSendResult`).
+  - `src/components/thread/addressing.ts`: `ThreadCandidate` names the session `thread`; `remote/remote-ops.ts` `holderDetails` names an alias holder `{ thread, device }`; `gateway/engine.ts` `turn_conflict` details say `thread`. `contracts/results.ts`: `ThreadGatewayDeliveryFacts` has no `endpoint`.
+  - `src/components/thread/thread-field.test.ts`: scans every verb's schema, and every value in the model-facing text of real calls, successes and refusals: a session id under any key but `thread`, or an endpoint internal anywhere, fails.
+- **A remote command always settles (#14041)**
+  - `device-service-core` `src/remote-attach.ts`: `RemoteAttach.command` takes `waitMs` (default 120 s) and rejects `request_timeout` with its `command_id` when no final state arrives; it waited forever before. `src/device-service.ts` keeps `waitMs` when it drops the wake mark below the minimum.
+  - `src/components/remote/port/device-service.ts`: `get_state` and `get_messages` pass a 30 s `waitMs`.
+- **Paged thread_read for threads on other devices (#14053)**
+  - `src/components/thread/remote/transcript-tail.ts`: `readContextTail` reads the newest entries with `get_entries` (`tail`, then `before`, up to 256 entries / 512 KiB per page), keeps them per (port, device, session) under a byte bound (16 MiB per port, nothing above 4 MiB per session), and refreshes them with `since`. A device without `get_entries` reads `get_messages`; a page refused for its fields or size falls back for that read only.
+  - `src/components/thread/remote/context-tail.ts`: projects the fetched entries along the holder's leaf with senpi's `buildSessionProjection` and decides when they determine the context's tail (root reached, 60 messages after the latest fetched compaction, or that compaction's first kept entry fetched).
+  - `src/components/thread/remote/default-remote.ts`, `remote/ports.ts`, `remote/port/lazy-remote.ts`: the extension's remote surface carries the engine's projector (`loadProjector`); the CLI surface has none.
+  - `src/components/thread/paged-reader.ts`: `selectEntryPage` applies the live reader's window and byte budget; entry cursors bind the leaf.
+  - `src/components/thread/tools/read-ops.ts`: `readLive` tries the control's `readEntryPage` before `getMessages`.
+  - `src/components/thread/read-budget.ts`: the shared byte-budget rule, moved out of `reader.ts`.
+  - `src/components/remote/port/device-service.ts`: `get_entries` is a read-only record (failures are typed refusals).
+- **thread_read wait_ms on this device (#14061)**
+  - `src/components/thread/control/wait-settled.ts`: `waitForTurnEnd`, the #13417 wait (turn end observed, deadline and abort, 3 s quiet rule), moved out of `relay-control.ts` so both legs run one body over their own watch.
+  - `src/components/thread/live-surface.ts`: `watchSession` follows one session on the endpoint's observing `subscribe_sessions` stream (snapshot row, `session_status` deltas, mirrored `agent_start`/`turn_start`/`agent_settled`; never an attachment). While the session runs, one observing `get_state` reads `currentTurnId`, and the records held meanwhile carry it.
+  - `src/components/thread/control/local-control.ts`: `waitSettled` over `watchSession`; `read-ops.ts` drops the `unsupported` branch; `SessionControl.waitSettled` is required.
+  - `senpi-task` `withRpcSocket` takes `listen` (uncorrelated frames and the connection's end); the contract host answers `subscribe_sessions`.
+
+## 2026-11-17 - thread_create reopens an exited thread; an empty create is refused (#14063)
+
+- `src/components/thread/tools.ts`: thread_create's `locate` resolves over the send address book (session files an id or name names) and runs the A4.3.3 account probe. A create with no prompt, name or alias is refused before placement.
+- `src/components/thread/addressing.ts`: `notFound` answers a durable-id miss without the sessionId hint.
+
+## 2026-11-17 - dev fmt, knip, bundle-inputs and EQ.omo golden reds from #14023 and #14024 (#14026)
+
+`dev` at e060760dd2 had four reds. Three come from 10b8d36a54 (#14023) alone: `scripts/qa/bunshin-ts-eval-sdk-qa.mjs` was not formatted (`bun fmt --check`), `BUNSHIN_NODE_AGENT_ENTRY` in `src/extension/sdk-root-provisioning.ts` was an unused export (`knip:check`), and `bundle-inputs.json` lacked the two `src/components/js-kernel-guard` sources (`bundle-inputs:check`). The fourth, the stale linux-x64 EQ.omo goldens (`--compare` 0/4), comes from both #14023 (bunshin hint, `js_kernel_guard`) and #14024 (`thread_*` addressing text). The script is formatted, the constant is module-local, and `bundle-inputs.json` plus `plugin/extensions/omo.js` are regenerated on Linux (bun 1.4.4, node 24); `omo.js` is 1,499,760 B against the 1,501,843 B ceiling. The linux-x64 EQ.omo goldens (`scripts/qa/fused-equivalence-golden/linux-x64/E21-E24.json`, `baseline.json`) are re-recorded at `dev` e060760dd2 with CI's recipe (`fused-equivalence-e2e.mjs --record --repeat 2`, senpi harness 5ab795e339): with those texts recorded, `--compare` goes from 0/4 to 4/4. The darwin-arm64 goldens are not compared in CI and were already recorded at an older `dev`; they are left as they are.
+
+## 2026-11-17 - Thread rename and close accept this session and session ids (#14024)
+
+- `src/components/thread/addressing.ts`: after the durable `thread_id`, an exact `session_ids` hit resolves as an id. Two hits are `ambiguous_target` and list the durable ids. A session-shaped miss says the query is a `sessionId` and names visible durable ids.
+- `src/components/thread/address-book.ts` and `remote/address-book.ts`: a routing or listing id that differs from the durable id is kept on the address entry.
+- `src/components/thread/tools.ts`: `thread_rename` and `thread_close` treat a missing `thread` as `self`.
+- `src/components/thread/control/operations.ts`: a close that ran answers `reason: "closed"` or `reason: "not_live"` next to `closed`.
+
+## 2026-11-17 - JS cells survive process.exit and the bunshin-ts SDK path is quoted (#14023)
+
+- `src/components/js-kernel-guard/`: an eval-only prelude replaces `process.exit` for cell code. The kernel's own exit binding, captured at process start, is unchanged. A cell that exits throws `ProcessExitInCell` and the next cell still sees globals set before the call.
+- `src/extension/sdk-root-provisioning.ts`: the bunshin hint tells the model that bash inherits `OMO_BUNSHIN_TS_SDK_ROOT`, that the expansion must be `"$OMO_BUNSHIN_TS_SDK_ROOT"`, and that `scripts/node/bunshin-node.mjs` is the node-agent executable.
+
+## 2026-11-17 - Session-facing relay next actions name session tools, not the shell (#13972)
+
+- `src/components/thread/gateway/relay.ts`: the `scope_denied`, `not_found`, `idempotency_uncertain` and fallback next actions now point at `thread_report` without `binding_id` (the gateway's binding) or `thread_outbox`. The relay does not know its caller there, and a session reaches all of them. `binding_conflict` and `stale_revision`, which only the gateway's or the CLI's bind/rebind/unbind return, keep the CLI wording.
+- `tools/relay-tools.ts`: the relay tools' `internal_error` next action likewise.
+- `gateway/relay.ts`: refusals whose cause or caller the code alone does not tell carry their own next action through `fromStore` overrides. A `thread_answer` whose question has left the outbox says to read `thread_outbox` for a newer question. A `not_found` from unbind or rebind, which only the gateway or the CLI calls, keeps `omo thread bindings`. A connector's `inbound` through an unknown binding is told to deliver through the binding the gateway keeps for the chat now.
+
+## 2026-11-17 - The chat-binding tools leave the session tool list (#13942)
+
+- `src/components/thread/metadata.ts`, `contracts/params.ts`, `contracts/fields.ts`, `contracts/results.ts`, `tools/relay-tools.ts`: `thread_bind`, `thread_unbind`, `thread_rebind` and `thread_bindings` are removed, together with their schemas, result types and the session-address resolver only they used. The relay SDK (`gateway/relay.ts` `bind`/`unbind`/`rebind`/`bindings`), the store and the CLI are unchanged.
+- `gateway/relay.ts`: the `next_action` texts that named those tools now point at the binding the gateway keeps and at `omo thread bindings|bind`. The store receipt operation names are unchanged.
+- Why: the gateway owns chat routing (it writes bindings through the relay SDK as its own principal), and no session, skill or script called the tools.
+- `src/components/thread/tools/relay-tools.ts`: `REMOVED_RELAY_TOOL_HINTS`, registered by `registerThreadTools` (`tools.ts`) through `pi.registerRemovedToolHint` when the engine has it (`ExtensionToolHost`), the way `ulw-loop` and `task` hint their removed tools.
+- `gateway/relay.ts`: the `binding_inactive` next action, which a session gets back from `thread_report`, no longer tells it to bind the chat itself.
+- `knip.workspace.jsonc` and `script/knip-coverage-baseline.jsonc`: the `contracts/params.ts` entry no longer names the four removed param schemas.
+
+## 2026-11-16 - thread_create's first prompt failure keeps the created thread (#13825)
+
+Review L1 of #13748 at 0571de8: `tools.ts` `firstPrompt` caught only typed refusals; a delivery that threw (gateway store or settle error, `gateway/engine.ts`) reached `execute`'s catch, so a create that had opened a thread answered `internal_error` with no thread id and its receipt settled as an error (a same-key retry answered `idempotency_uncertain`, a new-key retry opened a second thread). It now catches the throw and answers it as the result's `prompt.error` (`internal_error`, `details.thread_id`). Test: `control/thread-create-options.test.ts` "the prompt's delivery throws" (fixture `admitThrows`).
+
+## 2026-11-16 - The bunshin SDK hint needs a device sense and carries the only-discussed guard (#13467, fixes #13446)
+
+`components/skill-pointers/index.ts`: the bunshin target's keyword `fleet` is replaced by two forms. The owner form is `(?:my|our)\s+fleets?`, and it counts only when followed by the end of the text, punctuation or a function word, so a modifier or a vehicle fleet ("our fleet management UI", "our fleet of delivery trucks") does not fire. The machine-noun form is `fleet[\s-]+(?:machines?|devices?|hosts?|nodes?|box(?:es)?)`; it allows a hyphenated host-name suffix such as `fleet-node-3`, and `hosts` before an article is read as the verb. `bunshin` and `machine mesh` are unchanged.
+
+The pointer text now opens with a conditional ("If the user of this session is asking to run work on their machines") and ends with the shared `ignoreWhenOnlyDiscussed` sentence. `skillPointer` and the conditional `companionPointer` now build from that sentence too, byte-identical to before; these pointer-text builders live in `skill-pointers/pointer-text.ts`.
+
+`Fleet status please`, and other fleet wording with no device sense, no longer inject the hint. `packages/omo-senpi/AGENTS.md` names these triggers and says a bare `fleet` does not fire. This folds in review follow-ups #13780 and #13863.
+
+## 2026-11-16 - /remote renders enable, disable and control (#13796)
+
+`components/remote/tui/command.ts`: `sessionVerbLines` renders `{enabled}` (enable, disable) and the control state `{attached}` as sentences; anything else still falls back to its JSON. `show` adds the CLI's stderr as a warning after a successful result; `succeeded` shows a failed answer's `notice` (enable exits 3 with `{state, notice}` on stdout, omo-native `remote-bootstrap.ts`) before stderr and the exit code. Tests assert note type, count and the deadline handed to the runner instead of pinning notice wording.
+
+## 2026-11-14 - `thread_interrupt` stops the interrupted turn's background jobs
+
+- `src/components/thread/control/interrupt.ts` (new): `interruptOver`, the one interrupt body of both legs. It sends the engine's `interrupt` record with `background: "stop"` and reads the reply into `{ interrupted, turn_id, background }`; a reply with no `background` (an engine before senpi's `interrupt { background }`) reads as `not_supported`.
+- `src/components/thread/control/local-control.ts` and `control/relay-control.ts`: `interrupt` is `interruptOver` over this device's endpoint (`port.interrupt`) and over the device service (`sessionCommand`) respectively; neither builds its own record or parses its own reply any more.
+- `src/components/thread/tools/ports.ts`, `live-surface.ts`, `lazy-live-surface.ts`: the endpoint port's `interrupt` takes the request fields and answers the engine's reply data.
+- `src/components/thread/contracts/results.ts`, `control/operations.ts`, `control/port.ts`: the `thread_interrupt` result carries the typed `background` (`ThreadInterruptBackground`).
+- Why: measured on a remote thread, the interrupted turn's auto-detached `sleep 60` kept running, its completion woke the thread about 60 s later and the thread replied anyway.
+
+## 2026-11-16 - bunshin-ts SDK: typed fanout-run errors and resultOf naming (#13813, follow-up to #13744)
+
+`typedClient` returns the fanout run behind a proxy that types the run's own failure (`fanout on the fleet`) and every per-target error the runner made, such as a `FanoutTimeoutError` (`fanout on <device>`), while an error the callback threw passes as thrown; the machines in its outcomes and result are typed too. `FanoutOptionsError` and `FanoutDuplicateTargetError` map to `invalid_arguments`, `FanoutTimeoutError` to `timeout`. Only device-addressed calls (`getMachine`, `listTools`, `getPolicy`, `setPolicy`) use their first argument as the device; `resultOf` reports the fleet and puts its argument in `details.request_id`. New test: `bunshin-ts-fanout-errors.test.ts` (unknown target awaited and iterated, duplicate target, invalid options, per-target timeout, a callback's own error, `resultOf`); `bunshin-ts-sdk.test.ts` checks that the relay transport's new surface is exposed and typed through the SDK entry.
+
+## 2026-11-11 - Remote open_session rides the endpoint dialer, and borrowed connections stay open (#13761, adopting #13075)
+
+`endpointCommand` in `device-service.ts` sends an `open_session` through `dialEndpoint` (a fresh owned connection per call by default) and closes it in `finally` only when owned; every other record rides the long-lived connection; a borrowed connection (the CLI's shared one, `owned: false`) is left open for its owner. The attach that follows still rides the long-lived connection, which then carries one copy per delta. `device-service.test.ts` pins the split: the open leaves a borrowed connection open for the model set that follows. `device-service-watch.test.ts` pins the duplicate: one copy with the per-call dialer, two without it.
+
+## 2026-11-16 - thread_create carries the launch profile and the first prompt (#13748)
+
+`contracts/create-params.ts`: `model` (exact provider/id), `reasoning`, `permission_preset`, `prompt`, `delivery`, all for a new thread only (`control/create-launch.ts` refuses them with `thread`, a `delivery` without `prompt`, a model that is not provider/id, and a `permission_preset` wider than the creator's, before anything opens). The model and level ride on the `open_session` frame as senpi's launch profile (`provider`, `modelId`, `thinkingLevel`) on both legs (`SessionOpenRequest`, `ThreadHost.openSession`), so senpi's `model_unavailable` refusal (open-session-model.ts) creates nothing; `control/open-reply.ts` `modelRefusal` maps it to `model_not_found` with `details.reason: "model_unavailable"` on the relay leg and from the local host's thrown text (worktree discarded first). `contracts/permission-presets.ts` holds senpi's preset list and `presetWithin`, the allows-no-more order (full-access > workspace > accept-edits > read-only > ask; auto only between full-access and ask; an unknown creator may ask only for ask). `tools.ts` `firstPrompt` delivers `prompt` through `deliverThrough` to the created thread itself (device + durable id, never a name lookup, #13001) under `<create key>:prompt`; a replayed create answers its stored result, so it is sent once per key. The result's `prompt` is the delivery or `{ error }`; the thread stays created. Test: `control/thread-create-options.test.ts`. `remote/device-service.ts` `attachAddressed`: a durable id (a UUID) is located first and never sent to `session.attach` (a device service refuses it `invalid_request` since relay-daemon#1350, and crashed on it before); any other address is attached as typed and located once when the attach refuses it (`session_not_found` or `invalid_request`), so every verb accepts the id `open` printed (omo#13707); the port and `omo remote attach` share it. `remote/address-book.ts` `createdDeviceRow` addresses a just-created remote session by its open reply's relay key. Tests: `remote/device-service.test.ts`.
+
+## 2026-11-16 - bunshin-ts SDK: typed device operation failures (#13744, fixes #13406)
+
+`bunshin-ts-errors.ts` holds `BunshinSessionError` (moved from `bunshin-ts-pick-transport.ts`, still exported under the same name) with the thread tools' failure shape plus `uncertain` and `details`, and `deviceOperationError`, which classifies a rejection by its wire code (relay op-result codes 1:1, hub and relay transport codes by recovery class) or by the vendored error class name. `bunshin-ts-typed-machine.ts` wraps the lazy client and every machine it hands out (fanout callbacks, `withToken` / `withTask` / `tool()` results included); `createLazyBunshinClient` classifies a connect failure as `host_unavailable`. New test: `bunshin-ts-device-errors.test.ts` (operation x bad argument / offline / denied / transport lost, every relay code, the fs.read decode error, connect, `no_transport`).
+
+## 2026-11-16 - Remote wake and wait (#13743)
+
+`remote/remote-watch.ts` (watch v2, from the closed #12725): `RemoteSessionsPort.watch(device, session, handlers, options)` follows a session across attach ends, device-service restarts and engine restarts (re-attach with 1 s to 30 s backoff, resync from a fresh `get_state`, re-locate by durable id), deduplicates by stream seq and turn id, and bounds its queue at 256 records. `remote/attach-pool.ts` refcounts the one attach per session and detaches it 600 s after its last holder. `remote/monitor-source.ts` serves senpi's `RpcRemoteSource` seam, registered by `remote/lazy-ops.ts` `registerRemoteMonitorTargets`. `control/relay-control.ts` `waitSettled` backs `thread_read` `wait_ms` and settles only on an observed turn end (or 3 s of no run at all); a thread on this device answers `unsupported`. `followRemote` (`omo remote send`) still ends on a gap with its reason. `device-service-core` carries optional per-record `seqs` on `session.records`.
+
+## 2026-11-16 - /remote in the TUI (#13412)
+
+`components/remote/tui/` registers `/remote` (component `remote`, after `device-service`). Each action runs one `$OMO_BIN remote <verb> --json` process through `run-omo.ts`, the only spawn helper, imported only by `command.ts` (design v8-core r2 B5, guard G4b), and renders the typed answer: a `{kind:"error"}` result shows its message and `next_action`, an exit without JSON shows the CLI's stderr. `send` puts the text after `--`. With no absolute `OMO_BIN` the command says so and spawns nothing. **Must not break:** no device-service client or local-API connection enters the engine bundle from this component.
+
+## 2026-11-13 - A replaced desktop account ends, and a begin that crosses a retirement owns nothing (#13327 review follow-up)
+
+- **An account that is no longer current ends.** `desktopSyncAccount.ts` `isCurrent()` ends the account (aborts its signal) when it answers false: main's describe or durable record moved on without a `retired` event. Its `retired` listener leaves the channel, and the resolver's `onEnded` ends sessions on it once; before, it stayed on the channel with a live signal until the next `retired` or the channel's end.
+- **Session Workers.** `workerPort.ts` counts main's `retired` events; an `operationBegin` whose reply arrives after a retirement it was sent before is refused to the Worker and its handle is never owned, so the host never forwards that dead handle to main.
+- The rollover test now asserts a refused describe reads signed out (`null`) on both threads exactly; on the main thread that is #13329's refusal mapping, which this follow-up merges.
+- **Must not break:** an account the account source has replaced must not keep listening on the channel; a handle begun for a retired account must never be owned.
+
 ## 2026-11-14 - thread tools: one answer on this device and on another one
 
 `control/locate.ts` resolves a control tool's address against the send address book (`sendAddressBook`: the session files an address names are looked up when no endpoint lists it), so the control tools and `thread_send` find the same threads; `tools/read-ops.ts` reads any not-running thread that has a session file here, not only one whose endpoint died. `control/session-host.ts` `openedThread` is the one create summary both session hosts answer. `control/local-session-host.ts` `workspaceNote` adds the out-of-workspace note to a thread this device opened.

@@ -4,6 +4,7 @@
 use std::io::{self, BufRead, Write};
 use std::process::ExitCode;
 
+use omo_computer_core::paths;
 use omo_computer_session::Session;
 
 use crate::{route, rpc};
@@ -17,7 +18,15 @@ pub fn run() -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    match serve(&mut Session::new(backend), io::stdin().lock(), &mut io::stdout().lock()) {
+    let lookup = |name: &str| vars.iter().find(|(key, _)| key == name).map(|(_, value)| value.clone());
+    let roots = match paths::resolve(lookup) {
+        Ok(roots) => roots,
+        Err(error) => {
+            eprintln!("omo-computer-engine: state directory unavailable: {error}");
+            return ExitCode::from(2);
+        }
+    };
+    match serve(&mut Session::for_roots(backend, &roots), io::stdin().lock(), &mut io::stdout().lock()) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("omo-computer-engine: stdio: {error}");

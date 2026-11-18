@@ -87,6 +87,25 @@ posixBashTest(
   },
 )
 
+// A listing short of changed_files at or under the cap (a head that moved between the event and the read) is judged by
+// its paths, so it must not claim the label is honored without a path check.
+posixBashTest("#given a short listing at or under the API cap #then no truncation warning is printed", () => {
+  const result = decide("short-under-cap", ["packages/utils/src/a.ts"], 2)
+  expect(result.status).toBe(0)
+  expect(result.output).toContain("full_matrix=false")
+  expect(result.stdout).not.toContain("file list truncated")
+})
+
+posixBashTest.each([
+  [3000, false],
+  [3001, true],
+])("#given the label and a short listing of %i changed files #then the truncation warning is %p", (changed, warned) => {
+  const result = decide(`edge-${changed}`, ["packages/utils/src/a.ts"], changed)
+  expect(result.status).toBe(0)
+  expect(result.output).toContain(warned ? "full_matrix=true" : "full_matrix=false")
+  expect(result.stdout.includes("file list truncated")).toBe(warned)
+})
+
 posixBashTest("#given no label and a truncated list #then the pull request stays on Linux", () => {
   const result = decide("truncated-unlabelled", ["packages/utils/src/a.ts"], 3500, [])
   expect(result.status).toBe(0)

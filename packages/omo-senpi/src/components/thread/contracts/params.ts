@@ -3,7 +3,6 @@ import { type Static, Type } from "typebox"
 import {
   AllScope,
   BindingId,
-  ExpectedRevision,
   ExpectedTurnId,
   IdempotencyKey,
   Message,
@@ -19,34 +18,6 @@ import { ThreadCreateParams } from "./create-params"
 
 export { ThreadCreateParams }
 
-const BINDING_PLATFORM = Type.Union(
-  [
-    Type.Literal("discord"),
-    Type.Literal("telegram"),
-    Type.Literal("slack"),
-    Type.Literal("notion"),
-    Type.Literal("feishu"),
-    Type.Literal("herdr"),
-    Type.Literal("custom"),
-    Type.Literal("whatsapp"),
-  ],
-  { description: "Chat platform of the external conversation; custom covers any other connector." },
-)
-
-const OUTBOUND_EVENT = Type.Union([
-  Type.Literal("milestone"),
-  Type.Literal("report"),
-  Type.Literal("question"),
-  Type.Literal("completion"),
-])
-
-const BoundSession = Type.Optional(
-  Type.String({
-    description:
-      "Thread id or unique name of the session to attach, as returned by thread_list; self or leaving it unset attaches the calling session.",
-  }),
-)
-
 export const ThreadListParams = Type.Object({
   all_scope: Type.Optional(
     Type.Boolean({
@@ -57,14 +28,14 @@ export const ThreadListParams = Type.Object({
 })
 
 /** The longest a `thread_read` waits for its thread to settle (#13417). */
-export const THREAD_READ_WAIT_MAX_MS = 600_000
+const THREAD_READ_WAIT_MAX_MS = 600_000
 
 export const ThreadReadParams = Type.Object({
   thread: ThreadAddress,
   cursor: Type.Optional(
     Type.String({
       description:
-        "Opaque cursor from an earlier thread_read to continue a truncated transcript; a transcript revision that moved past it returns cursor_stale.",
+        "Opaque cursor from an earlier thread_read (tool.thread_read() in an eval cell) to continue a truncated transcript; a transcript revision that moved past it returns cursor_stale.",
     }),
   ),
   max_bytes: Type.Optional(
@@ -78,7 +49,7 @@ export const ThreadReadParams = Type.Object({
     Type.Integer({
       minimum: 1,
       maximum: THREAD_READ_WAIT_MAX_MS,
-      description: "Wait up to this many ms for a remote thread's turn to end, then read; see result.wait.",
+      description: "Wait up to this many ms for the thread's turn to end, then read; see result.wait.",
     }),
   ),
   all_scope: AllScope,
@@ -105,8 +76,16 @@ export const ThreadInterruptParams = Type.Object({
   all_scope: AllScope,
 })
 
+const SelfOrThread = Type.Optional(
+  Type.String({
+    minLength: 1,
+    description:
+      "Thread to act on. Omit or pass self for this session. Accepts the thread value of a thread_list row (tool.thread_list() in an eval cell), an alias, or a unique name. A miss names the thread value to pass.",
+  }),
+)
+
 const ThreadCloseParams = Type.Object({
-  thread: ThreadAddress,
+  thread: SelfOrThread,
   idempotency_key: IdempotencyKey,
   all_scope: AllScope,
 })
@@ -131,7 +110,7 @@ export const ThreadHandoffParams = Type.Object({
 })
 
 export const ThreadRenameParams = Type.Object({
-  thread: ThreadAddress,
+  thread: SelfOrThread,
   name: Type.Optional(
     Type.String({
       minLength: 1,
@@ -184,121 +163,6 @@ export const ThreadSetReasoningParams = Type.Object({
   idempotency_key: IdempotencyKey,
 })
 
-export const ThreadBindParams = Type.Object({
-  platform: BINDING_PLATFORM,
-  account_id: Type.String({
-    minLength: 1,
-    maxLength: 256,
-    description: "Bot or account id the connector speaks as on that platform.",
-  }),
-  chat_id: Type.String({
-    minLength: 1,
-    maxLength: 256,
-    description: "Channel, group or direct-chat id on the platform.",
-  }),
-  thread_id: Type.Optional(
-    Type.String({
-      minLength: 1,
-      maxLength: 256,
-      description: "Thread id inside the chat; @chat (the default) binds the whole chat on platforms without threads.",
-    }),
-  ),
-  root_message_id: Type.Optional(
-    Type.String({
-      minLength: 1,
-      maxLength: 256,
-      description: "Platform id of the message that started the thread, when there is one.",
-    }),
-  ),
-  progress_message_id: Type.Optional(
-    Type.String({
-      minLength: 1,
-      maxLength: 256,
-      description: "Platform id of an existing progress message that milestone reports edit in place.",
-    }),
-  ),
-  session: BoundSession,
-  direction: Type.Optional(
-    Type.Object(
-      { inbound: Type.Boolean(), outbound: Type.Boolean() },
-      {
-        description:
-          "inbound lets the thread's messages reach the session, outbound lets the session report to the thread; both default to true and at least one is required.",
-      },
-    ),
-  ),
-  inbound_mode: Type.Optional(
-    Type.Union([Type.Literal("auto"), Type.Literal("follow_up")], {
-      description:
-        "How inbound messages are delivered: auto steers the running turn and starts a turn when the session is idle; follow_up always queues behind the running turn.",
-    }),
-  ),
-  outbound_events: Type.Optional(
-    Type.Array(OUTBOUND_EVENT, {
-      maxItems: 4,
-      description:
-        "Report kinds this thread receives, each at most once; defaults to all four for an outbound binding.",
-    }),
-  ),
-  policy_id: Type.Optional(
-    Type.String({
-      minLength: 1,
-      maxLength: 256,
-      description: "Connector policy label stored with the binding; default is default.",
-    }),
-  ),
-  ttl_seconds: Type.Optional(
-    Type.Union([Type.Integer({ minimum: 1 }), Type.Null()], {
-      description:
-        "Lifetime in seconds from now, default 604800 (one week) and never extended; null keeps the binding until it is unbound.",
-    }),
-  ),
-  all_scope: AllScope,
-  idempotency_key: IdempotencyKey,
-})
-
-export const ThreadUnbindParams = Type.Object({
-  binding_id: BindingId,
-  expected_revision: ExpectedRevision,
-  idempotency_key: IdempotencyKey,
-})
-
-export const ThreadRebindParams = Type.Object({
-  binding_id: BindingId,
-  expected_revision: ExpectedRevision,
-  session: Type.String({
-    minLength: 1,
-    description: "Thread id or unique name of the session that takes the binding over, as returned by thread_list.",
-  }),
-  all_scope: AllScope,
-  idempotency_key: IdempotencyKey,
-})
-
-export const ThreadBindingsParams = Type.Object({
-  session: Type.Optional(
-    Type.String({
-      minLength: 1,
-      description: "Only bindings attached to this session (thread id, unique name, or self).",
-    }),
-  ),
-  platform: Type.Optional(BINDING_PLATFORM),
-  account_id: Type.Optional(Type.String({ minLength: 1, description: "Only bindings of this platform account." })),
-  chat_id: Type.Optional(Type.String({ minLength: 1, description: "Only bindings in this chat." })),
-  thread_id: Type.Optional(Type.String({ minLength: 1, description: "Only bindings of this thread id." })),
-  status: Type.Optional(
-    Type.Union([Type.Literal("active"), Type.Literal("detached"), Type.Literal("expired")], {
-      description: "Only bindings in this status; all statuses when unset.",
-    }),
-  ),
-  cursor: Type.Optional(
-    Type.String({ description: "next_cursor from an earlier thread_bindings call, to continue the same snapshot." }),
-  ),
-  limit: Type.Optional(
-    Type.Integer({ minimum: 1, maximum: 200, description: "Page size, default 50 and at most 200." }),
-  ),
-  all_scope: AllScope,
-})
-
 export const ThreadReportParams = Type.Object({
   binding_id: Type.Optional(
     Type.String({
@@ -332,7 +196,7 @@ export const ThreadReportParams = Type.Object({
       ],
       {
         description:
-          "For kind question: which extension UI request request_id is. It decides the answer forms thread_answer accepts: confirm takes yes/no (any case, surrounding spaces ignored), input and editor take any text including empty, question and select take non-blank text. Without it the answer goes out in every text form at once, so a question, select, input or editor each reads its own and the text must be non-blank; a yes/no word also goes out as the confirm field, so an undeclared confirm reads yes/no too (any other text reads as no).",
+          "For kind question: which extension UI request request_id is. It decides the answer forms thread_answer (tool.thread_answer() in an eval cell) accepts: confirm takes yes/no (any case, surrounding spaces ignored), input and editor take any text including empty, question and select take non-blank text. Without it the answer goes out in every text form at once, so a question, select, input or editor each reads its own and the text must be non-blank; a yes/no word also goes out as the confirm field, so an undeclared confirm reads yes/no too (any other text reads as no).",
       },
     ),
   ),
@@ -387,10 +251,6 @@ export type ThreadHandoffInput = Static<typeof ThreadHandoffParams>
 export type ThreadRenameInput = Static<typeof ThreadRenameParams>
 export type ThreadSetModelInput = Static<typeof ThreadSetModelParams>
 export type ThreadSetReasoningInput = Static<typeof ThreadSetReasoningParams>
-export type ThreadBindInput = Static<typeof ThreadBindParams>
-export type ThreadUnbindInput = Static<typeof ThreadUnbindParams>
-export type ThreadRebindInput = Static<typeof ThreadRebindParams>
-export type ThreadBindingsInput = Static<typeof ThreadBindingsParams>
 export type ThreadReportInput = Static<typeof ThreadReportParams>
 export type ThreadOutboxInput = Static<typeof ThreadOutboxParams>
 export type ThreadOutboxAckInput = Static<typeof ThreadOutboxAckParams>
@@ -407,10 +267,6 @@ export const threadToolParamSchemas = {
   thread_rename: ThreadRenameParams,
   thread_set_model: ThreadSetModelParams,
   thread_set_reasoning: ThreadSetReasoningParams,
-  thread_bind: ThreadBindParams,
-  thread_unbind: ThreadUnbindParams,
-  thread_rebind: ThreadRebindParams,
-  thread_bindings: ThreadBindingsParams,
   thread_report: ThreadReportParams,
   thread_outbox: ThreadOutboxParams,
   thread_outbox_ack: ThreadOutboxAckParams,

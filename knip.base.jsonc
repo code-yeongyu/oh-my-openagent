@@ -5,7 +5,8 @@
   // pre-existing at origin dev 4686e425b5: executables root scripts and tests run that no package declares (OS and platform tools)
   // busctl, hyprctl: Linux session tools run by script/qa/desktop/hyprland.ts
   // kdotool: KWin window tool run by script/qa/desktop/kwin.ts
-  "ignoreBinaries": ["busctl", "file", "gdbus", "gnome-extensions", "hyprctl", "icacls", "kdotool", "notepad.exe", "tasklist"],
+  // pgrep: finds the native parser child that typescript-native-source-parser.test.ts kills (#13951)
+  "ignoreBinaries": ["busctl", "file", "gdbus", "gnome-extensions", "hyprctl", "icacls", "kdotool", "notepad.exe", "pgrep", "tasklist"],
   // Findings marked "pre-existing at origin dev 4686e425b5" were already present when this check was added. Each ignore is
   // scoped to one file (and its issue types) or one dependency, so new dead code anywhere else still fails the check.
   // Remove an entry when its finding is fixed. Root-workspace file ignores live at the top level (knip reads the root
@@ -19,6 +20,13 @@
   // The device service local API client, vendored byte for byte from omo-relay-daemon (pinned by its PIN.json, with the
   // relay-spec symbols it imports ported in spec-proto.ts); its exports are the upstream client's API.
   "ignore": ["packages/shared-skills/upstreams/**", "packages/omo-senpi/vendor/**", "packages/gnome-window-rects-extension/extension.js", "packages/device-service-core/vendor/omo-5.1.66-decoder/**", "packages/device-service-core/src/local-api/**"],
+  // The Electron conformance fixture's main process and preload import "electron", which the Electron binary running them
+  // provides at run time (its CI job fetches one pinned release); scoped to those two files so an unlisted import elsewhere
+  // still fails.
+  "ignoreIssues": {
+    "script/qa/computer/conformance/fixtures/electron/main.cjs": ["unlisted"],
+    "script/qa/computer/conformance/fixtures/electron/preload.cjs": ["unlisted"],
+  },
   // Unused exports already present at origin dev 4686e425b5, named per symbol. knip has no per-symbol ignore and a file-wide
   // ignoreIssues "exports" entry would also hide a new unused export in that file, so script/knip-preexisting-exports.ts
   // (shared byte for byte with omo-relay-daemon, sha256-pinned by script/knip-coverage.test.ts) drops exactly these names, and

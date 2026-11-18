@@ -124,6 +124,8 @@ export { SESSION_ROW_STATES } from "./local-api/protocol.ts"
 export type { AttachEnd, CommandResult, RemoteAttach, RemoteAttachEvent } from "./remote-attach.ts"
 
 export { DEVICE_SERVICE_STATE_DIR_ENV, deviceServiceStateDir } from "./state-dir.ts"
+// The clock seam, here too so a local-only caller takes it without the package barrel (which reaches the release fetch).
+export { realTimers, type Timers } from "./timers.ts"
 
 /** The file a running service publishes in its state dir: the socket on POSIX, the port file on Windows. */
 export function deviceServiceEndpointPath(stateDir: string, platform: NodeJS.Platform = process.platform): string {
@@ -335,7 +337,14 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
     // The mark rides only to a service that carries it; below that, every command keeps today's bytes.
     attach: async (device, sessionId) => {
       const attached = await openAttach(client, device, sessionId, timers)
-      return carriesWakeMark ? attached : { ...attached, command: (rpc) => attached.command(rpc) }
+      // Below that only the mark is dropped; the command's own wait still applies.
+      return carriesWakeMark
+        ? attached
+        : {
+            ...attached,
+            command: (rpc, options) =>
+              attached.command(rpc, options?.waitMs === undefined ? undefined : { waitMs: options.waitMs }),
+          }
     },
     endpointCommand: async (device, rpc, options) => {
       // The endpoint lookup runs before any session.command is written, so whatever fails it (a timeout, a closed

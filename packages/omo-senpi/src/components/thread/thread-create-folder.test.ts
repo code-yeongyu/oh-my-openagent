@@ -12,14 +12,22 @@ describe("thread_create: the folder a new thread starts in", () => {
   test("#given a relative cwd #when the thread is created on this device #then it starts in that folder under the caller's folder", async () => {
     const a = account()
     const { run, openSession } = surface(a.remote)
-    expect(await run("thread_create", { cwd: "packages" })).toMatchObject({ kind: "ok" })
-    expect(openSession.mock.calls.map((call) => call[0])).toEqual([{ cwd: join(process.cwd(), "packages") }])
+    expect(await run("thread_create", { name: "thread-create-folder-15", cwd: "packages" })).toMatchObject({
+      kind: "ok",
+    })
+    // A create here asks for the id its call derives (#14060).
+    expect(openSession.mock.calls.map((call) => call[0])).toEqual([
+      { cwd: join(process.cwd(), "packages"), name: "thread-create-folder-15", durableSessionId: expect.any(String) },
+    ])
   })
 
   test("#given a cwd that does not exist #when the thread is created on this device #then invalid_arguments folder_missing and nothing opens", async () => {
     const a = account()
     const { run, openSession } = surface(a.remote)
-    const result = await run("thread_create", { cwd: join(process.cwd(), "no-such-folder-here") })
+    const result = await run("thread_create", {
+      name: "thread-create-folder-22",
+      cwd: join(process.cwd(), "no-such-folder-here"),
+    })
     expect(failure(result)).toMatchObject({ code: "invalid_arguments", details: { reason: "folder_missing" } })
     expect(openSession).not.toHaveBeenCalled()
   })
@@ -27,7 +35,7 @@ describe("thread_create: the folder a new thread starts in", () => {
   test("#given a relative cwd #when the thread is created on device b #then invalid_arguments relative_path and nothing reaches b", async () => {
     const a = account()
     const { run } = surface(a.remote)
-    const result = await run("thread_create", { device: "studio", cwd: "sub/dir" })
+    const result = await run("thread_create", { name: "thread-create-folder-30", device: "studio", cwd: "sub/dir" })
     expect(failure(result)).toMatchObject({
       code: "invalid_arguments",
       details: { reason: "relative_path", device: "b" },
@@ -38,7 +46,11 @@ describe("thread_create: the folder a new thread starts in", () => {
   test("#given b has no such folder #when the thread is created there #then b's missing_session_cwd answers invalid_arguments folder_missing naming b, not an omo update", async () => {
     const a = account({ refuse: "missing_session_cwd" })
     const { run } = surface(a.remote)
-    const result = await run("thread_create", { device: "studio", cwd: "/no/such/folder" })
+    const result = await run("thread_create", {
+      name: "thread-create-folder-41",
+      device: "studio",
+      cwd: "/no/such/folder",
+    })
     expect(failure(result)).toMatchObject({
       code: "invalid_arguments",
       details: { reason: "folder_missing", device: "b", path: "/no/such/folder" },
@@ -48,7 +60,7 @@ describe("thread_create: the folder a new thread starts in", () => {
   test("#given b says the cwd is a file #when the thread is created there #then invalid_arguments not_a_directory naming b", async () => {
     const a = account({ refuse: "session_cwd_not_directory" })
     const { run } = surface(a.remote)
-    const result = await run("thread_create", { device: "studio", cwd: "/etc/hostname" })
+    const result = await run("thread_create", { name: "folder-file", device: "studio", cwd: "/etc/hostname" })
     expect(failure(result)).toMatchObject({
       code: "invalid_arguments",
       details: { reason: "not_a_directory", device: "b", path: "/etc/hostname" },
@@ -58,7 +70,9 @@ describe("thread_create: the folder a new thread starts in", () => {
   test("#given a Windows absolute cwd #when the thread is created on device b #then it is passed to b unchanged", async () => {
     const a = account()
     const { run } = surface(a.remote)
-    expect(await run("thread_create", { device: "studio", cwd: "C:\\work\\repo" })).toMatchObject({ kind: "ok" })
+    expect(
+      await run("thread_create", { name: "thread-create-folder-61", device: "studio", cwd: "C:\\work\\repo" }),
+    ).toMatchObject({ kind: "ok" })
     expect(a.sent[0]?.rpc).toMatchObject({ type: "open_session", cwd: "C:\\work\\repo" })
   })
 
@@ -73,7 +87,7 @@ describe("thread_create: the folder a new thread starts in", () => {
     async (_label, device, options, code) => {
       const a = account(options)
       const { run, openSession } = surface(a.remote)
-      const error = failure(await run("thread_create", { device }))
+      const error = failure(await run("thread_create", { name: "thread-create-folder-76", device }))
       expect(error).toMatchObject({ code })
       expect(error?.next_action.length).toBeGreaterThan(0)
       expect(openSession).not.toHaveBeenCalled()

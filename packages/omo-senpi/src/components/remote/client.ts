@@ -7,57 +7,75 @@ import {
   realTimers,
   type DeviceService,
   type DeviceRow as WireDeviceRow,
+  type RemoteAttach,
   type ListingRow,
   type Timers,
-} from "@oh-my-opencode/device-service-core"
+} from "@oh-my-opencode/device-service-core/device-service"
+import { aliasMembers } from "./aliases"
+import { attachMember } from "./attach"
 import { failureFromError, nextActionFor, remoteFailure } from "./codes"
 import { BOUNDS, CONNECT_SLACK_MS, DEADLINES, withinDeadline } from "./deadlines"
+import { streamMembers } from "./follow"
+import { resolveMember } from "./resolve"
+import type { LocalSessions } from "./local-sessions"
 import { handleOf } from "./seams"
+import { sessionMembers } from "./sessions"
+import { thisDeviceRow } from "./this-device-row"
 import type {
-  BootstrapResult,
-  BootstrapSetup,
-  ControlState,
   DeviceRow,
   Opts,
   R,
+  RemoteClient,
+  RemoteClientDeps as RemoteClientDepsOver,
   RemoteFailure,
   RemoteSender,
-  ServiceInfo,
-  ServiceStatus,
   SessionRow,
   SessionsList,
   SessionsListFilter,
 } from "./types"
+import { unknownDevice } from "./unknown-device"
 
-export type RemoteClientDeps = {
-  readonly version: string
-  readonly stateDir?: string
-  /** The clock seam: every deadline of the client and of its connection runs on it (real timers by default). */
-  readonly timers?: Timers
-  /** Runs the device service bootstrap for `service.bootstrap`; the internal bootstrap entry provides it (part 4c-3). */
-  readonly bootstrap?: (setup: BootstrapSetup) => Promise<BootstrapResult>
+/** The client's deps over the device service SDK's own connection and attach (types.ts `RemoteClientDeps`). */
+export type RemoteClientDeps = RemoteClientDepsOver<DeviceService, RemoteAttach> & {
+  /**
+   * This device's own operator endpoint (`local-sessions.ts` `createLocalSessions`), where its sessions are listed, opened
+   * and driven (#13787). It opens sockets, so a caller outside `omo remote`'s local-only graph (#13440) injects it, and
+   * may load it lazily: it is loaded once, on the first member that needs it. Absent, sessions.list names this device
+   * unanswered (its sessions are missing from the listing, as when its host does not answer), and every other session
+   * member on this device answers `unsupported{feature:"local_sessions"}`.
+   */
+  readonly localSessions?: () => Promise<LocalSessions>
 }
+export type { RemoteClient }
 
-/** The members of part 4a-1 (design v8-core r2, B1); sessions.get onward land with their parts. */
-export type RemoteClient = {
-  readonly service: {
-    readonly info: (opts?: Opts) => R<ServiceInfo>
-    readonly status: (opts?: Opts) => R<ServiceStatus>
-    readonly setEnabled: (on: boolean, opts?: Opts) => R<{ readonly enabled: boolean }>
-    readonly control: (opts?: Opts) => R<ControlState>
-    readonly setControl: (on: boolean, opts?: Opts) => R<ControlState>
-    readonly bootstrap: (setup: BootstrapSetup, opts?: Opts) => R<BootstrapResult>
-  }
-  readonly devices: {
-    readonly list: (opts?: Opts) => R<readonly DeviceRow[]>
-    readonly resolve: (idOrName: string, opts?: Opts) => R<DeviceRow>
-  }
-  readonly sessions: { readonly list: (filter?: SessionsListFilter, opts?: Opts) => R<SessionsList> }
-  readonly close: () => void
+export type Outcome<T> = { readonly kind: "ok"; readonly value: T } | RemoteFailure
+export const ok = <T>(value: T): Outcome<T> => ({ kind: "ok", value })
+
+/** What every member module is built from: the client's sender, clock, deps, connection and member runner. */
+export type ClientCore = {
+  readonly sender: RemoteSender
+  readonly timers: Timers
+  readonly deps: RemoteClientDeps
+  /** Opens a new proven connection, as the client's own is opened; the caller owns it and closes it. */
+  readonly dial: () => Promise<DeviceService>
+  /** Runs `body` on the proven connection under the member's deadline; settles with data, never throws. */
+  readonly member: <T>(
+    opts: Opts | undefined,
+    defaultMs: number,
+    mutating: boolean,
+    body: (svc: DeviceService) => Promise<Outcome<T>>,
+    absent?: () => Outcome<T>,
+  ) => R<T>
+  readonly sessionsList: (filter?: SessionsListFilter, opts?: Opts) => R<SessionsList>
+  readonly devicesList: (opts?: Opts) => R<readonly DeviceRow[]>
+  /**
+   * The client these members belong to, for the thread bodies a member runs (they read the account through a client):
+   * valid once the client is built, which is before any member can be called.
+   */
+  readonly self: () => RemoteClient
+  /** This device's operator endpoint leg (RemoteClientDeps.localSessions), loaded once; undefined when not injected. */
+  readonly localSessions: () => Promise<LocalSessions | undefined>
 }
-
-type Outcome<T> = { readonly kind: "ok"; readonly value: T } | RemoteFailure
-const ok = <T>(value: T): Outcome<T> => ({ kind: "ok", value })
 
 const hostSlug = (): string =>
   hostname()
@@ -99,6 +117,28 @@ const unlistedDevice = (id: string): DeviceRow => ({
   caps: { attach: true, machine: false, control: false },
 })
 
+const controlUnsupported = (): RemoteFailure =>
+  remoteFailure(
+    "unsupported",
+    "The device service on this device does not have remote control yet.",
+    nextActionFor("unsupported"),
+    { details: { feature: "control" } },
+  )
+
+// Two causes, two answers: this build carries no wake switch at all (no service update enables it), or the device
+// service is older than the release that carries it (updating does).
+const wakeUnsupported = (svc: DeviceService): RemoteFailure =>
+  svc.wakeMarkMinimum === null
+    ? remoteFailure("unsupported", "This build of omo does not carry the wake switch yet.", "Update omo, then retry.", {
+        details: { feature: "wake", reason: "not_in_build" },
+      })
+    : remoteFailure(
+        "unsupported",
+        "The device service on this device cannot wake sessions for other devices yet.",
+        nextActionFor("unsupported"),
+        { details: { feature: "wake", reason: "service_too_old" } },
+      )
+
 const notPerson = (member: string): RemoteFailure =>
   remoteFailure(
     "sender_not_allowed",
@@ -115,9 +155,18 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
   const timers = deps.timers ?? realTimers
   const stateDir = deps.stateDir ?? deviceServiceStateDir()
   let service: Promise<DeviceService> | undefined
+  let localLeg: Promise<LocalSessions> | undefined
+  const localSessions = async (): Promise<LocalSessions | undefined> => {
+    const load = deps.localSessions
+    if (load === undefined) return undefined
+    localLeg ??= load()
+    return await localLeg
+  }
+  const dial = (): Promise<DeviceService> =>
+    (deps.connect ?? connectDeviceService)({ version: deps.version, stateDir, timers })
   const connection = (): Promise<DeviceService> => {
     if (service !== undefined) return service
-    const opening = connectDeviceService({ version: deps.version, stateDir, timers }).then(
+    const opening = dial().then(
       (connected) => {
         void connected.closed.then(() => {
           if (service === opening) service = undefined
@@ -152,6 +201,9 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
           details: { phase: "connect" },
         },
       )
+    // Every failure before the member's own call (refused, reset, no socket, a bad proof) names the connect phase, so a
+    // caller can tell a service that is not serving from a member that failed.
+    if (outcome.kind === "error") return { ...outcome, details: { ...outcome.details, phase: "connect" } }
     return outcome
   }
 
@@ -184,17 +236,11 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
   }
 
   const listDevices = async (svc: DeviceService): Promise<readonly DeviceRow[]> => {
-    const [rows, self] = await Promise.all([svc.devices(), svc.thisDevice()])
-    const control = svc.capabilities.includes("control")
+    const [rows, self, status] = await Promise.all([svc.devices(), svc.thisDevice(), svc.status()])
     const listed = rows.map(deviceRow)
     if (self === null) return [localSelfRow(), ...listed]
     const own = listed.find((row) => row.id === self.id)
-    const selfRow: DeviceRow = {
-      ...(own ?? { ...localSelfRow(), id: self.id, name: self.name, last_seen_ms: timers.now() }),
-      self: true,
-      online: true,
-      caps: { attach: true, machine: false, control },
-    }
+    const selfRow = thisDeviceRow(self, own, status, timers.now(), svc.capabilities.includes("control"))
     return [selfRow, ...listed.filter((row) => row.id !== self.id)]
   }
 
@@ -207,22 +253,102 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
       () => ok([localSelfRow()]),
     )
 
-  return {
+  /**
+   * This device's own sessions, under a bound of their own that ends before the listing's (#13787 review L1): a host that
+   * takes list_sessions and never answers leaves this device unanswered, never the whole listing a timeout.
+   */
+  const localRowsBefore = async (end: number, self: DeviceRow): Promise<readonly SessionRow[] | undefined> => {
+    const ms = Math.max(0, Math.min(DEADLINES.sessionsListLocal, end - timers.now() - 1))
+    const answered = await withinDeadline(timers, undefined, ms, false, async () => {
+      const leg = await localSessions()
+      return ok(leg === undefined ? undefined : await leg.rows(self))
+    })
+    return answered.kind === "ok" ? answered.value : undefined
+  }
+
+  const sessionsList = (filter?: SessionsListFilter, opts?: Opts): R<SessionsList> =>
+    member(opts, DEADLINES.sessionsList, false, async (svc) => {
+      // The listing's own deadline, whose clock member starts as this body does.
+      const end = timers.now() + (opts?.deadlineMs ?? DEADLINES.sessionsList)
+      const [listing, devices] = await Promise.all([
+        svc.sessions({
+          ...(filter?.device === undefined ? {} : { device: filter.device }),
+          ...(filter?.project === undefined ? {} : { project: filter.project }),
+          ...(filter?.state === undefined ? {} : { state: filter.state }),
+        }),
+        listDevices(svc),
+      ])
+      const byId = new Map(devices.map((row) => [row.id, row]))
+      const unknown = unknownDevice(filter?.device, byId, listing)
+      if (unknown !== undefined) return unknown
+      const deviceOf = (id: string): DeviceRow => byId.get(id) ?? unlistedDevice(id)
+      const wanted = filter?.name?.toLowerCase()
+      // This device's own sessions come from its own operator endpoint (#13787): the service's listing does not carry
+      // the asking device's sessions. One it already lists by the same durable id keeps the service's row.
+      const self = devices.find((row) => row.self === true && row.kind !== "local")
+      const listed = listing.rows.map((row) => sessionRow(row, deviceOf(row.device)))
+      const local =
+        self === undefined || (filter?.device !== undefined && filter.device !== self.id)
+          ? []
+          : await localRowsBefore(end, self)
+      const known = new Set(listed.flatMap((row) => (row.durable_id === undefined ? [] : [row.durable_id])))
+      const rows = [
+        ...listed,
+        ...(local ?? []).filter((row) => row.durable_id === undefined || !known.has(row.durable_id)),
+      ]
+        .filter((row) => filter?.state === undefined || row.state === filter.state)
+        .filter((row) => filter?.project === undefined || row.project === filter.project)
+        .filter(
+          (row) =>
+            (filter?.archived === undefined || row.archived === filter.archived) &&
+            (wanted === undefined || row.name.toLowerCase() === wanted),
+        )
+      // A device that missed the round, or whose answer was cut short (incomplete), lists cached rows at most.
+      const unanswered = [
+        ...new Set([
+          ...listing.incomplete,
+          ...Object.entries(listing.devices)
+            .filter(([, state]) => state !== "answered")
+            .map(([id]) => id),
+          // This device's own host did not answer: its sessions are missing from this listing.
+          ...(self !== undefined && local === undefined ? [self.id] : []),
+        ]),
+      ].map(deviceOf)
+      return ok({ revision: listing.revision, rows, unanswered })
+    })
+
+  let built: RemoteClient | undefined
+  const self = (): RemoteClient => {
+    if (built === undefined) throw new Error("the remote client was used before it was built")
+    return built
+  }
+  const core: ClientCore = { sender, timers, deps, dial, member, sessionsList, devicesList, localSessions, self }
+
+  built = {
     service: {
       info: (opts) =>
         member(opts, DEADLINES.service, false, async (svc) =>
           ok({ service_version: svc.serviceVersion, capabilities: svc.capabilities }),
         ),
-      status: (opts) => member(opts, DEADLINES.service, false, async (svc) => ok(await svc.status())),
+      // One call answers both: the state and the version of the service that reported it.
+      status: (opts) =>
+        member(opts, DEADLINES.service, false, async (svc) =>
+          ok({ ...(await svc.status()), service_version: svc.serviceVersion }),
+        ),
       setEnabled: async (on, opts) =>
         sender.kind !== "person"
           ? notPerson("service.setEnabled")
           : member(opts, DEADLINES.service, true, async (svc) => ok({ enabled: await svc.setEnabled(on) })),
-      control: (opts) => member(opts, DEADLINES.service, false, async (svc) => ok(await svc.attachControl())),
+      control: (opts) =>
+        member(opts, DEADLINES.service, false, async (svc) =>
+          svc.capabilities.includes("control") ? ok(await svc.attachControl()) : controlUnsupported(),
+        ),
       setControl: async (on, opts) =>
         sender.kind !== "person"
           ? notPerson("service.setControl")
-          : member(opts, DEADLINES.service, true, async (svc) => ok(await svc.setAttachControl(on))),
+          : member(opts, DEADLINES.service, true, async (svc) =>
+              svc.capabilities.includes("control") ? ok(await svc.setAttachControl(on)) : controlUnsupported(),
+            ),
       // The bootstrap installs and connects the service itself, so it holds no connection of this client. Its caller is
       // a person or the internal bootstrap entry's service client (B4).
       bootstrap: async (setup, opts) => {
@@ -237,6 +363,17 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
           )
         return await withinDeadline(timers, opts, DEADLINES.bootstrap, true, async () => ok(await run(setup)))
       },
+      // The gate is this connection's own service version (A7R-11), never a capability word.
+      wake: (opts) =>
+        member(opts, DEADLINES.service, false, async (svc) =>
+          svc.carriesWakeMark ? ok(await svc.sessionWake()) : wakeUnsupported(svc),
+        ),
+      setWake: async (on, opts) =>
+        sender.kind !== "person"
+          ? notPerson("service.setWake")
+          : member(opts, DEADLINES.service, true, async (svc) =>
+              svc.carriesWakeMark ? ok(await svc.setSessionWake(on)) : wakeUnsupported(svc),
+            ),
     },
     devices: {
       list: devicesList,
@@ -263,32 +400,13 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
       },
     },
     sessions: {
-      list: (filter, opts) =>
-        member(opts, DEADLINES.sessionsList, false, async (svc) => {
-          const [listing, devices] = await Promise.all([
-            svc.sessions({
-              ...(filter?.device === undefined ? {} : { device: filter.device }),
-              ...(filter?.project === undefined ? {} : { project: filter.project }),
-              ...(filter?.state === undefined ? {} : { state: filter.state }),
-            }),
-            listDevices(svc),
-          ])
-          const byId = new Map(devices.map((row) => [row.id, row]))
-          const deviceOf = (id: string): DeviceRow => byId.get(id) ?? unlistedDevice(id)
-          const wanted = filter?.name?.toLowerCase()
-          const rows = listing.rows
-            .map((row) => sessionRow(row, deviceOf(row.device)))
-            .filter(
-              (row) =>
-                (filter?.archived === undefined || row.archived === filter.archived) &&
-                (wanted === undefined || row.name.toLowerCase() === wanted),
-            )
-          const unanswered = Object.entries(listing.devices)
-            .filter(([, state]) => state !== "answered")
-            .map(([id]) => deviceOf(id))
-          return ok({ revision: listing.revision, rows, unanswered })
-        }),
+      list: sessionsList,
+      resolve: resolveMember(core),
+      ...sessionMembers(core),
+      ...streamMembers(core),
     },
+    attach: attachMember(core),
+    aliases: aliasMembers(core),
     close: () => {
       const open = service
       service = undefined
@@ -298,12 +416,14 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
       )
     },
   }
+  return built
 }
 
 // The listing carries one display name per session (its title); archive state has no layer yet (E-archive), so every
 // row is unarchived. The handle is the `<device>/<session>` form seam 1 parses.
 const sessionRow = (row: ListingRow, device: DeviceRow): SessionRow => ({
   thread: handleOf(row.device, row.session_id),
+  ...durableIdOf(row),
   name: row.title,
   title: row.title,
   device,
@@ -314,3 +434,9 @@ const sessionRow = (row: ListingRow, device: DeviceRow): SessionRow => ({
   updated_ms: row.updated_ms,
   source: row.source,
 })
+
+// The listing's optional durable_id (#12996); a service that predates it lists none.
+const durableIdOf = (row: object): { readonly durable_id?: string } => {
+  const value = Reflect.get(row, "durable_id")
+  return typeof value === "string" && value !== "" ? { durable_id: value } : {}
+}
