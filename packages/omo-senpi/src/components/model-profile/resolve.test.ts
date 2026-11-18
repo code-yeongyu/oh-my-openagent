@@ -19,6 +19,7 @@ const SOL_56 = "chatgpt-subscription/gpt-5.6-sol"
 const SOL_56_COPILOT = "github-copilot/gpt-5.6-sol"
 const SOL_61 = "chatgpt-subscription/gpt-6.1-sol"
 const ASTRA = "chatgpt-subscription/gpt-6-astra"
+const ASTRA_62 = "chatgpt-subscription/gpt-6.2-astra"
 
 const DAILY_NORMAL = {
   id: "daily-normal",
@@ -270,6 +271,21 @@ describe("builtin chain routing", () => {
         known: ["daily-heavy", "daily-normal", "geeky-heavy", "geeky-normal"],
       })
     }
+  })
+
+  it("resolves geeky-normal and geeky-heavy to gpt-6.2-astra when the subscription serves it beside GPT-6 Astra", () => {
+    expect(resolveModelProfile({ active: "geeky-normal", availableModels: [ASTRA_62, ASTRA, SOL_61] })).toMatchObject({
+      kind: "resolved",
+      provider: "chatgpt-subscription",
+      modelId: "gpt-6.2-astra",
+      reasoning: "medium",
+    })
+    expect(resolveModelProfile({ active: "geeky-heavy", availableModels: [ASTRA_62, ASTRA] })).toMatchObject({
+      kind: "resolved",
+      provider: "chatgpt-subscription",
+      modelId: "gpt-6.2-astra",
+      reasoning: "high",
+    })
   })
 
   it("resolves geeky-normal to gpt-6-astra medium when the subscription serves it beside the Sol tiers", () => {

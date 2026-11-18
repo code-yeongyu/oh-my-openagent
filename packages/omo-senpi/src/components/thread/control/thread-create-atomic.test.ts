@@ -98,7 +98,10 @@ describe("thread_create survives a lost open reply (#14060)", () => {
     const made = sessions.findIndex((session) => session.durableSessionId === id)
     expect(made).toBeGreaterThan(-1)
     // The engine names the session after its open (set_session_name), before a later step of the first run failed.
-    sessions[made] = { ...sessions[made]!, name: "named-retry" }
+    const existing = sessions[made]
+    expect(existing).toBeDefined()
+    if (!existing) throw new Error(`created session ${id} missing from sessions`)
+    sessions[made] = { ...existing, name: "named-retry" }
     expect(await run("thread_create", args)).toMatchObject({ kind: "ok", thread: id })
     expect(openSession).toHaveBeenCalledTimes(1)
     expect(enqueuedFor(id)).toBe(1)
