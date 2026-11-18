@@ -1,20 +1,13 @@
-import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import { gatewaySchemaRefusal, threadToolFailure } from "./errors"
-import type { ThreadErrorCode, ThreadToolFailure } from "./errors"
+import type { ThreadToolFailure } from "./errors"
 import { type Static } from "typebox"
 import { toThreadAddressEntries } from "./address-book"
-import { checkNameConflict, normalizeThreadName, type ThreadAddressEntry, type ThreadResolveResult } from "./addressing"
-import { createLocalSessionHost, workspaceNote } from "./control/local-session-host"
-import { createdThreadId, type SessionOpenOutcome } from "./control/session-host"
-import { checkInitialSkills } from "./initial-skills"
+import { type ThreadAddressEntry, type ThreadResolveResult } from "./addressing"
 import {
   parseThreadParams,
   threadToolParamSchemas,
   type ThreadCloseInput,
   type ThreadCreateInput,
-  type ThreadCreatePrompt,
-  type ThreadCreateResult,
-  type ThreadSendResult,
   type ThreadHandoffInput,
   type ThreadInterruptInput,
   type ThreadListInput,
@@ -23,13 +16,11 @@ import {
   type ThreadSendInput,
   type ThreadSetModelInput,
   type ThreadSetReasoningInput,
-  type ThreadSummary,
   type ThreadToolName,
   type ThreadToolResult,
 } from "./contracts"
 import { THREAD_FAMILY_PROMPT_GUIDELINES } from "./metadata"
-import { createLaunch } from "./control/create-launch"
-import { createdDeviceRow, relayAddressBook, type RelayAddressBook } from "./remote/address-book"
+import { relayAddressBook, type RelayAddressBook } from "./remote/address-book"
 import { threadLink } from "./thread-link"
 export type { ThreadTranscriptEntry } from "./reader"
 import { hashArgs } from "./gateway/bindings"
@@ -46,18 +37,17 @@ import { withThreadRenderers } from "./tools/render"
 import { consumedSendersOf, threadSendPermission } from "./tools/reply-permission"
 import { otherDevice, replyTargetFailure, replyTargetMismatch } from "./tools/reply-target"
 import { accountDevices } from "./remote/account"
-import { claimCreatedAlias, listAcross, planCreate, renameAlias, withAlias } from "./remote/lazy-ops"
+import { listAcross } from "./remote/lazy-ops"
 import { locateControl } from "./control/locate"
-import { closeThread, interruptThread, setModelOn, setThinkingLevelOn } from "./control/operations"
+import { createThread } from "./control/create"
+import { closeThread, interruptThread, NOT_LIVE, setModelOn, setThinkingLevelOn } from "./control/operations"
+import { renameThread } from "./control/rename"
 import { controlIdentity, controlRefusalOf } from "./control/port"
-import type { LocalAliasReason, LocalExisting } from "./remote/cross-device"
-import type { HostedThread } from "./control/session-host"
-import { recordThreadCreator, registerExtensionTools, type ExtensionToolHost } from "./tools/extension-tools"
+import { registerExtensionTools, type ExtensionToolHost } from "./tools/extension-tools"
 export type { ThreadHost, ThreadHostSession, ThreadToolSurfaceOptions } from "./tools/ports"
 export { UNKNOWN_CALLER } from "./tools/ports"
 import {
   UNKNOWN_CALLER,
-  type ThreadHost,
   type ThreadHostView,
   type ThreadHostViewRequest,
   type ThreadToolSurfaceOptions,
@@ -70,33 +60,23 @@ import {
   output,
   resolution,
   resolveEntries,
-  routingId,
   sendAddressBook,
-  sessionPort,
   summary,
   targetSession,
   type AnyTool,
   type ToolOutput,
   replyOnDevice,
   resolveAcross,
+  uncertainFailure,
 } from "./tools/internals"
-import { currentResult, openedResult, threadRow } from "./tools/thread-row"
+import { currentResult, threadRow } from "./tools/thread-row"
 
 /** How many keys a tool surface keeps for recovering receipts whose admission reply was lost. */
 export const RECEIPT_RECOVERY_MAX_KEYS = 4_096
-/** The longest untyped rename error kept as `local_name_unavailable_reason`, in code points; longer ones end in an ellipsis. */
-const RENAME_REASON_MAX_CHARS = 300
 /** A registered exact id needs no pre-engine view; the engine validates its one endpoint. */
 const PUBLISHED_SEND_VIEW: ThreadHostView = { sessions: [], hosts: [], disk: [] }
 /** A reply to a sender on another device resolves on that device alone and reads no view of this one. */
 const NO_LOCAL_VIEW: ThreadHostView = { sessions: [], hosts: [], disk: [] }
-/** A control tool's answer for a thread no engine holds live, on this device or another. */
-const NOT_LIVE: ThreadToolResult = failure(
-  "not_resumable",
-  "The thread has no live owner.",
-  "Retry when the target is live.",
-)
-
 export function createThreadTools(options: ThreadToolSurfaceOptions): readonly AnyTool[] {
   return buildThreadTools(options).tools
 }
@@ -344,250 +324,16 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
     parameters: threadToolParamSchemas.thread_create,
     promptGuidelines: [THREAD_FAMILY_PROMPT_GUIDELINES],
     execute: (id: string, args: ThreadCreateInput, _signal, _onUpdate, ectx) =>
-      execute("thread_create", id, args, ectx, async (current, value, operationId, callerId, retrying) => {
-        const launch = createLaunch(value, options.remote?.permissionPreset?.())
-        if ("kind" in launch) return launch
-        // #14050: a new thread with no first prompt and no name is an empty session nobody asked for; refuse it as data.
-        const named = (value.name?.trim() ?? "") !== "" || (value.alias?.trim() ?? "") !== ""
-        if (value.thread === undefined && value.fork_from === undefined && value.prompt === undefined && !named)
-          return failure(
-            "invalid_arguments",
-            "thread_create (tool.thread_create() in an eval cell) makes a new thread only with a prompt or a name; neither was given, so nothing was created.",
-            "Pass prompt (the new thread's first message) or name, or pass thread to open an existing thread.",
-          )
-        // #14060: an earlier run under this key failed after it may have made a thread. It is re-run only when the thread
-        // the key derives is on this device; otherwise (a create on another device, a host that ignored the derived id)
-        // a thread may exist that nothing here can find, so the retry is refused as any other uncertain operation is.
-        if (retrying !== undefined) {
-          const derived = existingHere(current, createdThreadId(callerId, operationId), callerId)
-          if (derived.kind !== "live" && derived.kind !== "file") return uncertainFailure(retrying.error_note)
-        }
-        // The session the open answered, with its listing key: a first prompt to a thread on another device needs it.
-        let opened: HostedThread | undefined
-        const made = await (async (): Promise<ThreadToolResult> => {
-          const skills =
-            value.skills === undefined || value.skills.length === 0 ? undefined : checkInitialSkills(value.skills)
-          if (skills?.kind === "invalid")
-            return failure(
-              "invalid_arguments",
-              `Not a skill name: ${skills.names.join(", ")}. Pass the names of installed skills, never a path or text.`,
-              "Pass skill names as listed by the skill index.",
-              { invalid: skills.names },
-            )
-          const loaded = skills?.kind === "ok" ? skills.names : undefined
-          const entries = resolveEntries(options, current)
-          const callerCwd = options.callerWorkspaceRoot()
-          const plan = await planCreate(options.remote, value, {
-            host: createLocalSessionHost(options.host, entries),
-            ...(callerCwd.trim() === "" ? {} : { callerCwd }),
-            resolve: (address) => resolution(options, entries, address, callerId, true),
-            // Decision 0027: an existing thread or a fork source is found by the same resolver every send uses, not by a second ladder.
-            locate: async (address) => {
-              // #14049: an existing thread whose process exited is still this device's when its session file is here, so
-              // the ladder sees the files an id or name names (the send address book), and an id nothing lists is looked
-              // up once on every online device of the account (A4.3.3), as a send to that id is.
-              const known = toThreadAddressEntries(sendAddressBook(options, current, address, true))
-              const found = await resolveAcross(options, known, address, callerId, true, "exact", true)
-              if (found.kind === "error")
-                return { kind: "error", result: { kind: "error", error: found } as ThreadToolResult }
-              // A session found only by a probe (no file path: its device holds it but runs it nowhere) is no existing thread to
-              // open (omo#13037 A4.4): today's answer for a holder that cannot be reached, and no open is sent. A listed ended
-              // thread still opens from its file, as before.
-              if (
-                found.entry.transport?.kind === "relay" &&
-                found.entry.transport.row.state === "ended" &&
-                found.entry.transport.row.path === ""
-              )
-                return {
-                  kind: "error",
-                  result: failure(
-                    "not_found",
-                    `Thread ${found.entry.thread_id} on device ${found.entry.transport.row.device} is not running there.`,
-                    "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to find the live thread.",
-                    { device: found.entry.transport.row.device, thread: found.entry.thread_id },
-                  ),
-                }
-              return found.entry.transport?.kind === "relay"
-                ? { kind: "remote", row: found.entry.transport.row }
-                : { kind: "local", address: found.entry.thread_id, accountWide: true }
-            },
-            existing: (address) => existingHere(current, address, callerId),
-          })
-          if (plan.kind === "done") return await withAlias(options.remote, value.alias, plan.result, plan.device)
-          // An alias no account holds names the thread on its device instead (#13104); a given name wins.
-          // Trimmed like thread_rename's alias-as-name, so " x " and "x" name the thread the same way.
-          const name = plan.localAlias === undefined ? value.name : (value.name ?? value.alias?.trim())
-          // #14060: a new thread on this device is created under an id derived from this call's idempotency key, so a
-          // create whose reply was lost (the connection closed after the host made the session) is found again: on the
-          // spot, and by a retry under the same key, which reopens or reuses that thread and admits its prompt once.
-          const createdId =
-            plan.creates && plan.host.device === undefined ? createdThreadId(callerId, operationId) : undefined
-          const earlier = createdId === undefined ? undefined : existingHere(current, createdId, callerId)
-          // The thread an earlier run made may already carry this name: it is this create's own thread, not a conflict.
-          if (name !== undefined && earlier?.kind !== "live" && earlier?.kind !== "file") {
-            const conflict = checkNameConflict(await plan.host.visible(), name)
-            if (conflict.kind === "error") return { kind: "error", error: conflict } as ThreadToolResult
-          }
-          const preset = plan.creates ? launch.permissionPreset : undefined
-          const reopened = async (): Promise<SessionOpenOutcome | undefined> => {
-            if (createdId === undefined) return undefined
-            const found = existingHere(await view(), createdId, callerId)
-            if (found.kind === "live") return { kind: "ok", thread: found.thread }
-            return found.kind === "file" ? await plan.host.open({ sessionPath: found.sessionPath }) : undefined
-          }
-          let outcome: SessionOpenOutcome
-          if (earlier?.kind === "live") outcome = { kind: "ok", thread: earlier.thread }
-          else if (earlier?.kind === "file") outcome = await plan.host.open({ sessionPath: earlier.sessionPath })
-          else
-            try {
-              outcome = await plan.host.open({
-                ...plan.request,
-                ...(plan.creates && name !== undefined ? { name } : {}),
-                ...(plan.creates && loaded !== undefined ? { initialSkills: loaded } : {}),
-                ...(preset === undefined ? {} : { permissionPreset: preset }),
-                ...(plan.creates ? launch.profile : {}),
-                ...(createdId === undefined ? {} : { durableSessionId: createdId }),
-              })
-            } catch (error) {
-              const found = await reopened()
-              if (found === undefined) throw error
-              outcome = found
-            }
-          if (outcome.kind === "error") return outcome
-          opened = outcome.thread
-          const created: ThreadToolResult = {
-            ...openedResult(outcome.thread, false),
-            ...(plan.creates && loaded !== undefined ? { requested_skills: loaded } : {}),
-            ...workspaceNote(outcome.thread, callerCwd),
-          }
-          const recorded = plan.creates ? await recordThreadCreator(options, current, callerId, created) : created
-          if (plan.localAlias !== undefined)
-            return recorded.kind === "ok"
-              ? ({ ...recorded, alias_scope: "local", alias_unavailable: plan.localAlias } as ThreadToolResult)
-              : recorded
-          if (!plan.creates) return await withAlias(options.remote, value.alias, recorded, plan.host.device)
-          const claimed = await claimCreatedAlias(options.remote, value.alias, recorded, plan.host.device)
-          if (!("local" in claimed)) return claimed
-          // The account was gone by the claim, after the create: the alias names the new thread here, as with no account.
-          if (recorded.kind !== "ok" || !("thread" in recorded) || value.alias === undefined) return recorded
-          const local = { alias_scope: "local", alias_unavailable: claimed.local } as const
-          if (value.name !== undefined) return { ...recorded, ...local } as ThreadToolResult
-          const localName = value.alias.trim()
-          const named = await nameCreatedThread(recorded.thread, localName, await plan.host.visible(), callerId)
-          return (
-            named === undefined
-              ? { ...recorded, name: localName, link: threadLink(recorded.thread, localName), ...local }
-              : {
-                  ...recorded,
-                  ...local,
-                  local_name_unavailable: named.code,
-                  ...(named.reason === undefined ? {} : { local_name_unavailable_reason: named.reason }),
-                }
-          ) as ThreadToolResult
-        })()
-        if (value.prompt === undefined || made.kind !== "ok" || opened === undefined) return made
-        if ((made as Extract<ThreadCreateResult, { kind: "ok" }>).deduplicated) return made
-        return {
-          ...made,
-          prompt: await firstPrompt(current, opened, value, operationId, callerId),
-        } as ThreadToolResult
-      }),
-  }
-  /**
-   * Delivers a create's `prompt` to the thread it just made, through the one send path (#13410), under a key derived
-   * from the create's own: a replayed create answers its stored result, so the prompt is sent once per key. The target is
-   * the created thread itself (its device and durable id), never a lookup by name, so a listing that has not caught up
-   * yet cannot answer not_found (#13001).
-   */
-  async function firstPrompt(
-    current: ThreadHostView,
-    thread: HostedThread,
-    value: ThreadCreateInput,
-    operationId: string,
-    callerId: string,
-  ): Promise<ThreadCreatePrompt> {
-    const target: DeliveryTarget =
-      thread.device === undefined
-        ? { kind: "local", thread_id: thread.thread_id, all_scope: true }
-        : {
-            kind: "remote",
-            row: createdDeviceRow(thread.device, thread),
-          }
-    const send = {
-      thread: thread.thread_id,
-      message: value.prompt ?? "",
-      ...(value.delivery === undefined ? {} : { delivery: value.delivery }),
-    }
-    // The thread exists from here on: a delivery that throws (a store or connection failure, not a typed refusal) is the
-    // prompt's outcome, never the create's, so the caller still gets the thread it made (review L1 at 0571de8).
-    let sent: ThreadToolResult
-    try {
-      sent = await deliverThrough(
-        options,
-        pipeline,
-        current,
-        target,
-        send,
-        `${operationId}:prompt`,
-        callerId,
-        undefined,
-        "creator",
-      )
-    } catch (error) {
-      return {
-        error: threadToolFailure(
-          "internal_error",
-          `The thread was created, but its first prompt was not delivered: ${error instanceof Error ? error.message : String(error)}.`,
-          `Send it with thread_send to ${thread.thread_id} (tool.thread_send({ thread, message }) in an eval cell); read the thread first if the prompt may have arrived.`,
-          { thread: thread.thread_id },
-        ),
-      }
-    }
-    if (sent.kind === "error") return { error: sent.error }
-    const { delivery, deduplicated, delivery_id, effective_mode } = sent as Extract<ThreadSendResult, { kind: "ok" }>
-    return {
-      delivery,
-      deduplicated,
-      ...(delivery_id === undefined ? {} : { delivery_id }),
-      ...(effective_mode === undefined ? {} : { effective_mode }),
-    }
-  }
-  /**
-   * Names a thread thread_create already made, through the same path thread_rename takes (the create's name check against
-   * the device's threads, then the located control's setName). Answers the refusing code instead of failing, because the
-   * thread exists either way: a rename that fails with no typed refusal answers `host_unavailable` with the error's
-   * message as `reason`, so the result still names the created thread (withAlias's rule for every failure after the
-   * create) and a failure in the rename path stays traceable.
-   */
-  async function nameCreatedThread(
-    threadId: string,
-    name: string,
-    visible: readonly ThreadSummary[],
-    callerId: string,
-  ): Promise<{ readonly code: ThreadErrorCode; readonly reason?: string } | undefined> {
-    const conflict = checkNameConflict(
-      visible.filter((thread) => thread.thread_id !== threadId),
-      name,
-    )
-    if (conflict.kind === "error") return { code: conflict.code }
-    const located = await locateControl(options, await view(), threadId, true, callerId)
-    if (located.kind === "not_live") return { code: "not_resumable" }
-    if (located.kind === "error")
-      return { code: located.result.kind === "error" ? located.result.error.code : "host_unavailable" }
-    try {
-      await located.control.setName(name)
-    } catch (error) {
-      const refusal = controlRefusalOf(error)
-      if (refusal !== undefined) return { code: refusal.code }
-      const message = [...(error instanceof Error ? error.message : String(error))]
-      // A failed RPC can carry a whole host reply frame (live-surface.ts), and the result is kept in the call's receipt.
-      const reason =
-        message.length > RENAME_REASON_MAX_CHARS
-          ? `${message.slice(0, RENAME_REASON_MAX_CHARS).join("")}…`
-          : message.join("")
-      return { code: "host_unavailable", reason }
-    }
-    return undefined
+      execute("thread_create", id, args, ectx, async (current, value, operationId, callerId, retrying) =>
+        createThread(options, current, value, {
+          operationId,
+          callerId,
+          retrying,
+          view: () => view(),
+          deliverPrompt: (prompted, target, send, key) =>
+            deliverThrough(options, pipeline, prompted, target, send, key, callerId, undefined, "creator"),
+        }),
+      ),
   }
   const list: AnyTool = {
     ...metadata("thread_list"),
@@ -655,58 +401,9 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
     ...metadata("thread_rename"),
     parameters: threadToolParamSchemas.thread_rename,
     execute: (id: string, args: ThreadRenameInput, _signal, _onUpdate, ectx) =>
-      execute("thread_rename", id, args, ectx, async (current, value, operationId, callerId) => {
-        if (value.name === undefined && value.alias === undefined)
-          return failure("invalid_arguments", "Pass a new name, a new alias, or both.", "Retry with name or alias.")
-        // Every refusal runs before the alias or the name changes anywhere: the target's own liveness first (locate:
-        // a thread with no live owner, a device that is offline), then the name checks.
-        const located = await locateControl(options, current, value.thread ?? "self", value.all_scope, callerId)
-        if (located.kind === "error") return located.result
-        const thread = located.kind === "control" ? located.control : located
-        // #13066: the name is checked on the target device's own listing, and only when a live owner holds the thread.
-        const nameRefusal = async (name: string): Promise<ThreadToolResult | undefined> => {
-          if (located.kind === "not_live") return NOT_LIVE
-          if (located.kind !== "control") return undefined
-          if (name.length === 0)
-            return failure("invalid_arguments", "The new thread name is empty.", "Pass a non-empty name.")
-          const visible = await located.control.visible()
-          const existing = visible.find(
-            (entry) =>
-              entry.thread_id !== thread.thread_id && normalizeThreadName(entry.name) === normalizeThreadName(name),
-          )
-          return existing === undefined
-            ? undefined
-            : failure(
-                "name_conflict",
-                `A thread named "${existing.name}" already exists.`,
-                "Call thread_list (tool.thread_list() in an eval cell) and choose another name.",
-              )
-        }
-        let name = value.name?.trim()
-        const refusedName = name === undefined ? undefined : await nameRefusal(name)
-        if (refusedName !== undefined) return refusedName
-        let localAlias: LocalAliasReason | undefined
-        if (value.alias !== undefined) {
-          const refused = await renameAlias(options.remote, thread.thread_id, thread.device, value.alias, operationId)
-          if (refused !== undefined && "local" in refused) {
-            // No account holds the alias and nothing changed (#13104): it becomes the thread's name unless one was given.
-            localAlias = refused.local
-            if (name === undefined) {
-              name = value.alias.trim()
-              const refusedAlias = await nameRefusal(name)
-              if (refusedAlias !== undefined) return refusedAlias
-            }
-          } else if (refused !== undefined) return refused
-        }
-        if (name !== undefined && located.kind === "control") await located.control.setName(name)
-        const aliasFields =
-          value.alias === undefined
-            ? {}
-            : localAlias === undefined
-              ? { alias: value.alias }
-              : { alias_scope: "local" as const, alias_unavailable: localAlias }
-        return { kind: "ok", ...controlIdentity(thread), name: name ?? thread.title, ...aliasFields }
-      }),
+      execute("thread_rename", id, args, ectx, async (current, value, operationId, callerId) =>
+        renameThread(options, current, value, operationId, callerId),
+      ),
   }
   const setModel: AnyTool = {
     ...metadata("thread_set_model"),
@@ -729,35 +426,6 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
         if (located.kind === "not_live") return NOT_LIVE
         return await setThinkingLevelOn(located.control, value.level, value.scope)
       }),
-  }
-  /** An existing thread this device is asked to open: live in the view, a session file the address book names, or neither. */
-  /** The answer to an operation whose earlier run under the same key may have acted: read before retrying. */
-  function uncertainFailure(note: string | null): ThreadToolResult {
-    return failure(
-      "idempotency_uncertain",
-      "The earlier operation may have been delivered.",
-      "Read the target transcript before deciding whether to retry.",
-      note === null ? undefined : { error_note: note },
-    )
-  }
-  function existingHere(current: ThreadHostView, address: string, callerId: string): LocalExisting {
-    const book = sendAddressBook(options, current, address, true)
-    const resolved = resolution(options, toThreadAddressEntries(book), address, callerId, true)
-    if (resolved.kind === "error")
-      return { kind: "error", result: { kind: "error", error: resolved } as ThreadToolResult }
-    const live = targetSession(current, resolved.entry.thread_id)
-    if (live !== undefined) return { kind: "live", thread: summary(live) }
-    const entry = book.find((candidate) => candidate.thread_id === resolved.entry.thread_id)
-    if (entry?.session_path === undefined || entry.session_path === null)
-      return {
-        kind: "error",
-        result: failure(
-          "not_resumable",
-          "The thread has no session file on this device to open.",
-          "Call thread_list (tool.thread_list() in an eval cell) and pick a thread it lists.",
-        ),
-      }
-    return { kind: "file", sessionPath: entry.session_path }
   }
   const relayTools = createRelayTools({ options, relay, failure })
   const dispose = () => {

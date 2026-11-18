@@ -5,7 +5,21 @@ import { askHost } from "../../../../senpi-task/src/runners/rpc-host/host-reques
 import { classifyWarmReply, type WarmAnswer } from "../../../../senpi-task/src/runners/rpc-host/host-warm-reply"
 
 import { toThreadAddressEntries, type AddressEntry } from "./address-book"
-import type { ThreadToolResult } from "./contracts"
+import {
+  parseThreadParams,
+  threadToolParamSchemas,
+  type ThreadCloseInput,
+  type ThreadCreateInput,
+  type ThreadInterruptInput,
+  type ThreadRenameInput,
+  type ThreadSetModelInput,
+  type ThreadToolResult,
+} from "./contracts"
+import { createThread } from "./control/create"
+import { locateControl } from "./control/locate"
+import { answered, closeThread, interruptThread, NOT_LIVE, setModelOn } from "./control/operations"
+import { renameThread } from "./control/rename"
+import { controlIdentity } from "./control/port"
 import { gatewaySchemaRefusal, threadToolFailure, type ThreadToolFailure } from "./errors"
 import type { ReleaseSessionReply, ReleaseSessionRequest } from "./gateway/adapter"
 import { isUiRequestKind, UI_REQUEST_KINDS } from "./gateway/answer-shape"
@@ -198,6 +212,16 @@ export type ThreadSdk = StoreExtensionApi & {
   readonly locate: (
     request: Scoped & { readonly thread: string },
   ) => Promise<{ readonly kind: "ok"; readonly thread: LocatedThread } | Failure>
+  /**
+   * The session controls of the agent tools (thread_create, thread_interrupt, thread_close, thread_rename,
+   * thread_set_model): the same arguments, bodies and results, on this device or another of the account. The SDK acts as
+   * itself, never as a session, so `self` is `caller_context_missing` and a created thread records no creator.
+   */
+  readonly create: (request: ThreadCreateInput) => Promise<ThreadToolResult>
+  readonly interrupt: (request: ThreadInterruptInput) => Promise<ThreadToolResult>
+  readonly close: (request: ThreadCloseInput) => Promise<ThreadToolResult>
+  readonly rename: (request: ThreadRenameInput) => Promise<ThreadToolResult>
+  readonly set_model: (request: ThreadSetModelInput) => Promise<ThreadToolResult>
   /** senpi `release_session` on the host that serves `thread`; a thrown transport failure is answered as `host_unavailable`. */
   readonly release: (
     thread: LocatedThread,
@@ -332,6 +356,27 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     } catch (error) {
       return unreachable(error)
     }
+  }
+
+  const controls: ThreadToolSurfaceOptions = {
+    ...surface,
+    ...(options.remote === undefined ? {} : { remote: options.remote }),
+  }
+  // One session control as its tool runs it: the tool's parameter schema, then its body, a control's typed refusal as data.
+  function control<I>(
+    schema: (typeof threadToolParamSchemas)[
+      "thread_create" | "thread_interrupt" | "thread_close" | "thread_rename" | "thread_set_model"],
+    request: I,
+    body: (value: I) => Promise<ThreadToolResult>,
+  ): Promise<ThreadToolResult> {
+    return guarded(async () => {
+      const parsed = parseThreadParams(schema, request)
+      if (parsed.kind === "error") return parsed as ThreadToolResult
+      return await answered(() => body(parsed.value as I))
+    })
+  }
+  async function located(address: string, allScope: boolean | undefined) {
+    return await locateControl(controls, await view(), address, allScope, UNKNOWN_CALLER)
   }
 
   async function sessionId(address: string, allScope: boolean | undefined): Promise<{ readonly id: string } | Failure> {
@@ -594,6 +639,57 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
           kind: "ok",
           thread: { thread_id, title, cwd, status, session_path, endpoint, surface: where, alive },
         } as const
+      }),
+    create: (request) =>
+      control(threadToolParamSchemas.thread_create, request, async (value) =>
+        createThread(controls, await view(), value, {
+          operationId: value.idempotency_key ?? `auto:${randomUUID()}`,
+          callerId: UNKNOWN_CALLER,
+          view,
+          deliverPrompt: async (_current, target, send, key) => {
+            // The script created the thread, so its first prompt carries the creator's authority (#14045), as the tool's does.
+            const sent = await pipeline.deliver({
+              sender: { kind: "cli", uid: options.uid, user: options.user },
+              caller_id: principal,
+              target,
+              text: send.message,
+              mode: send.delivery ?? "auto",
+              idempotency_key: key,
+              args: send,
+              authority: "creator",
+            })
+            if (sent.kind === "error") return { kind: "error", error: sent.error }
+            const { thread_id, ...facts } = sent
+            return { ...facts, thread: thread_id } as ThreadToolResult
+          },
+        }),
+      ),
+    interrupt: (request) =>
+      control(threadToolParamSchemas.thread_interrupt, request, async (value) => {
+        const found = await located(value.thread, value.all_scope)
+        if (found.kind === "error") return found.result
+        if (found.kind === "not_live") return NOT_LIVE
+        return await interruptThread(found.control, value.turn_id)
+      }),
+    close: (request) =>
+      control(threadToolParamSchemas.thread_close, request, async (value) => {
+        const found = await located(value.thread ?? "self", value.all_scope)
+        if (found.kind === "error") return found.result
+        // Nothing live holds it: there is nothing to close, and the thread stays resumable from its session file.
+        if (found.kind === "not_live")
+          return { kind: "ok", ...controlIdentity(found), closed: false, reason: "not_live" }
+        return await closeThread(found.control)
+      }),
+    rename: (request) =>
+      control(threadToolParamSchemas.thread_rename, request, async (value) =>
+        renameThread(controls, await view(), value, value.idempotency_key ?? `auto:${randomUUID()}`, UNKNOWN_CALLER),
+      ),
+    set_model: (request) =>
+      control(threadToolParamSchemas.thread_set_model, request, async (value) => {
+        const found = await located(value.thread, value.all_scope)
+        if (found.kind === "error") return found.result
+        if (found.kind === "not_live") return NOT_LIVE
+        return await setModelOn(found.control, value.model, value.provider)
       }),
     release: async (thread, request) => {
       const releaseSession = host.gateway?.releaseSession

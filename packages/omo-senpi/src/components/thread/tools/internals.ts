@@ -49,6 +49,16 @@ export function failure(
   return { kind: "error", error: threadToolFailure(code, message, next, details) }
 }
 
+/** The answer to an operation whose earlier run under the same key may have acted: read before retrying. */
+export function uncertainFailure(note: string | null): ThreadToolResult {
+  return failure(
+    "idempotency_uncertain",
+    "The earlier operation may have been delivered.",
+    "Read the target transcript before deciding whether to retry.",
+    note === null ? undefined : { error_note: note },
+  )
+}
+
 export function output(result: ThreadToolResult): ToolOutput {
   return {
     content: [{ type: "text", text: JSON.stringify(result) }],

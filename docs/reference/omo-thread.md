@@ -598,3 +598,32 @@ CLI's JSON; nothing throws for a refusal. Endpoints come from the endpoint regis
 `engineStatusAll` (a function returning the stdout of `omo host status --all --include-workers --json`) only to
 enumerate from that report instead. Neither the SDK nor `omo thread` runs that command itself: it is a full
 diagnostic pass that took 8-9 s on a host with about 50 endpoints.
+
+The SDK also controls threads, with the same arguments and results as the agent tools of the same name:
+
+| Method | Tool | Arguments |
+| --- | --- | --- |
+| `create` | `thread_create` | `{ thread?, device?, alias?, name?, cwd?, worktree?, fork_from?, skills?, model?, reasoning?, permission_preset?, prompt?, delivery?, idempotency_key? }` |
+| `interrupt` | `thread_interrupt` | `{ thread, turn_id?, all_scope? }` |
+| `close` | `thread_close` | `{ thread?, all_scope?, idempotency_key? }` |
+| `rename` | `thread_rename` | `{ thread?, name?, alias?, all_scope?, idempotency_key? }` |
+| `set_model` | `thread_set_model` | `{ thread, model, provider?, all_scope?, idempotency_key? }` |
+
+Each reaches the thread wherever it runs, on this device or another device of the account, through the
+same code as the tool. Invalid arguments answer `invalid_arguments`, a thread no session holds answers
+`not_resumable` (`close` answers `closed: false, reason: "not_live"`), and every other refusal is the tool's
+error code. A script acts as itself, never as a session: `self` (and a `close` or `rename` with no `thread`)
+answers `caller_context_missing`, a thread it creates records no creator session, and a `create` `prompt` is
+sent as the script's own command-line message with the creator's authority. `create` makes a new thread on this
+device under an id derived from `idempotency_key`, so a repeat under the same key reopens that thread instead of
+making another, and `rename` passes the key to the alias registry; the SDK keeps no tool receipt, so any other
+repeated call runs again.
+
+```js
+const created = await sdk.create({ name: "nightly-build" })
+if (created.kind === "ok") {
+  await sdk.set_model({ thread: created.thread, model: "opus" })
+  await sdk.interrupt({ thread: "nightly-build" })
+  await sdk.close({ thread: "nightly-build" })
+}
+```
