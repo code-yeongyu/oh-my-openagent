@@ -39,19 +39,26 @@ function sendToEndpoint(
   rpc: CommandRpc,
   locate: boolean,
   timers: Timers,
+  waitMs?: number,
 ): Promise<CommandResult> {
   // A service before decision 0018's 2026-11-06 amendment refuses the unknown `locate` field with invalid_request
   // before routing anything, so the command id is still unbound and the same command goes again without it; its
   // reply then names no `located` and the caller locates as before.
-  return followDelegatedCommand(client, device, timers, (commandId) => {
-    const send = (asked: boolean): Promise<unknown> =>
-      client.commandTo({ device, endpoint }, rpc, commandId, asked ? { locate: true } : {})
-    return send(locate).catch((error: unknown) =>
-      locate && error instanceof LocalApiError && error.code === "invalid_request"
-        ? send(false)
-        : Promise.reject(error),
-    )
-  })
+  return followDelegatedCommand(
+    client,
+    device,
+    timers,
+    (commandId) => {
+      const send = (asked: boolean): Promise<unknown> =>
+        client.commandTo({ device, endpoint }, rpc, commandId, asked ? { locate: true } : {})
+      return send(locate).catch((error: unknown) =>
+        locate && error instanceof LocalApiError && error.code === "invalid_request"
+          ? send(false)
+          : Promise.reject(error),
+      )
+    },
+    waitMs,
+  )
 }
 
 /**
@@ -63,6 +70,7 @@ function followDelegatedCommand(
   device: string,
   timers: Timers,
   send: (commandId: string) => Promise<unknown>,
+  waitMs: number = ENDPOINT_COMMAND_WAIT_MS,
 ): Promise<CommandResult> {
   return new Promise<CommandResult>((resolve, reject) => {
     // Minted before sending, so a state that arrives ahead of the answer is not missed.
@@ -93,8 +101,8 @@ function followDelegatedCommand(
         ...(located === undefined ? {} : { located }),
       })
     })
-    const cancelTimer = timers.after(ENDPOINT_COMMAND_WAIT_MS, () =>
-      fail(new Error(`no final state for endpoint command ${commandId} within ${ENDPOINT_COMMAND_WAIT_MS} ms`)),
+    const cancelTimer = timers.after(waitMs, () =>
+      fail(new Error(`no final state for endpoint command ${commandId} within ${waitMs} ms`)),
     )
     void client.closed.then(() => fail(new Error("the connection closed before the endpoint command settled")))
     send(commandId).catch(fail)
@@ -125,6 +133,7 @@ export type {
 } from "./local-api/protocol.ts"
 export { SESSION_ROW_STATES } from "./local-api/protocol.ts"
 export type { AttachEnd, CommandResult, RemoteAttach, RemoteAttachEvent } from "./remote-attach.ts"
+export { UnsettledCommandError } from "./unsettled-command.ts"
 
 export { DEVICE_SERVICE_STATE_DIR_ENV, deviceServiceStateDir } from "./state-dir.ts"
 // The clock seam, here too so a local-only caller takes it without the package barrel (which reaches the release fetch).
@@ -239,7 +248,12 @@ export type DeviceService = {
    * under `key`, delegated by the device's service with no attach on this connection (one round trip, where an attach
    * then its command takes two). Settles like `endpointCommand`; a refusal before sending is a `NotSentError`.
    */
-  readonly sessionCommand: (device: string, key: string, rpc: CommandRpc) => Promise<CommandResult>
+  readonly sessionCommand: (
+    device: string,
+    key: string,
+    rpc: CommandRpc,
+    options?: { readonly waitMs?: number },
+  ) => Promise<CommandResult>
   readonly close: () => void
   readonly closed: Promise<void>
   /**
@@ -258,7 +272,12 @@ export type DeviceService = {
    * ambiguous_session) in the outcome's receipt. Rejects `unsupported` before sending toward a device that lacks the
    * feature. Settles like `endpointCommand`.
    */
-  readonly wakeCommand: (device: string, durableId: string, rpc: CommandRpc) => Promise<CommandResult>
+  readonly wakeCommand: (
+    device: string,
+    durableId: string,
+    rpc: CommandRpc,
+    options?: { readonly waitMs?: number },
+  ) => Promise<CommandResult>
 }
 
 /**
@@ -269,6 +288,8 @@ export type EndpointCommandOptions = {
   readonly locate?: boolean
   /** The endpoint key an earlier command's result named: sent to as is, so no `session.endpoints` lookup runs. */
   readonly endpoint?: string
+  /** omo#14130: the caller's bound on the whole command, the endpoint lookup included (default ENDPOINT_COMMAND_WAIT_MS). */
+  readonly waitMs?: number
 }
 
 /** `endpoint`: the key the command was sent to, so a caller can send the next one there without a lookup. */
@@ -413,22 +434,62 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
     endpointCommand: async (device, rpc, options) => {
       // The endpoint lookup runs before any session.command is written, so whatever fails it (a timeout, a closed
       // connection, a refusal) dispatched nothing: it is marked not_sent, unlike a timeout after sending.
+      const started = timers.now()
       let endpoint = options?.endpoint
       if (endpoint === undefined) {
+        const lookup = client.request("session.endpoints", { device })
+        // omo#14130 review round 5 (L1): a caller's waitMs bounds the lookup itself, not only what follows it.
+        const waitMs = options?.waitMs
+        const bounded =
+          waitMs === undefined
+            ? lookup
+            : new Promise<Awaited<typeof lookup>>((resolve, reject) => {
+                const cancel = timers.after(waitMs, () =>
+                  reject(
+                    new NotSentError(
+                      "request_timeout",
+                      "the wait ran out during the endpoint lookup; nothing was sent",
+                    ),
+                  ),
+                )
+                lookup.then(
+                  (answer) => {
+                    cancel()
+                    resolve(answer)
+                  },
+                  (error: unknown) => {
+                    cancel()
+                    reject(error)
+                  },
+                )
+              })
         try {
-          endpoint = (await client.request("session.endpoints", { device })).endpoints[0]
+          endpoint = (await bounded).endpoints[0]
         } catch (error) {
           throw markNotSent(error)
         }
       }
       if (endpoint === undefined) throw new NotSentError("unsupported", "the device lists no engine endpoint")
-      return { ...(await sendToEndpoint(client, device, endpoint, rpc, options?.locate === true, timers)), endpoint }
+      // omo#14130 review round 3 (M1): a caller's waitMs covers the lookup too; spent by it, nothing is sent.
+      const waitMs = options?.waitMs === undefined ? undefined : options.waitMs - (timers.now() - started)
+      if (waitMs !== undefined && waitMs <= 0)
+        throw new NotSentError("request_timeout", "the wait ran out during the endpoint lookup; nothing was sent")
+      return {
+        ...(await sendToEndpoint(client, device, endpoint, rpc, options?.locate === true, timers, waitMs)),
+        endpoint,
+      }
     },
-    sessionCommand: (device, key, rpc) =>
-      followDelegatedCommand(client, device, timers, (commandId) =>
-        client.commandTo({ session: `${device}.${key}` }, rpc, commandId).catch((error: unknown) => {
-          throw error instanceof LocalApiError && error.command_id === undefined ? markNotSent(error) : error
-        }),
+    sessionCommand: (device, key, rpc, options) =>
+      followDelegatedCommand(
+        client,
+        device,
+        timers,
+        (commandId) =>
+          client.commandTo({ session: `${device}.${key}` }, rpc, commandId).catch((error: unknown) => {
+            throw error instanceof LocalApiError && error.command_id === undefined ? markNotSent(error) : error
+          }),
+        // omo#14130 review round 5 (M1): a caller's bound (a thread tool call's budget) caps the wait.
+        options?.waitMs,
       ),
     close: () => client.close(),
     closed: client.closed,
@@ -438,18 +499,23 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
         engine_id: engineId,
         ...(options?.single === true && takesSingleLocate ? { single: true as const } : {}),
       }),
-    wakeCommand: async (device, durableId, rpc) => {
+    wakeCommand: async (device, durableId, rpc, options) => {
       if (!carriesWakeMark) throw olderThanWakeMinimum(client.welcome.service_version, wakeMarkMinimum)
-      return await followDelegatedCommand(client, device, timers, (commandId) =>
-        client.commandTo({ wake: { device, durable_id: durableId } }, rpc, commandId).catch((error: unknown) => {
-          // Only a code that refuses before sending dispatched nothing (#13238 review): `closed` or
-          // `protocol_violation` can end a wake already written, so they stay unmarked and the caller reports uncertain.
-          throw error instanceof LocalApiError &&
-            error.command_id === undefined &&
-            REFUSED_BEFORE_SENDING.has(error.code)
-            ? markNotSent(error)
-            : error
-        }),
+      return await followDelegatedCommand(
+        client,
+        device,
+        timers,
+        (commandId) =>
+          client.commandTo({ wake: { device, durable_id: durableId } }, rpc, commandId).catch((error: unknown) => {
+            // Only a code that refuses before sending dispatched nothing (#13238 review): `closed` or
+            // `protocol_violation` can end a wake already written, so they stay unmarked and the caller reports uncertain.
+            throw error instanceof LocalApiError &&
+              error.command_id === undefined &&
+              REFUSED_BEFORE_SENDING.has(error.code)
+              ? markNotSent(error)
+              : error
+          }),
+        options?.waitMs,
       )
     },
   }

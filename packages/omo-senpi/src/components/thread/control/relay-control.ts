@@ -1,3 +1,4 @@
+import { waitWithinCallBudget } from "../../call-budget/call-deadline"
 import type { ThreadTranscriptEntry } from "../reader"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { relayAddressEntry } from "../remote/address-book"
@@ -146,7 +147,8 @@ export function createRelayControl(
       waitForTurnEnd(
         (handlers) => remote.sessions.watch(device, sessionId, handlers, { baseline: true }),
         (reason) => new ControlRefusal(outcomeFailure({ kind: "refused", reason }, device).error),
-        timeoutMs,
+        // omo#14130 review round 2 (M2): inside a tool call the wait leaves the transcript read after it its share.
+        waitWithinCallBudget(timeoutMs),
         signal,
       ),
     running: async () => row.state === "running" || (await command({ type: "get_state" }))["isStreaming"] === true,

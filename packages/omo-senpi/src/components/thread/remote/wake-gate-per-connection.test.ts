@@ -59,6 +59,10 @@ describe("omo#13037: the wake gate is read per connection", () => {
     await services[0]?.service.closed
     expect(await port.canWake?.()).toBe(false)
     await port.sessionCommand("b", "s", admit)
-    expect(services.map((fake) => fake.marks)).toEqual([[{ accepts: ["session-wake:v1"] }], [undefined]])
+    // omo#14130: every send carries its bounded wait (45 s); only the first connection's also carries the mark.
+    expect(services.map((fake) => fake.marks)).toEqual([
+      [{ accepts: ["session-wake:v1"], waitMs: 45_000 }],
+      [{ waitMs: 45_000 }],
+    ])
   })
 })

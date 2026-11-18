@@ -91,6 +91,8 @@ const UNANSWERED: ReadonlySet<string> = new Set([
   "handshake_timeout",
   "attach_failed",
   "reply_lost",
+  // omo#14130: a read the relay accepted for the device and whose answer was lost changed nothing there either.
+  "delivered_unconfirmed",
   "host_not_answering",
   "peer_not_found",
   "engine_stale",
@@ -121,6 +123,13 @@ export function outcomeFailure(
 ): Failure {
   // #13304: a reason another device sent is printed escaped; the comparisons below read it as received.
   const reason = escapeForDisplay(outcome.reason)
+  if (outcome.kind === "uncertain" && outcome.reason === "delivered_unconfirmed")
+    return fail(
+      "delivered_unconfirmed",
+      `The command left this device and the relay accepted it for device ${device}, but no answer came back in time (delivered_unconfirmed).`,
+      "Do not resend it: it may have run, or may still run. Read the thread to see whether it did.",
+      { device, reason },
+    )
   if (outcome.kind === "uncertain")
     return fail(
       "idempotency_uncertain",

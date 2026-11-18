@@ -1,3 +1,4 @@
+import { TOOL_CALL_BUDGET_MS, withCallDeadline } from "../call-budget/call-deadline"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { gatewaySchemaRefusal, threadToolFailure } from "./errors"
 import type { ThreadToolFailure } from "./errors"
@@ -309,15 +310,18 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
       // A send takes nothing live as the offline case: its view never raises host_unavailable.
       // A reply whose sender is on another device resolves there alone (A4.3.1), so it takes no local listing.
       const sendTo = name === "thread_send" && "thread" in value && typeof value.thread === "string" ? value.thread : ""
-      let current: ThreadHostView
-      if (sendTo !== "" && sendTo !== "self" && (await store.sessionOwner(sendTo)) !== null)
-        current = PUBLISHED_SEND_VIEW
-      else {
-        const route = sendTo === "" ? undefined : await replyRoute(options, sendTo)
-        current = route?.leaves === true ? { ...NO_LOCAL_VIEW } : await view(receipted ? undefined : { offline: true })
-        if (route?.read === true) DEVICE_READ.set(current, route.here)
-      }
-      result = await sideEffect(current, value, scope.idempotency_key, callerId, retrying)
+      // omo#14130: the call's one budget (call-deadline.ts) starts before its view, so the view's reads count against it.
+      result = await withCallDeadline(Date.now() + TOOL_CALL_BUDGET_MS, async () => {
+        let current: ThreadHostView
+        if (sendTo !== "" && sendTo !== "self" && (await store.sessionOwner(sendTo)) !== null)
+          current = PUBLISHED_SEND_VIEW
+        else {
+          const route = sendTo === "" ? undefined : await replyRoute(options, sendTo)
+          current = route?.leaves === true ? { ...NO_LOCAL_VIEW } : await view(receipted ? undefined : { offline: true })
+          if (route?.read === true) DEVICE_READ.set(current, route.here)
+        }
+        return await sideEffect(current, value, scope.idempotency_key, callerId, retrying)
+      })
     } catch (error) {
       // A control's typed refusal is the call's answer, recorded like one: a retry under the same key replays it.
       const refusal = controlRefusalOf(error)

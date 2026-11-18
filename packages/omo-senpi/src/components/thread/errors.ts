@@ -24,6 +24,7 @@ export const THREAD_ERROR_CODES = [
   "idempotency_conflict",
   "idempotency_in_progress",
   "idempotency_uncertain",
+  "delivered_unconfirmed",
   "approval_unavailable",
   "approval_route_locked",
   "partial_commit",
