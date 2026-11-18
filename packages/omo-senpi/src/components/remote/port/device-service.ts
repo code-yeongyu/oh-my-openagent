@@ -18,6 +18,7 @@ import type {
   RemoteSessionsPort,
 } from "../../thread/remote/ports"
 import { openSessionWatch } from "../../thread/remote/remote-watch"
+import { createListingRound } from "./listing-round"
 
 export type DeviceServiceSessionsOptions = {
   readonly version: string
@@ -34,6 +35,8 @@ export type DeviceServiceSessionsOptions = {
   readonly retryDelay?: (ms: number) => Promise<void>
   /** Test seam: how long an attach no op or watch holds is kept before it is detached. */
   readonly attachIdleMs?: number
+  /** Test seam: the clock that ages a finished account listing. */
+  readonly now?: () => number
 }
 
 // A device lists a session it just created only after its next listing change, and session.attach resolves against
@@ -259,6 +262,8 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       incomplete: listed.incomplete,
     }
   }
+  // Only the unfiltered account listing waits on every device, so only it is shared; a one-device listing goes out as asked.
+  const round = createListingRound(() => listing(), options.now ?? Date.now)
   // thread_list asks for this device's id and name in parallel: overlapping asks share one device.info read.
   let info: ReturnType<DeviceService["thisDevice"]> | undefined
   const deviceInfo = (): ReturnType<DeviceService["thisDevice"]> => {
@@ -271,7 +276,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     asked.then(clear, clear)
     return asked
   }
-  return {
+  const port = {
     status: async () => ({ state: (await (await svc()).status()).state }),
     thisDevice: async () => (await deviceInfo())?.id ?? null,
     thisDeviceName: async () => (await deviceInfo())?.name ?? null,
@@ -284,8 +289,8 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         kind: row.kind,
         last_seen_ms: row.last_seen_ms,
       })),
-    sessions: async (filter) => (await listing(filter)).rows,
-    listing: () => listing(),
+    sessions: async (filter) => (filter?.device === undefined ? await round.listing() : await listing(filter)).rows,
+    listing: round.listing,
     // create / open / fork on another device: relay daemon #393's attach-less `session.command {device, endpoint, rpc}`.
     // The endpoint lookup and every refusal answered before sending ran nothing; anything after sending may have.
     // An open_session goes on the endpoint dialer (a fresh owned connection per call by default), closed once it
@@ -428,6 +433,9 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       }
     },
     close: async () => {
+      // Closing the connection ends every listing it answered: no read after this joins a round still running on it or
+      // reuses what it kept (the caller may close to force a fresh listing).
+      round.invalidate()
       const open = service
       service = undefined
       pool.clear()
@@ -469,5 +477,16 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       }
       return { kind: "ok", sessionId: key }
     },
+  } satisfies RemoteSessionsPort
+  // A create, open, fork, wake, locate or session command that is not a read changes what devices list.
+  return {
+    ...port,
+    endpointCommand: round.fenced(port.endpointCommand),
+    locate: round.fenced(port.locate),
+    wake: round.fenced(port.wake),
+    sessionCommand: (device, sessionId, rpc, commandOptions) =>
+      READ_ONLY_RECORDS.has(String(rpc["type"]))
+        ? sessionCommand(device, sessionId, rpc, commandOptions)
+        : round.fenced(sessionCommand)(device, sessionId, rpc, commandOptions),
   }
 }
