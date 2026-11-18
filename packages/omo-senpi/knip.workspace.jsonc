@@ -834,8 +834,8 @@
     "packages/omo-senpi/src/components/thread/contracts/index.ts": ["THREAD_MESSAGE_MAX_BYTES", "THREAD_SUMMARY_MAX_LENGTH"],
     // pre-existing at origin dev 4686e425b5: unused export(s) ThreadListParams, ThreadReadParams, ThreadInterruptParams, ThreadHandoffParams, ThreadRenameParams, ThreadSetModelParams, ThreadSetReasoningParams, ThreadReportParams, ThreadOutboxParams, ThreadOutboxAckParams and 1 more
     "packages/omo-senpi/src/components/thread/contracts/params.ts": ["ThreadListParams", "ThreadReadParams", "ThreadInterruptParams", "ThreadHandoffParams", "ThreadRenameParams", "ThreadSetModelParams", "ThreadSetReasoningParams", "ThreadReportParams", "ThreadOutboxParams", "ThreadOutboxAckParams", "ThreadAnswerParams"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) ENDPOINT_REGISTRY_LAYOUT, canonicalEndpointPath, socketNamesDirectory
-    "packages/omo-senpi/src/components/thread/endpoint-registry.ts": ["ENDPOINT_REGISTRY_LAYOUT", "canonicalEndpointPath", "socketNamesDirectory"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ENDPOINT_REGISTRY_LAYOUT, socketNamesDirectory
+    "packages/omo-senpi/src/components/thread/endpoint-registry.ts": ["ENDPOINT_REGISTRY_LAYOUT", "socketNamesDirectory"],
     // pre-existing at origin dev 4686e425b5: unused export(s) isBlankAnswer
     "packages/omo-senpi/src/components/thread/gateway/answer-shape.ts": ["isBlankAnswer"],
     // pre-existing at origin dev 4686e425b5: unused export(s) AUTHOR_ID_MAX_LENGTH, AUTHOR_DISPLAY_MAX_LENGTH
