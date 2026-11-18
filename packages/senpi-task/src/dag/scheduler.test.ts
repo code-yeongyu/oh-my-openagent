@@ -507,8 +507,8 @@ function schedulerFixture(
         return baseStore.paths.result(resultRunId, nodeId)
       },
     },
-    withRunLock(resultRunId, operation) {
-      return baseStore.withRunLock(resultRunId, () => {
+    withJournalLock(resultRunId, operation) {
+      return baseStore.withJournalLock(resultRunId, () => {
         runLockDepth += 1
         try {
           return operation()

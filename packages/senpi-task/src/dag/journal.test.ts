@@ -92,6 +92,55 @@ async function nextMicrotask(): Promise<void> {
 }
 
 describe("createDagJournal WAL ordering and replay", () => {
+  test("#given the run coordination lock is held #when a journal commits #then the run lock does not delay the WAL", async () => {
+    // given
+    let time = 0
+    const store = createDagFileStore({ project_dir: tempProject() }, { now: () => (time += 30_001) })
+    const journal = createDagJournal({ store, runId, initialCheckpoint: initialCheckpoint(), applyEvent })
+
+    // when
+    await store.withRunCoordinationLock(runId, () => journal.append(dagRunStartedEvent({ generation: 1 })))
+
+    // then
+    expect(store.readCheckpoint<TestCheckpoint>(runId)?.checkpointSeq).toBe(1)
+    expect(store.readEvents(runId, 0, { limit: 10 }).events.map((event) => event.seq)).toEqual([1])
+  })
+
+  test("#given a live journal holder #when appenders wait #then a timer releases it and commits stay sequenced", async () => {
+    // given
+    let time = 0
+    const project = tempProject()
+    const options = { now: () => (time += 1_000) }
+    const store = createDagFileStore({ project_dir: project }, options)
+    const peerStore = createDagFileStore({ project_dir: project }, options)
+    const journalOptions = { runId, initialCheckpoint: initialCheckpoint(), applyEvent }
+    const first = createDagJournal({ store, ...journalOptions })
+    const second = createDagJournal({ store: peerStore, ...journalOptions })
+    const lock = store.paths.journalLock(runId)
+    fs.mkdirSync(store.paths.locks, { recursive: true })
+    fs.writeFileSync(lock, JSON.stringify({ hostPid: process.pid, token: "live-holder" }))
+
+    // when
+    let timerFired = false
+    const timer = setTimeout(() => {
+      timerFired = true
+      fs.rmSync(lock)
+    }, 0)
+    try {
+      await Promise.all([
+        store.withAsyncJournalLock(runId, () => first.append(dagRunStartedEvent({ generation: 1 }))),
+        peerStore.withAsyncJournalLock(runId, () => second.append(dagRunStartedEvent({ generation: 2 }))),
+      ])
+    } finally {
+      clearTimeout(timer)
+    }
+
+    // then
+    expect(timerFired).toBe(true)
+    expect(store.readEvents(runId, 0, { limit: 10 }).events.map((event) => event.seq)).toEqual([1, 2])
+    expect([...first.refresh().generations].sort()).toEqual([1, 2])
+  })
+
   test("#given three mutations #when appended #then subscribers see durable events in order and checkpoint seq reaches three", async () => {
     // given
     const store = createDagFileStore({ project_dir: tempProject() })

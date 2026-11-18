@@ -331,6 +331,38 @@ function whenNodeState(scheduler: ReturnType<typeof createDagScheduler>, nodeId:
 }
 
 describe("DAG scheduler dependency-frontier admission", () => {
+  test("#given a live journal lock #when a scheduler starts #then an unrelated timer runs before admission", async () => {
+    // given
+    let time = 0
+    const store = createDagFileStore({ project_dir: tempProject() }, { now: () => (time += 1_000) })
+    const manager = new FrontierFakeManager()
+    const { scheduler, events } = frontierFixture(definition([node("work")]), manager, { store })
+    const started = manager.whenStarted("work")
+    const lock = store.paths.journalLock?.(runId) ?? store.paths.runLock(runId)
+    fs.writeFileSync(lock, JSON.stringify({ hostPid: process.pid, token: "live-holder" }))
+
+    // when
+    let timerFired = false
+    const timer = setTimeout(() => {
+      timerFired = true
+      fs.rmSync(lock)
+    }, 0)
+    try {
+      const running = scheduler.run()
+      await Promise.race([started, running])
+      expect(timerFired).toBe(true)
+      manager.complete("work")
+      expect((await running).status).toBe("completed")
+    } finally {
+      clearTimeout(timer)
+    }
+
+    // then
+    const seqs = events().map((event) => event.seq)
+    expect(seqs).toEqual(seqs.map((_seq, index) => index + 1))
+    expect(events()[0]?.type).toBe("dag.run.started")
+  })
+
   test("#given a dependent whose dependsOn completed #when an unrelated sibling keeps running #then the dependent is admitted at once (dag_530ad299)", async () => {
     // given - the incident shape: lane-a and lane-c share wave 0; lane-b depends ONLY on lane-a.
     const manager = new FrontierFakeManager()

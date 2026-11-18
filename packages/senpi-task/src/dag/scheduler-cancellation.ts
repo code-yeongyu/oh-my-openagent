@@ -28,17 +28,20 @@ async function performCancellation(context: SchedulerContext, reason?: string): 
       ),
     )
     const cancellationFailure = cancellationResults.find((result) => result.status === "rejected")
-    const cancelledNodeIds: DagNodeId[] = []
-    for (const node of context.journal.snapshot().nodes) {
-      if (TERMINAL_NODE_STATES.has(node.state)) continue
-      transition(context, node.id, "cancelled", { kind: "cancelled" })
-      cancelledNodeIds.push(node.id)
-    }
-    const cancelled = context.journal.snapshot()
-    context.journal.append(
-      Object.assign(dagRunCancelledEvent({ reason, counts: countNodes(cancelled.nodes) }), { cancelledNodeIds }),
-    )
-    context.attachedTaskIds.clear()
+    const committed = context.journal.transact(() => {
+      const cancelledNodeIds: DagNodeId[] = []
+      for (const node of context.journal.snapshot().nodes) {
+        if (TERMINAL_NODE_STATES.has(node.state)) continue
+        transition(context, node.id, "cancelled", { kind: "cancelled" })
+        cancelledNodeIds.push(node.id)
+      }
+      const cancelled = context.journal.snapshot()
+      context.journal.append(
+        Object.assign(dagRunCancelledEvent({ reason, counts: countNodes(cancelled.nodes) }), { cancelledNodeIds }),
+      )
+      context.attachedTaskIds.clear()
+    })
+    if (committed instanceof Promise) await committed
     if (cancellationFailure?.status === "rejected") throw cancellationFailure.reason
   } finally {
     context.resolveCancellationCompleted()

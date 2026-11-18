@@ -22,7 +22,13 @@ import type { DagRunRecordV1 } from "./manager"
 export async function runFrontier(context: SchedulerContext): Promise<DagRunRecordV1> {
   if (context.suspended) return context.journal.snapshot()
   if (context.journal.snapshot().status === "pending") {
-    context.journal.append(dagRunStartedEvent({ generation: context.journal.snapshot().generation }))
+    const started = context.journal.transact(() => {
+      if (context.suspended || context.cancellationStarted) return
+      if (context.journal.snapshot().status === "pending") {
+        context.journal.append(dagRunStartedEvent({ generation: context.journal.snapshot().generation }))
+      }
+    })
+    if (started instanceof Promise) await started
   }
 
   for (;;) {
@@ -31,10 +37,15 @@ export async function runFrontier(context: SchedulerContext): Promise<DagRunReco
     // barrier-era rule that dependents were skipped between waves: a failed node stays revivable
     // (send -> revive) while any sibling is still mid-flight, and a revived outcome can complete
     // it, so an eager cascade would strand the dependent as skipped (dag_2d12c2f7 regression).
-    if (context.attachedTasks.size === 0) applyDependentSkipCascade(context)
-    // Completions are reported before the next admission pass so a finishing wave reads as
-    // settled before later-wave nodes it unblocked start interleaving their own events.
-    emitCompletedWaves(context)
+    const checked = context.journal.transact(() => {
+      if (context.suspended || context.cancellationStarted) return false
+      if (context.attachedTasks.size === 0) applyDependentSkipCascade(context)
+      // Completions are reported before the next admission pass so a finishing wave reads as
+      // settled before later-wave nodes it unblocked start interleaving their own events.
+      emitCompletedWaves(context)
+      return true
+    })
+    if (!(checked instanceof Promise ? await checked : checked)) return cancelledSnapshot(context)
     if (!(await admitFrontier(context)) || context.suspended) return cancelledSnapshot(context)
     const current = context.journal.snapshot()
     if (current.nodes.every((node) => TERMINAL_NODE_STATES.has(node.state))) break
@@ -51,15 +62,20 @@ export async function runFrontier(context: SchedulerContext): Promise<DagRunReco
     if (!(await settleOne(context))) return cancelledSnapshot(context)
   }
 
-  const snapshot = context.journal.snapshot()
-  const failed = primaryFailure(snapshot)
-  if (failed !== undefined) {
-    const error = failed.error ?? nodeError(failed.id, "start_failed", "DAG node failed", context.now)
-    context.journal.append(dagRunFailedEvent({ error, counts: countNodes(snapshot.nodes) }))
-  } else {
-    context.journal.append(dagRunCompletedEvent({ counts: countNodes(snapshot.nodes) }))
-  }
-  return context.journal.snapshot()
+  const committed = context.journal.transact(() => {
+    if (context.suspended || context.cancellationStarted) return undefined
+    const snapshot = context.journal.snapshot()
+    const failed = primaryFailure(snapshot)
+    if (failed !== undefined) {
+      const error = failed.error ?? nodeError(failed.id, "start_failed", "DAG node failed", context.now)
+      context.journal.append(dagRunFailedEvent({ error, counts: countNodes(snapshot.nodes) }))
+    } else {
+      context.journal.append(dagRunCompletedEvent({ counts: countNodes(snapshot.nodes) }))
+    }
+    return context.journal.snapshot()
+  })
+  const terminal = committed instanceof Promise ? await committed : committed
+  return terminal ?? cancelledSnapshot(context)
 }
 
 function applyDependentSkipCascade(context: SchedulerContext): void {
