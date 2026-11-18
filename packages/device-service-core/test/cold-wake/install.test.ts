@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, readFileSync, statSync } from "node:fs"
+import { chmodSync, existsSync, readFileSync, statSync } from "node:fs"
 import { join } from "node:path"
 
 import { type ColdWakeHost, installColdWake, uninstallColdWake } from "../../src/cold-wake/index.ts"
@@ -41,14 +41,33 @@ describe("cold wake on Linux", () => {
   // Windows has no POSIX modes (and no session host unit). The install runs in a child that sets umask 077 itself, so
   // the mode cannot come from the runner's umask (omo#14247: a creation mode is ANDed with ~umask).
   test.skipIf(process.platform === "win32")("writes the unit 0644 even under umask 077", () => {
-    const { home } = fakeSystemd()
-    const unit = join(UNIT_DIR(home), "omo-session-host.service")
-    const writer = new URL("../../src/cold-wake/host.ts", import.meta.url).pathname
-    const script = `process.umask(0o077); const { writeIfChanged } = await import(${JSON.stringify(writer)}); writeIfChanged(${JSON.stringify(unit)}, "[Unit]\\n")`
+    const at = (file: string) => JSON.stringify(new URL(file, import.meta.url).pathname)
+    const script = [
+      "process.umask(0o077)",
+      `const { installColdWake } = await import(${at("../../src/cold-wake/index.ts")})`,
+      `const { fakeSystemd, LAUNCH, UNIT_DIR, removeTempHomes } = await import(${at("./cold-wake-fakes.ts")})`,
+      'const { statSync } = await import("node:fs")',
+      "const { host, home } = fakeSystemd()",
+      "await installColdWake(host, LAUNCH)",
+      'process.stdout.write((statSync(UNIT_DIR(home) + "/omo-session-host.service").mode & 0o777).toString(8))',
+      "removeTempHomes()",
+    ].join("\n")
     const child = Bun.spawnSync([process.execPath, "-e", script], { stderr: "pipe" })
     expect(child.stderr.toString()).toBe("")
     expect(child.exitCode).toBe(0)
+    expect(child.stdout.toString()).toBe("644")
+  })
+
+  // A unit an older build wrote 0600 is repaired by the next install even though its text is unchanged (omo#14247).
+  test.skipIf(process.platform === "win32")("repairs an unchanged unit left 0600", async () => {
+    const { host, home, runs } = fakeSystemd()
+    await installColdWake(host, LAUNCH)
+    const unit = join(UNIT_DIR(home), "omo-session-host.service")
+    chmodSync(unit, 0o600)
+    runs.length = 0
+    expect(await installColdWake(host, LAUNCH)).toEqual({ kind: "installed", serviceRestarted: false })
     expect(statSync(unit).mode & 0o777).toBe(0o644)
+    expect(runs.filter((r) => !r.includes(" show "))).toEqual([])
   })
 
   test("starts a unit that is not running without rewriting anything else", async () => {
