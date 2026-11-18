@@ -214,7 +214,7 @@ describe("thread_create reopens a thread whose process exited (#14049)", () => {
       const { run, openSession, agentDir } = surface(signedIn ? a.remote : undefined, { sessionsDirectory: true })
       const file = sessionFile(agentDir, exited)
       const result = await run("thread_create", { thread: exited })
-      expect(result).toMatchObject({ kind: "ok", deduplicated: false })
+      expect(result).toMatchObject({ kind: "ok", thread: exited, deduplicated: false })
       expect(localOpenFrames(openSession)).toEqual([{ sessionPath: file }])
       expect(a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")).toEqual([])
     })
