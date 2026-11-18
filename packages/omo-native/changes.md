@@ -1,3 +1,7 @@
+## 2026-11-17 - omo sync disable (#14093)
+
+- `sync-cli.ts`: `omo sync disable` turns memory sync off for this device through `disableSync`; exit 0 with the off line, exit 1 when the service refuses or the device is signed out. `bin/lib/service-auth.generated.js` is rebuilt.
+
 ## 2026-11-17 - opt-in OmO keychain for Macs whose login keychain stays locked (#14033)
 
 `keychain-helper`:
