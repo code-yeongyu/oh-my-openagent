@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:fb6a10fbebc4ce5f96dbbb43736b577d0eefad305f629dcbd73ca5c85794b726:2c1a3bc408442e70cebf9bb0a532f4c7de82365079ac080873f720a4053560e1
+// omo-codex-install:68da1f9e0e4fbc8f617d481629dbf5c7a90de7d2562ced7dbf8aa1c52ae022f0:2c1a3bc408442e70cebf9bb0a532f4c7de82365079ac080873f720a4053560e1
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {

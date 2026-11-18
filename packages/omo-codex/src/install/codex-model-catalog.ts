@@ -18,7 +18,7 @@ export type CodexModelCatalog = {
 
 // The Astra id the Codex edition ships: its agent TOMLs, plugin/model-catalog.json and
 // migrate-codex-config/catalog.mjs all name it, so it moves with those files, not with
-// model-core's LATEST_MODEL_BY_FAMILY (#14126 left the Codex data bump as a follow-up).
+// model-core's LATEST_MODEL_BY_FAMILY (the Codex data bump is #14155).
 export const CODEX_ASTRA_MODEL = "gpt-6-astra"
 
 const FALLBACK_CODEX_MODEL_CATALOG: CodexModelCatalog = {
