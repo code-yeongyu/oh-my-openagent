@@ -5,13 +5,15 @@ import { join } from "node:path"
 import { systemPlatformFacts, userRecordHome } from "./account-home"
 import { credentialId } from "./keystore"
 import { credentialSchema, type Credentials } from "./protocol"
-import { fakeApi, grant, privateKeys, temporaryHome } from "./test-support"
+import { fakeApi, grant, noOwnDevice, privateKeys, temporaryHome } from "./test-support"
 
 test("two processes share the refresh lock and never persist credentials in HOME or child arguments", async () => {
   const home = await temporaryHome()
   let saved: Credentials = { ...grant, ...privateKeys, accessTokenExpiresAt: "2000-01-01T00:00:00Z" }
   let rotations = 0
   const api = fakeApi(async (request) => {
+    const listed = noOwnDevice(request)
+    if (listed !== undefined) return listed
     if (request.url.endsWith("/fake-store")) {
       if (request.method === "PUT") saved = credentialSchema.parse(await request.json())
       return Response.json(saved)
@@ -75,6 +77,8 @@ test("two refreshers with different HOME values present one refresh token once (
   const unlocked: { pid: string; release: () => void }[] = []
   let lockPath = ""
   const api = fakeApi(async (request) => {
+    const listed = noOwnDevice(request)
+    if (listed !== undefined) return listed
     if (request.url.endsWith("/fake-store")) {
       if (request.method === "PUT") saved = credentialSchema.parse(await request.json())
       const pid = request.headers.get("x-pid") ?? ""

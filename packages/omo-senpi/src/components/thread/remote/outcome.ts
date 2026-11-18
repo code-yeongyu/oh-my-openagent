@@ -18,7 +18,12 @@ const fail = (
 
 export function outcomeOf(result: CommandResult): RemoteCommandOutcome {
   const { outcome } = result
-  if (outcome.state === "engine_refused") return { kind: "refused", reason: outcome.reason }
+  if (outcome.state === "engine_refused") {
+    const detail = outcome.receipt?.["reason"]
+    return typeof detail === "string" && detail !== ""
+      ? { kind: "refused", reason: outcome.reason, detail }
+      : { kind: "refused", reason: outcome.reason }
+  }
   if (outcome.state === "uncertain") return { kind: "uncertain", reason: outcome.reason }
   if (outcome.state === "engine_stale") return { kind: "uncertain", reason: "engine_stale" }
   const response = result.response ?? {}
@@ -57,6 +62,7 @@ export const READ_UNCERTAIN: Readonly<Record<UncertainReason, "retry" | "too_lar
   hand_restarted: "retry",
   result_expired: "retry",
   record_too_large: "too_large",
+  result_undecodable: "retry",
 }
 
 // Refusals after which this call changed nothing on the other device: a command that never reached its engine (a lost

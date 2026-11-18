@@ -8,14 +8,17 @@ import type { RemoteSessionRow } from "./ports"
 // another device. A NEW thread tool that prints a remote field adds its row here.
 const PAYLOAD = "p\u202Eq\nr\u001b[31ms\u200Dt"
 const RAW = /[\u202E\n\u001b\u200D]/u
+// An address may carry format characters but never control characters (addressing refuses those), so the tests that
+// address a thread by its title use a title with format characters only.
+const ADDRESSABLE = "p\u202Eq r\u200Dt"
 const ESCAPED = String.raw`\u202e`
 
-const poisoned = (device: string, key: string, durable: string): RemoteSessionRow => ({
+const poisoned = (device: string, key: string, durable: string, title = PAYLOAD): RemoteSessionRow => ({
   ...B_ROW,
   device,
   session_id: key,
   durable_id: durable,
-  title: PAYLOAD,
+  title,
   project: `/w/${PAYLOAD}`,
 })
 
@@ -43,17 +46,34 @@ describe("text from another device in the thread tools' output (#13304)", () => 
           .flatMap((thread) => [thread["name"], thread["cwd"], thread["link"]].map(String)),
     },
     {
-      tool: "thread_read: a thread on another device (title)",
+      tool: "thread_read: a thread on another device (link)",
       rows: [poisoned("b", "rk-on-b", "dur-on-b")],
       run: (run: (n: never, a: unknown) => Promise<ThreadToolResult>) =>
         run("thread_read" as never, { thread: "dur-on-b" }),
-      texts: (result: ThreadToolResult) => [String((result as { title?: unknown }).title)],
+      texts: (result: ThreadToolResult) => [String((result as { link?: unknown }).link)],
+    },
+    {
+      tool: "thread_send: the receipt of a send to another device (link)",
+      rows: [poisoned("b", "rk-on-b", "dur-on-b")],
+      run: (run: (n: never, a: unknown) => Promise<ThreadToolResult>) =>
+        run("thread_send" as never, { thread: "dur-on-b", message: "hi" }),
+      texts: (result: ThreadToolResult) => [String((result as { link?: unknown }).link)],
+    },
+    {
+      tool: "thread_handoff: the receipt names another device's thread (name, cwd, link)",
+      rows: [poisoned("b", "rk-on-b", "dur-on-b", ADDRESSABLE)],
+      run: (run: (n: never, a: unknown) => Promise<ThreadToolResult>) =>
+        run("thread_handoff" as never, { thread: ADDRESSABLE, message: "hi" }),
+      texts: (result: ThreadToolResult) => {
+        const receipt = result as { name?: unknown; cwd?: unknown; link?: unknown }
+        return [receipt.name, receipt.cwd, receipt.link].map(String)
+      },
     },
     {
       tool: "thread_send: an ambiguous name quoted in the candidates",
-      rows: [poisoned("b", "rk-on-b", "dur-on-b"), poisoned("b", "rk-on-b-2", "dur-on-b-2")],
+      rows: [poisoned("b", "rk-on-b", "dur-on-b", ADDRESSABLE), poisoned("b", "rk-on-b-2", "dur-on-b-2", ADDRESSABLE)],
       run: (run: (n: never, a: unknown) => Promise<ThreadToolResult>) =>
-        run("thread_send" as never, { thread: PAYLOAD, message: "hi" }),
+        run("thread_send" as never, { thread: ADDRESSABLE, message: "hi" }),
       texts: (result: ThreadToolResult) =>
         ((errorOf(result).details?.["candidates"] as readonly Record<string, unknown>[] | undefined) ?? []).map((c) =>
           String(c["name"]),
@@ -73,9 +93,9 @@ describe("text from another device in the thread tools' output (#13304)", () => 
   })
 
   test("#given a thread on another device whose title carries the payload #when it is addressed by that exact title #then it is found: the data is not escaped", async () => {
-    const row = poisoned("b", "rk-on-b", "dur-on-b")
+    const row = poisoned("b", "rk-on-b", "dur-on-b", ADDRESSABLE)
     const a = fixture.account({ rows: [row], live: [row.session_id] })
-    expect(await fixture.surface(a.remote).run("thread_send", { thread: PAYLOAD, message: "hi" })).toMatchObject({
+    expect(await fixture.surface(a.remote).run("thread_send", { thread: ADDRESSABLE, message: "hi" })).toMatchObject({
       kind: "ok",
       device: "b",
     })
