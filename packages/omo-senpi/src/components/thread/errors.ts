@@ -15,7 +15,6 @@ export const THREAD_ERROR_CODES = [
   "foreign_live_owner",
   "no_active_turn",
   "turn_conflict",
-  "turn_active",
   "not_steerable",
   "message_too_large",
   "queue_full",

@@ -25,7 +25,7 @@ impl Win32Input {
                 this.keys_held(Via::SendInput(Some(window)), &codes, control, |_| (control.wait)())
             }),
             (Target::Window(id), DeliveryMode::Background) => {
-                let window = background::key_target(id, self.integrity, keys)?;
+                let window = background::key_target(id, self.integrity, keys, &codes)?;
                 self.keys_held(Via::Post(window), &codes, control, |_| (control.wait)())
             }
         }
@@ -47,12 +47,12 @@ impl Win32Input {
             (Target::Window(id), DeliveryMode::Background) => {
                 let root = Window::target(id, self.integrity)?;
                 background::refusal(id, root, EventKind::MouseClick).map_or(Ok(()), Err)?;
+                let keyboard = if hold.keys.is_empty() { None }
+                    else { Some(background::key_target(id, self.integrity, hold.keys, &codes)?) };
                 let (window, at) = background_pointer::child_at(root, hold.x, hold.y)?;
                 background::refusal(id, window, EventKind::MouseClick).map_or(Ok(()), Err)?;
-                let keyboard = if hold.keys.is_empty() { window }
-                    else { background::key_target(id, self.integrity, hold.keys)? };
                 let held = HeldButton { route: Route::Window(window.address()), button: hold.button, at };
-                self.keys_held(Via::Post(keyboard), &codes, control, |this| {
+                self.keys_held(Via::Post(keyboard.unwrap_or(window)), &codes, control, |this| {
                     this.button_held(held, None, key_flags(hold.keys), control)
                 })
             }

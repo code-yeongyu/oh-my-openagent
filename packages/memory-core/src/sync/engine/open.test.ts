@@ -5,7 +5,7 @@ import { join } from "node:path"
 
 import { createHttpTransport } from "./adapters/http-transport"
 import { startWireServer, type WireServer } from "./adapters/wire-server.test-support"
-import { FakeSealer, FakeVerifier } from "./fake-crypto.test-support"
+import { FAKE_SPACE, FakeSealer, FakeVerifier } from "./fake-crypto.test-support"
 import { gitRepo } from "./engine-harness.test-support"
 import { openDeviceSync } from "./open"
 
@@ -28,6 +28,7 @@ function session(server: WireServer, device: string) {
     transport: createHttpTransport({ baseUrl: server.url, token: () => server.tokenOf(device) }),
     verifier: new FakeVerifier("acct"),
     sealer: new FakeSealer("acct"),
+    space: FAKE_SPACE,
   }
 }
 

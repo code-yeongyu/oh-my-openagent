@@ -26,18 +26,6 @@ const VALID_SAMPLES: Record<keyof typeof threadToolParamSchemas, unknown> = {
   thread_rename: { thread: "019233a1-7c2e-7bbb", name: "payments-lane-2" },
   thread_set_model: { thread: "019233a1-7c2e-7bbb", model: "claude-opus-4" },
   thread_set_reasoning: { thread: "019233a1-7c2e-7bbb", level: "high" },
-  thread_archive: { thread: "019233a1-7c2e-7bbb", archived: false },
-  thread_bind: {
-    platform: "custom",
-    account_id: "qa",
-    chat_id: "c1",
-    thread_id: "t1",
-    session: "019233a1-7c2e-7bbb",
-    ttl_seconds: null,
-  },
-  thread_unbind: { binding_id: "bnd-1", expected_revision: 1 },
-  thread_rebind: { binding_id: "bnd-1", expected_revision: 1, session: "019233a1-7c2e-7bbc" },
-  thread_bindings: { platform: "discord", status: "active", limit: 10 },
   thread_report: { kind: "milestone", text: "done step 1" },
   thread_outbox: { binding_id: "bnd-1", after_cursor: 0 },
   thread_outbox_ack: { binding_id: "bnd-1", cursor: 3, provider_message_id: "m-1" },
@@ -73,11 +61,6 @@ describe("thread tool param schemas", () => {
       "thread_rename",
       "thread_set_model",
       "thread_set_reasoning",
-      "thread_archive",
-      "thread_bind",
-      "thread_unbind",
-      "thread_rebind",
-      "thread_bindings",
       "thread_report",
       "thread_outbox",
       "thread_outbox_ack",
@@ -122,9 +105,14 @@ describe("thread_rename params", () => {
     expect(outcome.kind).toBe("ok")
   })
 
-  test("#given a rename payload missing thread #when parsed #then it returns invalid_arguments as data", () => {
+  test("#given a rename payload missing thread #when parsed #then it is accepted so the tool can rename this session", () => {
     const outcome = parseThreadParams(threadToolParamSchemas.thread_rename, { name: "x" })
-    expect(outcome).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+    expect(outcome).toMatchObject({ kind: "ok", value: { name: "x" } })
+  })
+
+  test("#given a close payload missing thread #when parsed #then it is accepted so the tool can close this session", () => {
+    const outcome = parseThreadParams(threadToolParamSchemas.thread_close, {})
+    expect(outcome).toMatchObject({ kind: "ok", value: {} })
   })
 })
 
@@ -194,20 +182,6 @@ describe("thread_set_reasoning params", () => {
 })
 
 describe("relay tool params", () => {
-  test("#given a bind with an off-catalog platform #when parsed #then it returns invalid_arguments as data", () => {
-    const outcome = parseThreadParams(threadToolParamSchemas.thread_bind, {
-      platform: "irc",
-      account_id: "a",
-      chat_id: "c",
-    })
-    expect(outcome).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
-  })
-
-  test("#given an unbind without the revision it last saw #when parsed #then it returns invalid_arguments as data", () => {
-    const outcome = parseThreadParams(threadToolParamSchemas.thread_unbind, { binding_id: "bnd-1" })
-    expect(outcome).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
-  })
-
   test("#given a report of an unknown kind #when parsed #then it returns invalid_arguments as data", () => {
     const outcome = parseThreadParams(threadToolParamSchemas.thread_report, { kind: "broadcast", text: "hi" })
     expect(outcome).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
@@ -264,7 +238,6 @@ describe("thread error taxonomy", () => {
       "foreign_live_owner",
       "no_active_turn",
       "turn_conflict",
-      "turn_active",
       "not_steerable",
       "message_too_large",
       "queue_full",

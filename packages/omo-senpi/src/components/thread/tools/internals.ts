@@ -1,7 +1,9 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
-import type { ThreadResolveResult } from "../addressing"
-import { relayAddressBook, type RelayAddressBook } from "../remote/address-book"
-import type { RemoteSessionRow } from "../remote/ports"
+import type { ThreadResolveOptions, ThreadResolveResult } from "../addressing"
+import { relayAddressBook, relayAddressEntry, type RelayAddressBook } from "../remote/address-book"
+import { endedRow, rowThreadId, type RemoteSessionRow } from "../remote/ports"
+import { accountDevices } from "../remote/account"
+import { remoteAvailable } from "../remote/remote-ops"
 import {
   assembleAddressBook,
   findDiskSessions,
@@ -19,14 +21,7 @@ import {
   workspaceEntries,
   type ThreadAddressEntry,
 } from "../addressing"
-import {
-  THREAD_STATES,
-  type ThreadModel,
-  type ThreadState,
-  type ThreadToolName,
-  type ThreadToolResult,
-  type ThreadTranscriptItem,
-} from "../contracts"
+import type { ThreadToolName, ThreadToolResult, ThreadTranscriptItem } from "../contracts"
 import { threadToolFailure, type ThreadErrorCode } from "../errors"
 import { THREAD_TOOL_EXPOSURE, THREAD_TOOL_METADATA } from "../metadata"
 import { readSessionFacts, threadTitle } from "../session-facts"
@@ -55,61 +50,27 @@ export function failure(
 }
 
 export function output(result: ThreadToolResult): ToolOutput {
-  return { content: [{ type: "text", text: JSON.stringify(result) }], details: { result } }
+  return {
+    content: [{ type: "text", text: JSON.stringify(result) }],
+    details: { result },
+    ...(result.kind === "error" ? { isError: true } : {}),
+  }
 }
 
 export type ThreadToolSummary = Omit<
   ThreadHostSession,
-  "name" | "status" | "createdAt" | "updatedAt" | "created_at" | "updated_at" | "archived" | "activity" | "model"
+  "name" | "status" | "createdAt" | "updatedAt" | "created_at" | "updated_at"
 > & {
   readonly thread_id: string
   readonly name: string
-  /** Deprecated beside `state`: `resumable` when no engine holds the thread, else `live`. */
   readonly status: "live" | "resumable"
-  readonly state: ThreadState
-  readonly model?: ThreadModel
   readonly created_at: string
   readonly updated_at: string | null
   readonly endpoint?: AddressEndpoint | null
   readonly surface?: ThreadSurface | null
+  readonly alive?: boolean
   /** `[title](omo-thread://v1/<thread_id>)` (`thread-link.ts`): paste it when telling the user about this thread. */
   readonly link: string
-}
-
-/**
- * The one state rule (#13403, #13407): the archived flag wins; a thread no engine holds (closed, its endpoint dead or
- * degraded, known only from disk) is `inactive`; otherwise the engine's activity. A field an older engine does not
- * report reads as not archived and idle.
- */
-function threadState(facts: {
-  readonly archived?: unknown
-  readonly held: boolean
-  readonly activity?: unknown
-}): ThreadState {
-  if (facts.archived === true) return "archived"
-  if (!facts.held) return "inactive"
-  return facts.activity === "running" ? "running" : "idle"
-}
-
-/** A reported model, when it is exactly a non-empty provider and id. */
-export function threadModel(value: unknown): { readonly model?: ThreadModel } {
-  if (typeof value !== "object" || value === null) return {}
-  const { provider, id } = value as { readonly provider?: unknown; readonly id?: unknown }
-  return typeof provider === "string" && provider !== "" && typeof id === "string" && id !== ""
-    ? { model: { provider, id } }
-    : {}
-}
-
-/** Another device's listing row: an ended row is inactive, the archived flag wins, else the row's own running or idle. */
-export function rowState(row: RemoteSessionRow): ThreadState {
-  // A row from a device's cached listing (the device did not answer) is its last word: never running now.
-  const activity = row.cached_as_of === undefined ? row.state : "idle"
-  return threadState({ archived: row.archived, held: row.state !== "ended", activity })
-}
-
-/** The states a `thread_list` returns: the ones asked for, else every state but `archived`. */
-export function listedStates(asked: readonly ThreadState[] | undefined): ReadonlySet<ThreadState> {
-  return new Set(asked ?? THREAD_STATES.filter((state) => state !== "archived"))
 }
 
 export type ThreadToolMetadata = {
@@ -138,23 +99,17 @@ export function summary(session: ThreadHostSession, entry?: AddressEntry): Threa
     updatedAt: _updatedAt,
     created_at: _created,
     updated_at: _updated,
-    archived,
-    activity,
-    model,
     ...rest
   } = session
   const created = entry?.created_at ?? session.created_at ?? session.createdAt ?? new Date().toISOString()
-  const held = session.status !== "closed" && entry?.alive !== false
   return {
     ...rest,
     thread_id: id,
     name: entry?.title ?? threadTitle(session.name, null) ?? "",
-    status: held ? "live" : "resumable",
-    state: threadState({ archived, held, activity }),
-    ...threadModel(model),
+    status: session.status === "closed" ? "resumable" : "live",
     created_at: created,
     updated_at: entry === undefined ? (session.updated_at ?? session.updatedAt ?? created) : entry.updated_at,
-    ...(entry === undefined ? {} : { endpoint: entry.endpoint, surface: entry.surface }),
+    ...(entry === undefined ? {} : { endpoint: entry.endpoint, surface: entry.surface, alive: entry.alive }),
     link: threadLink(id, entry?.title ?? threadTitle(session.name, null)),
   }
 }
@@ -255,11 +210,11 @@ export function degradedSummary(entry: AddressEntry): ThreadToolSummary & { read
     thread_id: entry.thread_id,
     name: entry.title ?? "",
     status: "resumable",
-    state: threadState({ archived: entry.archived, held: false }),
     created_at: entry.created_at,
     updated_at: entry.updated_at,
     endpoint: entry.endpoint,
     surface: entry.surface,
+    alive: entry.alive,
     link: threadLink(entry.thread_id, entry.title),
     ...(entry.error_note === undefined ? {} : { error_note: entry.error_note }),
   }
@@ -282,24 +237,33 @@ export function resolution(
   target: string,
   callerId: string,
   allScope?: boolean,
+  idPrefix: ThreadResolveOptions["id_prefix"] = true,
 ) {
   if (target === "self") {
     // UNKNOWN_CALLER stands for an ABSENT identity, so it must never match an entry: a thread
     // that happened to carry it as its durable id would otherwise be renamed or re-modelled by
     // any caller whose host passes no execution context.
-    const caller = callerId === UNKNOWN_CALLER ? undefined : entries.find((entry) => entry.thread_id === callerId)
+    const caller =
+      callerId === UNKNOWN_CALLER
+        ? undefined
+        : (entries.find((entry) => entry.thread_id === callerId) ??
+          entries.find((entry) => entry.session_ids?.includes(callerId) === true))
     if (caller === undefined)
       return {
         kind: "error" as const,
         ...threadToolFailure(
           "caller_context_missing",
           "The caller's durable session id is not in the thread address book.",
-          "Call thread_list and pass an explicit thread_id, or retry from a session with caller context.",
+          "Call thread_list and pass an explicit thread, or retry from a session with caller context.",
         ),
       }
     target = caller.thread_id
   }
-  return resolveTarget(entries, target, { all_scope: allScope, callerWorkspaceRoot: options.callerWorkspaceRoot() })
+  return resolveTarget(entries, target, {
+    all_scope: allScope,
+    callerWorkspaceRoot: options.callerWorkspaceRoot(),
+    id_prefix: idPrefix,
+  })
 }
 
 export function routingId(session: ThreadHostSession): string {
@@ -317,6 +281,68 @@ export function targetSession(view: ThreadHostView, durableId: string): ThreadHo
 }
 
 /**
+ * Amendment A4.3.1 of #13037: an approved reply to a sender whose delivery came from another device resolves on THAT
+ * device and nowhere else: its listing row for that id when it lists one (a read of that one device, never the whole
+ * account), else one probe of that device, which finds a session it holds but does not run as an `ended` row (A4.2).
+ * No row there is not_found naming the device; a probe that got no answer is host_unavailable naming it.
+ */
+export async function replyOnDevice(
+  options: ThreadToolSurfaceOptions,
+  sender: { readonly session_id: string; readonly device: string },
+): Promise<ThreadResolveResult> {
+  const missing = (): ThreadResolveResult =>
+    ({
+      kind: "error",
+      ...threadToolFailure(
+        "not_found",
+        `The sender ${sender.session_id} is not listed on device ${sender.device}, the device its delivery came from.`,
+        "Retry when that session is running on its device, or send to another thread as a normal send.",
+        { thread: sender.session_id, device: sender.device },
+      ),
+    }) as ThreadResolveResult
+  const remote = options.remote
+  if (remote === undefined) return missing()
+  const unavailable = await remoteAvailable(remote)
+  if (unavailable !== undefined) return { kind: "error", ...unavailable.error } as ThreadResolveResult
+  let rows: readonly RemoteSessionRow[]
+  try {
+    rows = await remote.sessions.sessions({ device: sender.device })
+  } catch (error) {
+    return {
+      kind: "error",
+      ...threadToolFailure(
+        "host_unavailable",
+        "The account's session listing could not be reached.",
+        "Retry when the device service is reachable.",
+        { reason: error instanceof Error ? error.message : String(error) },
+      ),
+    } as ThreadResolveResult
+  }
+  const row = rows.find(
+    (candidate) => candidate.device === sender.device && rowThreadId(candidate) === sender.session_id,
+  )
+  if (row !== undefined) return { kind: "ok", entry: relayAddressEntry(row), resolution: "id" }
+  const probed = await remote.sessions.lookup?.(sender.device, sender.session_id)
+  if (probed?.kind === "found")
+    return {
+      kind: "ok",
+      entry: relayAddressEntry(endedRow(sender.device, probed.key, sender.session_id)),
+      resolution: "id",
+    }
+  if (probed?.kind === "silent")
+    return {
+      kind: "error",
+      ...threadToolFailure(
+        "host_unavailable",
+        `Device ${sender.device}, where the sender's delivery came from, did not answer whether it holds ${sender.session_id}.`,
+        "Retry when that device answers.",
+        { thread: sender.session_id, device: sender.device, reason: probed.reason },
+      ),
+    } as ThreadResolveResult
+  return missing()
+}
+
+/**
  * Decision 0027: ONE resolver over this device's entries and the relay transport's address book. A local hit never needs
  * the relay. A fuzzy handoff first tries the exact ladder (id, alias, name) over every row, ended remote rows included, so
  * it never lands on a different session than the exact path would; otherwise local, live remote and the ended remote rows
@@ -331,6 +357,8 @@ export async function resolveAcross(
   callerId: string,
   allScope: boolean | undefined,
   match: "exact" | "fuzzy" = "exact",
+  lookup = false,
+  idPrefix: ThreadResolveOptions["id_prefix"] = true,
 ): Promise<ThreadResolveResult & { readonly all_scope?: boolean | undefined }> {
   if (match === "fuzzy" && allScope !== true && options.callerWorkspaceRoot().trim() === "")
     return {
@@ -345,7 +373,7 @@ export async function resolveAcross(
     entries: readonly ThreadAddressEntry[],
     ranked: readonly ThreadAddressEntry[] = entries,
   ): ThreadResolveResult => {
-    const exact = resolution(options, entries, address, callerId, allScope)
+    const exact = resolution(options, entries, address, callerId, allScope, idPrefix)
     if (match === "exact") return exact
     // Exact first (#13141): an id, alias or name the exact path resolves is the answer, so fuzzy only ranks what exact
     // cannot reach. The caller stays excluded, as the fuzzy scan excludes it: a handoff never targets its own sender.
@@ -402,5 +430,90 @@ export async function resolveAcross(
   if (book.aliasFailure !== undefined) return { kind: "error", ...book.aliasFailure } as ThreadResolveResult
   if (book.unavailable !== undefined && here.kind === "error" && here.code === "not_found")
     return { kind: "error", ...book.unavailable } as ThreadResolveResult
+  if (lookup && across.code === "not_found" && SESSION_ID.test(address)) {
+    const looked = await lookupAcross(options.remote, address)
+    if (looked !== undefined) return looked.kind === "ok" ? { ...looked, all_scope: true } : looked
+  }
   return across
+}
+
+/** A durable session id: the only address the account-wide lookup of A4.3.3 is made for. */
+const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * omo#13037 A4.3.3: a session id that this device and the account listing both miss is looked up with one single-probe
+ * query to each ONLINE device of the account other than this one, in parallel (the device service bounds each at 3 s).
+ * One device holds it: its ended row. None and every device answered: not_found. None and a device stayed silent:
+ * host_unavailable naming it. Several: ambiguous_target naming the devices. Undefined when this device's service makes
+ * no single probe: the caller answers as before. Never a background scan; nothing is cached.
+ */
+async function lookupAcross(
+  remote: NonNullable<ThreadToolSurfaceOptions["remote"]>,
+  address: string,
+): Promise<ThreadResolveResult | undefined> {
+  // The capability first, from this device's own connection: with the probe off nothing is read for a lookup and the
+  // answer stays today's. A device round that fails leaves today's answer too.
+  const probe = remote.sessions.lookup
+  if (probe === undefined || (await remote.sessions.canLookup?.().catch(() => false)) !== true) return undefined
+  let online: readonly { readonly device: string; readonly online: boolean }[]
+  try {
+    const { here, devices } = await accountDevices(remote.client)
+    online = devices.filter((device) => device.online && device.device !== here)
+  } catch {
+    return undefined
+  }
+  const answers = await Promise.all(
+    online.map(async (device) => ({ device: device.device, answer: await probe(device.device, address) })),
+  )
+  if (answers.some(({ answer }) => answer.kind === "unavailable")) return undefined
+  // Found over silent, by choice: one device holding the id is used even when another did not answer within the bound or
+  // the client's cap. A device that hangs must not block a send another device can take; the silent one is not asked
+  // again, and two copies of one id behind a silent device is the residual A4.3.5 names, never ambiguous_target.
+  const holders = answers.flatMap(({ device, answer }) =>
+    answer.kind === "found" ? [{ device, key: answer.key }] : [],
+  )
+  const [only] = holders
+  if (holders.length === 1 && only !== undefined)
+    return { kind: "ok", entry: relayAddressEntry(endedRow(only.device, only.key, address)), resolution: "id" }
+  if (holders.length > 1) {
+    const candidates = holders.map((holder) => ({
+      thread: address,
+      name: "",
+      cwd: "",
+      preview: "",
+      updatedAt: null,
+      state: "resumable" as const,
+      device: holder.device,
+    }))
+    return {
+      kind: "error",
+      ...threadToolFailure(
+        "ambiguous_target",
+        `Session ${address} is held on more than one device; none was picked.`,
+        "Address the session on one device with <device>/<session id>.",
+        { candidates },
+      ),
+      candidates,
+    } as ThreadResolveResult
+  }
+  const silent = answers.flatMap(({ device, answer }) => (answer.kind === "silent" ? [device] : []))
+  if (silent.length > 0)
+    return {
+      kind: "error",
+      ...threadToolFailure(
+        "host_unavailable",
+        `No device that answered holds session ${address}, and ${silent.join(", ")} did not answer.`,
+        "Retry when that device answers.",
+        { thread: address, devices: silent },
+      ),
+    } as ThreadResolveResult
+  return {
+    kind: "error",
+    ...threadToolFailure(
+      "not_found",
+      `No online device of this account holds session ${address}.`,
+      "The session may live on a device that is offline: retry when that device is online, or call thread_list.",
+      { thread: address },
+    ),
+  } as ThreadResolveResult
 }

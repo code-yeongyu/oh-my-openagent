@@ -1,7 +1,8 @@
 import { mock } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import type { DeviceRow, RemoteClient, RemoteFailure, ServiceStatus } from "../remote"
 import type { ThreadToolName, ThreadToolResult } from "./contracts"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import type {
@@ -13,10 +14,14 @@ import type {
   RemoteDevice,
   RemoteSessionRow,
   RemoteThreadSurface,
+  RemoteWatchEnd,
+  RemoteWatchHandlers,
 } from "./remote/ports"
 import type { ThreadTranscriptEntry } from "./reader"
+import { answerGetEntries, senpiProjector, type FakeEntryLog } from "./thread-remote-entries-fixture"
 import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
 import type { ThreadCloseOutcome } from "./tools/ports"
+import type { SessionWatchHandlers } from "./control/wait-settled"
 
 // The listing key (what b's connector assigned) deliberately differs from the durable id (audit class C8, #13017): a test
 // that passes with either id proves nothing about which one a tool path matched.
@@ -32,7 +37,7 @@ export const B_ROW: RemoteSessionRow = {
 }
 
 type Sent = {
-  readonly via: "endpoint" | "session" | "read" | "watch"
+  readonly via: "endpoint" | "session" | "read" | "watch" | "wake"
   readonly device: string
   readonly session?: string
   readonly rpc?: JsonObject
@@ -62,9 +67,116 @@ export const ENGINE: Engine = {
 /** The levels both legs' engines run in these tests; `xhigh` is refused on both. */
 const THINKING_LEVELS: readonly string[] = ["off", "low", "high"]
 
+const unsupported = (member: string): RemoteFailure => ({
+  kind: "error",
+  code: "unsupported",
+  message: `The fake remote client has no ${member}.`,
+  next_action: "Fake it in the test that calls it.",
+})
+
+/**
+ * The remote client of a fake account: its device service state and devices, this device on the self row. `fail` makes
+ * every account read settle with that failure (a device service that cannot answer).
+ */
+export function fakeRemoteClient(account: {
+  readonly state: () => string
+  readonly here: string | null
+  readonly devices: () => readonly RemoteDevice[]
+  readonly fail?: RemoteFailure
+  /** Only the device list fails with this (the service state still answers). */
+  readonly devicesFail?: RemoteFailure
+  /** Each account read, by member name, in call order. */
+  readonly reads?: string[]
+}): RemoteClient {
+  const row = (device: RemoteDevice): DeviceRow => ({
+    id: device.device,
+    name: device.label,
+    kind: "device",
+    platform: "linux",
+    online: device.online,
+    last_seen_ms: null,
+    ...(device.device === account.here ? { self: true as const } : {}),
+    caps: { attach: true, machine: false, control: false },
+  })
+  const none =
+    (member: string) =>
+    async (..._args: unknown[]): Promise<RemoteFailure> =>
+      unsupported(member)
+  return {
+    service: {
+      info: none("service.info"),
+      status: async () => {
+        account.reads?.push("service.status")
+        if (account.fail !== undefined) return account.fail
+        const state = account.state() as ServiceStatus["state"]
+        const device = account.here === null ? null : { id: account.here, name: account.here }
+        return {
+          kind: "ok",
+          value: { state, since_ms: 0, device, origin_configured: true, enabled: true, service_version: "test" },
+        }
+      },
+      setEnabled: none("service.setEnabled"),
+      control: none("service.control"),
+      setControl: none("service.setControl"),
+      bootstrap: none("service.bootstrap"),
+      wake: none("service.wake"),
+      setWake: none("service.setWake"),
+    },
+    devices: {
+      list: async () => {
+        account.reads?.push("devices.list")
+        return account.fail ?? account.devicesFail ?? { kind: "ok", value: account.devices().map(row) }
+      },
+      resolve: none("devices.resolve"),
+    },
+    sessions: {
+      list: none("sessions.list"),
+      resolve: none("sessions.resolve"),
+      get: none("sessions.get"),
+      open: none("sessions.open"),
+      send: none("sessions.send"),
+      read: none("sessions.read"),
+      follow: () => ({
+        [Symbol.asyncIterator]: async function* () {
+          yield { kind: "failed" as const, failure: unsupported("sessions.follow") }
+        },
+        stop: () => {},
+      }),
+      wait: none("sessions.wait"),
+      interrupt: none("sessions.interrupt"),
+      setModel: none("sessions.setModel"),
+      setReasoning: none("sessions.setReasoning"),
+      close: none("sessions.close"),
+      archive: none("sessions.archive"),
+    },
+    attach: none("attach"),
+    aliases: { resolve: none("aliases.resolve"), set: none("aliases.set"), clear: none("aliases.clear") },
+    close: () => {},
+  }
+}
+
 export const comparable = (result: ThreadToolResult): unknown => {
-  const { thread_id: _id, link: _link, device: _device, ...rest } = result as Record<string, unknown>
+  const { thread: _thread, link: _link, device: _device, ...rest } = result as Record<string, unknown>
   return rest
+}
+
+/**
+ * A record the prompt's run writes, as senpi streams it: the prompt's own user message (`message_start`/`message_end`)
+ * carries the client message id the prompt named, when it named one and the record names none.
+ */
+export const stampPromptRecord = (record: JsonObject, clientMessageId: unknown): JsonObject => {
+  const message = record["message"]
+  if (
+    typeof clientMessageId !== "string" ||
+    (record["type"] !== "message_start" && record["type"] !== "message_end") ||
+    typeof message !== "object" ||
+    message === null ||
+    Array.isArray(message) ||
+    (message as JsonObject)["role"] !== "user" ||
+    "clientMessageId" in message
+  )
+    return record
+  return { ...record, message: { ...(message as JsonObject), clientMessageId } }
 }
 
 export function createRemoteThreadFixture() {
@@ -99,19 +211,52 @@ export function createRemoteThreadFixture() {
       rowState?: string
       live?: readonly string[]
       records?: readonly JsonObject[]
+      /** Entries the session stores once its turn ran (a queued send is stored when the queue drains): served on reads after the turn's records went out. */
+      entriesAfterAnswer?: readonly JsonObject[]
+      /** The turn finishes before its prompt's reply reaches the sender: its records go out at once, before the aim. */
+      recordsBeforeReply?: boolean
       rows?: readonly RemoteSessionRow[]
+      /** b's session entries, which its engine pages through `get_entries` (#14047); absent: an engine that pages nothing. */
+      entries?: FakeEntryLog
       /** Devices the account listing names as not answering this round. */
       incomplete?: readonly string[]
       /** Extra devices the account lists beyond this one and b. */
       devices?: readonly RemoteDevice[]
       /** The roster as relayd answers it: without this device (its row then comes from thisDeviceName). */
       rosterWithoutSelf?: boolean
-      failDevices?: boolean
       registryDown?: "refused" | "throws" | "signed_out"
       /** Only the claim fails (resolve and aliasesOf still answer): a token that expired between the two calls. */
       claimDown?: "refused" | "signed_out"
       chainCountLimit?: number
       relayKeys?: ReadonlyMap<string, string>
+      /** omo#13037: sessions a device holds on disk but runs nowhere, by device then durable id, with that device's key. */
+      ended?: Readonly<Record<string, Readonly<Record<string, string>>>>
+      /** omo#13037: devices whose single-probe lookup gets no answer within the bound. */
+      silent?: readonly string[]
+      /** omo#13037: this device's service carries the wake mark and the single probe (both gates open). Off by default, as shipped. */
+      wakeFeature?: boolean
+      /** omo#13037: this device's service makes no single probe (the lookup is never made). */
+      noLookup?: boolean
+      /** omo#13037 review: a sessions port as before the lookup existed (no lookup, no capability read). */
+      withoutLookup?: boolean
+      /** omo#13037 review: the account's device list cannot be read. */
+      devicesFail?: boolean
+      /** This device's own id read (device.info): it fails, or the service answers without an id. */
+      selfDevice?: "throws" | "unknown"
+      /** omo#13037: this device's service cannot carry the wake target (no wake is sent; today's path). */
+      noWake?: boolean
+      /** omo#13037: the wake path's answer; default the consumer's queued envelope with `waiting_on: {kind: "wake"}`. */
+      wakeOutcome?: RemoteCommandOutcome
+      /** The `get_state` fields a live session reports beyond the engine defaults (`paused`, `holds`). */
+      liveState?: JsonObject
+      /** b's engine refuses every open_session with this error text (senpi names an unresolvable model `model_unavailable: ...`). */
+      openRefuse?: string
+      /** b knows a session it just opened only by its relay key (relayKeys), not by its durable id: a listing that has not caught up yet. */
+      relayKeyOnly?: boolean
+      /** The device service throws on b's admit_external_message (a lost connection mid-delivery). */
+      admitThrows?: string
+      /** Every get_state after b admitted a delivery is refused with this reason (the read after the admission fails). */
+      stateRefusedAfterAdmit?: string
     } = {},
   ) {
     const engine = options.engine ?? ENGINE
@@ -120,13 +265,31 @@ export function createRemoteThreadFixture() {
     // admissions its user's open draft still holds (held_draft, taken by nothing).
     const admitted = new Set<string>()
     let heldDraft = options.heldDraft ?? 0
-    // The session's records a prompt makes it write, delivered to every watch after the prompt is answered.
-    const watchers = new Set<(record: JsonObject) => void>()
-    const writeRecords = () =>
-      queueMicrotask(() => {
-        for (const record of options.records ?? []) for (const listener of [...watchers]) listener(record)
-      })
+    // The session's records a prompt makes it write, held until the follower first reads after the answer: the
+    // engine's turn records follow its reply out over the wire, and the CLI's read is the first observable hop after
+    // its own bookkeeping for that reply.
+    const watchers = new Set<RemoteWatchHandlers>()
+    const ends = new Set<(end: RemoteWatchEnd) => void>()
+    // Settles when the first watch opens, so a test triggers a status change only once something is watching.
+    let watchStarted: () => void = () => {}
+    const watching = new Promise<void>((resolve) => {
+      watchStarted = resolve
+    })
+    let answeredPrompt = false
+    let recordsOut = false
+    // The client message id the answered prompt named: senpi stamps the prompt's own user message with it.
+    let promptClientMessageId: unknown
+    const writeRecords = () => {
+      if (recordsOut) return
+      recordsOut = true
+      for (const record of options.records ?? [])
+        for (const handlers of [...watchers]) handlers.record(stampPromptRecord(record, promptClientMessageId))
+    }
     const hops: number[] = []
+    const lookups: Array<{ readonly device: string; readonly durable_id: string }> = []
+    const deviceReads = { thisDevice: 0, devices: 0 }
+    // Account listing reads: `all` asks every device (one round across the account), `device` asks one device.
+    const listings = { all: 0, device: 0 }
     const aliases = options.aliases ?? new Map<string, AliasHolder>()
     // The sessions b's engine holds. Its close rules are senpi's (2026.11.5-1): close_session from a connection that never
     // attached is refused unknown_session (senpi#1782); an attached close releases only that hold, so the session ends
@@ -163,11 +326,16 @@ export function createRemoteThreadFixture() {
         live.delete(attachedTo)
         return ok({ outcome: "unloaded", sessionPath: B_ROW.path })
       }
+      if (rpc["type"] === "open_session" && options.openRefuse !== undefined)
+        return { kind: "refused", reason: options.openRefuse }
       if (rpc["type"] === "open_session") {
         const opened = rpc["sessionPath"] === undefined ? "dur-new-on-b" : "dur-on-b"
-        live.add(opened)
+        const key = options.relayKeys?.get(opened) ?? opened
+        for (const id of options.relayKeyOnly === true ? [key] : [opened, key]) live.add(id)
         return ok(options.openData ?? { sessionId: "rpc-9", state: { durableSessionId: opened } })
       }
+      if (rpc["type"] === "get_state" && options.stateRefusedAfterAdmit !== undefined && admitted.size > 0)
+        return { kind: "refused", reason: options.stateRefusedAfterAdmit }
       if (rpc["type"] === "get_state")
         return ok({
           isStreaming: engine.streaming,
@@ -175,8 +343,14 @@ export function createRemoteThreadFixture() {
           ...(engine.currentTurnId === undefined ? {} : { currentTurnId: engine.currentTurnId }),
           ...(engine.pendingQuestions === undefined ? {} : { pendingQuestions: [...engine.pendingQuestions] }),
           ...(engine.pendingDialogs === undefined ? {} : { pendingDialogs: [...engine.pendingDialogs] }),
+          ...options.liveState,
         })
       if (rpc["type"] === "get_messages") return ok({ messages: [...engine.messages] })
+      if (rpc["type"] === "get_entries") {
+        if (options.entries === undefined) return { kind: "refused", reason: "unsupported" }
+        const paged = answerGetEntries(options.entries, rpc)
+        return "refused" in paged ? { kind: "refused", reason: paged.refused } : ok(paged.data)
+      }
       if (rpc["type"] === "interrupt") return ok(engine.interrupt)
       // b's user set `threads.chainCountLimit` (senpi S32): its engine answers `{success: false, errorCode: "chain_count_limit"}`,
       // which the device service hands back as this refusal (device-service.ts).
@@ -234,10 +408,14 @@ export function createRemoteThreadFixture() {
       { device: "b", label: "studio", online: options.online ?? true },
       ...(options.devices ?? []),
     ]
-    for (const row of options.rows ?? [])
-      if (!devices.some((known) => known.device === row.device))
-        devices.push({ device: row.device, label: row.device, online: true })
+    for (const device of [
+      ...(options.rows ?? []).map((row) => row.device),
+      ...Object.keys(options.ended ?? {}),
+      ...(options.silent ?? []),
+    ])
+      if (!devices.some((known) => known.device === device)) devices.push({ device, label: device, online: true })
     const registryCalls: string[] = []
+    const accountReads: string[] = []
     const down = <T>(): Promise<AliasResult<T>> =>
       options.registryDown === "throws"
         ? Promise.reject(new Error("alias registry connection reset"))
@@ -309,19 +487,54 @@ export function createRemoteThreadFixture() {
               },
     }
     const remote: RemoteThreadSurface = {
+      loadProjector: async () => senpiProjector,
+      client: fakeRemoteClient({
+        state: () => options.plan ?? "connected",
+        // This device's own id comes from the same account read: unknown names no device, a failed read fails it.
+        here: options.selfDevice === "unknown" ? null : "here",
+        devices: () => devices,
+        reads: accountReads,
+        ...(options.selfDevice === "throws"
+          ? { fail: { kind: "error", code: "host_unavailable", message: "device.info failed", next_action: "Retry." } }
+          : {}),
+        ...(options.devicesFail === true
+          ? {
+              devicesFail: {
+                kind: "error",
+                code: "host_unavailable",
+                message: "closed",
+                next_action: "Retry.",
+              } as const,
+            }
+          : {}),
+      }),
       sessions: {
-        status: async () => ({ state: options.plan ?? "connected" }),
-        thisDevice: async () => "here",
+        status: async () => {
+          accountReads.push("port.status")
+          return { state: options.plan ?? "connected" }
+        },
+        thisDevice: async () => {
+          accountReads.push("port.thisDevice")
+          deviceReads.thisDevice += 1
+          if (options.selfDevice === "throws") throw new Error("device.info failed")
+          return options.selfDevice === "unknown" ? null : "here"
+        },
         thisDeviceName: async () => "this mac",
         devices: async () => {
-          if (options.failDevices === true) throw new Error("devices.list failed")
+          accountReads.push("port.devices")
+          deviceReads.devices += 1
+          if (options.devicesFail === true) throw new Error("closed")
           return devices
         },
-        sessions: async () => {
+        sessions: async (filter) => {
+          if (filter?.device === undefined) listings.all += 1
+          else listings.device += 1
           if (options.failSessionsList === true) throw new Error("account list failed")
-          return options.rows ?? [{ ...B_ROW, state: options.rowState ?? B_ROW.state }]
+          const rows = options.rows ?? [{ ...B_ROW, state: options.rowState ?? B_ROW.state }]
+          return filter?.device === undefined ? rows : rows.filter((row) => row.device === filter.device)
         },
         listing: async () => {
+          listings.all += 1
           if (options.failSessionsList === true) throw new Error("account list failed")
           return {
             rows: options.rows ?? [{ ...B_ROW, state: options.rowState ?? B_ROW.state }],
@@ -341,32 +554,81 @@ export function createRemoteThreadFixture() {
         },
         sessionCommand: async (device, session, rpc) => {
           sent.push({ via: "session", device, session, rpc })
+          if (rpc["type"] === "admit_external_message" && options.admitThrows !== undefined)
+            throw new Error(options.admitThrows)
           const outcome = answer(rpc, session)
-          if (rpc["type"] === "prompt" && outcome.kind === "ok") writeRecords()
+          if (rpc["type"] === "prompt" && outcome.kind === "ok") {
+            answeredPrompt = true
+            promptClientMessageId = rpc["clientMessageId"]
+            if (options.recordsBeforeReply === true) writeRecords()
+          }
           return outcome
         },
-        watch: async (device, session, listener) => {
+        watch: async (device, session, handlers, watchOptions) => {
           sent.push({ via: "watch", device, session })
           if (options.refuse !== undefined) return { kind: "refused", reason: options.refuse }
-          watchers.add(listener)
+          watchers.add(handlers)
+          let end: (reason: RemoteWatchEnd) => void = () => {}
+          const ended = new Promise<RemoteWatchEnd>((resolve) => {
+            end = resolve
+          })
+          ends.add(end)
+          watchStarted()
+          const initial =
+            watchOptions?.baseline === true
+              ? { initial: { status: engine.streaming ? "running" : "idle", sessionId: session } }
+              : {}
           return {
             kind: "ok",
             watch: {
-              ended: new Promise<string>(() => {}),
+              ended,
               stop: () => {
-                watchers.delete(listener)
+                watchers.delete(handlers)
+                end("stopped")
               },
+              ...initial,
             },
           }
         },
+        canLookup: async () => options.wakeFeature === true && options.noLookup !== true,
+        lookup: async (device, durableId) => {
+          if (options.noLookup === true || options.wakeFeature !== true) return { kind: "unavailable" }
+          lookups.push({ device, durable_id: durableId })
+          if (options.silent?.includes(device) === true) return { kind: "silent", reason: "host_not_answering" }
+          const key = options.ended?.[device]?.[durableId]
+          return key === undefined ? { kind: "none" } : { kind: "found", key }
+        },
+        canWake: async () => options.wakeFeature === true && options.noWake !== true,
+        wake: async (device, durableId, rpc) => {
+          if (options.noWake === true || options.wakeFeature !== true) return { kind: "unavailable" }
+          sent.push({ via: "wake", device, session: durableId, rpc })
+          return (
+            options.wakeOutcome ?? {
+              kind: "ok",
+              response: {
+                type: "response",
+                success: true,
+                data: {
+                  kind: "queued",
+                  stored_command_id: "stored-1",
+                  deduplicated: false,
+                  waiting_on: { kind: "wake" },
+                },
+              },
+            }
+          )
+        },
         read: async (device, session) => {
           sent.push({ via: "read", device, session })
+          const drained = recordsOut
+          if (answeredPrompt) writeRecords()
           return {
             kind: "ok",
             response: {
               entries: [
                 { role: "user", content: "hi b" },
                 { role: "assistant", content: "hello from b" },
+                ...(drained ? (options.entriesAfterAnswer ?? []) : []),
               ],
             },
           }
@@ -381,7 +643,28 @@ export function createRemoteThreadFixture() {
         },
       },
     }
-    return { remote, sent, hops, aliases, live, registryCalls }
+    if (options.withoutLookup === true) {
+      const { lookup: _lookup, canLookup: _canLookup, ...plain } = remote.sessions
+      ;(remote as { sessions: typeof plain }).sessions = plain
+    }
+    const endWatches = (reason: RemoteWatchEnd) => {
+      for (const end of [...ends]) end(reason)
+    }
+    return {
+      remote,
+      sent,
+      hops,
+      aliases,
+      live,
+      registryCalls,
+      lookups,
+      listings,
+      deviceReads,
+      watchers,
+      watching,
+      endWatches,
+      accountReads,
+    }
   }
 
   function surface(
@@ -391,15 +674,30 @@ export function createRemoteThreadFixture() {
       callerChainHop?: () => number
       callerName?: () => string | undefined
       callerReplyTargets?: () => readonly string[]
-      callerReplySenders?: () => readonly { readonly session_id: string; readonly name?: string }[]
+      callerReplySenders?: () => readonly {
+        readonly session_id: string
+        readonly name?: string
+        readonly device?: string
+      }[]
       env?: Readonly<Record<string, string | undefined>>
       sessions?: ThreadHostSession[]
       engine?: Engine
       caller?: string
       diskSessions?: readonly string[]
       closeOutcome?: ThreadCloseOutcome
-      /** How this device's engine takes `set_session_archived`: `absent` = a host port without it, `refused` = an older engine. */
-      archive?: "absent" | "refused"
+      /** Look session files up where senpi writes them, `<agentDir>/sessions`, as the component does. */
+      sessionsDirectory?: boolean
+      /** This device's engine refuses every open_session with this error text, as its host client throws it. */
+      openThrows?: string
+      /**
+       * #14060: the first N opens CREATE the session (under the asked `durableSessionId`, as a host with that capability
+       * does) and then lose the reply: the connection closes before the response arrives.
+       */
+      openLosesReply?: number
+      /** With `openLosesReply`: the next listing after a lost reply fails too, so the create cannot recover on the spot. */
+      listFailsAfterLostReply?: boolean
+      /** With `openLosesReply`: the host has no `durable_session_id` capability and creates under an id of its own. */
+      ignoresDurableSessionId?: boolean
     } = {},
   ) {
     const engine = extra.engine ?? ENGINE
@@ -411,32 +709,73 @@ export function createRemoteThreadFixture() {
       status: "open",
     }
     const sessions = extra.sessions ?? [local]
-    const openSession = mock(async (_request: Parameters<ThreadHost["openSession"]>[0]) => {
+    let lostReplies = extra.openLosesReply ?? 0
+    let listFails = false
+    const openSession = mock(async (request: Parameters<ThreadHost["openSession"]>[0]) => {
+      if (extra.openThrows !== undefined) throw new Error(extra.openThrows)
+      // An engine opening a session file on disk resumes it under the id in that file's header, as senpi does.
+      const resumed =
+        "sessionPath" in request && typeof request.sessionPath === "string" && existsSync(request.sessionPath)
+          ? (JSON.parse(readFileSync(request.sessionPath, "utf8").split("\n")[0] ?? "{}") as { id?: string }).id
+          : undefined
+      const losing = extra.openLosesReply !== undefined
       const created: ThreadHostSession = {
-        sessionId: "route-created",
-        durableSessionId: "dur-created-here",
+        sessionId: losing ? `route-created-${sessions.length}` : "route-created",
+        durableSessionId:
+          resumed ??
+          (losing && extra.ignoresDurableSessionId !== true && request.durableSessionId !== undefined
+            ? request.durableSessionId
+            : losing
+              ? `dur-created-${sessions.length}`
+              : "dur-created-here"),
         cwd: process.cwd(),
         name: null,
         status: "open",
       }
       sessions.push(created)
+      if (lostReplies > 0) {
+        lostReplies -= 1
+        listFails = extra.listFailsAfterLostReply === true
+        throw new Error("thread RPC connection closed before the response arrived")
+      }
       return created
     })
     const closed: Array<readonly [string, string | undefined]> = []
+    // The interrupt records this device's endpoint received, as b's engine's arrive in `sent`.
+    const interrupts: JsonObject[] = []
     const setSessionName = mock(async (_sessionId: string, _name: string) => {})
-    const archived: Array<readonly [string, boolean, string | undefined]> = []
-    const setSessionArchived = async (sessionId: string, value: boolean, durableId?: string) => {
-      if (extra.archive === "refused") throw new Error("unsupported:set_session_archived")
-      archived.push([sessionId, value, durableId])
-    }
+    // How often this device's endpoints were listed (the local enumeration a send can cost).
+    let localListings = 0
+    // How often a session on this device was prompted directly (a delivery never prompts; this counts any leak).
+    let localPrompts = 0
+    // The session watches open on this device's endpoint, as b's are in `watchers`; `watching` settles at the first.
+    const watchers = new Set<SessionWatchHandlers>()
+    const ends = new Set<(reason: string) => void>()
+    let watchStarted: () => void = () => {}
+    const watching = new Promise<void>((resolve) => {
+      watchStarted = resolve
+    })
     const host: ThreadHost = {
       socket: "/tmp/thread-remote-test.sock",
-      listSessions: async () => sessions,
+      listSessions: async () => {
+        localListings += 1
+        if (listFails) {
+          listFails = false
+          throw new Error("thread RPC connection closed before the response arrived")
+        }
+        return sessions
+      },
       openSession,
       getMessages: async () => [...engine.messages],
       getState: async () => ({ isStreaming: false }),
-      prompt: async () => ({ turnId: "turn-local" }),
-      interrupt: async () => engine.interrupt,
+      prompt: async () => {
+        localPrompts += 1
+        return { turnId: "turn-local" }
+      },
+      interrupt: async (_sessionId, request) => {
+        interrupts.push({ type: "interrupt", ...request })
+        return engine.interrupt
+      },
       setSessionName,
       setModel: async (_s, provider, id) => ({ provider, id }),
       getAvailableModels: async () => [],
@@ -449,7 +788,26 @@ export function createRemoteThreadFixture() {
         closed.push([sessionId, durableId])
         return extra.closeOutcome ?? "closed"
       },
-      ...(extra.archive === "absent" ? {} : { setSessionArchived }),
+      watchSession: async (_sessionId, handlers) => {
+        watchers.add(handlers)
+        let end: (reason: string) => void = () => {}
+        const ended = new Promise<string>((resolve) => {
+          end = resolve
+        })
+        ends.add(end)
+        watchStarted()
+        return {
+          kind: "ok",
+          watch: {
+            ended,
+            initial: { status: engine.streaming ? "running" : "idle" },
+            stop: () => {
+              watchers.delete(handlers)
+              end("stopped")
+            },
+          },
+        }
+      },
     }
     const agentDir = mkdtempSync(join(tmpdir(), "thread-remote-"))
     directories.push(agentDir)
@@ -466,11 +824,23 @@ export function createRemoteThreadFixture() {
       source_host: null,
     }))
     const caller = extra.caller ?? "dur-caller"
+    // Every delivery the gateway takes for a session on this device, by target: a local thread_send's real call.
+    const enqueued: Array<Parameters<GatewayStore["enqueue"]>[0]> = []
+    const countedStore = new Proxy(store, {
+      get: (target, property, receiver) =>
+        property === "enqueue"
+          ? (request: Parameters<GatewayStore["enqueue"]>[0]) => {
+              enqueued.push(request)
+              return target.enqueue(request)
+            }
+          : Reflect.get(target, property, receiver),
+    })
     const tools = createThreadTools({
       host,
-      store,
+      store: countedStore,
       stateDirectory: join(agentDir, "state"),
       diskSessions: () => disk,
+      ...(extra.sessionsDirectory === true ? { sessionsDirectory: () => join(agentDir, "sessions") } : {}),
       callerSessionId: () => caller,
       callerWorkspaceRoot: () => process.cwd(),
       remote,
@@ -496,7 +866,25 @@ export function createRemoteThreadFixture() {
       if (parse === undefined) throw new Error("thread_send declares no permission parser")
       return parse(args, process.cwd())
     }
-    return { run, permission, openSession, setSessionName, store, closed, archived, agentDir }
+    return {
+      run,
+      permission,
+      openSession,
+      setSessionName,
+      store,
+      closed,
+      interrupts,
+      agentDir,
+      listings: () => localListings,
+      prompts: () => localPrompts,
+      watchers,
+      watching,
+      endWatches: (reason: string) => {
+        for (const end of [...ends]) end(reason)
+      },
+      enqueuedFor: (durableId: string) => enqueued.filter((request) => request.target_durable_id === durableId).length,
+      enqueuedRequests: (durableId: string) => enqueued.filter((request) => request.target_durable_id === durableId),
+    }
   }
 
   return { account, surface, cleanup }

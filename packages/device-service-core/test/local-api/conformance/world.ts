@@ -37,13 +37,15 @@ export type WorldRevision = {
 }
 export type World = {
   readonly service_version: string
+  // omo#13037 A7.2.1: this run of the service cannot list the wake feature whatever the switch says.
+  readonly wake_overridden?: boolean
   readonly status: Status
   readonly devices: readonly DeviceRow[]
   readonly listing: {
     readonly revisions: readonly WorldRevision[]
     readonly devices: { readonly [device: string]: RoundDeviceState }
     // The newest sessions.list `rows` version the service knows (default 3); a newer one is refused invalid_request.
-    readonly rowsNewest?: 1 | 2 | 3 | 4
+    readonly rowsNewest?: 1 | 2 | 3
   }
   readonly sessions: readonly WorldSession[]
   // Decision 0018: the engine endpoint keys of the devices whose host takes delegated commands; others answer unsupported.
@@ -53,6 +55,23 @@ export type World = {
   // #393: what a host engine endpoint answers to an attach-less session.command {device, endpoint, rpc}: the engine's
   // reply data (sent as session.command_event before the states) and the outcome states.
   readonly endpointCommand?: { readonly data: JsonObject; readonly outcome: readonly CommandOutcome[] }
+  // omo#13037: an owner that takes delivery consumers; absent, every deliveries request answers unsupported.
+  readonly deliveries?: WorldDeliveries
+}
+
+type WorldHandOff = {
+  readonly command_id: string
+  readonly sender_device: string
+  readonly durable_id: string
+  readonly record: JsonObject
+}
+// The agent dirs a consumer may declare, the devices admitted with the grant now, and what the owner does to a consumer
+// the moment its declaration is accepted: hand it these records, and ask it whether it holds these durable ids.
+export type WorldDeliveries = {
+  readonly agent_dirs: readonly string[]
+  readonly admitted?: readonly string[]
+  readonly handed?: readonly WorldHandOff[]
+  readonly asked?: readonly string[]
 }
 
 export const PEER = "dev-peer-1"

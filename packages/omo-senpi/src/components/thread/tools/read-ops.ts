@@ -1,76 +1,55 @@
-import { listDiskSessions, toThreadAddressEntries } from "../address-book"
-import { workspaceDirectories, workspaceEntries } from "../addressing"
-import type { ThreadReadInput, ThreadState, ThreadToolResult } from "../contracts"
+import { workspaceEntries } from "../addressing"
+import type { ThreadReadInput, ThreadToolResult, ThreadWaitOutcome } from "../contracts"
 import { locateControl } from "../control/locate"
-import { controlIdentity } from "../control/port"
+import { controlIdentity, controlRefusalOf, type SessionControl } from "../control/port"
+import { isEntryCursor, staleEntryCursor } from "../paged-reader"
 import { readTranscript, type ThreadTranscriptEntry } from "../reader"
 import { threadLink } from "../thread-link"
 import {
   addressBook,
   degradedSummary,
   failure,
-  listedStates,
+  resolveEntries,
   sendAddressBook,
   summary,
   transcriptRole,
 } from "./internals"
+import { threadRow } from "./thread-row"
 import type { ThreadHostSession, ThreadHostView, ThreadToolSurfaceOptions } from "./ports"
 
 /**
  * `thread_list` over one host view. Default scope is the caller's workspace, the same test
  * thread_send applies before it delivers; the address book itself spans every workspace the host
- * knows. A session no engine holds is still a thread, listed `inactive` from its JSONL: one whose
- * endpoint stopped answering (with the endpoint's failure in error_note), and one whose session file
- * is in the scanned session directories (the caller's workspace, every workspace with `all_scope`;
- * the newest `DISK_LIST_MAX_SESSIONS` files, `inactive_truncated` when more were there) after its
- * engine closed it. `states` filters the rows; the default lists every state but archived.
+ * knows. A session whose endpoint stopped answering is still a thread: it is listed from its JSONL
+ * as resumable, with the endpoint's failure in error_note, instead of silently vanishing.
  */
 export function listThreads(
   options: ThreadToolSurfaceOptions,
   current: ThreadHostView,
   allScope: boolean | undefined,
-  states?: readonly ThreadState[],
 ): ThreadToolResult {
-  const root = options.callerWorkspaceRoot()
-  const sessionsDirectory = options.sessionsDirectory?.()
-  const scanned =
-    sessionsDirectory === undefined
-      ? { sessions: [], truncated: false }
-      : listDiskSessions(sessionsDirectory, { all_scope: allScope, workspaceRoots: workspaceDirectories(root) })
-  const book = addressBook(options, current, scanned.sessions)
-  const scoped = workspaceEntries(toThreadAddressEntries(book), root)
+  const scoped = workspaceEntries(resolveEntries(options, current), options.callerWorkspaceRoot())
   const inScope = (threadId: string) => allScope === true || scoped.some((entry) => entry.thread_id === threadId)
   const visible = current.sessions.filter((session) => inScope(session.durableSessionId ?? session.sessionId))
-  const listed = new Set(visible.map((session) => session.durableSessionId ?? session.sessionId))
+  const book = addressBook(options, current)
   const entryOf = (session: ThreadHostSession) =>
     book.find(
       (entry) =>
         entry.thread_id === (session.durableSessionId ?? session.sessionId) &&
         entry.source_host === (session.socket ?? entry.source_host),
     )
-  const scannedIds = new Set(scanned.sessions.map((session) => session.durable_id))
-  const inactive = book.filter(
-    (entry) =>
-      entry.status !== "live" &&
-      (entry.error_note !== undefined || scannedIds.has(entry.thread_id)) &&
-      !listed.has(entry.thread_id) &&
-      inScope(entry.thread_id),
+  const degraded = book.filter(
+    (entry) => entry.error_note !== undefined && entry.status !== "live" && inScope(entry.thread_id),
   )
   const order = new Map(book.map((entry, index) => [entry.thread_id, index]))
-  const shown = listedStates(states)
-  const threads = [...visible.map((session) => summary(session, entryOf(session))), ...inactive.map(degradedSummary)]
-    .filter((thread) => shown.has(thread.state))
+  const threads = [...visible.map((session) => summary(session, entryOf(session))), ...degraded.map(degradedSummary)]
     .sort(
       (left, right) =>
         (order.get(left.thread_id) ?? Number.MAX_SAFE_INTEGER) -
         (order.get(right.thread_id) ?? Number.MAX_SAFE_INTEGER),
     )
-  return {
-    kind: "ok",
-    threads,
-    scope: allScope === true ? "all" : "workspace",
-    ...(scanned.truncated ? { inactive_truncated: true } : {}),
-  }
+    .map((thread) => threadRow(thread))
+  return { kind: "ok", threads, scope: allScope === true ? "all" : "workspace" }
 }
 
 /**
@@ -87,13 +66,73 @@ export async function readThread(
   current: ThreadHostView,
   value: ThreadReadInput,
   callerId: string,
+  signal?: AbortSignal,
 ): Promise<ThreadToolResult> {
   const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
   if (located.kind === "error") return located.result
   if (located.kind === "not_live") return readDegraded(options, current, located.thread_id, value)
-  const { control } = located
-  const result = liveReadResult(control.thread_id, control.title, await control.getMessages(), value)
-  return result.kind === "ok" ? { ...result, ...controlIdentity(control) } : result
+  return readLive(located.control, value, signal)
+}
+
+/** `thread_read` of a live thread through its control: the optional wait, then one bounded slice. */
+async function readLive(
+  control: SessionControl,
+  value: ThreadReadInput,
+  signal?: AbortSignal,
+): Promise<ThreadToolResult> {
+  let wait: ThreadWaitOutcome | undefined
+  if (value.wait_ms !== undefined) {
+    try {
+      wait = await control.waitSettled(value.wait_ms, signal)
+    } catch (error) {
+      const refusal = controlRefusalOf(error)
+      if (refusal === undefined) throw error
+      return { kind: "error", error: refusal }
+    }
+  }
+  const result =
+    (await pagedReadResult(control, value)) ??
+    liveReadResult(control.thread_id, control.title, await control.getMessages(), value)
+  return result.kind === "ok"
+    ? { ...result, ...controlIdentity(control), ...(wait === undefined ? {} : { wait }) }
+    : result
+}
+
+/**
+ * The slice its holder pages (#14047), or undefined when the read takes the whole transcript: the leg pages nothing,
+ * the holder answers `unsupported`, or the cursor came from the whole-transcript reader. An entry cursor on a leg that
+ * no longer pages is stale.
+ */
+async function pagedReadResult(control: SessionControl, value: ThreadReadInput): Promise<ThreadToolResult | undefined> {
+  const entryCursor = value.cursor !== undefined && isEntryCursor(value.cursor)
+  if (value.cursor !== undefined && !entryCursor) return undefined
+  const page = await control.readEntryPage?.({
+    ...(value.max_bytes === undefined ? {} : { max_bytes: value.max_bytes }),
+    ...(value.cursor === undefined ? {} : { cursor: value.cursor }),
+  })
+  if (page === undefined || page.kind === "unsupported") {
+    if (!entryCursor) return undefined
+    return staleEntryCursor()
+  }
+  if (page.kind === "error") return page
+  return {
+    kind: "ok",
+    thread: control.thread_id,
+    link: threadLink(control.thread_id, control.title),
+    items: liveItems(page.messages),
+    truncated: page.truncated,
+    ...(page.next_cursor === null ? {} : { next_cursor: page.next_cursor }),
+    source: "live_host",
+  }
+}
+
+/** A live slice's messages as items, numbered from 1, on every leg. */
+function liveItems(messages: readonly ThreadTranscriptEntry[]) {
+  return messages.map((item, index) => ({
+    seq: index + 1,
+    role: transcriptRole(item.role),
+    content: JSON.stringify(item.content ?? item),
+  }))
 }
 
 /** A live session's transcript through the bounded reader; the same window rules on this device and on another one. */
@@ -107,13 +146,9 @@ export function liveReadResult(
   if (live.kind === "error") return { kind: "error", error: live.error }
   return {
     kind: "ok",
-    thread_id: threadId,
+    thread: threadId,
     link: threadLink(threadId, title),
-    items: live.items.map((item, index) => ({
-      seq: index + 1,
-      role: transcriptRole(item.role),
-      content: JSON.stringify(item.content ?? item),
-    })),
+    items: liveItems(live.items),
     truncated: live.truncated,
     ...(live.next_cursor === null ? {} : { next_cursor: live.next_cursor }),
     source: live.source,
@@ -121,9 +156,9 @@ export function liveReadResult(
 }
 
 /**
- * A thread with no live owner is read from its JSONL: one whose endpoint is dead (the address book
- * carries the durable path and the endpoint's failure) or one an engine closed, whose session file
- * the address book finds. A thread with no session file stays `not_resumable`.
+ * A thread with no live owner is read from its session file, the one a send to it finds (a closed thread, or one whose
+ * endpoint is dead, which adds the endpoint's failure as `error_note`). Only a thread with no file here is
+ * `not_resumable`.
  */
 function readDegraded(
   options: ThreadToolSurfaceOptions,
@@ -132,7 +167,7 @@ function readDegraded(
   value: ThreadReadInput,
 ): ThreadToolResult {
   const entry = sendAddressBook(options, current, threadId, true).find((candidate) => candidate.thread_id === threadId)
-  if (entry === undefined || entry.status === "live" || entry.session_path === null)
+  if (entry === undefined || entry.session_path === null)
     return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live.")
   const durable = readTranscript(
     { kind: "jsonl", path: entry.session_path, live_host_present: false },
@@ -153,7 +188,7 @@ function readDegraded(
   }))
   return {
     kind: "ok",
-    thread_id: threadId,
+    thread: threadId,
     link: threadLink(threadId, entry.title),
     items,
     truncated: durable.truncated,
