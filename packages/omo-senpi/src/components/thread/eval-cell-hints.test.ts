@@ -5,9 +5,11 @@ import { join } from "node:path"
 import { threadToolParamSchemas } from "./contracts"
 
 /**
- * Thread tools are eval-only since #12903. A model-facing sentence that names a bare "thread_list" sends the model
- * to a tool it cannot call directly, and one that writes a call with an argument the tool does not take gets
- * invalid_arguments back: either costs a turn.
+ * Thread tools are eval-only since #12903. A model-facing sentence that names only a bare "thread_list" sends the
+ * model to a tool it cannot call directly, and one that writes a call with an argument the tool does not take gets
+ * invalid_arguments back: either costs a turn. As in the tool descriptions (#14070), a sentence may name a tool
+ * directly when it also gives the eval form, `thread_list (tool.thread_list() in an eval cell)`, because the same
+ * text reaches sessions without an eval tool, where the tools are direct.
  */
 const SCHEMAS: Record<string, { properties: Record<string, unknown> }> = threadToolParamSchemas
 // Tests and their support files are not model-facing; the parameter schemas are shared with the `omo thread` CLI
@@ -31,7 +33,8 @@ function read(source: string): { code: string; sentences: string[] } {
 function hintProblems(sentences: readonly string[]): string[] {
   const problems: string[] = []
   for (const sentence of sentences) {
-    for (const [name] of sentence.matchAll(BARE_TOOL)) if (name in SCHEMAS) problems.push(`bare ${name}`)
+    for (const [name] of sentence.matchAll(BARE_TOOL))
+      if (name in SCHEMAS && !sentence.includes(`tool.${name}(`)) problems.push(`bare ${name}`)
     for (const [, name = "", args] of sentence.matchAll(EVAL_FORM)) {
       const schema = SCHEMAS[name]
       if (schema === undefined) problems.push(`no tool.${name}`)
@@ -48,16 +51,16 @@ function hintProblems(sentences: readonly string[]): string[] {
 const problemsOf = (lines: readonly string[]) => hintProblems(read(lines.join("\n")).sentences)
 
 describe("model-facing thread text names the eval cell", () => {
-  test("#given sentences that name a thread tool without tool. #when scanned #then each one is reported", () => {
+  test("#given sentences that name a thread tool without its eval form #when scanned #then each one is reported", () => {
     const problems = problemsOf([
       'export const a = "Read thread_outbox again and ack a cursor it returned."',
-      'export const b = "Run tool.thread_bindings in an eval cell or thread_outbox to see the state."',
+      'export const b = "Run tool.thread_list() in an eval cell or thread_outbox to see the state."',
       "// a comment's lone quote must not hide the next line",
-      "export const c = `Report through a binding of ${session}; thread_bindings lists them.`",
-      `export const d = 'Retry with mode set to "tail", then thread_rebind it.'`,
+      "export const c = `Send it to ${session}; thread_read shows the reply.`",
+      `export const d = 'Retry with mode set to "tail", then thread_rename it.'`,
     ])
 
-    expect(problems).toEqual(["bare thread_outbox", "bare thread_outbox", "bare thread_bindings", "bare thread_rebind"])
+    expect(problems).toEqual(["bare thread_outbox", "bare thread_outbox", "bare thread_read", "bare thread_rename"])
   })
 
   test("#given names, scopes, comments, types and eval forms #when scanned #then nothing is reported", () => {
@@ -68,6 +71,7 @@ describe("model-facing thread text names the eval cell", () => {
       'export type Name = "thread_read" | "thread_list"',
       'export const hint = "Run tool.thread_list in an eval cell and pass its thread_id."',
       'export const call = "Ask with tool.thread_send({ thread: <id>, message }) in an eval cell."',
+      'export const both = "Call thread_list (tool.thread_list() in an eval cell) and pass a row\'s thread value."',
     ])
 
     expect(problems).toEqual([])

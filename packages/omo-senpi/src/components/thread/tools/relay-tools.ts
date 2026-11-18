@@ -81,7 +81,7 @@ export function createRelayTools(context: RelayToolsContext): AnyTool[] {
         failure(
           "internal_error",
           `Thread relay operation failed: ${message}`,
-          "Retry; thread_report without binding_id uses the chat binding the gateway keeps for this session.",
+          "Retry; thread_report (tool.thread_report() in an eval cell) without binding_id uses the chat binding the gateway keeps for this session.",
         ),
       )
     }
@@ -131,7 +131,7 @@ export function createRelayTools(context: RelayToolsContext): AnyTool[] {
           return failure(
             "idempotency_uncertain",
             "An earlier completion report under this key was recorded without its arm sequence, and the session has no completion armed now: its completion was already written, or the arm is gone.",
-            "Read the binding's outbox with thread_outbox to see whether the completion was sent; to arm another, report again under a new idempotency_key.",
+            "Read the binding's outbox with thread_outbox (tool.thread_outbox() in an eval cell) to see whether the completion was sent; to arm another, report again under a new idempotency_key.",
           )
         options.onCompletionArmed?.(callerId, durableArmSeq)
       }

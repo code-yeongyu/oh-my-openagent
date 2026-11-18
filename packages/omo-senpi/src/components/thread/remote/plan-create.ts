@@ -114,7 +114,7 @@ function resolveDevice(
   return deviceFailure(
     "not_found",
     `No device named ${address} is signed in to this account.`,
-    "Pass a device name or id from candidates, or call thread_list with all_scope.",
+    "Pass a device name or id from candidates, or call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell).",
     address,
     devices,
   )
