@@ -178,7 +178,9 @@ describe("readSessionFactsAsync (a dead endpoint's listing, #13579)", () => {
       written(
         `${[HEADER, OLD, { ...OLD, id: "big", timestamp: NEW_TIMESTAMP, message: { role: "assistant", content: "x".repeat(160 * 1024) } }].map(line).join("\n")}\n`,
       ),
-      written(`${[HEADER, OLD].map(line).join("\n")}\n{"type":"message","timestamp":"${NEW_TIMESTAMP}","message":{"role":"assistant","content":"partial`),
+      written(
+        `${[HEADER, OLD].map(line).join("\n")}\n{"type":"message","timestamp":"${NEW_TIMESTAMP}","message":{"role":"assistant","content":"partial`,
+      ),
       written(`${line(OLD)}\n`),
       join(tmpdir(), "omo-session-facts-missing", "session.jsonl"),
     ]
