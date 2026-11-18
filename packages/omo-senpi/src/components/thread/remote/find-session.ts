@@ -26,16 +26,24 @@ const refusal = (
 const recordOf = (value: unknown): JsonObject | undefined =>
   typeof value === "object" && value !== null && !Array.isArray(value) ? (value as JsonObject) : undefined
 
+/** What the device holding a not-live row says of its session (`find_session`), or `unknown` when it cannot say. */
+export type HolderView = "running" | "on_disk" | "absent" | "unknown"
+
 /**
- * Whether an engine on `row`'s device runs its session now, by the holder's own answer (`find_session`'s `open`), for a
- * row this surface reads as ended: the listing and this surface's closed mark lag a reopen made elsewhere (#14179 review
- * L4). A holder that cannot say counts as not running it.
+ * The holder's own answer for a row this surface reads as not live, asked before any send path is chosen (#14184): the
+ * listing and this surface's closed mark lag a reopen made elsewhere (#14179 review L4), and a wake of a session the
+ * holder holds no file for waits out its deadline. An engine without the lookup, or one that does not answer, is
+ * `unknown`, and the send keeps the path it took before.
  */
-export async function runsNow(remote: RemoteThreadSurface, row: RemoteSessionRow): Promise<boolean> {
+export async function holderView(remote: RemoteThreadSurface, row: RemoteSessionRow): Promise<HolderView> {
   const thread = rowThreadId(row)
-  if (thread === "") return false
+  if (thread === "") return "unknown"
   const outcome = await remote.sessions.endpointCommand(row.device, { type: "find_session", durableSessionId: thread })
-  return outcome.kind === "ok" && recordOf(replyData(outcome.response)["found"])?.["open"] === true
+  if (outcome.kind !== "ok") return "unknown"
+  const data = replyData(outcome.response)
+  const found = recordOf(data["found"])
+  if (found !== undefined) return found["open"] === true ? "running" : "on_disk"
+  return data["unknown"] === true ? "absent" : "unknown"
 }
 
 /**

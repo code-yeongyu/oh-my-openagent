@@ -276,6 +276,10 @@ export function createRemoteThreadFixture() {
         ...(options.rows ?? [])
           .filter((row) => row.durable_id !== undefined && row.durable_id !== "dur-on-b")
           .map((row) => [row.durable_id as string, `/home/b/.omo/agent/sessions/${row.durable_id}.jsonl`]),
+        // A session a device holds on disk but runs nowhere (omo#13037) has its file there too.
+        ...Object.values(options.ended ?? {}).flatMap((held) =>
+          Object.keys(held).map((id) => [id, `/home/b/.omo/agent/sessions/${id}.jsonl`]),
+        ),
       ])
     const sent: Sent[] = []
     // b's engine ledger of admitted delivery ids (senpi external-admission: a repeated id is already_admitted), and how many

@@ -348,7 +348,29 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     ).toEqual(["rk-reopened"])
   })
 
-  test("#given an online b that refuses the reopen of its listed thread (it holds no session file) #when thread_send names that thread next #then not_resumable at once, and no session command waits on b (#14184, re-probe 2)", async () => {
+  test.each([
+    ["an ended row", { state: "ended" }],
+    ["a cached row", { source: "cache" }],
+  ] as const)(
+    "#given %s of an online b that can be woken, but b holds no session file for it #when the reopen is refused and thread_send names it next #then not_found at once, and nothing is woken or sent on b (#14184, re-probe 3)",
+    async (_row, shape) => {
+      // The real surface carries the wake path (relayd main): an ended row went straight to a wake b cannot do, and waited
+      // out b's deadline (about 60 s). b is asked first; a session it holds no file for is answered at once.
+      const a = account({ rows: [{ ...B_ROW, ...shape }], live: [], sessionFiles: {}, wakeFeature: true })
+      const { run } = surface(a.remote)
+      expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({
+        kind: "error",
+        error: { code: "not_found" },
+      })
+      expect(await run("thread_send", { thread: "dur-on-b", message: "still there?" })).toMatchObject({
+        kind: "error",
+        error: { code: "not_found", details: { device: "b", thread: "dur-on-b" } },
+      })
+      expect(a.sent.filter((entry) => entry.via === "session" || entry.via === "wake")).toEqual([])
+    },
+  )
+
+  test("#given an online b that refuses the reopen of its listed thread (it holds no session file) #when thread_send names that thread next #then not_found at once, as the refused reopen said, and no session command waits on b (#14184, re-probe 2)", async () => {
     // A cached row of an online device that runs nothing under it: the reopen asks b, which holds no file; the send that
     // follows asks b again and answers at once, instead of attaching to the row's old key until b's deadline.
     const a = account({ rows: [{ ...B_ROW, source: "cache" }], live: [], sessionFiles: {} })
@@ -359,7 +381,7 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     })
     expect(await run("thread_send", { thread: "dur-on-b", message: "still there?" })).toMatchObject({
       kind: "error",
-      error: { code: "not_resumable", details: { device: "b", thread: "dur-on-b" } },
+      error: { code: "not_found", details: { device: "b", thread: "dur-on-b" } },
     })
     expect(a.sent.filter((entry) => entry.via === "session" || entry.via === "wake")).toEqual([])
   })
