@@ -1,3 +1,4 @@
+// Vendored from sisyphuslabs/omo-relay-daemon@edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6 packages/local-api/src/validate-events.ts
 import { SESSION_READ_TAIL_MAX } from "./spec-proto.ts";
 import type { CommandStateEvent, EventKind, LocalEvent, RoundDeviceState } from "./protocol.ts";
 import {
@@ -13,10 +14,15 @@ import {
   nullable,
   oneOf,
   safeKey,
+  semver,
   uint,
 } from "./validate-fields.ts";
+import { MACHINE_EVENT_VALIDATORS } from "./validate-machine-events.ts";
 import { DELEGATED_EVENT_VALIDATORS } from "./validate-delegated.ts";
-import { deviceId, listingRowOf, readEntryOf, statusOf } from "./validate-shapes.ts";
+import { PRESENTER_EVENT_VALIDATORS } from "./validate-presenter.ts";
+import { DELIVERIES_EVENT_VALIDATORS } from "./validate-deliveries.ts";
+import { listingRowOf } from "./validate-listing-row.ts";
+import { deviceId, millis, readEntryOf, statusOf } from "./validate-shapes.ts";
 import {
   attachOf,
   eventFields,
@@ -31,6 +37,8 @@ import {
   RETRYABLE_STATES,
   ROUND_DEVICE_STATES,
   ROUND_STATES,
+  UPDATE_NOTICE_PHASES,
+  UPDATE_POLICIES,
   UPLOAD_ABORT_REASONS,
 } from "./vocabulary.ts";
 
@@ -92,7 +100,10 @@ const commandStateOf = (v: Fields): CommandStateEvent => {
 
 const VALIDATORS: EventValidators<EventKind> = {
   ...STREAM_EVENT_VALIDATORS,
+  ...MACHINE_EVENT_VALIDATORS,
   ...DELEGATED_EVENT_VALIDATORS,
+  ...PRESENTER_EVENT_VALIDATORS,
+  ...DELIVERIES_EVENT_VALIDATORS,
   "status.changed": (v) => ({
     type: "event",
     kind: "status.changed",
@@ -130,6 +141,17 @@ const VALIDATORS: EventValidators<EventKind> = {
       rows: rows.map(listingRowOf),
     };
   },
+  "sessions.listing_changed": (v) => {
+    const m = eventFields(v, ["device", "generation"]);
+    return {
+      type: "event",
+      kind: "sessions.listing_changed",
+      device: deviceId(m["device"]),
+      generation: nullable(m["generation"], (g) =>
+        uint(g, 0, Number.MAX_SAFE_INTEGER, "generation"),
+      ),
+    };
+  },
   "sessions.listing_end": (v) => {
     const m = eventFields(v, ["query_id", "revision", "incomplete"]);
     const incomplete = m["incomplete"];
@@ -159,6 +181,20 @@ const VALIDATORS: EventValidators<EventKind> = {
       query_id: queryOf(m),
       entries: rows,
       next_before,
+    };
+  },
+  "host.update_notice": (v) => {
+    const m = eventFields(v, ["target_version", "phase", "policy"], ["update_id", "deadline_ms"]);
+    const id = m["update_id"];
+    const deadline = m["deadline_ms"];
+    return {
+      type: "event",
+      kind: "host.update_notice",
+      ...(id === undefined ? {} : { update_id: localId(id, "update_id") }),
+      target_version: semver(m["target_version"], "target_version"),
+      phase: oneOf(UPDATE_NOTICE_PHASES, m["phase"], "update notice phase"),
+      ...(deadline === undefined ? {} : { deadline_ms: millis(deadline, "deadline_ms") }),
+      policy: oneOf(UPDATE_POLICIES, m["policy"], "update policy"),
     };
   },
   "session.upload_abort": (v) => {

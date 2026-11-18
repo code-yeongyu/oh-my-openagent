@@ -13,7 +13,12 @@ describe("PostHog test guard preload (#10394)", () => {
     // given
     const fetchSpy = spyOn(globalThis, "fetch").mockImplementation(async () => new Response("{}", { status: 200 }))
     const flushLog = spyOn(console, "error").mockImplementation(() => undefined)
-    const client = new PostHog("phc_test_guard_dummy_key", { host: "https://us.i.posthog.com", flushAt: 1, flushInterval: 0, fetchRetryCount: 0 })
+    const client = new PostHog("phc_test_guard_dummy_key", {
+      host: "https://us.i.posthog.com",
+      flushAt: 1,
+      flushInterval: 0,
+      fetchRetryCount: 0,
+    })
 
     try {
       // when
@@ -29,7 +34,9 @@ describe("PostHog test guard preload (#10394)", () => {
       expect(flushError).toBeDefined()
       const violations: string[] = takePostHogTestGuardViolations()
       expect(violations.length).toBeGreaterThan(0)
-      expect(violations.every((violation) => violation.includes("sent product telemetry to https://us.i.posthog.com"))).toBe(true)
+      expect(
+        violations.every((violation) => violation.includes("sent product telemetry to https://us.i.posthog.com")),
+      ).toBe(true)
     } finally {
       flushLog.mockRestore()
       fetchSpy.mockRestore()
@@ -56,8 +63,21 @@ describe("PostHog test guard preload (#10394)", () => {
 
     try {
       // when
-      const run = Bun.spawn([process.execPath, "test", "--preload", join(import.meta.dir, "posthog-test-guard.preload.ts"), "./after-last.test.ts"], { cwd: scratch, stdout: "pipe", stderr: "pipe" })
-      const [exitCode, stdout, stderr] = await Promise.all([run.exited, new Response(run.stdout).text(), new Response(run.stderr).text()])
+      const run = Bun.spawn(
+        [
+          process.execPath,
+          "test",
+          "--preload",
+          join(import.meta.dir, "posthog-test-guard.preload.ts"),
+          "./after-last.test.ts",
+        ],
+        { cwd: scratch, stdout: "pipe", stderr: "pipe" },
+      )
+      const [exitCode, stdout, stderr] = await Promise.all([
+        run.exited,
+        new Response(run.stdout).text(),
+        new Response(run.stderr).text(),
+      ])
 
       // then
       expect(exitCode).not.toBe(0)

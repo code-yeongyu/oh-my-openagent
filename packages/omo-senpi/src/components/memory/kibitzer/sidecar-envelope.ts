@@ -41,21 +41,28 @@ export function merge(parts: readonly Payload[]): Payload {
   }
 }
 
-export function envelopeInput(core: SidecarCore, payload: Payload, maxItems: number, withTask: boolean): KibitzerSidecarEnvelopeInput {
+export function envelopeInput(
+  core: SidecarCore,
+  payload: Payload,
+  maxItems: number,
+  withTask: boolean,
+): KibitzerSidecarEnvelopeInput {
   return {
     sessionId: core.sessionId,
     maxItems,
     toolBudget: core.toolBudget,
     events: payload.events.map(sidecarEvent),
     candidates: payload.candidates,
-    ...(payload.digest === undefined ? {} : {
-      digest: {
-        text: payload.digest.line,
-        cursorFrom: payload.digest.firstCursor,
-        cursorTo: payload.digest.lastCursor,
-        folded: payload.digest.count,
-      },
-    }),
+    ...(payload.digest === undefined
+      ? {}
+      : {
+          digest: {
+            text: payload.digest.line,
+            cursorFrom: payload.digest.firstCursor,
+            cursorTo: payload.digest.lastCursor,
+            folded: payload.digest.count,
+          },
+        }),
     ...(withTask && core.taskSummary !== undefined ? { taskSummary: core.taskSummary } : {}),
   }
 }
@@ -66,9 +73,19 @@ function sidecarEvent(event: KibitzerEvent): KibitzerSidecarEvent {
     case "assistant":
       return { cursor: event.cursor, kind: event.kind, text: event.body }
     case "tool_call":
-      return { cursor: event.cursor, kind: event.kind, ...(event.tool === undefined ? {} : { tool: event.tool }), args: event.body }
+      return {
+        cursor: event.cursor,
+        kind: event.kind,
+        ...(event.tool === undefined ? {} : { tool: event.tool }),
+        args: event.body,
+      }
     case "tool_result":
-      return { cursor: event.cursor, kind: event.kind, ...(event.tool === undefined ? {} : { tool: event.tool }), resultHead: event.body }
+      return {
+        cursor: event.cursor,
+        kind: event.kind,
+        ...(event.tool === undefined ? {} : { tool: event.tool }),
+        resultHead: event.body,
+      }
     default:
       return event.kind satisfies never
   }

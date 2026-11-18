@@ -8,7 +8,8 @@ import { generateKeyPairSync } from "node:crypto"
 import { fakeApi, grant, memorySecrets, temporaryHome } from "../../omo-opencode/src/cli/service-auth/test-support"
 import { signedInSyncContext } from "../sync-context"
 
-const der = (key: { export(options: { format: "der"; type: "pkcs8" }): Buffer }) => key.export({ format: "der", type: "pkcs8" }).toString("base64")
+const der = (key: { export(options: { format: "der"; type: "pkcs8" }): Buffer }) =>
+  key.export({ format: "der", type: "pkcs8" }).toString("base64")
 const privateKeys = {
   signingPrivateKey: der(generateKeyPairSync("ed25519").privateKey),
   sealingPrivateKey: der(generateKeyPairSync("x25519").privateKey),
@@ -16,7 +17,10 @@ const privateKeys = {
 
 async function context() {
   const api = fakeApi((request) =>
-    new URL(request.url).pathname === "/v1/me" ? Response.json({ user: { id: "u" }, account: { id: "acct-fence" } }) : new Response(null, { status: 404 }))
+    new URL(request.url).pathname === "/v1/me"
+      ? Response.json({ user: { id: "u" }, account: { id: "acct-fence" } })
+      : new Response(null, { status: 404 }),
+  )
   const store = memorySecrets().store(api)
   await store.write({ ...grant, ...privateKeys })
   const ctx = await signedInSyncContext({ env: { OMO_SERVICE_API_URL: api }, cwd: await temporaryHome(), store })
@@ -33,7 +37,11 @@ test("#given a sync context #when another process logged out meanwhile #then no 
   const { ctx, store } = await context()
   await store.clear()
   let published = false
-  await expect(ctx.authority.boundary?.(() => { published = true })).rejects.toThrow("no longer current")
+  await expect(
+    ctx.authority.boundary?.(() => {
+      published = true
+    }),
+  ).rejects.toThrow("no longer current")
   expect(published).toBe(false)
   expect(ctx.authority.signal.aborted).toBe(true)
   expect(() => ctx.authority.admit(() => undefined)).toThrow()

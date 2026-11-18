@@ -26,7 +26,17 @@
 import { spawn as spawnChild } from "node:child_process"
 import { randomBytes } from "node:crypto"
 import { EventEmitter } from "node:events"
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, watch, writeFileSync } from "node:fs"
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  watch,
+  writeFileSync,
+} from "node:fs"
 import { createServer } from "node:http"
 import { createConnection } from "node:net"
 import { dirname, join, resolve, sep } from "node:path"
@@ -233,7 +243,9 @@ export function hasFlag(name) {
 export function evidenceDir(label) {
   const explicit = flag("--evidence-dir")
   const out = flag("--out")
-  const dir = explicit ?? (out === undefined ? join(QA_TMP_ROOT, `thread-qa-evidence-${label}-${Date.now()}`) : join(dirname(out), label))
+  const dir =
+    explicit ??
+    (out === undefined ? join(QA_TMP_ROOT, `thread-qa-evidence-${label}-${Date.now()}`) : join(dirname(out), label))
   mkdirSync(dir, { recursive: true })
   return dir
 }
@@ -280,7 +292,10 @@ export function waitFor(check, { label, timeoutMs = 60_000 } = {}) {
       }
     }
     const onTick = () => void evaluate()
-    const timer = setTimeout(() => finish(rejectPromise, new Error(`timeout after ${timeoutMs}ms waiting for: ${label ?? "condition"}`)), timeoutMs)
+    const timer = setTimeout(
+      () => finish(rejectPromise, new Error(`timeout after ${timeoutMs}ms waiting for: ${label ?? "condition"}`)),
+      timeoutMs,
+    )
     bus.on("tick", onTick)
     void evaluate()
   })
@@ -302,18 +317,29 @@ export function watchTree(dir) {
 
 async function run(command, args, { cwd, env } = {}) {
   return await new Promise((resolvePromise) => {
-    const child = spawnChild(command, args, { cwd, env: withTelemetryOptOut(env ?? process.env), stdio: ["ignore", "pipe", "pipe"] })
+    const child = spawnChild(command, args, {
+      cwd,
+      env: withTelemetryOptOut(env ?? process.env),
+      stdio: ["ignore", "pipe", "pipe"],
+    })
     const out = []
     const err = []
     child.stdout.on("data", (chunk) => out.push(chunk))
     child.stderr.on("data", (chunk) => err.push(chunk))
-    child.once("close", (code) => resolvePromise({ code, stdout: Buffer.concat(out).toString("utf8"), stderr: Buffer.concat(err).toString("utf8") }))
+    child.once("close", (code) =>
+      resolvePromise({
+        code,
+        stdout: Buffer.concat(out).toString("utf8"),
+        stderr: Buffer.concat(err).toString("utf8"),
+      }),
+    )
   })
 }
 
 function installedEngineVersion() {
   try {
-    return JSON.parse(readFileSync(join(KIT_DIR, "node_modules", "@code-yeongyu", "senpi", "package.json"), "utf8")).version
+    return JSON.parse(readFileSync(join(KIT_DIR, "node_modules", "@code-yeongyu", "senpi", "package.json"), "utf8"))
+      .version
   } catch {
     return undefined
   }
@@ -321,20 +347,30 @@ function installedEngineVersion() {
 
 /** Every kit dependency present on disk; a kit missing any one (an older or partial kit) is reinstalled. */
 function kitDependenciesPresent() {
-  return Object.keys(KIT_DEPENDENCIES).every((name) => existsSync(join(KIT_DIR, "node_modules", ...name.split("/"), "package.json")))
+  return Object.keys(KIT_DEPENDENCIES).every((name) =>
+    existsSync(join(KIT_DIR, "node_modules", ...name.split("/"), "package.json")),
+  )
 }
 
 /** Install the released engine (and the screen emulators) into the kit once; later calls reuse it. */
 export async function ensureKit() {
   if (!sameVersion(installedEngineVersion(), ENGINE_VERSION) || !kitDependenciesPresent()) {
     mkdirSync(KIT_DIR, { recursive: true })
-    writeFileSync(join(KIT_DIR, "package.json"), `${JSON.stringify({ name: "qa-thread-tools-kit", private: true, type: "module", dependencies: KIT_DEPENDENCIES }, null, 2)}\n`)
+    writeFileSync(
+      join(KIT_DIR, "package.json"),
+      `${JSON.stringify({ name: "qa-thread-tools-kit", private: true, type: "module", dependencies: KIT_DEPENDENCIES }, null, 2)}\n`,
+    )
     const installed = await run(process.execPath, ["install"], { cwd: KIT_DIR })
-    if (installed.code !== 0) throw new Error(`kit install failed (${installed.code}):\n${installed.stderr.slice(-2000)}`)
+    if (installed.code !== 0)
+      throw new Error(`kit install failed (${installed.code}):\n${installed.stderr.slice(-2000)}`)
   }
   const version = installedEngineVersion()
   if (!sameVersion(version, ENGINE_VERSION)) throw new Error(`kit engine is ${version}, expected ${ENGINE_VERSION}`)
-  return { dir: KIT_DIR, engineVersion: version, engineDist: join(KIT_DIR, "node_modules", "@code-yeongyu", "senpi", "dist") }
+  return {
+    dir: KIT_DIR,
+    engineVersion: version,
+    engineDist: join(KIT_DIR, "node_modules", "@code-yeongyu", "senpi", "dist"),
+  }
 }
 
 /**
@@ -391,7 +427,10 @@ export async function buildOmoInstall(name, patchNames = []) {
     if (patch === undefined) throw new Error(`unknown patch ${patchName}`)
     const path = join(root, "plugin", patch.file)
     const text = readFileSync(path, "utf8")
-    const hits = patch.from instanceof RegExp ? [...text.matchAll(new RegExp(patch.from.source, "g"))].length : text.split(patch.from).length - 1
+    const hits =
+      patch.from instanceof RegExp
+        ? [...text.matchAll(new RegExp(patch.from.source, "g"))].length
+        : text.split(patch.from).length - 1
     if (hits !== 1) throw new Error(`patch ${patchName} matched ${hits} sites in ${patch.file}; expected exactly 1`)
     writeFileSync(path, text.replace(patch.from, patch.to))
     applied.push({ patch: patchName, file: patch.file })
@@ -416,9 +455,16 @@ export function makeScratch(label, fake) {
   const home = join(dir, "home")
   const agentDir = join(dir, "agent")
   const work = join(dir, "work")
-  for (const path of [home, agentDir, work, join(agentDir, "omo-senpi", "omo-native")]) mkdirSync(path, { recursive: true })
+  for (const path of [home, agentDir, work, join(agentDir, "omo-senpi", "omo-native")])
+    mkdirSync(path, { recursive: true })
   writeFileSync(join(agentDir, "models.json"), `${JSON.stringify(mockModels(fake.url), null, 2)}\n`)
-  writeFileSync(join(agentDir, "settings.json"), `${JSON.stringify({ defaultProvider: "mock", defaultModel: "mock-model", quietStartup: true }, null, 2)}\n`)
+  // The thread tools are eval-only while codemode's eval tool exists (#12903). These scenarios test the
+  // gateway through the fake model's DIRECT `QA:CALL thread_*` calls, so they run the no-eval surface,
+  // where the tools are direct; `plugin-surface.mjs` is the lane that proves the eval-only exposure.
+  writeFileSync(
+    join(agentDir, "settings.json"),
+    `${JSON.stringify({ defaultProvider: "mock", defaultModel: "mock-model", quietStartup: true, disabledBuiltinExtensions: ["codemode"] }, null, 2)}\n`,
+  )
   const omoConfig = `${JSON.stringify({ task: { host_shard_prewarm: "off" } }, null, 2)}\n`
   writeFileSync(join(agentDir, "omo.json"), omoConfig)
   mkdirSync(join(home, ".omo"), { recursive: true })
@@ -448,7 +494,16 @@ function mockModels(url) {
         baseUrl: url,
         apiKey: "sk-qa-thread-tools",
         api: "openai-completions",
-        models: [{ id: "mock-model", baseUrl: url, api: "openai-completions", contextWindow: 128000, maxTokens: 4096, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } }],
+        models: [
+          {
+            id: "mock-model",
+            baseUrl: url,
+            api: "openai-completions",
+            contextWindow: 128000,
+            maxTokens: 4096,
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+          },
+        ],
       },
     },
   }
@@ -471,7 +526,13 @@ const DELIVERY_PATTERN = /^\[OMO_GATEWAY v=1 ([^\]]*)\]\n[^\n]*\n([\s\S]*)$/
 export function parseDeliveryText(text) {
   const match = DELIVERY_PATTERN.exec(text)
   if (match === null) return undefined
-  const header = Object.fromEntries(match[1].split(" ").slice(1).map((pair) => pair.split("=")).map(([key, ...value]) => [key, value.join("=")]))
+  const header = Object.fromEntries(
+    match[1]
+      .split(" ")
+      .slice(1)
+      .map((pair) => pair.split("="))
+      .map(([key, ...value]) => [key, value.join("=")]),
+  )
   let body = match[2]
   try {
     body = JSON.parse(match[2])
@@ -483,7 +544,8 @@ export function parseDeliveryText(text) {
 
 function contentText(message) {
   if (typeof message?.content === "string") return message.content
-  if (Array.isArray(message?.content)) return message.content.map((part) => (typeof part?.text === "string" ? part.text : "")).join("\n")
+  if (Array.isArray(message?.content))
+    return message.content.map((part) => (typeof part?.text === "string" ? part.text : "")).join("\n")
   return ""
 }
 
@@ -518,27 +580,53 @@ export async function startFakeModel() {
       }
       const messages = Array.isArray(body.messages) ? body.messages : []
       const last = messages.at(-1)
-      const record = { at: Date.now(), tools: (body.tools ?? []).map((tool) => tool?.function?.name), messages, answer: undefined }
+      const record = {
+        at: Date.now(),
+        tools: (body.tools ?? []).map((tool) => tool?.function?.name),
+        messages,
+        answer: undefined,
+      }
       requests.push(record)
       let turn
       if (last?.role === "tool") {
-        const call = [...messages].reverse().find((message) => message.role === "assistant" && Array.isArray(message.tool_calls))
-        const nameOf = (message) => call?.tool_calls?.find((toolCall) => toolCall.id === message.tool_call_id)?.function?.name ?? "unknown"
+        const call = [...messages]
+          .reverse()
+          .find((message) => message.role === "assistant" && Array.isArray(message.tool_calls))
+        const nameOf = (message) =>
+          call?.tool_calls?.find((toolCall) => toolCall.id === message.tool_call_id)?.function?.name ?? "unknown"
         // Parallel tool calls come back as one request carrying every result after the assistant message.
         const trailing = messages.slice(messages.lastIndexOf(call) + 1).filter((message) => message.role === "tool")
         const name = nameOf(last)
-        record.answer = { kind: "tool_result", tool: name, result: contentText(last), results: trailing.map((message) => ({ tool: nameOf(message), result: contentText(message) })) }
+        record.answer = {
+          kind: "tool_result",
+          tool: name,
+          result: contentText(last),
+          results: trailing.map((message) => ({ tool: nameOf(message), result: contentText(message) })),
+        }
         turn = { text: `QA-TOOL-RESULT ${name} ${contentText(last).replace(/\s+/g, " ").slice(0, 400)}` }
       } else {
         const raw = contentText([...messages].reverse().find((message) => message.role === "user"))
         const delivery = parseDeliveryText(raw.trim())
         const text = delivery?.body ?? raw
-        const scripted = [...text.matchAll(/QA:SCRIPT ([A-Za-z0-9_-]+)/g)].flatMap((match) => scripts.get(match[1]) ?? [])
-        const calls = [...scripted, ...[...text.matchAll(/QA:CALL ([A-Za-z0-9_]+) ([A-Za-z0-9_-]+)/g)].map((match) => ({ name: match[1], args: JSON.parse(Buffer.from(match[2], "base64url").toString("utf8")) }))]
+        const scripted = [...text.matchAll(/QA:SCRIPT ([A-Za-z0-9_-]+)/g)].flatMap(
+          (match) => scripts.get(match[1]) ?? [],
+        )
+        const calls = [
+          ...scripted,
+          ...[...text.matchAll(/QA:CALL ([A-Za-z0-9_]+) ([A-Za-z0-9_-]+)/g)].map((match) => ({
+            name: match[1],
+            args: JSON.parse(Buffer.from(match[2], "base64url").toString("utf8")),
+          })),
+        ]
         const hold = /QA:HOLD ([A-Za-z0-9_-]+)/.exec(text)?.[1]
         const tokens = [...new Set(text.match(/QA-TOKEN-[A-Za-z0-9_-]+/g) ?? [])]
         if (calls.length > 0) {
-          record.answer = { kind: "tool_calls", calls, ...(hold === undefined ? {} : { hold }), delivery: delivery?.header }
+          record.answer = {
+            kind: "tool_calls",
+            calls,
+            ...(hold === undefined ? {} : { hold }),
+            delivery: delivery?.header,
+          }
           turn = { toolCalls: calls, ...(hold === undefined ? {} : { hold }) }
         } else if (hold !== undefined) {
           record.answer = { kind: "hold", tag: hold, tokens, delivery: delivery?.header }
@@ -589,16 +677,26 @@ export async function startFakeModel() {
 function writeSse(res, turn, model, holds) {
   res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" })
   const base = { id: "chatcmpl-qa", object: "chat.completion.chunk", created: 0, model }
-  const send = (delta, finish = null) => res.write(`data: ${JSON.stringify({ ...base, choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`)
+  const send = (delta, finish = null) =>
+    res.write(`data: ${JSON.stringify({ ...base, choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`)
   const complete = () => {
-    res.write(`data: ${JSON.stringify({ ...base, choices: [], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } })}\n\n`)
+    res.write(
+      `data: ${JSON.stringify({ ...base, choices: [], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } })}\n\n`,
+    )
     res.write("data: [DONE]\n\n")
     res.end()
   }
   send({ role: "assistant", content: "" })
   if (turn.toolCalls !== undefined) {
     const sendCalls = () => {
-      send({ tool_calls: turn.toolCalls.map((call, index) => ({ index, id: `call_${randomBytes(6).toString("hex")}`, type: "function", function: { name: call.name, arguments: JSON.stringify(call.args) } })) })
+      send({
+        tool_calls: turn.toolCalls.map((call, index) => ({
+          index,
+          id: `call_${randomBytes(6).toString("hex")}`,
+          type: "function",
+          function: { name: call.name, arguments: JSON.stringify(call.args) },
+        })),
+      })
       send({}, "tool_calls")
       complete()
     }
@@ -666,7 +764,9 @@ export function allToolResults(fake, tool, from = 0) {
 export function toolCallResults(fake, tool, from = 0) {
   return fake.requests.slice(from).flatMap((request) => {
     if (request.answer?.kind !== "tool_result") return []
-    const call = [...request.messages].reverse().find((message) => message.role === "assistant" && Array.isArray(message.tool_calls))
+    const call = [...request.messages]
+      .reverse()
+      .find((message) => message.role === "assistant" && Array.isArray(message.tool_calls))
     return request.messages
       .slice(request.messages.lastIndexOf(call) + 1)
       .filter((message) => message.role === "tool")
@@ -695,12 +795,24 @@ export function toolCallResults(fake, tool, from = 0) {
 
 let terminalModule
 async function headlessTerminal(cols, rows) {
-  terminalModule ??= await import(join(KIT_DIR, "node_modules", "@xterm", "headless", "lib-headless", "xterm-headless.js"))
+  terminalModule ??= await import(
+    join(KIT_DIR, "node_modules", "@xterm", "headless", "lib-headless", "xterm-headless.js")
+  )
   const Terminal = terminalModule.Terminal ?? terminalModule.default?.Terminal
   return new Terminal({ cols, rows, allowProposedApi: true, scrollback: 5000 })
 }
 
-const KEYS = { enter: "\r", escape: "\x1b", tab: "\t", backspace: "\x7f", "ctrl+c": "\x03", "ctrl+d": "\x04", "ctrl+u": "\x15", up: "\x1b[A", down: "\x1b[B" }
+const KEYS = {
+  enter: "\r",
+  escape: "\x1b",
+  tab: "\t",
+  backspace: "\x7f",
+  "ctrl+c": "\x03",
+  "ctrl+d": "\x04",
+  "ctrl+u": "\x15",
+  up: "\x1b[A",
+  down: "\x1b[B",
+}
 
 /**
  * One interactive `omo` in a real pty. The raw byte stream goes to `<evidence>/<label>.pty.log`; the
@@ -754,7 +866,8 @@ export class Tui {
   screen() {
     const buffer = this.term.buffer.active
     const lines = []
-    for (let row = 0; row < this.term.rows; row += 1) lines.push(buffer.getLine(buffer.viewportY + row)?.translateToString(true) ?? "")
+    for (let row = 0; row < this.term.rows; row += 1)
+      lines.push(buffer.getLine(buffer.viewportY + row)?.translateToString(true) ?? "")
     return lines.join("\n")
   }
 
@@ -781,12 +894,19 @@ export class Tui {
   }
 
   async waitScreen(predicate, { label, timeoutMs = 60_000, scope = "screen" } = {}) {
-    const test = typeof predicate === "function" ? predicate : (text) => (predicate instanceof RegExp ? predicate.test(text) : text.includes(predicate))
-    return await waitFor(() => {
-      if (this.exitCode !== undefined) throw new Error(`${this.label} exited (${this.exitCode}) while waiting for ${label ?? predicate}`)
-      const text = scope === "history" ? this.history() : this.screen()
-      return test(text) ? text : undefined
-    }, { label: `${this.label}: ${label ?? String(predicate)}`, timeoutMs })
+    const test =
+      typeof predicate === "function"
+        ? predicate
+        : (text) => (predicate instanceof RegExp ? predicate.test(text) : text.includes(predicate))
+    return await waitFor(
+      () => {
+        if (this.exitCode !== undefined)
+          throw new Error(`${this.label} exited (${this.exitCode}) while waiting for ${label ?? predicate}`)
+        const text = scope === "history" ? this.history() : this.screen()
+        return test(text) ? text : undefined
+      },
+      { label: `${this.label}: ${label ?? String(predicate)}`, timeoutMs },
+    )
   }
 
   write(text) {
@@ -797,7 +917,10 @@ export class Tui {
   /** Type text the way a user does: one write per character, each echoed before the next. */
   async type(text) {
     for (const char of text) this.write(char)
-    await this.waitScreen(() => (this.editorText() ?? "").replace(/\s+/g, "").includes(text.replace(/\s+/g, "")), { label: `editor shows ${JSON.stringify(text.slice(0, 40))}`, timeoutMs: 20_000 })
+    await this.waitScreen(() => (this.editorText() ?? "").replace(/\s+/g, "").includes(text.replace(/\s+/g, "")), {
+      label: `editor shows ${JSON.stringify(text.slice(0, 40))}`,
+      timeoutMs: 20_000,
+    })
   }
 
   press(key) {
@@ -810,7 +933,10 @@ export class Tui {
   async submit(text) {
     await this.type(text)
     this.press("enter")
-    await this.waitScreen(() => this.editorText() === "", { label: `editor cleared after submitting ${JSON.stringify(text.slice(0, 40))}`, timeoutMs: 30_000 })
+    await this.waitScreen(() => this.editorText() === "", {
+      label: `editor cleared after submitting ${JSON.stringify(text.slice(0, 40))}`,
+      timeoutMs: 30_000,
+    })
   }
 
   saveLog() {
@@ -822,7 +948,10 @@ export class Tui {
 
 /** Run `omo <args>` from the scratch work dir with the scratch env; `--json` output is parsed. */
 export async function omo(scratch, install, args, { env = {}, cwd } = {}) {
-  const result = await run(process.env.THREAD_QA_NODE ?? "node", [install.omoJs, ...args], { cwd: cwd ?? scratch.work, env: { ...scratch.env, ...env } })
+  const result = await run(process.env.THREAD_QA_NODE ?? "node", [install.omoJs, ...args], {
+    cwd: cwd ?? scratch.work,
+    env: { ...scratch.env, ...env },
+  })
   let json
   const trimmed = result.stdout.trim()
   if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
@@ -843,9 +972,21 @@ export async function omo(scratch, install, args, { env = {}, cwd } = {}) {
 export async function startShardHost(scratch, install, owner) {
   const shard = await omo(scratch, install, ["host", "shard-path", "--kind", "i", "--owner", owner, "--json"])
   const socket = shard.json?.socket ?? shard.json?.path ?? shard.stdout.trim().split("\n").pop()
-  if (typeof socket !== "string" || !socket.endsWith(".sock")) throw new Error(`shard-path answered ${shard.code}: ${shard.stdout} ${shard.stderr}`)
-  const ensured = await omo(scratch, install, ["host", "ensure", "--launch-spec", join(install.plugin, "daemon-launch-spec.json"), "--policy", "upgrade", "--socket", socket, "--json"])
-  if (ensured.code !== 0) throw new Error(`host ensure ${socket} exited ${ensured.code}: ${ensured.stdout} ${ensured.stderr.slice(-800)}`)
+  if (typeof socket !== "string" || !socket.endsWith(".sock"))
+    throw new Error(`shard-path answered ${shard.code}: ${shard.stdout} ${shard.stderr}`)
+  const ensured = await omo(scratch, install, [
+    "host",
+    "ensure",
+    "--launch-spec",
+    join(install.plugin, "daemon-launch-spec.json"),
+    "--policy",
+    "upgrade",
+    "--socket",
+    socket,
+    "--json",
+  ])
+  if (ensured.code !== 0)
+    throw new Error(`host ensure ${socket} exited ${ensured.code}: ${ensured.stdout} ${ensured.stderr.slice(-800)}`)
   const client = await EndpointClient.connect(socket, `shard-${owner}`)
   return { socket, client, ensured: ensured.json }
 }
@@ -857,7 +998,12 @@ export async function openHostSession(client, cwd, extra = {}) {
   const routingId = opened.data.sessionId
   const listed = await client.request({ type: "list_sessions" })
   const row = listed.data.sessions.find((session) => session.sessionId === routingId)
-  return { routingId, durableId: row?.durableSessionId ?? opened.data.state?.sessionId, sessionPath: row?.sessionPath ?? opened.data.state?.sessionFile, row }
+  return {
+    routingId,
+    durableId: row?.durableSessionId ?? opened.data.state?.sessionId,
+    sessionPath: row?.sessionPath ?? opened.data.state?.sessionFile,
+    row,
+  }
 }
 
 /** `omo thread send <target> <text> --json` from the sandbox (principal `cli:<uid>`). */
@@ -869,7 +1015,9 @@ export async function cliSend(scratch, install, target, text, args = [], options
 
 let socketTransport
 async function engineSocketTransport() {
-  socketTransport ??= await import(join(KIT_DIR, "node_modules", "@code-yeongyu", "senpi", "dist", "modes", "rpc", "socket-transport.js"))
+  socketTransport ??= await import(
+    join(KIT_DIR, "node_modules", "@code-yeongyu", "senpi", "dist", "modes", "rpc", "socket-transport.js")
+  )
   return socketTransport
 }
 
@@ -928,12 +1076,15 @@ export class EndpointClient {
     this.sequence += 1
     const id = `${this.label}-${this.sequence}`
     this.socket.write(`${JSON.stringify({ id, ...command })}\n`)
-    return await waitFor(() => {
-      const found = this.records.find((record) => record.type === "response" && record.id === id)
-      if (found !== undefined) return found
-      if (this.closed) throw new Error(`${this.label}: connection closed before ${command.type} answered`)
-      return undefined
-    }, { label: `${this.label} ${command.type}`, timeoutMs })
+    return await waitFor(
+      () => {
+        const found = this.records.find((record) => record.type === "response" && record.id === id)
+        if (found !== undefined) return found
+        if (this.closed) throw new Error(`${this.label}: connection closed before ${command.type} answered`)
+        return undefined
+      },
+      { label: `${this.label} ${command.type}`, timeoutMs },
+    )
   }
 
   close() {
@@ -965,10 +1116,17 @@ export function registryEndpoints(agentDir) {
  * for the one session row. Returns `{ socket, durableId, sessionPath, row }`.
  */
 export async function awaitTuiEndpoint(scratch, tui, { exclude = [], timeoutMs = 60_000 } = {}) {
-  const record = await waitFor(() => {
-    if (tui.exitCode !== undefined) throw new Error(`${tui.label} exited (${tui.exitCode}) before registering its endpoint`)
-    return registryEndpoints(scratch.agentDir).find((endpoint) => endpoint.endpoint_kind === "tui" && !exclude.includes(endpoint.socket) && existsSync(endpoint.socket))
-  }, { label: `${tui.label} registers a tui endpoint`, timeoutMs })
+  const record = await waitFor(
+    () => {
+      if (tui.exitCode !== undefined)
+        throw new Error(`${tui.label} exited (${tui.exitCode}) before registering its endpoint`)
+      return registryEndpoints(scratch.agentDir).find(
+        (endpoint) =>
+          endpoint.endpoint_kind === "tui" && !exclude.includes(endpoint.socket) && existsSync(endpoint.socket),
+      )
+    },
+    { label: `${tui.label} registers a tui endpoint`, timeoutMs },
+  )
   const client = await EndpointClient.connect(record.socket, `${tui.label}-ctl`)
   const listed = await client.request({ type: "list_sessions" })
   const row = listed.data?.sessions?.[0]
@@ -1033,7 +1191,9 @@ const DELIVERY_TYPE = "session_control_delivery"
  * (`role: "custom"`, `customType: "session_control_delivery"`, `details.delivery_id`).
  */
 export function deliveryEntries(path) {
-  return sessionEntries(path).filter((entry) => entry.customType === DELIVERY_TYPE || entry.message?.customType === DELIVERY_TYPE)
+  return sessionEntries(path).filter(
+    (entry) => entry.customType === DELIVERY_TYPE || entry.message?.customType === DELIVERY_TYPE,
+  )
 }
 
 export function deliveryIdOf(entry) {
@@ -1044,7 +1204,11 @@ export function deliveryIdOf(entry) {
 export function assistantTexts(path) {
   return sessionEntries(path)
     .filter((entry) => entry.type === "message" && entry.message?.role === "assistant")
-    .map((entry) => (Array.isArray(entry.message.content) ? entry.message.content.map((part) => part.text ?? "").join("") : String(entry.message.content ?? "")))
+    .map((entry) =>
+      Array.isArray(entry.message.content)
+        ? entry.message.content.map((part) => part.text ?? "").join("")
+        : String(entry.message.content ?? ""),
+    )
 }
 
 /* ------------------------------------------------------------------ cleanup receipt */
@@ -1063,9 +1227,26 @@ export async function finishWithReceipt(report, { scratch, fake, evidence, extra
   const pids = [...children].map((entry) => ({ label: entry.label, pid: entry.pid }))
   await cleanupAll()
   const scratchDir = scratch?.dir
-  const survivors = scratchDir === undefined ? [] : capture("pgrep", ["-f", scratchDir]).split("\n").map((line) => line.trim()).filter(Boolean)
-  const unixHolders = scratchDir === undefined ? [] : capture("lsof", ["-U"]).split("\n").filter((line) => line.includes(scratchDir))
-  const portHolders = fake === undefined ? [] : capture("lsof", ["-a", "-i", `TCP:${fake.port}`, "-sTCP:LISTEN", "-t"]).split("\n").map((line) => line.trim()).filter(Boolean)
+  const survivors =
+    scratchDir === undefined
+      ? []
+      : capture("pgrep", ["-f", scratchDir])
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean)
+  const unixHolders =
+    scratchDir === undefined
+      ? []
+      : capture("lsof", ["-U"])
+          .split("\n")
+          .filter((line) => line.includes(scratchDir))
+  const portHolders =
+    fake === undefined
+      ? []
+      : capture("lsof", ["-a", "-i", `TCP:${fake.port}`, "-sTCP:LISTEN", "-t"])
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean)
   const scratchLeft = scratchDir !== undefined && existsSync(scratchDir)
   const receipt = {
     scenario: report.label,
@@ -1080,10 +1261,15 @@ export async function finishWithReceipt(report, { scratch, fake, evidence, extra
     scratch_removed: !scratchLeft,
     ...extra,
   }
-  if (evidence !== undefined) writeFileSync(join(evidence, "cleanup-receipt.json"), `${JSON.stringify(receipt, null, 2)}\n`)
+  if (evidence !== undefined)
+    writeFileSync(join(evidence, "cleanup-receipt.json"), `${JSON.stringify(receipt, null, 2)}\n`)
   report.assert(
     "cleanup-no-leftovers",
-    receipt.pids_alive.length === 0 && survivors.length === 0 && unixHolders.length === 0 && portHolders.length === 0 && !scratchLeft,
+    receipt.pids_alive.length === 0 &&
+      survivors.length === 0 &&
+      unixHolders.length === 0 &&
+      portHolders.length === 0 &&
+      !scratchLeft,
     `pids_alive=${JSON.stringify(receipt.pids_alive)} pgrep=${JSON.stringify(survivors)} lsof_unix=${unixHolders.length} lsof_port=${portHolders.length} scratch_removed=${!scratchLeft}`,
   )
   return receipt
@@ -1092,7 +1278,10 @@ export async function finishWithReceipt(report, { scratch, fake, evidence, extra
 /** Write the scenario's machine-readable result next to its text log. */
 export function writeResult(report, evidence, extra = {}) {
   if (evidence === undefined) return
-  writeFileSync(join(evidence, "result.json"), `${JSON.stringify({ scenario: report.label, failures: report.failures, skipped: report.skipped, product_defects: report.defects, steps: report.steps, ...extra }, null, 2)}\n`)
+  writeFileSync(
+    join(evidence, "result.json"),
+    `${JSON.stringify({ scenario: report.label, failures: report.failures, skipped: report.skipped, product_defects: report.defects, steps: report.steps, ...extra }, null, 2)}\n`,
+  )
   writeFileSync(join(evidence, "report.txt"), `${report.lines.join("\n")}\n`)
   const out = flag("--out")
   if (out !== undefined) {
@@ -1103,16 +1292,21 @@ export function writeResult(report, evidence, extra = {}) {
 
 /** The next `<tool>` result the fake model sees after request index `from`, parsed. */
 export async function awaitToolResult(fake, tool, from, { timeoutMs = 60_000, label } = {}) {
-  return await waitFor(() => {
-    const found = fake.requests.slice(from).find((request) => request.answer?.kind === "tool_result" && request.answer.tool === tool)
-    if (found === undefined) return undefined
-    try {
-      const parsed = JSON.parse(found.answer.result)
-      return parsed?.details?.result ?? parsed?.result ?? parsed
-    } catch {
-      return { unparsed: found.answer.result }
-    }
-  }, { label: label ?? `${tool} result`, timeoutMs })
+  return await waitFor(
+    () => {
+      const found = fake.requests
+        .slice(from)
+        .find((request) => request.answer?.kind === "tool_result" && request.answer.tool === tool)
+      if (found === undefined) return undefined
+      try {
+        const parsed = JSON.parse(found.answer.result)
+        return parsed?.details?.result ?? parsed?.result ?? parsed
+      } catch {
+        return { unparsed: found.answer.result }
+      }
+    },
+    { label: label ?? `${tool} result`, timeoutMs },
+  )
 }
 
 /**
@@ -1134,10 +1328,16 @@ export async function runScenario(label, body, { patches = [], installName } = {
     ctx.install = await buildOmoInstall(installName ?? `omo-ai-${label}`, patches)
     ctx.fake = await startFakeModel()
     ctx.scratch = makeScratch(label, ctx.fake)
-    report.log(`engine senpi ${ENGINE_VERSION} install=${ctx.install.root} patches=${ctx.install.patches.map((patch) => patch.patch).join(",")} scratch=${ctx.scratch.dir}`)
+    report.log(
+      `engine senpi ${ENGINE_VERSION} install=${ctx.install.root} patches=${ctx.install.patches.map((patch) => patch.patch).join(",")} scratch=${ctx.scratch.dir}`,
+    )
     await body(ctx)
   } catch (error) {
-    report.assert("scenario-completed", false, error instanceof Error ? (error.stack ?? error.message).split("\n").slice(0, 6).join(" | ") : String(error))
+    report.assert(
+      "scenario-completed",
+      false,
+      error instanceof Error ? (error.stack ?? error.message).split("\n").slice(0, 6).join(" | ") : String(error),
+    )
   } finally {
     for (const tui of ctx.tuis) {
       tui.saveLog()
@@ -1165,7 +1365,11 @@ const term = new Terminal({ cols: ${cols}, rows: ${rows}, fontSize: 14, fontFami
 term.open(document.getElementById('t'));
 window.__render = (data) => new Promise((done) => term.write(data, () => requestAnimationFrame(() => requestAnimationFrame(() => done('rendered')))));
 </script></body></html>`
-  const server = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => new Response(page, { headers: { "content-type": "text/html; charset=utf-8" } }) })
+  const server = Bun.serve({
+    port: 0,
+    hostname: "127.0.0.1",
+    fetch: () => new Response(page, { headers: { "content-type": "text/html; charset=utf-8" } }),
+  })
   const view = new Bun.WebView({ width: Math.ceil(cols * 8.5) + 32, height: rows * 17 + 32 })
   try {
     await view.navigate(`http://127.0.0.1:${server.port}/`)

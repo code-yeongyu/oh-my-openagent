@@ -18,8 +18,7 @@ export const AGENT_NAMES = [
 ]
 
 export const agentPattern = new RegExp(
-  `\\b(${AGENT_NAMES
-    .sort((a, b) => b.length - a.length)
+  `\\b(${AGENT_NAMES.sort((a, b) => b.length - a.length)
     .map((a) => a.replace(/-/g, "\\-"))
     .join("|")})\\b`,
   "i",

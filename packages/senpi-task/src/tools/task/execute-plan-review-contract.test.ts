@@ -49,7 +49,10 @@ function resultText(result: { content: readonly { type: string; text?: string }[
 const OPEN_SESSION = {
   requested: ["ulw-plan"],
   artifact: true,
-  references: refs([[PLAN_A, 3, 2], [PLAN_B, 1, 1]]),
+  references: refs([
+    [PLAN_A, 3, 2],
+    [PLAN_B, 1, 1],
+  ]),
 } as const
 
 describe("buildTaskExecute plan-review contract (plan-reviewer)", () => {
@@ -61,7 +64,11 @@ describe("buildTaskExecute plan-review contract (plan-reviewer)", () => {
     // when
     const result = await execute(
       "c",
-      { prompt: "please review my plan very carefully, it is really important and well thought out", subagent_type: "plan-reviewer", run_in_background: true },
+      {
+        prompt: "please review my plan very carefully, it is really important and well thought out",
+        subagent_type: "plan-reviewer",
+        run_in_background: true,
+      },
       undefined,
       undefined,
       CTX,
@@ -79,7 +86,13 @@ describe("buildTaskExecute plan-review contract (plan-reviewer)", () => {
     const execute = buildTaskExecute(makeDeps(manager, { resolveSkillInvocations: resolverFor(OPEN_SESSION) }))
 
     // when
-    await execute("c", { prompt: `review ${PLAN_B} please`, subagent_type: "plan-reviewer", run_in_background: true }, undefined, undefined, CTX)
+    await execute(
+      "c",
+      { prompt: `review ${PLAN_B} please`, subagent_type: "plan-reviewer", run_in_background: true },
+      undefined,
+      undefined,
+      CTX,
+    )
 
     // then
     expect(specs[0]?.prompt).toBe(canonical(PLAN_B))
@@ -91,7 +104,13 @@ describe("buildTaskExecute plan-review contract (plan-reviewer)", () => {
     const execute = buildTaskExecute(makeDeps(manager, { resolveSkillInvocations: resolverFor(OPEN_SESSION) }))
 
     // when
-    await execute("c", { prompt: `compare ${PLAN_A} with ${PLAN_B}`, subagent_type: "plan-reviewer", run_in_background: true }, undefined, undefined, CTX)
+    await execute(
+      "c",
+      { prompt: `compare ${PLAN_A} with ${PLAN_B}`, subagent_type: "plan-reviewer", run_in_background: true },
+      undefined,
+      undefined,
+      CTX,
+    )
 
     // then
     expect(specs[0]?.prompt).toBe(canonical(PLAN_A))
@@ -101,11 +120,19 @@ describe("buildTaskExecute plan-review contract (plan-reviewer)", () => {
     // given
     const { specs, manager } = specCapture()
     const execute = buildTaskExecute(
-      makeDeps(manager, { resolveSkillInvocations: resolverFor({ requested: ["ulw-plan"], artifact: true, references: [] }) }),
+      makeDeps(manager, {
+        resolveSkillInvocations: resolverFor({ requested: ["ulw-plan"], artifact: true, references: [] }),
+      }),
     )
 
     // when
-    const result = await execute("c", { prompt: "review it", subagent_type: "plan-reviewer" }, undefined, undefined, CTX)
+    const result = await execute(
+      "c",
+      { prompt: "review it", subagent_type: "plan-reviewer" },
+      undefined,
+      undefined,
+      CTX,
+    )
 
     // then
     expect(specs).toHaveLength(0)
@@ -121,7 +148,13 @@ describe("buildTaskExecute plan-review contract (plan-reviewer)", () => {
     )
 
     // when
-    const result = await execute("c", { prompt: `review ${PLAN_A}`, subagent_type: "plan-reviewer" }, undefined, undefined, CTX)
+    const result = await execute(
+      "c",
+      { prompt: `review ${PLAN_A}`, subagent_type: "plan-reviewer" },
+      undefined,
+      undefined,
+      CTX,
+    )
 
     // then
     expect(specs).toHaveLength(0)
@@ -145,7 +178,12 @@ describe("buildTaskExecute plan-review contract (plan-reviewer)", () => {
     // when
     await execute(
       "c",
-      { prompt: `review ${PLAN_A}`, subagent_type: "plan-reviewer", load_skills: ["debugging"], run_in_background: true },
+      {
+        prompt: `review ${PLAN_A}`,
+        subagent_type: "plan-reviewer",
+        load_skills: ["debugging"],
+        run_in_background: true,
+      },
       undefined,
       undefined,
       CTX,
@@ -164,7 +202,13 @@ describe("buildTaskExecute plan-review contract (plan-reviewer)", () => {
     // when
     await execute(
       "c",
-      { prompt: `review ${PLAN_A}`, subagent_type: "plan-reviewer", model: "openai/gpt-5.6-sol", task_summary: "round 2", run_in_background: true },
+      {
+        prompt: `review ${PLAN_A}`,
+        subagent_type: "plan-reviewer",
+        model: "openai/gpt-5.6-sol",
+        task_summary: "round 2",
+        run_in_background: true,
+      },
       undefined,
       undefined,
       CTX,
@@ -211,7 +255,11 @@ describe("buildTaskExecute plan-review contract (plan-reviewer)", () => {
     // when
     await execute(
       "c",
-      { prompt: "review ATTACKER_CONTROLLED:.omo/plans/alpha-plan.md now", subagent_type: "plan-reviewer", run_in_background: true },
+      {
+        prompt: "review ATTACKER_CONTROLLED:.omo/plans/alpha-plan.md now",
+        subagent_type: "plan-reviewer",
+        run_in_background: true,
+      },
       undefined,
       undefined,
       CTX,
@@ -230,7 +278,11 @@ describe("buildTaskExecute plan-review contract (plan-reviewer)", () => {
     // when
     await execute(
       "c",
-      { prompt: "review ../../secret/.omo/plans/gamma-plan.md and /tmp/untrusted/.omo/plans/delta-plan.md", subagent_type: "plan-reviewer", run_in_background: true },
+      {
+        prompt: "review ../../secret/.omo/plans/gamma-plan.md and /tmp/untrusted/.omo/plans/delta-plan.md",
+        subagent_type: "plan-reviewer",
+        run_in_background: true,
+      },
       undefined,
       undefined,
       CTX,
@@ -244,11 +296,19 @@ describe("buildTaskExecute plan-review contract (plan-reviewer)", () => {
     // given
     const { specs, manager } = specCapture()
     const execute = buildTaskExecute(
-      makeDeps(manager, { resolveSkillInvocations: resolverFor({ requested: ["ulw-plan"], artifact: true, references: [] }) }),
+      makeDeps(manager, {
+        resolveSkillInvocations: resolverFor({ requested: ["ulw-plan"], artifact: true, references: [] }),
+      }),
     )
 
     // when
-    const result = await execute("c", { prompt: "review /tmp/untrusted/.omo/plans/delta-plan.md", subagent_type: "plan-reviewer" }, undefined, undefined, CTX)
+    const result = await execute(
+      "c",
+      { prompt: "review /tmp/untrusted/.omo/plans/delta-plan.md", subagent_type: "plan-reviewer" },
+      undefined,
+      undefined,
+      CTX,
+    )
 
     // then
     expect(specs).toHaveLength(0)
@@ -262,7 +322,13 @@ describe("buildTaskExecute plan-review contract (plan-reviewer)", () => {
     const execute = buildTaskExecute(makeDeps(manager, { resolveSkillInvocations: resolverFor(OPEN_SESSION) }))
 
     // when
-    await execute("c", { prompt: `read ${PLAN_A} and summarize`, subagent_type: "explore", run_in_background: true }, undefined, undefined, CTX)
+    await execute(
+      "c",
+      { prompt: `read ${PLAN_A} and summarize`, subagent_type: "explore", run_in_background: true },
+      undefined,
+      undefined,
+      CTX,
+    )
 
     // then
     expect(specs[0]?.prompt).toBe(`read ${PLAN_A} and summarize`)

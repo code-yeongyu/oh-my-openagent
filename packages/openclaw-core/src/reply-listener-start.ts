@@ -91,9 +91,10 @@ export async function startReplyListener(
       }
     }
 
-    const stopped = runningPid === null
-      ? await waitForDaemonToStop(REPLY_LISTENER_STOP_TIMEOUT_MS)
-      : await waitForReplyListenerProcessExit(runningPid, REPLY_LISTENER_STOP_TIMEOUT_MS)
+    const stopped =
+      runningPid === null
+        ? await waitForDaemonToStop(REPLY_LISTENER_STOP_TIMEOUT_MS)
+        : await waitForReplyListenerProcessExit(runningPid, REPLY_LISTENER_STOP_TIMEOUT_MS)
     if (!stopped) {
       return {
         success: false,

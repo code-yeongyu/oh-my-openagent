@@ -8,7 +8,13 @@
  * reads is deleted.
  */
 import { OUTBOX_RETENTION_MS, rfc3339 } from "./bindings"
-import { DELIVERY_RETENTION_MS, PAIR_BUCKET_BURST, PAIR_BUCKET_REFILL_MS, RETENTION_SWEEP_BATCH, RETENTION_SWEEP_INTERVAL_MS } from "./constants"
+import {
+  DELIVERY_RETENTION_MS,
+  PAIR_BUCKET_BURST,
+  PAIR_BUCKET_REFILL_MS,
+  RETENTION_SWEEP_BATCH,
+  RETENTION_SWEEP_INTERVAL_MS,
+} from "./constants"
 import type { Sql } from "./sql"
 import { OPEN_STATES, type StoreContext, write } from "./store-ops"
 
@@ -31,8 +37,16 @@ export type RetentionSweep = {
  * retention. Answers how many rows it deleted: the caller passes that to `sweepRetentionIfDue`, which
  * counts it against the call's receipt batch.
  */
-export function deleteExpiredReceipt(ctx: StoreContext, key: { readonly principal: string; readonly operation: string; readonly idempotency_key: string }, now: number): number {
-  return write(ctx, "DELETE FROM receipts WHERE principal = ? AND operation = ? AND idempotency_key = ? AND expires_at <= ?", [key.principal, key.operation, key.idempotency_key, now])
+export function deleteExpiredReceipt(
+  ctx: StoreContext,
+  key: { readonly principal: string; readonly operation: string; readonly idempotency_key: string },
+  now: number,
+): number {
+  return write(
+    ctx,
+    "DELETE FROM receipts WHERE principal = ? AND operation = ? AND idempotency_key = ? AND expires_at <= ?",
+    [key.principal, key.operation, key.idempotency_key, now],
+  )
 }
 
 /**
@@ -43,7 +57,9 @@ export function deleteExpiredReceipt(ctx: StoreContext, key: { readonly principa
 export function sweepRetentionIfDue(ctx: StoreContext, now: number, receiptsDeleted = 0): RetentionSweep | null {
   if (now < (nextSweepDue.get(ctx.sql) ?? Number.NEGATIVE_INFINITY)) return null
   const swept = sweepRetention(ctx, now, Math.max(RETENTION_SWEEP_BATCH - receiptsDeleted, 0))
-  const full = swept.receipts + receiptsDeleted >= RETENTION_SWEEP_BATCH || Object.values(swept).some((count) => count >= RETENTION_SWEEP_BATCH)
+  const full =
+    swept.receipts + receiptsDeleted >= RETENTION_SWEEP_BATCH ||
+    Object.values(swept).some((count) => count >= RETENTION_SWEEP_BATCH)
   nextSweepDue.set(ctx.sql, full ? now : now + RETENTION_SWEEP_INTERVAL_MS)
   return swept
 }
@@ -51,7 +67,11 @@ export function sweepRetentionIfDue(ctx: StoreContext, now: number, receiptsDele
 export function sweepRetention(ctx: StoreContext, now: number, receiptBatch = RETENTION_SWEEP_BATCH): RetentionSweep {
   const batch = RETENTION_SWEEP_BATCH
   // A receipt check clears only an expired receipt under its own key; the backlog goes here, a batch at a time.
-  const receipts = write(ctx, "DELETE FROM receipts WHERE rowid IN (SELECT rowid FROM receipts WHERE expires_at <= ? LIMIT ?)", [now, receiptBatch])
+  const receipts = write(
+    ctx,
+    "DELETE FROM receipts WHERE rowid IN (SELECT rowid FROM receipts WHERE expires_at <= ? LIMIT ?)",
+    [now, receiptBatch],
+  )
   // A terminal delivery a live receipt points at stays: the receipt's replay reads it.
   const deliveries = write(
     ctx,
@@ -102,5 +122,14 @@ export function sweepRetention(ctx: StoreContext, now: number, receiptBatch = RE
       AND NOT EXISTS (SELECT 1 FROM completion_arms a WHERE a.session_durable_id = m.durable_id) LIMIT ?)`,
     [batch],
   )
-  return { receipts, deliveries, causal_edges: causalEdges, causal_roots: causalRoots, rate_buckets: rateBuckets, bindings, outbox_cursors: outboxCursors, session_meta: sessionMeta }
+  return {
+    receipts,
+    deliveries,
+    causal_edges: causalEdges,
+    causal_roots: causalRoots,
+    rate_buckets: rateBuckets,
+    bindings,
+    outbox_cursors: outboxCursors,
+    session_meta: sessionMeta,
+  }
 }

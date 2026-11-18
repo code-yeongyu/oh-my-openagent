@@ -75,7 +75,8 @@ $ARGUMENTS
       argumentHint: "[plan-name] [--worktree <path>] [--make-pr] [--ship]",
     },
     "stop-continuation": {
-      description: "(builtin) Stop all continuation mechanisms (ralph loop, todo continuation, boulder) for this session",
+      description:
+        "(builtin) Stop all continuation mechanisms (ralph loop, todo continuation, boulder) for this session",
       template: `<command-instruction>
 ${STOP_CONTINUATION_TEMPLATE}
 </command-instruction>`,
@@ -107,7 +108,8 @@ $ARGUMENTS
       argumentHint: "[goal]",
     },
     hyperplan: {
-      description: "(builtin) Adversarial multi-agent planning via team-mode (5 hostile category members cross-critique, lead synthesizes)",
+      description:
+        "(builtin) Adversarial multi-agent planning via team-mode (5 hostile category members cross-critique, lead synthesizes)",
       template: `<command-instruction>
 ${HYPERPLAN_TEMPLATE}
 </command-instruction>`,

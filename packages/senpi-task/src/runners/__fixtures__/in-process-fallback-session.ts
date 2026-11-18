@@ -8,11 +8,19 @@ import { loadSenpiBarrel } from "../../lazy/senpi-barrel"
 import { createMinimalSenpiResourceLoader } from "../../senpi/minimal-resource-loader"
 import { createRuntimeFallbackSettings } from "../in-process/runtime-fallback-settings"
 
-type StopReason = "stop" | "error"
+type StopReason = "stop" | "error" | "toolUse"
 
 type AssistantMessage = {
   readonly role: "assistant"
-  readonly content: readonly { readonly type: "text"; readonly text: string }[]
+  readonly content: readonly (
+    | { readonly type: "text"; readonly text: string }
+    | {
+        readonly type: "toolCall"
+        readonly id: string
+        readonly name: string
+        readonly arguments: Readonly<Record<string, unknown>>
+      }
+  )[]
   readonly api: "openai-completions"
   readonly provider: string
   readonly model: string
@@ -39,19 +47,14 @@ export type FallbackSessionHarness = {
   readonly calls: readonly string[]
   readonly events: readonly AgentSessionEvent[]
   readonly session: Awaited<ReturnType<typeof createAgentSession>>["session"]
-  dispose(): void
+  dispose(): Promise<void>
 }
 
 export const FALLBACK_PROVIDER = "runtime-fallback-test-alt"
 
 export async function createFallbackSessionHarness(errorMessage: string): Promise<FallbackSessionHarness> {
-  const {
-    createAgentSession,
-    ModelRegistry,
-    ModelRuntime,
-    SessionManager,
-    createExtensionRuntime,
-  } = await loadSenpiBarrel()
+  const { createAgentSession, ModelRegistry, ModelRuntime, SessionManager, createExtensionRuntime } =
+    await loadSenpiBarrel()
   const root = mkdtempSync(join(tmpdir(), "senpi-task-access-terminated-"))
   const modelRuntime = ModelRuntime.createSync()
   const modelRegistry = new ModelRegistry(modelRuntime)
@@ -72,19 +75,27 @@ export async function createFallbackSessionHarness(errorMessage: string): Promis
       )
     },
   })
-  Reflect.apply(modelRegistry.registerProvider, modelRegistry, ["runtime-fallback-test", providerFor("runtime-fallback-test", "dead-primary")])
-  Reflect.apply(modelRegistry.registerProvider, modelRegistry, [FALLBACK_PROVIDER, providerFor(FALLBACK_PROVIDER, "healthy-fallback")])
+  Reflect.apply(modelRegistry.registerProvider, modelRegistry, [
+    "runtime-fallback-test",
+    providerFor("runtime-fallback-test", "dead-primary"),
+  ])
+  Reflect.apply(modelRegistry.registerProvider, modelRegistry, [
+    FALLBACK_PROVIDER,
+    providerFor(FALLBACK_PROVIDER, "healthy-fallback"),
+  ])
   const primary = modelRegistry.find("runtime-fallback-test", "dead-primary")
   if (primary === undefined) throw new Error("primary model missing")
   const settingsManager = createRuntimeFallbackSettings(
     { cwd: root, agentDir: join(root, "agent"), projectTrusted: false },
     "runtime-fallback-test/dead-primary",
-    [{
-      source: "category",
-      provider: FALLBACK_PROVIDER,
-      model_id: "healthy-fallback",
-      display: `${FALLBACK_PROVIDER}/healthy-fallback`,
-    }],
+    [
+      {
+        source: "category",
+        provider: FALLBACK_PROVIDER,
+        model_id: "healthy-fallback",
+        display: `${FALLBACK_PROVIDER}/healthy-fallback`,
+      },
+    ],
   )
   if (settingsManager === undefined) throw new Error("fallback settings missing")
   const { session } = await createAgentSession({
@@ -109,9 +120,12 @@ export async function createFallbackSessionHarness(errorMessage: string): Promis
     calls,
     events,
     session,
-    dispose() {
+    // The engine starts its fallback-log first-start step when the session is created; dispose() only folds that step
+    // into the session's barrier, which is what says this root's agent dir can no longer be written (#13520).
+    async dispose() {
       unsubscribe()
       session.dispose()
+      await session.whenToolChildClosed()
       rmSync(root, { recursive: true, force: true })
     },
   }
@@ -189,9 +203,10 @@ export function streamMessage(message: AssistantMessage): EventStream {
     },
   }
   queueMicrotask(() => {
-    const event = message.stopReason === "error"
-      ? { type: "error", reason: "error", error: message }
-      : { type: "done", reason: "stop", message }
+    const event =
+      message.stopReason === "error"
+        ? { type: "error", reason: "error", error: message }
+        : { type: "done", reason: "stop", message }
     stream.push(event)
     stream.end(message)
   })

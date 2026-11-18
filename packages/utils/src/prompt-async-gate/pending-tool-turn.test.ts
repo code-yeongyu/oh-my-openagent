@@ -3,10 +3,7 @@
 // allow: SIZE_OK - pending tool-turn tests share one prompt-gate state machine fixture; this release adds narrow regressions and future edits should split by gate state.
 
 import { describe, expect, test } from "bun:test"
-import {
-  OMO_INTERNAL_INITIATOR_MARKER,
-  OMO_INTERNAL_NOREPLY_MARKER,
-} from "../internal-initiator-marker"
+import { OMO_INTERNAL_INITIATOR_MARKER, OMO_INTERNAL_NOREPLY_MARKER } from "../internal-initiator-marker"
 import { latestAssistantTurnBlocksInternalPrompt } from "./pending-tool-turn"
 
 const NOREPLY_TAIL_TEXT = `notification\n${OMO_INTERNAL_INITIATOR_MARKER}\n${OMO_INTERNAL_NOREPLY_MARKER}`
@@ -160,7 +157,7 @@ describe("latestAssistantTurnBlocksInternalPrompt", () => {
             tool: "question",
             state: {
               status: "completed",
-              output: "User has answered your questions: \"format\"=\"Flat codex:sess_abc\".",
+              output: 'User has answered your questions: "format"="Flat codex:sess_abc".',
             },
           },
         ],
@@ -250,10 +247,7 @@ describe("latestAssistantTurnBlocksInternalPrompt", () => {
           finish: "unknown",
           time: { created: 2000, completed: 3000 },
         },
-        parts: [
-          { type: "step-start" },
-          { type: "step-finish", reason: "unknown" },
-        ],
+        parts: [{ type: "step-start" }, { type: "step-finish", reason: "unknown" }],
       },
     ]
 

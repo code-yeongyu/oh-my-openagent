@@ -14,7 +14,7 @@ import { createLockRecord } from "../../locks/lock-record"
 import { createDeviceItemStore } from "./adapters/device-item-store"
 import { createGitSyncRepo } from "./adapters/git-sync-repo"
 import { type EngineStatus, SyncEngine } from "./engine"
-import type { Clock, FreezeSettler, Sealer, Transport, Verifier, WriterLock } from "./ports"
+import type { Clock, FreezeSettler, Sealer, SyncLog, Transport, Verifier, WriterLock } from "./ports"
 
 /** How long an apply waits for a memory tool write to finish before the cycle is retried. */
 const WRITER_WAIT_MS = 30_000
@@ -23,6 +23,10 @@ export interface SyncSession {
   readonly transport: Transport
   readonly verifier: Verifier
   readonly sealer: Sealer
+  /** The memory space (hex id) the verifier and sealer are bound to. */
+  readonly space: string
+  /** The per-device `local:` space this repository synced before it moved to the default space (#13720). */
+  readonly legacySpace?: string
   readonly freeze?: FreezeSettler
 }
 
@@ -34,7 +38,7 @@ export interface OpenDeviceSyncOptions {
   readonly locksDir: string
   readonly session: SyncSession
   readonly machineId?: string
-  readonly log?: (line: string) => void
+  readonly log?: SyncLog
   /** Called when the failure the status shows appears, changes kind or clears. */
   readonly onStatusChange?: () => void
 }
@@ -70,13 +74,17 @@ export async function openDeviceSync(options: OpenDeviceSyncOptions): Promise<De
   try {
     await mkdir(options.locksDir, { recursive: true })
     const writer: WriterLock = {
-      withLock: async (fn) => withLock(memoryWriterLockPath(options.locksDir), await createLockRecord("memory sync apply"), fn, { waitTimeoutMs: WRITER_WAIT_MS }),
+      withLock: async (fn) =>
+        withLock(memoryWriterLockPath(options.locksDir), await createLockRecord("memory sync apply"), fn, {
+          waitTimeoutMs: WRITER_WAIT_MS,
+        }),
     }
     const store = createDeviceItemStore({
       stateDir: options.stateDir,
       memoryRoot: options.repoDir,
       syncDir,
       ...(options.machineId === undefined ? {} : { machineId: options.machineId }),
+      ...(options.log === undefined ? {} : { log: options.log }),
     })
     const engine = new SyncEngine({
       repo,

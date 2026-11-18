@@ -62,7 +62,7 @@ export async function checkForUpdate(directory: string): Promise<UpdateCheckResu
   // still register.
   const needsUpdate = isStrictlyNewerVersion(currentVersion, latestVersion)
   log(
-    `[auto-update-checker] Current: ${currentVersion}, Latest (${channel}): ${latestVersion}, NeedsUpdate: ${needsUpdate}`
+    `[auto-update-checker] Current: ${currentVersion}, Latest (${channel}): ${latestVersion}, NeedsUpdate: ${needsUpdate}`,
   )
   return {
     needsUpdate,

@@ -3,6 +3,7 @@
 // key the engine compares to announce transitions only.
 
 import { describeSyncFailure, isFailureShown, type SyncFailure } from "./failure"
+import type { SyncStage } from "./failure-cause"
 import type { Frozen } from "./push-cycle"
 
 interface Failing {
@@ -40,19 +41,21 @@ export class StatusTracker {
     this.shown = null
   }
 
-  failed(error: unknown): void {
-    const failure = describeSyncFailure(error)
+  /** Records a failed cycle; true when the shown failure appeared or changed (#13635), the only time it is worth a warning. */
+  failed(error: unknown, stage: SyncStage): boolean {
+    const failure = describeSyncFailure(error, stage)
     const previous = this.failing
-    const failing = previous?.failure.kind === failure.kind
-      ? { failure, since: previous.since, attempts: previous.attempts + 1 }
-      : { failure, since: this.now(), attempts: 1 }
+    const failing =
+      previous?.failure.kind === failure.kind
+        ? { failure, since: previous.since, attempts: previous.attempts + 1 }
+        : { failure, since: this.now(), attempts: 1 }
     this.failing = failing
     // A failure below its threshold (an offline blip) never replaces or clears what is shown: only a
     // successful cycle clears a shown failure.
-    if (!isFailureShown(failing.failure.kind, failing.attempts)) return
+    if (!isFailureShown(failing.failure.kind, failing.attempts)) return false
     const shown = this.shown
-    this.shown = shown !== null && shown.failure.kind === failure.kind && shown.failure.action === failure.action
-      ? { failure, since: shown.since, attempts: shown.attempts + 1 }
-      : failing
+    const same = shown !== null && shown.failure.kind === failure.kind && shown.failure.action === failure.action
+    this.shown = same ? { failure, since: shown.since, attempts: shown.attempts + 1 } : failing
+    return !same
   }
 }

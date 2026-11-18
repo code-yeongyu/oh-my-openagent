@@ -73,7 +73,8 @@ export function createToolGuardHooks(args: {
         createToolOutputTruncatorHook(ctx, {
           modelCacheState,
           experimental: pluginConfig.experimental,
-        }))
+        }),
+      )
     : null
 
   let directoryAgentsInjector: ReturnType<typeof createDirectoryAgentsInjectorHook> | null = null
@@ -88,13 +89,13 @@ export function createToolGuardHooks(args: {
       })
     } else {
       directoryAgentsInjector = safeHook("directory-agents-injector", () =>
-        createDirectoryAgentsInjectorHook(ctx, modelCacheState))
+        createDirectoryAgentsInjectorHook(ctx, modelCacheState),
+      )
     }
   }
 
   const directoryReadmeInjector = isHookEnabled("directory-readme-injector")
-    ? safeHook("directory-readme-injector", () =>
-        createDirectoryReadmeInjectorHook(ctx, modelCacheState))
+    ? safeHook("directory-readme-injector", () => createDirectoryReadmeInjectorHook(ctx, modelCacheState))
     : null
 
   const emptyTaskResponseDetector = isHookEnabled("empty-task-response-detector")
@@ -107,12 +108,14 @@ export function createToolGuardHooks(args: {
     ? safeHook("rules-injector", () =>
         createRulesInjectorHook(ctx, modelCacheState, {
           skipClaudeUserRules,
-        }))
+        }),
+      )
     : null
 
   const tasksTodowriteDisabler = isHookEnabled("tasks-todowrite-disabler")
     ? safeHook("tasks-todowrite-disabler", () =>
-        createTasksTodowriteDisablerHook({ experimental: pluginConfig.experimental }))
+        createTasksTodowriteDisablerHook({ experimental: pluginConfig.experimental }),
+      )
     : null
 
   const writeExistingFileGuard = isHookEnabled("write-existing-file-guard")
@@ -124,7 +127,9 @@ export function createToolGuardHooks(args: {
     : null
 
   const hashlineReadEnhancer = isHookEnabled("hashline-read-enhancer")
-    ? safeHook("hashline-read-enhancer", () => createHashlineReadEnhancerHook(ctx, { hashline_edit: { enabled: pluginConfig.hashline_edit ?? false } }))
+    ? safeHook("hashline-read-enhancer", () =>
+        createHashlineReadEnhancerHook(ctx, { hashline_edit: { enabled: pluginConfig.hashline_edit ?? false } }),
+      )
     : null
 
   const jsonErrorRecovery = isHookEnabled("json-error-recovery")

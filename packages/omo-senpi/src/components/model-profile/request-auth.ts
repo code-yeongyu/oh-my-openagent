@@ -105,7 +105,11 @@ function errorKind(error: unknown): string {
 // a model's configured header fails with a plain error. Matched by name, not `instanceof`, because
 // the host and this bundle can load different copies of the class.
 function isCredentialResolutionError(error: unknown): boolean {
-  return error instanceof Error && error.name === "ModelsError" && typeof (error as Error & { code?: unknown }).code === "string"
+  return (
+    error instanceof Error &&
+    error.name === "ModelsError" &&
+    typeof (error as Error & { code?: unknown }).code === "string"
+  )
 }
 
 function providerFailureReason(error: unknown): AuthFailureReason {
@@ -192,13 +196,24 @@ export async function probeRequestAuth(
     }
   }
   if (!resolved && unavailable === undefined) {
-    return { provider, model: modelId, reason: providerFailureReason(lastError), errorKind: errorKind(lastError), error: lastError }
+    return {
+      provider,
+      model: modelId,
+      reason: providerFailureReason(lastError),
+      errorKind: errorKind(lastError),
+      error: lastError,
+    }
   }
   // A slot whose refresh is only temporarily unavailable may serve the first turn after its retry,
   // so the provider stays eligible and the model-scope check runs on that slot.
   const modelSlot = resolved ? resolvedSlot : unavailable?.slot
   const keep = (marked: object): undefined => {
-    onRefreshUnavailable?.({ provider, model: modelId, errorKind: errorKind(marked), causeKind: transientCauseKind(marked) })
+    onRefreshUnavailable?.({
+      provider,
+      model: modelId,
+      errorKind: errorKind(marked),
+      causeKind: transientCauseKind(marked),
+    })
     return undefined
   }
 
@@ -235,16 +250,18 @@ function sanitizedLine(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error)
   // The class name is kept verbatim (it can itself read like a secret-named field, for example
   // `OAuthRefreshExchangeError:`); only the message is redacted.
-  return (name + message
-    .split("\n")[0]!
-    .replace(/shell command:.*$/i, "shell command: <redacted>")
-    .replace(/\b(body|stack|details)=.*$/i, "$1=<redacted>")
-    .replace(SECRET_FIELD, "$1$2$1$3<redacted>")
-    .replace(/\b(bearer|basic)\s+[^\s,;"']+/gi, "$1 <redacted>")
-    .replace(/(\b[a-z][a-z0-9+.-]*:\/\/)[^/\s@]*@/gi, "$1<redacted>@")
-    .replace(/(\b[a-z][a-z0-9+.-]*:\/\/[^\s?#]*)[?#][^\s]*/gi, "$1?<redacted>")
-    .replace(/[A-Za-z0-9_+/=-]{24,}/g, "<redacted>"))
-    .slice(0, DETAIL_MAX_LENGTH)
+  return (
+    name +
+    message
+      .split("\n")[0]!
+      .replace(/shell command:.*$/i, "shell command: <redacted>")
+      .replace(/\b(body|stack|details)=.*$/i, "$1=<redacted>")
+      .replace(SECRET_FIELD, "$1$2$1$3<redacted>")
+      .replace(/\b(bearer|basic)\s+[^\s,;"']+/gi, "$1 <redacted>")
+      .replace(/(\b[a-z][a-z0-9+.-]*:\/\/)[^/\s@]*@/gi, "$1<redacted>@")
+      .replace(/(\b[a-z][a-z0-9+.-]*:\/\/[^\s?#]*)[?#][^\s]*/gi, "$1?<redacted>")
+      .replace(/[A-Za-z0-9_+/=-]{24,}/g, "<redacted>")
+  ).slice(0, DETAIL_MAX_LENGTH)
 }
 
 /** Redacted, bounded description of an auth failure for opt-in (debug) diagnostics only. */

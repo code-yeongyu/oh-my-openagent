@@ -1,3 +1,4 @@
+import type { MachineWriteResult } from "../../protocol/src/composed-tools.ts";
 import type { ShellResult } from "../../protocol/src/terminal.ts";
 import type { MachineCallOptions, MachineRouting, MachineTaskOptions, MachineTransportKind, ReadHandle, ReplayJournalEntry, ShellRequestPayload, StandaloneMachine, StandaloneMachineRecord, StepFn } from "./types.ts";
 /** The per-task memoization context a task-scoped proxy binds; owned by the client, referenced here by shape. */
@@ -70,7 +71,7 @@ export type MachineProxyHost = {
     readText(call: ReadCall): Promise<string>;
     pushTree(call: PushTreeCall): Promise<unknown>;
     pullTree(call: PullTreeCall): Promise<unknown>;
-    write(call: WriteCall): Promise<unknown>;
+    write(call: WriteCall): Promise<MachineWriteResult>;
     tool(machineId: string, capability: string, boundOptions: MachineCallOptions): ((args?: unknown, callOptions?: MachineCallOptions) => Promise<unknown>) | undefined;
     createTaskContext(taskId: string, options?: MachineTaskOptions): ProxyTaskContext;
     taskContextRequired(): never;

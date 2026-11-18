@@ -84,13 +84,19 @@ async function currentRecord(lockPath: string): Promise<string | null> {
   }
 }
 
-export function createLockLease(lockPath: string, ownerRecord: string, ownerTag: string, options: LockLeaseOptions = {}): LockLease {
+export function createLockLease(
+  lockPath: string,
+  ownerRecord: string,
+  ownerTag: string,
+  options: LockLeaseOptions = {},
+): LockLease {
   const staleAfterMs = options.staleAfterMs ?? Number.POSITIVE_INFINITY
   let handedTo: string | null = null
   return {
     async handOver(pid) {
       if (handedTo !== null) throw new Error("The lock is already handed over; restore it first.")
-      if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) throw new Error(`Cannot hand the lock to pid ${pid}.`)
+      if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid)
+        throw new Error(`Cannot hand the lock to pid ${pid}.`)
       if ((await currentRecord(lockPath)) !== ownerRecord) throw new LockLeaseLostError(lockPath)
       await removeLeftoverTemps(lockPath)
       const processStart = await lockProcessStartLine(pid)

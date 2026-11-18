@@ -74,10 +74,7 @@ describe("task batch run_in_background resolution", () => {
       {
         category: "quick",
         run_in_background: false,
-        tasks: [
-          { prompt: "review one", run_in_background: true },
-          { prompt: "review two" },
-        ],
+        tasks: [{ prompt: "review one", run_in_background: true }, { prompt: "review two" }],
       },
       undefined,
       undefined,
@@ -128,10 +125,7 @@ describe("task batch run_in_background resolution", () => {
       {
         category: "quick",
         run_in_background: true,
-        tasks: [
-          { prompt: "review one", run_in_background: true },
-          { prompt: "review two" },
-        ],
+        tasks: [{ prompt: "review one", run_in_background: true }, { prompt: "review two" }],
       },
       undefined,
       undefined,

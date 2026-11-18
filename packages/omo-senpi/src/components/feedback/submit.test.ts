@@ -8,7 +8,6 @@ import { buildDraft, FEEDBACK_SECTION_IDS, type UploadRedactor } from "./draft"
 import { submitReport, type ReportTransport } from "./submit"
 import { expectUserOnly, readWindowsAcl, unexpectedWindowsReaders } from "./report-file.test-support"
 
-
 const redactTokens: UploadRedactor = (text) => {
   let count = 0
   const out = text.replace(/ghp_[A-Za-z0-9]{8,}/g, () => {
@@ -29,7 +28,15 @@ const draft = buildDraft({
   signedIn: false,
 })
 
-const client = { app: "cli", omo: "5.1.36", senpi: "2026.10.18-1", os: "darwin", arch: "arm64", locale: "en-US", channel: "beta" }
+const client = {
+  app: "cli",
+  omo: "5.1.36",
+  senpi: "2026.10.18-1",
+  os: "darwin",
+  arch: "arm64",
+  locale: "en-US",
+  channel: "beta",
+}
 
 const dirs: string[] = []
 const tempDir = (): string => {
@@ -74,7 +81,11 @@ describe("submitReport", () => {
     const payload = String(request?.init.body)
     expect(request?.url).toBe("https://api.example.test/v1/reports")
     expect(payload).not.toContain("ghp_")
-    expect(JSON.parse(payload).sections.map((section: { id: string }) => section.id)).toEqual(["description", "environment", "session"])
+    expect(JSON.parse(payload).sections.map((section: { id: string }) => section.id)).toEqual([
+      "description",
+      "environment",
+      "session",
+    ])
     expect(new Headers(request?.init.headers).get("authorization")).toBeNull()
     const ledger = readFileSync(join(stateDir, "feedback", "sent.json"), "utf8")
     expect(JSON.parse(ledger)).toEqual([{ id: "rpt_1", deleteToken: "dt_secret", createdAt: expect.any(String) }])
@@ -126,26 +137,65 @@ describe("submitReport", () => {
   })
 
   test.each([
-    "description", "identity", "environment", "session", "logs", "crash", "config",
-    undefined, null, "", "unknown", "LOGS", 1, {}, [],
-  ])("#given a secret refusal naming section %j #when submitted #then only a valid section id is returned", async (sectionId) => {
-    const { transport } = recordingTransport(400, { error: { code: "secret_detected", detail: { sectionId } } })
-    const result = await submitReport({
-      draft, kind: "bug", description: "synthetic", redact: redactTokens, client, env: {},
-      stateDir: tempDir(), apiOrigin: "https://api.example.test", accessToken: null, transport,
-    })
-    const section = FEEDBACK_SECTION_IDS.find(id => id === sectionId)
-    expect(result).toEqual({ kind: "refused", reason: "secret-detected", ...(section === undefined ? {} : { sectionId: section }) })
-  })
+    "description",
+    "identity",
+    "environment",
+    "session",
+    "logs",
+    "crash",
+    "config",
+    undefined,
+    null,
+    "",
+    "unknown",
+    "LOGS",
+    1,
+    {},
+    [],
+  ])(
+    "#given a secret refusal naming section %j #when submitted #then only a valid section id is returned",
+    async (sectionId) => {
+      const { transport } = recordingTransport(400, { error: { code: "secret_detected", detail: { sectionId } } })
+      const result = await submitReport({
+        draft,
+        kind: "bug",
+        description: "synthetic",
+        redact: redactTokens,
+        client,
+        env: {},
+        stateDir: tempDir(),
+        apiOrigin: "https://api.example.test",
+        accessToken: null,
+        transport,
+      })
+      const section = FEEDBACK_SECTION_IDS.find((id) => id === sectionId)
+      expect(result).toEqual({
+        kind: "refused",
+        reason: "secret-detected",
+        ...(section === undefined ? {} : { sectionId: section }),
+      })
+    },
+  )
 
-  test.each([undefined, null, "logs", 1, []])("#given malformed secret refusal detail %j #when submitted #then the codeless refusal stays compatible", async (detail) => {
-    const { transport } = recordingTransport(400, { error: { code: "secret_detected", detail } })
-    const result = await submitReport({
-      draft, kind: "bug", description: "synthetic", redact: redactTokens, client, env: {},
-      stateDir: tempDir(), apiOrigin: "https://api.example.test", accessToken: null, transport,
-    })
-    expect(result).toEqual({ kind: "refused", reason: "secret-detected" })
-  })
+  test.each([undefined, null, "logs", 1, []])(
+    "#given malformed secret refusal detail %j #when submitted #then the codeless refusal stays compatible",
+    async (detail) => {
+      const { transport } = recordingTransport(400, { error: { code: "secret_detected", detail } })
+      const result = await submitReport({
+        draft,
+        kind: "bug",
+        description: "synthetic",
+        redact: redactTokens,
+        client,
+        env: {},
+        stateDir: tempDir(),
+        apiOrigin: "https://api.example.test",
+        accessToken: null,
+        transport,
+      })
+      expect(result).toEqual({ kind: "refused", reason: "secret-detected" })
+    },
+  )
 
   test("#given a signed-in user #when the report is submitted #then the request carries their access token and no delete token is stored", async () => {
     const stateDir = tempDir()
@@ -175,24 +225,27 @@ describe("submitReport", () => {
     [429, { kind: "refused", reason: "rate-limited" }],
     [418, { kind: "refused", reason: "service-rejected", code: "unknown" }],
     [503, { kind: "refused", reason: "service-unavailable", code: "unknown" }],
-  ] as const)("#given an answer %i without a known error code #when the report is submitted #then it is refused as %o", async (status, refusal) => {
-    const { transport } = recordingTransport(status, { error: { code: "x" } })
+  ] as const)(
+    "#given an answer %i without a known error code #when the report is submitted #then it is refused as %o",
+    async (status, refusal) => {
+      const { transport } = recordingTransport(status, { error: { code: "x" } })
 
-    const result = await submitReport({
-      draft,
-      kind: "bug",
-      description: "x",
-      redact: redactTokens,
-      client,
-      env: {},
-      stateDir: tempDir(),
-      apiOrigin: "https://api.example.test",
-      accessToken: null,
-      transport,
-    })
+      const result = await submitReport({
+        draft,
+        kind: "bug",
+        description: "x",
+        redact: redactTokens,
+        client,
+        env: {},
+        stateDir: tempDir(),
+        apiOrigin: "https://api.example.test",
+        accessToken: null,
+        transport,
+      })
 
-    expect(result).toEqual(refusal)
-  })
+      expect(result).toEqual(refusal)
+    },
+  )
 
   test("#given the report folder cannot be created #when uploads are off and the report is saved #then the user gets a refusal instead of a crash", async () => {
     const stateDir = tempDir()

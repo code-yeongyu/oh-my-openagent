@@ -1,12 +1,6 @@
 /** Reason a byte string is not acceptable canonical JSON for signing. */
 export type CanonicalJsonViolation =
-  | "json"
-  | "duplicate-key"
-  | "number"
-  | "order"
-  | "escape"
-  | "whitespace"
-  | "encoding"
+  "json" | "duplicate-key" | "number" | "order" | "escape" | "whitespace" | "encoding"
 
 export class CanonicalJsonError extends Error {
   readonly name = "CanonicalJsonError"
@@ -19,4 +13,5 @@ export class CanonicalJsonError extends Error {
 }
 
 /** The JSON value domain the canonicalizer walks: plain data, no undefined/functions. */
-export type CanonicalJsonValue = null | boolean | number | string | CanonicalJsonValue[] | { [key: string]: CanonicalJsonValue }
+export type CanonicalJsonValue =
+  null | boolean | number | string | CanonicalJsonValue[] | { [key: string]: CanonicalJsonValue }

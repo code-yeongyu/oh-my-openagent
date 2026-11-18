@@ -3,7 +3,6 @@ import { Command } from "commander"
 import { createMcpOAuthCommand } from "./index"
 
 describe("mcp oauth command", () => {
-
   describe("command structure", () => {
     it("creates mcp command group with oauth subcommand", () => {
       // given

@@ -104,7 +104,8 @@ describe("createSkillInvocationTracker - replay on session_start (omo#10378 2b)"
     }
 
     // then
-    for (const index of forged.keys()) expect(tracker.stateFor(`sess-forged-${index}`).hasUserRequested("ulw-plan")).toBe(false)
+    for (const index of forged.keys())
+      expect(tracker.stateFor(`sess-forged-${index}`).hasUserRequested("ulw-plan")).toBe(false)
   })
 
   test("#given a source written on the message instead of the entry #when replayed #then it is not trusted", async () => {
@@ -113,7 +114,12 @@ describe("createSkillInvocationTracker - replay on session_start (omo#10378 2b)"
     const tracker = createSkillInvocationTracker(pi)
     const onMessage: Entry = {
       type: "message",
-      message: { role: "user", content: [{ type: "text", text: "ulw-plan this" }], timestamp: 1, inputSource: "interactive" },
+      message: {
+        role: "user",
+        content: [{ type: "text", text: "ulw-plan this" }],
+        timestamp: 1,
+        inputSource: "interactive",
+      },
     }
 
     // when
@@ -205,7 +211,11 @@ describe("createSkillInvocationTracker - replay on session_start (omo#10378 2b)"
     await rebuilt.dispatch(
       "session_start",
       { type: "session_start", reason: "reload" },
-      resumedCtx("sess-handoff", [user("please ulw-plan this"), toolCall("w9", "write", { path: PLAN }), toolResult("w9", "write")]),
+      resumedCtx("sess-handoff", [
+        user("please ulw-plan this"),
+        toolCall("w9", "write", { path: PLAN }),
+        toolResult("w9", "write"),
+      ]),
     )
 
     // then
@@ -225,6 +235,11 @@ describe("createSkillInvocationTracker - replay on session_start (omo#10378 2b)"
     await pi.dispatch("session_start", { type: "session_start", reason: "reload" }, ctx)
 
     // then
-    expect(tracker.stateFor("sess-2").planArtifactReferences().map((ref) => ref.count)).toEqual([1])
+    expect(
+      tracker
+        .stateFor("sess-2")
+        .planArtifactReferences()
+        .map((ref) => ref.count),
+    ).toEqual([1])
   })
 })

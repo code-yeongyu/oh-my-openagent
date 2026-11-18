@@ -31,25 +31,26 @@ export async function createTask(
   await mkdir(tasksDirectory, { recursive: true, mode: 0o700 })
   await mkdir(path.join(tasksDirectory, "claims"), { recursive: true, mode: 0o700 })
 
-  return withLock(path.join(tasksDirectory, ".lock"), async () => {
-    const watermarkPath = path.join(tasksDirectory, HIGH_WATERMARK_FILE)
-    const nextTaskId = (await readHighWatermark(watermarkPath)) + 1
-    await atomicWrite(watermarkPath, String(nextTaskId))
+  return withLock(
+    path.join(tasksDirectory, ".lock"),
+    async () => {
+      const watermarkPath = path.join(tasksDirectory, HIGH_WATERMARK_FILE)
+      const nextTaskId = (await readHighWatermark(watermarkPath)) + 1
+      await atomicWrite(watermarkPath, String(nextTaskId))
 
-    const now = Date.now()
-    const task = TaskSchema.parse({
-      ...taskInput,
-      version: 1,
-      id: String(nextTaskId),
-      createdAt: now,
-      updatedAt: now,
-    })
+      const now = Date.now()
+      const task = TaskSchema.parse({
+        ...taskInput,
+        version: 1,
+        id: String(nextTaskId),
+        createdAt: now,
+        updatedAt: now,
+      })
 
-    await atomicWrite(
-      getTaskFilePath(baseDirectory, teamRunId, task.id),
-      `${JSON.stringify(task, null, 2)}\n`,
-    )
+      await atomicWrite(getTaskFilePath(baseDirectory, teamRunId, task.id), `${JSON.stringify(task, null, 2)}\n`)
 
-    return task
-  }, { ownerTag: `create-task:${teamRunId}` })
+      return task
+    },
+    { ownerTag: `create-task:${teamRunId}` },
+  )
 }

@@ -13,7 +13,12 @@ import {
   type AddressBookHost,
   type DiskSession,
 } from "./address-book"
-import { readSessionFacts, SESSION_FACTS_LAST_LINE_MAX_BYTES, SESSION_FACTS_WINDOW_BYTES, THREAD_TITLE_MAX_CHARS } from "./session-facts"
+import {
+  readSessionFacts,
+  SESSION_FACTS_LAST_LINE_MAX_BYTES,
+  SESSION_FACTS_WINDOW_BYTES,
+  THREAD_TITLE_MAX_CHARS,
+} from "./session-facts"
 import { summary } from "./tools/internals"
 
 const scratch: string[] = []
@@ -131,11 +136,14 @@ describe("assembleAddressBook", () => {
   })
 
   test("sorts newest updated_at first and durable id ascending for ties", () => {
-    const entries = assembleAddressBook([], [
-      disk({ durable_id: "b", cwd: "/b", updated_at: "2026-01-02T00:00:00.000Z" }),
-      disk({ durable_id: "c", cwd: "/c", updated_at: "2026-01-03T00:00:00.000Z" }),
-      disk({ durable_id: "a", cwd: "/a", updated_at: "2026-01-02T00:00:00.000Z" }),
-    ])
+    const entries = assembleAddressBook(
+      [],
+      [
+        disk({ durable_id: "b", cwd: "/b", updated_at: "2026-01-02T00:00:00.000Z" }),
+        disk({ durable_id: "c", cwd: "/c", updated_at: "2026-01-03T00:00:00.000Z" }),
+        disk({ durable_id: "a", cwd: "/a", updated_at: "2026-01-02T00:00:00.000Z" }),
+      ],
+    )
 
     expect(entries.map((entry) => entry.durable_id)).toEqual(["c", "a", "b"])
   })
@@ -143,21 +151,58 @@ describe("assembleAddressBook", () => {
 
 const HEADER_TIME = "2026-09-28T04:19:00.000Z"
 const LAST_TIME = "2026-09-28T04:23:30.000Z"
-const FIRST_USER = "Please look at why thread_list shows every name as a UUID and 1970 for the creation time on all rows"
+const FIRST_USER =
+  "Please look at why thread_list shows every name as a UUID and 1970 for the creation time on all rows"
 
 /** A senpi v3 session file: header, a model change, the user's first message, an assistant reply, optionally a `/name`. */
-function sessionFile(dir: string, durableId: string, options: { readonly name?: string; readonly padding?: number } = {}): string {
+function sessionFile(
+  dir: string,
+  durableId: string,
+  options: { readonly name?: string; readonly padding?: number } = {},
+): string {
   const path = join(dir, `${durableId}.jsonl`)
   const lines: unknown[] = [
     { type: "session", version: 3, id: durableId, timestamp: HEADER_TIME, cwd: "/work/project" },
-    { type: "model_change", id: "e1", parentId: null, timestamp: "2026-09-28T04:19:00.500Z", provider: "p", modelId: "m" },
-    { type: "message", id: "e2", parentId: "e1", timestamp: "2026-09-28T04:19:01.000Z", message: { role: "user", content: [{ type: "text", text: FIRST_USER }] } },
+    {
+      type: "model_change",
+      id: "e1",
+      parentId: null,
+      timestamp: "2026-09-28T04:19:00.500Z",
+      provider: "p",
+      modelId: "m",
+    },
+    {
+      type: "message",
+      id: "e2",
+      parentId: "e1",
+      timestamp: "2026-09-28T04:19:01.000Z",
+      message: { role: "user", content: [{ type: "text", text: FIRST_USER }] },
+    },
   ]
   for (let index = 0; index < (options.padding ?? 0); index++) {
-    lines.push({ type: "message", id: `p${index}`, parentId: "e2", timestamp: "2026-09-28T04:20:00.000Z", message: { role: "assistant", content: [{ type: "text", text: "x".repeat(1024) }] } })
+    lines.push({
+      type: "message",
+      id: `p${index}`,
+      parentId: "e2",
+      timestamp: "2026-09-28T04:20:00.000Z",
+      message: { role: "assistant", content: [{ type: "text", text: "x".repeat(1024) }] },
+    })
   }
-  if (options.name !== undefined) lines.push({ type: "session_info", id: "e8", parentId: "e2", timestamp: "2026-09-28T04:23:00.000Z", name: options.name })
-  lines.push({ type: "message", id: "e9", parentId: "e2", timestamp: LAST_TIME, message: { role: "assistant", content: [{ type: "text", text: "done" }] } })
+  if (options.name !== undefined)
+    lines.push({
+      type: "session_info",
+      id: "e8",
+      parentId: "e2",
+      timestamp: "2026-09-28T04:23:00.000Z",
+      name: options.name,
+    })
+  lines.push({
+    type: "message",
+    id: "e9",
+    parentId: "e2",
+    timestamp: LAST_TIME,
+    message: { role: "assistant", content: [{ type: "text", text: "done" }] },
+  })
   writeFileSync(path, `${lines.map((line) => JSON.stringify(line)).join("\n")}\n`)
   return path
 }
@@ -172,19 +217,60 @@ describe("address book names, timestamps, endpoints (real JSONL header fixture)"
   test("#given a live host row that reports no name or timestamps #when assembled #then the name comes from /name and the times from the header and last entry, never a UUID or 1970", () => {
     // given
     const path = sessionFile(tempSessions(), "019a0000-0000-7000-8000-00000000000a", { name: "my-tui" })
-    const host: AddressBookHost = { socket: "/a/rpc/rpc.sock", legacy: true, result: { sessions: [{ sessionId: "rpc-1", durableSessionId: "019a0000-0000-7000-8000-00000000000a", sessionPath: path, cwd: "/work/project", status: "open", kind: "interactive" }] } }
+    const host: AddressBookHost = {
+      socket: "/a/rpc/rpc.sock",
+      legacy: true,
+      result: {
+        sessions: [
+          {
+            sessionId: "rpc-1",
+            durableSessionId: "019a0000-0000-7000-8000-00000000000a",
+            sessionPath: path,
+            cwd: "/work/project",
+            status: "open",
+            kind: "interactive",
+          },
+        ],
+      },
+    }
 
     // when
     const [entry] = assembleAddressBook([host], [], { facts: readSessionFacts })
 
     // then
-    expect(entry).toMatchObject({ name: "my-tui", title: "my-tui", created_at: HEADER_TIME, updated_at: LAST_TIME, surface: "daemon", alive: true, endpoint: { kind: "rpc_host", socket: "/a/rpc/rpc.sock", routing_id: "rpc-1" } })
+    expect(entry).toMatchObject({
+      name: "my-tui",
+      title: "my-tui",
+      created_at: HEADER_TIME,
+      updated_at: LAST_TIME,
+      surface: "daemon",
+      alive: true,
+      endpoint: { kind: "rpc_host", socket: "/a/rpc/rpc.sock", routing_id: "rpc-1" },
+    })
     expect(entry?.created_at >= HEADER_TIME).toBe(true)
   })
 
   test("#given an unnamed session #when assembled #then the title is the first user message cut to the title length and the name stays null", () => {
     const path = sessionFile(tempSessions(), "019a0000-0000-7000-8000-00000000000b")
-    const [entry] = assembleAddressBook([{ socket: "/a/rpc/shards/i-00000000000000aa.sock", result: { sessions: [{ sessionId: "rpc-1", durableSessionId: "019a0000-0000-7000-8000-00000000000b", sessionPath: path, cwd: "/w" }] } }], [], { facts: readSessionFacts })
+    const [entry] = assembleAddressBook(
+      [
+        {
+          socket: "/a/rpc/shards/i-00000000000000aa.sock",
+          result: {
+            sessions: [
+              {
+                sessionId: "rpc-1",
+                durableSessionId: "019a0000-0000-7000-8000-00000000000b",
+                sessionPath: path,
+                cwd: "/w",
+              },
+            ],
+          },
+        },
+      ],
+      [],
+      { facts: readSessionFacts },
+    )
     expect(entry?.name).toBeNull()
     expect(entry?.title).toBe(FIRST_USER.slice(0, THREAD_TITLE_MAX_CHARS))
     expect(entry?.title).not.toContain("019a0000")
@@ -196,32 +282,69 @@ describe("address book names, timestamps, endpoints (real JSONL header fixture)"
     const dir = tempSessions()
     const durableId = "019a0000-0000-7000-8000-00000000000d"
     const path = join(dir, `${durableId}.jsonl`)
-    writeFileSync(path, `${[
-      { type: "session", version: 3, id: durableId, timestamp: HEADER_TIME, cwd: "/work/project" },
-      { type: "message", id: "e1", parentId: null, timestamp: LAST_TIME, message: { role: "assistant", content: [{ type: "text", text: "hello" }] } },
-    ].map((line) => JSON.stringify(line)).join("\n")}\n`)
-    const session = { sessionId: "rpc-9", durableSessionId: durableId, sessionPath: path, cwd: "/work/project", status: "open" as const }
+    writeFileSync(
+      path,
+      `${[
+        { type: "session", version: 3, id: durableId, timestamp: HEADER_TIME, cwd: "/work/project" },
+        {
+          type: "message",
+          id: "e1",
+          parentId: null,
+          timestamp: LAST_TIME,
+          message: { role: "assistant", content: [{ type: "text", text: "hello" }] },
+        },
+      ]
+        .map((line) => JSON.stringify(line))
+        .join("\n")}\n`,
+    )
+    const session = {
+      sessionId: "rpc-9",
+      durableSessionId: durableId,
+      sessionPath: path,
+      cwd: "/work/project",
+      status: "open" as const,
+    }
 
     // when
-    const [entry] = assembleAddressBook([{ socket: "/a/rpc/rpc.sock", result: { sessions: [session] } }], [], { facts: readSessionFacts })
+    const [entry] = assembleAddressBook([{ socket: "/a/rpc/rpc.sock", result: { sessions: [session] } }], [], {
+      facts: readSessionFacts,
+    })
     const listed = summary(session, entry)
     const unaddressed = summary(session)
 
     // then
-    expect({ name: entry?.name, title: entry?.title, created: entry?.created_at, updated: entry?.updated_at }).toEqual({ name: null, title: null, created: HEADER_TIME, updated: LAST_TIME })
+    expect({ name: entry?.name, title: entry?.title, created: entry?.created_at, updated: entry?.updated_at }).toEqual({
+      name: null,
+      title: null,
+      created: HEADER_TIME,
+      updated: LAST_TIME,
+    })
     expect(listed.name).toBe("")
     expect(unaddressed.name).toBe("")
     expect(JSON.stringify([listed.name, unaddressed.name, entry?.title])).not.toContain("019a0000")
   })
 
   test("#given a transcript larger than two read windows #when its facts are read #then the header, first user message and the /name plus last timestamp in the tail are all found", () => {
-    const path = sessionFile(tempSessions(), "019a0000-0000-7000-8000-00000000000c", { name: "long-one", padding: (SESSION_FACTS_WINDOW_BYTES * 3) / 1024 })
-    expect(readSessionFacts(path)).toEqual({ durable_id: "019a0000-0000-7000-8000-00000000000c", cwd: "/work/project", created_at: HEADER_TIME, updated_at: LAST_TIME, name: "long-one", first_user_text: FIRST_USER })
+    const path = sessionFile(tempSessions(), "019a0000-0000-7000-8000-00000000000c", {
+      name: "long-one",
+      padding: (SESSION_FACTS_WINDOW_BYTES * 3) / 1024,
+    })
+    expect(readSessionFacts(path)).toEqual({
+      durable_id: "019a0000-0000-7000-8000-00000000000c",
+      cwd: "/work/project",
+      created_at: HEADER_TIME,
+      updated_at: LAST_TIME,
+      name: "long-one",
+      first_user_text: FIRST_USER,
+    })
   })
 
   test("#given a transcript of many MB #when a dead endpoint's session is read for listing #then only bounded windows are read, never the whole file", () => {
     // given
-    const path = sessionFile(tempSessions(), "019a0000-0000-7000-8000-00000000000d", { name: "huge-one", padding: 8 * 1024 })
+    const path = sessionFile(tempSessions(), "019a0000-0000-7000-8000-00000000000d", {
+      name: "huge-one",
+      padding: 8 * 1024,
+    })
     const whole = spyOn(fs, "readFileSync")
     const reads = spyOn(fs, "readSync")
     try {
@@ -229,9 +352,19 @@ describe("address book names, timestamps, endpoints (real JSONL header fixture)"
       const session = readDiskSession(path, "/gone.sock")
 
       // then
-      expect(session).toMatchObject({ durable_id: "019a0000-0000-7000-8000-00000000000d", name: "huge-one", first_user_text: FIRST_USER, created_at: HEADER_TIME, updated_at: LAST_TIME, source_host: "/gone.sock" })
+      expect(session).toMatchObject({
+        durable_id: "019a0000-0000-7000-8000-00000000000d",
+        name: "huge-one",
+        first_user_text: FIRST_USER,
+        created_at: HEADER_TIME,
+        updated_at: LAST_TIME,
+        source_host: "/gone.sock",
+      })
       expect(whole.mock.calls.filter(([target]) => target === path)).toEqual([])
-      const bytes = reads.mock.results.reduce((sum, result) => sum + (typeof result.value === "number" ? result.value : 0), 0)
+      const bytes = reads.mock.results.reduce(
+        (sum, result) => sum + (typeof result.value === "number" ? result.value : 0),
+        0,
+      )
       expect(bytes).toBeLessThanOrEqual(2 * SESSION_FACTS_WINDOW_BYTES + SESSION_FACTS_LAST_LINE_MAX_BYTES + 2)
     } finally {
       whole.mockRestore()
@@ -240,8 +373,45 @@ describe("address book names, timestamps, endpoints (real JSONL header fixture)"
   })
 
   test("#given a terminal endpoint listing its one session by durable id #when assembled #then the entry is a tui thread on that endpoint", () => {
-    const entries = assembleAddressBook([{ socket: "/a/rpc/tui/t-0123456789abcdef.sock", endpoint_kind: "tui", alive: true, result: { sessions: [{ sessionId: "dur-tui", cwd: "/w", name: "my-tui", kind: "interactive", created_at: HEADER_TIME, updated_at: LAST_TIME }] } }], [])
-    expect(entries).toEqual([expect.objectContaining({ durable_id: "dur-tui", routing_id: "dur-tui", name: "my-tui", surface: "tui", alive: true, created_at: HEADER_TIME, updated_at: LAST_TIME, endpoint: { kind: "tui", socket: "/a/rpc/tui/t-0123456789abcdef.sock", routing_id: "dur-tui", durable_session_id: "dur-tui" } })])
+    const entries = assembleAddressBook(
+      [
+        {
+          socket: "/a/rpc/tui/t-0123456789abcdef.sock",
+          endpoint_kind: "tui",
+          alive: true,
+          result: {
+            sessions: [
+              {
+                sessionId: "dur-tui",
+                cwd: "/w",
+                name: "my-tui",
+                kind: "interactive",
+                created_at: HEADER_TIME,
+                updated_at: LAST_TIME,
+              },
+            ],
+          },
+        },
+      ],
+      [],
+    )
+    expect(entries).toEqual([
+      expect.objectContaining({
+        durable_id: "dur-tui",
+        routing_id: "dur-tui",
+        name: "my-tui",
+        surface: "tui",
+        alive: true,
+        created_at: HEADER_TIME,
+        updated_at: LAST_TIME,
+        endpoint: {
+          kind: "tui",
+          socket: "/a/rpc/tui/t-0123456789abcdef.sock",
+          routing_id: "dur-tui",
+          durable_session_id: "dur-tui",
+        },
+      }),
+    ])
   })
 
   test("#given a suspended terminal the engine reports live_unresponsive #when assembled #then its session degrades to disk truth with error_note live_unresponsive and alive false, and the gateway sees it as live_unresponsive (not dead)", () => {
@@ -249,17 +419,41 @@ describe("address book names, timestamps, endpoints (real JSONL header fixture)"
     const path = sessionFile(tempSessions(), "dur-stopped", { name: "my-tui" })
     const disk = readDiskSession(path, socket)
     if (disk === null) throw new Error("fixture did not parse")
-    const entries = assembleAddressBook([{ socket, endpoint_kind: "tui", alive: false, reason: "live_unresponsive", error: "live_unresponsive" }], [disk])
-    expect(entries).toEqual([expect.objectContaining({ durable_id: "dur-stopped", status: "resumable", alive: false, error_note: "live_unresponsive", name: "my-tui", created_at: HEADER_TIME, updated_at: LAST_TIME, surface: "tui", endpoint: { kind: "tui", socket, routing_id: null, durable_session_id: "dur-stopped" } })])
-    expect(toGatewayAddressEntries(entries)[0]).toMatchObject({ thread_id: "dur-stopped", liveness: "live_unresponsive", endpoint: { kind: "tui" } })
+    const entries = assembleAddressBook(
+      [{ socket, endpoint_kind: "tui", alive: false, reason: "live_unresponsive", error: "live_unresponsive" }],
+      [disk],
+    )
+    expect(entries).toEqual([
+      expect.objectContaining({
+        durable_id: "dur-stopped",
+        status: "resumable",
+        alive: false,
+        error_note: "live_unresponsive",
+        name: "my-tui",
+        created_at: HEADER_TIME,
+        updated_at: LAST_TIME,
+        surface: "tui",
+        endpoint: { kind: "tui", socket, routing_id: null, durable_session_id: "dur-stopped" },
+      }),
+    ])
+    expect(toGatewayAddressEntries(entries)[0]).toMatchObject({
+      thread_id: "dur-stopped",
+      liveness: "live_unresponsive",
+      endpoint: { kind: "tui" },
+    })
   })
 
   test("#given an endpoint that refused the connection #when handed to the gateway #then the thread is dead, and a listed thread is routable", () => {
     const entries = assembleAddressBook(
-      [{ socket: "/gone.sock", error: "connect ECONNREFUSED" }, live("/up.sock", [{ sessionId: "rpc-1", durableSessionId: "up", cwd: "/w" }])],
+      [
+        { socket: "/gone.sock", error: "connect ECONNREFUSED" },
+        live("/up.sock", [{ sessionId: "rpc-1", durableSessionId: "up", cwd: "/w" }]),
+      ],
       [disk({ durable_id: "gone", cwd: "/w", source_host: "/gone.sock" })],
     )
-    const liveness = Object.fromEntries(toGatewayAddressEntries(entries).map((entry) => [entry.thread_id, entry.liveness]))
+    const liveness = Object.fromEntries(
+      toGatewayAddressEntries(entries).map((entry) => [entry.thread_id, entry.liveness]),
+    )
     expect(liveness).toEqual({ gone: "dead", up: "routable" })
   })
 
@@ -282,8 +476,20 @@ describe("scanDiskSessions", () => {
     writeFileSync(
       path,
       [
-        JSON.stringify({ type: "session", version: 3, id: "durable-disk", timestamp: "2026-01-01T00:00:00.000Z", cwd: "/Users/me/project" }),
-        JSON.stringify({ type: "session_info", id: "one", parentId: null, timestamp: "2026-01-02T00:00:00.000Z", name: "Old" }),
+        JSON.stringify({
+          type: "session",
+          version: 3,
+          id: "durable-disk",
+          timestamp: "2026-01-01T00:00:00.000Z",
+          cwd: "/Users/me/project",
+        }),
+        JSON.stringify({
+          type: "session_info",
+          id: "one",
+          parentId: null,
+          timestamp: "2026-01-02T00:00:00.000Z",
+          name: "Old",
+        }),
         JSON.stringify({ type: "session_info", id: "two", parentId: "one", timestamp: "2026-01-03T00:00:00.000Z" }),
       ].join("\n") + "\n",
     )

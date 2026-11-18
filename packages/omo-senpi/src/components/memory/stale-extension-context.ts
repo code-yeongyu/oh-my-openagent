@@ -10,6 +10,7 @@ const STALE_EXTENSION_CONTEXT_ERROR_PREFIXES = [
 ] as const
 
 export function isStaleExtensionContextError(error: unknown): boolean {
-  return error instanceof Error
-    && STALE_EXTENSION_CONTEXT_ERROR_PREFIXES.some((prefix) => error.message.startsWith(prefix))
+  return (
+    error instanceof Error && STALE_EXTENSION_CONTEXT_ERROR_PREFIXES.some((prefix) => error.message.startsWith(prefix))
+  )
 }

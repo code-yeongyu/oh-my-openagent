@@ -8,8 +8,6 @@ export function assertNoUnresolvedTeamMembers(members: readonly RuntimeStateMemb
   const unresolved = members.filter((member) => member.sessionId === undefined)
   if (unresolved.length === 0) return
 
-  const summary = unresolved
-    .map((member) => `${member.name} (${member.status})`)
-    .join(", ")
+  const summary = unresolved.map((member) => `${member.name} (${member.status})`).join(", ")
   throw new Error(`team runtime cannot transition to active with unresolved member(s): ${summary}`)
 }

@@ -11,10 +11,7 @@ import { z } from "zod"
 import { TeamModeConfigSchema } from "../../../config/schema/team-mode"
 import { _resetForTesting, registerAgentName } from "../../claude-code-session-state"
 import { SessionCategoryRegistry } from "../../../shared/session-category-registry"
-import {
-  clearAllSessionPromptParams,
-  getSessionPromptParams,
-} from "../../../shared/session-prompt-params-state"
+import { clearAllSessionPromptParams, getSessionPromptParams } from "../../../shared/session-prompt-params-state"
 import {
   DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS,
   dispatchInternalPrompt,
@@ -27,7 +24,11 @@ import { listUnreadMessages } from "@oh-my-opencode/team-core/team-mailbox/inbox
 import { pollAndBuildInjection } from "@oh-my-opencode/team-core/team-mailbox/poll"
 import { BroadcastNotPermittedError } from "@oh-my-opencode/team-core/team-mailbox/send"
 import { getInboxDir, resolveBaseDir } from "@oh-my-opencode/team-core/team-registry/paths"
-import { createRuntimeState, loadRuntimeState, saveRuntimeState } from "@oh-my-opencode/team-core/team-state-store/store"
+import {
+  createRuntimeState,
+  loadRuntimeState,
+  saveRuntimeState,
+} from "@oh-my-opencode/team-core/team-state-store/store"
 import { clearTeamSessionRegistry, registerTeamSession } from "../team-session-registry"
 import type { Message } from "@oh-my-opencode/team-core/types"
 import { MessageSchema } from "@oh-my-opencode/team-core/types"
@@ -90,14 +91,18 @@ function createRecordingClient(): { client: LiveDeliveryClient; calls: PromptAsy
 
 const mockClient: LiveDeliveryClient = {
   session: {
-    promptAsync: async () => { throw new Error("live delivery disabled in fixture") },
+    promptAsync: async () => {
+      throw new Error("live delivery disabled in fixture")
+    },
   },
 }
 
-const TeamSendToolResultSchema = z.object({
-  messageId: z.string(),
-  deliveredTo: z.array(z.string()),
-}).strict()
+const TeamSendToolResultSchema = z
+  .object({
+    messageId: z.string(),
+    deliveredTo: z.array(z.string()),
+  })
+  .strict()
 
 type TeamSendToolResult = z.infer<typeof TeamSendToolResultSchema>
 
@@ -138,6 +143,44 @@ function createImmediateTeamSendMessageTool(
   return createTeamSendMessageTool(config, client, { loadRuntimeState, dispatchTiming: IMMEDIATE_DISPATCH_TIMING })
 }
 
+type HeldRecipient = {
+  release(): boolean
+}
+
+const heldClocks: Array<{ mockRestore(): void }> = []
+
+// The blocker's post-dispatch hold lapses on the wall clock after
+// DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS. A loaded shard can spend longer than that
+// between the blocker and its release, and the queued wake then prunes the lapsed hold and
+// dispatches early. Freezing Date.now until release() makes the explicit release the only
+// way the hold ends.
+async function holdRecipientBehindBlocker(
+  fixture: { readonly memberTwoSessionId: string; readonly config: ReturnType<typeof createConfig> },
+  client: Parameters<typeof createProductionTeamSendMessageTool>[1],
+): Promise<HeldRecipient> {
+  const clock = spyOn(Date, "now").mockReturnValue(Date.now())
+  heldClocks.push(clock)
+  await dispatchInternalPrompt({
+    mode: "async",
+    client,
+    sessionID: fixture.memberTwoSessionId,
+    source: "test-blocker",
+    input: {
+      path: { id: fixture.memberTwoSessionId },
+      body: { parts: [{ type: "text", text: "blocker" }] },
+      query: { directory: resolveBaseDir(fixture.config) },
+    },
+  })
+  return {
+    release: () => {
+      const released = releasePromptAsyncReservation(fixture.memberTwoSessionId, "test-blocker")
+      heldClocks.splice(heldClocks.indexOf(clock), 1)
+      clock.mockRestore()
+      return released
+    },
+  }
+}
+
 function createDeferred<T>(): Deferred<T> {
   let resolvePromise: Deferred<T>["resolve"] | undefined
   const promise = new Promise<T>((resolve) => {
@@ -168,14 +211,17 @@ async function waitForEvent<T>(
 
 afterEach(async () => {
   jest.useRealTimers()
+  for (const clock of heldClocks.splice(0)) clock.mockRestore()
   clearTeamSessionRegistry()
   SessionCategoryRegistry.clear()
   clearAllSessionPromptParams()
   releaseAllPromptAsyncReservationsForTesting()
   _resetForTesting()
-  await Promise.all(temporaryDirectories.splice(0).map(async (directoryPath) => {
-    await rm(directoryPath, { recursive: true, force: true })
-  }))
+  await Promise.all(
+    temporaryDirectories.splice(0).map(async (directoryPath) => {
+      await rm(directoryPath, { recursive: true, force: true })
+    }),
+  )
 })
 
 async function createFixtureBaseDir(): Promise<string> {
@@ -216,14 +262,32 @@ async function createTeamFixture() {
     {
       version: 1,
       name: "team-alpha",
-        createdAt: Date.now(),
-        leadAgentId: "team-lead",
-        members: [
-          { kind: "subagent_type", name: "team-lead", subagent_type: "sisyphus-junior", backendType: "in-process", isActive: true },
-          { kind: "subagent_type", name: "m1", subagent_type: "sisyphus-junior", backendType: "in-process", isActive: true },
-          { kind: "subagent_type", name: "m2", subagent_type: "sisyphus-junior", backendType: "in-process", isActive: true },
-        ],
-      },
+      createdAt: Date.now(),
+      leadAgentId: "team-lead",
+      members: [
+        {
+          kind: "subagent_type",
+          name: "team-lead",
+          subagent_type: "sisyphus-junior",
+          backendType: "in-process",
+          isActive: true,
+        },
+        {
+          kind: "subagent_type",
+          name: "m1",
+          subagent_type: "sisyphus-junior",
+          backendType: "in-process",
+          isActive: true,
+        },
+        {
+          kind: "subagent_type",
+          name: "m2",
+          subagent_type: "sisyphus-junior",
+          backendType: "in-process",
+          isActive: true,
+        },
+      ],
+    },
     leadSessionId,
     "project",
     config,
@@ -241,13 +305,13 @@ async function createTeamFixture() {
 
   return {
     config,
-      teamRunId: runtimeState.teamRunId,
-      leadSessionId,
-      memberOneSessionId,
-      memberTwoSessionId,
-      tool: createTeamSendMessageTool(config, mockClient),
-      toolContext: (sessionID: string) => createToolContext(sessionID, baseDir),
-    }
+    teamRunId: runtimeState.teamRunId,
+    leadSessionId,
+    memberOneSessionId,
+    memberTwoSessionId,
+    tool: createTeamSendMessageTool(config, mockClient),
+    toolContext: (sessionID: string) => createToolContext(sessionID, baseDir),
+  }
 }
 
 describe("createTeamSendMessageTool", () => {
@@ -297,11 +361,14 @@ describe("createTeamSendMessageTool", () => {
     const fixture = await createTeamFixture()
 
     // when
-    const result = await fixture.tool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "hello",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+    const result = await fixture.tool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "hello",
+      },
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
     const parsedResult = parseToolResult(result)
 
     // then
@@ -318,11 +385,14 @@ describe("createTeamSendMessageTool", () => {
     const escapedInboxRoot = path.join(resolveBaseDir(fixture.config), "runtime", "escape")
 
     // when
-    const result = fixture.tool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "../../escape",
-      body: "escape attempt",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+    const result = fixture.tool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "../../escape",
+        body: "escape attempt",
+      },
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
 
     // then
     await expect(result).rejects.toThrow("unknown or inactive team recipient")
@@ -334,12 +404,15 @@ describe("createTeamSendMessageTool", () => {
     const fixture = await createTeamFixture()
 
     // when
-    const result = await fixture.tool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "hello without metadata",
-      correlationId: "",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+    const result = await fixture.tool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "hello without metadata",
+        correlationId: "",
+      },
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
     const parsedResult = parseToolResult(result)
 
     // then
@@ -356,14 +429,17 @@ describe("createTeamSendMessageTool", () => {
     const correlationId = randomUUID()
 
     // when
-    const result = await fixture.tool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "hello with metadata",
-      correlationId,
-      summary: "metadata summary",
-      references: [{ path: "src/features/team-mode/tools/messaging.ts", description: "send tool" }],
-    }, fixture.toolContext(fixture.memberOneSessionId))
+    const result = await fixture.tool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "hello with metadata",
+        correlationId,
+        summary: "metadata summary",
+        references: [{ path: "src/features/team-mode/tools/messaging.ts", description: "send tool" }],
+      },
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
     const parsedResult = parseToolResult(result)
 
     // then
@@ -384,22 +460,28 @@ describe("createTeamSendMessageTool", () => {
     const fixture = await createTeamFixture()
 
     // when
-    const nonLeadResult = fixture.tool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "*",
-      body: "hello everyone",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+    const nonLeadResult = fixture.tool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "*",
+        body: "hello everyone",
+      },
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
 
     // then
     expect(nonLeadResult).rejects.toBeInstanceOf(BroadcastNotPermittedError)
 
     // when
-    const leadResult = await fixture.tool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "*",
-      body: "team announcement",
-      kind: "announcement",
-    }, fixture.toolContext(fixture.leadSessionId))
+    const leadResult = await fixture.tool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "*",
+        body: "team announcement",
+        kind: "announcement",
+      },
+      fixture.toolContext(fixture.leadSessionId),
+    )
     const parsedLeadResult = parseToolResult(leadResult)
 
     // then
@@ -417,11 +499,14 @@ describe("createTeamSendMessageTool", () => {
     const liveTool = createTeamSendMessageTool(fixture.config, client)
 
     // when
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "ping",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+    await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "ping",
+      },
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
 
     // then
     expect(calls).toHaveLength(1)
@@ -447,11 +532,14 @@ describe("createTeamSendMessageTool", () => {
     const liveTool = createTeamSendMessageTool(fixture.config, client)
 
     // when
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "ping",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+    await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "ping",
+      },
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
 
     // then
     expect(calls).toHaveLength(1)
@@ -472,11 +560,14 @@ describe("createTeamSendMessageTool", () => {
     const liveTool = createTeamSendMessageTool(fixture.config, client)
 
     // when
-    const result = await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "ping",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+    const result = await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "ping",
+      },
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
     const parsedResult = parseToolResult(result)
 
     // then
@@ -505,11 +596,14 @@ describe("createTeamSendMessageTool", () => {
     const liveTool = createTeamSendMessageTool(fixture.config, client)
 
     // when
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "ping while busy",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+    await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "ping while busy",
+      },
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
 
     // then
     expect(promptCalls).toBe(0)
@@ -525,16 +619,22 @@ describe("createTeamSendMessageTool", () => {
     const liveTool = createTeamSendMessageTool(fixture.config, client)
 
     // when
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "first ping",
-    }, fixture.toolContext(fixture.memberOneSessionId))
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "second ping",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+    await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "first ping",
+      },
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
+    await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "second ping",
+      },
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
 
     // then
     expect(calls).toHaveLength(1)
@@ -559,29 +659,22 @@ describe("createTeamSendMessageTool", () => {
     }
     const liveTool = createTeamSendMessageTool(fixture.config, client)
 
-    await dispatchInternalPrompt({
-      mode: "async",
-      client,
-      sessionID: fixture.memberTwoSessionId,
-      source: "test-blocker",
-      input: {
-        path: { id: fixture.memberTwoSessionId },
-        body: { parts: [{ type: "text", text: "blocker" }] },
-        query: { directory: resolveBaseDir(fixture.config) },
+    const blocker = await holdRecipientBehindBlocker(fixture, client)
+    await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "fallback ping",
       },
-    })
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "fallback ping",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
 
     expect(promptCalls).toBe(1)
     const unread = await listUnreadMessages(fixture.teamRunId, "m2", fixture.config)
     expect(unread.map((message) => message.body)).toEqual(["fallback ping"])
 
     // when
-    expect(releasePromptAsyncReservation(fixture.memberTwoSessionId, "test-blocker")).toBe(true)
+    expect(blocker.release()).toBe(true)
     await waitForEvent(fallbackWakeDispatched.promise, "queued fallback mailbox wake")
     const injection = await pollAndBuildInjection(
       fixture.memberTwoSessionId,
@@ -615,16 +708,22 @@ describe("createTeamSendMessageTool", () => {
     const liveTool = createTeamSendMessageTool(fixture.config, client)
 
     try {
-      await liveTool.execute({
-        teamRunId: fixture.teamRunId,
-        to: "m2",
-        body: "live ping",
-      }, fixture.toolContext(fixture.memberOneSessionId))
-      await liveTool.execute({
-        teamRunId: fixture.teamRunId,
-        to: "m2",
-        body: "waiting ping",
-      }, fixture.toolContext(fixture.memberOneSessionId))
+      await liveTool.execute(
+        {
+          teamRunId: fixture.teamRunId,
+          to: "m2",
+          body: "live ping",
+        },
+        fixture.toolContext(fixture.memberOneSessionId),
+      )
+      await liveTool.execute(
+        {
+          teamRunId: fixture.teamRunId,
+          to: "m2",
+          body: "waiting ping",
+        },
+        fixture.toolContext(fixture.memberOneSessionId),
+      )
 
       expect(promptCalls).toBe(1)
       const unread = await listUnreadMessages(fixture.teamRunId, "m2", fixture.config)
@@ -666,22 +765,15 @@ describe("createTeamSendMessageTool", () => {
     }
     const liveTool = createImmediateTeamSendMessageTool(fixture.config, client)
 
-    await dispatchInternalPrompt({
-      mode: "async",
-      client,
-      sessionID: fixture.memberTwoSessionId,
-      source: "test-blocker",
-      input: {
-        path: { id: fixture.memberTwoSessionId },
-        body: { parts: [{ type: "text", text: "blocker" }] },
-        query: { directory: resolveBaseDir(fixture.config) },
+    const blocker = await holdRecipientBehindBlocker(fixture, client)
+    await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "already injected",
       },
-    })
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "already injected",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
     const injection = await pollAndBuildInjection(
       fixture.memberTwoSessionId,
       "m2",
@@ -708,7 +800,7 @@ describe("createTeamSendMessageTool", () => {
     expect(probeResult.status).toBe("queued")
 
     // when
-    expect(releasePromptAsyncReservation(fixture.memberTwoSessionId, "test-blocker")).toBe(true)
+    expect(blocker.release()).toBe(true)
     await waitForEvent(probeDispatched.promise, "queue probe after cancelled fallback wake")
 
     // then
@@ -731,22 +823,15 @@ describe("createTeamSendMessageTool", () => {
     }
     const liveTool = createImmediateTeamSendMessageTool(fixture.config, client)
 
-    await dispatchInternalPrompt({
-      mode: "async",
-      client,
-      sessionID: fixture.memberTwoSessionId,
-      source: "test-blocker",
-      input: {
-        path: { id: fixture.memberTwoSessionId },
-        body: { parts: [{ type: "text", text: "blocker" }] },
-        query: { directory: resolveBaseDir(fixture.config) },
+    const blocker = await holdRecipientBehindBlocker(fixture, client)
+    await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "pending acknowledgement",
       },
-    })
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "pending acknowledgement",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
     const injection = await pollAndBuildInjection(
       fixture.memberTwoSessionId,
       "m2",
@@ -771,7 +856,7 @@ describe("createTeamSendMessageTool", () => {
     expect(probeResult.status).toBe("queued")
 
     // when
-    expect(releasePromptAsyncReservation(fixture.memberTwoSessionId, "test-blocker")).toBe(true)
+    expect(blocker.release()).toBe(true)
     await waitForEvent(probeDispatched.promise, "queue probe after pending acknowledgement")
 
     // then
@@ -794,22 +879,15 @@ describe("createTeamSendMessageTool", () => {
     }
     const liveTool = createImmediateTeamSendMessageTool(fixture.config, client)
 
-    await dispatchInternalPrompt({
-      mode: "async",
-      client,
-      sessionID: fixture.memberTwoSessionId,
-      source: "test-blocker",
-      input: {
-        path: { id: fixture.memberTwoSessionId },
-        body: { parts: [{ type: "text", text: "blocker" }] },
-        query: { directory: resolveBaseDir(fixture.config) },
+    const blocker = await holdRecipientBehindBlocker(fixture, client)
+    await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "first fallback",
       },
-    })
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "first fallback",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
     const firstInjection = await pollAndBuildInjection(
       fixture.memberTwoSessionId,
       "m2",
@@ -819,17 +897,20 @@ describe("createTeamSendMessageTool", () => {
     )
     expect(firstInjection.injected).toBe(true)
 
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "second fallback",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+    await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "second fallback",
+      },
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
     await ackMessages(fixture.teamRunId, "m2", firstInjection.messageIds, fixture.config)
     const unreadBeforeWake = await listUnreadMessages(fixture.teamRunId, "m2", fixture.config)
     expect(unreadBeforeWake.map((message) => message.body)).toEqual(["second fallback"])
 
     // when
-    expect(releasePromptAsyncReservation(fixture.memberTwoSessionId, "test-blocker")).toBe(true)
+    expect(blocker.release()).toBe(true)
     await waitForEvent(secondWakeDispatched.promise, "second message fallback wake")
     const secondInjection = await pollAndBuildInjection(
       fixture.memberTwoSessionId,
@@ -861,22 +942,15 @@ describe("createTeamSendMessageTool", () => {
     }
     const liveTool = createImmediateTeamSendMessageTool(fixture.config, client)
 
-    await dispatchInternalPrompt({
-      mode: "async",
-      client,
-      sessionID: fixture.memberTwoSessionId,
-      source: "test-blocker",
-      input: {
-        path: { id: fixture.memberTwoSessionId },
-        body: { parts: [{ type: "text", text: "blocker" }] },
-        query: { directory: resolveBaseDir(fixture.config) },
+    const blocker = await holdRecipientBehindBlocker(fixture, client)
+    await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "unread after shutdown",
       },
-    })
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "unread after shutdown",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
 
     const { loadRuntimeState: loadState, saveRuntimeState: saveState } = await import("../team-state-store/store")
     const runtimeState = await loadState(fixture.teamRunId, fixture.config)
@@ -900,7 +974,7 @@ describe("createTeamSendMessageTool", () => {
     expect(probeResult.status).toBe("queued")
 
     // when
-    expect(releasePromptAsyncReservation(fixture.memberTwoSessionId, "test-blocker")).toBe(true)
+    expect(blocker.release()).toBe(true)
     await waitForEvent(probeDispatched.promise, "queue probe after recipient shutdown")
 
     // then
@@ -925,22 +999,15 @@ describe("createTeamSendMessageTool", () => {
     }
     const liveTool = createImmediateTeamSendMessageTool(fixture.config, client)
 
-    await dispatchInternalPrompt({
-      mode: "async",
-      client,
-      sessionID: fixture.memberTwoSessionId,
-      source: "test-blocker",
-      input: {
-        path: { id: fixture.memberTwoSessionId },
-        body: { parts: [{ type: "text", text: "blocker" }] },
-        query: { directory: resolveBaseDir(fixture.config) },
+    const blocker = await holdRecipientBehindBlocker(fixture, client)
+    await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "unread before deletion",
       },
-    })
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "unread before deletion",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
     await rm(path.join(resolveBaseDir(fixture.config), "runtime", fixture.teamRunId), {
       recursive: true,
       force: true,
@@ -961,7 +1028,7 @@ describe("createTeamSendMessageTool", () => {
     expect(probeResult.status).toBe("queued")
 
     // when
-    expect(releasePromptAsyncReservation(fixture.memberTwoSessionId, "test-blocker")).toBe(true)
+    expect(blocker.release()).toBe(true)
     await waitForEvent(probeDispatched.promise, "queue probe after team deletion")
 
     // then
@@ -974,21 +1041,31 @@ describe("createTeamSendMessageTool", () => {
     const { client, calls } = createRecordingClient()
     const liveTool = createTeamSendMessageTool(fixture.config, client)
 
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "first ping",
-    }, fixture.toolContext(fixture.memberOneSessionId))
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "second ping",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+    await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "first ping",
+      },
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
+    await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "second ping",
+      },
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
 
-    const wakeHint = createTeamIdleWakeHint({
-      directory: resolveBaseDir(fixture.config),
-      client,
-    }, fixture.config, { idleSettleMs: 0 })
+    const wakeHint = createTeamIdleWakeHint(
+      {
+        directory: resolveBaseDir(fixture.config),
+        client,
+      },
+      fixture.config,
+      { idleSettleMs: 0 },
+    )
 
     // when
     await wakeHint({
@@ -1021,11 +1098,14 @@ describe("createTeamSendMessageTool", () => {
     const liveTool = createTeamSendMessageTool(fixture.config, client)
 
     // when
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "ping",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+    await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "ping",
+      },
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
 
     // then
     expect(calls).toHaveLength(1)
@@ -1052,18 +1132,17 @@ describe("createTeamSendMessageTool", () => {
       // given
       const fixture = await createTeamFixture()
       const { client, calls } = createRecordingClient()
-      const liveTool = createProductionTeamSendMessageTool(
-        fixture.config,
-        client,
-        defaultTeamSendMessageToolDeps,
-      )
+      const liveTool = createProductionTeamSendMessageTool(fixture.config, client, defaultTeamSendMessageToolDeps)
 
       // when
-      const delivery = liveTool.execute({
-        teamRunId: fixture.teamRunId,
-        to: "m2",
-        body: "ambient default ping",
-      }, fixture.toolContext(fixture.memberOneSessionId))
+      const delivery = liveTool.execute(
+        {
+          teamRunId: fixture.teamRunId,
+          to: "m2",
+          body: "ambient default ping",
+        },
+        fixture.toolContext(fixture.memberOneSessionId),
+      )
       await waitForEvent(settleTimerScheduled.promise, "live delivery idle-settle timer")
       await delivery
 
@@ -1090,11 +1169,14 @@ describe("createTeamSendMessageTool", () => {
     const liveTool = createTeamSendMessageTool(fixture.config, client)
 
     // when
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "ping",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+    await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "ping",
+      },
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
 
     // then
     expect(calls).toHaveLength(1)
@@ -1126,11 +1208,14 @@ describe("createTeamSendMessageTool", () => {
     const liveTool = createTeamSendMessageTool(fixture.config, client)
 
     // when
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "ping",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+    await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "ping",
+      },
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
 
     // then
     expect(calls).toHaveLength(1)
@@ -1156,11 +1241,14 @@ describe("createTeamSendMessageTool", () => {
     const liveTool = createTeamSendMessageTool(fixture.config, client)
 
     // when
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "ping",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+    await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "ping",
+      },
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
 
     // then
     expect(calls).toHaveLength(1)
@@ -1186,11 +1274,14 @@ describe("createTeamSendMessageTool", () => {
     await saveState(runtimeState, fixture.config)
 
     // when
-    const result = await fixture.tool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "hello",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+    const result = await fixture.tool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "hello",
+      },
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
     const parsedResult = parseToolResult(result)
 
     // then
@@ -1208,11 +1299,14 @@ describe("createTeamSendMessageTool", () => {
     const liveTool = createTeamSendMessageTool(fixture.config, client)
 
     // when
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "ping",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+    await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "ping",
+      },
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
 
     // then
     const inboxDir = getInboxDir(resolveBaseDir(fixture.config), fixture.teamRunId, "m2")
@@ -1233,19 +1327,19 @@ describe("createTeamSendMessageTool", () => {
     const liveTool = createTeamSendMessageTool(fixture.config, client)
 
     // when
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "*",
-      body: "broadcast ping",
-      kind: "announcement",
-    }, fixture.toolContext(fixture.leadSessionId))
+    await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "*",
+        body: "broadcast ping",
+        kind: "announcement",
+      },
+      fixture.toolContext(fixture.leadSessionId),
+    )
 
     // then
     const targetedSessionIds = calls.map((entry) => entry.sessionId).sort()
-    expect(targetedSessionIds).toEqual([
-      fixture.memberOneSessionId,
-      fixture.memberTwoSessionId,
-    ].sort())
+    expect(targetedSessionIds).toEqual([fixture.memberOneSessionId, fixture.memberTwoSessionId].sort())
   })
 
   test("broadcast still queues for members whose session has not spawned yet", async () => {
@@ -1262,12 +1356,15 @@ describe("createTeamSendMessageTool", () => {
     const liveTool = createTeamSendMessageTool(fixture.config, client)
 
     // when
-    const result = await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "*",
-      body: "broadcast ping",
-      kind: "announcement",
-    }, fixture.toolContext(fixture.leadSessionId))
+    const result = await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "*",
+        body: "broadcast ping",
+        kind: "announcement",
+      },
+      fixture.toolContext(fixture.leadSessionId),
+    )
     const parsedResult = parseToolResult(result)
 
     // then
@@ -1293,11 +1390,14 @@ describe("createTeamSendMessageTool", () => {
     const liveTool = createTeamSendMessageTool(fixture.config, failingClient)
 
     // when
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "non-retryable ping",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+    await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "non-retryable ping",
+      },
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
 
     // then
     expect(promptCalls).toBe(1)
@@ -1326,11 +1426,14 @@ describe("createTeamSendMessageTool", () => {
     const liveTool = createImmediateTeamSendMessageTool(fixture.config, failingClient)
 
     // when
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "ping",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+    await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "ping",
+      },
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
     await waitForEvent(fallbackDispatched.promise, "fallback wake after pre-send transport failure")
     const injection = await pollAndBuildInjection(
       fixture.memberTwoSessionId,
@@ -1367,11 +1470,14 @@ describe("createTeamSendMessageTool", () => {
     })
 
     // when
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "maybe already accepted",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+    await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "maybe already accepted",
+      },
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
 
     // then
     expect(promptCalls).toBe(1)
@@ -1403,11 +1509,14 @@ describe("createTeamSendMessageTool", () => {
     const liveTool = createTeamSendMessageTool(fixture.config, failingClient)
 
     // when
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "ambiguous failure should retry",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+    await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "ambiguous failure should retry",
+      },
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
 
     // then
     const unread = await listUnreadMessages(fixture.teamRunId, "m2", fixture.config)
@@ -1416,7 +1525,9 @@ describe("createTeamSendMessageTool", () => {
     const inboxDir = getInboxDir(resolveBaseDir(fixture.config), fixture.teamRunId, "m2")
     const inboxEntries = await readdir(inboxDir)
     expect(inboxEntries.filter((entry) => entry.startsWith(".delivering-"))).toHaveLength(0)
-    const processedEntries = (await readdir(path.join(inboxDir, "processed"))).filter((entry) => entry.endsWith(".json"))
+    const processedEntries = (await readdir(path.join(inboxDir, "processed"))).filter((entry) =>
+      entry.endsWith(".json"),
+    )
     expect(processedEntries).toHaveLength(1)
   })
 
@@ -1435,11 +1546,14 @@ describe("createTeamSendMessageTool", () => {
     const liveTool = createTeamSendMessageTool(fixture.config, client)
 
     // when
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "accepted before state vanished",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+    await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "accepted before state vanished",
+      },
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
 
     // then
     expect(promptCalls).toBe(1)
@@ -1449,7 +1563,9 @@ describe("createTeamSendMessageTool", () => {
     const inboxDir = getInboxDir(resolveBaseDir(fixture.config), fixture.teamRunId, "m2")
     const inboxEntries = (await readdir(inboxDir)).filter((entry) => entry.endsWith(".json"))
     expect(inboxEntries.filter((entry) => entry.startsWith(".delivering-"))).toHaveLength(0)
-    const processedEntries = (await readdir(path.join(inboxDir, "processed"))).filter((entry) => entry.endsWith(".json"))
+    const processedEntries = (await readdir(path.join(inboxDir, "processed"))).filter((entry) =>
+      entry.endsWith(".json"),
+    )
     expect(processedEntries).toHaveLength(1)
   })
 
@@ -1466,18 +1582,23 @@ describe("createTeamSendMessageTool", () => {
     const liveTool = createTeamSendMessageTool(fixture.config, client)
 
     // when
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "accepted prompt should be processed",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+    await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "accepted prompt should be processed",
+      },
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
 
     // then
     const inboxDir = getInboxDir(resolveBaseDir(fixture.config), fixture.teamRunId, "m2")
     const inboxEntries = await readdir(inboxDir)
     expect(inboxEntries.filter((entry) => entry.startsWith(".delivering-"))).toHaveLength(0)
 
-    const processedEntries = (await readdir(path.join(inboxDir, "processed"))).filter((entry) => entry.endsWith(".json"))
+    const processedEntries = (await readdir(path.join(inboxDir, "processed"))).filter((entry) =>
+      entry.endsWith(".json"),
+    )
     expect(processedEntries).toHaveLength(1)
 
     const unread = await listUnreadMessages(fixture.teamRunId, "m2", fixture.config)
@@ -1503,11 +1624,14 @@ describe("createTeamSendMessageTool", () => {
     const liveTool = createTeamSendMessageTool(fixture.config, client, deps)
 
     // when
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "fallback unread",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+    await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "fallback unread",
+      },
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
 
     // then
     expect(calls).toHaveLength(0)
@@ -1535,11 +1659,14 @@ describe("createTeamSendMessageTool", () => {
     const liveTool = createTeamSendMessageTool(fixture.config, reservingClient)
 
     // when
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "ping",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+    await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "ping",
+      },
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
 
     // then
     expect(unreadDuringDelivery).toHaveLength(0)
@@ -1558,21 +1685,17 @@ describe("createTeamSendMessageTool", () => {
         if (loadCount === 2) {
           return {
             ...state,
-            members: state.members.map((member) => (
-              member.name === "m2"
-                ? { ...member, status: "running" as const, pendingInjectedMessageIds: [] }
-                : member
-            )),
+            members: state.members.map((member) =>
+              member.name === "m2" ? { ...member, status: "running" as const, pendingInjectedMessageIds: [] } : member,
+            ),
           }
         }
         if (loadCount === 3) {
           const staleIdleSnapshot = {
             ...state,
-            members: state.members.map((member) => (
-              member.name === "m2"
-                ? { ...member, status: "idle" as const, pendingInjectedMessageIds: [] }
-                : member
-            )),
+            members: state.members.map((member) =>
+              member.name === "m2" ? { ...member, status: "idle" as const, pendingInjectedMessageIds: [] } : member,
+            ),
           }
           await saveState(staleIdleSnapshot, fixture.config)
           transformResult = await pollAndBuildInjection(
@@ -1591,11 +1714,14 @@ describe("createTeamSendMessageTool", () => {
     const liveTool = createTeamSendMessageTool(fixture.config, client, deps)
 
     // when
-    await liveTool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "race payload",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+    await liveTool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "race payload",
+      },
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
 
     // then
     expect(transformResult).toEqual({
@@ -1614,23 +1740,27 @@ describe("createTeamSendMessageTool", () => {
     const messageId = randomUUID()
 
     // when
-    await sendMessage({
-      version: 1,
-      messageId,
-      from: "m1",
-      to: "m2",
-      kind: "message",
-      body: "ping",
-      timestamp: Date.now(),
-    }, fixture.teamRunId, fixture.config, {
-      isLead: false,
-      activeMembers: ["m2"],
-      reservedRecipients: new Set(["m2"]),
-    })
+    await sendMessage(
+      {
+        version: 1,
+        messageId,
+        from: "m1",
+        to: "m2",
+        kind: "message",
+        body: "ping",
+        timestamp: Date.now(),
+      },
+      fixture.teamRunId,
+      fixture.config,
+      {
+        isLead: false,
+        activeMembers: ["m2"],
+        reservedRecipients: new Set(["m2"]),
+      },
+    )
     const unreadImmediately = await listUnreadMessages(fixture.teamRunId, "m2", fixture.config)
     const inboxDir = getInboxDir(resolveBaseDir(fixture.config), fixture.teamRunId, "m2")
-    const rawEntries = (await readdir(inboxDir))
-      .filter((entry) => entry.endsWith(".json"))
+    const rawEntries = (await readdir(inboxDir)).filter((entry) => entry.endsWith(".json"))
 
     // then
     expect(unreadImmediately).toHaveLength(0)
@@ -1642,12 +1772,15 @@ describe("createTeamSendMessageTool", () => {
     const fixture = await createTeamFixture()
 
     // when
-    const result = fixture.tool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m1",
-      body: "stop",
-      kind: "shutdown_request",
-    }, fixture.toolContext(fixture.leadSessionId))
+    const result = fixture.tool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m1",
+        body: "stop",
+        kind: "shutdown_request",
+      },
+      fixture.toolContext(fixture.leadSessionId),
+    )
 
     // then
     expect(result).rejects.toBeInstanceOf(Error)
@@ -1658,12 +1791,15 @@ describe("createTeamSendMessageTool", () => {
     const fixture = await createTeamFixture()
 
     // when
-    const result = fixture.tool.execute({
-      teamRunId: fixture.teamRunId,
-      to: "m2",
-      body: "hello",
-      correlationId: "task-1",
-    }, fixture.toolContext(fixture.memberOneSessionId))
+    const result = fixture.tool.execute(
+      {
+        teamRunId: fixture.teamRunId,
+        to: "m2",
+        body: "hello",
+        correlationId: "task-1",
+      },
+      fixture.toolContext(fixture.memberOneSessionId),
+    )
 
     // then
     await expect(result).rejects.toThrow("correlationId")

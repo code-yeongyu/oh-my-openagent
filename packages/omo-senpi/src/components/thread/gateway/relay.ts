@@ -1,53 +1,153 @@
 /**
  * The relay SDK: bindings, the outbox, reply tokens and connector inbound, over one gateway store.
- * The agent tools (`thread_bind` ... `thread_answer`) call it with the calling session's principal;
+ * The agent tools (`thread_report` ... `thread_answer`) call it with the calling session's principal;
  * the `omo thread` CLI (todo 14) calls the same functions with `cli:<uid>`, and a connector drives
- * only `outbox`, `ack`, `answer` and `inbound`. Every result is data: `{ kind: "ok", ... }` or
+ * only `outbox`, `ack`, `answer` and `inbound`. Binding is not a session tool: the gateway binds,
+ * rebinds and unbinds chat threads through these functions as its own principal. Every result is data: `{ kind: "ok", ... }` or
  * `{ kind: "error", error }` with a taxonomy code and a `next_action`.
  */
 import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from "../errors"
 import type { GatewayEndpointPort, GatewayEndpointRef, UiAnswerReply } from "./adapter"
 import { answerShape, type UiRequestKind } from "./answer-shape"
-import { type BindInput, type BindingRecord, type CompletionOutcome, hashArgs, INBOUND_MODES, type InboundMode, normalizeBindInput, type OutboundEvent, RELAY_TEXT_MAX_BYTES, type RelayOutcome } from "./bindings"
+import {
+  type BindInput,
+  type BindingRecord,
+  type CompletionOutcome,
+  hashArgs,
+  INBOUND_MODES,
+  type InboundMode,
+  normalizeBindInput,
+  type OutboundEvent,
+  RELAY_TEXT_MAX_BYTES,
+  type RelayOutcome,
+} from "./bindings"
 import { deliveryArgsHash, type GatewayEngine } from "./engine"
 import { isLockWaitExceeded, retryAfterLockWait } from "./lock-wait"
 import type { GatewayStore, OutboxPage } from "./store"
-import { CLOSED_ELSEWHERE, type AnswerClaimRef, type AnswerDelivered, type BindingsFilter, type ReportOpResult } from "./store-relay-ops"
+import {
+  CLOSED_ELSEWHERE,
+  type AnswerClaimRef,
+  type AnswerDelivered,
+  type BindingsFilter,
+  type ReportOpResult,
+} from "./store-relay-ops"
 import { normalizeAuthor } from "./author"
 import type { ExternalAuthor, GatewayDeliveryResult, StoreRefusal } from "./types"
 
-export type RelayResult<T> = ({ readonly kind: "ok" } & T) | { readonly kind: "error"; readonly error: ThreadToolFailure }
+export type RelayResult<T> =
+  ({ readonly kind: "ok" } & T) | { readonly kind: "error"; readonly error: ThreadToolFailure }
 
 type Keyed = { readonly principal: string; readonly idempotency_key?: string }
 
 export type GatewayRelay = {
-  readonly bind: (request: Keyed & { readonly binding: BindInput }) => Promise<RelayResult<{ readonly binding: BindingRecord; readonly deduplicated: boolean }>>
-  readonly unbind: (request: Keyed & { readonly binding_id: string; readonly expected_revision: number }) => Promise<RelayResult<{ readonly binding: BindingRecord; readonly already_closed: boolean; readonly in_flight: readonly string[]; readonly deduplicated: boolean }>>
-  readonly rebind: (request: Keyed & { readonly binding_id: string; readonly expected_revision: number; readonly session_durable_id: string }) => Promise<RelayResult<{ readonly binding: BindingRecord; readonly closed: readonly string[]; readonly deduplicated: boolean }>>
-  readonly bindings: (request: { readonly filter: BindingsFilter; readonly cursor?: string; readonly limit?: number }) => Promise<RelayResult<{ readonly bindings: readonly BindingRecord[]; readonly next_cursor: string | null }>>
-  readonly report: (request: Keyed & { readonly session_durable_id: string; readonly binding_id?: string; readonly origin_delivery_ids?: readonly string[]; readonly origin_local_input?: boolean; readonly event: OutboundEvent; readonly text: string; readonly request_id?: string; readonly request_kind?: UiRequestKind }) => Promise<RelayResult<ReportOpResult & { readonly deduplicated: boolean }>>
-  readonly outbox: (request: { readonly binding_id: string; readonly after_cursor?: number; readonly limit?: number }) => Promise<RelayResult<OutboxPage>>
-  readonly ack: (request: { readonly binding_id: string; readonly cursor: number; readonly provider_message_id?: string }) => Promise<RelayResult<{ readonly binding_id: string; readonly acked_cursor: number; readonly changed: boolean }>>
+  readonly bind: (
+    request: Keyed & { readonly binding: BindInput },
+  ) => Promise<RelayResult<{ readonly binding: BindingRecord; readonly deduplicated: boolean }>>
+  readonly unbind: (request: Keyed & { readonly binding_id: string; readonly expected_revision: number }) => Promise<
+    RelayResult<{
+      readonly binding: BindingRecord
+      readonly already_closed: boolean
+      readonly in_flight: readonly string[]
+      readonly deduplicated: boolean
+    }>
+  >
+  readonly rebind: (
+    request: Keyed & {
+      readonly binding_id: string
+      readonly expected_revision: number
+      readonly session_durable_id: string
+    },
+  ) => Promise<
+    RelayResult<{ readonly binding: BindingRecord; readonly closed: readonly string[]; readonly deduplicated: boolean }>
+  >
+  readonly bindings: (request: {
+    readonly filter: BindingsFilter
+    readonly cursor?: string
+    readonly limit?: number
+  }) => Promise<RelayResult<{ readonly bindings: readonly BindingRecord[]; readonly next_cursor: string | null }>>
+  readonly report: (
+    request: Keyed & {
+      readonly session_durable_id: string
+      readonly binding_id?: string
+      readonly origin_delivery_ids?: readonly string[]
+      readonly origin_local_input?: boolean
+      readonly event: OutboundEvent
+      readonly text: string
+      readonly request_id?: string
+      readonly request_kind?: UiRequestKind
+    },
+  ) => Promise<RelayResult<ReportOpResult & { readonly deduplicated: boolean }>>
+  readonly outbox: (request: {
+    readonly binding_id: string
+    readonly after_cursor?: number
+    readonly limit?: number
+  }) => Promise<RelayResult<OutboxPage>>
+  readonly ack: (request: {
+    readonly binding_id: string
+    readonly cursor: number
+    readonly provider_message_id?: string
+  }) => Promise<RelayResult<{ readonly binding_id: string; readonly acked_cursor: number; readonly changed: boolean }>>
   /**
    * `binding_id` is the binding the answer arrived THROUGH (the connector's authenticated context), never read from the token.
    * `author` is the human who answered, recorded on the question's outbox row as `answered_by`.
    */
-  readonly answer: (request: { readonly binding_id: string; readonly reply_token: string; readonly answer: string; readonly author?: ExternalAuthor }) => Promise<RelayResult<{ readonly binding_id: string; readonly cursor: number; readonly session_durable_id: string; readonly answered_by: ExternalAuthor | null }>>
+  readonly answer: (request: {
+    readonly binding_id: string
+    readonly reply_token: string
+    readonly answer: string
+    readonly author?: ExternalAuthor
+  }) => Promise<
+    RelayResult<{
+      readonly binding_id: string
+      readonly cursor: number
+      readonly session_durable_id: string
+      readonly answered_by: ExternalAuthor | null
+    }>
+  >
   /**
    * A connector's inbound message; one `event_id` is admitted once. `author` is the human who wrote it,
    * rendered in the provenance header outside the body. `mode` defaults to the binding's `inbound_mode`
    * and may never exceed it: `follow_up` is allowed on an `auto` binding, `auto` on a `follow_up` binding
    * is `invalid_arguments`, and `steer` is refused on every binding.
    */
-  readonly inbound: (request: { readonly binding_id: string; readonly event_id: string; readonly text: string; readonly author?: ExternalAuthor; readonly mode?: InboundMode }) => Promise<GatewayDeliveryResult>
+  readonly inbound: (request: {
+    readonly binding_id: string
+    readonly event_id: string
+    readonly text: string
+    readonly author?: ExternalAuthor
+    readonly mode?: InboundMode
+  }) => Promise<GatewayDeliveryResult>
   /** The session settled: armed completions (those up to `through_arm_seq`, when given) become outbox rows with this outcome. */
-  readonly settle: (request: { readonly session_durable_id: string; readonly outcome: CompletionOutcome; readonly through_arm_seq?: number }) => Promise<readonly { readonly binding_id: string; readonly cursor: number }[]>
+  readonly settle: (request: {
+    readonly session_durable_id: string
+    readonly outcome: CompletionOutcome
+    readonly through_arm_seq?: number
+  }) => Promise<readonly { readonly binding_id: string; readonly cursor: number }[]>
   /** Shutdown: cancels background answer-release retries. */
   readonly dispose: () => void
 }
 
 export type GatewayRelayOptions = {
-  readonly store: Pick<GatewayStore, "now" | "busyTimeoutMs" | "bind" | "unbind" | "rebind" | "listBindings" | "report" | "readOutbox" | "ackOutbox" | "claimAnswer" | "releaseAnswer" | "confirmAnswer" | "markPriorDelivered" | "bindingView" | "emitCompletions" | "deliveryReceipt" | "recoverDelivery">
+  readonly store: Pick<
+    GatewayStore,
+    | "now"
+    | "busyTimeoutMs"
+    | "bind"
+    | "unbind"
+    | "rebind"
+    | "listBindings"
+    | "report"
+    | "readOutbox"
+    | "ackOutbox"
+    | "claimAnswer"
+    | "releaseAnswer"
+    | "confirmAnswer"
+    | "markPriorDelivered"
+    | "bindingView"
+    | "emitCompletions"
+    | "deliveryReceipt"
+    | "recoverDelivery"
+  >
   readonly engine: GatewayEngine
   readonly endpoints: GatewayEndpointPort
   /** The endpoint serving a session right now, or null when nothing answers for it. */
@@ -55,37 +155,72 @@ export type GatewayRelayOptions = {
   readonly now?: () => number
 }
 
+const SELF = "thread_report without binding_id uses the chat binding the gateway keeps for this session."
+
+// The default next action per code. The relay does not know its caller here, and a session reaches every code below
+// through its relay tools except binding_conflict and stale_revision (only bind/rebind/unbind return them, and only the
+// gateway or the CLI calls those), so every other text names session tools and never a shell command. A refusal that only
+// the gateway, the CLI or a connector can get, or one whose cause the code alone does not tell, carries its own next
+// action where it is returned (`fromStore`'s overrides, `failure`'s nextAction).
 const NEXT_ACTION: Partial<Record<ThreadErrorCode, string>> = {
-  binding_conflict: "Call thread_bindings to find the binding that holds this thread, then thread_rebind it with its revision, or thread_unbind it first.",
+  binding_conflict:
+    "Find the binding that holds this thread with `omo thread bindings`, then rebind it with its revision, or unbind it first.",
   binding_mismatch: "Answer through the binding that asked the question; the question stays pending.",
-  binding_inactive: "Bind the thread again with thread_bind.",
-  stale_revision: "Call thread_bindings for the current revision and retry with it.",
-  stale_token: "The question was asked under an earlier binding revision or session runtime; wait for the session to ask again.",
+  binding_inactive:
+    "The chat binding is closed: the gateway binds the chat again when its next message arrives, so report through that binding.",
+  stale_revision: "Read the binding's current revision with `omo thread bindings` and retry with it.",
+  stale_token:
+    "The question was asked under an earlier binding revision or session runtime; wait for the session to ask again.",
   already_answered: "Nothing to do: the question has its answer.",
-  answer_in_progress: "Retry after a moment: another answer is still being handed to the session, and the question goes back to pending if that fails.",
+  answer_in_progress:
+    "Retry after a moment: another answer is still being handed to the session, and the question goes back to pending if that fails.",
   idempotency_conflict: "Retry with a new idempotency_key.",
-  idempotency_uncertain: "Call thread_bindings or thread_outbox to see the current state before retrying with a new key.",
-  scope_denied: "Report through a binding attached to this session; thread_bindings lists them.",
+  idempotency_uncertain:
+    "Read the binding's outbox with thread_outbox to see whether the earlier call took effect, then retry with a new idempotency_key.",
+  scope_denied: `That binding belongs to another session: ${SELF}`,
   unsupported: "Report only the events the binding subscribes to, through a binding with an outbound direction.",
-  not_found: "Call thread_bindings for the binding ids that exist.",
+  not_found: `No binding has that id: ${SELF}`,
   cursor_invalid: "Read thread_outbox again and ack a cursor it returned.",
   host_unavailable: "Retry when the session is running; the question stays pending.",
   invalid_arguments: "Fix the arguments and call again.",
 }
 
 /** Endpoint refusals meaning the session no longer waits on the request (senpi host dialog/question, terminal). */
-const SESSION_NO_LONGER_WAITS: ReadonlySet<string> = new Set(["question_already_resolved", "unknown_extension_ui_request", "unknown_request"])
+const SESSION_NO_LONGER_WAITS: ReadonlySet<string> = new Set([
+  "question_already_resolved",
+  "unknown_extension_ui_request",
+  "unknown_request",
+])
 
-function failure(code: ThreadErrorCode, message: string, details?: Readonly<Record<string, unknown>>, nextAction?: string): { readonly kind: "error"; readonly error: ThreadToolFailure } {
-  return { kind: "error", error: threadToolFailure(code, message, nextAction ?? NEXT_ACTION[code] ?? "Call thread_bindings and retry after checking the binding.", details) }
+function failure(
+  code: ThreadErrorCode,
+  message: string,
+  details?: Readonly<Record<string, unknown>>,
+  nextAction?: string,
+): { readonly kind: "error"; readonly error: ThreadToolFailure } {
+  return {
+    kind: "error",
+    error: threadToolFailure(code, message, nextAction ?? NEXT_ACTION[code] ?? `Retry; ${SELF}`, details),
+  }
 }
 
-function fromStore<T extends object>(outcome: RelayOutcome<T> | StoreRefusal): RelayResult<T> {
-  if (outcome.kind === "refused") return failure(outcome.code, outcome.message, outcome.details)
+function fromStore<T extends object>(
+  outcome: RelayOutcome<T> | StoreRefusal,
+  nextAction?: Partial<Record<ThreadErrorCode, string>>,
+): RelayResult<T> {
+  if (outcome.kind === "refused")
+    return failure(outcome.code, outcome.message, outcome.details, nextAction?.[outcome.code])
   return outcome as RelayResult<T>
 }
 
-function checkedAuthor(author: ExternalAuthor | undefined): ExternalAuthor | undefined | { readonly kind: "error"; readonly error: ThreadToolFailure } {
+/** unbind and rebind run only as the gateway or the CLI, which can list the bindings. */
+const BINDING_ADMIN_NEXT_ACTION: Partial<Record<ThreadErrorCode, string>> = {
+  not_found: "List the binding ids that exist with `omo thread bindings`.",
+}
+
+function checkedAuthor(
+  author: ExternalAuthor | undefined,
+): ExternalAuthor | undefined | { readonly kind: "error"; readonly error: ThreadToolFailure } {
   if (author === undefined) return undefined
   const normalized = normalizeAuthor(author)
   return "kind" in normalized ? failure("invalid_arguments", normalized.message) : normalized
@@ -93,11 +228,15 @@ function checkedAuthor(author: ExternalAuthor | undefined): ExternalAuthor | und
 
 function textTooLarge(text: string): { readonly kind: "error"; readonly error: ThreadToolFailure } | undefined {
   const bytes = Buffer.byteLength(text)
-  return bytes > RELAY_TEXT_MAX_BYTES ? failure("message_too_large", `The text is ${bytes} bytes, above the ${RELAY_TEXT_MAX_BYTES}-byte limit.`) : undefined
+  return bytes > RELAY_TEXT_MAX_BYTES
+    ? failure("message_too_large", `The text is ${bytes} bytes, above the ${RELAY_TEXT_MAX_BYTES}-byte limit.`)
+    : undefined
 }
 
 function receipt(request: Keyed, operation: string, args: unknown) {
-  return request.idempotency_key === undefined ? null : { principal: request.principal, operation, idempotency_key: request.idempotency_key, args_hash: hashArgs(args) }
+  return request.idempotency_key === undefined
+    ? null
+    : { principal: request.principal, operation, idempotency_key: request.idempotency_key, args_hash: hashArgs(args) }
 }
 
 export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
@@ -125,9 +264,14 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
     } catch (error) {
       if (!isLockWaitExceeded(error) || disposed) throw error
       const retry = retryAfterLockWait(
-        () => attempt().then(() => { retries.delete(retry) }),
+        () =>
+          attempt().then(() => {
+            retries.delete(retry)
+          }),
         () => store.busyTimeoutMs,
-        () => { retries.delete(retry) },
+        () => {
+          retries.delete(retry)
+        },
       )
       retries.add(retry)
     }
@@ -137,22 +281,50 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
     bind: async (request) => {
       const binding = normalizeBindInput(request.binding)
       if ("kind" in binding) return fromStore(binding)
-      return fromStore(await store.bind({ now: now(), receipt: receipt(request, "thread_bind", binding), binding })) as RelayResult<{ binding: BindingRecord; deduplicated: boolean }>
+      return fromStore(
+        await store.bind({ now: now(), receipt: receipt(request, "thread_bind", binding), binding }),
+      ) as RelayResult<{ binding: BindingRecord; deduplicated: boolean }>
     },
     unbind: async (request) => {
       const args = { binding_id: request.binding_id, expected_revision: request.expected_revision }
-      return fromStore(await store.unbind({ now: now(), receipt: receipt(request, "thread_unbind", args), ...args })) as RelayResult<{ binding: BindingRecord; already_closed: boolean; in_flight: readonly string[]; deduplicated: boolean }>
+      return fromStore(
+        await store.unbind({ now: now(), receipt: receipt(request, "thread_unbind", args), ...args }),
+        BINDING_ADMIN_NEXT_ACTION,
+      ) as RelayResult<{
+        binding: BindingRecord
+        already_closed: boolean
+        in_flight: readonly string[]
+        deduplicated: boolean
+      }>
     },
     rebind: async (request) => {
-      const args = { binding_id: request.binding_id, expected_revision: request.expected_revision, session_durable_id: request.session_durable_id }
-      return fromStore(await store.rebind({ now: now(), receipt: receipt(request, "thread_rebind", args), ...args })) as RelayResult<{ binding: BindingRecord; closed: readonly string[]; deduplicated: boolean }>
+      const args = {
+        binding_id: request.binding_id,
+        expected_revision: request.expected_revision,
+        session_durable_id: request.session_durable_id,
+      }
+      return fromStore(
+        await store.rebind({ now: now(), receipt: receipt(request, "thread_rebind", args), ...args }),
+        BINDING_ADMIN_NEXT_ACTION,
+      ) as RelayResult<{ binding: BindingRecord; closed: readonly string[]; deduplicated: boolean }>
     },
     bindings: async (request) => fromStore(await store.listBindings({ now: now(), ...request })),
     report: async (request) => {
       const tooLarge = textTooLarge(request.text)
       if (tooLarge !== undefined) return tooLarge
-      const args = { session_durable_id: request.session_durable_id, binding_id: request.binding_id ?? null, origin_delivery_ids: request.origin_delivery_ids ?? [], origin_local_input: request.origin_local_input === true, event: request.event, text: request.text, ui_request_id: request.request_id ?? null, ui_request_kind: request.request_kind ?? null }
-      return fromStore(await store.report({ now: now(), receipt: receipt(request, "thread_report", args), ...args })) as RelayResult<ReportOpResult & { deduplicated: boolean }>
+      const args = {
+        session_durable_id: request.session_durable_id,
+        binding_id: request.binding_id ?? null,
+        origin_delivery_ids: request.origin_delivery_ids ?? [],
+        origin_local_input: request.origin_local_input === true,
+        event: request.event,
+        text: request.text,
+        ui_request_id: request.request_id ?? null,
+        ui_request_kind: request.request_kind ?? null,
+      }
+      return fromStore(
+        await store.report({ now: now(), receipt: receipt(request, "thread_report", args), ...args }),
+      ) as RelayResult<ReportOpResult & { deduplicated: boolean }>
     },
     outbox: async (request) => fromStore(await store.readOutbox({ now: now(), ...request })),
     ack: async (request) => fromStore(await store.ackOutbox({ now: now(), ...request })),
@@ -162,8 +334,19 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
       const author = checkedAuthor(request.author)
       if (author !== undefined && "kind" in author) return author
       const answeredBy = author ?? null
-      const claim = await store.claimAnswer({ now: now(), binding_id: request.binding_id, reply_token: request.reply_token, answer: request.answer, answered_by: answeredBy })
-      if (claim.kind !== "ok") return fromStore(claim)
+      const claim = await store.claimAnswer({
+        now: now(),
+        binding_id: request.binding_id,
+        reply_token: request.reply_token,
+        answer: request.answer,
+        answered_by: answeredBy,
+      })
+      // The token named this binding, so not_found here means its question left the outbox, not an unknown binding.
+      if (claim.kind !== "ok")
+        return fromStore(claim, {
+          not_found:
+            "The question this token belongs to is gone from the outbox: read thread_outbox for a newer question and answer that one.",
+        })
       const own: AnswerClaimRef = { reply_token: request.reply_token, claimed_at: claim.claimed_at }
       const respond = options.endpoints.respondUi
       let endpoint: GatewayEndpointRef | null = null
@@ -177,19 +360,30 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
       }
       if (respond === undefined || endpoint === null) {
         await release(own)
-        return failure(respond === undefined ? "unsupported" : "host_unavailable", `The session that asked is not reachable to take the answer${unreachable}.`, { session: claim.session_durable_id })
+        return failure(
+          respond === undefined ? "unsupported" : "host_unavailable",
+          `The session that asked is not reachable to take the answer${unreachable}.`,
+          { session: claim.session_durable_id },
+        )
       }
       const shape = answerShape(claim.ui_request_kind, request.answer)
       if (!shape.ok) {
         await release(own)
-        return failure("invalid_arguments", shape.reason, { session: claim.session_durable_id, ui_request_kind: claim.ui_request_kind })
+        return failure("invalid_arguments", shape.reason, {
+          session: claim.session_durable_id,
+          ui_request_kind: claim.ui_request_kind,
+        })
       }
       let reply: UiAnswerReply
       try {
         reply = await respond(endpoint, { ui_request_id: claim.ui_request_id, fields: shape.fields })
       } catch (error) {
         await release(own)
-        return failure("host_unavailable", `The answer could not be handed to the session: ${error instanceof Error ? error.message : String(error)}`, { session: claim.session_durable_id })
+        return failure(
+          "host_unavailable",
+          `The answer could not be handed to the session: ${error instanceof Error ? error.message : String(error)}`,
+          { session: claim.session_durable_id },
+        )
       }
       if (!reply.delivered) {
         // The session answered and refused: it no longer waits on that request, or cannot read the answer.
@@ -201,16 +395,31 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
         if (priorAnswer !== null && SESSION_NO_LONGER_WAITS.has(reply.error)) {
           if (reply.error === "question_already_resolved") {
             await settleClaim(() => store.markPriorDelivered({ ...own, prior: priorAnswer }))
-            return failure("already_answered", `The session already took an earlier answer to this question (${reply.error}).`, { session: claim.session_durable_id, reason: reply.error })
+            return failure(
+              "already_answered",
+              `The session already took an earlier answer to this question (${reply.error}).`,
+              { session: claim.session_durable_id, reason: reply.error },
+            )
           }
-          await settleClaim(() => store.markPriorDelivered({ ...own, prior: { answer: null, answered_at: own.claimed_at } }))
-          return failure("already_answered", `${CLOSED_ELSEWHERE} (${reply.error}).`, { session: claim.session_durable_id, reason: reply.error }, "Nothing to do: the session no longer waits for this question.")
+          await settleClaim(() =>
+            store.markPriorDelivered({ ...own, prior: { answer: null, answered_at: own.claimed_at } }),
+          )
+          return failure(
+            "already_answered",
+            `${CLOSED_ELSEWHERE} (${reply.error}).`,
+            { session: claim.session_durable_id, reason: reply.error },
+            "Nothing to do: the session no longer waits for this question.",
+          )
         }
         await release(own)
         const malformed = reply.error === "invalid_response" || reply.error === "question_incomplete"
         if (reply.error === "host_draining") {
-          return failure("stale_token", "The session's host is draining and could not take the answer: host_draining", { session: claim.session_durable_id, reason: reply.error },
-            "The session's host is handing its sessions over; the question stays pending. Answer it again once the host is back.")
+          return failure(
+            "stale_token",
+            "The session's host is draining and could not take the answer: host_draining",
+            { session: claim.session_durable_id, reason: reply.error },
+            "The session's host is handing its sessions over; the question stays pending. Answer it again once the host is back.",
+          )
         }
         return failure(
           malformed ? "invalid_arguments" : "stale_token",
@@ -222,16 +431,33 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
         )
       }
       await confirm({ ...own, answer: request.answer, answered_by: answeredBy })
-      return { kind: "ok", binding_id: request.binding_id, cursor: claim.cursor, session_durable_id: claim.session_durable_id, answered_by: answeredBy }
+      return {
+        kind: "ok",
+        binding_id: request.binding_id,
+        cursor: claim.cursor,
+        session_durable_id: claim.session_durable_id,
+        answered_by: answeredBy,
+      }
     },
     inbound: async (request) => {
       if (request.mode !== undefined && !(INBOUND_MODES as readonly string[]).includes(request.mode)) {
-        return failure("invalid_arguments", `A binding message is delivered as ${INBOUND_MODES.join(" or ")}, never ${String(request.mode)}.`, { mode: request.mode }, "Send with mode auto or follow_up, or omit it for the binding's inbound_mode.")
+        return failure(
+          "invalid_arguments",
+          `A binding message is delivered as ${INBOUND_MODES.join(" or ")}, never ${String(request.mode)}.`,
+          { mode: request.mode },
+          "Send with mode auto or follow_up, or omit it for the binding's inbound_mode.",
+        )
       }
       const author = checkedAuthor(request.author)
       if (author !== undefined && "kind" in author) return author
       const binding = await store.bindingView({ now: now(), binding_id: request.binding_id })
-      if (binding === null) return failure("not_found", "No binding has this id.", { binding_id: request.binding_id })
+      if (binding === null)
+        return failure(
+          "not_found",
+          "No binding has this id.",
+          { binding_id: request.binding_id },
+          "Deliver the message through the binding the gateway keeps for this chat now; this one no longer exists.",
+        )
       // An event the session already took keeps its stored result whatever the binding did since (a
       // connector that lost the ACK retries it): the receipt is checked against the target and
       // revision it was delivered under BEFORE the binding's current status or revision, so neither an
@@ -241,32 +467,55 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
       // stays in progress or uncertain.
       const key = { principal: `binding:${binding.binding_id}`, idempotency_key: `event:${request.event_id}` }
       const prior = await store.deliveryReceipt({ now: now(), ...key })
-      const same = prior !== null && prior.binding_revision !== null && prior.args_hash === deliveryArgsHash({
-        target: prior.target_durable_id,
-        text: request.text,
-        mode: request.mode ?? binding.inbound_mode,
-        expected_turn_id: null,
-        binding: { binding_id: binding.binding_id, revision: prior.binding_revision },
-        author,
-      })
+      const same =
+        prior !== null &&
+        prior.binding_revision !== null &&
+        prior.args_hash ===
+          deliveryArgsHash({
+            target: prior.target_durable_id,
+            text: request.text,
+            mode: request.mode ?? binding.inbound_mode,
+            expected_turn_id: null,
+            binding: { binding_id: binding.binding_id, revision: prior.binding_revision },
+            author,
+          })
       if (same) {
-        const recovered = prior.completed ? { kind: "replay" as const, result: prior.result } : await store.recoverDelivery({ now: now(), ...key, args_hash: prior.args_hash })
+        const recovered = prior.completed
+          ? { kind: "replay" as const, result: prior.result }
+          : await store.recoverDelivery({ now: now(), ...key, args_hash: prior.args_hash })
         if (recovered?.kind === "replay") {
           const replayed = recovered.result as GatewayDeliveryResult
           return replayed.kind === "ok" ? { ...replayed, deduplicated: true } : replayed
         }
         if (recovered?.kind === "refused") return failure(recovered.code, recovered.message, recovered.details)
       }
-      if (binding.status !== "active") return failure("binding_inactive", `The binding is ${binding.status}.`, { binding_id: binding.binding_id, status: binding.status })
-      if (!binding.direction.inbound) return failure("unsupported", "The binding carries no inbound direction.", { binding_id: binding.binding_id })
+      if (binding.status !== "active")
+        return failure("binding_inactive", `The binding is ${binding.status}.`, {
+          binding_id: binding.binding_id,
+          status: binding.status,
+        })
+      if (!binding.direction.inbound)
+        return failure("unsupported", "The binding carries no inbound direction.", { binding_id: binding.binding_id })
       const mode = request.mode ?? binding.inbound_mode
       if (mode === "auto" && binding.inbound_mode === "follow_up") {
-        return failure("invalid_arguments", "The binding delivers at most follow_up; a message cannot ask for more than its binding's inbound_mode.", { binding_id: binding.binding_id, mode, inbound_mode: binding.inbound_mode }, "Send with mode follow_up (or omit it), or rebind the thread with inbound_mode auto.")
+        return failure(
+          "invalid_arguments",
+          "The binding delivers at most follow_up; a message cannot ask for more than its binding's inbound_mode.",
+          { binding_id: binding.binding_id, mode, inbound_mode: binding.inbound_mode },
+          "Send with mode follow_up (or omit it), or rebind the thread with inbound_mode auto.",
+        )
       }
       return await options.engine.deliver({
         sender: {
           kind: "external",
-          origin: { platform: binding.platform, account_id: binding.account_id, chat_id: binding.chat_id, thread_id: binding.thread_id, message_id: request.event_id, ...(author === undefined ? {} : { author }) },
+          origin: {
+            platform: binding.platform,
+            account_id: binding.account_id,
+            chat_id: binding.chat_id,
+            thread_id: binding.thread_id,
+            message_id: request.event_id,
+            ...(author === undefined ? {} : { author }),
+          },
           binding_id: binding.binding_id,
           binding_revision: binding.revision,
         },

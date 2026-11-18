@@ -38,15 +38,13 @@ class UnsafeNamedModel implements SenpiModelPort {
 function registry(model: SenpiModelPort): TaskModelRegistry {
   return {
     getAvailable: () => [model],
-    find: (provider, modelId) => provider === model.provider && modelId === model.id ? model : undefined,
+    find: (provider, modelId) => (provider === model.provider && modelId === model.id ? model : undefined),
   }
 }
 
 function displayFor(model: SenpiModelPort): string | undefined {
-  const planner = createTaskChildPlanner(
-    { categories: { ultrabrain: { model: "openai/gpt-5.6-sol" } } },
-    {},
-    () => registry(model),
+  const planner = createTaskChildPlanner({ categories: { ultrabrain: { model: "openai/gpt-5.6-sol" } } }, {}, () =>
+    registry(model),
   )
   const result = planner({
     prompt: "Inspect the model boundary.",

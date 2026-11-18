@@ -1,8 +1,4 @@
-import type {
-  StopInput,
-  StopOutput,
-  ClaudeHooksConfig,
-} from "./types"
+import type { StopInput, StopOutput, ClaudeHooksConfig } from "./types"
 import { findMatchingHooks, log } from "../../shared"
 import { dispatchHook, getHookIdentifier } from "./dispatch-hook"
 import { getTodoPath } from "./todo"
@@ -48,7 +44,7 @@ export interface StopResult {
 export async function executeStopHooks(
   ctx: StopContext,
   config: ClaudeHooksConfig | null,
-  extendedConfig?: PluginExtendedConfig | null
+  extendedConfig?: PluginExtendedConfig | null,
 ): Promise<StopResult> {
   if (ctx.parentSessionId) {
     return { block: false }
@@ -74,10 +70,10 @@ export async function executeStopHooks(
     hook_source: "opencode-plugin",
   }
 
-   for (const matcher of matchers) {
-     if (!matcher.hooks || matcher.hooks.length === 0) continue
-     for (const hook of matcher.hooks) {
-       if (hook.type !== "command" && hook.type !== "http") continue
+  for (const matcher of matchers) {
+    if (!matcher.hooks || matcher.hooks.length === 0) continue
+    for (const hook of matcher.hooks) {
+      if (hook.type !== "command" && hook.type !== "http") continue
 
       const hookName = getHookIdentifier(hook)
       if (isHookCommandDisabled("Stop", hookName, extendedConfig ?? null)) {
@@ -97,32 +93,32 @@ export async function executeStopHooks(
         }
       }
 
-       if (result.stdout) {
-         try {
-           const output = JSON.parse(result.stdout || "{}") as StopOutput
-           if (output.stop_hook_active !== undefined) {
-             stopHookActiveState.set(ctx.sessionId, output.stop_hook_active)
-           }
-           const isBlock = output.decision === "block"
-           // Only return early if the hook explicitly blocks - non-blocking hooks
-           // should not prevent subsequent hooks from executing (matches Claude Code behavior)
-           if (isBlock) {
-             const reason = normalizeHookText(output.reason)
-             const injectPrompt = normalizeHookText(output.inject_prompt) ?? reason
-             return {
-               block: true,
-               reason,
-               stopHookActive: output.stop_hook_active,
-               permissionMode: output.permission_mode,
-               injectPrompt,
-             }
-           }
-         } catch (error) {
-           if (!(error instanceof SyntaxError)) {
-             throw error
-           }
-         }
-       }
+      if (result.stdout) {
+        try {
+          const output = JSON.parse(result.stdout || "{}") as StopOutput
+          if (output.stop_hook_active !== undefined) {
+            stopHookActiveState.set(ctx.sessionId, output.stop_hook_active)
+          }
+          const isBlock = output.decision === "block"
+          // Only return early if the hook explicitly blocks - non-blocking hooks
+          // should not prevent subsequent hooks from executing (matches Claude Code behavior)
+          if (isBlock) {
+            const reason = normalizeHookText(output.reason)
+            const injectPrompt = normalizeHookText(output.inject_prompt) ?? reason
+            return {
+              block: true,
+              reason,
+              stopHookActive: output.stop_hook_active,
+              permissionMode: output.permission_mode,
+              injectPrompt,
+            }
+          }
+        } catch (error) {
+          if (!(error instanceof SyntaxError)) {
+            throw error
+          }
+        }
+      }
     }
   }
 

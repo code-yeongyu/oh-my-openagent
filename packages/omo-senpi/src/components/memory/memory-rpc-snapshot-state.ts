@@ -1,19 +1,10 @@
 import { readFile, readdir } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
-import {
-  GitMemoryRepo,
-  createNodeGitExec,
-  type GitTreeSizedEntry,
-} from "@oh-my-opencode/memory-core"
+import { GitMemoryRepo, createNodeGitExec, type GitTreeSizedEntry } from "@oh-my-opencode/memory-core"
 
 import type { MemoryIdentityContext } from "./context"
-import type {
-  MemoryRpcActiveRun,
-  MemoryRpcGitRepo,
-  MemoryRpcLastOutcome,
-  MemoryRpcSnapshot,
-} from "./memory-rpc-bridge"
+import type { MemoryRpcActiveRun, MemoryRpcGitRepo, MemoryRpcLastOutcome, MemoryRpcSnapshot } from "./memory-rpc-bridge"
 import { readMemoryRpcJournalState } from "./memory-rpc-journal-state"
 import { readMemoryRpcSync } from "./memory-rpc-sync"
 import { MEMORY_HEALTH_SCAN_LIMIT } from "./status"
@@ -77,10 +68,7 @@ export async function buildMemorySnapshot(
 type TimelineState = Pick<MemoryRpcSnapshot["repo"], "entriesToday" | "previousEntryAtISO">
 
 async function readMemoryRpcTimeline(repo: MemoryRpcGitRepo): Promise<TimelineState> {
-  const [entriesToday, previousEntryAtISO] = await Promise.all([
-    countEntriesToday(repo),
-    readPreviousEntryAt(repo),
-  ])
+  const [entriesToday, previousEntryAtISO] = await Promise.all([countEntriesToday(repo), readPreviousEntryAt(repo)])
   return {
     ...(entriesToday === undefined ? {} : { entriesToday }),
     ...(previousEntryAtISO === undefined ? {} : { previousEntryAtISO }),
@@ -111,9 +99,7 @@ async function readPreviousEntryAt(repo: MemoryRpcGitRepo): Promise<string | und
 }
 
 /** Newest `merged` reflection completion; the only outcome that changed committed memory. */
-async function readLastConsolidationAt(
-  context: MemoryIdentityContext,
-): Promise<string | undefined> {
+async function readLastConsolidationAt(context: MemoryIdentityContext): Promise<string | undefined> {
   const dir = join(context.identityPaths.reflection, "completions")
   let names: string[]
   try {
@@ -154,9 +140,8 @@ export async function readMemoryRpcRepoState(
     repo.headSubject().catch(() => null),
     readTreeStats(asTreeRepo(repo), head, treeStats),
   ])
-  const systemTokensEstimate = stats === undefined
-    ? tokenEstimates.get(head) ?? 0
-    : Math.floor(stats.systemMarkdownBytes / 4)
+  const systemTokensEstimate =
+    stats === undefined ? (tokenEstimates.get(head) ?? 0) : Math.floor(stats.systemMarkdownBytes / 4)
   if (stats !== undefined) tokenEstimates.set(head, systemTokensEstimate)
   return {
     headSha: head,
@@ -260,10 +245,9 @@ interface HealthState {
 
 export async function readMemoryRpcHealth(context: MemoryIdentityContext): Promise<HealthState> {
   try {
-    const health = await readReflectionHealth(
-      join(context.identityPaths.reflection, "completions"),
-      { limit: MEMORY_HEALTH_SCAN_LIMIT },
-    )
+    const health = await readReflectionHealth(join(context.identityPaths.reflection, "completions"), {
+      limit: MEMORY_HEALTH_SCAN_LIMIT,
+    })
     const last = health.lastOutcome
     return {
       streak: health.streak,
@@ -305,10 +289,10 @@ export function createMemoryRpcGitRepo(repoPath: string): MemoryRpcGitRepo & Mem
  * widening memory-core's API.
  */
 async function countCommitsSince(repoPath: string, sinceISO: string): Promise<number> {
-  const result = await createNodeGitExec().run(
-    ["rev-list", "--count", `--since=${sinceISO}`, "HEAD"],
-    { cwd: repoPath, timeoutMs: GIT_QUERY_TIMEOUT_MS },
-  )
+  const result = await createNodeGitExec().run(["rev-list", "--count", `--since=${sinceISO}`, "HEAD"], {
+    cwd: repoPath,
+    timeoutMs: GIT_QUERY_TIMEOUT_MS,
+  })
   if (result.code !== 0) throw new Error(`git rev-list failed: ${result.stderr.trim()}`)
   const count = Number.parseInt(result.stdout.trim(), 10)
   if (!Number.isSafeInteger(count) || count < 0) throw new Error("git rev-list returned no count")

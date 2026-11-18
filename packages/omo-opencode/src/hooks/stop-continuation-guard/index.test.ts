@@ -54,7 +54,10 @@ describe("stop-continuation-guard", () => {
     }
   }
 
-  function createMockBackgroundManager(tasks: BackgroundTask[], cancelCalls: CancelCall[]): Pick<BackgroundManager, "getAllDescendantTasks" | "cancelTask"> {
+  function createMockBackgroundManager(
+    tasks: BackgroundTask[],
+    cancelCalls: CancelCall[],
+  ): Pick<BackgroundManager, "getAllDescendantTasks" | "cancelTask"> {
     return {
       getAllDescendantTasks: () => tasks,
       cancelTask: async (taskId: string, options?: Parameters<BackgroundManager["cancelTask"]>[1]) => {

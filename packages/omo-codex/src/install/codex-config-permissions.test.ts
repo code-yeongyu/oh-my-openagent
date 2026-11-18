@@ -14,7 +14,7 @@ posixTest("#given unreadable existing config #when updating config #then rejects
   // given
   const root = await mkdtemp(join(tmpdir(), "omo-codex-config-unreadable-"))
   const configPath = join(root, "config.toml")
-  const originalContent = ['[user]', 'important = "keep"', ""].join("\n")
+  const originalContent = ["[user]", 'important = "keep"', ""].join("\n")
   await writeFile(configPath, originalContent)
   await chmod(configPath, 0o200)
 

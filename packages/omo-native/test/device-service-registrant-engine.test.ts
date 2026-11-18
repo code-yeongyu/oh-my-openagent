@@ -57,15 +57,16 @@ async function ownerAt(stateDir: string): Promise<Owner> {
   const owner = await startFakeOwner({
     stateDir,
     world: defaultWorld(),
-    onRequest: type => {
-      for (const waiter of waiters.filter(entry => entry.type === type)) {
+    onRequest: (type) => {
+      for (const waiter of waiters.filter((entry) => entry.type === type)) {
         waiters.splice(waiters.indexOf(waiter), 1)
         waiter.resolve()
       }
     },
   })
   owners.push(owner)
-  const next = (type: LocalRequest["type"], what: string) => within(new Promise<void>(resolve => waiters.push({ type, resolve })), what)
+  const next = (type: LocalRequest["type"], what: string) =>
+    within(new Promise<void>((resolve) => waiters.push({ type, resolve })), what)
   return { owner, next }
 }
 
@@ -96,7 +97,7 @@ function startEngine(home: string, agentDir: string) {
         continue
       }
       const id = typeof message === "object" && message !== null && "id" in message ? message.id : undefined
-      const waiter = replies.find(entry => entry.id === id)
+      const waiter = replies.find((entry) => entry.id === id)
       if (waiter !== undefined) {
         replies.splice(replies.indexOf(waiter), 1)
         waiter.resolve(message)
@@ -104,7 +105,10 @@ function startEngine(home: string, agentDir: string) {
     }
   })
   const request = (command: Record<string, unknown> & { readonly id: string }, what: string) => {
-    const reply = within(new Promise<unknown>(resolveReply => replies.push({ id: command.id, resolve: resolveReply })), what)
+    const reply = within(
+      new Promise<unknown>((resolveReply) => replies.push({ id: command.id, resolve: resolveReply })),
+      what,
+    )
     engine.stdin?.write(`${JSON.stringify(command)}\n`)
     return reply
   }
@@ -129,49 +133,52 @@ const credential = (id: string) => {
   return { device: { id, name: id }, signingPrivateKey: keys.signing, sealingPrivateKey: keys.sealing }
 }
 
-describe.skipIf(process.platform === "win32")("a real RPC engine registers its own agent dir with the device service (#12379)", () => {
-  test("the engine registers the agent dir it runs with, and nothing else, with no manual register", async () => {
-    const { home, agentDir, stateDir } = sandbox()
-    const { owner, next } = await ownerAt(stateDir)
-    const registered = next("endpoints.register", "the engine's register")
+describe.skipIf(process.platform === "win32")(
+  "a real RPC engine registers its own agent dir with the device service (#12379)",
+  () => {
+    test("the engine registers the agent dir it runs with, and nothing else, with no manual register", async () => {
+      const { home, agentDir, stateDir } = sandbox()
+      const { owner, next } = await ownerAt(stateDir)
+      const registered = next("endpoints.register", "the engine's register")
 
-    await startEngine(home, agentDir).openSession("open-1")
+      await startEngine(home, agentDir).openSession("open-1")
 
-    await registered
-    expect([...owner.state.endpoints]).toEqual([agentDir])
-  })
+      await registered
+      expect([...owner.state.endpoints]).toEqual([agentDir])
+    })
 
-  test("a fresh service on the same state dir gets the register again while the engine stays up", async () => {
-    const { home, agentDir, stateDir } = sandbox()
-    const first = await ownerAt(stateDir)
-    const registered = first.next("endpoints.register", "the first register")
-    await startEngine(home, agentDir).openSession("open-1")
-    await registered
+    test("a fresh service on the same state dir gets the register again while the engine stays up", async () => {
+      const { home, agentDir, stateDir } = sandbox()
+      const first = await ownerAt(stateDir)
+      const registered = first.next("endpoints.register", "the first register")
+      await startEngine(home, agentDir).openSession("open-1")
+      await registered
 
-    owners.splice(owners.indexOf(first.owner), 1)
-    await first.owner.stop()
-    const second = await ownerAt(stateDir)
-    await second.next("endpoints.register", "the register on the restarted service")
+      owners.splice(owners.indexOf(first.owner), 1)
+      await first.owner.stop()
+      const second = await ownerAt(stateDir)
+      await second.next("endpoints.register", "the register on the restarted service")
 
-    expect([...second.owner.state.endpoints]).toEqual([agentDir])
-  })
+      expect([...second.owner.state.endpoints]).toEqual([agentDir])
+    })
 
-  test("after the session that started the registrant closes, the registrant still answers a device change", async () => {
-    const { home, agentDir, stateDir } = sandbox()
-    const { owner, next } = await ownerAt(stateDir)
-    const registered = next("endpoints.register", "the first register")
-    const engine = startEngine(home, agentDir)
-    const first = await engine.openSession("open-1")
-    await registered
-    await engine.openSession("open-2")
+    test("after the session that started the registrant closes, the registrant still answers a device change", async () => {
+      const { home, agentDir, stateDir } = sandbox()
+      const { owner, next } = await ownerAt(stateDir)
+      const registered = next("endpoints.register", "the first register")
+      const engine = startEngine(home, agentDir)
+      const first = await engine.openSession("open-1")
+      await registered
+      await engine.openSession("open-2")
 
-    await engine.request({ id: "close-1", type: "close_session", sessionId: first }, "the first session closing")
-    const other = await clientAt(stateDir)
-    const reRegistered = next("endpoints.register", "the register for the newly adopted device")
-    await other.forget()
-    await other.adopt(credential("dev-new"))
+      await engine.request({ id: "close-1", type: "close_session", sessionId: first }, "the first session closing")
+      const other = await clientAt(stateDir)
+      const reRegistered = next("endpoints.register", "the register for the newly adopted device")
+      await other.forget()
+      await other.adopt(credential("dev-new"))
 
-    await reRegistered
-    expect([...owner.state.endpoints]).toEqual([agentDir])
-  })
-})
+      await reRegistered
+      expect([...owner.state.endpoints]).toEqual([agentDir])
+    })
+  },
+)

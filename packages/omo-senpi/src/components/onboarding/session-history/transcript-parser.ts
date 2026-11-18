@@ -23,7 +23,9 @@ function splitTranscriptRecords(contents: string, limit: number): Array<string> 
 }
 
 /** Keep visible user and assistant text while ignoring tools, reasoning, and malformed records. */
-export function parseAgentSessionTranscript(input: TranscriptMetadata & { readonly contents: string }): AgentSessionThread | null {
+export function parseAgentSessionTranscript(
+  input: TranscriptMetadata & { readonly contents: string },
+): AgentSessionThread | null {
   const lines = splitTranscriptRecords(input.contents, MAX_IMPORT_RECORDS + 1)
   if (lines.length > MAX_IMPORT_RECORDS) return null
   const records = lines.flatMap((line) => decodeTranscriptLine(line, input.source) ?? [])
@@ -64,7 +66,10 @@ class MessageWindow {
   }
 }
 
-export function parseAgentSessionRecords(input: TranscriptMetadata, records: ReadonlyArray<TranscriptRecord>): AgentSessionThread | null {
+export function parseAgentSessionRecords(
+  input: TranscriptMetadata,
+  records: ReadonlyArray<TranscriptRecord>,
+): AgentSessionThread | null {
   const fallbackTimestamp = new Date(input.lastActiveAtMs).toISOString()
   // Claude filenames are session ids; Codex rollout names are not, so only metadata can supply one.
   let providerSessionId = input.source === "codex" ? "" : input.fallbackSessionId
@@ -85,7 +90,8 @@ export function parseAgentSessionRecords(input: TranscriptMetadata, records: Rea
       if (messageModel && messageModel !== "<synthetic>") model = messageModel
       if (record.type !== "user" && record.type !== "assistant") return
       const text = extractText(record.message?.content)
-      if (text.length > 0) window.retain({ role: record.type, text, createdAt: createdAt(record), codexResponseUser: false })
+      if (text.length > 0)
+        window.retain({ role: record.type, text, createdAt: createdAt(record), codexResponseUser: false })
       return
     }
     const payload = record.payload
@@ -121,7 +127,9 @@ export function parseAgentSessionRecords(input: TranscriptMetadata, records: Rea
   if (providerSessionId.trim().length === 0 || first === undefined) return null
   const visible = window.messages.map(({ codexResponseUser: _, ...message }) => message)
   const { codexResponseUser: _first, ...visibleFirst } = first
-  const retained = window.messages.includes(first) ? visible : [visibleFirst, ...visible.slice(-(MAX_IMPORTED_MESSAGES - 1))]
+  const retained = window.messages.includes(first)
+    ? visible
+    : [visibleFirst, ...visible.slice(-(MAX_IMPORTED_MESSAGES - 1))]
   const derivedTitle = visibleFirst.text.trim().split("\n")[0]?.slice(0, 100).trim()
   return {
     source: input.source,

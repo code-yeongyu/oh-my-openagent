@@ -5,12 +5,14 @@ import {
   asKeystoreError,
   createDarwinBackend,
   type DarwinBackend,
+  dedicatedHelperMissing,
   guardHelperlessRead,
   helperAccess,
   type KeychainHelperOptions,
 } from "./darwin-backend"
 import type { LockedDarwinStore, WriteIntent } from "./darwin-store"
 import { createCreatorHandOff, desktopRuntimeCandidates, HANDOFF_ENV } from "./creator-handoff"
+import { dedicatedStoreState } from "./dedicated-store"
 import { keychainProcessState } from "./process-state"
 import { gatedSecrets } from "./secrets-gate"
 
@@ -39,7 +41,8 @@ const readers = new Map<DarwinBackend, SecretApi>()
 // with a fake and marks it, so the fake never counts as the real macOS store and never reaches the signed helper or the
 // login Keychain (#11262: on darwin it took the helper path from a non-GUI test child and failed at the real Keychain).
 const INJECTED_SECRETS = Symbol.for("omo.test.injectedSecrets")
-const isInjectedSecrets = (api: SecretApi): boolean => (api as { readonly [INJECTED_SECRETS]?: unknown })[INJECTED_SECRETS] === true
+const isInjectedSecrets = (api: SecretApi): boolean =>
+  (api as { readonly [INJECTED_SECRETS]?: unknown })[INJECTED_SECRETS] === true
 const backends = new Map<string, Promise<DarwinBackend | null>>()
 
 // Addendum change 1: at most one hand-off attempt per process (shared by every bundled copy), to the installed and
@@ -69,45 +72,59 @@ export function bindKeychainHelper(input: {
 }): HelperBinding {
   const { secrets: real, key, options } = input
   const eligible =
-    input.platform === "darwin" && input.namespace === "omo-cli" && (options !== undefined || (typeof Bun !== "undefined" && real === Bun.secrets && !isInjectedSecrets(real)))
+    input.platform === "darwin" &&
+    input.namespace === "omo-cli" &&
+    (options !== undefined || (typeof Bun !== "undefined" && real === Bun.secrets && !isInjectedSecrets(real)))
   const secrets: SecretApi = !eligible
     ? real
     : {
-        get: entry => gatedSecrets(() => real.get(entry)),
-        set: entry => gatedSecrets(() => real.set(entry)),
-        delete: entry => gatedSecrets(() => real.delete(entry)),
+        get: (entry) => gatedSecrets(() => real.get(entry)),
+        set: (entry) => gatedSecrets(() => real.set(entry)),
+        delete: (entry) => gatedSecrets(() => real.delete(entry)),
       }
-  const cacheKey = `${key.service}\n${key.name}\n${input.background ? "bounded" : "interactive"}`
-  let own: Promise<DarwinBackend | null> | undefined
+  // A store given helper options (a test) never reads the real marker unless it hands one in.
+  const dedicatedActive =
+    options?.dedicatedStore ?? (options === undefined ? () => dedicatedStoreState() === "active" : () => false)
+  const owned = new Map<boolean, Promise<DarwinBackend | null>>()
+  // The store is chosen on every call, before the helper-less branch (#13116 r2 finding 1), so a long-lived process
+  // follows an enable or disable made by another process.
   const backend = (): Promise<DarwinBackend | null> => {
     if (!eligible) return Promise.resolve(null)
-    const known = options === undefined ? backends.get(cacheKey) : own
+    const dedicated = dedicatedActive()
+    const cacheKey = `${key.service}\n${key.name}\n${input.background ? "bounded" : "interactive"}\n${dedicated ? "omo" : "login"}`
+    const known = options === undefined ? backends.get(cacheKey) : owned.get(dedicated)
     if (known !== undefined) return known
-    const created = (options?.access ?? helperAccess)().then(access =>
-      access.kind !== "ready"
-        ? null
-        : createDarwinBackend({
-            access,
-            secrets: real,
-            service: key.service,
-            account: key.name,
-            background: input.background,
-            noDialog: options?.noDialog ?? process.env[HANDOFF_ENV] === "1",
-            notice: input.notice,
-            ...(options?.home === undefined ? {} : { home: options.home }),
-            ...(options?.row8b === undefined ? {} : { row8b: options.row8b }),
-            ...(options?.silently === undefined ? {} : { silently: options.silently }),
-            ...(options?.cache === undefined ? {} : { cache: options.cache }),
-            handOff: options === undefined ? processHandOff(input.origin) : (options.handOff ?? (async () => false)),
-          }),
-    )
+    const created = (options?.access ?? helperAccess)().then((access) => {
+      if (access.kind !== "ready") {
+        if (dedicated) throw dedicatedHelperMissing()
+        return null
+      }
+      return createDarwinBackend({
+        dedicated,
+        access,
+        secrets: real,
+        service: key.service,
+        account: key.name,
+        background: input.background,
+        noDialog: options?.noDialog ?? process.env[HANDOFF_ENV] === "1",
+        notice: input.notice,
+        ...(options?.home === undefined ? {} : { home: options.home }),
+        ...(options?.row8b === undefined ? {} : { row8b: options.row8b }),
+        ...(options?.silently === undefined ? {} : { silently: options.silently }),
+        ...(options?.cache === undefined ? {} : { cache: options.cache }),
+        handOff: options === undefined ? processHandOff(input.origin) : (options.handOff ?? (async () => false)),
+      })
+    })
     if (options === undefined) {
       backends.set(cacheKey, created)
       // No helper right now (none found, or a transient failure): the next call resolves again instead of keeping it.
-      void created.then(found => {
-        if (found === null && backends.get(cacheKey) === created) backends.delete(cacheKey)
-      })
-    } else own = created
+      const drop = () => {
+        if (backends.get(cacheKey) === created) backends.delete(cacheKey)
+      }
+      void created.then((found) => {
+        if (found === null) drop()
+      }, drop)
+    } else owned.set(dedicated, created)
     return created
   }
   const reader = (helper: DarwinBackend): SecretApi => {
@@ -121,7 +138,7 @@ export function bindKeychainHelper(input: {
         try {
           return await helper.read()
         } catch (error) {
-          throw asKeystoreError(error, message => input.pending(`${message} Credentials are never saved to a file.`))
+          throw asKeystoreError(error, (message) => input.pending(`${message} Credentials are never saved to a file.`))
         }
       },
       set: refuse,
@@ -135,11 +152,12 @@ export function bindKeychainHelper(input: {
     eligible,
     backend,
     reader,
-    isHelperReader: api => [...readers.values()].includes(api),
+    isHelperReader: (api) => [...readers.values()].includes(api),
     guardHelperless: async () => {
       if (!eligible) return
       // A hand-off child never shows a dialog, not even on today's helper-less read (#11613 review).
-      if ((options?.noDialog ?? process.env[HANDOFF_ENV] === "1") === true) throw input.pending("The keychain hand-off cannot show a dialog.")
+      if ((options?.noDialog ?? process.env[HANDOFF_ENV] === "1") === true)
+        throw input.pending("The keychain hand-off cannot show a dialog.")
       await guardHelperlessRead(key.service, key.name, options?.row9b, options?.ownerMarker)
     },
   }

@@ -35,36 +35,62 @@ function runEntry(args, engineVersion) {
   delete env.THREAD_QA_SENPI_VERSION
   if (engineVersion !== undefined) env.THREAD_QA_SENPI_VERSION = engineVersion
   const scratchBefore = new Set(readdirSync(QA_TMP_ROOT).filter((name) => name.startsWith(SCRATCH_PREFIX)))
-  const child = Bun.spawnSync([process.execPath, ...args], { env, stdout: "pipe", stderr: "pipe", timeout: CHILD_TIMEOUT_MS })
-  const scratchAfter = readdirSync(QA_TMP_ROOT).filter((name) => name.startsWith(SCRATCH_PREFIX) && !scratchBefore.has(name))
-  return { code: child.exitCode, stdout: child.stdout.toString(), stderr: child.stderr.toString(), newScratch: scratchAfter }
+  const child = Bun.spawnSync([process.execPath, ...args], {
+    env,
+    stdout: "pipe",
+    stderr: "pipe",
+    timeout: CHILD_TIMEOUT_MS,
+  })
+  const scratchAfter = readdirSync(QA_TMP_ROOT).filter(
+    (name) => name.startsWith(SCRATCH_PREFIX) && !scratchBefore.has(name),
+  )
+  return {
+    code: child.exitCode,
+    stdout: child.stdout.toString(),
+    stderr: child.stderr.toString(),
+    newScratch: scratchAfter,
+  }
 }
 
 describe("thread-tool gateway QA engine version", () => {
   test.each([
     ["unset", undefined],
     ["empty", ""],
-  ])("#given THREAD_QA_SENPI_VERSION %s #when run-all runs the gateway suite #then it refuses before running any scenario", (_label, engineVersion) => {
-    const outDir = join(work, "out")
+  ])(
+    "#given THREAD_QA_SENPI_VERSION %s #when run-all runs the gateway suite #then it refuses before running any scenario",
+    (_label, engineVersion) => {
+      const outDir = join(work, "out")
 
-    const result = runEntry([join(here, "run-all.mjs"), "--suite", "gateway", "--out-dir", outDir], engineVersion)
+      const result = runEntry([join(here, "run-all.mjs"), "--suite", "gateway", "--out-dir", outDir], engineVersion)
 
-    expect(result.code).not.toBe(0)
-    expect(result.stderr.trim()).toBe(REFUSAL)
-    expect(result.stdout).not.toContain("=====")
-    expect(existsSync(outDir)).toBe(false)
-    expect(result.newScratch).toEqual([])
-  }, CHILD_TIMEOUT_MS)
+      expect(result.code).not.toBe(0)
+      expect(result.stderr.trim()).toBe(REFUSAL)
+      expect(result.stdout).not.toContain("=====")
+      expect(existsSync(outDir)).toBe(false)
+      expect(result.newScratch).toEqual([])
+    },
+    CHILD_TIMEOUT_MS,
+  )
 
-  test("#given THREAD_QA_SENPI_VERSION unset #when a gateway scenario runs on its own #then it refuses before creating evidence or scratch dirs", () => {
-    const evidence = join(work, "evidence")
+  test(
+    "#given THREAD_QA_SENPI_VERSION unset #when a gateway scenario runs on its own #then it refuses before creating evidence or scratch dirs",
+    () => {
+      const evidence = join(work, "evidence")
 
-    const result = runEntry([join(here, "tui-to-tui.mjs"), "--out", join(work, "report", "tui-to-tui.txt"), "--evidence-dir", evidence])
+      const result = runEntry([
+        join(here, "tui-to-tui.mjs"),
+        "--out",
+        join(work, "report", "tui-to-tui.txt"),
+        "--evidence-dir",
+        evidence,
+      ])
 
-    expect(result.code).not.toBe(0)
-    expect(result.stderr.trim()).toBe(REFUSAL)
-    expect(existsSync(evidence)).toBe(false)
-    expect(existsSync(join(work, "report"))).toBe(false)
-    expect(result.newScratch).toEqual([])
-  }, CHILD_TIMEOUT_MS)
+      expect(result.code).not.toBe(0)
+      expect(result.stderr.trim()).toBe(REFUSAL)
+      expect(existsSync(evidence)).toBe(false)
+      expect(existsSync(join(work, "report"))).toBe(false)
+      expect(result.newScratch).toEqual([])
+    },
+    CHILD_TIMEOUT_MS,
+  )
 })

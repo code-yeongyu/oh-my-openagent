@@ -6,7 +6,10 @@ import { adaptRpcHandle } from "../../manager/child-handle"
 import { createTaskRecord } from "../../state"
 
 const harness = hostRunnerHarness()
-afterEach(async () => { await harness.release(); cleanupProjects() })
+afterEach(async () => {
+  await harness.release()
+  cleanupProjects()
+})
 
 describe("host recovery adopts a turn finished during the transport gap", () => {
   for (const rejectState of [false, true]) {
@@ -18,13 +21,23 @@ describe("host recovery adopts a turn finished during the transport gap", () => 
       const host = await harness.fakeHost({ transcripts: true })
       const runner = harness.runnerOver(host, {
         reattachDelaysMs: [0],
-        sleep: () => { recovering.resolve(); return reopen.promise },
-        shardEvents: { onReattachOutcome: info => reattached.push(info.outcome) },
+        sleep: () => {
+          recovering.resolve()
+          return reopen.promise
+        },
+        shardEvents: { onReattachOutcome: (info) => reattached.push(info.outcome) },
       })
-      const initial = createTaskRecord({
-        parent_session_id: "parent", root_session_id: "parent", depth: 1,
-        execution_mode: "process", model: "anthropic/claude-sonnet-4-5", notify_on_terminal: false,
-      }, 0)
+      const initial = createTaskRecord(
+        {
+          parent_session_id: "parent",
+          root_session_id: "parent",
+          depth: 1,
+          execution_mode: "process",
+          model: "anthropic/claude-sonnet-4-5",
+          notify_on_terminal: false,
+        },
+        0,
+      )
       const handle = await runner.start(childSpec({ state_dir: project, task_id: initial.task_id }))
       if (!isHostSessionHandle(handle)) throw new Error("expected host session")
       const { manager, store } = makeManager({ project })
@@ -47,9 +60,13 @@ describe("host recovery adopts a turn finished during the transport gap", () => 
         expect(handle.wasAbortedByUser()).toBe(false)
         expect(store.load(record.task_id)?.status).toBe("running")
         expect(store.load(record.task_id)?.final_response).toBeUndefined()
-        expect(host.commands.slice(before).filter(command =>
-          ["prompt", "steer", "follow_up", "abort", "close_session", "detach_session"].includes(command.type),
-        )).toEqual([])
+        expect(
+          host.commands
+            .slice(before)
+            .filter((command) =>
+              ["prompt", "steer", "follow_up", "abort", "close_session", "detach_session"].includes(command.type),
+            ),
+        ).toEqual([])
 
         // A later outcome must still reach the manager, proving its tracker remains armed.
         host.failReply("get_state", undefined)
@@ -71,8 +88,16 @@ describe("host recovery adopts a turn finished during the transport gap", () => 
     const host = await harness.fakeHost({ transcripts: true })
     const runner = harness.runnerOver(host, {
       reattachDelaysMs: [0],
-      sleep: () => { recovering.resolve(); return reopen.promise },
-      shardEvents: { onReattachOutcome: info => { reattached.push(info.outcome); outcome.resolve(info.outcome) } },
+      sleep: () => {
+        recovering.resolve()
+        return reopen.promise
+      },
+      shardEvents: {
+        onReattachOutcome: (info) => {
+          reattached.push(info.outcome)
+          outcome.resolve(info.outcome)
+        },
+      },
     })
     const handle = await runner.start(childSpec({ state_dir: tempProject() }))
     if (!isHostSessionHandle(handle)) throw new Error("expected host session")
@@ -108,7 +133,10 @@ describe("host recovery adopts a turn finished during the transport gap", () => 
     const host = await harness.fakeHost({ transcripts: true })
     const runner = harness.runnerOver(host, {
       reattachDelaysMs: [0],
-      sleep: () => { recovering.resolve(); return reopen.promise },
+      sleep: () => {
+        recovering.resolve()
+        return reopen.promise
+      },
     })
     const handle = await runner.start(childSpec({ state_dir: tempProject() }))
     if (!isHostSessionHandle(handle)) throw new Error("expected host session")

@@ -71,8 +71,10 @@ export function createComputerUseTelemetry(options: {
         platform,
         backend: computerUseBackend(capabilities.backend),
       }
-      if (!capabilities.capture) observers.publish({ kind: "permission_denied", ...runtime, scope: "os", permission: "capture" })
-      if (!capabilities.input) observers.publish({ kind: "permission_denied", ...runtime, scope: "os", permission: "input" })
+      if (!capabilities.capture)
+        observers.publish({ kind: "permission_denied", ...runtime, scope: "os", permission: "capture" })
+      if (!capabilities.input)
+        observers.publish({ kind: "permission_denied", ...runtime, scope: "os", permission: "input" })
       if (!capabilities.ax) observers.publish({ kind: "permission_denied", ...runtime, scope: "os", permission: "ax" })
     },
     toolExecutionStarted(payload) {
@@ -100,32 +102,36 @@ export function createComputerUseTelemetry(options: {
   }
 }
 
-function permissionRequest(value: unknown): {
-  readonly toolCallId: string
-  readonly toolName: string
-  readonly permission: ComputerUsePermission
-} | undefined {
+function permissionRequest(value: unknown):
+  | {
+      readonly toolCallId: string
+      readonly toolName: string
+      readonly permission: ComputerUsePermission
+    }
+  | undefined {
   if (!isRecord(value) || value.type !== "tool_execution_start") return undefined
   if (typeof value.toolCallId !== "string" || typeof value.toolName !== "string" || !isRecord(value.args)) {
     return undefined
   }
   const permission = permissionForTool(value.toolName, value.args)
-  return permission === undefined
-    ? undefined
-    : { toolCallId: value.toolCallId, toolName: value.toolName, permission }
+  return permission === undefined ? undefined : { toolCallId: value.toolCallId, toolName: value.toolName, permission }
 }
 
-function permissionFrom(requests: readonly { readonly patterns: readonly string[] }[]): ComputerUsePermission | undefined {
+function permissionFrom(
+  requests: readonly { readonly patterns: readonly string[] }[],
+): ComputerUsePermission | undefined {
   const tier = requests[0]?.patterns[0]
   return tier === "read" || tier === "exec" ? tier : undefined
 }
 
-function deniedToolExecution(value: unknown): {
-  readonly toolCallId: string
-  readonly toolName: string
-  readonly denied: boolean
-  readonly final: boolean
-} | undefined {
+function deniedToolExecution(value: unknown):
+  | {
+      readonly toolCallId: string
+      readonly toolName: string
+      readonly denied: boolean
+      readonly final: boolean
+    }
+  | undefined {
   if (!isRecord(value)) return undefined
   if (value.type === "message_end" && isRecord(value.message)) {
     const message = value.message
@@ -161,10 +167,7 @@ function deniedToolExecution(value: unknown): {
   }
 }
 
-function permissionForTool(
-  toolName: string,
-  input: Record<string, unknown>,
-): ComputerUsePermission | undefined {
+function permissionForTool(toolName: string, input: Record<string, unknown>): ComputerUsePermission | undefined {
   if (matchesToolName(toolName, COMPUTER_TOOL_NAME)) {
     return permissionFrom(computerPermissionParser(COMPUTER_TOOL_NAME, input, ""))
   }
@@ -185,9 +188,13 @@ function isPermissionPolicyFailure(result: Record<string, unknown>): boolean {
   return result.content.some((part) => {
     if (!isRecord(part) || part.type !== "text" || typeof part.text !== "string") return false
     // senpi appends guidance after these fixed first sentences, so they are matched as prefixes.
-    return part.text.startsWith("The user rejected permission to use this specific tool call.") ||
-      part.text.startsWith("The user rejected permission to use this specific tool call with the following feedback:") ||
+    return (
+      part.text.startsWith("The user rejected permission to use this specific tool call.") ||
+      part.text.startsWith(
+        "The user rejected permission to use this specific tool call with the following feedback:",
+      ) ||
       part.text.startsWith("The user has specified a rule which prevents you from using this specific tool call.")
+    )
   })
 }
 

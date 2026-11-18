@@ -17,80 +17,168 @@
  * a hidden count limit). Part 1 must then FAIL, which is the proof this scenario can fail. Give it its
  * own `--evidence-dir`.
  */
-import { allToolResults, awaitTuiEndpoint, cliSend, deliveryEntries, hasFlag, openHostSession, runScenario, startShardHost, storeRows, toolCallResults, waitFor } from "./lib/gateway.mjs"
+import {
+  allToolResults,
+  awaitTuiEndpoint,
+  cliSend,
+  deliveryEntries,
+  hasFlag,
+  openHostSession,
+  runScenario,
+  startShardHost,
+  storeRows,
+  toolCallResults,
+  waitFor,
+} from "./lib/gateway.mjs"
 
 const MUTANT = hasFlag("--mutant")
 const FANOUT_TARGETS = 17
 const BURST = 8
 const REFILL_WAIT_MS = 5_000
 
-await runScenario("loop-guard", async ({ report, fake, scratch, install, startTui }) => {
-  report.log(MUTANT ? "MUTANT RUN: a hop-2 cap in the store worker (patch hop_cap_2); part 1 is expected to FAIL" : "normal run")
+await runScenario(
+  "loop-guard",
+  async ({ report, fake, scratch, install, startTui }) => {
+    report.log(
+      MUTANT
+        ? "MUTANT RUN: a hop-2 cap in the store worker (patch hop_cap_2); part 1 is expected to FAIL"
+        : "normal run",
+    )
 
-  // ------------------------------------------------------------------ 1. chain A -> B -> C -> A
-  const tuis = {}
-  for (const name of ["a", "b", "c"]) {
-    const tui = await startTui(`tui-${name}`)
-    const endpoint = await awaitTuiEndpoint(scratch, tui, { exclude: Object.values(tuis).map((entry) => entry.endpoint.socket) })
-    await tui.submit(`/name tui-${name}`)
-    tuis[name] = { tui, endpoint }
-  }
-  // Each hop's message carries the next hop's script, so every send runs in the turn the previous delivery caused.
-  const hop3 = fake.script("cycle-c", [{ name: "thread_send", args: { thread: "tui-a", message: "QA-TOKEN-hop3 closes the loop" } }])
-  const hop2 = fake.script("cycle-b", [{ name: "thread_send", args: { thread: "tui-c", message: `QA-TOKEN-hop2 ${hop3}` } }])
-  const hop1 = fake.script("cycle-a", [{ name: "thread_send", args: { thread: "tui-b", message: `QA-TOKEN-hop1 ${hop2}` } }])
-  const mark = fake.requests.length
-  await tuis.a.tui.submit(hop1)
-  // The three TUIs reach the shared fake model in scheduler order, so each hop's result is picked by
-  // the target its call named (A sends to tui-b, B to tui-c, C to tui-a), not by arrival order.
-  const sends = await waitFor(() => {
-    const byTarget = new Map(toolCallResults(fake, "thread_send", mark).map((entry) => [entry.args?.thread, entry.result]))
-    return ["tui-b", "tui-c", "tui-a"].every((thread) => byTarget.has(thread)) ? byTarget : undefined
-  }, { label: "three thread_send results (A->B, B->C, C->A)", timeoutMs: 120_000 })
-  const [first, second, third] = [sends.get("tui-b"), sends.get("tui-c"), sends.get("tui-a")]
-  report.assert("chain-hop1-and-hop2-delivered", first?.kind === "ok" && second?.kind === "ok", `a->b=${first?.kind} b->c=${second?.kind}`)
-  report.assert("chain-back-to-a-accepted", third?.kind === "ok", JSON.stringify(third).slice(0, 400))
-  // The delivery to A continues hop 1's root and carries the chain's count.
-  const [hop1Row] = await storeRows(scratch.agentDir, "SELECT root_id FROM deliveries WHERE delivery_id = ?", [first?.delivery_id ?? ""])
-  const toA = await waitFor(async () => {
-    const rows = await storeRows(scratch.agentDir, "SELECT delivery_id, state, hop FROM deliveries WHERE root_id = ? AND target_durable_id = ?", [hop1Row?.root_id ?? "", tuis.a.endpoint.durableId])
-    return rows.length === 1 && rows[0].state === "applied" ? rows : undefined
-  }, { label: "the A->B->C->A delivery applied in A", timeoutMs: 120_000 })
-  report.assert("chain-reaches-a-with-hop-3", Number(toA[0].hop) === 3 && deliveryEntries(tuis.a.endpoint.sessionPath).length >= 1, `rows_to_a_under_root=${JSON.stringify(toA)} a_entries=${deliveryEntries(tuis.a.endpoint.sessionPath).length}`)
+    // ------------------------------------------------------------------ 1. chain A -> B -> C -> A
+    const tuis = {}
+    for (const name of ["a", "b", "c"]) {
+      const tui = await startTui(`tui-${name}`)
+      const endpoint = await awaitTuiEndpoint(scratch, tui, {
+        exclude: Object.values(tuis).map((entry) => entry.endpoint.socket),
+      })
+      await tui.submit(`/name tui-${name}`)
+      tuis[name] = { tui, endpoint }
+    }
+    // Each hop's message carries the next hop's script, so every send runs in the turn the previous delivery caused.
+    const hop3 = fake.script("cycle-c", [
+      { name: "thread_send", args: { thread: "tui-a", message: "QA-TOKEN-hop3 closes the loop" } },
+    ])
+    const hop2 = fake.script("cycle-b", [
+      { name: "thread_send", args: { thread: "tui-c", message: `QA-TOKEN-hop2 ${hop3}` } },
+    ])
+    const hop1 = fake.script("cycle-a", [
+      { name: "thread_send", args: { thread: "tui-b", message: `QA-TOKEN-hop1 ${hop2}` } },
+    ])
+    const mark = fake.requests.length
+    await tuis.a.tui.submit(hop1)
+    // The three TUIs reach the shared fake model in scheduler order, so each hop's result is picked by
+    // the target its call named (A sends to tui-b, B to tui-c, C to tui-a), not by arrival order.
+    const sends = await waitFor(
+      () => {
+        const byTarget = new Map(
+          toolCallResults(fake, "thread_send", mark).map((entry) => [entry.args?.thread, entry.result]),
+        )
+        return ["tui-b", "tui-c", "tui-a"].every((thread) => byTarget.has(thread)) ? byTarget : undefined
+      },
+      { label: "three thread_send results (A->B, B->C, C->A)", timeoutMs: 120_000 },
+    )
+    const [first, second, third] = [sends.get("tui-b"), sends.get("tui-c"), sends.get("tui-a")]
+    report.assert(
+      "chain-hop1-and-hop2-delivered",
+      first?.kind === "ok" && second?.kind === "ok",
+      `a->b=${first?.kind} b->c=${second?.kind}`,
+    )
+    report.assert("chain-back-to-a-accepted", third?.kind === "ok", JSON.stringify(third).slice(0, 400))
+    // The delivery to A continues hop 1's root and carries the chain's count.
+    const [hop1Row] = await storeRows(scratch.agentDir, "SELECT root_id FROM deliveries WHERE delivery_id = ?", [
+      first?.delivery_id ?? "",
+    ])
+    const toA = await waitFor(
+      async () => {
+        const rows = await storeRows(
+          scratch.agentDir,
+          "SELECT delivery_id, state, hop FROM deliveries WHERE root_id = ? AND target_durable_id = ?",
+          [hop1Row?.root_id ?? "", tuis.a.endpoint.durableId],
+        )
+        return rows.length === 1 && rows[0].state === "applied" ? rows : undefined
+      },
+      { label: "the A->B->C->A delivery applied in A", timeoutMs: 120_000 },
+    )
+    report.assert(
+      "chain-reaches-a-with-hop-3",
+      Number(toA[0].hop) === 3 && deliveryEntries(tuis.a.endpoint.sessionPath).length >= 1,
+      `rows_to_a_under_root=${JSON.stringify(toA)} a_entries=${deliveryEntries(tuis.a.endpoint.sessionPath).length}`,
+    )
 
-  // ------------------------------------------------------------------ 2. fan-out cap
-  const shard = await startShardHost(scratch, install, `qa-loop-guard-${process.pid}`)
-  const targets = []
-  for (let index = 0; index < FANOUT_TARGETS; index += 1) targets.push((await openHostSession(shard.client, scratch.work)).durableId)
-  report.assert("fanout-targets-open", new Set(targets).size === FANOUT_TARGETS, `targets=${targets.length} on ${shard.socket}`)
-  const fanMark = fake.requests.length
-  await tuis.a.tui.submit(fake.script("fanout", targets.map((thread, index) => ({ name: "thread_send", args: { thread, message: `QA-TOKEN-fan-${index}` } }))))
-  const fanResults = await waitFor(() => {
-    const results = allToolResults(fake, "thread_send", fanMark)
-    return results.length >= targets.length ? results : undefined
-  }, { label: `${targets.length} fan-out results`, timeoutMs: 120_000 })
-  const accepted = fanResults.filter((result) => result?.kind === "ok").length
-  const capped = fanResults.filter((result) => result?.kind === "error" && result.error?.code === "overloaded" && result.error?.details?.budget === "fanout")
-  report.assert("fanout-cap-16", accepted === 16 && capped.length === 1, `accepted=${accepted} refused_fanout=${capped.length} ${JSON.stringify(capped[0]?.error ?? null).slice(0, 200)}`)
+    // ------------------------------------------------------------------ 2. fan-out cap
+    const shard = await startShardHost(scratch, install, `qa-loop-guard-${process.pid}`)
+    const targets = []
+    for (let index = 0; index < FANOUT_TARGETS; index += 1)
+      targets.push((await openHostSession(shard.client, scratch.work)).durableId)
+    report.assert(
+      "fanout-targets-open",
+      new Set(targets).size === FANOUT_TARGETS,
+      `targets=${targets.length} on ${shard.socket}`,
+    )
+    const fanMark = fake.requests.length
+    await tuis.a.tui.submit(
+      fake.script(
+        "fanout",
+        targets.map((thread, index) => ({ name: "thread_send", args: { thread, message: `QA-TOKEN-fan-${index}` } })),
+      ),
+    )
+    const fanResults = await waitFor(
+      () => {
+        const results = allToolResults(fake, "thread_send", fanMark)
+        return results.length >= targets.length ? results : undefined
+      },
+      { label: `${targets.length} fan-out results`, timeoutMs: 120_000 },
+    )
+    const accepted = fanResults.filter((result) => result?.kind === "ok").length
+    const capped = fanResults.filter(
+      (result) =>
+        result?.kind === "error" && result.error?.code === "overloaded" && result.error?.details?.budget === "fanout",
+    )
+    report.assert(
+      "fanout-cap-16",
+      accepted === 16 && capped.length === 1,
+      `accepted=${accepted} refused_fanout=${capped.length} ${JSON.stringify(capped[0]?.error ?? null).slice(0, 200)}`,
+    )
 
-  // ------------------------------------------------------------------ 3. per-pair burst + real refill
-  // The nine sends go out at once: one `omo thread send` takes about a second, so sequential sends
-  // would refill tokens between them (5 s each) and the burst would measure the machine, not the cap.
-  const burstTarget = targets[0]
-  const burst = await Promise.all(Array.from({ length: BURST + 1 }, (_, index) => cliSend(scratch, install, burstTarget, `QA-TOKEN-burst-${index}`)))
-  const passed = burst.filter((result) => result.json?.kind === "ok")
-  const refused = burst.filter((result) => result.json?.kind === "error" && result.json.error?.code === "overloaded" && result.json.error?.details?.budget === "pair_rate" && result.json.error.details.retry_after_ms > 0)
-  const stamps = (await storeRows(scratch.agentDir, "SELECT created_at FROM deliveries WHERE target_durable_id = ? AND body LIKE '%QA-TOKEN-burst-%'", [burstTarget])).map((row) => Number(row.created_at))
-  const spreadMs = stamps.length === 0 ? 0 : Math.max(...stamps) - Math.min(...stamps)
-  // Tokens are real time: a bucket of 8 plus one per 5 s elapsed between the first and last admission.
-  const allowed = Math.min(BURST + 1, BURST + Math.floor(spreadMs / 5_000))
-  report.assert(
-    "burst-8-then-refused",
-    passed.length === allowed && refused.length === BURST + 1 - allowed && refused.length >= 1,
-    `passed=${passed.length} refused_pair_rate=${refused.length} allowed_by_clock=${allowed} spread_ms=${spreadMs} refusal=${JSON.stringify(refused[0]?.json?.error ?? null).slice(0, 200)}`,
-  )
-  report.log(`TIME-UNDER-TEST EXCEPTION: waiting ${REFILL_WAIT_MS} ms of real wall time for one pair-bucket token to refill`)
-  await new Promise((resolvePromise) => setTimeout(resolvePromise, REFILL_WAIT_MS))
-  const refilled = await cliSend(scratch, install, burstTarget, "QA-TOKEN-burst-after-refill")
-  report.assert("burst-refills-after-5s", refilled.json?.kind === "ok", refilled.stdout.trim().slice(0, 200))
-}, MUTANT ? { patches: ["hop_cap_2"], installName: "omo-ai-loop-guard-mutant" } : {})
+    // ------------------------------------------------------------------ 3. per-pair burst + real refill
+    // The nine sends go out at once: one `omo thread send` takes about a second, so sequential sends
+    // would refill tokens between them (5 s each) and the burst would measure the machine, not the cap.
+    const burstTarget = targets[0]
+    const burst = await Promise.all(
+      Array.from({ length: BURST + 1 }, (_, index) =>
+        cliSend(scratch, install, burstTarget, `QA-TOKEN-burst-${index}`),
+      ),
+    )
+    const passed = burst.filter((result) => result.json?.kind === "ok")
+    const refused = burst.filter(
+      (result) =>
+        result.json?.kind === "error" &&
+        result.json.error?.code === "overloaded" &&
+        result.json.error?.details?.budget === "pair_rate" &&
+        result.json.error.details.retry_after_ms > 0,
+    )
+    const stamps = (
+      await storeRows(
+        scratch.agentDir,
+        "SELECT created_at FROM deliveries WHERE target_durable_id = ? AND body LIKE '%QA-TOKEN-burst-%'",
+        [burstTarget],
+      )
+    ).map((row) => Number(row.created_at))
+    const spreadMs = stamps.length === 0 ? 0 : Math.max(...stamps) - Math.min(...stamps)
+    // Tokens are real time: a bucket of 8 plus one per 5 s elapsed between the first and last admission.
+    const allowed = Math.min(BURST + 1, BURST + Math.floor(spreadMs / 5_000))
+    report.assert(
+      "burst-8-then-refused",
+      passed.length === allowed && refused.length === BURST + 1 - allowed && refused.length >= 1,
+      `passed=${passed.length} refused_pair_rate=${refused.length} allowed_by_clock=${allowed} spread_ms=${spreadMs} refusal=${JSON.stringify(refused[0]?.json?.error ?? null).slice(0, 200)}`,
+    )
+    report.log(
+      `TIME-UNDER-TEST EXCEPTION: waiting ${REFILL_WAIT_MS} ms of real wall time for one pair-bucket token to refill`,
+    )
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, REFILL_WAIT_MS))
+    const refilled = await cliSend(scratch, install, burstTarget, "QA-TOKEN-burst-after-refill")
+    report.assert("burst-refills-after-5s", refilled.json?.kind === "ok", refilled.stdout.trim().slice(0, 200))
+  },
+  MUTANT ? { patches: ["hop_cap_2"], installName: "omo-ai-loop-guard-mutant" } : {},
+)

@@ -36,11 +36,7 @@ const locale = (): string => Intl.DateTimeFormat().resolvedOptions().locale
 
 const telemetryAllowed = (facts: HostFacts, config: Parameters<typeof isOmoTelemetryEnabled>[0]): boolean =>
   !shouldDisableTelemetry({ env: { ...facts.env }, productEnvPrefix: "OMO_NATIVE" }) &&
-  isOmoNativeTelemetryEnabled(
-    { isConfigEnabled: () => isOmoTelemetryEnabled(config) },
-    facts.session,
-    { ...facts.env },
-  )
+  isOmoNativeTelemetryEnabled({ isConfigEnabled: () => isOmoTelemetryEnabled(config) }, facts.session, { ...facts.env })
 
 export function collectHostSections(facts: HostFacts): HostCollection {
   const loaded = loadSenpiOmoConfig({

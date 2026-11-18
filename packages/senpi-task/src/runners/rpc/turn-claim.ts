@@ -8,7 +8,9 @@ export function createTurnClaim() {
     claim(): () => void {
       const claim = {}
       claimed = claim
-      return () => { if (claimed === claim) claimed = undefined }
+      return () => {
+        if (claimed === claim) claimed = undefined
+      }
     },
     consume(): boolean {
       if (claimed === undefined) return false

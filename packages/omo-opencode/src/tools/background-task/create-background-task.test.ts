@@ -7,19 +7,21 @@ import { createBackgroundTask } from "./create-background-task"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
 describe("createBackgroundTask", () => {
-  const launchMock = mock(async (): Promise<{
-    id: string
-    sessionId: string | null
-    description: string
-    agent: string
-    status: string
-  }> => ({
-    id: "test-task-id",
-    sessionId: null,
-    description: "Test task",
-    agent: "test-agent",
-    status: "pending",
-  }))
+  const launchMock = mock(
+    async (): Promise<{
+      id: string
+      sessionId: string | null
+      description: string
+      agent: string
+      status: string
+    }> => ({
+      id: "test-task-id",
+      sessionId: null,
+      description: "Test task",
+      agent: "test-agent",
+      status: "pending",
+    }),
+  )
   const getTaskMock = mock()
 
   const mockManager = unsafeTestValue<BackgroundManager>({

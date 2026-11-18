@@ -122,7 +122,8 @@ async function readRuntimeManifest(distDir) {
   const inputDigest = manifest.inputDigest
   const outputs = manifest.outputs
   if (schemaVersion !== 1) throw new Error(`Senpi LSP runtime manifest schemaVersion must be 1: ${manifestPath}`)
-  if (typeof version !== "string" || version.length === 0) throw new Error(`Senpi LSP runtime manifest version is invalid: ${manifestPath}`)
+  if (typeof version !== "string" || version.length === 0)
+    throw new Error(`Senpi LSP runtime manifest version is invalid: ${manifestPath}`)
   if (typeof inputDigest !== "string" || !/^sha256:[0-9a-f]{64}$/.test(inputDigest)) {
     throw new Error(`Senpi LSP runtime manifest inputDigest is invalid: ${manifestPath}`)
   }
@@ -146,7 +147,7 @@ async function computeInputDigest(root, candidates) {
   const files = []
   for (const candidate of candidates) {
     const path = join(root, candidate)
-    if (await fileExists(path)) files.push(...await listFiles(path))
+    if (await fileExists(path)) files.push(...(await listFiles(path)))
   }
   files.sort((left, right) => relative(root, left).localeCompare(relative(root, right)))
   const hash = createHash("sha256")
@@ -192,7 +193,7 @@ async function listFiles(path) {
   const files = []
   for (const entry of entries) {
     const entryPath = join(path, entry.name)
-    if (entry.isDirectory()) files.push(...await listFiles(entryPath))
+    if (entry.isDirectory()) files.push(...(await listFiles(entryPath)))
     else if (entry.isFile()) files.push(entryPath)
   }
   return files
@@ -211,7 +212,9 @@ function stringField(record, field, path) {
 }
 
 async function sha256(path) {
-  return createHash("sha256").update(await readFile(path)).digest("hex")
+  return createHash("sha256")
+    .update(await readFile(path))
+    .digest("hex")
 }
 
 function isRecord(value) {

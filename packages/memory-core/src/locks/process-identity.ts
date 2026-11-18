@@ -28,7 +28,10 @@ async function readLinuxStartIdentity(pid: number): Promise<string | null> {
     const stat = await readFile(`/proc/${pid}/stat`, "utf8")
     const commandEnd = stat.lastIndexOf(")")
     if (commandEnd < 0) return null
-    const fieldsAfterCommand = stat.slice(commandEnd + 2).trim().split(/\s+/)
+    const fieldsAfterCommand = stat
+      .slice(commandEnd + 2)
+      .trim()
+      .split(/\s+/)
     const startTicks = fieldsAfterCommand[19]
     return startTicks === undefined ? null : `linux-proc-start-ticks:${startTicks}`
   } catch {
@@ -50,6 +53,19 @@ async function readWin32StartIdentity(pid: number): Promise<string | null> {
   return value === null ? null : `win32-creation-date:${value}`
 }
 
+/**
+ * The image name in `tasklist /FO CSV /NH` output, which is `"bun.exe","1234","Console","1","12,345 K"` for a match and
+ * an INFO line otherwise. Only the first row counts, and only when it names the pid that was asked for.
+ */
+export function tasklistImageName(output: string | null, pid: number): string | null {
+  const match = output === null ? null : /^"([^"]+)","(\d+)"/.exec(output)
+  return match === null || Number(match[2]) !== pid ? null : match[1]
+}
+
+async function readWin32ImageName(pid: number): Promise<string | null> {
+  return tasklistImageName(await execFileText("tasklist.exe", ["/FI", `PID eq ${pid}`, "/FO", "CSV", "/NH"]), pid)
+}
+
 type ReadProcessStartIdentity = (pid: number) => Promise<string | null>
 
 export function createProcessStartIdentityReader(
@@ -61,13 +77,16 @@ export function createProcessStartIdentityReader(
   let ownIdentity: Promise<string | null> | undefined
   return (pid) => {
     if (pid !== ownPid) return read(pid)
-    ownIdentity ??= read(pid).then((identity) => {
-      if (identity === null) ownIdentity = undefined
-      return identity
-    }, (error: unknown) => {
-      ownIdentity = undefined
-      throw error
-    })
+    ownIdentity ??= read(pid).then(
+      (identity) => {
+        if (identity === null) ownIdentity = undefined
+        return identity
+      },
+      (error: unknown) => {
+        ownIdentity = undefined
+        throw error
+      },
+    )
     return ownIdentity
   }
 }
@@ -85,6 +104,28 @@ async function readProcessStartIdentity(pid: number): Promise<string | null> {
   }
   if (process.platform === "win32") return await readWin32StartIdentity(pid)
   return null
+}
+
+/**
+ * The basename of a live process's argv[0], or null when the process is gone or the platform cannot say. Lets a
+ * caller name a lock holder by what it runs; Linux reads /proc, macOS and FreeBSD ask ps, Windows asks tasklist for the
+ * image name (Windows keeps no argv[0] another process can read).
+ */
+export async function getProcessCommandName(pid: number): Promise<string | null> {
+  let argv0: string | undefined
+  if (process.platform === "linux") {
+    try {
+      argv0 = (await readFile(`/proc/${pid}/cmdline`, "utf8")).split("\0", 1)[0]
+    } catch {
+      return null
+    }
+  } else if (process.platform === "darwin" || process.platform === "freebsd") {
+    argv0 = (await execFileText("/bin/ps", ["-o", "args=", "-p", String(pid)]))?.split(/\s+/, 1)[0]
+  } else if (process.platform === "win32") {
+    return readWin32ImageName(pid)
+  }
+  const name = argv0?.slice(argv0.lastIndexOf("/") + 1)
+  return name === undefined || name === "" ? null : name
 }
 
 function identityScheme(identity: string): string | null {

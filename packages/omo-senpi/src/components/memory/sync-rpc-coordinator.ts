@@ -1,8 +1,48 @@
-import type { ApprovalProgress, SyncApproveRequest, SyncApproveResponse, SyncEnableResponse, SyncRpcProblem, SyncStatusResponse } from "./sync-rpc-contract"
-import type { SyncRpcAccount, SyncRpcAuthority, SyncRpcContext, SyncRpcOperation, SyncRpcOptions } from "./sync-rpc-ports"
-import { identityOf, refused, RetiredSyncOperation, runSyncRpcOperation, serviceProblem, unavailable, type CeremonyOperation, type Operation } from "./sync-rpc-operation"
+import type {
+  ApprovalProgress,
+  SyncAcknowledgeRequest,
+  SyncAcknowledgeResponse,
+  SyncEnableRequest,
+  SyncApproveRequest,
+  SyncApproveResponse,
+  SyncEnableResponse,
+  SyncRpcProblem,
+  SyncUnavailableCode,
+  SyncStatusResponse,
+} from "./sync-rpc-contract"
+import type {
+  SyncRpcAccount,
+  SyncRpcAuthority,
+  SyncRpcContext,
+  SyncRpcOperation,
+  SyncRpcOptions,
+} from "./sync-rpc-ports"
+import {
+  identityOf,
+  refused,
+  RetiredSyncOperation,
+  runSyncRpcOperation,
+  serviceProblem,
+  syncErrorFields,
+  unavailable,
+  type CeremonyOperation,
+  type Operation,
+} from "./sync-rpc-operation"
 
 export function createSyncRpcCoordinator(options: SyncRpcOptions) {
+  // The desktop polls status and the pending/devices reads, so a cause is logged once when it starts, not on every poll.
+  const lastUnavailable = new Map<"status" | "read", SyncUnavailableCode>()
+  const reportUnavailable = (
+    path: "status" | "read",
+    code: SyncUnavailableCode,
+    fields: Record<string, unknown> = {},
+  ): SyncRpcProblem => {
+    if (lastUnavailable.get(path) !== code) {
+      lastUnavailable.set(path, code)
+      options.warn?.(`memory sync ${path} unavailable`, { path, code, ...fields })
+    }
+    return unavailable(code)
+  }
   let lifetime = new AbortController()
   let enable: Operation | undefined
   const approvals = new Map<string, Operation>()
@@ -26,7 +66,10 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
     if (record.timer !== undefined) clearTimeout(record.timer)
   }
   const subscribe = (record: Operation, signal: AbortSignal): void => {
-    const listener = () => { record.expired = false; cancel(record) }
+    const listener = () => {
+      record.expired = false
+      cancel(record)
+    }
     signal.addEventListener("abort", listener, { once: true })
     record.disposeListeners.push(() => signal.removeEventListener("abort", listener))
     if (signal.aborted) listener()
@@ -35,7 +78,9 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
     check(context)
     const account = await options.source()
     check(context)
-    if (account === null || account.signal.aborted || !(await account.isCurrent())) throw new RetiredSyncOperation()
+    if (account === null) throw new RetiredSyncOperation("no_account")
+    if (account.signal.aborted) throw new RetiredSyncOperation("account_aborted")
+    if (!(await account.isCurrent())) throw new RetiredSyncOperation("account_not_current")
     check(context)
     if (account.signal.aborted) throw new RetiredSyncOperation()
     return account
@@ -57,13 +102,31 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
       return account.boundary(() => authority(record).admit(dispatch))
     },
   })
-  const newRecord = <K extends Operation["kind"]>(owner: SyncRpcContext, kind: K, pendingId?: string): Operation & { readonly kind: K } => {
+  const newRecord = <K extends Operation["kind"]>(
+    owner: SyncRpcContext,
+    kind: K,
+    pendingId?: string,
+  ): Operation & { readonly kind: K } => {
     const record: Operation & { readonly kind: K } = {
-      kind, owner, pendingId, controller: new AbortController(),
-      ready: Promise.withResolvers<void>(), confirmation: Promise.withResolvers<boolean>(),
-      disposeListeners: [], account: undefined, identity: undefined, active: true,
-      expired: false, expiresAt: undefined, code: null, confirmed: false,
-      enable: null, approval: null, problem: undefined, timer: undefined, done: Promise.resolve(),
+      kind,
+      owner,
+      pendingId,
+      controller: new AbortController(),
+      ready: Promise.withResolvers<void>(),
+      confirmation: Promise.withResolvers<boolean>(),
+      disposeListeners: [],
+      account: undefined,
+      identity: undefined,
+      active: true,
+      expired: false,
+      expiresAt: undefined,
+      code: null,
+      confirmed: false,
+      enable: null,
+      approval: null,
+      problem: undefined,
+      timer: undefined,
+      done: Promise.resolve(),
     }
     subscribe(record, owner.disconnectSignal)
     subscribe(record, options.signal)
@@ -74,21 +137,37 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
     if (record.timer !== undefined) clearTimeout(record.timer)
     for (const dispose of record.disposeListeners.splice(0)) dispose()
   }
-  const progress = (record: Operation): SyncApproveResponse => record.expiresAt === undefined
-    ? record.problem ?? refused()
-    : { pendingId: record.pendingId ?? "", expiresAt: record.expiresAt, code: record.code, outcome: record.approval }
+  const progress = (record: Operation): SyncApproveResponse =>
+    record.expiresAt === undefined
+      ? (record.problem ?? refused())
+      : { pendingId: record.pendingId ?? "", expiresAt: record.expiresAt, code: record.code, outcome: record.approval }
   const readEnable = (record: Operation): SyncEnableResponse => record.enable ?? unavailable()
+  // A notice that cannot be read is reported as unresolved: never as void, never as saved.
+  const phraseNotice = async (account: SyncRpcAccount) => {
+    const read = options.runtime.phraseNoticeStatus
+    if (read === undefined) return {}
+    try {
+      return await read({
+        pinDir: options.pinDir,
+        account: account.descriptor.accountId,
+        principalId: account.descriptor.syncPrincipalId,
+      })
+    } catch {
+      return { phraseUnresolved: true } as const
+    }
+  }
 
   const start = (record: CeremonyOperation): void => {
     operations.add(record)
-    record.done = runSyncRpcOperation(record, options, { current, authority, subscribe, cancel })
-      .finally(() => operations.delete(record))
+    record.done = runSyncRpcOperation(record, options, { current, authority, subscribe, cancel }).finally(() =>
+      operations.delete(record),
+    )
   }
   // Only ownerId is compared here. A reconnect that reuses an ownerId is a new connection incarnation, and it is
   // fenced indirectly: the old connection's disconnect aborts the record's controller (so the check below fails),
   // and identityOf keys every operation by the account descriptor's incarnation.
-  const ensureOwned = (record: Operation, owner: SyncRpcContext): boolean => record.owner.ownerId === owner.ownerId
-    && (!record.controller.signal.aborted || record.expired)
+  const ensureOwned = (record: Operation, owner: SyncRpcContext): boolean =>
+    record.owner.ownerId === owner.ownerId && (!record.controller.signal.aborted || record.expired)
   const currentRecord = async (record: Operation, owner: SyncRpcContext): Promise<boolean> => {
     if (!ensureOwned(record, owner)) return false
     if (record.account !== undefined && (record.account.signal.aborted || !(await record.account.isCurrent()))) {
@@ -103,17 +182,23 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
   return {
     check(context: SyncRpcContext | undefined): context is SyncRpcContext {
       if (context === undefined) return false
-      try { check(context); return true } catch { return false }
+      try {
+        check(context)
+        return true
+      } catch {
+        return false
+      }
     },
-    async enable(owner: SyncRpcContext): Promise<SyncEnableResponse> {
+    async enable(owner: SyncRpcContext, request: SyncEnableRequest = {}): Promise<SyncEnableResponse> {
       if (enable?.active) {
         if (!ensureOwned(enable, owner)) return refused()
         const record = enable
         await record.ready.promise
-        return await currentRecord(record, owner) ? readEnable(record) : refused()
+        return (await currentRecord(record, owner)) ? readEnable(record) : refused()
       }
       if (enable !== undefined) disposeRecord(enable)
       const record = newRecord(owner, "enable")
+      if (request.method !== undefined) record.method = request.method
       enable = record
       start(record)
       await record.ready.promise
@@ -125,7 +210,10 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
       if (previous !== undefined && !ensureOwned(previous, owner)) return refused()
       if (previous !== undefined && !(await currentRecord(previous, owner))) return refused()
       if (request.action === "begin") {
-        if (previous !== undefined && wasActive) { await previous.ready.promise; return progress(previous) }
+        if (previous !== undefined && wasActive) {
+          await previous.ready.promise
+          return progress(previous)
+        }
         if (previous !== undefined) disposeRecord(previous)
         const record = newRecord(owner, "approve", request.pendingId)
         approvals.set(request.pendingId, record)
@@ -145,25 +233,84 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
     },
     async status(owner: SyncRpcContext): Promise<SyncStatusResponse> {
       const binding = lifetime.signal
+      let step: "account" | "identity" | "sync_status" | "recheck" = "account"
       try {
         const account = await current(owner)
+        step = "identity"
         const identity = identityOf(account)
+        step = "sync_status"
         const sync = await options.syncStatus()
+        step = "recheck"
         check(owner)
         binding.throwIfAborted()
-        if (account.signal.aborted || !(await account.isCurrent())) return unavailable()
+        if (account.signal.aborted || !(await account.isCurrent()))
+          return reportUnavailable("status", "account_not_current", { step })
         check(owner)
+        lastUnavailable.delete("status")
         const visible = records().filter((record) => ensureOwned(record, owner) && record.identity === identity)
+        let notice = await phraseNotice(account)
+        check(owner)
+        // Review LOW (#13336 @ 9f9734a8): an unresolved local read may be an enroll/rotate void notice; resolve it
+        // against the verified chain so the notice can show over RPC.
+        const verify = options.runtime.verifiedPhraseNoticeStatus
+        if (notice.phraseUnresolved === true && verify !== undefined) {
+          const verified = await this.read(owner, (ports, current) =>
+            verify({
+              pinDir: options.pinDir,
+              account: current.descriptor.accountId,
+              principalId: current.descriptor.syncPrincipalId,
+              chain: ports.chain,
+            }),
+          )
+          if (!("kind" in verified)) notice = verified
+          check(owner)
+        }
+        const ownEnable = visible.find((record) => record.kind === "enable")?.enable ?? null
         return {
           ...(sync === undefined ? {} : { sync }),
-          enable: visible.find((record) => record.kind === "enable")?.enable ?? null,
-          approvals: visible.filter((record) => record.kind === "approve" && record.expiresAt !== undefined).map((record): ApprovalProgress => ({
-            pendingId: record.pendingId ?? "", expiresAt: record.expiresAt ?? 0, code: record.code, outcome: record.approval,
-          })),
+          // Another process (the CLI) holding the ceremony shows as in progress, never as a void phrase.
+          enable: ownEnable ?? (notice.inProgress === true ? { kind: "in_progress" } : null),
+          ...(notice.phraseVoid !== undefined ? { phraseVoid: notice.phraseVoid } : {}),
+          ...(notice.phraseUnresolved === true ? { phraseUnresolved: true } : {}),
+          approvals: visible
+            .filter((record) => record.kind === "approve" && record.expiresAt !== undefined)
+            .map((record): ApprovalProgress => ({
+              pendingId: record.pendingId ?? "",
+              expiresAt: record.expiresAt ?? 0,
+              code: record.code,
+              outcome: record.approval,
+            })),
         }
-      } catch { return unavailable() }
+      } catch (error) {
+        return reportUnavailable("status", error instanceof RetiredSyncOperation ? error.code : "status_read_failed", {
+          step,
+          ...syncErrorFields(error),
+        })
+      }
     },
-    async read<T>(owner: SyncRpcContext, use: (ports: SyncRpcOperation) => Promise<T>): Promise<T | SyncRpcProblem> {
+    async acknowledge(owner: SyncRpcContext, request: SyncAcknowledgeRequest): Promise<SyncAcknowledgeResponse> {
+      const acknowledgePhraseVoid = options.runtime.acknowledgePhraseVoid
+      if (acknowledgePhraseVoid === undefined) return unavailable()
+      return this.read(owner, (ports, account, auth) =>
+        acknowledgePhraseVoid({
+          account: account.descriptor.accountId,
+          serviceDeviceId: account.descriptor.serviceDeviceId,
+          serviceOrigin: account.descriptor.serviceOrigin,
+          keyring: ports.keyring,
+          chain: ports.chain,
+          pairing: ports.pairing,
+          pinDir: options.pinDir,
+          authority: auth,
+          signal: auth.signal,
+          purpose: request.purpose,
+          ...(request.credentialId !== undefined ? { credentialId: request.credentialId } : {}),
+        }),
+      )
+    },
+    async read<T>(
+      owner: SyncRpcContext,
+      use: (ports: SyncRpcOperation, account: SyncRpcAccount, auth: SyncRpcAuthority) => Promise<T>,
+    ): Promise<T | SyncRpcProblem> {
       const record = newRecord(owner, "read")
       const task = (async () => {
         let ports: SyncRpcOperation | undefined
@@ -174,15 +321,33 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
           auth.admit(() => undefined)
           ports = await record.account.forOperation(auth)
           auth.admit(() => undefined)
-          const result = await use(ports)
+          const result = await use(ports, record.account, auth)
           auth.admit(() => undefined)
-          if (!(await record.account.isCurrent())) return unavailable()
+          if (!(await record.account.isCurrent())) return reportUnavailable("read", "account_not_current")
           auth.admit(() => undefined)
+          lastUnavailable.delete("read")
           return result
-        } catch (error) { return serviceProblem(error) } finally { try { await ports?.close() } finally { disposeRecord(record) } }
+        } catch (error) {
+          const problem = serviceProblem(error)
+          // A refusal means the service answered, so an earlier unavailable cause has ended and its recurrence logs again.
+          if (problem.kind === "refused") lastUnavailable.delete("read")
+          return problem.kind === "unavailable" && problem.code !== undefined
+            ? reportUnavailable("read", problem.code, syncErrorFields(error))
+            : problem
+        } finally {
+          try {
+            await ports?.close()
+          } finally {
+            disposeRecord(record)
+          }
+        }
       })()
       reads.add(task)
-      try { return await task } finally { reads.delete(task) }
+      try {
+        return await task
+      } finally {
+        reads.delete(task)
+      }
     },
     async dispose(): Promise<void> {
       lifetime.abort()

@@ -36,10 +36,7 @@ describe("memory component fs boundary", () => {
     for (const sample of escapes) {
       expect(DIRECT_NODE_FS.test(sample)).toBe(true)
     }
-    const allowed = [
-      'import { readdirSync } from "@oh-my-opencode/memory-core/fs"',
-      'import { x } from "node:fstream"',
-    ]
+    const allowed = ['import { readdirSync } from "@oh-my-opencode/memory-core/fs"', 'import { x } from "node:fstream"']
     for (const sample of allowed) {
       expect(DIRECT_NODE_FS.test(sample)).toBe(false)
     }

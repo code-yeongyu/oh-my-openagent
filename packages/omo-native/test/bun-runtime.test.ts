@@ -236,7 +236,11 @@ describe("bun runtime detection", () => {
         env: { Path: npmPrefix, PATHEXT: ".COM;.EXE;.BAT;.CMD" },
         homedir: () => WIN_HOME,
         platform: "win32",
-        exists: existsOnly(win32.join(npmPrefix, "bun.CMD"), win32.join(npmPrefix, "bun.cmd"), win32.join(npmPrefix, "bun")),
+        exists: existsOnly(
+          win32.join(npmPrefix, "bun.CMD"),
+          win32.join(npmPrefix, "bun.cmd"),
+          win32.join(npmPrefix, "bun"),
+        ),
         realpath: identityRealpath,
       })
 

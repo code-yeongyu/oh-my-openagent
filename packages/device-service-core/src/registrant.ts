@@ -7,8 +7,10 @@ import { type EndpointWatch, watchEndpointFile } from "./registrant-watch.ts"
 // each proof, and again whenever the status names a device it has not registered for on that connection. A
 // signed-out status, a refused register and a transport error reset that, so the next device id registers again. A
 // new connection comes from the endpoint file appearing (watched before the first existence check) or from the
-// previous connection closing; nothing polls. The only timers are the bounded connect retries and the watch's one
-// settle re-check after each arm (see registrant-watch.ts).
+// previous connection closing; nothing polls. Once the endpoint it knew is gone (after a close, or under a failing
+// connect), the registrant arms the watch again, so a service that comes right back is found by that arm's settle
+// re-check even when its watch event is late or lost (#12733). The only timers are the bounded connect retries and
+// the watch's one settle re-check after each arm (see registrant-watch.ts).
 
 const REGISTRANT_RETRY_DELAYS_MS: readonly number[] = [250, 1_000, 4_000]
 
@@ -90,7 +92,7 @@ function holdConnection(
 
   want(null)
   service
-    .watchStatus(status => {
+    .watchStatus((status) => {
       const deviceId = status.device?.id ?? null
       emit({ kind: "status", deviceId })
       if (deviceId === null) registeredFor = NONE
@@ -102,7 +104,9 @@ function holdConnection(
 export function startAgentDirRegistrant(options: AgentDirRegistrantOptions): AgentDirRegistrant {
   const endpoint = deviceServiceEndpointPath(options.stateDir)
   const emit = options.onEvent ?? (() => {})
-  const connect = options.connect ?? (() => connectDeviceService({ version: options.version, stateDir: options.stateDir, background: true }))
+  const connect =
+    options.connect ??
+    (() => connectDeviceService({ version: options.version, stateDir: options.stateDir, background: true }))
   const schedule = options.schedule ?? backgroundTimer
   let stopped = false
   let current: DeviceService | undefined
@@ -112,7 +116,7 @@ export function startAgentDirRegistrant(options: AgentDirRegistrantOptions): Age
   const attempt = (retry: number): void => {
     connecting = true
     connect().then(
-      service => {
+      (service) => {
         connecting = false
         if (stopped) {
           service.close()
@@ -123,6 +127,7 @@ export function startAgentDirRegistrant(options: AgentDirRegistrantOptions): Age
           if (current !== service) return
           current = undefined
           emit({ kind: "disconnected" })
+          if (!existsSync(endpoint)) rearmWatch()
           trigger()
         })
         holdConnection(service, options.agentDir, emit, () => current === service && !stopped)
@@ -132,7 +137,13 @@ export function startAgentDirRegistrant(options: AgentDirRegistrantOptions): Age
         if (stopped) return
         emit({ kind: "connect_failed", reason: reasonOf(error) })
         const delay = REGISTRANT_RETRY_DELAYS_MS[retry]
-        if (delay === undefined || !existsSync(endpoint)) {
+        if (!existsSync(endpoint)) {
+          emit({ kind: "gave_up" })
+          rearmWatch()
+          trigger()
+          return
+        }
+        if (delay === undefined) {
           emit({ kind: "gave_up" })
           return
         }
@@ -151,7 +162,15 @@ export function startAgentDirRegistrant(options: AgentDirRegistrantOptions): Age
     attempt(0)
   }
 
-  const stopWatch = (options.watchEndpoint ?? watchEndpointFile)(endpoint, trigger)
+  const watchEndpoint = options.watchEndpoint ?? watchEndpointFile
+  let stopWatch = watchEndpoint(endpoint, trigger)
+  // A watch that armed while the old endpoint existed does not settle on its replacement. The new watch is armed
+  // before the old one stops, so the endpoint is never unwatched in between; the caller checks existence right after.
+  function rearmWatch(): void {
+    const stopPrevious = stopWatch
+    stopWatch = watchEndpoint(endpoint, trigger)
+    stopPrevious()
+  }
   void (async () => {
     await options.startupGap?.()
     trigger()

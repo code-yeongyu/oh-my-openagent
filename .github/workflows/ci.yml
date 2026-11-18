@@ -35,7 +35,7 @@ jobs:
         with:
           node-version: "24"
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: "1.4.4"
 
@@ -65,6 +65,7 @@ jobs:
       run_heavy: ${{ steps.classify.outputs.run_heavy }}
       full_matrix: ${{ steps.classify.outputs.full_matrix }}
       runtime_touching: ${{ steps.classify.outputs.runtime_touching }}
+      label_refused: ${{ steps.classify.outputs.label_refused }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -92,6 +93,9 @@ jobs:
           fi
 
           MERGE_PARENTS="$(git show -s --format=%P "$GITHUB_SHA" | wc -w)"
+          BODY_FILE="$RUNNER_TEMP/pr-body.md"
+          # Read from the event file: a PR body can exceed the per-variable environment limit.
+          jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH" > "$BODY_FILE"
 
           MODE_JSON="$(node script/ci-fast-path.mjs \
             --event "$GITHUB_EVENT_NAME" \
@@ -100,6 +104,8 @@ jobs:
             --merge-parents "$MERGE_PARENTS" \
             --head-ref "$HEAD_REF" \
             --labels "${PR_LABELS:-[]}" \
+            --body-file "$BODY_FILE" \
+            --changed-files "$(jq -r '.pull_request.changed_files // 0' "$GITHUB_EVENT_PATH")" \
             < "$PATHS_FILE")"
 
           jq -r '"generated_release_push=\(.generatedReleasePush)"' <<< "$MODE_JSON" >> "$GITHUB_OUTPUT"
@@ -107,6 +113,10 @@ jobs:
           jq -r '"run_heavy=\(.runHeavy)"' <<< "$MODE_JSON" >> "$GITHUB_OUTPUT"
           jq -r '"full_matrix=\(.fullMatrix)"' <<< "$MODE_JSON" >> "$GITHUB_OUTPUT"
           jq -r '"runtime_touching=\(.runtimeTouching)"' <<< "$MODE_JSON" >> "$GITHUB_OUTPUT"
+          jq -r '"label_refused=\(.labelRefused)"' <<< "$MODE_JSON" >> "$GITHUB_OUTPUT"
+          if jq -e '.labelRefused' <<< "$MODE_JSON" > /dev/null; then
+            echo "::warning title=ci:full-matrix refused::This diff touches no platform path and the PR body has no 'Platform-reason: <why>' line, so this run stays on Linux. Add the line or remove the label."
+          fi
           jq . <<< "$MODE_JSON"
 
       # The report-only temp-leak list (#9766) may only shrink: a new leak is fixed, not listed.
@@ -128,8 +138,9 @@ jobs:
             - Web-only change: `${{ steps.classify.outputs.web_only || 'unknown' }}`.
             - Run heavy validation: `${{ steps.classify.outputs.run_heavy || 'unknown' }}`.
             - Runtime-touching change: `${{ steps.classify.outputs.runtime_touching || 'unknown' }}` (informational; the OS matrix follows the full-matrix flag below).
-            - Full 3-OS matrix: `${{ steps.classify.outputs.full_matrix || 'unknown' }}` (pull requests set it only for platform-specific paths; false keeps heavy work on ubuntu; add `run-full-ci` or `ci:full-matrix` for a separate run with optional `full-matrix / ...` checks that do not gate merge; keep the label and push a commit or reopen the PR to run the full matrix in required checks).
-          JOB_SUMMARY_NEXT: Classification failures default to heavy validation on the full matrix; inspect the changed-path diff and event metadata.
+            - `ci:full-matrix` refused: `${{ steps.classify.outputs.label_refused || 'unknown' }}` (the label needs a platform path in the diff or a `Platform-reason: <why>` line in the PR body).
+            - Full 3-OS matrix: `${{ steps.classify.outputs.full_matrix || 'unknown' }}` (pull requests set it only for the `ci:full-matrix` label or a release-state head, #13802; false keeps heavy work on ubuntu; add `ci:full-matrix` for a separate run with optional `full-matrix / ...` checks that do not gate merge; keep the label and push a commit or reopen the PR to run the full matrix in required checks).
+          JOB_SUMMARY_NEXT: Classification failures default to heavy validation (every OS on push, Linux only on a pull request); inspect the changed-path diff and event metadata.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   # Block PRs targeting master branch (comment + auto-close, then fail the check)
@@ -225,7 +236,7 @@ jobs:
         with:
           node-version: "24"
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         with:
           # and 1.3.12 hangs on windows-latest in the ast-grep install-script
@@ -371,7 +382,9 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: windows-root-test-telemetry-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard == '1/2' && 'shard-1' || 'shard-2' }}
-          path: ${{ runner.temp }}/windows-root-test-telemetry/*.json
+          path: |
+            ${{ runner.temp }}/windows-root-test-telemetry/*.json
+            ${{ runner.temp }}/windows-root-test-telemetry/*.junit.xml
           if-no-files-found: warn
           overwrite: false
 
@@ -446,11 +459,14 @@ jobs:
     runs-on: macos-latest
     # Each part has its own step timeout so one hung part fails only its own
     # context; the job budget covers install plus the sum of the part budgets.
-    timeout-minutes: 90
+    # Shard 2 is two parts (heavy, light). Their budgets replaced the single
+    # 20-minute step that run 43943966867 hit while tests were still passing.
+    timeout-minutes: 110
     outputs:
       lsp: ${{ steps.lsp-daemon-tests.outcome }}
       shard1: ${{ steps.root-tests-posix-1.outcome }}
-      shard2: ${{ steps.root-tests-posix-2.outcome }}
+      shard2a: ${{ steps.root-tests-posix-2a.outcome }}
+      shard2b: ${{ steps.root-tests-posix-2b.outcome }}
       codex: ${{ steps.codex-platform-tests.outcome }}
       senpi: ${{ steps.senpi-tests-posix.outcome }}
     steps:
@@ -458,7 +474,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: "24"
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: "1.4.4"
       - uses: actions/cache@v6
@@ -480,12 +496,25 @@ jobs:
         id: root-tests-posix-1
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         timeout-minutes: 20
-        run: bun test --timeout 20000 packages/omo-opencode packages/memory-core
-      - name: Run root test shard 2
-        id: root-tests-posix-2
+        env:
+          CI_JUNIT_DIR: ${{ runner.temp }}/junit
+        run: |
+          mkdir -p "$CI_JUNIT_DIR"
+          bun test --timeout 20000 packages/omo-opencode packages/memory-core --reporter=junit --reporter-outfile="$CI_JUNIT_DIR/root-1.xml"
+      - name: Run root test shard 2 heavy
+        id: root-tests-posix-2a
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         timeout-minutes: 20
-        run: bash .github/scripts/ci-root-shard-2.sh
+        env:
+          CI_JUNIT_DIR: ${{ runner.temp }}/junit
+        run: bash .github/scripts/ci-root-shard-2.sh heavy
+      - name: Run root test shard 2 light
+        id: root-tests-posix-2b
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        timeout-minutes: 20
+        env:
+          CI_JUNIT_DIR: ${{ runner.temp }}/junit
+        run: bash .github/scripts/ci-root-shard-2.sh light
       - name: Run Codex platform smoke
         id: codex-platform-tests
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
@@ -498,7 +527,20 @@ jobs:
         id: senpi-tests-posix
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         timeout-minutes: 20
+        env:
+          CI_JUNIT_DIR: ${{ runner.temp }}/junit
         run: bash .github/scripts/ci-senpi-posix.sh
+
+      # The JUnit reports prove a re-sharded layout runs exactly the tests this one runs (#13315).
+      - name: Upload macOS JUnit reports
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v6
+        with:
+          name: macos-junit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/junit/*.xml
+          if-no-files-found: warn
+          overwrite: false
 
       - name: Write job summary
         if: always()
@@ -508,7 +550,8 @@ jobs:
           JOB_SUMMARY_DETAILS: |
             - LSP daemon: `${{ steps.lsp-daemon-tests.outcome }}`.
             - Root shard 1: `${{ steps.root-tests-posix-1.outcome }}`.
-            - Root shard 2: `${{ steps.root-tests-posix-2.outcome }}`.
+            - Root shard 2 heavy: `${{ steps.root-tests-posix-2a.outcome }}`.
+            - Root shard 2 light: `${{ steps.root-tests-posix-2b.outcome }}`.
             - Codex platform: `${{ steps.codex-platform-tests.outcome }}`.
             - Senpi: `${{ steps.senpi-tests-posix.outcome }}`.
           JOB_SUMMARY_NEXT: Inspect the failed part; independent parts continue after an earlier failure.
@@ -560,7 +603,7 @@ jobs:
         env:
           LEG_OS: ${{ matrix.os }}
           LEG_JOB_STATUS: ${{ needs.macos-combined.result }}
-          TEST_OUTCOMES: ${{ needs.macos-combined.outputs.lsp }} ${{ needs.macos-combined.outputs.shard2 }}
+          TEST_OUTCOMES: ${{ needs.macos-combined.outputs.lsp }} ${{ needs.macos-combined.outputs.shard2a }} ${{ needs.macos-combined.outputs.shard2b }}
           RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
           FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
           RUNTIME_TOUCHING: ${{ needs.ci-mode.outputs.runtime_touching }}
@@ -625,7 +668,7 @@ jobs:
         with:
           node-version: "24"
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           bun-version: "1.4.4"
@@ -672,7 +715,7 @@ jobs:
         if: needs.ci-mode.outputs.run_heavy == 'true'
         run: bun run lint:ratchet
 
-      # Unused files, exports and dependencies; pre-existing findings are scoped ignores in knip.jsonc.
+      # Unused files, exports and dependencies; pre-existing findings are scoped ignores in each directory's knip.workspace.jsonc.
       - name: Dead-code check (knip)
         if: needs.ci-mode.outputs.run_heavy == 'true'
         run: bun run knip:check
@@ -713,7 +756,7 @@ jobs:
         with:
           node-version: "24"
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         with:
           bun-version: "1.4.4"
@@ -815,7 +858,7 @@ jobs:
         with:
           node-version: "24"
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         with:
           bun-version: "1.4.4"
@@ -874,6 +917,9 @@ jobs:
           git -C "$RUNNER_TEMP/senpi-eq" -c advice.detachedHead=false checkout -q FETCH_HEAD
           # E24 observes the pinned TypeScript language server only; the runner's own servers never reach a case.
           npm install --prefix "$RUNNER_TEMP/eq-lsp" --no-save --no-audit --no-fund typescript-language-server@5.3.0 typescript@5.9.3
+          # E24 runs the pinned comment-checker binary from the Codex plugin workspace (the root install does not carry it);
+          # the binaries ship inside the npm tarball, so --ignore-scripts still installs them and nothing is downloaded mid-case.
+          npm --prefix packages/omo-codex/plugin ci --ignore-scripts --no-audit --no-fund
           node packages/omo-senpi/scripts/qa/fused-equivalence-e2e.mjs --compare --placement fused --senpi-repo "$RUNNER_TEMP/senpi-eq" \
             --lsp-dir "$RUNNER_TEMP/eq-lsp/node_modules/.bin" --evidence-dir "$RUNNER_TEMP/eq-omo"
 
@@ -913,7 +959,9 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: windows-senpi-compatibility-telemetry-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/windows-senpi-compatibility-telemetry/*.json
+          path: |
+            ${{ runner.temp }}/windows-senpi-compatibility-telemetry/*.json
+            ${{ runner.temp }}/windows-senpi-compatibility-telemetry/*.junit.xml
           if-no-files-found: warn
           overwrite: false
 
@@ -953,7 +1001,7 @@ jobs:
         with:
           node-version: "24"
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           bun-version: "1.4.4"
@@ -1042,7 +1090,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           bun-version: "1.4.4"
@@ -1108,7 +1156,7 @@ jobs:
         with:
           node-version: "24"
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           bun-version: "1.4.4"
@@ -1193,7 +1241,7 @@ jobs:
         with:
           node-version: "24"
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         if: needs.ci-mode.outputs.run_heavy == 'true'
         with:
           bun-version: "1.4.4"
@@ -1220,6 +1268,10 @@ jobs:
           cargo build --release -p senpi-desktop-engine --locked --target ${{ matrix.rust-target }}
           # build-omo-binary.ts stages the engine trust helper on Darwin and Windows (omo#10762); its own call, as release builds it.
           cargo build --release -p omo-engine-trust-helper --locked --target ${{ matrix.rust-target }}
+          # It stages the git job helper on Windows only (omo#10391); its own call, static CRT as released.
+          if [[ "${{ matrix.target }}" == windows-* ]]; then
+            RUSTFLAGS="-C target-feature=+crt-static" cargo build --release -p omo-git-job-helper --locked --target ${{ matrix.rust-target }}
+          fi
 
       # build-omo-binary embeds the keychain helper into darwin binaries (#11262); the release lane
       # signs it, this parity leg embeds an unsigned build.
@@ -1283,7 +1335,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: "1.4.4"
 
@@ -1339,7 +1391,7 @@ jobs:
 
       - run: git fetch --force --tags
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: "1.4.4"
 

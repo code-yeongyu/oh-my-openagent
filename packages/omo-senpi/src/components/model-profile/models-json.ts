@@ -5,12 +5,7 @@ import { readJsoncFile } from "@oh-my-opencode/utils"
 
 /** A parsed JSON value that is readonly at every depth, matching the frozen parse below. */
 export type ModelsJsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | readonly ModelsJsonValue[]
-  | { readonly [key: string]: ModelsJsonValue }
+  string | number | boolean | null | readonly ModelsJsonValue[] | { readonly [key: string]: ModelsJsonValue }
 
 type CachedModelsJson = { readonly stamp: string; readonly parsed: ModelsJsonValue }
 

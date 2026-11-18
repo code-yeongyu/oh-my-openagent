@@ -14,11 +14,20 @@ const provider = "chatgpt-subscription"
 const baseId = "gpt-6-luna"
 const registry = new ModelRegistry(ModelRuntime.createSync())
 registry.registerProvider(provider, {
-  api: "openai-completions", baseUrl: "file://priority-pairing", apiKey: "test",
-  models: [{
-    id: baseId, name: baseId, reasoning: false, input: ["text"],
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 16000, maxTokens: 4096,
-  }],
+  api: "openai-completions",
+  baseUrl: "file://priority-pairing",
+  apiKey: "test",
+  models: [
+    {
+      id: baseId,
+      name: baseId,
+      reasoning: false,
+      input: ["text"],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 16000,
+      maxTokens: 4096,
+    },
+  ],
 })
 const base = registry.find(provider, baseId)
 if (base === undefined) throw new Error("fixture model missing")
@@ -43,14 +52,23 @@ describe("in-process registry pairing (#9812)", () => {
     const handle = await runner.start(spec)
     try {
       const observed = adaptInProcessHandle(handle).effectiveModel?.()
-      const record = stampSpawnEffectiveModel(createTaskRecord({
-        parent_session_id: "parent", root_session_id: "parent", depth: 1,
-        execution_mode: "in-process", model: spec.selectedModel ?? "", notify_on_terminal: false,
-      }), observed)
+      const record = stampSpawnEffectiveModel(
+        createTaskRecord({
+          parent_session_id: "parent",
+          root_session_id: "parent",
+          depth: 1,
+          execution_mode: "in-process",
+          model: spec.selectedModel ?? "",
+          notify_on_terminal: false,
+        }),
+        observed,
+      )
       const store = createTaskRecordStore({ project_dir: spec.cwd, task: { state_dir: spec.sessionDir } })
       store.save(record)
       // then: independent store instance exercises the persisted model parser too
-      const reloaded = createTaskRecordStore({ project_dir: spec.cwd, task: { state_dir: spec.sessionDir } }).load(record.task_id)
+      const reloaded = createTaskRecordStore({ project_dir: spec.cwd, task: { state_dir: spec.sessionDir } }).load(
+        record.task_id,
+      )
       expect(reloaded?.effective_model).toMatchObject({ provider, model_id: started.id, service_tier: tier })
     } finally {
       fake.lastText.value = "done"
@@ -73,7 +91,8 @@ describe("in-process registry pairing (#9812)", () => {
     const pinned = reverse ? base : sku
     const runner = new InProcessRunner({ createSession: async () => fake.session })
     // when
-    const failure = await runner.start(baseSpec({ model: pinned, selectedModel: `${provider}/${pinned.id}` }))
+    const failure = await runner
+      .start(baseSpec({ model: pinned, selectedModel: `${provider}/${pinned.id}` }))
       .catch((error: unknown) => error)
     // then
     expect(RunnerError.is(failure) ? failure.failure.kind : undefined).toBe("model_unavailable")
@@ -87,17 +106,28 @@ describe("in-process registry pairing (#9812)", () => {
 describe("in-process pairing declared by provider config (#10536)", () => {
   const configDir = mkdtempSync(join(tmpdir(), "priority-pairing-config-"))
   const modelsJson = join(configDir, "models.json")
-  writeFileSync(modelsJson, JSON.stringify({ providers: { [provider]: { models: [
-    { id: `${baseId}-fast`, serviceTier: "priority", upstreamModelId: baseId },
-  ] } } }))
-  const configured = new ModelRegistry(ModelRuntime.createSync({
-    agentDir: configDir, authPath: join(configDir, "auth.json"), modelsPath: modelsJson, modelsStorePath: join(configDir, "models-store.json"),
-  }))
+  writeFileSync(
+    modelsJson,
+    JSON.stringify({
+      providers: {
+        [provider]: { models: [{ id: `${baseId}-fast`, serviceTier: "priority", upstreamModelId: baseId }] },
+      },
+    }),
+  )
+  const configured = new ModelRegistry(
+    ModelRuntime.createSync({
+      agentDir: configDir,
+      authPath: join(configDir, "auth.json"),
+      modelsPath: modelsJson,
+      modelsStorePath: join(configDir, "models-store.json"),
+    }),
+  )
   afterAll(() => rmSync(configDir, { recursive: true, force: true }))
   const configuredBase = configured.find(provider, baseId)
   const configuredAlias = configured.find(provider, `${baseId}-fast`)
   const otherModel = configured.find(provider, "gpt-6-sol")
-  if (configuredBase === undefined || configuredAlias === undefined || otherModel === undefined) throw new Error("fixture model missing")
+  if (configuredBase === undefined || configuredAlias === undefined || otherModel === undefined)
+    throw new Error("fixture model missing")
 
   test("the fixture reproduces the split: no tier on the entry, priority from the registry", () => {
     expect("serviceTier" in configuredAlias ? configuredAlias.serviceTier : undefined).toBeUndefined()
@@ -130,7 +160,11 @@ describe("in-process pairing declared by provider config (#10536)", () => {
     // given
     const fake = createFakeSession()
     fake.session = { ...fake.session, model: started }
-    const spec = baseSpec({ model: configuredAlias, selectedModel: `${provider}/${configuredAlias.id}`, modelRegistry: configured })
+    const spec = baseSpec({
+      model: configuredAlias,
+      selectedModel: `${provider}/${configuredAlias.id}`,
+      modelRegistry: configured,
+    })
     const runner = new InProcessRunner({ createSession: async () => fake.session })
     // when
     const failure = await runner.start(spec).catch((error: unknown) => error)

@@ -63,7 +63,11 @@ export function daemonStderrTail(agentDir, limit = 25) {
   return readdirSync(root)
     .flatMap((entry) => {
       const path = join(root, entry, "stderr.log")
-      return existsSync(path) ? readFileSync(path, "utf8").split("\n").filter((line) => line.trim().length > 0) : []
+      return existsSync(path)
+        ? readFileSync(path, "utf8")
+            .split("\n")
+            .filter((line) => line.trim().length > 0)
+        : []
     })
     .slice(-limit)
 }

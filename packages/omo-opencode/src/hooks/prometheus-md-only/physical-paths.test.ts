@@ -36,9 +36,21 @@ describe("physical planner destinations (B2-R)", () => {
 
   const calls = [
     { tool: "write", kind: "write", args: (path: string) => ({ filePath: path, content: "probe" }) },
-    { tool: "edit", kind: "edit", args: (path: string) => ({ filePath: path, edits: [{ op: "append", lines: ["probe"] }] }) },
-    { tool: "edit", kind: "rename", args: (path: string) => ({ filePath: ".omo/source.md", rename: path, edits: [{ op: "append", lines: ["probe"] }] }) },
-    ...["Add File", "Update File", "Delete File", "Move to"].map(header => ({
+    {
+      tool: "edit",
+      kind: "edit",
+      args: (path: string) => ({ filePath: path, edits: [{ op: "append", lines: ["probe"] }] }),
+    },
+    {
+      tool: "edit",
+      kind: "rename",
+      args: (path: string) => ({
+        filePath: ".omo/source.md",
+        rename: path,
+        edits: [{ op: "append", lines: ["probe"] }],
+      }),
+    },
+    ...["Add File", "Update File", "Delete File", "Move to"].map((header) => ({
       tool: "apply_patch",
       kind: header,
       args: (path: string) => ({
@@ -84,8 +96,12 @@ describe("physical planner destinations (B2-R)", () => {
     for (const separators of ["slash", "backslash", "mixed"]) {
       test(`${planning} remains writable with ${separators} separators`, async () => {
         const path = `${planning}/plans/new.md`
-        const filePath = separators === "backslash" ? path.replaceAll("/", "\\")
-          : separators === "mixed" ? path.replace("/plans/", "\\plans/") : path
+        const filePath =
+          separators === "backslash"
+            ? path.replaceAll("/", "\\")
+            : separators === "mixed"
+              ? path.replace("/plans/", "\\plans/")
+              : path
         await expect(invoke("write", { filePath, content: "plan" })).resolves.toBeUndefined()
       })
     }
@@ -100,8 +116,9 @@ describe("physical planner destinations (B2-R)", () => {
     test(`${planning} cannot alias a directory outside the project`, async () => {
       mkdirSync(join(root, planning, ".."), { recursive: true })
       symlinkSync(relative(join(root, planning, ".."), join(fixture, "outside")), join(root, planning), "dir")
-      await expect(invoke("write", { filePath: `${planning}/new.md`, content: "plan" }))
-        .rejects.toThrow("File operations restricted")
+      await expect(invoke("write", { filePath: `${planning}/new.md`, content: "plan" })).rejects.toThrow(
+        "File operations restricted",
+      )
     })
   }
 })

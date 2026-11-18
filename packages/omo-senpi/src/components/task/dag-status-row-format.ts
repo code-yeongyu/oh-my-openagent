@@ -1,5 +1,9 @@
 import { formatDurationHuman } from "@oh-my-opencode/utils"
-import { excerptRendererText, normalizeRendererText, rendererVisibleWidth } from "@oh-my-opencode/senpi-task/renderer-text"
+import {
+  excerptRendererText,
+  normalizeRendererText,
+  rendererVisibleWidth,
+} from "@oh-my-opencode/senpi-task/renderer-text"
 
 const MAX_NODE_ROWS = 12
 const LABEL_MIN = 16
@@ -93,7 +97,11 @@ const NODE_ICONS: Readonly<Record<string, string>> = {
 // contradiction during the resume-reconcile window, so the header claims nothing about motion.
 const PAUSED_RUN_ICON = "·"
 
-export function runRows(run: DagStatusRunSnapshot, activity: ReadonlyMap<string, string> | undefined, options?: DagRunRowsOptions): string[] {
+export function runRows(
+  run: DagStatusRunSnapshot,
+  activity: ReadonlyMap<string, string> | undefined,
+  options?: DagRunRowsOptions,
+): string[] {
   const renderedAt = options?.now ?? Date.now()
   const maxWidth = boundedRowWidth(options?.maxWidth)
   const rows = [runHeaderRow(run, options?.isProcessAlive ?? isProcessAlive)]
@@ -221,7 +229,12 @@ function waitingLabel(node: DagStatusNode, now: number): string | undefined {
 // mirroring the task widget's formatLiveBackgroundRow budget: every part keeps a floor, the
 // activity absorbs the slack (the plan's point: long latest-activity lines get the room), then
 // route, then label up to LABEL_MAX.
-function nodeRow(node: DagStatusNode, activity: ReadonlyMap<string, string> | undefined, now: number, maxWidth: number): string {
+function nodeRow(
+  node: DagStatusNode,
+  activity: ReadonlyMap<string, string> | undefined,
+  now: number,
+  maxWidth: number,
+): string {
   const icon = NODE_ICONS[node.state] ?? "○"
   const head = `  ${icon} `
   const label = normalizeRendererText(node.label ?? node.id)

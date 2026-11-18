@@ -16,12 +16,20 @@ const ACCOUNT = "c".repeat(64)
 type Observation = { readonly step: string; readonly automatic: string; readonly observed: string }
 
 async function capture(command: readonly string[], stdin?: string): Promise<string> {
-  const child = Bun.spawn([...command], { stdin: stdin === undefined ? "ignore" : "pipe", stdout: "pipe", stderr: "pipe" })
+  const child = Bun.spawn([...command], {
+    stdin: stdin === undefined ? "ignore" : "pipe",
+    stdout: "pipe",
+    stderr: "pipe",
+  })
   if (stdin !== undefined && child.stdin) {
     child.stdin.write(stdin)
     child.stdin.end()
   }
-  const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+  const [stdout, stderr, code] = await Promise.all([
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+    child.exited,
+  ])
   return `exit=${code} ${stdout.trim()} ${stderr.trim()}`.trim()
 }
 
@@ -38,8 +46,15 @@ async function main(reportPath: string): Promise<void> {
   const fixture = join(dir, "keychain-fixture")
   await buildKeychainHelper({ output: helper, flavor: "test" })
   const built = await capture([
-    "clang", "-Wno-deprecated-declarations", "-framework", "Security", "-framework", "CoreFoundation",
-    "-o", fixture, join(import.meta.dir, "test-support", "keychain-fixture.c"),
+    "clang",
+    "-Wno-deprecated-declarations",
+    "-framework",
+    "Security",
+    "-framework",
+    "CoreFoundation",
+    "-o",
+    fixture,
+    join(import.meta.dir, "test-support", "keychain-fixture.c"),
   ])
   if (!built.startsWith("exit=0")) throw new Error(built)
   const prompt = createInterface({ input: process.stdin, output: process.stdout })
@@ -51,7 +66,9 @@ async function main(reportPath: string): Promise<void> {
     await prompt.question(`\n[${name}] ${instruction}\nPress Enter to run it.`)
     const automatic = await run()
     console.log(`automatic result: ${automatic}`)
-    const observed = await prompt.question("Describe exactly what appeared on screen (dialog title, buttons, or 'nothing'): ")
+    const observed = await prompt.question(
+      "Describe exactly what appeared on screen (dialog title, buttons, or 'nothing'): ",
+    )
     observations.push({ step: name, automatic, observed })
   }
 
@@ -62,31 +79,62 @@ async function main(reportPath: string): Promise<void> {
     const partition = await helperCall({ v: 1, verb: "read", account: ACCOUNT }, ["--no-ui"])
     // Precondition (design 9): the claims below are only meaningful where the item got a partition entry naming a
     // team ("ours" or "other"); "none", "unknown", "missing" or an error reply all stop the run.
-    if (!/"partition":"(ours|other)"/.test(partition)) throw new Error(`No usable partition entry in this session; stop: ${partition}`)
+    if (!/"partition":"(ours|other)"/.test(partition))
+      throw new Error(`No usable partition entry in this session; stop: ${partition}`)
     observations.push({ step: "partition-at-creation", automatic: partition, observed: "checked automatically" })
-    await step("own-identity-with-partition", "The creator reads and deletes its own item. Expect no dialog.", async () =>
-      `${await fx("read", ACCOUNT)} | ${await fx("delete", ACCOUNT)}`)
-    await step("dialog-kind-foreign-team", "The helper approves an item another identity created. Record the dialog kind, then click Allow.", async () =>
-      `${await fx("add", ACCOUNT, "dummy-gui")} | ${await helperCall({ v: 1, verb: "approve", account: ACCOUNT })}`)
-    await step("always-allow-then-delete", "Approve again and click Always Allow; then the helper deletes it.", async () =>
-      `${await helperCall({ v: 1, verb: "approve", account: ACCOUNT })} | ${await helperCall({ v: 1, verb: "remove", account: ACCOUNT })}`)
-    await step("unlock-dialog-only", "The keychain is locked, then the helper reads an owned item. Expect only the unlock dialog; enter the dummy password.", async () =>
-      `${await helperCall({ v: 1, verb: "write", account: ACCOUNT, value: "dummy-owned" }, ["--no-ui"])} | ${await fx("lock")} | ${await helperCall({ v: 1, verb: "read", account: ACCOUNT })}`)
-    await step("dialog-closes-on-client-exit", "A detached helper opens an approve dialog; its client exits after 5 s. Expect the dialog to appear, then vanish.", async () => {
-      await fx("add", `${"d".repeat(64)}`, "dummy-foreign")
-      const child = Bun.spawn([helper, "--keychain", keychain], { stdin: "pipe", stdout: "pipe", detached: true })
-      child.stdin.write(`${JSON.stringify({ v: 1, verb: "approve", account: "d".repeat(64) })}\n`)
-      child.stdin.flush()
-      await Bun.sleep(5_000)
-      child.stdin.end()
-      return `exit=${await child.exited}`
-    })
-    await step("untrusted-delete-interactive", "Another identity (the fixture) deletes a helper-owned item with interaction allowed. Record prompt or refusal.", async () =>
-      `${await helperCall({ v: 1, verb: "write", account: "e".repeat(64), value: "dummy-owned" }, ["--no-ui"])} | ${await fx("delete-interactive", "e".repeat(64))}`)
-    await step("one-time-allow-cached-per-process", "Another identity reads a helper-owned item twice in ONE process. Click Allow (not Always Allow) once; record whether a second dialog appeared.", async () =>
-      `${await helperCall({ v: 1, verb: "write", account: "e".repeat(64), value: "dummy-owned" }, ["--no-ui"])} | ${await fx("read-twice-interactive", "e".repeat(64))}`)
-    await step("approve-snapshot", "Approve an owned item; the reply's value and mdat must belong together (not load-bearing).", async () =>
-      helperCall({ v: 1, verb: "approve", account: ACCOUNT }))
+    await step(
+      "own-identity-with-partition",
+      "The creator reads and deletes its own item. Expect no dialog.",
+      async () => `${await fx("read", ACCOUNT)} | ${await fx("delete", ACCOUNT)}`,
+    )
+    await step(
+      "dialog-kind-foreign-team",
+      "The helper approves an item another identity created. Record the dialog kind, then click Allow.",
+      async () =>
+        `${await fx("add", ACCOUNT, "dummy-gui")} | ${await helperCall({ v: 1, verb: "approve", account: ACCOUNT })}`,
+    )
+    await step(
+      "always-allow-then-delete",
+      "Approve again and click Always Allow; then the helper deletes it.",
+      async () =>
+        `${await helperCall({ v: 1, verb: "approve", account: ACCOUNT })} | ${await helperCall({ v: 1, verb: "remove", account: ACCOUNT })}`,
+    )
+    await step(
+      "unlock-dialog-only",
+      "The keychain is locked, then the helper reads an owned item. Expect only the unlock dialog; enter the dummy password.",
+      async () =>
+        `${await helperCall({ v: 1, verb: "write", account: ACCOUNT, value: "dummy-owned" }, ["--no-ui"])} | ${await fx("lock")} | ${await helperCall({ v: 1, verb: "read", account: ACCOUNT })}`,
+    )
+    await step(
+      "dialog-closes-on-client-exit",
+      "A detached helper opens an approve dialog; its client exits after 5 s. Expect the dialog to appear, then vanish.",
+      async () => {
+        await fx("add", `${"d".repeat(64)}`, "dummy-foreign")
+        const child = Bun.spawn([helper, "--keychain", keychain], { stdin: "pipe", stdout: "pipe", detached: true })
+        child.stdin.write(`${JSON.stringify({ v: 1, verb: "approve", account: "d".repeat(64) })}\n`)
+        child.stdin.flush()
+        await Bun.sleep(5_000)
+        child.stdin.end()
+        return `exit=${await child.exited}`
+      },
+    )
+    await step(
+      "untrusted-delete-interactive",
+      "Another identity (the fixture) deletes a helper-owned item with interaction allowed. Record prompt or refusal.",
+      async () =>
+        `${await helperCall({ v: 1, verb: "write", account: "e".repeat(64), value: "dummy-owned" }, ["--no-ui"])} | ${await fx("delete-interactive", "e".repeat(64))}`,
+    )
+    await step(
+      "one-time-allow-cached-per-process",
+      "Another identity reads a helper-owned item twice in ONE process. Click Allow (not Always Allow) once; record whether a second dialog appeared.",
+      async () =>
+        `${await helperCall({ v: 1, verb: "write", account: "e".repeat(64), value: "dummy-owned" }, ["--no-ui"])} | ${await fx("read-twice-interactive", "e".repeat(64))}`,
+    )
+    await step(
+      "approve-snapshot",
+      "Approve an owned item; the reply's value and mdat must belong together (not load-bearing).",
+      async () => helperCall({ v: 1, verb: "approve", account: ACCOUNT }),
+    )
   } finally {
     prompt.close()
     if (existsSync(keychain)) await fx("destroy")

@@ -29,7 +29,20 @@ import {
 // The transport requires a schema artifact's projection; this mirrors telemetry-core's test stand-in
 // (`$session_id` becomes `session.id`, every other primitive that passes the key rule `omo.<name>`), which is
 // not exported to other packages.
-const NON_WIRE_KEYS = new Set(["$os", "$os_version", "$process_person_profile", "$session_id", "ci", "event_id", "install_hash", "package_version", "platform", "product_name", "schema_version", "surface"])
+const NON_WIRE_KEYS = new Set([
+  "$os",
+  "$os_version",
+  "$process_person_profile",
+  "$session_id",
+  "ci",
+  "event_id",
+  "install_hash",
+  "package_version",
+  "platform",
+  "product_name",
+  "schema_version",
+  "surface",
+])
 // Every attribute omo-native-turn-span sets on `omo.turn`; the transport drops anything not listed.
 const TURN_SPANS: SpanAllowlist = {
   "omo.turn": [
@@ -54,7 +67,11 @@ const testProjection: OtlpWireProjection = (_event, properties) => {
   if (typeof session === "string" && session.length > 0) attributes["session.id"] = session
   for (const [key, value] of Object.entries(properties)) {
     if (NON_WIRE_KEYS.has(key) || key.startsWith("$")) continue
-    if (typeof value === "string" || typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value))) {
+    if (
+      typeof value === "string" ||
+      typeof value === "boolean" ||
+      (typeof value === "number" && Number.isFinite(value))
+    ) {
       attributes[`omo.${key}`] = value
     }
   }
@@ -152,7 +169,15 @@ function turnEnd(turnIndex: number, stopReason = "stop"): Record<string, unknown
       api: "openai-responses",
       provider: "openai",
       model: "gpt-5.6-sol",
-      usage: { input: 11, output: 22, cacheRead: 3, cacheWrite: 4, reasoning: 5, totalTokens: 40, cost: { total: 0.12 } },
+      usage: {
+        input: 11,
+        output: 22,
+        cacheRead: 3,
+        cacheWrite: 4,
+        reasoning: 5,
+        totalTokens: 40,
+        cost: { total: 0.12 },
+      },
       stopReason,
       timestamp: 1,
     },
@@ -239,18 +264,18 @@ async function openSession(
   return { pi, ctx }
 }
 
-const turnRows = (logs: readonly InspectedLogRecord[]) => logs.filter(({ eventName }) => eventName === "omo.turn_completed")
+const turnRows = (logs: readonly InspectedLogRecord[]) =>
+  logs.filter(({ eventName }) => eventName === "omo.turn_completed")
 
 describe("omo.turn span per assistant turn", () => {
-
   test("#given a turn on a model the collector pin does not list #then the span's model attributes leave as custom", async () => {
     await withTempAgentDir(async (agentDir) => {
-      // given: claude-fable-5-5 is in the client vocabulary but not in the pinned enum (required on the span)
+      // given: claude-fable-5-2 is in the client vocabulary but not in the pinned enum (required on the span)
       const collector = await otlpCollector()
       const { pi, ctx } = await openSession(agentDir, collector.factory, "main-unpinned")
-      const unpinnedCtx = { ...ctx, model: { provider: "anthropic", id: "claude-fable-5-5" } }
+      const unpinnedCtx = { ...ctx, model: { provider: "anthropic", id: "claude-fable-5-2" } }
       const end = turnEnd(0)
-      const message = { ...(end.message as Record<string, unknown>), provider: "anthropic", model: "claude-fable-5-5" }
+      const message = { ...(end.message as Record<string, unknown>), provider: "anthropic", model: "claude-fable-5-2" }
 
       // when
       await pi.dispatch("turn_start", turnStart(0), unpinnedCtx)
@@ -299,8 +324,9 @@ describe("omo.turn span per assistant turn", () => {
           "omo.turn.index": index,
         })
       }
-      expect(turnRows(logs).map(({ traceId, spanId }) => ({ traceId, spanId })))
-        .toEqual(spans.map(({ traceId, spanId }) => ({ traceId, spanId })))
+      expect(turnRows(logs).map(({ traceId, spanId }) => ({ traceId, spanId }))).toEqual(
+        spans.map(({ traceId, spanId }) => ({ traceId, spanId })),
+      )
       const feature = logs.find(({ eventName }) => eventName === "omo.feature_used")
       expect(feature).toMatchObject({ traceId: spans[1]?.traceId, spanId: spans[1]?.spanId })
       for (const name of ["omo.session_started", "omo.daily_active", "omo.session_summary"]) {
@@ -340,12 +366,16 @@ describe("omo.turn span per assistant turn", () => {
       expect(childSpan).toMatchObject({ traceId: parentSpan?.traceId, parentSpanId: parentSpan?.spanId })
       expect(childSpan?.attributes["omo.session.role"]).toBe("child")
       const rows = turnRows(logs)
-      const exactPairs = rows.flatMap((row) => spans.filter((span) => span.traceId === row.traceId && span.spanId === row.spanId))
+      const exactPairs = rows.flatMap((row) =>
+        spans.filter((span) => span.traceId === row.traceId && span.spanId === row.spanId),
+      )
       const traceOnly = rows.flatMap((row) => spans.filter((span) => span.traceId === row.traceId))
       expect(rows).toHaveLength(2)
       expect(exactPairs).toHaveLength(2)
       expect(traceOnly).toHaveLength(4)
-      expect(rows.find(({ attributes }) => attributes["session.id"] === "hashed:child-process")?.spanId).toBe(childSpan?.spanId)
+      expect(rows.find(({ attributes }) => attributes["session.id"] === "hashed:child-process")?.spanId).toBe(
+        childSpan?.spanId,
+      )
       expect(readTurnTraceparent("parent-raw")).toBeUndefined()
     })
   })
@@ -390,7 +420,9 @@ describe("omo.turn span per assistant turn", () => {
       // then
       expect(spans).toHaveLength(1)
       expect(spans[0]).toMatchObject({ traceId: "4bf92f3577b34da6a3ce929d0e0e4736", parentSpanId: "b7ad6b7169203331" })
-      expect(turnRows(logs).map(({ traceId, spanId }) => [traceId, spanId])).toEqual([[spans[0]?.traceId, spans[0]?.spanId]])
+      expect(turnRows(logs).map(({ traceId, spanId }) => [traceId, spanId])).toEqual([
+        [spans[0]?.traceId, spans[0]?.spanId],
+      ])
     })
   })
 
@@ -413,7 +445,9 @@ describe("omo.turn span per assistant turn", () => {
       const spanOf = (turnIndex: number) => spans.find(({ attributes }) => attributes["omo.turn.index"] === turnIndex)
       expect(spans).toHaveLength(2)
       expect(spanOf(3)?.spanId).not.toBe(spanOf(7)?.spanId)
-      const rows = turnRows(logs).toSorted((left, right) => Number(left.attributes["omo.turn_index"]) - Number(right.attributes["omo.turn_index"]))
+      const rows = turnRows(logs).toSorted(
+        (left, right) => Number(left.attributes["omo.turn_index"]) - Number(right.attributes["omo.turn_index"]),
+      )
       expect(rows.map(({ attributes, spanId }) => [attributes["omo.turn_index"], spanId])).toEqual([
         [3, spanOf(3)?.spanId],
         [7, spanOf(7)?.spanId],
@@ -435,7 +469,10 @@ describe("omo.turn span per assistant turn", () => {
       const { logs, spans } = await collector.drain()
 
       // then
-      expect(spans.map(({ status, attributes }) => [attributes["omo.turn.index"], status])).toEqual([[0, "error"], [1, "error"]])
+      expect(spans.map(({ status, attributes }) => [attributes["omo.turn.index"], status])).toEqual([
+        [0, "error"],
+        [1, "error"],
+      ])
       expect(turnRows(logs).map(({ traceId, spanId }) => ({ traceId, spanId }))).toEqual([
         { traceId: spans[0]?.traceId, spanId: spans[0]?.spanId },
       ])
@@ -456,7 +493,13 @@ describe("omo.turn span per assistant turn", () => {
       const { spans } = await collector.drain()
 
       // then
-      expect(spans.map(({ status, attributes }) => [attributes["omo.turn.index"], status, attributes["omo.turn.end_reason"]])).toEqual([
+      expect(
+        spans.map(({ status, attributes }) => [
+          attributes["omo.turn.index"],
+          status,
+          attributes["omo.turn.end_reason"],
+        ]),
+      ).toEqual([
         [0, "ok", undefined],
         [1, "error", "shutdown"],
       ])
@@ -487,13 +530,27 @@ describe("omo.turn span per assistant turn", () => {
     readonly finish: (session: Session) => Promise<void>
     readonly exported: readonly (readonly [number, string])[]
   }[] = [
-    { name: "turn_end", finish: async ({ pi, ctx }) => { await pi.dispatch("turn_end", turnEnd(0), ctx) }, exported: [[0, "ok"]] },
+    {
+      name: "turn_end",
+      finish: async ({ pi, ctx }) => {
+        await pi.dispatch("turn_end", turnEnd(0), ctx)
+      },
+      exported: [[0, "ok"]],
+    },
     {
       name: "agent_end abandon",
-      finish: async ({ pi, ctx }) => { await pi.dispatch("agent_end", { type: "agent_end", messages: [], aborted: true }, ctx) },
+      finish: async ({ pi, ctx }) => {
+        await pi.dispatch("agent_end", { type: "agent_end", messages: [], aborted: true }, ctx)
+      },
       exported: [[0, "error"]],
     },
-    { name: "the next turn_start", finish: async ({ pi, ctx }) => { await pi.dispatch("turn_start", turnStart(1), ctx) }, exported: [[0, "error"]] },
+    {
+      name: "the next turn_start",
+      finish: async ({ pi, ctx }) => {
+        await pi.dispatch("turn_start", turnStart(1), ctx)
+      },
+      exported: [[0, "error"]],
+    },
   ]
 
   for (const ending of spanEndings) {
@@ -529,7 +586,9 @@ describe("omo.turn span per assistant turn", () => {
         const { spans } = await collector.drain()
 
         // then
-        expect(spans.map(({ attributes, status }) => [attributes["omo.turn.index"], status])).toEqual(ending.exported.map((row) => [...row]))
+        expect(spans.map(({ attributes, status }) => [attributes["omo.turn.index"], status])).toEqual(
+          ending.exported.map((row) => [...row]),
+        )
       })
     })
   }

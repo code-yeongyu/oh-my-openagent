@@ -1,11 +1,22 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import {
   ADOPTION_MARKER,
   adoptLegacyFlatState,
   canonicalAgentDir,
+  ensureAgentDir,
   legacyFlatAgentDir,
 } from "../bin/lib/agent-dir.js"
 
@@ -26,10 +37,14 @@ function readJson(path: string): Record<string, unknown> {
   return JSON.parse(readFileSync(path, "utf8"))
 }
 
-const FLAT_SETTINGS = JSON.stringify({
-  favoriteModels: ["anthropic/claude-fable-5"],
-  retry: { fallbackChains: { "claude-fable-5": [] }, modelFallback: true },
-}, null, 2)
+const FLAT_SETTINGS = JSON.stringify(
+  {
+    favoriteModels: ["anthropic/claude-fable-5"],
+    retry: { fallbackChains: { "claude-fable-5": [] }, modelFallback: true },
+  },
+  null,
+  2,
+)
 
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
@@ -156,5 +171,35 @@ describe("omo agent directory", () => {
         expect(readJson(join(canonical, "settings.json"))).toEqual({ favoriteModels: [] })
       })
     })
+  })
+})
+
+// The engine refuses to publish its keys under a dir any group or other user can write (#13958), so the agent dir the
+// launcher creates must not take a group-writable umask; a dir the user already has is left exactly as it is.
+describe.skipIf(process.platform === "win32")("ensureAgentDir under a group-writable umask (#13958)", () => {
+  const underUmask = <T>(mask: number, body: () => T): T => {
+    const previous = process.umask(mask)
+    try {
+      return body()
+    } finally {
+      process.umask(previous)
+    }
+  }
+
+  test("#given umask 002 and no agent dir #when the launcher prepares it #then it and every dir it creates are owner-only", () => {
+    const home = createHome()
+    const agentDir = join(home, ".omo", "agent")
+    underUmask(0o002, () => ensureAgentDir(agentDir))
+    expect(statSync(agentDir).mode & 0o777).toBe(0o700)
+    expect(statSync(join(home, ".omo")).mode & 0o777).toBe(0o700)
+  })
+
+  test("#given an existing group-writable agent dir #when the launcher prepares it #then its mode is left as the user set it", () => {
+    const home = createHome()
+    const agentDir = join(home, "agent")
+    mkdirSync(agentDir)
+    chmodSync(agentDir, 0o775)
+    underUmask(0o002, () => ensureAgentDir(agentDir))
+    expect(statSync(agentDir).mode & 0o777).toBe(0o775)
   })
 })

@@ -10,10 +10,14 @@ export class BtrfsBackend implements IsolationBackend {
   readonly clonesTree = true
   constructor(private readonly io: BackendRuntime = runtime) {}
   async probe(lower: string, ctx?: IsolationContext) {
-    if (this.io.platform !== "linux" || !this.io.which("btrfs")) return { available: false, reason: "btrfs requires Linux and btrfs on PATH" }
+    if (this.io.platform !== "linux" || !this.io.which("btrfs"))
+      return { available: false, reason: "btrfs requires Linux and btrfs on PATH" }
     if (ctx?.crossDevice) return { available: false, reason: "btrfs requires the same filesystem" }
     const result = await this.io.run(["btrfs", "subvolume", "show", lower])
-    if (result.code && /not a btrfs|not a subvolume|cannot find|no such|unknown subvolume|not a directory/i.test(result.stderr)) {
+    if (
+      result.code &&
+      /not a btrfs|not a subvolume|cannot find|no such|unknown subvolume|not a directory/i.test(result.stderr)
+    ) {
       return { available: false, reason: result.stderr }
     }
     if (result.code && !/operation not permitted|permission denied|could not search b-tree/i.test(result.stderr)) {
@@ -45,13 +49,18 @@ export class BtrfsBackend implements IsolationBackend {
     if (!probe.available) throw new IsolationUnavailableError(probe.reason)
     const result = await this.io.run(["btrfs", "subvolume", "snapshot", lower, merged])
     if (result.code) {
-      if (/not a subvolume|not a btrfs|operation not permitted|permission denied|operation not supported|cross-device/i.test(result.stderr)) throw new IsolationUnavailableError(result.stderr)
+      if (
+        /not a subvolume|not a btrfs|operation not permitted|permission denied|operation not supported|cross-device/i.test(
+          result.stderr,
+        )
+      )
+        throw new IsolationUnavailableError(result.stderr)
       throw new Error(`btrfs snapshot failed: ${result.stderr}`)
     }
     await markStarted(ctx.baseDir, this.kind)
   }
   async stop(merged: string) {
-    if (!await exists(merged)) return
+    if (!(await exists(merged))) return
     await checked(this.io, ["btrfs", "subvolume", "delete", merged])
     await rm(merged, { recursive: true, force: true })
   }

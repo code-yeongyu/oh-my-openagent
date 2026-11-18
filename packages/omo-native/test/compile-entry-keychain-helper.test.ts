@@ -19,6 +19,6 @@ describe("compiled binary: the keychain helper beside it serves every command (#
     }
     expect(keychainProcessState().entryCandidates[0]).toBe(compiledKeychainHelper(execDir))
     // RULING-74, desktop#5057: omo-keychain directly beside the runtime binary.
-    expect(compiledKeychainHelper("/opt/omo")).toBe("/opt/omo/omo-keychain")
+    expect(compiledKeychainHelper(join("/opt", "omo"))).toBe(join("/opt", "omo", "omo-keychain"))
   })
 })

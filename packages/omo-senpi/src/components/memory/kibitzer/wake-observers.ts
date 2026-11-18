@@ -7,30 +7,30 @@ import type { KibitzerWakeOutcome, KibitzerWakeStatus } from "./sidecar-outcome"
  */
 export type KibitzerTelemetrySignal =
   | {
-    readonly kind: "wake"
-    readonly sessionId: string
-    readonly wake: number
-    readonly generation: number
-    readonly status: KibitzerWakeStatus
-    readonly nudges: number
-    readonly candidateCount: number
-    readonly toolCalls: number
-    readonly durationMs: number
-    readonly slotWaitMs: number
-    readonly model?: string
-    readonly usage?: {
-      readonly input: number
-      readonly output: number
-      readonly cacheRead: number
-      readonly cacheWrite: number
+      readonly kind: "wake"
+      readonly sessionId: string
+      readonly wake: number
+      readonly generation: number
+      readonly status: KibitzerWakeStatus
+      readonly nudges: number
+      readonly candidateCount: number
+      readonly toolCalls: number
+      readonly durationMs: number
+      readonly slotWaitMs: number
+      readonly model?: string
+      readonly usage?: {
+        readonly input: number
+        readonly output: number
+        readonly cacheRead: number
+        readonly cacheWrite: number
+      }
     }
-  }
   | {
-    readonly kind: "offer"
-    readonly sessionId: string
-    readonly action: KibitzerOfferResult["action"]
-    readonly reason?: KibitzerBufferedReason
-  }
+      readonly kind: "offer"
+      readonly sessionId: string
+      readonly action: KibitzerOfferResult["action"]
+      readonly reason?: KibitzerBufferedReason
+    }
 
 export type KibitzerTelemetryObserver = (signal: KibitzerTelemetrySignal) => void
 
@@ -44,7 +44,9 @@ export interface KibitzerTelemetryObservers {
 // leave the memory component notifying one evaluation's set while telemetry subscribed to another.
 export const KIBITZER_TELEMETRY_OBSERVERS_KEY = Symbol.for("omo.kibitzer.telemetryObservers")
 
-export function createKibitzerTelemetryObservers(onObserverError?: (error: unknown) => void): KibitzerTelemetryObservers {
+export function createKibitzerTelemetryObservers(
+  onObserverError?: (error: unknown) => void,
+): KibitzerTelemetryObservers {
   const observers = new Set<KibitzerTelemetryObserver>()
   return {
     subscribe: (observer) => {

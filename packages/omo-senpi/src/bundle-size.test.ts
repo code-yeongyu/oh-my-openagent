@@ -170,6 +170,16 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // bun 1.4.3, byte-identical). Ceiling = that measurement rounded up to the next 5,000 bytes (never below what is measured).
 // Batch #18 measured omo.js at 1,422,712 B with the telemetry lazy chunk; revisit this budget when a trim lands.
 // Batch #19 measured omo.js at 1,426,658 B (11 cars); budget = measured + 4 KiB (lead rule). Revisit when a trim lands.
+// Raised 1,476,000 -> 1,478,000 for the #13037 wake train (#13458): a fresh build at the W1 head 6dfefeea6c measures
+// 1,547,852 B (the committed artifact predates the train); splitting the session wake into the lazy
+// #omo-wake-runtime sidecar brings it to 1,476,860 B, so the ceiling covers the measured need with a
+// 1,140-byte margin instead of failing it by 860 bytes.
+// Train omo-5173 (#13627, 22 members) on dev 71cc3ecf70 (1,481,163 B): the train-top regen measures 1,485,337 B (+4,174);
+// budget = measured + 4 KiB (lead rule) = 1,489,433.
+// Remerged on dev 050c1879cb (dev ceiling 1,493,600): the regenerated train-top omo.js measures 1,497,747 B;
+// budget = measured + 4 KiB (lead rule) = 1,501,843.
+// Train omotrain2-20261118 (#14141, 10 thread cars) on dev e79f804ce0 (1,506,330 B): the train-top regen measures
+// 1,515,915 B (+9,585; linux/amd64, node 24.22 + bun 1.4.4); budget = measured + 4 KiB (lead rule) = 1,520,011.
 const BUDGET_BYTES = bundleBudget.omoJsBytes
 
 describe("omo-senpi bundle size budget", () => {
@@ -190,6 +200,8 @@ describe("omo-senpi bundle size budget has one source", () => {
     expect(mainCap, "build-extension.test.mjs must cap the main entry").not.toBeNull()
     expect(mainCap?.[1]).toBe("bundleBudget.omoJsBytes")
     expect(buildTest).toContain('from "../../bundle-budget.json"')
-    expect(readFileSync(join(packageRoot, "src", "bundle-size.test.ts"), "utf8")).toContain('from "../bundle-budget.json"')
+    expect(readFileSync(join(packageRoot, "src", "bundle-size.test.ts"), "utf8")).toContain(
+      'from "../bundle-budget.json"',
+    )
   })
 })

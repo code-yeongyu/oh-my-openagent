@@ -8,6 +8,10 @@
 		".": {
 			"types": "./src/index.ts",
 			"import": "./src/index.ts"
+		},
+		"./testing": {
+			"types": "./test/testing.ts",
+			"import": "./test/testing.ts"
 		}
 	},
 	"types": "./src/index.ts",
@@ -17,7 +21,9 @@
 	},
 	"dependencies": {
 		"@oh-my-opencode/senpi-desktop-engine": "workspace:*",
-		"@oh-my-opencode/senpi-desktop-protocol": "workspace:*"
+		"@oh-my-opencode/senpi-desktop-protocol": "workspace:*",
+		"@oh-my-opencode/senpi-desktop-sdk": "workspace:*",
+		"quickjs-wasi": "3.6.2"
 	},
 	"devDependencies": {
 		"@types/node": "26.6.2",

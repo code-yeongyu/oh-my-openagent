@@ -80,49 +80,53 @@ export async function processWithCli(
     runCommentChecker?: typeof runCommentChecker
   } = {},
 ): Promise<void> {
-  await withCommentCheckerLock(async () => {
-    void input
-    debugLog("using CLI mode with path:", cliPath)
+  await withCommentCheckerLock(
+    async () => {
+      void input
+      debugLog("using CLI mode with path:", cliPath)
 
-    const hookInput: HookInput = {
-      session_id: pendingCall.sessionID,
-      tool_name: pendingCall.tool.charAt(0).toUpperCase() + pendingCall.tool.slice(1),
-      transcript_path: "",
-      cwd: process.cwd(),
-      hook_event_name: "PostToolUse",
-      tool_input: {
-        file_path: pendingCall.filePath,
-        content: pendingCall.content,
-        old_string: pendingCall.oldString,
-        new_string: pendingCall.newString,
-        edits: pendingCall.edits,
-      },
-    }
+      const hookInput: HookInput = {
+        session_id: pendingCall.sessionID,
+        tool_name: pendingCall.tool.charAt(0).toUpperCase() + pendingCall.tool.slice(1),
+        transcript_path: "",
+        cwd: process.cwd(),
+        hook_event_name: "PostToolUse",
+        tool_input: {
+          file_path: pendingCall.filePath,
+          content: pendingCall.content,
+          old_string: pendingCall.oldString,
+          new_string: pendingCall.newString,
+          edits: pendingCall.edits,
+        },
+      }
 
-    // --- Fix #4292 Issue 1: skip if comment was already in oldString ---
-    if (!hasNewCommentsOnly(pendingCall.oldString, pendingCall.newString)) {
-      debugLog("skipping: no net-new comments in edit (oldString/newString)")
-      return
-    }
+      // --- Fix #4292 Issue 1: skip if comment was already in oldString ---
+      if (!hasNewCommentsOnly(pendingCall.oldString, pendingCall.newString)) {
+        debugLog("skipping: no net-new comments in edit (oldString/newString)")
+        return
+      }
 
-    // --- Fix #4292 Issue 2: deduplicate per-session (at most once per 30s) ---
-    const lastWarned = sessionLastWarning.get(pendingCall.sessionID) ?? 0
-    const now = Date.now()
-    if (now - lastWarned < DEDUP_WINDOW_MS) {
-      debugLog("dedup: skipping comment warning within dedup window for session", pendingCall.sessionID)
-      return
-    }
-    sessionLastWarning.set(pendingCall.sessionID, now)
+      // --- Fix #4292 Issue 2: deduplicate per-session (at most once per 30s) ---
+      const lastWarned = sessionLastWarning.get(pendingCall.sessionID) ?? 0
+      const now = Date.now()
+      if (now - lastWarned < DEDUP_WINDOW_MS) {
+        debugLog("dedup: skipping comment warning within dedup window for session", pendingCall.sessionID)
+        return
+      }
+      sessionLastWarning.set(pendingCall.sessionID, now)
 
-    const result = await (deps.runCommentChecker ?? runCommentChecker)(hookInput, cliPath, customPrompt)
+      const result = await (deps.runCommentChecker ?? runCommentChecker)(hookInput, cliPath, customPrompt)
 
-    if (result.hasComments && result.message) {
-      debugLog("CLI detected comments, appending message")
-      output.output += `\n\n${result.message}`
-    } else {
-      debugLog("CLI: no comments detected")
-    }
-  }, undefined, debugLog)
+      if (result.hasComments && result.message) {
+        debugLog("CLI detected comments, appending message")
+        output.output += `\n\n${result.message}`
+      } else {
+        debugLog("CLI: no comments detected")
+      }
+    },
+    undefined,
+    debugLog,
+  )
 }
 
 export interface ApplyPatchEdit {
@@ -142,27 +146,31 @@ export async function processApplyPatchEditsWithCli(
   debugLog("processing apply_patch edits:", edits.length)
 
   for (const edit of edits) {
-    await withCommentCheckerLock(async () => {
-      const hookInput: HookInput = {
-        session_id: sessionID,
-        tool_name: "Edit",
-        transcript_path: "",
-        cwd: process.cwd(),
-        hook_event_name: "PostToolUse",
-        tool_input: {
-          file_path: edit.filePath,
-          old_string: edit.before,
-          new_string: edit.after,
-        },
-      }
+    await withCommentCheckerLock(
+      async () => {
+        const hookInput: HookInput = {
+          session_id: sessionID,
+          tool_name: "Edit",
+          transcript_path: "",
+          cwd: process.cwd(),
+          hook_event_name: "PostToolUse",
+          tool_input: {
+            file_path: edit.filePath,
+            old_string: edit.before,
+            new_string: edit.after,
+          },
+        }
 
-      const result = await runCommentChecker(hookInput, cliPath, customPrompt)
+        const result = await runCommentChecker(hookInput, cliPath, customPrompt)
 
-      if (result.hasComments && result.message) {
-        debugLog("CLI detected comments for apply_patch file:", edit.filePath)
-        output.output += `\n\n${result.message}`
-      }
-    }, undefined, debugLog)
+        if (result.hasComments && result.message) {
+          debugLog("CLI detected comments for apply_patch file:", edit.filePath)
+          output.output += `\n\n${result.message}`
+        }
+      },
+      undefined,
+      debugLog,
+    )
   }
 }
 

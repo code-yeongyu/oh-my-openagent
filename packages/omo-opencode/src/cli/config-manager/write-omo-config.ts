@@ -10,7 +10,7 @@ import { formatErrorWithSuggestion } from "./format-error-with-suggestion"
 import { generateOmoConfig } from "./generate-omo-config"
 
 function record(value: unknown): Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {}
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
 }
 
 function existingOpenCodeConfig(path: string): Record<string, unknown> {

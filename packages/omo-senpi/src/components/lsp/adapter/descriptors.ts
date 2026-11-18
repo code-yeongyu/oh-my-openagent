@@ -13,8 +13,18 @@ import type {
 import type { ApplyResult } from "@oh-my-opencode/lsp-core/lsp/workspace-edit-types"
 
 import { renderDiagnosticsCall, renderDiagnosticsResult } from "./renderers-diagnostics.js"
-import { renderFindReferencesCall, renderFindReferencesResult, renderGotoDefinitionCall, renderGotoDefinitionResult } from "./renderers-navigation.js"
-import { renderPrepareRenameCall, renderPrepareRenameResult, renderRenameCall, renderRenameResult } from "./renderers-rename.js"
+import {
+  renderFindReferencesCall,
+  renderFindReferencesResult,
+  renderGotoDefinitionCall,
+  renderGotoDefinitionResult,
+} from "./renderers-navigation.js"
+import {
+  renderPrepareRenameCall,
+  renderPrepareRenameResult,
+  renderRenameCall,
+  renderRenameResult,
+} from "./renderers-rename.js"
 import { renderSymbolsCall, renderSymbolsResult } from "./renderers-symbols.js"
 import { defineTool, Type } from "./schema.js"
 
@@ -128,7 +138,9 @@ const SymbolsParams = Type.Object({
     description: "'document' for file symbols, 'workspace' for project-wide search",
   }),
   query: Type.Optional(Type.String({ description: "Symbol name to search (required for workspace scope)" })),
-  limit: Type.Optional(Type.Number({ description: "Max results (default and maximum: 200; larger values are clamped to 200)" })),
+  limit: Type.Optional(
+    Type.Number({ description: "Max results (default and maximum: 200; larger values are clamped to 200)" }),
+  ),
 })
 
 export const lsp_diagnostics = defineTool({
@@ -157,7 +169,8 @@ export const lsp_goto_definition = defineTool({
 export const lsp_find_references = defineTool({
   name: "lsp_find_references",
   label: "LSP Find References",
-  description: "Find usages/references of a symbol across the workspace. Output lists at most the first 200; when there are more, the first line reports the total.",
+  description:
+    "Find usages/references of a symbol across the workspace. Output lists at most the first 200; when there are more, the first line reports the total.",
   parameters: ReferencesParams,
   renderCall: renderFindReferencesCall,
   renderResult: renderFindReferencesResult,

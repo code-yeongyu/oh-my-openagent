@@ -48,7 +48,11 @@ export function agreementItemsOf(content: string | undefined): readonly Agreemen
   return content === undefined ? [] : parseAgreementsLedger(parseMemoryFile(content).body).items
 }
 
-export function renderAgreementsFile(existing: string | undefined, items: readonly AgreementItem[], receipts?: readonly string[]): string {
+export function renderAgreementsFile(
+  existing: string | undefined,
+  items: readonly AgreementItem[],
+  receipts?: readonly string[],
+): string {
   const parsed = existing === undefined ? undefined : parseMemoryFile(existing)
   const ledger = parsed === undefined ? undefined : parseAgreementsLedger(parsed.body)
   // The first journal snapshots pre-upgrade dates; later ack/drop must not seed modern dates.
@@ -58,7 +62,10 @@ export function renderAgreementsFile(existing: string | undefined, items: readon
   const body = serialized.length === 0 ? "" : `${serialized}\n`
   // Neither ledger writer (/agreements, the facts lane) is the memory tool, so the header follows the rule the hooks
   // enforce on every other writer: a user-record header is lowered to "mixed" and a legacy one is dropped.
-  const frontmatter = parsed === undefined ? { description: AGREEMENTS_DESCRIPTION } : stampReceipt(parsed, parsed.frontmatter, body, undefined)
+  const frontmatter =
+    parsed === undefined
+      ? { description: AGREEMENTS_DESCRIPTION }
+      : stampReceipt(parsed, parsed.frontmatter, body, undefined)
   return renderMemoryFile(frontmatter, body)
 }
 

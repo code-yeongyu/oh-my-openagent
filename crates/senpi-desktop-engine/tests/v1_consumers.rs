@@ -7,6 +7,10 @@
 //!   the `--serve` daemon the first request auto-starts with no session flags;
 //! - `mcp`: the `--mcp` stdio server over the same kind of daemon.
 //!
+//! A `oneshot` step may instead carry a `control` the user or a supervisor
+//! performs: `start-daemon` (a `--serve` daemon the test owns),
+//! `restart-daemon` (SIGKILL it and serve again) or `resume` (`--resume`).
+//!
 //! The corpus freezes today's replies before any v2 behavior change: each
 //! step's messages must deep-equal the expected ones modulo the declared
 //! `variable` JSON pointers (present, any value), in any order within the step,
@@ -21,7 +25,9 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::mpsc;
 use std::thread;
+use std::time::{Duration, Instant};
 
+use common::scenario::Scenario;
 use common::{fake_backend, Engine, BINARY, HANG_GUARD};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -56,8 +62,21 @@ struct Case {
 
 #[derive(Deserialize)]
 struct Step {
+    #[serde(default)]
+    control: Option<Control>,
+    #[serde(default)]
     send: Value,
+    #[serde(default)]
     expect: Vec<Expected>,
+}
+
+/// An out-of-band step: what a user or supervisor does between requests.
+#[derive(Deserialize, Clone, Copy, Debug)]
+#[serde(rename_all = "kebab-case")]
+enum Control {
+    StartDaemon,
+    RestartDaemon,
+    Resume,
 }
 
 #[derive(Deserialize)]
@@ -150,7 +169,8 @@ struct DaemonDir(PathBuf);
 impl DaemonDir {
     fn new(index: usize) -> Self {
         let dir = std::env::temp_dir().join(format!("senpi-v1c-{}-{index}", std::process::id()));
-        std::fs::create_dir_all(&dir).expect("temp dir");
+        let _ = std::fs::remove_dir_all(&dir);
+        private_dir(&dir);
         Self(dir)
     }
 
@@ -160,6 +180,58 @@ impl DaemonDir {
             .to_str()
             .expect("utf-8 path")
             .to_owned()
+    }
+}
+
+/// The daemon refuses an endpoint directory group or other can enter (#12229).
+#[cfg(unix)]
+fn private_dir(dir: &std::path::Path) {
+    use std::os::unix::fs::DirBuilderExt;
+    std::fs::DirBuilder::new().mode(0o700).create(dir).expect("private temp dir");
+}
+
+#[cfg(not(unix))]
+fn private_dir(dir: &std::path::Path) {
+    std::fs::create_dir_all(dir).expect("temp dir");
+}
+
+/// A `--serve` daemon the test owns, so a step can kill and restart it.
+struct ServeDaemon(Child);
+
+impl ServeDaemon {
+    fn start(env: &[(String, String)], socket: &str) -> Result<Self, String> {
+        let mut child = engine_command(
+            env,
+            &["--enable-daemon", "--serve", socket, "--idle-ms", "60000"],
+        )
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| format!("--serve spawns: {error}"))?;
+        let stderr = child.stderr.take().expect("stderr is piped");
+        let (sender, ready) = mpsc::channel();
+        thread::spawn(move || {
+            let mut announced = false;
+            for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+                if !announced && line.contains("serving on") {
+                    announced = true;
+                    let _ = sender.send(());
+                }
+            }
+        });
+        let daemon = Self(child);
+        ready
+            .recv_timeout(HANG_GUARD)
+            .map_err(|_| "--serve did not announce `serving on` within the hang guard".to_owned())?;
+        Ok(daemon)
+    }
+}
+
+impl Drop for ServeDaemon {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
     }
 }
 
@@ -223,6 +295,7 @@ enum Driver {
     Stdio(Engine),
     Oneshot {
         env: Vec<(String, String)>,
+        daemon: Option<ServeDaemon>,
         dir: DaemonDir,
     },
     Mcp {
@@ -243,6 +316,7 @@ impl Driver {
             }
             Transport::Oneshot => Self::Oneshot {
                 env,
+                daemon: None,
                 dir: DaemonDir::new(index),
             },
             Transport::Mcp => {
@@ -273,12 +347,39 @@ impl Driver {
                 engine.send(message);
                 (0..expected).map(|_| engine.next()).collect()
             }
-            Self::Oneshot { env, dir } => oneshot(env, &dir.socket(), message),
+            Self::Oneshot { env, dir, .. } => oneshot(env, &dir.socket(), message),
             Self::Mcp { child, .. } => {
                 child.send(message);
                 (0..expected).map(|_| child.next()).collect()
             }
         }
+    }
+
+    fn control(&mut self, control: Control) -> Result<(), String> {
+        let Self::Oneshot { env, daemon, dir } = self else {
+            return Err(format!("{control:?} needs the oneshot transport"));
+        };
+        let socket = dir.socket();
+        match control {
+            Control::StartDaemon => *daemon = Some(ServeDaemon::start(env, &socket)?),
+            Control::RestartDaemon => {
+                // SIGKILL: no exit cleanup runs, the socket and token file stay behind.
+                drop(daemon.take().ok_or("restart-daemon before start-daemon")?);
+                *daemon = Some(ServeDaemon::start(env, &socket)?);
+            }
+            Control::Resume => {
+                let output = engine_command(
+                    env,
+                    &["--enable-daemon", "--resume", "--endpoint", &socket],
+                )
+                .output()
+                .map_err(|error| format!("--resume runs: {error}"))?;
+                if !output.status.success() {
+                    return Err(format!("--resume failed: {output:?}"));
+                }
+            }
+        }
+        Ok(())
     }
 
     fn finish(self) -> Vec<Value> {
@@ -304,6 +405,12 @@ fn replay(index: usize, name: &str, case: &Case) -> Result<(), String> {
     );
     let mut driver = Driver::start(index, case.transport, env);
     for (index, step) in case.steps.iter().enumerate() {
+        if let Some(control) = step.control {
+            driver
+                .control(control)
+                .map_err(|error| format!("{name}: steps/{index}: {error}"))?;
+            continue;
+        }
         let mut actual = driver.exchange(&step.send, step.expect.len());
         for (slot, expected) in step.expect.iter().enumerate() {
             let Some(found) = actual.iter().position(|message| matches(expected, message)) else {
@@ -404,4 +511,188 @@ fn every_v1_consumer_case_replays_against_the_engine_binary() {
         .collect();
     // Then
     assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// The directory two fake engines share their machine-wide interaction lock
+/// in (`SENPI_DESKTOP_FAKE_RUNTIME_DIR`); removed on drop.
+struct LockDir(PathBuf);
+
+impl LockDir {
+    fn new() -> Self {
+        let dir = std::env::temp_dir().join(format!("senpi-v1c-lock-{}-{}", std::process::id(), ulid::Ulid::generate()));
+        std::fs::create_dir_all(&dir).expect("lock dir");
+        Self(dir)
+    }
+
+    /// Whether some process holds the lock file the engines created.
+    fn held(&self) -> bool {
+        let Ok(entries) = std::fs::read_dir(self.0.join("senpi-desktop")) else {
+            return false;
+        };
+        entries
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .filter(|path| path.extension().is_some_and(|extension| extension == "lock"))
+            .any(|path| {
+                std::fs::OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .open(path)
+                    .is_ok_and(|file| matches!(file.try_lock(), Err(std::fs::TryLockError::WouldBlock)))
+            })
+    }
+}
+
+impl Drop for LockDir {
+    fn drop(&mut self) {
+        // A leftover dir in the temp dir is harmless; the next run uses a new name.
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+/// A v1 (null-mode) engine over `scenario` whose input takes the lock in `dir`,
+/// opened with no options and a live stop path, with window 101 captured.
+fn null_mode_engine(scenario: &Scenario, dir: &LockDir) -> Engine {
+    let mut engine = Engine::spawn(&[
+        scenario.backend(),
+        ("SENPI_DESKTOP_FAKE_STOP_PATH", "live".to_owned()),
+        ("SENPI_DESKTOP_FAKE_RUNTIME_DIR", dir.0.to_str().expect("utf-8 path").to_owned()),
+    ]);
+    engine.invoke("session.open", json!({}));
+    engine.invoke("stopPath.start", json!({"chord": common::scenario::CHORD}));
+    engine.invoke("capture", json!({"target": "101", "caps": {"maxWidth": 64}}));
+    engine
+}
+
+fn click(engine: &mut Engine) -> Value {
+    engine.invoke("click", json!({"target": "101", "x": 10, "y": 10}))
+}
+
+/// How long the fake's click takes; the second engine's click can only start
+/// once the first one's dispatch released the lock.
+const CLICK_MS: u64 = 600;
+
+#[test]
+fn two_null_mode_engines_serialize_their_clicks_and_both_succeed() {
+    // Given
+    let scenario = Scenario::two_displays_with(&json!({"delay_ms": {"click": CLICK_MS}}));
+    let dir = LockDir::new();
+    let mut engines = [null_mode_engine(&scenario, &dir), null_mode_engine(&scenario, &dir)];
+    // When: both click at once
+    let replied: Vec<(Value, Instant)> = thread::scope(|scope| {
+        let clicks: Vec<_> = engines
+            .iter_mut()
+            .map(|engine| scope.spawn(move || (click(engine), Instant::now())))
+            .collect();
+        clicks.into_iter().map(|click| click.join().expect("click thread")).collect()
+    });
+    // Then: both succeed with v1's null result, and the replies land at least
+    // half a click apart. This bounds, but does not prove, non-overlap across
+    // processes; the sink ordering inside the lock is pinned in-process by
+    // `senpi-desktop-session` `mutate::lock_tests`.
+    for (reply, _) in &replied {
+        assert_eq!(reply["result"], Value::Null, "{reply}");
+        assert!(reply.get("error").is_none(), "{reply}");
+    }
+    let gap = replied[0].1.max(replied[1].1) - replied[0].1.min(replied[1].1);
+    assert!(gap >= Duration::from_millis(CLICK_MS / 2), "the clicks overlapped: replies {gap:?} apart");
+    for engine in engines {
+        engine.drain();
+    }
+}
+
+#[test]
+fn a_second_engine_is_refused_input_busy_while_the_first_holds_the_lock_then_proceeds() {
+    // Given: the first engine's click holds the lock past the wait budget
+    let scenario = Scenario::two_displays_with(&json!({"delay_ms": {"click": 4000}}));
+    let dir = LockDir::new();
+    let mut first = null_mode_engine(&scenario, &dir);
+    let mut second = null_mode_engine(&Scenario::two_displays_with(&json!({})), &dir);
+    first.request(77, "click", json!({"target": "101", "x": 10, "y": 10}));
+    let deadline = Instant::now() + HANG_GUARD;
+    while !dir.held() {
+        assert!(Instant::now() < deadline, "the first engine never took the lock");
+        thread::yield_now();
+    }
+    // When
+    let busy = click(&mut second);
+    // Then: refused within the budget, nothing sent
+    assert_eq!(busy["error"]["data"]["code"], json!("InputBusy"), "{busy}");
+    // When: the first engine is done
+    let done = loop {
+        let message = first.next();
+        if message.get("id") == Some(&json!(77)) {
+            break message;
+        }
+    };
+    assert_eq!(done["result"], Value::Null, "{done}");
+    let retried = click(&mut second);
+    // Then
+    assert_eq!(retried["result"], Value::Null, "{retried}");
+    first.drain();
+    second.drain();
+}
+
+/// A 900 KiB text, under the engine's 1 MiB request line cap with its envelope.
+const UNDER_CAP_BYTES: usize = 900 * 1024;
+const OVER_CAP_BYTES: usize = 2 * 1024 * 1024;
+
+#[test]
+fn a_null_mode_session_takes_a_900_kib_request_and_refuses_a_2_mib_one_and_stays_usable() {
+    // Given
+    let dir = LockDir::new();
+    let mut engine = null_mode_engine(&Scenario::two_displays_with(&json!({})), &dir);
+    let under = "a".repeat(UNDER_CAP_BYTES);
+    // When
+    let written = engine.invoke("clipboard.write", json!({"text": under}));
+    // Then: today's v1 reply
+    assert_eq!(written["result"], Value::Null, "{}", written["error"]);
+    // When: a request line over the cap
+    engine.request(7, "clipboard.write", json!({"text": "b".repeat(OVER_CAP_BYTES)}));
+    let refused = loop {
+        let message = engine.next();
+        if message.get("id").is_some() {
+            break message;
+        }
+    };
+    // Then: a structured error under the request's own id; the request never ran
+    assert_eq!(refused["id"], json!(7), "{refused}");
+    assert_eq!(refused["error"]["data"]["code"], json!("Internal"), "{refused}");
+    assert_eq!(refused["error"]["data"]["reason"], json!("request_too_large"), "{refused}");
+    let read = engine.invoke("clipboard.read", json!({}));
+    assert_eq!(read["result"]["text"].as_str().map(str::len), Some(UNDER_CAP_BYTES));
+    engine.drain();
+}
+
+#[test]
+fn an_oversized_request_whose_id_follows_its_params_is_still_answered_under_that_id() {
+    // Given
+    let dir = LockDir::new();
+    let mut engine = null_mode_engine(&Scenario::two_displays_with(&json!({})), &dir);
+    let text = "c".repeat(OVER_CAP_BYTES);
+    // When: the id is the last member, past the cap
+    engine.send_raw(format!(r#"{{"jsonrpc":"2.0","method":"clipboard.write","params":{{"text":"{text}"}},"id":"late"}}"#).as_bytes());
+    engine.send_raw(b"\n");
+    let refused = engine.next();
+    // Then
+    assert_eq!(refused["id"], json!("late"), "{refused}");
+    assert_eq!(refused["error"]["data"]["reason"], json!("request_too_large"), "{refused}");
+    engine.drain();
+}
+
+#[test]
+fn an_oversized_line_without_a_readable_id_is_refused_and_the_connection_closes() {
+    // Given
+    let dir = LockDir::new();
+    let mut engine = null_mode_engine(&Scenario::two_displays_with(&json!({})), &dir);
+    // When: an object cut short, so no id can be read from it
+    let text = "d".repeat(OVER_CAP_BYTES);
+    engine.send_raw(format!(r#"{{"jsonrpc":"2.0","method":"clipboard.write","params":{{"text":"{text}"#).as_bytes());
+    engine.send_raw(b"\n");
+    // Then: one typed refusal, then the engine closes its output with stdin still open
+    let written = engine.until_closed();
+    let refusals: Vec<&Value> = written.iter().filter(|message| message.get("id").is_some()).collect();
+    assert_eq!(refusals.len(), 1, "{written:?}");
+    assert_eq!(refusals[0]["id"], Value::Null, "{written:?}");
+    assert_eq!(refusals[0]["error"]["data"]["reason"], json!("request_too_large"), "{written:?}");
 }

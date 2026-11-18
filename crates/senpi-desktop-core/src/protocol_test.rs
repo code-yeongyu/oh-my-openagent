@@ -247,7 +247,10 @@ fn protocol_doc() -> String {
          is the standard `-32601 Method not found` with `data: {reason: \"unknown\" | \"hostOnly\" | \
          \"testOnly\"}`. Malformed input uses the standard `-32700`, `-32600`, and `-32602`. \
          `CaptureUnavailable` also carries `data: {captureUnavailable: {reason}}`; B9 defines the \
-         reason `\"minimized\"` for a window that exists but is minimized. In a session opened with \
+         reason `\"minimized\"` for a window that exists but is minimized; P8 adds `\"off-space\"` for a \
+         window on another Space that no route can read (switch to its Space, or read it through \
+         accessibility) and `\"off-screen\"` for an off-screen window that drew nothing and is not placed \
+         on another Space. In a session opened with \
          `reportMode: \"object\"`, every error of a mutating request also carries `data.disposition` \
          (and, when they apply, `reason`, `delivered`, `focusRestoration`), and its result is an \
          `ActionReport` instead of `null`; `engine.hello` lists `action-report` in `features` when the \

@@ -19,12 +19,8 @@ function detectLocale(): SupportedLocale {
 }
 
 export function initI18n(opts?: { locale?: string; fallback?: string }): void {
-  currentLang = opts?.locale && isSupportedLocale(opts.locale)
-    ? opts.locale
-    : detectLocale()
-  fallbackLang = opts?.fallback && isSupportedLocale(opts.fallback)
-    ? opts.fallback
-    : "en"
+  currentLang = opts?.locale && isSupportedLocale(opts.locale) ? opts.locale : detectLocale()
+  fallbackLang = opts?.fallback && isSupportedLocale(opts.fallback) ? opts.fallback : "en"
   if (!isSupportedLocale(currentLang)) currentLang = "en"
 }
 

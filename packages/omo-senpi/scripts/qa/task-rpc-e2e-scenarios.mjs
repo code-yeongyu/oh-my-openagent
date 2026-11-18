@@ -26,32 +26,66 @@ const TASKS_DIR_PLACEHOLDER = "<tasks-dir>"
 
 /** Binds the scenario's await_task steps to this run's task store. */
 export function bindTasksDir(steps, stateDir) {
-  return steps.map((step) => step.type === "await_task" ? { ...step, tasksDir: join(stateDir, "tasks") } : step)
+  return steps.map((step) => (step.type === "await_task" ? { ...step, tasksDir: join(stateDir, "tasks") } : step))
 }
 
 export const SCENARIO_A_STEPS = [
-  { type: "tool_call", name: "task", arguments: { category: "proc", run_in_background: true, name: "p1", prompt: "Do the rpc child work and stop." } },
+  {
+    type: "tool_call",
+    name: "task",
+    arguments: { category: "proc", run_in_background: true, name: "p1", prompt: "Do the rpc child work and stop." },
+  },
   { type: "tool_call", name: "task_send", arguments: { to: "p1", message: "steer: keep going" } },
   { type: "tool_call", name: "task_output", arguments: { name: "p1", mode: "status" } },
   { type: "tool_call", name: "task_output", arguments: { name: "p1", mode: "status" } },
   // The background start returns before the host admits the child (#10042), so the parent waits for
   // the child's terminal record instead of ending its turn first; the completion check then proves the
   // completion lands while the parent is alive, not that the child happened to beat the parent's steps.
-  { type: "await_task", name: "p1", tasksDir: TASKS_DIR_PLACEHOLDER, timeoutMs: 60_000, text: "rpc-process scenario A complete" },
+  {
+    type: "await_task",
+    name: "p1",
+    tasksDir: TASKS_DIR_PLACEHOLDER,
+    timeoutMs: 60_000,
+    text: "rpc-process scenario A complete",
+  },
 ]
 
 export const hangingChildSteps = (name) => [
-  { type: "tool_call", name: "task", arguments: { category: "proc", run_in_background: true, name, prompt: "hang until signalled" } },
+  {
+    type: "tool_call",
+    name: "task",
+    arguments: { category: "proc", run_in_background: true, name, prompt: "hang until signalled" },
+  },
   { type: "tool_call", name: "task_output", arguments: { name, mode: "status" } },
   { type: "hang" },
 ]
 
 function childArgv(sessionDir, prompt) {
-  return ["-e", mockProviderEntry, "-p", "--mode", "json", "--provider", "omo-mock", "--model", "mock-1", "--session-dir", sessionDir, prompt]
+  return [
+    "-e",
+    mockProviderEntry,
+    "-p",
+    "--mode",
+    "json",
+    "--provider",
+    "omo-mock",
+    "--model",
+    "mock-1",
+    "--session-dir",
+    sessionDir,
+    prompt,
+  ]
 }
 
 function childEnv(sandbox, sessionDir, senpiBin) {
-  return { ...isolatedChildEnv(process.env, sandbox.agentDir), SENPI_BIN: senpiBin, SENPI_CODING_AGENT_DIR: sandbox.agentDir, XDG_CONFIG_HOME: sandbox.xdgConfigHome, SENPI_CODING_AGENT_SESSION_DIR: sessionDir, OMO_SENPI_QA: "1" }
+  return {
+    ...isolatedChildEnv(process.env, sandbox.agentDir),
+    SENPI_BIN: senpiBin,
+    SENPI_CODING_AGENT_DIR: sandbox.agentDir,
+    XDG_CONFIG_HOME: sandbox.xdgConfigHome,
+    SENPI_CODING_AGENT_SESSION_DIR: sessionDir,
+    OMO_SENPI_QA: "1",
+  }
 }
 
 function writeScript(sandbox, parentSteps, childSteps) {
@@ -88,7 +122,14 @@ export function prepareScenarioSandbox(projectConfig = PROJECT_OMO_CONFIG) {
   return { sandbox, sessionDir, stateDir }
 }
 
-export async function driveSenpi(senpiBin, sandbox, sessionDir, parentSteps, childSteps = CHILD_STEPS_COMPLETE, prompt = "run the rpc-process task e2e") {
+export async function driveSenpi(
+  senpiBin,
+  sandbox,
+  sessionDir,
+  parentSteps,
+  childSteps = CHILD_STEPS_COMPLETE,
+  prompt = "run the rpc-process task e2e",
+) {
   writeScript(sandbox, parentSteps, childSteps)
   const child = spawn(senpiBin, childArgv(sessionDir, prompt), {
     cwd: sandbox.cwd,
@@ -101,8 +142,12 @@ export async function driveSenpi(senpiBin, sandbox, sessionDir, parentSteps, chi
   let stderr = ""
   child.stdout?.setEncoding("utf8")
   child.stderr?.setEncoding("utf8")
-  child.stdout?.on("data", (chunk) => { stdout += chunk })
-  child.stderr?.on("data", (chunk) => { stderr += chunk })
+  child.stdout?.on("data", (chunk) => {
+    stdout += chunk
+  })
+  child.stderr?.on("data", (chunk) => {
+    stderr += chunk
+  })
   const [status, signal] = await new Promise((resolve) => {
     child.once("close", (code, closeSignal) => resolve([code, closeSignal]))
     child.once("error", () => resolve([null, null]))
@@ -148,11 +193,19 @@ export async function cleanupSenpiHost(child) {
 }
 
 /** The external-kill check proves a different, honest outcome per platform (#9471). */
-export const KILL_CHECK = process.platform === "win32" ? "external_termination_reports_unexpected_exit" : "kill_marks_error_killed_true"
+export const KILL_CHECK =
+  process.platform === "win32" ? "external_termination_reports_unexpected_exit" : "kill_marks_error_killed_true"
 
 export async function runKillCheck(senpiBin) {
   const { sandbox, sessionDir, stateDir } = prepareScenarioSandbox()
-  const parent = driveSenpiAsync(senpiBin, sandbox, sessionDir, hangingChildSteps("pk"), CHILD_STEPS_HANG, "drive the kill scenario")
+  const parent = driveSenpiAsync(
+    senpiBin,
+    sandbox,
+    sessionDir,
+    hangingChildSteps("pk"),
+    CHILD_STEPS_HANG,
+    "drive the kill scenario",
+  )
   try {
     const running = await waitForRunningRpcChild(stateDir, "pk")
     if (running === undefined) {
@@ -190,13 +243,28 @@ export async function runKillCheck(senpiBin) {
     const settled = await waitForRecord(stateDir, (r) => r.task_id === running.task_id && r.status === "error", 15_000)
     const latest = readRecords(stateDir).find((r) => r.task_id === running.task_id)
     const errorMessage = typeof latest?.error_message === "string" ? latest.error_message : ""
-    const pass = settled !== undefined
-      && (expectKilled ? settled.killed === true : settled.killed !== true && errorMessage.startsWith("RPC child exited unexpectedly (exit code"))
+    const pass =
+      settled !== undefined &&
+      (expectKilled
+        ? settled.killed === true
+        : settled.killed !== true && errorMessage.startsWith("RPC child exited unexpectedly (exit code"))
     return {
       check: KILL_CHECK,
       verdict: pass ? "PASS" : "FAIL",
-      ...(pass ? {} : { reason: expectKilled ? "kill did not yield status=error killed:true" : "external termination did not yield status=error killed:false with an unexpected-exit message" }),
-      facts: { pid: running.pid, status: latest?.status, recordedKilled: latest?.killed, error_message: errorMessage, error_message_lines: errorMessage.split("\n") },
+      ...(pass
+        ? {}
+        : {
+            reason: expectKilled
+              ? "kill did not yield status=error killed:true"
+              : "external termination did not yield status=error killed:false with an unexpected-exit message",
+          }),
+      facts: {
+        pid: running.pid,
+        status: latest?.status,
+        recordedKilled: latest?.killed,
+        error_message: errorMessage,
+        error_message_lines: errorMessage.split("\n"),
+      },
     }
   } finally {
     await cleanupSenpiHost(parent)

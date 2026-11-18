@@ -69,7 +69,5 @@ export function isExcluded(root: string, path: string): boolean {
   const content = readExcludeContent(excludePath)
   if (content === "") return false
 
-  return content
-    .split("\n")
-    .some((line) => line.trim() === path)
+  return content.split("\n").some((line) => line.trim() === path)
 }

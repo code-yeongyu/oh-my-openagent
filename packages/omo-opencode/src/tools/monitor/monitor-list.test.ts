@@ -101,7 +101,7 @@ describe("createMonitorList", () => {
       new Map([
         ["session-a", [currentSessionRecord]],
         ["session-b", [otherSessionRecord]],
-      ])
+      ]),
     )
     const tool = createMonitorList(manager, { sessionID: "session-a" })
 
@@ -137,7 +137,7 @@ describe("createMonitorList", () => {
             }),
           ],
         ],
-      ])
+      ]),
     )
     const tool = createMonitorList(manager, { sessionID: "session-a" })
 
@@ -168,7 +168,7 @@ describe("createMonitorList", () => {
   it("does not include the raw command in output", async () => {
     //#given
     const manager = new FakeMonitorManager(
-      new Map([["session-a", [createRecord({ command: "deploy --token secret-token-123" })]]])
+      new Map([["session-a", [createRecord({ command: "deploy --token secret-token-123" })]]]),
     )
     const tool = createMonitorList(manager, { sessionID: "session-a" })
 
@@ -195,20 +195,18 @@ describe("createMonitorList", () => {
             createRecord({ id: "failed", status: "failed" }),
           ],
         ],
-      ])
+      ]),
     )
     const tool = createMonitorList(manager, { sessionID: "session-a" })
 
     //#when
     const defaultResult = resultOutput(await tool.execute({}, createToolContext("session-a")))
     const includeExitedResult = resultOutput(
-      await tool.execute({ include_exited: true }, createToolContext("session-a"))
+      await tool.execute({ include_exited: true }, createToolContext("session-a")),
     )
 
     //#then
-    expect(JSON.parse(defaultResult).monitors.map((monitor: { id: string }) => monitor.id)).toEqual([
-      "running",
-    ])
+    expect(JSON.parse(defaultResult).monitors.map((monitor: { id: string }) => monitor.id)).toEqual(["running"])
     expect(JSON.parse(includeExitedResult).monitors.map((monitor: { id: string }) => monitor.id)).toEqual([
       "running",
       "exited",

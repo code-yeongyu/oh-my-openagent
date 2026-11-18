@@ -5,7 +5,14 @@ import { appendEntries, emptyChain } from "../crypto/chain.ts"
 import type { KeyringEntry } from "../crypto/entry.ts"
 import { createRejectionCounter } from "../crypto/rejection.ts"
 import { loadTrustAnchor, pinTrustAnchor } from "../crypto/trust-pin.ts"
-import { approve, createWorld, freshStateDir, newDevice, removeWorldStateDirs, type World } from "../recovery/testing/world.test-support.ts"
+import {
+  approve,
+  createWorld,
+  freshStateDir,
+  newDevice,
+  removeWorldStateDirs,
+  type World,
+} from "../recovery/testing/world.test-support.ts"
 import { openAccountChain } from "./account-chain.ts"
 import { createAccountHttp } from "./http.ts"
 import { openAccountSession } from "./session.ts"
@@ -21,7 +28,11 @@ afterEach(async () => {
 afterAll(removeWorldStateDirs)
 
 async function pinnedDir(world: World): Promise<string> {
-  const walked = await appendEntries(emptyChain(world.account, creatorAnchor(world.account, world.owner.keyring)), world.server.chain(world.account), createRejectionCounter())
+  const walked = await appendEntries(
+    emptyChain(world.account, creatorAnchor(world.account, world.owner.keyring)),
+    world.server.chain(world.account),
+    createRejectionCounter(),
+  )
   if (!walked.ok || walked.state.pin === null) throw new Error("the fixture genesis does not anchor")
   const dir = freshStateDir()
   await pinTrustAnchor(dir, world.account, walked.state.pin)
@@ -35,7 +46,14 @@ async function fourRowAccount(wire: { readonly entriesBatchId?: boolean } = {}) 
   servers.push(server)
   const token = server.tokenFor({ ...world.owner.principal })
   const pinDir = await pinnedDir(world)
-  const opened = await openAccountSession({ baseUrl: server.url, token: () => token, account: world.account, keyring: world.owner.keyring, pinDir, spaceId: SPACE })
+  const opened = await openAccountSession({
+    baseUrl: server.url,
+    token: () => token,
+    account: world.account,
+    keyring: world.owner.keyring,
+    pinDir,
+    spaceId: SPACE,
+  })
   if (!opened.ok) throw new Error(`no session: ${opened.reason}`)
   await pushBatch(opened.session, { baseSeq: 1, key: "notes/a.md", text: "before" })
   await approve(world, await newDevice())
@@ -51,9 +69,12 @@ function servedHttp(input: { url: string; token: string; page?: number }) {
   const knobs = { badKeyringSeq: null as number | null }
   const http = {
     ...real,
-    listEntriesAfter: async (after: number) => (await real.listEntriesAfter(after))?.slice(0, input.page ?? Number.MAX_SAFE_INTEGER) ?? null,
+    listEntriesAfter: async (after: number) =>
+      (await real.listEntriesAfter(after))?.slice(0, input.page ?? Number.MAX_SAFE_INTEGER) ?? null,
     listKeys: async () =>
-      (await real.listKeys())?.map((entry): KeyringEntry => (entry.seq === knobs.badKeyringSeq ? { ...entry, digest: `${entry.digest}x` } : entry)) ?? null,
+      (await real.listKeys())?.map((entry): KeyringEntry =>
+        entry.seq === knobs.badKeyringSeq ? { ...entry, digest: `${entry.digest}x` } : entry,
+      ) ?? null,
   }
   return { http, knobs }
 }
@@ -63,7 +84,13 @@ async function openChain(world: World, pinDir: string, http: ReturnType<typeof s
   if (!pin.ok) throw new Error(`no pin: ${pin.reason}`)
   const lines: string[] = []
   const rejections = createRejectionCounter((line) => lines.push(line))
-  const chain = await openAccountChain({ account: world.account, anchor: pin.anchor, keyring: world.owner.keyring, http, rejections })
+  const chain = await openAccountChain({
+    account: world.account,
+    anchor: pin.anchor,
+    keyring: world.owner.keyring,
+    http,
+    rejections,
+  })
   return { chain, rejections, lines }
 }
 
@@ -91,7 +118,13 @@ describe("account chain over served pages", () => {
     const { world, server, token, pinDir } = await fourRowAccount()
     const { http } = servedHttp({ url: server.url, token })
     let garbled = true
-    const reading = { ...http, listEntriesAfter: async (after: number) => (await http.listEntriesAfter(after))?.map((row) => (garbled && row.seq === 3 ? { ...row, seq: "three" } : row)) ?? null }
+    const reading = {
+      ...http,
+      listEntriesAfter: async (after: number) =>
+        (await http.listEntriesAfter(after))?.map((row) =>
+          garbled && row.seq === 3 ? { ...row, seq: "three" } : row,
+        ) ?? null,
+    }
     const { chain, lines } = await openChain(world, pinDir, reading as typeof http)
 
     expect((await chain.reach(2)).kind).toBe("batch")
@@ -106,12 +139,16 @@ describe("account chain over served pages", () => {
   test.each([
     ["with batch_id (the contract SyncPullEntry shape)", true],
     ["without batch_id (the SyncEntry shape)", false],
-  ] as const)("rows served one page at a time are all walked, so membership past the first page is found: %s", async (_shape, entriesBatchId) => {
-    const { world, server, token, pinDir } = await fourRowAccount({ entriesBatchId })
-    const { http } = servedHttp({ url: server.url, token, page: 1 })
-    const { chain } = await openChain(world, pinDir, http)
-    expect(chain.state().head?.seq).toBe(4)
-    expect(chain.isMember()).toBe(true)
-    expect((await chain.reach(4)).kind).toBe("batch")
-  }, 30_000)
+  ] as const)(
+    "rows served one page at a time are all walked, so membership past the first page is found: %s",
+    async (_shape, entriesBatchId) => {
+      const { world, server, token, pinDir } = await fourRowAccount({ entriesBatchId })
+      const { http } = servedHttp({ url: server.url, token, page: 1 })
+      const { chain } = await openChain(world, pinDir, http)
+      expect(chain.state().head?.seq).toBe(4)
+      expect(chain.isMember()).toBe(true)
+      expect((await chain.reach(4)).kind).toBe("batch")
+    },
+    30_000,
+  )
 })

@@ -40,7 +40,8 @@ export function createUlwExecuteContinuationComponent(
         consecutiveContinuations: 0,
         lastSignature: undefined as string | undefined,
         // This run's agent_end payload and session identity. The decision runs on agent_settled.
-        pendingRun: undefined as { payload: unknown; sessionId: string | undefined; cwd: string | undefined } | undefined,
+        pendingRun: undefined as
+          { payload: unknown; sessionId: string | undefined; cwd: string | undefined } | undefined,
       }
       const runCompletion = createRunCompletionTracker((runId) => {
         try {

@@ -24,7 +24,14 @@ describe("task completion effective model visibility (F12)", () => {
       }),
       status: "completed" as const,
       final_response: "done",
-      effective_model: { provider: "anthropic", model_id: "claude-opus-5-5", display: "anthropic/claude-opus-5-5", reasoning: "high", source: "set" as const, switched_by_operator: true },
+      effective_model: {
+        provider: "anthropic",
+        model_id: "claude-opus-5-5",
+        display: "anthropic/claude-opus-5-5",
+        reasoning: "high",
+        source: "set" as const,
+        switched_by_operator: true,
+      },
     }
 
     // when
@@ -55,7 +62,12 @@ describe("task completion effective model visibility (F12)", () => {
       }),
       status: "completed" as const,
       final_response: "done",
-      effective_model: { provider: "kimi-coding", model_id: "kimi-for-coding-highspeed-unlocked", display: "kimi-coding/kimi-for-coding-highspeed-unlocked", source: "fallback-revert" as const },
+      effective_model: {
+        provider: "kimi-coding",
+        model_id: "kimi-for-coding-highspeed-unlocked",
+        display: "kimi-coding/kimi-for-coding-highspeed-unlocked",
+        source: "fallback-revert" as const,
+      },
     }
 
     // when

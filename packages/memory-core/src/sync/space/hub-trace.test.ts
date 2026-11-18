@@ -77,7 +77,8 @@ describe("stripT2Blocks (hub md-merge-driver pickFrontmatter shape)", () => {
   })
 
   test("QA failure case: a malformed T2 block stays untouched", () => {
-    const bad = "\n<!-- memory-sync 2026-10-15: the other machine had different frontmatter for n.md; kept here so no fact is lost:\n---\n: [unclosed\n---\n-->\n"
+    const bad =
+      "\n<!-- memory-sync 2026-10-15: the other machine had different frontmatter for n.md; kept here so no fact is lost:\n---\n: [unclosed\n---\n-->\n"
     const r = stripT2Blocks(`keep me\n${bad}after\n`)
     expect(r.entries).toEqual([])
     expect(r.malformed).toEqual([bad])
@@ -122,7 +123,12 @@ describe("hub-trace folding end to end (fixture shaped like real hub output)", (
 
   test("T1 folds the side file in insert-only and schedules its removal; T2 lands as frontmatter", async () => {
     const doc = await newDoc("1")
-    const plan = planAdoption(files(), { currentText: null, tombstoned: false, lastMaterialised: null, registers: soleRegisters(null) })
+    const plan = planAdoption(files(), {
+      currentText: null,
+      tombstoned: false,
+      lastMaterialised: null,
+      registers: soleRegisters(null),
+    })
     expect(plan.action).toBe("capture")
     if (plan.action !== "capture") return
     expect(plan.removalCandidates).toEqual(["notes/daily.sync-conflict-20261015-mini.md"])
@@ -131,7 +137,10 @@ describe("hub-trace folding end to end (fixture shaped like real hub output)", (
     expect(rendered).toBe(plan.rendered)
     const parsed = splitItem(rendered)
 
-    const preBody = splitItem(mainText).body.replace(t2Block("2026-10-15", "notes/daily.md", "---\nreviewed: true\n---\n"), "")
+    const preBody = splitItem(mainText).body.replace(
+      t2Block("2026-10-15", "notes/daily.md", "---\nreviewed: true\n---\n"),
+      "",
+    )
     expect(isOrderedSubsequence(preBody, parsed.body)).toBe(true)
     expect(isOrderedSubsequence(splitItem(sideText).body, parsed.body)).toBe(true)
     expect(parsed.body).not.toContain("<!-- memory-sync")
@@ -145,14 +154,19 @@ describe("hub-trace folding end to end (fixture shaped like real hub output)", (
 
   test("the fold is idempotent against the adopted state", async () => {
     const doc = await newDoc("1")
-    const first = planAdoption(files(), { currentText: null, tombstoned: false, lastMaterialised: null, registers: soleRegisters(null) })
+    const first = planAdoption(files(), {
+      currentText: null,
+      tombstoned: false,
+      lastMaterialised: null,
+      registers: soleRegisters(null),
+    })
     if (first.action !== "capture") throw new Error("expected capture")
     applyPlan(doc, "", first)
     const second = planAdoption(files(), {
       currentText: renderDocContent(doc),
       tombstoned: false,
       lastMaterialised: null,
-      registers: activeRegisters(doc)
+      registers: activeRegisters(doc),
     })
     expect(second.action).toBe("none")
     doc.free()

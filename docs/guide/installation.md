@@ -556,7 +556,7 @@ After OpenCode sees the provider, reference models with the OpenCode provider pr
 ```json
 {
   "agents": {
-    "plan-consultant": { "model": "amazon-bedrock/us.anthropic.claude-fable-5-1", "reasoning": "max" },
+    "plan-consultant": { "model": "amazon-bedrock/us.anthropic.claude-fable-5-2", "reasoning": "max" },
     "plan-reviewer": { "model": "amazon-bedrock/us.anthropic.claude-opus-5-5" }
   },
   "categories": {
@@ -601,7 +601,7 @@ When OpenCode Zen is the best available provider, common examples:
 
 | Agent / category      | Model                                                |
 | --------------------- | ---------------------------------------------------- |
-| **plan-consultant**   | `opencode/claude-fable-5-1` (max)                    |
+| **plan-consultant**   | `opencode/claude-fable-5-2` (max)                    |
 | **plan-reviewer**     | `opencode/gpt-6-astra` (high)                        |
 | **deep** (category)   | `opencode/gpt-6-astra` (high)                        |
 | main agent (session)  | `opencode/claude-opus-5-5` or `opencode-go/kimi-k3.1-pro` |
@@ -673,7 +673,7 @@ Not all models behave the same way. Understanding "similar" families helps you m
 
 | Agent               | Role                                       | Default Chain                                                          |
 | ------------------- | ------------------------------------------ | ---------------------------------------------------------------------- |
-| **plan-consultant** | Pre-planning gap analysis for `/ulw-plan`  | anthropic\|github-copilot\|opencode/claude-fable-5-1 (max) → anthropic\|github-copilot\|opencode/claude-opus-5-5 (max) → opencode-go\|kimi-for-coding\|moonshotai/kimi-k3.1-pro (max) → opencode/kimi-k3 (max) |
+| **plan-consultant** | Pre-planning gap analysis for `/ulw-plan`  | anthropic\|github-copilot\|opencode/claude-fable-5-2 (max) → anthropic\|github-copilot\|opencode/claude-fable-5-1 (max) → anthropic\|github-copilot\|opencode/claude-opus-5-5 (max) → opencode-go\|kimi-for-coding\|moonshotai/kimi-k3.1-pro (max) → opencode/kimi-k3 (max) |
 | **plan-reviewer**   | High-accuracy plan review gate             | openai\|chatgpt-subscription/gpt-6-astra (xhigh) → github-copilot/gpt-6-astra (high) → openai\|chatgpt-subscription\|opencode/gpt-6-astra (high) → anthropic\|github-copilot\|opencode/claude-opus-5-5 (max) → … (full chain in source) |
 | **explore**         | Fast codebase grep                         | kimi-coding\|kimi-for-coding/kimi-for-coding-highspeed (off) → openai\|chatgpt-subscription/gpt-6-luna-fast (low) → anthropic\|github-copilot/claude-haiku-5-5 (medium) → deepseek/deepseek-flash (max) → opencode-go\|bailian-coding-plan/qwen3.7-plus → opencode-go/minimax-m2.7 |
 | **librarian**       | Docs/code search                           | (same chain as `explore`)                                              |
@@ -696,7 +696,7 @@ If the user wants to override which model a curated agent or category uses, edit
 ```jsonc
 {
   "agents": {
-    "plan-consultant": { "model": "anthropic/claude-fable-5-1", "reasoning": "max" },
+    "plan-consultant": { "model": "anthropic/claude-fable-5-2", "reasoning": "max" },
     "plan-reviewer": { "model": "openai/gpt-6-astra" }, // the plan gate; keep it on a strong reasoning model
   },
   "categories": {
@@ -705,7 +705,7 @@ If the user wants to override which model a curated agent or category uses, edit
 }
 ```
 
-**Lower-risk overrides** (compatible behavior): main agent Opus 5.5 → Fable 5.1/Kimi K3/GLM 5.3 (each is on the Recommended list and has a tuned prompt preset); Plan Consultant Fable 5.1 → Opus 5.5/Kimi K3; Plan Reviewer GPT-6 Astra → Opus 5.5 (max).
+**Lower-risk overrides** (compatible behavior): main agent Opus 5.5 → Fable 5.1/Kimi K3/GLM 5.3 (each is on the Recommended list and has a tuned prompt preset); Plan Consultant Fable 5.2 → Fable 5.1/Opus 5.5/Kimi K3; Plan Reviewer GPT-6 Astra → Opus 5.5 (max).
 
 **GLM 5.2 as the session model:** GLM 5.2 gets the GLM-calibrated prompt preset because its model ID is recognized as GLM. It still has less maintainer validation than Claude or Kimi.
 

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { withContractHost, type ContractHost } from "../../../../senpi-task/src/runners/rpc-host/testing/contract-host"
+import { controlRefusalOf } from "./control/port"
 import { createLiveThreadSurface, type LiveThreadSurface } from "./live-surface"
 
 // The contract host enforces the engine's own close rules (senpi 2026.11.5-1): a close from a connection that holds no
@@ -8,7 +9,8 @@ import { createLiveThreadSurface, type LiveThreadSurface } from "./live-surface"
 function surface(host: ContractHost): LiveThreadSurface {
   return createLiveThreadSurface(undefined, {
     env: { OMO_CODING_AGENT_DIR: host.root, SENPI_RPC_SOCKET: host.socket, SENPI_RPC_KEY_ROOT: host.root },
-    statusAll: async () => undefined, registry: async () => [],
+    statusAll: async () => undefined,
+    registry: async () => [],
   })
 }
 
@@ -18,14 +20,23 @@ async function close(host: ContractHost): Promise<unknown> {
   return await client.closeSession("rpc-1", "dur-selected")
 }
 
-const sentTypes = (host: ContractHost) => host.frames.map(({ frame }) => frame.type).filter((type) => type !== "get_protocol_info" && type !== "authenticate")
+const sentTypes = (host: ContractHost) =>
+  host.frames.map(({ frame }) => frame.type).filter((type) => type !== "get_protocol_info" && type !== "authenticate")
 
 describe("thread_close on this device's host: the session ends for every client that holds it", () => {
   test("#given a session another client also holds #when it is closed #then the host ends it for every holder and the close answers closed", async () => {
     await withContractHost({ auth: true, otherAttachments: 1 }, async (host) => {
       expect(await close(host)).toBe("closed")
       expect(host.live()).toBe(false)
-      expect(host.mutations).toEqual([expect.objectContaining({ type: "unload_session", sessionId: "rpc-1", force: true, interrupt: true, children: "detach" })])
+      expect(host.mutations).toEqual([
+        expect.objectContaining({
+          type: "unload_session",
+          sessionId: "rpc-1",
+          force: true,
+          interrupt: true,
+          children: "detach",
+        }),
+      ])
       expect(sentTypes(host).slice(0, 2)).toEqual(["attach_session", "unload_session"])
     })
   })
@@ -38,12 +49,30 @@ describe("thread_close on this device's host: the session ends for every client 
     })
   })
 
-  test("#given a session with no file yet that another client holds #when it is closed #then the answer says another client still holds it", async () => {
+  test("#given a session with no file yet that another client holds #when it is closed #then the answer says another client still holds it, decided by one get_state probe", async () => {
     await withContractHost({ auth: true, unwritten: true, otherAttachments: 1 }, async (host) => {
       expect(await close(host)).toBe("held_elsewhere")
       expect(host.live()).toBe(true)
+      expect(sentTypes(host).filter((type) => type === "get_state" || type === "list_sessions")).toEqual(["get_state"])
     })
   })
+
+  test.each([
+    ["a reason the ladder does not know", "attached", "unsupported"],
+    ["a draining host", "host_draining", "host_unavailable"],
+  ] as const)(
+    "#given unload_session refused with %s #when it is closed #then the refusal is typed %s naming the reason, as on another device",
+    async (_label, reason, code) => {
+      await withContractHost({ auth: true, unloadRefusal: reason }, async (host) => {
+        const refused = await close(host).then(
+          () => undefined,
+          (error: unknown) => controlRefusalOf(error),
+        )
+        expect(refused).toMatchObject({ code, details: { command: "unload_session", reason } })
+        expect(host.mutations).toEqual([])
+      })
+    },
+  )
 
   test("#given a session that already left the host #when it is closed #then nothing was live and nothing is mutated", async () => {
     await withContractHost({ auth: true, attachRefusal: "unknown_session" }, async (host) => {
