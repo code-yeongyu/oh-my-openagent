@@ -3,9 +3,9 @@
  * target meaning "the newest model of this family" reads it from here, so a bump is one edit;
  * `script/latest-model-ids-audit.test.ts` rejects a literal copy elsewhere. Deliberate older rungs
  * (`claude-opus-4-6`, `gpt-5.6-sol`, `claude-fable-5-1`, and the GPT-6 / GPT-6.1 rungs behind GPT-6.2) stay literal. No imports: consumers outside the barrel use the
- * `@oh-my-opencode/model-core/latest-models` subpath. Not covered: the Codex plugin's data files
- * (`omo-codex/plugin` agent TOMLs, `migrate-codex-config/catalog.mjs`, `model-catalog.json`) still
- * spell `gptAstra`'s id, so a Codex default bump also edits those.
+ * `@oh-my-opencode/model-core/latest-models` subpath. Not covered: the Codex edition pins its own Astra
+ * id (`CODEX_ASTRA_MODEL` in `omo-codex/src/install/codex-model-catalog.ts`) beside the data files that
+ * spell it (agent TOMLs, `migrate-codex-config/catalog.mjs`, `model-catalog.json`), so a Codex bump edits those.
  * `kimiK3` is the previous Kimi generation, kept for the rungs of providers that do not serve
  * `kimi` yet (OpenCode Zen, Bailian, Firmware, Ollama Cloud, AIHubMix).
  */
