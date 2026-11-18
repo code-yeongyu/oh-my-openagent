@@ -43,7 +43,10 @@ async function serveReleaseThroughFetch(): Promise<() => number> {
   const stage = mkdtempSync(join(root, "stage-"))
   writeFileSync(join(stage, "comment-checker"), FRESH_BINARY, { mode: 0o755 })
   const archive = join(root, "release.tar.gz")
-  const tar = Bun.spawnSync(["tar", "-czf", archive, "-C", stage, "comment-checker"], { stdout: "pipe", stderr: "pipe" })
+  const tar = Bun.spawnSync(["tar", "-czf", archive, "-C", stage, "comment-checker"], {
+    stdout: "pipe",
+    stderr: "pipe",
+  })
   if (tar.exitCode !== 0) throw new Error(`tar failed: ${new TextDecoder().decode(tar.stderr)}`)
   const bytes = await Bun.file(archive).bytes()
   let requests = 0
@@ -54,22 +57,46 @@ async function serveReleaseThroughFetch(): Promise<() => number> {
   return () => requests
 }
 
-describe.skipIf(process.platform === "win32")("OpenCode comment-checker shared cache is pinned to the release (#8850)", () => {
-  for (const [label, marker] of [["no version marker", undefined], ["an older version marker", "0.6.1"]] as const) {
-    it(`#given a cached checker with ${label} #when looking up the cache #then it is not trusted`, () => {
+describe.skipIf(process.platform === "win32")(
+  "OpenCode comment-checker shared cache is pinned to the release (#8850)",
+  () => {
+    for (const [label, marker] of [
+      ["no version marker", undefined],
+      ["an older version marker", "0.6.1"],
+    ] as const) {
+      it(`#given a cached checker with ${label} #when looking up the cache #then it is not trusted`, () => {
+        // given
+        plantCachedBinary(marker)
+
+        // when
+        const cached = getCachedBinaryPath()
+
+        // then
+        expect(cached).toBeNull()
+      })
+
+      it(`#given a cached checker with ${label} #when ensuring the binary #then the pinned release replaces it and is recorded`, async () => {
+        // given
+        const binaryPath = plantCachedBinary(marker)
+        const requests = await serveReleaseThroughFetch()
+
+        // when
+        const ensured = await ensureCommentCheckerBinary()
+
+        // then
+        expect(ensured).toBe(binaryPath)
+        expect(requests()).toBe(1)
+        expect(readFileSync(binaryPath, "utf-8")).toBe(FRESH_BINARY)
+        expect(readFileSync(join(getCacheDir(), COMMENT_CHECKER_VERSION_MARKER), "utf-8").trim()).toBe(
+          COMMENT_CHECKER_RELEASE_VERSION,
+        )
+        expect(getCachedBinaryPath()).toBe(binaryPath)
+      })
+    }
+
+    it("#given a cached checker recorded at the pinned release #when ensuring the binary #then the cache answers without a request", async () => {
       // given
-      plantCachedBinary(marker)
-
-      // when
-      const cached = getCachedBinaryPath()
-
-      // then
-      expect(cached).toBeNull()
-    })
-
-    it(`#given a cached checker with ${label} #when ensuring the binary #then the pinned release replaces it and is recorded`, async () => {
-      // given
-      const binaryPath = plantCachedBinary(marker)
+      const binaryPath = plantCachedBinary(COMMENT_CHECKER_RELEASE_VERSION)
       const requests = await serveReleaseThroughFetch()
 
       // when
@@ -77,24 +104,8 @@ describe.skipIf(process.platform === "win32")("OpenCode comment-checker shared c
 
       // then
       expect(ensured).toBe(binaryPath)
-      expect(requests()).toBe(1)
-      expect(readFileSync(binaryPath, "utf-8")).toBe(FRESH_BINARY)
-      expect(readFileSync(join(getCacheDir(), COMMENT_CHECKER_VERSION_MARKER), "utf-8").trim()).toBe(COMMENT_CHECKER_RELEASE_VERSION)
-      expect(getCachedBinaryPath()).toBe(binaryPath)
+      expect(requests()).toBe(0)
+      expect(readFileSync(binaryPath, "utf-8")).toBe(STALE_BINARY)
     })
-  }
-
-  it("#given a cached checker recorded at the pinned release #when ensuring the binary #then the cache answers without a request", async () => {
-    // given
-    const binaryPath = plantCachedBinary(COMMENT_CHECKER_RELEASE_VERSION)
-    const requests = await serveReleaseThroughFetch()
-
-    // when
-    const ensured = await ensureCommentCheckerBinary()
-
-    // then
-    expect(ensured).toBe(binaryPath)
-    expect(requests()).toBe(0)
-    expect(readFileSync(binaryPath, "utf-8")).toBe(STALE_BINARY)
-  })
-})
+  },
+)

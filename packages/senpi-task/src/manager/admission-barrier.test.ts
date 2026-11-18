@@ -2,7 +2,14 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { createTaskManager } from "./manager"
 import { createTaskRecordStore } from "../store"
 import { AdmissionBarrier } from "../pause/admission-barrier"
-import { baseSpec, categoryPlanner, cleanupProjects, FakeRunner, settings, tempProject } from "./__fixtures__/manager-fakes"
+import {
+  baseSpec,
+  categoryPlanner,
+  cleanupProjects,
+  FakeRunner,
+  settings,
+  tempProject,
+} from "./__fixtures__/manager-fakes"
 
 afterEach(cleanupProjects)
 
@@ -13,10 +20,16 @@ describe("manager start admission belongs to the root before any await", () => {
     const admission = Promise.withResolvers<void>()
     const runner = new FakeRunner()
     const manager = createTaskManager({
-      cwd, store: createTaskRecordStore({ project_dir: cwd }), config: settings(),
-      runners: { "in-process": runner, process: runner }, admissionBarrier: barrier,
+      cwd,
+      store: createTaskRecordStore({ project_dir: cwd }),
+      config: settings(),
+      runners: { "in-process": runner, process: runner },
+      admissionBarrier: barrier,
       planner: categoryPlanner(),
-      admit: async () => { await admission.promise; return { kind: "admitted" } },
+      admit: async () => {
+        await admission.promise
+        return { kind: "admitted" }
+      },
     })
     const spec = { ...baseSpec(), root_session_id: "root" }
     const starting = manager.start(spec)
@@ -36,9 +49,15 @@ describe("manager start admission belongs to the root before any await", () => {
     let planned = 0
     const runner = new FakeRunner()
     const manager = createTaskManager({
-      cwd, store: createTaskRecordStore({ project_dir: cwd }), config: settings(),
-      runners: { "in-process": runner, process: runner }, admissionBarrier: barrier,
-      planner: input => { planned += 1; return categoryPlanner()(input) },
+      cwd,
+      store: createTaskRecordStore({ project_dir: cwd }),
+      config: settings(),
+      runners: { "in-process": runner, process: runner },
+      admissionBarrier: barrier,
+      planner: (input) => {
+        planned += 1
+        return categoryPlanner()(input)
+      },
     })
     expect(await manager.start(spec)).toMatchObject({ kind: "held", pauseSeq: 1 })
     expect(planned).toBe(0)

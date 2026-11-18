@@ -29,7 +29,7 @@ const bindDarwinSignIn = (secrets: SecretApi) =>
     key: { service: "omo-cli", name: "a".repeat(64) },
     background: false,
     notice: () => {},
-    pending: message => new Error(message),
+    pending: (message) => new Error(message),
   })
 
 describe("a launcher-injected Bun.secrets is never the real macOS store (#11262)", () => {

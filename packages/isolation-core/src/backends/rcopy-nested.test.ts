@@ -26,7 +26,8 @@ async function nestedRepoAt(path: string) {
 test("rcopy seeds an untracked embedded repository including its git metadata", async () => {
   const f = await repo()
   await nestedRepoAt(join(f.repoRoot, "vendor", "inner"))
-  const baseDir = join(f.root, "base"), merged = join(baseDir, "m")
+  const baseDir = join(f.root, "base"),
+    merged = join(baseDir, "m")
   await new RcopyBackend().start(f.repoRoot, merged, { id: "seed", baseDir, crossDevice: false })
   expect(await readFile(join(merged, "vendor", "inner", "inner-file"), "utf8")).toBe("inner\n")
   expect(await readFile(join(merged, "vendor", "inner", ".git", "HEAD"), "utf8")).toContain("ref:")
@@ -48,14 +49,32 @@ test("rcopy isolation round-trips edits to an untracked embedded repository", as
   const f = await repo()
   await nestedRepoAt(join(f.repoRoot, "vendor", "inner"))
   const baseline = await captureBaseline(f.repoRoot)
-  const handle = await ensureIsolation({ repoRoot: f.repoRoot, homeDir: f.homeDir, id: "roundtrip", backends: [new RcopyBackend()], preferred: "rcopy" })
+  const handle = await ensureIsolation({
+    repoRoot: f.repoRoot,
+    homeDir: f.homeDir,
+    id: "roundtrip",
+    backends: [new RcopyBackend()],
+    preferred: "rcopy",
+  })
   try {
     await writeFile(join(handle.mergedDir, "vendor", "inner", "inner-file"), "edited\n")
-    const result = await mergeIsolatedChanges({ ...f, baseline, isolationDir: handle.mergedDir, id: "roundtrip", artifactsDir: join(f.root, "artifacts"), apply: true, mode: "patch" as const })
+    const result = await mergeIsolatedChanges({
+      ...f,
+      baseline,
+      isolationDir: handle.mergedDir,
+      id: "roundtrip",
+      artifactsDir: join(f.root, "artifacts"),
+      apply: true,
+      mode: "patch" as const,
+    })
     expect(result.nested_failed ?? []).toEqual([])
-    expect(await git(join(f.repoRoot, "vendor", "inner"), "log", "-1", "--format=%s")).toBe("chore(task): isolated nested changes")
+    expect(await git(join(f.repoRoot, "vendor", "inner"), "log", "-1", "--format=%s")).toBe(
+      "chore(task): isolated nested changes",
+    )
     expect(await readFile(join(f.repoRoot, "vendor", "inner", "inner-file"), "utf8")).toBe("edited\n")
-  } finally { await cleanupIsolation(handle) }
+  } finally {
+    await cleanupIsolation(handle)
+  }
 })
 
 test("rcopy teardown fails closed when worktree removal fails for a live registration", async () => {
@@ -66,7 +85,12 @@ test("rcopy teardown fails closed when worktree removal fails for a live registr
   await rm(join(f.repoRoot, ".git", "worktrees", "merged", "gitdir"), { force: true })
   await expect(new RcopyBackend().stop(merged)).rejects.toThrow(/worktree remove/)
   // Fail-closed: the tree is not silently deleted while the registration remains.
-  expect(await access(merged).then(() => true, () => false)).toBe(true)
+  expect(
+    await access(merged).then(
+      () => true,
+      () => false,
+    ),
+  ).toBe(true)
 })
 
 test("rcopy teardown proceeds when the registration is already gone", async () => {

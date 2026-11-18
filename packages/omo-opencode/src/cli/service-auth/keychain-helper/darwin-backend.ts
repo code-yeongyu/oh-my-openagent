@@ -1,8 +1,10 @@
 import { homedir } from "node:os"
 import { join } from "node:path"
+import { accountHome, lockDirectoryIn } from "../account-home"
+import { CredentialStoreError } from "../keystore"
 import { type HelperAccess, resolveHelperAccess } from "./access"
 import { type ApprovalCache, processApprovalCache } from "./approval-cache"
-import { HelperReadError, readThroughHelper, type Row8bChoice } from "./darwin-read"
+import { ACL_DENIAL_MESSAGE, HelperReadError, readThroughHelper, type Row8bChoice } from "./darwin-read"
 import { lockedDarwinStore, type LockedDarwinStore } from "./darwin-store"
 import type { HelperLease } from "./client"
 import { bundleCandidates, machineCandidates } from "./location"
@@ -28,7 +30,7 @@ const ROW_9B_DEFAULT: Row9bChoice = "reinstall-notice"
 /** Entry points with their own layout (the compiled binary's `execDir`, the desktop runtime) register their copy first. */
 export function registerHelperCandidates(paths: readonly string[]): void {
   const { entryCandidates } = keychainProcessState()
-  entryCandidates.unshift(...paths.filter(path => !entryCandidates.includes(path)))
+  entryCandidates.unshift(...paths.filter((path) => !entryCandidates.includes(path)))
 }
 
 /**
@@ -38,7 +40,11 @@ export function registerHelperCandidates(paths: readonly string[]): void {
 export const helperAccess = (): Promise<HelperAccess> =>
   sharedHelperAccess(() => {
     const { entryCandidates } = keychainProcessState()
-    return resolveHelperAccess([...entryCandidates, ...bundleCandidates(import.meta.url), ...machineCandidates(homedir())])
+    return resolveHelperAccess([
+      ...entryCandidates,
+      ...bundleCandidates(import.meta.url),
+      ...machineCandidates(homedir()),
+    ])
   })
 
 export function sharedHelperAccess(resolve: () => Promise<HelperAccess>): Promise<HelperAccess> {
@@ -47,7 +53,7 @@ export function sharedHelperAccess(resolve: () => Promise<HelperAccess>): Promis
   const started = resolve()
   state.helperAccess = started
   void started.then(
-    access => {
+    (access) => {
       if (access.kind === "unavailable" && state.helperAccess === started) state.helperAccess = undefined
     },
     () => {
@@ -64,6 +70,7 @@ export function asKeystoreError(error: unknown, pending: (message: string) => Er
   if (!(error instanceof HelperReadError)) return error
   if (error.failure === "pending") return pending(error.message)
   if (error.failure === "locked") return Object.assign(new Error(error.message), { code: "-25308" })
+  if (error.failure === "acl") return new CredentialStoreError(ACL_DENIAL_MESSAGE)
   return error
 }
 
@@ -109,7 +116,9 @@ export function createDarwinBackend(options: {
     access: options.access,
     cache: options.cache ?? processApprovalCache(),
     background: options.background,
-    takePromptLock: promptLockAt(join(options.home ?? homedir(), ".omo", "session-locks", `${options.account}.keychain-prompt`)),
+    takePromptLock: promptLockAt(
+      join(lockDirectoryIn(options.home ?? accountHome()), `${options.account}.keychain-prompt`),
+    ),
     ownSilentGet: () => silently(() => options.secrets.get(key)),
     ownOverwrite: (value: string) => silently(() => options.secrets.set({ ...key, value })),
     ownDelete: (name: string) =>
@@ -128,7 +137,7 @@ export function createDarwinBackend(options: {
       unowned = result.kind === "value" && result.source !== "owned"
       return result.kind === "value" ? result.value : null
     },
-    underLock: lease => lockedDarwinStore(deps, lease),
+    underLock: (lease) => lockedDarwinStore(deps, lease),
     migrationPending: () => unowned,
   }
 }
@@ -145,5 +154,7 @@ export async function guardHelperlessRead(
 ): Promise<void> {
   if (choice === "dialog") return
   if ((await probe(service, account)) === "helper-owned")
-    throw new HelperMissingForOwnedItem("OmO's keychain helper is missing or damaged on this Mac. Reinstall omo, then try again.")
+    throw new HelperMissingForOwnedItem(
+      "OmO's keychain helper is missing or damaged on this Mac. Reinstall omo, then try again.",
+    )
 }

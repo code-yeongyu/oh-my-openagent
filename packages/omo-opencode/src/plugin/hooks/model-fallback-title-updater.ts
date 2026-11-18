@@ -20,12 +20,15 @@ export function createModelFallbackTitleUpdater(ctx: PluginContext) {
     if (!existing.baseTitle) {
       const sessionResp = await ctx.client.session.get({ path: { id: input.sessionID } }).catch(() => null)
       const sessionInfo = sessionResp
-        ? normalizeSDKResponse<{ readonly title?: string } | null>(sessionResp, null, { preferResponseOnMissingData: true })
+        ? normalizeSDKResponse<{ readonly title?: string } | null>(sessionResp, null, {
+            preferResponseOnMissingData: true,
+          })
         : null
       const rawTitle = sessionInfo?.title
-      existing.baseTitle = typeof rawTitle === "string" && rawTitle.length > 0
-        ? rawTitle.replace(/\s*\[fallback:[^\]]+\]$/i, "").trim()
-        : "Session"
+      existing.baseTitle =
+        typeof rawTitle === "string" && rawTitle.length > 0
+          ? rawTitle.replace(/\s*\[fallback:[^\]]+\]$/i, "").trim()
+          : "Session"
     }
 
     const variantLabel = input.variant ? ` ${input.variant}` : ""

@@ -45,12 +45,15 @@ async function main(): Promise<void> {
   const preambles = fragments
     .map((fragment) => ({ pr: fragment.pr, content: splitFragment(fragment.content).preamble }))
     .filter((fragment) => fragment.content !== "")
-  if (preambles.length === 0) throw new Error(`no CHANGELOG paragraph in any fragment under ${FRAGMENT_DIR}/ to release`)
+  if (preambles.length === 0)
+    throw new Error(`no CHANGELOG paragraph in any fragment under ${FRAGMENT_DIR}/ to release`)
   const changelog = await Bun.file(changelogPath).text()
   // Unreleased text written before the fragments gate (#10841) is released first, exactly as written.
   const assembly = assembleRelease(unreleasedBody(changelog), preambles)
   if (assembly.duplicates.length > 0) {
-    console.error(`consumed without a second entry (an Unreleased paragraph already links them): ${assembly.duplicates.map((pr) => `#${pr}`).join(", ")}`)
+    console.error(
+      `consumed without a second entry (an Unreleased paragraph already links them): ${assembly.duplicates.map((pr) => `#${pr}`).join(", ")}`,
+    )
   }
   const stamped = stampUnreleased(mergeUnreleased(changelog, assembly.body), version, date)
   await Bun.write(changelogPath, stamped)
@@ -60,7 +63,9 @@ async function main(): Promise<void> {
   for (const name of names) {
     if (parseFragment(name, contents.get(name) ?? "") !== null) await rm(new URL(name, fragmentDir))
   }
-  console.error(`stamped ## [${version}] - ${date} from ${fragments.length} fragment(s): ${fragments.map((f) => `#${f.pr}`).join(", ")}`)
+  console.error(
+    `stamped ## [${version}] - ${date} from ${fragments.length} fragment(s): ${fragments.map((f) => `#${f.pr}`).join(", ")}`,
+  )
 }
 
 if (import.meta.main) await main()

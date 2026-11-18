@@ -3,10 +3,20 @@ import type { Provenance } from "./types"
 /** The worker boundary also serves JavaScript callers, not just typed engine requests. */
 export function isProvenance(value: unknown): value is Provenance {
   if (typeof value !== "object" || value === null) return false
-  return "workspace" in value && typeof value.workspace === "string" && value.workspace.trim().length > 0
-    && "project" in value && typeof value.project === "string" && value.project.trim().length > 0
-    && (!("lane" in value) || value.lane === undefined || (typeof value.lane === "string" && value.lane.trim().length > 0))
-    && (!("session" in value) || value.session === undefined || (typeof value.session === "string" && value.session.trim().length > 0))
+  return (
+    "workspace" in value &&
+    typeof value.workspace === "string" &&
+    value.workspace.trim().length > 0 &&
+    "project" in value &&
+    typeof value.project === "string" &&
+    value.project.trim().length > 0 &&
+    (!("lane" in value) ||
+      value.lane === undefined ||
+      (typeof value.lane === "string" && value.lane.trim().length > 0)) &&
+    (!("session" in value) ||
+      value.session === undefined ||
+      (typeof value.session === "string" && value.session.trim().length > 0))
+  )
 }
 
 /** Insert-only: existing JSON remains readable and receivers can update historical delivery state. */

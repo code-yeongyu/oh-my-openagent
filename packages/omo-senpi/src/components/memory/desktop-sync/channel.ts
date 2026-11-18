@@ -1,8 +1,14 @@
 import type { Duplex } from "node:stream"
+import { DesktopSyncRefused } from "./desktopSyncProtocol"
 import { readFrames, writeFrame } from "./framing"
 import {
-  desktopSyncChild, desktopSyncEvent, desktopSyncReply, desktopSyncRequest, DesktopSyncUnavailable,
-  type DesktopSyncEvent, type DesktopSyncRequest,
+  desktopSyncChild,
+  desktopSyncEvent,
+  desktopSyncReply,
+  desktopSyncRequest,
+  DesktopSyncUnavailable,
+  type DesktopSyncEvent,
+  type DesktopSyncRequest,
 } from "./protocol"
 
 export type { DesktopSyncEvent, DesktopSyncRequest } from "./protocol"
@@ -38,24 +44,32 @@ export async function attachDesktopSyncChannel(stream: Duplex | undefined): Prom
     waiting.clear()
     listeners.clear()
   }
-  readFrames(stream, (packet) => {
-    if (typeof packet === "object" && packet !== null && "event" in packet) {
-      const event = desktopSyncEvent.parse(packet)
-      if (child === undefined || event.child !== child) throw new DesktopSyncUnavailable()
-      for (const listener of listeners) listener(event)
-      if (event.event === "retired") close()
-      return
-    }
-    const reply = desktopSyncReply.parse(packet)
-    const pending = waiting.get(reply.id)
-    if (pending === undefined) throw new DesktopSyncUnavailable()
-    waiting.delete(reply.id)
-    if (reply.ok) pending.resolve(reply.value)
-    else pending.reject(new DesktopSyncUnavailable())
-  }, close)
+  readFrames(
+    stream,
+    (packet) => {
+      if (typeof packet === "object" && packet !== null && "event" in packet) {
+        const event = desktopSyncEvent.parse(packet)
+        if (child === undefined || event.child !== child) throw new DesktopSyncUnavailable()
+        // `retired` ends main's current account, not the channel: the account source ends that account and the
+        // next resolve opens main's next one (#13325). Only a closed stream ends the channel.
+        for (const listener of listeners) listener(event)
+        return
+      }
+      const reply = desktopSyncReply.parse(packet)
+      const pending = waiting.get(reply.id)
+      if (pending === undefined) throw new DesktopSyncUnavailable()
+      waiting.delete(reply.id)
+      // A refusal is main's answer (signed out, or a handle it no longer knows), not a broken channel: the same
+      // DesktopSyncRefused a session Worker's port gives, which the account source reads as signed out.
+      if (reply.ok) pending.resolve(reply.value)
+      else pending.reject(new DesktopSyncRefused())
+    },
+    close,
+  )
   // Not async: the authority's admission callback must enclose the immediate write.
   const request = (packet: Readonly<Record<string, unknown>>): Promise<unknown> => {
-    if (lifetime.signal.aborted || waiting.size >= 64 || nextId >= 0x7fffffff) return Promise.reject(new DesktopSyncUnavailable())
+    if (lifetime.signal.aborted || waiting.size >= 64 || nextId >= 0x7fffffff)
+      return Promise.reject(new DesktopSyncUnavailable())
     const id = ++nextId
     const pending = Promise.withResolvers<unknown>()
     waiting.set(id, pending)
@@ -78,7 +92,9 @@ export async function attachDesktopSyncChannel(stream: Duplex | undefined): Prom
         close,
         onEvent(listener) {
           if (!lifetime.signal.aborted) listeners.add(listener)
-          return () => { listeners.delete(listener) }
+          return () => {
+            listeners.delete(listener)
+          }
         },
         request(packet) {
           const parsed = desktopSyncRequest.safeParse(packet)

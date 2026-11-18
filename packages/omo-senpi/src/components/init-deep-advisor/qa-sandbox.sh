@@ -3,7 +3,9 @@ set -euo pipefail
 set -o pipefail
 
 SANDBOX="" SANDBOX2=""
-export SENPI_BIN=/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-senpi-onboarding-init-deep-advisor/packages/omo-senpi/plugin/extensions/omo.js
+REPO_ROOT=$(git -C "$(dirname -- "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)
+export SENPI_BIN="${SENPI_BIN:-$REPO_ROOT/packages/omo-senpi/plugin/extensions/omo.js}"
+test -f "$SENPI_BIN" || { printf 'SENPI_BIN plugin does not exist: %s (build it with bun run build:senpi-plugin)\n' "$SENPI_BIN" >&2; exit 1; }
 MOCK_PROVIDER="$PWD/packages/omo-senpi/scripts/qa/mock-provider/index.ts"
 
 cleanup() { rm -rf -- "${SANDBOX:-}" "${SANDBOX2:-}"; }

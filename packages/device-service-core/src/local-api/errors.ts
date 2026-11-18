@@ -1,4 +1,6 @@
-import type { PathRefusal } from "./protocol.ts";
+// Vendored from sisyphuslabs/omo-relay-daemon@edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6 packages/local-api/src/errors.ts
+import type { IncompleteDevice, PathRefusal, SessionCandidate } from "./protocol.ts";
+import type { SignInReason } from "./protocol-status.ts";
 import type { ClientErrorCode, ErrorCode } from "./vocabulary.ts";
 
 // Every failure the local API reports: an owner's error response (code, reason, action) or one the client raises
@@ -11,9 +13,11 @@ export class LocalApiError extends Error {
   readonly path_refusal?: PathRefusal;
   // On a session.command that timed out: the command_id it was sent under, whose outcome may still arrive.
   readonly command_id?: string;
-  // Set when the call failed before any session.command was written (for example the endpoint lookup an endpoint
-  // command makes first): nothing was dispatched, so a caller may treat it as refused and retry safely.
-  readonly not_sent?: true;
+  // #393 part B: an alias's session_ambiguous candidates, or the devices that kept its session_not_found incomplete.
+  readonly candidates?: readonly SessionCandidate[];
+  readonly incomplete?: readonly IncompleteDevice[];
+  // #1031: on a device.adopt sign_in_required that asked for it, why sign-in is needed.
+  readonly sign_in_reason?: SignInReason;
 
   constructor(
     code: ErrorCode | ClientErrorCode,
@@ -23,7 +27,9 @@ export class LocalApiError extends Error {
       readonly limit_chars?: number;
       readonly path_refusal?: PathRefusal;
       readonly command_id?: string;
-      readonly not_sent?: true;
+      readonly candidates?: readonly SessionCandidate[];
+      readonly incomplete?: readonly IncompleteDevice[];
+      readonly sign_in_reason?: SignInReason;
     } = {},
   ) {
     super(`${code}: ${reason}`);
@@ -34,7 +40,9 @@ export class LocalApiError extends Error {
     if (extra.limit_chars !== undefined) this.limit_chars = extra.limit_chars;
     if (extra.path_refusal !== undefined) this.path_refusal = extra.path_refusal;
     if (extra.command_id !== undefined) this.command_id = extra.command_id;
-    if (extra.not_sent === true) this.not_sent = true;
+    if (extra.candidates !== undefined) this.candidates = extra.candidates;
+    if (extra.incomplete !== undefined) this.incomplete = extra.incomplete;
+    if (extra.sign_in_reason !== undefined) this.sign_in_reason = extra.sign_in_reason;
   }
 }
 

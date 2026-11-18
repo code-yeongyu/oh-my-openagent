@@ -17,7 +17,8 @@ afterAll(() => rmSync(scratch, { recursive: true, force: true }))
 
 async function readJsonObject(url: URL): Promise<JsonObject> {
   const parsed: unknown = JSON.parse(await readFile(url, "utf8"))
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) throw new Error(`${url.pathname} must contain a JSON object`)
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))
+    throw new Error(`${url.pathname} must contain a JSON object`)
   return parsed as JsonObject
 }
 
@@ -35,26 +36,68 @@ function isInsidePackageNodeModules(typeRoot: string): boolean {
 
 const toPosix = (path: string): string => path.replaceAll("\\", "/")
 
-type DecoyListing = { decoy: string; exitCode: number; stdout: string; stderr: string; files: string[]; nodeTypes: string[] }
+type DecoyListing = {
+  decoy: string
+  exitCode: number
+  stdout: string
+  stderr: string
+  files: string[]
+  nodeTypes: string[]
+}
 
 async function listNodeTypesUnderDecoyParent(name: string, linkPackageNodeTypes: boolean): Promise<DecoyListing> {
   const decoy = join(scratch, name)
   const project = join(decoy, "project")
   mkdirSync(join(decoy, "node_modules", "@types", "node"), { recursive: true })
-  writeFileSync(join(decoy, "node_modules", "@types", "node", "package.json"), JSON.stringify({ name: "@types/node", version: "0.0.0-decoy", types: "index.d.ts" }))
-  writeFileSync(join(decoy, "node_modules", "@types", "node", "index.d.ts"), 'declare module "child_process" { interface ForkOptions { cwd?: string } }\n')
+  writeFileSync(
+    join(decoy, "node_modules", "@types", "node", "package.json"),
+    JSON.stringify({ name: "@types/node", version: "0.0.0-decoy", types: "index.d.ts" }),
+  )
+  writeFileSync(
+    join(decoy, "node_modules", "@types", "node", "index.d.ts"),
+    'declare module "child_process" { interface ForkOptions { cwd?: string } }\n',
+  )
   mkdirSync(join(project, "src"), { recursive: true })
   mkdirSync(join(project, "node_modules", "@types"), { recursive: true })
   writeFileSync(join(project, "src", "index.ts"), "export const probe = 1\n")
-  symlinkSync(realpathSync(join(packageDir, "node_modules", "bun-types")), join(project, "node_modules", "bun-types"), "junction")
-  if (linkPackageNodeTypes) symlinkSync(realpathSync(join(packageDir, "node_modules", "@types", "node")), join(project, "node_modules", "@types", "node"), "junction")
+  symlinkSync(
+    realpathSync(join(packageDir, "node_modules", "bun-types")),
+    join(project, "node_modules", "bun-types"),
+    "junction",
+  )
+  if (linkPackageNodeTypes)
+    symlinkSync(
+      realpathSync(join(packageDir, "node_modules", "@types", "node")),
+      join(project, "node_modules", "@types", "node"),
+      "junction",
+    )
   const tsconfig = await readJsonObject(new URL("tsconfig.json", packageRoot))
-  writeFileSync(join(project, "tsconfig.json"), JSON.stringify({ compilerOptions: tsconfig.compilerOptions, include: ["src/**/*"] }))
+  writeFileSync(
+    join(project, "tsconfig.json"),
+    JSON.stringify({ compilerOptions: tsconfig.compilerOptions, include: ["src/**/*"] }),
+  )
 
-  const proc = Bun.spawn([process.execPath, tsgo, "-p", join(project, "tsconfig.json"), "--listFilesOnly"], { stdout: "pipe", stderr: "pipe" })
-  const [stdout, stderr, exitCode] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited])
-  const files = stdout.split(/\r?\n/).filter((line) => isAbsolute(line)).map(toPosix)
-  return { decoy: toPosix(join(decoy, "node_modules")), exitCode, stdout, stderr, files, nodeTypes: files.filter((file) => file.includes("/@types/node/")) }
+  const proc = Bun.spawn([process.execPath, tsgo, "-p", join(project, "tsconfig.json"), "--listFilesOnly"], {
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ])
+  const files = stdout
+    .split(/\r?\n/)
+    .filter((line) => isAbsolute(line))
+    .map(toPosix)
+  return {
+    decoy: toPosix(join(decoy, "node_modules")),
+    exitCode,
+    stdout,
+    stderr,
+    files,
+    nodeTypes: files.filter((file) => file.includes("/@types/node/")),
+  }
 }
 
 // A frozen install may leave the root's overridden @types/node out of node_modules, and tsc/tsgo then walks up to a
@@ -78,7 +121,10 @@ describe("omo-senpi typecheck resolves only its own type packages", () => {
   }, 60_000)
 
   test("#given a decoy @types/node in a parent folder and no local @types/node #when the program is listed #then tsgo reports node types as missing and never loads the decoy", async () => {
-    const { decoy, exitCode, stdout, stderr, files, nodeTypes } = await listNodeTypesUnderDecoyParent("missing-install", false)
+    const { decoy, exitCode, stdout, stderr, files, nodeTypes } = await listNodeTypesUnderDecoyParent(
+      "missing-install",
+      false,
+    )
 
     expect({ exitCode, stderr }).toEqual({ exitCode: 1, stderr: "" })
     expect(stdout.split(/\r?\n/).some((line) => line.includes("error TS2688:") && line.includes("'node'"))).toBe(true)
@@ -91,9 +137,12 @@ describe("omo-senpi typecheck resolves only its own type packages", () => {
     ["./node_modules", true],
     ["./node_modules/../..", false],
     ["../../node_modules/@types", false],
-  ])("#given the type root %s #when it is resolved against the package #then package-local is %p", (typeRoot, expected) => {
-    expect(isInsidePackageNodeModules(typeRoot)).toBe(expected)
-  })
+  ])(
+    "#given the type root %s #when it is resolved against the package #then package-local is %p",
+    (typeRoot, expected) => {
+      expect(isInsidePackageNodeModules(typeRoot)).toBe(expected)
+    },
+  )
 
   test("#given the tsconfig #when its type roots are resolved #then every root is inside the package's own node_modules", async () => {
     const tsconfig = await readJsonObject(new URL("tsconfig.json", packageRoot))

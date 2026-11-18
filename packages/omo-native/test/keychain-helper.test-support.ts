@@ -16,7 +16,10 @@ export type Harness = {
   readonly helper: string
   readonly buildFlavor: (name: string, build: Omit<KeychainHelperBuild, "output">) => Promise<string>
   readonly fixture: (op: string, ...args: string[]) => Promise<string>
-  readonly run: (request: object | string, options?: { readonly binary?: string; readonly args?: readonly string[] }) => Promise<HelperRun>
+  readonly run: (
+    request: object | string,
+    options?: { readonly binary?: string; readonly args?: readonly string[] },
+  ) => Promise<HelperRun>
   readonly dispose: () => Promise<void>
 }
 
@@ -34,7 +37,9 @@ async function output(command: readonly string[]): Promise<string> {
 /** The user's keychain search list, read only: the tests prove they leave it exactly as they found it. */
 export const userSearchList = (): Promise<string> => output(["/usr/bin/security", "list-keychains", "-d", "user"])
 
-export async function readLine(stream: ReadableStream<Uint8Array>): Promise<{ readonly line: string; readonly rest: Promise<string> }> {
+export async function readLine(
+  stream: ReadableStream<Uint8Array>,
+): Promise<{ readonly line: string; readonly rest: Promise<string> }> {
   const reader = stream.getReader()
   const decoder = new TextDecoder()
   let text = ""
@@ -54,7 +59,8 @@ export async function readLine(stream: ReadableStream<Uint8Array>): Promise<{ re
   return { line: text, rest }
 }
 
-const isReply = (value: unknown): value is HelperReply => typeof value === "object" && value !== null && !Array.isArray(value)
+const isReply = (value: unknown): value is HelperReply =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
 
 export async function createHarness(): Promise<Harness> {
   const dir = mkdtempSync(join(tmpdir(), "omo-keychain-helper-"))
@@ -79,7 +85,12 @@ export async function createHarness(): Promise<Harness> {
 
   const run: Harness["run"] = async (request, options = {}) => {
     const args = options.args ?? ["--keychain", keychain, "--no-ui"]
-    const child = Bun.spawn([options.binary ?? helper, ...args], { stdin: "pipe", stdout: "pipe", stderr: "pipe", env: {} })
+    const child = Bun.spawn([options.binary ?? helper, ...args], {
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
+      env: {},
+    })
     child.stdin.write(`${typeof request === "string" ? request : JSON.stringify(request)}\n`)
     child.stdin.flush()
     const { line, rest } = await readLine(child.stdout)

@@ -110,7 +110,7 @@ Phase 5 opens by turning the recorded fields into `design-spec.md`.
 
 ## Phase 1 — Saturation wave
 
-**When the user asked for MASS research, the wave is sized by the topic's angles, not by the roster ceiling.** "mass ulw research", "mulw research", "ulw mass research" — in any language — order over-collection that a team of 8 cannot produce. Where the harness has a dependency-graph surface (the `mass-ulw` skill and its `references/planning.md`), run collection through it instead: 60+ angles covering every angle the topic has, routed across the whole difficulty ladder — mechanical sweeps and per-item harvest batches on the cheapest tier, judgment-shaped angles a step up, cross-territory angles a step above that, and the deepest tier reserved for genuinely hairy contradictions. Define each angle as a harvest -> expand -> verify chain before the run starts, each stage reading the previous stage's handoff file; open leads re-enter as new chains in each cluster of angles the moment that cluster settles, and the synthesis reduces through per-cluster architect-tier slice reducers into ONE architect-tier reducer (the strongest reasoning tier substitutes wherever no architect tier exists). Absent that surface, run the same per-angle chains with background workers, pasting each worker's reply into its angle's next-stage prompt the moment it reports. Everything else in this skill still binds: the deliverable interview, the journal, the claim graph, the convergence rules, and the delivery gates.
+**When the user asked for MASS research, the wave is sized by the topic's angles, not by the roster ceiling.** "mass ulw research", "mulw research", "ulw mass research" — in any language — order over-collection that a team of 8 cannot produce. Where the harness has a dependency-graph surface (the `mass-ulw` skill and its `references/planning.md`), run collection through it instead: one harvest node per angle the topic has, routed across the whole difficulty ladder — mechanical sweeps and per-item harvest batches on the cheapest tier, judgment-shaped angles a step up, cross-territory angles a step above that, and the deepest tier reserved for genuinely hairy contradictions. Each harvest writes its handoff file; when a cluster of angles settles, its open leads re-enter as new nodes until a round finds nothing new, the claims the synthesis rests on are verified per cluster, and the synthesis reduces in ONE architect-tier reducer, fed by per-cluster architect-tier slice reducers when one context cannot hold the result (the strongest reasoning tier substitutes wherever no architect tier exists). Absent that surface, run the same angles with background workers, feeding each worker's open leads into the next round the moment it reports. Everything else in this skill still binds: the deliverable interview, the journal, the claim graph, the convergence rules, and the delivery gates.
 
 Otherwise launch the entire first wave in one turn — every axis at once, as team members if you formed a team, else as background workers. Sequential launches and "start with one and see" defeat the mode.
 
@@ -139,7 +139,7 @@ task(subagent_type="explore", run_in_background=true, prompt="TASK: act as a cod
 This is an explicit exhaustive-research assignment. Your default retrieval budget and stop-when-answered rules do not apply — run the full protocol below and report every lead.
 SCOPE: find everything in this codebase related to <angle>: <what complete looks like>.
 PROTOCOL: grep 3+ keyword variations; structural search; LSP references; globs; git history (-S and --grep). Cross-validate across tools. Report absolute paths and file:line patterns.
-End your reply with the ## EXPAND tail: '- LEAD: <discovery> — WHY: <why> — ANGLE: <search>' per lead, or 'none — <reason>'.")
+Tag every claim OBSERVED: <URL | file:line | command>. End your reply with the ## EXPAND tail: '- LEAD: <discovery> — WHY: <why> — ANGLE: <search>' per lead, '- DEAD END: <lead> — PROBED: <what exhausted it>', or 'none — <reason>'.")
 ```
 
 ## Phase 2 — Expand until convergence
@@ -154,7 +154,7 @@ This loop is what makes the mode research rather than search. Collect returns as
 task(category="deep-low", load_skills=["browser"], run_in_background=true, prompt="TASK: expansion wave <N> — investigate: <lead>.
 PARENT: <which return surfaced it>. This is an explicit exhaustive-research assignment; budgets do not apply.
 <role protocol for the lead's territory — web protocol for external leads, explore protocol for codebase leads>
-End your reply with the ## EXPAND tail.")
+Tag every claim OBSERVED: <URL | file:line | command>. End your reply with the ## EXPAND tail.")
 ```
 
 ### Excursions — dive deep on a new find, then surface back out

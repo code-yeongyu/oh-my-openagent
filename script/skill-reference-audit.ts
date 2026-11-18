@@ -138,7 +138,9 @@ function skillNamesUnder(root: string): string[] {
 
 function codexComponentSkillRoots(repoRoot: string): string[] {
   const componentsRoot = join(repoRoot, "packages", "omo-codex", "plugin", "components")
-  return listDirectories(componentsRoot).flatMap((component) => skillRootsUnder(join(componentsRoot, component, "skills")))
+  return listDirectories(componentsRoot).flatMap((component) =>
+    skillRootsUnder(join(componentsRoot, component, "skills")),
+  )
 }
 
 function codexAgentRoleNames(repoRoot: string): string[] {
@@ -148,7 +150,10 @@ function codexAgentRoleNames(repoRoot: string): string[] {
     if (!existsSync(agentsDir)) return []
     return readdirSync(agentsDir)
       .filter((file) => file.endsWith(".toml"))
-      .map((file) => readFileSync(join(agentsDir, file), "utf8").match(/^name\s*=\s*"([^"]+)"/m)?.[1] ?? basename(file, ".toml"))
+      .map(
+        (file) =>
+          readFileSync(join(agentsDir, file), "utf8").match(/^name\s*=\s*"([^"]+)"/m)?.[1] ?? basename(file, ".toml"),
+      )
   })
 }
 
@@ -182,7 +187,9 @@ function buildReferenceCatalog(repoRoot: string): ReferenceCatalog {
   const sharedRoots = skillRootsUnder(join(packagesRoot, "shared-skills", "skills"))
   const nativeSources = createNativeSkillSources(packagesRoot).sources
   const xSearchRoot = join(packagesRoot, "omo-senpi", "src", "components", "x-search", "skill")
-  const loaderBuiltinRoots = skillRootsUnder(join(packagesRoot, "skills-loader-core", "src", "features", "builtin-skills"))
+  const loaderBuiltinRoots = skillRootsUnder(
+    join(packagesRoot, "skills-loader-core", "src", "features", "builtin-skills"),
+  )
   const codexComponentRoots = codexComponentSkillRoots(repoRoot)
   const engineRoots = senpiEngineSkillRoots(repoRoot)
   const agentsLocalRoots = skillRootsUnder(join(repoRoot, ".agents", "skills"))
@@ -241,7 +248,8 @@ function buildReferenceCatalog(repoRoot: string): ReferenceCatalog {
 }
 
 const TEXT_FILE = /\.(md|mdx|txt|mjs|js|ts|json|ya?ml|toml)$/
-const NON_SHIPPED_FILE = /(?:\.test\.|\.spec\.|(?:^|\/)(?:test|tests|__tests__|fixtures)\/|(?:^|\/)ATTRIBUTION\.md$|(?:^|\/)EVIDENCE\.md$|(?:^|\/)changes\.md$|(?:^|\/)CHANGELOG\.md$)/
+const NON_SHIPPED_FILE =
+  /(?:\.test\.|\.spec\.|(?:^|\/)(?:test|tests|__tests__|fixtures)\/|(?:^|\/)ATTRIBUTION\.md$|(?:^|\/)EVIDENCE\.md$|(?:^|\/)changes\.md$|(?:^|\/)CHANGELOG\.md$)/
 
 function auditedTree(
   repoRoot: string,
@@ -352,7 +360,8 @@ const PROJECT_LOCAL_MENTION = /\bproject[- ]local(?:ly)?\b/i
 const CONDITIONAL_WORD = /\b(?:when|whenever|if|where|unless)\b/i
 // An optional mention names availability of the skill or of a harness surface, never a generic "has": "when the \`x\`
 // skill is available", "if the session lists the \`x\` skill", "where the harness has a dependency-graph surface".
-const AVAILABILITY_WORD = /\b(?:is available|are available|is listed|are listed|lists|provides|is installed|is (?:driving|active|running|enabled))\b|\b(?:session|harness|environment|runtime)\b[^.]{0,60}\b(?:has|have|gives|provides)\b/i
+const AVAILABILITY_WORD =
+  /\b(?:is available|are available|is listed|are listed|lists|provides|is installed|is (?:driving|active|running|enabled))\b|\b(?:session|harness|environment|runtime)\b[^.]{0,60}\b(?:has|have|gives|provides)\b/i
 
 function taskCallBodies(content: string): { readonly start: number; readonly body: string }[] {
   const bodies: { start: number; body: string }[] = []
@@ -462,7 +471,11 @@ function lineBounds(content: string, index: number): { readonly start: number; r
 
 function lineNumber(content: string, index: number): number {
   let line = 1
-  for (let cursor = content.indexOf("\n"); cursor !== -1 && cursor < index; cursor = content.indexOf("\n", cursor + 1)) {
+  for (
+    let cursor = content.indexOf("\n");
+    cursor !== -1 && cursor < index;
+    cursor = content.indexOf("\n", cursor + 1)
+  ) {
     line += 1
   }
   return line
@@ -505,7 +518,10 @@ const thirdPartyFrontendPaths: ReadonlySet<string> = new Set([
   ...thirdPartyRelativePaths(),
   ...designpowersThirdPartyRelativePaths(),
 ])
-const materializedFrontendPaths: ReadonlySet<string> = new Set([...thirdPartyFrontendPaths, ...keptDesignRelativePaths()])
+const materializedFrontendPaths: ReadonlySet<string> = new Set([
+  ...thirdPartyFrontendPaths,
+  ...keptDesignRelativePaths(),
+])
 
 function resolvesUnder(root: string, reference: string): boolean {
   const target = cleanPath(reference)
@@ -513,7 +529,10 @@ function resolvesUnder(root: string, reference: string): boolean {
   if (existsSync(resolve(root, target))) return true
   // Third-party frontend references are materialized into the package at build time (see the skill's .gitignore).
   const fromFrontend = toPortable(relative(frontendSkillRoot, resolve(root, target)))
-  return materializedFrontendPaths.has(fromFrontend) || [...materializedFrontendPaths].some((path) => path.startsWith(`${fromFrontend.replace(/\/$/, "")}/`))
+  return (
+    materializedFrontendPaths.has(fromFrontend) ||
+    [...materializedFrontendPaths].some((path) => path.startsWith(`${fromFrontend.replace(/\/$/, "")}/`))
+  )
 }
 
 function catalogFor(
@@ -530,7 +549,13 @@ function catalogFor(
  * `task(...)` examples (the synced Senpi output is checked by omo-senpi's skills-sync test), so a
  * target there must be real in OpenCode or Senpi. A Codex `agent_type` must be a Codex role.
  */
-function taskTargetAccepted(file: AuditedFile, catalog: ReferenceCatalog, kind: "agent-name" | "category-name", name: string, isAgentType: boolean): boolean {
+function taskTargetAccepted(
+  file: AuditedFile,
+  catalog: ReferenceCatalog,
+  kind: "agent-name" | "category-name",
+  name: string,
+  isAgentType: boolean,
+): boolean {
   const byEdition = catalogFor(catalog, kind)
   if (isAgentType) return byEdition.codex.has(name)
   if (file.editions.includes("repo")) return byEdition.repo.has(name)
@@ -588,14 +613,29 @@ function auditFile(file: AuditedFile, catalog: ReferenceCatalog, repoRoot: strin
 
     if (raw.referenceClass !== "skill-name") {
       if (taskTargetAccepted(file, catalog, raw.referenceClass, name, isAgentType)) continue
-      const checked: readonly Edition[] = isAgentType ? ["codex"] : file.editions.includes("repo") ? ["repo"] : [file.taskDialect]
-      findings.push({ ...at, referenceClass: raw.referenceClass, reference: name, missingIn: checked, suggestion: suggestName(name, checked.flatMap((edition) => [...byEdition[edition]])) })
+      const checked: readonly Edition[] = isAgentType
+        ? ["codex"]
+        : file.editions.includes("repo")
+          ? ["repo"]
+          : [file.taskDialect]
+      findings.push({
+        ...at,
+        referenceClass: raw.referenceClass,
+        reference: name,
+        missingIn: checked,
+        suggestion: suggestName(
+          name,
+          checked.flatMap((edition) => [...byEdition[edition]]),
+        ),
+      })
       continue
     }
 
     const optional = isOptionalMention(content, raw.index)
     const missingIn = optional
-      ? SHIPPED_EDITIONS.some((edition) => byEdition[edition].has(name)) || PROJECT_LOCAL_MENTION.test(sentenceAround(content, raw.index)) || (editions.includes("repo") && byEdition.repo.has(name))
+      ? SHIPPED_EDITIONS.some((edition) => byEdition[edition].has(name)) ||
+        PROJECT_LOCAL_MENTION.test(sentenceAround(content, raw.index)) ||
+        (editions.includes("repo") && byEdition.repo.has(name))
         ? []
         : editions
       : editions.filter((edition) => !byEdition[edition].has(name))
@@ -605,7 +645,10 @@ function auditFile(file: AuditedFile, catalog: ReferenceCatalog, repoRoot: strin
       referenceClass: "skill-name",
       reference: name,
       missingIn,
-      suggestion: suggestName(name, missingIn.flatMap((edition) => [...byEdition[edition]])),
+      suggestion: suggestName(
+        name,
+        missingIn.flatMap((edition) => [...byEdition[edition]]),
+      ),
     })
   }
   return findings

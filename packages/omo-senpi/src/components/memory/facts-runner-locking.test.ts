@@ -13,15 +13,19 @@ describe("deterministic facts writer-lock interleavings", () => {
     const { root, identity, queue } = await fixture()
     const attempts: number[] = []
     let released = false
-    const runner = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fact", {
-      withWriterLock: async (operation, attempt) => {
-        attempts.push(attempt)
-        if (!released) throw new LockContentionError("memory-write.lock", null)
-        return operation()
-      },
-      retryDelay: async () => { released = true },
-      random: () => 0,
-    }))
+    const runner = new FactsExtractorRunner(
+      runnerOptions(root, identity, queue, "fact", {
+        withWriterLock: async (operation, attempt) => {
+          attempts.push(attempt)
+          if (!released) throw new LockContentionError("memory-write.lock", null)
+          return operation()
+        },
+        retryDelay: async () => {
+          released = true
+        },
+        random: () => 0,
+      }),
+    )
 
     // when
     const result = await runner.launchPending()
@@ -39,19 +43,23 @@ describe("deterministic facts writer-lock interleavings", () => {
     const attempts: number[] = []
     const delays: number[] = []
     const warnings: string[] = []
-    const runner = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fact", {
-      withWriterLock: async (_operation, attempt) => {
-        attempts.push(attempt)
-        throw new LockContentionError("memory-write.lock", null)
-      },
-      retryDelay: async (attempt) => { delays.push(attempt) },
-      logger: {
-        info: () => undefined,
-        warn: (message) => warnings.push(message),
-        error: () => undefined,
-      },
-      random: () => 0,
-    }))
+    const runner = new FactsExtractorRunner(
+      runnerOptions(root, identity, queue, "fact", {
+        withWriterLock: async (_operation, attempt) => {
+          attempts.push(attempt)
+          throw new LockContentionError("memory-write.lock", null)
+        },
+        retryDelay: async (attempt) => {
+          delays.push(attempt)
+        },
+        logger: {
+          info: () => undefined,
+          warn: (message) => warnings.push(message),
+          error: () => undefined,
+        },
+        random: () => 0,
+      }),
+    )
 
     // when
     const result = await runner.launchPending()

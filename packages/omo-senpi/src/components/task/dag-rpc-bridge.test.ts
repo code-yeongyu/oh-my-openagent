@@ -101,10 +101,7 @@ function activityEvent(runId: string, nodeId: string, activity: string): DagBrid
   return { schemaVersion: 1, runId, nodeId, taskId: `st_${nodeId}`, at: "2026-08-14T00:00:00.000Z", activity, turns: 1 }
 }
 
-function wire(
-  runs: readonly DagBridgeRun[],
-  overrides: Partial<DagRpcBridgeDeps> = {},
-) {
+function wire(runs: readonly DagBridgeRun[], overrides: Partial<DagRpcBridgeDeps> = {}) {
   const timers = fakeTimers()
   const { pi, emitted } = fakePi()
   const owned = [...runs]
@@ -138,8 +135,24 @@ function runSnapshot(runId: string, overrides: Partial<DagBridgeRunSnapshot> = {
       skipped: 0,
     },
     nodes: [
-      { id: "plan", prompt: "plan it", dependsOn: [], state: "completed", attempt: 1, createdAt: "2026-08-14T00:00:00.000Z", taskId: "st_plan" },
-      { id: "build", label: "build", prompt: "build it", dependsOn: ["plan"], state: "running", attempt: 1, createdAt: "2026-08-14T00:00:00.000Z" },
+      {
+        id: "plan",
+        prompt: "plan it",
+        dependsOn: [],
+        state: "completed",
+        attempt: 1,
+        createdAt: "2026-08-14T00:00:00.000Z",
+        taskId: "st_plan",
+      },
+      {
+        id: "build",
+        label: "build",
+        prompt: "build it",
+        dependsOn: ["plan"],
+        state: "running",
+        attempt: 1,
+        createdAt: "2026-08-14T00:00:00.000Z",
+      },
     ],
     edges: [{ from: "plan", to: "build" }],
     waves: [
@@ -169,8 +182,7 @@ function wireSnapshots(initial: readonly DagBridgeRunSnapshot[], parentSessionId
   }
 }
 
-const emittedNames = (emitted: readonly EmittedEvent[], name: string) =>
-  emitted.filter((entry) => entry.name === name)
+const emittedNames = (emitted: readonly EmittedEvent[], name: string) => emitted.filter((entry) => entry.name === name)
 
 describe("dag rpc bridge", () => {
   describe("#given a journal that fans out post-durability", () => {
@@ -347,9 +359,7 @@ describe("dag rpc bridge", () => {
       timers.advance(DAG_ACTIVITY_COALESCE_MS)
 
       // then
-      const activity = emittedNames(emitted, "omo.dag.activity").map(
-        (entry) => (entry.data as DagBridgeActivityEvent),
-      )
+      const activity = emittedNames(emitted, "omo.dag.activity").map((entry) => entry.data as DagBridgeActivityEvent)
       expect(activity.map((event) => [event.nodeId, event.activity])).toEqual([
         ["node_a", "a2"],
         ["node_b", "b1"],
@@ -446,8 +456,25 @@ describe("dag rpc bridge", () => {
         runSnapshot("dag_1", {
           status: "completed",
           nodes: [
-            { id: "plan", prompt: "plan it", dependsOn: [], state: "completed", attempt: 1, createdAt: "2026-08-14T00:00:00.000Z", taskId: "st_plan" },
-            { id: "build", label: "build", prompt: "build it", dependsOn: ["plan"], state: "completed", attempt: 1, createdAt: "2026-08-14T00:00:00.000Z", taskId: "st_build" },
+            {
+              id: "plan",
+              prompt: "plan it",
+              dependsOn: [],
+              state: "completed",
+              attempt: 1,
+              createdAt: "2026-08-14T00:00:00.000Z",
+              taskId: "st_plan",
+            },
+            {
+              id: "build",
+              label: "build",
+              prompt: "build it",
+              dependsOn: ["plan"],
+              state: "completed",
+              attempt: 1,
+              createdAt: "2026-08-14T00:00:00.000Z",
+              taskId: "st_build",
+            },
           ],
         }),
       ])
@@ -457,7 +484,9 @@ describe("dag rpc bridge", () => {
       // then
       const updates = emittedNames(emitted, "omo.dag.updated")
       expect(updates).toHaveLength(2)
-      const latest = updates[1]?.data as { runs: { status: string; nodes: { id: string; state: string; task_id?: string }[] }[] }
+      const latest = updates[1]?.data as {
+        runs: { status: string; nodes: { id: string; state: string; task_id?: string }[] }[]
+      }
       expect(latest.runs[0]?.status).toBe("completed")
       expect(latest.runs[0]?.nodes.map((node) => [node.id, node.state])).toEqual([
         ["plan", "completed"],
@@ -676,7 +705,16 @@ describe("dag rpc bridge", () => {
       const failed = runSnapshot("dag_1", {
         status: "failed",
         nodes: [
-          { id: "build", prompt: "build it", dependsOn: [], state: "failed", attempt: 1, createdAt: "2026-08-14T00:00:00.000Z", taskId: "st_build", error: { code: "task_error", message: "build exited 1" } },
+          {
+            id: "build",
+            prompt: "build it",
+            dependsOn: [],
+            state: "failed",
+            attempt: 1,
+            createdAt: "2026-08-14T00:00:00.000Z",
+            taskId: "st_build",
+            error: { code: "task_error", message: "build exited 1" },
+          },
         ],
       })
       const { bridge, emitted, timers, setSnapshots } = wireSnapshots([failed])
@@ -689,7 +727,15 @@ describe("dag rpc bridge", () => {
         runSnapshot("dag_1", {
           status: "running",
           nodes: [
-            { id: "build", prompt: "build it", dependsOn: [], state: "running", attempt: 2, createdAt: "2026-08-14T00:00:00.000Z", taskId: "st_build" },
+            {
+              id: "build",
+              prompt: "build it",
+              dependsOn: [],
+              state: "running",
+              attempt: 2,
+              createdAt: "2026-08-14T00:00:00.000Z",
+              taskId: "st_build",
+            },
           ],
         }),
       ])
@@ -709,7 +755,16 @@ describe("dag rpc bridge", () => {
       const first = runSnapshot("dag_1", {
         status: "failed",
         nodes: [
-          { id: "build", prompt: "build it", dependsOn: [], state: "failed", attempt: 2, createdAt: "2026-08-14T00:00:00.000Z", taskId: "st_build", error: { code: "task_error", message: "build exited 1" } },
+          {
+            id: "build",
+            prompt: "build it",
+            dependsOn: [],
+            state: "failed",
+            attempt: 2,
+            createdAt: "2026-08-14T00:00:00.000Z",
+            taskId: "st_build",
+            error: { code: "task_error", message: "build exited 1" },
+          },
         ],
       })
       const { bridge, emitted, timers, setSnapshots } = wireSnapshots([first])
@@ -721,7 +776,16 @@ describe("dag rpc bridge", () => {
         runSnapshot("dag_1", {
           status: "failed",
           nodes: [
-            { id: "build", prompt: "build it", dependsOn: [], state: "failed", attempt: 2, createdAt: "2026-08-14T00:00:00.000Z", taskId: "st_build", error: { code: "task_cancelled", message: "cancelled by operator" } },
+            {
+              id: "build",
+              prompt: "build it",
+              dependsOn: [],
+              state: "failed",
+              attempt: 2,
+              createdAt: "2026-08-14T00:00:00.000Z",
+              taskId: "st_build",
+              error: { code: "task_cancelled", message: "cancelled by operator" },
+            },
           ],
         }),
       ])
@@ -773,7 +837,9 @@ describe("dag rpc bridge", () => {
   // the whole process down ("OmO exiting due to uncaughtException: ENOENT ... dag/runs").
   describe("#given the run store stops being readable mid-session", () => {
     function storeFault(): Error {
-      return Object.assign(new Error("ENOENT: no such file or directory, scandir '/p/.omo/senpi-task/dag/runs'"), { code: "ENOENT" })
+      return Object.assign(new Error("ENOENT: no such file or directory, scandir '/p/.omo/senpi-task/dag/runs'"), {
+        code: "ENOENT",
+      })
     }
 
     it("#when the heartbeat tick hits the fault #then the tick survives, logs once, and beats resume when reads recover", () => {

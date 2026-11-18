@@ -70,16 +70,26 @@ async function findCommitSecretFailures(run: CompletionGitRun, commit: string): 
   for (const record of introduced) {
     const hit = scanSecretLikeMaterial(record.path)[0]
     if (hit !== undefined) {
-      flag(record.path, `secret_like_content: ${redactSecretLikeMaterial(record.path)} (${hit.class}, file name) @${commit.slice(0, 7)}`)
+      flag(
+        record.path,
+        `secret_like_content: ${redactSecretLikeMaterial(record.path)} (${hit.class}, file name) @${commit.slice(0, 7)}`,
+      )
     }
   }
   const blobRecords = introduced.filter((record) => SCANNED_BLOB_MODES.has(record.dstMode))
-  const blobs = await readBlobContents(run, blobRecords.map((record) => record.dstSha))
+  const blobs = await readBlobContents(
+    run,
+    blobRecords.map((record) => record.dstSha),
+  )
   for (const record of blobRecords) {
     const content = blobs.get(record.dstSha)
     if (content === undefined) continue
     const hit = scanSecretLikeMaterial(content)[0]
-    if (hit !== undefined) flag(record.path, `secret_like_content: ${redactSecretLikeMaterial(record.path)} (${hit.class}) @${commit.slice(0, 7)}`)
+    if (hit !== undefined)
+      flag(
+        record.path,
+        `secret_like_content: ${redactSecretLikeMaterial(record.path)} (${hit.class}) @${commit.slice(0, 7)}`,
+      )
   }
   return failures
 }
@@ -91,7 +101,16 @@ async function findCommitSecretFailures(run: CompletionGitRun, commit: string): 
  */
 async function listCommitFileVersions(run: CompletionGitRun, commit: string): Promise<DiffTreeRecord[]> {
   const result = await run([
-    ...STABLE_LOG_OUTPUT, "diff-tree", "-r", "-m", "--no-commit-id", "--no-renames", "--diff-filter=AMT", "--raw", "-z", commit,
+    ...STABLE_LOG_OUTPUT,
+    "diff-tree",
+    "-r",
+    "-m",
+    "--no-commit-id",
+    "--no-renames",
+    "--diff-filter=AMT",
+    "--raw",
+    "-z",
+    commit,
   ])
   if (result.code !== 0) throw new Error(result.stderr.trim() || "git diff-tree failed")
   const parts = result.stdout.split("\0")

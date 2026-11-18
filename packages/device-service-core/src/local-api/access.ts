@@ -1,4 +1,5 @@
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+// Vendored from sisyphuslabs/omo-relay-daemon@edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6 packages/local-api/src/access.ts
+import { randomBytes } from "node:crypto";
 import {
   chmodSync,
   closeSync,
@@ -11,63 +12,31 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { LocalApiError } from "./errors.ts";
+import { decodedBytes, mintId } from "./proof.ts";
 
 export { applyExactDacl, verifyExactDacl, windowsSecureFile } from "./dacl.ts";
+export { clientProof, mintId, mintNonce, NONCE_BYTES, proofMatches, serverProof } from "./proof.ts";
 
 // The access contract (docs/local-api.md "Access"): a private state dir, and a 32-byte per-boot token in
-// <state dir>/token that both sides prove with HMAC-SHA256 before any request is honored.
+// <state dir>/token that both sides prove with HMAC-SHA256 (proof.ts) before any request is honored.
 export const TOKEN_FILE = "token";
 export const TOKEN_BYTES = 32;
-export const NONCE_BYTES = 32;
 export const SOCKET_FILE = "service.sock";
 
 // Applies and verifies the platform protection of one state dir entry; throws insecure_state_dir when it cannot.
 export type SecureFile = (path: string, kind: "dir" | "file" | "socket") => Promise<void>;
 
 const base64url = (bytes: Uint8Array): string => Buffer.from(bytes).toString("base64url");
-export const mintNonce = (): string => base64url(randomBytes(NONCE_BYTES));
-export const mintId = (): string => base64url(randomBytes(16));
 
 const insecure = (detail: string): never => {
   throw new LocalApiError("insecure_state_dir", detail);
 };
 
-const decoded = (value: string, bytes: number, what: string): Uint8Array => {
-  const out = Buffer.from(value, "base64url");
-  if (out.length !== bytes || base64url(out) !== value)
-    throw new LocalApiError("protocol_violation", `${what} is not ${bytes} base64url bytes`);
-  return out;
-};
-
 // The endpoint both proofs are bound to: `tcp:<port>` for the Windows loopback listener (the owner's listening port;
 // for a client, the port it read from endpoint.json and connected to), `unix` for the POSIX socket in the private
-// state dir. A forwarder through a squatted old port proves the wrong endpoint on both sides.
+// state dir. A relay through a squatted old port proves the wrong endpoint on both sides.
 export const UNIX_ENDPOINT = "unix";
 export const tcpEndpoint = (port: number): string => `tcp:${port}`;
-
-// HMAC-SHA256(token, label || nonce (32 raw bytes) || UTF-8 endpoint); the label and nonce are fixed-length.
-const proof = (
-  token: Uint8Array,
-  label: "server" | "client",
-  nonce: string,
-  endpoint: string,
-): string =>
-  base64url(
-    createHmac("sha256", token)
-      .update(label)
-      .update(decoded(nonce, NONCE_BYTES, "a nonce"))
-      .update(endpoint, "utf8")
-      .digest(),
-  );
-export const serverProof = (token: Uint8Array, clientNonce: string, endpoint: string): string =>
-  proof(token, "server", clientNonce, endpoint);
-export const clientProof = (token: Uint8Array, serverNonce: string, endpoint: string): string =>
-  proof(token, "client", serverNonce, endpoint);
-export const proofMatches = (expected: string, actual: string): boolean => {
-  const a = Buffer.from(expected);
-  const b = Buffer.from(actual);
-  return a.length === b.length && timingSafeEqual(a, b);
-};
 
 const isMissing = (error: unknown): boolean =>
   typeof error === "object" &&
@@ -123,7 +92,7 @@ export const readToken = (stateDir: string): Uint8Array => {
     throw error;
   }
   try {
-    return decoded(value, TOKEN_BYTES, "the token");
+    return decodedBytes(value, TOKEN_BYTES, "the token");
   } catch (error) {
     if (error instanceof LocalApiError) return insecure("the token is malformed");
     throw error;

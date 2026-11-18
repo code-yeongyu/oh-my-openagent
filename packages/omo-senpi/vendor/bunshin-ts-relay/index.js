@@ -62,8 +62,10 @@ var STATUS_STATES = [
   "authorization_stale",
   "service_degraded",
   "update_required",
-  "signed_out"
+  "signed_out",
+  "fail_closed"
 ];
+var STATUS_UPDATE_PHASES = ["trial", "committed"];
 var POLICY_STATES = ["off", "pending", "active"];
 var THIS_DEVICE_STATES = [
   "unclassified",
@@ -78,7 +80,6 @@ var OPTIONAL_CAPABILITIES = ["machine"];
 var REFUSED_REASONS = ["version", "data_home_required", "malformed"];
 var COMMAND_ID_CHARS = 22;
 var MACHINE_STATES = ["online", "offline", "unsupported"];
-var MACHINE_ROUTE_KINDS = ["internet", "lan"];
 var MACHINE_LOOKUP_STATES = ["in_flight", "terminal", "unknown"];
 // packages/local-api/src/errors.ts
 class LocalApiError extends Error {
@@ -90,6 +91,7 @@ class LocalApiError extends Error {
   command_id;
   candidates;
   incomplete;
+  sign_in_reason;
   constructor(code, reason, extra = {}) {
     super(`${code}: ${reason}`);
     this.name = "LocalApiError";
@@ -106,6 +108,8 @@ class LocalApiError extends Error {
       this.candidates = extra.candidates;
     if (extra.incomplete !== undefined)
       this.incomplete = extra.incomplete;
+    if (extra.sign_in_reason !== undefined)
+      this.sign_in_reason = extra.sign_in_reason;
   }
 }
 // packages/local-api/src/framing.ts
@@ -238,7 +242,6 @@ import { createHash } from "node:crypto";
 // packages/bunshin-ts-relay/src/spec-proto.ts
 var SESSION_BLOB_MAX = 16777216;
 var SESSION_DEVICE_MAX_CHARS = 64;
-var SESSION_KIND_MAX_CHARS = 32;
 class ProtoError extends Error {
   code;
   constructor(code, detail) {
@@ -259,6 +262,11 @@ var LOCAL_INLINE_MAX = 524288;
 var LOCAL_CHUNK_MAX = 262144;
 var LOCAL_JSON_EXPANSION_MAX = 6;
 var LOCAL_BLOB_MAX = LOCAL_JSON_EXPANSION_MAX * SESSION_BLOB_MAX;
+var MACHINE_UPLOAD_MAX_BYTES = 3840000;
+var MACHINE_UPLOAD_PARTS_MAX = Math.ceil(MACHINE_UPLOAD_MAX_BYTES / LOCAL_CHUNK_MAX);
+var MACHINE_UPLOADS_OPEN_MAX = 4;
+var grouped = (n) => n.toLocaleString("en-US");
+var MACHINE_UPLOAD_LIMIT = `an uploaded batch is at most ${grouped(MACHINE_UPLOAD_MAX_BYTES)} bytes (${MACHINE_UPLOAD_PARTS_MAX} parts of ${grouped(LOCAL_CHUNK_MAX)} bytes)`;
 var encoder2 = new TextEncoder;
 var lineBytes = (value) => encoder2.encode(JSON.stringify(value)).length + 1;
 var sha256Hex = (data) => createHash("sha256").update(data).digest("hex");
@@ -273,7 +281,9 @@ var chunkPayload = (data) => {
 };
 
 // packages/local-api/src/validate-fields.ts
+import { posix, win32 } from "node:path";
 var LOCAL_ID_MAX_CHARS = 64;
+var PATH_MAX_CHARS = 4096;
 var LABEL_MAX_CHARS = 256;
 var NONCE_CHARS = 43;
 
@@ -300,6 +310,20 @@ var exactly = (v, required, optional = [], what = "message") => {
       fail2(`${what} has an unknown field`);
   return v;
 };
+var known = (v, required, optional = [], what = "message") => {
+  if (!isRecord(v))
+    return fail2(`${what} must be an object`);
+  const out = {};
+  for (const name of required) {
+    if (!Object.hasOwn(v, name))
+      fail2(`${what} misses ${name}`);
+    out[name] = v[name];
+  }
+  for (const name of optional)
+    if (Object.hasOwn(v, name))
+      out[name] = v[name];
+  return out;
+};
 var oneOf = (list, v, what) => list.find((item) => item === v) ?? fail2(what);
 var text = (v, max, what, min = 1) => typeof v === "string" && v.length >= min && v.length <= max && v.isWellFormed() ? v : fail2(what);
 var bool = (v, what) => typeof v === "boolean" ? v : fail2(what);
@@ -310,6 +334,7 @@ var commandId = (v) => typeof v === "string" && v.length === COMMAND_ID_CHARS &&
 var nonce = (v, what) => typeof v === "string" && v.length === NONCE_CHARS && BASE64URL.test(v) ? v : fail2(what);
 var SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 var semver = (v, what) => typeof v === "string" && v.length <= 64 && SEMVER.test(v) ? v : fail2(what);
+var absolutePath = (v, what) => typeof v === "string" && v.length <= PATH_MAX_CHARS && v.isWellFormed() && !v.includes("\x00") && (posix.isAbsolute(v) || win32.isAbsolute(v)) ? v : fail2(what);
 var nullable = (v, check) => v === null ? null : check(v);
 var jsonValue = (v, what) => {
   if (v === null || typeof v === "boolean" || typeof v === "string")
@@ -369,16 +394,19 @@ var formatSessionRef = (ref) => {
   return `${ref.device}.${ref.key}`;
 };
 
+// packages/local-api/src/protocol-status.ts
+var SIGN_IN_REASONS = ["not_adopted", "device_revoked", "reauth_required"];
+
 // packages/local-api/src/validate-session-answer.ts
 var refOf = (v, what) => {
-  const m = exactly(v, ["device", "key", "session"], [], what);
+  const m = known(v, ["device", "key", "session"], [], what);
   const ref = parseSessionRef(m["session"]);
   if (ref === undefined || ref.device !== m["device"] || ref.key !== m["key"])
     return fail2(what);
   return { device: ref.device, key: ref.key, session: formatSessionRef(ref) };
 };
 var commandAnswerOf = (v) => {
-  const m = exactly(v, ["command_id"], ["device", "key", "session"], "session.command data");
+  const m = known(v, ["command_id"], ["device", "key", "session"], "session.command data");
   const command_id = commandId(m["command_id"]);
   if (m["device"] === undefined && m["key"] === undefined && m["session"] === undefined)
     return { command_id };
@@ -386,20 +414,33 @@ var commandAnswerOf = (v) => {
   return { command_id, ...refOf({ device, key, session }, "session.command data") };
 };
 
+// packages/local-api/src/validate-update.ts
+var READY_REASON_MAX_CHARS = 64;
+var statusUpdateOf = (v) => {
+  const m = known(v, ["update_id", "phase", "target_version", "ready", "ready_reason"], [], "status.update");
+  return {
+    update_id: localId(m["update_id"], "status.update.update_id"),
+    phase: oneOf(STATUS_UPDATE_PHASES, m["phase"], "status.update.phase"),
+    target_version: semver(m["target_version"], "status.update.target_version"),
+    ready: bool(m["ready"], "status.update.ready"),
+    ready_reason: nullable(m["ready_reason"], (r) => text(r, READY_REASON_MAX_CHARS, "status.update.ready_reason"))
+  };
+};
+
 // packages/local-api/src/validate-shapes.ts
 var CODE = /^[a-z_]{1,64}$/;
 var MILLIS_MAX = Number.MAX_SAFE_INTEGER;
 var deviceId = (v, what = "device") => text(v, SESSION_DEVICE_MAX_CHARS, what);
 var millis = (v, what) => uint(v, 0, MILLIS_MAX, what);
-var deviceRef = (v, what = "device") => {
-  const m = exactly(v, ["id", "name"], [], what);
+var deviceRef = (v, what = "device", fields = exactly) => {
+  const m = fields(v, ["id", "name"], [], what);
   return {
     id: deviceId(m["id"], `${what}.id`),
     name: text(m["name"], LABEL_MAX_CHARS, `${what}.name`)
   };
 };
 var policyOf = (v) => {
-  const m = exactly(v, ["state", "generation", "this_device", "homes_pending", "unacked"], [], "policy");
+  const m = known(v, ["state", "generation", "this_device", "homes_pending", "unacked"], [], "policy");
   const unacked = m["unacked"];
   if (!Array.isArray(unacked))
     return fail2("policy.unacked");
@@ -409,7 +450,7 @@ var policyOf = (v) => {
     this_device: oneOf(THIS_DEVICE_STATES, m["this_device"], "policy.this_device"),
     homes_pending: millis(m["homes_pending"], "policy.homes_pending"),
     unacked: unacked.map((u) => {
-      const entry = exactly(u, ["device", "label"], [], "policy.unacked");
+      const entry = known(u, ["device", "label"], [], "policy.unacked");
       return {
         device: deviceId(entry["device"]),
         label: text(entry["label"], LABEL_MAX_CHARS, "label", 0)
@@ -418,39 +459,42 @@ var policyOf = (v) => {
   };
 };
 var statusOf = (v) => {
-  const m = exactly(v, ["state", "since_ms", "device", "origin_configured", "enabled"], ["detail", "policy"], "status");
-  const detail = m["detail"];
-  const policy = m["policy"];
+  const m = known(v, ["state", "since_ms", "device", "origin_configured", "enabled"], ["detail", "policy", "update", "exe"], "status");
+  const { detail, policy, update, exe } = m;
   return {
     state: oneOf(STATUS_STATES, m["state"], "status.state"),
     since_ms: millis(m["since_ms"], "status.since_ms"),
     ...detail === undefined ? {} : { detail: detailOf(detail) },
-    device: nullable(m["device"], (d) => deviceRef(d, "status.device")),
+    device: nullable(m["device"], (d) => deviceRef(d, "status.device", known)),
     origin_configured: bool(m["origin_configured"], "status.origin_configured"),
     enabled: bool(m["enabled"], "status.enabled"),
-    ...policy === undefined ? {} : { policy: policyOf(policy) }
+    ...policy === undefined ? {} : { policy: policyOf(policy) },
+    ...update === undefined ? {} : { update: statusUpdateOf(update) },
+    ...exe === undefined ? {} : { exe: absolutePath(exe, "status.exe") }
   };
 };
 var detailOf = (v) => {
-  const m = exactly(v, ["code", "action"], [], "status.detail");
-  const code = m["code"];
+  const m = known(v, ["code", "action"], ["sign_in_reason"], "status.detail");
+  const { code, sign_in_reason: reason } = m;
   return {
     code: typeof code === "string" && CODE.test(code) ? code : fail2("status.detail.code"),
-    action: nullable(m["action"], (a) => text(a, LABEL_MAX_CHARS, "status.detail.action"))
+    action: nullable(m["action"], (a) => text(a, LABEL_MAX_CHARS, "status.detail.action")),
+    ...reason === undefined ? {} : { sign_in_reason: oneOf(SIGN_IN_REASONS, reason, "status.detail.sign_in_reason") }
   };
 };
 var deviceRowOf = (v) => {
-  const m = exactly(v, ["device", "label", "kind", "platform", "last_seen_ms", "online"], [], "device row");
+  const m = known(v, ["device", "label", "kind", "platform", "last_seen_ms", "online"], ["managed"], "device row");
+  const managed = m["managed"];
   return {
     device: deviceId(m["device"]),
     label: text(m["label"], LABEL_MAX_CHARS, "label", 0),
     kind: text(m["kind"], 64, "kind", 0),
     platform: text(m["platform"], 64, "platform", 0),
     last_seen_ms: nullable(m["last_seen_ms"], (t) => millis(t, "last_seen_ms")),
-    online: bool(m["online"], "online")
+    online: bool(m["online"], "online"),
+    ...managed === undefined ? {} : { managed: bool(managed, "managed") }
   };
 };
-var ROW_KIND = new RegExp(`^[a-z][a-z0-9_-]{0,${SESSION_KIND_MAX_CHARS - 1}}$`);
 
 // packages/local-api/src/validate-delegated.ts
 var ENDPOINT_KEY = /^[A-Za-z0-9_-]{22}$/;
@@ -464,38 +508,51 @@ var keysOf = (v, max, what) => {
   return new Set(keys).size === keys.length ? keys : fail2(what);
 };
 var endpointsData = (v) => {
-  const m = exactly(v, ["endpoints"], ["environments"], "data");
+  const m = known(v, ["endpoints"], ["environments", "primary"], "data");
   const endpoints = keysOf(m["endpoints"], ENDPOINTS_MAX, "endpoints");
-  if (m["environments"] === undefined)
-    return { endpoints };
-  return { endpoints, environments: keysOf(m["environments"], ENVIRONMENTS_MAX, "environments") };
+  const primary = m["primary"] === undefined ? undefined : endpointKey(m["primary"], "primary");
+  if (primary !== undefined && !endpoints.includes(primary))
+    return fail2("primary");
+  return {
+    endpoints,
+    ...m["environments"] === undefined ? {} : { environments: keysOf(m["environments"], ENVIRONMENTS_MAX, "environments") },
+    ...primary === undefined ? {} : { primary }
+  };
+};
+var endpointsListData = (m) => {
+  const dirs = m["agent_dirs"];
+  if (!Array.isArray(dirs))
+    return fail2("agent_dirs");
+  return { agent_dirs: dirs.map((d) => absolutePath(d, "agent_dirs")) };
 };
 
 // packages/local-api/src/validate-machine.ts
 var BASE64URL2 = /^[A-Za-z0-9_-]+$/;
 var machineId = (v, what) => typeof v === "string" && v.length === COMMAND_ID_CHARS && BASE64URL2.test(v) ? v : fail2(what);
 var empty = (v) => {
-  exactly(v, [], [], "data");
+  known(v, [], [], "data");
   return {};
 };
-var fields = (v, names) => exactly(v, names, [], "data");
-var routeOf = (v) => {
-  const r = exactly(v, ["kind", "online"], [], "machine route");
-  return {
-    kind: oneOf(MACHINE_ROUTE_KINDS, r["kind"], "machine route kind"),
-    online: bool(r["online"], "online")
-  };
+var fields = (v, names) => known(v, names, [], "data");
+var LEGACY_MACHINE_ROUTE_KINDS = ["internet", "lan"];
+var legacyRouteOf = (v) => {
+  const r = known(v, ["kind", "online"], [], "machine route");
+  const kind = oneOf(LEGACY_MACHINE_ROUTE_KINDS, r["kind"], "machine route kind");
+  bool(r["online"], "online");
+  return kind;
 };
 var machineRowOf = (v) => {
-  const m = exactly(v, ["device", "label", "state"], ["routes"], "machine row");
+  const m = known(v, ["device", "label", "state"], ["routes"], "machine row");
   const routes = m["routes"];
-  if (routes !== undefined && (!Array.isArray(routes) || routes.length > MACHINE_ROUTE_KINDS.length))
+  if (routes !== undefined && (!Array.isArray(routes) || routes.length > LEGACY_MACHINE_ROUTE_KINDS.length))
+    return fail2("routes");
+  const listed = routes?.map(legacyRouteOf);
+  if (listed !== undefined && new Set(listed).size !== listed.length)
     return fail2("routes");
   return {
     device: deviceId(m["device"]),
     label: text(m["label"], LABEL_MAX_CHARS, "label", 0),
-    state: oneOf(MACHINE_STATES, m["state"], "machine state"),
-    ...routes === undefined ? {} : { routes: routes.map(routeOf) }
+    state: oneOf(MACHINE_STATES, m["state"], "machine state")
   };
 };
 var MACHINE_DATA = {
@@ -516,7 +573,7 @@ var MACHINE_DATA = {
     batch_id: machineId(fields(v, ["batch_id"])["batch_id"], "batch_id")
   }),
   "machine.batch_part": (v) => ({
-    received: uint(fields(v, ["received"])["received"], 0, LOCAL_UPLOAD_PARTS_MAX - 1, "received")
+    received: uint(fields(v, ["received"])["received"], 0, MACHINE_UPLOAD_PARTS_MAX - 1, "received")
   }),
   "machine.cancel": empty,
   "machine.credit": empty,
@@ -524,6 +581,45 @@ var MACHINE_DATA = {
     state: oneOf(MACHINE_LOOKUP_STATES, fields(v, ["state"])["state"], "lookup state")
   }),
   "machine.events.subscribe": empty
+};
+
+// packages/local-api/src/validate-deliveries.ts
+var empty2 = (v) => {
+  known(v, [], [], "data");
+  return {};
+};
+var DELIVERIES_DATA = {
+  "deliveries.serve": (v) => {
+    const m = known(v, ["wake"], [], "data");
+    return { wake: bool(m["wake"], "wake") };
+  },
+  "delivery.answer": empty2,
+  "delivery.held": empty2,
+  "delivery.pending": empty2,
+  "delivery.drained": (v) => {
+    const m = known(v, ["kept"], ["expecting"], "data");
+    const kept = bool(m["kept"], "kept");
+    if (!kept)
+      return m["expecting"] === undefined ? { kept } : fail2("expecting");
+    return { kept, expecting: commandId(m["expecting"]) };
+  },
+  "peer.admitted": (v) => ({
+    admitted: bool(known(v, ["admitted"], [], "data")["admitted"], "admitted")
+  })
+};
+
+// packages/local-api/src/validate-session-wake.ts
+var storedOf = (v) => v === null || v === "unreadable" || typeof v === "boolean" ? v : fail2("stored");
+var sessionWakeState = (v) => {
+  const m = known(v, ["enabled", "stored", "changedAt", "overridden"], [], "data");
+  const stored = m["stored"];
+  const changedAt = m["changedAt"];
+  return {
+    enabled: bool(m["enabled"], "enabled"),
+    stored: storedOf(stored),
+    changedAt: typeof changedAt === "string" ? changedAt : fail2("changedAt"),
+    overridden: bool(m["overridden"], "overridden")
+  };
 };
 
 // packages/local-api/src/validate.ts
@@ -538,7 +634,7 @@ var asViolation = (check) => {
 };
 var validateWelcome = (v) => asViolation(() => {
   if (isRecord(v) && v["type"] === "refused") {
-    const m = exactly(v, ["type", "reason"], [], "refused");
+    const m = known(v, ["type", "reason"], [], "refused");
     return { type: "refused", reason: oneOf(REFUSED_REASONS, m["reason"], "refused reason") };
   }
   if (isRecord(v) && v["type"] === "welcome" && v["v"] !== LOCAL_API_VERSION)
@@ -553,7 +649,7 @@ var validateWelcome = (v) => asViolation(() => {
     "capabilities",
     "state"
   ];
-  const m = exactly(v, fields, [], "welcome");
+  const m = known(v, fields, [], "welcome");
   const capabilities = m["capabilities"];
   if (m["type"] !== "welcome" || m["owner"] !== "service")
     return fail2("welcome");
@@ -570,13 +666,13 @@ var validateWelcome = (v) => asViolation(() => {
     state: statusOf(m["state"])
   };
 });
-var empty2 = (v) => {
-  exactly(v, [], [], "data");
+var empty3 = (v) => {
+  known(v, [], [], "data");
   return {};
 };
-var one = (v, name) => exactly(v, [name], [], "data")[name];
+var one = (v, name) => known(v, [name], [], "data")[name];
 var attachState = (v) => {
-  const m = exactly(v, ["attached", "changedAt"], [], "data");
+  const m = known(v, ["attached", "changedAt"], [], "data");
   const changedAt = m["changedAt"];
   return {
     attached: bool(m["attached"], "attached"),
@@ -584,7 +680,7 @@ var attachState = (v) => {
   };
 };
 var remoteCommandsState = (v) => {
-  const m = exactly(v, ["enabled", "changedAt", "overridden"], [], "data");
+  const m = known(v, ["enabled", "changedAt", "overridden"], [], "data");
   const changedAt = m["changedAt"];
   return {
     enabled: bool(m["enabled"], "enabled"),
@@ -593,39 +689,47 @@ var remoteCommandsState = (v) => {
   };
 };
 var DATA = {
-  authenticate: empty2,
+  authenticate: empty3,
   "status.get": statusOf,
-  "status.subscribe": empty2,
+  "status.subscribe": empty3,
   "service.set_enabled": (v) => ({ enabled: bool(one(v, "enabled"), "enabled") }),
-  "refresher.register": empty2,
-  "device.adopt": (v) => ({ device: deviceRef(one(v, "device")) }),
-  "device.forget": empty2,
-  "device.info": (v) => ({ device: nullable(one(v, "device"), (d) => deviceRef(d)) }),
-  "endpoints.register": empty2,
-  "endpoints.unregister": empty2,
-  "session.presenter_open": empty2,
-  "session.presenter_send": empty2,
+  "refresher.register": empty3,
+  "device.adopt": (v) => ({ device: deviceRef(one(v, "device"), "device", known) }),
+  "device.forget": empty3,
+  "device.info": (v) => ({
+    device: nullable(one(v, "device"), (d) => deviceRef(d, "device", known))
+  }),
+  "endpoints.register": empty3,
+  "endpoints.unregister": empty3,
+  "endpoints.list": (v) => endpointsListData(known(v, ["agent_dirs"], [], "data")),
+  "session.presenter_open": empty3,
+  "session.presenter_send": empty3,
   "devices.list": (v) => {
     const devices = one(v, "devices");
     return Array.isArray(devices) ? { devices: devices.map(deviceRowOf) } : fail2("devices");
   },
   "sessions.list": (v) => ({ query_id: localId(one(v, "query_id"), "query_id") }),
+  "sessions.events.subscribe": empty3,
   "session.attach": (v) => ({ attach: localId(one(v, "attach"), "attach") }),
-  "session.detach": empty2,
+  "session.detach": empty3,
   "session.command": commandAnswerOf,
   "session.command_part": (v) => ({
     received: uint(one(v, "received"), 0, LOCAL_UPLOAD_PARTS_MAX - 1, "received")
   }),
   "session.read": (v) => ({ query_id: localId(one(v, "query_id"), "query_id") }),
-  "enforcement.report": empty2,
-  "owner.shutdown_for_upgrade": empty2,
+  "enforcement.report": empty3,
+  "owner.shutdown_for_upgrade": empty3,
+  "owner.update_committed": empty3,
   "control.attach.get": attachState,
   "control.attach.set": attachState,
   "control.remote_commands.get": remoteCommandsState,
   "control.remote_commands.set": remoteCommandsState,
+  "control.session_wake.get": sessionWakeState,
+  "control.session_wake.set": sessionWakeState,
   "session.endpoints": endpointsData,
   "session.locate": (v) => refOf(v, "session.locate data"),
-  ...MACHINE_DATA
+  ...MACHINE_DATA,
+  ...DELIVERIES_DATA
 };
 // packages/local-api/src/proof.ts
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
@@ -834,7 +938,8 @@ var RELAY_STATUS_STATES = [
   "authorization_stale",
   "service_degraded",
   "update_required",
-  "signed_out"
+  "signed_out",
+  "fail_closed"
 ];
 var OUTPUT_CREDIT_BYTES = 65536;
 
@@ -1044,16 +1149,45 @@ var statusOf2 = async (wire) => {
 
 // packages/bunshin-ts-relay/src/env.ts
 import { homedir } from "node:os";
-import { join as join3 } from "node:path";
+
+// packages/local-api/src/state-dir.ts
+import { readFileSync as readFileSync3, statSync } from "node:fs";
+import { join as join3, posix as posix2, win32 as win322 } from "node:path";
 var STATE_DIR_ENV = "OMO_DEVICE_SERVICE_STATE_DIR";
+var isAbsoluteOn = (platform, path) => (platform === "win32" ? win322 : posix2).isAbsolute(path);
+var defaultStateDir = (platform, home, env) => platform === "win32" ? join3(env["LOCALAPPDATA"] ?? join3(home, "AppData", "Local"), "OmO", "device-service") : join3(home, ".omo", "device-service");
+var locationFile = (platform, home, env) => `${defaultStateDir(platform, home, env)}.location.json`;
+var locatedStateDir = (platform, file) => {
+  try {
+    const parsed = JSON.parse(readFileSync3(file, "utf8"));
+    if (typeof parsed !== "object" || parsed === null)
+      return;
+    const v = Reflect.get(parsed, "v");
+    const dir = Reflect.get(parsed, "state_dir");
+    return v === 1 && typeof dir === "string" && isAbsoluteOn(platform, dir) ? dir : undefined;
+  } catch {
+    return;
+  }
+};
+var isDirectory = (path) => {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+};
+var resolveStateDir = (platform, home, env) => {
+  const explicit = env[STATE_DIR_ENV];
+  if (explicit !== undefined && explicit !== "" && isAbsoluteOn(platform, explicit))
+    return explicit;
+  const located = locatedStateDir(platform, locationFile(platform, home, env));
+  return located !== undefined && isDirectory(located) ? located : defaultStateDir(platform, home, env);
+};
+
+// packages/bunshin-ts-relay/src/env.ts
 var SESSION_REF_ENV = "PI_SESSION_ID";
 var SESSION_REF_MAX_CHARS = 128;
-var defaultStateDir = (env = process.env, home = homedir(), platform = process.platform) => {
-  const override = env[STATE_DIR_ENV];
-  if (override !== undefined && override !== "")
-    return override;
-  return platform === "win32" ? join3(env["LOCALAPPDATA"] ?? join3(home, "AppData", "Local"), "OmO", "device-service") : join3(home, ".omo", "device-service");
-};
+var serviceStateDir = (env = process.env, home = homedir(), platform = process.platform) => resolveStateDir(platform, home, env);
 var sessionRefFromEnv = (env = process.env) => {
   const raw = env[SESSION_REF_ENV]?.trim();
   return raw === undefined || raw === "" || raw.length > SESSION_REF_MAX_CHARS ? undefined : raw;
@@ -1106,13 +1240,69 @@ class MachineWireError extends HubTransportError {
   }
 }
 
+// packages/bunshin-ts-relay/src/token-grant.ts
+var isRecord2 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+var canonical = (value) => JSON.stringify(value, (_key, v) => isRecord2(v) ? Object.fromEntries(Object.entries(v).toSorted(([a], [b]) => a < b ? -1 : 1)) : v);
+var admits = (constraint, value) => {
+  if (!isRecord2(constraint))
+    return false;
+  switch (constraint["kind"]) {
+    case "any":
+      return true;
+    case "exact":
+      return Object.hasOwn(constraint, "value") && canonical(value) === canonical(constraint["value"]);
+    case "oneOf": {
+      const values = constraint["values"];
+      return Array.isArray(values) && values.some((v) => canonical(v) === canonical(value));
+    }
+    case "prefix": {
+      const prefix = constraint["prefix"];
+      return typeof value === "string" && typeof prefix === "string" && value.startsWith(prefix);
+    }
+    case "range": {
+      const { min, max } = constraint;
+      return typeof value === "number" && typeof min === "number" && typeof max === "number" && value >= min && value <= max;
+    }
+    default:
+      return false;
+  }
+};
+var violation = (message) => {
+  throw new MachineWireError("constraint_violation", message);
+};
+var assertGrantCovers = (claims, args, taskId) => {
+  const granted = claims["taskId"];
+  if (granted !== undefined && granted !== taskId)
+    violation("the token was minted for another task");
+  const argConstraints = claims["argConstraints"];
+  if (argConstraints === undefined)
+    return;
+  if (!isRecord2(argConstraints))
+    return violation("the token's argConstraints are not an object");
+  for (const [field, constraint] of Object.entries(argConstraints)) {
+    if (!isRecord2(args) || !Object.hasOwn(args, field))
+      violation(`the token constrains ${field}, which the op does not carry`);
+    else if (!admits(constraint, args[field]))
+      violation(`${field} is outside the token's grant`);
+  }
+};
+
 // packages/bunshin-ts-relay/src/capability-token.ts
 var DEFAULT_TOKEN_TTL_MS = 15 * 60000;
+var CLAIM_KEYS = new Set([
+  "machineId",
+  "allowedOps",
+  "pathJail",
+  "argConstraints",
+  "taskId",
+  "exp",
+  "nbf"
+]);
 var malformed = (message) => {
   throw new CapabilityTokenMintError(400, "malformed_input", message);
 };
 var nonEmpty = (value) => typeof value === "string" && value !== "";
-var isRecord2 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+var isRecord3 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
 var mintCapabilityToken = (input, now = Date.now()) => {
   if (!nonEmpty(input.machineId))
     return malformed("machineId must be a non-empty string");
@@ -1122,7 +1312,7 @@ var mintCapabilityToken = (input, now = Date.now()) => {
     return malformed("every allowed op must be a non-empty string");
   if (!nonEmpty(input.pathJail))
     return malformed("pathJail must be a non-empty string");
-  if (input.argConstraints !== undefined && !isRecord2(input.argConstraints))
+  if (input.argConstraints !== undefined && !isRecord3(input.argConstraints))
     return malformed("argConstraints must be an object");
   if (input.taskId !== undefined && !nonEmpty(input.taskId))
     return malformed("taskId must be a non-empty string");
@@ -1143,7 +1333,7 @@ var mintCapabilityToken = (input, now = Date.now()) => {
   };
   return { token: Buffer.from(JSON.stringify(claims)).toString("base64url"), expiry: claims.exp };
 };
-var constraintsOf = (token) => {
+var constraintsOf = (token, machineId, args, taskId) => {
   let claims;
   try {
     claims = JSON.parse(Buffer.from(token, "base64url").toString("utf8"));
@@ -1152,29 +1342,656 @@ var constraintsOf = (token) => {
       cause: error
     });
   }
-  if (!isRecord2(claims) || !nonEmpty(claims["machineId"]) || !Array.isArray(claims["allowedOps"]))
+  if (!isRecord3(claims) || !nonEmpty(claims["machineId"]) || !Array.isArray(claims["allowedOps"]))
     throw new CapabilityTokenMintError(400, "malformed_token", "the token carries no claims");
-  return claims;
+  const unknown = Object.keys(claims).filter((key) => !CLAIM_KEYS.has(key));
+  if (unknown.length > 0)
+    throw new CapabilityTokenMintError(400, "malformed_token", `the token carries claims this sender cannot enforce: ${unknown.join(", ")}`);
+  if (claims["machineId"] !== machineId)
+    throw new MachineWireError("constraint_violation", "the token targets another machine");
+  const nbf = claims["nbf"];
+  if (typeof nbf !== "number" || !Number.isFinite(nbf))
+    throw new CapabilityTokenMintError(400, "malformed_token", "the token has no finite nbf");
+  if (nbf > Date.now())
+    throw new MachineWireError("constraint_violation", "the token is not active yet");
+  assertGrantCovers(claims, args, taskId);
+  const { allowedOps, pathJail, exp } = claims;
+  const services = servicesOf(allowedOps, claims["argConstraints"]);
+  return { allowedOps, pathJail, exp, ...services === undefined ? {} : { services } };
+};
+var servicesOf = (allowedOps, argConstraints) => {
+  if (!Array.isArray(allowedOps) || !allowedOps.includes("service.restart"))
+    return;
+  const name = isRecord3(argConstraints) ? argConstraints["name"] : undefined;
+  if (!isRecord3(name))
+    return;
+  if (name["kind"] === "exact" && typeof name["value"] === "string")
+    return [name["value"]];
+  const values = name["values"];
+  return name["kind"] === "oneOf" && Array.isArray(values) && values.every((v) => typeof v === "string") ? values : undefined;
+};
+var tokenAllows = (token, machineId, op, args, taskId) => {
+  try {
+    const { allowedOps } = constraintsOf(token, machineId, args, taskId);
+    return Array.isArray(allowedOps) && allowedOps.includes(op);
+  } catch {
+    return false;
+  }
+};
+
+// packages/bunshin-ts-relay/src/op-fields.ts
+import { createHash as createHash2 } from "node:crypto";
+var mintOpId = () => mintId();
+var OP_ID = /^[A-Za-z0-9_-]{22}$/;
+var wireOpIdOf = (opId) => OP_ID.test(opId) ? opId : createHash2("sha256").update(opId).digest().subarray(0, 16).toString("base64url");
+var isRecord4 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+var violation2 = (detail) => {
+  throw new LocalApiError("protocol_violation", detail);
+};
+var text2 = (event, name) => {
+  const value = event[name];
+  return typeof value === "string" ? value : violation2(`${event.kind} without ${name}`);
+};
+var entryOf = (value) => {
+  if (!isRecord4(value) || typeof value["state"] !== "string")
+    return violation2("an op result without a state");
+  const error = value["error"];
+  const code = isRecord4(error) ? error["code"] : undefined;
+  if (error !== undefined && typeof code !== "string")
+    return violation2("an op error without a code");
+  const message = isRecord4(error) ? String(error["message"] ?? code) : "";
+  const uncertain = isRecord4(error) && error["uncertain"] === true ? { uncertain: true } : {};
+  return {
+    state: value["state"],
+    ..."response" in value ? { response: value["response"] } : {},
+    ...typeof code === "string" ? { error: { code, message, ...uncertain } } : {}
+  };
+};
+var argsOf = (args) => {
+  if (args === undefined)
+    return {};
+  const plain = JSON.parse(JSON.stringify(args));
+  if (!isRecord4(plain))
+    throw new TypeError("machine op args must be a JSON object");
+  return plain;
+};
+var abortError = (signal) => signal.reason instanceof Error ? signal.reason : new DOMException("the operation was aborted", "AbortError");
+
+// packages/bunshin-ts-relay/src/chunked-read.ts
+var CHUNKED_READ_MAX_BYTES = 256 * 1024 * 1024;
+var wholeReadPath = (capability, args) => capability === "fs.read" && isRecord4(args) && typeof args["path"] === "string" && args["offset"] === undefined && args["limit_bytes"] === undefined ? args["path"] : undefined;
+var isLimitExceeded = (error) => error instanceof MachineWireError && error.code === "limit_exceeded";
+var changed = (path, detail) => {
+  throw new MachineWireError("file_changed", `${path} changed while it was read in chunks: ${detail}`);
+};
+var versionOf = (path, reply) => {
+  const size = isRecord4(reply) ? reply["size"] : undefined;
+  const mtimeMs = isRecord4(reply) ? reply["mtimeMs"] : undefined;
+  return typeof size === "number" && typeof mtimeMs === "number" ? { size, mtimeMs } : violation2(`fs.stat of ${path} answered without a numeric size and mtimeMs`);
+};
+var isStatRefusal = (error) => error instanceof CapabilityUnavailableError || error instanceof MachineWireError && (error.code === "op_unknown" || error.code.startsWith("capability_") || error.code.startsWith("constraint_"));
+var chunkOf = (path, reply, offset, chunkBytes, size) => {
+  const bytes = isRecord4(reply) ? reply["bytes"] : undefined;
+  const replySize = isRecord4(reply) ? reply["size"] : undefined;
+  if (!isRecord4(reply) || typeof bytes !== "string" || typeof replySize !== "number")
+    return violation2("an fs.read chunk reply without base64 bytes and a numeric size");
+  if (replySize !== size)
+    return changed(path, `its size went from ${size} to ${replySize} bytes`);
+  if (reply["offset"] !== offset)
+    return violation2(`an fs.read chunk reply at offset ${String(reply["offset"])}, asked for ${offset}`);
+  const part = Buffer.from(bytes, "base64");
+  if (part.length > chunkBytes || offset + part.length > size)
+    return violation2(`an fs.read chunk reply of ${part.length} bytes at offset ${offset}, above the ${chunkBytes}-byte chunk or the ${size}-byte size`);
+  if (part.length === 0)
+    return changed(path, `it ended at ${offset} of ${size} bytes`);
+  return { part, path: reply["path"] };
+};
+var capped = (path, size, chunkBytes) => {
+  throw new MachineWireError("limit_exceeded", `${path} is ${size} bytes, above the ${CHUNKED_READ_MAX_BYTES}-byte cap of an automatic chunked read; read it in chunks with fs.read {path, offset, limit_bytes}, limit_bytes at most ${chunkBytes}`);
+};
+var readInChunks = async (path, chunkBytes, ops, refusal) => {
+  const before = versionOf(path, await ops.stat().catch((error) => {
+    throw isStatRefusal(error) ? refusal : error;
+  }));
+  if (before.size > CHUNKED_READ_MAX_BYTES)
+    return capped(path, before.size, chunkBytes);
+  const parts = [];
+  let offset = 0;
+  let resolved = path;
+  while (offset < before.size) {
+    const reply = await ops.read({ path, offset, limit_bytes: chunkBytes });
+    const chunk = chunkOf(path, reply, offset, chunkBytes, before.size);
+    resolved = chunk.path;
+    parts.push(chunk.part);
+    offset += chunk.part.length;
+  }
+  const after = versionOf(path, await ops.stat());
+  if (after.size !== before.size || after.mtimeMs !== before.mtimeMs)
+    return changed(path, `fs.stat went from ${before.size} bytes at ${before.mtimeMs} ms to ${after.size} bytes at ${after.mtimeMs} ms`);
+  return {
+    path: resolved,
+    bytes: Buffer.concat(parts).toString("base64"),
+    size: before.size,
+    offset: 0
+  };
+};
+
+// packages/bunshin-ts-relay/src/tree-apply.ts
+import { isAbsolute as isAbsolute2 } from "node:path";
+
+// packages/bunshin-ts-relay/src/tree-archive.ts
+import { createHash as createHash3 } from "node:crypto";
+import { isAbsolute } from "node:path";
+import { gunzipSync, gzipSync } from "node:zlib";
+var BLOCK = 512;
+var TYPE_CODES = { file: "0", dir: "5", symlink: "2" };
+var FIELDS = {
+  name: [0, 100],
+  mode: [100, 8],
+  uid: [108, 8],
+  gid: [116, 8],
+  size: [124, 12],
+  mtime: [136, 12],
+  checksum: [148, 8],
+  typeflag: [156, 1],
+  linkname: [157, 100],
+  magic: [257, 6],
+  version: [263, 2],
+  uname: [265, 32],
+  gname: [297, 32]
+};
+var malformed2 = (detail) => {
+  throw new MachineWireError("malformed_input", `malformed_input: ${detail}`);
+};
+var escape = (detail) => {
+  throw new MachineWireError("path_escape", `path_escape: ${detail}`);
+};
+var linkTargetStaysInside = (entryName, link) => {
+  if (isAbsolute(link) || /^[\\/]/.test(link) || /^[A-Za-z]:[\\/]/.test(link))
+    return false;
+  let depth = entryName.split(/[\\/]/).filter(Boolean).length - 1;
+  for (const part of link.split(/[\\/]/)) {
+    if (part === "" || part === ".")
+      continue;
+    depth += part === ".." ? -1 : 1;
+    if (depth < 0)
+      return false;
+  }
+  return true;
+};
+var octal = (value, length) => `${value.toString(8).padStart(length - 1, "0")}\x00`.slice(-length);
+var put = (block, field, value) => {
+  const [offset, length] = FIELDS[field];
+  block.write(value, offset, Math.min(length, Buffer.byteLength(value)), "utf8");
+};
+var bytesOf = (block, field) => {
+  const [offset, length] = FIELDS[field];
+  return block.subarray(offset, offset + length);
+};
+var stringOf = (value) => value.toString("utf8").replace(/\0.*$/s, "");
+var numberOf = (value) => Number.parseInt(stringOf(value).trim() || "0", 8);
+var header = (name, mode, size, type, link = "") => {
+  const h = Buffer.alloc(BLOCK);
+  put(h, "name", name);
+  put(h, "mode", octal(mode & 4095, 8));
+  put(h, "uid", octal(0, 8));
+  put(h, "gid", octal(0, 8));
+  put(h, "size", octal(size, 12));
+  put(h, "mtime", octal(0, 12));
+  h.fill(32, 148, 156);
+  put(h, "typeflag", type);
+  put(h, "linkname", link);
+  put(h, "magic", "ustar\x00");
+  put(h, "version", "00");
+  put(h, "uname", "root");
+  put(h, "gname", "root");
+  let sum = 0;
+  for (const byte of h)
+    sum += byte;
+  put(h, "checksum", octal(sum, 8));
+  return h;
+};
+var padded = (bytes) => Buffer.concat([bytes, Buffer.alloc((BLOCK - bytes.length % BLOCK) % BLOCK)]);
+var paxRecord = (key, value) => {
+  const raw = `${key}=${value}
+`;
+  let length = Buffer.byteLength(raw) + String(Buffer.byteLength(raw)).length + 1;
+  while (length !== Buffer.byteLength(`${length} ${raw}`))
+    length = Buffer.byteLength(`${length} ${raw}`);
+  return Buffer.from(`${length} ${raw}`);
+};
+var archiveName = (entry) => entry.kind === "dir" ? `${entry.path}/` : entry.path;
+var entryBlocks = (entry) => {
+  const name = archiveName(entry);
+  const data = entry.data ?? new Uint8Array(0);
+  const longName = Buffer.byteLength(name) > 100;
+  const longLink = entry.link !== undefined && Buffer.byteLength(entry.link) > 100;
+  const type = TYPE_CODES[entry.kind];
+  const body = [
+    header(longName ? "" : name, entry.mode, data.length, type, longLink ? "" : entry.link),
+    padded(data)
+  ];
+  if (!longName && !longLink)
+    return body;
+  const pax = Buffer.concat([
+    longName ? paxRecord("path", name) : Buffer.alloc(0),
+    longLink ? paxRecord("linkpath", entry.link ?? "") : Buffer.alloc(0)
+  ]);
+  const paxName = `PaxHeaders/${createHash3("sha256").update(name).digest("hex").slice(0, 16)}`;
+  return [header(paxName, 420, pax.length, "x"), padded(pax), ...body];
+};
+var packTreeEntries = (entries) => {
+  const sorted = [...entries].sort((a, b) => archiveName(a).localeCompare(archiveName(b)));
+  return gzipSync(Buffer.concat([...sorted.flatMap(entryBlocks), Buffer.alloc(BLOCK * 2)]), {
+    level: 9
+  });
+};
+var ancestorsOf = (path) => path.split("/").slice(0, -1).map((_, at, parts) => parts.slice(0, at + 1).join("/"));
+var checkShape = (entries) => {
+  const seen = new Set;
+  const links = new Set(entries.filter((e) => e.kind === "symlink").map((e) => e.path));
+  for (const entry of entries) {
+    if (seen.has(entry.path))
+      malformed2(`${entry.path} is listed twice`);
+    seen.add(entry.path);
+    if (ancestorsOf(entry.path).some((parent) => links.has(parent)))
+      escape(`${entry.path} is under a symlink member`);
+  }
+  return entries;
+};
+var relativeName = (raw) => raw.replace(/^(\.\/)+/, "").replace(/\/+$/, "");
+var readTreeEntries = (archive) => {
+  let bytes;
+  try {
+    bytes = gunzipSync(archive);
+  } catch {
+    return malformed2("invalid gzip");
+  }
+  const entries = [];
+  const long = {};
+  for (let offset = 0;offset + BLOCK <= bytes.length; ) {
+    const h = bytes.subarray(offset, offset + BLOCK);
+    offset += BLOCK;
+    if (h.every((v) => v === 0))
+      break;
+    const size = numberOf(bytesOf(h, "size"));
+    const type = String.fromCharCode(h[156] ?? 0);
+    const body = bytes.subarray(offset, offset + size);
+    if (body.length !== size)
+      return malformed2("a member runs past the archive");
+    offset += Math.ceil(size / BLOCK) * BLOCK;
+    if (type === "x") {
+      const text = body.toString();
+      const path = /(?:^|\n)\d+ path=([^\n]+)\n/.exec(text)?.[1];
+      const link = /(?:^|\n)\d+ linkpath=([^\n]+)\n/.exec(text)?.[1];
+      if (path === undefined && link === undefined)
+        return malformed2("invalid pax header");
+      if (path !== undefined)
+        long.path = path;
+      if (link !== undefined)
+        long.link = link;
+      continue;
+    }
+    if (type === "L" || type === "K") {
+      long[type === "L" ? "path" : "link"] = stringOf(body);
+      continue;
+    }
+    const raw = long.path ?? stringOf(bytesOf(h, "name"));
+    const link = long.link ?? stringOf(bytesOf(h, "linkname"));
+    delete long.path;
+    delete long.link;
+    const path = relativeName(raw);
+    if (path === "" || path === ".")
+      continue;
+    if (isAbsolute(raw) || path.split(/[\\/]/).includes(".."))
+      return escape(raw);
+    const mode = numberOf(bytesOf(h, "mode")) & 4095;
+    if (type === "5")
+      entries.push({ path, kind: "dir", mode });
+    else if (type === "2") {
+      if (!linkTargetStaysInside(path, link))
+        return escape(`${path} -> ${link}`);
+      entries.push({ path, kind: "symlink", mode, link });
+    } else if (type === "0" || type === "\x00")
+      entries.push({ path, kind: "file", mode, data: new Uint8Array(body) });
+    else
+      return malformed2(`unsupported tar type ${type}`);
+  }
+  return checkShape(entries);
+};
+
+// packages/bunshin-ts-relay/src/tree-shell.ts
+import { createHash as createHash4 } from "node:crypto";
+var PATHS_PER_COMMAND = 200;
+var quote = (value) => `'${value.replaceAll("'", `'\\''`)}'`;
+var joinPath = (root, path) => path === "" ? root : `${root.replace(/\/+$/, "")}/${path}`;
+var runShell = async (send, command, step) => {
+  const reply = await send("shell", { command, cwd: "." });
+  const exitCode = isRecord4(reply) ? reply["exitCode"] : undefined;
+  const stdout = isRecord4(reply) ? reply["stdout"] : undefined;
+  if (exitCode !== 0 || typeof stdout !== "string") {
+    const stderr = isRecord4(reply) && typeof reply["stderr"] === "string" ? reply["stderr"] : "";
+    throw new MachineWireError("tree_step_failed", `${step} failed on the device (exit ${String(exitCode)}): ${stderr.trim().slice(0, 500)}`);
+  }
+  if (isRecord4(reply) && reply["truncated"] === true)
+    throw new MachineWireError("tree_step_failed", `${step}: the device cut the command's output`);
+  return stdout;
+};
+var chunksOf = (items, size = PATHS_PER_COMMAND) => {
+  const chunks = [];
+  for (let at = 0;at < items.length; at += size)
+    chunks.push(items.slice(at, at + size));
+  return chunks;
+};
+var pool = async (items, limit, work) => {
+  let next = 0;
+  let failed = false;
+  const lane = async () => {
+    while (!failed && next < items.length) {
+      const item = items[next];
+      next += 1;
+      if (item !== undefined)
+        await work(item).catch((error) => {
+          failed = true;
+          throw error;
+        });
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, lane));
+};
+var sha256Hex2 = (bytes) => createHash4("sha256").update(bytes).digest("hex");
+var HASH_COMMAND = 'if command -v sha256sum >/dev/null 2>&1; then H="sha256sum"; else H="shasum -a 256"; fi; $H --';
+var remoteDigests = async (send, root, paths) => {
+  const digests = [];
+  for (const chunk of chunksOf(paths)) {
+    const out = await runShell(send, `cd -- ${quote(root)} && ${HASH_COMMAND} ${chunk.map(quote).join(" ")}`, "hashing the tree's files");
+    for (const line of out.split(`
+`).filter((l) => l !== "")) {
+      const digest = /^\\?([0-9a-f]{64})\s/.exec(line)?.[1];
+      if (digest === undefined)
+        throw new MachineWireError("tree_step_failed", `unreadable hash line: ${line}`);
+      digests.push(digest);
+    }
+  }
+  if (digests.length !== paths.length)
+    throw new MachineWireError("tree_step_failed", `hashed ${digests.length} of ${paths.length} files`);
+  return digests;
+};
+var verifyFiles = async (send, root, files) => {
+  const remote = await remoteDigests(send, root, files.map((file) => file.path));
+  files.forEach((file, at) => {
+    if (remote[at] !== sha256Hex2(file.data))
+      throw new MachineWireError("verify_failed", `${joinPath(root, file.path)}: the device's sha256 differs from the bytes transferred`);
+  });
+  return files.length;
+};
+
+// packages/bunshin-ts-relay/src/tree-destination.ts
+var clearDestinationLinks = async (send, root, entries) => {
+  const dirMembers = new Set(entries.filter((e) => e.kind === "dir").map((e) => e.path));
+  const parents = new Set(entries.flatMap((e) => ancestorsOf(e.path)));
+  const targets = entries.filter((e) => e.kind !== "symlink").map((e) => e.path);
+  const found = [];
+  for (const chunk of chunksOf([...new Set([...parents, ...targets])])) {
+    const out = await runShell(send, `[ -d ${quote(root)} ] || exit 0; cd -- ${quote(root)} && for p in ${chunk.map(quote).join(" ")}; do if [ -L "$p" ]; then printf '%s\\0' "$p"; fi; done`, "checking the destination for symlinks");
+    found.push(...out.split("\x00").filter((path) => path !== ""));
+  }
+  const links = new Set(found);
+  const outermost = found.filter((path) => !ancestorsOf(path).some((parent) => links.has(parent)));
+  const escaping = outermost.find((path) => parents.has(path) && !dirMembers.has(path));
+  if (escaping !== undefined)
+    throw new MachineWireError("path_escape", `path_escape: ${joinPath(root, escaping)} is a symlink in the destination`);
+  for (const chunk of chunksOf(outermost))
+    await runShell(send, `rm -f -- ${chunk.map((path) => quote(joinPath(root, path))).join(" ")}`, "replacing the destination's symlinks");
+};
+
+// packages/bunshin-ts-relay/src/write-pieces.ts
+import { posix as posix3 } from "node:path";
+var WRITE_CHUNK_BYTES = 256 * 1024;
+var SINGLE_WRITE_BASE64_MAX = LOCAL_INLINE_MAX - 32 * 1024;
+var WRITE_KEYS = new Set(["path", "bytes", "create_parent_dirs"]);
+var base64 = (bytes) => Buffer.from(bytes).toString("base64");
+var writeInPieces = async (send, path, data, createParentDirs) => {
+  const first = await send("fs.write", {
+    path,
+    bytes: base64(data.subarray(0, WRITE_CHUNK_BYTES)),
+    create_parent_dirs: createParentDirs
+  });
+  for (let offset = WRITE_CHUNK_BYTES;offset < data.length; offset += WRITE_CHUNK_BYTES)
+    await send("fs.write_range", {
+      path,
+      offset,
+      bytes: base64(data.subarray(offset, offset + WRITE_CHUNK_BYTES)),
+      total: data.length
+    }).catch((error) => {
+      if (!(error instanceof MachineWireError))
+        throw error;
+      throw new MachineWireError(error.code, `${error.message} (the write is incomplete: ${path} holds the new bytes up to ${offset}; the rest is missing or zero-filled)`);
+    });
+  return first;
+};
+var isPieceWrite = (capability, args) => {
+  if (capability !== "fs.write" || !isRecord4(args))
+    return false;
+  const { path, bytes, create_parent_dirs: parents } = args;
+  return Object.keys(args).every((key) => WRITE_KEYS.has(key)) && typeof path === "string" && path !== "" && typeof bytes === "string" && bytes.length > SINGLE_WRITE_BASE64_MAX && (parents === undefined || typeof parents === "boolean") && Buffer.from(bytes, "base64").toString("base64") === bytes;
+};
+var pieceWritePlan = (args, deviceOps, permits) => {
+  const path = String(args["path"]);
+  const range = { path, offset: 0, bytes: "", total: 0 };
+  if (!deviceOps.includes("fs.write_range") || !permits("fs.write", args) || !permits("fs.write_range", range))
+    return;
+  return { verify: deviceOps.includes("shell") && permits("shell", { command: "true", cwd: "." }) };
+};
+var writeLarge = async (send, args, verify) => {
+  const path = String(args["path"]);
+  const data = Buffer.from(String(args["bytes"]), "base64");
+  const first = await writeInPieces(send, path, data, args["create_parent_dirs"] === true);
+  if (verify)
+    await verifyFiles(send, posix3.dirname(path), [{ path: posix3.basename(path), data }]);
+  const resolved = isRecord4(first) && typeof first["path"] === "string" ? first["path"] : path;
+  return { path: resolved, writtenBytes: data.length };
+};
+
+// packages/bunshin-ts-relay/src/tree-apply.ts
+var TREE_CONCURRENCY = 4;
+var cleanDestination = async (send, root) => {
+  if (!isAbsolute2(root) || root.split("/").filter(Boolean).length < 2)
+    throw new MachineWireError("invalid_path", "invalid_path: clean destination is too shallow");
+  await runShell(send, `mkdir -p -- ${quote(root)} && find ${quote(root)} -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +`, "emptying the destination");
+};
+var eachCommand = async (send, parts, separator, step) => {
+  for (const chunk of chunksOf(parts))
+    await runShell(send, chunk.join(separator), step);
+};
+var setModes = async (send, root, entries) => {
+  const byMode = new Map;
+  for (const entry of entries)
+    byMode.set(entry.mode, [...byMode.get(entry.mode) ?? [], joinPath(root, entry.path)]);
+  const commands = [...byMode].flatMap(([mode, paths]) => chunksOf(paths).map((chunk) => `chmod ${mode.toString(8)} -- ${chunk.map(quote).join(" ")}`));
+  await eachCommand(send, commands, " && ", "setting the tree's modes");
+};
+var treePathArg = (args) => {
+  const path = args["path"];
+  if (typeof path !== "string" || path === "")
+    throw new MachineWireError("invalid_argument", "fs.tree.* needs a non-empty path");
+  if (args["format"] !== undefined && args["format"] !== "tar+gzip")
+    throw new MachineWireError("invalid_argument", "fs.tree.* moves only the tar+gzip format");
+  return path;
+};
+var applyTree = async (send, args, archive) => {
+  const root = treePathArg(args);
+  const entries = readTreeEntries(archive);
+  const dirs = entries.filter((entry) => entry.kind === "dir");
+  const links = entries.filter((entry) => entry.kind === "symlink");
+  const files = entries.flatMap((entry) => entry.kind === "file" ? [{ ...entry, data: entry.data ?? new Uint8Array(0) }] : []);
+  if (args["clean"] === true)
+    await cleanDestination(send, root);
+  await clearDestinationLinks(send, root, entries);
+  const dirPaths = [root, ...dirs.map((dir) => joinPath(root, dir.path))];
+  await eachCommand(send, chunksOf(dirPaths).map((chunk) => `mkdir -p -- ${chunk.map(quote).join(" ")}`), " && ", "making the tree's directories");
+  await pool(files, TREE_CONCURRENCY, async (file) => {
+    await writeInPieces(send, joinPath(root, file.path), file.data, true);
+  });
+  const linkCommands = links.map((link) => {
+    const at = quote(joinPath(root, link.path));
+    return `rm -f -- ${at} && ln -s -- ${quote(link.link ?? "")} ${at}`;
+  });
+  await setModes(send, root, [...dirs, ...files]);
+  await eachCommand(send, linkCommands, " && ", "making the tree's symlinks");
+  const verifiedFiles = await verifyFiles(send, root, files);
+  return {
+    fileCount: files.length,
+    dirCount: dirs.length,
+    symlinkCount: links.length,
+    writtenBytes: files.reduce((sum, file) => sum + file.data.length, 0),
+    verifiedFiles
+  };
+};
+
+// packages/bunshin-ts-relay/src/tree-pack.ts
+var DEFAULT_TREE_EXCLUDES = new Set([
+  ".git",
+  "node_modules",
+  "target",
+  ".DS_Store"
+]);
+var globs = (value) => Array.isArray(value) ? value.filter((v) => typeof v === "string") : [];
+var listOf = async (send, path) => {
+  const reply = await send("fs.list", { path });
+  const entries = isRecord4(reply) ? reply["entries"] : undefined;
+  if (!Array.isArray(entries))
+    throw new MachineWireError("protocol_violation", `fs.list of ${path} answered no entries`);
+  return entries.flatMap((e) => isRecord4(e) && typeof e["name"] === "string" && typeof e["type"] === "string" ? [{ name: e["name"], type: e["type"] }] : []).sort((a, b) => a.name.localeCompare(b.name));
+};
+var walk = async (send, root, args) => {
+  const ignore = globs(args["ignore"]);
+  const include = globs(args["include"]);
+  const match = (pattern, path) => new Bun.Glob(pattern).match(path);
+  const ignored = (path) => path.split("/").some((part) => DEFAULT_TREE_EXCLUDES.has(part)) || ignore.some((pattern) => match(pattern, path));
+  const included = (path) => include.length === 0 || include.some((pattern) => match(pattern, path) || match(pattern, `${path}/`));
+  const walked = { files: [], dirs: [], links: [] };
+  let level = [
+    { rel: "", conditional: false }
+  ];
+  while (level.length > 0) {
+    const next = [];
+    await pool(level, TREE_CONCURRENCY, async ({ rel, conditional }) => {
+      const listed = await listOf(send, joinPath(root, rel));
+      const name = (entry) => rel === "" ? entry.name : `${rel}/${entry.name}`;
+      if (conditional && !listed.some((entry) => included(name(entry))))
+        return;
+      if (rel !== "")
+        walked.dirs.push(rel);
+      for (const entry of listed) {
+        const path = name(entry);
+        if (ignored(path))
+          continue;
+        if (entry.type === "directory")
+          next.push({ rel: path, conditional: !included(path) });
+        else if (!included(path))
+          continue;
+        else if (entry.type === "file")
+          walked.files.push(path);
+        else if (entry.type === "symlink")
+          walked.links.push(path);
+        else
+          throw new MachineWireError("unsupported_path_kind", `unsupported_path_kind: ${joinPath(root, path)}`);
+      }
+    });
+    level = next;
+  }
+  return walked;
+};
+var statOf = async (send, path) => {
+  const reply = await send("fs.stat", { path });
+  const mode = isRecord4(reply) ? reply["mode"] : undefined;
+  const size = isRecord4(reply) ? reply["size"] : undefined;
+  if (typeof mode !== "number" || typeof size !== "number")
+    throw new MachineWireError("protocol_violation", `fs.stat of ${path} answered no numeric mode and size`);
+  return { mode: mode & 4095, size };
+};
+var linkTargets = async (send, root, links) => {
+  const targets = [];
+  for (const chunk of chunksOf(links)) {
+    const out = await runShell(send, `cd -- ${quote(root)} && for p in ${chunk.map(quote).join(" ")}; do t=$(readlink -- "$p" && printf x) || exit 1; t=\${t%x}; printf '%s\\0' "\${t%?}"; done`, "reading the tree's symlinks");
+    const read = out.split("\x00");
+    if (read.length !== chunk.length + 1)
+      throw new MachineWireError("tree_step_failed", `read ${read.length - 1} of ${chunk.length} symlinks`);
+    targets.push(...read.slice(0, chunk.length));
+  }
+  return targets;
+};
+var packRemoteTree = async (deps, args) => {
+  const root = treePathArg(args);
+  const walked = await walk(deps.send, root, args);
+  const entries = [];
+  const files = [];
+  await pool(walked.dirs, TREE_CONCURRENCY, async (path) => {
+    const { mode } = await statOf(deps.send, joinPath(root, path));
+    entries.push({ path, kind: "dir", mode });
+  });
+  await pool(walked.files, TREE_CONCURRENCY, async (path) => {
+    const at = joinPath(root, path);
+    const { mode, size } = await statOf(deps.send, at);
+    const data = await deps.readWhole(at);
+    if (data.length !== size)
+      throw new MachineWireError("file_changed", `${at} changed while it was read: fs.stat said ${size} bytes, the read gave ${data.length}`);
+    entries.push({ path, kind: "file", mode, data });
+    files.push({ path, data });
+  });
+  const targets = await linkTargets(deps.send, root, walked.links);
+  walked.links.forEach((path, at) => {
+    const link = targets[at] ?? "";
+    if (linkTargetStaysInside(path, link))
+      entries.push({ path, kind: "symlink", mode: 511, link });
+  });
+  const verifiedFiles = await verifyFiles(deps.send, root, files);
+  return {
+    bytes: packTreeEntries(entries),
+    fileCount: files.length,
+    dirCount: walked.dirs.length,
+    symlinkCount: entries.filter((entry) => entry.kind === "symlink").length,
+    totalBytes: files.reduce((sum, file) => sum + file.data.length, 0),
+    verifiedFiles
+  };
+};
+
+// packages/bunshin-ts-relay/src/tree-transfer.ts
+var TREE_PACK = "fs.tree.pack";
+var TREE_APPLY = "fs.tree.apply";
+var NEEDS = {
+  [TREE_PACK]: ["fs.list", "fs.stat", "fs.read", "shell"],
+  [TREE_APPLY]: ["fs.write", "fs.write_range", "shell"]
+};
+var composedTreeOps = (ops, os) => os === "win32" || os === "windows" ? [] : Object.entries(NEEDS).filter(([op, needs]) => !ops.includes(op) && needs.every((need) => ops.includes(need))).map(([op]) => op);
+var isTreeOp = (capability) => capability === TREE_PACK || capability === TREE_APPLY;
+var runComposedTreeOp = async (capability, args, deps) => {
+  const record = isRecord4(args) ? args : {};
+  if (capability === TREE_APPLY)
+    return applyTree(deps.send, record, deps.artifacts.take(record["artifact"]));
+  const { bytes, ...summary } = await packRemoteTree(deps, record);
+  return { ...summary, archiveBytes: bytes.length, artifact: deps.artifacts.hold(bytes) };
 };
 
 // packages/bunshin-ts-relay/src/records.ts
-var isRecord3 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
-var malformed2 = (what) => {
+var isRecord5 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+var malformed3 = (what) => {
   throw new LocalApiError("protocol_violation", `${what} is malformed`);
 };
 var strings = (value) => Array.isArray(value) ? value.filter((v) => typeof v === "string") : [];
-var text2 = (value) => typeof value === "string" ? value : undefined;
+var text3 = (value) => typeof value === "string" ? value : undefined;
 var STATES = new Set(["online", "offline", "unsupported"]);
 var machineRowsOf = (data) => {
-  const machines = isRecord3(data) ? data["machines"] : undefined;
+  const machines = isRecord5(data) ? data["machines"] : undefined;
   if (!Array.isArray(machines))
-    return malformed2("machine.list");
+    return malformed3("machine.list");
   return machines.map((row) => {
-    if (!isRecord3(row))
-      return malformed2("a machine.list row");
+    if (!isRecord5(row))
+      return malformed3("a machine.list row");
     const { device, label, state } = row;
     if (typeof device !== "string" || typeof label !== "string" || !STATES.has(String(state)))
-      return malformed2("a machine.list row");
+      return malformed3("a machine.list row");
     return {
       device,
       label,
@@ -1185,10 +2002,10 @@ var machineRowsOf = (data) => {
 var opsOf = (value) => (Array.isArray(value) ? value : []).flatMap((op) => {
   if (typeof op === "string")
     return [{ name: op }];
-  if (!isRecord3(op) || typeof op["name"] !== "string")
+  if (!isRecord5(op) || typeof op["name"] !== "string")
     return [];
-  const version = text2(op["version"]);
-  const description = text2(op["description"]);
+  const version = text3(op["version"]);
+  const description = text3(op["description"]);
   return [
     {
       name: op["name"],
@@ -1198,26 +2015,28 @@ var opsOf = (value) => (Array.isArray(value) ? value : []).flatMap((op) => {
   ];
 });
 var buildOf = (value) => {
-  if (!isRecord3(value))
+  if (!isRecord5(value))
     return;
-  const version = text2(value["version"]);
-  const binarySha256 = text2(value["sha256"]) ?? text2(value["binarySha256"]);
+  const version = text3(value["version"]);
+  const binarySha256 = text3(value["sha256"]) ?? text3(value["binarySha256"]);
   return version === undefined || binarySha256 === undefined ? undefined : { version, binarySha256 };
 };
 var hostOf = (value) => {
-  if (!isRecord3(value))
+  if (!isRecord5(value))
     return;
   const { load1, cores } = value;
   return typeof load1 === "number" && typeof cores === "number" ? { load1, cores } : undefined;
 };
 var descriptionOf = (data) => {
-  const description = isRecord3(data) ? data["description"] : undefined;
-  if (!isRecord3(description))
-    return malformed2("machine.describe");
-  const os = text2(description["os"]);
-  const arch = text2(description["arch"]);
+  const description = isRecord5(data) ? data["description"] : undefined;
+  if (!isRecord5(description))
+    return malformed3("machine.describe");
+  const os = text3(description["os"]);
+  const arch = text3(description["arch"]);
   const build = buildOf(description["build"]);
   const host = hostOf(description["host"]);
+  const limits = description["limits"];
+  const readMaxBytes = isRecord5(limits) ? limits["read_max_bytes"] : undefined;
   return {
     kind: "described",
     ...os === undefined ? {} : { os },
@@ -1226,7 +2045,8 @@ var descriptionOf = (data) => {
     ...build === undefined ? {} : { build },
     ...host === undefined ? {} : { host },
     ops: opsOf(description["ops"]),
-    features: strings(description["features"])
+    features: strings(description["features"]),
+    ...typeof readMaxBytes === "number" && Number.isSafeInteger(readMaxBytes) && readMaxBytes > 0 ? { readMaxBytes } : {}
   };
 };
 var recordOf = (row, description) => {
@@ -1247,7 +2067,7 @@ var recordOf = (row, description) => {
         kind: "direct",
         machineId: row.device,
         online,
-        capabilities: unsupported ? [] : known?.ops.map((op) => op.name) ?? []
+        capabilities: unsupported || known === undefined ? [] : capabilitiesOf(known)
       }
     ],
     connection: online ? "relay" : "none",
@@ -1272,14 +2092,25 @@ var localRecordOf = (device) => ({
   unsupported: true,
   attention: "this device: the device service runs no machine operations on its own device"
 });
-var toolsOf = (description) => description.ops.map((op) => ({
-  name: op.name,
-  capability: op.name,
-  inputSchema: { type: "object", additionalProperties: true },
-  transport: "built-in",
-  version: op.version ?? "1",
-  ...op.description === undefined ? {} : { description: op.description }
-}));
+var composedOf = (description) => composedTreeOps(description.ops.map((op) => op.name), description.os);
+var capabilitiesOf = (description) => [
+  ...description.ops.map((op) => op.name),
+  ...composedOf(description)
+];
+var toolsOf = (description) => {
+  const composed = composedOf(description).map((name) => ({
+    name,
+    description: "composed by the relay transport from the device's file and shell ops"
+  }));
+  return [...description.ops, ...composed].map((op) => ({
+    name: op.name,
+    capability: op.name,
+    inputSchema: { type: "object", additionalProperties: true },
+    transport: "built-in",
+    version: op.version ?? "1",
+    ...op.description === undefined ? {} : { description: op.description }
+  }));
+};
 
 // packages/bunshin-ts-relay/src/directory.ts
 var CONNECTION_FAILURES = new Set([
@@ -1294,6 +2125,10 @@ var reasonOf = (error) => error instanceof Error ? error.message : String(error)
 var createDirectory = (deps) => {
   const descriptions = new Map;
   const unreachable = new Map;
+  const RETRY_UNREACHABLE_MS = deps.retryUnreachableMs ?? 30000;
+  const now = deps.now ?? (() => performance.now());
+  const failedAt = new Map;
+  let listedUnsupported = new Set;
   let localDevice;
   const describe = async (device) => {
     const cached = descriptions.get(device);
@@ -1329,10 +2164,32 @@ var createDirectory = (deps) => {
     });
     return described;
   };
+  const unasked = (device, state) => {
+    if (!unreachable.has(device))
+      return false;
+    if (state === "offline")
+      return true;
+    const failed = failedAt.get(device);
+    if (failed === undefined || failed.state === "offline")
+      return false;
+    if (now() - failed.at < RETRY_UNREACHABLE_MS)
+      return true;
+    failedAt.delete(device);
+    unreachable.delete(device);
+    return false;
+  };
   const recordFor = async (row) => {
     if (row.state === "unsupported")
       return recordOf(row, descriptions.get(row.device));
+    if (unasked(row.device, row.state)) {
+      const known = descriptions.get(row.device);
+      return recordOf(row, known ?? (row.state === "offline" ? undefined : unreachable.get(row.device)));
+    }
     const described = await describe(row.device);
+    if (described.kind === "unreachable")
+      failedAt.set(row.device, { at: now(), state: row.state });
+    else
+      failedAt.delete(row.device);
     const offlineUnknown = row.state === "offline" && described.kind === "unreachable";
     return recordOf(row, offlineUnknown ? undefined : described);
   };
@@ -1340,6 +2197,7 @@ var createDirectory = (deps) => {
     listMachines: async () => {
       const [listed, status] = await Promise.all([deps.request("machine.list"), deps.status()]);
       const rows = machineRowsOf(listed);
+      listedUnsupported = new Set(rows.filter((row) => row.state === "unsupported").map((row) => row.device));
       const records = await Promise.all(rows.map(recordFor));
       const self = status.device;
       localDevice = self?.id;
@@ -1348,6 +2206,8 @@ var createDirectory = (deps) => {
       return [...records, localRecordOf(self)];
     },
     listTools: async (machineId) => {
+      if (listedUnsupported.has(machineId))
+        return [];
       const cached = descriptions.get(machineId);
       if (cached !== undefined)
         return toolsOf(cached);
@@ -1355,6 +2215,14 @@ var createDirectory = (deps) => {
         return [];
       const described = await describe(machineId);
       return described.kind === "described" ? toolsOf(described) : [];
+    },
+    deviceOpsOf: async (machineId) => {
+      const described = await describe(machineId);
+      return described.kind === "described" ? described.ops.map((op) => op.name) : [];
+    },
+    readLimitOf: async (machineId) => {
+      const described = await describe(machineId);
+      return described.kind === "described" ? described.readMaxBytes : undefined;
     }
   };
 };
@@ -1484,7 +2352,7 @@ var openEvents = (feeds, options) => {
 };
 
 // packages/bunshin-ts-relay/src/blob.ts
-var violation = (detail) => {
+var violation3 = (detail) => {
   throw new LocalApiError("protocol_violation", detail);
 };
 
@@ -1492,16 +2360,16 @@ class BlobAssembler {
   #open = new Map;
   open(id, opId, bytes, sha256) {
     if (this.#open.has(id))
-      return violation("a blob id opened twice");
+      return violation3("a blob id opened twice");
     if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > LOCAL_BLOB_MAX)
-      return violation("a result blob over LOCAL_BLOB_MAX");
+      return violation3("a result blob over LOCAL_BLOB_MAX");
     this.#open.set(id, { opId, bytes, sha256, parts: [], received: 0 });
   }
   chunk(id, off, b) {
     const blob = this.#current(id);
     const data = new Uint8Array(Buffer.from(b, "base64"));
     if (off !== blob.received || blob.received + data.length > blob.bytes)
-      return violation("a result blob chunk out of order");
+      return violation3("a result blob chunk out of order");
     blob.parts.push(data);
     blob.received += data.length;
   }
@@ -1509,14 +2377,14 @@ class BlobAssembler {
     const blob = this.#current(id);
     this.#open.delete(id);
     if (blob.received !== blob.bytes)
-      return violation("a result blob done before its last chunk");
+      return violation3("a result blob done before its last chunk");
     const data = new Uint8Array(blob.bytes);
     let at = 0;
     for (const part of blob.parts) {
       data.set(part, at);
       at += part.length;
     }
-    return sha256Hex(data) === blob.sha256 ? { opId: blob.opId, data } : violation("a result blob digest mismatch");
+    return sha256Hex(data) === blob.sha256 ? { opId: blob.opId, data } : violation3("a result blob digest mismatch");
   }
   abort(id) {
     const blob = this.#current(id);
@@ -1524,46 +2392,84 @@ class BlobAssembler {
     return blob.opId;
   }
   #current(id) {
-    return this.#open.get(id) ?? violation("a result blob that is not open");
+    return this.#open.get(id) ?? violation3("a result blob that is not open");
   }
 }
 
-// packages/bunshin-ts-relay/src/op-fields.ts
-import { createHash as createHash2 } from "node:crypto";
-var mintOpId = () => mintId();
-var OP_ID = /^[A-Za-z0-9_-]{22}$/;
-var wireOpIdOf = (opId) => OP_ID.test(opId) ? opId : createHash2("sha256").update(opId).digest().subarray(0, 16).toString("base64url");
-var isRecord4 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
-var violation2 = (detail) => {
-  throw new LocalApiError("protocol_violation", detail);
-};
-var text3 = (event, name) => {
-  const value = event[name];
-  return typeof value === "string" ? value : violation2(`${event.kind} without ${name}`);
-};
-var entryOf = (value) => {
-  if (!isRecord4(value) || typeof value["state"] !== "string")
-    return violation2("an op result without a state");
-  const error = value["error"];
-  const code = isRecord4(error) ? error["code"] : undefined;
-  if (error !== undefined && typeof code !== "string")
-    return violation2("an op error without a code");
-  const message = isRecord4(error) ? String(error["message"] ?? code) : "";
-  return {
-    state: value["state"],
-    ..."response" in value ? { response: value["response"] } : {},
-    ...typeof code === "string" ? { error: { code, message } } : {}
-  };
-};
-var argsOf = (args) => {
-  if (args === undefined)
-    return {};
-  const plain = JSON.parse(JSON.stringify(args));
-  if (!isRecord4(plain))
-    throw new TypeError("machine op args must be a JSON object");
-  return plain;
-};
-var abortError = (signal) => signal.reason instanceof Error ? signal.reason : new DOMException("the operation was aborted", "AbortError");
+// packages/bunshin-ts-relay/src/contract-error.ts
+var MISSING_PATH_OPS = new Set(["fs.read", "fs.stat", "fs.list", "fs.grep"]);
+var contractErrorOf = (capability, code, message) => code === "not_found" && message.startsWith("ENOENT:") && MISSING_PATH_OPS.has(capability) ? { code: "missing_path", message: "path does not exist" } : { code, message };
+
+// packages/bunshin-ts-relay/src/machine-uploads.ts
+var DROP_PART = { index: 0, count: 2, b: "AA==" };
+
+class MachineUploads {
+  #wire;
+  #waiting = [];
+  #open = 0;
+  constructor(wire) {
+    this.#wire = wire;
+  }
+  get waiting() {
+    return this.#waiting.length;
+  }
+  async send(json, final, wanted, signal) {
+    if (!await this.#take(signal))
+      return;
+    try {
+      if (!wanted())
+        return;
+      const upload_id = mintId();
+      const sent = await Promise.allSettled(uploadParts(json).map((part) => this.#wire.request("machine.batch_part", { upload_id, ...part })));
+      const failed = sent.find((s) => s.status === "rejected");
+      if (failed === undefined && wanted()) {
+        await final(upload_id);
+        return;
+      }
+      await this.#drop(upload_id);
+      if (failed !== undefined) {
+        const reason = failed.reason;
+        throw reason;
+      }
+    } finally {
+      this.#give();
+    }
+  }
+  async#drop(upload_id) {
+    await this.#wire.request("machine.batch_part", { upload_id, ...DROP_PART }).then(() => {
+      return;
+    }, () => {
+      return;
+    });
+  }
+  #take(signal) {
+    if (this.#open < MACHINE_UPLOADS_OPEN_MAX) {
+      this.#open += 1;
+      return Promise.resolve(true);
+    }
+    if (signal?.aborted === true)
+      return Promise.resolve(false);
+    return new Promise((resolve) => {
+      const enter = () => {
+        signal?.removeEventListener("abort", leave);
+        resolve(true);
+      };
+      const leave = () => {
+        this.#waiting.splice(this.#waiting.indexOf(enter), 1);
+        resolve(false);
+      };
+      this.#waiting.push(enter);
+      signal?.addEventListener("abort", leave, { once: true });
+    });
+  }
+  #give() {
+    const next = this.#waiting.shift();
+    if (next === undefined)
+      this.#open -= 1;
+    else
+      next();
+  }
+}
 
 // packages/bunshin-ts-relay/src/invoke.ts
 class Invoker {
@@ -1575,8 +2481,10 @@ class Invoker {
   #running = new Map;
   #waiters = new Map;
   #blobs = new BlobAssembler;
+  #uploads;
   constructor(wire, sessionRef, timer, timeoutMs) {
     this.#wire = wire;
+    this.#uploads = new MachineUploads(wire);
     this.#sessionRef = sessionRef;
     this.#timer = timer;
     this.#timeoutMs = timeoutMs;
@@ -1628,7 +2536,7 @@ class Invoker {
         reject: (error) => (done(), reject(error))
       });
       signal?.addEventListener("abort", onAbort, { once: true });
-      this.#sendBatch(call.machineId, op, opId).catch((error) => {
+      this.#sendBatch(call.machineId, op, opId, signal).catch((error) => {
         const pending = this.#pending.get(opId);
         if (pending === undefined)
           return;
@@ -1675,18 +2583,14 @@ class Invoker {
     else
       this.#waiters.set(opId, rest);
   }
-  async#sendBatch(device, op, opId) {
+  async#sendBatch(device, op, opId, signal) {
     const ref = this.#sessionRef === undefined ? {} : { session_ref: this.#sessionRef };
     const inline = { device, ops: [op], ...ref };
     if (lineBytes({ id: "0".repeat(16), type: "machine.batch", ...inline }) <= LOCAL_INLINE_MAX) {
       await this.#wire.request("machine.batch", inline);
       return;
     }
-    const upload_id = mintId();
-    await Promise.all(uploadParts(JSON.stringify([op])).map((part) => this.#wire.request("machine.batch_part", { upload_id, ...part })));
-    if (!this.#pending.has(opId))
-      return;
-    await this.#wire.request("machine.batch", { device, upload_id, ...ref });
+    await this.#uploads.send(JSON.stringify([op]), (upload_id) => this.#wire.request("machine.batch", { device, upload_id, ...ref }), () => this.#pending.has(opId), signal);
   }
   #batchError(error, opId) {
     if (error instanceof WireRefusal && error.code !== "unsupported")
@@ -1699,7 +2603,7 @@ class Invoker {
   #onEvent(event) {
     switch (event.kind) {
       case "machine.op_result": {
-        const opId = text3(event, "op_id");
+        const opId = text2(event, "op_id");
         const blob = event["blob"];
         if (!isRecord4(blob))
           return this.#settle(opId, entryOf(event["response"]));
@@ -1712,15 +2616,15 @@ class Invoker {
         const off = event["off"];
         if (typeof off !== "number")
           return violation2("machine.blob_chunk without off");
-        return this.#blobs.chunk(text3(event, "id"), off, text3(event, "b"));
+        return this.#blobs.chunk(text2(event, "id"), off, text2(event, "b"));
       }
       case "machine.blob_done": {
-        const { opId, data } = this.#blobs.done(text3(event, "id"));
+        const { opId, data } = this.#blobs.done(text2(event, "id"));
         return this.#settle(opId, entryOf(JSON.parse(new TextDecoder().decode(data))));
       }
       case "machine.blob_abort": {
-        const reason = text3(event, "reason");
-        const opId = this.#blobs.abort(text3(event, "id"));
+        const reason = text2(event, "reason");
+        const opId = this.#blobs.abort(text2(event, "id"));
         return this.#settle(opId, {
           state: "failed",
           error: { code: reason, message: `the result blob was aborted: ${reason}` }
@@ -1742,7 +2646,8 @@ class Invoker {
     const code = entry.error?.code ?? entry.state;
     if (code === "op_unknown")
       return pending.reject(new CapabilityUnavailableError(pending.call.machineId, pending.call.capability));
-    pending.reject(new MachineWireError(code, entry.error?.message ?? `the op was ${entry.state}`, opId, undefined, entry));
+    const failure = contractErrorOf(pending.call.capability, code, entry.error?.message ?? `the op was ${entry.state}`);
+    pending.reject(new MachineWireError(failure.code, failure.message, opId, undefined, entry));
   }
 }
 
@@ -1855,21 +2760,21 @@ class OutputStreams {
 }
 
 // packages/bunshin-ts-relay/src/policy.ts
-var isRecord5 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
-var malformed3 = (field) => {
+var isRecord6 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+var malformed4 = (field) => {
   throw new TypeError(`the device answered a policy whose ${field} is malformed`);
 };
-var strings2 = (value, field) => Array.isArray(value) && value.every((v) => typeof v === "string") ? value : malformed3(field);
+var strings2 = (value, field) => Array.isArray(value) && value.every((v) => typeof v === "string") ? value : malformed4(field);
 var SOURCES = ["ssh_config", "tailscale", "manual"];
-var sourceOf = (value) => SOURCES.find((s) => s === value) ?? malformed3("bridge.sources");
+var sourceOf = (value) => SOURCES.find((s) => s === value) ?? malformed4("bridge.sources");
 var targetOf = (value) => {
-  if (!isRecord5(value) || typeof value["target"] !== "string")
-    return malformed3("bridge.targets");
+  if (!isRecord6(value) || typeof value["target"] !== "string")
+    return malformed4("bridge.targets");
   const { target, enabled, hostKeyFp, home } = value;
   if (enabled !== undefined && typeof enabled !== "boolean")
-    return malformed3("bridge.targets");
+    return malformed4("bridge.targets");
   if (home !== undefined && typeof home !== "string")
-    return malformed3("bridge.targets");
+    return malformed4("bridge.targets");
   return {
     target,
     ...enabled === undefined ? {} : { enabled },
@@ -1878,13 +2783,13 @@ var targetOf = (value) => {
   };
 };
 var bridgeOf = (value) => {
-  if (!isRecord5(value))
-    return malformed3("bridge");
+  if (!isRecord6(value))
+    return malformed4("bridge");
   const { enabled, sources, targets } = value;
   if (enabled !== undefined && typeof enabled !== "boolean")
-    return malformed3("bridge.enabled");
+    return malformed4("bridge.enabled");
   if (targets !== undefined && !Array.isArray(targets))
-    return malformed3("bridge.targets");
+    return malformed4("bridge.targets");
   return {
     ...enabled === undefined ? {} : { enabled },
     ...sources === undefined ? {} : { sources: strings2(sources, "bridge.sources").map(sourceOf) },
@@ -1892,13 +2797,13 @@ var bridgeOf = (value) => {
   };
 };
 var policyOf2 = (value) => {
-  if (!isRecord5(value))
-    return malformed3("shape");
+  if (!isRecord6(value))
+    return malformed4("shape");
   const { tags, alias, pathAppend, longShellBudgetMs, bridge } = value;
   if (alias !== undefined && typeof alias !== "string")
-    return malformed3("alias");
+    return malformed4("alias");
   if (longShellBudgetMs !== undefined && !Number.isInteger(longShellBudgetMs))
-    return malformed3("longShellBudgetMs");
+    return malformed4("longShellBudgetMs");
   return {
     ...tags === undefined ? {} : { tags: strings2(tags, "tags") },
     ...alias === undefined ? {} : { alias },
@@ -1908,17 +2813,98 @@ var policyOf2 = (value) => {
   };
 };
 
+// packages/bunshin-ts-relay/src/read-result.ts
+var isRecord7 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+var sdkResultOf = (capability, result) => {
+  if (!isRecord7(result))
+    return result;
+  if (capability === "fs.read")
+    return sdkReadResult(result);
+  if (capability === "fs.write")
+    return sdkWriteResult(result);
+  return result;
+};
+var sdkWriteResult = (result) => {
+  const writtenBytes = result["writtenBytes"];
+  if (typeof writtenBytes !== "number" || !Number.isSafeInteger(writtenBytes) || writtenBytes < 0)
+    throw new RelayTransportError("unsupported", "the device's fs.write reply carries no integer byte count, so what it wrote cannot be told");
+  return { ...result, bytesWritten: writtenBytes };
+};
+var sdkReadResult = (result) => {
+  const base64 = result["bytes"];
+  if (typeof base64 !== "string")
+    return result;
+  const size = result["size"];
+  if (typeof size !== "number" || !Number.isFinite(size))
+    throw new RelayTransportError("unsupported", "the device's fs.read reply carries no numeric size, so whether the read is whole cannot be told");
+  const sizeBytes = Buffer.byteLength(base64, "base64");
+  const offset = typeof result["offset"] === "number" ? result["offset"] : 0;
+  const truncated = offset + sizeBytes < size;
+  return {
+    ...result,
+    bytes: { kind: truncated ? "truncated" : "full", base64 },
+    sizeBytes,
+    truncated
+  };
+};
+
+// packages/bunshin-ts-relay/src/tree-artifacts.ts
+import { randomUUID } from "node:crypto";
+var ORIGIN = "https://relay-artifact.invalid/";
+var urlOf = (input) => typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+
+class TreeArtifacts {
+  #held = new Map;
+  hold(bytes) {
+    const key = randomUUID();
+    this.#held.set(key, new Uint8Array(bytes));
+    return {
+      kind: "artifact",
+      sha256: sha256Hex2(bytes),
+      size: bytes.length,
+      url: `${ORIGIN}${key}`
+    };
+  }
+  take(ref) {
+    const url = isRecord4(ref) ? ref["url"] : undefined;
+    const key = typeof url === "string" && url.startsWith(ORIGIN) ? url.slice(ORIGIN.length) : "";
+    const bytes = this.#held.get(key);
+    if (bytes === undefined || !isRecord4(ref) || ref["sha256"] !== sha256Hex2(bytes))
+      throw new MachineWireError("artifact_missing", "fs.tree.apply names no archive this transport holds; upload it with this transport's uploadArtifact first");
+    this.#held.delete(key);
+    return bytes;
+  }
+  clear() {
+    this.#held.clear();
+  }
+  fetch = Object.assign(async (input, init) => {
+    const url = urlOf(input);
+    if (!url.startsWith(ORIGIN))
+      return fetch(input, init);
+    const key = url.slice(ORIGIN.length);
+    const bytes = this.#held.get(key);
+    if (bytes === undefined)
+      return new Response(null, { status: 404 });
+    this.#held.delete(key);
+    return new Response(bytes);
+  }, { preconnect: fetch.preconnect });
+}
+
 // packages/bunshin-ts-relay/src/transport.ts
 var SDK_TRANSPORT_VERSION = "0.1.0";
 var DESCRIBE_TIMEOUT_MS = 1e4;
+var SDK_CLIENT_NAMES = ["sdk"];
 var createRelayTransport = (options = {}) => {
-  const stateDir = options.stateDir ?? defaultStateDir();
+  const clientName = SDK_CLIENT_NAMES.find((name) => name === (options.clientName ?? "sdk"));
+  if (clientName === undefined)
+    throw new RelayTransportError("invalid_client_name", `clientName must be one of ${SDK_CLIENT_NAMES.join(", ")} (default sdk); it is a local API role, not an application name`);
+  const stateDir = options.stateDir ?? serviceStateDir();
   const sessionRef = options.sessionRef ?? sessionRefFromEnv();
   const requestTimeoutMs = options.requestTimeoutMs ?? REQUEST_TIMEOUT_MS;
   const describeTimeoutMs = options.describeTimeoutMs ?? DESCRIBE_TIMEOUT_MS;
   const open = () => openConnection({
     stateDir,
-    clientName: options.clientName ?? "sdk",
+    clientName,
     clientVersion: options.clientVersion ?? SDK_TRANSPORT_VERSION,
     requestTimeoutMs,
     ...options.timer === undefined ? {} : { timer: options.timer }
@@ -1927,6 +2913,7 @@ var createRelayTransport = (options = {}) => {
   const closeListeners = new Set;
   let session;
   let closed = false;
+  const artifacts = new TreeArtifacts;
   const start = async () => {
     const wire = await open();
     const invoker = new Invoker(wire, sessionRef, options.timer ?? defaultTimer, requestTimeoutMs);
@@ -1960,20 +2947,52 @@ var createRelayTransport = (options = {}) => {
     request,
     status: async () => statusOf2((await current()).wire),
     timer: options.timer ?? defaultTimer,
-    describeTimeoutMs
+    describeTimeoutMs,
+    ...options.retryUnreachableMs === undefined ? {} : { retryUnreachableMs: options.retryUnreachableMs }
   });
   const invokeOp = async (machineId, capability, args, metadata, terminalTimeoutMs, signal) => {
     const { invoker } = await current();
     const token = metadata?.capabilityToken;
-    return invoker.invoke({
+    const deadlineMs = terminalTimeoutMs === undefined ? undefined : Date.now() + terminalTimeoutMs;
+    const send = (op, opArgs, opId) => invoker.invoke({
       machineId,
-      capability,
-      args,
-      ...metadata?.opId === undefined ? {} : { opId: metadata.opId },
-      ...terminalTimeoutMs === undefined ? {} : { deadlineMs: terminalTimeoutMs },
-      ...token === undefined ? {} : { constraints: constraintsOf(token) },
+      capability: op,
+      args: opArgs,
+      ...opId === undefined ? {} : { opId },
+      ...deadlineMs === undefined ? {} : { deadlineMs },
+      ...token === undefined ? {} : { constraints: constraintsOf(token, machineId, opArgs, metadata?.taskId) },
       ...signal === undefined ? {} : { signal }
     });
+    const sendRead = (op, opArgs, opId) => {
+      const whole = wholeReadPath(op, opArgs);
+      return send(op, opArgs, opId).catch(async (error) => {
+        const limit = whole !== undefined && isLimitExceeded(error) ? await directory.readLimitOf(machineId) : undefined;
+        if (whole === undefined || limit === undefined)
+          throw error;
+        const chunkOps = {
+          read: (chunk) => send("fs.read", chunk, undefined),
+          stat: () => send("fs.stat", { path: whole }, undefined)
+        };
+        return readInChunks(whole, limit, chunkOps, error);
+      });
+    };
+    if (isTreeOp(capability) && !(await directory.deviceOpsOf(machineId)).includes(capability))
+      return runComposedTreeOp(capability, args, {
+        send: (op, opArgs) => send(op, opArgs, undefined),
+        readWhole: async (path) => {
+          const reply = await sendRead("fs.read", { path }, undefined);
+          const bytes = isRecord4(reply) ? reply["bytes"] : undefined;
+          return typeof bytes === "string" ? Buffer.from(bytes, "base64") : violation2(`an fs.read of ${path} answered without base64 bytes`);
+        },
+        artifacts
+      });
+    if (isPieceWrite(capability, args)) {
+      const permits = (op, opArgs) => token === undefined || tokenAllows(token, machineId, op, opArgs, metadata?.taskId);
+      const plan = pieceWritePlan(args, await directory.deviceOpsOf(machineId), permits);
+      if (plan !== undefined)
+        return sdkResultOf(capability, await writeLarge((op, a) => send(op, a, undefined), args, plan.verify));
+    }
+    return sdkResultOf(capability, await sendRead(capability, args, metadata?.opId));
   };
   return {
     kind: "relay",
@@ -1992,6 +3011,7 @@ var createRelayTransport = (options = {}) => {
       if (closed)
         return;
       closed = true;
+      artifacts.clear();
       for (const listener of [...closeListeners])
         listener();
       const opened = await session?.catch(() => {
@@ -1999,6 +3019,8 @@ var createRelayTransport = (options = {}) => {
       });
       opened?.wire.close();
     },
+    uploadArtifact: async (bytes) => artifacts.hold(bytes),
+    fetchArtifact: artifacts.fetch,
     listMachines: directory.listMachines,
     listTools: directory.listTools,
     invoke: invokeOp,
@@ -2040,7 +3062,7 @@ var relayStatus = async (options = {}) => {
   let wire;
   try {
     wire = await openConnection({
-      stateDir: options.stateDir ?? defaultStateDir(),
+      stateDir: options.stateDir ?? serviceStateDir(),
       clientName: "sdk",
       clientVersion: SDK_TRANSPORT_VERSION,
       requestTimeoutMs: REQUEST_TIMEOUT_MS

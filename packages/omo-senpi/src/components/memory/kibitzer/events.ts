@@ -12,7 +12,15 @@
 
 import type { ComponentLogger } from "../../../extension/types"
 import { newestAssistant, promptText, toolArgsText, toolCallOf, toolResultOf } from "./events-payload"
-import { DIGEST_TAIL_FRAGMENTS, digestLine, escapeXml, fragmentOf, redactKibitzerEventText, truncateHead, type FoldState } from "./events-text"
+import {
+  DIGEST_TAIL_FRAGMENTS,
+  digestLine,
+  escapeXml,
+  fragmentOf,
+  redactKibitzerEventText,
+  truncateHead,
+  type FoldState,
+} from "./events-text"
 
 export { KIBITZER_DIGEST_MAX_CHARS, redactKibitzerEventText } from "./events-text"
 
@@ -26,7 +34,12 @@ export interface KibitzerEventCaps {
   readonly prompt: number
 }
 
-export const DEFAULT_KIBITZER_EVENT_CAPS: KibitzerEventCaps = { toolArgs: 400, resultHead: 600, assistant: 1500, prompt: 4000 }
+export const DEFAULT_KIBITZER_EVENT_CAPS: KibitzerEventCaps = {
+  toolArgs: 400,
+  resultHead: 600,
+  assistant: 1500,
+  prompt: 4000,
+}
 export const KIBITZER_EVENT_BUFFER_SIZE = 20
 
 export interface KibitzerEvent {
@@ -134,7 +147,15 @@ export function createKibitzerEventStream(options: KibitzerEventStreamOptions = 
   function foldInto(event: KibitzerEvent): void {
     const fragment = fragmentOf(event)
     if (fold === undefined) {
-      fold = { count: 1, firstSeq: event.seq, lastSeq: event.seq, firstCursor: event.cursor, lastCursor: event.cursor, head: fragment, tail: [] }
+      fold = {
+        count: 1,
+        firstSeq: event.seq,
+        lastSeq: event.seq,
+        firstCursor: event.cursor,
+        lastCursor: event.cursor,
+        head: fragment,
+        tail: [],
+      }
       return
     }
     fold.count += 1
@@ -162,14 +183,17 @@ export function createKibitzerEventStream(options: KibitzerEventStreamOptions = 
   }
 
   function batch(): KibitzerEventBatch {
-    const digest: KibitzerEventDigest | undefined = fold === undefined ? undefined : {
-      count: fold.count,
-      firstSeq: fold.firstSeq,
-      lastSeq: fold.lastSeq,
-      firstCursor: fold.firstCursor,
-      lastCursor: fold.lastCursor,
-      line: digestLine(fold),
-    }
+    const digest: KibitzerEventDigest | undefined =
+      fold === undefined
+        ? undefined
+        : {
+            count: fold.count,
+            firstSeq: fold.firstSeq,
+            lastSeq: fold.lastSeq,
+            firstCursor: fold.firstCursor,
+            lastCursor: fold.lastCursor,
+            line: digestLine(fold),
+          }
     const first = digest?.firstCursor ?? events[0]?.cursor
     const last = events.at(-1)?.cursor ?? digest?.lastCursor
     return {
@@ -236,7 +260,9 @@ export function createKibitzerEventStream(options: KibitzerEventStreamOptions = 
 export function renderKibitzerEventBatch(batch: KibitzerEventBatch): string {
   const lines: string[] = []
   if (batch.digest !== undefined) {
-    lines.push(`<digest folded="${batch.digest.count}" cursor="${batch.digest.firstCursor}..${batch.digest.lastCursor}">${escapeXml(batch.digest.line)}</digest>`)
+    lines.push(
+      `<digest folded="${batch.digest.count}" cursor="${batch.digest.firstCursor}..${batch.digest.lastCursor}">${escapeXml(batch.digest.line)}</digest>`,
+    )
   }
   for (const event of batch.events) lines.push(renderEvent(event))
   return lines.join("\n")

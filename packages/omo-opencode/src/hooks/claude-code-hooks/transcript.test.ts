@@ -13,7 +13,7 @@ function createMockClient(messages: unknown[] = []) {
       messages: mock(() =>
         Promise.resolve({
           data: messages,
-        })
+        }),
       ),
     },
   }
@@ -41,21 +41,9 @@ describe("transcript caching", () => {
       },
     ])
 
-    const path1 = await buildTranscriptFromSession(
-      client,
-      "ses_cache1",
-      "/tmp",
-      "bash",
-      { command: "echo hi" }
-    )
+    const path1 = await buildTranscriptFromSession(client, "ses_cache1", "/tmp", "bash", { command: "echo hi" })
 
-    const path2 = await buildTranscriptFromSession(
-      client,
-      "ses_cache1",
-      "/tmp",
-      "read",
-      { path: "/tmp/file" }
-    )
+    const path2 = await buildTranscriptFromSession(client, "ses_cache1", "/tmp", "read", { path: "/tmp/file" })
 
     // session.messages() called only once
     expect(client.session.messages).toHaveBeenCalledTimes(1)
@@ -126,31 +114,20 @@ describe("transcript caching", () => {
       return readFileSync(path, "utf-8").trim().split("\n").length
     }
 
-    const firstPath = await buildTranscriptFromSession(
-      client,
-      "ses_no_growth",
-      "/tmp",
-      "bash",
-      { command: "echo first" }
-    )
+    const firstPath = await buildTranscriptFromSession(client, "ses_no_growth", "/tmp", "bash", {
+      command: "echo first",
+    })
     const firstLines = countLines(firstPath)
 
-    const secondPath = await buildTranscriptFromSession(
-      client,
-      "ses_no_growth",
-      "/tmp",
-      "read",
-      { filePath: "/tmp/second.txt" }
-    )
+    const secondPath = await buildTranscriptFromSession(client, "ses_no_growth", "/tmp", "read", {
+      filePath: "/tmp/second.txt",
+    })
     const secondLines = countLines(secondPath)
 
-    const thirdPath = await buildTranscriptFromSession(
-      client,
-      "ses_no_growth",
-      "/tmp",
-      "write",
-      { filePath: "/tmp/third.txt", content: "third" }
-    )
+    const thirdPath = await buildTranscriptFromSession(client, "ses_no_growth", "/tmp", "write", {
+      filePath: "/tmp/third.txt",
+      content: "third",
+    })
     const thirdContent = thirdPath ? readFileSync(thirdPath, "utf-8") : ""
     const thirdLines = thirdContent ? thirdContent.trim().split("\n").length : -1
 
@@ -184,20 +161,10 @@ describe("transcript caching", () => {
     const client = createMockClient([])
 
     // when
-    const firstPath = await buildTranscriptFromSession(
-      client,
-      "ses_cleanup",
-      "/tmp",
-      "bash",
-      { command: "echo first" }
-    )
-    const secondPath = await buildTranscriptFromSession(
-      client,
-      "ses_cleanup",
-      "/tmp",
-      "read",
-      { filePath: "/tmp/second.txt" }
-    )
+    const firstPath = await buildTranscriptFromSession(client, "ses_cleanup", "/tmp", "bash", { command: "echo first" })
+    const secondPath = await buildTranscriptFromSession(client, "ses_cleanup", "/tmp", "read", {
+      filePath: "/tmp/second.txt",
+    })
 
     // then
     expect(firstPath).not.toBeNull()
@@ -215,13 +182,9 @@ describe("transcript caching", () => {
   it("#given previous temp cleanup fails #when rebuilding cached transcript #then logs and returns the next transcript", async () => {
     // given
     const client = createMockClient([])
-    const firstPath = await buildTranscriptFromSession(
-      client,
-      "ses_cleanup_failure",
-      "/tmp",
-      "bash",
-      { command: "echo first" }
-    )
+    const firstPath = await buildTranscriptFromSession(client, "ses_cleanup_failure", "/tmp", "bash", {
+      command: "echo first",
+    })
     expect(firstPath).not.toBeNull()
     if (!firstPath) return
     unlinkSync(firstPath)
@@ -229,13 +192,9 @@ describe("transcript caching", () => {
 
     try {
       // when
-      const secondPath = await buildTranscriptFromSession(
-        client,
-        "ses_cleanup_failure",
-        "/tmp",
-        "read",
-        { filePath: "/tmp/second.txt" }
-      )
+      const secondPath = await buildTranscriptFromSession(client, "ses_cleanup_failure", "/tmp", "read", {
+        filePath: "/tmp/second.txt",
+      })
 
       // then
       expect(secondPath).not.toBeNull()
@@ -257,13 +216,10 @@ describe("transcript caching", () => {
     }
 
     // when
-    const path = await buildTranscriptFromSession(
-      client,
-      "ses_fallback",
-      "/tmp",
-      "write",
-      { filePath: "/tmp/file.txt", content: "hello" }
-    )
+    const path = await buildTranscriptFromSession(client, "ses_fallback", "/tmp", "write", {
+      filePath: "/tmp/file.txt",
+      content: "hello",
+    })
 
     // then
     expect(path).not.toBeNull()

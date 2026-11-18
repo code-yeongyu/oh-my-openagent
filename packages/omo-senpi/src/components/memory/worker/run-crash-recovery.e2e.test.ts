@@ -5,7 +5,12 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { buildIdentityPaths, readMemoryReceipts, receiptIdentity, type MemoryKillPoint } from "@oh-my-opencode/memory-core"
+import {
+  buildIdentityPaths,
+  readMemoryReceipts,
+  receiptIdentity,
+  type MemoryKillPoint,
+} from "@oh-my-opencode/memory-core"
 
 // Every case runs a launcher, a supervisor, a bootstrap and a model child, then an out-of-process
 // reconciliation. Synchronisation is on process exit events and durable files, never on time.
@@ -17,10 +22,25 @@ const RUN_ID = "run-1"
 // writing; the reconcile child starts past that window, as the next session start would.
 const PAST_LAUNCH_WINDOW_MS = "61000"
 const FINALIZATION_FIELDS = new Set([
-  "finalizePhase", "validatedTipSha", "validatedChangedPaths", "integrationSha",
-  "finalizeOutcome", "finalizeReason", "finalizeDetail", "finalizedAt", "cleanupIncomplete",
+  "finalizePhase",
+  "validatedTipSha",
+  "validatedChangedPaths",
+  "integrationSha",
+  "finalizeOutcome",
+  "finalizeReason",
+  "finalizeDetail",
+  "finalizedAt",
+  "cleanupIncomplete",
 ])
-const EVIDENCE = ["prelaunch.json", "launch.json", "transcript-payload.json", "outcome.json", "stdout.log", "stderr.log", "child-stderr.log"]
+const EVIDENCE = [
+  "prelaunch.json",
+  "launch.json",
+  "transcript-payload.json",
+  "outcome.json",
+  "stdout.log",
+  "stderr.log",
+  "child-stderr.log",
+]
 
 const roots: string[] = []
 const pids: number[] = []
@@ -29,7 +49,9 @@ afterEach(async () => {
   const survivors = pids.splice(0).filter(isAlive)
   for (const pid of survivors) process.kill(pid, "SIGKILL")
   expect(survivors).toEqual([])
-  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })))
+  await Promise.all(
+    roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })),
+  )
 })
 
 function isAlive(pid: number): boolean {
@@ -84,13 +106,20 @@ interface Exit {
 async function drive(item: Hermetic, args: readonly string[], killPoint?: MemoryKillPoint): Promise<Exit> {
   const env: Record<string, string> = { ...item.env }
   if (killPoint !== undefined) env.OMO_MEMORY_KILL_POINT = killPoint
-  const child = spawn(process.execPath, [DRIVER, "--root", item.root, ...args], { env, stdio: ["ignore", "pipe", "pipe"] })
+  const child = spawn(process.execPath, [DRIVER, "--root", item.root, ...args], {
+    env,
+    stdio: ["ignore", "pipe", "pipe"],
+  })
   if (child.pid === undefined) throw new Error("driver did not start")
   pids.push(child.pid)
   let stdout = ""
   let stderr = ""
-  child.stdout.on("data", (chunk) => { stdout += String(chunk) })
-  child.stderr.on("data", (chunk) => { stderr += String(chunk) })
+  child.stdout.on("data", (chunk) => {
+    stdout += String(chunk)
+  })
+  child.stderr.on("data", (chunk) => {
+    stderr += String(chunk)
+  })
   return await new Promise<Exit>((resolve, reject) => {
     const bound = setTimeout(() => {
       child.kill("SIGKILL")
@@ -114,7 +143,11 @@ function expectKilled(exit: Exit): void {
 }
 
 function expectSupervisorKilled(exit: Exit): void {
-  expect(exit.stdout).toMatch(process.platform === "win32" ? /supervisor-exit: memory run supervisor exited with [1-9]/ : /supervisor-exit: memory run supervisor exited with SIGKILL/)
+  expect(exit.stdout).toMatch(
+    process.platform === "win32"
+      ? /supervisor-exit: memory run supervisor exited with [1-9]/
+      : /supervisor-exit: memory run supervisor exited with SIGKILL/,
+  )
 }
 
 async function reconcile(item: Hermetic, extra: readonly string[] = []): Promise<Exit> {
@@ -130,20 +163,26 @@ function runDir(item: Hermetic): string {
 async function snapshotRun(item: Hermetic): Promise<Map<string, string>> {
   const dir = runDir(item)
   if (!existsSync(dir)) return new Map()
-  const names = (await readdir(dir, { withFileTypes: true })).filter((entry) => entry.isFile()).map((entry) => entry.name)
+  const names = (await readdir(dir, { withFileTypes: true }))
+    .filter((entry) => entry.isFile())
+    .map((entry) => entry.name)
   return new Map(await Promise.all(names.map(async (name) => [name, await readFile(join(dir, name), "utf8")] as const)))
 }
 
 /** In write order: the reader returns the newest receipt first. */
 async function terminalEvents(item: Hermetic): Promise<string[]> {
   const { receipts } = await readMemoryReceipts(item.paths.runtime, {})
-  return [...receipts].reverse()
+  return [...receipts]
+    .reverse()
     .filter((receipt) => receipt.kind !== "facts" && receipt.runId === RUN_ID && receipt.event !== "launched")
     .map((receipt) => receipt.event)
 }
 
 function omoRunCommits(item: Hermetic): number {
-  const log = execFileSync("git", ["-C", item.paths.repo, "log", "--format=%B", "HEAD"], { env: item.env, encoding: "utf8" })
+  const log = execFileSync("git", ["-C", item.paths.repo, "log", "--format=%B", "HEAD"], {
+    env: item.env,
+    encoding: "utf8",
+  })
   return log.split("\n").filter((line) => line.trim() === `Omo-Run: ${RUN_ID}`).length
 }
 
@@ -168,8 +207,10 @@ async function expectEvidencePreserved(item: Hermetic, before: Map<string, strin
   const ledgerAfter = after.get("ledger.json")
   if (ledgerBefore === undefined) return
   if (ledgerAfter === undefined) throw new Error("ledger.json disappeared")
-  const identity = (text: string) => Object.fromEntries(Object.entries(JSON.parse(text) as Record<string, unknown>)
-    .filter(([key]) => !FINALIZATION_FIELDS.has(key)))
+  const identity = (text: string) =>
+    Object.fromEntries(
+      Object.entries(JSON.parse(text) as Record<string, unknown>).filter(([key]) => !FINALIZATION_FIELDS.has(key)),
+    )
   expect(identity(ledgerAfter)).toEqual(identity(ledgerBefore))
 }
 
@@ -180,24 +221,117 @@ interface Row {
   readonly deadlineMs?: number
   readonly killSelf?: boolean
   readonly killed: "launcher" | "supervisor" | "supervisor-and-launcher"
-  readonly terminal: { readonly file: "abandoned.json"; readonly reason: string } | { readonly file: "final.json"; readonly outcome: string; readonly reason?: string }
+  readonly terminal:
+    | { readonly file: "abandoned.json"; readonly reason: string }
+    | { readonly file: "final.json"; readonly outcome: string; readonly reason?: string }
   readonly events: readonly string[]
   readonly commits: 0 | 1
 }
 
 const ROWS: readonly Row[] = [
-  { name: "after-reserve", point: "after-reserve", killed: "launcher", terminal: { file: "abandoned.json", reason: "launch_interrupted" }, events: ["abandoned"], commits: 0 },
-  { name: "after-prelaunch", point: "after-prelaunch", killed: "launcher", terminal: { file: "abandoned.json", reason: "launch_interrupted" }, events: ["abandoned"], commits: 0 },
-  { name: "after-worktree", point: "after-worktree", killed: "launcher", terminal: { file: "abandoned.json", reason: "launch_interrupted" }, events: ["abandoned"], commits: 0 },
-  { name: "after-child-exit with the launcher alive", point: "after-child-exit", killed: "supervisor", terminal: { file: "final.json", outcome: "merged" }, events: ["recovered", "merged"], commits: 1 },
-  { name: "after-child-exit with the launcher dead too", point: "after-child-exit", killSelf: true, killed: "supervisor-and-launcher", terminal: { file: "final.json", outcome: "merged" }, events: ["recovered", "merged"], commits: 1 },
-  { name: "after-validate", point: "after-validate", killed: "launcher", terminal: { file: "final.json", outcome: "merged" }, events: ["recovered", "merged"], commits: 1 },
-  { name: "after-merge", point: "after-merge", killed: "launcher", terminal: { file: "final.json", outcome: "merged" }, events: ["recovered", "merged"], commits: 1 },
-  { name: "before-receipt", point: "before-receipt", killed: "launcher", terminal: { file: "final.json", outcome: "merged" }, events: ["merged"], commits: 1 },
-  { name: "after-child-exit control: the child committed nothing", point: "after-child-exit", child: "noop", killed: "supervisor", terminal: { file: "final.json", outcome: "failed", reason: "supervisor_failed" }, events: ["failed"], commits: 0 },
-  { name: "after-child-exit: the child committed then exited 1", point: "after-child-exit", child: "commit-fail", killed: "supervisor", terminal: { file: "final.json", outcome: "failed", reason: "supervisor_failed" }, events: ["failed"], commits: 0 },
-  { name: "after-child-exit: the child committed then ran past its deadline", point: "after-child-exit", child: "commit-hang", deadlineMs: 4_000, killed: "supervisor", terminal: { file: "final.json", outcome: "failed", reason: "supervisor_failed" }, events: ["failed"], commits: 0 },
-  { name: "after-child-exit: the child committed and exited 0 only after its deadline", point: "after-child-exit", child: "commit-late-ok", deadlineMs: 4_000, killed: "supervisor", terminal: { file: "final.json", outcome: "failed", reason: "supervisor_failed" }, events: ["failed"], commits: 0 },
+  {
+    name: "after-reserve",
+    point: "after-reserve",
+    killed: "launcher",
+    terminal: { file: "abandoned.json", reason: "launch_interrupted" },
+    events: ["abandoned"],
+    commits: 0,
+  },
+  {
+    name: "after-prelaunch",
+    point: "after-prelaunch",
+    killed: "launcher",
+    terminal: { file: "abandoned.json", reason: "launch_interrupted" },
+    events: ["abandoned"],
+    commits: 0,
+  },
+  {
+    name: "after-worktree",
+    point: "after-worktree",
+    killed: "launcher",
+    terminal: { file: "abandoned.json", reason: "launch_interrupted" },
+    events: ["abandoned"],
+    commits: 0,
+  },
+  {
+    name: "after-child-exit with the launcher alive",
+    point: "after-child-exit",
+    killed: "supervisor",
+    terminal: { file: "final.json", outcome: "merged" },
+    events: ["recovered", "merged"],
+    commits: 1,
+  },
+  {
+    name: "after-child-exit with the launcher dead too",
+    point: "after-child-exit",
+    killSelf: true,
+    killed: "supervisor-and-launcher",
+    terminal: { file: "final.json", outcome: "merged" },
+    events: ["recovered", "merged"],
+    commits: 1,
+  },
+  {
+    name: "after-validate",
+    point: "after-validate",
+    killed: "launcher",
+    terminal: { file: "final.json", outcome: "merged" },
+    events: ["recovered", "merged"],
+    commits: 1,
+  },
+  {
+    name: "after-merge",
+    point: "after-merge",
+    killed: "launcher",
+    terminal: { file: "final.json", outcome: "merged" },
+    events: ["recovered", "merged"],
+    commits: 1,
+  },
+  {
+    name: "before-receipt",
+    point: "before-receipt",
+    killed: "launcher",
+    terminal: { file: "final.json", outcome: "merged" },
+    events: ["merged"],
+    commits: 1,
+  },
+  {
+    name: "after-child-exit control: the child committed nothing",
+    point: "after-child-exit",
+    child: "noop",
+    killed: "supervisor",
+    terminal: { file: "final.json", outcome: "failed", reason: "supervisor_failed" },
+    events: ["failed"],
+    commits: 0,
+  },
+  {
+    name: "after-child-exit: the child committed then exited 1",
+    point: "after-child-exit",
+    child: "commit-fail",
+    killed: "supervisor",
+    terminal: { file: "final.json", outcome: "failed", reason: "supervisor_failed" },
+    events: ["failed"],
+    commits: 0,
+  },
+  {
+    name: "after-child-exit: the child committed then ran past its deadline",
+    point: "after-child-exit",
+    child: "commit-hang",
+    deadlineMs: 4_000,
+    killed: "supervisor",
+    terminal: { file: "final.json", outcome: "failed", reason: "supervisor_failed" },
+    events: ["failed"],
+    commits: 0,
+  },
+  {
+    name: "after-child-exit: the child committed and exited 0 only after its deadline",
+    point: "after-child-exit",
+    child: "commit-late-ok",
+    deadlineMs: 4_000,
+    killed: "supervisor",
+    terminal: { file: "final.json", outcome: "failed", reason: "supervisor_failed" },
+    events: ["failed"],
+    commits: 0,
+  },
 ]
 
 describe("memory run crash recovery at every kill point", () => {
@@ -205,12 +339,16 @@ describe("memory run crash recovery at every kill point", () => {
     test(`#given a run killed at ${row.name} #when reconciled in a fresh process #then it settles once with its evidence intact`, async () => {
       // given
       const item = await hermetic()
-      const run = await drive(item, [
-        "--run",
-        ...(row.child === undefined ? [] : ["--child", row.child]),
-        ...(row.deadlineMs === undefined ? [] : ["--deadline-ms", String(row.deadlineMs)]),
-        ...(row.killSelf === true ? ["--kill-self-after-supervisor-exit"] : []),
-      ], row.point)
+      const run = await drive(
+        item,
+        [
+          "--run",
+          ...(row.child === undefined ? [] : ["--child", row.child]),
+          ...(row.deadlineMs === undefined ? [] : ["--deadline-ms", String(row.deadlineMs)]),
+          ...(row.killSelf === true ? ["--kill-self-after-supervisor-exit"] : []),
+        ],
+        row.point,
+      )
       await recordProcesses(item)
       if (row.killed === "supervisor") {
         expectSupervisorKilled(run)
@@ -231,12 +369,19 @@ describe("memory run crash recovery at every kill point", () => {
       const terminal = await json(join(runDir(item), row.terminal.file))
       if (row.terminal.file === "abandoned.json") {
         expect(terminal).toMatchObject({
-          version: 1, runId: RUN_ID, reason: row.terminal.reason, kind: "reflection", trigger: "step-count",
+          version: 1,
+          runId: RUN_ID,
+          reason: row.terminal.reason,
+          kind: "reflection",
+          trigger: "step-count",
           generation: reservation?.reservedAt,
         })
         expect(existsSync(join(runDir(item), "ledger.json"))).toBe(false)
       } else {
-        expect(terminal).toMatchObject({ outcome: row.terminal.outcome, ...(row.terminal.reason === undefined ? {} : { reason: row.terminal.reason }) })
+        expect(terminal).toMatchObject({
+          outcome: row.terminal.outcome,
+          ...(row.terminal.reason === undefined ? {} : { reason: row.terminal.reason }),
+        })
       }
       expect(await terminalEvents(item)).toEqual([...row.events])
       expect(omoRunCommits(item)).toBe(row.commits)
@@ -263,17 +408,32 @@ describe("memory run crash recovery at every kill point", () => {
       // then
       expect(lost.stdout).toContain("injected receipt loss for abandoned")
       expect(afterLoss).toEqual([])
-      expect(sentinel).toMatchObject(dream
-        ? { kind: "dream", trigger: "dream", origin: "idle" }
-        : { kind: "reflection", trigger: "step-count" })
+      expect(sentinel).toMatchObject(
+        dream ? { kind: "dream", trigger: "dream", origin: "idle" } : { kind: "reflection", trigger: "step-count" },
+      )
       const { receipts } = await readMemoryReceipts(item.paths.runtime, {})
-      const written = receipts.filter((receipt) => receipt.kind !== "facts" && receipt.runId === RUN_ID && receipt.event === "abandoned")
+      const written = receipts.filter(
+        (receipt) => receipt.kind !== "facts" && receipt.runId === RUN_ID && receipt.event === "abandoned",
+      )
       expect(written).toHaveLength(1)
       const [receipt] = written
       if (receipt === undefined || receipt.kind === "facts") throw new Error("expected one run receipt")
       expect(receipt.kind).toBe(dream ? "dream" : "reflection")
-      expect(receiptIdentity({ kind: receipt.kind, runId: receipt.runId, event: receipt.event, generation: receipt.generation }))
-        .toBe(receiptIdentity({ kind: dream ? "dream" : "reflection", runId: RUN_ID, event: "abandoned", generation: String(sentinel.generation) }))
+      expect(
+        receiptIdentity({
+          kind: receipt.kind,
+          runId: receipt.runId,
+          event: receipt.event,
+          generation: receipt.generation,
+        }),
+      ).toBe(
+        receiptIdentity({
+          kind: dream ? "dream" : "reflection",
+          runId: RUN_ID,
+          event: "abandoned",
+          generation: String(sentinel.generation),
+        }),
+      )
     })
   }
 })

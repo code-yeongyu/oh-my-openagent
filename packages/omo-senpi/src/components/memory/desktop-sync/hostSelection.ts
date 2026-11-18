@@ -7,7 +7,8 @@
 import { MessageChannel, type MessagePort } from "node:worker_threads"
 import type { DesktopSyncEngineWire } from "./desktopSyncAccount"
 
-export type UnavailableReason = "private_channel_unavailable" | "port_absent" | "selection_failed" | "host_bootstrap_absent"
+export type UnavailableReason =
+  "private_channel_unavailable" | "port_absent" | "selection_failed" | "host_bootstrap_absent"
 
 export type MemorySyncSelection =
   | { readonly kind: "cli" }
@@ -19,7 +20,11 @@ export interface HostMemorySyncSidecar {
   serveWorkerPort(selection: Promise<MemorySyncSelection>, port: MessagePort, closed: AbortSignal): void
 }
 /** One session Worker's memory-sync value for senpi provideSessionWorkerData: a private port, transferred. */
-export interface MemorySyncWorkerData { readonly value: MessagePort; readonly transfer: readonly MessagePort[]; dispose(): void }
+export interface MemorySyncWorkerData {
+  readonly value: MessagePort
+  readonly transfer: readonly MessagePort[]
+  dispose(): void
+}
 export interface HostMemorySync {
   readonly selection: Promise<MemorySyncSelection>
   /** The create() for senpi provideSessionWorkerData(MEMORY_SYNC_WORKER_DATA, ...): one private port per session Worker. */
@@ -50,7 +55,10 @@ export function selectHostMemorySyncSource(options: {
       const closed = new AbortController()
       port1.once("close", () => closed.abort())
       // A sidecar that cannot load closes the port: the Worker reads port_absent, never the CLI source.
-      void options.sidecar().then(loaded => loaded.serveWorkerPort(selection, port1, closed.signal), () => port1.close())
+      void options.sidecar().then(
+        (loaded) => loaded.serveWorkerPort(selection, port1, closed.signal),
+        () => port1.close(),
+      )
       return { value: port2, transfer: [port2], dispose: () => port1.close() }
     },
   }

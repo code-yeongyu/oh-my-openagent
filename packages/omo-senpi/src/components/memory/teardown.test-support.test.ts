@@ -21,10 +21,14 @@ describe("rmSyncEfaultTolerant", () => {
       if (calls === 1) throw errno("EFAULT", "bad address in system call argument")
     }
 
-    rmSyncEfaultTolerant("/tmp/omo-teardown-efault-once", { recursive: true, force: true }, {
-      rmSync,
-      sleep: () => {},
-    })
+    rmSyncEfaultTolerant(
+      "/tmp/omo-teardown-efault-once",
+      { recursive: true, force: true },
+      {
+        rmSync,
+        sleep: () => {},
+      },
+    )
 
     expect(calls).toBe(2)
   })
@@ -39,12 +43,16 @@ describe("rmSyncEfaultTolerant", () => {
 
     let thrown: unknown
     try {
-      rmSyncEfaultTolerant("/tmp/omo-teardown-enoent", { recursive: true, force: true }, {
-        rmSync,
-        sleep: () => {
-          throw new Error("sleep must not run for non-EFAULT")
+      rmSyncEfaultTolerant(
+        "/tmp/omo-teardown-enoent",
+        { recursive: true, force: true },
+        {
+          rmSync,
+          sleep: () => {
+            throw new Error("sleep must not run for non-EFAULT")
+          },
         },
-      })
+      )
     } catch (caught) {
       thrown = caught
     }
@@ -62,11 +70,15 @@ describe("rmSyncEfaultTolerant", () => {
 
     let thrown: unknown
     try {
-      rmSyncEfaultTolerant("/tmp/omo-teardown-efault-exhausted", { recursive: true, force: true }, {
-        rmSync,
-        sleep: () => {},
-        efaultAttempts: 3,
-      })
+      rmSyncEfaultTolerant(
+        "/tmp/omo-teardown-efault-exhausted",
+        { recursive: true, force: true },
+        {
+          rmSync,
+          sleep: () => {},
+          efaultAttempts: 3,
+        },
+      )
     } catch (caught) {
       thrown = caught
     }
@@ -85,10 +97,14 @@ describe("rmEfaultTolerant", () => {
       if (calls === 1) throw errno("EFAULT", "bad address in system call argument")
     }
 
-    await rmEfaultTolerant("/tmp/omo-teardown-efault-once-async", { recursive: true, force: true }, {
-      rm,
-      sleep: async () => {},
-    })
+    await rmEfaultTolerant(
+      "/tmp/omo-teardown-efault-once-async",
+      { recursive: true, force: true },
+      {
+        rm,
+        sleep: async () => {},
+      },
+    )
 
     expect(calls).toBe(2)
   })
@@ -100,10 +116,14 @@ describe("rmEfaultTolerant", () => {
       if (calls === 1) throw errno("EBUSY", "resource busy or locked")
     }
 
-    await rmEfaultTolerant("/tmp/omo-teardown-ebusy-once-async", { recursive: true, force: true }, {
-      rm,
-      sleep: async () => {},
-    })
+    await rmEfaultTolerant(
+      "/tmp/omo-teardown-ebusy-once-async",
+      { recursive: true, force: true },
+      {
+        rm,
+        sleep: async () => {},
+      },
+    )
 
     expect(calls).toBe(2)
   })
@@ -118,12 +138,16 @@ describe("rmEfaultTolerant", () => {
 
     let thrown: unknown
     try {
-      await rmEfaultTolerant("/tmp/omo-teardown-enoent-async", { recursive: true, force: true }, {
-        rm,
-        sleep: async () => {
-          throw new Error("sleep must not run for non-EFAULT")
+      await rmEfaultTolerant(
+        "/tmp/omo-teardown-enoent-async",
+        { recursive: true, force: true },
+        {
+          rm,
+          sleep: async () => {
+            throw new Error("sleep must not run for non-EFAULT")
+          },
         },
-      })
+      )
     } catch (caught) {
       thrown = caught
     }
@@ -141,11 +165,15 @@ describe("rmEfaultTolerant", () => {
 
     let thrown: unknown
     try {
-      await rmEfaultTolerant("/tmp/omo-teardown-efault-exhausted-async", { recursive: true, force: true }, {
-        rm,
-        sleep: async () => {},
-        efaultAttempts: 3,
-      })
+      await rmEfaultTolerant(
+        "/tmp/omo-teardown-efault-exhausted-async",
+        { recursive: true, force: true },
+        {
+          rm,
+          sleep: async () => {},
+          efaultAttempts: 3,
+        },
+      )
     } catch (caught) {
       thrown = caught
     }
@@ -165,13 +193,17 @@ describe("rmWhenReleased (omo #10445)", () => {
       if (clock < 2_500) throw errno("EBUSY", "resource busy or locked")
     }
 
-    await rmWhenReleased("/tmp/omo-teardown-busy", { recursive: true, force: true }, {
-      rm,
-      now: () => clock,
-      sleep: async (ms) => {
-        clock += ms
+    await rmWhenReleased(
+      "/tmp/omo-teardown-busy",
+      { recursive: true, force: true },
+      {
+        rm,
+        now: () => clock,
+        sleep: async (ms) => {
+          clock += ms
+        },
       },
-    })
+    )
 
     expect(clock).toBeGreaterThanOrEqual(2_500)
     expect(calls).toBeGreaterThan(3)
@@ -185,14 +217,18 @@ describe("rmWhenReleased (omo #10445)", () => {
 
     let thrown: unknown
     try {
-      await rmWhenReleased("/tmp/omo-teardown-never", { recursive: true, force: true }, {
-        rm,
-        releaseTimeoutMs: 1_000,
-        now: () => clock,
-        sleep: async (ms) => {
-          clock += ms
+      await rmWhenReleased(
+        "/tmp/omo-teardown-never",
+        { recursive: true, force: true },
+        {
+          rm,
+          releaseTimeoutMs: 1_000,
+          now: () => clock,
+          sleep: async (ms) => {
+            clock += ms
+          },
         },
-      })
+      )
     } catch (caught) {
       thrown = caught
     }

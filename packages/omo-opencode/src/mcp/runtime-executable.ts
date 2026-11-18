@@ -29,7 +29,10 @@ function isNodeExecPath(execPath: string): boolean {
   return NODE_EXECUTABLE_NAMES.has(basename(execPath).toLowerCase())
 }
 
-export function resolveRuntimeExecutable(commandName: string, options: RuntimeExecutableOptions = {}): RuntimeExecutable {
+export function resolveRuntimeExecutable(
+  commandName: string,
+  options: RuntimeExecutableOptions = {},
+): RuntimeExecutable {
   if (isUnsafeCommandName(commandName)) {
     return { command: commandName, available: false }
   }

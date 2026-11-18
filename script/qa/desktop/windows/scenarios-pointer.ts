@@ -33,7 +33,10 @@ export const foregroundClickLandsInTarget: Scenario = {
         [
           ...stagingChecks(state, point.screen),
           ["click-succeeded", reply.error === undefined],
-          ["target-got-one-press-at-point", down.length === 1 && down.every((line) => eventAt(line, point.screen, POINT_TOLERANCE))],
+          [
+            "target-got-one-press-at-point",
+            down.length === 1 && down.every((line) => eventAt(line, point.screen, POINT_TOLERANCE)),
+          ],
           ["target-got-release", pointerEvents(state.target, "mouseup").length === 1],
           ["front-got-no-press", pointerEvents(state.front, "mousedown").length === 0],
           ...restoreChecks(state, after),
@@ -71,8 +74,14 @@ export const foregroundDragSelectsInTarget: Scenario = {
         [
           ...stagingChecks(state, from.screen),
           ["drag-succeeded", reply.error === undefined],
-          ["target-press-at-path-start", down.length === 1 && down.every((line) => eventAt(line, from.screen, POINT_TOLERANCE))],
-          ["target-release-at-path-end", up.length === 1 && up.every((line) => eventAt(line, to.screen, POINT_TOLERANCE))],
+          [
+            "target-press-at-path-start",
+            down.length === 1 && down.every((line) => eventAt(line, from.screen, POINT_TOLERANCE)),
+          ],
+          [
+            "target-release-at-path-end",
+            up.length === 1 && up.every((line) => eventAt(line, to.screen, POINT_TOLERANCE)),
+          ],
           ["target-text-selected", selection.end > selection.start && selection.start >= 0],
           ["front-got-no-press", pointerEvents(state.front, "mousedown").length === 0],
           ["front-selection-empty", frontSelection.start === frontSelection.end],

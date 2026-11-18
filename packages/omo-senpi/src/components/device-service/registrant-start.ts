@@ -1,6 +1,10 @@
 import { isAbsolute } from "node:path"
 
-import { type AgentDirRegistrant, deviceServiceStateDir, startAgentDirRegistrant } from "@oh-my-opencode/device-service-core"
+import {
+  type AgentDirRegistrant,
+  deviceServiceStateDir,
+  startAgentDirRegistrant,
+} from "@oh-my-opencode/device-service-core"
 import { isOmoDeviceServiceEnabled, type OmoDeviceServiceConfigView } from "@oh-my-opencode/omo-config-core"
 import { OMO_SENPI_TASK_RPC_CHILD } from "@oh-my-opencode/senpi-task/rpc-spawn"
 
@@ -50,17 +54,20 @@ export const isCi = (env: Readonly<Record<string, string | undefined>>): boolean
   return ci !== undefined && ci !== "" && ci !== "0" && ci !== "false"
 }
 
-const startDefault = (logger: ComponentLogger): StartRegistrant => ({ agentDir }) =>
-  startAgentDirRegistrant({
-    agentDir,
-    stateDir: deviceServiceStateDir(),
-    version: createOmoNativeProductConfig().packageVersion,
-    onEvent: event => {
-      if (event.kind === "register_failed") logger.warn("device service did not take this engine's agent dir", { reason: event.reason })
-    },
-  })
+const startDefault =
+  (logger: ComponentLogger): StartRegistrant =>
+  ({ agentDir }) =>
+    startAgentDirRegistrant({
+      agentDir,
+      stateDir: deviceServiceStateDir(),
+      version: createOmoNativeProductConfig().packageVersion,
+      onEvent: (event) => {
+        if (event.kind === "register_failed")
+          logger.warn("device service did not take this engine's agent dir", { reason: event.reason })
+      },
+    })
 
-const unscoped: ProcessScope = { runInAsyncScope: fn => fn() }
+const unscoped: ProcessScope = { runInAsyncScope: (fn) => fn() }
 
 export function startRegistrantAtStart(
   eventCtx: unknown,

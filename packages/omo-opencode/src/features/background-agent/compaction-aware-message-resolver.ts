@@ -2,11 +2,7 @@ import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import type { StoredMessage } from "../hook-message-injector"
 import { getCompactionAgentConfigCheckpoint } from "../../shared/compaction-agent-config-checkpoint"
-import {
-  hasCompactionPartInStorage,
-  isCompactionAgent,
-  isCompactionMessage,
-} from "../../shared/compaction-marker"
+import { hasCompactionPartInStorage, isCompactionAgent, isCompactionMessage } from "../../shared/compaction-marker"
 
 export { isCompactionAgent } from "../../shared/compaction-marker"
 
@@ -28,10 +24,7 @@ type SessionMessage = {
 }
 
 function hasFullAgentAndModel(message: StoredMessage): boolean {
-  return !!message.agent &&
-    !isCompactionAgent(message.agent) &&
-    !!message.model?.providerID &&
-    !!message.model?.modelID
+  return !!message.agent && !isCompactionAgent(message.agent) && !!message.model?.providerID && !!message.model?.modelID
 }
 
 function hasPartialAgentOrModel(message: StoredMessage): boolean {
@@ -69,10 +62,7 @@ function convertSessionMessageToStoredMessage(message: SessionMessage): StoredMe
   }
 }
 
-function mergeStoredMessages(
-  messages: Array<StoredMessage | null>,
-  sessionID?: string,
-): StoredMessage | null {
+function mergeStoredMessages(messages: Array<StoredMessage | null>, sessionID?: string): StoredMessage | null {
   const merged: StoredMessage = {}
 
   for (const message of messages) {
@@ -112,9 +102,7 @@ function mergeStoredMessages(
     }
   }
 
-  const checkpoint = sessionID
-    ? getCompactionAgentConfigCheckpoint(sessionID)
-    : undefined
+  const checkpoint = sessionID ? getCompactionAgentConfigCheckpoint(sessionID) : undefined
 
   if (!merged.agent && checkpoint?.agent) {
     merged.agent = checkpoint.agent
@@ -139,17 +127,12 @@ export function resolvePromptContextFromSessionMessages(
   messages: SessionMessage[],
   sessionID?: string,
 ): StoredMessage | null {
-  const convertedMessages = messages
-    .map(convertSessionMessageToStoredMessage)
-    .reverse()
+  const convertedMessages = messages.map(convertSessionMessageToStoredMessage).reverse()
 
   return mergeStoredMessages(convertedMessages, sessionID)
 }
 
-export function findNearestMessageExcludingCompaction(
-  messageDir: string,
-  sessionID?: string,
-): StoredMessage | null {
+export function findNearestMessageExcludingCompaction(messageDir: string, sessionID?: string): StoredMessage | null {
   try {
     const files = readdirSync(messageDir)
       .filter((name: string) => name.endsWith(".json"))

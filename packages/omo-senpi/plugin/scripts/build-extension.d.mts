@@ -19,6 +19,7 @@ export interface BuildExtensionOptions {
   telemetryPosthogOutputPath?: string
   memorySyncOutputPath?: string
   threadClientOutputPath?: string
+  wakeOutputPath?: string
   telemetryRecoveryOutputPath?: string
   feedbackOutputPath?: string
   desktopToolkitOutputPath?: string
@@ -45,11 +46,13 @@ export function buildExtension(options?: BuildExtensionOptions): Promise<{
   telemetryPosthogInputs: string[]
   memorySyncInputs: string[]
   threadClientInputs: string[]
+  wakeInputs: string[]
   telemetryRecoveryInputs: string[]
   feedbackInputs: string[]
   desktopToolkitInputs: string[]
   claimReceiptInputs: string[]
   computerUseInputs: string[]
+  computerRunWorkerInputs: string[]
   toolkitSdkInputs: string[]
   bunshinTsInputs: string[]
   rollbackRuntimeInputs: string[]
@@ -60,7 +63,9 @@ export interface CheckExtensionCurrentOptions extends BuildExtensionOptions {
   /** An already-built reproduction root to compare against instead of building a fresh one; left in place. */
   expectedRoot?: string
 }
-export function checkExtensionCurrent(options?: CheckExtensionCurrentOptions): Promise<
+export function checkExtensionCurrent(
+  options?: CheckExtensionCurrentOptions,
+): Promise<
   | { ok: true; output: string; gatewayStoreWorkerOutput: string; threadSdkOutput: string }
   | { ok: false; reason: "missing-output" | "stale-output"; output: string }
 >

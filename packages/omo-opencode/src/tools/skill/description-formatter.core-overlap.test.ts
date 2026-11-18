@@ -63,7 +63,9 @@ const cases: OverlapCase[] = [
       scope: "opencode",
       location: join(linkedRoot, "config", "skills", "linked-skill", "SKILL.md"),
     }),
-    coreList: [coreEntry("linked-skill", join(linkedRoot, "agents", "skills", "linked-skill", "SKILL.md"), "linked desc")],
+    coreList: [
+      coreEntry("linked-skill", join(linkedRoot, "agents", "skills", "linked-skill", "SKILL.md"), "linked desc"),
+    ],
     listedBy: "core",
   },
   {

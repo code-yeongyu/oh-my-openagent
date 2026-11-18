@@ -1,3 +1,4 @@
+// Vendored from sisyphuslabs/omo-relay-daemon@edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6 packages/local-api/src/client-listing.ts
 import { type LocalApiError, protocolViolation } from "./errors.ts";
 import type { ListingRow, LocalEvent, RoundDeviceState } from "./protocol.ts";
 import { assertNever } from "./validate-fields.ts";
@@ -15,7 +16,11 @@ export type Settle<T> = {
   readonly resolve: (value: T) => void;
   readonly reject: (error: LocalApiError) => void;
 };
-type ListingEvent = Extract<LocalEvent, { readonly kind: `sessions.${string}` }>;
+// #1066: sessions.listing_changed names no query; it is the caller's hint, not part of a listing.
+type ListingEvent = Exclude<
+  Extract<LocalEvent, { readonly kind: `sessions.${string}` }>,
+  { readonly kind: "sessions.listing_changed" }
+>;
 type Watch = Settle<ListingResult> & {
   readonly onRevision: ((revision: ListingRevision) => void) | undefined;
   open: { readonly revision: number; readonly rows: ListingRow[] } | undefined;

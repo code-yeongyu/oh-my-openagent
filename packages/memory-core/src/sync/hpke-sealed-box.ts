@@ -11,7 +11,9 @@ function labeledExtract(suiteId: Buffer, label: string, ikm: Uint8Array, salt: U
   // RFC 9180 §4: LabeledExtract = HKDF-Extract(salt, "HPKE-v1" || suite_id || label || ikm);
   // an empty salt means HashLen zero bytes (RFC 5869 §2.2).
   const key = salt.length === 0 ? Buffer.alloc(HKDF_HASH_LENGTH) : Buffer.from(salt)
-  return createHmac("sha256", key).update(Buffer.concat([Buffer.from("HPKE-v1"), suiteId, Buffer.from(label), Buffer.from(ikm)])).digest()
+  return createHmac("sha256", key)
+    .update(Buffer.concat([Buffer.from("HPKE-v1"), suiteId, Buffer.from(label), Buffer.from(ikm)]))
+    .digest()
 }
 
 function labeledExpand(suiteId: Buffer, label: string, prk: Buffer, info: Uint8Array, length: number): Buffer {
@@ -20,7 +22,14 @@ function labeledExpand(suiteId: Buffer, label: string, prk: Buffer, info: Uint8A
   if (length > HKDF_HASH_LENGTH) throw new Error("hpke expand length exceeds one SHA-256 block")
   const lengthBytes = Buffer.alloc(2)
   lengthBytes.writeUInt16BE(length)
-  const t0 = Buffer.concat([lengthBytes, Buffer.from("HPKE-v1"), suiteId, Buffer.from(label), Buffer.from(info), Buffer.from([1])])
+  const t0 = Buffer.concat([
+    lengthBytes,
+    Buffer.from("HPKE-v1"),
+    suiteId,
+    Buffer.from(label),
+    Buffer.from(info),
+    Buffer.from([1]),
+  ])
   return createHmac("sha256", prk).update(t0).digest().subarray(0, length)
 }
 
@@ -29,7 +38,10 @@ const KDF_ID = Buffer.from([0, 0x01])
 const AEAD_ID = Buffer.from([0, 0x02])
 
 function x25519PublicKeyFromRaw(raw: Uint8Array): ReturnType<typeof createPublicKey> {
-  return createPublicKey({ key: { kty: "OKP", crv: "X25519", x: Buffer.from(raw).toString("base64url") }, format: "jwk" })
+  return createPublicKey({
+    key: { kty: "OKP", crv: "X25519", x: Buffer.from(raw).toString("base64url") },
+    format: "jwk",
+  })
 }
 
 /**

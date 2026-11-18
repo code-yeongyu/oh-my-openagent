@@ -32,7 +32,10 @@ export interface TrustRetentionStat {
 export interface TrustRetentionFs {
   readdir(path: string): Promise<string[]>
   lstat(path: string): Promise<TrustRetentionStat>
-  open(path: string, flags: number): Promise<{
+  open(
+    path: string,
+    flags: number,
+  ): Promise<{
     read(buffer: Uint8Array, offset: number, length: number, position: number): Promise<{ readonly bytesRead: number }>
     stat(): Promise<TrustRetentionStat>
     close(): Promise<void>
@@ -72,12 +75,20 @@ export interface TrustRetentionFailure {
 /** Never thrown: a sweep failure must not fail the launch that runs it. */
 export type TrustRetentionOutcome =
   | {
-    readonly kind: "swept"
-    /** Generation and user-extras digests, and lease entry names, each sorted. */
-    readonly removed: { readonly generations: readonly string[]; readonly leases: readonly string[]; readonly userExtras: readonly string[] }
-    readonly failures: readonly TrustRetentionFailure[]
-  }
-  | { readonly kind: "skipped"; readonly reason: "directory-unsafe" | "leases-unsafe" | "sweep-error"; readonly failures: readonly TrustRetentionFailure[] }
+      readonly kind: "swept"
+      /** Generation and user-extras digests, and lease entry names, each sorted. */
+      readonly removed: {
+        readonly generations: readonly string[]
+        readonly leases: readonly string[]
+        readonly userExtras: readonly string[]
+      }
+      readonly failures: readonly TrustRetentionFailure[]
+    }
+  | {
+      readonly kind: "skipped"
+      readonly reason: "directory-unsafe" | "leases-unsafe" | "sweep-error"
+      readonly failures: readonly TrustRetentionFailure[]
+    }
 
 export function pidAnswersSignalZero(pid: number): boolean {
   try {
@@ -137,7 +148,8 @@ async function regularEntries(
   prefix: string,
   failStep: TrustRetentionFailure["step"],
 ) {
-  const found: { readonly entry: string; readonly match: RegExpExecArray; readonly stat: TrustRetentionStat | null }[] = []
+  const found: { readonly entry: string; readonly match: RegExpExecArray; readonly stat: TrustRetentionStat | null }[] =
+    []
   const failures: TrustRetentionFailure[] = []
   for (const entry of names) {
     const match = pattern.exec(entry)
@@ -165,7 +177,8 @@ async function run(options: TrustRetentionOptions, failures: TrustRetentionFailu
     }
   }
 
-  if (!safeDirectory(await step(".", "inspect", () => fs.lstat(directory)))) return { kind: "skipped", reason: "directory-unsafe", failures }
+  if (!safeDirectory(await step(".", "inspect", () => fs.lstat(directory))))
+    return { kind: "skipped", reason: "directory-unsafe", failures }
   const names = await step(".", "list", () => fs.readdir(directory))
 
   const leaseDirectory = join(directory, "leases")
@@ -204,7 +217,7 @@ async function run(options: TrustRetentionOptions, failures: TrustRetentionFailu
         continue
       }
     }
-    const fields = typeof body === "object" && body !== null ? body as Record<string, unknown> : {}
+    const fields = typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {}
     const { v, pid, bootAtMs } = fields
     // A newer engine's lease may encode liveness differently: it cannot be proven dead here, so it pins, stays and is
     // reported, so an operator can tell why its generation never ages out.
@@ -213,9 +226,14 @@ async function run(options: TrustRetentionOptions, failures: TrustRetentionFailu
       pinned.add(generation)
       continue
     }
-    const wellFormed = v === 1 && typeof pid === "number" && Number.isSafeInteger(pid) && String(pid) === pidText
-      && typeof bootAtMs === "number" && Number.isFinite(bootAtMs)
-      && Math.abs(bootAtMs - options.bootAtMs) <= BOOT_INSTANT_TOLERANCE_MS
+    const wellFormed =
+      v === 1 &&
+      typeof pid === "number" &&
+      Number.isSafeInteger(pid) &&
+      String(pid) === pidText &&
+      typeof bootAtMs === "number" &&
+      Number.isFinite(bootAtMs) &&
+      Math.abs(bootAtMs - options.bootAtMs) <= BOOT_INSTANT_TOLERANCE_MS
     let alive = false
     if (wellFormed) {
       try {
@@ -244,7 +262,9 @@ async function run(options: TrustRetentionOptions, failures: TrustRetentionFailu
   failures.push(...generations.failures)
   let headersKnown = generations.found.every(({ stat }) => stat !== null)
   const ranked = generations.found
-    .flatMap(({ match, stat }) => match[1] === undefined || stat === null ? [] : [{ digest: match[1], mtimeMs: stat.mtimeMs }])
+    .flatMap(({ match, stat }) =>
+      match[1] === undefined || stat === null ? [] : [{ digest: match[1], mtimeMs: stat.mtimeMs }],
+    )
     .sort((a, b) => b.mtimeMs - a.mtimeMs || a.digest.localeCompare(b.digest))
   const remaining: string[] = ranked.slice(0, RETAINED_GENERATIONS).map(({ digest }) => digest)
   const removedGenerations: string[] = []
@@ -293,7 +313,11 @@ async function run(options: TrustRetentionOptions, failures: TrustRetentionFailu
 
   return {
     kind: "swept",
-    removed: { generations: removedGenerations.sort(), leases: removedLeases.sort(), userExtras: removedUserExtras.sort() },
+    removed: {
+      generations: removedGenerations.sort(),
+      leases: removedLeases.sort(),
+      userExtras: removedUserExtras.sort(),
+    },
     failures,
   }
 }

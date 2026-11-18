@@ -48,6 +48,7 @@ const USAGE = [
   "",
   "  --json            print the engine's JSON line instead of a summary",
   "  --no-upgrade      never hand off, even from an older build",
+  "  --pinned          with run, the host it starts never idle-exits (the always-on session host unit)",
   "  --include-workers include subagent sessions in status",
   "  --all             apply stop to every discovered endpoint",
   "  --wait            with stop --drain --all, wait for generations and claims to end",
@@ -103,7 +104,13 @@ async function adopt(args, options) {
     return await runAdoptCommand(args, { sdk: loaded.sdk, stdout: options.stdout, stderr: options.stderr })
   } finally {
     // The release already happened; a store that fails to close is logged, never a new outcome.
-    await loaded.sdk.dispose().catch((error) => options.stderr.write(`omo daemon adopt: closing the gateway store failed: ${error instanceof Error ? error.message : String(error)}\n`))
+    await loaded.sdk
+      .dispose()
+      .catch((error) =>
+        options.stderr.write(
+          `omo daemon adopt: closing the gateway store failed: ${error instanceof Error ? error.message : String(error)}\n`,
+        ),
+      )
   }
 }
 
@@ -126,7 +133,10 @@ export function runDaemonCommand(args, options) {
   }
   if (!SUBCOMMANDS.has(subcommand)) {
     // Scripts written for the removed shared-host join get a pointer to what replaced it.
-    const removed = subcommand === "attach" ? "omo daemon: 'attach' was removed; to continue a host session in this terminal, run omo daemon adopt <session>\n" : ""
+    const removed =
+      subcommand === "attach"
+        ? "omo daemon: 'attach' was removed; to continue a host session in this terminal, run omo daemon adopt <session>\n"
+        : ""
     stderr.write(`omo daemon: unknown subcommand '${subcommand}'\n${removed}${USAGE}\n`)
     return DAEMON_EXIT.usage
   }
@@ -151,7 +161,13 @@ export function runDaemonCommand(args, options) {
     return DAEMON_EXIT.engineRefused
   }
 
-  const { config } = readDaemonConfig({ pluginRoot, agentDir, env, cwd: options.cwd, loadRuntime: options.loadTaskConfig })
+  const { config } = readDaemonConfig({
+    pluginRoot,
+    agentDir,
+    env,
+    cwd: options.cwd,
+    loadRuntime: options.loadTaskConfig,
+  })
   if (subcommand === "status") {
     const status = runStatus({
       engine,
@@ -226,12 +242,48 @@ export function runDaemonCommand(args, options) {
     if (outcome !== undefined) return outcome
   }
   const engineArgs = buildArgs(subcommand, args, { specPath, policy: resolvePolicy(args, config) })
-  const result = engine.run(engineArgs, { env: hostCommandEnvironment(env, agentDir, config) })
+  const commandEnv = hostCommandEnvironment(env, agentDir, config)
+  // omo#13594: the session host unit's run. Only the host this ensure starts is pinned; task hosts drop the variable.
+  if (subcommand === "run" && args.includes("--pinned")) commandEnv.SENPI_RPC_HOST_COLD_START = "persistent"
+  const result = engine.run(engineArgs, { env: commandEnv })
   const parsed = parseEngineLine(result.stdout ?? "")
 
   if (result.stderr) stderr.write(result.stderr)
 
   if (args.includes("--json") && result.stdout) stdout.write(result.stdout.trim() + "\n")
   else stdout.write(`${summarize(subcommand, parsed, result.exitCode)}\n`)
+  if (subcommand === "run" && result.exitCode === DAEMON_EXIT.ok) return warmAfterRun(options)
   return result.exitCode
+}
+
+/**
+ * `omo daemon run` ends with senpi's `warm` on the daemon it ensured. A multi-session host loads omo only for an open
+ * or a warm, and once it has loaded omo the operator daemon declares the delivery consumer, so a daemon the device
+ * service cold-starts can be handed deliveries before any session runs (#13037 cold wake). A warm that fails is
+ * reported and changes nothing about the run's answer: the consumer then starts with the daemon's first session.
+ */
+async function warmAfterRun(options) {
+  const report = (reason) =>
+    options.stderr.write(
+      `omo daemon: the daemon did not load omo (${reason}); its delivery consumer starts with its first session\n`,
+    )
+  const loaded = await (options.threadSdk ?? loadThreadSdk)({ ...options, cwd: options.cwd ?? process.cwd() })
+  if (loaded.error !== undefined) {
+    report(loaded.error)
+    return DAEMON_EXIT.ok
+  }
+  try {
+    const answer = await loaded.sdk.warmDaemon()
+    if (answer.kind === "refused") report(answer.code)
+    else if (answer.kind === "unsupported") report("the engine has no warm")
+  } catch (error) {
+    report(error instanceof Error ? error.message : String(error))
+  } finally {
+    await loaded.sdk
+      .dispose()
+      .catch((error) =>
+        report(`closing the gateway store failed: ${error instanceof Error ? error.message : String(error)}`),
+      )
+  }
+  return DAEMON_EXIT.ok
 }

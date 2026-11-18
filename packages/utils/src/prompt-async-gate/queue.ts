@@ -1,9 +1,6 @@
 import { log } from "../logger"
 import { dispatchAfterSessionIdle } from "./session-idle-dispatch"
-import {
-  getActiveReservation,
-  setExpiredReservationHandler,
-} from "./reservations"
+import { getActiveReservation, setExpiredReservationHandler } from "./reservations"
 import type { InternalPromptDispatchResult, QueuedInternalPrompt } from "./types"
 
 declare function setTimeout(callback: () => void, delay?: number): unknown
@@ -13,10 +10,13 @@ const promptQueues = new Map<string, QueuedInternalPrompt[]>()
 const promptQueueDraining = new Set<string>()
 const promptQueueInFlight = new Map<string, QueuedInternalPrompt>()
 const promptQueueTimers = new Map<string, unknown>()
-const promptQueueRetryStates = new Map<number, {
-  readonly failureCount: number
-  readonly retryAfter?: number
-}>()
+const promptQueueRetryStates = new Map<
+  number,
+  {
+    readonly failureCount: number
+    readonly retryAfter?: number
+  }
+>()
 const MAX_QUEUED_RETRYABLE_FAILURES = 3
 const MAX_DURABLE_RETRY_BACKOFF_MS = 30_000
 let promptQueueSequence = 0
@@ -44,7 +44,11 @@ function setPromptQueue(sessionID: string, queue: QueuedInternalPrompt[]): void 
   promptQueues.set(sessionID, queue)
 }
 
-function queuedResult(entry: QueuedInternalPrompt, position: number, queuedBy = entry.source): InternalPromptDispatchResult {
+function queuedResult(
+  entry: QueuedInternalPrompt,
+  position: number,
+  queuedBy = entry.source,
+): InternalPromptDispatchResult {
   return {
     status: "queued",
     queuedBy,
@@ -68,15 +72,18 @@ export function schedulePromptQueueDrain(sessionID: string, delayMs: number): vo
   }
 
   clearPromptQueueTimer(sessionID)
-  const timer = setTimeout(() => {
-    promptQueueTimers.delete(sessionID)
-    void drainPromptQueue(sessionID).catch((error: unknown) => {
-      log("[prompt-async-gate] queued prompt drain failed", {
-        sessionID,
-        error: String(error),
+  const timer = setTimeout(
+    () => {
+      promptQueueTimers.delete(sessionID)
+      void drainPromptQueue(sessionID).catch((error: unknown) => {
+        log("[prompt-async-gate] queued prompt drain failed", {
+          sessionID,
+          error: String(error),
+        })
       })
-    })
-  }, Math.max(0, delayMs))
+    },
+    Math.max(0, delayMs),
+  )
   promptQueueTimers.set(sessionID, timer)
 }
 
@@ -129,7 +136,10 @@ export function clearPromptQueueStateForTesting(): void {
   promptQueueTimers.clear()
 }
 
-async function drainPromptQueue(sessionID: string, awaitedEntry?: QueuedInternalPrompt): Promise<InternalPromptDispatchResult | undefined> {
+async function drainPromptQueue(
+  sessionID: string,
+  awaitedEntry?: QueuedInternalPrompt,
+): Promise<InternalPromptDispatchResult | undefined> {
   if (promptQueueDraining.has(sessionID)) {
     return awaitedEntry ? queuedResult(awaitedEntry, 1) : undefined
   }
@@ -150,10 +160,12 @@ async function drainPromptQueue(sessionID: string, awaitedEntry?: QueuedInternal
       const retryState = promptQueueRetryStates.get(entry.id)
       if (entry.durableRetry && retryState?.retryAfter !== undefined && retryState.retryAfter > Date.now()) {
         if (deferredRetryIds.has(entry.id)) {
-          const nextRetryAt = Math.min(...queue.flatMap((queued) => {
-            const retryAfter = promptQueueRetryStates.get(queued.id)?.retryAfter
-            return retryAfter === undefined ? [] : [retryAfter]
-          }))
+          const nextRetryAt = Math.min(
+            ...queue.flatMap((queued) => {
+              const retryAfter = promptQueueRetryStates.get(queued.id)?.retryAfter
+              return retryAfter === undefined ? [] : [retryAfter]
+            }),
+          )
           schedulePromptQueueDrain(sessionID, nextRetryAt - Date.now())
           break
         }
@@ -184,12 +196,12 @@ async function drainPromptQueue(sessionID: string, awaitedEntry?: QueuedInternal
         promptQueueInFlight.delete(sessionID)
       }
 
-      const retryableQueuedFailure = result.status === "failed"
-        && (!result.dispatchAttempted || result.queueRetryable === true)
+      const retryableQueuedFailure =
+        result.status === "failed" && (!result.dispatchAttempted || result.queueRetryable === true)
       if (retryableQueuedFailure) {
         const failureCount = (promptQueueRetryStates.get(entry.id)?.failureCount ?? 0) + 1
         if (entry.durableRetry) {
-          const exponentialBackoffMs = entry.queueRetryMs * (2 ** Math.min(failureCount, 7))
+          const exponentialBackoffMs = entry.queueRetryMs * 2 ** Math.min(failureCount, 7)
           const retryDelayMs = Math.max(
             entry.postDispatchHoldMs,
             Math.min(exponentialBackoffMs, MAX_DURABLE_RETRY_BACKOFF_MS),
@@ -221,16 +233,8 @@ async function drainPromptQueue(sessionID: string, awaitedEntry?: QueuedInternal
         promptQueueRetryStates.set(entry.id, { failureCount })
       }
 
-      if (
-        result.status === "active"
-        || result.status === "reserved"
-        || retryableQueuedFailure
-      ) {
-        const queued = queuedResult(
-          entry,
-          1,
-          result.status === "reserved" ? result.reservedBy : entry.source,
-        )
+      if (result.status === "active" || result.status === "reserved" || retryableQueuedFailure) {
+        const queued = queuedResult(entry, 1, result.status === "reserved" ? result.reservedBy : entry.source)
         if (awaitedEntry?.id === entry.id) {
           awaitedResult = queued
         }

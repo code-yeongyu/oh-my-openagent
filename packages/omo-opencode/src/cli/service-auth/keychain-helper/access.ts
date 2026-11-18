@@ -1,10 +1,22 @@
-import { callHelper, type HelperCall, type HelperLease, HelperProtocolError, type HelperReply, type HelperSpawner, spawnDetachedHelper } from "./client"
+import {
+  callHelper,
+  type HelperCall,
+  type HelperLease,
+  HelperProtocolError,
+  type HelperReply,
+  type HelperSpawner,
+  spawnDetachedHelper,
+} from "./client"
 import { locateHelper } from "./location"
 import { type PinResult, pinVerifiedCopy } from "./pin"
 import { processSignatureChecker, type SignatureVerdict } from "./signature"
 
 export type HelperAccess =
-  | { readonly kind: "ready"; readonly path: string; readonly call: (call: HelperCall, lease?: HelperLease) => Promise<HelperReply> }
+  | {
+      readonly kind: "ready"
+      readonly path: string
+      readonly call: (call: HelperCall, lease?: HelperLease) => Promise<HelperReply>
+    }
   | { readonly kind: "missing" }
   | { readonly kind: "invalid"; readonly rejected: readonly string[] }
   | { readonly kind: "unavailable"; readonly reason: string }
@@ -43,10 +55,14 @@ export async function resolveHelperAccess(
     path: pinned,
     call: async (call, lease) => {
       const verdict = await verify(pinned).catch((error: unknown) => {
-        throw new HelperProtocolError(`OmO's keychain helper could not be checked before it ran: ${error instanceof Error ? error.message : String(error)}`)
+        throw new HelperProtocolError(
+          `OmO's keychain helper could not be checked before it ran: ${error instanceof Error ? error.message : String(error)}`,
+        )
       })
       if (verdict !== "valid")
-        throw new HelperProtocolError("OmO's keychain helper changed on disk and failed its signature check; it was not run.")
+        throw new HelperProtocolError(
+          "OmO's keychain helper changed on disk and failed its signature check; it was not run.",
+        )
       return callHelper(pinned, call, { spawn, ...(lease === undefined ? {} : { lease }) })
     },
   }

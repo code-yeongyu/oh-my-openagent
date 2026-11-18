@@ -100,14 +100,20 @@ function full(host: OpenCodeShellHost, file: string): string {
 
 function resolveShell(host: OpenCodeShellHost, file: string): string | undefined {
   const shell = full(host, file)
-  const rooted = host.platform === "win32" ? path.win32.isAbsolute(windowsPath(host, shell)) : path.posix.isAbsolute(shell)
+  const rooted =
+    host.platform === "win32" ? path.win32.isAbsolute(windowsPath(host, shell)) : path.posix.isAbsolute(shell)
   if (rooted) return isFile(host, shell) ? shell : undefined
   return which(host, shell)
 }
 
 function platformDefault(host: OpenCodeShellHost): string {
   if (host.platform === "win32") {
-    const candidates = [which(host, "pwsh"), which(host, "powershell"), gitBash(host), envValue(host, "COMSPEC") || "cmd.exe"]
+    const candidates = [
+      which(host, "pwsh"),
+      which(host, "powershell"),
+      gitBash(host),
+      envValue(host, "COMSPEC") || "cmd.exe",
+    ]
     const first = candidates.find((candidate): candidate is string => Boolean(candidate))
     return full(host, first ?? "cmd.exe")
   }
@@ -137,7 +143,9 @@ export interface OpenCodeShellTypeResolver {
   resolveShellType(): ShellType
 }
 
-export function createOpenCodeShellTypeResolver(host: () => OpenCodeShellHost = defaultHost): OpenCodeShellTypeResolver {
+export function createOpenCodeShellTypeResolver(
+  host: () => OpenCodeShellHost = defaultHost,
+): OpenCodeShellTypeResolver {
   let configuredShell: string | undefined
   let cached: ShellType | undefined
   return {

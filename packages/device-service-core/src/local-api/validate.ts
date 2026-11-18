@@ -1,3 +1,4 @@
+// Vendored from sisyphuslabs/omo-relay-daemon@edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6 packages/local-api/src/validate.ts
 import { LocalApiError } from "./errors.ts";
 import type {
   Empty,
@@ -14,14 +15,15 @@ import type {
 } from "./protocol.ts";
 import { LOCAL_UPLOAD_PARTS_MAX } from "./upload.ts";
 import { EVENT_KINDS, validateEventFields } from "./validate-events.ts";
+import { sessionWakeState } from "./validate-session-wake.ts";
 import {
   absolutePath,
   bool,
-  commandId,
   exactly,
   fail,
   InvalidMessage,
   isRecord,
+  known,
   localId,
   nonce,
   nullable,
@@ -30,7 +32,10 @@ import {
   semver,
   uint,
 } from "./validate-fields.ts";
-import { endpointsData, locateData } from "./validate-delegated.ts";
+import { MACHINE_DATA } from "./validate-machine.ts";
+import { DELIVERIES_DATA } from "./validate-deliveries.ts";
+import { commandAnswerOf, refOf } from "./validate-session-answer.ts";
+import { endpointsData, endpointsListData } from "./validate-delegated.ts";
 import { isRequestType, REQUEST_TYPES, validateRequestFields } from "./validate-requests.ts";
 import {
   deviceRef,
@@ -100,7 +105,7 @@ export const validateHello = (v: unknown): HelloVerdict => {
 export const validateWelcome = (v: unknown): Welcome | Refused =>
   asViolation(() => {
     if (isRecord(v) && v["type"] === "refused") {
-      const m = exactly(v, ["type", "reason"], [], "refused");
+      const m = known(v, ["type", "reason"], [], "refused");
       return { type: "refused", reason: oneOf(REFUSED_REASONS, m["reason"], "refused reason") };
     }
     if (isRecord(v) && v["type"] === "welcome" && v["v"] !== LOCAL_API_VERSION)
@@ -115,7 +120,7 @@ export const validateWelcome = (v: unknown): Welcome | Refused =>
       "capabilities",
       "state",
     ];
-    const m = exactly(v, fields, [], "welcome");
+    const m = known(v, fields, [], "welcome");
     const capabilities = m["capabilities"];
     if (m["type"] !== "welcome" || m["owner"] !== "service") return fail("welcome");
     if (!Array.isArray(capabilities) || new Set(capabilities).size !== capabilities.length)
@@ -161,16 +166,25 @@ export const validateRequest = (v: unknown): RequestVerdict => {
 };
 
 const empty = (v: unknown): Empty => {
-  exactly(v, [], [], "data");
+  known(v, [], [], "data");
   return {};
 };
-const one = (v: unknown, name: string): unknown => exactly(v, [name], [], "data")[name];
+const one = (v: unknown, name: string): unknown => known(v, [name], [], "data")[name];
 const attachState = (v: unknown) => {
-  const m = exactly(v, ["attached", "changedAt"], [], "data");
+  const m = known(v, ["attached", "changedAt"], [], "data");
   const changedAt = m["changedAt"];
   return {
     attached: bool(m["attached"], "attached"),
     changedAt: typeof changedAt === "string" ? changedAt : fail("changedAt"),
+  };
+};
+const remoteCommandsState = (v: unknown) => {
+  const m = known(v, ["enabled", "changedAt", "overridden"], [], "data");
+  const changedAt = m["changedAt"];
+  return {
+    enabled: bool(m["enabled"], "enabled"),
+    changedAt: typeof changedAt === "string" ? changedAt : fail("changedAt"),
+    overridden: bool(m["overridden"], "overridden"),
   };
 };
 const DATA: { readonly [T in RequestType]: (v: unknown) => ResponseData[T] } = {
@@ -179,29 +193,42 @@ const DATA: { readonly [T in RequestType]: (v: unknown) => ResponseData[T] } = {
   "status.subscribe": empty,
   "service.set_enabled": (v) => ({ enabled: bool(one(v, "enabled"), "enabled") }),
   "refresher.register": empty,
-  "device.adopt": (v) => ({ device: deviceRef(one(v, "device")) }),
+  "device.adopt": (v) => ({ device: deviceRef(one(v, "device"), "device", known) }),
   "device.forget": empty,
-  "device.info": (v) => ({ device: nullable(one(v, "device"), (d) => deviceRef(d)) }),
+  "device.info": (v) => ({
+    device: nullable(one(v, "device"), (d) => deviceRef(d, "device", known)),
+  }),
   "endpoints.register": empty,
   "endpoints.unregister": empty,
+  "endpoints.list": (v) => endpointsListData(known(v, ["agent_dirs"], [], "data")),
+  "session.presenter_open": empty,
+  "session.presenter_send": empty,
   "devices.list": (v) => {
     const devices = one(v, "devices");
     return Array.isArray(devices) ? { devices: devices.map(deviceRowOf) } : fail("devices");
   },
   "sessions.list": (v) => ({ query_id: localId(one(v, "query_id"), "query_id") }),
+  "sessions.events.subscribe": empty,
   "session.attach": (v) => ({ attach: localId(one(v, "attach"), "attach") }),
   "session.detach": empty,
-  "session.command": (v) => ({ command_id: commandId(one(v, "command_id")) }),
+  "session.command": commandAnswerOf,
   "session.command_part": (v) => ({
     received: uint(one(v, "received"), 0, LOCAL_UPLOAD_PARTS_MAX - 1, "received"),
   }),
   "session.read": (v) => ({ query_id: localId(one(v, "query_id"), "query_id") }),
   "enforcement.report": empty,
   "owner.shutdown_for_upgrade": empty,
-  "session.endpoints": endpointsData,
-  "session.locate": locateData,
+  "owner.update_committed": empty,
   "control.attach.get": attachState,
   "control.attach.set": attachState,
+  "control.remote_commands.get": remoteCommandsState,
+  "control.remote_commands.set": remoteCommandsState,
+  "control.session_wake.get": sessionWakeState,
+  "control.session_wake.set": sessionWakeState,
+  "session.endpoints": endpointsData,
+  "session.locate": (v) => refOf(v, "session.locate data"),
+  ...MACHINE_DATA,
+  ...DELIVERIES_DATA,
 };
 
 export type ValidResponse<T extends RequestType> =
@@ -209,7 +236,7 @@ export type ValidResponse<T extends RequestType> =
   | { readonly id: string; readonly ok: false; readonly error: ErrorBody };
 export const validateResponse = <T extends RequestType>(v: unknown, type: T): ValidResponse<T> =>
   asViolation(() => {
-    const m = exactly(v, ["id", "type", "ok"], ["data", "error"], "response");
+    const m = known(v, ["id", "type", "ok"], ["data", "error"], "response");
     const id = requestId(m["id"]) ?? fail("response id");
     if (m["type"] !== "response") return fail("response type");
     if (m["ok"] === true) {

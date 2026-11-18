@@ -92,7 +92,10 @@ async function readRecord(file: string): Promise<JsonRecord | undefined> {
   }
 }
 
-async function recordNaming(file: string, dir: string): Promise<{ readonly socket: string; readonly record: JsonRecord } | undefined> {
+async function recordNaming(
+  file: string,
+  dir: string,
+): Promise<{ readonly socket: string; readonly record: JsonRecord } | undefined> {
   const record = await readRecord(file)
   const socket = record?.socket
   if (record === undefined || typeof socket !== "string" || socket === "") return undefined
@@ -111,11 +114,19 @@ async function identify(dir: string): Promise<RegistryEndpoint> {
     }
   }
   const booted = await recordNaming(join(dir, "settings.json"), dir)
-  if (booted !== undefined) return { socket: booted.socket, dir, identity: "settings", endpoint_kind: "rpc_host", registry_version: null }
+  if (booted !== undefined)
+    return { socket: booted.socket, dir, identity: "settings", endpoint_kind: "rpc_host", registry_version: null }
   const generations = await readdir(join(dir, "generations")).catch(() => [] as string[])
   for (const instanceId of generations.sort()) {
     const recorded = await recordNaming(join(dir, "generations", instanceId, "settings.json"), dir)
-    if (recorded !== undefined) return { socket: recorded.socket, dir, identity: "generation-settings", endpoint_kind: "rpc_host", registry_version: null }
+    if (recorded !== undefined)
+      return {
+        socket: recorded.socket,
+        dir,
+        identity: "generation-settings",
+        endpoint_kind: "rpc_host",
+        registry_version: null,
+      }
   }
   return { socket: null, dir, identity: "unknown", endpoint_kind: "rpc_host", registry_version: null }
 }
@@ -140,6 +151,8 @@ export async function listRegistryEndpoints(agentDir: string): Promise<readonly 
 export function endpointKindOf(socket: string, registry: readonly RegistryEndpoint[]): EndpointKind {
   if (isTuiControlSocket(socket)) return "tui"
   const canonical = canonicalEndpointPath(socket)
-  const recorded = registry.find((entry) => entry.socket !== null && (entry.socket === socket || canonicalEndpointPath(entry.socket) === canonical))
+  const recorded = registry.find(
+    (entry) => entry.socket !== null && (entry.socket === socket || canonicalEndpointPath(entry.socket) === canonical),
+  )
   return recorded?.endpoint_kind ?? "rpc_host"
 }

@@ -113,10 +113,7 @@ export function resetPluginHooksState(): void {
   pluginHooksState.clear()
 }
 
-function mergeHooksConfig(
-  base: ClaudeHooksConfig,
-  override: ClaudeHooksConfig
-): ClaudeHooksConfig {
+function mergeHooksConfig(base: ClaudeHooksConfig, override: ClaudeHooksConfig): ClaudeHooksConfig {
   const result: ClaudeHooksConfig = { ...base }
   for (const eventType of ALL_HOOK_EVENT_TYPES) {
     if (override[eventType]) {
@@ -196,7 +193,7 @@ function applyMcpEnvAllowlist(action: HookAction): HookAction {
 
 export function mergePluginHooksConfigs(
   base: ClaudeHooksConfig,
-  pluginHooksConfigs: PluginHooksConfig[]
+  pluginHooksConfigs: PluginHooksConfig[],
 ): ClaudeHooksConfig {
   let result = { ...base }
 
@@ -212,9 +209,7 @@ export function mergePluginHooksConfigs(
         .filter(isPluginHookMatcher)
         .map((m) => ({
           matcher: m.matcher ?? m.pattern ?? "*",
-          hooks: (m.hooks ?? [])
-            .filter(isHookAction)
-            .map(applyMcpEnvAllowlist),
+          hooks: (m.hooks ?? []).filter(isHookAction).map(applyMcpEnvAllowlist),
         }))
         .filter((m) => m.hooks.length > 0)
 
@@ -229,9 +224,7 @@ export function mergePluginHooksConfigs(
   return result
 }
 
-export async function loadClaudeHooksConfig(
-  customSettingsPath?: string
-): Promise<ClaudeHooksConfig | null> {
+export async function loadClaudeHooksConfig(customSettingsPath?: string): Promise<ClaudeHooksConfig | null> {
   const cacheKey = getCacheKey(customSettingsPath)
   const cachedConfig = getCachedConfig(cacheKey)
   if (cachedConfig !== undefined) {

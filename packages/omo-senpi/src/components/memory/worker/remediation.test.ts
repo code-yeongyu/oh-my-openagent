@@ -39,8 +39,14 @@ describe("reflectionRemediation", () => {
 
   describe("#given a pressure dream budget warning", () => {
     test("#when remediated #then it tells the next run to trim system memory below the supplied target", () => {
-      expect(reflectionRemediation("budget_not_met", "Committed system/ estimate is 90 tokens; pressure dream target is below 80 tokens"))
-        .toBe("run /dream again and trim or demote the largest system/ files until the committed estimate is below $SYSTEM_TOKEN_TARGET")
+      expect(
+        reflectionRemediation(
+          "budget_not_met",
+          "Committed system/ estimate is 90 tokens; pressure dream target is below 80 tokens",
+        ),
+      ).toBe(
+        "run /dream again and trim or demote the largest system/ files until the committed estimate is below $SYSTEM_TOKEN_TARGET",
+      )
     })
   })
 
@@ -76,7 +82,10 @@ describe("reflectionRemediation", () => {
 
     test("#when a real user-namespace error is remediated #then the host fix comes first and disabling the sandbox is only a last resort", () => {
       // when
-      const hint = reflectionRemediation("child_exit", "bwrap: No permissions to creating new namespace, likely because the kernel does not allow non-privileged user namespaces. See https://deb.li/bubblewrap or https://deb.li/bubblewrap-sysctl.")
+      const hint = reflectionRemediation(
+        "child_exit",
+        "bwrap: No permissions to creating new namespace, likely because the kernel does not allow non-privileged user namespaces. See https://deb.li/bubblewrap or https://deb.li/bubblewrap-sysctl.",
+      )
 
       // then
       expect(hint).toContain("user namespace")
@@ -87,14 +96,17 @@ describe("reflectionRemediation", () => {
 
     test("#when bwrap cannot find a bind source path #then it names the missing directory and never blames user namespaces or suggests turning the sandbox off (#10317)", () => {
       // when
-      const hint = reflectionRemediation("child_exit", "bwrap: Can't find source path /home/u/.omo/memory/agents/a1/runtime/reflection-sessions: No such file or directory")
+      const hint = reflectionRemediation(
+        "child_exit",
+        "bwrap: Can't find source path /home/u/.omo/memory/agents/a1/runtime/reflection-sessions: No such file or directory",
+      )
 
       // then
       expect(hint).toContain("/home/u/.omo/memory/agents/a1/runtime/reflection-sessions")
       expect(hint).toContain("mkdir")
       expect(hint).not.toContain("user namespace")
       expect(hint).not.toContain("memory.reflection.sandbox")
-      expect(hint).not.toContain("\"off\"")
+      expect(hint).not.toContain('"off"')
     })
 
     // Verbatim bwrap output (bubblewrap.c: die() prints "bwrap: <msg>", die_with_error() appends ": <strerror>").
@@ -116,14 +128,19 @@ describe("reflectionRemediation", () => {
 
         // then
         expect(hint).toContain("allow unprivileged user namespaces")
-        expect(hint.indexOf("allow unprivileged user namespaces")).toBeLessThan(hint.indexOf("memory.reflection.sandbox"))
+        expect(hint.indexOf("allow unprivileged user namespaces")).toBeLessThan(
+          hint.indexOf("memory.reflection.sandbox"),
+        )
         expect(hint).toContain("last resort")
       })
     }
 
     test("#when the missing bind source path contains spaces #then the whole path is named and quoted in the mkdir advice", () => {
       // when
-      const hint = reflectionRemediation("child_exit", "bwrap: Can't find source path /home/u/My Memory/runtime/reflection-sessions: No such file or directory")
+      const hint = reflectionRemediation(
+        "child_exit",
+        "bwrap: Can't find source path /home/u/My Memory/runtime/reflection-sessions: No such file or directory",
+      )
 
       // then
       expect(hint).toContain("mkdir -p '/home/u/My Memory/runtime/reflection-sessions'")
@@ -132,7 +149,10 @@ describe("reflectionRemediation", () => {
 
     test("#when the missing bind source path contains a single quote #then the mkdir advice still names exactly that path when pasted into a shell", () => {
       // when
-      const hint = reflectionRemediation("child_exit", "bwrap: Can't find source path /home/u/it's mine/runtime/reflection-sessions: No such file or directory")
+      const hint = reflectionRemediation(
+        "child_exit",
+        "bwrap: Can't find source path /home/u/it's mine/runtime/reflection-sessions: No such file or directory",
+      )
 
       // then
       expect(hint).toContain("mkdir -p '/home/u/it'\\''s mine/runtime/reflection-sessions'")
@@ -144,7 +164,7 @@ describe("reflectionRemediation", () => {
 
       // then
       expect(hint).not.toContain("user namespace")
-      expect(hint).not.toContain("\"off\"")
+      expect(hint).not.toContain('"off"')
     })
   })
 
@@ -181,7 +201,10 @@ describe("reflectionRemediation", () => {
 
     test("#when the prompt overflowed every candidate #then the hint names the context escape hatches", () => {
       // given: context_overflow had no branch at all and fell through to the child log
-      const hint = reflectionRemediation("spawn_failed", `context_overflow:prompt is 412000 tokens, limit is 272000; ${attempted}`)
+      const hint = reflectionRemediation(
+        "spawn_failed",
+        `context_overflow:prompt is 412000 tokens, limit is 272000; ${attempted}`,
+      )
 
       // then
       expect(hint).toContain("memory.reflection")
@@ -210,7 +233,9 @@ describe("reflectionRemediation", () => {
 
     test("#when no launcher could be resolved at all #then the SENPI_BIN hint is kept", () => {
       // given: the verbatim throw from senpi-command `resolveSenpiLaunch`, which carries no model roster
-      expect(reflectionRemediation("spawn_failed", "Unable to resolve a runnable Senpi launcher")).toContain("SENPI_BIN")
+      expect(reflectionRemediation("spawn_failed", "Unable to resolve a runnable Senpi launcher")).toContain(
+        "SENPI_BIN",
+      )
     })
 
     test("#when a running child dies on a missing file #then the hint points at the child log, not SENPI_BIN", () => {

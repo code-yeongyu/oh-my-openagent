@@ -45,7 +45,8 @@ pub struct DesktopSessionOptions {
     pub intervention: InterventionPolicy,
     /// macOS background key priming; accepted and stored, not acted on yet.
     pub macos_key_priming: KeyPriming,
-    /// Per-request timing traces; accepted and stored, not acted on yet.
+    /// Per-stage `timings` in action reports, and with `auditPath` a
+    /// redacted JSONL trace in its `trace/` directory.
     pub trace: bool,
 }
 

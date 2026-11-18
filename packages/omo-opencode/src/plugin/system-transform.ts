@@ -15,9 +15,7 @@ type UltraworkRestoration = {
  * builtin providers). Ids that already carry a provider prefix pass through
  * unchanged so both hook payload shapes stay comparable.
  */
-function toCanonicalModel(
-  model: { id: string; providerID: string } | undefined,
-): string | undefined {
+function toCanonicalModel(model: { id: string; providerID: string } | undefined): string | undefined {
   if (!model?.id) return undefined
   if (!model.providerID || model.id.startsWith(`${model.providerID}/`)) return model.id
   return `${model.providerID}/${model.id}`
@@ -41,8 +39,13 @@ export function createSystemTransformHandler(
     reconcileSisyphusRuntimePrompt(output.system, toCanonicalModel(input.model))
     const runtimePermissions = await getSessionToolPermissions?.(input.sessionID)
     const canRefreshTools = !getSessionToolPermissions || runtimePermissions !== undefined
-    reconcileNativeModelPrompts(output.system, toCanonicalModel(input.model),
-      canRefreshTools ? getToolSnippets?.() : undefined, undefined, runtimePermissions)
+    reconcileNativeModelPrompts(
+      output.system,
+      toCanonicalModel(input.model),
+      canRefreshTools ? getToolSnippets?.() : undefined,
+      undefined,
+      runtimePermissions,
+    )
 
     const restoredGuidance = input.sessionID
       ? ultraworkRestoration?.getSystemTransformGuidance?.(input.sessionID, input.model?.id)

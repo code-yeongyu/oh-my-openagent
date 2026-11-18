@@ -15,20 +15,17 @@ interface RunLookAtSessionInput {
   inputParts: LookAtInputPart[]
 }
 
-export async function runLookAtSession({
-  ctx,
-  toolContext,
-  goal,
-  inputParts,
-}: RunLookAtSessionInput): Promise<string> {
+export async function runLookAtSession({ ctx, toolContext, goal, inputParts }: RunLookAtSessionInput): Promise<string> {
   const fileParts = inputParts.filter((part): part is LookAtFilePart => part.type === "file")
   const prompt = buildLookAtPrompt(goal, fileParts)
   const { agentModel, agentVariant } = await resolveMultimodalLookerAgentMetadata(ctx)
 
   log(`[look_at] Creating session with parent: ${toolContext.sessionID}`)
-  const parentSession = await ctx.client.session.get({
-    path: { id: toolContext.sessionID },
-  }).catch(() => null)
+  const parentSession = await ctx.client.session
+    .get({
+      path: { id: toolContext.sessionID },
+    })
+    .catch(() => null)
   const parentDirectory = parentSession?.data?.directory ?? ctx.directory
 
   const createResult = await ctx.client.session.create({
@@ -62,26 +59,27 @@ Original error: ${createResult.error}`
   log(`[look_at] Sending prompt with ${fileParts.length} file(s) to session ${sessionID}`)
   let shouldWaitForStatus = true
   try {
-    await promptSyncWithModelSuggestionRetry(ctx.client, {
-      path: { id: sessionID },
-      body: {
-        agent: MULTIMODAL_LOOKER_AGENT,
-        tools: {
-          task: false,
-          call_omo_agent: false,
-          look_at: false,
-          read: READ_ENABLED,
+    await promptSyncWithModelSuggestionRetry(
+      ctx.client,
+      {
+        path: { id: sessionID },
+        body: {
+          agent: MULTIMODAL_LOOKER_AGENT,
+          tools: {
+            task: false,
+            call_omo_agent: false,
+            look_at: false,
+            read: READ_ENABLED,
+          },
+          parts: [{ type: "text", text: prompt }, ...inputParts],
+          ...(agentModel ? { model: { providerID: agentModel.providerID, modelID: agentModel.modelID } } : {}),
+          ...(agentVariant ? { variant: agentVariant } : {}),
         },
-        parts: [
-          { type: "text", text: prompt },
-          ...inputParts,
-        ],
-        ...(agentModel ? { model: { providerID: agentModel.providerID, modelID: agentModel.modelID } } : {}),
-        ...(agentVariant ? { variant: agentVariant } : {}),
       },
-    }, {
-      queueBehavior: "defer",
-    })
+      {
+        queueBehavior: "defer",
+      },
+    )
   } catch (promptError) {
     log("[look_at] Prompt dispatch failed; checking child session evidence:", promptError)
     shouldWaitForStatus = isAmbiguousPromptDispatchFailure(promptError)

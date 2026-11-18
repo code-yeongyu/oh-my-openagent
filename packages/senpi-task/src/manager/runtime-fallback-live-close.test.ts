@@ -28,7 +28,11 @@ function rung(id: string): ResolvedModelRecord {
 }
 
 describe("runtime fallback over a live daemon session", () => {
-  for (const [acknowledged, lateReply] of [[true, false], [true, true], [false, false]] as const) {
+  for (const [acknowledged, lateReply] of [
+    [true, false],
+    [true, true],
+    [false, false],
+  ] as const) {
     test(`#given the failed rung's close_session is ${acknowledged ? (lateReply ? "acknowledged after its close grace" : "acknowledged") : "never acknowledged"} #when fallback runs #then ${acknowledged ? "the next rung replaces it" : "the task fails and the next rung never starts beside it"}`, async () => {
       // given
       const project = tempProject()
@@ -38,7 +42,15 @@ describe("runtime fallback over a live daemon session", () => {
       const launched: ManagedChildHandle[] = []
       const runner: ManagedRunner = {
         start: async (spec) => {
-          const handle = adaptRpcHandle(await rpc.start({ task_id: spec.taskId, cwd: project, state_dir: spec.stateDir, prompt: spec.prompt, model: spec.model }))
+          const handle = adaptRpcHandle(
+            await rpc.start({
+              task_id: spec.taskId,
+              cwd: project,
+              state_dir: spec.stateDir,
+              prompt: spec.prompt,
+              model: spec.model,
+            }),
+          )
           launched.push(handle)
           return handle
         },
@@ -49,7 +61,15 @@ describe("runtime fallback over a live daemon session", () => {
         config,
         cwd: project,
         runners: { process: runner, "in-process": runner },
-        planner: () => ({ kind: "resolved", plan: { model: "test/old", requested_model: rung("old"), resolved_model: rung("old"), fallback_models: [rung("next")] } }),
+        planner: () => ({
+          kind: "resolved",
+          plan: {
+            model: "test/old",
+            requested_model: rung("old"),
+            resolved_model: rung("old"),
+            fallback_models: [rung("next")],
+          },
+        }),
         destruction: { destroyResidentTask: (taskId, cause) => lifecycle.destroyResidentTask(taskId, cause) },
       })
       const lifecycle = createTaskLifecycle({
@@ -65,10 +85,13 @@ describe("runtime fallback over a live daemon session", () => {
       await launchSettled(manager, task.task_id)
       const [original] = host.sessions()
       if (original === undefined) throw new Error("expected the failed rung's session")
-      store.mutate(task.task_id, record => ({ ...record, pending_steering: [
-        { id: "queued-1", message: "Q1", deliver_as: "steer" },
-        { id: "queued-2", message: "Q2", deliver_as: "steer" },
-      ] }))
+      store.mutate(task.task_id, (record) => ({
+        ...record,
+        pending_steering: [
+          { id: "queued-1", message: "Q1", deliver_as: "steer" },
+          { id: "queued-2", message: "Q2", deliver_as: "steer" },
+        ],
+      }))
       let deliveries = 0
       const drained = Promise.withResolvers<void>()
       const append = store.appendEvent.bind(store)
@@ -90,7 +113,15 @@ describe("runtime fallback over a live daemon session", () => {
       let timeout: ReturnType<typeof setTimeout> | undefined
       // Arm a real watchdog before freezing the grace clock: socket I/O still runs in real time.
       const deadline = new Promise<never>((_, reject) => {
-        timeout = setTimeout(() => reject(new Error(`fallback did not settle within 10s; task status: ${store.load(task.task_id)?.status ?? "missing"}`)), 10_000)
+        timeout = setTimeout(
+          () =>
+            reject(
+              new Error(
+                `fallback did not settle within 10s; task status: ${store.load(task.task_id)?.status ?? "missing"}`,
+              ),
+            ),
+          10_000,
+        )
       })
       // Keep both 50 ms close graces frozen until the real host confirms the close, so a slow
       // socket reply cannot turn the acknowledged case into an unconfirmed close (#9489).
@@ -98,7 +129,10 @@ describe("runtime fallback over a live daemon session", () => {
 
       try {
         // when
-        host.emitRecord(original.routingId, { type: "message_end", message: { role: "assistant", content: [], stopReason: "error", errorMessage: "provider failed" } })
+        host.emitRecord(original.routingId, {
+          type: "message_end",
+          message: { role: "assistant", content: [], stopReason: "error", errorMessage: "provider failed" },
+        })
         host.emitRecord(original.routingId, { type: "agent_end", willRetry: false, messages: [] })
         host.emitRecord(original.routingId, { type: "agent_idle" })
 
@@ -111,14 +145,18 @@ describe("runtime fallback over a live daemon session", () => {
           expect(store.load(task.task_id)?.pending_steering).toBeUndefined()
           expect(deliveries).toBe(2)
           expect(store.load(task.task_id)?.model).toBe("test/next")
-          expect(host.commands.filter(command => command.type === "steer").map(command => command.payload.message)).toEqual(["Q1", "Q2"])
+          expect(
+            host.commands.filter((command) => command.type === "steer").map((command) => command.payload.message),
+          ).toEqual(["Q1", "Q2"])
           expect(host.sessions().map((session) => session.sessionPath)).not.toContain(original.sessionPath)
         } else {
           if (settled === undefined) throw new Error("expected a terminal wait for the unconfirmed close")
           const record = await Promise.race([settled, deadline])
           expect(record.status).toBe("error")
           expect(launched).toHaveLength(1)
-          expect(record.fallback_closing_child?.host_session?.session_path ?? record.host_session?.session_path).toBe(original.sessionPath)
+          expect(record.fallback_closing_child?.host_session?.session_path ?? record.host_session?.session_path).toBe(
+            original.sessionPath,
+          )
         }
       } finally {
         if (acknowledged) jest.useRealTimers()

@@ -41,15 +41,27 @@ export function sanitizeRuntimeState(runtimeState: RuntimeState): Omit<RuntimeSt
 } {
   return {
     ...runtimeState,
-    members: runtimeState.members.map(({ lastInjectedTurnMarker: _turnMarker, pendingInjectedMessageIds: _pendingIds, ...member }) => member),
+    members: runtimeState.members.map(
+      ({ lastInjectedTurnMarker: _turnMarker, pendingInjectedMessageIds: _pendingIds, ...member }) => member,
+    ),
   }
 }
 
-export async function findParticipantRuntime(sessionID: string, config: TeamModeConfig, deps: TeamRuntimeStoreDeps): Promise<RuntimeState | undefined> {
+export async function findParticipantRuntime(
+  sessionID: string,
+  config: TeamModeConfig,
+  deps: TeamRuntimeStoreDeps,
+): Promise<RuntimeState | undefined> {
   const registryEntry = lookupTeamSession(sessionID)
   if (registryEntry) {
-    const runtimeState = await deps.loadRuntimeState(registryEntry.teamRunId, config).catch(resolveRuntimeStateLoadFailure)
-    if (runtimeState && ACTIVE_RUNTIME_STATUSES.has(runtimeState.status) && resolveRegisteredParticipant(runtimeState, registryEntry)) {
+    const runtimeState = await deps
+      .loadRuntimeState(registryEntry.teamRunId, config)
+      .catch(resolveRuntimeStateLoadFailure)
+    if (
+      runtimeState &&
+      ACTIVE_RUNTIME_STATUSES.has(runtimeState.status) &&
+      resolveRegisteredParticipant(runtimeState, registryEntry)
+    ) {
       return runtimeState
     }
   }
@@ -62,7 +74,12 @@ export async function findParticipantRuntime(sessionID: string, config: TeamMode
   }
 }
 
-export async function resolveParticipant(teamRunId: string, sessionID: string, config: TeamModeConfig, deps: TeamRuntimeStoreDeps): Promise<{ runtimeState: RuntimeState; participant?: TeamParticipant }> {
+export async function resolveParticipant(
+  teamRunId: string,
+  sessionID: string,
+  config: TeamModeConfig,
+  deps: TeamRuntimeStoreDeps,
+): Promise<{ runtimeState: RuntimeState; participant?: TeamParticipant }> {
   const registryEntry = lookupTeamSession(sessionID)
   const runtimeState = await deps.loadRuntimeState(teamRunId, config)
   if (registryEntry?.teamRunId === teamRunId) {

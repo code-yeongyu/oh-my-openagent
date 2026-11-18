@@ -45,13 +45,17 @@ export async function reconcileTeamMailboxOnSessionStart(deps: ReconcileTeamMail
     try {
       const runtimeDir = resolveTeamRuntimeDirs(deps.stateDir, team.teamRunId).runtimeDir
       const memberNames = Object.keys(await readMemberTaskMap(runtimeDir))
-      const recipients = team.leadSessionId === deps.currentLeadSessionId
-        ? [...new Set([...memberNames, TEAM_LEAD_SENTINEL])]
-        : memberNames
+      const recipients =
+        team.leadSessionId === deps.currentLeadSessionId
+          ? [...new Set([...memberNames, TEAM_LEAD_SENTINEL])]
+          : memberNames
       if (recipients.length === 0) continue
       await reclaimStaleTeamReservations(team.teamRunId, recipients, deps.config, staleTtlMs)
     } catch (error) {
-      log("senpi-task team session-start reclaim skipped one team", { teamRunId: team.teamRunId, error: toErrorMessage(error) })
+      log("senpi-task team session-start reclaim skipped one team", {
+        teamRunId: team.teamRunId,
+        error: toErrorMessage(error),
+      })
     }
   }
 }

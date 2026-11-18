@@ -19,11 +19,7 @@ async function writeJournalState(fixture: BoundFixture, body: string): Promise<v
 async function writeMergedCompletion(fixture: BoundFixture, finishedAt: string): Promise<void> {
   const dir = join(fixture.context.identityPaths.reflection, "completions")
   await mkdir(dir, { recursive: true })
-  await writeFile(
-    join(dir, "run-1.json"),
-    JSON.stringify({ runId: "run-1", outcome: "merged", finishedAt }),
-    "utf8",
-  )
+  await writeFile(join(dir, "run-1.json"), JSON.stringify({ runId: "run-1", outcome: "merged", finishedAt }), "utf8")
 }
 
 function toolsFor(fixture: BoundFixture) {
@@ -99,11 +95,15 @@ describe("memory write notice gathering", () => {
       description: "First.",
       file_text: "body",
     })
-    const single = await gatherMemoryWriteNotice(fixture.context, {
-      sha: await git(fixture.repo, ["rev-parse", "HEAD"]),
-      subject: "First entry",
-      affectedPaths: ["knowledge/first.md"],
-    }, { sessionId: SESSION_ID, buildSnapshot: async () => ({ repo: {}, reflection: {}, journal: {} }) as never })
+    const single = await gatherMemoryWriteNotice(
+      fixture.context,
+      {
+        sha: await git(fixture.repo, ["rev-parse", "HEAD"]),
+        subject: "First entry",
+        affectedPaths: ["knowledge/first.md"],
+      },
+      { sessionId: SESSION_ID, buildSnapshot: async () => ({ repo: {}, reflection: {}, journal: {} }) as never },
+    )
 
     // then
     expect(result.isError).toBeUndefined()
@@ -159,11 +159,15 @@ describe("memory write notice gathering", () => {
     const fixture = await boundFixture()
 
     // when
-    const notice = await gatherMemoryWriteNotice(fixture.context, {
-      sha: "0".repeat(40),
-      subject: "Unreachable commit",
-      affectedPaths: ["knowledge/ghost.md"],
-    }, { sessionId: SESSION_ID })
+    const notice = await gatherMemoryWriteNotice(
+      fixture.context,
+      {
+        sha: "0".repeat(40),
+        subject: "Unreachable commit",
+        affectedPaths: ["knowledge/ghost.md"],
+      },
+      { sessionId: SESSION_ID },
+    )
 
     // then
     expect(notice.affected).toEqual([])
@@ -176,16 +180,20 @@ describe("memory write notice gathering", () => {
     const fixture = await boundFixture()
 
     // when
-    const notice = await gatherMemoryWriteNotice(fixture.context, {
-      sha: "0".repeat(40),
-      subject: "Broken snapshot",
-      affectedPaths: [],
-    }, {
-      sessionId: SESSION_ID,
-      buildSnapshot: async () => {
-        throw new Error("snapshot exploded")
+    const notice = await gatherMemoryWriteNotice(
+      fixture.context,
+      {
+        sha: "0".repeat(40),
+        subject: "Broken snapshot",
+        affectedPaths: [],
       },
-    })
+      {
+        sessionId: SESSION_ID,
+        buildSnapshot: async () => {
+          throw new Error("snapshot exploded")
+        },
+      },
+    )
 
     // then
     expect(notice.size).toBeUndefined()
@@ -271,14 +279,21 @@ describe("memory tool result rendering", () => {
     }
     const context = {
       args: { command: "create", file_path: "knowledge/render.md" },
-      state: {}, lastComponent: undefined, isError: false, hasResult: true,
+      state: {},
+      lastComponent: undefined,
+      isError: false,
+      hasResult: true,
     }
-    const collapsed = (Reflect.apply(renderResult, undefined, [
-      created, { expanded: false, isPartial: false }, theme, context,
-    ]) as { render(width: number): string[] }).render(200)
-    const expanded = (Reflect.apply(renderResult, undefined, [
-      created, { expanded: true, isPartial: false }, theme, context,
-    ]) as { render(width: number): string[] }).render(200)
+    const collapsed = (
+      Reflect.apply(renderResult, undefined, [created, { expanded: false, isPartial: false }, theme, context]) as {
+        render(width: number): string[]
+      }
+    ).render(200)
+    const expanded = (
+      Reflect.apply(renderResult, undefined, [created, { expanded: true, isPartial: false }, theme, context]) as {
+        render(width: number): string[]
+      }
+    ).render(200)
 
     // then
     expect(collapsed[1]).toContain("● Remembered")

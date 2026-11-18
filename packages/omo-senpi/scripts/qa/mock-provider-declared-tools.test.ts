@@ -34,7 +34,14 @@ describe("mock provider declared-tool recorder", () => {
   })
 
   it("#given transcript system messages that declare no tools #then the declaration is an empty list", () => {
-    expect(declaredToolNames({ messages: [{ role: "system", content: "base" }, { role: "user", content: "hi" }] })).toEqual([])
+    expect(
+      declaredToolNames({
+        messages: [
+          { role: "system", content: "base" },
+          { role: "user", content: "hi" },
+        ],
+      }),
+    ).toEqual([])
   })
 
   it("#given no tools list and no system message #then the declaration is unavailable, not empty", () => {

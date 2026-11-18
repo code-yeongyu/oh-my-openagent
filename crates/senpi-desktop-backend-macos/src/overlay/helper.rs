@@ -1,4 +1,4 @@
-//! Private helper; EOF closes the panel and ends the process.
+//! Private helper; EOF or the engine's death closes the panel and ends the process.
 use super::{
     coordination,
     motion::{Frame, Motion},
@@ -15,6 +15,9 @@ use std::sync::mpsc::{sync_channel, TryRecvError};
 use std::time::{Duration, Instant};
 
 pub(crate) fn run() -> io::Result<()> {
+    if let Err(error) = crate::parent_death::exit_with_parent() {
+        eprintln!("cursor-overlay: no parent-death watch, stdin EOF still ends it: {error}");
+    }
     let mtm =
         MainThreadMarker::new().ok_or_else(|| io::Error::other("overlay requires main thread"))?;
     let app = NSApplication::sharedApplication(mtm);

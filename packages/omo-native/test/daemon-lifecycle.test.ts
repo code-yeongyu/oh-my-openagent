@@ -49,7 +49,13 @@ describe("omo daemon endpoint lifecycle", () => {
     const stdout = capture()
 
     const exitCode = runDaemonCommand(["handoff"], {
-      engine, pluginRoot, agentDir, env: {}, stdout, stderr: capture(), platform: "darwin",
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout,
+      stderr: capture(),
+      platform: "darwin",
     })
 
     expect(exitCode).toBe(3)
@@ -57,23 +63,27 @@ describe("omo daemon endpoint lifecycle", () => {
     const ensuredSockets = engine.calls
       .filter((call) => call.args[1] === "ensure")
       .map((call) => call.args[call.args.indexOf("--socket") + 1])
-    expect(ensuredSockets).toEqual([
-      endpoints[1]?.socket,
-      endpoints[2]?.socket,
-      endpoints[3]?.socket,
-    ])
+    expect(ensuredSockets).toEqual([endpoints[1]?.socket, endpoints[2]?.socket, endpoints[3]?.socket])
     expect(stdout.text()).toContain(`${endpoints[2]?.socket}: refuse`)
   })
 
   test("#given task.host_idle_exit_ms #when handoff fans out #then every host action receives the supported env override", () => {
     const { pluginRoot, agentDir, endpoints } = fixture()
     writeJson(join(agentDir, "omo.json"), { task: { host_idle_exit_ms: 12_345 } })
-    const engine = scriptedEngine((args) => args.includes("--all")
-      ? { exitCode: 0, stdout: JSON.stringify({ endpoints }) }
-      : { exitCode: 0, stdout: JSON.stringify({ action: "reuse" }) })
+    const engine = scriptedEngine((args) =>
+      args.includes("--all")
+        ? { exitCode: 0, stdout: JSON.stringify({ endpoints }) }
+        : { exitCode: 0, stdout: JSON.stringify({ action: "reuse" }) },
+    )
 
     const exitCode = runDaemonCommand(["handoff"], {
-      engine, pluginRoot, agentDir, env: {}, stdout: capture(), stderr: capture(), platform: "darwin",
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout: capture(),
+      stderr: capture(),
+      platform: "darwin",
     })
 
     expect(exitCode).toBe(0)
@@ -85,13 +95,21 @@ describe("omo daemon endpoint lifecycle", () => {
 
   test("#given four owned endpoints #when stop --all runs without wait #then each endpoint gets one stop request", () => {
     const { pluginRoot, agentDir, endpoints } = fixture()
-    const engine = scriptedEngine((args) => args.includes("--all")
-      ? { exitCode: 0, stdout: JSON.stringify({ endpoints }) }
-      : { exitCode: 0, stdout: JSON.stringify({ action: "stopped" }) })
+    const engine = scriptedEngine((args) =>
+      args.includes("--all")
+        ? { exitCode: 0, stdout: JSON.stringify({ endpoints }) }
+        : { exitCode: 0, stdout: JSON.stringify({ action: "stopped" }) },
+    )
     const stdout = capture()
 
     const exitCode = runDaemonCommand(["stop", "--all"], {
-      engine, pluginRoot, agentDir, env: {}, stdout, stderr: capture(), platform: "darwin",
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout,
+      stderr: capture(),
+      platform: "darwin",
     })
 
     const stopCalls = engine.calls.filter((call) => call.args[1] === "stop")
@@ -122,7 +140,13 @@ describe("omo daemon endpoint lifecycle", () => {
     const stdout = capture()
 
     const exitCode = runDaemonCommand(["gc", "--json"], {
-      engine, pluginRoot, agentDir, env: {}, stdout, stderr: capture(), platform: "darwin",
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout,
+      stderr: capture(),
+      platform: "darwin",
     })
 
     const payload = JSON.parse(stdout.text())
@@ -219,5 +243,4 @@ describe("omo daemon endpoint lifecycle", () => {
     expect(exitCode).toBe(3)
     expect(stdout.text()).toContain("TIMEOUT: still live (pid 2, 1 sessions, 1 claims)")
   })
-
 })

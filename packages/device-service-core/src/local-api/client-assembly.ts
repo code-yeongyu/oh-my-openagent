@@ -1,3 +1,4 @@
+// Vendored from sisyphuslabs/omo-relay-daemon@edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6 packages/local-api/src/client-assembly.ts
 import { LocalBlobAssembler } from "./chunking.ts";
 import {
   ListingTracker,
@@ -93,17 +94,36 @@ export class EventAssembler {
       case "session.detached":
         return this.#detached(event.attach);
       case "status.changed":
+      // #1066: a hint to list again, the caller's to act on.
+      case "sessions.listing_changed":
       case "session.snapshot":
       case "session.snapshot_loading":
       case "session.records":
       case "session.attach_pending":
       case "session.command_state":
       case "session.upload_abort":
+      // Machine events are the caller's to follow (op_id, handle, blob id); the client only hands them on.
+      case "machine.op_state":
+      case "machine.op_result":
+      case "machine.output":
+      case "machine.changed":
+      case "machine.blob_chunk":
+      case "machine.blob_done":
+      case "machine.blob_abort":
       // The delegated channel (0018) is the caller's to follow too: frames and replies by device, blobs by id.
       case "session.command_event":
       case "session.command_blob_chunk":
       case "session.command_blob_done":
       case "session.channel_closed":
+      // Decision 0020: the presenter tunnel is the caller's to follow as well (lines by device and lane).
+      case "session.presenter_frame":
+      case "session.presenter_ended":
+      // #829 P3: a runtime update's step is the caller's to show.
+      case "host.update_notice":
+      // omo#13037: a delivery consumer answers what it is handed and asked itself.
+      case "delivery.inbound":
+      case "delivery.holds":
+      case "delivery.wake":
         return;
       default:
         return assertNever(event);
@@ -153,6 +173,7 @@ export class EventAssembler {
           attach,
           attach_id: open.position.attach_id,
           records,
+          seqs: [open.position.seq],
         });
       }
       case "entry": {

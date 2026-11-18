@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test"
 import type { DesktopSyncOperation } from "@oh-my-opencode/memory-core/sync-engine"
 import { disposeSyncRpcFixtures, owner, setup } from "./sync-rpc-test-support"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 afterEach(disposeSyncRpcFixtures)
 
@@ -20,16 +21,28 @@ async function fixture(genesis: "supported" | "unsupported") {
   const supported = genesis === "supported"
   const base = f.account.forOperation
   Object.assign(f.account, {
-    descriptor: { ...f.account.descriptor, genesis, rpId: supported ? "sync.example" : null, userName: supported ? "person" : null },
-    forOperation: async (authority: Parameters<typeof base>[0]) => ({ ...await base(authority), genesis: bridge }),
+    descriptor: {
+      ...f.account.descriptor,
+      genesis,
+      rpId: supported ? "sync.example" : null,
+      userName: supported ? "person" : null,
+    },
+    forOperation: async (authority: Parameters<typeof base>[0]) => ({ ...(await base(authority)), genesis: bridge }),
   })
   const seen: EnableInput[] = []
   const called = Promise.withResolvers<void>()
-  f.runtime.enableSync = async (input) => { seen.push(input); called.resolve(); return { kind: "needs_first_device" } }
-  const enabled = () => Promise.race([
-    called.promise,
-    Bun.sleep(10_000).then(() => { throw new Error("waited 10s for enableSync, never called") }),
-  ])
+  f.runtime.enableSync = async (input) => {
+    seen.push(input)
+    called.resolve()
+    return { kind: "method_required", methods: [] }
+  }
+  const enabled = () =>
+    Promise.race([
+      called.promise,
+      Bun.sleep(remainingTestTime()).then(() => {
+        throw new Error("waited out the test budget for enableSync, never called")
+      }),
+    ])
   return { f, bridge, seen, enabled }
 }
 
@@ -38,7 +51,7 @@ test("#given forged enable fields #when enable is called #then the request is re
 
   const result = await f.call("enable", owner("a").context, forgedRequest)
 
-  expect(result).toEqual({ kind: "refused", reason: "This request takes no parameters." })
+  expect(result).toEqual({ kind: "refused", reason: "Invalid enable request." })
   expect(seen).toEqual([])
   expect(f.counts().begins).toBe(0)
 })

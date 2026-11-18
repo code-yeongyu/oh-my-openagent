@@ -50,7 +50,10 @@ describe("rollup into D1 and the public stats", () => {
   test("GitHub redirects never add to the uncounted total and adjustments subtract QA installs", async () => {
     const { db, sqlite } = sqliteD1(migration)
     const h = harness(db)
-    await runDownloadsRollup(h.ctx.env, (async () => Response.json({ data: [row("r2", 6), row("github", 40), row("r2", 9, "2026-09-29", "engine")] })) as unknown as typeof fetch)
+    await runDownloadsRollup(h.ctx.env, (async () =>
+      Response.json({
+        data: [row("r2", 6), row("github", 40), row("r2", 9, "2026-09-29", "engine")],
+      })) as unknown as typeof fetch)
     sqlite.run("INSERT INTO download_adjustments (delta, reason) VALUES (-4, 'qa installs')")
     const stats = await readDownloadStats(db)
     expect(stats.servedFromMirror).toBe(6)
@@ -63,7 +66,8 @@ describe("rollup into D1 and the public stats", () => {
   test("a failed Analytics Engine call leaves the stored counts untouched", async () => {
     const { db } = sqliteD1(migration)
     const h = harness(db)
-    await runDownloadsRollup(h.ctx.env, (async () => Response.json({ data: [row("r2", 7)] })) as unknown as typeof fetch)
+    await runDownloadsRollup(h.ctx.env, (async () =>
+      Response.json({ data: [row("r2", 7)] })) as unknown as typeof fetch)
     const failing = (async () => new Response("denied", { status: 403 })) as unknown as typeof fetch
     await expect(runDownloadsRollup(h.ctx.env, failing)).rejects.toThrow("Analytics Engine SQL returned 403")
     expect((await readDownloadStats(db)).servedFromMirror).toBe(7)
@@ -74,9 +78,12 @@ describe("the rollup's first day (account move, 2026-10-09)", () => {
   test("rows before ROLLUP_FIRST_DAY are never written, so a day completed by the backfill keeps its count", async () => {
     const { db, sqlite } = sqliteD1(migration)
     const h = harness(db)
-    sqlite.run("INSERT INTO downloads_daily (day, kind, source, version, asset, count) VALUES ('2026-10-09', 'binary', 'r2', '5.1.1', 'omo-linux-x64', 500)")
+    sqlite.run(
+      "INSERT INTO downloads_daily (day, kind, source, version, asset, count) VALUES ('2026-10-09', 'binary', 'r2', '5.1.1', 'omo-linux-x64', 500)",
+    )
     const env = { ...h.ctx.env, ROLLUP_FIRST_DAY: "2026-10-10" }
-    const written = await runDownloadsRollup(env, (async () => Response.json({ data: [row("r2", 30, "2026-10-09"), row("r2", 12, "2026-10-10")] })) as unknown as typeof fetch)
+    const written = await runDownloadsRollup(env, (async () =>
+      Response.json({ data: [row("r2", 30, "2026-10-09"), row("r2", 12, "2026-10-10")] })) as unknown as typeof fetch)
     expect(written).toBe(1)
     const rows = sqlite.query("SELECT day, count FROM downloads_daily ORDER BY day").all()
     expect(rows).toEqual([
@@ -99,7 +106,9 @@ describe("the rollup's first day (account move, 2026-10-09)", () => {
       queried = true
       return Response.json({ data: [] })
     }) as unknown as typeof fetch
-    await expect(runDownloadsRollup({ ...h.ctx.env, ROLLUP_FIRST_DAY: "10/10/2026" }, fetcher)).rejects.toThrow("ROLLUP_FIRST_DAY")
+    await expect(runDownloadsRollup({ ...h.ctx.env, ROLLUP_FIRST_DAY: "10/10/2026" }, fetcher)).rejects.toThrow(
+      "ROLLUP_FIRST_DAY",
+    )
     expect(queried).toBe(false)
   })
 

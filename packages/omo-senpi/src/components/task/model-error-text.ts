@@ -54,12 +54,14 @@ export function chainUnavailableText(
   unlistedModel: string | undefined,
 ): string {
   const models = chain.length === 0 ? "none" : chainEntriesText(chain)
-  const reason = missingProviders.length === 0
-    ? "its chain's providers are connected but none of them lists these model ids"
-    : `its chain needs providers this machine has not connected (${missingProviders.join(", ")})`
-  const fix = missingProviders.length === 0
-    ? `set ${chainFixKey(target)} in Settings to a model you already run`
-    : `connect one of those providers, or set ${chainFixKey(target)} in Settings to a model you already run`
+  const reason =
+    missingProviders.length === 0
+      ? "its chain's providers are connected but none of them lists these model ids"
+      : `its chain needs providers this machine has not connected (${missingProviders.join(", ")})`
+  const fix =
+    missingProviders.length === 0
+      ? `set ${chainFixKey(target)} in Settings to a model you already run`
+      : `connect one of those providers, or set ${chainFixKey(target)} in Settings to a model you already run`
   return `${targetKind(target)} "${targetName(target)}" has no usable model: ${reason}. Chain, in order: ${models}.${unlistedOptInText(unlistedModel, target)} Fix: ${fix}. No child was spawned.`
 }
 
@@ -95,7 +97,12 @@ export function categoryModelFailureText(
   const category = canonicalCategory ?? error.category
   if (category === undefined) return undefined
   if (error.attempted_chain !== undefined) {
-    return chainUnavailableText({ category }, error.attempted_chain, error.missing_providers ?? [], error.unlisted_provider_model)
+    return chainUnavailableText(
+      { category },
+      error.attempted_chain,
+      error.missing_providers ?? [],
+      error.unlisted_provider_model,
+    )
   }
   // A pin can be written either way the schema allows: a scalar model or a models list.
   const pin = firstConfiguredPin(omoConfig.categories?.[category])
@@ -108,7 +115,9 @@ type ModelPinConfig = {
 }
 
 // Which field held the pin matters to the reader: the fix names that field, not one they never wrote.
-function firstConfiguredPin(config: ModelPinConfig | undefined): { readonly model: string; readonly key: "model" | "models" } | undefined {
+function firstConfiguredPin(
+  config: ModelPinConfig | undefined,
+): { readonly model: string; readonly key: "model" | "models" } | undefined {
   if (config?.model !== undefined) return { model: config.model, key: "model" }
   const entry = config?.models?.[0]
   if (entry === undefined) return undefined

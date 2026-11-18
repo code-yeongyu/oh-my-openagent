@@ -11,18 +11,30 @@ import type { MemorySyncSelection } from "./hostSelection"
 const reason = z.enum(["private_channel_unavailable", "port_absent", "selection_failed", "host_bootstrap_absent"])
 const HostToWorker = z.union([
   z.strictObject({ kind: z.literal("outcome"), outcome: z.union([z.literal("cli"), z.literal("desktop"), reason]) }),
-  z.strictObject({ kind: z.literal("reply"), id: z.number().int().positive(), ok: z.boolean(), value: z.unknown().optional() }),
+  z.strictObject({
+    kind: z.literal("reply"),
+    id: z.number().int().positive(),
+    ok: z.boolean(),
+    value: z.unknown().optional(),
+  }),
   z.strictObject({ kind: z.literal("event"), event: DesktopSyncEvent }),
   z.strictObject({ kind: z.literal("retired") }),
 ])
-const WorkerToHost = z.strictObject({ kind: z.literal("request"), id: z.number().int().positive(), request: DesktopSyncRequest })
+const WorkerToHost = z.strictObject({
+  kind: z.literal("request"),
+  id: z.number().int().positive(),
+  request: DesktopSyncRequest,
+})
 type HostToWorker = z.infer<typeof HostToWorker>
 
 /** Host side of one Worker port: every port hears the settled outcome; a desktop outcome also serves its requests. */
 export function serveWorkerPort(selection: Promise<MemorySyncSelection>, port: MessagePort, closed: AbortSignal): void {
-  void selection.then(settled => {
+  void selection.then((settled) => {
     if (closed.aborted) return
-    port.postMessage({ kind: "outcome", outcome: settled.kind === "unavailable" ? settled.reason : settled.kind } satisfies HostToWorker)
+    port.postMessage({
+      kind: "outcome",
+      outcome: settled.kind === "unavailable" ? settled.reason : settled.kind,
+    } satisfies HostToWorker)
     if (settled.kind === "desktop") serveDesktopWorker(settled.channel, port, closed)
   })
 }
@@ -31,18 +43,35 @@ export function serveWorkerPort(selection: Promise<MemorySyncSelection>, port: M
 function serveDesktopWorker(channel: DesktopSyncEngineWire, port: MessagePort, closed: AbortSignal): void {
   if (closed.aborted) return
   const owned = new Set<string>()
-  const post = (message: HostToWorker) => { if (!closed.aborted) port.postMessage(message) }
-  const stopEvents = channel.onEvent(event => {
-    if (event.event !== "retired" && owned.has(event.handle)) post({ kind: "event", event })
-  })
-  closed.addEventListener("abort", () => {
-    stopEvents()
-    for (const handle of owned) {
-      void channel.request({ op: "operationCancel", handle })
-        .finally(() => channel.request({ op: "operationEnd", handle })).catch(() => undefined)
+  // Counts main's `retired` events: a handle begun before one belongs to an account that has ended.
+  let accounts = 0
+  const post = (message: HostToWorker) => {
+    if (!closed.aborted) port.postMessage(message)
+  }
+  const stopEvents = channel.onEvent((event) => {
+    if (event.event !== "retired") {
+      if (owned.has(event.handle)) post({ kind: "event", event })
+      return
     }
+    // Main's account retired, not the channel (#13325): every Worker's account on it ends, and its handles with it.
+    accounts += 1
     owned.clear()
-  }, { once: true })
+    post({ kind: "event", event })
+  })
+  closed.addEventListener(
+    "abort",
+    () => {
+      stopEvents()
+      for (const handle of owned) {
+        void channel
+          .request({ op: "operationCancel", handle })
+          .finally(() => channel.request({ op: "operationEnd", handle }))
+          .catch(() => undefined)
+      }
+      owned.clear()
+    },
+    { once: true },
+  )
   if (channel.signal.aborted) post({ kind: "retired" })
   else channel.signal.addEventListener("abort", () => post({ kind: "retired" }), { once: true })
   port.on("message", (raw: unknown) => {
@@ -54,9 +83,17 @@ function serveDesktopWorker(channel: DesktopSyncEngineWire, port: MessagePort, c
       return
     }
     void (async () => {
+      const account = accounts
       try {
         const value = await channel.request(request)
-        if (request.op === "operationBegin") owned.add(decodeSyncHandle(value).handle)
+        if (request.op === "operationBegin") {
+          // Its reply crossed main's retirement: the handle died with the old account, so it is never owned.
+          if (account !== accounts) {
+            post({ kind: "reply", id, ok: false })
+            return
+          }
+          owned.add(decodeSyncHandle(value).handle)
+        }
         if (request.op === "operationEnd") owned.delete(request.handle)
         post({ kind: "reply", id, ok: true, value })
       } catch {
@@ -97,7 +134,7 @@ export function workerMemorySyncSource(value: unknown): Promise<MemorySyncSelect
     },
     close: retire,
   }
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     let answered = false
     port.on("close", () => {
       retire()

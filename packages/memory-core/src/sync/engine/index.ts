@@ -1,12 +1,26 @@
 export { createHttpTransport, SyncHttpError, type HttpTransportOptions } from "./adapters/http-transport"
-export { type EngineStatus, type SyncFailure, type SyncFailureKind, SyncEngine } from "./engine"
+export { type EngineStatus, type Failing, type SyncFailure, type SyncFailureKind, SyncEngine } from "./engine"
+export type { SyncFailureCause, SyncStage } from "./failure-cause"
 // The sync sidecar re-exports the Loro loader so a packaged install can prove the wasm beside it loads.
 export { loadLoroRuntime } from "../../crdt/loro-runtime"
 export { caseFold } from "../item/casefold"
 export type { RevocationView } from "../account/revocation-view"
-export { type AccountSessionIdle, type AccountSessionOptions, type AccountSessionOutcome, openAccountSession } from "../account/session"
+export {
+  type AccountSessionIdle,
+  type AccountSessionOptions,
+  type AccountSessionOutcome,
+  openAccountSession,
+} from "../account/session"
 export { type ApproveOutcome, approveDevice } from "../account/approve"
-export { type EnableOutcome, enableSync } from "../account/enable"
+export { type EnableMethod, type EnableOutcome, enableSync } from "../account/enable"
+export {
+  acknowledgePhraseVoid,
+  type AcknowledgeInput,
+  phraseNoticeStatus,
+  type PhraseNoticeStatus,
+  verifiedPhraseNoticeStatus,
+  type PhraseVoidNotice,
+} from "../account/phrase-notice"
 export { type CeremonyClock, type JoinOutcome, joinAccount } from "../account/join"
 export type { AccountHttp } from "../account/http"
 export type { PairingHttp } from "../account/pairing-http"
@@ -14,7 +28,15 @@ export type { SyncOperationAuthority, SyncOperationOptions } from "../operation-
 export { type DeviceSync, openDeviceSync, type OpenDeviceSyncOptions, type SyncSession } from "./open"
 export type { RefusalCode, Sealer, Transport, Verifier } from "./ports"
 export { deviceKeyringFromMaterial } from "../account/device-keyring"
-export type { DesktopSyncDescriptor, SyncDevice, DesktopSyncOperation, DesktopSyncAccount } from "../account/source-types"
+export type {
+  DesktopSyncDescriptor,
+  SyncDevice,
+  DesktopSyncOperation,
+  DesktopSyncAccount,
+} from "../account/source-types"
 export type { GenesisBridge, GenesisBridgeResult } from "../genesis/bridge.ts"
+export type { PhraseGate, PhraseGateRefusal, ServiceFloor } from "../genesis/phrase-gate.ts"
+export { readServiceFloor } from "../genesis/phrase-gate.ts"
+export { SYNC_CAPABILITIES, SYNC_CONTRACT_VERSION } from "../contract-version.ts"
 export type { DeviceKeyMaterial } from "../keyring-port"
-export { GitSpaceConfig, listRemotes, resolveSpace } from "../space/space"
+export { GitSpaceConfig, listRemotes, repoHasCommit, resolveSpace } from "../space/space"

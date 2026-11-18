@@ -8,9 +8,9 @@ import {
   estimateQuickCost,
 } from "./fork-cost"
 
-const KIMI = { input: 0.60, cacheRead: 0.15, output: 2.50 }
-const LUNA = { input: 0.25, cacheRead: 0.025, output: 2.00 }
-const OPUS = { input: 5.00, cacheRead: 0.50, output: 25.0 }
+const KIMI = { input: 0.6, cacheRead: 0.15, output: 2.5 }
+const LUNA = { input: 0.25, cacheRead: 0.025, output: 2.0 }
+const OPUS = { input: 5.0, cacheRead: 0.5, output: 25.0 }
 
 const MEASURED_REFLECTION_COST = 0.26042
 const PARENT_P50 = 156_872
@@ -20,9 +20,27 @@ describe("estimateForkCost", () => {
   describe("#given a cached prefix that is re-billed every turn", () => {
     test("#when turn count rises #then cost rises roughly linearly", () => {
       // when
-      const one = estimateForkCost({ pricing: KIMI, parentContextTokens: PARENT_P50, turns: 1, outputTokens: 6996, cacheHit: true })
-      const five = estimateForkCost({ pricing: KIMI, parentContextTokens: PARENT_P50, turns: 5, outputTokens: 6996, cacheHit: true })
-      const twentyOne = estimateForkCost({ pricing: KIMI, parentContextTokens: PARENT_P50, turns: 21, outputTokens: 6996, cacheHit: true })
+      const one = estimateForkCost({
+        pricing: KIMI,
+        parentContextTokens: PARENT_P50,
+        turns: 1,
+        outputTokens: 6996,
+        cacheHit: true,
+      })
+      const five = estimateForkCost({
+        pricing: KIMI,
+        parentContextTokens: PARENT_P50,
+        turns: 5,
+        outputTokens: 6996,
+        cacheHit: true,
+      })
+      const twentyOne = estimateForkCost({
+        pricing: KIMI,
+        parentContextTokens: PARENT_P50,
+        turns: 21,
+        outputTokens: 6996,
+        cacheHit: true,
+      })
 
       // then
       expect(one / MEASURED_REFLECTION_COST).toBeCloseTo(0.17, 1)
@@ -33,8 +51,20 @@ describe("estimateForkCost", () => {
 
     test("#when the cache misses #then the first turn pays full input price and costs more", () => {
       // when
-      const hit = estimateForkCost({ pricing: KIMI, parentContextTokens: PARENT_P50, turns: 21, outputTokens: 6996, cacheHit: true })
-      const miss = estimateForkCost({ pricing: KIMI, parentContextTokens: PARENT_P50, turns: 21, outputTokens: 6996, cacheHit: false })
+      const hit = estimateForkCost({
+        pricing: KIMI,
+        parentContextTokens: PARENT_P50,
+        turns: 21,
+        outputTokens: 6996,
+        cacheHit: true,
+      })
+      const miss = estimateForkCost({
+        pricing: KIMI,
+        parentContextTokens: PARENT_P50,
+        turns: 21,
+        outputTokens: 6996,
+        cacheHit: false,
+      })
 
       // then
       expect(miss).toBeGreaterThan(hit)
@@ -42,8 +72,20 @@ describe("estimateForkCost", () => {
 
     test("#when the parent context grows #then fork gets more expensive", () => {
       // when / then
-      const p50 = estimateForkCost({ pricing: KIMI, parentContextTokens: PARENT_P50, turns: 21, outputTokens: 6996, cacheHit: true })
-      const p90 = estimateForkCost({ pricing: KIMI, parentContextTokens: PARENT_P90, turns: 21, outputTokens: 6996, cacheHit: true })
+      const p50 = estimateForkCost({
+        pricing: KIMI,
+        parentContextTokens: PARENT_P50,
+        turns: 21,
+        outputTokens: 6996,
+        cacheHit: true,
+      })
+      const p90 = estimateForkCost({
+        pricing: KIMI,
+        parentContextTokens: PARENT_P90,
+        turns: 21,
+        outputTokens: 6996,
+        cacheHit: true,
+      })
       expect(p90).toBeGreaterThan(p50 * 1.5)
     })
   })

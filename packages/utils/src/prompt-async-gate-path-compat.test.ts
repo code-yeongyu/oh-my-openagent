@@ -2,10 +2,7 @@
 
 import { afterEach, describe, expect, mock, test } from "bun:test"
 
-import {
-  dispatchInternalPrompt,
-  releaseAllPromptAsyncReservationsForTesting,
-} from "./prompt-async-gate"
+import { dispatchInternalPrompt, releaseAllPromptAsyncReservationsForTesting } from "./prompt-async-gate"
 
 type CompatPromptInput = {
   readonly path: { readonly id: string } | string
@@ -55,10 +52,7 @@ describe("dispatchInternalPrompt path compatibility", () => {
 
     // then
     expect(result.status).toBe("dispatched")
-    expect(calls.map((call) => call.path)).toEqual([
-      { id: "ses_sync_path_compat" },
-      "ses_sync_path_compat",
-    ])
+    expect(calls.map((call) => call.path)).toEqual([{ id: "ses_sync_path_compat" }, "ses_sync_path_compat"])
   })
 
   test("#given async prompt rejects object-form session path #when dispatching #then it retries with string-form path", async () => {
@@ -84,10 +78,7 @@ describe("dispatchInternalPrompt path compatibility", () => {
 
     // then
     expect(result.status).toBe("dispatched")
-    expect(calls.map((call) => call.path)).toEqual([
-      { id: "ses_async_path_compat" },
-      "ses_async_path_compat",
-    ])
+    expect(calls.map((call) => call.path)).toEqual([{ id: "ses_async_path_compat" }, "ses_async_path_compat"])
   })
 
   test("#given prompt rejects with 'got undefined' error #when dispatching #then it retries with string-form path", async () => {

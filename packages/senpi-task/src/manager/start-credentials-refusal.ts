@@ -4,7 +4,8 @@ import { classifyStartCause, type StartCause } from "./start-failure-cause"
 
 /** The start refusal that says the child's provider cannot authenticate (#10806), or undefined for any other failure. */
 export function startCredentialsRefusal(error: unknown): StartCause | undefined {
-  if (!RunnerError.is(error) || error.failure.kind !== "child-prompt-failed" || error.failure.reason !== undefined) return undefined
+  if (!RunnerError.is(error) || error.failure.kind !== "child-prompt-failed" || error.failure.reason !== undefined)
+    return undefined
   const cause = classifyStartCause(error.failure.cause)
   return cause?.cause_class === "credentials_missing" ? cause : undefined
 }

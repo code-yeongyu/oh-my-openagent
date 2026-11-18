@@ -107,7 +107,8 @@ describe("captureItem", () => {
     expect(updateB).not.toBeNull()
     if (updateB !== null) docA.import(updateB)
 
-    expect(renderItem(docA)).toBe("---\ndescription: d\n---\nalpha FIRST beta gamma LAST\n")
+    // A's FIRST survives; the two edits of one line merge as whole lines, never spliced (#12279).
+    expect(renderItem(docA)).toBe("---\ndescription: d\n---\nalpha FIRST beta gamma\nalpha beta gamma LAST\n")
     docA.free()
     docB.free()
   })

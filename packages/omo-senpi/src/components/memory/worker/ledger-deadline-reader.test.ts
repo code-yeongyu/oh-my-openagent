@@ -26,7 +26,7 @@ describe("parent completion deadline from the run ledger", () => {
   })
 
   test("#given a torn ledger #when read #then it does not throw", () => {
-    const read = createLedgerDeadlineReader("/run", 5, () => "{\"queued\": fal")
+    const read = createLedgerDeadlineReader("/run", 5, () => '{"queued": fal')
     expect(() => read()).not.toThrow()
   })
 })

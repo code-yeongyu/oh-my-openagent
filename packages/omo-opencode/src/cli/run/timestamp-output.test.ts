@@ -20,14 +20,11 @@ interface MockWriteStream {
 function createMockWriteStream(): MockWriteStream {
   const writes: string[] = []
 
-  const write: MockWriteStream["write"] = (
-    chunk,
-    encodingOrCallback,
-    callback,
-  ) => {
-    const text = typeof chunk === "string"
-      ? chunk
-      : Buffer.from(chunk).toString(typeof encodingOrCallback === "string" ? encodingOrCallback : undefined)
+  const write: MockWriteStream["write"] = (chunk, encodingOrCallback, callback) => {
+    const text =
+      typeof chunk === "string"
+        ? chunk
+        : Buffer.from(chunk).toString(typeof encodingOrCallback === "string" ? encodingOrCallback : undefined)
 
     writes.push(text)
 

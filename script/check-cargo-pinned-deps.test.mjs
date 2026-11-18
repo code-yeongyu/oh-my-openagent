@@ -30,7 +30,9 @@ describe("Cargo dependency pinning", () => {
       'version = "1.0.0"',
     ].join("\n")
     expect(unpinnedCargoDependencies(manifest, "Cargo.toml").map((problem) => problem.split(" ")[2])).toEqual([
-      "zbus", "png", "ashpd",
+      "zbus",
+      "png",
+      "ashpd",
     ])
   })
 })

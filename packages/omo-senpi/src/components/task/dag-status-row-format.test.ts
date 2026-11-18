@@ -28,7 +28,10 @@ function snapshot(overrides: Partial<DagStatusRunSnapshot> & { runId: string }):
   }
 }
 
-function rows(overrides: Partial<DagStatusRunSnapshot> & { runId: string }, options?: Parameters<typeof runRows>[2]): string[] {
+function rows(
+  overrides: Partial<DagStatusRunSnapshot> & { runId: string },
+  options?: Parameters<typeof runRows>[2],
+): string[] {
   return runRows(snapshot(overrides), undefined, options)
 }
 
@@ -59,7 +62,9 @@ describe("runRows node selection", () => {
   it("#given more running nodes than the whole row budget #when rendering #then running rows are exempt from the cap", () => {
     // given thirteen running nodes plus two completed ones
     const nodes = [
-      ...Array.from({ length: 13 }, (_, index) => node({ id: `r${index + 1}`, state: "running", startedAt: iso(-15_000) })),
+      ...Array.from({ length: 13 }, (_, index) =>
+        node({ id: `r${index + 1}`, state: "running", startedAt: iso(-15_000) }),
+      ),
       node({ id: "c14", state: "completed", startedAt: iso(-60_000), completedAt: iso(-30_000) }),
       node({ id: "c15", state: "completed", startedAt: iso(-60_000), completedAt: iso(-30_000) }),
     ]
@@ -292,7 +297,6 @@ describe("runRows activity semantics", () => {
     expect(rendered[1]).toContain("1m")
   })
 })
-
 
 // The pending phase is where users decide the DAG is frozen: a node that has not started yet must
 // still prove the run is alive. These three cases pin that liveness contract.

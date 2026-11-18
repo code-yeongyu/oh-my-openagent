@@ -1,4 +1,9 @@
-import { getPlanProgress, normalizeSessionId, readBoulderState, resolveBoulderPlanPath } from "../../features/boulder-state"
+import {
+  getPlanProgress,
+  normalizeSessionId,
+  readBoulderState,
+  resolveBoulderPlanPath,
+} from "../../features/boulder-state"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import {
   getActiveContinuationMarkerReason,
@@ -52,7 +57,9 @@ async function hasActiveBoulderContinuation(
   if (!client) return false
 
   const normalizedSessionID = normalizeSessionId(sessionID)
-  const normalizedTrackedSessionIDs = boulder.session_ids.map((trackedSessionID) => normalizeSessionId(trackedSessionID))
+  const normalizedTrackedSessionIDs = boulder.session_ids.map((trackedSessionID) =>
+    normalizeSessionId(trackedSessionID),
+  )
   if (!normalizedTrackedSessionIDs.includes(normalizedSessionID)) {
     return false
   }
@@ -62,8 +69,9 @@ async function hasActiveBoulderContinuation(
     return true
   }
 
-  const trackedAncestorSessionIDs = normalizedTrackedSessionIDs
-    .filter((trackedSessionID) => trackedSessionID !== normalizedSessionID)
+  const trackedAncestorSessionIDs = normalizedTrackedSessionIDs.filter(
+    (trackedSessionID) => trackedSessionID !== normalizedSessionID,
+  )
   if (trackedAncestorSessionIDs.length === 0) {
     return true
   }
@@ -73,8 +81,7 @@ async function hasActiveBoulderContinuation(
     return false
   }
 
-  const sessionAgent = await getLastAgentFromSession(sessionID, client)
-    ?? getSessionAgent(sessionID)
+  const sessionAgent = (await getLastAgentFromSession(sessionID, client)) ?? getSessionAgent(sessionID)
   if (!sessionAgent) {
     return false
   }
@@ -82,8 +89,8 @@ async function hasActiveBoulderContinuation(
   const requiredAgentKey = getAgentConfigKey(boulder.agent ?? "atlas")
   const sessionAgentKey = getAgentConfigKey(sessionAgent)
   if (
-    sessionAgentKey !== requiredAgentKey
-    && !(requiredAgentKey === getAgentConfigKey("atlas") && sessionAgentKey === getAgentConfigKey("sisyphus"))
+    sessionAgentKey !== requiredAgentKey &&
+    !(requiredAgentKey === getAgentConfigKey("atlas") && sessionAgentKey === getAgentConfigKey("sisyphus"))
   ) {
     return false
   }

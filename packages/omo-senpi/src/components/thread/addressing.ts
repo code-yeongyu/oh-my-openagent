@@ -23,6 +23,7 @@
  */
 
 import { execFileSync } from "node:child_process"
+import type { RemoteSessionRow } from "./remote/ports"
 import { realpathSync } from "node:fs"
 import { basename } from "node:path"
 
@@ -31,7 +32,20 @@ import { threadToolFailure, type ThreadErrorCode } from "./errors"
 
 // A thread as the addressing layer sees it: the shared summary plus the
 // optional last-message preview the discovery layer may already have loaded.
-export type ThreadAddressEntry = ThreadSummary & { readonly preview?: string }
+export type ThreadAddressEntry = ThreadSummary & {
+  readonly preview?: string
+  /** The account device holding the thread when it is not this one (decision 0027: one address book across transports). */
+  readonly device?: string
+  /** Account aliases this thread holds (the registry answered them for the address being resolved). */
+  readonly aliases?: readonly string[]
+  /**
+   * Ephemeral session ids that name this same thread: the host routing id (`rpc-N`, a short engine session id)
+   * or another device's listing key, when it differs from `thread_id`. Addressing one resolves to `thread_id`.
+   */
+  readonly session_ids?: readonly string[]
+  /** How a send reaches the thread when it is not local: the relay transport and the listing row it dispatches to. */
+  readonly transport?: { readonly kind: "relay"; readonly row: RemoteSessionRow }
+}
 
 /** The candidate payload every ambiguity error carries (up to ten). */
 export type ThreadCandidate = {
@@ -41,10 +55,12 @@ export type ThreadCandidate = {
   readonly preview: string
   readonly updatedAt: string | null
   readonly state: ThreadStatus
+  /** The account device that holds it, when the candidates span devices (a name matched across the account). */
+  readonly device?: string
 }
 
 /** How a resolveTarget hit was found. */
-export type ThreadTargetResolution = "id" | "name"
+export type ThreadTargetResolution = "id" | "alias" | "name"
 
 /** Which fuzzy signal produced the accepted score. */
 export type ThreadFuzzyBasis = "name" | "preview" | "cwd"
@@ -70,12 +86,17 @@ export type ThreadResolveResult =
   | ThreadAddressError
 
 export type ThreadFuzzyResult =
-  | { readonly kind: "ok"; readonly entry: ThreadAddressEntry; readonly score: number; readonly basis: ThreadFuzzyBasis }
+  | {
+      readonly kind: "ok"
+      readonly entry: ThreadAddressEntry
+      readonly score: number
+      readonly basis: ThreadFuzzyBasis
+    }
   | ThreadAddressError
 
 export type ThreadNameConflictResult = { readonly kind: "ok" } | ThreadAddressError
 
-const AMBIGUOUS_CANDIDATE_LIMIT = 10
+export const AMBIGUOUS_CANDIDATE_LIMIT = 10
 const FUZZY_MIN_QUERY_LENGTH = 3
 const FUZZY_MAX_CANDIDATES = 500
 const FUZZY_PREVIEW_WEIGHT = 0.85
@@ -94,25 +115,43 @@ const UNFOLDABLE_CONTROLS = /[\u0000-\u0008\u000e-\u001f\u007f]/
  * composed and a decomposed spelling of the same name are one name.
  */
 export function normalizeThreadName(value: string): string {
-  return value
-    .normalize("NFKC")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ")
+  return value.normalize("NFKC").trim().toLowerCase().replace(/\s+/g, " ")
 }
 
-type Guarded = { readonly ok: true; readonly normalized: string } | { readonly ok: false; readonly error: ThreadAddressError }
+type Guarded =
+  { readonly ok: true; readonly normalized: string } | { readonly ok: false; readonly error: ThreadAddressError }
 
 function guardInput(value: string, what: string): Guarded {
   if (typeof value !== "string") {
-    return { ok: false, error: addressError("invalid_arguments", `The ${what} must be a string.`, `Pass a thread_id or a unique name from thread_list as the ${what}.`) }
+    return {
+      ok: false,
+      error: addressError(
+        "invalid_arguments",
+        `The ${what} must be a string.`,
+        `Pass a thread_id or a unique name from thread_list as the ${what}.`,
+      ),
+    }
   }
   if (UNFOLDABLE_CONTROLS.test(value)) {
-    return { ok: false, error: addressError("invalid_arguments", `The ${what} contains control characters.`, `Remove the control characters and retry, or pass an address from thread_list.`) }
+    return {
+      ok: false,
+      error: addressError(
+        "invalid_arguments",
+        `The ${what} contains control characters.`,
+        `Remove the control characters and retry, or pass an address from thread_list.`,
+      ),
+    }
   }
   const normalized = normalizeThreadName(value)
   if (normalized.length === 0) {
-    return { ok: false, error: addressError("invalid_arguments", `The ${what} is empty.`, `Pass a thread_id or a unique name from thread_list as the ${what}.`) }
+    return {
+      ok: false,
+      error: addressError(
+        "invalid_arguments",
+        `The ${what} is empty.`,
+        `Pass a thread_id or a unique name from thread_list as the ${what}.`,
+      ),
+    }
   }
   return { ok: true, normalized }
 }
@@ -138,15 +177,35 @@ function toCandidate(entry: ThreadAddressEntry): ThreadCandidate {
     preview: entry.preview ?? "",
     updatedAt: entry.updated_at,
     state: entry.status,
+    ...(entry.device === undefined ? {} : { device: entry.device }),
   }
 }
 
 // Most recently updated first, thread_id ascending as the deterministic
 // tiebreak, capped at the candidate limit.
 function toCandidates(matches: readonly ThreadAddressEntry[]): readonly ThreadCandidate[] {
+  // When the candidates span devices, this device's threads say so too, so the caller can tell them apart.
+  const spans = matches.some((entry) => entry.device !== undefined)
   return [...matches]
+    .map((entry) =>
+      spans && entry.device === undefined && entry.transport === undefined ? { ...entry, device: "here" } : entry,
+    )
     .sort((a, b) =>
-      a.updated_at === b.updated_at ? (a.thread_id < b.thread_id ? -1 : 1) : a.updated_at === null ? 1 : b.updated_at === null ? -1 : a.updated_at < b.updated_at ? 1 : -1,
+      (a.transport === undefined) !== (b.transport === undefined)
+        ? a.transport === undefined
+          ? -1
+          : 1
+        : a.updated_at === b.updated_at
+          ? a.thread_id < b.thread_id
+            ? -1
+            : 1
+          : a.updated_at === null
+            ? 1
+            : b.updated_at === null
+              ? -1
+              : a.updated_at < b.updated_at
+                ? 1
+                : -1,
     )
     .slice(0, AMBIGUOUS_CANDIDATE_LIMIT)
     .map(toCandidate)
@@ -212,11 +271,6 @@ export function workspaceDirectories(callerWorkspaceRoot: string): string[] {
 }
 
 /**
- * Resolve a thread address (durable id or unique name) against the entries
- * the daemon knows, restricted to the caller's workspace unless `all_scope`
- * widens it. Errors come back as data, never throws.
- */
-/**
  * The entries that belong to the caller's workspace, judged exactly as the scoped name ladder in
  * `resolveTarget` judges them. Without a caller root nothing is in scope: listing every workspace
  * under a "workspace" label is what `all_scope` exists to make explicit.
@@ -231,6 +285,54 @@ export function workspaceEntries(
   return entries.filter((entry) => sameWorkspace(entry.cwd, callerRoot, rootResolver))
 }
 
+function scopedIdHit(
+  entry: ThreadAddressEntry,
+  opts: ThreadResolveOptions,
+  callerRoot: string,
+  hasCallerRoot: boolean,
+  rootResolver: (dir: string) => string | null,
+): ThreadResolveResult {
+  // A thread on another device belongs to the account, not to a workspace of this device (decision 0027).
+  if (opts.all_scope === true || entry.transport !== undefined) return { kind: "ok", entry, resolution: "id" }
+  if (!hasCallerRoot) {
+    return addressError(
+      "caller_context_missing",
+      "Scoping an id hit needs the caller's workspace root, which this call did not provide.",
+      "Set all_scope to address every workspace, or call thread_list from a session that knows its workspace.",
+    )
+  }
+  if (sameWorkspace(entry.cwd, callerRoot, rootResolver)) return { kind: "ok", entry, resolution: "id" }
+  return addressError(
+    "scope_denied",
+    `Thread ${entry.thread_id} exists outside this workspace.`,
+    "Call thread_list with all_scope to confirm the id, then retry with all_scope set, or target a thread in this workspace.",
+  )
+}
+
+const SESSION_ID_SHAPE = /^(?:rpc-\d+|[A-Za-z0-9_-]{16,})$/
+
+function notFound(target: string, scope: string, visible: readonly ThreadAddressEntry[]): ThreadAddressError {
+  const base = `No visible thread matches "${target}" in ${scope}.`
+  if (!SESSION_ID_SHAPE.test(target)) {
+    return addressError("not_found", base, "Call thread_list and pass the thread_id or a unique name it returned.")
+  }
+  const ids = visible
+    .map((entry) => entry.thread_id)
+    .filter((id) => id.length > 0)
+    .slice(0, 5)
+  const listed = ids.length === 0 ? "" : ` Visible thread_id values: ${ids.join(", ")}.`
+  return addressError(
+    "not_found",
+    `${base} "${target}" is a sessionId, not a thread_id. Pass that row's thread_id (the durable id), or omit thread / pass self for this session.${listed}`,
+    "Call thread_list and pass thread_id, the durable id, not sessionId.",
+  )
+}
+
+/**
+ * Resolve a thread address (durable id, sessionId alias, or unique name) against the entries
+ * the daemon knows, restricted to the caller's workspace unless `all_scope`
+ * widens it. Errors come back as data, never throws.
+ */
 export function resolveTarget(
   entries: readonly ThreadAddressEntry[],
   target: string,
@@ -245,24 +347,39 @@ export function resolveTarget(
 
   // Ladder step 1: the exact durable id wins immediately, across every entry.
   const idHit = entries.find((entry) => entry.thread_id === target)
-  if (idHit !== undefined) {
-    if (opts.all_scope === true) return { kind: "ok", entry: idHit, resolution: "id" }
-    if (!hasCallerRoot) {
+  if (idHit !== undefined) return scopedIdHit(idHit, opts, callerRoot, hasCallerRoot, rootResolver)
+
+  // Ladder step 1b: a sessionId (`rpc-N`, a short engine session id, another device's listing key) is an alias of
+  // the durable thread_id. One live match resolves to that id; two are ambiguous and name the durable ids.
+  const sessionHits = entries.filter((entry) => entry.session_ids?.includes(target) === true)
+  if (sessionHits.length === 1) {
+    const hit = scopedIdHit(sessionHits[0], opts, callerRoot, hasCallerRoot, rootResolver)
+    if (hit.kind === "error" && hit.code === "scope_denied") {
       return addressError(
-        "caller_context_missing",
-        "Scoping an id hit needs the caller's workspace root, which this call did not provide.",
-        "Set all_scope to address every workspace, or call thread_list from a session that knows its workspace.",
+        "scope_denied",
+        `Thread ${sessionHits[0].thread_id} (sessionId "${target}") exists outside this workspace.`,
+        `Call thread_list with all_scope and pass thread_id ${sessionHits[0].thread_id}, or target a thread in this workspace.`,
       )
     }
-    if (sameWorkspace(idHit.cwd, callerRoot, rootResolver)) {
-      return { kind: "ok", entry: idHit, resolution: "id" }
-    }
+    return hit
+  }
+  if (sessionHits.length >= 2) {
+    const ids = sessionHits.map((entry) => entry.thread_id).filter((id) => id.length > 0)
     return addressError(
-      "scope_denied",
-      `Thread ${idHit.thread_id} exists outside this workspace.`,
-      "Call thread_list with all_scope to confirm the id, then retry with all_scope set, or target a thread in this workspace.",
+      "ambiguous_target",
+      `${sessionHits.length} visible threads share the sessionId "${target}". Pass one thread_id: ${ids.join(", ")}.`,
+      "Call thread_list and pass the exact thread_id of the intended thread.",
+      toCandidates(sessionHits),
     )
   }
+
+  // Ladder step 1c (decision 0027): an account alias names one thread account-wide, on any device, never workspace-scoped.
+  const wantedAlias = normalizeThreadName(target)
+  const aliasHit =
+    wantedAlias === ""
+      ? undefined
+      : entries.find((entry) => entry.aliases?.some((alias) => normalizeThreadName(alias) === wantedAlias))
+  if (aliasHit !== undefined) return { kind: "ok", entry: aliasHit, resolution: "alias" }
 
   // Ladder step 2: normalized name match over the visible entries only.
   let visible: readonly ThreadAddressEntry[]
@@ -276,7 +393,10 @@ export function resolveTarget(
         "Set all_scope to address every workspace, or call thread_list from a session that knows its workspace.",
       )
     }
-    visible = entries.filter((entry) => sameWorkspace(entry.cwd, callerRoot, rootResolver))
+    // A thread on another device belongs to the account, not to a workspace of this device: it stays visible (decision 0027).
+    visible = entries.filter(
+      (entry) => entry.transport !== undefined || sameWorkspace(entry.cwd, callerRoot, rootResolver),
+    )
   }
 
   const matches = visible.filter((entry) => normalizeThreadName(entry.name) === guard.normalized)
@@ -289,11 +409,7 @@ export function resolveTarget(
       toCandidates(matches),
     )
   }
-  return addressError(
-    "not_found",
-    `No visible thread matches "${target}" in ${opts.all_scope === true ? "the daemon-wide scope" : "this workspace"}.`,
-    "Call thread_list and pass the thread_id or a unique name it returned.",
-  )
+  return notFound(target, opts.all_scope === true ? "the daemon-wide scope" : "this workspace", visible)
 }
 
 function trigrams(value: string): string[] {
@@ -395,6 +511,19 @@ export function fuzzyMatch(entries: readonly ThreadAddressEntry[], query: string
     )
   }
   return { kind: "ok", entry: leader.entry, score: leader.score, basis: leader.basis }
+}
+
+/**
+ * The entries that can still change a `fuzzyMatch` outcome for `query`. An entry scoring below the accept floor minus the
+ * margin can neither lead nor sit within the margin of an accepted leader, so dropping it changes no accepted match and
+ * no ambiguity verdict. Callers use it to bound a large set (an account's ended history) before the candidate cap
+ * applies. An invalid or too-short query keeps nothing: `fuzzyMatch` reports that query on the rest of the set.
+ */
+export function fuzzyContenders(entries: readonly ThreadAddressEntry[], query: string): ThreadAddressEntry[] {
+  const guard = guardInput(query, "fuzzy query")
+  if (!guard.ok || guard.normalized.length < FUZZY_MIN_QUERY_LENGTH) return []
+  const queryGrams = trigrams(guard.normalized)
+  return entries.filter((entry) => scoreEntry(entry, queryGrams).score >= FUZZY_ACCEPT_SCORE - FUZZY_ACCEPT_MARGIN)
 }
 
 /**

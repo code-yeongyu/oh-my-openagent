@@ -17,9 +17,7 @@ import {
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createMemoryBinding } from "./binding"
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
-import {
-  type MemoryToolExecutionResult,
-} from "./tools"
+import { type MemoryToolExecutionResult } from "./tools"
 
 const exec = promisify(execFile)
 export const IDENTITY = "agent-memory-tools-test"
@@ -37,12 +35,13 @@ async function removeRoot(root: string): Promise<void> {
     // A lingering Windows handle can outlast the bounded retry window. Ignore only that platform's
     // known cleanup races; every other cleanup defect still fails loudly.
     if (
-      process.platform === "win32"
-      && error instanceof Error
-      && "code" in error
-      && typeof error.code === "string"
-      && WINDOWS_CLEANUP_RACE_CODES.has(error.code)
-    ) return
+      process.platform === "win32" &&
+      error instanceof Error &&
+      "code" in error &&
+      typeof error.code === "string" &&
+      WINDOWS_CLEANUP_RACE_CODES.has(error.code)
+    )
+      return
     throw error
   }
 }

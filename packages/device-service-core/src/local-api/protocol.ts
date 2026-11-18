@@ -1,3 +1,4 @@
+// Vendored from sisyphuslabs/omo-relay-daemon@edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6 packages/local-api/src/protocol.ts
 import type {
   Capability,
   ClientName,
@@ -6,19 +7,30 @@ import type {
   PolicyState,
   RefusedReason,
   SessionRowState,
-  StatusState,
   ThisDeviceState,
 } from "./vocabulary.ts";
 
 export * from "./vocabulary.ts";
+export type * from "./protocol-status.ts";
+import type { SignInReason, Status, StatusGet } from "./protocol-status.ts";
 export * from "./protocol-events.ts";
-export type * from "./protocol-delegated.ts";
-import type { SessionCandidate, SessionEndpoints, SessionEndpointsData, SessionLocate } from "./protocol-delegated.ts";
-import type { SessionCommand, SessionCommandPart } from "./protocol-command.ts";
-export type * from "./protocol-command.ts";
 export type * from "./protocol-control.ts";
-
-import type { ControlAttachGet, ControlAttachSet, ControlAttachState } from "./protocol-control.ts";
+export type * from "./protocol-machine.ts";
+export type * from "./protocol-delegated.ts";
+export * from "./protocol-presenter.ts";
+export * from "./protocol-deliveries.ts";
+import type { DeliveriesRequest, DeliveriesResponseData } from "./protocol-deliveries.ts";
+import type { AttachFeatures, ControlRequest, ControlResponseData } from "./protocol-control.ts";
+import type { MachineRequest, MachineResponseData } from "./protocol-machine.ts";
+import type { DelegatedRequest, DelegatedResponseData } from "./protocol-delegated.ts";
+import type {
+  IncompleteDevice,
+  SessionCandidate,
+  SessionCommand,
+  SessionCommandAnswer,
+  SessionCommandPart,
+} from "./protocol-command.ts";
+export type * from "./protocol-command.ts";
 
 // The local API v1 messages (docs/local-api.md). One JSON object per LF-terminated line: the handshake, then
 // requests {id, type, ...} each answered by exactly one response, and pushed events {type: "event", kind, ...}.
@@ -41,16 +53,6 @@ export type Policy = {
   readonly homes_pending: number;
   readonly unacked: readonly { readonly device: string; readonly label: string }[];
 };
-export type Status = {
-  readonly state: StatusState;
-  readonly since_ms: number;
-  readonly detail?: { readonly code: string; readonly action: string | null };
-  readonly device: DeviceRef | null;
-  readonly origin_configured: boolean;
-  readonly enabled: boolean;
-  readonly policy?: Policy;
-};
-
 export type ClientInfo = {
   readonly name: ClientName;
   readonly version: string;
@@ -93,7 +95,6 @@ export type Authenticate = {
   readonly type: "authenticate";
   readonly client_proof: string;
 };
-export type StatusGet = { readonly id: string; readonly type: "status.get" };
 export type StatusSubscribe = { readonly id: string; readonly type: "status.subscribe" };
 export type SetEnabled = {
   readonly id: string;
@@ -110,30 +111,51 @@ export type DeviceAdopt = {
   readonly id: string;
   readonly type: "device.adopt";
   readonly device: DeviceRef;
+  // Design D (r6): the signed-in account. A client sends it only to a service whose welcome.service_version is at or
+  // above the first relayd that accepts it; older services refuse the unknown field.
+  readonly account?: string;
+  // 0.1.31 (#1031): asks for sign_in_reason on a sign_in_required refusal; send it only to a 0.1.31+ service.
+  readonly sign_in_reason?: true;
   readonly signing_private_key: string;
   readonly sealing_private_key: string;
 };
 export type DeviceForget = { readonly id: string; readonly type: "device.forget" };
 export type DeviceInfo = { readonly id: string; readonly type: "device.info" };
-export type EndpointsRegister = {
+// Decision 0019: besides an engine agent dir, a desktop environment server registers its own socket and key root.
+type EnvironmentEndpoint = { readonly kind: "environment"; readonly socket: string };
+export type EndpointsRegister = { readonly id: string; readonly type: "endpoints.register" } & (
+  | { readonly agent_dir: string }
+  | (EnvironmentEndpoint & { readonly key_root: string })
+);
+export type EndpointsUnregister = { readonly id: string; readonly type: "endpoints.unregister" } & (
+  | { readonly agent_dir: string }
+  | EnvironmentEndpoint
+);
+/** #1266: the agent dirs registered with endpoints.register {agent_dir}, the stored list. */
+export type EndpointsList = { readonly id: string; readonly type: "endpoints.list" };
+export type DevicesList = {
   readonly id: string;
-  readonly type: "endpoints.register";
-  readonly agent_dir: string;
+  readonly type: "devices.list";
+  /** #993: true: each row whose peer the roster speaks for (roster v2) carries `managed`; absent, no row does. */
+  readonly managed?: true;
 };
-export type EndpointsUnregister = {
-  readonly id: string;
-  readonly type: "endpoints.unregister";
-  readonly agent_dir: string;
-};
-export type DevicesList = { readonly id: string; readonly type: "devices.list" };
 export type SessionsList = {
   readonly id: string;
   readonly type: "sessions.list";
   readonly filter?: SessionFilter;
-  /** 2: this query's rows may carry `kind`, `parent` and `parent_listed` (#316); absent, they never do. */
-  readonly rows?: 2;
+  /**
+   * 2: this query's rows may carry `kind`, `parent` and `parent_listed` (#316); 3: those and `durable_id` (#935);
+   * 4: those and `model` and `archived` (#1121); 5: those and `settled` and `settled_by`; absent, they never do.
+   */
+  readonly rows?: 2 | 3 | 4 | 5;
 };
-export type SessionAttach = {
+// #1066: opt in, on this connection, to sessions.listing_changed. Send it only to a service at or above the release
+// that ships it (docs/local-api.md); an older service refuses the request type.
+export type SessionsEventsSubscribe = {
+  readonly id: string;
+  readonly type: "sessions.events.subscribe";
+};
+export type SessionAttach = AttachFeatures & {
   readonly id: string;
   readonly type: "session.attach";
   readonly device: string;
@@ -175,8 +197,10 @@ export type LocalRequest =
   | DeviceInfo
   | EndpointsRegister
   | EndpointsUnregister
+  | EndpointsList
   | DevicesList
   | SessionsList
+  | SessionsEventsSubscribe
   | SessionAttach
   | SessionDetach
   | SessionCommand
@@ -184,10 +208,10 @@ export type LocalRequest =
   | SessionRead
   | EnforcementReport
   | ShutdownForUpgrade
-  | SessionEndpoints
-  | SessionLocate
-  | ControlAttachGet
-  | ControlAttachSet;
+  | ControlRequest
+  | DelegatedRequest
+  | MachineRequest
+  | DeliveriesRequest;
 export type RequestType = LocalRequest["type"];
 
 export type DeviceRow = {
@@ -197,6 +221,8 @@ export type DeviceRow = {
   readonly platform: string;
   readonly last_seen_ms: number | null;
   readonly online: boolean;
+  /** #993: only when the request asked (`managed: true`) and the roster is v2: the peer is hosted, not the user's own. */
+  readonly managed?: boolean;
 };
 export type ResponseData = {
   readonly authenticate: Empty;
@@ -209,20 +235,21 @@ export type ResponseData = {
   readonly "device.info": { readonly device: DeviceRef | null };
   readonly "endpoints.register": Empty;
   readonly "endpoints.unregister": Empty;
+  readonly "endpoints.list": { readonly agent_dirs: readonly string[] };
   readonly "devices.list": { readonly devices: readonly DeviceRow[] };
   readonly "sessions.list": { readonly query_id: string };
+  readonly "sessions.events.subscribe": Empty;
   readonly "session.attach": { readonly attach: string };
   readonly "session.detach": Empty;
-  readonly "session.command": { readonly command_id: string };
+  readonly "session.command": SessionCommandAnswer;
   readonly "session.command_part": { readonly received: number };
   readonly "session.read": { readonly query_id: string };
   readonly "enforcement.report": Empty;
   readonly "owner.shutdown_for_upgrade": Empty;
-  readonly "session.endpoints": SessionEndpointsData;
-  readonly "session.locate": SessionCandidate;
-  readonly "control.attach.get": ControlAttachState;
-  readonly "control.attach.set": ControlAttachState;
-};
+} & ControlResponseData &
+  DelegatedResponseData &
+  MachineResponseData &
+  DeliveriesResponseData;
 export type PathRefusal = { readonly component: string; readonly problem: PathRefusalProblem };
 export type ErrorBody = {
   readonly code: ErrorCode;
@@ -230,6 +257,12 @@ export type ErrorBody = {
   readonly action: string | null;
   readonly limit_chars?: number;
   readonly path_refusal?: PathRefusal;
+  /** #1031: on a device.adopt sign_in_required that asked (`sign_in_reason: true`), why sign-in is needed. */
+  readonly sign_in_reason?: SignInReason;
+  /** #393 part B: on session_ambiguous, every row the alias matched. */
+  readonly candidates?: readonly SessionCandidate[];
+  /** #393 part B: on an alias's session_not_found, the devices whose listing was not complete. */
+  readonly incomplete?: readonly IncompleteDevice[];
 };
 export type LocalResponse =
   | { readonly id: string; readonly type: "response"; readonly ok: true; readonly data: JsonObject }

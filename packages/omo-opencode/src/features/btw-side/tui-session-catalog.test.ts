@@ -1,11 +1,7 @@
 import { describe, expect, it, mock } from "bun:test"
 
 import { BTW_SIDE_METADATA_KEY } from "./metadata"
-import {
-  classifyBtwSessionCatalog,
-  loadBtwSessionCatalog,
-  type BtwCatalogSession,
-} from "./tui-session-catalog"
+import { classifyBtwSessionCatalog, loadBtwSessionCatalog, type BtwCatalogSession } from "./tui-session-catalog"
 
 function session(input: {
   id: string
@@ -65,14 +61,8 @@ describe("loadBtwSessionCatalog", () => {
     })
 
     // then
-    expect(listSessions.mock.calls.map(([input]) => input.limit)).toEqual([
-      2,
-      4,
-    ])
-    expect(result.catalog?.sides.map((side) => side.id)).toEqual([
-      "ses_side_1",
-      "ses_side_2",
-    ])
+    expect(listSessions.mock.calls.map(([input]) => input.limit)).toEqual([2, 4])
+    expect(result.catalog?.sides.map((side) => side.id)).toEqual(["ses_side_1", "ses_side_2"])
     expect(result.truncated).toBe(false)
   })
 
@@ -144,10 +134,7 @@ describe("classifyBtwSessionCatalog", () => {
 
     // then
     expect(result?.main.id).toBe("ses_parent")
-    expect(result?.sides.map((side) => side.id)).toEqual([
-      "ses_side_older",
-      "ses_side_newer",
-    ])
+    expect(result?.sides.map((side) => side.id)).toEqual(["ses_side_older", "ses_side_newer"])
   })
 
   it("#given a retained side route #when its catalog is classified #then it resolves the original parent scope", () => {
@@ -171,10 +158,7 @@ describe("classifyBtwSessionCatalog", () => {
 
     // then
     expect(result?.main.id).toBe("ses_parent")
-    expect(result?.sides.map((side) => side.id)).toEqual([
-      "ses_side_1",
-      "ses_side_2",
-    ])
+    expect(result?.sides.map((side) => side.id)).toEqual(["ses_side_1", "ses_side_2"])
   })
 
   it("#given a stale side whose parent row is missing #when classified #then no unsafe navigation catalog is returned", () => {

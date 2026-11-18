@@ -21,8 +21,7 @@ const VERDICT_PATTERN = /\*\*\[(OKAY|REJECT)\]\*\*/
 // Anchored to a token boundary so a plan path is captured whole: an absolute
 // path keeps its leading directories instead of being reduced to the current
 // project's `.omo/plans/...` suffix, and a match cannot start mid-word.
-const PLAN_PATH_PATTERN =
-  /(?:^|[\s"'`(\[=:])([^\s"'`)\]]*?(?:\.omo|\.sisyphus)\/plans\/[^\s"'`)\]]+?\.md)/gm
+const PLAN_PATH_PATTERN = /(?:^|[\s"'`(\[=:])([^\s"'`)\]]*?(?:\.omo|\.sisyphus)\/plans\/[^\s"'`)\]]+?\.md)/gm
 
 export function parseMomusVerdict(outputText: string): MomusReviewVerdict | null {
   const match = VERDICT_PATTERN.exec(outputText)
@@ -73,10 +72,11 @@ function formatModel(value: unknown): string | undefined {
 
 export function readReviewMetadata(metadata: unknown, args?: Record<string, unknown>): ReviewMetadata {
   const record = asRecord(metadata) ?? {}
-  const agent = readString(record, "agent")
-    ?? readString(args ?? {}, "subagent_type")
-    ?? readString(args ?? {}, "agent")
-    ?? readString(record, "requested_subagent_type")
+  const agent =
+    readString(record, "agent") ??
+    readString(args ?? {}, "subagent_type") ??
+    readString(args ?? {}, "agent") ??
+    readString(record, "requested_subagent_type")
   return {
     agent,
     prompt: readString(record, "prompt") ?? readString(args ?? {}, "prompt"),
@@ -118,9 +118,8 @@ export async function resolveSessionReviewContext(
 
     const startedAt = firstUser?.info?.time?.created
     const endedAt = lastAssistant?.info?.time?.completed ?? lastAssistant?.info?.time?.created
-    const durationMs = startedAt !== undefined && endedAt !== undefined && endedAt >= startedAt
-      ? endedAt - startedAt
-      : undefined
+    const durationMs =
+      startedAt !== undefined && endedAt !== undefined && endedAt >= startedAt ? endedAt - startedAt : undefined
 
     const providerID = firstAssistant?.info?.providerID
     const modelID = firstAssistant?.info?.modelID

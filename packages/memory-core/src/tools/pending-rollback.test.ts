@@ -5,7 +5,13 @@ import { existsSync, realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
-import { GitMemoryRepo, inspectStrandedGitLock, unlockStrandedGitLock, type GitCommitAuthor, type UnlockScans } from "../git"
+import {
+  GitMemoryRepo,
+  inspectStrandedGitLock,
+  unlockStrandedGitLock,
+  type GitCommitAuthor,
+  type UnlockScans,
+} from "../git"
 import { PendingRollbackEditsKeptError } from "../git/pending-rollback"
 import { renderMemoryFile } from "../memfs/frontmatter"
 import { runMemoryApplyPatch } from "./memory-apply-patch"
@@ -22,7 +28,9 @@ const AUTHOR: GitCommitAuthor = { agentId: "agent-pending-rollback", authorName:
 const NOBODY: UnlockScans = { findHolders: async () => [], findRepoUsers: async () => [] }
 
 class IndexLockAtCommitRepo extends GitMemoryRepo {
-  override async commitPrepared(...args: Parameters<GitMemoryRepo["commitPrepared"]>): ReturnType<GitMemoryRepo["commitPrepared"]> {
+  override async commitPrepared(
+    ...args: Parameters<GitMemoryRepo["commitPrepared"]>
+  ): ReturnType<GitMemoryRepo["commitPrepared"]> {
     await writeFile(join(this.dir, ".git", "index.lock"), "", "utf8")
     return super.commitPrepared(...args)
   }
@@ -68,7 +76,14 @@ function keptPaths(failure: unknown): readonly string[] | undefined {
   return failure.cause.paths
 }
 
-const CREATE_NEW = { command: "create", reason: "write behind a commit-time lock", file_path: "system/new.md", description: "Fact", file_text: "new fact", author: AUTHOR } as const
+const CREATE_NEW = {
+  command: "create",
+  reason: "write behind a commit-time lock",
+  file_path: "system/new.md",
+  description: "Fact",
+  file_text: "new fact",
+  author: AUTHOR,
+} as const
 
 async function writeOther(repo: GitMemoryRepo): Promise<void> {
   await mkdir(dirname(join(repo.dir, "system/other.md")), { recursive: true })
@@ -84,7 +99,19 @@ describe("a pending rollback after a staged failure (omo #10199)", () => {
     const result = await runMemoryApplyPatch({
       repo,
       lock,
-      params: { reason: "patch after unlock", author: AUTHOR, input: ["*** Begin Patch", "*** Add File: system/other.md", "+---", "+description: Other", "+---", "+other fact", "*** End Patch"].join("\n") },
+      params: {
+        reason: "patch after unlock",
+        author: AUTHOR,
+        input: [
+          "*** Begin Patch",
+          "*** Add File: system/other.md",
+          "+---",
+          "+description: Other",
+          "+---",
+          "+other fact",
+          "*** End Patch",
+        ].join("\n"),
+      },
     })
 
     // #then
@@ -127,7 +154,11 @@ describe("a pending rollback after a staged failure (omo #10199)", () => {
     await writeFile(join(repo.dir, "system", "new.md"), handWritten, "utf8")
 
     // #when
-    const failure = await runMemoryTool({ repo, lock, params: { ...CREATE_NEW, file_path: "system/other.md", reason: "next write" } }).catch((error: unknown) => error)
+    const failure = await runMemoryTool({
+      repo,
+      lock,
+      params: { ...CREATE_NEW, file_path: "system/other.md", reason: "next write" },
+    }).catch((error: unknown) => error)
 
     // #then
     expect(keptPaths(failure)).toEqual(["system/new.md"])
@@ -138,14 +169,25 @@ describe("a pending rollback after a staged failure (omo #10199)", () => {
   it("#given a committed file edited by hand after a failed str_replace #when the next write settles the rollback #then the edit survives unstaged and is reported", async () => {
     // #given
     const repo = await afterStagedFailure(
-      { command: "str_replace", reason: "edit behind a commit-time lock", file_path: "system/facts.md", old_string: "old fact", new_string: "tool fact", author: AUTHOR },
+      {
+        command: "str_replace",
+        reason: "edit behind a commit-time lock",
+        file_path: "system/facts.md",
+        old_string: "old fact",
+        new_string: "tool fact",
+        author: AUTHOR,
+      },
       "system/facts.md",
     )
     const edited = renderMemoryFile({ description: "Seed" }, "hand edit\n")
     await writeFile(join(repo.dir, "system", "facts.md"), edited, "utf8")
 
     // #when
-    const failure = await runMemoryTool({ repo, lock, params: { ...CREATE_NEW, file_path: "system/other.md", reason: "next write" } }).catch((error: unknown) => error)
+    const failure = await runMemoryTool({
+      repo,
+      lock,
+      params: { ...CREATE_NEW, file_path: "system/other.md", reason: "next write" },
+    }).catch((error: unknown) => error)
 
     // #then
     expect(keptPaths(failure)).toEqual(["system/facts.md"])

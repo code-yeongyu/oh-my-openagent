@@ -52,7 +52,8 @@ export class FakeSyncServer {
       upload: async (uploadId, bytes) => {
         const upload = this.uploads.get(uploadId)
         if (upload === undefined) throw new Error(`no upload ${uploadId}`)
-        if (bytes.length !== upload.size || sha256Hex(bytes) !== upload.digest) throw new Error("bytes differ from the reservation")
+        if (bytes.length !== upload.size || sha256Hex(bytes) !== upload.digest)
+          throw new Error("bytes differ from the reservation")
         upload.bytes = bytes
       },
       append: async (request) => {
@@ -110,7 +111,10 @@ export class FakeSyncServer {
     this.objects.set(objectId, snapshotBytes)
     this.snapshot = { coversSeq, objectIds: [objectId], digest: sha256Hex(snapshotBytes) }
     this.trimmedThrough = coversSeq
-    this.entries.splice(0, this.entries.findIndex((e) => e.seq > coversSeq))
+    this.entries.splice(
+      0,
+      this.entries.findIndex((e) => e.seq > coversSeq),
+    )
   }
 
   private pull(after: number, limit: number): PullPage {
