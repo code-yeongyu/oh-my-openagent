@@ -137,24 +137,14 @@ async function identify(dir: string): Promise<RegistryEndpoint> {
  * they are the record of its threads in a process that never listed it alive. Unreadable claims are skipped.
  */
 export async function claimedSessionPaths(dir: string): Promise<readonly string[]> {
-  let names: string[]
-  try {
-    names = await readdir(join(dir, "reservations"))
-  } catch {
-    return []
-  }
+  const names = await readdir(join(dir, "reservations")).catch(() => [] as string[])
   const claims = await Promise.all(
     names
       .filter((name) => name.endsWith(".json"))
       .sort()
       .map(async (name) => {
-        try {
-          const claim: unknown = JSON.parse(await readFile(join(dir, "reservations", name), "utf8"))
-          const path = typeof claim === "object" && claim !== null ? Reflect.get(claim, "sessionPath") : undefined
-          return typeof path === "string" && path !== "" ? [path] : []
-        } catch {
-          return []
-        }
+        const path = (await readRecord(join(dir, "reservations", name)))?.sessionPath
+        return typeof path === "string" && path !== "" ? [path] : []
       }),
   )
   return claims.flat()
