@@ -68,7 +68,11 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   "deep-high": {
     fallbackChain: [
-      { providers: ["openai", "chatgpt-subscription", "opencode"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "high" },
+      {
+        providers: ["openai", "chatgpt-subscription", "opencode"],
+        model: LATEST_MODEL_BY_FAMILY.gptAstra,
+        variant: "high",
+      },
       {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
         model: "gpt-6-astra",

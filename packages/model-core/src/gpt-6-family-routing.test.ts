@@ -18,9 +18,14 @@ describe("GPT-6 family routing", () => {
   })
 
   test("deep-high still carries only Astra, so neither deep lane borrows the other's model", () => {
-    expect(CATEGORY_MODEL_REQUIREMENTS["deep-high"].fallbackChain.map(({ model }) => model)).toEqual(["gpt-6.2-astra", "gpt-6-astra"])
+    expect(CATEGORY_MODEL_REQUIREMENTS["deep-high"].fallbackChain.map(({ model }) => model)).toEqual([
+      "gpt-6.2-astra",
+      "gpt-6-astra",
+    ])
     expect(CATEGORY_MODEL_REQUIREMENTS["deep-low"].fallbackChain.map(({ model }) => model)).not.toContain("gpt-6-astra")
-    expect(CATEGORY_MODEL_REQUIREMENTS["deep-low"].fallbackChain.map(({ model }) => model)).not.toContain("gpt-6.2-astra")
+    expect(CATEGORY_MODEL_REQUIREMENTS["deep-low"].fallbackChain.map(({ model }) => model)).not.toContain(
+      "gpt-6.2-astra",
+    )
   })
 
   test("quick leads with gpt-6-luna-fast low", () => {
