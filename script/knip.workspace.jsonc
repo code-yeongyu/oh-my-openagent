@@ -34,6 +34,9 @@
         "script/keychain-helper-release.ts",
         "script/lint-ratchet.ts",
         "script/oxlint/biome-ports.ts",
+        // loaded by oxlint as a jsPlugin from script/lint-ratchet.oxlintrc.json by path, not imported; its two
+        // rule modules are its static imports and stay reachable (and flaggable) through this entry (#14208)
+        "script/oxlint/testing.ts",
         "script/patch-node-require-shim.ts",
         "script/preflight-trust.mjs",
         "script/print-release-notes.ts",
