@@ -5,7 +5,11 @@ import { join } from "node:path"
 
 import { writeRunJsonAtomic } from "./run-artifacts"
 import { reconcileReflectionRuns } from "./run-reconciliation"
-import { cleanupReconciliationFixtures, reconciliationFixture as fixture } from "./run-reconciliation.test-support"
+import {
+  cleanupReconciliationFixtures,
+  FIXTURE_HOST,
+  reconciliationFixture as fixture,
+} from "./run-reconciliation.test-support"
 
 afterEach(cleanupReconciliationFixtures)
 
@@ -13,7 +17,7 @@ const NOW = Date.parse("2026-08-10T01:00:00.000Z")
 
 function liveLauncher() {
   return {
-    hostname: () => "fixture-host",
+    hostname: () => FIXTURE_HOST,
     now: () => NOW,
     getPidLiveness: (pid: number) => (pid === 111 ? ("alive" as const) : ("dead" as const)),
   }

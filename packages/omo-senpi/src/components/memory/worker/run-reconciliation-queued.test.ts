@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
-import { cleanupReconciliationFixtures, reconciliationFixture } from "./run-reconciliation.test-support"
+import { cleanupReconciliationFixtures, FIXTURE_HOST, reconciliationFixture } from "./run-reconciliation.test-support"
 import { writeRunJsonAtomic } from "./run-artifacts"
 import { reconcileReflectionRuns } from "./run-reconciliation"
 import { abandonReservationRun } from "./run-finalization"
@@ -24,7 +24,7 @@ test.each(["known", "unknown"] as const)(
       identity: item.identity,
       reservation: item.store,
       now: () => Date.parse(item.ledger.startedAt) + 90_000,
-      hostname: () => "fixture-host",
+      hostname: () => FIXTURE_HOST,
       getPidLiveness: (pid: number) => (pid === 222 ? ("alive" as const) : ("dead" as const)),
       getProcessStartIdentity: async () => (identity === "known" ? "supervisor-start" : null),
       waitForOutcome: async () => {
@@ -54,7 +54,7 @@ test("a queued supervisor proven dead still settles as failed", async () => {
       identity: item.identity,
       reservation: item.store,
       now: () => 99_000,
-      hostname: () => "fixture-host",
+      hostname: () => FIXTURE_HOST,
       getPidLiveness: () => "dead",
       getProcessStartIdentity: async () => null,
     }),

@@ -7,6 +7,8 @@ import type { StaleLockDecision, StaleLockProbe, StrandedRunDecision } from "./s
 export const REFLECTION_DIR = "/memory/agents/agent-a/runtime/reflection"
 const RUN = "reflection-run-64"
 const HOST = "this-host"
+// Without an id the table would spawn a real probe; every recorded id here is absent, so it is inert.
+const HOST_ID = "test-machine"
 const LAUNCHER = 11096
 const CLAIMANT = 4200
 const LOCK = join(REFLECTION_DIR, "active.lock")
@@ -235,6 +237,7 @@ export function probeFor(facts: Facts): ReflectionLockProbe {
       return state
     },
     hostname: () => HOST,
+    hostId: () => HOST_ID,
     getPidLiveness: (pid) => facts.pids[pid] ?? "dead",
     getProcessStartIdentity: async (pid) => facts.starts[pid] ?? null,
   }
@@ -276,6 +279,7 @@ function ledger(fields: Record<string, unknown> = {}): string {
 
 interface ReaperFacts extends Facts {
   readonly mtimes: Readonly<Record<string, number>>
+  readonly hostId?: string | null
 }
 
 export interface ReaperScenario {
@@ -291,6 +295,7 @@ function stuckHolder(
     pids?: Facts["pids"]
     starts?: Facts["starts"]
     mtimes?: Record<string, number>
+    hostId?: string | null
   } = {},
 ): ReaperFacts {
   const files: Record<string, FileState> = {
@@ -300,7 +305,13 @@ function stuckHolder(
     if (state === undefined) delete files[path]
     else files[path] = state
   }
-  return { files, pids: change.pids ?? {}, starts: change.starts ?? {}, mtimes: change.mtimes ?? {} }
+  return {
+    files,
+    pids: change.pids ?? {},
+    starts: change.starts ?? {},
+    mtimes: change.mtimes ?? {},
+    hostId: change.hostId ?? null,
+  }
 }
 
 const TORN_OLD = REAPER_NOW - 2 * 60 * 60_000
@@ -462,6 +473,18 @@ export const REAPER_SCENARIOS: readonly ReaperScenario[] = [
       mtimes: { [LOCK]: TORN_OLD },
     }),
     expected: kept("unknown", "active.lock is not valid JSON and its launcher is on host other-host"),
+  },
+  {
+    name: "a torn same-host lock without a complete machine id",
+    rule: "torn-host-id-unknown",
+    facts: stuckHolder({
+      files: {
+        [LOCK]: `{"runId":"${RUN}","launcherPid":${LAUNCHER},"launcherHostname":"${HOST}","launcherHostId":"foreign-`,
+      },
+      mtimes: { [LOCK]: TORN_OLD },
+      hostId: HOST_ID,
+    }),
+    expected: kept("unknown", "active.lock is not valid JSON and its launcher machine identity is incomplete"),
   },
   {
     name: "a torn active.lock whose launcher is alive",
@@ -643,6 +666,7 @@ export function reaperProbeFor(facts: ReaperFacts): StaleLockProbe {
   const base = probeFor(facts)
   return {
     ...base,
+    hostId: () => facts.hostId ?? null,
     now: () => REAPER_NOW,
     listDirectory: async (path) => {
       const prefix = `${path}${sep}`

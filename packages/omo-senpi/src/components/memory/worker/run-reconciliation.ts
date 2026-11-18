@@ -9,7 +9,6 @@ import {
   LockContentionError,
   type MemoryIdentity,
   type ProcessLiveness,
-  type ReservationState,
   type ReservedRun,
 } from "@oh-my-opencode/memory-core"
 
@@ -23,7 +22,7 @@ import {
 } from "./run-finalization"
 import { backfillRunReceipt } from "./run-receipt-backfill"
 import { classifyRunProcess, signalRecordedProcessGroup, waitUntil as waitForTime } from "./run-liveness"
-import { quarantineRun, reconcilePrelaunch } from "./run-reconciliation-prelaunch"
+import { isReservationForeign, quarantineRun, reconcilePrelaunch } from "./run-reconciliation-prelaunch"
 import { RunTerminalClaimUnrecoverableError } from "./run-terminal-claim"
 import { parseReservationRunLedger, type ReservationRunLedger } from "./reservation-run-ledger"
 import { emitMemoryReceipt, type MemoryReceiptsPort, type ReceiptWarn } from "../receipts-port"
@@ -41,6 +40,7 @@ export interface ReflectionRunReconciliationOptions {
   readonly launch?: (run: ReservedRun) => void
   readonly now?: () => number
   readonly hostname?: () => string
+  readonly hostId?: () => string | null | Promise<string | null>
   readonly getPidLiveness?: (pid: number) => ProcessLiveness
   readonly getProcessStartIdentity?: (pid: number) => Promise<string | null>
   readonly waitForOutcome?: (path: string, deadlineAt: number, signal?: AbortSignal) => Promise<SentinelWaitResult>
@@ -82,8 +82,10 @@ export async function reconcileReflectionRuns(
       context.getPidLiveness,
     )
     const runsDir = join(options.identity.paths.reflection, "runs")
-    let reservation: ReservationState | undefined
-    const reserved = async (): Promise<ReservationState> => {
+    // One scheduler-lock read per pass. A later directory must not take the lock again: contention
+    // there aborts the whole pass and drops runs this pass already settled.
+    let reservation: Awaited<ReturnType<ReconcileContext["reservation"]["readState"]>> | undefined
+    const readReservation = async () => {
       reservation ??= await context.reservation.readState(
         context.deferOnSchedulerContention ? { waitTimeoutMs: 0 } : undefined,
       )
@@ -91,22 +93,24 @@ export async function reconcileReflectionRuns(
     }
     for (const name of await directoryNames(runsDir)) {
       context.signal?.throwIfAborted()
-      // A retired-generation dir shares the active reservation's id; settling it through the
-      // normal path would complete the live reservation, so it waits for a later pass.
+      // A retired generation sharing an active ID must not settle that reservation.
       if (name === prelaunch.retiredRunId) continue
       const runDir = join(runsDir, name)
-      await sweepStrandedRunTemporaries(runDir, context.now(), context.getPidLiveness)
+      const state = await readReservation()
+      const active = state.active
+      const foreign = active !== undefined && name === active.runId && (await isReservationForeign(active, context))
+      if (!foreign) await sweepStrandedRunTemporaries(runDir, context.now(), context.getPidLiveness)
       context.signal?.throwIfAborted()
       if (["final.json", "abandoned.json", "quarantined.json"].some((file) => existsSync(join(runDir, file)))) {
         await backfillRunReceipt(options.identity.paths.runtime, runDir, options.receipts, options.warn)
         continue
       }
+      if (foreign) continue
       const ledger = existsSync(join(runDir, "ledger.json")) ? await readLedgerOrUndefined(runDir) : undefined
       context.signal?.throwIfAborted()
       if (ledger === undefined) {
         // No ledger, or one that cannot be read: the active run is prelaunch's, any other run that is
         // provably dead gets its terminal sentinel here so it stops counting as live (#11920, #11976).
-        const state = await reserved()
         if (name === state.active?.runId || name === state.pending?.runId) continue
         const settled = await settleStrandedRun(context, runDir, name)
         if (settled !== undefined) results.push(settled)

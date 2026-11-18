@@ -7,6 +7,7 @@ import {
   createLockRecord,
   discardReflectionWorktree,
   GitMemoryRepo,
+  isReflectionHostLocal,
   isSettledUnderDeadLauncher,
   LockContentionError,
   runFinalizationLockPath,
@@ -27,6 +28,19 @@ import { parseReservationRunLedger, type ReservationRunLedger } from "./reservat
 
 const LAUNCH_WINDOW_MS = 60_000
 
+async function isReservationLocal(active: ReservedRun, context: ReconcileContext): Promise<boolean> {
+  if (active.launcherHostname === undefined && !active.launcherHostId) return false
+  return isReflectionHostLocal(active.launcherHostname ?? "", active.launcherHostId, context)
+}
+
+export async function isReservationForeign(active: ReservedRun, context: ReconcileContext): Promise<boolean> {
+  const hostname = typeof active.launcherHostname === "string" ? active.launcherHostname : undefined
+  const hostId =
+    typeof active.launcherHostId === "string" && active.launcherHostId.length > 0 ? active.launcherHostId : undefined
+  if (hostname === undefined && hostId === undefined) return false
+  return !(await isReflectionHostLocal(hostname ?? "", hostId, context))
+}
+
 export interface PrelaunchReconcile {
   readonly result?: ReflectionRunReconcileResult
   readonly retiredRunId?: string
@@ -46,6 +60,7 @@ export async function reconcilePrelaunch(context: ReconcileContext): Promise<Pre
     if (promoted !== undefined) context.launch?.(promoted)
     return {}
   }
+  if (await isReservationForeign(active, context)) return {}
   // An earlier settle wrote this generation's sentinel and stopped before releasing (DESIGN.r3 c.14).
   if (await isSettledUnderDeadLauncher(context.identity.paths.reflection, context)) {
     // Under the run's finalize lock without waiting (REVIEW-3 R2): a settler still holding it finishes first.
@@ -59,8 +74,12 @@ export async function reconcilePrelaunch(context: ReconcileContext): Promise<Pre
   const ghost = await classifyGhostActive({ identity: context.identity, active })
   context.signal?.throwIfAborted()
   if (ghost.ghost && ghost.reason === "missing-identity") {
-    if (active.launcherPid !== undefined && active.launcherHostname !== undefined) {
-      if (active.launcherHostname !== context.hostname()) return {}
+    if (
+      active.launcherPid !== undefined &&
+      (active.launcherHostname !== undefined ||
+        (typeof active.launcherHostId === "string" && active.launcherHostId.length > 0))
+    ) {
+      if (!(await isReservationLocal(active, context))) return {}
       if (!(await isLauncherDead(active.launcherPid, active.launcherProcessStart, context))) return {}
     }
     return { result: await releaseReservationAsFailed(context, active.runId), retiredRunId: active.runId }
@@ -107,7 +126,7 @@ export async function reconcilePrelaunch(context: ReconcileContext): Promise<Pre
   }
   if (
     context.now() - Date.parse(active.reservedAt) <= LAUNCH_WINDOW_MS ||
-    active.launcherHostname !== context.hostname()
+    !(await isReservationLocal(active, context))
   ) {
     return retiredGeneration ? { retiredRunId: active.runId } : {}
   }
@@ -199,7 +218,7 @@ async function releaseFinishedUnderDeadLauncher(
   context: ReconcileContext,
   active: ReservedRun,
 ): Promise<PrelaunchReconcile> {
-  if (active.launcherPid === undefined || active.launcherHostname !== context.hostname()) return {}
+  if (active.launcherPid === undefined || !(await isReservationLocal(active, context))) return {}
   if (!(await isLauncherDead(active.launcherPid, active.launcherProcessStart, context))) return {}
   return { result: await releaseReservationAsFailed(context, active.runId), retiredRunId: active.runId }
 }
@@ -239,7 +258,7 @@ async function quarantineUnderDeadLauncher(
   reason: QuarantineReason,
   ledger?: ReservationRunLedger,
 ): Promise<PrelaunchReconcile> {
-  if (active.launcherPid === undefined || active.launcherHostname !== context.hostname()) return {}
+  if (active.launcherPid === undefined || !(await isReservationLocal(active, context))) return {}
   if (!(await isLauncherDead(active.launcherPid, active.launcherProcessStart, context))) return {}
   const result = await withRunFinalizeLock(context.identity.paths.locks, active.runId, () =>
     quarantineRun(context, runDir, active.runId, reason, ledger, active),
