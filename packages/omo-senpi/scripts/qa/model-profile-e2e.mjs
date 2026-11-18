@@ -240,7 +240,7 @@ function runScenario(name, scenario, args, senpiBin) {
           : onlyCliThinkingPersisted(
               settingsBeforeJson,
               settingsAfterJson,
-              `omo-mock/${scenario.cliModel}`,
+              `omo-mock/${scenario.cliModel ?? "mock-1"}`,
               scenario.cliThinking,
             ),
       turn_model: lastAssistant?.model === scenario.expect.model,
