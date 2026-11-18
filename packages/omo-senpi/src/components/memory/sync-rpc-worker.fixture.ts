@@ -69,6 +69,7 @@ const coordinator = registerSyncRpc(
     runtime: {
       enableSync,
       disableSync,
+      recoverSync: async () => ({ ok: false, reason: "unavailable" }),
       approveDevice,
       joinAccount: (input) =>
         joinAccount({

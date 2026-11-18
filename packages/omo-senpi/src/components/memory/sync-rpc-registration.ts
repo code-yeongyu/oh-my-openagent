@@ -12,7 +12,8 @@ const acknowledgeRequest = z
     credentialId: z.string().min(1).optional(),
   })
   .strict()
-const FEATURES = ["enable-method", "phrase-genesis", "acknowledge", "disable"] as const
+const recoverRequest = z.object({ method: z.enum(["passkey", "phrase"]).optional() }).strict()
+const FEATURES = ["enable-method", "phrase-genesis", "acknowledge", "disable", "recover"] as const
 const approval = z.discriminatedUnion("action", [
   z.object({ action: z.literal("begin"), pendingId: z.string().min(1) }).strict(),
   z
@@ -45,6 +46,7 @@ export function registerSyncRpc(rpc: SyncRpcRegistration, options: SyncRpcOption
     "features",
     "acknowledge",
     "disable",
+    "recover",
   ] as const) {
     rpc.handle(`omo.memory.sync.${verb}`, async (data, context) => {
       if (!coordinator.check(context)) return { kind: "unavailable", reason: "A live trusted connection is required." }
@@ -65,6 +67,12 @@ export function registerSyncRpc(rpc: SyncRpcRegistration, options: SyncRpcOption
           if (!parsed.success) return { kind: "refused", reason: "Invalid acknowledge request." }
           const { credentialId, ...rest } = parsed.data
           return await coordinator.acknowledge(context, credentialId === undefined ? rest : { ...rest, credentialId })
+        }
+        if (verb === "recover") {
+          const parsed = recoverRequest.safeParse(data)
+          if (!parsed.success) return { kind: "refused", reason: "Invalid recover request." }
+          const { method } = parsed.data
+          return await coordinator.recover(context, method === undefined ? {} : { method })
         }
         if (!empty.safeParse(data).success) return { kind: "refused", reason: "This request takes no parameters." }
         switch (verb) {

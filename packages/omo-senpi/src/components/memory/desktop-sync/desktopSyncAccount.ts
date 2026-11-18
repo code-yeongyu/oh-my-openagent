@@ -13,6 +13,7 @@ import { SYNC_CAPABILITIES } from "@oh-my-opencode/memory-core/sync-capabilities
 import { desktopSyncAccountPorts } from "./desktopSyncAccountPorts"
 import { desktopSyncBoundary } from "./desktopSyncBoundary"
 import { openDesktopSyncOperation } from "./desktopSyncOperation"
+import { desktopRecoveryBridge } from "./desktopRecoveryBridge"
 import { DesktopSyncServiceError, SyncDescriptor } from "./desktopSyncPortSchema"
 import { DesktopSyncRefused, type DesktopSyncEvent, type DesktopSyncWire } from "./desktopSyncProtocol"
 import { desktopSyncReplicationPort } from "./desktopSyncReplicationPort"
@@ -183,8 +184,17 @@ async function openAccount(
       devices: operation.devices,
       close: operation.close,
     }
+    const recovery =
+      descriptor.recovery === "supported"
+        ? {
+            recovery: desktopRecoveryBridge(
+              (data) => authority.admit(() => operation.request({ op: "recovery", data })),
+              descriptor.genesis === "supported",
+            ),
+          }
+        : {}
     const phrase = descriptor.phraseGenesis === "supported"
-    if (descriptor.genesis !== "supported" && !phrase) return ports
+    if (descriptor.genesis !== "supported" && !phrase) return { ...ports, ...recovery }
     try {
       const offered =
         descriptor.genesis === "supported"
@@ -208,7 +218,7 @@ async function openAccount(
           },
         }),
       }
-      return { ...ports, genesis }
+      return { ...ports, ...recovery, genesis }
     } catch (error) {
       await operation.close()
       throw error

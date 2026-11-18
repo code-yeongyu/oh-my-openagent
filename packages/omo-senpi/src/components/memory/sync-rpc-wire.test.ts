@@ -125,6 +125,7 @@ async function setup(empty = false) {
     const runtime: SyncRpcRuntime = {
       enableSync,
       disableSync,
+      recoverSync: async () => ({ ok: false, reason: "unavailable" }),
       joinAccount: async (input) => {
         const result = await joinAccount({
           ...input,

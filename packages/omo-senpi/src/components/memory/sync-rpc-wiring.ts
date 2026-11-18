@@ -36,6 +36,7 @@ export function wireSyncRpc(options: {
     runtime: {
       enableSync: async (input) => (await import("#omo-memory-sync-runtime")).enableSync(input),
       disableSync: async (input) => (await import("#omo-memory-sync-runtime")).disableSync(input),
+      recoverSync: async (input) => (await import("#omo-memory-sync-runtime")).recoverSync(input),
       joinAccount: async (input) => (await import("#omo-memory-sync-runtime")).joinAccount(input),
       approveDevice: async (input) => (await import("#omo-memory-sync-runtime")).approveDevice(input),
       phraseNoticeStatus: async (place) => (await import("#omo-memory-sync-runtime")).phraseNoticeStatus(place),

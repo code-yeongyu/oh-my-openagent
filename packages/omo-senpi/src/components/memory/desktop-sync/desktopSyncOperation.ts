@@ -7,7 +7,7 @@ import {
 } from "./desktopSyncProtocol"
 
 type OperationRequest = {
-  readonly op: "service" | "keyring" | "genesisRun" | "phraseGenesisRun"
+  readonly op: "service" | "keyring" | "genesisRun" | "phraseGenesisRun" | "recovery"
   readonly data: unknown
 }
 

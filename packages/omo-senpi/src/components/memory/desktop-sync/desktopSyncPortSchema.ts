@@ -76,6 +76,8 @@ export const decodeSyncPending = (input: unknown) => {
 export const SyncDescriptor = z.object({
   genesis: z.enum(["supported", "unsupported"]),
   phraseGenesis: z.enum(["supported", "unsupported"]).optional(),
+  /** Desktop main serves recovery begin/finish (#14122); absent on a main that predates it. */
+  recovery: z.enum(["supported", "unsupported"]).optional(),
   rpId: z.string().nullable(),
   userName: z.string().nullable(),
   serviceOrigin: z.string(),

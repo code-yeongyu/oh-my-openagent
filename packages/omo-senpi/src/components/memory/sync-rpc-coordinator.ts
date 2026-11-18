@@ -1,3 +1,4 @@
+import { recoverResponse } from "./sync-rpc-recover"
 import type {
   ApprovalProgress,
   SyncAcknowledgeRequest,
@@ -6,6 +7,8 @@ import type {
   SyncApproveRequest,
   SyncApproveResponse,
   SyncDisableResponse,
+  SyncRecoverRequest,
+  SyncRecoverResponse,
   SyncEnableResponse,
   SyncRpcProblem,
   SyncUnavailableCode,
@@ -334,6 +337,23 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
       // so the next status read already shows a device that does not sync.
       await options.stopSync?.()
       return { kind: "off" }
+    },
+    /** Recovers this device with the account's recovery method (#14122); the phrase and keys stay in desktop main. */
+    async recover(owner: SyncRpcContext, request: SyncRecoverRequest): Promise<SyncRecoverResponse> {
+      const result = await this.read(owner, async (ports, account) => {
+        if (ports.recovery === undefined) return { response: { kind: "recover_refused", reason: "unavailable" } as const }
+        const outcome = await options.runtime.recoverSync({
+          account: account.descriptor.accountId,
+          rpId: account.descriptor.rpId ?? "",
+          keyring: ports.keyring,
+          chain: ports.chain,
+          bridge: ports.recovery,
+          pinDir: options.pinDir,
+          ...(request.method === undefined ? {} : { method: request.method }),
+        })
+        return { response: recoverResponse(outcome) }
+      })
+      return "kind" in result ? result : result.response
     },
     async read<T>(
       owner: SyncRpcContext,

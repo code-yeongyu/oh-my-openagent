@@ -74,6 +74,7 @@ export async function setup(overrides: Partial<SyncRpcOptions> = {}) {
       return (await confirmation) ? { kind: "approved", seq: 2 } : { kind: "declined" }
     },
     disableSync: async () => ({ kind: "off" }),
+    recoverSync: async () => ({ ok: false, reason: "unavailable" }),
   }
   const http = {
     baseUrl: "https://unused.invalid",

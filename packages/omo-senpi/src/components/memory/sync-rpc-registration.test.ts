@@ -24,6 +24,9 @@ function fixture() {
       approveDevice: async () => {
         throw new Error("unexpected approval")
       },
+      recoverSync: async () => {
+        throw new Error("not used")
+      },
       disableSync: async () => {
         throw new Error("unexpected disable")
       },

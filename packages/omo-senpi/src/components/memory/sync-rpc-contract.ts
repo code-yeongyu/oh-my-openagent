@@ -10,7 +10,7 @@ export type SyncFeaturesRequest = Readonly<Record<string, never>>
  * The features this engine speaks; an engine older than recovery-phrase genesis answers it as an unknown verb.
  * `disable` (#14093): the engine answers `omo.memory.sync.disable`, so a client offers Turn off only when it is listed.
  */
-export type SyncFeature = "enable-method" | "phrase-genesis" | "acknowledge" | "disable"
+export type SyncFeature = "enable-method" | "phrase-genesis" | "acknowledge" | "disable" | "recover"
 export type SyncFeaturesResponse = { readonly features: readonly SyncFeature[] }
 export type SyncAcknowledgeRequest = {
   readonly notice: "phrase_void"
@@ -24,6 +24,20 @@ export type SyncDisableRequest = Readonly<Record<string, never>>
  * answers it too. Memory on this device is not touched and the account's other devices keep syncing.
  */
 export type SyncDisableResponse = { readonly kind: "off" } | SyncRpcProblem
+/**
+ * `recover` (#14122): a device that does not sync yet recovers the account's synced memory with its recovery
+ * method. The phrase is typed in, and the recovery keys stay in, desktop main; this verb carries neither. Only the
+ * person at this computer may run it: a paired or remote client is refused before the engine.
+ */
+export type SyncRecoverRequest = { readonly method?: "passkey" | "phrase" }
+export type SyncRecoverResponse =
+  | { readonly kind: "recovered" }
+  | { readonly kind: "recovered_read_only" }
+  | {
+      readonly kind: "recover_refused"
+      readonly reason: "cancelled" | "no-recovery-key" | "history-incomplete" | "unavailable" | "refused"
+    }
+  | SyncRpcProblem
 export type SyncPendingRequest = Readonly<Record<string, never>>
 export type SyncStatusRequest = Readonly<Record<string, never>>
 export type SyncDevicesRequest = Readonly<Record<string, never>>

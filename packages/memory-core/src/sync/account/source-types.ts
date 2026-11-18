@@ -1,3 +1,4 @@
+import type { RecoveryBridge } from "../recovery/ports.ts"
 import type { DeviceKeyring } from "../keyring-port"
 import type { Transport } from "../engine/ports"
 import type { AccountHttp } from "./http"
@@ -12,6 +13,8 @@ export interface DesktopSyncDescriptor {
   readonly genesis: "supported" | "unsupported"
   /** Whether this process owns a protected recovery-phrase surface; the only phrase flag the engine trusts. */
   readonly phraseGenesis?: "supported" | "unsupported"
+  /** Whether desktop main serves recovery begin/finish over the operation channel (#14122). */
+  readonly recovery?: "supported" | "unsupported"
   readonly rpId: string | null
   readonly userName: string | null
   readonly serviceOrigin: string
@@ -44,11 +47,13 @@ export interface DesktopSyncOperation {
   readonly pairing: PairingHttp
   /** Bound to this operation's main-issued handle; absent for the CLI source, never on background ports. */
   readonly genesis?: GenesisBridge
+  /** Recovery begin/finish served by desktop main (#14122); absent for the CLI source and on an older main. */
+  readonly recovery?: RecoveryBridge
   devices(): Promise<readonly SyncDevice[]>
   close(): Promise<void>
 }
 
-export interface DesktopSyncAccount extends Omit<DesktopSyncOperation, "close" | "genesis"> {
+export interface DesktopSyncAccount extends Omit<DesktopSyncOperation, "close" | "genesis" | "recovery"> {
   readonly kind: "desktop"
   readonly descriptor: DesktopSyncDescriptor
   readonly signal: AbortSignal

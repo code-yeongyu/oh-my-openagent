@@ -21,6 +21,7 @@ export {
   readServiceFloor,
   verifiedPhraseNoticeStatus,
 } from "@oh-my-opencode/memory-core/sync-engine"
+export { recoverSync } from "./sync-recover-runtime"
 // A freeze status exists only while the engine runs, so its words ship with the engine, not the eager bundle.
 export { causeNote, failureRpcSync, freezeFailure } from "./sync-status-copy"
 

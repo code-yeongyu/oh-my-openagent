@@ -1,3 +1,4 @@
+import type { RecoverOutcome } from "@oh-my-opencode/memory-core/sync-recovery"
 import type { DeviceKeyring } from "@oh-my-opencode/memory-core/keyring"
 import type {
   AccountHttp,
@@ -54,7 +55,18 @@ export interface SyncRpcCeremonyInput {
   readonly signal: AbortSignal
 }
 
+export interface SyncRpcRecoverInput {
+  readonly account: string
+  readonly rpId: string
+  readonly keyring: DeviceKeyring
+  readonly chain: AccountHttp
+  readonly bridge: NonNullable<DesktopSyncOperation["recovery"]>
+  readonly pinDir: string
+  readonly method?: "passkey" | "phrase"
+}
+
 export interface SyncRpcRuntime {
+  recoverSync(input: SyncRpcRecoverInput): Promise<RecoverOutcome>
   enableSync(
     input: SyncRpcCeremonyInput & {
       readonly serviceDeviceId: string

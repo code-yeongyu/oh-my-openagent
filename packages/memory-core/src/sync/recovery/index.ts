@@ -1,5 +1,6 @@
 export { APPROVAL_PATH_MESSAGE, type RecoveryAvailability, recoveryAvailability } from "./availability.ts"
 export { createRecoveryBridge } from "./bridge.ts"
+export { createRejectionCounter } from "../crypto/rejection.ts"
 export { deriveRecoveryKeys, hmacSecretSaltForPrf, recoveryPrfSalt, recoveryUserHandle } from "./derive.ts"
 export { type EnrollInput, type EnrollOutcome, enrollRecoveryKey } from "./enroll.ts"
 export { classifyRecoveryJoin, type JoinNotice, VETO_WINDOW_MS } from "./join-notice.ts"
