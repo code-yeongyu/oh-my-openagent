@@ -186,7 +186,7 @@ export const pinTrustAnchor = async (
 export const forgetTrustAnchor = (stateDir: string, account: string): Promise<void> =>
   retireSyncDevice({ pinDir: stateDir, account })
 
-/** The genesis digest of the newest retired pin for `account`, or null when none parses. */
+/** The genesis digest of the newest retired pin for `account`, or null when there is no retired pin; a newest pin that does not parse throws (PIN_UNREADABLE). */
 const newestRetiredRoot = async (stateDir: string, account: string): Promise<string | null> => {
   const prefix = `${accountKey(account)}.retired-`
   let names: string[]

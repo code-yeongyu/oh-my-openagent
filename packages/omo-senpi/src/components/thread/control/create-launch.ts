@@ -37,7 +37,7 @@ export function createLaunch(
       return failure(
         "invalid_arguments",
         `model ${JSON.stringify(value.model)} is not a provider/id.`,
-        "Pass the exact provider/id the device lists (thread_set_model shows them).",
+        "Pass the exact provider/id the device lists (thread_set_model, tool.thread_set_model() in an eval cell, shows them).",
         { model: value.model },
       )
     profile = { ...profile, provider: value.model.slice(0, slash), modelId: value.model.slice(slash + 1) }

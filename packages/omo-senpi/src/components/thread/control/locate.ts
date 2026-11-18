@@ -1,4 +1,5 @@
 import type { ThreadToolResult } from "../contracts"
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { toThreadAddressEntries } from "../address-book"
 import { workspaceEntries } from "../addressing"
 import { rowThreadId } from "../remote/ports"
@@ -38,7 +39,7 @@ export async function locateControl(
     const offline = await deviceOnline(options.remote, row.device)
     if (offline !== undefined) return { kind: "error", result: offline }
     if (row.state === "ended")
-      return { kind: "not_live", thread_id: rowThreadId(row), title: row.title, device: row.device }
+      return { kind: "not_live", thread_id: rowThreadId(row), title: escapeForDisplay(row.title), device: row.device }
     return { kind: "control", control: createRelayControl(options.remote, row) }
   }
   if (resolved.kind === "error") return { kind: "error", result: { kind: "error", error: resolved } }

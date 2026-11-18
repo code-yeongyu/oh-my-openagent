@@ -1,19 +1,59 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { createRequire } from "node:module"
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join, sep } from "node:path"
+import { basename, join, sep } from "node:path"
 
 const packageRoot = join(import.meta.dir, "..")
-// Each step's own bound, inside the test's 240 s: a stuck step fails here instead of overrunning the test (#13974).
+// Each step's absolute cap, inside the test's 240 s: a step never overruns the test budget (#13974).
 const STEP_BOUND_MS = 200_000
+// A step with a progress probe fails once STEP_STALL_MS passes with no measurable progress anywhere in
+// this file's run root: that is a hung install (a blackholed registry, a dead postinstall), not a slow
+// one. Watching work instead of wall clock keeps a loaded runner's slower-but-progressing install from
+// being a false red; the absolute cap above still bounds the test's budget and names the last progress.
+const STEP_STALL_MS = 90_000
+const PROBE_INTERVAL_MS = 15_000
+
+/** A signature of all filesystem work under the run root: entry count and total bytes. */
+function runRootProgress(rootDir: string): () => string {
+  return () => {
+    let entries = 0
+    let bytes = 0
+    const walk = (dir: string): void => {
+      let listing
+      try {
+        listing = readdirSync(dir, { withFileTypes: true })
+      } catch {
+        return
+      }
+      for (const entry of listing) {
+        entries += 1
+        const path = join(dir, entry.name)
+        if (entry.isDirectory()) walk(path)
+        else {
+          try {
+            bytes += statSync(path).size
+          } catch {
+            // A file replaced mid-walk reads as zero progress for one sample; never a crash.
+          }
+        }
+      }
+    }
+    walk(rootDir)
+    return "entries=" + entries + " bytes=" + bytes
+  }
+}
 
 type Step = { readonly exitCode: number; readonly stdout: string; readonly stderr: string }
 
-/** Runs one command and awaits its exit, killing it and failing once the bound passes. */
+/**
+ * Runs one command and awaits its exit. Without a probe it fails at the absolute cap. With one, it
+ * also fails - sooner - once the probe shows no progress for STEP_STALL_MS, and every failure names
+ * the last observed progress so a red under load carries its own evidence (#12246).
+ */
 async function step(
   cmd: readonly string[],
-  options: { cwd: string; env?: Record<string, string | undefined> },
+  options: { cwd: string; env?: Record<string, string | undefined>; progress?: () => string },
 ): Promise<Step> {
   const proc = Bun.spawn([...cmd], {
     cwd: options.cwd,
@@ -21,11 +61,32 @@ async function step(
     stdout: "pipe",
     stderr: "pipe",
   })
+  const probe = options.progress
+  let lastProgress = probe?.() ?? ""
+  let lastProgressAt = Date.now()
+  let stalledForMs = 0
+  let probeTimer: ReturnType<typeof setInterval> | undefined
+  if (probe !== undefined) {
+    probeTimer = setInterval(() => {
+      const current = probe()
+      if (current !== lastProgress) {
+        lastProgress = current
+        lastProgressAt = Date.now()
+        return
+      }
+      const quietForMs = Date.now() - lastProgressAt
+      if (quietForMs >= STEP_STALL_MS) {
+        stalledForMs = quietForMs
+        proc.kill()
+      }
+    }, PROBE_INTERVAL_MS)
+  }
+  const progressNote = probe === undefined ? "" : "; last progress " + lastProgress
   let bound: ReturnType<typeof setTimeout> | undefined
   const overran = new Promise<never>((_, reject) => {
     bound = setTimeout(() => {
       proc.kill()
-      reject(new Error(`${cmd.join(" ")} did not exit within ${STEP_BOUND_MS} ms`))
+      reject(new Error(cmd.join(" ") + " did not exit within " + STEP_BOUND_MS + " ms" + progressNote))
     }, STEP_BOUND_MS)
   })
   try {
@@ -33,9 +94,21 @@ async function step(
       Promise.all([proc.exited, new Response(proc.stdout).text(), new Response(proc.stderr).text()]),
       overran,
     ])
+    if (stalledForMs > 0) {
+      throw new Error(
+        cmd.join(" ") +
+          " made no progress for " +
+          stalledForMs +
+          " ms (last progress " +
+          lastProgress +
+          "); stderr: " +
+          stderr.slice(0, 2_000),
+      )
+    }
     return { exitCode, stdout, stderr }
   } finally {
     clearTimeout(bound)
+    if (probeTimer !== undefined) clearInterval(probeTimer)
   }
 }
 
@@ -54,9 +127,21 @@ let tarball = ""
 async function bunAddInIsolatedCache(consumer: string, args: readonly string[]): Promise<Step> {
   const cache = join(root, "bun-install-cache")
   const before = cacheEntries(cache)
+  // bun stages package extraction in TMPDIR. Pointed at the shared OS temp dir, a killed install
+  // leaves an unowned staging directory behind (#9766); inside the run root, afterAll removes it on
+  // every path, kill included.
+  const staging = join(root, "staging", basename(consumer))
+  mkdirSync(staging, { recursive: true })
   const result = await step(["bun", "add", "--backend", "copyfile", ...args, tarball], {
     cwd: consumer,
-    env: { ...process.env, BUN_INSTALL_CACHE_DIR: cache },
+    env: {
+      ...process.env,
+      BUN_INSTALL_CACHE_DIR: cache,
+      TMPDIR: staging,
+      TMP: staging,
+      TEMP: staging,
+    },
+    progress: runRootProgress(root),
   })
   installs.push({ cache, added: cacheEntries(cache) - before })
   return result
@@ -147,6 +232,7 @@ describe("omo-ai packed install", () => {
         OMO_RUNTIME: "node",
         OMO_CODING_AGENT_DIR: join(home, ".omo", "agent"),
       },
+      progress: runRootProgress(root),
     })
     expect(launch.stderr).not.toContain("could not prepare the installed engine")
     expect(launch.exitCode).toBe(0)

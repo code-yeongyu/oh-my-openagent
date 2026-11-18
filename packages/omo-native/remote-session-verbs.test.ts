@@ -132,7 +132,7 @@ describe("omo remote open connection", () => {
       code: REMOTE_EXIT.ok,
       errors: [],
       // The readiness check reads the state; the client's device list reads it again in its own round.
-      calls: ["shared:status", "shared:devices", "shared:status", "dialed:endpoint", "dialed:close", "shared:attach"],
+      calls: ["shared:status", "shared:devices", "shared:status", "dialed:endpoint", "dialed:close"],
       dialed: 1,
       sharedClosed: false,
     })
