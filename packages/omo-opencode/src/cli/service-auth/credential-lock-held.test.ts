@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { basename, join } from "node:path"
 import { credentialLockPaths, withCredentialLock } from "./credential-lock"
 import { SignInError } from "./protocol"
 
@@ -59,6 +59,23 @@ describe("withCredentialLock when the lock stays held", () => {
       refusal(finishing.home),
       refusal(other.home),
     ])
+
+    if (process.platform === "win32") {
+      // Windows keeps no argv[0] another process can read, so every holder is named by its image (bun.exe), there is
+      // no keychain helper to recognise, and the one way to end a console process is `taskkill /F`.
+      for (const [error, holder] of [
+        [helperError, helper],
+        [finishingError, finishing],
+        [otherError, other],
+      ] as const) {
+        expect(error).toBeInstanceOf(SignInError)
+        const message = (error as SignInError).message
+        expect(message).toContain(`pid ${holder.pid}, ${basename(process.execPath)}`)
+        expect(message).toContain(holder.lock)
+        expect(message).toContain(`taskkill /PID ${holder.pid} /F`)
+      }
+      return
+    }
 
     expect(finishingError).toBeInstanceOf(SignInError)
     const finishingMessage = (finishingError as SignInError).message
