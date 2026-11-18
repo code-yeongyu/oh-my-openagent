@@ -83,7 +83,7 @@ export async function readWorking(root: string, path: string): Promise<string | 
     // Positional reads, each retried on EINTR: a handle's readFile moves the file position, so the
     // EINTR-resilient handle cannot replay it, while a read at an explicit offset is idempotent.
     const chunks: Buffer[] = []
-    for (let position = 0; ; ) {
+    for (let position = 0; ;) {
       const buffer = Buffer.alloc(READ_CHUNK_BYTES)
       const { bytesRead } = await retryOnEintr(() => handle.read(buffer, 0, buffer.length, position))
       if (bytesRead === 0) break

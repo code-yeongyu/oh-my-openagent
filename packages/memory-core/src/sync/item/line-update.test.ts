@@ -7,7 +7,8 @@ import { newDoc } from "./test-support"
 // up and the body falls back to the character merge (`text.update`). These pin the bound on both sides and
 // check that a concurrent edit on another device still merges on the fallback path.
 
-const lines = (prefix: string, count: number): string => Array.from({ length: count }, (_, index) => `${prefix} ${index}\n`).join("")
+const lines = (prefix: string, count: number): string =>
+  Array.from({ length: count }, (_, index) => `${prefix} ${index}\n`).join("")
 
 async function bodyDoc(peer: `${number}`, body: string) {
   const doc = await newDoc(peer)

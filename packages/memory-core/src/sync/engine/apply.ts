@@ -173,7 +173,8 @@ export async function advance(
   // The path staging must use for a key: the spelling its latest render landed at, else the fresh
   // tree resolution. The recorded spelling wins because a delete that already landed leaves no
   // file for the tree to resolve (inv. 7); a record without one falls back to the fresh resolution.
-  const stagedPath = (rendered: ReadonlyMap<string, RenderRecord>, key: string): string => rendered.get(key)?.path ?? landingPath(paths, key) ?? key
+  const stagedPath = (rendered: ReadonlyMap<string, RenderRecord>, key: string): string =>
+    rendered.get(key)?.path ?? landingPath(paths, key) ?? key
   const save = async (next: CycleRecord, point: "rendered" | "committed" | "checkpointed") => {
     cycle = next
     // Every key the cycle rendered no longer owes a render (#12284 review H1); same write as the checkpoint.
