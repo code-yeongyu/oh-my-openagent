@@ -3,6 +3,7 @@ import { hostname } from "node:os"
 import {
   connectDeviceService,
   deviceServiceEndpointPath,
+  deviceServiceAbsence,
   deviceServiceStateDir,
   realTimers,
   type DeviceService,
@@ -184,7 +185,25 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
 
   // A cold connect is bounded by the handshake plus CONNECT_SLACK_MS before the member's own clock starts.
   const connected = async (opts: Opts | undefined): Promise<Outcome<DeviceService> | "not_installed"> => {
-    if (!existsSync(deviceServiceEndpointPath(stateDir))) return "not_installed"
+    if (!existsSync(deviceServiceEndpointPath(stateDir))) {
+      // A signed-in device with no endpoint is a service not serving right now, never "not installed" (#14172): retryable
+      // while it restarts or updates, and a service to start when nothing holds its state.
+      const absence = deviceServiceAbsence(stateDir, timers.now())
+      if (absence === "not_installed") return "not_installed"
+      return absence === "restarting"
+        ? remoteFailure(
+            "host_unavailable",
+            "The device service is restarting; its endpoint is not up yet.",
+            nextActionFor("host_unavailable"),
+            { details: { phase: "connect", reason: "service_restarting" } },
+          )
+        : remoteFailure(
+            "host_unavailable",
+            "The device service is set up on this device but not running.",
+            "Start the device service (omo remote bootstrap), then retry.",
+            { details: { phase: "connect", reason: "service_not_running" } },
+          )
+    }
     const outcome = await withinDeadline(
       timers,
       opts?.signal === undefined ? undefined : { signal: opts.signal },

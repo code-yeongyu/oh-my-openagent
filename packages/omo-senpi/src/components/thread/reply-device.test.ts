@@ -86,8 +86,13 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
       ...(selfDevice ? { selfDevice } : {}),
     })
     // `listingReads`: how many reads of the account session listing answer before every later one throws.
+    // The rows (`sessions`) and the round with its missing devices (`listing`) are the same account listing read.
     let reads = 0
     const listing = account.remote.sessions
+    const read = () => {
+      reads += 1
+      if (listingReads !== undefined && reads > listingReads) throw new Error("account list failed")
+    }
     const remote =
       listingReads === undefined
         ? account.remote
@@ -96,9 +101,12 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
             sessions: {
               ...listing,
               sessions: async (...args: Parameters<typeof listing.sessions>) => {
-                reads += 1
-                if (reads > listingReads) throw new Error("account list failed")
+                read()
                 return await listing.sessions(...args)
+              },
+              listing: async () => {
+                read()
+                return { rows: await listing.sessions(), incomplete: [] }
               },
             },
           }

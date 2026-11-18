@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -100,6 +101,10 @@ describe("#13012 route parity", () => {
         sessions: async () => {
           listings += 1
           return ended
+        },
+        listing: async () => {
+          listings += 1
+          return { rows: ended, incomplete: [] }
         },
       },
     })
@@ -334,6 +339,91 @@ describe("#13012 route parity", () => {
     },
   )
 
+  test("#given a signed-in device whose service endpoint is briefly gone (an update swap, #14172) #when a durable id is sent to #then host_unavailable, never not_found", async () => {
+    const stateDir = mkdtempSync(join(tmpdir(), "omo-restarting-device-service-"))
+    try {
+      // The adopted identity outlives the service process, and the new process holds the state before its per-boot socket is up.
+      writeFileSync(join(stateDir, "device-identity.json"), "{}")
+      writeFileSync(join(stateDir, "owner.info"), JSON.stringify({ pid: process.pid, since_ms: 0, owner: "service" }))
+      let connects = 0
+      const remote = createLazyRemoteSurface({
+        version: "0.0.0",
+        sender: { kind: "session", id: "caller" },
+        loadRuntime: async () => ({
+          remoteClient: (version, sender) => createRemoteClient(sender, { version, stateDir }),
+          remoteSessionsPort: () =>
+            sessionsPort({
+              version: "0.0.0",
+              connect: async () => {
+                connects += 1
+                throw Object.assign(new Error("device service endpoint is absent"), { code: "ENOENT" })
+              },
+            }),
+        }),
+      })
+      expect(
+        await surface(remote).run("thread_send", { thread: B_ROW.durable_id ?? "", message: "continue" }),
+      ).toMatchObject({
+        kind: "error",
+        error: { code: "host_unavailable", details: { state: "unreachable" } },
+      })
+      expect(connects).toBe(0)
+    } finally {
+      rmSync(stateDir, { recursive: true, force: true })
+    }
+  })
+
+  // #14172: b answered the first round (thread_list showed its thread) and missed the next; the account listing's rounds.
+  const missedSecondRound = () => {
+    const a = account()
+    let round = 0
+    const remote = {
+      ...a.remote,
+      sessions: {
+        ...a.remote.sessions,
+        listing: async () =>
+          ++round === 1 ? { rows: [B_ROW], incomplete: [] } : { rows: [], incomplete: [B_ROW.device] },
+      },
+    }
+    return { a, run: surface(remote).run }
+  }
+
+  test("#given a thread listed on b, then a round b missed (#14172) #when it is sent to by durable id #then host_unavailable names b, never not_found", async () => {
+    const { a, run } = missedSecondRound()
+    expect(await run("thread_list", {})).toMatchObject({ kind: "ok" })
+    expect(await run("thread_send", { thread: B_ROW.durable_id ?? "", message: "continue" })).toMatchObject({
+      kind: "error",
+      error: { code: "host_unavailable", details: { reason: "listing_incomplete", devices: [B_ROW.device] } },
+    })
+    expect(admits(a.sent)).toEqual([])
+  })
+
+  test.each([
+    ["a name no device ever listed (a typo)", "relase planer"],
+    ["a durable id no device ever listed", "0195f0c2-1a2b-7c3d-8e4f-0000000000ff"],
+  ])(
+    "#given b missed this round #when %s is sent to #then it stays not_found, since nothing ties it to b",
+    async (_case, thread) => {
+      const { a, run } = missedSecondRound()
+      expect(await run("thread_list", {})).toMatchObject({ kind: "ok" })
+      expect(await run("thread_send", { thread, message: "continue" })).toMatchObject({
+        kind: "error",
+        error: { code: "not_found" },
+      })
+      expect(admits(a.sent)).toEqual([])
+    },
+  )
+
+  test("#given another device missed this listing round #when a thread on a listed device is sent to #then it still delivers there", async () => {
+    const a = account({ incomplete: ["c"] })
+    const { run } = surface(a.remote)
+    expect(await run("thread_send", { thread: B_ROW.durable_id ?? "", message: "continue" })).toMatchObject({
+      kind: "ok",
+      device: B_ROW.device,
+    })
+    expect(admits(a.sent)).toEqual([[B_ROW.device, B_ROW.session_id]])
+  })
+
   test.each(["signed_out", "disabled"])(
     "#given remote sessions are %s #when a local name misses #then lookup stays local instead of requiring remote setup",
     async (plan) => {
@@ -346,6 +436,10 @@ describe("#13012 route parity", () => {
           sessions: async () => {
             listings += 1
             return [B_ROW]
+          },
+          listing: async () => {
+            listings += 1
+            return { rows: [B_ROW], incomplete: [] }
           },
         },
       })
@@ -399,9 +493,14 @@ describe("#13012 route parity", () => {
       ...a.remote,
       sessions: {
         ...a.remote.sessions,
+        // The send-side book reads the round (`listing`), the rename its device's rows (`sessions`): one listing count.
         sessions: async () => {
           if (++listings === 2) throw new Error("rename listing failed")
           return [B_ROW]
+        },
+        listing: async () => {
+          if (++listings === 2) throw new Error("rename listing failed")
+          return { rows: [B_ROW], incomplete: [] }
         },
       },
     })
