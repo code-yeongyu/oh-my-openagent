@@ -113,3 +113,52 @@ describe("CLI operation-scoped account", () => {
     })
   }
 })
+
+test("#given a CLI account operation #when another device's sync is turned off through it #then nothing is sent, and this device's own request is", async () => {
+  let sealed: string | null = null
+  const store = createCredentialStore("https://api.example.test", {
+    platform: "darwin",
+    secrets: {
+      get: async () => sealed,
+      set: async ({ value }) => {
+        sealed = value
+      },
+      delete: async () => {
+        sealed = null
+        return true
+      },
+    },
+  })
+  await store.write({
+    ...keys(),
+    accessToken: "access",
+    refreshToken: "refresh",
+    accessTokenExpiresAt: "2099-01-01T00:00:00.000Z",
+    device: { id: "service-device", name: "fixture" },
+    accountId: "account",
+  })
+  const sent: string[] = []
+  const account = await createCliAccountSource({
+    api: "https://api.example.test",
+    store,
+    fetch: Object.assign(
+      async (url: Parameters<typeof fetch>[0], init?: RequestInit) => {
+        const path = new URL(String(url)).pathname
+        if (path === "/v1/me") return Response.json({ account: { id: "account" }, deviceId: "service-device" })
+        if (path === "/v1/devices")
+          return Response.json({ devices: [{ id: "service-device", current: true, revokedAt: null }] })
+        sent.push(`${init?.method ?? "GET"} ${path}`)
+        if (path === "/v1/confirm") return Response.json({ ready: true, code: null, token: "confirm-token" })
+        return new Response(null, { status: 204 })
+      },
+      { preconnect: fetch.preconnect },
+    ),
+  })()
+  if (account === null) throw new Error("missing fixture account")
+  const operation = await account.forOperation({ signal: new AbortController().signal, admit: (effect) => effect() })
+  await expect(operation.pairing.disableDeviceSync("another-device")).rejects.toThrow()
+  expect(sent).toEqual([])
+  expect(await operation.pairing.disableDeviceSync("service-device")).toEqual({ ok: true })
+  expect(sent).toEqual(["POST /v1/confirm", "PUT /v1/devices/service-device/sync"])
+  await operation.close()
+})

@@ -399,6 +399,7 @@
     "packages/memory-core/src/sync/account/account-ports-runtime.ts",
     "packages/memory-core/src/sync/account/approve.ts",
     "packages/memory-core/src/sync/account/device-keyring.ts",
+    "packages/memory-core/src/sync/account/device-switch.ts",
     "packages/memory-core/src/sync/account/enable-phrase.ts",
     "packages/memory-core/src/sync/account/enable.ts",
     "packages/memory-core/src/sync/account/freeze-eligibility.ts",
