@@ -488,7 +488,7 @@ export function resolveTarget(
         outOfScope.length === 1
           ? `A thread named "${target}" exists on this device outside this workspace.`
           : `${outOfScope.length} threads named "${target}" exist on this device outside this workspace.`,
-        "Call thread_list with all_scope to see it, then retry with all_scope set, or target a thread in this workspace.",
+        "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to see it, then retry with all_scope set, or target a thread in this workspace.",
         toCandidates(outOfScope),
       )
   }
