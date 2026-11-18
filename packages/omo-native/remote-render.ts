@@ -158,7 +158,8 @@ export function sessionVerbLines(
     if (delivery.kind === "steered") return [`Steered turn ${delivery.turn_id} on ${label}.`]
     return [`Sent to ${label}: turn ${delivery.turn_id} started.`]
   }
-  if (verb === "model" && "model" in result && result.model !== undefined) return [`${label} now uses ${result.model.provider}/${result.model.id}.`]
+  if (verb === "model" && "model" in result && result.model !== undefined)
+    return [`${label} now uses ${result.model.provider}/${result.model.id}.`]
   if (verb === "interrupt" && "interrupted" in result) {
     if (!result.interrupted) return [`Nothing was running on ${label}.`]
     const { background } = result
