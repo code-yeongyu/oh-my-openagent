@@ -35,10 +35,10 @@ export type SessionControl = {
   readonly setModel: (provider: string, id: string) => Promise<{ readonly provider: string; readonly id: string }>
   readonly getAvailableThinkingLevels: () => Promise<readonly string[]>
   /**
-   * Changes only this session's level (`SESSION_ONLY_THINKING_SCOPE`) whatever `scope` says, never the device's
-   * remembered level for the model. Refuses `thinking_level_unsupported` for a level the active model cannot run.
+   * Changes only this session's level (`SESSION_ONLY_THINKING_SCOPE`), never the device's remembered level for the
+   * model. Refuses `thinking_level_unsupported` for a level the active model cannot run.
    */
-  readonly setThinkingLevel: (level: string, scope?: "turn") => Promise<void>
+  readonly setThinkingLevel: (level: string) => Promise<void>
   readonly getMessages: () => Promise<readonly ThreadTranscriptEntry[]>
   /**
    * One page of the session's newest entries, sent by its holder (`paged-reader.ts`, #14047). `unsupported`: the holder
