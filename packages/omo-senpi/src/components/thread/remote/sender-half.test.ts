@@ -316,13 +316,31 @@ describe("#13037 the sender half reaches a session on another device that is not
       ["not_wakeable", "not_resumable", {}],
       ["sender_not_admitted", "not_resumable", {}],
       ["sender_not_allowed", "unsupported", {}],
-      ["chain_count_limit", "unsupported", { reason: "chain_count_limit" }],
+      ["chain_count_limit", "chain_count_limit", { reason: "chain_count_limit", setting: "threads.chainCountLimit" }],
       ["queue_full", "queue_full", {}],
       ["wake_limit_reached", "overloaded", { reason: "wake_limit_reached" }],
     ] as const)("#given the receiver refused it with %s #then the tool answers %s", async (reason, code, details) => {
       expect(await answered(queuedEnvelope({ kind: "refused", reason }))).toMatchObject({
         kind: "error",
         error: { code, details: { device: "c", ...details } },
+      })
+    })
+
+    test("#given the receiving store refused it past its chain limit #then the tool answers chain_count_limit with the store's counts, the same code the running engine's refusal answers", async () => {
+      expect(
+        await answered(queuedEnvelope({ kind: "refused", reason: "chain_count_limit", chain_count: 4, limit: 3 })),
+      ).toMatchObject({
+        kind: "error",
+        error: {
+          code: "chain_count_limit",
+          details: {
+            device: "c",
+            reason: "chain_count_limit",
+            setting: "threads.chainCountLimit",
+            chain_count: 4,
+            limit: 3,
+          },
+        },
       })
     })
 

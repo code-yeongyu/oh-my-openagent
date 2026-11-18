@@ -15,6 +15,20 @@ const fail = (
   details?: Readonly<Record<string, unknown>>,
 ): Failure => ({ kind: "error", error: threadToolFailure(code, message, next, details) })
 
+/**
+ * senpi S32: the other device refuses a thread call past its own user's `threads.chainCountLimit`, from its running
+ * engine or, for a session that is not running, from its gateway store's intake. Nothing there needs updating and a
+ * retry is refused again; only that device's user can allow more hops. `extra` carries the counts the store reports.
+ */
+export function chainCountLimitFailure(device: string, extra: Readonly<Record<string, unknown>> = {}): Failure {
+  return fail(
+    "chain_count_limit",
+    `Device ${device} refused this thread call: the chain has made more hops than its user's thread chain limit (threads.chainCountLimit on device ${device}).`,
+    `Do not retry or extend this chain; finish with what you have. Only the user of device ${device} can allow more hops, by raising or unsetting threads.chainCountLimit there.`,
+    { ...extra, device, reason: "chain_count_limit", setting: "threads.chainCountLimit" },
+  )
+}
+
 export function outcomeOf(result: CommandResult): RemoteCommandOutcome {
   const { outcome } = result
   if (outcome.state === "engine_refused") {
@@ -143,6 +157,7 @@ export function outcomeFailure(
       "Call thread_list to see the thread's current state, then retry when it runs again.",
       { device, reason: outcome.reason },
     )
+  if (outcome.reason === "chain_count_limit") return chainCountLimitFailure(device)
   if (outcome.reason === "record_too_large")
     return fail(
       "unsupported",

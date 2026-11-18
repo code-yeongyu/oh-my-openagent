@@ -1,6 +1,6 @@
 import { GatewayMigrationError } from "../gateway/store-ops"
 import type { GatewayStore } from "../gateway/store"
-import type { IntakeRecord } from "../gateway/types"
+import type { IntakeOutcome, IntakeRecord } from "../gateway/types"
 import { findDiskSessions } from "../address-book"
 import { resolveWakeTarget } from "../wake/session-target"
 import { decodeServeAck, refusalCode, type DeliveryInboundEvent, type DeliveryServicePort } from "./port"
@@ -56,6 +56,20 @@ function intakeRecord(event: DeliveryInboundEvent): IntakeRecord | undefined {
 }
 
 const UNKNOWN_SHAPE = new Set(["unknown_type", "unsupported"])
+
+/**
+ * The answer for a record the intake refused. The store names the precise cause in `details.reason` (for example
+ * `chain_count_limit`, with `chain_count` and `limit`); the sender maps that reason (`relay-transport.ts` `wakeRefusal`),
+ * so it is sent in place of the coarse tool code, which stays the reason only when the store named none.
+ */
+function intakeRefusal(refusal: Extract<IntakeOutcome, { kind: "refused" }>): Record<string, unknown> {
+  const details = refusal.details ?? {}
+  const reason = typeof details["reason"] === "string" ? details["reason"] : refusal.code
+  const counts = Object.fromEntries(
+    ["chain_count", "limit"].flatMap((key) => (typeof details[key] === "number" ? [[key, details[key]]] : [])),
+  )
+  return { kind: "refused", reason, ...counts }
+}
 
 /**
  * The engine side of the delivery protocol (#13037 5.4, 5.12, A2.4, A2.14). A handed record is resolved here first
@@ -128,8 +142,12 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
       provenance: { workspace: "remote", project: "remote" },
       target_session_kind: "interactive",
     })
-    if (outcome.kind !== "queued") {
-      await answer(pair, { kind: "refused", reason: outcome.kind === "busy" ? "busy" : outcome.code })
+    if (outcome.kind === "busy") {
+      await answer(pair, { kind: "refused", reason: "busy" })
+      return
+    }
+    if (outcome.kind === "refused") {
+      await answer(pair, intakeRefusal(outcome))
       return
     }
     if (!outcome.deduplicated)
