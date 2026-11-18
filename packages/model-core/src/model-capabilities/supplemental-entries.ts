@@ -1,6 +1,8 @@
+import { GPT_6_2_MODEL_CAPABILITIES } from "./gpt-6-2-entries"
 import type { ModelCapabilitiesSnapshotEntry } from "./types"
 
 export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSnapshotEntry> = {
+  ...GPT_6_2_MODEL_CAPABILITIES,
   "kimi-k3": {
     id: "kimi-k3",
     family: "kimi",

@@ -1,6 +1,7 @@
 import type { RemoteClient } from "../../remote"
 import type { DeviceService } from "@oh-my-opencode/device-service-core/device-service"
 import type { AliasRegistry } from "./alias-port"
+import type { ThreadStatus } from "../contracts/results"
 
 export type JsonObject = { readonly [key: string]: unknown }
 
@@ -16,6 +17,11 @@ export type RemoteSessionRow = {
   readonly path: string
   readonly state: string
   readonly updated_ms: number
+  /**
+   * `live`: the device answered this listing round. `cache`: it did not, and the relay served its last snapshot, whose
+   * `state` is only what it was then (#14043). Absent (an older service, a row built here): treated as `live`.
+   */
+  readonly source?: "live" | "cache"
 }
 
 export type RemoteDevice = {
@@ -213,8 +219,20 @@ export type ChainCountWire = {
 export type { AliasError, AliasErrorCode, AliasHolder, AliasRegistry, AliasResult } from "./alias-port"
 
 /** Everything the tools need to reach past this machine. Absent: the tools are exactly the local ones. */
+/**
+ * senpi's `buildSessionProjection(entries, leafId).entries`: the session's context along the leaf, each projected entry
+ * with the messages it contributes (`get_messages` answers exactly these messages). A paged thread_read projects the
+ * entries it fetched with it (#14047).
+ */
+export type SessionProjector = (
+  entries: readonly JsonObject[],
+  leafId: string | null,
+) => readonly { readonly sourceEntry: { readonly id: string }; readonly messages: readonly object[] }[]
+
 export type RemoteThreadSurface = {
   readonly sessions: RemoteSessionsPort
+  /** The engine's own projector, loaded on the first paged read; absent (the CLI), remote reads take `get_messages`. */
+  readonly loadProjector?: () => Promise<SessionProjector>
   /** The one remote client (#13414): the account's state, this device and the device list are read through it. */
   readonly client: RemoteClient
   /** Absent until the account service's alias registry ships: aliases are then refused typed, never guessed. */
@@ -226,6 +244,17 @@ export type RemoteThreadSurface = {
 
 /** The id a listing row has ABOVE the ports (decision 0027 D2): its durable id and nothing else; "" when the device publishes none. */
 export const rowThreadId = (row: RemoteSessionRow): string => row.durable_id ?? ""
+
+/**
+ * A listing row's thread status. Live only when its device answered this round with a non-ended state: a cached row of a
+ * device that did not answer is a snapshot (often days old, of sessions long gone), never proof the session runs (#14043).
+ */
+export const rowStatus = (row: RemoteSessionRow): ThreadStatus =>
+  row.state === "ended" || row.source === "cache" ? "resumable" : "live"
+
+/** A listing row's display name: its title, else its folder's name, so no listed thread shows an empty name (#14043). */
+export const rowLabel = (row: RemoteSessionRow): string =>
+  row.title !== "" ? row.title : (row.project.split(/[\\/]/).findLast((part) => part !== "") ?? "")
 
 /**
  * A session a device holds on disk but no engine runs (omo#13037 A4.2): built from that device's own probe answer, its

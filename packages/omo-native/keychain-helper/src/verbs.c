@@ -257,7 +257,7 @@ void verb_remove(const char *account) {
   item_state_release(&data);
   // A locked keychain is today's locked class. An unlocked ACL miss on someone else's item is not-owned.
   // Our own marker on an unlocked keychain is deleted without decrypt rights: the trusted-app path can be a
-  // helper copy that no longer exists, and that refusal is not a locked keychain.
+  // helper copy that no longer exists, and that refusal is not a locked keychain (delete_item, store.c).
   if (status == errSecAuthFailed && item_keychain_locked(account)) {
     reply_error("locked", NULL, status);
     return;
@@ -277,10 +277,6 @@ void verb_remove(const char *account) {
   }
   if (deleted == errSecItemNotFound) {
     reply_ok("missing");
-    return;
-  }
-  if (marked && !item_keychain_locked(account) && security_delete_generic_password(account)) {
-    reply_ok(NULL);
     return;
   }
   if ((deleted == errSecAuthFailed || status == errSecAuthFailed) && !item_keychain_locked(account))

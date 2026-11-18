@@ -1,5 +1,5 @@
 import type { ThreadSummary } from "../contracts"
-import { rowThreadId } from "../remote/ports"
+import { rowLabel, rowStatus, rowThreadId } from "../remote/ports"
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import { INITIAL_SKILLS_CONTEXT_KEY } from "../initial-skills"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "../remote/ports"
@@ -30,13 +30,13 @@ export function listedThread(row: RemoteSessionRow): HostedThread {
   return {
     sessionId: row.session_id,
     thread_id: rowThreadId(row),
-    name: row.title,
-    status: row.state === "ended" ? "resumable" : "live",
+    name: rowLabel(row),
+    status: rowStatus(row),
     cwd: row.project,
     created_at: seen,
     updated_at: seen,
     device: row.device,
-    link: threadLink(rowThreadId(row), row.title),
+    link: threadLink(rowThreadId(row), rowLabel(row)),
   }
 }
 
@@ -118,7 +118,7 @@ export function createRelaySessionHost(
             threadToolFailure(
               "unsupported",
               `Device ${device} created the thread but did not name its relay key (${located.reason}).`,
-              "Address it by thread_id once thread_list with all_scope lists it, or update omo on that device.",
+              "Address it by its thread value once thread_list with all_scope lists it, or update omo on that device.",
               { device, reason: located.reason },
             ),
           )

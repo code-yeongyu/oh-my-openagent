@@ -129,7 +129,7 @@ describe("category activation gating", () => {
       // then
       expect(result.kind).toBe("model_unavailable")
       if (result.kind !== "model_unavailable") throw new Error("Expected model_unavailable")
-      expect(result.attemptedModel).toBe("chatgpt-subscription/gpt-6-astra")
+      expect(result.attemptedModel).toBe("chatgpt-subscription/gpt-6.2-astra")
       expect(result.availableCategories).not.toContain("ultrabrain")
     })
 
