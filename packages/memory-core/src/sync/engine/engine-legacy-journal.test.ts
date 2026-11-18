@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test"
-import { readFile, rm, writeFile } from "node:fs/promises"
+import { readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import { CrashInjected } from "./engine"
@@ -117,6 +117,41 @@ for (const [label, point, shape] of LEGACY_SHAPES.filter(([label]) => !label.inc
     GIT_TEST_TIMEOUT,
   )
 }
+
+// #12575 review: adoption reads the working file of an unconfirmed legacy render; a leaf this device refuses to read
+// (here a symlink, refused with ELOOP) is not adoptable, instead of failing the resumed cycle on every run.
+test(
+  "a legacy unconfirmed render whose working file became a symlink is not adopted, and the resumed cycle completes",
+  async () => {
+    // given
+    const server = new FakeSyncServer()
+    const a = await makeDevice(server, "a")
+    const b = await makeDevice(server, "b")
+    devices.push(a, b)
+    await a.write("x.md", "one\n")
+    await a.engine.runCycle()
+    await b.engine.runCycle()
+    await a.write("x.md", "one\ntwo\n")
+    await a.engine.runCycle()
+    await b.restart(crashAt("render-key"))
+    await expect(b.engine.runCycle()).rejects.toBeInstanceOf(CrashInjected)
+    await rewriteAsLegacy(b, { stage: "merged", texts: {}, progress: { "x.md": { text: "one\ntwo\n", done: false } } })
+    await rm(join(b.repo.root, "x.md"))
+    await symlink("nowhere.md", join(b.repo.root, "x.md"))
+
+    // when
+    await b.restart()
+    const outcome = await b.engine.runCycle().then(
+      () => "completed",
+      (error: unknown) => error,
+    )
+
+    // then
+    expect(outcome).toBe("completed")
+    expect((await b.engine.state()).cycle).toBeNull()
+  },
+  GIT_TEST_TIMEOUT,
+)
 
 for (const realStore of [false, true]) {
   test(
