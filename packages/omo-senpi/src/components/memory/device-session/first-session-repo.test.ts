@@ -8,7 +8,12 @@ import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
 import type { DeviceKeyring } from "@oh-my-opencode/memory-core/keyring"
 import { GitSpaceConfig, listRemotes, repoHasCommit, resolveSpace } from "@oh-my-opencode/memory-core/sync-engine"
 
-import { createSyncRunner, SYNC_IDLE_NO_DEVICE_SESSION, SYNC_IDLE_NOT_JOINED } from "../sync-runner"
+import {
+  createSyncRunner,
+  SYNC_IDLE_NO_DEVICE_SESSION,
+  SYNC_IDLE_NOT_JOINED,
+  type SyncRunnerTimers,
+} from "../sync-runner"
 import { isSyncSessionDeferred } from "../sync-session-deferred"
 import type { CliDeviceAccount, DeviceAccount } from "./account-source"
 import { createDeviceSessionResolver, type DeviceSessionRuntime } from "./resolver"
@@ -182,7 +187,24 @@ describe("an account change while sync waits for the memory repository (#13624)"
     const warnings: string[] = []
     const errors: string[] = []
     let passes = 0
+    // The runner's own live timers (#14001): the process may hold others (Windows CI did), so tests count only these.
+    const live = new Set<ReturnType<typeof setTimeout>>()
+    const timers: SyncRunnerTimers = {
+      setTimeout: (run, ms) => {
+        const handle = setTimeout(() => {
+          live.delete(handle)
+          run()
+        }, ms)
+        live.add(handle)
+        return handle
+      },
+      clearTimeout: (handle) => {
+        if (handle !== undefined) live.delete(handle)
+        clearTimeout(handle)
+      },
+    }
     const runner = createSyncRunner({
+      timers,
       logger: {
         info: (message, fields) => {
           if (message === SYNC_IDLE_NO_DEVICE_SESSION || message === SYNC_IDLE_NOT_JOINED)
@@ -205,7 +227,17 @@ describe("an account change while sync waits for the memory repository (#13624)"
     })
     await runner.acquire("agent", paths, { enabled: true }, { profile: null, projectDir })
     await runner.status(paths.repo)
-    return { runner, paths, lifetime, opened, idle, warnings, errors, passes: () => passes }
+    return {
+      runner,
+      paths,
+      lifetime,
+      opened,
+      idle,
+      warnings,
+      errors,
+      passes: () => passes,
+      runnerTimers: () => live.size,
+    }
   }
 
   test("a sign-out goes idle at the account's signal, with one account pass for the change and no retry after", async () => {
@@ -259,13 +291,13 @@ describe("an account change while sync waits for the memory repository (#13624)"
     const sync = await waitingRunner(() => null)
     try {
       // The waiting pass's retry delay is the one timer the runner holds.
-      expect(jest.getTimerCount()).toBe(1)
+      expect(sync.runnerTimers()).toBe(1)
       sync.lifetime.abort()
       await sync.runner.status(sync.paths.repo)
 
       expect(sync.idle).toEqual([{ message: SYNC_IDLE_NO_DEVICE_SESSION, reason: undefined }])
       // The retry ran at the signal, so its delay timer is gone instead of pending for up to five minutes.
-      expect(jest.getTimerCount()).toBe(0)
+      expect(sync.runnerTimers()).toBe(0)
     } finally {
       jest.useRealTimers()
       await sync.runner.release(sync.paths.repo)
@@ -283,7 +315,7 @@ describe("an account change while sync waits for the memory repository (#13624)"
       expect(sync.idle).toEqual([{ message: SYNC_IDLE_NO_DEVICE_SESSION, reason: undefined }])
       expect(sync.passes()).toBe(2)
       expect(sync.warnings).toHaveLength(1)
-      expect(jest.getTimerCount()).toBe(0)
+      expect(sync.runnerTimers()).toBe(0)
       expect(sync.errors).toEqual([])
     } finally {
       jest.useRealTimers()
