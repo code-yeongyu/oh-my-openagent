@@ -43,7 +43,62 @@ for (const [code, status, reason] of KNOWN) {
     }
     expect(await f.call("pending", owner("a").context)).toEqual({ kind: "refused", reason, code })
   })
+
+  // #13659: every verb that can surface a service refusal carries its code, not only enable and pending.
+  test(`#given the service refuses the devices read with ${code} #when devices is read #then it reports that code with its own copy`, async () => {
+    const f = await setup()
+    const original = f.account.forOperation
+    f.account.forOperation = async (authority) => ({
+      ...(await original(authority)),
+      devices: async () => {
+        throw new AccountHttpError(code, status)
+      },
+    })
+    expect(await f.call("devices", owner("a").context)).toEqual({ kind: "refused", reason, code })
+  })
+
+  test(`#given the service refuses approval with ${code} before any pending row #when approve begins #then it reports that code with its own copy`, async () => {
+    const f = await setup()
+    f.runtime.approveDevice = async () => {
+      throw new AccountHttpError(code, status)
+    }
+    const result = await f.call("approve", owner("a").context, { action: "begin", pendingId: "p" })
+    expect(result).toEqual({ kind: "refused", reason, code })
+  })
+
+  test(`#given the service refuses with ${code} after the pending row was answered #when the approval settles #then its outcome reports that code with its own copy`, async () => {
+    const f = await approvalRefusedAfterAnswer(new AccountHttpError(code, status))
+    expect(await f.confirm()).toMatchObject({ pendingId: "p", outcome: { kind: "refused", reason, code } })
+  })
 }
+
+// The approver answered the pending row, showed its code, and the service refuses once the person confirms.
+async function approvalRefusedAfterAnswer(error: Error) {
+  const f = await setup()
+  const a = owner("a")
+  const displayed = Promise.withResolvers<undefined>()
+  f.runtime.approveDevice = async (input) => {
+    input.onAnswered({ id: input.pendingId, expires_at: Date.now() + 60_000 })
+    const confirmation = input.confirmCode("012345")
+    displayed.resolve(undefined)
+    await confirmation
+    throw error
+  }
+  await f.call("approve", a.context, { action: "begin", pendingId: "p" })
+  await displayed.promise
+  return { confirm: () => f.call("approve", a.context, { action: "confirm", pendingId: "p", code: "012345" }) }
+}
+
+test("#given a service code outside the contract after the pending row was answered #when the approval settles #then the outcome is the generic refusal with no code or service text", async () => {
+  const f = await approvalRefusedAfterAnswer(new AccountHttpError("private-detail", 403))
+  const result = await f.confirm()
+  expect(result).toMatchObject({ pendingId: "p" })
+  expect((result as { readonly outcome: unknown }).outcome).toEqual({
+    kind: "refused",
+    reason: "The sync service could not complete this operation.",
+  })
+  expect(JSON.stringify(result)).not.toContain("private-detail")
+})
 
 test("#given a service code outside the contract #when enable settles #then the generic refusal carries no code or service text", async () => {
   const f = await setup()

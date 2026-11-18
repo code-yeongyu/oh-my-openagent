@@ -95,11 +95,17 @@ export type SyncApproveRequest =
   | { readonly action: "confirm"; readonly pendingId: PendingId; readonly code: PairingCode }
   | { readonly action: "decline"; readonly pendingId: PendingId }
 
+/**
+ * How an approval ended. memory-core's outcome never names a service code: a service refusal reaches the adapter as an
+ * error, so a code from the contract's list rides on the same `refused` shape the other verbs answer with (#13659).
+ */
+export type SyncApproveOutcome = ApproveOutcome | Extract<SyncRpcProblem, { readonly kind: "refused" }>
+
 export interface ApprovalProgress {
   readonly pendingId: PendingId
   readonly expiresAt: number
   readonly code: PairingCode | null
-  readonly outcome: ApproveOutcome | null
+  readonly outcome: SyncApproveOutcome | null
 }
 
 export type SyncApproveResponse = ApprovalProgress | SyncRpcProblem
