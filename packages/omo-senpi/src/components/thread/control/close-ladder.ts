@@ -18,7 +18,7 @@ export const SESSION_GONE: ReadonlySet<string> = new Set([
 ])
 
 /** senpi#7004: the engine takes `unload_session { deliveries: "refuse" }` and names unwritten deliveries it refuses on. */
-export const UNLOAD_REFUSE_DELIVERIES = "unload_refuse_deliveries"
+const UNLOAD_REFUSE_DELIVERIES = "unload_refuse_deliveries"
 
 const UNLOAD = { type: "unload_session", force: true, children: "detach" } as const
 
@@ -75,7 +75,12 @@ export async function closeLadder(
         "turn_active",
         `Thread ${sessionId} is still working (${describe(refused)}), and its host's engine cannot name the messages a forced close would drop.`,
         "Wait for it to finish, or close it with force: true to stop it now (anything it has not read is dropped); update omo on that device to see those messages first.",
-        { command: "unload_session", reason: refused["reason"], detail: refused["detail"], pending_deliveries: "unavailable" },
+        {
+          command: "unload_session",
+          reason: refused["reason"],
+          detail: refused["detail"],
+          pending_deliveries: "unavailable",
+        },
       )
     const second = await unload({ interrupt: true, deliveries: "refuse" })
     if ("done" in second) return second.done

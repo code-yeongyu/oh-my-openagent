@@ -372,11 +372,21 @@ export function createRemoteThreadFixture() {
         // senpi session-unload.ts as of #7006 (an engine without the capability ignores `deliveries`).
         const pending = capable ? { pending: { deliveries: [...unread] } } : {}
         if (busy && unread.length > 0 && capable && rpc["deliveries"] === "refuse")
-          return ok({ outcome: "refused", reason: "work_pending", detail: "an admitted delivery not yet written", ...pending })
+          return ok({
+            outcome: "refused",
+            reason: "work_pending",
+            detail: "an admitted delivery not yet written",
+            ...pending,
+          })
         if (busy && rpc["interrupt"] !== true)
           return ok({ outcome: "refused", reason: "turn_active", detail: "an agent run" })
         if (!busy && unread.length > 0 && rpc["interrupt"] !== true)
-          return ok({ outcome: "refused", reason: "work_pending", detail: "an admitted delivery not yet written", ...pending })
+          return ok({
+            outcome: "refused",
+            reason: "work_pending",
+            detail: "an admitted delivery not yet written",
+            ...pending,
+          })
         const dropped = rpc["interrupt"] === true ? unread.splice(0) : []
         busy = false
         live.delete(attachedTo)

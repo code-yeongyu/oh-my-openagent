@@ -826,7 +826,14 @@ export function createLiveThreadSurface(
               kind: "ok",
               data:
                 type === "get_state"
-                  ? await callOn<Record<string, unknown>>(socket ?? legacy, "get_state", data, undefined, durableId, true)
+                  ? await callOn<Record<string, unknown>>(
+                      socket ?? legacy,
+                      "get_state",
+                      data,
+                      undefined,
+                      durableId,
+                      true,
+                    )
                   : // The host's own capabilities, read the way every connection opens (an observing read, no fence).
                     type === "get_protocol_info"
                     ? await callOn<Record<string, unknown>>(socket ?? legacy, "get_protocol_info", { observe: true })

@@ -64,13 +64,21 @@ describe("thread_close and the messages a thread has not read (#14234)", () => {
       closed: true,
       dropped_deliveries: [],
     })
-    expect(a.sent.map((entry) => entry.rpc?.["type"])).toEqual(["unload_session", "get_protocol_info", "unload_session"])
+    expect(a.sent.map((entry) => entry.rpc?.["type"])).toEqual([
+      "unload_session",
+      "get_protocol_info",
+      "unload_session",
+    ])
   })
 
   test("#given an idle thread on b with nothing pending #when thread_close names it #then one unload closes it", async () => {
     const a = account()
     const { run } = surface(a.remote)
-    expect(await run("thread_close", { thread: "dur-on-b" })).toMatchObject({ kind: "ok", closed: true, dropped_deliveries: [] })
+    expect(await run("thread_close", { thread: "dur-on-b" })).toMatchObject({
+      kind: "ok",
+      closed: true,
+      dropped_deliveries: [],
+    })
     expect(a.sent.map((entry) => entry.rpc?.["type"])).toEqual(["unload_session"])
   })
 

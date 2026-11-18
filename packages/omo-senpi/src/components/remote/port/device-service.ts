@@ -74,7 +74,12 @@ const sessionReason = (code: string): string => (code === "session_not_found" ? 
 
 // The engine records the thread tools send that change nothing on the other device (thread_read and its paged form,
 // the pre-send probe). Like the port's read, every failure of one is a typed refusal: there is nothing that may have run.
-const READ_ONLY_RECORDS: ReadonlySet<string> = new Set(["get_state", "get_messages", "get_entries", "get_protocol_info"])
+const READ_ONLY_RECORDS: ReadonlySet<string> = new Set([
+  "get_state",
+  "get_messages",
+  "get_entries",
+  "get_protocol_info",
+])
 
 // How long a read-only record waits for its final state before it is refused request_timeout (the local API's own request
 // bound). Every other record keeps the attach's default bound: a lost final state never holds a tool call forever.

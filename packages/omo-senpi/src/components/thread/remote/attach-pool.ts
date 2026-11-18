@@ -8,7 +8,7 @@ import type { JsonObject } from "./ports"
 // capability is only ever read as "may refuse instead of drop". Status and transcript reads (`get_state`,
 // `get_messages`) are never held: the engine's in-memory state changes with no record on the attach (a live run held
 // isStreaming false for 17 s of a running turn), so they always go to the device.
-export const CATALOG_RECORD = "get_available_models"
+const CATALOG_RECORD = "get_available_models"
 export const HELD_RECORDS: ReadonlySet<string> = new Set([CATALOG_RECORD, "get_protocol_info"])
 const CATALOG_MAX_AGE_MS = 600_000
 

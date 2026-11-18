@@ -370,7 +370,10 @@ describe("sessions.send and sessions.read", () => {
 describe("sessions controls", () => {
   test("#given the live session #when sessions.close runs #then the close ladder unloads it", async () => {
     const { owner, sent } = await onWorld()
-    expect(await valueOf(clientOn(owner.stateDir, fakeClock()).sessions.close(LIVE))).toEqual({ closed: true, dropped_deliveries: [] })
+    expect(await valueOf(clientOn(owner.stateDir, fakeClock()).sessions.close(LIVE))).toEqual({
+      closed: true,
+      dropped_deliveries: [],
+    })
     expect(sent("unload_session")).toEqual([expect.objectContaining({ sessionId: SESSION_ID, force: true })])
   })
 
