@@ -12,7 +12,6 @@ import type { ToolContext } from "@opencode-ai/plugin/tool"
 const TEST_DIR = join(tmpdir(), `omo-test-session-paging-${randomUUID()}`)
 
 mock.module("./constants", () => ({
-  OPENCODE_STORAGE: TEST_DIR,
   MESSAGE_STORAGE: join(TEST_DIR, "message"),
   PART_STORAGE: join(TEST_DIR, "part"),
   SESSION_STORAGE: join(TEST_DIR, "session"),
@@ -22,8 +21,6 @@ mock.module("./constants", () => ({
   SESSION_READ_DESCRIPTION: "test",
   SESSION_SEARCH_DESCRIPTION: "test",
   SESSION_INFO_DESCRIPTION: "test",
-  SESSION_DELETE_DESCRIPTION: "test",
-  TOOL_NAME_PREFIX: "session_",
 }))
 
 mock.module("../../shared/opencode-storage-detection", () => ({

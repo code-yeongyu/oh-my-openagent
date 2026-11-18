@@ -1,6 +1,6 @@
 {
   "name": "oh-my-opencode",
-  "version": "5.1.70",
+  "version": "5.1.76",
   "description": "The Best AI Agent Harness - Batteries-Included OpenCode Plugin with Multi-Model Orchestration, Parallel Background Agents, and Crafted LSP/AST Tools",
   "main": "./dist/index.js",
   "types": "dist/index.d.ts",
@@ -164,7 +164,7 @@
     "build:git-bash-mcp": "bun run --cwd packages/git-bash-mcp build",
     "build:ast-grep-mcp": "bun run --cwd packages/ast-grep-mcp build",
     "test:desktop": "bun script/check-cargo-pinned-deps.mjs && node --test scripts/desktop-package-boundaries.test.mjs && bun run --cwd packages/senpi-desktop-protocol test && bun run --cwd packages/senpi-desktop-engine test && bun run --cwd packages/senpi-desktop-prelude test && bun run --cwd packages/senpi-desktop-sdk test && bun run --cwd packages/senpi-desktop-service test && bun run --cwd packages/senpi-desktop-tool test",
-    "test:computer": "bun script/check-cargo-pinned-deps.mjs && bun run --cwd packages/omo-computer-protocol test && bun run --cwd packages/omo-computer-sdk test && bun run --cwd packages/omo-computer-engine test && bun run --cwd packages/omo-computer-hand test && bun run --cwd packages/omo-computer-carriers test && bun run --cwd packages/omo-computer-tool test && bun run --cwd packages/omo-computer-prelude test",
+    "test:computer": "bun script/check-cargo-pinned-deps.mjs && bun crates/omo-computer-backend-wayland/probes/probe-sp-w.ts --self-test && bun run --cwd packages/omo-computer-protocol test && bun run --cwd packages/omo-computer-sdk test && bun run --cwd packages/omo-computer-engine test && bun run --cwd packages/omo-computer-hand test && bun run --cwd packages/omo-computer-carriers test && bun run --cwd packages/omo-computer-tool test && bun run --cwd packages/omo-computer-prelude test",
     "fmt": "bun fmt --no-script",
     "fmt:check": "bun fmt --no-script --check",
     "lint:ratchet": "bun script/lint-ratchet.ts",
@@ -198,7 +198,7 @@
   },
   "devDependencies": {
     "@clack/prompts": "^1.8.1",
-    "@code-yeongyu/senpi": "2026.11.13",
+    "@code-yeongyu/senpi": "2026.11.15-4",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@oh-my-opencode/agents-md-core": "workspace:*",
     "@oh-my-opencode/ast-grep-mcp": "workspace:*",
@@ -271,18 +271,18 @@
     "typescript": "^7.0.2"
   },
   "optionalDependencies": {
-    "oh-my-opencode-darwin-arm64": "5.1.70",
-    "oh-my-opencode-darwin-x64": "5.1.70",
-    "oh-my-opencode-darwin-x64-baseline": "5.1.70",
-    "oh-my-opencode-linux-arm64": "5.1.70",
-    "oh-my-opencode-linux-arm64-musl": "5.1.70",
-    "oh-my-opencode-linux-x64": "5.1.70",
-    "oh-my-opencode-linux-x64-baseline": "5.1.70",
-    "oh-my-opencode-linux-x64-musl": "5.1.70",
-    "oh-my-opencode-linux-x64-musl-baseline": "5.1.70",
-    "oh-my-opencode-windows-arm64": "5.1.70",
-    "oh-my-opencode-windows-x64": "5.1.70",
-    "oh-my-opencode-windows-x64-baseline": "5.1.70"
+    "oh-my-opencode-darwin-arm64": "5.1.76",
+    "oh-my-opencode-darwin-x64": "5.1.76",
+    "oh-my-opencode-darwin-x64-baseline": "5.1.76",
+    "oh-my-opencode-linux-arm64": "5.1.76",
+    "oh-my-opencode-linux-arm64-musl": "5.1.76",
+    "oh-my-opencode-linux-x64": "5.1.76",
+    "oh-my-opencode-linux-x64-baseline": "5.1.76",
+    "oh-my-opencode-linux-x64-musl": "5.1.76",
+    "oh-my-opencode-linux-x64-musl-baseline": "5.1.76",
+    "oh-my-opencode-windows-arm64": "5.1.76",
+    "oh-my-opencode-windows-x64": "5.1.76",
+    "oh-my-opencode-windows-x64-baseline": "5.1.76"
   },
   "overrides": {
     "hono": "^4.13.8",

@@ -121,8 +121,10 @@ missing required field, or a field one variant of a message defines carried by a
 | `device.info`                |                                                                          | `{device}` (`{id, name}` or null)                                    |                                                                       |
 | `endpoints.register`         | `agent_dir` (absolute)                                                   | `{}`                                                                 |                                                                       |
 | `endpoints.unregister`       | `agent_dir` (absolute)                                                   | `{}`                                                                 |                                                                       |
+| `endpoints.list`             |                                                                          | `{agent_dirs}` (absolute, sorted)                                    | relay daemon 0.1.35 (#1266): the agent dirs registered with `endpoints.register`; send only to a service at 0.1.35 or later |
 | `devices.list`               |                                                                          | `{devices: [{device, label, kind, platform, last_seen_ms, online}]}` |                                                                       |
 | `sessions.list`              | `filter?` (`device`, `project`, `state`), `rows?` (`2`, `3`)             | `{query_id}`                                                         | then the round and listing events                                     |
+| `sessions.events.subscribe`  |                                                                          | `{}`                                                                 | then `sessions.listing_changed` events on this connection (omo does not send it yet) |
 | `session.attach`             | `device`, `session_id`                                                   | `{attach}`                                                           | then the attach stream                                                |
 | `session.detach`             | `attach`                                                                 | `{}`                                                                 | closing a connection detaches its attaches                            |
 | `session.command`            | `attach`, `command_id?`, `rpc` or `upload_id`, `delegated?`, `endpoint?` | `{command_id}`                                                       | then `session.command_state`; delegated: see below                    |
@@ -134,21 +136,11 @@ missing required field, or a field one variant of a message defines carried by a
 | `owner.shutdown_for_upgrade` | `target_version` (semver)                                                | `{}`                                                                 | installer clients only; the service then stops                        |
 | `control.attach.get`         |                                                                          | `{attached, changedAt}`                                              | desktop and CLI clients; never set reads attached with changedAt ""   |
 | `control.attach.set`         | `attached` (boolean)                                                     | `{attached, changedAt}`                                              | desktop and CLI clients; persists; detached refuses other devices     |
-| `control.session_wake.get`   |                                                                          | `{enabled, stored, changedAt, overridden}`                           | desktop and CLI clients; local only, never over the transport         |
-| `control.session_wake.set`   | `enabled` (boolean or null)                                              | `{enabled, stored, changedAt, overridden}`                           | desktop and CLI clients; persists; null follows the build default     |
 
 Keys for `device.adopt`: the standard base64 (padded) of the key's PKCS#8 DER, 48 bytes: the body of a PEM file without
 its header, footer and line breaks. The signing key is Ed25519 (OID 1.3.101.112), the sealing key X25519
 (OID 1.3.101.110); a key of the other algorithm, another length, or anything that is not exactly that encoding is
 refused `invalid_request`. The local API checks the shape only; the service checks the keys themselves.
-
-The wake switch (`control.session_wake.*`, omo#13037 A7.2.1) says whether a session on this device that is not running
-may be started by a message from another of the account's devices. `enabled` is the value in effect. `stored` is what the
-device holds: `true`, `false`, `null` (nothing stored, so the build default applies) or `"unreadable"` (a stored value
-that does not parse, or a read that failed); a set replaces it, which is how an unreadable value is repaired, and a set
-of `null` removes the stored value. `changedAt` is the RFC 3339 UTC time of the last set, or `""` when nothing was ever
-stored. `overridden` is true when this run of the service cannot carry the wake whatever the switch says. Any other
-client is refused `forbidden`.
 
 `environments` in `enforcement.report` is a list of `{environment_id, revoked, closed}` with unique ids and
 non-negative integer counts; `complete` is true only when every environment of that home reported for `generation`.

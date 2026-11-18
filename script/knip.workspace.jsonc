@@ -38,10 +38,17 @@
         "script/preflight-trust.mjs",
         "script/print-release-notes.ts",
         "script/published-install-smoke.mjs",
+        "script/qa/computer/conformance/fixtures/electron/main.cjs",
+        "script/qa/computer/conformance/fixtures/electron/preload.cjs",
+        "script/qa/computer/conformance/fixtures/self-test.ts",
+        "script/qa/computer/conformance/fixtures/web/page.js",
         "script/qa/computer/conformance/report.ts",
         "script/qa/computer/conformance/run.ts",
+        "script/qa/computer/pool/macos-vm.ts",
         "script/qa/computer/pool/windows-full.ts",
         "script/qa/computer/pool/xorg-uinput-probe.ts",
+        // run by path as the computer-use v3 corpus replay driver
+        "script/qa/computer/replay.ts",
         // run by path as the live GNOME Wayland window-input QA (docs/guide/computer-use.md)
         "script/qa/desktop/gnome.ts",
         "script/qa/desktop/hyprland.ts",
@@ -87,8 +94,6 @@
         "script/check-temp-leak-report-only.d.mts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "script/ci-fast-path.d.mts",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "script/ci-platform-invocations.d.mts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "script/fixtures/senpi-hooks-state-error-runner.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
@@ -221,8 +226,6 @@
     "script/ci-fast-path.mjs": ["isRuntimePath", "classifyCiMode"],
     // pre-existing at origin dev 4686e425b5: unused export(s) judgeLeg
     "script/ci-leg-tests-guard.mjs": ["judgeLeg"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) platformOnlyStepTexts
-    "script/ci-platform-invocations.mjs": ["platformOnlyStepTexts"],
     // pre-existing at origin dev 4686e425b5: unused export(s) claudeCodePackageFor, lockfileIntegrity
     "script/claude-code-pin.ts": ["claudeCodePackageFor", "lockfileIntegrity"],
     // pre-existing at origin dev 4686e425b5: unused export(s) proveStagedDesktopEngine
@@ -285,8 +288,8 @@
     "script/qa/omo-native-parity-compare.mjs": ["DOCTOR_EXPECTED_ONLY", "sectionKey", "compareLines", "BINARY_ONLY_REQUIRED_STEPS", "memoryReceiptFailures"],
     // pre-existing at origin dev 4686e425b5: unused export(s) GOVERNED_SURFACES
     "script/retired-agent-names.test.ts": ["GOVERNED_SURFACES"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) ROOT_TEST_SERIAL_QUARANTINE, POSIX_TEST_TIMEOUT_MS
-    "script/root-test-serial-quarantine.ts": ["ROOT_TEST_SERIAL_QUARANTINE", "POSIX_TEST_TIMEOUT_MS"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) ROOT_TEST_SERIAL_QUARANTINE
+    "script/root-test-serial-quarantine.ts": ["ROOT_TEST_SERIAL_QUARANTINE"],
     // pre-existing at origin dev 4686e425b5: unused export(s) runStats
     "script/stats.ts": ["runStats"],
     // added on dev after the last merge (origin dev 2b5831715e): unused export(s) keyAssignments

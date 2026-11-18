@@ -45,6 +45,24 @@ diagnostics go to stderr.
 | 8 | Keychain unavailable: `{"keychain":"unavailable"}` |
 | 9 | Native storage failure or timeout: `{"error":"store-unavailable"}` |
 
+`omo account show` prints one JSON object and does not refresh the sign-in. A signed-in object includes `refreshState`:
+
+- `ok` means the stored sign-in has no refresh fence.
+- `uncertain` means a protocol-2 refresh attempt is still eligible on this boot: its deadline has not passed and the recovery clock still matches.
+- `expired` means the stored fence is `uncertain` and recovery can no longer be proved. That is no `refreshAttempt`, an attempt whose state is `exhausted`, or an attempt the recovery clock rejects because the deadline passed, the machine rebooted, or the clock itself is unavailable. `signedIn` stays true and the exit code stays 0. The keychain item is not rewritten.
+
+#### `omo account store` (macOS, opt-in)
+
+`omo account store status|enable|disable [--discard]` manages OmO's own keychain for a Mac whose login keychain stays locked. That happens when another macOS user holds the screen, or when nobody is signed in and omo runs over SSH or as a background service. The default stays the login keychain; nothing switches stores on its own.
+
+- `enable` creates `~/Library/Application Support/OmO/credential-keychain/`: a `0700` folder holding the keychain and its random key (`0600`), excluded from Time Machine. If the login keychain holds a sign-in omo can read without a dialog, it is copied, read back, the store is activated, and only then is the login copy removed. If the login keychain is locked, the store starts empty and `omo login` signs in to it.
+- `disable` copies the sign-in back to the login keychain, reads it back, deactivates the store and erases it. It refuses and changes nothing while the login keychain is locked. `--discard` erases the store without moving anything back, and only when signed out (`omo logout` first). A damaged store (one omo refuses) is turned off by `--discard` and its folder is left for you to delete.
+- `status` prints `{"store":"omo"|"login","state":"absent"|"inactive"|"active","path":...}`.
+
+While the store is active, the CLI, the desktop runtime and the device service use it for every read, write and refresh, with no keychain dialog. the sign-in never touches the login keychain, and omo never changes the keychain search list or the default keychain. A damaged store (wrong owner or mode, a symlink, a bad key) is refused by name and never falls back to the login keychain. `omo doctor` prints a `credential store` line when the store exists.
+
+Trade-off: the key sits beside the keychain with owner-only permissions. Other macOS users cannot read it. Anything running as you can, and a backup or disk image taken without FileVault exposes the sign-in; other backup tools copy the key and the keychain together. A restored Mac needs `omo login` again. An OmO desktop app older than this protocol keeps using the login keychain, so update it too.
+
 After a storage failure, the command reports that failure without another store
 read. Native operations are still awaited: there is no additional command
 deadline or forced process termination. A native timeout can therefore still

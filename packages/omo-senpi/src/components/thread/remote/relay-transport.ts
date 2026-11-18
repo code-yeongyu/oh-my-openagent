@@ -4,7 +4,7 @@ import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import { hashArgs } from "../gateway/bindings"
 import { decideDelivery } from "../gateway/decision"
 import { senderFacts } from "../gateway/envelope"
-import { deliveryProvenanceLine, renderDeliveryText } from "../gateway/provenance"
+import { renderDeliveryDisplayText, renderDeliveryText } from "../gateway/provenance"
 import { REFUSAL_CODES } from "../gateway/result"
 import type { GatewayStore } from "../gateway/store"
 import type { DeliveryOutcome, DeliveryTransport, OutboundDelivery, RelayDeliverySuccess } from "../gateway/transport"
@@ -326,9 +326,7 @@ export function createRelayTransport(
     return result
   }
 
-  async function chain(
-    callerId: string,
-  ): Promise<{ readonly delivery_id: string; readonly root_id: string; readonly hop: number }> {
+  async function chain(): Promise<{ readonly delivery_id: string; readonly root_id: string; readonly hop: number }> {
     const cause = options.callerCause?.()
     const prior = cause === undefined ? undefined : (await store.deliveryView(cause))?.row
     return {
@@ -385,7 +383,7 @@ export function createRelayTransport(
       }
     }
     const facts = senderFacts(delivery.sender, await options.senderProvenance())
-    const { delivery_id, root_id, hop } = await chain(delivery.caller_id)
+    const { delivery_id, root_id, hop } = await chain()
     const name = delivery.sender.kind === "session" ? delivery.sender.name?.trim() : undefined
     const recordFor = (effective: EffectiveLane) =>
       remote.chain.stamp(
@@ -404,6 +402,7 @@ export function createRelayTransport(
               root_id,
               hop,
               delivery_id,
+              ...(delivery.authority === undefined ? {} : { authority: delivery.authority }),
             },
             body: delivery.text,
             mode_requested: delivery.mode,
@@ -411,7 +410,13 @@ export function createRelayTransport(
             binding_id: null,
             binding_revision: null,
           }),
-          displayText: `${deliveryProvenanceLine(facts.provenance)}\n${delivery.text}`,
+          displayText: renderDeliveryDisplayText({
+            envelope: {
+              provenance: facts.provenance,
+              ...(delivery.authority === undefined ? {} : { authority: delivery.authority }),
+            },
+            body: delivery.text,
+          }),
           sender: {
             kind: "agent",
             session_id: delivery.caller_id,
@@ -493,21 +498,15 @@ export function createRelayTransport(
       }
       later((revise) => retryHeld(row, record, delivery_id, revise))
     }
-    // An idle receiver reports pendingMessageCount 0 while it holds (held_draft) or already took (already_admitted) the
-    // delivery: the message is still first in line there, so those two kinds answer position 1, never uncertain.
-    // A receiver parked on an approval (an open question its human must answer on that device) reports no queue
-    // position while it holds the message: the delivery is not uncertain, it waits behind that approval (#12886).
+    // Each of these kinds is the engine's own receipt that it holds the delivery, so none of them is uncertain. The
+    // engine's pendingMessageCount does not count an admitted delivery (senpi enqueues it straight into the agent's queue,
+    // outside the user-input count), so a receiver that reports none still holds it, first in line: position 1.
+    // A receiver parked on an approval (an open question its human must answer on that device) waits behind that
+    // approval (#12886); a paused or held one waits on its holds.
     if (kind === "queued" && afterState?.held === true)
       return ok({ kind: "queued", queue_position: pending ?? 1, waiting_on: { kind: "hold", device: row.device } })
     if (kind === "queued" && afterState?.parkedOnApproval === true)
       return ok({ kind: "queued", queue_position: pending ?? 1, waiting_on: { kind: "approval", device: row.device } })
-    if (kind === "queued" && pending === null)
-      return fail(
-        "idempotency_uncertain",
-        `Device ${row.device} accepted the message but did not report where it waits.`,
-        "Read the thread before deciding whether to send again.",
-        { device: row.device, delivery_id },
-      )
     return ok({ kind: "queued", queue_position: pending ?? 1 }, kind === "already_admitted")
   }
 
@@ -536,8 +535,7 @@ export function createRelayTransport(
       if (sent.reason === "unsupported") return wakeRefusal("wake_unsupported", device)
       if (sent.reason === "engine_capability_missing" && sent.detail !== undefined)
         return wakeRefusal(sent.detail, device)
-      // The service's refusal can carry the other device's free-form error text: the same allowlist (#13277 review).
-      return outcomeFailure({ ...sent, reason: shownReason(sent.reason) }, device)
+      return outcomeFailure(sent, device)
     }
     const data = replyData(sent.response)
     const kind = data["kind"]
@@ -636,7 +634,13 @@ export function createRelayTransport(
       row.device,
       row.session_id,
       remote.chain.stamp(
-        { type: "prompt", sessionId: row.session_id, message: delivery.text, streamingBehavior: "followUp" },
+        {
+          type: "prompt",
+          sessionId: row.session_id,
+          message: delivery.text,
+          streamingBehavior: "followUp",
+          ...(delivery.client_message_id === undefined ? {} : { clientMessageId: delivery.client_message_id }),
+        },
         1,
       ),
     )

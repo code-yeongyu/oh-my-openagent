@@ -55,6 +55,23 @@ export type World = {
   // #393: what a host engine endpoint answers to an attach-less session.command {device, endpoint, rpc}: the engine's
   // reply data (sent as session.command_event before the states) and the outcome states.
   readonly endpointCommand?: { readonly data: JsonObject; readonly outcome: readonly CommandOutcome[] }
+  // omo#13037: an owner that takes delivery consumers; absent, every deliveries request answers unsupported.
+  readonly deliveries?: WorldDeliveries
+}
+
+type WorldHandOff = {
+  readonly command_id: string
+  readonly sender_device: string
+  readonly durable_id: string
+  readonly record: JsonObject
+}
+// The agent dirs a consumer may declare, the devices admitted with the grant now, and what the owner does to a consumer
+// the moment its declaration is accepted: hand it these records, and ask it whether it holds these durable ids.
+export type WorldDeliveries = {
+  readonly agent_dirs: readonly string[]
+  readonly admitted?: readonly string[]
+  readonly handed?: readonly WorldHandOff[]
+  readonly asked?: readonly string[]
 }
 
 export const PEER = "dev-peer-1"
