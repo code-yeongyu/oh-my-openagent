@@ -34,7 +34,7 @@ function record(deliveryId: string, sessionId = "t"): Record<string, unknown> {
   }
 }
 
-function setup(options: { readonly admitted?: boolean } = {}) {
+function setup(options: { readonly admitted?: boolean; readonly chainCountLimit?: number } = {}) {
   const h = (harness = createGatewayHarness())
   const service: FakeDeliveryService = createFakeDeliveryService({ admitted: options.admitted ?? true })
   const sessions = join(h.agentDir, "sessions")
@@ -45,6 +45,7 @@ function setup(options: { readonly admitted?: boolean } = {}) {
     port: service.port,
     agentDir: h.agentDir,
     sessionsDirectory: sessions,
+    chainCountLimit: async () => options.chainCountLimit,
     wake: async (durableId) => {
       woken.push(durableId)
     },
@@ -248,6 +249,32 @@ describe("a handed delivery", () => {
       expect(reply.data).toEqual({ kind: "refused", reason })
       await consumer.idle()
       expect(woken).toEqual([])
+    },
+  )
+
+  // #12766 review L1: the device's `threads.chainCountLimit` reaches the store's intake, so the queued route refuses a
+  // chain past it as the running engine does, with the count and the limit the sender maps.
+  test.each([
+    [4, { kind: "refused", reason: "chain_count_limit", chain_count: 4, limit: 3 }],
+    [3, { kind: "queued" }],
+  ])(
+    "#given this device's user set a chain count limit of 3 #when a record at hop %i is handed in #then the answer is %o",
+    async (chainCount, expected) => {
+      const { h, sessions, service, woken, consumer } = setup({ chainCountLimit: 3 })
+      writeSessionFile(sessions, "t")
+      await consumer.start()
+      const reply = await service.inbound({
+        command_id: "c-1",
+        sender_device: "dev-a",
+        durable_id: "t",
+        record: { ...record("d-1"), chainCount },
+      })
+      expect(reply.data).toMatchObject(expected)
+      await consumer.idle()
+      if (expected.kind === "refused") {
+        expect(await h.store().list({ target_durable_id: "t" })).toEqual([])
+        expect(woken).toEqual([])
+      } else expect(woken).toEqual(["t"])
     },
   )
 
