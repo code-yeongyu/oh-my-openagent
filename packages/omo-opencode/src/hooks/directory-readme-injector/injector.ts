@@ -48,6 +48,9 @@ export async function processFilePathForReadmeInjection(input: {
     try {
       const content = await readFile(readmePath, "utf-8")
       const { result, truncated } = await input.truncator.truncate(input.sessionID, content)
+      // Compaction may replace the cache, and another Read may inject while truncation is pending.
+      if (input.sessionCaches.get(input.sessionID) !== cache) return
+      if (cache.has(readmeDir)) continue
       const truncationNotice = truncated
         ? `\n\n[Note: Content was truncated to save context window space. For full context, please read the file directly: ${readmePath}]`
         : ""
@@ -64,7 +67,7 @@ export async function processFilePathForReadmeInjection(input: {
     }
   }
 
-  if (dirty) {
+  if (dirty && input.sessionCaches.get(input.sessionID) === cache) {
     saveInjectedPaths(input.sessionID, cache)
   }
 }

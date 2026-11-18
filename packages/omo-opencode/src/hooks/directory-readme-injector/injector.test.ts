@@ -201,6 +201,97 @@ describe("processFilePathForReadmeInjection", () => {
     expect(secondOutput.output).toBe("")
   })
 
+  it("#given parallel reads for one session #when truncation overlaps #then the README is appended once", async () => {
+    // given
+    writeFileSync(join(testRoot, "README.md"), "# Root README")
+    const { processFilePathForReadmeInjection } = await import("./injector")
+    const sessionCaches = new Map<string, Set<string>>()
+    const truncating = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const truncator = createTruncator()
+    const input = {
+      ctx: createPluginContext(testRoot),
+      truncator,
+      sessionCaches,
+      sessionID: "session-overlap",
+    }
+    const first = { title: "Read A", output: "range A", metadata: {} }
+    const second = { title: "Read B", output: "range B", metadata: {} }
+    const third = { title: "Read C", output: "range C", metadata: {} }
+    const otherSession = { title: "Read D", output: "range D", metadata: {} }
+
+    // when
+    const pending = processFilePathForReadmeInjection({
+      ...input,
+      truncator: {
+        ...truncator,
+        truncate: async (sessionID, content) => {
+          truncating.resolve()
+          await release.promise
+          return truncator.truncate(sessionID, content)
+        },
+      },
+      filePath: join(testRoot, "a.ts"),
+      output: first,
+    })
+    try {
+      await truncating.promise
+      await processFilePathForReadmeInjection({ ...input, filePath: join(testRoot, "b.ts"), output: second })
+    } finally {
+      release.resolve()
+      await pending
+    }
+    await processFilePathForReadmeInjection({ ...input, filePath: join(testRoot, "c.ts"), output: third })
+    await processFilePathForReadmeInjection({
+      ...input,
+      sessionID: "session-other",
+      filePath: join(testRoot, "d.ts"),
+      output: otherSession,
+    })
+
+    // then
+    expect(countReadmeMarkers(first.output + second.output)).toBe(1)
+    expect(first.output.startsWith("range A")).toBe(true)
+    expect(second.output.startsWith("range B")).toBe(true)
+    expect(third.output).toBe("range C")
+    expect(countReadmeMarkers(otherSession.output)).toBe(1)
+  })
+
+  it("#given a Read with a stale cache #when the session cache is reset mid-read #then the next Read can inject", async () => {
+    // given
+    writeFileSync(join(testRoot, "README.md"), "# Root README")
+    const { processFilePathForReadmeInjection } = await import("./injector")
+    const sessionCaches = new Map<string, Set<string>>()
+    const original = { title: "Original", output: "original", metadata: {} }
+    const next = { title: "Next", output: "next", metadata: {} }
+    const input = {
+      ctx: createPluginContext(testRoot),
+      sessionCaches,
+      sessionID: "session-reset",
+      filePath: join(testRoot, "file.ts"),
+    }
+    const truncator = createTruncator()
+
+    // when
+    await processFilePathForReadmeInjection({
+      ...input,
+      truncator: {
+        ...truncator,
+        truncate: async (sessionID, content) => {
+          sessionCaches.delete(sessionID)
+          storageMaps.delete(sessionID)
+          return truncator.truncate(sessionID, content)
+        },
+      },
+      output: original,
+    })
+    await processFilePathForReadmeInjection({ ...input, truncator, output: next })
+
+    // then
+    expect(original.output).toBe("original")
+    expect(countReadmeMarkers(next.output)).toBe(1)
+  })
+
   it("shows truncation notice when content is truncated", async () => {
     // given
     const sourceDirectory = join(testRoot, "src")
@@ -287,5 +378,18 @@ describe("processFilePathForReadmeInjection", () => {
         sessionID,
       },
     )
+
+    // when a later Read retries the same directory
+    await processFilePathForReadmeInjection({
+      ctx: createPluginContext(testRoot),
+      truncator: createTruncator(),
+      sessionCaches,
+      filePath: join(sourceDirectory, "retry.ts"),
+      sessionID,
+      output,
+    })
+
+    // then
+    expect(countReadmeMarkers(output.output)).toBe(1)
   })
 })
