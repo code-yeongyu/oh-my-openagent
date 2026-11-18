@@ -7,6 +7,7 @@ import { openedResult } from "../tools/thread-row"
 import {
   rowStatus,
   type AliasError,
+  type AliasHolder,
   type AliasRegistry,
   type RemoteDevice,
   type RemoteSessionRow,
@@ -261,11 +262,24 @@ export async function planCreate(
   // The thread an open names, located once: the alias check below and the open both need it.
   let located: CrossTarget | undefined
   const locateThread = async (thread: string): Promise<CrossTarget> => (located ??= await local.locate(thread))
-  const opensHolder = async (thread: string, holder: string): Promise<boolean> => {
-    if (thread === value.alias || thread === holder) return true
+  // The holder is a session on ONE device (#14175 review L1): a copy of its session file on another device carries the
+  // same durable id but is not the holder, so the device is compared too. When this device's id cannot be read the
+  // open goes on and the alias claim after it still refuses a thread that is not the holder.
+  const opensHolder = async (thread: string, holder: AliasHolder): Promise<boolean> => {
+    if (thread === value.alias) return true
     const target = await locateThread(thread)
-    if (target.kind === "local") return target.address === holder
-    return target.kind === "remote" && (target.row.durable_id === holder || target.row.session_id === holder)
+    if (target.kind === "error") return thread === holder.session_id
+    if (target.kind === "remote")
+      return (
+        target.row.device === holder.device &&
+        (target.row.durable_id === holder.session_id || target.row.session_id === holder.session_id)
+      )
+    if (target.address !== holder.session_id) return false
+    const here = await accountDevices(remote.client).then(
+      (devices) => devices.here,
+      () => undefined,
+    )
+    return here === undefined || here === holder.device
   }
   const scoped = (plan: CreatePlan): CreatePlan =>
     localAlias === undefined || plan.kind !== "open" ? plan : { ...plan, localAlias }
@@ -285,7 +299,7 @@ export async function planCreate(
       }))
     // Opening the thread that already holds the alias, by that alias, its id or any address that locates it, keeps the
     // alias it has (#12641): only another thread holding it is alias_taken.
-    if (held.kind === "ok" && !(value.thread !== undefined && (await opensHolder(value.thread, held.value.session_id))))
+    if (held.kind === "ok" && !(value.thread !== undefined && (await opensHolder(value.thread, held.value))))
       return {
         kind: "done",
         result: {

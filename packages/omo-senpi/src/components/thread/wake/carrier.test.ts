@@ -208,8 +208,9 @@ describe("the carrier lifts, reads finished, and hands back", () => {
     expect(await carrier.evaluate("s1")).toEqual({ kind: "released" })
   })
 
-  // 6e (two-device cold wake): a wake admitted while the engine was still restoring the session sat queued; the session
-  // read finished, the release was refused for that delivery, and the interrupt retry parked it for a person's turn.
+  // Hardening (#13709): a wake admitted while the engine is still restoring the session sits queued; the session reads
+  // finished, the release is refused for that delivery, and an interrupt retry would park it for a person's turn. This
+  // race was not the cause of the stalled two-device cold wake (6e), which an operator drain stop caused (#13716).
   test("#given a finished-looking session with a queued delivery #when the release is refused for it #then the carrier keeps the session without an interrupt, and releases once the delivery ran", async () => {
     const { fake, store, carrier, path } = await setup()
     fake.setSnapshot(path("s1"), FINISHED)

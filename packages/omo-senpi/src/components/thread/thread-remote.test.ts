@@ -2,6 +2,7 @@ import { Database } from "bun:sqlite"
 import { afterEach, describe, expect, test } from "bun:test"
 import { COMMAND_UNCERTAIN_REASONS } from "../../../../device-service-core/src/local-api/vocabulary"
 import type { ThreadToolResult } from "./contracts"
+import type { RemoteSessionRow } from "./remote/ports"
 import { gatewayDatabasePath } from "./gateway/paths"
 import { type ThreadHostSession } from "./tools"
 import { B_FILE, B_ROW, comparable, createRemoteThreadFixture } from "./thread-remote-fixture"
@@ -534,6 +535,23 @@ describe("A3: an existing thread is named by id or alias only; a device only to 
       expect(a.aliases.get("taken")).toMatchObject({ session_id: "dur-on-b" })
     },
   )
+
+  // #14175 review L1: the holder is a session on one device, so a copy of its file on device c (same durable id) is not it.
+  test("#given b's thread holds an alias and device c lists a copy with the same durable id #when thread_create opens c's copy with that alias #then it is alias_taken and nothing is opened", async () => {
+    const copyOnC: RemoteSessionRow = { ...B_ROW, device: "c", session_id: "rk-copy-on-c", title: "copy on c" }
+    const a = account({
+      rows: [B_ROW, copyOnC],
+      devices: [{ device: "c", label: "laptop", online: true }],
+      aliases: new Map([["taken", { session_id: "dur-on-b", device: "b" }]]),
+    })
+    const { run, openSession } = surface(a.remote)
+    expect(await run("thread_create", { thread: "rk-copy-on-c", alias: "taken" })).toMatchObject({
+      kind: "error",
+      error: { code: "alias_taken", details: { holder: { thread: "dur-on-b", device: "b" } } },
+    })
+    expect(openSession).not.toHaveBeenCalled()
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")).toEqual([])
+  })
 
   test("#given b's thread holds an alias #when thread_create opens a different thread with that alias #then it is still alias_taken and nothing is opened (#12641)", async () => {
     const a = account({ aliases: new Map([["taken", { session_id: "dur-on-b", device: "b" }]]) })

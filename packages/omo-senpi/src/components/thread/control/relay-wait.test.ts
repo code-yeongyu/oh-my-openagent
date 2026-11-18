@@ -82,7 +82,10 @@ describe("thread_read wait on another device: deadline and abort cover the attac
       process.off("unhandledRejection", onUnhandled)
     }
   })
+})
 
+// #13871: a retry record belongs to the run it retries, so the wait settles on that run's turn.
+describe("a retry record counts as the run's own", () => {
   test.each(["auto_retry_start", "auto_retry_end"])(
     "#given a %s record #when the session then reads idle #then the wait settles on the retried run's turn",
     async (type) => {

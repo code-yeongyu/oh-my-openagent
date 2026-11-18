@@ -4,7 +4,7 @@ import { rowLabel, rowStatus, rowThreadId } from "../remote/ports"
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import { INITIAL_SKILLS_CONTEXT_KEY } from "../initial-skills"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "../remote/ports"
-import { outcomeFailure } from "../remote/outcome"
+import { notSignedInFailure, outcomeFailure } from "../remote/outcome"
 import { deviceOnline, replyData } from "../remote/remote-ops"
 import { prepareRemoteWorktree, removeRemoteWorktree } from "../worktree/remote-worktree"
 import { openedEngineId, openRefusal } from "./open-reply"
@@ -146,14 +146,16 @@ export function createRelaySessionHost(
         // The session exists on b from here on: a later step that fails is a warning on the created thread, never an
         // error, so a retry under the same key replays the thread and a new key cannot make a second session.
         const located = await remote.sessions.locate(device, engineId, outcome.located)
+        // This device's own missing sign-in is no reason to update omo on b (#14015 review L1).
         if (located.kind !== "ok")
           warnings.push(
-            threadToolFailure(
-              "unsupported",
-              `Device ${device} created the thread but did not name its relay key (${escapeForDisplay(located.reason)}).`,
-              "Address it by its thread value once thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) lists it, or update omo on that device.",
-              { device, reason: escapeForDisplay(located.reason) },
-            ),
+            notSignedInFailure(located.reason, device)?.error ??
+              threadToolFailure(
+                "unsupported",
+                `Device ${device} created the thread but did not name its relay key (${escapeForDisplay(located.reason)}).`,
+                "Address it by its thread value once thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) lists it, or update omo on that device.",
+                { device, reason: escapeForDisplay(located.reason) },
+              ),
           )
         threadId = located.kind === "ok" ? located.sessionId : engineId
       }

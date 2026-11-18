@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { gatewaySchemaRefusal } from "./errors"
+import { GatewaySchemaVersionError } from "./gateway/schema"
 
 describe("gatewaySchemaRefusal", () => {
   const tooNew = () =>
@@ -23,6 +24,19 @@ describe("gatewaySchemaRefusal", () => {
       if (prior === undefined) delete process.env.SENPI_BRAND
       else process.env.SENPI_BRAND = prior
     }
+  })
+
+  // #13941 review L2: an extension's own schema error carries the same code; its migration counts are not the gateway's.
+  test("#given an extension's schema is newer #when mapped #then it is not reported as the gateway schema", () => {
+    const extensionError = new GatewaySchemaVersionError(5, 3, "omo_gateway")
+    expect(extensionError.message).toBe(
+      "Extension omo_gateway schema 5 is newer than this binary's supported version 3.",
+    )
+    expect(gatewaySchemaRefusal(extensionError)).toBeUndefined()
+    expect(gatewaySchemaRefusal(new GatewaySchemaVersionError(17, 14))).toMatchObject({
+      code: "gateway_schema_too_new",
+      details: { gateway_schema: 17, binary_schema: 14 },
+    })
   })
 
   test("#given any other store failure #when mapped #then it is not a schema refusal", () => {

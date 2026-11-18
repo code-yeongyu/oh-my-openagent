@@ -235,6 +235,8 @@ export function createRemoteThreadFixture() {
       claimDown?: "refused" | "signed_out"
       chainCountLimit?: number
       relayKeys?: ReadonlyMap<string, string>
+      /** Every session.locate of a created session is refused with this reason (this device signed out mid-create). */
+      locateRefuse?: string
       /** omo#13037: sessions a device holds on disk but runs nowhere, by device then durable id, with that device's key. */
       ended?: Readonly<Record<string, Readonly<Record<string, string>>>>
       /** omo#13037: devices whose single-probe lookup gets no answer within the bound. */
@@ -609,6 +611,7 @@ export function createRemoteThreadFixture() {
         // This fake device lists a created session by the id its create reply names.
         locate: async (device, engineId) => {
           located.push({ device, session: engineId })
+          if (options.locateRefuse !== undefined) return { kind: "refused", reason: options.locateRefuse }
           // A device's relay connector keys each session it lists by a relay key, kept beside the durable id (relayKeys).
           // Without relay keys, the key the engine holds the session under now: a listed key it runs, else the id itself.
           if (options.relayKeys === undefined) {
