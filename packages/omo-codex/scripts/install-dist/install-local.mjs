@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:68da1f9e0e4fbc8f617d481629dbf5c7a90de7d2562ced7dbf8aa1c52ae022f0:2c1a3bc408442e70cebf9bb0a532f4c7de82365079ac080873f720a4053560e1
+// omo-codex-install:aa023e9e1e8ba2fbe946a954f29b13d62f1766743a606d2aa8939bf89f478891:e6bffc6bb790b2936346b150e1b1197ca87997fd6b8bfcdcd02306696946dd12
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -10237,7 +10237,6 @@ var init_package = __esm(() => {
       "sync:skills": "node plugin/scripts/sync-skills.mjs"
     },
     dependencies: {
-      "@oh-my-opencode/model-core": "workspace:*",
       "@oh-my-opencode/shared-skills": "workspace:*",
       "@oh-my-opencode/utils": "workspace:*"
     },
