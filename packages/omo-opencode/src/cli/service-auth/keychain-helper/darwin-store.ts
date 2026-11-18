@@ -6,6 +6,7 @@ import {
   readThroughHelper,
   type ReadResult,
 } from "./darwin-read"
+import { dedicatedStoreRefusal } from "./dedicated-store"
 import { migrate } from "./migration"
 import { deleteOldSlots, namesFromRead, OLD_SLOT_COUNT, oldSlotsOf, runRecovery } from "./recovery"
 
@@ -43,13 +44,19 @@ const OLD_SLOTS_FULL_MESSAGE =
 const NOT_OWNED_MESSAGE =
   'The OmO sign-in in the macOS keychain (item "omo-cli") is owned by a different program, and macOS does not let this one remove it. Open Keychain Access, delete the "omo-cli" item for OmO, then try again.'
 
-const failed = (reply: HelperReply, verb: string) =>
-  new HelperReadError(
+const DEDICATED_NOT_OWNED_MESSAGE =
+  'The OmO sign-in in OmO\'s own keychain (item "omo-cli") is owned by a different program, so omo cannot remove it. Run "omo account store disable --discard", then sign in again.'
+
+const failed = (reply: HelperReply, verb: string) => {
+  const dedicated = dedicatedStoreRefusal(reply)
+  if (dedicated !== null) return new HelperReadError("dedicated", dedicated)
+  return new HelperReadError(
     reply.error === "locked" ? "locked" : reply.error === "acl" ? "acl" : "store",
     reply.error === "acl"
       ? ACL_DENIAL_MESSAGE
       : `The keychain helper could not ${verb} the sign-in (${reply.error ?? "no answer"}).`,
   )
+}
 
 /**
  * The session-lock view (design 3.3, 3.4, 3.6): every helper mutation is handed the lease; reads never prompt (an
@@ -122,6 +129,8 @@ export function lockedDarwinStore(deps: DarwinStoreDeps, lease: HelperLease): Lo
       const removed = await helper({ verb: "remove", account: deps.account })
       if (removed.error === "not-owned")
         await deps.ownDelete(deps.account).catch((error: unknown) => {
+          if (error instanceof HelperReadError && error.failure === "dedicated")
+            throw new HelperReadError("dedicated", DEDICATED_NOT_OWNED_MESSAGE)
           throw new HelperItemNotOwned(NOT_OWNED_MESSAGE, { cause: error })
         })
       else if (removed.ok !== true) throw failed(removed, "remove")
