@@ -2,10 +2,41 @@ import { z } from "zod"
 
 import { spawn } from "../../../shared/bun-spawn-shim"
 
-export type HelperVerb = "read" | "approve" | "write" | "stage" | "retire" | "promote" | "remove"
-export type HelperCall = { readonly verb: HelperVerb; readonly account: string; readonly value?: string }
+export type HelperVerb =
+  | "read"
+  | "approve"
+  | "write"
+  | "stage"
+  | "retire"
+  | "promote"
+  | "remove"
+  | "store-create"
+  | "store-activate"
+  | "store-deactivate"
+  | "store-erase"
+/**
+ * Which keychain a call reaches (#13116 design r2): absent is the login keychain (refused while OmO's own keychain is
+ * active), "omo" is OmO's own keychain while active, "omo-migrate" and "login" are the enable/disable copy steps only.
+ */
+export type HelperStore = "omo" | "omo-migrate" | "login"
+export type HelperCall = {
+  readonly verb: HelperVerb
+  readonly account: string
+  readonly value?: string
+  readonly store?: HelperStore
+}
 
-const MUTATING: ReadonlySet<HelperVerb> = new Set(["write", "stage", "retire", "promote", "remove"])
+const MUTATING: ReadonlySet<HelperVerb> = new Set([
+  "write",
+  "stage",
+  "retire",
+  "promote",
+  "remove",
+  "store-create",
+  "store-activate",
+  "store-deactivate",
+  "store-erase",
+])
 
 const helperReplySchema = z
   .object({
@@ -25,7 +56,7 @@ const helperReplySchema = z
     created: z.boolean(),
     skipped: z.boolean(),
     slot: z.number().int().min(0).max(7),
-    error: z.enum(["locked", "store", "not-owned", "exists", "missing", "denied", "refused", "acl"]),
+    error: z.enum(["locked", "store", "not-owned", "exists", "missing", "denied", "refused", "acl", "store-refused"]),
     reason: z.string(),
     status: z.number(),
   })
@@ -111,7 +142,13 @@ export async function callHelper(
       handedOver = true
     }
     helper.send(
-      `${JSON.stringify({ v: 1, verb: call.verb, account: call.account, ...(call.value === undefined ? {} : { value: call.value }) })}\n`,
+      `${JSON.stringify({
+        v: 1,
+        verb: call.verb,
+        account: call.account,
+        ...(call.value === undefined ? {} : { value: call.value }),
+        ...(call.store === undefined ? {} : { store: call.store }),
+      })}\n`,
     )
     const line = await helper.reply
     if (handedOver && options.lease !== undefined) {
