@@ -50,6 +50,7 @@ import { runLoroSmoke } from "./loro-smoke"
 import { runAccountCommand } from "./account-cli"
 import { registerHelperCandidates } from "../omo-opencode/src/cli/service-auth/keychain-helper/darwin-backend"
 import { refreshSessionHostUnit, runRemoteAttachCommand, runRemoteCommand } from "./remote-entry"
+import { olderRuntime } from "./release-version"
 import { runSyncCommand } from "./sync-cli"
 import { spawnSync } from "node:child_process"
 import { compiledRollbackMigration } from "./compiled-rollback"
@@ -519,7 +520,7 @@ async function main(): Promise<void> {
   if (answerCompiledFastPath(process.argv.slice(2), manifest)) return
   if (launchPrunesRuntimes(process.argv.slice(2), launch) && launch.launcher !== undefined) {
     // Before the prune: a session host unit must never keep naming a runtime this launch is about to remove.
-    await refreshSessionHostUnit(manifest.omoAiVersion)
+    await refreshSessionHostUnit((installed) => olderRuntime(installed, manifest.omoAiVersion))
     reportRuntimePrune(pruneProvisionedRuntimes({ root: dirname(dirname(expected)), current: manifest.omoAiVersion }))
     removeReplacedLauncher(launch.launcher)
   }

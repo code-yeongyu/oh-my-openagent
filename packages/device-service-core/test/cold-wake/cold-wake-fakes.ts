@@ -19,12 +19,12 @@ export const LAUNCH = SessionHostLaunch.from({ omoBin: "/opt/omo", execPath: "/o
 export const UNIT_DIR = (home: string) => join(home, ".config", "systemd", "user")
 export const DROP_IN = (home: string) => join(UNIT_DIR(home), "omo-relay-daemon.service.d", "50-omo-cold-wake.conf")
 
-export const ok = (output = "") => ({ exitCode: 0, output })
+const ok = (output = "") => ({ exitCode: 0, output })
 
 export const OMO = "/usr/bin/env OMO_CODING_AGENT_DIR=/h/.omo/agent /opt/omo daemon"
 
 /** `omo daemon status/stop` for the agent dir: one operator host, launched with or without the cold-start pin. */
-export function fakeOmoHost(pinned: boolean) {
+function fakeOmoHost(pinned: boolean) {
   const state = { running: true, pinned }
   const answer = (argv: readonly string[]) => {
     if (argv.includes("status")) {

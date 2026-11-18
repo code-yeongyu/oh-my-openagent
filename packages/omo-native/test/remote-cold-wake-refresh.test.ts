@@ -3,7 +3,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { olderRuntime, refreshColdWakeAtLaunch } from "../remote-cold-wake"
+import { olderRuntime } from "../release-version"
+import { refreshColdWakeAtLaunch } from "../remote-cold-wake"
 
 // omo#14191 / #14194 review L1: the launch-time wrapper's own contract. Its version gate decides which installed unit a
 // launch may touch, and every path that is not a refresh returns before any service manager call; a unit it cannot
@@ -29,7 +30,12 @@ const homeWithUnit = (version: string, agentDir: string): { home: string; unit: 
 const refreshAt = async (home: string, version: string) => {
   const lines: string[] = []
   await refreshColdWakeAtLaunch(
-    { runtime: join(home, ".omo", "binary-runtime", version, "omo"), version, platform: "linux", home },
+    {
+      runtime: join(home, ".omo", "binary-runtime", version, "omo"),
+      isOlder: (installed) => olderRuntime(installed, version),
+      platform: "linux",
+      home,
+    },
     (line) => lines.push(line),
   )
   return lines

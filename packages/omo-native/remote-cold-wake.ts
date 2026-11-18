@@ -11,7 +11,6 @@ import {
   uninstallColdWake,
   type UnitState,
 } from "../device-service-core/src/index.ts"
-import { RELEASE_VERSION } from "./release-version"
 
 // omo#13594: the cold-wake unit of this device. `omo remote bootstrap` and `enable` install it, `disable` removes it, and a
 // bootstrap on a device whose remote sessions are off removes it too, so it never comes back while they stay off.
@@ -117,10 +116,6 @@ function coldWakeNotice(outcome: ColdWakeOutcome): string | undefined {
   }
 }
 
-/** Whether `installed` is a release older than `version` (both `RELEASE_VERSION`s); anything else is not older. */
-export const olderRuntime = (installed: string, version: string): boolean =>
-  RELEASE_VERSION.test(installed) && RELEASE_VERSION.test(version) && Bun.semver.order(installed, version) < 0
-
 /**
  * omo#14191: a launch of `runtime` (release `version`) brings an installed session host unit an older runtime wrote to
  * this runtime's program and shape; `omo update` cannot, because the new runtime copy only exists once the new launcher
@@ -129,19 +124,16 @@ export const olderRuntime = (installed: string, version: string): boolean =>
 export async function refreshColdWakeAtLaunch(
   options: {
     readonly runtime: string
-    readonly version: string
+    readonly isOlder: (installedRuntimeVersion: string) => boolean
     readonly platform?: NodeJS.Platform
     readonly home?: string
   },
   error: (line: string) => void,
 ): Promise<void> {
   const host = coldWakeHost(options.platform ?? process.platform, options.home)
-  if (host === undefined || !RELEASE_VERSION.test(options.version)) return
+  if (host === undefined) return
   try {
-    const outcome = await refreshColdWake(host, {
-      runtime: options.runtime,
-      isOlder: (installed) => olderRuntime(installed, options.version),
-    })
+    const outcome = await refreshColdWake(host, { runtime: options.runtime, isOlder: options.isOlder })
     const notice = outcome === undefined ? undefined : coldWakeNotice(outcome)
     if (notice !== undefined) error(notice)
   } catch (cause) {
