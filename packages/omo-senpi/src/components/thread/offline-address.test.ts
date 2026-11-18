@@ -261,32 +261,6 @@ describe("store-only operations with no live endpoint", () => {
     })
     expect(moved).toMatchObject({ kind: "ok", binding: { session_durable_id: "dur-next", revision: 2 } })
   })
-
-  test("#given no endpoint answers #when a session's thread_bind names another session known only from disk #then the tool binds it", async () => {
-    const agentDir = agentDirectory()
-    sessionFile(agentDir, "dur-gone", process.cwd(), "gone-tui")
-    const host = createLiveThreadSurface(undefined, {
-      env: { HOME: agentDir, OMO_CODING_AGENT_DIR: agentDir },
-      statusAll: async () => parseHostStatusAll(deadTerminalStatus(agentDir)),
-    })
-    const tools = createThreadTools({
-      host,
-      stateDirectory: agentDir,
-      store: storeAt(agentDir),
-      sessionsDirectory: () => join(agentDir, "sessions"),
-      callerSessionId: () => "dur-caller",
-      callerWorkspaceRoot: () => process.cwd(),
-    })
-    const bind = tools.find((tool) => tool.name === "thread_bind")
-    const output = await bind!.execute(
-      "call-1",
-      { platform: "custom", account_id: "bot", chat_id: "c1", session: "gone-tui" },
-      undefined,
-      undefined,
-      { sessionManager: { getSessionId: () => "dur-caller" } } as never,
-    )
-    expect(output.details.result).toMatchObject({ kind: "ok", binding: { session_durable_id: "dur-gone" } })
-  })
 })
 
 describe("findDiskSessions", () => {

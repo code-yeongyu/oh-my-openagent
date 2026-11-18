@@ -1,4 +1,4 @@
-import type { ThreadToolFailure } from "../errors"
+import type { ThreadErrorCode, ThreadToolFailure } from "../errors"
 import type { BindingRecord, OutboxRow } from "../gateway/bindings"
 
 // Discriminated result unions. The error branch is shared data, never an exception: a caller
@@ -46,14 +46,18 @@ export type ThreadResultSummary = ThreadSummary & { readonly link: string }
 export type ThreadDelivery =
   | { readonly kind: "steered"; readonly turn_id: string }
   | { readonly kind: "started"; readonly turn_id: string }
-  /** `waiting_on`: the receiver is parked on an approval a human must answer on that device (`device`, absent when this install has no device identity); the message runs after it. */
+  /**
+   * `waiting_on`: what the message waits on, on that device (`device`, absent when this install has no device identity):
+   * an `approval` a human must answer, a `hold` on the session (a Stop, a pause), or the `wake` of a session no engine runs
+   * (omo#13037); the message runs after it.
+   */
   | {
       readonly kind: "queued"
       readonly queue_position: number
-      readonly waiting_on?: { readonly kind: "approval"; readonly device?: string }
+      readonly waiting_on?: { readonly kind: "approval" | "hold" | "wake"; readonly device?: string }
     }
   /** Gateway only: the target has no answering endpoint; the message is durable and its drain takes it on the next start. */
-  | { readonly kind: "queued_offline"; readonly queue_position: number }
+  | { readonly kind: "queued_offline"; readonly queue_position: number; readonly reason?: "wake_unavailable" }
 
 /**
  * What a send through the session gateway adds to a delivery result: the durable `delivery_id`, the
@@ -76,16 +80,82 @@ export type ThreadTranscriptItem = {
   readonly content: string
 }
 
+/**
+ * `alias_scope: "local"` (#13104): no account could hold the alias (`alias_unavailable` says why), so it is only the
+ * thread's name on its device - addressable there like any name, never account-wide.
+ */
+export type ThreadLocalAliasNote = {
+  readonly alias_scope?: "local"
+  readonly alias_unavailable?: "sign_in" | "no_registry" | "no_remote"
+  /**
+   * Set only when the account was gone by the alias claim, after thread_create had made the thread: the alias could
+   * not become its local name (`name_conflict` with another thread, or the code that refused the rename), so the
+   * thread keeps the name it was created with.
+   */
+  readonly local_name_unavailable?: ThreadErrorCode
+}
+
+/**
+ * Set when a thread this device opened is in a folder outside the caller's workspace: every thread tool answers it
+ * `scope_denied` from the caller unless `all_scope` is set, which `scope_next_action` says.
+ */
+export type ThreadWorkspaceNote = { readonly workspace_scope?: "outside"; readonly scope_next_action?: string }
+
+/**
+ * The first message a `thread_create` with `prompt` delivered to the thread it made (#13410): the delivery as thread_send
+ * reports it, or the failure that stopped it. The thread exists either way.
+ */
+export type ThreadCreatePrompt =
+  | ({ readonly delivery: ThreadDelivery; readonly deduplicated: boolean } & ThreadGatewayDeliveryFacts)
+  | { readonly error: ThreadToolFailure }
+
 export type ThreadCreateResult =
-  { readonly kind: "ok"; readonly thread: ThreadResultSummary; readonly deduplicated: boolean } | ThreadDataError
+  | ({
+      readonly kind: "ok"
+      readonly thread: ThreadResultSummary
+      readonly deduplicated: boolean
+      readonly prompt?: ThreadCreatePrompt
+    } & ThreadLocalAliasNote &
+      ThreadWorkspaceNote)
+  | ThreadDataError
+
+/**
+ * One of the account's devices as `thread_list` reports it. `online` is the device's, never a thread's. `listing`:
+ * `listed` when this listing holds the device's threads, `incomplete` when the device did not answer this round (its
+ * threads are missing, not gone), `offline` when the device is not connected. `threads` counts the threads this result
+ * lists on the device (this device's are the caller's scoped threads). This device's row is always present.
+ */
+export type ThreadDevice = {
+  readonly device: string
+  readonly name: string
+  readonly platform?: string
+  readonly kind?: string
+  readonly online: boolean
+  readonly last_seen: string | null
+  readonly this_device: boolean
+  readonly listing: "listed" | "incomplete" | "offline"
+  readonly threads: number
+}
 
 export type ThreadListResult =
   | {
       readonly kind: "ok"
       readonly threads: readonly ThreadResultSummary[]
       readonly scope: "workspace" | "all"
-      /** Set when the account's other devices could not be listed (A5: `relay_requires_paid_plan`, or the device service is unreachable). */
+      /** The account's devices, this one included, when the account's devices could be listed. */
+      readonly devices?: readonly ThreadDevice[]
+      /**
+       * Set when the account's other devices could not be listed (A5: `relay_requires_paid_plan`, or the device service is
+       * unreachable), or `devices_unavailable` when only the device roster failed (the threads are still merged).
+       */
       readonly remote_unavailable?: string
+      /**
+       * Set when the threads are listed without the account's aliases, so a missing alias is unknown, not free: the alias
+       * registry could not be read (`sign_in`, or `host_unavailable`), or was not asked because the account's other devices
+       * cannot be reached from here (`not_asked`): the device service is not connected, or it answered that the account's
+       * plan has no relay (`plan_required`, a Free plan).
+       */
+      readonly aliases_unavailable?: "sign_in" | "host_unavailable" | "not_asked"
     }
   | ThreadDataError
 
@@ -102,8 +172,24 @@ export type ThreadReadResult =
       readonly source_incomplete?: boolean
       readonly error_note?: string
       readonly device?: string
+      /** Set when the read asked to wait (`wait_ms`): how the wait ended, read before the transcript. */
+      readonly wait?: ThreadWaitOutcome
     }
   | ThreadDataError
+
+/**
+ * A `thread_read` wait (#13417). `settled`: a turn end was observed (`turn_id`), or the thread showed no run for the
+ * quiet window and is idle (no `turn_id`); a snapshot's idle alone never settles it.
+ * `timeout`: `wait_ms` passed with the thread still running. `cancelled`: the call was aborted. `ended`: the watch
+ * could not continue (the session closed for good or the access ended; `status` names why).
+ */
+export type ThreadWaitOutcome = {
+  readonly outcome: "settled" | "timeout" | "cancelled" | "ended"
+  readonly status: string
+  readonly waited_ms: number
+  /** The turn whose observed end settled the wait; absent when the session showed no run and settled on its idle. */
+  readonly turn_id?: string
+}
 
 export type ThreadSendResult =
   | ({
@@ -118,19 +204,47 @@ export type ThreadSendResult =
     } & ThreadGatewayDeliveryFacts)
   | ThreadDataError
 
+export type ThreadInterruptBackgroundJob = {
+  readonly kind: string
+  readonly id: string
+  readonly description?: string
+}
+
+/**
+ * The background jobs the interrupted turn started (background bash sessions): `stopped` ended them, so none of them
+ * wakes the thread later; `not_supported` is an engine that predates the stop, where they were left running.
+ */
+export type ThreadInterruptBackground =
+  | {
+      readonly status: "stopped"
+      readonly stopped: readonly ThreadInterruptBackgroundJob[]
+      readonly failed: readonly (ThreadInterruptBackgroundJob & { readonly reason: string })[]
+    }
+  | { readonly status: "not_supported" }
+
 export type ThreadInterruptResult =
   | {
       readonly kind: "ok"
       readonly thread_id: string
       readonly turn_id?: string
       readonly interrupted: boolean
+      readonly background: ThreadInterruptBackground
       readonly device?: string
     }
   | ThreadDataError
 
-/** `closed` is false when no live owner held the thread, so there was nothing to close. */
+/**
+ * `closed` is whether this call shut the session down. `reason` is always set: `closed` when it did,
+ * `not_live` when nothing live held it (the session stays as it was).
+ */
 export type ThreadCloseResult =
-  | { readonly kind: "ok"; readonly thread_id: string; readonly closed: boolean; readonly device?: string }
+  | {
+      readonly kind: "ok"
+      readonly thread_id: string
+      readonly closed: boolean
+      readonly reason: "closed" | "not_live"
+      readonly device?: string
+    }
   | ThreadDataError
 
 export type ThreadHandoffResult =
@@ -151,13 +265,13 @@ export type ThreadThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" 
 export type ThreadReasoningScope = "session" | "turn"
 
 export type ThreadRenameResult =
-  | {
+  | ({
       readonly kind: "ok"
       readonly thread_id: string
       readonly name: string
       readonly alias?: string
       readonly device?: string
-    }
+    } & ThreadLocalAliasNote)
   | ThreadDataError
 
 export type ThreadSetModelResult =
@@ -182,35 +296,6 @@ export type ThreadSetReasoningResult =
 export type ThreadBinding = BindingRecord
 
 export type ThreadOutboxRow = OutboxRow
-
-export type ThreadBindResult =
-  { readonly kind: "ok"; readonly binding: ThreadBinding; readonly deduplicated: boolean } | ThreadDataError
-
-export type ThreadUnbindResult =
-  | {
-      readonly kind: "ok"
-      readonly binding: ThreadBinding
-      /** True when the binding was already detached or expired: the call replays success and changes nothing. */
-      readonly already_closed: boolean
-      /** Deliveries accepted through this binding that the session has not taken yet. */
-      readonly in_flight: readonly string[]
-      readonly deduplicated: boolean
-    }
-  | ThreadDataError
-
-export type ThreadRebindResult =
-  | {
-      readonly kind: "ok"
-      readonly binding: ThreadBinding
-      /** Deliveries queued under the old revision, closed with a binding_closed refusal instead of being moved. */
-      readonly closed: readonly string[]
-      readonly deduplicated: boolean
-    }
-  | ThreadDataError
-
-export type ThreadBindingsResult =
-  | { readonly kind: "ok"; readonly bindings: readonly ThreadBinding[]; readonly next_cursor: string | null }
-  | ThreadDataError
 
 export type ThreadReportResult =
   | {
@@ -247,10 +332,6 @@ export type ThreadAnswerResult =
   | ThreadDataError
 
 export type ThreadToolResult =
-  | ThreadBindResult
-  | ThreadUnbindResult
-  | ThreadRebindResult
-  | ThreadBindingsResult
   | ThreadReportResult
   | ThreadOutboxResult
   | ThreadOutboxAckResult

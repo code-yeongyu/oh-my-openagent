@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { existsSync, readdirSync } from "node:fs"
 
-import { parseThreadParams, threadToolParamSchemas } from "../contracts"
 import {
   BINDING_DEFAULT_TTL_SECONDS,
   type BindInput,
@@ -100,13 +99,10 @@ describe("binding_uniqueness_revision_expiry_and_replay", () => {
     ).toEqual(["B", "C", "D", "E"])
   })
 
-  test("#given the Notion and Feishu connectors #when a thread is bound on each by its native platform name #then the tool schema takes the name and the store keeps it", async () => {
+  test("#given the Notion and Feishu connectors #when a thread is bound on each by its native platform name #then the store keeps it", async () => {
     const h = open()
     const relay = relayOn(h)
     for (const platform of ["notion", "feishu", "whatsapp"] as const) {
-      expect(
-        parseThreadParams(threadToolParamSchemas.thread_bind, { platform, account_id: "qa", chat_id: "c1" }).kind,
-      ).toBe("ok")
       ok(await relay.bind({ principal: "session:A", binding: thread(`S-${platform}`, { platform }) }))
     }
     expect(

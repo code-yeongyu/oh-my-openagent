@@ -56,7 +56,11 @@ export async function recordThreadCreator(
 }
 
 function output(result: ExtensionCallResult): ExtensionToolOutput {
-  return { content: [{ type: "text", text: JSON.stringify(result) }], details: { result } }
+  return {
+    content: [{ type: "text", text: JSON.stringify(result) }],
+    details: { result },
+    ...(result.kind === "ok" ? {} : { isError: true }),
+  }
 }
 
 function extensionTool(options: ThreadToolSurfaceOptions, op: DeclaredSessionOp): AnyTool {
@@ -93,6 +97,8 @@ export type ExtensionToolHost = {
   on?(event: string, handler: () => void): void
   /** senpi's tool registry for the session (builtins and every extension's tools). */
   getAllTools?(): readonly { readonly name: string }[]
+  /** Answers a call to a tool that no longer exists with a hint (senpi feature-detected; absent on older engines). */
+  registerRemovedToolHint?(name: string, hint: string): void
 }
 
 /**
