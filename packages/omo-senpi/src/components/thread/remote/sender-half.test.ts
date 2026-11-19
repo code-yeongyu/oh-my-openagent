@@ -304,6 +304,13 @@ describe("#13037 the sender half reaches a session on another device that is not
       },
     )
 
+    test("#given the woken engine answered held under a person's Stop (senpi#7014) #then the result is queued waiting on a hold on the receiving device, not uncertain", async () => {
+      expect(await answered(queuedEnvelope({ kind: "held", holds: ["session_hold"], turnId: "0" }))).toMatchObject({
+        kind: "ok",
+        delivery: { kind: "queued", queue_position: 1, waiting_on: { kind: "hold", device: "c" } },
+      })
+    })
+
     test("#given the receiver answered an existing row #then the result is deduplicated", async () => {
       expect(
         await answered(
@@ -404,6 +411,18 @@ describe("#13037 the sender half reaches a session on another device that is not
       })
       const { run } = fixture.surface(a.remote)
       expect(await run("thread_send", { thread: "dur-on-b", message: "hi", delivery: "follow_up" })).toMatchObject({
+        kind: "ok",
+        delivery: { kind: "queued", waiting_on: { kind: "hold", device: "b" } },
+      })
+    })
+
+    test("#given an idle session on b under a hold a peer cannot release #when the engine answers held (senpi#7014) #then the result waits on a hold on b, not idempotency_uncertain", async () => {
+      const a = account({
+        rows: [B_ROW],
+        admitOutcome: queuedEnvelope({ kind: "held", holds: ["interrupted_run"], turnId: "0" }),
+      })
+      const { run } = fixture.surface(a.remote)
+      expect(await run("thread_send", { thread: "dur-on-b", message: "hi" })).toMatchObject({
         kind: "ok",
         delivery: { kind: "queued", waiting_on: { kind: "hold", device: "b" } },
       })
