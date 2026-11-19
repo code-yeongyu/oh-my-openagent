@@ -1,11 +1,11 @@
 import { describe, expect, it } from "bun:test"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import { BUNSHIN_CUSTOM_TYPE, matchedSkillPointerNames } from "./index"
+import { matchedSkillPointerNames, OMO_RELAY_CUSTOM_TYPE } from "./index"
 import { dispatchInput, expectNoInjection, injectedContent, registerSkillPointers } from "./test-support"
 
-describe("omo-senpi skill-pointers bunshin pointer", () => {
-  it("#given fleet wording #when matched #then the bunshin pointer target fires", () => {
+describe("omo-senpi skill-pointers omo-relay pointer", () => {
+  it("#given fleet or other-device wording #when matched #then the omo-relay pointer target fires", () => {
     const triggers = [
       "run this on builder via bunshin",
       "list my fleet",
@@ -19,9 +19,12 @@ describe("omo-senpi skill-pointers bunshin pointer", () => {
       "run it on my fleet, then report",
       "check the machine mesh",
       "machine-mesh health",
+      "run this on my other machine",
+      "check disk on our other devices",
+      "fan this out with omo-relay",
     ] as const
     for (const text of triggers) {
-      expect({ text, matched: matchedSkillPointerNames(text) }).toEqual({ text, matched: ["bunshin"] })
+      expect({ text, matched: matchedSkillPointerNames(text) }).toEqual({ text, matched: ["omo-relay"] })
     }
   })
 
@@ -45,26 +48,26 @@ describe("omo-senpi skill-pointers bunshin pointer", () => {
       "machine learning",
       "`bunshin` in a code span",
       "mybunshin_helper",
+      "my other machine learning project",
+      "the other machine in the lab",
     ] as const
     for (const text of misses) {
       expect({ text, matched: matchedSkillPointerNames(text) }).toEqual({ text, matched: [] })
     }
   })
 
-  it("#given an interactive prompt naming the fleet #when dispatched #then one hidden bunshin pointer carries the SDK root env key", async () => {
+  it("#given an interactive prompt naming the fleet #when dispatched #then one hidden omo-relay pointer sends the agent to the skill and keeps the import safety", async () => {
     const pi = new FakeExtensionAPI()
     await registerSkillPointers(pi)
     const result = await dispatchInput(pi, "list my fleet")
     expect(result).toEqual({ action: "continue" })
     expect(pi.messages.map((call) => [call.message["customType"], call.message["display"]])).toEqual([
-      [BUNSHIN_CUSTOM_TYPE, false],
+      [OMO_RELAY_CUSTOM_TYPE, false],
     ])
-    const content = injectedContent(pi, BUNSHIN_CUSTOM_TYPE)
-    expect(content).toStartWith("<omo-bunshin-pointer>")
-    expect(content).toContain("OMO_BUNSHIN_TS_SDK_ROOT")
-    // Shell form and forbidden entry the pointer must carry. An unquoted ls of the desktop path
-    // (spaces and parentheses) prints a false miss, and importing the node-agent executable exits the kernel.
-    expect(content).toContain('"$OMO_BUNSHIN_TS_SDK_ROOT"')
+    const content = injectedContent(pi, OMO_RELAY_CUSTOM_TYPE)
+    expect(content).toStartWith("<omo-omo-relay-pointer>")
+    expect(content).toContain("omo-relay/SKILL.md")
+    // The forbidden entry the pointer must still carry: importing the node-agent executable exits the kernel.
     expect(content).toContain("scripts/node/bunshin-node.mjs")
   })
 
@@ -74,17 +77,17 @@ describe("omo-senpi skill-pointers bunshin pointer", () => {
     expectNoInjection(pi, await dispatchInput(pi, "the fleet dashboard CSS is broken"))
   })
 
-  it("#given a device-operations request #when dispatched #then the hidden bunshin pointer is still injected", async () => {
+  it("#given a device-operations request #when dispatched #then the hidden omo-relay pointer is still injected", async () => {
     const pi = new FakeExtensionAPI()
     await registerSkillPointers(pi)
     const result = await dispatchInput(pi, "check disk usage on every machine in my fleet")
     expect(result).toEqual({ action: "continue" })
     expect(pi.messages.map((call) => [call.message["customType"], call.message["display"]])).toEqual([
-      [BUNSHIN_CUSTOM_TYPE, false],
+      [OMO_RELAY_CUSTOM_TYPE, false],
     ])
   })
 
-  it("#given a prompt without fleet wording #when dispatched #then no bunshin pointer is injected", async () => {
+  it("#given a prompt without fleet wording #when dispatched #then no omo-relay pointer is injected", async () => {
     const pi = new FakeExtensionAPI()
     await registerSkillPointers(pi)
     expectNoInjection(pi, await dispatchInput(pi, "rename this variable"))
