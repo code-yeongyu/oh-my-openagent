@@ -97,6 +97,24 @@ await runScenario("default-delivery", async ({ report, fake, scratch, install, s
   )
   report.assert("release-busy-1", fake.release("busy-1"), "held turn released")
   await answered("QA-ACK QA-TOKEN-steer")
+  // The steered turn has settled only when its delivery is applied, both its answers are written and the TUI itself
+  // reports no running turn and nothing pending; a prompt submitted before that is taken as a steer, not a new turn.
+  const settledState = await waitFor(
+    async () => {
+      const row = await deliveryRow(scratch.agentDir, steer.delivery_id)
+      if (row?.state !== "applied") return undefined
+      const texts = assistantTexts(target.sessionPath)
+      if (!texts.some((text) => text.includes("QA-RELEASED busy-1"))) return undefined
+      const state = (await target.client.request({ type: "get_state" })).data
+      return state?.isStreaming === false && (state.pendingMessageCount ?? 0) === 0 ? state : undefined
+    },
+    { label: "steered turn settled (row applied, busy-1 answered, tui idle)" },
+  )
+  report.assert(
+    "steered-turn-settled",
+    settledState.isStreaming === false,
+    `isStreaming=${settledState.isStreaming} pending=${settledState.pendingMessageCount ?? 0}`,
+  )
 
   // 3. mid-turn, explicit follow_up
   await tui.submit(`${holdDirective("busy-2")} QA-TOKEN-busy-2`)
