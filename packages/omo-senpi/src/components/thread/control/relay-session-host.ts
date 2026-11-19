@@ -7,9 +7,7 @@ import { INITIAL_SKILLS_CONTEXT_KEY } from "../initial-skills"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "../remote/ports"
 import { notSignedInFailure, outcomeFailure } from "../remote/outcome"
 import { replyData } from "../remote/remote-ops"
-import { accountDevices } from "../address/account"
-import { resolveAccountDevice } from "../address/device"
-import { asFailure } from "../address/refusals"
+import { resolveTypedDevice } from "../address/device"
 import { prepareRemoteWorktree, removeRemoteWorktree } from "../worktree/remote-worktree"
 import { openedEngineId, openRefusal } from "./open-reply"
 import { threadLink } from "../thread-link"
@@ -91,21 +89,10 @@ export function createRelaySessionHost(
     open: async (request: SessionOpenRequest): Promise<SessionOpenOutcome> => {
       // The device resolved as the address module resolves one with need "online": unknown is not_found, offline is
       // device_offline (A3: nothing is queued for it), and a roster that cannot be read is host_unavailable.
-      let account: Awaited<ReturnType<typeof accountDevices>>
-      try {
-        account = await accountDevices(remote.client)
-      } catch (error) {
-        return fail(
-          "host_unavailable",
-          "This device's device service could not list the account's devices.",
-          "Retry when the device service is reachable.",
-          { device, reason: error instanceof Error ? error.message : String(error) },
-        )
-      }
-      const resolved = resolveAccountDevice(account, device, { online: true })
-      if (resolved.kind === "error") return { kind: "error", error: asFailure(resolved) }
+      const resolved = await resolveTypedDevice(remote.client, device)
+      if (resolved.kind === "error") return resolved
       // The host is for the device with this id: a name or id prefix that matched another device names no device here.
-      if (resolved.device.id !== device)
+      if (resolved.device !== device)
         return fail(
           "not_found",
           `No device named ${device} is signed in to this account.`,
