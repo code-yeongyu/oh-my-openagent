@@ -90,6 +90,7 @@ async function terminateWindowsProcessTree(child: ChildProcess, pid: number): Pr
   // the child's exit and the shared observation window, then reap the tool best-effort (#14300: the
   // open-ended taskkill close held a cleanup hook for 46.8 s, hosted run 44461756495 job 135350180742,
   // after the exit-event wait below was already bounded for run 44169815547).
+  let observationWindow: ReturnType<typeof setTimeout> | undefined
   await Promise.race([
     new Promise<void>((resolve, reject) => {
       taskkill.once("error", reject)
@@ -97,11 +98,15 @@ async function terminateWindowsProcessTree(child: ChildProcess, pid: number): Pr
     }),
     exited,
     new Promise<void>((resolve) => {
-      const window = setTimeout(() => resolve(), PROCESS_EXIT_OBSERVATION_TIMEOUT_MS)
-      window.unref?.()
+      observationWindow = setTimeout(() => resolve(), PROCESS_EXIT_OBSERVATION_TIMEOUT_MS)
+      observationWindow.unref?.()
     }),
-  ])
-  if (taskkill.exitCode === null) taskkill.kill()
+  ]).finally(() => {
+    if (observationWindow) clearTimeout(observationWindow)
+  })
+  // A still-running tree kill is left to finish detached: killing the tool would stop /T /F partway
+  // and orphan descendants the child's own exit cannot reach (#14300 review M1).
+  if (taskkill.exitCode === null) taskkill.unref()
   if (!hasExited(child)) {
     child.kill("SIGKILL")
   }
