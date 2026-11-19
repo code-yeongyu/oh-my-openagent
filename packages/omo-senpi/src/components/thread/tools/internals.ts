@@ -492,8 +492,10 @@ async function lookupAcross(
   if (probe === undefined || (await remote.sessions.canLookup?.().catch(() => false)) !== true) return undefined
   if (!(await probeMayBuildEndedRow(remote.sessions))) return undefined
   let online: readonly { readonly device: string; readonly online: boolean }[]
+  let self: string | null
   try {
     const { here, devices } = await accountDevices(remote.client)
+    self = here
     online = devices.filter((device) => device.online && device.device !== here)
   } catch {
     return undefined
@@ -533,14 +535,20 @@ async function lookupAcross(
     } as ThreadResolveResult
   }
   const silent = answers.flatMap(({ device, answer }) => (answer.kind === "silent" ? [device] : []))
+  // omo#14270: name who answered "not held", this device first (its own miss came before this lookup), so a miss on the
+  // device that really keeps the file shows instead of reading as "wait for the silent one".
+  const answered = [
+    ...(self === null ? [] : [self]),
+    ...answers.flatMap(({ device, answer }) => (answer.kind === "silent" ? [] : [device])),
+  ]
   if (silent.length > 0)
     return {
       kind: "error",
       ...threadToolFailure(
         "host_unavailable",
-        `No device that answered holds session ${address}, and ${silent.join(", ")} did not answer.`,
-        "Retry when that device answers.",
-        { thread: address, devices: silent },
+        `Session ${address} is not held by ${answered.join(", ") || "any device that answered"}; ${silent.join(", ")} did not answer and may hold it.`,
+        "Retry when that device answers. If the session should be on a device that answered, its file is not where that device looks for sessions.",
+        { thread: address, devices: silent, answered },
       ),
     } as ThreadResolveResult
   return {

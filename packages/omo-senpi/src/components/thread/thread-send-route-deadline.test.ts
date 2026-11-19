@@ -57,7 +57,7 @@ describe("thread_send's reply-route selection runs under the call's deadline (#1
    * records the wait the send would get and, as the device-service port does (device-service.test.ts), is refused
    * request_timeout before sending when the call's budget is spent.
    */
-  async function replyingRun(takesMs: number) {
+  async function replyingRun(takesMs: number, neverAnswers = false) {
     const agentDir = mkdtempSync(join(tmpdir(), "thr-send-route-deadline-"))
     directories.push(agentDir)
     const store = createGatewayStore({ agentDir })
@@ -76,6 +76,7 @@ describe("thread_send's reply-route selection runs under the call's deadline (#1
           list: async (...args: Parameters<typeof list>) => {
             deviceReadWaits.push(commandWaitMs(UNBOUNDED_WAIT_MS))
             if (deviceReadWaits.length === 1) setSystemTime(new Date(Date.now() + takesMs))
+            if (neverAnswers) return await new Promise<never>(() => {})
             return await list(...args)
           },
         },
@@ -181,6 +182,20 @@ describe("thread_send's reply-route selection runs under the call's deadline (#1
     })
     expect(run.admitWaits).toHaveLength(1)
     expect(run.admitWaits[0]).toBeLessThanOrEqual(0)
+    expect(run.admitted()).toEqual([])
+  })
+
+  // #14226: a device read that never answers is cut by the call's budget, not only by the device client's 35 s deadline.
+  test("#given this device's id read never answers and the call's budget runs out meanwhile #when the reply goes on #then thread_send ends typed at once and nothing reaches any route (#14226)", async () => {
+    setSystemTime(new Date("2026-11-18T00:00:00.000Z"))
+    const run = await replyingRun(TOOL_CALL_BUDGET_MS + 1, true)
+    // Circuit breaker only: the fixed path settles on the budget's expiry, which has already passed.
+    const breaker = new Promise<"unsettled">((resolve) => setTimeout(() => resolve("unsettled"), 3_000).unref())
+    expect(await Promise.race([run.reply(), breaker])).toMatchObject({
+      kind: "error",
+      error: { code: "host_unavailable", details: { reason: "request_timeout" } },
+    })
+    expect(run.admitWaits).toEqual([])
     expect(run.admitted()).toEqual([])
   })
 })

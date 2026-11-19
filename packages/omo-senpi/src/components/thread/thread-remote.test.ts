@@ -371,6 +371,55 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     },
   )
 
+  // #14240: the listing still reads the thread live, but b's host parked it: a session command to it is refused
+  // route_unlisted. The send asks b again and takes the path b's answer names, at most once.
+  test.each(["auto", "follow_up"] as const)(
+    "#given b parked a thread its listing still reads live, and this device can wake it #when thread_send (%s) names it #then b is asked again and the session is woken with the delivery, under one delivery id (#14240)",
+    async (mode) => {
+      const a = account({ live: [], unlistedReason: "route_unlisted", wakeFeature: true })
+      const { run } = surface(a.remote)
+      expect(await run("thread_send", { thread: "dur-on-b", message: "wake up", mode })).toMatchObject({
+        kind: "ok",
+        thread: "dur-on-b",
+        delivery: { kind: "queued", waiting_on: { kind: "wake", device: "b" } },
+      })
+      const woken = a.sent.filter((entry) => entry.via === "wake")
+      expect(woken.map((entry) => entry.session)).toEqual(["dur-on-b"])
+      expect(a.sent.filter((entry) => entry.rpc?.["type"] === "find_session")).toHaveLength(1)
+      const ids = a.sent
+        .filter((entry) => entry.via === "wake" || entry.rpc?.["type"] === "admit_external_message")
+        .map((entry) => entry.rpc?.["deliveryId"])
+      expect(new Set(ids).size).toBe(1)
+      // The retry's record is stamped as the first attempt's was: one hop for the whole delivery, so the chain count the
+      // receiver sees does not grow across the retry.
+      expect(new Set(a.hops).size).toBe(1)
+      const stamped = a.sent
+        .filter((entry) => entry.via === "wake" || entry.rpc?.["type"] === "admit_external_message")
+        .map((entry) => entry.rpc?.["chainCount"])
+      expect(new Set(stamped).size).toBe(1)
+    },
+  )
+
+  test.each([
+    ["this device cannot wake it", {}, "not_resumable"],
+    ["b holds no session file for it", { wakeFeature: true, sessionFiles: {} }, "not_found"],
+  ] as const)(
+    "#given b parked a thread its listing still reads live, and %s #when thread_send names it #then a typed refusal from b's find_session answer after one re-ask, and nothing is woken (#14240)",
+    async (_case, extra, code) => {
+      const a = account({ live: [], unlistedReason: "route_unlisted", ...extra })
+      const { run } = surface(a.remote)
+      const result = await run("thread_send", { thread: "dur-on-b", message: "wake up" })
+      expect(result).toMatchObject({
+        kind: "error",
+        error: { code, details: { device: "b", thread: "dur-on-b" } },
+      })
+      // b answered, so the refusal is its answer's, never the route_unlisted one find_session was asked to look past.
+      expect(result).not.toMatchObject({ error: { details: { reason: "route_unlisted" } } })
+      expect(a.sent.filter((entry) => entry.via === "wake")).toEqual([])
+      expect(a.sent.filter((entry) => entry.rpc?.["type"] === "find_session")).toHaveLength(1)
+    },
+  )
+
   test("#given an online b that refuses the reopen of its listed thread (it holds no session file) #when thread_send names that thread next #then not_found at once, as the refused reopen said, and no session command waits on b (#14184, re-probe 2)", async () => {
     // A cached row of an online device that runs nothing under it: the reopen asks b, which holds no file; the send that
     // follows asks b again and answers at once, instead of attaching to the row's old key until b's deadline.
@@ -403,21 +452,59 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     ).toEqual([B_ROW.session_id])
   })
 
-  test("#given a closed session on b that b lists nowhere #when thread_create reopens it by session id #then the probe finds b, b names its file, and that file is opened on b (#14170)", async () => {
-    const closed = "0195f0c2-1a2b-7c3d-8e4f-00000000d001"
-    const file = `/home/b/.omo/agent/sessions/${closed}.jsonl`
-    const a = account({ wakeFeature: true, ended: { b: { [closed]: "rk-closed" } }, sessionFiles: { [closed]: file } })
-    const { run } = surface(a.remote)
-    expect(await run("thread_create", { thread: closed })).toMatchObject({
-      kind: "ok",
-      thread: closed,
-      device: "b",
-      deduplicated: false,
-    })
-    expect(
-      a.sent.filter((entry) => entry.rpc?.["type"] === "open_session").map((entry) => entry.rpc?.["sessionPath"]),
-    ).toEqual([file])
-  })
+  // #14170 and omo#14270 (#13017): a closed session its holder lists nowhere is found by id, its file opened on the holder,
+  // and a turn delivered there, whatever the file's place under the session root and whether the holder registers as a
+  // `cli` daemon or as the `desktop` app that is its device's only thread host.
+  test.each([
+    { name: "a session file at the sessions root", bKind: undefined, folder: "" },
+    { name: "a CLI TUI session file on a cli device", bKind: "cli", folder: "--home-b--/2026-11-19T02-05-00-000Z_" },
+    {
+      name: "a CLI TUI session file on a desktop device",
+      bKind: "desktop",
+      folder: "--home-b--/2026-11-19T02-05-00-000Z_",
+    },
+  ])(
+    "#given $name that b lists nowhere #when thread_create reopens it by id and a message follows #then b names its file, that file is opened on b and the turn starts there (#14170, #14270)",
+    async ({ bKind, folder }) => {
+      const closed = "0195f0c2-1a2b-7c3d-8e4f-00000000d270"
+      const file = `/home/b/.omo/agent/sessions/${folder}${closed}.jsonl`
+      const a = account({
+        ...(bKind === undefined ? {} : { bKind }),
+        wakeFeature: true,
+        ended: { b: { [closed]: "rk-closed" } },
+        sessionFiles: { [closed]: file },
+      })
+      const { run } = surface(a.remote)
+      // The holder's kind reaches the tools through the same device roster the reopen route reads.
+      const listed = await run("thread_list", {})
+      expect(listed.kind === "ok" && "devices" in listed && listed.devices?.find((d) => d.device === "b")?.kind).toBe(
+        bKind,
+      )
+      expect(await run("thread_create", { thread: closed })).toMatchObject({
+        kind: "ok",
+        thread: closed,
+        device: "b",
+        deduplicated: false,
+      })
+      expect(await run("thread_send", { thread: closed, message: "still there?" })).toMatchObject({
+        kind: "ok",
+        thread: closed,
+        delivery: { kind: "started" },
+      })
+      expect(
+        a.sent.flatMap((entry) =>
+          entry.rpc?.["type"] === "open_session"
+            ? [["open", entry.device, entry.rpc["sessionPath"]]]
+            : entry.rpc?.["type"] === "admit_external_message"
+              ? [["admit", entry.device]]
+              : [],
+        ),
+      ).toEqual([
+        ["open", "b", file],
+        ["admit", "b"],
+      ])
+    },
+  )
 
   test("#given b lists a thread with an empty title #when it is listed and then addressed #then it is listed under its folder's name, yet resolves by its thread id only: the derived label is display-only, never an address (#14043)", async () => {
     const a = account({ rows: [{ ...B_ROW, title: "" }] })

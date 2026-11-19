@@ -32,7 +32,7 @@ const RENDER = {
   ],
   read: (result) => [
     ...result.items.map((item) => `[${item.role}] ${item.content}`),
-    ...(result.truncated ? [`(truncated; continue with --cursor ${result.next_cursor})`] : []),
+    ...(result.truncated ? [`(truncated; older messages: --cursor ${result.next_cursor})`] : []),
   ],
 }
 
