@@ -646,14 +646,15 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     expect(await run("thread_read", { thread: "b" })).toMatchObject({ kind: "error", error: { code: "not_found" } })
   })
 
-  test("#given a thread on b #when thread_create forks it #then the fork is refused unsupported naming b's source, and nothing reaches b (#13031)", async () => {
+  test("#given a thread on b whose engine does not fork #when thread_create forks it #then the fork is refused unsupported naming b's source, and b is only asked what it can do (#13031)", async () => {
     const a = account()
     const { run } = surface(a.remote)
     expect(await run("thread_create", { fork_from: "dur-on-b" })).toMatchObject({
       kind: "error",
       error: { code: "unsupported", details: { reason: "fork_unsupported", thread: "dur-on-b", device: "b" } },
     })
-    expect(a.sent).toEqual([])
+    // The one read is b's capabilities (open_session_fork, senpi#7085); nothing is opened there.
+    expect(a.sent.map((entry) => entry.rpc?.["type"])).toEqual(["get_protocol_info"])
   })
 
   test("#given b's engine answers open_session with its real envelope (ids under data) #when thread_create creates and forks on b #then the create succeeds with the durable id (data.sessionId when none is named) and the fork is refused", async () => {
