@@ -311,6 +311,12 @@ describe("thread SDK: a send with no remote surface resolves through the address
     expect(await sdk.send({ thread: HEX, text: "ping" })).toMatchObject({ kind: "ok" })
     expect(views).toEqual([])
   })
+
+  test("#given an id the gateway store does not own #when the CLI sends to it with no remote surface #then the host is listed once (#14322 review L5)", async () => {
+    const { sdk, views } = fixture({ sessions: [hexSession] })
+    expect(await sdk.send({ thread: HEX, text: "ping" })).toMatchObject({ kind: "ok" })
+    expect(views).toEqual([{ offline: true }])
+  })
 })
 
 describe("thread SDK: a gateway store a newer omo build migrated", () => {
