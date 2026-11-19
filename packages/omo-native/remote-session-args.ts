@@ -1,4 +1,4 @@
-import { THINKING_LEVELS } from "../omo-senpi/src/components/thread/contracts/fields"
+import { REMOTE_GRACEFUL_MAX_WAIT_MS, THINKING_LEVELS } from "../omo-senpi/src/components/thread/contracts/fields"
 import type { WorktreeRequest } from "../omo-senpi/src/components/thread/worktree/thread-worktree"
 import { UsageError } from "./remote-exit"
 import { isPermissionPreset, PERMISSION_PRESETS } from "./remote-permission-preset"
@@ -175,8 +175,13 @@ export function parseSession(
   if (verb === "close") {
     const waitValue = values.get("--wait-ms")
     const graceful = switches.has("--graceful")
-    if (waitValue !== undefined && (!graceful || !/^[1-9]\d{0,5}$/.test(waitValue) || Number(waitValue) > 600_000))
-      throw new UsageError("omo remote close: --wait-ms takes 1..600000 milliseconds and goes with --graceful")
+    if (
+      waitValue !== undefined &&
+      (!graceful || !/^[1-9]\d{0,5}$/.test(waitValue) || Number(waitValue) > REMOTE_GRACEFUL_MAX_WAIT_MS)
+    )
+      throw new UsageError(
+        `omo remote close: --wait-ms takes 1..${REMOTE_GRACEFUL_MAX_WAIT_MS} milliseconds and goes with --graceful`,
+      )
     if (graceful && switches.has("--force"))
       throw new UsageError("omo remote close: --graceful and --force exclude each other")
     return {

@@ -9,6 +9,7 @@ import { readContextTail } from "../remote/transcript-tail"
 import { selectEntryPage } from "../paged-reader"
 import { replyData } from "../remote/remote-ops"
 import type { ModelChoice } from "../tools/model-match"
+import { REMOTE_GRACEFUL_MAX_WAIT_MS } from "../contracts/fields"
 import { closeLadder, SESSION_GONE, type RecordAnswer } from "./close-ladder"
 import { interruptOver } from "./interrupt"
 import { ControlRefusal, refuse, SESSION_ONLY_THINKING_SCOPE, type SessionControl } from "./port"
@@ -98,6 +99,7 @@ export function createRelayControl(
             return answered
           },
           closeOptions,
+          REMOTE_GRACEFUL_MAX_WAIT_MS,
         )
         if (closed.outcome !== "held_elsewhere") remote.sessions.closed?.(row, unloaded, closedAt)
         return closed

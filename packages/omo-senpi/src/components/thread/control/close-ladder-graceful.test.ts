@@ -70,6 +70,28 @@ describe("closeLadder { graceful: true }", () => {
     expect(waits).toEqual([20_000])
   })
 
+  test("#given a leg that can wait at most 35 s for its answer #when a graceful close asks for 120 s #then the engine drains 35 s and an expired drain names the cap", async () => {
+    const { send, sent, waits } = engine({
+      capabilities: GRACEFUL_ENGINE,
+      unload: (rpc) => ({
+        outcome: "refused",
+        reason: "turn_active",
+        timed_out: true,
+        open: true,
+        turn: 2,
+        waited_ms: rpc["waitMs"],
+        dropped: { deliveries: [], user_messages: [] },
+      }),
+    })
+    const refusal = await refusalOf(() => closeLadder("s1", send, { graceful: true, wait_ms: 120_000 }, 35_000))
+    expect(sent.find((rpc) => rpc["type"] === "unload_session")?.["waitMs"]).toBe(35_000)
+    expect(waits).toEqual([35_000])
+    expect(refusal).toMatchObject({
+      code: "turn_active",
+      details: { waited_ms: 35_000, wait_capped: { requested_ms: 120_000, max_ms: 35_000 } },
+    })
+  })
+
   test("#given a turn that outlives the wait #when the thread closes gracefully #then it is refused turn_active, still running and open, naming the turn and the returned messages", async () => {
     const { send } = engine({
       capabilities: GRACEFUL_ENGINE,

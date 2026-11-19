@@ -75,14 +75,17 @@ const deliveriesOf = (value: unknown): string[] | undefined =>
  * holder, so the holder's wake sweep knows the session was closed on request, and when, whichever device closed it
  * (`wake/session-target.ts` `closed_at`). An engine without the effect ledger ignores the field.
  *
- * `graceful` (omo#14313) is one record of its own, `gracefulClose`.
+ * `graceful` (omo#14313) is one record of its own, `gracefulClose`. `legMaxWaitMs`: the longest drain the leg can wait
+ * for its answer (`REMOTE_GRACEFUL_MAX_WAIT_MS` on the relay leg); a longer `wait_ms` is cut to it and an expired drain
+ * says so (`wait_capped`).
  */
 export async function closeLadder(
   sessionId: string,
   send: LadderSend,
   options: ThreadCloseOptions = {},
+  legMaxWaitMs?: number,
 ): Promise<ThreadCloseAnswer> {
-  if (options.graceful === true) return await gracefulClose(sessionId, send, options.wait_ms)
+  if (options.graceful === true) return await gracefulClose(sessionId, send, options.wait_ms, legMaxWaitMs)
   const done = (outcome: ThreadCloseOutcome, data?: JsonObject): ThreadCloseAnswer => ({
     outcome,
     dropped_deliveries: deliveriesOf(data?.["dropped"]) ?? [],
@@ -146,7 +149,12 @@ const describe = (data: JsonObject): string =>
  * `turn_active` with `still_running`, the session still open and taking messages again. An engine without
  * `unload_graceful` is refused before anything is sent: a graceful close never falls back to an interrupting one.
  */
-async function gracefulClose(sessionId: string, send: LadderSend, waitMs?: number): Promise<ThreadCloseAnswer> {
+async function gracefulClose(
+  sessionId: string,
+  send: LadderSend,
+  waitMs: number | undefined,
+  legMaxWaitMs: number | undefined,
+): Promise<ThreadCloseAnswer> {
   if (!(await advertises(sessionId, send, UNLOAD_GRACEFUL)))
     throw refuse(
       "unsupported",
@@ -154,7 +162,9 @@ async function gracefulClose(sessionId: string, send: LadderSend, waitMs?: numbe
       "Update omo on that device and restart its host, or close the thread with force: true (its running turn is stopped).",
       { command: "unload_session", capability: UNLOAD_GRACEFUL },
     )
-  const wait = waitWithinCallBudget(waitMs ?? GRACEFUL_WAIT_MS, GRACEFUL_ANSWER_RESERVE_MS)
+  const requested = waitMs ?? GRACEFUL_WAIT_MS
+  const capped = legMaxWaitMs !== undefined && requested > legMaxWaitMs ? legMaxWaitMs : undefined
+  const wait = waitWithinCallBudget(capped ?? requested, GRACEFUL_ANSWER_RESERVE_MS)
   if (wait <= 0)
     throw refuse(
       "unsupported",
@@ -175,9 +185,12 @@ async function gracefulClose(sessionId: string, send: LadderSend, waitMs?: numbe
   if (data["timed_out"] === true)
     throw refuse(
       "turn_active",
-      `Thread ${sessionId} is still working on turn ${String(data["turn"])} after ${String(data["waited_ms"])} ms. It stays open and takes messages again; the ${dropped.length} unread message(s) taken out of its queue are queued for it again.`,
-      "Close it again with a longer wait_ms once its turn is nearly done, or with force: true to stop the turn.",
+      `Thread ${sessionId} is still working on turn ${String(data["turn"])} after ${String(data["waited_ms"])} ms${capped === undefined ? "" : ` (the most a thread on another device can wait, not the ${String(requested)} ms asked for)`}. It stays open and takes messages again; the ${dropped.length} unread message(s) taken out of its queue are queued for it again.`,
+      capped === undefined
+        ? "Close it again with a longer wait_ms once its turn is nearly done, or with force: true to stop the turn."
+        : "Close it again once its turn is nearly done, or with force: true to stop the turn.",
       {
+        ...(capped === undefined ? {} : { wait_capped: { requested_ms: requested, max_ms: capped } }),
         command: "unload_session",
         reason: "turn_active",
         still_running: true,

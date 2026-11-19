@@ -47,11 +47,6 @@ function headerOf(path: string): Record<string, unknown> | null {
 const RPC_EFFECT_ENTRY = "rpc_effect"
 
 /**
- * The newest `unload_session` the session's transcript tail records as done (#14273): senpi writes the effect of an
- * unload that carries an `effectId` (the close ladder sends one) to the transcript before it tears the session down, so
- * the holder knows the session was closed on request, and when, whichever device asked. An idle park writes nothing.
- */
-/**
  * When one transcript entry records a close on request: an `rpc_effect` unload in state `done` (#14273), or the
  * `session-closed` record a graceful close writes (omo#14313), which a terminal's own close leaves without an effect.
  */
@@ -67,6 +62,11 @@ function closeInstantOf(customType: unknown, data: Record<string, unknown>): num
   return typeof stamp === "string" ? Date.parse(stamp) : undefined
 }
 
+/**
+ * The newest `unload_session` the session's transcript tail records as done (#14273): senpi writes the effect of an
+ * unload that carries an `effectId` (the close ladder sends one) to the transcript before it tears the session down, so
+ * the holder knows the session was closed on request, and when, whichever device asked. An idle park writes nothing.
+ */
 function closedAtOf(path: string): number | undefined {
   let fd: number
   try {

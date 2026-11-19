@@ -61,6 +61,12 @@ export async function closeThread(
       "graceful and force exclude each other: a graceful close lets the turn end, a forced one stops it.",
       "Pass one of them.",
     )
+  if (options.wait_ms !== undefined && options.graceful !== true)
+    return failure(
+      "invalid_arguments",
+      "wait_ms only bounds a graceful close: a close without graceful does not wait for the turn.",
+      "Pass graceful: true with wait_ms, or drop wait_ms.",
+    )
   const { outcome, dropped_deliveries, graceful } = await control.close(options)
   if (outcome === "held_elsewhere")
     return failure(

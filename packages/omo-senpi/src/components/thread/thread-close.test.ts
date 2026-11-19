@@ -211,14 +211,20 @@ describe("thread_close: close a thread on this device or on another one", () => 
     expect(closeRequests).toEqual([{ graceful: true, wait_ms: 5000 }])
   })
 
-  test("#given graceful and force together #when thread_close is called #then it is refused invalid_arguments and nothing is closed", async () => {
-    const { run, closed } = surface(undefined)
-    expect(await run("thread_close", { thread: "dur-local", graceful: true, force: true })).toMatchObject({
-      kind: "error",
-      error: { code: "invalid_arguments" },
-    })
-    expect(closed).toEqual([])
-  })
+  test.each([
+    ["graceful and force together", { graceful: true, force: true }],
+    ["wait_ms without graceful", { wait_ms: 5000 }],
+  ])(
+    "#given %s #when thread_close is called #then it is refused invalid_arguments and nothing is closed",
+    async (_, args) => {
+      const { run, closed } = surface(undefined)
+      expect(await run("thread_close", { thread: "dur-local", ...args })).toMatchObject({
+        kind: "error",
+        error: { code: "invalid_arguments" },
+      })
+      expect(closed).toEqual([])
+    },
+  )
 
   test("#given b's engine refuses the unload with a reason the ladder does not know #when thread_close names b's thread #then it is typed unsupported naming the reason and b, and nothing else is sent", async () => {
     const a = account({ unloadReason: "attached" })
