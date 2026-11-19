@@ -131,9 +131,11 @@ export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThrea
     thisDeviceName: async () => (await (await load()).thisDeviceName?.()) ?? null,
     devices: async () => await (await load()).devices(),
     sessions: async (filter) => await (await load()).sessions(filter),
-    listing: async () => {
+    listing: async (filter) => {
       const loaded = await load()
-      return loaded.listing === undefined ? { rows: await loaded.sessions(), incomplete: [] } : await loaded.listing()
+      return loaded.listing === undefined
+        ? { rows: await loaded.sessions(filter), incomplete: [] }
+        : await loaded.listing(filter)
     },
     endpointCommand: async (device, rpc, options) => await (await load()).endpointCommand(device, rpc, options),
     locate: async (device, engineId, knownKey) => await (await load()).locate(device, engineId, knownKey),

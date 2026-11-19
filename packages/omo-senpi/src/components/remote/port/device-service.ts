@@ -322,7 +322,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         last_seen_ms: row.last_seen_ms,
       })),
     sessions: async (filter) => (filter?.device === undefined ? await round.listing() : await listing(filter)).rows,
-    listing: round.listing,
+    listing: async (filter) => (filter?.device === undefined ? await round.listing() : await listing(filter)),
     // create / open / fork on another device: relay daemon #393's attach-less `session.command {device, endpoint, rpc}`.
     // The endpoint lookup and every refusal answered before sending ran nothing; anything after sending may have.
     // An open_session goes on the endpoint dialer (a fresh owned connection per call by default), closed once it

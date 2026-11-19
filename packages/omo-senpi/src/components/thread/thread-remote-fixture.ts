@@ -641,13 +641,18 @@ export function createRemoteThreadFixture() {
           const rows = options.rows ?? [{ ...B_ROW, state: options.rowState ?? B_ROW.state }]
           return filter?.device === undefined ? rows : rows.filter((row) => row.device === filter.device)
         },
-        listing: async () => {
-          listings.all += 1
+        listing: async (filter) => {
+          if (filter?.device === undefined) listings.all += 1
+          else listings.device += 1
           if (options.failSessionsList === true) throw new Error("account list failed")
-          return {
-            rows: options.rows ?? [{ ...B_ROW, state: options.rowState ?? B_ROW.state }],
-            incomplete: options.incomplete ?? [],
-          }
+          const rows = options.rows ?? [{ ...B_ROW, state: options.rowState ?? B_ROW.state }]
+          const incomplete = options.incomplete ?? []
+          return filter?.device === undefined
+            ? { rows, incomplete }
+            : {
+                rows: rows.filter((row) => row.device === filter.device),
+                incomplete: incomplete.filter((device) => device === filter.device),
+              }
         },
         endpointCommand: async (device, rpc) => {
           sent.push({ via: "endpoint", device, rpc })
