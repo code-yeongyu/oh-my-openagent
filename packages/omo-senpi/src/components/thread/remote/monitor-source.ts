@@ -3,7 +3,8 @@ import type { RpcRemoteHandlers, RpcRemoteRow, RpcRemoteSource, RpcRemoteState }
 import type { ThreadResolveResult } from "../addressing"
 import type { MonitorTargetResolution } from "../tools/monitor-target"
 import { rowThreadId, type JsonObject, type RemoteSessionRow, type RemoteSessionState, type RemoteThreadSurface } from "./ports"
-import { deviceNamed, remoteAvailable } from "./remote-ops"
+import { threadToolFailure } from "../errors"
+import { deviceRefusal, listedDevices, remoteAvailable } from "./remote-ops"
 
 // A device-wide target reads the account listing (running | idle | ended rows), round by round at senpi's own rescan
 // cadence (RPC_RESCAN_MS): coarse, and enough to wake. A session's content needs a session target.
@@ -34,6 +35,31 @@ export function createRemoteMonitorSource(remote: RemoteThreadSurface): RpcRemot
 
 const KEEP: MonitorTargetResolution = { kind: "keep" }
 
+/**
+ * The online account device a `<device>/<thread>` target names (#14294): by id, else by the name the account lists it
+ * under, where two devices of that name are ambiguous_target. Unknown and offline devices answer as deviceOnline does.
+ */
+async function deviceNamed(remote: RemoteThreadSurface, name: string): Promise<MonitorTargetResolution | string> {
+  const listed = await listedDevices(remote.client, name)
+  if ("kind" in listed) return { kind: "refused", failure: listed.error }
+  const named = listed.devices.some((candidate) => candidate.device === name)
+    ? [name]
+    : listed.devices.filter((candidate) => candidate.label === name).map((candidate) => candidate.device)
+  if (named.length > 1)
+    return {
+      kind: "refused",
+      failure: threadToolFailure(
+        "ambiguous_target",
+        `${named.length} devices on this account are named ${name}.`,
+        "Name the device by its id (<device id>/<thread>); thread_list with all_scope shows each device's id.",
+        { device: name, candidates: named },
+      ),
+    }
+  const device = named[0] ?? name
+  const refusal = deviceRefusal(listed.devices, device)
+  return refusal === undefined ? device : { kind: "refused", failure: refusal.error }
+}
+
 // senpi's own local targets (rpc-monitor-targets.ts `parseRpcTarget`): the lineage and account keywords, a task id, and a
 // session file path, which no thread address can spell.
 const SENPI_LOCAL_TARGET = /^(?:children|all|st_.*)$/
@@ -55,8 +81,8 @@ export async function resolveMonitorTarget(
     if (device !== undefined) {
       if (remote === undefined) return KEEP
       const named = await deviceNamed(remote, device)
-      if ("kind" in named) return { kind: "refused", failure: named.error }
-      armedTarget = `${named.device}/${session}`
+      if (typeof named !== "string") return named
+      armedTarget = `${named}/${session}`
     }
     return armedTarget === text ? KEEP : { kind: "target", target: armedTarget }
   }
