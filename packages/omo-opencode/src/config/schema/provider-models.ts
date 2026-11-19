@@ -4,7 +4,7 @@ export const MODEL_PROVIDERS = ["openai", "anthropic"] as const
 
 export const ModelProviderSchema = z.enum(MODEL_PROVIDERS)
 
-export const ProviderModelPinSchema = z
+const ProviderModelPinSchema = z
   .object({
     model: z
       .string()
@@ -16,7 +16,7 @@ export const ProviderModelPinSchema = z
 
 const ProviderModelPinMapSchema = z.record(z.string(), ProviderModelPinSchema)
 
-export const ProviderModelSetSchema = z
+const ProviderModelSetSchema = z
   .object({
     agents: ProviderModelPinMapSchema.optional().describe(
       "Agent name (sisyphus-junior, multimodal-looker, explore, librarian, oracle, ...) to the model task(subagent_type=...) and look_at use when this provider is requested.",
