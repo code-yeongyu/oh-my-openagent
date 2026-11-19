@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test"
 
-import { readHostMemoryHeadroom, readWakeMemoryFloor, WAKE_MEMORY_FLOOR_BYTES } from "./memory-headroom"
+import {
+  readHostMemoryHeadroom,
+  readWakeMemoryFloor,
+  WAKE_MEMORY_FLOOR_BYTES,
+  WAKE_SESSION_COST_BYTES,
+} from "./memory-headroom"
 
 const GIB = 1024 ** 3
 const MIB = 1024 ** 2
@@ -57,19 +62,36 @@ describe("host memory headroom for a wake", () => {
 })
 
 // #14363 review L1: a fixed 1 GiB floor under a cgroup limit at or below 1 GiB (or on a small host) deferred every wake
-// forever. The floor is a quarter of the memory this process may use, capped at 1 GiB.
+// forever. The floor is a quarter of the memory this process may use, capped at 1 GiB, and never below what one woken
+// session measured to cost (delta review L2), so a wake is never started into less room than it needs.
 describe("the wake memory floor", () => {
-  test("#given a cgroup v2 limit of 768 MiB #when read on linux #then the floor is a quarter of it, 192 MiB", () => {
+  test("#given the measured cost of one woken session #then it is 409 MiB", () => {
+    expect(WAKE_SESSION_COST_BYTES).toBe(409 * MIB)
+  })
+
+  test("#given a cgroup v2 limit of 768 MiB, whose quarter is below one wake's cost #when read on linux #then the floor is that cost, 409 MiB", () => {
     const read = files({
       "/proc/self/cgroup": "0::/omo.scope\n",
       "/sys/fs/cgroup/omo.scope/memory.max": `${768 * MIB}\n`,
       "/sys/fs/cgroup/omo.scope/memory.current": `${500 * MIB}\n`,
       "/proc/meminfo": MEMINFO(8 * 1024 * 1024),
     })
-    expect(readWakeMemoryFloor({ platform: "linux", readFile: read })).toBe(192 * MIB)
+    expect(readWakeMemoryFloor({ platform: "linux", readFile: read })).toBe(409 * MIB)
   })
 
-  test("#given no cgroup limit on a 2 GiB host #when read on linux #then the floor is a quarter of MemTotal, 512 MiB", () => {
+  test("#given a cgroup v2 limit of 256 MiB, which cannot hold one wake #when read on linux #then the floor is still one wake's cost, so the room never reaches it and the wake defers host_memory_pressure", () => {
+    const read = files({
+      "/proc/self/cgroup": "0::/omo.scope\n",
+      "/sys/fs/cgroup/omo.scope/memory.max": `${256 * MIB}\n`,
+      "/sys/fs/cgroup/omo.scope/memory.current": `${16 * MIB}\n`,
+      "/proc/meminfo": MEMINFO(8 * 1024 * 1024),
+    })
+    const floor = readWakeMemoryFloor({ platform: "linux", readFile: read })
+    expect(floor).toBe(409 * MIB)
+    expect(readHostMemoryHeadroom({ platform: "linux", readFile: read })).toBeLessThan(floor)
+  })
+
+  test("#given no cgroup limit on a 2 GiB host #when read on linux #then the floor is a quarter of MemTotal, 512 MiB, above one wake's cost", () => {
     const read = files({
       "/proc/self/cgroup": "0::/\n",
       "/sys/fs/cgroup/memory.max": "max\n",

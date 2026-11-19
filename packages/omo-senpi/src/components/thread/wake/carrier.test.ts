@@ -885,10 +885,10 @@ describe("the carrier admits wakes on measured host memory, never on a count", (
   })
 
   // #14363 review L1: under a cgroup limit at or below 1 GiB the room never reaches a fixed 1 GiB, so no wake ever ran.
-  test("#given a 768 MiB cgroup whose floor is 192 MiB and 300 MiB of room #when a session is woken #then it opens and wakes", async () => {
+  test("#given a 768 MiB cgroup whose floor is one wake's cost, 409 MiB, and 500 MiB of room #when a session is woken #then it opens and wakes", async () => {
     const { fake, store, carrier, path } = await setup({
-      memoryHeadroom: () => 300 * 1024 * 1024,
-      memoryFloor: () => 192 * 1024 * 1024,
+      memoryHeadroom: () => 500 * 1024 * 1024,
+      memoryFloor: () => 409 * 1024 * 1024,
     })
     await store.woken.request({ durable_id: "s1", session_file: path("s1") })
 
@@ -900,14 +900,14 @@ describe("the carrier admits wakes on measured host memory, never on a count", (
 
   test("#given room below that floor #when a session is woken #then the deferral names the floor it was measured against", async () => {
     const { carrier, path } = await setup({
-      memoryHeadroom: () => 100 * 1024 * 1024,
-      memoryFloor: () => 192 * 1024 * 1024,
+      memoryHeadroom: () => 300 * 1024 * 1024,
+      memoryFloor: () => 409 * 1024 * 1024,
     })
     path("s1")
     expect(await carrier.wake("s1")).toEqual({
       kind: "host_memory_pressure",
-      available_bytes: 100 * 1024 * 1024,
-      floor_bytes: 192 * 1024 * 1024,
+      available_bytes: 300 * 1024 * 1024,
+      floor_bytes: 409 * 1024 * 1024,
     })
   })
 })
