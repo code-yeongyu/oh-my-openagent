@@ -8,6 +8,7 @@ import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { gatewaySchemaRefusal, threadToolFailure } from "./errors"
 import type { ThreadToolFailure } from "./errors"
 import { type Static } from "typebox"
+import { toThreadAddressEntries } from "./address-book"
 import { type ThreadAddressEntry } from "./addressing"
 import { resolveAddress } from "./address/lazy"
 import {
@@ -47,7 +48,7 @@ import { threadToolPermission } from "./tools/local-permission"
 import { withThreadRenderers } from "./tools/render"
 import { consumedSendersOf, threadSendPermission } from "./tools/reply-permission"
 import { otherDevice, replyTargetFailure, replyTargetMismatch } from "./tools/reply-target"
-import { accountDevices } from "./remote/account"
+import { accountDevices } from "./address/account"
 import { listAcross } from "./remote/lazy-ops"
 import { locateControl } from "./control/locate"
 import { createThread } from "./control/create"
@@ -77,8 +78,8 @@ import {
   failure,
   hostView,
   metadata,
+  addressBook,
   output,
-  resolveEntries,
   sendAddressBook,
   sendBookFor,
   summary,
@@ -574,7 +575,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     }
     // Decision 0027: ONE resolver over this device's book and the account's other devices (resolveAddress, which takes
     // <device>/<thread> too); where it resolved says which transport carries the send.
-    const entries = match === "fuzzy" ? resolveEntries(options, current) : localFor(address)
+    const entries = match === "fuzzy" ? toThreadAddressEntries(addressBook(options, current)) : localFor(address)
     // A reply to a sender on this device resolves among this device's entries only (A4.3.1), and only by the sender's
     // exact id or stated name: an id prefix never turns an approved reply into a send to another thread. A send never
     // targets its own caller, so an id prefix is resolved without it (UUIDv7 ids share 8 hex characters for ~65 s).

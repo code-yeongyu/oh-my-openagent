@@ -7,7 +7,7 @@ import { controlIdentity, controlRefusalOf, type SessionControl } from "../contr
 import { isEntryCursor, staleEntryCursor } from "../paged-reader"
 import { readTranscript, type ThreadTranscriptEntry } from "../reader"
 import { threadLink } from "../thread-link"
-import { addressBook, degradedSummary, failure, sendAddressBook, summary } from "./internals"
+import { addressBook, degradedSummary, failure, rowNamed, sendAddressBook, summary } from "./internals"
 import { readItem } from "./read-item"
 import { threadRow } from "./thread-row"
 import { listedStates } from "./thread-state"
@@ -56,7 +56,13 @@ export function listThreads(
   )
   const order = new Map(book.map((entry, index) => [entry.thread_id, index]))
   const shown = listedStates(states)
-  const threads = [...visible.map((session) => summary(session, entryOf(session))), ...inactive.map(degradedSummary)]
+  const threads = [
+    ...visible.map((session) => {
+      const entry = entryOf(session)
+      return rowNamed(summary(session, entry), entry?.name ?? session.name, entry?.title)
+    }),
+    ...inactive.map((entry) => rowNamed(degradedSummary(entry), entry.name, entry.title)),
+  ]
     .filter((thread) => shown.has(thread.state))
     .sort(
       (left, right) =>
