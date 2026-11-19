@@ -120,9 +120,21 @@ const miss = (address: string, unanswered: readonly DeviceRow[]): RemoteFailure 
     },
   })
 
+// A device the listing names but the roster misses (#13402, unknown-device.ts): it counts by its exact id, named by it.
+const listingNamed = (id: string): DeviceRow => ({
+  id,
+  name: id,
+  platform: "unknown",
+  online: true,
+  last_seen_ms: null,
+  caps: { attach: true, machine: false, control: false },
+})
+
 /**
- * The core's device resolver over the client's roster (one devices.list round): id > here > name (normalizeName) >
- * unique 6+ id prefix. `row` is the roster's own row for the resolved id, when the roster carries one.
+ * The core's device resolver (id > here > name by normalizeName > unique 6+ id prefix) over the devices this account
+ * knows: the roster (one devices.list round), plus a device the roster misses that the listing names, which resolves by
+ * its exact id only (#13402: the listing asked for that id answers rows or a round state, not not_found{device}).
+ * `row` is the device's row: the roster's, or the listing-named one.
  */
 export async function resolveRemoteDevice(
   core: ClientCore,
@@ -134,23 +146,22 @@ export async function resolveRemoteDevice(
 > {
   const roster = await core.devicesList(opts)
   if (roster.kind === "error") return roster
-  const self = roster.value.find((row) => row.self === true)
-  const resolved = resolveDevice(
-    {
-      here: self === undefined || self.id === "local" ? null : self.id,
-      devices: roster.value.map((row) => ({
-        id: row.id,
-        name: row.name,
-        online: row.online,
-        last_seen_ms: row.last_seen_ms,
-      })),
-    },
-    text,
-    { online: false },
-  )
-  return resolved.kind === "ok"
-    ? ok({ ref: resolved.device, row: roster.value.find((row) => row.id === resolved.device.id) })
-    : deviceRefusal(resolved.refusal)
+  const here = roster.value.find((row) => row.self === true)?.id
+  const over = (rows: readonly DeviceRow[]) => ({
+    rows,
+    resolved: resolveDevice({ here: here === undefined || here === "local" ? null : here, devices: rows }, text, {
+      online: false,
+    }),
+  })
+  const answer = ({ rows, resolved }: ReturnType<typeof over>) =>
+    resolved.kind === "ok"
+      ? ok({ ref: resolved.device, row: rows.find((row) => row.id === resolved.device.id) })
+      : deviceRefusal(resolved.refusal)
+  const first = over(roster.value)
+  if (first.resolved.kind === "ok" || first.resolved.refusal.reason !== "no_device") return answer(first)
+  const named = await core.sessionsList({ device: text }, opts)
+  if (named.kind === "error") return named.code === "not_found" ? answer(first) : named
+  return answer(over([...roster.value, listingNamed(text)]))
 }
 
 /**
