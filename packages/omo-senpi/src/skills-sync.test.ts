@@ -24,6 +24,7 @@ const expectedSkillNames = [
   "init-deep",
   "lsp-setup",
   "mass-ulw",
+  "omo-relay",
   "onboarding",
   "programming",
   "refactor",
@@ -48,6 +49,7 @@ const NATIVE_SENPI_SKILL_NAMES: Record<string, true> = {
   hyperplan: true,
   "init-deep": true,
   "mass-ulw": true,
+  "omo-relay": true,
   onboarding: true,
   ultrawork: true,
   "ulw-loop": true,
@@ -135,7 +137,7 @@ describe("OMO Senpi scoped skill sync", () => {
     expect([...telemetrySkillNames].sort()).toEqual(listDirectoryNames(skillsRoot))
   })
 
-  test("#given synced skill output #when inspected #then exactly 27 roots exist with valid names", () => {
+  test("#given synced skill output #when inspected #then exactly 28 roots exist with valid names", () => {
     const actualNames = listDirectoryNames(skillsRoot)
     expect(actualNames).toEqual([...expectedSkillNames].sort())
 

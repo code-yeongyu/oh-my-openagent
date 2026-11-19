@@ -89,7 +89,10 @@ export type SessionRow = {
   readonly thread: ThreadHandle
   /** The session's omo durable id when its device publishes it: the id every thread tool names it by (decision 0027 D2). */
   readonly durable_id?: string
+  /** The session's name, else its fallback (thread-address-core `rowName`), the same on both legs. */
   readonly name: string
+  /** Set when `name` is a fallback: the session has no name of its own, and only a real name is an address. */
+  readonly unnamed?: true
   readonly title: string
   readonly device: DeviceRow
   readonly project: string

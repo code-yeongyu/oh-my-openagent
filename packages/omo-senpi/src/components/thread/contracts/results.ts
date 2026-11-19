@@ -68,6 +68,8 @@ export type ThreadRetryWait = {
 export type ThreadResultSummary = {
   readonly thread: string
   readonly name: string
+  /** Set when `name` is a fallback (thread-address-core `rowName`): the thread has no name of its own, so its name is no address. */
+  readonly unnamed?: true
   readonly status: ThreadStatus
   readonly machine?: string
   readonly cwd: string

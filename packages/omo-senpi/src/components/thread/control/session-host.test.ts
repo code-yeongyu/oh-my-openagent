@@ -160,10 +160,17 @@ describe("SessionHost: opening an existing thread on both legs", () => {
     const there = await run("thread_create", { thread: "dur-on-b" })
     expect(here).toMatchObject({ kind: "ok", thread: "dur-created-here", deduplicated: false })
     expect(there).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b", deduplicated: false })
-    expect(localOpenFrames(openSession)).toEqual([{ sessionPath: expect.stringContaining("dur-on-disk.jsonl") }])
+    // Each reopen names the folder its file records, so neither engine probes the path (#14296).
+    expect(localOpenFrames(openSession)).toEqual([
+      { sessionPath: expect.stringContaining("dur-on-disk.jsonl"), cwd: process.cwd() },
+    ])
     expect(a.sent.filter((entry) => entry.via === "endpoint")).toEqual([
       { via: "endpoint", device: "b", rpc: { type: "find_session", durableSessionId: "dur-on-b" } },
-      { via: "endpoint", device: "b", rpc: { type: "open_session", retain_on_disconnect: true, sessionPath: B_FILE } },
+      {
+        via: "endpoint",
+        device: "b",
+        rpc: { type: "open_session", retain_on_disconnect: true, sessionPath: B_FILE, cwd: B_ROW.project },
+      },
     ])
   })
 })
@@ -224,7 +231,7 @@ describe("thread_create reopens a thread whose process exited (#14049)", () => {
       const file = sessionFile(agentDir, exited)
       const result = await run("thread_create", { thread: exited })
       expect(result).toMatchObject({ kind: "ok", thread: exited, deduplicated: false })
-      expect(localOpenFrames(openSession)).toEqual([{ sessionPath: file }])
+      expect(localOpenFrames(openSession)).toEqual([{ sessionPath: file, cwd: process.cwd() }])
       expect(a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")).toEqual([])
     })
 
@@ -232,7 +239,7 @@ describe("thread_create reopens a thread whose process exited (#14049)", () => {
     const { run, openSession, agentDir } = surface(undefined, { sessionsDirectory: true })
     const file = sessionFile(agentDir, exited)
     expect(await run("thread_create", { thread: `here/${exited}` })).toMatchObject({ kind: "ok", thread: exited })
-    expect(localOpenFrames(openSession)).toEqual([{ sessionPath: file }])
+    expect(localOpenFrames(openSession)).toEqual([{ sessionPath: file, cwd: process.cwd() }])
   })
 
   test("#given an id no device holds #when thread_create opens it #then a typed not_found and nothing is opened", async () => {
