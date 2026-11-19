@@ -347,7 +347,7 @@ describe("lost_ack_and_durable_recovery", () => {
   })
 })
 
-describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
+describe("causal_cycle_hop_and_rate_budgets", () => {
   // K8: A->B->A thread chains are allowed and no count limit applies unless the user sets one; only a
   // session sending to itself is refused.
   test("#given A->B->C under one root #when C sends back to A and A answers B directly #then both are delivered and carry the chain's hop count", async () => {
@@ -451,16 +451,16 @@ describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
     expect(Math.max(...sizes) - Math.min(...sizes)).toBeLessThan(16)
   }, 60_000)
 
-  test("#given one sender turn #when it reaches a 17th distinct session #then that send is refused while a second send to a known target passes", async () => {
+  // Q 2026-11-19: no per-turn cap on how many sessions one turn may reach; a recovering sender must be able to wake every
+  // session it owns from one turn.
+  test("#given one sender turn #when it sends to 40 distinct sessions #then every send is delivered", async () => {
     const h = open()
     h.session("F")
-    for (let index = 1; index <= 17; index++) h.phantom(`G${index}`)
+    for (let index = 1; index <= 40; index++) h.phantom(`G${index}`)
     const results: string[] = []
-    for (let index = 1; index <= 17; index++)
+    for (let index = 1; index <= 40; index++)
       results.push(summary(await send(h, "F", `G${index}`, "fan", { turn_id: "turn-1" })))
-    expect(results.slice(0, 16).every((result) => result === "queued_offline")).toBe(true)
-    expect(results[16]).toBe("error:overloaded")
-    expect(summary(await send(h, "F", "G1", "again", { turn_id: "turn-1" }))).toBe("queued_offline")
+    expect(results).toEqual(Array.from({ length: 40 }, () => "queued_offline"))
   })
 
   test("#given a pair bucket of 8 #when a 9th send follows at once, a retry replays, and 5 s pass #then the 9th is refused, the retry costs nothing, and one token refills", async () => {
@@ -470,15 +470,31 @@ describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
     for (let index = 1; index <= 8; index++)
       expect(summary(await send(h, "R", "S", `m${index}`, { idempotency_key: `r${index}` }))).toBe("queued_offline")
     const ninth = await send(h, "R", "S", "m9", { idempotency_key: "r9" })
-    expect(ninth.kind === "error" && { code: ninth.error.code, budget: ninth.error.details?.budget }).toEqual({
-      code: "overloaded",
-      budget: "pair_rate",
+    expect(ninth.kind === "error" && { code: ninth.error.code, guard: ninth.error.details?.guard }).toEqual({
+      code: "pair_loop_guard",
+      guard: "pair_loop",
     })
     const retry = await send(h, "R", "S", "m3", { idempotency_key: "r3" })
     expect(retry.kind === "ok" && retry.deduplicated).toBe(true)
     h.clock.now += 5_000
     expect(summary(await send(h, "R", "S", "m9", { idempotency_key: "r9" }))).toBe("queued_offline")
-    expect(summary(await send(h, "R", "S", "m10", { idempotency_key: "r10" }))).toBe("error:overloaded")
+    expect(summary(await send(h, "R", "S", "m10", { idempotency_key: "r10" }))).toBe("error:pair_loop_guard")
+  })
+
+  test("#given A sends to B in one burst #when the 9th send follows the 8th at once and the refill window then passes #then all 8 deliver, the 9th is refused pair_loop_guard with the measured burst and the wait, and the next send is accepted", async () => {
+    const h = open()
+    h.session("A")
+    h.session("B")
+    for (let index = 1; index <= 8; index++)
+      expect((await send(h, "A", "B", `burst ${index}`, { idempotency_key: `b${index}` })).kind).toBe("ok")
+    const ninth = await send(h, "A", "B", "burst 9", { idempotency_key: "b9" })
+    if (ninth.kind !== "error") throw new Error(`expected the 9th send refused, got ${JSON.stringify(ninth)}`)
+    expect(ninth.error.code).toBe("pair_loop_guard")
+    expect(ninth.error.details).toEqual({ guard: "pair_loop", burst: 8, window_ms: 40_000, retry_after_ms: 5_000 })
+    // The message names the sending end of the loop by its principal, whatever its wording.
+    expect(ninth.error.message).toContain("session:A")
+    h.clock.now += Number(ninth.error.details?.retry_after_ms)
+    expect((await send(h, "A", "B", "burst 9", { idempotency_key: "b9" })).kind).toBe("ok")
   })
 
   test("#given roots are minted by the gateway #when a caller names its own root or continues a delivery it never received #then each is refused, and a chain continued past the root lifetime is delivered under a fresh root", async () => {
@@ -645,5 +661,19 @@ describe("held_draft_quiescence", () => {
       marker: existsSync(marker),
       entries: b.runtime.transcriptEntries(id),
     }).toEqual({ state: "applied", marker: false, entries: 1 })
+  })
+})
+
+describe("held_target", () => {
+  // senpi#7014: an idle session under a hold that is not only `unattended` keeps a peer delivery as a held notice and
+  // answers admission `held`. The sender is told the delivery waits on that hold; it is never answered started.
+  test("#given an idle target whose engine holds it #when A sends auto #then the answer is queued waiting on the hold and no turn starts", async () => {
+    const h = open()
+    h.session("A")
+    const target = h.session("T")
+    target.runtime.sessionHolds = ["session_hold"]
+    const result = await send(h, "A", "T", "are you there")
+    expect(result).toMatchObject({ kind: "ok", delivery: { kind: "queued", waiting_on: { kind: "hold" } } })
+    expect(target.runtime.enqueueCalls).toEqual([])
   })
 })

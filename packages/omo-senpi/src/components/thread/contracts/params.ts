@@ -35,6 +35,7 @@ export const ThreadListParams = Type.Object({
       },
     ),
   ),
+  idempotency_key: IdempotencyKey,
 })
 
 /** The longest a `thread_read` waits for its thread to settle (#13417). */
@@ -63,6 +64,7 @@ export const ThreadReadParams = Type.Object({
     }),
   ),
   all_scope: AllScope,
+  idempotency_key: IdempotencyKey,
 })
 
 export const ThreadSendParams = Type.Object({
@@ -84,6 +86,7 @@ export const ThreadInterruptParams = Type.Object({
     }),
   ),
   all_scope: AllScope,
+  idempotency_key: IdempotencyKey,
 })
 
 const SelfOrThread = Type.Optional(
@@ -102,6 +105,19 @@ const ThreadCloseParams = Type.Object({
     Type.Boolean({
       description:
         "Close even when the thread has messages it has not read yet; they are dropped and listed in dropped_deliveries.",
+    }),
+  ),
+  graceful: Type.Optional(
+    Type.Boolean({
+      description:
+        "Let the running turn end instead of stopping it; new messages are refused and unread ones go back to their senders. Monitors, loops and the goal stop cleanly. Also closes a terminal's thread, which then exits.",
+    }),
+  ),
+  wait_ms: Type.Optional(
+    Type.Integer({
+      minimum: 1,
+      maximum: 600_000,
+      description: "How long a graceful close waits for the turn (default 30000, cut to what the call has left).",
     }),
   ),
 })
@@ -242,6 +258,7 @@ export const ThreadOutboxParams = Type.Object({
   limit: Type.Optional(
     Type.Integer({ minimum: 1, maximum: 500, description: "Rows per read, default 100 and at most 500." }),
   ),
+  idempotency_key: IdempotencyKey,
 })
 
 export const ThreadOutboxAckParams = Type.Object({
@@ -258,6 +275,7 @@ export const ThreadOutboxAckParams = Type.Object({
         "Platform id of the message posted for the row at cursor; the first one for a milestone becomes the progress message later milestones edit.",
     }),
   ),
+  idempotency_key: IdempotencyKey,
 })
 
 export const ThreadAnswerParams = Type.Object({
@@ -267,6 +285,7 @@ export const ThreadAnswerParams = Type.Object({
   }),
   reply_token: Type.String({ minLength: 1, description: "reply_token of the question row being answered." }),
   answer: RelayText,
+  idempotency_key: IdempotencyKey,
 })
 
 export type ThreadCreateInput = Static<typeof ThreadCreateParams>

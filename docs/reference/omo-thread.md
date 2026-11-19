@@ -53,7 +53,11 @@ omo thread ack <binding-id> <cursor> [--provider-message-id <id>]
 `omo thread list` lists this device's threads (in this directory's workspace, or every workspace with `--all-scope`)
 together with the threads on the account's other devices, each with its `device`. With `--json` it prints the whole
 result as one object: `threads`, `devices` (each device's name, platform, kind, `online`, `last_seen`, `this_device`,
-its thread count and `listing`: `listed`, `incomplete` when it did not answer this listing, or `offline`) and
+its thread count and `listing`: `listed`, `incomplete` when it did not answer this listing or answered only part of
+it, or `offline`; this device's row carries `dropped`, the inactive or archived threads the listing left unread),
+`listing: "incomplete"` with `unanswered_endpoints` when one of this device's engine endpoints did not answer (its
+threads read `inactive` with an `error_note` naming the failure, `live_unresponsive` for a timeout, until it answers again; the command fails instead when
+none answered) and
 `remote_unavailable` when other devices could not be listed, and `aliases_unavailable` when a thread listed without an
 alias may still hold one: `sign_in` or `host_unavailable` when the account's aliases could not be read, `not_asked` when
 the account's other devices cannot be reached from here: this device's device service is not connected, or it answered
@@ -67,18 +71,33 @@ agent tool `thread_create` calls) or launches `omo` itself, then binds that sess
 `omo thread bind`. A session that is not running is still bound, sent to (`queued_offline`) and
 reported for; it takes its messages when it next starts.
 
-A target or session is a durable session id, or an exact name. Without `--all-scope` only
-sessions in the current directory's workspace resolve (the same rule the agent tools apply);
-an id outside it is `scope_denied`. `--idempotency-key` on a mutation replays the first result
-instead of acting twice (`deduplicated: true`); reusing a key with other arguments is
-`idempotency_conflict`.
+Addresses: a `<target>` or `<session>` is a thread id, a session id, an account alias,
+an exact name, a unique thread-id prefix, or `<device>/<thread>` (the device part a device id,
+`here`, a device name or a unique device-id prefix; the thread part resolves among that device's
+threads only). Names match after Unicode normalization, case folding and whitespace collapsing,
+and an address may resolve to a thread on another of the account's devices: `read` and `locate`
+reach it there. `send` resolves it too, but the other device's engine admits no command-line
+sender, so a bindingless send answers `unsupported` with `details.reason: "sender_not_allowed"`
+naming the device. The binding operations (`bind`, `rebind`, `bindings --session`, `report`, and a
+bound send's target) resolve on this device first and bind and report only sessions this device
+holds: a session only another device holds answers `unsupported` with `details.reason:
+"session_on_other_device"` naming the device. `self` names the calling session, which `omo thread`
+(principal `cli:<uid>`) never is, so it answers `caller_context_missing` here. Without
+`--all-scope` only sessions in the current directory's workspace resolve (the
+same rule the agent tools apply); an id outside it is `scope_denied`. `--idempotency-key` on a
+mutation replays the first result instead of acting twice (`deduplicated: true`); reusing a key
+with other arguments is `idempotency_conflict`.
 
 ## Sending
 
 A bindingless `send` delivers as `cli:<uid>`. `--mode auto` (the default) steers a running turn:
 the message enters the turn in flight, as typing into its terminal does, with that running turn as
 its expected turn (`delivery.kind: "steered"`, `effective_mode: "steer"`). On an idle session it
-starts a turn. It queues behind only what cannot be steered: a question the session waits on, a
+starts a turn (`effective_mode: "start"`, and `effective=start` in the delivery header the receiver reads). The result's
+`effective_mode` is the lane the receiver's answer proves (`started` is `start`, `steered` is `steer`, a queued answer is
+`follow_up`, except a delivery waiting only for a wake, which starts the woken session). The header is written before
+the receiver answers, so when a turn begins or ends in between, the header keeps the lane that was asked for; a
+message that waits behind a turn reports `follow_up`. It queues behind only what cannot be steered: a question the session waits on, a
 compaction, or a running turn whose epoch the engine does not report. If the turn ends before the
 steer reaches it, `auto` does not fail: it takes the lane the target has now (a new turn when idle,
 queued behind a turn that began since). `--mode follow_up` always queues behind the running turn.
@@ -143,15 +162,14 @@ Every send is checked against fixed budgets, which no setting raises:
 | --- | --- | --- |
 | Message size | 1 MiB for `send` (with or without `--binding`); 32 KiB for `report` and `answer` text | `message_too_large` |
 | Backlog of one target | 128 undelivered messages or 1 MiB | `queue_full` |
-| One sender to one target | bursts of 8, then one every 5 s; a binding sender is keyed by binding and author (`binding:<id>#author:<platform user id>`), or by the binding alone when the message names no author | `overloaded` with `retry_after_ms` |
-| One turn | reaches at most 16 sessions | `overloaded` |
+| One sender to one target (the loop guard) | bursts of 8, then one every 5 s; a binding sender is keyed by binding and author (`binding:<id>#author:<platform user id>`), or by the binding alone when the message names no author | `pair_loop_guard` with `burst`, `window_ms` and `retry_after_ms` |
 | One causal chain (a message and the messages it caused) | no count limit; each delivery records its hop | - |
 | A send to itself | always refused | `loop_detected` |
 | An undelivered message | expires after 24 hours (or when its binding expires) | the row ends `refused` |
 
 A session may message the session that messaged it, so A to B to A is delivered; answers also flow back through `read`, `report` and `answer`.
 
-A connector treats `overloaded` as back-pressure, not as a lost message: nothing was written, so
+A connector treats `pair_loop_guard` as back-pressure, not as a lost message: nothing was written, so
 it queues the message and retries the same `send` (same `--idempotency-key`) after
 `error.details.retry_after_ms`. The author id that keys a bucket is whatever the connector passes:
 the gateway trusts the local connector to authenticate its humans, and a connector that varied it
@@ -547,7 +565,7 @@ every other subcommand prints the full result.
 | Subcommand | `--json` on success |
 | --- | --- |
 | `list` | `[{thread, name, state: running\|idle\|inactive\|archived, model?: {provider, id}, status: live\|resumable (deprecated: resumable exactly when no engine holds the thread), machine?, cwd, created_at, updated_at: <ISO 8601 string>\|null, link, surface?: tui\|desktop\|child\|daemon, as_of?, controls?, error_note?, device?, alias?}]`; `--state` (repeatable or comma-separated) picks the states listed, and the default lists every state except `archived`; a thread its engine closed stays listed `inactive` from its session file (the newest 200 files in scope); `thread` is the address `read` and `send` take back. Live and degraded rows use the same bounded final-record policy, so `updated_at` is null rather than an older timestamp when the final complete valid entry's timestamp cannot be proved. After live and degraded rows are combined, the public list sorts known `updated_at` newest first, then unknown activity last, with `thread` ascending for ties. Routing ids, socket and session-file paths are not shown (#14044) |
-| `send` | `{kind:"ok", thread, delivery_id, message_seq, delivery: {kind: queued\|queued_offline\|started\|steered, ...}, effective_mode, endpoint_kind: rpc_host\|tui\|null, deduplicated}` |
+| `send` | `{kind:"ok", thread, delivery_id, message_seq, delivery: {kind: queued\|queued_offline\|started\|steered, ...}, effective_mode: start\|steer\|follow_up (the requested mode while it waits for a receiver), endpoint_kind: rpc_host\|tui\|null, deduplicated}` |
 | `read` | `{kind:"ok", thread, link, items: [{seq, role: user\|assistant\|tool\|system, content}], truncated, next_cursor?, source, source_incomplete?, error_note?}` |
 | `bind` | `{kind:"ok", binding: <binding>, deduplicated}` |
 | `unbind` | `{kind:"ok", binding, already_closed, in_flight: [delivery ids], deduplicated}` |
@@ -573,10 +591,10 @@ The failures the CLI answers itself use the same shape: a usage error is `invali
 | Code | Meaning |
 | --- | --- |
 | 0 | done |
-| 1 | the gateway refused (read `error.code`: `not_found`, `scope_denied`, `binding_mismatch`, `turn_conflict`, `loop_detected`, `answer_in_progress` (retry after a moment), `already_answered` (stop), `invalid_arguments` for a `--mode` above the binding's `inbound_mode` or an author field that is empty, too long or not one line, ...) |
+| 1 | the gateway refused (read `error.code`: `not_found`, `scope_denied`, `unsupported` with `details.reason` `sender_not_allowed` or `session_on_other_device`, `binding_mismatch`, `turn_conflict`, `loop_detected`, `answer_in_progress` (retry after a moment), `already_answered` (stop), `invalid_arguments` for a `--mode` above the binding's `inbound_mode` or an author field that is empty, too long or not one line, ...) |
 | 2 | usage: unknown subcommand or option, a missing required flag, a non-integer where a number goes, a `--mode` other than `auto`/`steer`/`follow_up` (or `steer`/`--expected-turn` with `--binding`), a `--direction` other than `in`/`out`/`both`, an empty or whitespace-only `send` text, `--author-*` without `--binding` or without both `--author-id` and `--author-name` (the SDK is not loaded) |
-| 3 | `host_unavailable`: no endpoint answered where one was needed: `list`, `read` of a live session, `answer`. Never for `send` (it queues offline), nor for `bind`, `rebind`, `report` or `bindings --session`, which resolve the session like a send, including one known only from its session file |
-| 4 | unsupported: win32 (no unix sockets), or a runtime without `node:sqlite` |
+| 3 | `host_unavailable`: no endpoint answered where one was needed: `list`, `read` of a live session, `answer`; or, with the account's devices, an address this device does not hold that a device which did not answer may hold (`details.reason` `listing_incomplete` or `device_unanswered`). A `send` to a session this device holds, or knows from its session file, never answers it (it queues offline); nor do `bind`, `rebind`, `report` or `bindings --session` for such a session |
+| 4 | the CLI cannot run here: win32 (no unix sockets), or a runtime without `node:sqlite`. A gateway answer with code `unsupported` exits 1 |
 | 5 | `internal_error`, also when the plugin's thread SDK cannot be loaded (a broken install; with `--json` still one JSON error) |
 
 ## For scripts in JavaScript
@@ -605,7 +623,7 @@ The SDK also controls threads, with the same arguments and results as the agent 
 | --- | --- | --- |
 | `create` | `thread_create` | `{ thread?, device?, alias?, name?, cwd?, worktree?, fork_from?, skills?, model?, reasoning?, permission_preset?, prompt?, delivery?, idempotency_key? }` |
 | `interrupt` | `thread_interrupt` | `{ thread, turn_id?, all_scope? }` |
-| `close` | `thread_close` | `{ thread?, all_scope?, idempotency_key? }` |
+| `close` | `thread_close` | `{ thread?, all_scope?, idempotency_key?, force?, graceful?, wait_ms? }` |
 | `rename` | `thread_rename` | `{ thread?, name?, alias?, all_scope?, idempotency_key? }` |
 | `set_model` | `thread_set_model` | `{ thread, model, provider?, all_scope?, idempotency_key? }` |
 

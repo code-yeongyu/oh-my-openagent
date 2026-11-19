@@ -1,5 +1,5 @@
 import type { DrainWakeEvent, GatewayAdmissionKind, SessionRuntimePort, WakeReason } from "./adapter"
-import { decideDelivery } from "./decision"
+import { decideDelivery, effectiveLaneOf } from "./decision"
 import { intakeAdmissionPass, type IntakeAdmission } from "./intake-admission"
 import { isLockWaitExceeded } from "./lock-wait"
 import { deliverySender, renderDeliveryDisplayText, renderDeliveryText } from "./provenance"
@@ -126,7 +126,7 @@ export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
         now: now(),
         delivery_id: row.delivery_id,
         self,
-        lane: decision.deliverAs === "steer" ? "steer" : "follow_up",
+        lane: effectiveLaneOf(decision),
       })
       if (claimed.kind !== "claimed") continue
       options._test?.afterClaim?.(claimed.row)

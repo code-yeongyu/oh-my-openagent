@@ -43,6 +43,14 @@ const RENDER = {
     ...result.items.map((item) => `[${item.role}] ${item.content}`),
     ...(result.truncated ? [`(truncated; older messages: --cursor ${result.next_cursor})`] : []),
   ],
+  close: (result) => [
+    result.closed
+      ? `closed ${result.thread}${result.graceful === undefined ? "" : ` after turn ${result.graceful.turn} (${result.graceful.waited_ms} ms)`}`
+      : `${result.thread} was not running`,
+    ...(result.dropped_deliveries.length === 0
+      ? []
+      : [`returned to their senders: ${result.dropped_deliveries.join(", ")}`]),
+  ],
   bind: (result) => [`bound ${bindingLine(result.binding)}${result.deduplicated ? " (already bound)" : ""}`],
   unbind: (result) => [`unbound ${bindingLine(result.binding)}${result.already_closed ? " (already closed)" : ""}`],
   rebind: (result) => [`rebound ${bindingLine(result.binding)}`],

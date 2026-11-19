@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { createRemoteThreadFixture } from "./thread-remote-fixture"
+import { B, T, createTwoDevices } from "./address/testing/two-devices"
 
 const { account, surface, cleanup } = createRemoteThreadFixture()
 afterEach(cleanup)
@@ -104,5 +105,20 @@ describe("#14072 thread_create names a signed-in device by its display name, its
     for (const row of rows) await run("thread_create", { name: `device-name-${row.machine}`, device: row.machine })
     expect(openSession).toHaveBeenCalledTimes(1)
     expect(openedOn(a.sent)).toEqual(["b"])
+  })
+})
+
+describe("#14305: thread_create opens an existing thread named as <device>/<thread>", () => {
+  test("#given B's live thread #when thread_create names it as <device name>/<thread id> #then it answers that thread on B, already open", async () => {
+    const two = createTwoDevices()
+    try {
+      expect(await two.run("thread_create", { thread: `${B.name}/${T.bLive}` })).toMatchObject({
+        kind: "ok",
+        thread: T.bLive,
+        device: B.id,
+      })
+    } finally {
+      await two.cleanup()
+    }
   })
 })

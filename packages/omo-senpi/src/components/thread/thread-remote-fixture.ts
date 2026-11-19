@@ -4,7 +4,10 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { DeviceRow, RemoteClient, RemoteFailure, ServiceStatus } from "../remote"
 import type { ThreadToolName, ThreadToolResult } from "./contracts"
+import type { RuntimePhase } from "./gateway/adapter"
+import { createInboxDrain } from "./gateway/drain"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
+import { FakeSessionRuntime } from "./gateway/testing/fake-runtime"
 import type {
   AliasHolder,
   AliasRegistry,
@@ -20,7 +23,7 @@ import type {
 import type { ThreadTranscriptEntry } from "./reader"
 import { answerGetEntries, senpiProjector, type FakeEntryLog } from "./thread-remote-entries-fixture"
 import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
-import type { ThreadCloseOutcome } from "./tools/ports"
+import type { ThreadCloseOptions, ThreadCloseOutcome } from "./tools/ports"
 import type { SessionWatchHandlers } from "./control/wait-settled"
 import { createMonitorTargetResolver } from "./tools/monitor-target"
 
@@ -39,6 +42,8 @@ export const B_ROW: RemoteSessionRow = {
   state: "idle",
   updated_ms: 1_700_000_000_000,
 }
+/** When b's engine records an unload of its session (the effect's `updatedAt`), on b's clock: after B_ROW's activity. */
+export const B_UNLOADED_MS = B_ROW.updated_ms + 60_000
 
 type Sent = {
   readonly via: "endpoint" | "session" | "read" | "watch" | "wake"
@@ -417,10 +422,19 @@ export function createRemoteThreadFixture() {
         const dropped = rpc["interrupt"] === true ? unread.splice(0) : []
         busy = false
         live.delete(attachedTo)
+        // senpi effect-commands.ts `effectAnswer`: an unload with an `effectId` answers its effect, stamped on b's clock.
+        const effectId = rpc["effectId"]
         return ok({
           outcome: "unloaded",
           sessionPath: B_FILE,
           ...(dropped.length > 0 ? { dropped: { deliveries: dropped } } : {}),
+          ...(typeof effectId === "string"
+            ? {
+                effectId,
+                state: "done",
+                effect: { effectId, kind: "unload", state: "done", updatedAt: new Date(B_UNLOADED_MS).toISOString() },
+              }
+            : {}),
         })
       }
       if (rpc["type"] === "open_session" && options.openRefuse !== undefined)
@@ -888,6 +902,15 @@ export function createRemoteThreadFixture() {
       listFailsAfterLostReply?: boolean
       /** With `openLosesReply`: the host has no `durable_session_id` capability and creates under an id of its own. */
       ignoresDurableSessionId?: boolean
+      /** How long a create waits for its first prompt to start on this device; 0 by default (the drain below is synchronous). */
+      firstPromptWaitMs?: number
+      /**
+       * A session this device's host creates drains its inbox as a live new session does (its control endpoint
+       * registered); with this set it never does, so a delivery to it stays queued (the held-thread report).
+       */
+      createdNeverDrains?: boolean
+      /** The live session here (`dur-local`) drains each delivery at once, in this phase (a busy turn, a question). */
+      localDrainsIn?: RuntimePhase
     } = {},
   ) {
     const engine = extra.engine ?? ENGINE
@@ -901,6 +924,7 @@ export function createRemoteThreadFixture() {
     const sessions = extra.sessions ?? [local]
     let lostReplies = extra.openLosesReply ?? 0
     let listFails = false
+    const createdIds = new Set<string>()
     const openSession = mock(async (request: Parameters<ThreadHost["openSession"]>[0]) => {
       if (extra.openThrows !== undefined) throw new Error(extra.openThrows)
       // An engine opening a session file on disk resumes it under the id in that file's header, as senpi does.
@@ -923,6 +947,7 @@ export function createRemoteThreadFixture() {
         status: "open",
       }
       sessions.push(created)
+      if (created.durableSessionId !== undefined) createdIds.add(created.durableSessionId)
       if (lostReplies > 0) {
         lostReplies -= 1
         listFails = extra.listFailsAfterLostReply === true
@@ -932,6 +957,7 @@ export function createRemoteThreadFixture() {
     })
     const closed: Array<readonly [string, string | undefined]> = []
     const forcedCloses: string[] = []
+    const closeRequests: ThreadCloseOptions[] = []
     // The interrupt records this device's endpoint received, as b's engine's arrive in `sent`.
     const interrupts: JsonObject[] = []
     const setSessionName = mock(async (_sessionId: string, _name: string) => {})
@@ -983,6 +1009,7 @@ export function createRemoteThreadFixture() {
       closeSession: async (sessionId, durableId, options) => {
         closed.push([sessionId, durableId])
         if (options?.force === true) forcedCloses.push(sessionId)
+        closeRequests.push(options ?? {})
         return { outcome: extra.closeOutcome ?? "closed", dropped_deliveries: extra.closeDropped ?? [] }
       },
       ...(extra.archive === "absent" ? {} : { setSessionArchived }),
@@ -1024,12 +1051,34 @@ export function createRemoteThreadFixture() {
     const caller = extra.caller ?? "dur-caller"
     // Every delivery the gateway takes for a session on this device, by target: a local thread_send's real call.
     const enqueued: Array<Parameters<GatewayStore["enqueue"]>[0]> = []
+    // A session this device's host created drains a delivery as its registered control endpoint does: one idle runtime
+    // per pass, so its first prompt starts.
+    const drainCreated = async (durableId: string, phase?: RuntimePhase): Promise<void> => {
+      const runtime = new FakeSessionRuntime(join(agentDir, `${durableId}.jsonl`), durableId, process.cwd())
+      if (phase !== undefined) runtime.phaseValue = phase
+      const drain = createInboxDrain({ store, runtime, durableId, sessionPath: () => runtime.sessionPath })
+      await drain.drain({ reason: "command" })
+      drain.stop()
+    }
     const countedStore = new Proxy(store, {
       get: (target, property, receiver) =>
         property === "enqueue"
-          ? (request: Parameters<GatewayStore["enqueue"]>[0]) => {
+          ? async (request: Parameters<GatewayStore["enqueue"]>[0]) => {
               enqueued.push(request)
-              return target.enqueue(request)
+              const outcome = await target.enqueue(request)
+              if (
+                outcome.kind === "inserted" &&
+                createdIds.has(request.target_durable_id) &&
+                extra.createdNeverDrains !== true
+              )
+                await drainCreated(request.target_durable_id)
+              if (
+                outcome.kind === "inserted" &&
+                request.target_durable_id === local.durableSessionId &&
+                extra.localDrainsIn !== undefined
+              )
+                await drainCreated(request.target_durable_id, extra.localDrainsIn)
+              return outcome
             }
           : Reflect.get(target, property, receiver),
     })
@@ -1048,6 +1097,7 @@ export function createRemoteThreadFixture() {
       ...(extra.callerChainHop === undefined ? {} : { callerChainHop: extra.callerChainHop }),
       ...(extra.callerName === undefined ? {} : { callerName: extra.callerName }),
       ...(extra.env === undefined ? {} : { env: extra.env }),
+      firstPromptWaitMs: extra.firstPromptWaitMs ?? 0,
     }
     const tools = createThreadTools(toolOptions)
     const resolveMonitorTarget = createMonitorTargetResolver(toolOptions)
@@ -1076,6 +1126,7 @@ export function createRemoteThreadFixture() {
       store,
       closed,
       forcedCloses,
+      closeRequests,
       archived,
       interrupts,
       agentDir,

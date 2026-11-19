@@ -43,6 +43,7 @@ import { dirname, join, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { withTelemetryOptOut } from "../../telemetry-opt-out-env.mjs"
+import { parseDeliveryText } from "./delivery-text.mjs"
 import { requireEngineVersion } from "./engine-version.mjs"
 import { QA_TMP_ROOT } from "./qa-tmp.mjs"
 import { createScratchLayout } from "./scratch-layout.mjs"
@@ -515,28 +516,6 @@ export function callDirective(tool, args) {
 
 export function holdDirective(tag) {
   return `QA:HOLD ${tag}`
-}
-
-const DELIVERY_PATTERN = /^\[OMO_GATEWAY v=1 ([^\]]*)\]\n[^\n]*\n([\s\S]*)$/
-
-/** A delivery's rendered text split into its header fields and the sender's own text. */
-export function parseDeliveryText(text) {
-  const match = DELIVERY_PATTERN.exec(text)
-  if (match === null) return undefined
-  const header = Object.fromEntries(
-    match[1]
-      .split(" ")
-      .slice(1)
-      .map((pair) => pair.split("="))
-      .map(([key, ...value]) => [key, value.join("=")]),
-  )
-  let body = match[2]
-  try {
-    body = JSON.parse(match[2])
-  } catch {
-    // An unparseable body stays the raw text.
-  }
-  return { header, body: typeof body === "string" ? body : JSON.stringify(body) }
 }
 
 function contentText(message) {

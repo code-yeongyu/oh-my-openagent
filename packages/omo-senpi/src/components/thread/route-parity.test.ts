@@ -84,8 +84,9 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
 
   /**
    * A delivered send on either leg: the target it reached, a minted delivery id, and the lane as the contract defines it
-   * (contracts/results.ts): the lane the target took once admitted (`follow_up` for the default mode on an idle or busy
-   * target), or the requested mode while the delivery still waits for a receiver (`queued_offline` has no lane yet).
+   * (contracts/results.ts): the lane the target took once admitted (`start` for a turn begun on an idle target,
+   * `follow_up` behind a busy one), or the requested mode while the delivery still waits for a receiver (`queued_offline`
+   * has no lane yet, and neither has a same-device row its receiver's drain has not taken).
    */
   const delivered = (result: unknown, leg: Leg) => {
     const { delivery, delivery_id, effective_mode } = result as {
@@ -96,7 +97,13 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
     expect(result).toMatchObject({ kind: "ok", thread: TARGET[leg].id, deduplicated: false })
     expect(delivery_id).toMatch(UUID)
     expect(["started", "queued", "queued_offline"]).toContain(delivery.kind)
-    expect(effective_mode).toBe(delivery.kind === "queued_offline" ? "auto" : "follow_up")
+    expect(effective_mode).toBe(
+      delivery.kind === "started"
+        ? "start"
+        : delivery.kind === "queued_offline" || leg === "local"
+          ? "auto"
+          : "follow_up",
+    )
     return sharedKeys(result as object)
   }
 

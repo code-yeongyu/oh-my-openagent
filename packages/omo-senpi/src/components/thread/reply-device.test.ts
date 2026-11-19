@@ -452,9 +452,18 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
     expect(reachedLocally("dur-local")).toBe(false)
   })
 
-  test("#given an unattested delivery whose sender is listed only on b #when the account listing cannot be read again to confirm the device #then it is host_unavailable and nothing is sent", async () => {
+  // #14305: the account-wide lookup and the check that one device holds the sender share ONE listing read.
+  test("#given an unattested delivery whose sender is listed only on b and one account listing read answers #when the run replies by its id #then that one read finds the sender and confirms its device, and the reply reaches b", async () => {
     const { reply, admittedOn } = await consumed([{ id: "rpc:local/d-1", session_id: "dur-on-b" }], [B_ROW], {
       listingReads: 1,
+    })
+    expect(await reply("dur-on-b")).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b" })
+    expect(admittedOn()).toEqual(["b"])
+  })
+
+  test("#given an unattested delivery whose sender is listed only on b #when the account listing cannot be read #then it is host_unavailable and nothing is sent", async () => {
+    const { reply, admittedOn } = await consumed([{ id: "rpc:local/d-1", session_id: "dur-on-b" }], [B_ROW], {
+      listingReads: 0,
     })
     expect(await reply("dur-on-b")).toMatchObject({ kind: "error", error: { code: "host_unavailable" } })
     expect(admittedOn()).toEqual([])

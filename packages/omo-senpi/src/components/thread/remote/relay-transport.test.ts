@@ -92,7 +92,7 @@ describe("a delivery the receiver's open draft holds is queued at once, like a s
     expect(admitWaits.slice(1)).toEqual([45_000])
   })
 
-  test("#given b's user has a draft open that holds two admissions #when a message is sent #then the send answers queued at b's pending count at once, the same record reaches b three times, and the third is taken", async () => {
+  test("#given idle b's user has a draft open that holds two admissions #when a message is sent #then the send answers a follow-up queued at b's pending count at once, the record reaches b three times as a follow-up after the first start, and the third is taken", async () => {
     const a = account({ heldDraft: 2, engine: { ...ENGINE, pending: 2 } })
     const { relay, log } = transport(a.remote)
     const first = await relay.deliver(delivery("hold me", "k1"))
@@ -101,15 +101,18 @@ describe("a delivery the receiver's open draft holds is queued at once, like a s
       device: "b",
       delivery: { kind: "queued", queue_position: 2 },
       deduplicated: false,
+      effective_mode: "follow_up",
     })
     await admitted(a.sent, 3)
     const records = admits(a.sent)
     expect(new Set(records.map((record) => record["deliveryId"])).size).toBe(1)
-    expect(records.map((record) => record["text"])).toEqual([
-      records[0]?.["text"],
-      records[0]?.["text"],
-      records[0]?.["text"],
+    // The probe found b idle, so the first record starts a turn; the draft held it, so the re-sends wait behind it.
+    expect(records.map((record) => /effective=(\S+)/.exec(String(record["text"]))?.[1])).toEqual([
+      "start",
+      "follow_up",
+      "follow_up",
     ])
+    expect(records[2]?.["text"]).toBe(records[1]?.["text"])
     expect(log.filter((line) => line.startsWith("relay_delivery_held:"))).toHaveLength(2)
     expect(log.filter((line) => line.startsWith("relay_delivery_failed:"))).toEqual([])
     // The receiver took the third; nothing more is sent and a retry of the send under its key replays the first answer.
@@ -556,5 +559,32 @@ describe("a person's waiting send names its prompt so its follow can anchor on t
     const { relay } = transport(a.remote)
     expect(await relay.deliver(personSend("p2"))).toMatchObject({ kind: "ok" })
     expect(prompts(a.sent).map((record) => "clientMessageId" in record)).toEqual([false])
+  })
+})
+
+describe("a receiver whose engine holds the delivery answers the hold, never an uncertain admission", () => {
+  // senpi#7014: an idle held receiver answers admit_external_message with `held` and its hold kinds; the engine keeps the
+  // delivery as a held notice. The sender must read that typed wait, not idempotency_uncertain (a re-send would duplicate).
+  test("#given b's engine answers held (a person's Stop) #when a message is sent #then the send is queued waiting on that hold on b", async () => {
+    const a = account({
+      engine: { ...ENGINE, pending: 0 },
+      admitOutcome: {
+        kind: "ok" as const,
+        response: {
+          type: "response",
+          command: "admit_external_message",
+          success: true,
+          data: { kind: "held", holds: ["session_hold"], turnId: "4" },
+        },
+      },
+    })
+    const { relay } = transport(a.remote)
+    expect(await relay.deliver(delivery("to a held b", "k-held"))).toMatchObject({
+      kind: "ok",
+      device: "b",
+      delivery: { kind: "queued", queue_position: 1, waiting_on: { kind: "hold", device: "b" } },
+    })
+    expect(admits(a.sent)).toHaveLength(1)
+    relay.dispose()
   })
 })

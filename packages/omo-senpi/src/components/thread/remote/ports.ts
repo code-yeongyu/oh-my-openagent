@@ -227,10 +227,12 @@ export type RemoteSessionsPort = {
     options?: RemoteWatchOptions,
   ) => Promise<RemoteWatchOutcome>
   /**
-   * #14170 (`closed-rows.ts`): this surface closed `row`'s session, whose unload named `file`. Until the listing catches
-   * up it lists the row ended, carrying that file as `session_file`. Absent: the listing is read as it comes.
+   * #14170 (`closed-rows.ts`): this surface closed `row`'s session, whose unload named `file`, or its holder answered that
+   * nothing runs it (#14273). Until the listing catches up it lists the row ended, carrying that file as `session_file`.
+   * `at`: when the holder recorded the close, on the holder's clock (the unload's effect), so the close's own activity
+   * never reads as a reopen. Absent: the listing is read as it comes.
    */
-  readonly closed?: (row: RemoteSessionRow, file: string | undefined) => void
+  readonly closed?: (row: RemoteSessionRow, file: string | undefined, at?: number) => void
   /**
    * #14170: `row`'s session runs again under `key` (this surface reopened it, or its holder says an engine runs it), so a
    * closed mark no longer applies.
