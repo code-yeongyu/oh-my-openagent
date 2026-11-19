@@ -50,7 +50,7 @@ describe("monitor rpc target addressing (#14294): the address thread_send takes"
 })
 
 describe("monitor rpc target addressing (#14294): the tool_call hook", () => {
-  function hooked(resolution: MonitorTargetResolution) {
+  function hooked(resolution: MonitorTargetResolution, remoteWakeSeam = true) {
     const seen: string[] = []
     let handler: ((event: unknown, ctx?: unknown) => unknown) | undefined
     installMonitorTargetResolution(
@@ -58,6 +58,7 @@ describe("monitor rpc target addressing (#14294): the tool_call hook", () => {
         on: (event, registered) => {
           if (event === "tool_call") handler = registered
         },
+        ...(remoteWakeSeam ? { registerRpcRemoteSource: () => undefined } : {}),
       },
       async (target) => {
         seen.push(target)
@@ -73,6 +74,17 @@ describe("monitor rpc target addressing (#14294): the tool_call hook", () => {
     const input: Record<string, unknown> = { type: "rpc", target: "studio/dur-on-b", description: "watch b" }
     expect(await handler({ toolName: "monitor", input })).toBeUndefined()
     expect(input["target"]).toBe("b/dur-on-b")
+  })
+
+  test("#given an engine without the remote-wake seam #when a bare id resolves to a thread on another device #then the call is refused remote_wake_unavailable, never armed", async () => {
+    const { handler } = hooked({ kind: "target", target: "b/dur-on-b" }, false)
+    const input: Record<string, unknown> = { type: "rpc", target: "dur-on-b", description: "watch b" }
+    const result = (await handler({ toolName: "monitor", input })) as { block?: boolean; reason?: string }
+    expect([result.block, result.reason?.split(":")[0], input["target"]]).toEqual([
+      true,
+      "remote_wake_unavailable",
+      "dur-on-b",
+    ])
   })
 
   test("#given an unresolvable rpc target #when monitor is called #then the call is blocked with the typed reason", async () => {

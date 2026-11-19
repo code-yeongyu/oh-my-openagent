@@ -1,4 +1,4 @@
-import { monitorRpcOpen } from "../../../extension/senpi-seams"
+import { monitorRpcOpen, remoteWakeUnavailable } from "../../../extension/senpi-seams"
 import { toThreadAddressEntries } from "../address-book"
 import type { ThreadToolFailure } from "../errors"
 import { resolveMonitorTarget } from "../remote/lazy-ops"
@@ -38,7 +38,7 @@ export function createMonitorTargetResolver(options: ThreadToolSurfaceOptions): 
  * Other tools, other monitor sources and other actions are never read.
  */
 export function installMonitorTargetResolution(
-  pi: Required<Pick<ExtensionToolHost, "on">>,
+  pi: Required<Pick<ExtensionToolHost, "on">> & { readonly registerRpcRemoteSource?: unknown },
   resolve: MonitorTargetResolver,
   callerSessionId: () => string = () => "",
 ): void {
@@ -49,7 +49,12 @@ export function installMonitorTargetResolution(
       (ctx as { sessionManager?: { getSessionId?: () => string } } | undefined)?.sessionManager?.getSessionId?.() ??
       callerSessionId()
     const resolution = await resolve(call.target, caller)
-    if (resolution.kind === "target") Reflect.set(call.input, "target", resolution.target)
+    if (resolution.kind === "target") {
+      // The remote-wake refusal ran on the target as given; a rewrite to <device>/<thread> is checked again.
+      const unwakeable = remoteWakeUnavailable(pi, resolution.target)
+      if (unwakeable !== undefined) return { block: true, reason: unwakeable.message }
+      Reflect.set(call.input, "target", resolution.target)
+    }
     if (resolution.kind !== "refused") return undefined
     const { code, message, next_action } = resolution.failure
     return { block: true, reason: `${code}: ${message} ${next_action}` }
