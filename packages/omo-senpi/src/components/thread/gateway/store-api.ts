@@ -74,6 +74,12 @@ export type GatewayStore = ExtensionFacade & {
     readonly delivery_id: string
     readonly reason: RefusalReason
   }) => Promise<boolean>
+  /** A delivery its session took in and handed back unread at a graceful close (omo#14313); never an applied row. */
+  readonly refuseReturned: (request: {
+    readonly now: number
+    readonly delivery_id: string
+    readonly reason: RefusalReason
+  }) => Promise<boolean>
   readonly completeReceipt: (request: {
     readonly now: number
     readonly principal: string

@@ -1,9 +1,8 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import type { ThreadResolveOptions, ThreadResolveResult } from "../addressing"
 import { relayAddressBook, relayAddressEntry, type RelayAddressBook } from "../remote/address-book"
-import { endedRow, probeMayBuildEndedRow, rowThreadId, type RemoteSessionRow } from "../remote/ports"
+import { endedRow, probeMayBuildEndedRow } from "../remote/ports"
 import { accountDevices } from "../remote/account"
-import { remoteAvailable } from "../remote/remote-ops"
 import {
   assembleAddressBook,
   findDiskSessions,
@@ -24,6 +23,7 @@ import {
 import type {
   ThreadActivity,
   ThreadModel,
+  ThreadRetryWait,
   ThreadState,
   ThreadToolName,
   ThreadToolResult,
@@ -41,8 +41,7 @@ import {
   type ThreadSessionPort,
   type ThreadToolSurfaceOptions,
 } from "./ports"
-import { sendView } from "./send-view"
-import { activityDetail, threadModel, threadState } from "./thread-state"
+import { activityDetail, retryWait, threadModel, threadState } from "./thread-state"
 
 // biome-ignore lint/suspicious/noExplicitAny: the tool definitions are heterogeneous by design.
 export type AnyTool = ToolDefinition<any, any>
@@ -88,6 +87,7 @@ export type ThreadToolSummary = Omit<
   | "error_code"
   | "turn_id"
   | "model"
+  | "waiting"
 > & {
   readonly thread_id: string
   readonly name: string
@@ -100,6 +100,8 @@ export type ThreadToolSummary = Omit<
   readonly error_code?: string
   /** The current or most recent turn's id. */
   readonly turn_id?: string
+  /** A running thread asleep between provider retries (senpi#7025). */
+  readonly waiting_on?: ThreadRetryWait
   readonly model?: ThreadModel
   readonly created_at: string
   readonly updated_at: string | null
@@ -140,6 +142,7 @@ export function summary(session: ThreadHostSession, entry?: AddressEntry): Threa
     error_code,
     turn_id,
     model,
+    waiting,
     ...rest
   } = session
   const created = entry?.created_at ?? session.created_at ?? session.createdAt ?? new Date().toISOString()
@@ -152,6 +155,7 @@ export function summary(session: ThreadHostSession, entry?: AddressEntry): Threa
     state: threadState({ archived, held, activity }),
     ...threadModel(model),
     ...activityDetail(held && archived !== true, activity, error_code, turn_id),
+    ...retryWait(held && archived !== true && activity === "running", waiting),
     created_at: created,
     updated_at: entry === undefined ? (session.updated_at ?? session.updatedAt ?? created) : entry.updated_at,
     ...(entry === undefined ? {} : { endpoint: entry.endpoint, surface: entry.surface }),
@@ -222,27 +226,11 @@ export function sendAddressBook(
   return found.length === 0 ? book : addressBook(options, view, found)
 }
 
-/**
- * Resolves a session address for a store-only operation (bind, rebind, report, bindings by
- * session) the way a send resolves its target: with nothing live it is a view with no live
- * sessions, not `host_unavailable`, and a session known only from its session file still resolves.
- */
-export async function resolveStoredSession(
-  options: ThreadToolSurfaceOptions,
-  view: (request: ThreadHostViewRequest) => Promise<ThreadHostView>,
-  address: string,
-  callerId: string,
-  allScope?: boolean,
-) {
-  const current = await sendView(options, address, () => view({ offline: true }))
-  return resolution(
-    options,
-    toThreadAddressEntries(sendAddressBook(options, current, address, allScope)),
-    address,
-    callerId,
-    allScope,
-  )
-}
+/** This device's send address book as the resolver asks it, for one address part at a time (`ResolveContext.localFor`). */
+export const sendBookFor =
+  (options: Omit<ThreadToolSurfaceOptions, "store">, view: ThreadHostView) =>
+  (address: string): ThreadAddressEntry[] =>
+    toThreadAddressEntries(sendAddressBook(options, view, address, true))
 
 /** A thread listed from disk because its endpoint is dead: resumable, addressed by its durable id. */
 export function degradedSummary(entry: AddressEntry): ThreadToolSummary & { readonly error_note?: string } {
@@ -276,7 +264,7 @@ export function sessionPort(options: ThreadToolSurfaceOptions, session: ThreadHo
     : options.host
 }
 
-export function resolution(
+function resolution(
   options: ThreadToolSurfaceOptions,
   entries: readonly ThreadAddressEntry[],
   target: string,
@@ -323,71 +311,6 @@ export function transcriptRole(role: unknown): ThreadTranscriptItem["role"] {
 
 export function targetSession(view: ThreadHostView, durableId: string): ThreadHostSession | undefined {
   return view.sessions.find((session) => (session.durableSessionId ?? session.sessionId) === durableId)
-}
-
-/**
- * Amendment A4.3.1 of #13037: an approved reply to a sender whose delivery came from another device resolves on THAT
- * device and nowhere else: its listing row for that id when it lists one (a read of that one device, never the whole
- * account), else one probe of that device, which finds a session it holds but does not run as an `ended` row (A4.2).
- * No row there is not_found naming the device; a probe that got no answer is host_unavailable naming it.
- */
-export async function replyOnDevice(
-  options: ThreadToolSurfaceOptions,
-  sender: { readonly session_id: string; readonly device: string },
-): Promise<ThreadResolveResult> {
-  const missing = (): ThreadResolveResult =>
-    ({
-      kind: "error",
-      ...threadToolFailure(
-        "not_found",
-        `The sender ${sender.session_id} is not listed on device ${sender.device}, the device its delivery came from.`,
-        "Retry when that session is running on its device, or send to another thread as a normal send.",
-        { thread: sender.session_id, device: sender.device },
-      ),
-    }) as ThreadResolveResult
-  const remote = options.remote
-  if (remote === undefined) return missing()
-  const unavailable = await remoteAvailable(remote)
-  if (unavailable !== undefined) return { kind: "error", ...unavailable.error } as ThreadResolveResult
-  let rows: readonly RemoteSessionRow[]
-  try {
-    rows = await remote.sessions.sessions({ device: sender.device })
-  } catch (error) {
-    return {
-      kind: "error",
-      ...threadToolFailure(
-        "host_unavailable",
-        "The account's session listing could not be reached.",
-        "Retry when the device service is reachable.",
-        { reason: error instanceof Error ? error.message : String(error) },
-      ),
-    } as ThreadResolveResult
-  }
-  const row = rows.find(
-    (candidate) => candidate.device === sender.device && rowThreadId(candidate) === sender.session_id,
-  )
-  if (row !== undefined) return { kind: "ok", entry: relayAddressEntry(row), resolution: "id" }
-  // One rule for a probe-built ended row (probeMayBuildEndedRow): no probe while the wake cannot be carried.
-  const probed = (await probeMayBuildEndedRow(remote.sessions))
-    ? await remote.sessions.lookup?.(sender.device, sender.session_id)
-    : undefined
-  if (probed?.kind === "found")
-    return {
-      kind: "ok",
-      entry: relayAddressEntry(endedRow(sender.device, probed.key, sender.session_id)),
-      resolution: "id",
-    }
-  if (probed?.kind === "silent")
-    return {
-      kind: "error",
-      ...threadToolFailure(
-        "host_unavailable",
-        `Device ${sender.device}, where the sender's delivery came from, did not answer whether it holds ${sender.session_id}.`,
-        "Retry when that device answers.",
-        { thread: sender.session_id, device: sender.device, reason: probed.reason },
-      ),
-    } as ThreadResolveResult
-  return missing()
 }
 
 /**

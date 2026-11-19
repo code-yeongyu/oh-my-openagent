@@ -83,6 +83,9 @@ export const ENDPOINT_LIST_TIMEOUT_MS = 10_000
  * most this long, the same bound senpi's `status --all` probes a `tui` row under (TUI_PROBE_TIMEOUT_MS).
  */
 export const TUI_REQUEST_TIMEOUT_MS = 1_500
+
+/** How long past a graceful close's drain its answer may take to arrive (the teardown and the reply). */
+const LADDER_ANSWER_MARGIN_MS = 5_000
 /** How long one endpoint enumeration is reused before it is read again. */
 export const HOST_ENDPOINTS_CACHE_TTL_MS = 5_000
 /**
@@ -820,24 +823,34 @@ export function createLiveThreadSurface(
     closeSession: (sessionId, durableId, options) =>
       closeLadder(
         sessionId,
-        async ({ type, ...data }) => {
+        async ({ type, ...data }, record) => {
           try {
             return {
               kind: "ok",
               data:
-                type === "get_state"
+                // A graceful close is answered when the drain ends (omo#14313): its request outlives the drain it names,
+                // whatever this endpoint's own bound is (a terminal's is 1.5 s).
+                record?.waitMs !== undefined
                   ? await callOn<Record<string, unknown>>(
                       socket ?? legacy,
-                      "get_state",
+                      String(type),
                       data,
-                      undefined,
+                      record.waitMs + LADDER_ANSWER_MARGIN_MS,
                       durableId,
-                      true,
                     )
-                  : // The host's own capabilities, read the way every connection opens (an observing read, no fence).
-                    type === "get_protocol_info"
-                    ? await callOn<Record<string, unknown>>(socket ?? legacy, "get_protocol_info", { observe: true })
-                    : await send<Record<string, unknown>>(String(type), data, durableId),
+                  : type === "get_state"
+                    ? await callOn<Record<string, unknown>>(
+                        socket ?? legacy,
+                        "get_state",
+                        data,
+                        undefined,
+                        durableId,
+                        true,
+                      )
+                    : // The host's own capabilities, read the way every connection opens (an observing read, no fence).
+                      type === "get_protocol_info"
+                      ? await callOn<Record<string, unknown>>(socket ?? legacy, "get_protocol_info", { observe: true })
+                      : await send<Record<string, unknown>>(String(type), data, durableId),
             }
           } catch (error) {
             const reason = error instanceof Error ? error.message.slice(0, Math.max(0, error.message.indexOf(":"))) : ""
@@ -1022,10 +1035,11 @@ export { createServiceAliasRegistry } from "./remote/alias-registry"
 export { createCliRemoteSurface, remoteClient, remoteSessionsPort } from "../remote/port/thread-runtime"
 export { claimCreatedAlias, listAcross, planCreate, renameAlias, withAlias } from "./remote/cross-device"
 export { deviceOnline } from "./remote/remote-ops"
-export { createRemoteMonitorSource } from "./remote/monitor-source"
+export { createRemoteMonitorSource, resolveMonitorTarget } from "./remote/monitor-source"
 export { outcomeFailure } from "./remote/outcome"
 export { createRelayTransport } from "./remote/relay-transport"
 export { createRelayControl } from "./control/relay-control"
+export { resolveAddress } from "./address"
 // thread_create's folder and worktree code (#13450): the local open and the worktree request another device sends.
 export { openLocally } from "./control/local-open"
 export { answerWorktreeRequest } from "./worktree/worktree-rpc"

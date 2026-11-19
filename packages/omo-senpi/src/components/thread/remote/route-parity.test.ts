@@ -330,7 +330,8 @@ describe("#13012 route parity", () => {
             }),
         }),
       })
-      expect(await surface(remote).run(tool, { thread: "local peeer", message: "continue" })).toMatchObject({
+      const args = tool === "thread_send" ? { thread: "local peeer", message: "continue" } : { thread: "local peeer" }
+      expect(await surface(remote).run(tool, args)).toMatchObject({
         kind: "error",
         error: { code: "not_found" },
       })
@@ -402,13 +403,16 @@ describe("#13012 route parity", () => {
     ["a name no device ever listed (a typo)", "relase planer"],
     ["a durable id no device ever listed", "0195f0c2-1a2b-7c3d-8e4f-0000000000ff"],
   ])(
-    "#given b missed this round #when %s is sent to #then it stays not_found, since nothing ties it to b",
+    "#given b missed this round #when %s is sent to #then it is host_unavailable naming b (b could hold it), never not_found (#14305 design section 5)",
     async (_case, thread) => {
       const { a, run } = missedSecondRound()
       expect(await run("thread_list", {})).toMatchObject({ kind: "ok" })
       expect(await run("thread_send", { thread, message: "continue" })).toMatchObject({
         kind: "error",
-        error: { code: "not_found" },
+        error: {
+          code: "host_unavailable",
+          details: { reason: "listing_incomplete", devices: [B_ROW.device], device_names: ["studio"] },
+        },
       })
       expect(admits(a.sent)).toEqual([])
     },
@@ -444,7 +448,8 @@ describe("#13012 route parity", () => {
         },
       })
       for (const tool of ["thread_read", "thread_send"] as const) {
-        expect(await run(tool, { thread: "local peeer", message: "continue" })).toMatchObject({
+        const args = tool === "thread_send" ? { thread: "local peeer", message: "continue" } : { thread: "local peeer" }
+        expect(await run(tool, args)).toMatchObject({
           kind: "error",
           error: { code: "not_found" },
         })

@@ -25,7 +25,7 @@ function writeSession(directory: string, index: number, modifiedSeconds: number)
 }
 
 describe("listDiskSessions", () => {
-  test("#given more session files than one listing stats #when listed with all_scope #then only the newest files by name are ranked by modification time, and the listing says it is truncated", () => {
+  test("#given more session files than one listing stats #when listed with all_scope #then only the newest files by name are ranked by modification time, and the listing names every file it did not read", () => {
     const sessionsDir = mkdtempSync(join(tmpdir(), "disk-list-"))
     dirs.push(sessionsDir)
     const directory = join(sessionsDir, "--tmp-workspace--")
@@ -39,13 +39,15 @@ describe("listDiskSessions", () => {
     const listed = listDiskSessions(sessionsDir, { all_scope: true })
 
     const ids = listed.sessions.map((session) => session.durable_id)
-    expect(listed.truncated).toBe(true)
+    expect(listed.unread).toHaveLength(801)
+    expect(listed.unread).toContain(oldest)
+    expect(listed.unread).not.toContain(newest.at(-1))
     expect(ids).toHaveLength(200)
     expect(ids).not.toContain(oldest)
     expect(ids).toEqual(newest.slice(-200).reverse())
   })
 
-  test("#given a few session files #when listed #then every one is read, newest modification first, and nothing is truncated", () => {
+  test("#given a few session files #when listed #then every one is read, newest modification first, and none is left unread", () => {
     const sessionsDir = mkdtempSync(join(tmpdir(), "disk-list-"))
     dirs.push(sessionsDir)
     const directory = join(sessionsDir, "--tmp-workspace--")
@@ -57,7 +59,7 @@ describe("listDiskSessions", () => {
 
     const listed = listDiskSessions(sessionsDir, { all_scope: true })
 
-    expect(listed.truncated).toBe(false)
+    expect(listed.unread).toEqual([])
     expect(listed.sessions.map((session) => session.durable_id)).toEqual([first, third, second])
   })
 })

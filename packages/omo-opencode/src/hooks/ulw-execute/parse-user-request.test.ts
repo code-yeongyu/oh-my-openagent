@@ -101,6 +101,21 @@ describe("parseUserRequest", () => {
     })
   })
 
+  // #14388: an opt-in light profile keeps the plan but drops per-step ceremony
+  describe("when the light profile flag is present", () => {
+    test("#given --light with plan name and delivery flags #when parsing #then light is true and the flag leaves the plan name", () => {
+      const result = parseUserRequest("<user-request>my-plan --light --ship</user-request>")
+      expect(result.planName).toBe("my-plan")
+      expect(result.light).toBe(true)
+      expect(result.ship).toBe(true)
+    })
+
+    test("#given no --light #when parsing #then light defaults false", () => {
+      expect(parseUserRequest("<user-request>my-plan --ship</user-request>").light).toBe(false)
+      expect(parseUserRequest("<user-request>my-plan --lightweight</user-request>").light).toBe(false)
+    })
+  })
+
   describe("when ultrawork keywords are present", () => {
     test("#given plan name with ultrawork keyword #when parsing #then strips keyword from plan name", () => {
       const result = parseUserRequest("<user-request>my-plan ultrawork</user-request>")
