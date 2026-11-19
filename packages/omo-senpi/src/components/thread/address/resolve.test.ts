@@ -185,6 +185,10 @@ describe("#given unique_holder (#14048: a sender whose delivery names no device)
     expect(candidates.map((candidate) => candidate.device).sort()).toEqual([B.id, HERE.id].sort())
   })
 
+  test("#given a copy here and B's row #when the id is written <B>/<id> with unique_holder #then it names its device, so B's row answers (review L6 of #14328)", async () => {
+    await expectHit(`${B.id}/${T.stale}`, hit(T.stale, "device", "id", B.id), { unique_holder: true, id_prefix: false })
+  })
+
   const C = { id: "c3d4e5f60718293a", name: "garage" } as const
   const onDevice = (device: string, key: string): RemoteSessionRow => ({
     device,
