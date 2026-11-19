@@ -43,16 +43,36 @@ export async function resolveTypedDevice(
  * sessions): every form resolves over the account the surface reads - a bare thread id, name, alias or 8-hex id
  * prefix, and `<device id | device name | 6+ char device id prefix | here>/<any of those>`. A refusal passes through
  * typed, in the same shape `resolveTypedDevice` answers a device.
+ *
+ * A durable id two devices list is ambiguous_target (`unique_holder`): a person's verb never picks one holder. A thread
+ * this device holds (an account alias held here) is outside omo remote's scope: it answers what `here/<thread>` answers,
+ * the module's own not_found, with `on_this_device` added to its details.
  */
 export async function resolveTypedAddress(
   remote: RemoteThreadSurface,
   typed: string,
   opts: { readonly need: "address" | "online" },
-): Promise<Resolved | { readonly kind: "error"; readonly error: ThreadToolFailure }> {
-  const resolved = await resolveAddress(
-    { remote, callerWorkspaceRoot: "", local: [], callerId: UNKNOWN_CALLER },
-    typed,
-    { all_scope: true, probe: true, need: opts.need },
-  )
-  return resolved.kind === "ok" ? resolved : { kind: "error", error: asFailure(resolved) }
+): Promise<RemoteResolved | { readonly kind: "error"; readonly error: ThreadToolFailure }> {
+  const resolve = (text: string) =>
+    resolveAddress({ remote, callerWorkspaceRoot: "", local: [], callerId: UNKNOWN_CALLER }, text, {
+      all_scope: true,
+      probe: true,
+      unique_holder: true,
+      need: opts.need,
+    })
+  const resolved = await resolve(typed)
+  if (resolved.kind !== "ok") return { kind: "error", error: asFailure(resolved) }
+  const { where } = resolved
+  if (where.kind === "device") return { ...resolved, where }
+  // This device's book is empty here, so `here/<thread>` always refuses.
+  const here = await resolve(`here/${resolved.thread}`)
+  if (here.kind === "ok") throw new Error(`here/${resolved.thread} resolved over an empty local book`)
+  const failure = asFailure(here)
+  return {
+    kind: "error",
+    error: { ...failure, details: { ...failure.details, thread: resolved.thread, on_this_device: true } },
+  }
 }
+
+/** A resolved address on another device: the only kind an `omo remote` verb acts on. */
+type RemoteResolved = Resolved & { readonly where: Extract<Resolved["where"], { readonly kind: "device" }> }

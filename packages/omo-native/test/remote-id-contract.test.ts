@@ -3,7 +3,12 @@ import { existsSync, watch } from "node:fs"
 import { basename, dirname } from "node:path"
 import { connectDeviceService } from "../../device-service-core/src/index.ts"
 import { startFakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
-import { defaultWorld, PEER, SESSION_ID } from "../../device-service-core/test/local-api/conformance/world.ts"
+import {
+  defaultWorld,
+  OFFLINE_PEER,
+  PEER,
+  SESSION_ID,
+} from "../../device-service-core/test/local-api/conformance/world.ts"
 import { prepareRemoteAttach, REMOTE_EXIT } from "../remote-cli"
 import { owners, privateDir, run, SIGNED_IN, useRemoteCliCleanup } from "./remote-cli-harness"
 
@@ -24,13 +29,16 @@ async function owner(duplicate = false) {
       ...world,
       // The conformance owner implements locate, but not the newer single-probe request field.
       service_version: "0.1.12",
-      devices: world.devices.filter((device) => device.device === PEER),
+      // A second holder is a device of the account: the module drops the rows of a device the roster no longer has.
+      devices: world.devices.filter(
+        (device) => device.device === PEER || (duplicate && device.device === OFFLINE_PEER),
+      ),
       listing: {
         revisions: [
           {
             rows: [
               { ...row, durable_id: DURABLE },
-              ...(duplicate ? [{ ...row, device: "another-device", durable_id: DURABLE }] : []),
+              ...(duplicate ? [{ ...row, device: OFFLINE_PEER, durable_id: DURABLE }] : []),
             ],
             incomplete: [],
           },
