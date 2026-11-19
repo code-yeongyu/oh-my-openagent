@@ -395,17 +395,19 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
 
   /**
    * A session a store-only operation names (bind, rebind, bindings --session, report, a bound send's target), through
-   * the one address module: this device's book first, the account's devices with it. These operations write THIS
-   * device's gateway store, so a thread that resolved on another device is refused naming that device, never
-   * `not_found` for a thread that resolved (before the module it was a plain local miss with no device named).
+   * the one address module. These operations write THIS device's gateway store, so the address resolves on this device
+   * first, exactly as before the module (a name a local session shares with another device's thread is the local
+   * session); only a local not_found consults the account, so a thread that lives on another device is refused naming
+   * that device instead of a bare not_found.
    */
   async function sessionId(address: string, allScope: boolean | undefined): Promise<{ readonly id: string } | Failure> {
     const offline = await sendView(surface, address, () => hostView(surface, { offline: true }))
-    const resolved = await resolveAddress(
-      resolveContext(toThreadAddressEntries(sendAddressBook(surface, offline, bareOf(address), allScope))),
-      address,
-      { all_scope: allScope, probe: true },
-    )
+    const context = resolveContext(toThreadAddressEntries(sendAddressBook(surface, offline, bareOf(address), allScope)))
+    const here = await resolveAddress({ ...context, remote: undefined }, address, { all_scope: allScope })
+    const resolved =
+      here.kind === "error" && here.code === "not_found" && options.remote !== undefined
+        ? await resolveAddress(context, address, { all_scope: allScope, probe: true })
+        : here
     if (resolved.kind === "error") return { kind: "error", error: resolved }
     if (resolved.where.kind === "device") {
       const device = resolved.device
