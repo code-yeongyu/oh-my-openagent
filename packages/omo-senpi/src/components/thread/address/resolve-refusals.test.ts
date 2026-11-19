@@ -217,7 +217,11 @@ describe("#given an approved reply pinned to its sender's device #when it resolv
       "B cannot be asked (this device's service carries no wake, so no probe)",
       { device: B.id, thread: T.nowhere },
       {},
-      { kind: "error", code: "host_unavailable", details: { reason: "wake_unavailable", device: B.id, thread: T.nowhere } },
+      {
+        kind: "error",
+        code: "host_unavailable",
+        details: { reason: "wake_unavailable", device: B.id, thread: T.nowhere },
+      },
     ],
   ] as const)("%s", async (_label, pin, setup, expected) => {
     expect(await resolve(pin.thread, { pin }, setup)).toMatchObject(expected)

@@ -61,12 +61,27 @@ describe("#given a thread on device B #when a control tool names it as <device>/
 
 describe("#given <device>/<thread id> on B that B's listing does not show #when thread_read names it #then B is asked and its answer decides (#14305 review H1)", () => {
   test.each([
-    ["B answered and holds no such thread", { probe: true }, { code: "not_found", details: { kind: "thread", device: B.id } }],
-    ["B did not answer the probe", { probe: true, silent: [B.id] }, { code: "host_unavailable", details: { reason: "host_not_answering" } }],
+    [
+      "B answered and holds no such thread",
+      { probe: true },
+      { code: "not_found", details: { kind: "thread", device: B.id } },
+    ],
+    [
+      "B did not answer the probe",
+      { probe: true, silent: [B.id] },
+      { code: "host_unavailable", details: { reason: "host_not_answering" } },
+    ],
     ["B cannot be asked", {}, { code: "host_unavailable", details: { reason: "wake_unavailable" } }],
-    ["B missed this listing round", { probe: true, incomplete: true }, { code: "host_unavailable", details: { reason: "listing_incomplete" } }],
+    [
+      "B missed this listing round",
+      { probe: true, incomplete: true },
+      { code: "host_unavailable", details: { reason: "listing_incomplete" } },
+    ],
   ] as const)("%s", async (_label, setup, error) => {
-    expect(await run("thread_read", { thread: `${B.name}/${T.nowhere}` }, setup)).toMatchObject({ kind: "error", error })
+    expect(await run("thread_read", { thread: `${B.name}/${T.nowhere}` }, setup)).toMatchObject({
+      kind: "error",
+      error,
+    })
   })
 
   test("#given B holds a thread only on disk #when thread_read names it as <device>/<thread id> #then it answers as the bare id does", async () => {

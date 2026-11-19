@@ -17,14 +17,7 @@ import { claimCreatedAlias, planCreate, withAlias } from "../remote/lazy-ops"
 import { threadLink } from "../thread-link"
 import { recordThreadCreator } from "../tools/extension-tools"
 import { resolveAddress } from "../address/lazy"
-import {
-  failure,
-  resolveEntries,
-  sendAddressBook,
-  summary,
-  targetSession,
-  uncertainFailure,
-} from "../tools/internals"
+import { failure, resolveEntries, sendAddressBook, summary, targetSession, uncertainFailure } from "../tools/internals"
 import type { ThreadHostView, ThreadToolSurfaceOptions } from "../tools/ports"
 import { openedResult } from "../tools/thread-row"
 import { createLaunch } from "./create-launch"

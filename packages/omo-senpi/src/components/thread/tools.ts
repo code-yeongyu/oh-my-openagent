@@ -550,10 +550,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     }
     // Decision 0027: ONE resolver over this device's book and the account's other devices (resolveAddress, which takes
     // <device>/<thread> too); where it resolved says which transport carries the send.
-    const entries =
-      match === "fuzzy"
-        ? resolveEntries(options, current)
-        : localFor(address)
+    const entries = match === "fuzzy" ? resolveEntries(options, current) : localFor(address)
     // A reply to a sender on this device resolves among this device's entries only (A4.3.1), and only by the sender's
     // exact id or stated name: an id prefix never turns an approved reply into a send to another thread. A send never
     // targets its own caller, so an id prefix is resolved without it (UUIDv7 ids share 8 hex characters for ~65 s).

@@ -428,18 +428,26 @@ describe("#14305: thread_send and thread_handoff take every address form the add
     twos.push(devices.cleanup)
     return devices
   }
-  const admittedOn = (sent: readonly { readonly device?: string; readonly rpc?: Readonly<Record<string, unknown>> }[]) =>
-    sent.filter((entry) => entry.rpc?.["type"] === ADMIT).map((entry) => entry.device)
+  const admittedOn = (
+    sent: readonly { readonly device?: string; readonly rpc?: Readonly<Record<string, unknown>> }[],
+  ) => sent.filter((entry) => entry.rpc?.["type"] === ADMIT).map((entry) => entry.device)
 
   test.each([
     ["<device name>/<thread id>", `${B.name}/${T.bLive}`],
     ["<device id prefix>/<thread id prefix>", `${B.id.slice(0, 6)}/${T.bLive.slice(0, 8)}`],
     ["<device name>/<thread name>", `${B.name}/${NAMES.bLive}`],
-  ])("#given B's live thread #when thread_send names it as %s #then the message is admitted on B", async (_form, thread) => {
-    const { run, account: b } = await two()
-    expect(await run("thread_send", { thread, message: "x" })).toMatchObject({ kind: "ok", thread: T.bLive, device: B.id })
-    expect(admittedOn(b.sent)).toEqual([B.id])
-  })
+  ])(
+    "#given B's live thread #when thread_send names it as %s #then the message is admitted on B",
+    async (_form, thread) => {
+      const { run, account: b } = await two()
+      expect(await run("thread_send", { thread, message: "x" })).toMatchObject({
+        kind: "ok",
+        thread: T.bLive,
+        device: B.id,
+      })
+      expect(admittedOn(b.sent)).toEqual([B.id])
+    },
+  )
 
   test("#given a thread on this device #when thread_send names it as here/<thread id> #then it is delivered here and nothing reaches B", async () => {
     const { run, account: b } = await two()

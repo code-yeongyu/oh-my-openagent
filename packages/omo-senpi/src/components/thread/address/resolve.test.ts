@@ -178,7 +178,9 @@ describe("#given unique_holder (#14048: a sender whose delivery names no device)
   test("#given a copy here and B's row #when the id is resolved with unique_holder #then ambiguous_target names this device and B", async () => {
     const resolved = await resolve(T.stale, { unique_holder: true, id_prefix: false })
     expect(resolved).toMatchObject({ kind: "error", code: "ambiguous_target" })
-    const candidates = (resolved.kind === "error" ? (resolved.details?.["candidates"] ?? []) : []) as readonly AddressCandidate[]
+    const candidates = (
+      resolved.kind === "error" ? (resolved.details?.["candidates"] ?? []) : []
+    ) as readonly AddressCandidate[]
     expect(candidates.map((candidate) => candidate.device).sort()).toEqual([B.id, HERE.id].sort())
   })
 
@@ -214,7 +216,9 @@ describe("#given unique_holder (#14048: a sender whose delivery names no device)
         { unique_holder: true, id_prefix: false },
       )
       expect(resolved).toMatchObject({ kind: "error", code: "ambiguous_target" })
-      const candidates = (resolved.kind === "error" ? (resolved.details?.["candidates"] ?? []) : []) as readonly AddressCandidate[]
+      const candidates = (
+        resolved.kind === "error" ? (resolved.details?.["candidates"] ?? []) : []
+      ) as readonly AddressCandidate[]
       expect(candidates.map((candidate) => candidate.address).sort()).toEqual(
         [`${B.id}/${T.nowhere}`, `${C.id}/${T.nowhere}`].sort(),
       )
@@ -229,7 +233,11 @@ describe("#given a device-qualified session part B has not listed #when it is re
     ["an unlisted routing id", "rpc-7", "rpc-7"],
   ])("#given %s #when <B>/<it> is resolved #then it passes through to B unresolved", async (_label, part, key) => {
     const resolved = await resolve(`${B.id}/${part}`)
-    expect(resolved).toMatchObject({ kind: "ok", address: `${B.id}/${part}`, where: { kind: "device", row: { device: B.id, session_id: key } } })
+    expect(resolved).toMatchObject({
+      kind: "ok",
+      address: `${B.id}/${part}`,
+      where: { kind: "device", row: { device: B.id, session_id: key } },
+    })
   })
 
   test.each(["no such thread", "release-planner-2"])(
