@@ -167,4 +167,66 @@ describe.skipIf(!posix)("omo update on a versioned install layout (#12022)", () 
     expect(report).toContain(join(f.versions, "current", "omo"))
     expect(report).not.toContain("update failed")
   })
+
+  test("#given a target dir without .complete that runs the target #then it is adopted, not reinstalled", async () => {
+    const f = fixture("wrapper")
+    const next = join(f.versions, "5.1.78")
+    writePackage(next, "5.1.78")
+    writeFileSync(join(next, "package.json"), `${JSON.stringify(MANIFEST)}\n`)
+    const entry = join(next, "node_modules", "omo-ai", "bin", "omo.js")
+    writeFileSync(join(next, "omo"), `#!/bin/sh\nexec '${entry}' "$@"\n`, { mode: 0o755 })
+
+    const code = await runSelfUpdate(["update"], f.options())
+
+    expect(f.errors).toEqual([])
+    expect(code).toBe(0)
+    expect(f.spawned).toEqual([])
+    expect(existsSync(join(next, ".complete"))).toBe(true)
+    expect(readlinkSync(join(f.versions, "current"))).toBe("5.1.78")
+    expect(readdirSync(f.versions).filter((name) => name.startsWith(".failed-"))).toEqual([])
+  })
+
+  test("#given another live installer's stage for the target #then the update stops without touching current or the stage", async () => {
+    const f = fixture("wrapper")
+    const foreign = join(f.versions, `.stage-5.1.78-${process.ppid}`)
+    mkdirSync(foreign)
+
+    const code = await runSelfUpdate(["update"], f.options())
+
+    expect(code).not.toBe(0)
+    expect(f.spawned).toEqual([])
+    expect(f.errors.join("\n")).toContain(`another installer is updating ${join(f.versions, "5.1.78")}`)
+    expect(readlinkSync(join(f.versions, "current"))).toBe("5.1.77")
+    expect(existsSync(foreign)).toBe(true)
+  })
+
+  test("#given leftovers in the versions dir #then only the two newest .failed dirs and live stages survive", async () => {
+    const f = fixture("wrapper")
+    const leftovers = [".failed-5.1.70-100", ".failed-5.1.71-200", ".failed-5.1.72-300", ".stage-5.1.60-99999999"]
+    const liveStage = `.stage-5.1.99-${process.ppid}`
+    for (const name of [...leftovers, liveStage]) mkdirSync(join(f.versions, name))
+
+    expect(await runSelfUpdate(["update"], f.options())).toBe(0)
+
+    const dotted = readdirSync(f.versions)
+      .filter((name) => name.startsWith("."))
+      .sort()
+    expect(dotted).toEqual([".failed-5.1.71-200", ".failed-5.1.72-300", liveStage])
+  })
+
+  test("#given a wrapper that names its dir without a trailing slash #then the new wrapper is regenerated for the new dir", async () => {
+    const f = fixture("wrapper")
+    const old = join(f.versions, "5.1.77")
+    writeFileSync(join(old, "omo"), `#!/bin/sh\ncd '${old}' && exec ./node_modules/omo-ai/bin/omo.js "$@"\n`, {
+      mode: 0o755,
+    })
+
+    const code = await runSelfUpdate(["update"], f.options())
+
+    expect(f.errors).toEqual([])
+    expect(code).toBe(0)
+    expect(readFileSync(join(f.versions, "5.1.78", "omo"), "utf8")).not.toContain(old)
+    const proc = Bun.spawnSync([join(f.bunBin, "omo"), "--version"], { env: f.env })
+    expect(proc.stdout.toString().trim()).toBe("omo 5.1.78 (engine: senpi 0.0.0)")
+  })
 })
