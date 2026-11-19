@@ -347,7 +347,7 @@ describe("lost_ack_and_durable_recovery", () => {
   })
 })
 
-describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
+describe("causal_cycle_hop_and_rate_budgets", () => {
   // K8: A->B->A thread chains are allowed and no count limit applies unless the user sets one; only a
   // session sending to itself is refused.
   test("#given A->B->C under one root #when C sends back to A and A answers B directly #then both are delivered and carry the chain's hop count", async () => {
@@ -451,16 +451,16 @@ describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
     expect(Math.max(...sizes) - Math.min(...sizes)).toBeLessThan(16)
   }, 60_000)
 
-  test("#given one sender turn #when it reaches a 17th distinct session #then that send is refused while a second send to a known target passes", async () => {
+  // Q 2026-11-19: no per-turn cap on how many sessions one turn may reach; a recovering sender must be able to wake every
+  // session it owns from one turn.
+  test("#given one sender turn #when it sends to 40 distinct sessions #then every send is delivered", async () => {
     const h = open()
     h.session("F")
-    for (let index = 1; index <= 17; index++) h.phantom(`G${index}`)
+    for (let index = 1; index <= 40; index++) h.phantom(`G${index}`)
     const results: string[] = []
-    for (let index = 1; index <= 17; index++)
+    for (let index = 1; index <= 40; index++)
       results.push(summary(await send(h, "F", `G${index}`, "fan", { turn_id: "turn-1" })))
-    expect(results.slice(0, 16).every((result) => result === "queued_offline")).toBe(true)
-    expect(results[16]).toBe("error:overloaded")
-    expect(summary(await send(h, "F", "G1", "again", { turn_id: "turn-1" }))).toBe("queued_offline")
+    expect(results).toEqual(Array.from({ length: 40 }, () => "queued_offline"))
   })
 
   test("#given a pair bucket of 8 #when a 9th send follows at once, a retry replays, and 5 s pass #then the 9th is refused, the retry costs nothing, and one token refills", async () => {
