@@ -156,13 +156,17 @@ describe("#13037 the sender half reaches a session on another device that is not
       nothingSent(a)
     })
 
-    test("#given no device holds it and one online device that lists the feature did not answer #then it is host_unavailable naming that device", async () => {
+    // omo#14270: the answer also names the devices that answered "not held", this one included, so a miss on the device
+    // that really keeps the file is visible instead of reading as "wait for c".
+    test("#given no device holds it and one online device that lists the feature did not answer #then it is host_unavailable naming that device and the devices that answered", async () => {
       const a = account({ rows: [B_ROW, C_ROW], silent: ["c"] })
       const { run } = fixture.surface(a.remote)
-      expect(await run("thread_send", { thread: GONE, message: "hi" })).toMatchObject({
+      const result = await run("thread_send", { thread: GONE, message: "hi" })
+      expect(result).toMatchObject({
         kind: "error",
-        error: { code: "host_unavailable", details: { devices: ["c"] } },
+        error: { code: "host_unavailable", details: { thread: GONE, devices: ["c"], answered: ["here", "b"] } },
       })
+      expect((result as { error: { message: string } }).error.message).toContain("here, b")
       nothingSent(a)
     })
 
@@ -225,7 +229,8 @@ describe("#13037 the sender half reaches a session on another device that is not
   // #13238 review: one rule for every probe that may build an `ended` row - only while this device's service can carry
   // the wake. With the single probe on and the wake off, a probe-built row would go down the live path instead.
   describe("lookup on with wake off: no probe builds an ended row", () => {
-    test("#given a reply to a sender on b that b no longer lists #when the run replies by id #then it is not_found naming b, with no probe and nothing sent", async () => {
+    // #14280: with no probe, b cannot be asked whether it still holds the sender, so the answer says so, never not_found.
+    test("#given a reply to a sender on b that b no longer lists #when the run replies by id #then it is host_unavailable (wake_unavailable) naming b, with no probe and nothing sent", async () => {
       const a = account({ rows: [B_ROW], ended: { b: { [GONE]: "rk-gone" } }, noWake: true })
       const { run } = fixture.surface(a.remote, {
         callerReplyTargets: () => [GONE],
@@ -233,7 +238,7 @@ describe("#13037 the sender half reaches a session on another device that is not
       })
       expect(await run("thread_send", { thread: GONE, message: "reply" })).toMatchObject({
         kind: "error",
-        error: { code: "not_found", details: { device: "b" } },
+        error: { code: "host_unavailable", details: { device: "b", reason: "wake_unavailable" } },
       })
       expect({ lookups: a.lookups, sent: a.sent }).toEqual({ lookups: [], sent: [] })
     })
@@ -303,6 +308,13 @@ describe("#13037 the sender half reaches a session on another device that is not
         ).toMatchObject({ kind: "ok", delivery: { kind: "queued", waiting_on: { kind, device: "c" } } })
       },
     )
+
+    test("#given the woken engine answered held under a person's Stop (senpi#7014) #then the result is queued waiting on a hold on the receiving device, not uncertain", async () => {
+      expect(await answered(queuedEnvelope({ kind: "held", holds: ["session_hold"], turnId: "0" }))).toMatchObject({
+        kind: "ok",
+        delivery: { kind: "queued", queue_position: 1, waiting_on: { kind: "hold", device: "c" } },
+      })
+    })
 
     test("#given the receiver answered an existing row #then the result is deduplicated", async () => {
       expect(
@@ -404,6 +416,18 @@ describe("#13037 the sender half reaches a session on another device that is not
       })
       const { run } = fixture.surface(a.remote)
       expect(await run("thread_send", { thread: "dur-on-b", message: "hi", delivery: "follow_up" })).toMatchObject({
+        kind: "ok",
+        delivery: { kind: "queued", waiting_on: { kind: "hold", device: "b" } },
+      })
+    })
+
+    test("#given an idle session on b under a hold a peer cannot release #when the engine answers held (senpi#7014) #then the result waits on a hold on b, not idempotency_uncertain", async () => {
+      const a = account({
+        rows: [B_ROW],
+        admitOutcome: queuedEnvelope({ kind: "held", holds: ["interrupted_run"], turnId: "0" }),
+      })
+      const { run } = fixture.surface(a.remote)
+      expect(await run("thread_send", { thread: "dur-on-b", message: "hi" })).toMatchObject({
         kind: "ok",
         delivery: { kind: "queued", waiting_on: { kind: "hold", device: "b" } },
       })

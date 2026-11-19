@@ -73,7 +73,7 @@ describe("runtime-fallback error classifier", () => {
         name: "AI_APICallError",
         statusCode: 524,
         isRetryable: true,
-        responseBody: "<title>mengmota.com | 524: A timeout occurred</title>",
+        responseBody: "<title>example.com | 524: A timeout occurred</title>",
       },
     }
 

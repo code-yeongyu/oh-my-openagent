@@ -53,6 +53,18 @@ export type ThreadSummary = {
  * in this shape too: `currentResult` (`tools/thread-row.ts`) maps its `thread_id` or nested `thread`, rows, candidates
  * and endpoint kind, and rebuilds a missing `link`.
  */
+/**
+ * A running thread asleep between provider retries (senpi#7025): `reason` is the engine's (`rate_limit` after a 429,
+ * `retry` after another retryable error), `until` when the next attempt starts, `attempt` of `max_attempts`.
+ */
+export type ThreadRetryWait = {
+  readonly kind: "retry"
+  readonly reason: "rate_limit" | "retry"
+  readonly until: string
+  readonly attempt: number
+  readonly max_attempts: number
+}
+
 export type ThreadResultSummary = {
   readonly thread: string
   readonly name: string
@@ -77,6 +89,11 @@ export type ThreadResultSummary = {
   readonly error_code?: string
   /** The current or most recent turn's id, as the prompt response names it. */
   readonly turn_id?: string
+  /**
+   * Set on a `running` thread whose engine sleeps between provider retries: it is waiting, not working, until `until`.
+   * Absent while it works, and on an engine that does not publish the wait (senpi before #7025, another device's row).
+   */
+  readonly waiting_on?: ThreadRetryWait
   /**
    * Set when the row comes from another device's cached listing (it did not answer this round): when that listing was
    * taken. Such a row is the device's last word, so it reads `inactive` (or `archived`), never `running`.
@@ -178,7 +195,8 @@ export type ThreadCreateResult =
 /**
  * One of the account's devices as `thread_list` reports it. `online` is the device's, never a thread's. `listing`:
  * `listed` when this listing holds the device's threads, `incomplete` when the device did not answer this round (its
- * threads are missing, not gone), `offline` when the device is not connected. `threads` counts the threads this result
+ * threads are missing, not gone; also a device the round marked anything but answered, such as one capped by the relay's
+ * page limit), `offline` when the device is not connected. `threads` counts the threads this result
  * lists on the device (this device's are the caller's scoped threads). This device's row is always present.
  */
 export type ThreadDevice = {
@@ -191,6 +209,8 @@ export type ThreadDevice = {
   readonly this_device: boolean
   readonly listing: "listed" | "incomplete" | "offline"
   readonly threads: number
+  /** On this device's row: the inactive or archived threads this listing left out (`inactive_dropped`); absent when none were. */
+  readonly dropped?: number
 }
 
 export type ThreadListResult =
@@ -214,6 +234,18 @@ export type ThreadListResult =
       readonly aliases_unavailable?: "sign_in" | "host_unavailable" | "not_asked"
       /** More session files were in scope than one list reads (newest first): older inactive threads are left out. */
       readonly inactive_truncated?: true
+      /**
+       * With `inactive_truncated`: how many threads this device's listing left out unread, each inactive or archived; set
+       * when the filter shows either state.
+       */
+      readonly inactive_dropped?: number
+      /**
+       * `incomplete` when an engine endpoint of this device did not answer the listing (a timeout, an auth or protocol
+       * failure, not a socket that is gone): its threads may read `inactive` from their files although an engine holds
+       * them. `unanswered_endpoints` counts those endpoints. Absent when every endpoint answered.
+       */
+      readonly listing?: "incomplete"
+      readonly unanswered_endpoints?: number
     }
   | ThreadDataError
 

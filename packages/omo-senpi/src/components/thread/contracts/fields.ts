@@ -73,10 +73,18 @@ export const RelayText = Type.String({
   description: `Text relayed to or from the external thread; longer than ${RELAY_TEXT_MAX_BYTES} UTF-8 bytes returns message_too_large.`,
 })
 
+/**
+ * The delivery mode of every send that names none: the thread tools (thread_send, thread_create's first prompt,
+ * thread_handoff), the thread SDK, `omo thread send` and `omo remote send|open`. `auto` steers a running turn and starts
+ * one on an idle session, so an omitted mode never queues behind the receiver's turn; follow_up is only ever asked for.
+ */
+export const DEFAULT_THREAD_DELIVERY = "auto" as const
+
 // R6: an enum instead of a boolean because delivery has three plausible states.
 export const ThreadDeliveryMode = Type.Union([Type.Literal("auto"), Type.Literal("steer"), Type.Literal("follow_up")], {
+  default: DEFAULT_THREAD_DELIVERY,
   description:
-    "auto steers the running turn when one is active and starts a new turn otherwise; steer requires expected_turn_id and becomes turn_conflict when the active turn changed; follow_up queues the message behind the running turn.",
+    "Omitted: auto. auto steers the running turn when one is active and starts a new turn otherwise; steer requires expected_turn_id and becomes turn_conflict when the active turn changed; follow_up queues the message behind the running turn (pass it only when the message must wait for that turn to end).",
 })
 
 /**

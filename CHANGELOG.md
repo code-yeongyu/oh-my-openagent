@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.1.79] - 2026-11-19
+
+### Fixed
+
+- The `/remote` close in the TUI follows `thread_close`'s close contract (#14234). A close refused because the thread has messages it has not read names `/remote close <session> --force` and lists those messages, or says the ids are unavailable on that device's engine. The picker then offers "Close anyway". A forced close lists the messages it dropped. The refusal's `details.reason` is the engine's own reason (`turn_active` or `work_pending`). ([#14246](https://github.com/code-yeongyu/oh-my-openagent/pull/14246), fixes [#14245](https://github.com/code-yeongyu/oh-my-openagent/issues/14245)) ([#14248](https://github.com/code-yeongyu/oh-my-openagent/pull/14248))
+- Thread tools: a command for a thread whose session parked on another device after it was listed no longer fails `unsupported` with advice to update omo on that device. The device service answers such a command `route_unlisted` (its host no longer lists that session, so nothing was sent to it). `thread_close` now answers `closed: false, reason: "not_live"`, and the other thread tools answer `not_resumable`, as for a session that ended there. A create, or a reopen's session-file lookup, refused that way is `host_unavailable`, with a retry. ([#14237](https://github.com/code-yeongyu/oh-my-openagent/pull/14237), fixes [#14233](https://github.com/code-yeongyu/oh-my-openagent/issues/14233)) ([#14248](https://github.com/code-yeongyu/oh-my-openagent/pull/14248))
+- The cold-wake session host unit (and every other unit or plist the cold-wake install writes) is now written 0644 under any umask. Under umask 077 it was written 0600, because a file's creation mode is masked by the umask; the mode is now set explicitly before the file is moved into place. ([#14249](https://github.com/code-yeongyu/oh-my-openagent/pull/14249), fixes [#14247](https://github.com/code-yeongyu/oh-my-openagent/issues/14247)) ([#14248](https://github.com/code-yeongyu/oh-my-openagent/pull/14248))
+- A cold-wake unit or plist an earlier build already left 0600 is set back to 0644 the next time the install (or a refresh to a newer runtime) finds its content unchanged, with no reload or restart. A file this user cannot change the mode of (another owner's, or on a read-only filesystem) is left as it is and the install still succeeds. ([#14249](https://github.com/code-yeongyu/oh-my-openagent/pull/14249)) ([#14248](https://github.com/code-yeongyu/oh-my-openagent/pull/14248))
+
+### Changed
+
+- **`thread_close` no longer drops messages a thread has not read unless you ask it to.** Before, it always interrupted the session and silently dropped any messages queued behind its run. Now:
+  - A busy thread with unread messages is refused `turn_active`. The refusal names those messages (`pending_deliveries`) and gives the `force` option.
+  - `thread_close({ thread, force: true })` closes it anyway.
+  - Every close result carries `dropped_deliveries`, the messages it handed back unread (an empty list when there were none).
+  - An idle thread still closes without `force`, even when an interrupted run left messages stranded (#14169); those are listed too.
+  - On a device whose engine cannot name its queued messages (older than code-yeongyu/senpi#7006), a default close never interrupts. It says the message ids are unavailable there, and `force: true` still closes it.
+  - `omo remote close` takes `--force` and reports the dropped messages as well. ([#14242](https://github.com/code-yeongyu/oh-my-openagent/pull/14242), fixes [#14234](https://github.com/code-yeongyu/oh-my-openagent/issues/14234)) ([#14248](https://github.com/code-yeongyu/oh-my-openagent/pull/14248))
+
+### Added
+
+- The desktop can ask OmO which model each category and agent runs. A new read-only extension request, `omo.modelRouting.resolve`, answers the model every category (under its canonical name) and every task agent would spawn on, using the same resolvers a `task` call uses against the session's project config, model registry and sign-ins, and says whether that model came from your omo.json or from OmO's defaults. ([#14025](https://github.com/code-yeongyu/oh-my-openagent/pull/14025))
+
 ## [5.1.78] - 2026-11-18
 
 ### Changed

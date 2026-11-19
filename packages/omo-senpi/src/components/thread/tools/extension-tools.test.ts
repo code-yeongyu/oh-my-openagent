@@ -117,7 +117,7 @@ async function surface(
 /** A session's tool registry as senpi keeps it (one tool per name), with `session_start` fired by the test. */
 function sessionStartHost(preRegistered: Readonly<Record<string, Record<string, unknown>>>) {
   const tools = new Map(Object.entries(preRegistered))
-  const handlers: (() => void)[] = []
+  const handlers: ((event: unknown, ctx?: unknown) => unknown)[] = []
   let waiting: { readonly name: string; readonly done: () => void } | undefined
   return {
     tools,
@@ -127,7 +127,7 @@ function sessionStartHost(preRegistered: Readonly<Record<string, Record<string, 
       if (awaited !== undefined && awaited.name === tool.name) awaited.done()
     },
     getAllTools: () => [...tools.keys()].map((name) => ({ name })),
-    on(event: string, handler: () => void) {
+    on(event: string, handler: (event: unknown, ctx?: unknown) => unknown) {
       if (event === "session_start") handlers.push(handler)
     },
     /** Fires session_start and resolves once `until` is registered (the registration pass is one synchronous loop). */
@@ -135,7 +135,7 @@ function sessionStartHost(preRegistered: Readonly<Record<string, Record<string, 
       const done = new Promise<void>((resolve) => {
         waiting = { name: until, done: resolve }
       })
-      for (const handler of handlers) handler()
+      for (const handler of handlers) handler({ type: "session_start" })
       return done
     },
   }
