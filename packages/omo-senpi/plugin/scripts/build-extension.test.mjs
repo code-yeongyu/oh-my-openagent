@@ -379,6 +379,34 @@ describe("checkExtensionCurrent", () => {
     expect(threadClientInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))).toBe(true)
   })
 
+  // #14204: `omo thread` and `omo daemon` import the thread client with a plain dynamic import, outside the engine,
+  // so no senpi loader alias resolves a bare `typebox` there, and the compiled runtime ships no node_modules.
+  test("#given the thread client copied into a plugin layout with no node_modules #when Node imports it the way the omo CLI does #then it loads and exposes the CLI remote surface", async () => {
+    const { threadClientOutputPath } = await sharedOutputs()
+    const work = await mkdtemp(join(tmpdir(), "omo-thread-client-cli-load-"))
+    try {
+      const sidecar = join(work, "plugin", "extensions", "omo-thread-client.js")
+      await mkdir(dirname(sidecar), { recursive: true })
+      await cp(join(pluginRoot, "package.json"), join(work, "plugin", "package.json"))
+      await cp(threadClientOutputPath, sidecar)
+      const probe = join(work, "thread-client-probe.mjs")
+      await writeFile(
+        probe,
+        [
+          'import { pathToFileURL } from "node:url"',
+          `const client = await import(pathToFileURL(${JSON.stringify(sidecar)}).href)`,
+          'if (typeof client.createCliRemoteSurface !== "function") throw new Error("createCliRemoteSurface missing")',
+          'console.log("thread-client-ok")',
+        ].join("\n"),
+      )
+      const run = await runBoundedStage("node probe", "node", [probe], { cwd: parse(work).root }, PACKED_STAGE_CAPS.probe)
+      expect(run.stdout, run.stderr).toContain("thread-client-ok")
+      expect(run.status, run.stderr).toBe(0)
+    } finally {
+      removeTestRootBestEffort(work)
+    }
+  })
+
   test("#given the lazy session wake #when bundle inputs are inspected #then the carrier, the consumer and the device-service client are confined to their sidecar", async () => {
     const { mainInputs, wakeInputs } = await sharedOutputs()
     for (const suffix of [

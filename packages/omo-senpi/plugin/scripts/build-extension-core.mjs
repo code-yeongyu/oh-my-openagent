@@ -279,6 +279,12 @@ const externalSpecifiers = [
   ...builtinModuleNames.map((moduleName) => `node:${moduleName}`),
 ]
 const sdkExternalSpecifiers = [...builtinModuleNames, ...builtinModuleNames.map((name) => `node:${name}`)]
+// #14204: `omo thread` and `omo daemon` import the thread client with a plain dynamic import, outside any engine, and
+// the compiled runtime ships no node_modules, so a bare `typebox` there cannot resolve. The sidecar inlines TypeBox
+// instead of leaning on the engine's loader alias. TypeBox 1.x tags schemas with plain `~kind` string keys, so the
+// sidecar's copy produces schemas the engine's TypeBox reads as its own.
+const TYPEBOX_LOADER_ALIASES = new Set(SENPI_LOADER_ALIASES.filter((specifier) => /^(@sinclair\/)?typebox(\/|$)/.test(specifier)))
+const threadClientExternalSpecifiers = externalSpecifiers.filter((specifier) => !TYPEBOX_LOADER_ALIASES.has(specifier))
 const BUILD_SETTINGS = JSON.stringify({
   target: "node",
   format: "esm",
@@ -480,7 +486,12 @@ export async function buildExtension(options = {}) {
   const memorySyncInputs = await buildEntry(memorySyncEntryPath, memorySyncOutput, buildDefines, externalSpecifiers, {
     assets: true,
   })
-  const threadClientInputs = await buildEntry(threadClientEntryPath, threadClientOutput, buildDefines)
+  const threadClientInputs = await buildEntry(
+    threadClientEntryPath,
+    threadClientOutput,
+    buildDefines,
+    threadClientExternalSpecifiers,
+  )
   const wakeInputs = await buildEntry(wakeEntryPath, wakeOutput, buildDefines)
   const telemetryRecoveryInputs = await buildEntry(telemetryRecoveryEntryPath, telemetryRecoveryOutput, buildDefines)
   const feedbackInputs = await buildEntry(feedbackEntryPath, feedbackOutput, buildDefines)
