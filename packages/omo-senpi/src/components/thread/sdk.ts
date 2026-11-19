@@ -531,9 +531,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
         if ((await store.sessionOwner(request.thread)) === null) {
           const offline = await hostView(surface, { offline: true })
           const across = await resolveAddress(
-            resolveContext(
-              toThreadAddressEntries(sendAddressBook(surface, offline, bareOf(request.thread), request.all_scope)),
-            ),
+            resolveContext(toThreadAddressEntries(sendAddressBook(surface, offline, bareOf(request.thread), true))),
             request.thread,
             { all_scope: request.all_scope, id_prefix: true },
           )
