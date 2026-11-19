@@ -146,12 +146,15 @@ const miss = (address: string, unanswered: readonly DeviceRow[]): RemoteFailure 
     },
   })
 
-// A device the listing names but the roster misses (#13402, unknown-device.ts): it counts by its exact id, named by it.
+// A device the listing names but the roster misses (#13402, unknown-device.ts), as a caller sees it: the row sessions.list
+// shows for it (client.ts unlistedDevice), offline, so one device never reads online in one answer and offline in
+// another. The core resolver alone sees it online, which only passes it through the need-online gate.
 const listingNamed = (id: string): DeviceRow => ({
   id,
   name: id,
+  kind: "unknown",
   platform: "unknown",
-  online: true,
+  online: false,
   last_seen_ms: null,
   caps: { attach: true, machine: false, control: false },
 })
