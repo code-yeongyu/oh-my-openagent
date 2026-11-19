@@ -82,5 +82,12 @@ export type SessionHost = {
   readonly device?: string
   /** The threads visible on that device: this device's address book, or the account listing's live rows of that device. */
   readonly visible: () => Promise<readonly ThreadSummary[]>
-  readonly open: (request: SessionOpenRequest) => Promise<SessionOpenOutcome>
+  /**
+   * `promptFollows`: the create sends the new thread a first prompt next, so another device's host first checks that
+   * its route reaches the session it opened (#14394). It is a hint to the host, never a field of the engine's open.
+   */
+  readonly open: (
+    request: SessionOpenRequest,
+    options?: { readonly promptFollows?: boolean },
+  ) => Promise<SessionOpenOutcome>
 }

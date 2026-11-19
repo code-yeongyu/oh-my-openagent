@@ -7,7 +7,6 @@ import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "../remot
 import { notSignedInFailure, outcomeFailure } from "../remote/outcome"
 import { deviceOnline, replyData } from "../remote/remote-ops"
 import { prepareRemoteWorktree, removeRemoteWorktree } from "../worktree/remote-worktree"
-import { SESSION_GONE } from "./close-ladder"
 import { openedEngineId, openRefusal } from "./open-reply"
 import { threadLink } from "../thread-link"
 import type { ThreadHostSession } from "../tools/ports"
@@ -19,6 +18,9 @@ import {
   type SessionOpenOutcome,
   type SessionOpenRequest,
 } from "./session-host"
+
+/** The device service's own refusal: its route lists no such session, so nothing was dispatched to an engine. */
+const ROUTE_UNLISTED = "route_unlisted"
 
 const nonEmpty = (value: unknown): string | undefined =>
   typeof value === "string" && value.length > 0 ? value : undefined
@@ -110,7 +112,7 @@ export function createRelaySessionHost(
       (await remote.sessions.sessions())
         .filter((row) => row.device === device && row.state !== "ended")
         .map(listedThread),
-    open: async (request: SessionOpenRequest): Promise<SessionOpenOutcome> => {
+    open: async (request: SessionOpenRequest, options): Promise<SessionOpenOutcome> => {
       const offline = await deviceOnline(remote, device)
       if (offline !== undefined) return offline
       const { name, initialSkills, permissionPreset, worktree, ...asked } = request
@@ -199,19 +201,23 @@ export function createRelaySessionHost(
               { type: "set_session_name", sessionId: threadId, name },
               { direct: true },
             )
+      // #14394: every later step (its name, its first prompt, every tool) reaches the new session through b's route. A
+      // route that does not list it (a host the service does not route, such as the Desktop app's) leaves an orphan
+      // nothing can address: the create ends it where it was opened and refuses, before anything records the thread.
+      // The name is the first such step; with no name, the state read its first prompt would make anyway asks the same
+      // route now. Only the service's own route_unlisted counts: an engine's answer about the key is no route verdict.
       if (!reopens) {
-        // #14394: every later step (its name, its first prompt, every tool) reaches the new session through b's route.
-        // A route that answers it does not hold the session (a host the service does not route, such as the Desktop
-        // app's) leaves an orphan nothing can address: the create ends it where it was opened and refuses instead.
         const reached =
           named ??
-          (await remote.sessions.sessionCommand(
-            device,
-            threadId,
-            { type: "get_state", sessionId: threadId },
-            { direct: true },
-          ))
-        if (reached.kind === "refused" && SESSION_GONE.has(reached.reason))
+          (options?.promptFollows === true
+            ? await remote.sessions.sessionCommand(
+                device,
+                threadId,
+                { type: "get_state", sessionId: threadId },
+                { direct: true },
+              )
+            : undefined)
+        if (reached?.kind === "refused" && reached.reason === ROUTE_UNLISTED)
           return await unreachable(
             reached.reason,
             nonEmpty(data["sessionId"]),
