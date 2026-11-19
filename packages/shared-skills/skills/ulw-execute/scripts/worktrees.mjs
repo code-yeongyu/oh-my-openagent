@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // ulw-execute worktree lifecycle (#14391): `add` creates a task-owned worktree, copies the gitignored local
 // config into it and records it; `provision` re-copies into an existing one; `teardown` removes every
-// recorded worktree and its branch once the branch is merged. Prints one JSON line. Exit 3: required config missing.
+// recorded worktree and its branch once the branch is merged. Prints one JSON line. Exit 3: listed config is missing, or
+// unlisted local config (.env, .env.*) exists: ask the user before going on.
 import { execFileSync } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
@@ -51,19 +52,19 @@ function isMerged(repo, branch, into) {
 }
 
 /** Removes recorded worktrees whose branch is merged into `into` (default: the main checkout's HEAD). */
-function teardown(repo, { into, force }) {
+function teardown(repo, { into }) {
   const target = into ?? git(repo, ["rev-parse", "--abbrev-ref", "HEAD"])
   const manifest = readManifest(repo)
   const removed = []
   const kept = []
   for (const entry of manifest.created) {
-    if (!force && !isMerged(repo, entry.branch, target)) {
+    if (!isMerged(repo, entry.branch, target)) {
       kept.push({ path: entry.path, branch: entry.branch, reason: `not merged into ${target}` })
       continue
     }
     try {
-      if (existsSync(entry.path)) git(repo, ["worktree", "remove", ...(force ? ["--force"] : []), entry.path])
-      git(repo, ["branch", force ? "-D" : "-d", entry.branch])
+      if (existsSync(entry.path)) git(repo, ["worktree", "remove", entry.path])
+      git(repo, ["branch", "-d", entry.branch])
       removed.push({ path: entry.path, branch: entry.branch })
     } catch (error) {
       kept.push({ path: entry.path, branch: entry.branch, reason: String(error.stderr ?? error.message).trim() })
@@ -78,8 +79,7 @@ function parseFlags(argv) {
   const flags = {}
   for (let i = 0; i < argv.length; i++) {
     const name = argv[i].replace(/^--/, "")
-    if (name === "force") flags.force = true
-    else flags[name] = argv[++i]
+    flags[name] = argv[++i]
   }
   return flags
 }
@@ -94,10 +94,10 @@ export function main(argv) {
   else if (command === "teardown") result = teardown(repo, flags)
   else
     throw new Error(
-      "usage: worktrees.mjs <add|provision|teardown> [--repo <dir>] [--path <dir>] [--branch <name>] [--base <ref>] [--into <branch>] [--force]",
+      "usage: worktrees.mjs <add|provision|teardown> [--repo <dir>] [--path <dir>] [--branch <name>] [--base <ref>] [--into <branch>]",
     )
   console.log(JSON.stringify(result))
-  return result.missingRequired?.length > 0 ? EXIT_MISSING_REQUIRED : 0
+  return result.missingRequired?.length > 0 || result.unlisted?.length > 0 ? EXIT_MISSING_REQUIRED : 0
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

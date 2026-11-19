@@ -1,18 +1,27 @@
 import { spawnSync } from "node:child_process"
-import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync } from "node:fs"
+import {
+  constants,
+  copyFileSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+} from "node:fs"
 import { dirname, isAbsolute, join, relative, sep } from "node:path"
 
-// Gitignored local config a fresh `git worktree add` leaves behind (#14391). Without an include file the
-// root `.env` and `.env.*` files are copied; `.worktreeinclude` replaces that default with its own list,
-// and an empty one copies nothing. A plain listed path is required: missing, it stops the run. Only paths git
-// ignores are copied; the copy keeps the source file's mode.
-const DEFAULT_PATTERNS = [".env", ".env.*"]
+// Gitignored local config a fresh `git worktree add` leaves behind (#14391). Only what `.worktreeinclude` lists is
+// ever copied. Without that file nothing is copied, and the root `.env` / `.env.*` files that exist are reported
+// as `unlisted` so the run stops and asks instead of working without them. A plain listed path is required:
+// missing, it stops the run. A copy needs a path both trees ignore and keeps the source file's mode.
+const ENV_CANDIDATES = /^\.env(?:\..+)?$/
 const INCLUDE_FILE = ".worktreeinclude"
 
 /** @returns {{ patterns: string[], explicit: boolean }} */
 function readIncludeList(repo) {
   const file = join(repo, INCLUDE_FILE)
-  if (!existsSync(file)) return { patterns: DEFAULT_PATTERNS, explicit: false }
+  if (!existsSync(file)) return { patterns: [], explicit: false }
   const patterns = readFileSync(file, "utf8")
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -57,7 +66,10 @@ function expand(repo, pattern) {
  */
 export function provision(repo, worktree) {
   const { patterns, explicit } = readIncludeList(repo)
-  const result = { provisioned: [], skipped: [], refused: [], missingRequired: [] }
+  const result = { provisioned: [], skipped: [], refused: [], missingRequired: [], unlisted: [] }
+  if (!explicit) {
+    result.unlisted = readdirSync(repo).filter((name) => ENV_CANDIDATES.test(name) && isGitIgnored(repo, name))
+  }
   for (const pattern of patterns) {
     if (escapes(repo, pattern)) {
       result.refused.push(pattern)
@@ -84,10 +96,11 @@ function isSymlink(path) {
   }
 }
 
-// Only a file git ignores may be copied: anything else would show up as untracked in the worktree and could be
+// Only a file git ignores may be copied, and it must be ignored by the WORKTREE's own rules too (its .gitignore
+// comes from the base, not from the checkout's working tree): anything else shows up as untracked there and can be
 // staged and committed with the run's work, which for a secret means publishing it.
-function isGitIgnored(repo, path) {
-  return spawnSync("git", ["check-ignore", "-q", "--", path], { cwd: repo, stdio: "ignore" }).status === 0
+function isGitIgnored(cwd, path) {
+  return spawnSync("git", ["check-ignore", "-q", "--", path], { cwd, stdio: "ignore" }).status === 0
 }
 
 function within(root, path) {
@@ -108,15 +121,22 @@ function copyOne(repo, worktree, path, result) {
   const stat = lstatSync(source)
   const target = join(worktree, path)
   const escapes = !within(repo, realpathSync(source)) || !within(worktree, join(resolvedAncestor(dirname(target)), "x"))
-  if (stat.isSymbolicLink() || !stat.isFile() || escapes || !isGitIgnored(repo, path)) {
+  if (
+    stat.isSymbolicLink() ||
+    !stat.isFile() ||
+    escapes ||
+    !isGitIgnored(repo, path) ||
+    !isGitIgnored(worktree, path)
+  ) {
     result.refused.push(path)
     return
   }
-  if (existsSync(target)) {
+  // lstat, not existsSync: a dangling symlink at the target reads as absent and copyFileSync would follow it.
+  if (existsSync(target) || isSymlink(target)) {
     result.skipped.push(path)
     return
   }
   mkdirSync(dirname(target), { recursive: true })
-  copyFileSync(source, target)
+  copyFileSync(source, target, constants.COPYFILE_EXCL)
   result.provisioned.push(path.split(sep).join("/"))
 }

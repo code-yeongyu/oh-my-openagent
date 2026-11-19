@@ -62,16 +62,17 @@ function run(repo: string, ...args: string[]) {
 }
 
 describe("ulw-execute worktrees helper", () => {
-  test("#given a gitignored .env and no include file #when a worktree is added #then .env and .env.* are copied and recorded", () => {
+  test("#given gitignored .env files and no include file #when a worktree is added #then nothing is copied and the unlisted files stop the run", () => {
     const repo = fixtureRepo({ ".env": "TOKEN=dummy\n", ".env.local": "LOCAL=1\n" })
     const wt = join(repo, "..", "wt-a")
 
     const result = run(repo, "add", "--path", wt, "--branch", "ulw/a")
 
-    expect(result.status).toBe(0)
-    expect(readFileSync(join(wt, ".env"), "utf8")).toBe("TOKEN=dummy\n")
-    expect(readFileSync(join(wt, ".env.local"), "utf8")).toBe("LOCAL=1\n")
-    expect(result.json.provisioned.sort()).toEqual([".env", ".env.local"])
+    expect(result.status).toBe(3)
+    expect(existsSync(join(wt, ".env"))).toBe(false)
+    expect(existsSync(join(wt, ".env.local"))).toBe(false)
+    expect(result.json.provisioned).toEqual([])
+    expect(result.json.unlisted.sort()).toEqual([".env", ".env.local"])
     const manifest = JSON.parse(readFileSync(join(repo, ".omo", "ulw-execute", "worktrees.json"), "utf8"))
     expect(manifest.created).toEqual([expect.objectContaining({ path: wt, branch: "ulw/a" })])
   })
@@ -128,6 +129,52 @@ describe("ulw-execute worktrees helper", () => {
     expect(existsSync(join(outside, "local.json"))).toBe(false)
   })
 
+  test("#given .env listed in .worktreeinclude #when a worktree is added #then exactly the listed file is copied", () => {
+    const repo = fixtureRepo({ ".env": "TOKEN=dummy\n", ".env.local": "LOCAL=1\n", ".worktreeinclude": ".env\n" })
+    const wt = join(repo, "..", "wt-g")
+
+    const result = run(repo, "add", "--path", wt, "--branch", "ulw/g")
+
+    expect(result.status).toBe(0)
+    expect(readFileSync(join(wt, ".env"), "utf8")).toBe("TOKEN=dummy\n")
+    expect(existsSync(join(wt, ".env.local"))).toBe(false)
+    expect(result.json.provisioned).toEqual([".env"])
+  })
+
+  test("#given the checkout ignores .env only through an uncommitted rule #when provisioning #then .env is refused because the worktree would not ignore it", () => {
+    const repo = fixtureRepo({ ".env": "TOKEN=dummy\n", ".worktreeinclude": ".env\n" })
+    writeFileSync(join(repo, ".gitignore"), ".omo/\n")
+    git(repo, "commit", "-qam", "stop ignoring .env in history")
+    writeFileSync(join(repo, ".gitignore"), ".omo/\n.env\n")
+    const wt = join(repo, "..", "wt-h")
+
+    const result = run(repo, "add", "--path", wt, "--branch", "ulw/h")
+
+    expect(result.json.refused).toEqual([".env"])
+    expect(existsSync(join(wt, ".env"))).toBe(false)
+    git(wt, "add", "-A")
+    expect(git(wt, "status", "--porcelain")).toBe("")
+  })
+
+  test("#given the base tracks a dangling symlink at a listed path #when provisioning #then the secret is never written through it", () => {
+    const outside = realpathSync(mkdtempSync(join(tmpdir(), "ulw-outside-")))
+    onTestFinished(() => rmSync(outside, { recursive: true, force: true }))
+    const repo = fixtureRepo({ ".worktreeinclude": ".env.local\n" })
+    git(repo, "checkout", "-q", "-b", "evilbase")
+    symlinkSync(join(outside, "stolen"), join(repo, ".env.local"))
+    git(repo, "add", "-f", ".env.local")
+    git(repo, "commit", "-qm", "track a dangling symlink")
+    git(repo, "checkout", "-q", "main")
+    writeFileSync(join(repo, ".env.local"), "SECRET=1\n")
+    const wt = join(repo, "..", "wt-i")
+
+    const result = run(repo, "add", "--path", wt, "--branch", "ulw/i", "--base", "evilbase")
+
+    expect(existsSync(join(outside, "stolen"))).toBe(false)
+    expect(result.json.provisioned).toEqual([])
+    expect([...result.json.skipped, ...result.json.refused]).toEqual([".env.local"])
+  })
+
   test("#given an empty .worktreeinclude #when a worktree is added #then nothing is copied", () => {
     const repo = fixtureRepo({ ".env": "TOKEN=dummy\n", ".worktreeinclude": "" })
     const wt = join(repo, "..", "wt-c")
@@ -137,7 +184,7 @@ describe("ulw-execute worktrees helper", () => {
   })
 
   test("#given a file already in the worktree #when provisioning again #then it is never overwritten", () => {
-    const repo = fixtureRepo({ ".env": "TOKEN=main\n" })
+    const repo = fixtureRepo({ ".env": "TOKEN=main\n", ".worktreeinclude": ".env\n" })
     const wt = join(repo, "..", "wt-d")
     run(repo, "add", "--path", wt, "--branch", "ulw/d")
     writeFileSync(join(wt, ".env"), "TOKEN=edited\n")
@@ -149,7 +196,7 @@ describe("ulw-execute worktrees helper", () => {
   })
 
   test("#given worktrees the run created and one it did not #when torn down after the merge #then only the recorded ones go, an unmerged branch is kept", () => {
-    const repo = fixtureRepo({ ".env": "TOKEN=dummy\n" })
+    const repo = fixtureRepo({ ".env": "TOKEN=dummy\n", ".worktreeinclude": ".env\n" })
     const merged = join(repo, "..", "wt-merged")
     const unmerged = join(repo, "..", "wt-unmerged")
     const foreign = join(repo, "..", "wt-foreign")
