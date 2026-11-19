@@ -955,7 +955,7 @@ describe("omo remote session verbs", () => {
     expect([code, out, port.calls]).toEqual([
       REMOTE_EXIT.ok,
       ["Steered turn 3 on b/dur-on-b."],
-      ["status", "devices", "sessions:b", "sessions", "command:get_state", "command:prompt"],
+      ["status", "devices", "sessions:b", "command:get_state", "command:prompt"],
     ])
   })
 
@@ -990,28 +990,23 @@ describe("omo remote session verbs", () => {
 
   // A verb costs one relay status read (the address module's), ONE filtered listing of the device it names (sessions:b)
   // and its remote op's round trips, never the device-less account listing whose round waits for the account's slowest
-  // device (#12709: ~10 s live). The trailing unfiltered "sessions" is the address module's "/"-in-a-name reading of a
-  // name-shaped thread part, due to go (#14305).
+  // device (#12709: ~10 s live; #14305).
   test.each([
     [
       ["model", "b/dur-on-b", "anthropic/claude-opus"],
       "b/dur-on-b now uses anthropic/claude-opus.",
-      ["status", "devices", "sessions:b", "sessions", "command:get_available_models", "command:set_model"],
+      ["status", "devices", "sessions:b", "command:get_available_models", "command:set_model"],
     ],
     [
       ["interrupt", "b/dur-on-b"],
       "Nothing was running on b/dur-on-b.",
-      ["status", "devices", "sessions:b", "sessions", "command:interrupt"],
+      ["status", "devices", "sessions:b", "command:interrupt"],
     ],
-    [
-      ["close", "b/dur-on-b"],
-      "Closed b/dur-on-b.",
-      ["status", "devices", "sessions:b", "sessions", "command:unload_session"],
-    ],
+    [["close", "b/dur-on-b"], "Closed b/dur-on-b.", ["status", "devices", "sessions:b", "command:unload_session"]],
     [
       ["send", "b/dur-on-b", "hi", "--no-wait"],
       "Sent to b/dur-on-b: turn turn-b started.",
-      ["status", "devices", "sessions:b", "sessions", "command:prompt"],
+      ["status", "devices", "sessions:b", "command:prompt"],
     ],
     [["open", "b"], "b/dur-new-on-b", ["status", "devices", "endpoint:open_session", "locate"]],
   ])("%p makes only its remote op's calls and reports the answer", async (args, line, calls) => {
