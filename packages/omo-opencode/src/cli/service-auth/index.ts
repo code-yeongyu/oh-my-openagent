@@ -1,5 +1,5 @@
 export { accountHome, credentialLockPaths, withCredentialLock } from "./credential-lock"
-export { type LiveDevice, listLiveDevices } from "./devices"
+export { type LiveDevice, listLiveDevices, renameDevice } from "./devices"
 export { currentServiceDevice } from "./protocol"
 export {
   CredentialIdentityChanged,

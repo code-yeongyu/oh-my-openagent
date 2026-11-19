@@ -67,6 +67,16 @@ export async function setUpRemoteAfterLogin(): Promise<void> {
   await runLoginSetup(dependencies, dependencies.bootstrap, dependencies, backgroundRemote(omoBinaryPath()))
 }
 
+/**
+ * The same setup for `omo account sign-in`, whose stdout carries JSON lines only: the setup's human lines go to stderr
+ * and its outcome is returned for the `signed_in` event.
+ */
+export async function setUpRemoteAfterSignIn(): Promise<"on" | "kept_off" | "not_on" | "background"> {
+  if ((globalThis as Record<symbol, unknown>)[testSkipKey] === true) return "not_on"
+  const dependencies = { ...remoteDependencies(), output: (line: string) => process.stderr.write(`${line}\n`) }
+  return runLoginSetup(dependencies, dependencies.bootstrap, dependencies, backgroundRemote(omoBinaryPath()))
+}
+
 /** `packageRoot`: the compiled binary's provisioned runtime directory (its staged `plugin/`); the npm launcher passes nothing. */
 export async function runRemoteCommand(args: readonly string[], packageRoot?: string): Promise<void> {
   process.exitCode = await runRemoteVerb(remoteDependencies(packageRoot), args.slice(1))
