@@ -757,6 +757,8 @@ export function createRemoteThreadFixture() {
       engine?: Engine
       caller?: string
       diskSessions?: readonly string[]
+      /** #14274: the name a disk session's thread had (by durable id); absent ids have none. */
+      diskNames?: Readonly<Record<string, string>>
       closeOutcome?: ThreadCloseOutcome
       /** How this device's engine takes `set_session_archived`: `absent` = a host port without it, `refused` = an older engine. */
       archive?: "absent" | "refused"
@@ -897,7 +899,7 @@ export function createRemoteThreadFixture() {
     // Session files with no live owner: the address book lists them from disk, and no host holds them.
     const disk = (extra.diskSessions ?? []).map((id) => ({
       durable_id: id,
-      name: null,
+      name: extra.diskNames?.[id] ?? null,
       cwd: process.cwd(),
       created_at: "2026-11-01T00:00:00Z",
       updated_at: null,

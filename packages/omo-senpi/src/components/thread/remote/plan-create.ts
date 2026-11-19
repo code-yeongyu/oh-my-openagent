@@ -138,7 +138,8 @@ async function targetDevice(
 /** What this device answers for an existing thread named to thread_create: it is live here, or its session file is here, or neither. */
 export type LocalExisting =
   | { readonly kind: "live"; readonly thread: HostedThread }
-  | { readonly kind: "file"; readonly sessionPath: string }
+  /** `name`: the name the thread had, so a reopen keeps it (#14274). */
+  | { readonly kind: "file"; readonly sessionPath: string; readonly name?: string }
   | { readonly kind: "error"; readonly result: ThreadToolResult }
 
 /** This device's side of placement: its name ladder, what it knows of an existing thread, and its SessionHost. */
@@ -179,6 +180,8 @@ export type CreatePlan =
       readonly host: SessionHost
       readonly request: OpenFields
       readonly creates: boolean
+      /** #14274: the name the existing thread had; the reopen sets it again unless a name was given. */
+      readonly previousName?: string
       readonly localAlias?: LocalAliasReason
     }
   | { readonly kind: "done"; readonly result: ThreadToolResult; readonly device?: string }
@@ -219,7 +222,14 @@ export async function planCreate(
   const openHere = (address: string): CreatePlan => {
     const existing = local.existing(address)
     if (existing.kind === "error") return { kind: "done", result: existing.result }
-    return existing.kind === "live" ? alreadyLive(existing.thread) : here({ sessionPath: existing.sessionPath }, false)
+    if (existing.kind === "live") return alreadyLive(existing.thread)
+    return {
+      kind: "open",
+      host: local.host,
+      request: { sessionPath: existing.sessionPath },
+      creates: false,
+      ...(existing.name === undefined ? {} : { previousName: existing.name }),
+    }
   }
   if (value.thread !== undefined && value.device !== undefined)
     return {
@@ -335,6 +345,7 @@ export async function planCreate(
       host: createRelaySessionHost(remote, target.row.device, target.row),
       request: { sessionPath: file.path },
       creates: false,
+      ...(target.row.title === "" ? {} : { previousName: target.row.title }),
     }
   }
   if (value.fork_from !== undefined) {

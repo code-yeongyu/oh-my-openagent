@@ -140,11 +140,16 @@ export async function createThread(
       plan.creates && plan.host.device === undefined ? createdThreadId(callerId, operationId) : undefined
     const earlier = createdId === undefined ? undefined : existingHere(options, current, createdId, callerId)
     // The thread an earlier run made may already carry this name: it is this create's own thread, not a conflict.
-    if (name !== undefined && earlier?.kind !== "live" && earlier?.kind !== "file") {
+    // A reopen checks its name after the open, against every thread but itself (keepName): its own name is no conflict.
+    if (plan.creates && name !== undefined && earlier?.kind !== "live" && earlier?.kind !== "file") {
       const conflict = checkNameConflict(await plan.host.visible(), name)
       if (conflict.kind === "error") return { kind: "error", error: conflict } as ThreadToolResult
     }
     const preset = plan.creates ? launch.permissionPreset : undefined
+    // #14274: a reopen keeps the thread's name, or takes the one given. Another device's host sets it on the session it
+    // locates (relay-session-host); this device's engine resumes a file without it, so keepName sets it after the open.
+    const kept = plan.creates ? undefined : (name ?? plan.previousName)
+    const openName = plan.creates ? name : plan.host.device === undefined ? undefined : kept
     const reopened = async (): Promise<SessionOpenOutcome | undefined> => {
       if (createdId === undefined) return undefined
       const found = existingHere(options, await view(), createdId, callerId)
@@ -158,7 +163,7 @@ export async function createThread(
       try {
         outcome = await plan.host.open({
           ...plan.request,
-          ...(plan.creates && name !== undefined ? { name } : {}),
+          ...(openName === undefined ? {} : { name: openName }),
           ...(plan.creates && loaded !== undefined ? { initialSkills: loaded } : {}),
           ...(preset === undefined ? {} : { permissionPreset: preset }),
           ...(plan.creates ? launch.profile : {}),
@@ -176,7 +181,11 @@ export async function createThread(
       ...(plan.creates && loaded !== undefined ? { requested_skills: loaded } : {}),
       ...workspaceNote(outcome.thread, callerCwd),
     }
-    const recorded = plan.creates ? await recordThreadCreator(options, current, callerId, created) : created
+    const recorded = plan.creates
+      ? await recordThreadCreator(options, current, callerId, created)
+      : plan.host.device === undefined
+        ? await keepName(options, created, kept, outcome.thread, await plan.host.visible(), callerId, view)
+        : created
     if (plan.localAlias !== undefined)
       return recorded.kind === "ok"
         ? ({ ...recorded, alias_scope: "local", alias_unavailable: plan.localAlias } as ThreadToolResult)
@@ -263,6 +272,35 @@ async function firstPrompt(
 }
 
 /**
+ * #14274: a reopened thread keeps its name. The engine resumes a session file without the name its listing showed (the
+ * listing then falls back to the folder's name), so the name given at reopen, else the one the thread had, is set again
+ * through thread_rename's path. A name that cannot be set is a warning on the reopened thread, never an error: it runs.
+ */
+async function keepName(
+  options: ThreadToolSurfaceOptions,
+  created: ThreadToolResult,
+  wanted: string | undefined,
+  thread: HostedThread,
+  visible: readonly ThreadSummary[],
+  callerId: string,
+  view: () => Promise<ThreadHostView>,
+): Promise<ThreadToolResult> {
+  const name = wanted?.trim()
+  // Set even when the reply already shows it: the reply can echo the listing's name while the engine holds none.
+  if (name === undefined || name === "" || created.kind !== "ok") return created
+  const refusal = await nameCreatedThread(options, thread.thread_id, name, visible, callerId, view)
+  if (refusal === undefined) return { ...created, name, link: threadLink(thread.thread_id, name) } as ThreadToolResult
+  const warning = threadToolFailure(
+    refusal.code,
+    "The thread was reopened, but its name was not set on it.",
+    "Name it with thread_rename (tool.thread_rename({ thread, name }) in an eval cell).",
+    { reason: "name_not_applied", name, ...(refusal.reason === undefined ? {} : { cause: refusal.reason }) },
+  )
+  const earlier = "warnings" in created && Array.isArray(created.warnings) ? created.warnings : []
+  return { ...created, warnings: [...earlier, warning] } as ThreadToolResult
+}
+
+/**
  * Names a thread the create already made, through the same path thread_rename takes (the create's name check against the
  * device's threads, then the located control's setName). Answers the refusing code instead of failing, because the
  * thread exists either way: a rename that fails with no typed refusal answers `host_unavailable` with the error's message
@@ -325,5 +363,8 @@ function existingHere(
         "Call thread_list (tool.thread_list() in an eval cell) and pick a thread it lists.",
       ),
     }
-  return { kind: "file", sessionPath: entry.session_path }
+  const name = entry.name?.trim()
+  return name === undefined || name === ""
+    ? { kind: "file", sessionPath: entry.session_path }
+    : { kind: "file", sessionPath: entry.session_path, name }
 }
