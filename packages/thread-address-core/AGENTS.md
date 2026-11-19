@@ -17,6 +17,6 @@ The thread and device address rules every omo surface shares (#14305): the addre
 | `device.ts` | `resolveDevice`: exact id > `here` > name (online twins count) > unique 6+ id prefix; `DeviceRef` |
 | `listing.ts` | `deviceListing`: `listed / incomplete / offline` from one round and the roster |
 | `row.ts` | `rowKey`, `rowAddress`, `rowName` (only a real name is an address; a fallback is `unnamed`), `mergeRows` |
-| `refusals.ts` | refusal codes, the plain refusal union and its builders, the device and thread candidate shapes, `deviceLabel` (`name (id)`) |
+| `refusals.ts` | refusal codes, the plain refusal union and its builders, the device candidate shape, `deviceLabel` (`name (id)`) |
 
 The stateful half (account reads, `resolveAddress`) lives in `packages/omo-senpi/src/components/thread/address/`.

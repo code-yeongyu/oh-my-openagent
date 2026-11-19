@@ -31,5 +31,4 @@ export {
   type DeviceCandidate,
   type DeviceRow,
   type RefusalCode,
-  type ThreadCandidate,
 } from "./refusals"

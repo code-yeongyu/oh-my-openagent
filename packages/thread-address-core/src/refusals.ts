@@ -11,18 +11,6 @@ export type RefusalCode =
 /** A device as a refusal lists it. */
 export type DeviceCandidate = { readonly device: string; readonly name: string; readonly online: boolean }
 
-/** The one thread candidate shape: `address` resolves as written; `device` is the id, `device_name` its name. */
-export type ThreadCandidate = {
-  readonly thread: string
-  readonly address: string
-  readonly name: string
-  readonly cwd: string
-  readonly state: string
-  readonly updatedAt: string | null
-  readonly device?: string
-  readonly device_name?: string
-}
-
 /** A device row as the roster names it. */
 export type DeviceRow = {
   readonly id: string
