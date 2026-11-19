@@ -144,18 +144,38 @@ function oneDeviceListing(remote: RemoteThreadSurface): RemoteThreadSurface {
   return { ...remote, client: { ...remote.client, devices } }
 }
 
+type Named = <T extends object>(result: T) => T
+
+const isEntry = (value: unknown): value is Readonly<Record<string, unknown>> =>
+  typeof value === "object" && value !== null
+
+/**
+ * A listing key the person typed names the session at the fields that name it - `thread`, `link` and a refusal's
+ * `details.thread` - as before the address module. Nothing else in the answer changes: a reply's text keeps every id.
+ */
+function namedBy<T extends object>(result: T, key: string, title: string): T {
+  const error = "error" in result ? result.error : undefined
+  const details = isEntry(error) ? error["details"] : undefined
+  return {
+    ...result,
+    ...("thread" in result ? { thread: key } : {}),
+    ...("link" in result ? { link: threadLink(key, title) } : {}),
+    ...(isEntry(error) && isEntry(details) && "thread" in details
+      ? { error: { ...error, details: { ...details, thread: key } } }
+      : {}),
+  }
+}
+
 async function runSessionOn(
   remote: RemoteThreadSurface,
   args: SessionArgs,
   json: boolean,
   dependencies: RemoteCommandDependencies,
 ): Promise<number> {
-  // Every --json line goes through `output`, so a listing key the person typed can name the session in all of them.
-  let output = dependencies.output
   const show: Show = (result, label) => {
     // A next action naming the agents' eval-only thread_list reads the CLI verb in --json too: scripts run the CLI.
     if (json)
-      output(
+      dependencies.output(
         JSON.stringify(
           result.kind === "error"
             ? { ...result, error: { ...result.error, next_action: personNextAction(result.error.next_action) } }
@@ -193,20 +213,19 @@ async function runSessionOn(
   // A listing key the person typed names the session in every --json answer (the ended one and the link included), as
   // before the address module; the row itself keeps its durable id.
   const typedKey = args.target === row.session_id || args.target.endsWith(`/${row.session_id}`)
-  const durable = row.durable_id
-  if (json && typedKey && durable !== undefined && durable !== "" && durable !== row.session_id)
-    output = (line) => dependencies.output(line.replaceAll(durable, row.session_id))
+  const named: Named = typedKey ? (result) => namedBy(result, row.session_id, row.title) : (result) => result
+  const answer: Show = (result, label) => show(named(result), label)
   // The output names the session by its address, whatever the person typed for it.
   const label = resolved.address
-  if (args.verb === "send") return sendTo(remote, row, args, { label, json, show }, { ...dependencies, output })
+  if (args.verb === "send") return sendTo(remote, row, args, { label, json, show: answer, named }, dependencies)
   const control = createRelayControl(remote, row)
   switch (args.verb) {
     case "model":
-      return show(await answered(() => setModelOn(control, args.model, undefined)), label)
+      return answer(await answered(() => setModelOn(control, args.model, undefined)), label)
     case "interrupt":
-      return show(await answered(() => interruptThread(control, undefined)), label)
+      return answer(await answered(() => interruptThread(control, undefined)), label)
     case "close":
-      return show(cliClose(await answered(() => closeThread(control, args.force)), label), label)
+      return answer(cliClose(await answered(() => closeThread(control, args.force)), label), label)
   }
 }
 
@@ -358,7 +377,12 @@ async function sendTo(
   remote: RemoteThreadSurface,
   row: RemoteSessionRow,
   args: Extract<SessionArgs, { readonly verb: "send" }>,
-  { label, json, show }: { readonly label: string; readonly json: boolean; readonly show: Show },
+  {
+    label,
+    json,
+    show,
+    named,
+  }: { readonly label: string; readonly json: boolean; readonly show: Show; readonly named: Named },
   dependencies: RemoteCommandDependencies,
 ): Promise<number> {
   const delivery = personDelivery(remote, dependencies)
@@ -416,17 +440,19 @@ async function sendTo(
     const queuedNoticeField = waitNotice === null ? {} : { queued_notice: waitNotice }
     if (!json && reply.length > 0 && !reply.endsWith("\n")) dependencies.write("\n")
     // --json: the send's typed result, with the answer it streamed.
-    if (json && end === "settled") dependencies.output(JSON.stringify({ ...sent, reply, ...queuedNoticeField }))
+    if (json && end === "settled") dependencies.output(JSON.stringify(named({ ...sent, reply, ...queuedNoticeField })))
     if (end === "__omo_send_timeout__") {
       if (json)
         dependencies.output(
-          JSON.stringify({
-            ...sent,
-            kind: "timeout",
-            waited_ms: waitMs,
-            ...queuedNoticeField,
-            next_action: "The message was delivered; read the thread to see its answer when the turn settles.",
-          }),
+          JSON.stringify(
+            named({
+              ...sent,
+              kind: "timeout",
+              waited_ms: waitMs,
+              ...queuedNoticeField,
+              next_action: "The message was delivered; read the thread to see its answer when the turn settles.",
+            }),
+          ),
         )
       else
         dependencies.error(
@@ -439,7 +465,8 @@ async function sendTo(
       return REMOTE_EXIT.failed
     }
     if (end !== "settled") {
-      if (json) dependencies.output(JSON.stringify({ ...sent, kind: "session_ended", end, ...queuedNoticeField }))
+      if (json)
+        dependencies.output(JSON.stringify(named({ ...sent, kind: "session_ended", end, ...queuedNoticeField })))
       else dependencies.error(`omo remote: the session on ${row.device} ended before its turn settled (${end}).`)
       return REMOTE_EXIT.failed
     }
