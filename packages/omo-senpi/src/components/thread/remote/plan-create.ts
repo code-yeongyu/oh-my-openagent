@@ -4,7 +4,6 @@ import type { HostedThread, SessionHost, SessionOpenRequest } from "../control/s
 import { threadToolFailure } from "../errors"
 import { openedResult } from "../tools/thread-row"
 import {
-  rowThreadId,
   rowStatus,
   type AliasError,
   type AliasHolder,
@@ -248,7 +247,9 @@ export async function planCreate(
       request: { sessionPath: file.path },
       creates: false,
       ...(target.row.title === "" ? {} : { previousName: target.row.title }),
-      ...(rowThreadId(target.row) === "" ? {} : { reopenedId: rowThreadId(target.row) }),
+      ...(target.row.durable_id === undefined || target.row.durable_id === ""
+        ? {}
+        : { reopenedId: target.row.durable_id }),
     }
   }
   if (value.fork_from !== undefined) {

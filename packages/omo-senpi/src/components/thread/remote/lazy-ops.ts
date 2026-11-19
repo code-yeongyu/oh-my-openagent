@@ -2,7 +2,6 @@ import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import type { RpcRemoteSource, SenpiExtensionAPI } from "../../../extension/types"
 import type * as CrossDevice from "./cross-device"
 import type * as MonitorSource from "./monitor-source"
-import { rowThreadId } from "./ports"
 import type * as RelayTransport from "./relay-transport"
 import type * as RelayControl from "../control/relay-control"
 import type { SessionControl } from "../control/port"
@@ -60,7 +59,7 @@ export const createRelayTransport = (
 export const createRelayControl = (remote: RemoteThreadSurface, row: RemoteSessionRow): SessionControl => {
   const built = runtime().then((loaded) => loaded.createRelayControl(remote, row))
   return {
-    thread_id: rowThreadId(row),
+    thread_id: row.durable_id ?? "",
     device: row.device,
     // #13304: printed by thread_read; another device's own text.
     title: escapeForDisplay(row.title),

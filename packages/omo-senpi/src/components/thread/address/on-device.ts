@@ -8,7 +8,7 @@ import {
   type DeviceRef,
 } from "@oh-my-opencode/thread-address-core"
 import { namedDeviceRow, relayAddressEntry } from "../remote/address-book"
-import { rowThreadId, type RemoteThreadSurface } from "../remote/ports"
+import type { RemoteThreadSurface } from "../remote/ports"
 import { holderTarget } from "./holder"
 import type { Account, Ready } from "./account"
 import { deviceNameOf, listedEntry } from "./bare"
@@ -58,7 +58,7 @@ export async function resolveOnDevice(
   const listed = rows.find((row) =>
     sameSession(
       { device: device.id, thread, key: thread },
-      { device: row.device, thread: rowThreadId(row), key: row.session_id },
+      { device: row.device, thread: row.durable_id ?? "", key: row.session_id },
     ),
   )
   if (listed !== undefined)

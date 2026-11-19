@@ -1,6 +1,6 @@
 import { accountState, asFailure, resolveAddress, type Resolved } from "../thread/address"
 import { threadToolFailure, type ThreadToolFailure } from "../thread/errors"
-import { rowThreadId, type RemoteThreadSurface } from "../thread/remote/ports"
+import type { RemoteThreadSurface } from "../thread/remote/ports"
 import { parseAddress } from "@oh-my-opencode/thread-address-core"
 import { UNKNOWN_CALLER } from "../thread/tools/ports"
 
@@ -93,7 +93,7 @@ async function copyHere(read: RemoteThreadSurface, thread: string): Promise<stri
       : read.sessions.listing().then((round) => round.rows),
   ])
   const here = "kind" in state ? null : state.here
-  return here !== null && rows.some((row) => row.device === here && rowThreadId(row) === thread) ? here : undefined
+  return here !== null && rows.some((row) => row.device === here && row.durable_id === thread) ? here : undefined
 }
 
 /** A resolved address on another device: the only kind an `omo remote` verb acts on. */
