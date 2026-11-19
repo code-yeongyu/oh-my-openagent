@@ -228,6 +228,13 @@ describe("thread_create reopens a thread whose process exited (#14049)", () => {
       expect(a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")).toEqual([])
     })
 
+  test("#given only the session file of an exited thread and no account #when thread_create opens it as here/<id> #then it is opened from that file (review L3 of #14328)", async () => {
+    const { run, openSession, agentDir } = surface(undefined, { sessionsDirectory: true })
+    const file = sessionFile(agentDir, exited)
+    expect(await run("thread_create", { thread: `here/${exited}` })).toMatchObject({ kind: "ok", thread: exited })
+    expect(localOpenFrames(openSession)).toEqual([{ sessionPath: file }])
+  })
+
   test("#given an id no device holds #when thread_create opens it #then a typed not_found and nothing is opened", async () => {
     const a = account()
     const { run, openSession } = surface(a.remote, { sessionsDirectory: true })

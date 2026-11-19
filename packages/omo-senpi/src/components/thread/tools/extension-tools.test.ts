@@ -431,8 +431,9 @@ test("#given a store at the previous schema version with data #when it opens #th
   const agentDir = tempDir("extension-tools-migrate-")
   const path = gatewayDatabasePath(agentDir)
   // Back to the store before v10 (toolkit_replay_receipts), v11 (deliveries.wait_kind), v12 (the intake columns), v13
-  // (woken_sessions) and v14 (the wake state tables; v13 and v14 are idempotent so their tables can stay): all re-run.
-  const previous = GATEWAY_MIGRATIONS.length - 5
+  // (woken_sessions), v14 (the wake state tables; v13 and v14 are idempotent so their tables can stay) and v15 (the
+  // deliveries rebuild): all re-run. Pinned, not counted from the end, because later migrations append.
+  const previous = 9
   {
     const seed = storeAt(agentDir)
     await seed.identity()

@@ -7,7 +7,6 @@ import {
 } from "../device-service-core/src/account-state.ts"
 import {
   connectDeviceService,
-  type DeviceRow,
   type DeviceService,
   deviceServiceEndpointPath,
   deviceServiceStateDir,
@@ -15,7 +14,6 @@ import {
   SESSION_ROW_STATES,
   type SessionFilter,
   type SessionRowState,
-  type Status,
 } from "../device-service-core/src/device-service.ts"
 import {
   exitCodeOf,
@@ -29,7 +27,15 @@ import { readAccountInProcess } from "./account-show"
 import type { LocalStatus } from "./remote-cold-wake"
 import packageJson from "./package.json" with { type: "json" }
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
-import { controlLines, deviceLines, localRows, sessionLines, statusLines, wakeLines } from "./remote-render"
+import {
+  candidateLines,
+  controlLines,
+  deviceLines,
+  localRows,
+  sessionLines,
+  statusLines,
+  wakeLines,
+} from "./remote-render"
 import { isSessionVerb, parseSession, type SessionArgs } from "./remote-session-args"
 import { runSession } from "./remote-session-verbs"
 import { AFTER_LOGIN_FLAG } from "./remote-verbs"
@@ -222,6 +228,7 @@ async function runRead(client: RemoteClient, parsed: Parsed, dependencies: Remot
     case "sessions": {
       const listed = await client.sessions.list(parsed.filter)
       // A typo in --device and a device with no sessions both used to list nothing: the client names the unknown device.
+      // An ambiguous one is a typed failure like any other: renderFailure prints its candidates (#14305).
       if (listed.kind === "error" && listed.code === "not_found" && listed.details?.["kind"] === "device") {
         dependencies.error(
           `omo remote sessions: no device ${parsed.filter.device} on this account (see omo remote devices)`,
@@ -296,6 +303,7 @@ function renderFailure(dependencies: RemoteCommandDependencies, failure: RemoteF
   }
   dependencies.error(`omo remote: ${failure.message}`)
   dependencies.error(withVerbs(failure.next_action))
+  for (const line of candidateLines(failure.details)) dependencies.error(line)
   return exitCodeOf(failure)
 }
 
