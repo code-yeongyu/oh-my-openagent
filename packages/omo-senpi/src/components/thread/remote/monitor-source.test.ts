@@ -111,6 +111,15 @@ describe("monitor rpc remote targets (#12719): omo's RpcRemoteSource", () => {
     },
   )
 
+  test("#given a persistent monitor stored as <this device's id>/<thread id> before the tool hook armed targets #when it is restored #then it watches that session on this device, as before (review L1 of #14406)", async () => {
+    const a = account()
+    const opened = await registered(a.remote).open({ device: "here", session: "dur-local" }, {}, capture().handlers)
+    opened.stop()
+    expect(a.sent.filter((entry) => entry.via === "watch").map((entry) => [entry.device, entry.session])).toEqual([
+      ["here", "dur-local"],
+    ])
+  })
+
   test("#given device b by its name #when the monitor opens <device name>/* #then it follows b's listing rows", async () => {
     const opened = await registered(account().remote).open({ device: "studio", session: "*" }, {}, capture().handlers)
     opened.stop()
