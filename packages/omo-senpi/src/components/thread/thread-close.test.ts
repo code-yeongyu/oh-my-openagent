@@ -1,11 +1,27 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { createRemoteThreadFixture } from "./thread-remote-fixture"
+import { B_ROW, B_UNLOADED_MS, createRemoteThreadFixture } from "./thread-remote-fixture"
 import type { ThreadHostSession } from "./tools"
 
 const { account, surface, cleanup } = createRemoteThreadFixture()
 afterEach(cleanup)
 
-const UNLOAD = { type: "unload_session", sessionId: "rk-on-b", force: true, children: "detach", deliveries: "refuse" }
+// Every unload carries an effectId (#14273): senpi records the unload in the holder's transcript only then, which is how
+// the holder's wake sweep knows the session was closed on request.
+const UNLOAD = {
+  type: "unload_session",
+  sessionId: "rk-on-b",
+  effectId: expect.any(String),
+  force: true,
+  children: "detach",
+  deliveries: "refuse",
+}
+
+const listedAlive = async (
+  run: (tool: "thread_list", input: { readonly all_scope: true }) => Promise<unknown>,
+): Promise<unknown> => {
+  const listed = (await run("thread_list", { all_scope: true })) as { readonly threads?: readonly object[] }
+  return (listed.threads ?? []).find((row) => (row as { readonly thread?: unknown }).thread === "dur-on-b")
+}
 
 describe("thread_close: close a thread on this device or on another one", () => {
   test("#given a live thread on this device #when thread_close names it and is retried #then its host closes it once and the retry replays the answer", async () => {
@@ -63,6 +79,29 @@ describe("thread_close: close a thread on this device or on another one", () => 
     expect(a.live.has("rk-on-b")).toBe(false)
     expect(a.sent.map((entry) => [entry.via, entry.device, entry.rpc])).toEqual([["session", "b", UNLOAD]])
     expect(closed).toEqual([])
+  })
+
+  test("#given b's listing still serves a closed thread as running, its activity no newer than b's record of the close #when thread_list runs #then the thread is listed ended until activity newer than the close shows (#14273)", async () => {
+    const rows = [{ ...B_ROW }]
+    const a = account({ rows })
+    const { run } = surface(a.remote)
+    expect(await run("thread_close", { thread: "dur-on-b" })).toMatchObject({ kind: "ok", closed: true })
+    // The close itself is activity on b: a lagging listing can carry it while still naming the session running.
+    rows[0] = { ...B_ROW, updated_ms: B_UNLOADED_MS }
+    expect(await listedAlive(run)).toMatchObject({ status: "resumable" })
+    rows[0] = { ...B_ROW, updated_ms: B_UNLOADED_MS + 1 }
+    expect(await listedAlive(run)).toMatchObject({ status: "live" })
+  })
+
+  test("#given b's listing names a thread running that b's engine no longer holds #when a control finds it gone #then thread_list lists it ended while the listing lags (#14273)", async () => {
+    const a = account({ live: [] })
+    const { run } = surface(a.remote)
+    expect(await listedAlive(run)).toMatchObject({ status: "live" })
+    expect(await run("thread_interrupt", { thread: "dur-on-b" })).toMatchObject({
+      kind: "error",
+      error: { code: "not_resumable" },
+    })
+    expect(await listedAlive(run)).toMatchObject({ status: "resumable" })
   })
 
   test("#given a thread on device b with no session file yet #when thread_close names it #then b closes it through the attached close_session", async () => {
@@ -150,6 +189,42 @@ describe("thread_close: close a thread on this device or on another one", () => 
     })
     expect(closed).toEqual([])
   })
+
+  test("#given a thread held by an interactive terminal #when thread_close names it gracefully #then the terminal's endpoint is asked for a graceful close and the thread closes", async () => {
+    const terminal: ThreadHostSession = {
+      sessionId: "route-tui",
+      durableSessionId: "dur-tui",
+      cwd: process.cwd(),
+      name: "terminal",
+      status: "open",
+      endpoint_kind: "tui",
+    }
+    const { run, closed, closeRequests } = surface(undefined, { sessions: [terminal] })
+    expect(await run("thread_close", { thread: "dur-tui", graceful: true, wait_ms: 5000 })).toEqual({
+      kind: "ok",
+      thread: "dur-tui",
+      closed: true,
+      reason: "closed",
+      dropped_deliveries: [],
+    })
+    expect(closed).toEqual([["route-tui", "dur-tui"]])
+    expect(closeRequests).toEqual([{ graceful: true, wait_ms: 5000 }])
+  })
+
+  test.each([
+    ["graceful and force together", { graceful: true, force: true }],
+    ["wait_ms without graceful", { wait_ms: 5000 }],
+  ])(
+    "#given %s #when thread_close is called #then it is refused invalid_arguments and nothing is closed",
+    async (_, args) => {
+      const { run, closed } = surface(undefined)
+      expect(await run("thread_close", { thread: "dur-local", ...args })).toMatchObject({
+        kind: "error",
+        error: { code: "invalid_arguments" },
+      })
+      expect(closed).toEqual([])
+    },
+  )
 
   test("#given b's engine refuses the unload with a reason the ladder does not know #when thread_close names b's thread #then it is typed unsupported naming the reason and b, and nothing else is sent", async () => {
     const a = account({ unloadReason: "attached" })

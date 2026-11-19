@@ -28,12 +28,13 @@ export function createLocalControl(
     visible: async () => visible(),
     interrupt: (turnId) => interruptOver((request) => port.interrupt(routing, request, threadId), turnId),
     close: async (closeOptions) => {
-      if (session.endpoint_kind === "tui")
+      // A terminal closes its own session only gracefully, and then exits by itself (omo#14313).
+      if (session.endpoint_kind === "tui" && closeOptions?.graceful !== true)
         throw refuse(
           "unsupported",
-          `Thread ${threadId} belongs to an interactive terminal, which closes it when the terminal exits.`,
-          "Close that terminal, or use thread_interrupt (tool.thread_interrupt() in an eval cell) to stop its turn.",
-          { command: "close_session" },
+          `Thread ${threadId} belongs to an interactive terminal, which closes only gracefully.`,
+          "Close it with graceful: true (the terminal exits once its turn ends), or use thread_interrupt (tool.thread_interrupt() in an eval cell) to stop its turn.",
+          { command: "close_session", retry_with: { graceful: true } },
         )
       if (port.closeSession === undefined)
         throw refuse(

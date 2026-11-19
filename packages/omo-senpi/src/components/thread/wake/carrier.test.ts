@@ -20,7 +20,7 @@ import {
   type FakeEngineHost,
   type FakeEngineOptions,
 } from "./testing/fake-engine-host"
-import { writeSessionFile } from "./testing/fake-wake-host"
+import { recordUnloadEffect, writeSessionFile } from "./testing/fake-wake-host"
 
 // The carrier (#13037 A3.1.3 to A3.1.8, A3.2): it lifts a woken session's gate, sends the engine's wake, reads
 // "finished" and hands the session back quietly, and follows the held rule and the 30 minute rule, over a real store
@@ -62,6 +62,8 @@ async function setup(
     readonly admitIntake?: (device: string) => Promise<IntakeAdmission>
     readonly storeWrap?: (store: GatewayStore) => GatewayStore
     readonly schedule?: (run: () => void, ms: number) => () => void
+    readonly memoryHeadroom?: () => number | undefined
+    readonly memoryFloor?: () => number
   } = {},
 ): Promise<Setup> {
   const h = (harness = createGatewayHarness())
@@ -93,6 +95,8 @@ async function setup(
     sameDevice: options.sameDevice ?? (() => true),
     ...(options.remoteWake === undefined ? {} : { remoteWake: options.remoteWake }),
     ...(options.admitIntake === undefined ? {} : { admitIntake: options.admitIntake }),
+    ...(options.memoryHeadroom === undefined ? {} : { memoryHeadroom: options.memoryHeadroom }),
+    ...(options.memoryFloor === undefined ? {} : { memoryFloor: options.memoryFloor }),
     schedule: options.schedule ?? (() => () => undefined),
     onEvent: (event) => {
       events.push(event)
@@ -193,6 +197,28 @@ describe("the carrier lifts, reads finished, and hands back", () => {
     expect(release).not.toHaveProperty("force")
     expect(sent(fake, "detach_connection")).toHaveLength(1)
     expect(await store.woken.list()).toEqual([])
+  })
+
+  test("#given rows queued for a session that was then closed on request #when it is woken #then nothing opens, the rows are refused target_closed, and a send after the close opens it (#14273)", async () => {
+    const { fake, h, store, carrier, path, intakeRow } = await setup({
+      remoteWake: () => true,
+      admitIntake: async () => "admitted",
+    })
+    const file = path("s1")
+    await intakeRow("s1", "d-before")
+    h.clock.now += 60_000
+    recordUnloadEffect(file, "s1", h.clock.now, "done")
+    h.clock.now += 60_000
+
+    expect(await carrier.wake("s1")).toEqual({ kind: "nothing_queued" })
+    expect(sent(fake, "open_session")).toEqual([])
+    expect((await store.list({ target_durable_id: "s1" })).map((row) => [row.state, row.reason])).toEqual([
+      ["refused", "target_closed"],
+      ["refused", "target_closed"],
+    ])
+
+    await intakeRow("s1", "d-after")
+    expect(await carrier.wake("s1")).toMatchObject({ kind: "open" })
   })
 
   test("#given a streaming turn #when the carrier looks #then it sends no release and keeps the row, and releases once the turn settled", async () => {
@@ -840,5 +866,70 @@ describe("the bound on woken turns (A3.5.3)", () => {
     expect(await carrier.wake("s1")).toMatchObject({ kind: "open" })
     await carrier.evaluate("s1")
     expect(await carrier.wake("s1")).toEqual({ kind: "wake_limit_reached" })
+  })
+})
+
+const GIB = 1024 ** 3
+
+describe("the carrier admits wakes on measured host memory, never on a count", () => {
+  test("#given 9 sessions a host restart parked, each with a delivery and a requested wake #when the carrier sweeps with plenty of memory #then all 9 are opened and woken", async () => {
+    const { fake, store, carrier, path } = await setup({ memoryHeadroom: () => 64 * GIB })
+    const ids = Array.from({ length: 9 }, (_, index) => `parked-${index + 1}`)
+    for (const id of ids) await store.woken.request({ durable_id: id, session_file: path(id) })
+
+    await carrier.sweep()
+
+    const rows = await store.woken.list()
+    expect(rows.map((row) => [row.durable_id, row.state]).sort()).toEqual(ids.map((id) => [id, "open"]).sort())
+    expect(sent(fake, "open_session")).toHaveLength(9)
+    expect(sent(fake, "wake")).toHaveLength(9)
+  })
+
+  test("#given host memory headroom below the floor #when a session is woken #then the wake is deferred typed host_memory_pressure with the numbers, nothing opens, the row stays requested, and it opens once the probe reports enough", async () => {
+    let available = 512 * 1024 * 1024
+    const { fake, store, carrier, path } = await setup({ memoryHeadroom: () => available })
+    path("s1")
+
+    expect(await carrier.wake("s1")).toEqual({
+      kind: "host_memory_pressure",
+      available_bytes: 512 * 1024 * 1024,
+      floor_bytes: GIB,
+    })
+    expect(sent(fake, "open_session")).toEqual([])
+    expect(await store.woken.list()).toMatchObject([{ durable_id: "s1", state: "requested" }])
+    expect(await store.sessionWait.waitingOn({ durable_id: "s1" })).toEqual({ kind: "wake" })
+
+    available = 8 * GIB
+    await carrier.sweep()
+    expect(await store.woken.list()).toMatchObject([{ durable_id: "s1", state: "open" }])
+    expect(sent(fake, "open_session")).toHaveLength(1)
+    expect(sent(fake, "wake")).toHaveLength(1)
+  })
+
+  // #14363 review L1: under a cgroup limit at or below 1 GiB the room never reaches a fixed 1 GiB, so no wake ever ran.
+  test("#given a 768 MiB cgroup whose floor is one wake's cost, 409 MiB, and 500 MiB of room #when a session is woken #then it opens and wakes", async () => {
+    const { fake, store, carrier, path } = await setup({
+      memoryHeadroom: () => 500 * 1024 * 1024,
+      memoryFloor: () => 409 * 1024 * 1024,
+    })
+    await store.woken.request({ durable_id: "s1", session_file: path("s1") })
+
+    await carrier.sweep()
+
+    expect(await store.woken.list()).toMatchObject([{ durable_id: "s1", state: "open" }])
+    expect(sent(fake, "wake")).toHaveLength(1)
+  })
+
+  test("#given room below that floor #when a session is woken #then the deferral names the floor it was measured against", async () => {
+    const { carrier, path } = await setup({
+      memoryHeadroom: () => 300 * 1024 * 1024,
+      memoryFloor: () => 409 * 1024 * 1024,
+    })
+    path("s1")
+    expect(await carrier.wake("s1")).toEqual({
+      kind: "host_memory_pressure",
+      available_bytes: 300 * 1024 * 1024,
+      floor_bytes: 409 * 1024 * 1024,
+    })
   })
 })

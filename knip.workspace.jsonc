@@ -36,6 +36,8 @@
         // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
         "@oh-my-opencode/boulder-state",
         "@oh-my-opencode/device-service-core",
+        // a core package the registration audit requires as a root devDependency; omo-senpi imports it
+        "@oh-my-opencode/thread-address-core",
         // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
         "@oh-my-opencode/claude-code-compat-core",
         // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports

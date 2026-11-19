@@ -291,7 +291,16 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         ...(row.model === undefined ? {} : { model: { provider: row.model.provider, id: row.model.id } }),
         ...(row.archived === true ? { archived: true as const } : {}),
       })),
-      incomplete: listed.incomplete,
+      // A device the round did not mark answered (page_cap, timed_out, undelivered, ...) listed only part of its rows, or
+      // none: it is incomplete like the devices the round names so, never read as that device's whole listing (#14295).
+      incomplete: [
+        ...new Set([
+          ...listed.incomplete,
+          ...Object.entries(listed.devices ?? {})
+            .filter(([, state]) => state !== "answered")
+            .map(([device]) => device),
+        ]),
+      ],
     }
   }
   // Only the unfiltered account listing waits on every device, so only it is shared; a one-device listing goes out as asked.

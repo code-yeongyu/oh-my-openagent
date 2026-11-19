@@ -366,7 +366,7 @@ describe("thread send to a session this process never saw alive", () => {
     expect(wakes).toEqual([])
   })
 
-  test("#given session files on disk #when the address is an unknown id, a name two sessions share, or a name only another workspace holds #then not_found, ambiguous_target, and not_found unless all_scope, with nothing written", async () => {
+  test("#given session files on disk #when the address is an unknown id, a name two sessions share, or a name only another workspace holds #then not_found, ambiguous_target, and scope_denied unless all_scope, with nothing written", async () => {
     const agentDir = agentDirectory()
     const elsewhere = realpathSync(mkdtempSync(join(tmpdir(), "thread-offline-elsewhere-")))
     cleanups.push(() => rmSync(elsewhere, { recursive: true, force: true }))
@@ -384,7 +384,7 @@ describe("thread send to a session this process never saw alive", () => {
     })
     expect(await sdk.send({ thread: "far-lane", text: "x" })).toMatchObject({
       kind: "error",
-      error: { code: "not_found" },
+      error: { code: "scope_denied" },
     })
     const store = storeAt(agentDir)
     expect(await store.list()).toEqual([])
