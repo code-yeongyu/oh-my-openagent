@@ -8,7 +8,7 @@ import {
   type AddressRefusal,
   type DeviceRef,
 } from "@oh-my-opencode/thread-address-core"
-import { type ClientCore, ok, type RemoteClient } from "./client"
+import { type ClientCore, listingNamedDevice, ok, type RemoteClient } from "./client"
 import { DEADLINES } from "./deadlines"
 import { nextActionFor, remoteFailure } from "./codes"
 import { canonicalizeThreadHandle, handleOf, type CanonicalThread } from "./seams"
@@ -71,7 +71,10 @@ function match(rows: readonly SessionRow[], target: CanonicalThread, device: str
   const byId = picked(rows.filter((row) => row.durable_id === t.address || row.thread === t.address))
   if (byId !== undefined) return byId
   const wanted = normalizeName(t.address)
-  return picked(rows.filter((row) => inScope(row, target.scope) && normalizeName(row.name) === wanted))
+  // Only a real name is an address: a fallback name (`unnamed`) never matches.
+  return picked(
+    rows.filter((row) => row.unnamed !== true && inScope(row, target.scope) && normalizeName(row.name) === wanted),
+  )
 }
 
 const ambiguous = (address: string, rows: readonly SessionRow[]): RemoteFailure =>
@@ -84,7 +87,7 @@ const ambiguous = (address: string, rows: readonly SessionRow[]): RemoteFailure 
     },
   )
 
-const deviceRefusal = (refusal: AddressRefusal): RemoteFailure => {
+export const deviceRefusal = (refusal: AddressRefusal): RemoteFailure => {
   switch (refusal.reason) {
     case "no_device":
       return remoteFailure(
@@ -146,19 +149,6 @@ const miss = (address: string, unanswered: readonly DeviceRow[]): RemoteFailure 
     },
   })
 
-// A device the listing names but the roster misses (#13402, unknown-device.ts), as a caller sees it: the row sessions.list
-// shows for it (client.ts unlistedDevice), offline, so one device never reads online in one answer and offline in
-// another. The core resolver alone sees it online, which only passes it through the need-online gate.
-const listingNamed = (id: string): DeviceRow => ({
-  id,
-  name: id,
-  kind: "unknown",
-  platform: "unknown",
-  online: false,
-  last_seen_ms: null,
-  caps: { attach: true, machine: false, control: false },
-})
-
 /**
  * The core's device resolver (id > here > name by normalizeName > unique 6+ id prefix) over the devices this account
  * knows: the roster (one devices.list round), plus a device the roster misses that the listing names, which resolves by
@@ -184,7 +174,8 @@ export async function resolveRemoteDevice(
   const roster = await core.devicesList(stage(DEADLINES.devices))
   if (roster.kind === "error") return roster
   const here = roster.value.find((row) => row.self === true)?.id
-  // What the core resolver sees: the roster, plus the listing-named device when one is added, online so it resolves.
+  // What the core resolver sees: the roster, plus the listing-named device when one is added. It answered the listing
+  // round, so it is not known offline and passes the need-online gate; the row a caller sees is listingNamedDevice's.
   const over = (named: readonly { readonly id: string; readonly name: string; readonly online: true }[]) =>
     resolveDevice(
       { here: here === undefined || here === "local" ? null : here, devices: [...roster.value, ...named] },
@@ -198,7 +189,7 @@ export async function resolveRemoteDevice(
     resolved.kind === "ok"
       ? ok({
           ref: resolved.device,
-          row: roster.value.find((row) => row.id === resolved.device.id) ?? listingNamed(resolved.device.id),
+          row: roster.value.find((row) => row.id === resolved.device.id) ?? listingNamedDevice(resolved.device.id),
           ...(listed === undefined ? {} : { listed }),
         })
       : deviceRefusal(resolved.refusal)
