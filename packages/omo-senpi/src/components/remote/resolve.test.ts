@@ -7,7 +7,12 @@ import {
   startFakeOwner,
   type FakeOwner,
 } from "../../../../device-service-core/test/local-api/conformance/fake-owner.ts"
-import { defaultWorld, OFFLINE_PEER, PEER } from "../../../../device-service-core/test/local-api/conformance/world.ts"
+import {
+  defaultWorld,
+  OFFLINE_PEER,
+  PEER,
+  type World,
+} from "../../../../device-service-core/test/local-api/conformance/world.ts"
 import { clientOn, closeClients, failureOf, fakeClock } from "./testing/fake-service"
 
 // sessions.resolve (#13414 unit U5) over the conformance fake owner: an address to its row from the listing the client
@@ -34,7 +39,10 @@ const listed = (device: string, key: string, durable: string, title: string, pro
   as_of: 1_790_000_100_000,
 })
 
-async function account(rows: readonly ListingRow[]) {
+async function account(
+  rows: readonly ListingRow[],
+  over: { devices?: readonly World["devices"][number][]; incomplete?: readonly string[] } = {},
+) {
   const stateDir = mkdtempSync(join(tmpdir(), "rs-"))
   chmodSync(stateDir, 0o700)
   dirs.push(stateDir)
@@ -42,7 +50,11 @@ async function account(rows: readonly ListingRow[]) {
   let listings = 0
   const owner = await startFakeOwner({
     stateDir,
-    world: { ...world, listing: { ...world.listing, revisions: [{ rows, incomplete: [] }] } },
+    world: {
+      ...world,
+      ...(over.devices === undefined ? {} : { devices: over.devices }),
+      listing: { ...world.listing, revisions: [{ rows, incomplete: over.incomplete ?? [] }] },
+    },
     onRequest: (type) => {
       if (type === "sessions.list") listings += 1
     },
@@ -99,5 +111,69 @@ describe("sessions.resolve", () => {
       kind: "ok",
     })
     expect(await client.sessions.resolve("dur-1", { workspace: "/work/omo" })).toMatchObject({ kind: "ok" })
+  })
+
+  test("#given a device named 'Studio Mac' #when the device part differs only by Unicode form or inner whitespace #then normalizeName still resolves its session", async () => {
+    const { client } = await account([listed(PEER, "rk-8", "dur-8", "Bot")], {
+      devices: [
+        {
+          device: PEER,
+          label: "Studio Mac",
+          kind: "desktop",
+          platform: "darwin",
+          last_seen_ms: 1_790_000_000_000,
+          online: true,
+        },
+        {
+          device: OFFLINE_PEER,
+          label: "Laptop",
+          kind: "cli",
+          platform: "linux",
+          last_seen_ms: 1_789_000_000_000,
+          online: false,
+        },
+      ],
+    })
+    for (const address of ["Ｓｔｕｄｉｏ mac/dur-8", "studio  mac/dur-8"])
+      expect(await client.sessions.resolve(address)).toMatchObject({
+        kind: "ok",
+        value: { thread: `${PEER}/rk-8`, durable_id: "dur-8" },
+      })
+  })
+
+  test("#given an account device no other id shares #when the device part is a 6+ character id prefix #then it resolves that device's session", async () => {
+    const { client } = await account([listed("gpu-rig-77", "rk-9", "dur-9", "Rig Bot")], {
+      devices: [
+        {
+          device: "gpu-rig-77",
+          label: "Rig",
+          kind: "desktop",
+          platform: "linux",
+          last_seen_ms: 1_790_000_000_000,
+          online: true,
+        },
+      ],
+    })
+    expect(await client.sessions.resolve("gpu-ri/dur-9")).toMatchObject({
+      kind: "ok",
+      value: { thread: "gpu-rig-77/rk-9", durable_id: "dur-9", device: { id: "gpu-rig-77", name: "Rig" } },
+    })
+  })
+
+  test("#given a session this device's listing carries #when the device part is here #then it resolves on this device", async () => {
+    const { client } = await account([listed("dev-self", "rk-s", "dur-s", "Here Bot")])
+    expect(await client.sessions.resolve("here/dur-s")).toMatchObject({
+      kind: "ok",
+      value: { thread: "dev-self/rk-s", durable_id: "dur-s", device: { id: "dev-self" } },
+    })
+  })
+
+  test("#given an online device that did not answer the listing round #when nothing else matches #then the miss is host_unavailable naming it, never not_found", async () => {
+    const { client } = await account([], { incomplete: [PEER] })
+    const failure = failureOf(await client.sessions.resolve("dur-x"))
+    expect(failure).toMatchObject({
+      code: "host_unavailable",
+      details: { reason: "listing_incomplete", devices: [PEER] },
+    })
   })
 })
