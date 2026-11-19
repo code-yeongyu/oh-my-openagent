@@ -517,17 +517,16 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
             "An author names a human in a bound external thread; a send without a binding has none.",
             "Pass binding_id with the author, or drop the author.",
           )
-        // The same road as an agent's send: the address resolves across the account, and the target's kind picks the transport.
-        // Like the agent's thread_send, a published id needs no lookup (no host listing, no account call), and any other address
-        // resolves over the offline view and the send address book, so an own alias is account-wide and a thread that is not
-        // running with nothing live answering still queues offline.
+        // The same road as an agent's send: the address resolves through the address module (across the account when this SDK
+        // has one, this device only otherwise), and the target's kind picks the transport. Like the agent's thread_send, an id
+        // this device's gateway owns needs no lookup (no host listing, no account call); any other address resolves over the
+        // offline view and the send address book, so a thread that is not running with nothing live answering still queues offline.
         let target: DeliveryTarget = {
           kind: "local",
           thread_id: request.thread,
           ...(request.all_scope === undefined ? {} : { all_scope: request.all_scope }),
         }
-        const remote = options.remote
-        if (remote !== undefined && (await store.sessionOwner(request.thread)) === null) {
+        if ((await store.sessionOwner(request.thread)) === null) {
           const offline = await hostView(surface, { offline: true })
           const across = await resolveAddress(
             resolveContext(toThreadAddressEntries(sendAddressBook(surface, offline, bareOf(request.thread), true))),
