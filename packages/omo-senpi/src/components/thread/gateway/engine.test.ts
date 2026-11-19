@@ -481,6 +481,23 @@ describe("causal_cycle_hop_and_rate_budgets", () => {
     expect(summary(await send(h, "R", "S", "m10", { idempotency_key: "r10" }))).toBe("error:overloaded")
   })
 
+  test("#given A sends to B in one burst #when the 9th send follows the 8th at once and the refill window then passes #then all 8 deliver, the 9th is refused pair_loop_guard with the measured burst and the wait, and the next send is accepted", async () => {
+    const h = open()
+    h.session("A")
+    h.session("B")
+    for (let index = 1; index <= 8; index++)
+      expect((await send(h, "A", "B", `burst ${index}`, { idempotency_key: `b${index}` })).kind).toBe("ok")
+    const ninth = await send(h, "A", "B", "burst 9", { idempotency_key: "b9" })
+    if (ninth.kind !== "error") throw new Error(`expected the 9th send refused, got ${JSON.stringify(ninth)}`)
+    expect(ninth.error.code).toBe("pair_loop_guard")
+    expect(ninth.error.details).toEqual({ guard: "pair_loop", burst: 8, window_ms: 40_000, retry_after_ms: 5_000 })
+    expect(ninth.error.message).toContain("8 sends from session:A to B within 40 s")
+    expect(ninth.error.next_action).toContain("send loop between these two sessions")
+    expect(ninth.error.next_action).toContain("accepted after 5 s")
+    h.clock.now += Number(ninth.error.details?.retry_after_ms)
+    expect((await send(h, "A", "B", "burst 9", { idempotency_key: "b9" })).kind).toBe("ok")
+  })
+
   test("#given roots are minted by the gateway #when a caller names its own root or continues a delivery it never received #then each is refused, and a chain continued past the root lifetime is delivered under a fresh root", async () => {
     const h = open()
     for (const id of ["A", "B", "C"]) h.session(id)
