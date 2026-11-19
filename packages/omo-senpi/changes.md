@@ -1,3 +1,7 @@
+## 2026-11-17 - omo.modelRouting.resolve (#14025)
+
+`components/task/model-routing-rpc.ts` registers `omo.modelRouting.resolve` (no request data). It loads the session cwd's config with the task engine's own loader and answers `{ schemaVersion: 1, rows }` from `model-routing-rows.ts`: one row per builtin and configured category, then per task agent, each from `resolveCategory` / `resolveAgent` against the planner's own inputs: the register-time project cwd its live config reads, the agent table the engine composed (so a mid-session `agents` edit shows exactly what a spawn still picks), and the parent fast-tier step (`-fast` sibling unless `exclude_models` keeps it out). Retired agent aliases fold into their canonical row. The round-robin distributor is not consulted, so a read never advances a rotation, with `effective` (`provider/model` or null), `source` (`override` / `provider-fallback` / `unresolved`) and the thinking level as `variant`. A missing cwd, an unreadable config layer and a session without a model registry answer typed errors (`cwd_unavailable`, `config_invalid`, `registry_unavailable`). The consumer is the desktop app's model-routing settings.
+
 ## 2026-11-18 - Thread train 2 top: thread tool fixes and the senpi 2026.11.18-2 pin (#14225)
 
 - **Reopen a closed thread on another device from its file (#14179)**

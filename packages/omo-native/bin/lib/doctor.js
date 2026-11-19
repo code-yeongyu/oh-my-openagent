@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs"
 import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 import { canonicalAgentDir } from "./agent-dir.js"
+import { isEngineCommand } from "./engine-commands.js"
 import { fetchNpmDistTagsSync } from "./npm-dist-tags.js"
 import {
   channelDistTagVersion,
@@ -101,18 +102,12 @@ const MANAGED_MODE_FLAG = "--mode"
 // or engine flags count; those other roles are never engines.
 const BINARY_RUNTIME_EXECUTABLE = String.raw`[\\/]binary-runtime[\\/][^\\/\s]+[\\/]omo(?:\.exe)?`
 const BINARY_ENGINE = new RegExp(String.raw`${BINARY_RUNTIME_EXECUTABLE}(?=\s|$)\s*(\S*)`)
+// omo's own commands; the engine's one-shot commands come from engine-commands.js (isEngineCommand).
 const BINARY_NON_ENGINE_COMMANDS = new Set([
   "doctor",
   "setup",
   "daemon",
-  "update",
   "upgrade",
-  "host",
-  "install",
-  "remove",
-  "list",
-  "config",
-  "auth",
   "ulw-loop",
   "--version",
   "-v",
@@ -123,7 +118,9 @@ function isBinaryEngine(command) {
   if (!match) return false
   const first = match[1] ?? ""
   if (first.startsWith("--internal-") || /\.(?:m?js|cjs|ts)$/.test(first)) return false
-  return !BINARY_NON_ENGINE_COMMANDS.has(first)
+  // A one-shot command omo hands to the engine unchanged runs to completion and is never a session (#14336).
+  const args = command.slice(match.index + match[0].length - first.length).split(/\s+/)
+  return !BINARY_NON_ENGINE_COMMANDS.has(first) && !isEngineCommand(args)
 }
 
 function isEngine(entry) {

@@ -255,6 +255,8 @@ export function createRemoteThreadFixture() {
       silent?: readonly string[]
       /** omo#13037: this device's service carries the wake mark and the single probe (both gates open). Off by default, as shipped. */
       wakeFeature?: boolean
+      /** omo#14270: what kind of device b registers as (`cli` daemon or `desktop` app); unset, b names none. */
+      bKind?: string
       /** omo#13037: this device's service makes no single probe (the lookup is never made). */
       noLookup?: boolean
       /** omo#13037 review: a sessions port as before the lookup existed (no lookup, no capability read). */
@@ -265,6 +267,8 @@ export function createRemoteThreadFixture() {
       selfDevice?: "throws" | "unknown"
       /** omo#13037: this device's service cannot carry the wake target (no wake is sent; today's path). */
       noWake?: boolean
+      /** #14240: b's host refuses a session command to a key it does not run with this reason (a parked session: `route_unlisted`). Default `unknown_session`. */
+      unlistedReason?: string
       /** omo#13037: the wake path's answer; default the consumer's queued envelope with `waiting_on: {kind: "wake"}`. */
       wakeOutcome?: RemoteCommandOutcome
       /** The `get_state` fields a live session reports beyond the engine defaults (`paused`, `holds`). */
@@ -352,7 +356,8 @@ export function createRemoteThreadFixture() {
         response: { type: "response", id: null, command: rpc["type"] ?? null, success: true, data },
       })
       if (options.refuse !== undefined) return { kind: "refused", reason: options.refuse }
-      if (attachedTo !== undefined && !live.has(attachedTo)) return { kind: "refused", reason: "unknown_session" }
+      if (attachedTo !== undefined && !live.has(attachedTo))
+        return { kind: "refused", reason: options.unlistedReason ?? "unknown_session" }
       // A terminal's engine takes no session lifecycle record (live-surface.ts `unsupported:` on this device): it answers the
       // failed envelope the device service reports as this refusal.
       if (options.terminal === true && (rpc["type"] === "close_session" || rpc["type"] === "unload_session"))
@@ -518,7 +523,12 @@ export function createRemoteThreadFixture() {
     }
     const devices: RemoteDevice[] = [
       ...(options.rosterWithoutSelf === true ? [] : [{ device: "here", label: "this mac", online: true }]),
-      { device: "b", label: "studio", online: options.online ?? true },
+      {
+        device: "b",
+        label: "studio",
+        online: options.online ?? true,
+        ...(options.bKind === undefined ? {} : { kind: options.bKind }),
+      },
       ...(options.devices ?? []),
     ]
     for (const device of [

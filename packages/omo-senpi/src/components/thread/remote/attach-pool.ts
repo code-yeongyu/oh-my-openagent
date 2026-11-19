@@ -12,8 +12,8 @@ const CATALOG_RECORD = "get_available_models"
 export const HELD_RECORDS: ReadonlySet<string> = new Set([CATALOG_RECORD, "get_protocol_info"])
 const CATALOG_MAX_AGE_MS = 600_000
 
-/** One remote session's held reads, one per record; a read that a new snapshot raced is not kept. */
-function createCatalogHold(attached: RemoteAttach) {
+/** One remote session's held reads, one per record; a read that a new snapshot raced is not kept. `now` is the age clock. */
+function createCatalogHold(attached: RemoteAttach, now: () => number) {
   const held = new Map<string, { readonly response: JsonObject; readonly at: number }>()
   let snapshots = 0
   attached.onEvent((event) => {
@@ -25,10 +25,10 @@ function createCatalogHold(attached: RemoteAttach) {
     snapshots: () => snapshots,
     get: (key: string): JsonObject | undefined => {
       const kept = held.get(key)
-      return kept !== undefined && Date.now() - kept.at <= CATALOG_MAX_AGE_MS ? kept.response : undefined
+      return kept !== undefined && now() - kept.at <= CATALOG_MAX_AGE_MS ? kept.response : undefined
     },
     keep: (key: string, response: JsonObject, sentAt: number): void => {
-      if (sentAt === snapshots) held.set(key, { response, at: Date.now() })
+      if (sentAt === snapshots) held.set(key, { response, at: now() })
     },
   }
 }
@@ -63,6 +63,7 @@ export function createAttachPool(
   svc: () => Promise<DeviceService>,
   attach: AttachAddressed,
   idleMs: number = ATTACH_IDLE_MS,
+  now: () => number = Date.now,
 ) {
   const entries = new Map<string, Entry>()
   const hold = async (device: string, sessionId: string): Promise<HeldAttach> => {
@@ -76,7 +77,7 @@ export function createAttachPool(
             void attached.detached.then(() => {
               if (entries.get(key)?.opened === opened) entries.delete(key)
             })
-            return { attached, key: attachedOn, catalog: createCatalogHold(attached) }
+            return { attached, key: attachedOn, catalog: createCatalogHold(attached, now) }
           },
           (error: unknown) => {
             if (entries.get(key)?.opened === opened) entries.delete(key)
