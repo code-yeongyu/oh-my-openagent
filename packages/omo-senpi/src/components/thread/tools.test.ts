@@ -1,13 +1,17 @@
+import { Database } from "bun:sqlite"
 import { afterEach, describe, expect, mock, test } from "bun:test"
 import { deliverySender } from "./gateway/provenance"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { ThreadToolName, ThreadToolResult } from "./contracts"
+import { parseThreadParams, threadToolParamSchemas, type ThreadToolName, type ThreadToolResult } from "./contracts"
 import type { GatewayEndpointRef } from "./gateway/adapter"
-import { type BindInput, normalizeBindInput } from "./gateway/bindings"
+import { type BindInput, hashArgs, normalizeBindInput } from "./gateway/bindings"
 import { GATEWAY_RECEIPT_RETENTION_MS } from "./gateway/constants"
+import { gatewayDatabasePath } from "./gateway/paths"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
+import { storeMigratedByNewerBuild } from "./gateway/testing/newer-schema"
+import type { ThreadToolFailure } from "./errors"
 import { parseThreadLinkUrl } from "./thread-link"
 import {
   createThreadTools,
@@ -128,7 +132,7 @@ describe("thread tool registration", () => {
     expect(f.setModel.mock.calls[0]).toEqual(["route-peer", "openai", "gpt-x", "dur-peer"])
   })
 
-  test("registers exactly the fourteen contract tools with eval exposure", () => {
+  test("registers exactly the fifteen contract tools with eval exposure", () => {
     const tools: Record<string, unknown>[] = []
     const f = fixture()
     registerThreadTools(
@@ -146,6 +150,7 @@ describe("thread tool registration", () => {
       "thread_rename",
       "thread_set_model",
       "thread_set_reasoning",
+      "thread_archive",
       "thread_report",
       "thread_outbox",
       "thread_outbox_ack",
@@ -158,6 +163,32 @@ describe("thread tool registration", () => {
         String(tool.name),
       ).toEqual([])
     }
+  })
+
+  test("#given the registered tools #when one runs #then the model still gets the JSON result while the TUI row renders a summary (#12994)", async () => {
+    const tools: Array<Record<string, unknown> & ReturnType<typeof createThreadTools>[number]> = []
+    const f = fixture()
+    registerThreadTools(
+      { registerTool: (tool) => tools.push(tool as never) },
+      { ...f, callerSessionId: () => "caller", callerWorkspaceRoot: () => process.cwd() },
+    )
+    expect(
+      tools
+        .filter((tool) => typeof tool.renderCall !== "function" || typeof tool.renderResult !== "function")
+        .map((tool) => tool.name),
+    ).toEqual([])
+
+    const list = tools.find((tool) => tool.name === "thread_list")
+    expect(typeof list?.renderResult).toBe("function")
+    if (list?.renderResult === undefined) return
+    const output = await list.execute("call-1", {}, undefined, undefined, {} as never)
+    // The model-facing content is the result JSON, byte for byte: rendering changes only what the person sees.
+    expect(output.content).toEqual([{ type: "text", text: JSON.stringify(output.details.result) }])
+    const plain = { fg: (_color: string, text: string) => text, bold: (text: string) => text } as never
+    const lines = list
+      .renderResult(output, { expanded: false, isPartial: false }, plain, { args: {}, isError: false } as never)
+      .render(200)
+    expect(lines[0]?.trimEnd()).toBe("1 thread in this workspace")
   })
 
   test("#given live threads in two workspaces #when thread_list runs in the default scope #then only the caller's workspace is listed and all_scope widens it", async () => {
@@ -189,18 +220,18 @@ describe("thread tool registration", () => {
     })
     const list = tools[1]
     const threadsOf = (result: Awaited<ReturnType<typeof list.execute>>) =>
-      (result.details as { result: { threads: Array<{ thread_id: string }>; scope: string } }).result
+      (result.details as { result: { threads: Array<{ thread: string }>; scope: string } }).result
 
     // when
     const scoped = threadsOf(await list.execute("call-1", {}, undefined, undefined, {} as never))
     const widened = threadsOf(await list.execute("call-2", { all_scope: true }, undefined, undefined, {} as never))
 
     // then
-    expect({ scope: scoped.scope, ids: scoped.threads.map((thread) => thread.thread_id) }).toEqual({
+    expect({ scope: scoped.scope, ids: scoped.threads.map((thread) => thread.thread) }).toEqual({
       scope: "workspace",
       ids: ["dur-a"],
     })
-    expect({ scope: widened.scope, ids: widened.threads.map((thread) => thread.thread_id).sort() }).toEqual({
+    expect({ scope: widened.scope, ids: widened.threads.map((thread) => thread.thread).sort() }).toEqual({
       scope: "all",
       ids: ["dur-a", "dur-b"],
     })
@@ -216,7 +247,7 @@ describe("thread tool registration", () => {
     })
   })
 
-  test("#given a live transcript longer than one byte window #when thread_read follows next_cursor #then each read returns the next slice until the end", async () => {
+  test("#given a live transcript longer than one byte window #when thread_read follows next_cursor #then the first read ends at the newest message and each next one returns the slice before it until the start", async () => {
     // given
     const f = fixture()
     const transcript = Array.from({ length: 12 }, (_, index) => ({
@@ -245,7 +276,10 @@ describe("thread tool registration", () => {
 
     // then
     expect(pages.length).toBeGreaterThan(1)
-    expect(pages.flatMap((page) => page.contents)).toEqual(transcript.map((message) => JSON.stringify(message.content)))
+    expect(pages[0]?.contents.at(-1)).toBe(JSON.stringify(transcript.at(-1)?.content))
+    expect(pages.reverse().flatMap((page) => page.contents)).toEqual(
+      transcript.map((message) => JSON.stringify(message.content)),
+    )
   })
 })
 
@@ -263,17 +297,18 @@ describe("thread links", () => {
 
     // when
     const listed = (await run("thread_list", {}, undefined, "call-list")) as unknown as {
-      threads: Array<{ thread_id: string; link?: string }>
+      threads: Array<{ thread: string; link?: string }>
     }
     const created = (await run("thread_create", { name: "fresh" }, undefined, "call-create")) as unknown as {
-      thread: { thread_id: string; link?: string }
+      thread: string
+      link?: string
     }
     const read = (await run("thread_read", { thread: "peer" }, undefined, "call-read")) as unknown as {
-      thread_id: string
+      thread: string
       link?: string
     }
     const sent = (await run("thread_send", { thread: "peer", message: "hi" }, "dur-other", "call-send")) as unknown as {
-      thread_id: string
+      thread: string
       link?: string
     }
     const handed = (await run(
@@ -281,15 +316,15 @@ describe("thread links", () => {
       { thread: "peer", message: "go" },
       "dur-other",
       "call-handoff",
-    )) as unknown as { thread: { thread_id: string; link?: string } }
+    )) as unknown as { thread: string; link?: string }
 
     // then
     expect(listed.threads.length).toBeGreaterThan(0)
-    for (const thread of listed.threads) expect(linkTarget(thread.link)).toEqual({ threadId: thread.thread_id })
-    expect(linkTarget(created.thread.link)).toEqual({ threadId: created.thread.thread_id })
+    for (const thread of listed.threads) expect(linkTarget(thread.link)).toEqual({ threadId: thread.thread })
+    expect(linkTarget(created.link)).toEqual({ threadId: created.thread })
     expect(linkTarget(read.link)).toEqual({ threadId: "dur-peer" })
     expect(linkTarget(sent.link)).toEqual({ threadId: "dur-peer" })
-    expect(linkTarget(handed.thread.link)).toEqual({ threadId: "dur-peer" })
+    expect(linkTarget(handed.link)).toEqual({ threadId: "dur-peer" })
     expect(String(read.link)).toStartWith("[peer]")
   })
 })
@@ -299,7 +334,7 @@ describe("thread session controls", () => {
     const f = fixture()
     expect(await runner(f)("thread_rename", { thread: "peer", name: "  New Name  " })).toEqual({
       kind: "ok",
-      thread_id: "dur-peer",
+      thread: "dur-peer",
       name: "New Name",
     })
     expect(f.setSessionName.mock.calls).toEqual([["route-peer", "New Name", "dur-peer"]])
@@ -343,7 +378,7 @@ describe("thread session controls", () => {
     const f = fixture()
     expect(await runner(f)("thread_rename", { thread: "peer", name: "PEER" })).toEqual({
       kind: "ok",
-      thread_id: "dur-peer",
+      thread: "dur-peer",
       name: "PEER",
     })
   })
@@ -365,7 +400,7 @@ describe("thread session controls", () => {
     const run = runner(f)
     expect(await run("thread_rename", { thread: "dur-peer", name: "Taken" })).toEqual({
       kind: "ok",
-      thread_id: "dur-peer",
+      thread: "dur-peer",
       name: "Taken",
     })
     expect(
@@ -378,7 +413,7 @@ describe("thread session controls", () => {
     const f = fixture()
     expect(await runner(f)("thread_set_model", { thread: "peer", model })).toEqual({
       kind: "ok",
-      thread_id: "dur-peer",
+      thread: "dur-peer",
       model: { provider: "openai", id: "gpt-x" },
     })
     expect(f.getAvailableModels.mock.calls).toEqual([["route-peer"]])
@@ -434,7 +469,7 @@ describe("thread session controls", () => {
     f.models.push({ provider: "openai", id: "gpt-x-mini" })
     expect(await runner(f)("thread_set_model", { thread: "peer", model })).toEqual({
       kind: "ok",
-      thread_id: "dur-peer",
+      thread: "dur-peer",
       model: { provider: "openai", id: "gpt-x" },
     })
     expect(f.setModel.mock.calls).toEqual([["route-peer", "openai", "gpt-x", "dur-peer"]])
@@ -445,7 +480,7 @@ describe("thread session controls", () => {
     f.models.push({ provider: "other", id: "gpt-y" })
     expect(await runner(f)("thread_set_model", { thread: "peer", model: "gpt", provider: "other" })).toEqual({
       kind: "ok",
-      thread_id: "dur-peer",
+      thread: "dur-peer",
       model: { provider: "other", id: "gpt-y" },
     })
     expect(f.setModel.mock.calls).toEqual([["route-peer", "other", "gpt-y", "dur-peer"]])
@@ -465,7 +500,7 @@ describe("thread session controls", () => {
     expect(f.setModel).not.toHaveBeenCalled()
     expect(
       await run("thread_set_model", { thread: "dur-other", model: "gpt-x", all_scope: true }, undefined, "call-2"),
-    ).toMatchObject({ kind: "ok", thread_id: "dur-other" })
+    ).toMatchObject({ kind: "ok", thread: "dur-other" })
     expect(f.setModel.mock.calls).toEqual([["route-other", "openai", "gpt-x", "dur-other"]])
   })
 
@@ -479,7 +514,7 @@ describe("thread session controls", () => {
           level: "high",
           ...(scope === undefined ? {} : { scope }),
         }),
-      ).toEqual({ kind: "ok", thread_id: "dur-peer", level: "high", scope: scope ?? "session" })
+      ).toEqual({ kind: "ok", thread: "dur-peer", level: "high", scope: scope ?? "session" })
       expect(f.setThinkingLevel.mock.calls).toEqual([["route-peer", "high", "turn", "dur-peer"]])
       expect(f.getAvailableThinkingLevels).not.toHaveBeenCalled()
     },
@@ -527,7 +562,7 @@ describe("thread session controls", () => {
   ] as const)("$name resolves self from the fifth-argument caller durable id", async ({ name, args }) => {
     const f = fixture()
     const result = await runner(f)(name, args, "dur-peer")
-    expect(result).toMatchObject({ kind: "ok", thread_id: "dur-peer" })
+    expect(result).toMatchObject({ kind: "ok", thread: "dur-peer" })
     if (name === "thread_rename") expect(f.setSessionName.mock.calls).toEqual([["route-peer", "New Name", "dur-peer"]])
   })
 
@@ -560,7 +595,7 @@ describe("thread session controls", () => {
     const f = fixture()
     expect(await runner(f, "dur-peer")("thread_rename", { name: "릴레이 테스트" })).toEqual({
       kind: "ok",
-      thread_id: "dur-peer",
+      thread: "dur-peer",
       name: "릴레이 테스트",
     })
     expect(f.setSessionName.mock.calls).toEqual([["route-peer", "릴레이 테스트", "dur-peer"]])
@@ -570,18 +605,18 @@ describe("thread session controls", () => {
     const f = fixture()
     expect(await runner(f)("thread_rename", { thread: "route-peer", name: "릴레이 테스트" })).toEqual({
       kind: "ok",
-      thread_id: "dur-peer",
+      thread: "dur-peer",
       name: "릴레이 테스트",
     })
   })
 
-  test("#given rpc-9 is not a listed sessionId #when thread_rename names it #then not_found suggests the durable thread_id", async () => {
+  test("#given rpc-9 is not a listed sessionId #when thread_rename names it #then not_found suggests the thread value", async () => {
     const f = fixture()
     const result = await runner(f)("thread_rename", { thread: "rpc-9", name: "릴레이 테스트" })
     expect(result).toMatchObject({ kind: "error", error: { code: "not_found" } })
     if (result.kind !== "error") throw new Error("expected not_found")
     expect(result.error.message).toContain("dur-peer")
-    expect(result.error.next_action).toContain("thread_id")
+    expect(result.error.next_action).toContain("thread value")
     expect(f.setSessionName).not.toHaveBeenCalled()
   })
 
@@ -589,7 +624,7 @@ describe("thread session controls", () => {
     const f = fixture()
     expect(await runner(f, "dur-peer")("thread_rename", { thread: "self", name: "New Name" })).toEqual({
       kind: "ok",
-      thread_id: "dur-peer",
+      thread: "dur-peer",
       name: "New Name",
     })
   })
@@ -647,7 +682,7 @@ describe("thread session controls", () => {
     })
     expect(
       await runner(f)("thread_handoff", { thread: "payments work", match: "fuzzy", message: "continue" }, "dur-self"),
-    ).toMatchObject({ kind: "ok", thread: { thread_id: "dur-peer" }, resolved_by: "fuzzy" })
+    ).toMatchObject({ kind: "ok", thread: "dur-peer", resolved_by: "fuzzy" })
     expect(f.prompt).not.toHaveBeenCalled()
   })
 
@@ -681,8 +716,8 @@ describe("thread session controls", () => {
     )
 
     // then
-    expect(scoped).toMatchObject({ kind: "ok", thread: { thread_id: "dur-near" }, resolved_by: "fuzzy" })
-    expect(wide).toMatchObject({ kind: "ok", thread: { thread_id: "dur-far" }, resolved_by: "fuzzy" })
+    expect(scoped).toMatchObject({ kind: "ok", thread: "dur-near", resolved_by: "fuzzy" })
+    expect(wide).toMatchObject({ kind: "ok", thread: "dur-far", resolved_by: "fuzzy" })
   })
 
   test("#given a caller with no workspace root #when a fuzzy handoff runs without all_scope #then it is caller_context_missing, as the exact ladder answers, not not_found", async () => {
@@ -744,7 +779,7 @@ const TUI_SOCKET = "/tmp/t-0123456789abcdef.sock"
 const HOST_SOCKET = "/tmp/i-0123456789abcdef.sock"
 
 /** A host session (the caller) and a terminal session, each on its own endpoint, with a recording gateway port. */
-function gatewayFixture() {
+function gatewayFixture(store?: GatewayStore) {
   const f = fixture()
   const hostSession: ThreadHostSession = {
     sessionId: "rpc-1",
@@ -805,7 +840,7 @@ function gatewayFixture() {
       host,
       stateDirectory: f.stateDirectory,
       sessionsDirectory: () => join(f.stateDirectory, "sessions"),
-      store: f.store,
+      store: store ?? f.store,
       callerSessionId: () => callerId,
       callerWorkspaceRoot: () => process.cwd(),
       callerName: () => callerName,
@@ -828,14 +863,13 @@ function gatewayFixture() {
 }
 
 describe("thread_send through the session gateway", () => {
-  test("#given a host session and a terminal endpoint #when the host session sends to the terminal #then the result carries delivery_id and endpoint.kind tui and only a wake reached the terminal", async () => {
+  test("#given a host session and a terminal endpoint #when the host session sends to the terminal #then the result carries delivery_id, no endpoint internals, and only a wake reached the terminal", async () => {
     const g = gatewayFixture()
     const result = await g.run("thread_send", { thread: "my-tui", message: "hello terminal" }, "dur-host", "call-1")
     // The fixture's wake answers with nothing admitted and no drain behind it, so nothing will start the message (#12486).
     expect(result).toMatchObject({
       kind: "ok",
-      thread_id: "dur-tui",
-      endpoint: { kind: "tui" },
+      thread: "dur-tui",
       effective_mode: "auto",
       delivery: { kind: "queued_offline" },
       deduplicated: false,
@@ -951,7 +985,7 @@ describe("tool receipts the store could not settle", () => {
     const run = runner({ ...f, store }, "caller")
     expect(
       await run("thread_rename", { thread: "peer", name: "Renamed", idempotency_key: "rename-1" }, "caller"),
-    ).toEqual({ kind: "ok", thread_id: "dur-peer", name: "Renamed" })
+    ).toEqual({ kind: "ok", thread: "dur-peer", name: "Renamed" })
     const retried = await run(
       "thread_rename",
       { thread: "peer", name: "Renamed", idempotency_key: "rename-1" },
@@ -995,7 +1029,7 @@ describe("tool receipts the store could not settle", () => {
       error: { code: "internal_error" },
     })
     expect(f.setSessionName).not.toHaveBeenCalled()
-    expect(await run("thread_rename", args, "caller")).toEqual({ kind: "ok", thread_id: "dur-peer", name: "Renamed" })
+    expect(await run("thread_rename", args, "caller")).toEqual({ kind: "ok", thread: "dur-peer", name: "Renamed" })
     expect(f.setSessionName).toHaveBeenCalledTimes(1)
   })
 
@@ -1020,8 +1054,8 @@ describe("tool receipts the store could not settle", () => {
       error: { code: "internal_error" },
     })
     expect(f.setSessionName).not.toHaveBeenCalled()
-    expect(await run("thread_rename", args, "caller")).toEqual({ kind: "ok", thread_id: "dur-peer", name: "Renamed" })
-    expect(await run("thread_rename", args, "caller")).toEqual({ kind: "ok", thread_id: "dur-peer", name: "Renamed" })
+    expect(await run("thread_rename", args, "caller")).toEqual({ kind: "ok", thread: "dur-peer", name: "Renamed" })
+    expect(await run("thread_rename", args, "caller")).toEqual({ kind: "ok", thread: "dur-peer", name: "Renamed" })
     expect(f.setSessionName).toHaveBeenCalledTimes(1)
   })
 
@@ -1113,8 +1147,8 @@ describe("tool receipts the store could not settle", () => {
     expect(f.setSessionName).not.toHaveBeenCalled()
     // The bound is full with the fill keys and actual-a: a new key is refused until actual-a recovers, which frees exactly one slot.
     expect(await s.rename("fresh-1")).toMatchObject({ kind: "error", error: { code: "overloaded" } })
-    expect(await s.rename("actual-a")).toEqual({ kind: "ok", thread_id: "dur-peer", name: "Renamed" })
-    expect(await s.rename("fresh-2")).toEqual({ kind: "ok", thread_id: "dur-peer", name: "Renamed" })
+    expect(await s.rename("actual-a")).toEqual({ kind: "ok", thread: "dur-peer", name: "Renamed" })
+    expect(await s.rename("fresh-2")).toEqual({ kind: "ok", thread: "dur-peer", name: "Renamed" })
     expect(f.setSessionName).toHaveBeenCalledTimes(2)
   })
 
@@ -1137,8 +1171,8 @@ describe("tool receipts the store could not settle", () => {
     expect(await first).toMatchObject({ kind: "error", error: { code: "internal_error" } })
     expect(await second).toMatchObject({ kind: "error", error: { code: "internal_error" } })
     expect(await s.rename("fresh-1")).toMatchObject({ kind: "error", error: { code: "overloaded" } })
-    expect(await s.rename("shared")).toEqual({ kind: "ok", thread_id: "dur-peer", name: "Renamed" })
-    expect(await s.rename("fresh-2")).toEqual({ kind: "ok", thread_id: "dur-peer", name: "Renamed" })
+    expect(await s.rename("shared")).toEqual({ kind: "ok", thread: "dur-peer", name: "Renamed" })
+    expect(await s.rename("fresh-2")).toEqual({ kind: "ok", thread: "dur-peer", name: "Renamed" })
     expect(f.setSessionName).toHaveBeenCalledTimes(2)
   })
 
@@ -1151,8 +1185,8 @@ describe("tool receipts the store could not settle", () => {
 
     expect(await s.rename("new")).toMatchObject({ kind: "error", error: { code: "overloaded" } })
     expect(f.setSessionName).not.toHaveBeenCalled()
-    expect(await s.rename("lost-oldest")).toEqual({ kind: "ok", thread_id: "dur-peer", name: "Renamed" })
-    expect(await s.rename("new")).toEqual({ kind: "ok", thread_id: "dur-peer", name: "Renamed" })
+    expect(await s.rename("lost-oldest")).toEqual({ kind: "ok", thread: "dur-peer", name: "Renamed" })
+    expect(await s.rename("new")).toEqual({ kind: "ok", thread: "dur-peer", name: "Renamed" })
     expect(f.setSessionName).toHaveBeenCalledTimes(2)
   })
 
@@ -1164,7 +1198,7 @@ describe("tool receipts the store could not settle", () => {
     clock.now += GATEWAY_RECEIPT_RETENTION_MS - 1
     expect(await s.rename("before-expiry")).toMatchObject({ kind: "error", error: { code: "overloaded" } })
     clock.now += 1
-    expect(await s.rename("at-expiry")).toEqual({ kind: "ok", thread_id: "dur-peer", name: "Renamed" })
+    expect(await s.rename("at-expiry")).toEqual({ kind: "ok", thread: "dur-peer", name: "Renamed" })
     expect(f.setSessionName).toHaveBeenCalledTimes(1)
   })
 
@@ -1174,7 +1208,7 @@ describe("tool receipts the store could not settle", () => {
     await s.failMany("fill", RECEIPT_RECOVERY_MAX_KEYS)
     expect(await s.rename("before-dispose")).toMatchObject({ kind: "error", error: { code: "overloaded" } })
     s.dispose()
-    expect(await s.rename("after-dispose")).toEqual({ kind: "ok", thread_id: "dur-peer", name: "Renamed" })
+    expect(await s.rename("after-dispose")).toEqual({ kind: "ok", thread: "dur-peer", name: "Renamed" })
     expect(f.setSessionName).toHaveBeenCalledTimes(1)
   })
 
@@ -1218,7 +1252,243 @@ describe("tool receipts the store could not settle", () => {
       error: { code: "idempotency_in_progress" },
     })
     releaseRename()
-    expect(await first).toEqual({ kind: "ok", thread_id: "dur-peer", name: "Renamed" })
+    expect(await first).toEqual({ kind: "ok", thread: "dur-peer", name: "Renamed" })
     expect(f.setSessionName).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe("thread tools over a gateway store a newer omo build migrated", () => {
+  function newerStore(ahead: number) {
+    const agentDir = mkdtempSync(join(tmpdir(), "thread-tools-newer-schema-"))
+    directories.push(agentDir)
+    const versions = storeMigratedByNewerBuild(agentDir, ahead)
+    const store = createGatewayStore({ agentDir })
+    stores.push(store)
+    return { store, agentDir, ...versions }
+  }
+
+  test.each([1, 3])(
+    "#given the agent dir's store is %i schema version(s) past this binary's #when thread_send and a receipted tool run #then each answers gateway_schema_too_new naming both schemas and the update command, and the store keeps its schema",
+    async (ahead) => {
+      // given: the old-binary fixture, a store a newer build migrated past every schema this build knows (N+1 is the next schema)
+      const n = newerStore(ahead)
+      const g = gatewayFixture(n.store)
+      const refusal = {
+        kind: "error",
+        error: {
+          code: "gateway_schema_too_new",
+          details: { gateway_schema: n.gateway, binary_schema: n.binary, update_command: "omo update" },
+        },
+      }
+
+      // when
+      const sent = await g.run("thread_send", { thread: "my-tui", message: "hello" }, "dur-host", "call-1")
+      const renamed = await g.run("thread_rename", { thread: "my-tui", name: "renamed" }, "dur-host", "call-2")
+
+      // then
+      // the hint carries the command (read before toMatchObject, which writes its asymmetric matchers into the received object)
+      for (const result of [sent, renamed]) {
+        const error = (result as { readonly error: ThreadToolFailure }).error
+        expect(error.next_action).toContain(String(error.details?.update_command))
+      }
+      expect(sent).toMatchObject(refusal)
+      expect(renamed).toMatchObject(refusal)
+      // A read-write connection: the refused store closed its WAL connection, which removed -wal and -shm, and a
+      // read-only connection cannot recreate them (macOS's system SQLite answers SQLITE_CANTOPEN). It only reads.
+      const db = new Database(gatewayDatabasePath(n.agentDir))
+      try {
+        expect(db.query("PRAGMA user_version").get()).toEqual({ user_version: n.gateway })
+      } finally {
+        db.close()
+      }
+    },
+  )
+
+  test.each([
+    ["thread_outbox_ack", { binding_id: "bnd-1", cursor: 3, provider_message_id: "m-1" }],
+    ["thread_report", { kind: "milestone", text: "done step 1" }],
+    ["thread_outbox", { binding_id: "bnd-1", after_cursor: 0 }],
+  ] as const)(
+    "#given the agent dir's store is one schema version past this binary's #when the relay tool %s runs #then it answers gateway_schema_too_new naming both schemas and omo update",
+    async (name, args) => {
+      const n = newerStore(1)
+      const g = gatewayFixture(n.store)
+      expect(await g.run(name, args, "dur-host", "call-relay")).toMatchObject({
+        kind: "error",
+        error: {
+          code: "gateway_schema_too_new",
+          details: { gateway_schema: n.gateway, binary_schema: n.binary, update_command: "omo update" },
+        },
+      })
+    },
+  )
+})
+
+describe("receipts stored before one field named a session (#14044 4a)", () => {
+  /** Writes a settled receipt through the real store under the key a retry of `args` uses, as an earlier build would. */
+  async function stored(
+    f: ReturnType<typeof fixture>,
+    operation: ThreadToolName,
+    args: Record<string, unknown>,
+    result: unknown,
+  ): Promise<void> {
+    const parsed = parseThreadParams(threadToolParamSchemas[operation], args)
+    if (parsed.kind !== "ok") throw new Error(`invalid ${operation} args`)
+    const scope = { principal: "session:caller", operation, idempotency_key: String(args["idempotency_key"]) }
+    expect(await f.store.toolReceiptBegin({ ...scope, now: Date.now(), args_hash: hashArgs(parsed.value) })).toEqual({
+      kind: "accepted",
+    })
+    await f.store.toolReceiptSettle({ ...scope, now: Date.now(), result: result as ThreadToolResult })
+  }
+
+  test("#given thread_create, thread_list, thread_rename and an ambiguous thread_read receipts stored in the old shape #when the same keys are retried #then each replays the current shape: thread is the address string and no endpoint internal comes back", async () => {
+    // given: receipts written by a build before #14044, under the keys the retries below use
+    const f = fixture()
+    const created = { name: "old create", idempotency_key: "create-before-14044" }
+    const listed = { idempotency_key: "list-before-14044" }
+    const renamed = { thread: "peer", name: "Renamed", idempotency_key: "rename-before-14044" }
+    const ambiguous = { thread: "twin", idempotency_key: "read-before-14044" }
+    const oldRow = {
+      sessionId: "route-peer",
+      durableSessionId: "dur-peer",
+      thread_id: "dur-peer",
+      name: "old create",
+      status: "live",
+      cwd: "/w",
+      created_at: "2026-11-01T00:00:00.000Z",
+      updated_at: "2026-11-01T00:00:00.000Z",
+      socket: "/tmp/thread-tools-test.sock",
+      endpoint_kind: "rpc_host",
+      endpoint: { kind: "rpc_host", socket: "/tmp/thread-tools-test.sock", routing_id: "route-peer" },
+      surface: "daemon",
+      alive: true,
+    }
+    await stored(f, "thread_create", created, {
+      kind: "ok",
+      thread: { ...oldRow, requested_skills: ["lead"] },
+      deduplicated: false,
+      prompt: { delivery: { kind: "started", turn_id: "1" }, deduplicated: false, endpoint: { kind: "rpc_host" } },
+    })
+    await stored(f, "thread_list", listed, { kind: "ok", threads: [oldRow], scope: "workspace" })
+    await stored(f, "thread_rename", renamed, { kind: "ok", thread_id: "dur-peer", name: "Renamed" })
+    const oldCandidates = [
+      { id: "dur-twin-1", name: "twin", cwd: "/w", preview: "", updatedAt: null, state: "live" },
+      { id: "dur-twin-2", name: "twin", cwd: "/w", preview: "", updatedAt: null, state: "live" },
+    ]
+    await stored(f, "thread_read", ambiguous, {
+      kind: "error",
+      error: {
+        code: "ambiguous_target",
+        message: "Two threads are named twin.",
+        next_action: "Pass one thread.",
+        details: { candidates: oldCandidates },
+      },
+    })
+
+    // when
+    const run = runner(f, "caller")
+    const replayed = {
+      create: await run("thread_create", created, "caller"),
+      list: await run("thread_list", listed, "caller"),
+      rename: await run("thread_rename", renamed, "caller"),
+      read: await run("thread_read", ambiguous, "caller"),
+    }
+
+    // then: the whole result, in the shape a current call answers
+    const row = {
+      thread: "dur-peer",
+      name: "old create",
+      status: "live",
+      cwd: "/w",
+      created_at: "2026-11-01T00:00:00.000Z",
+      updated_at: "2026-11-01T00:00:00.000Z",
+      link: "[old create](omo-thread://v1/dur-peer)",
+      surface: "daemon",
+      state: "idle",
+    }
+    const candidates = oldCandidates.map(({ id, ...rest }) => ({ thread: id, ...rest }))
+    expect(replayed).toStrictEqual({
+      create: {
+        kind: "ok",
+        ...row,
+        requested_skills: ["lead"],
+        deduplicated: false,
+        prompt: { delivery: { kind: "started", turn_id: "1" }, deduplicated: false },
+      },
+      list: { kind: "ok", threads: [row], scope: "workspace" },
+      rename: { kind: "ok", thread: "dur-peer", name: "Renamed" },
+      read: {
+        kind: "error",
+        error: {
+          code: "ambiguous_target",
+          message: "Two threads are named twin.",
+          next_action: "Pass one thread.",
+          details: { candidates },
+        },
+      },
+    } as unknown as typeof replayed)
+    expect(f.setSessionName).not.toHaveBeenCalled()
+    expect(f.prompt).not.toHaveBeenCalled()
+  })
+
+  test("#given receipts stored in the current shape #when the same keys are retried #then each replays byte-identical to what was stored", async () => {
+    // given: results a current build wrote, success and refusal alike
+    const f = fixture()
+    const row = {
+      thread: "dur-peer",
+      name: "peer",
+      status: "live",
+      cwd: "/w",
+      created_at: "2026-11-17T00:00:00.000Z",
+      updated_at: null,
+      link: "[peer](omo-thread://v1/dur-peer)",
+      surface: "daemon",
+      state: "idle",
+      controls: ["send", "read"],
+    }
+    const receipts = [
+      {
+        operation: "thread_create" as const,
+        args: { name: "peer", idempotency_key: "create-current" },
+        result: { kind: "ok", ...row, requested_skills: ["lead"], deduplicated: false },
+      },
+      {
+        operation: "thread_list" as const,
+        args: { idempotency_key: "list-current" },
+        result: { kind: "ok", threads: [row], scope: "workspace", devices: [] },
+      },
+      {
+        operation: "thread_rename" as const,
+        args: { thread: "peer", name: "Renamed", idempotency_key: "rename-current" },
+        result: { kind: "ok", thread: "dur-peer", name: "Renamed" },
+      },
+      {
+        operation: "thread_read" as const,
+        args: { thread: "twin", idempotency_key: "read-current" },
+        result: {
+          kind: "error",
+          error: {
+            code: "ambiguous_target",
+            message: "Two threads are named twin.",
+            next_action: "Pass one thread.",
+            details: {
+              candidates: [
+                { thread: "dur-twin-1", name: "twin", cwd: "/w", preview: "", updatedAt: null, state: "live" },
+              ],
+            },
+          },
+        },
+      },
+    ]
+    for (const receipt of receipts) await stored(f, receipt.operation, receipt.args, receipt.result)
+
+    // when
+    const run = runner(f, "caller")
+    const replayed: string[] = []
+    for (const receipt of receipts) replayed.push(JSON.stringify(await run(receipt.operation, receipt.args, "caller")))
+
+    // then
+    expect(replayed).toEqual(receipts.map((receipt) => JSON.stringify(receipt.result)))
+    expect(f.setSessionName).not.toHaveBeenCalled()
   })
 })

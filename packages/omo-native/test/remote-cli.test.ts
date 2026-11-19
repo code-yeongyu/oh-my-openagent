@@ -661,7 +661,8 @@ describe("omo remote session verbs", () => {
     // Review LOW at c09a616: --json still names the model the session opened on, as it did before #13409.
     expect(JSON.parse(out.join(""))).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-new-on-b", device: "b" },
+      thread: "dur-new-on-b",
+      device: "b",
       model: { provider: "openai", id: "gpt-6" },
     })
     expect(types(a.sent, "open_session").map((entry) => [entry.rpc?.["provider"], entry.rpc?.["modelId"]])).toEqual([
@@ -941,12 +942,46 @@ describe("omo remote session verbs", () => {
     expect([code, out, port.calls]).toEqual([REMOTE_EXIT.ok, [line], calls])
   })
 
+  // omo#14234 review M1: the CLI close takes the same force the tool does, names its own option, and lists what it dropped.
+  test.each([
+    ["an engine that names unread messages", {}, "messages it has not read: device:a/second, device:a/third"],
+    [
+      "an engine without unload_refuse_deliveries",
+      { refusesDeliveries: false },
+      "message ids: unavailable on that device's engine",
+    ],
+  ] as const)(
+    "close of a busy session with unread messages on %s is refused naming --force; --force closes it and lists them",
+    async (_label, engine, ids) => {
+      const unread = ["device:a/second", "device:a/third"]
+      const refused = fixture.account({ busy: true, unread, ...engine })
+      const denied = await run(["close", "b/dur-on-b"], undefined, SIGNED_IN, testBootstrap(), refused.remote)
+      expect(denied.code).toBe(REMOTE_EXIT.failed)
+      expect(denied.err.at(-1)).toBe(
+        `${ids}. Run omo remote close b/dur-on-b --force to close it anyway; those messages are dropped.`,
+      )
+      expect(refused.live.has("rk-on-b")).toBe(true)
+      const forced = fixture.account({ busy: true, unread, ...engine })
+      const { code, out } = await run(
+        ["close", "b/dur-on-b", "--force"],
+        undefined,
+        SIGNED_IN,
+        testBootstrap(),
+        forced.remote,
+      )
+      expect([code, out]).toEqual([
+        REMOTE_EXIT.ok,
+        ["Closed b/dur-on-b.", "Dropped 2 message(s) it had not read: device:a/second, device:a/third."],
+      ])
+    },
+  )
+
   test("--json prints the remote op's typed result as is", async () => {
     const a = fixture.account({ engine: { ...ENGINE, interrupt: { turnId: "turn-b", interrupted: true } } })
     const { out } = await run(["interrupt", "b/dur-on-b", "--json"], undefined, SIGNED_IN, testBootstrap(), a.remote)
     expect(JSON.parse(out.join(""))).toEqual({
       kind: "ok",
-      thread_id: "dur-on-b",
+      thread: "dur-on-b",
       turn_id: "turn-b",
       interrupted: true,
       background: { status: "not_supported" },
@@ -986,7 +1021,7 @@ describe("omo remote session verbs", () => {
   test.each([
     [
       ["send", "/session", "hi"],
-      "omo remote send: name the session as <device>/<session> (the SESSION column of omo remote sessions) or by the thread_id open printed",
+      "omo remote send: name the session as <device>/<session> (the SESSION column of omo remote sessions) or by the thread value open printed",
     ],
     [["send", "b/dur-on-b"], "omo remote send: the message text is required"],
     [["send", "b/dur-on-b", "hi", "--steer", "--follow-up"], "omo remote send: pass --steer or --follow-up, not both"],

@@ -206,6 +206,7 @@ describe("DeviceService.endpointCommand (relay daemon #393's attach-less session
   const endpointWorld = (): World => ({
     ...defaultWorld(),
     endpoints: { [PEER]: [ENDPOINT] },
+    primary: { [PEER]: ENDPOINT },
     endpointCommand: {
       data: { sessionId: "bmV3LXNlc3Npb24tMDAwMQ" },
       outcome: [
@@ -233,7 +234,7 @@ describe("DeviceService.endpointCommand (relay daemon #393's attach-less session
   })
 
   test("#given the peer lists no engine endpoint #when a session-less record is sent to it #then it is refused before any command goes out", async () => {
-    const { owner, service } = await serviceFor({ ...endpointWorld(), endpoints: { [PEER]: [] } })
+    const { owner, service } = await serviceFor({ ...endpointWorld(), endpoints: { [PEER]: [] }, primary: {} })
     const error = await service.endpointCommand(PEER, { type: "open_session" }).catch((e: unknown) => e)
     expect(error).toBeInstanceOf(LocalApiError)
     expect((error as LocalApiError).code).toBe("unsupported")

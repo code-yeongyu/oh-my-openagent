@@ -60,7 +60,7 @@ export const THREAD_TOOL_METADATA: readonly ThreadToolEntry[] = [
     name: "thread_send",
     label: "Send message to session",
     description:
-      "Delivers a message into another session that is already running, for when the user wants to talk to that session mid-task; its reply comes back through thread_read, and a bound chat thread's replies through thread_report and thread_answer" +
+      "Delivers a message into another session that is already running, for when the user wants to talk to that session mid-task; its reply comes back through thread_read, and a bound chat thread's replies through thread_report and thread_answer (in an eval cell: tool.thread_read(), tool.thread_report(), tool.thread_answer())" +
       ROUTE_TO_TASK,
     exposure: THREAD_TOOL_EXPOSURE,
   },
@@ -76,7 +76,7 @@ export const THREAD_TOOL_METADATA: readonly ThreadToolEntry[] = [
     name: "thread_close",
     label: "Close session",
     description:
-      "Closes a session. Omit thread or pass self to close this session. thread accepts a thread_id, a unique name, or a sessionId from thread_list (rpc-N or the short session id), which resolves to the durable thread_id; the result is closed true or false plus a reason" +
+      "Closes a session. Omit thread or pass self to close this session. thread accepts the thread value of a thread_list row (tool.thread_list() in an eval cell), an alias, or a unique name; the result is closed true or false plus a reason. A thread with messages it has not read is refused, naming them; pass force: true to close it anyway (dropped_deliveries lists them)" +
       ROUTE_TO_TASK,
     exposure: THREAD_TOOL_EXPOSURE,
   },
@@ -92,7 +92,7 @@ export const THREAD_TOOL_METADATA: readonly ThreadToolEntry[] = [
     name: "thread_rename",
     label: "Rename session",
     description:
-      "Renames a session's label, for when the user asks to call a session something clearer. Omit thread or pass self to rename this session. thread accepts a thread_id, a unique name, or a sessionId from thread_list (rpc-N or the short session id), which resolves to the durable thread_id; a miss names that thread_id",
+      "Renames a session's label, for when the user asks to call a session something clearer. Omit thread or pass self to rename this session. thread accepts the thread value of a thread_list row (tool.thread_list() in an eval cell), an alias, or a unique name; a miss names the thread value to pass",
     exposure: THREAD_TOOL_EXPOSURE,
   },
   {
@@ -110,10 +110,17 @@ export const THREAD_TOOL_METADATA: readonly ThreadToolEntry[] = [
     exposure: THREAD_TOOL_EXPOSURE,
   },
   {
+    name: "thread_archive",
+    label: "Archive session",
+    description:
+      "Archives or unarchives a session so the session list hides or shows it again, for when the user is finished with a session but wants to keep it",
+    exposure: THREAD_TOOL_EXPOSURE,
+  },
+  {
     name: "thread_report",
     label: "Report to chat thread",
     description:
-      "Posts a milestone, result, question or completion from this session to its bound chat thread, for when the user wants progress relayed to that chat; replies flow back through thread_read, thread_report and thread_answer",
+      "Posts a milestone, result, question or completion from this session to its bound chat thread, for when the user wants progress relayed to that chat; replies flow back through thread_read, thread_report and thread_answer (in an eval cell: tool.thread_read(), tool.thread_report(), tool.thread_answer())",
     exposure: THREAD_TOOL_EXPOSURE,
   },
   {
@@ -144,4 +151,4 @@ export const THREAD_TOOL_METADATA: readonly ThreadToolEntry[] = [
  * tokens, so the per-tool entries above stay free of policy prose.
  */
 export const THREAD_FAMILY_PROMPT_GUIDELINES =
-  "Thread tools address peer sessions, never child tasks: call thread_list first and pass a thread_id, a unique name, or that row's sessionId (rpc-N or the short session id), which resolves to the durable thread_id; thread_rename and thread_close take this session when thread is omitted or self; an ambiguous name returns candidates instead of delivering; leave all_scope unset to stay inside this workspace and set it only when the caller explicitly asks for sessions in every workspace; when you mention a thread to the user, paste the link its result carries instead of writing its id or inventing a link."
+  "Thread tools address peer sessions, never child tasks; while an eval tool exists they run only inside an eval cell, as tool.thread_<verb>(): call tool.thread_list() first and pass a row's thread value (every result names a session as thread, the exact string to pass back), an alias, or a unique name; tool.thread_rename() and tool.thread_close() take this session when thread is omitted or self; an ambiguous name returns candidates instead of delivering; leave all_scope unset to stay inside this workspace and set it only when the caller explicitly asks for sessions in every workspace; when you mention a thread to the user, paste the link its result carries instead of writing its id or inventing a link."

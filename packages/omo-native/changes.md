@@ -1,3 +1,36 @@
+## 2026-11-17 - omo sync disable (#14093)
+
+- `sync-cli.ts`: `omo sync disable` turns memory sync off for this device through `disableSync`; exit 0 with the off line, exit 1 when the service refuses or the device is signed out. `bin/lib/service-auth.generated.js` is rebuilt.
+
+## 2026-11-17 - opt-in OmO keychain for Macs whose login keychain stays locked (#14033)
+
+`keychain-helper`:
+- New `store` request field and the `store-create` / `store-activate` / `store-deactivate` / `store-erase` verbs (`dedicated.c`, `dedicated-lifecycle.c`, `store-select.c`).
+- The store is `~/Library/Application Support/OmO/credential-keychain` (`0700`) with a `0600` keychain and key.
+- Store-less requests are refused while it is active. Items there get an any-application ACL.
+
+`account-store.ts` adds `omo account store`. `keychain-helper-doctor.js` adds a `credential store` line. The service-auth `store-binding` chooses the store per call and has no helper-less path while it is active (#13116).
+
+## 2026-11-17 - omo thread and omo remote print the thread field (#14056)
+
+- `bin/lib/thread-output.js`, `remote-render.ts`, `remote-session-verbs.ts`: `omo thread list|send` and `omo remote open|send` read and print `thread`; `omo remote open --json` answers the flat `thread_create` shape.
+
+## 2026-11-17 - omo login replaces this computer's earlier device on machine_exists (#14055, fixes #14032)
+
+`device-flow.ts` `loginDevice`: on `machine_exists` it calls the new `replaceDevice` option with the refusal's `detail` (`deviceId`, `deviceName`, both optional, parsed in `protocol-request.ts`). If that returns true, it mints a new device code with `replace: { deviceId }` and polls it with the same keys. A second `machine_exists` (an older service that ignores `replace`) is reported as unsupported. `invalid_grant` with `detail.reason = "replace_mismatch"` is terminal. Only the device-token reply schema (`deviceTokenGrantSchema`) accepts `replacedDeviceId`; `grantSchema` and the stored credential schema do not, and `device-flow.ts` returns it to the caller. `login-routes.ts` `signInByRoute`: a browser sign-in refused with `machine_exists` gets the same decision and, when accepted, continues as a device-code replace sign-in (`loginDevice` with `replacing`). `replace-device.ts` `decideReplace` holds the three modes (`--replace`, interactive confirm with default No, a non-interactive refusal that names the flag). `commands.ts` adds `--replace` to the open command and the closed help, and `closed-device-login.ts` accepts `--replace`. The client revokes nothing.
+
+## 2026-11-17 - the keychain helper ends with its caller; a held credential lock names its holder (#14030)
+
+`keychain-helper/src/session.c`: the client is gone on stdin EOF or on `NOTE_EXIT` of the spawning process (parent-pid poll without a kqueue). A watchdog ends a mutating verb `limits.grace_ms` (30 s) after the client is gone and every run after `limits.lifetime_ms` (10 min), with the new exit code 5. Test builds take `--grace-ms`, `--lifetime-ms` and `--stall-mutation`. `team-core` `withLock` throws `LockWaitTimeoutError` with the holder record; `credential-lock.ts` maps it to a `SignInError` naming pid, age, lock path and action. `darwin-store.ts` `clear()` throws `HelperItemNotOwned` when both deletes are refused, mapped to `KeychainItemNotOwnedError` (carried from #13792).
+
+## 2026-11-17 - account show names an unrecoverable refresh, and forget deletes it (#14021)
+
+`account-show.ts` `reportedRefreshState`: `uncertain` with no `refreshAttempt`, an attempt whose `state` is `exhausted`, or one `eligibleAttempt` rejects is reported as `expired`. An eligible attempt stays `uncertain`. `docs/reference/cli.md` documents the value. `keychain-helper` `verb_remove` deletes a marked item without a successful decrypt, then `/usr/bin/security delete-generic-password` if the ACL still refuses this binary. `pin.ts` keeps the verified helper at a content-hash path and does not delete it on exit. The helper error `acl` says the keychain is unlocked and this program is not on the item's access list.
+
+## 2026-11-16 - remote usage names the bare thread id (#13825)
+
+Review L2 of #13748 at 0571de8: `remote-session-args.ts` `parseTarget`'s usage error names `<device>/<session>` or the `thread_id` open printed; `docs/reference/remote-sessions.md` says a bare id resolves through the account listing, which can lag a session opened a moment ago, so right after `open` the device-qualified form is the one to use. Review LOW of #13748 at c09a616: `remote-session-verbs.ts` `openOn` puts `model {provider, id}` from `--model` back on the `--json` result (the one-open launch profile had dropped the field the old `set_model` step set); `test/remote-cli.test.ts` and `test/remote-id-contract.test.ts` assert it.
+
 ## 2026-11-16 - omo remote open takes the launch profile, a worktree and a first prompt (#13748)
 
 `remote-session-args.ts`: `--model provider/id` (checked), `--thinking`, `--worktree [--branch B] [--base REF]` (needs `--project`), `--prompt TEXT [--steer|--follow-up]`. `remote-session-verbs.ts` `openOn` passes them to `createRelaySessionHost().open`, the same create path as `thread_create`, and no longer sends a `set_model` after the open, so a refused model leaves no session. `personDelivery` is the person pipeline `send` used, now shared with `open --prompt`. `remote-permission-preset.ts` re-exports the preset list from omo-senpi's `permission-presets.ts`. Folded from #13666: `remote-session-args.ts` `parseTarget` takes a bare durable id; `remote-session-target.ts` `resolveSessionTarget` finds its device in the account listing (`not_found` / `ambiguous_target` refuse before any command) and passes `<device>/<session>` through unchanged; `remote-cli.ts` attach resolves the same way and attaches through `attachAddressed`; `send` reports the row's thread id. Tests: `test/remote-open-mode.test.ts`, `test/remote-id-contract.test.ts` (from #13666).

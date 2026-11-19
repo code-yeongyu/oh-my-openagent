@@ -1,7 +1,7 @@
 import type { ThreadDataError } from "../contracts"
 import { threadToolFailure } from "../errors"
 import type { JsonObject, RemoteCommandOutcome } from "../remote/ports"
-import { outcomeFailure } from "../remote/outcome"
+import { endpointOutcomeFailure } from "../remote/outcome"
 import { folderFailure } from "../worktree/failures"
 
 const nonEmpty = (value: unknown): string | undefined =>
@@ -30,7 +30,7 @@ export function modelRefusal(text: string, model: string | undefined, device?: s
     error: threadToolFailure(
       "model_not_found",
       `No thread was created: ${where} cannot run ${model}.`,
-      `Pass a provider/id ${where} has (thread_set_model lists them), or leave model unset for its default.`,
+      `Pass a provider/id ${where} has (thread_set_model, tool.thread_set_model() in an eval cell, lists them), or leave model unset for its default.`,
       { reason: "model_unavailable", model, ...(device === undefined ? {} : { device }) },
     ),
   }
@@ -59,5 +59,5 @@ export function openRefusal(
       device,
       ...(cwd === undefined ? {} : { path: cwd }),
     })
-  return outcomeFailure(outcome, device)
+  return endpointOutcomeFailure(outcome, device)
 }

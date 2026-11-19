@@ -74,7 +74,9 @@ function checkpoint(
 }
 
 // Mirrors LOCK_WAIT_TIMEOUT_MS in store.ts; the handoff test asserts the wait exceeded it in total.
-const LOCK_WAIT_TIMEOUT_MS_FOR_TEST = 1_000
+const LOCK_WAIT_TIMEOUT_MS_FOR_TEST = 30_000
+// One step of an injected clock that already crosses the lock-wait ceiling.
+const PAST_LOCK_WAIT_MS = LOCK_WAIT_TIMEOUT_MS_FOR_TEST + 1
 
 describe("createDagFileStore event WAL", () => {
   test("#given five durable events #when reading two at a time #then sinceSeq is exclusive and hasMore flips", () => {
@@ -448,7 +450,7 @@ describe("createDagFileStore locks and retention", () => {
         isProcessAlive: (pid: number) => pid === holderPid,
         platform: "win32" as const,
         now: () => {
-          clock += 1_001
+          clock += PAST_LOCK_WAIT_MS
           return clock
         },
       },
@@ -535,7 +537,7 @@ describe("createDagFileStore locks and retention", () => {
       { project_dir: project },
       {
         now: () => {
-          reclaimerClock += 1_001
+          reclaimerClock += PAST_LOCK_WAIT_MS
           return reclaimerClock
         },
         isProcessAlive,
@@ -545,7 +547,7 @@ describe("createDagFileStore locks and retention", () => {
       { project_dir: project },
       {
         now: () => {
-          contenderClock += 1_001
+          contenderClock += PAST_LOCK_WAIT_MS
           return contenderClock
         },
         isProcessAlive,
@@ -720,7 +722,7 @@ describe("createDagFileStore locks and retention", () => {
         secondReclaimerEntered = true
       })
       // the first reclaimer's remaining I/O is slow on the loaded host
-      clock += 1_500
+      clock += LOCK_WAIT_TIMEOUT_MS_FOR_TEST + 500
       return fd
     })
 
@@ -741,8 +743,9 @@ describe("createDagFileStore locks and retention", () => {
 
   test("#given two live holders hand the lock over back to back #when each holds for less than the budget but together they exceed it #then the waiter acquires because the budget restarts per holder", () => {
     // given - the deadline must bound time stalled behind ONE holder. Holder A (alive) keeps us out
-    // for 800ms, then hands off to holder B (alive) for another 800ms. Neither stalls us past the
-    // 1000ms budget on its own; a wall-clock deadline would throw at B's second poll.
+    // for 80% of the budget, then hands off to holder B (alive) for another 80%. Neither stalls us
+    // past the budget on its own; a wall-clock deadline would throw at B's second poll.
+    const pollCost = LOCK_WAIT_TIMEOUT_MS_FOR_TEST * 0.4
     const project = tempProject()
     let clock = 5_000_000
     const now = () => clock
@@ -758,9 +761,9 @@ describe("createDagFileStore locks and retention", () => {
       const content = realRead(path, options as never)
       if (path !== canonical) return content
       polls += 1
-      // each poll of the canonical lock costs 400ms on this slow host
-      clock += 400
-      // after two polls (800ms) A releases and B takes over; after two more, B releases
+      // each poll of the canonical lock costs 40% of the budget on this slow host
+      clock += pollCost
+      // after two polls A releases and B takes over; after two more, B releases
       if (polls === 2) fs.writeFileSync(canonical, JSON.stringify(holderB))
       if (polls === 4) fs.rmSync(canonical, { force: true })
       return content
@@ -775,7 +778,41 @@ describe("createDagFileStore locks and retention", () => {
     // then
     expect(entered).toBe(true)
     expect(polls).toBeGreaterThanOrEqual(4)
-    expect(clock - 5_000_000).toBeGreaterThanOrEqual(LOCK_WAIT_TIMEOUT_MS_FOR_TEST + 400)
+    expect(clock - 5_000_000).toBeGreaterThanOrEqual(LOCK_WAIT_TIMEOUT_MS_FOR_TEST + pollCost)
+  })
+
+  test("#given one live holder whose fsynced writes stall for seconds on a starved host #when it releases #then the waiter acquires instead of timing out", () => {
+    // given - the losing side of a same-key dag start (#9306, #14095): the winner is alive and progressing, but a
+    // loaded runner stalls its checkpoint, key and WAL writes for seconds. Each poll of the lock observes 2 s pass.
+    const project = tempProject()
+    let clock = 7_000_000
+    const holder = { hostPid: 4101, token: "slow-live-holder" }
+    const store = createDagFileStore(
+      { project_dir: project },
+      { isProcessAlive: (pid) => pid === process.pid || pid === holder.hostPid, now: () => clock },
+    )
+    const canonical = store.paths.runLock(runId)
+    fs.writeFileSync(canonical, JSON.stringify(holder))
+    const realRead = fs.readFileSync
+    let polls = 0
+    spyOn(fs, "readFileSync").mockImplementation(((path: fs.PathOrFileDescriptor, options?: unknown) => {
+      const content = realRead(path, options as never)
+      if (path !== canonical) return content
+      polls += 1
+      clock += 2_000
+      if (polls === 3) fs.rmSync(canonical, { force: true })
+      return content
+    }) as typeof fs.readFileSync)
+
+    // when
+    let entered = false
+    store.withRunLock(runId, () => {
+      entered = true
+    })
+
+    // then
+    expect(entered).toBe(true)
+    expect(clock - 7_000_000).toBeGreaterThanOrEqual(6_000)
   })
 
   test("#given a crashed reclaimer left its sentinel #when another process reclaims the stale holder #then the sentinel cannot wedge acquisition", () => {
@@ -845,7 +882,8 @@ describe("createDagFileStore locks and retention", () => {
     fs.writeFileSync(reclaimSentinel, JSON.stringify({ hostPid: 202, token: "crashed-reclaimer" }))
     const realRead = fs.readFileSync
     spyOn(fs, "readFileSync").mockImplementation(((path: fs.PathOrFileDescriptor, options?: unknown) => {
-      if (typeof path === "string" && (path === canonical || path === reclaimSentinel)) clock += 600
+      if (typeof path === "string" && (path === canonical || path === reclaimSentinel))
+        clock += LOCK_WAIT_TIMEOUT_MS_FOR_TEST * 0.6
       return realRead(path, options as never)
     }) as typeof fs.readFileSync)
     const realLink = fs.linkSync
@@ -881,7 +919,7 @@ describe("createDagFileStore locks and retention", () => {
       { project_dir: project },
       {
         now: () => {
-          contenderClock += 1_001
+          contenderClock += PAST_LOCK_WAIT_MS
           return contenderClock
         },
         isProcessAlive: () => true,
@@ -934,7 +972,7 @@ describe("createDagFileStore locks and retention", () => {
       { project_dir: project },
       {
         now: () => {
-          clock += 1_001
+          clock += PAST_LOCK_WAIT_MS
           return clock
         },
         isProcessAlive: (pid) => pid === freshPid,
@@ -979,7 +1017,7 @@ describe("createDagFileStore locks and retention", () => {
       { project_dir: project },
       {
         now: () => {
-          clock += 1_001
+          clock += PAST_LOCK_WAIT_MS
           return clock
         },
         isProcessAlive: (pid) => pid === freshPid || pid === contenderPid,
@@ -1040,7 +1078,7 @@ describe("createDagFileStore locks and retention", () => {
       { project_dir: project },
       {
         now: () => {
-          clock += 1_001
+          clock += PAST_LOCK_WAIT_MS
           return clock
         },
         isProcessAlive: (pid) => {

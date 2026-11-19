@@ -1,4 +1,5 @@
 import type { ThreadToolResult } from "../contracts"
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { toThreadAddressEntries } from "../address-book"
 import { workspaceEntries } from "../addressing"
 import { rowThreadId } from "../remote/ports"
@@ -29,14 +30,16 @@ export async function locateControl(
 ): Promise<LocatedControl> {
   // Decision 0027: one resolver over this device's entries and the relay transport's address book. The entries are the
   // ones a send resolves against, session files no engine runs included, so every tool finds the thread a send finds.
+  // A session id both miss gets the send's account-wide lookup (A4.3.3, #13215): a session another device holds but
+  // runs nowhere is its ended row, so it answers not_live as it does on its own device, never not_found.
   const entries = toThreadAddressEntries(sendAddressBook(options, current, address, true))
-  const resolved = await resolveAcross(options, entries, address, callerId, allScope)
+  const resolved = await resolveAcross(options, entries, address, callerId, allScope, "exact", true)
   if (resolved.kind === "ok" && resolved.entry.transport?.kind === "relay" && options.remote !== undefined) {
     const row = resolved.entry.transport.row
     const offline = await deviceOnline(options.remote, row.device)
     if (offline !== undefined) return { kind: "error", result: offline }
     if (row.state === "ended")
-      return { kind: "not_live", thread_id: rowThreadId(row), title: row.title, device: row.device }
+      return { kind: "not_live", thread_id: rowThreadId(row), title: escapeForDisplay(row.title), device: row.device }
     return { kind: "control", control: createRelayControl(options.remote, row) }
   }
   if (resolved.kind === "error") return { kind: "error", result: { kind: "error", error: resolved } }

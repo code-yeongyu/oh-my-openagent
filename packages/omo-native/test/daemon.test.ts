@@ -260,6 +260,35 @@ describe("omo daemon", () => {
     expect(warm.events).toEqual([])
   })
 
+  // omo#14191: a bare `daemon: refuse` in the session host unit's log hid why every ensure was refused for days.
+  test("a refused run says why, where, and which host holds the socket", async () => {
+    const { pluginRoot, agentDir } = workspace()
+    const refusal = {
+      action: "refuse",
+      reason: "endpoint_occupied",
+      detail: "no host registration names this socket",
+      socket: "/h/.omo/agent/rpc/rpc.sock",
+      host: { engineVersion: "2026.11.15-2", generation: 15, instanceId: "8b27df13" },
+    }
+    const engine = fakeEngine({ exitCode: 3, stdout: JSON.stringify(refusal) })
+    const stdout = capture()
+
+    const exitCode = await runDaemonCommand(["run", "--pinned"], {
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout,
+      stderr: capture(),
+      platform: "darwin",
+      threadSdk: warmingSdk().threadSdk,
+    })
+
+    expect(exitCode).toBe(3)
+    for (const part of [refusal.reason, refusal.detail, refusal.socket, "2026.11.15-2", "8b27df13"])
+      expect(stdout.text()).toContain(part)
+  })
+
   test("--foreground fails clearly because the adopted engine always detaches", () => {
     const { pluginRoot, agentDir } = workspace()
     const engine = fakeEngine({ exitCode: 0, stdout: JSON.stringify({ action: "start", pid: 9 }) })

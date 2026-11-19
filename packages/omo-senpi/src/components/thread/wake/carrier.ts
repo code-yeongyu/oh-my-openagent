@@ -12,6 +12,9 @@ import { resolveWakeTarget, type WakeSessionKind } from "./session-target"
 const PERSON_WAIT_CLOSE_MS = 30 * 60_000
 /** How often a carrier renews its leases and sweeps (A3.1.3). */
 const CARRIER_RENEW_MS = 20_000
+// How long a finished-looking session refused for a queued delivery is kept for that delivery to run (#13708): a wake
+// admitted during the restore starts within seconds; past this the delivery is taken as held and dropped as before.
+const QUEUED_DELIVERY_GRACE_MS = 2 * 60_000
 
 export type CarrierWakeOutcome =
   | { readonly kind: "open"; readonly session_id: string; readonly generation: number }
@@ -86,6 +89,8 @@ type Carried = {
   readonly sessionId: string
   generation: number
   readonly off: () => void
+  /** When the release was first refused for a delivery since the session last worked or was refused otherwise (#13708). */
+  deliveryRefusedSince?: number
 }
 
 const HELD_ELSEWHERE = new Set(["session_held", "session_path_in_use"])
@@ -165,17 +170,25 @@ export function createCarrier(options: CarrierOptions): Carrier {
     })
   }
 
-  /** The quiet hand-back (A3.2.4): a refusal naming a held delivery is retried once with interrupt, which drops it. */
+  /**
+   * The quiet hand-back (A3.2.4). On a held session a refusal naming a held delivery is retried once with interrupt,
+   * which drops it. A finished session refused for a delivery has one queued to run (a wake admitted while the engine
+   * was still restoring it): it is kept, not interrupted, since an interrupt parks that delivery for a person's turn,
+   * for up to QUEUED_DELIVERY_GRACE_MS; a delivery still refused after that is held, and the interrupt drops it.
+   */
   const quietRelease = async (
     entry: Carried,
-  ): Promise<{ readonly ok: true } | { readonly ok: false; readonly code: string }> => {
+    dropHeldDelivery = true,
+  ): Promise<{ readonly ok: true } | { readonly ok: false; readonly code: string; readonly forDelivery?: true }> => {
     const first = await entry.connection.request({
       type: "release_session",
       sessionId: entry.sessionId,
       reason: "takeover",
     })
     if (first.success === true) return { ok: true }
-    if (codeOf(first) === "turn_active" && busyList(first).includes("delivery")) {
+    const forDelivery = codeOf(first) === "turn_active" && busyList(first).includes("delivery")
+    if (!dropHeldDelivery && forDelivery) return { ok: false, code: "turn_active", forDelivery: true }
+    if (forDelivery) {
       const second = await entry.connection.request({
         type: "release_session",
         sessionId: entry.sessionId,
@@ -239,8 +252,16 @@ export function createCarrier(options: CarrierOptions): Carrier {
       return { kind: "closed_waiting" }
     }
     if (renewed.row.first_waiting_at !== null) await store.woken.clearWaiting(fence)
-    if (!view.finished) return { kind: "kept", reason: "working" }
-    const released = await quietRelease(entry)
+    if (!view.finished) {
+      // Working again: a later refusal for a delivery gets its own full grace (#13709 review M1).
+      entry.deliveryRefusedSince = undefined
+      return { kind: "kept", reason: "working" }
+    }
+    const refusedSince = entry.deliveryRefusedSince
+    const graceOver = refusedSince !== undefined && store.now() - refusedSince >= QUEUED_DELIVERY_GRACE_MS
+    const released = await quietRelease(entry, graceOver)
+    if (!released.ok && released.forDelivery === true) entry.deliveryRefusedSince ??= store.now()
+    else entry.deliveryRefusedSince = undefined
     if (!released.ok) {
       if (released.code === "turn_active" || released.code === "session_busy")
         return { kind: "kept", reason: "working" }

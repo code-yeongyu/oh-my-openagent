@@ -1,13 +1,22 @@
 import type { ThreadErrorCode, ThreadToolFailure } from "../errors"
 import type { BindingRecord, OutboxRow } from "../gateway/bindings"
+import type { ThreadWorktree } from "../worktree/thread-worktree"
+import type { ThreadActivity, ThreadModel, ThreadState } from "./state"
+
+export { THREAD_ACTIVITIES, THREAD_STATES, type ThreadActivity, type ThreadModel, type ThreadState } from "./state"
 
 // Discriminated result unions. The error branch is shared data, never an exception: a caller
 // that sent a malformed payload receives { kind: "error", error: { code: "invalid_arguments" } }.
 
 export type ThreadDataError = { readonly kind: "error"; readonly error: ThreadToolFailure }
 
+/** Deprecated beside `state`, kept for one release: `resumable` when no engine holds the thread, else `live`. */
 export type ThreadStatus = "live" | "resumable"
 
+/**
+ * A thread as the address book and the controls hold it, never as a tool answers it: `thread_id` is its durable id and
+ * `endpoint` names the socket and routing id that reach it. Tool results carry `ThreadResultSummary` instead.
+ */
 export type ThreadSummary = {
   readonly thread_id: string
   readonly name: string
@@ -25,8 +34,6 @@ export type ThreadSummary = {
     readonly durable_session_id: string
   } | null
   readonly surface?: "tui" | "desktop" | "child" | "daemon" | null
-  /** `false` when the endpoint is not answering; the fields then come from the session file. */
-  readonly alive?: boolean
   /** What a caller can do to this thread through its endpoint; an older terminal accepts only send, read and rename. */
   readonly controls?: readonly ("send" | "read" | "rename" | "set_model" | "set_reasoning" | "interrupt")[]
   /** `thread_create` only: the initial skills attached to the new thread (`initial-skills.ts`). */
@@ -38,10 +45,49 @@ export type ThreadSummary = {
 }
 
 /**
- * A thread as a tool result names it: `link` is `[title](omo-thread://v1/<thread_id>)` (`thread-link.ts`), pasted when telling the user about the thread.
- * A `thread_create`, `thread_list` or `thread_read` result stored before links existed and replayed for the same idempotency key (30-day retention) has no `link`.
+ * A thread as a tool result names it (#14044 step 4a). `thread` is the exact string every thread tool takes back as its
+ * `thread` input (today the durable id); no other field names the session, and no endpoint internal (socket, session
+ * file, routing id) is shown. `machine` is the display name of the device that holds it, when known. `link` is
+ * `[title](omo-thread://v1/<thread>)` (`thread-link.ts`), pasted when telling the user about the thread.
+ * A result stored by an earlier build and replayed for the same idempotency key (30-day receipt retention) is answered
+ * in this shape too: `currentResult` (`tools/thread-row.ts`) maps its `thread_id` or nested `thread`, rows, candidates
+ * and endpoint kind, and rebuilds a missing `link`.
  */
-export type ThreadResultSummary = ThreadSummary & { readonly link: string }
+export type ThreadResultSummary = {
+  readonly thread: string
+  readonly name: string
+  readonly status: ThreadStatus
+  readonly machine?: string
+  readonly cwd: string
+  readonly created_at: string
+  readonly updated_at: string | null
+  readonly link: string
+  /** The account device that holds the thread, when it is not this device's: pass it as thread_create's `device`. */
+  readonly device?: string
+  /** The thread's account-wide alias, usable instead of `thread` in every thread tool. */
+  readonly alias?: string
+  readonly surface?: ThreadSummary["surface"]
+  /** What the thread is doing (`contracts/state.ts`); a thread has no online state, `online` is a device's. */
+  readonly state: ThreadState
+  /** The thread's current model; absent when its engine does not report one (an older engine, an inactive thread). */
+  readonly model?: ThreadModel
+  /** A held thread's finer activity when its engine reports one (an older engine reports none). */
+  readonly activity?: ThreadActivity
+  /** With `activity: "errored"`: the failed turn's category. */
+  readonly error_code?: string
+  /** The current or most recent turn's id, as the prompt response names it. */
+  readonly turn_id?: string
+  /**
+   * Set when the row comes from another device's cached listing (it did not answer this round): when that listing was
+   * taken. Such a row is the device's last word, so it reads `inactive` (or `archived`), never `running`.
+   */
+  readonly as_of?: string
+  readonly controls?: ThreadSummary["controls"]
+  /** Present only on a thread listed from disk because its endpoint stopped answering. */
+  readonly error_note?: string
+  /** `thread_create` only: the initial skills attached to the new thread (`initial-skills.ts`). */
+  readonly skills?: readonly string[]
+}
 
 export type ThreadDelivery =
   | { readonly kind: "steered"; readonly turn_id: string }
@@ -60,14 +106,13 @@ export type ThreadDelivery =
   | { readonly kind: "queued_offline"; readonly queue_position: number; readonly reason?: "wake_unavailable" }
 
 /**
- * What a send through the session gateway adds to a delivery result: the durable `delivery_id`, the
- * lane the target used (`steer` / `follow_up`, or the requested mode while it waits), and the kind
- * of endpoint that serves the target (null when none answered).
+ * What a send through the session gateway adds to a delivery result: the durable `delivery_id` and the lane the target
+ * used (`steer` / `follow_up`, or the requested mode while it waits). The kind of endpoint that served the target is an
+ * endpoint internal (#14044): only the SDK's send (`endpoint_kind`, for `omo thread send` and connectors) reports it.
  */
 export type ThreadGatewayDeliveryFacts = {
   readonly delivery_id?: string
   readonly effective_mode?: "auto" | "steer" | "follow_up"
-  readonly endpoint?: { readonly kind: "rpc_host" | "tui" } | null
 }
 
 export type ThreadAddressResolution = "id" | "exact_name" | "fuzzy"
@@ -89,10 +134,16 @@ export type ThreadLocalAliasNote = {
   readonly alias_unavailable?: "sign_in" | "no_registry" | "no_remote"
   /**
    * Set only when the account was gone by the alias claim, after thread_create had made the thread: the alias could
-   * not become its local name (`name_conflict` with another thread, or the code that refused the rename), so the
-   * thread keeps the name it was created with.
+   * not become its local name (`name_conflict` with another thread, the code that refused the rename, or
+   * `host_unavailable` when the rename failed with no typed refusal), so the thread keeps the name it was created with.
    */
   readonly local_name_unavailable?: ThreadErrorCode
+  /**
+   * Set only with `local_name_unavailable: "host_unavailable"` from a rename that failed with no typed refusal: the
+   * error's message (its string form when the thrown value is not an Error), capped at 300 code points with an ellipsis,
+   * so a failure in the rename path is traceable instead of a bare code.
+   */
+  readonly local_name_unavailable_reason?: string
 }
 
 /**
@@ -109,12 +160,17 @@ export type ThreadCreatePrompt =
   | ({ readonly delivery: ThreadDelivery; readonly deduplicated: boolean } & ThreadGatewayDeliveryFacts)
   | { readonly error: ThreadToolFailure }
 
+/** `thread_create` answers the thread it made or opened flat: its `thread` is the address to pass back. */
 export type ThreadCreateResult =
-  | ({
+  | (ThreadResultSummary & {
       readonly kind: "ok"
-      readonly thread: ThreadResultSummary
       readonly deduplicated: boolean
       readonly prompt?: ThreadCreatePrompt
+      readonly requested_skills?: readonly string[]
+      /** The git worktree the new thread was started in, when thread_create asked for one. */
+      readonly worktree?: ThreadWorktree
+      /** Steps after the session was created that failed; the thread exists anyway. */
+      readonly warnings?: readonly ThreadToolFailure[]
     } & ThreadLocalAliasNote &
       ThreadWorkspaceNote)
   | ThreadDataError
@@ -156,13 +212,15 @@ export type ThreadListResult =
        * plan has no relay (`plan_required`, a Free plan).
        */
       readonly aliases_unavailable?: "sign_in" | "host_unavailable" | "not_asked"
+      /** More session files were in scope than one list reads (newest first): older inactive threads are left out. */
+      readonly inactive_truncated?: true
     }
   | ThreadDataError
 
 export type ThreadReadResult =
   | {
       readonly kind: "ok"
-      readonly thread_id: string
+      readonly thread: string
       readonly link: string
       readonly items: readonly ThreadTranscriptItem[]
       readonly truncated: boolean
@@ -194,7 +252,7 @@ export type ThreadWaitOutcome = {
 export type ThreadSendResult =
   | ({
       readonly kind: "ok"
-      readonly thread_id: string
+      readonly thread: string
       readonly link: string
       readonly delivery: ThreadDelivery
       /** The gateway row's sequence; absent for a session on another device, which has no row here. */
@@ -225,7 +283,7 @@ export type ThreadInterruptBackground =
 export type ThreadInterruptResult =
   | {
       readonly kind: "ok"
-      readonly thread_id: string
+      readonly thread: string
       readonly turn_id?: string
       readonly interrupted: boolean
       readonly background: ThreadInterruptBackground
@@ -235,22 +293,24 @@ export type ThreadInterruptResult =
 
 /**
  * `closed` is whether this call shut the session down. `reason` is always set: `closed` when it did,
- * `not_live` when nothing live held it (the session stays as it was).
+ * `not_live` when nothing live held it (the session stays as it was). `dropped_deliveries` is always set: the
+ * deliveries the close handed back unread (their senders redeliver them), empty when none (omo#14234).
  */
 export type ThreadCloseResult =
   | {
       readonly kind: "ok"
-      readonly thread_id: string
+      readonly thread: string
       readonly closed: boolean
       readonly reason: "closed" | "not_live"
+      readonly dropped_deliveries: readonly string[]
       readonly device?: string
     }
   | ThreadDataError
 
+/** `thread_handoff` answers the thread it reached flat, like `thread_create`. */
 export type ThreadHandoffResult =
-  | ({
+  | (ThreadResultSummary & {
       readonly kind: "ok"
-      readonly thread: ThreadResultSummary
       readonly resolved_by: ThreadAddressResolution
       readonly delivery: ThreadDelivery
       /** The gateway row's sequence; absent for a session on another device, which has no row here. */
@@ -267,7 +327,7 @@ export type ThreadReasoningScope = "session" | "turn"
 export type ThreadRenameResult =
   | ({
       readonly kind: "ok"
-      readonly thread_id: string
+      readonly thread: string
       readonly name: string
       readonly alias?: string
       readonly device?: string
@@ -277,16 +337,20 @@ export type ThreadRenameResult =
 export type ThreadSetModelResult =
   | {
       readonly kind: "ok"
-      readonly thread_id: string
+      readonly thread: string
       readonly model: { readonly provider: string; readonly id: string }
       readonly device?: string
     }
   | ThreadDataError
 
+/** The thread as `thread_list` would list it now, with the state its archived flag gives it. */
+export type ThreadArchiveResult =
+  ({ readonly kind: "ok"; readonly archived: boolean } & ThreadResultSummary) | ThreadDataError
+
 export type ThreadSetReasoningResult =
   | {
       readonly kind: "ok"
-      readonly thread_id: string
+      readonly thread: string
       readonly level: ThreadThinkingLevel
       readonly scope: ThreadReasoningScope
       readonly device?: string
@@ -346,3 +410,4 @@ export type ThreadToolResult =
   | ThreadRenameResult
   | ThreadSetModelResult
   | ThreadSetReasoningResult
+  | ThreadArchiveResult

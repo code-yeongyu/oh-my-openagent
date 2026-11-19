@@ -162,6 +162,42 @@ describe("publish.yml child path release tag", () => {
     }
   })
 
+  test.each(Object.keys(PRE_TAG_WRITERS))(
+    "#given the pre-tag writer %s #then its guard keeps every write off the child run",
+    (name) => {
+      const guard = PRE_TAG_WRITERS[name]?.guard
+      expect({ name, guard: typeof guard }).toEqual({ name, guard: "string" })
+      const writes = stepsOf(name).filter(
+        (s) => publishersOf({ jobs: { probe: { steps: [s] } } }).publishers.length > 0,
+      )
+      expect(writes.length).toBeGreaterThan(0)
+      for (const write of writes) {
+        const guarded = [workflow.jobs[name]?.if, write.if].some(
+          (condition) => guard !== undefined && condition?.includes(guard),
+        )
+        expect({ name, step: write.name, guarded }).toEqual({ name, step: write.name, guarded: true })
+      }
+    },
+  )
+
+  test("#given a child run #when prepare-release-state generates #then it hands back the prepared SHA and pushes nothing", () => {
+    const root = mkdtempSync(join(tmpdir(), "publish-prepare-child-"))
+    scratch.push(root)
+    const output = join(root, "output")
+    writeFileSync(output, "")
+    const sha = "0123456789abcdef0123456789abcdef01234567"
+    const run = step({ job: "prepare-release-state", name: "Prepare release state (generation)" }).run
+    const result = spawnSync("bash", ["-eo", "pipefail", "-c", run], {
+      cwd: root,
+      encoding: "utf8",
+      env: { PATH: process.env.PATH ?? "", GITHUB_OUTPUT: output, GITHUB_SHA: sha, PREPARED_RELEASE_SHA: sha, VERSION },
+    })
+    expect(result.status).toBe(0)
+    expect(readFileSync(output, "utf8").split("\n")).toEqual(
+      expect.arrayContaining([`release_sha=${sha}`, "needs_push=false"]),
+    )
+  })
+
   test("#given the workflow #then exactly one step tags the prepared source", () => {
     const tagSteps = Object.entries(workflow.jobs).flatMap(([name, job]) =>
       (job.steps ?? []).filter((s) => s.name === TAG_STEP.name).map(() => name),

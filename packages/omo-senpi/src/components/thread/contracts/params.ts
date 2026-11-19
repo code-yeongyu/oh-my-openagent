@@ -25,6 +25,16 @@ export const ThreadListParams = Type.Object({
         "List this machine's threads from every workspace; the default returns only the caller's workspace here. The account's other devices' threads are always listed.",
     }),
   ),
+  state: Type.Optional(
+    Type.Array(
+      Type.Union([Type.Literal("running"), Type.Literal("idle"), Type.Literal("inactive"), Type.Literal("archived")]),
+      {
+        minItems: 1,
+        description:
+          "Thread states to list: running, idle, inactive (no engine holds it) or archived; the default lists every state but archived.",
+      },
+    ),
+  ),
 })
 
 /** The longest a `thread_read` waits for its thread to settle (#13417). */
@@ -35,7 +45,7 @@ export const ThreadReadParams = Type.Object({
   cursor: Type.Optional(
     Type.String({
       description:
-        "Opaque cursor from an earlier thread_read to continue a truncated transcript; a transcript revision that moved past it returns cursor_stale.",
+        "Opaque cursor from an earlier thread_read (tool.thread_read() in an eval cell) to page the older messages of a truncated read (a read without one returns the newest messages that fit max_bytes); a transcript revision that moved past it returns cursor_stale.",
     }),
   ),
   max_bytes: Type.Optional(
@@ -49,7 +59,7 @@ export const ThreadReadParams = Type.Object({
     Type.Integer({
       minimum: 1,
       maximum: THREAD_READ_WAIT_MAX_MS,
-      description: "Wait up to this many ms for a remote thread's turn to end, then read; see result.wait.",
+      description: "Wait up to this many ms for the thread's turn to end, then read; see result.wait.",
     }),
   ),
   all_scope: AllScope,
@@ -80,7 +90,7 @@ const SelfOrThread = Type.Optional(
   Type.String({
     minLength: 1,
     description:
-      "Thread to act on. Omit or pass self for this session. Accepts a thread_id, a unique name, or a sessionId from thread_list (rpc-N or the short session id); a sessionId resolves to that row's durable thread_id. A miss names the durable thread_id to pass.",
+      "Thread to act on. Omit or pass self for this session. Accepts the thread value of a thread_list row (tool.thread_list() in an eval cell), an alias, or a unique name. A miss names the thread value to pass.",
   }),
 )
 
@@ -88,6 +98,12 @@ const ThreadCloseParams = Type.Object({
   thread: SelfOrThread,
   idempotency_key: IdempotencyKey,
   all_scope: AllScope,
+  force: Type.Optional(
+    Type.Boolean({
+      description:
+        "Close even when the thread has messages it has not read yet; they are dropped and listed in dropped_deliveries.",
+    }),
+  ),
 })
 
 export const ThreadHandoffParams = Type.Object({
@@ -163,6 +179,18 @@ export const ThreadSetReasoningParams = Type.Object({
   idempotency_key: IdempotencyKey,
 })
 
+const ThreadArchiveParams = Type.Object({
+  thread: ThreadAddress,
+  archived: Type.Optional(
+    Type.Boolean({
+      description:
+        "true (the default) archives the thread, so thread_list (tool.thread_list() in an eval cell) hides it unless state includes archived; false unarchives it.",
+    }),
+  ),
+  all_scope: AllScope,
+  idempotency_key: IdempotencyKey,
+})
+
 export const ThreadReportParams = Type.Object({
   binding_id: Type.Optional(
     Type.String({
@@ -196,7 +224,7 @@ export const ThreadReportParams = Type.Object({
       ],
       {
         description:
-          "For kind question: which extension UI request request_id is. It decides the answer forms thread_answer accepts: confirm takes yes/no (any case, surrounding spaces ignored), input and editor take any text including empty, question and select take non-blank text. Without it the answer goes out in every text form at once, so a question, select, input or editor each reads its own and the text must be non-blank; a yes/no word also goes out as the confirm field, so an undeclared confirm reads yes/no too (any other text reads as no).",
+          "For kind question: which extension UI request request_id is. It decides the answer forms thread_answer (tool.thread_answer() in an eval cell) accepts: confirm takes yes/no (any case, surrounding spaces ignored), input and editor take any text including empty, question and select take non-blank text. Without it the answer goes out in every text form at once, so a question, select, input or editor each reads its own and the text must be non-blank; a yes/no word also goes out as the confirm field, so an undeclared confirm reads yes/no too (any other text reads as no).",
       },
     ),
   ),
@@ -251,6 +279,7 @@ export type ThreadHandoffInput = Static<typeof ThreadHandoffParams>
 export type ThreadRenameInput = Static<typeof ThreadRenameParams>
 export type ThreadSetModelInput = Static<typeof ThreadSetModelParams>
 export type ThreadSetReasoningInput = Static<typeof ThreadSetReasoningParams>
+export type ThreadArchiveInput = Static<typeof ThreadArchiveParams>
 export type ThreadReportInput = Static<typeof ThreadReportParams>
 export type ThreadOutboxInput = Static<typeof ThreadOutboxParams>
 export type ThreadOutboxAckInput = Static<typeof ThreadOutboxAckParams>
@@ -267,6 +296,7 @@ export const threadToolParamSchemas = {
   thread_rename: ThreadRenameParams,
   thread_set_model: ThreadSetModelParams,
   thread_set_reasoning: ThreadSetReasoningParams,
+  thread_archive: ThreadArchiveParams,
   thread_report: ThreadReportParams,
   thread_outbox: ThreadOutboxParams,
   thread_outbox_ack: ThreadOutboxAckParams,
