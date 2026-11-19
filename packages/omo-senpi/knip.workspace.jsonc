@@ -355,6 +355,8 @@
         "scripts/qa/thread-tools/desktop-to-cli.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/draft-preservation.mjs",
+        // run by path from scripts/qa/thread-tools/run-all.mjs (#14333: no mode starts an idle TUI and steers a busy one)
+        "scripts/qa/thread-tools/default-delivery.mjs",
         // run by path as the free-plan cross-workspace thread-tools QA driver (#14201)
         "scripts/qa/thread-tools/free-plan-cross-workspace.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
