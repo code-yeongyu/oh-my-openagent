@@ -133,7 +133,14 @@ export function withAddresses(
     return {
       ...candidate,
       ...(device === undefined ? {} : { device }),
-      ...(device === undefined ? {} : { address: formatAddress(device, candidate.thread) }),
+      // A row with no thread id is passed back by its row key, `<device id>/<listing key>`: already an address.
+      ...(device === undefined
+        ? {}
+        : {
+            address: candidate.thread.startsWith(`${device}/`)
+              ? candidate.thread
+              : formatAddress(device, candidate.thread),
+          }),
       ...(name === undefined ? {} : { device_name: name }),
     }
   })

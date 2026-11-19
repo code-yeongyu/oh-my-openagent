@@ -1,4 +1,5 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
+import { rowName } from "@oh-my-opencode/thread-address-core"
 import {
   assembleAddressBook,
   findDiskSessions,
@@ -148,6 +149,24 @@ export function summary(session: ThreadHostSession, entry?: AddressEntry): Threa
     updated_at: entry === undefined ? (session.updated_at ?? session.updatedAt ?? created) : entry.updated_at,
     ...(entry === undefined ? {} : { endpoint: entry.endpoint, surface: entry.surface }),
     link: threadLink(id, entry?.title ?? threadTitle(session.name, null)),
+  }
+}
+
+/**
+ * A listed thread named by the one rule another device's rows take (thread-address-core `rowName`): its name, else its
+ * first message, else its folder, marked `unnamed`, because only a real name is an address.
+ */
+export function rowNamed<T extends ThreadToolSummary>(
+  thread: T,
+  name: string | null | undefined,
+  firstMessage: string | null | undefined,
+): T & { readonly unnamed?: true } {
+  const shown = rowName({ name, first_message: firstMessage, folder: thread.cwd })
+  return {
+    ...thread,
+    name: shown.name,
+    ...(shown.unnamed ? { unnamed: true as const } : {}),
+    link: threadLink(thread.thread_id, shown.name),
   }
 }
 
