@@ -23,12 +23,13 @@ export {
 } from "./row"
 export {
   deviceLabel,
+  deviceNotAsked,
   devicesSilent,
   noDevice,
   noThreadOnDevice,
-  probeUnavailable,
   type AddressRefusal,
   type DeviceCandidate,
   type DeviceRow,
+  type NotAskedReason,
   type RefusalCode,
 } from "./refusals"

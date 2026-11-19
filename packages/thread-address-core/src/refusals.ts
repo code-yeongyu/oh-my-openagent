@@ -11,6 +11,12 @@ export type RefusalCode =
 /** A device as a refusal lists it. */
 export type DeviceCandidate = { readonly device: string; readonly name: string; readonly online: boolean }
 
+/**
+ * Why a device that does not list a thread could not be asked whether it holds it (#14280): this device has no account
+ * connection, its service carries no wake (so it makes no probe), or it makes no single probe.
+ */
+export type NotAskedReason = "remote_unavailable" | "wake_unavailable" | "lookup_unavailable"
+
 /** A device row as the roster names it. */
 export type DeviceRow = {
   readonly id: string
@@ -66,9 +72,9 @@ export type AddressRefusal =
     }
   | {
       readonly code: "host_unavailable"
-      readonly reason: "probe_unavailable"
+      readonly reason: NotAskedReason
       readonly details: {
-        readonly reason: "probe_unavailable"
+        readonly reason: NotAskedReason
         readonly thread: string
         readonly device: string
         readonly device_name: string
@@ -133,13 +139,14 @@ export const devicesSilent = (
   details: { reason, devices: devices.map((device) => device.id), device_names: devices.map((device) => device.name) },
 })
 
-export const probeUnavailable = (
+export const deviceNotAsked = (
+  reason: NotAskedReason,
   thread: string,
   device: { readonly id: string; readonly name: string },
 ): AddressRefusal => ({
   code: "host_unavailable",
-  reason: "probe_unavailable",
-  details: { reason: "probe_unavailable", thread, device: device.id, device_name: device.name },
+  reason,
+  details: { reason, thread, device: device.id, device_name: device.name },
 })
 
 export const noThreadOnDevice = (

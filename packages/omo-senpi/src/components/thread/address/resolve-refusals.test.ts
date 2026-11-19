@@ -204,7 +204,8 @@ describe("#given an approved reply pinned to its sender's device #when it resolv
       "B silent on the probe",
       { device: B.id, thread: T.nowhere },
       { probe: true, silent: [B.id] },
-      { kind: "error", code: "host_unavailable", details: { reason: "device_unanswered", devices: [B.id] } },
+      // #14280: a silent probe keeps the service's own reason.
+      { kind: "error", code: "host_unavailable", details: { reason: "host_not_answering", devices: [B.id] } },
     ],
     [
       "B answered and holds no such thread",
@@ -213,10 +214,10 @@ describe("#given an approved reply pinned to its sender's device #when it resolv
       { kind: "error", code: "not_found", details: { kind: "thread", device: B.id, device_name: B.name } },
     ],
     [
-      "B cannot be asked (no probe)",
+      "B cannot be asked (this device's service carries no wake, so no probe)",
       { device: B.id, thread: T.nowhere },
       {},
-      { kind: "error", code: "host_unavailable", details: { reason: "probe_unavailable", device: B.id } },
+      { kind: "error", code: "host_unavailable", details: { reason: "wake_unavailable", device: B.id, thread: T.nowhere } },
     ],
   ] as const)("%s", async (_label, pin, setup, expected) => {
     expect(await resolve(pin.thread, { pin }, setup)).toMatchObject(expected)

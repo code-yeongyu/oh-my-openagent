@@ -1,11 +1,12 @@
-import { devicesSilent, noThreadOnDevice, probeUnavailable, sameSession } from "@oh-my-opencode/thread-address-core"
+import { deviceNotAsked, devicesSilent, noThreadOnDevice, sameSession } from "@oh-my-opencode/thread-address-core"
 import { threadToolFailure } from "../errors"
-import { relayAddressEntry } from "../remote/address-book"
+import { deviceListing, relayAddressEntry } from "../remote/address-book"
 import {
   endedRow,
   probeMayBuildEndedRow,
   rowThreadId,
   type RemoteDevice,
+  type RemoteListing,
   type RemoteThreadSurface,
 } from "../remote/ports"
 import { remoteAvailable } from "../remote/remote-ops"
@@ -78,7 +79,13 @@ export async function probeAcross(
     }
   }
   const silent = answers.flatMap(({ device, answer }) => (answer.kind === "silent" ? [named(devices, device)] : []))
-  if (silent.length > 0) return toolRefusal(devicesSilent("device_unanswered", silent), thread)
+  // omo#14270: who answered "not held", this device first (its own miss came before the probe), so a miss on the device
+  // that really keeps the file shows instead of reading as "wait for the silent one".
+  const answered = [
+    ...(here === null ? [] : [here]),
+    ...answers.flatMap(({ device, answer }) => (answer.kind === "silent" ? [] : [device])),
+  ]
+  if (silent.length > 0) return toolRefusal(devicesSilent("device_unanswered", silent), thread, answered)
   return refusal(
     "not_found",
     `No online device of this account holds session ${thread}.`,
@@ -90,41 +97,63 @@ export async function probeAcross(
 /**
  * Amendment A4.3.1 of #13037: an approved reply to a sender whose delivery came from another device resolves on THAT
  * device and nowhere else: its listing row (a read of that one device), else one probe of it, which finds a session it
- * holds but does not run as an ended row. Each other outcome has its own refusal (#14280).
+ * holds but does not run as an ended row. #14280: the listing finds the sender's key; it never decides the sender is gone.
+ * A row miss is read again once, and each refusal names its own reason: the device missed the round
+ * (`listing_incomplete`), this device cannot reach the account or cannot ask the device (`remote_unavailable`,
+ * `wake_unavailable`, `lookup_unavailable`), the probe got no answer (the service's own reason). not_found only when the
+ * device answered twice that it lists no such session and its probe answered that it holds none.
  */
 export async function pinned(
   remote: RemoteThreadSurface | undefined,
   pin: { readonly device: string; readonly thread: string },
 ): Promise<Found | ThreadRefusal> {
-  const roster = async () =>
-    remote === undefined
-      ? undefined
-      : await accountDevices(remote.client).then(
-          (read) => read.devices,
-          () => undefined,
-        )
-  if (remote === undefined) return toolRefusal(noThreadOnDevice(pin.thread, { id: pin.device, name: pin.device }))
+  if (remote === undefined)
+    return toolRefusal(deviceNotAsked("remote_unavailable", pin.thread, { id: pin.device, name: pin.device }))
   const unavailable = await remoteAvailable(remote)
   if (unavailable !== undefined) return asRefusal(unavailable.error)
-  try {
-    const rows = await remote.sessions.sessions({ device: pin.device })
-    const row = rows.find((candidate) =>
+  const device = async () =>
+    named(
+      await accountDevices(remote.client).then(
+        (read) => read.devices,
+        () => undefined,
+      ),
+      pin.device,
+    )
+  // Every refusal of a pinned reply names the sender and its device.
+  const onPin = (refused: ThreadRefusal, extra: Readonly<Record<string, unknown>> = {}): ThreadRefusal => ({
+    ...refused,
+    details: { ...refused.details, thread: pin.thread, device: pin.device, ...extra },
+  })
+  // One read of the sender's device: its row, a refusal naming why the read could not tell, or undefined (it answered
+  // and lists no such session).
+  const listed = async (): Promise<Found | ThreadRefusal | undefined> => {
+    let listing: RemoteListing
+    try {
+      listing = await deviceListing(remote, pin.device)
+    } catch (error) {
+      return refusal(
+        "host_unavailable",
+        "The account's session listing could not be reached.",
+        "Retry when the device service is reachable.",
+        { reason: error instanceof Error ? error.message : String(error) },
+      )
+    }
+    const row = listing.rows.find((candidate) =>
       sameSession(
         { device: pin.device, thread: pin.thread },
         { device: candidate.device, thread: rowThreadId(candidate), key: candidate.session_id },
       ),
     )
     if (row !== undefined) return { kind: "ok", entry: relayAddressEntry(row), resolution: "id", all_scope: true }
-  } catch (error) {
-    return refusal(
-      "host_unavailable",
-      "The account's session listing could not be reached.",
-      "Retry when the device service is reachable.",
-      { reason: error instanceof Error ? error.message : String(error) },
-    )
+    if (listing.incomplete.includes(pin.device))
+      return onPin(toolRefusal(devicesSilent("listing_incomplete", [await device()])))
+    return undefined
   }
-  const canProbe = remote.sessions.lookup !== undefined && (await probeMayBuildEndedRow(remote.sessions))
-  const probed = canProbe ? await remote.sessions.lookup?.(pin.device, pin.thread) : undefined
+  const first = await listed()
+  if (first !== undefined) return first
+  // One rule for a probe-built ended row (probeMayBuildEndedRow): no probe while the wake cannot be carried.
+  const mayProbe = await probeMayBuildEndedRow(remote.sessions)
+  const probed = mayProbe ? await remote.sessions.lookup?.(pin.device, pin.thread) : undefined
   if (probed?.kind === "found")
     return {
       kind: "ok",
@@ -132,8 +161,13 @@ export async function pinned(
       resolution: "probe",
       all_scope: true,
     }
-  const device = named(await roster(), pin.device)
-  if (probed?.kind === "silent") return toolRefusal(devicesSilent("device_unanswered", [device]), pin.thread)
-  if (probed?.kind === "none") return toolRefusal(noThreadOnDevice(pin.thread, device))
-  return toolRefusal(probeUnavailable(pin.thread, device))
+  if (probed?.kind === "silent")
+    return onPin(toolRefusal(devicesSilent("device_unanswered", [await device()]), pin.thread), {
+      reason: probed.reason,
+    })
+  const again = await listed()
+  if (again !== undefined) return again
+  if (!mayProbe) return toolRefusal(deviceNotAsked("wake_unavailable", pin.thread, await device()))
+  if (probed?.kind !== "none") return toolRefusal(deviceNotAsked("lookup_unavailable", pin.thread, await device()))
+  return toolRefusal(noThreadOnDevice(pin.thread, await device()))
 }
