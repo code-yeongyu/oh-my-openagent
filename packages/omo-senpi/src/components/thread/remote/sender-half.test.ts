@@ -156,13 +156,17 @@ describe("#13037 the sender half reaches a session on another device that is not
       nothingSent(a)
     })
 
-    test("#given no device holds it and one online device that lists the feature did not answer #then it is host_unavailable naming that device", async () => {
+    // omo#14270: the answer also names the devices that answered "not held", this one included, so a miss on the device
+    // that really keeps the file is visible instead of reading as "wait for c".
+    test("#given no device holds it and one online device that lists the feature did not answer #then it is host_unavailable naming that device and the devices that answered", async () => {
       const a = account({ rows: [B_ROW, C_ROW], silent: ["c"] })
       const { run } = fixture.surface(a.remote)
-      expect(await run("thread_send", { thread: GONE, message: "hi" })).toMatchObject({
+      const result = await run("thread_send", { thread: GONE, message: "hi" })
+      expect(result).toMatchObject({
         kind: "error",
-        error: { code: "host_unavailable", details: { devices: ["c"] } },
+        error: { code: "host_unavailable", details: { thread: GONE, devices: ["c"], answered: ["here", "b"] } },
       })
+      expect((result as { error: { message: string } }).error.message).toContain("here, b")
       nothingSent(a)
     })
 

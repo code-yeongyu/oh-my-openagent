@@ -67,7 +67,7 @@ describe("codex ultrawork trigger policy", () => {
 		// given
 		const prompt = [
 			"그 ",
-			"› 그 인증이 문제면 $computer-use:computer-use $chrome:control-chrome ssh mengmotaMac 등 해서 인증을 다 잘 되게 하게해서 인증해주셈",
+			"› 그 인증이 문제면 $computer-use:computer-use $chrome:control-chrome ssh studio-mac 등 해서 인증을 다 잘 되게 하게해서 인증해주셈",
 			"",
 			"",
 			"• ULTRAWORK MODE ENABLED!",
