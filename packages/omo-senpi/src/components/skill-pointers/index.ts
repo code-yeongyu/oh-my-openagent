@@ -3,15 +3,9 @@ import { readSessionRole } from "@oh-my-opencode/senpi-task"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { getBuiltinSkillsRoot } from "../telemetry/product-identity"
 import { resolveUlwLoopSessionScope } from "../ulw-loop/session-scope"
-import { BUNSHIN_TS_CELL_HINT } from "../../extension/sdk-root-provisioning"
+import { BUNSHIN_TS_IMPORT_SAFETY } from "../../extension/sdk-root-provisioning"
 import { NOT_AFTER_IDENTIFIER, NOT_BEFORE_PATH, NOT_INTO_IDENTIFIER, stripQuotedRegions } from "./strip-quoted-regions"
-import {
-  companionPointer,
-  ignoreWhenOnlyDiscussed,
-  skillPointer,
-  type SkillCompanion,
-  type SkillPointerTarget,
-} from "./pointer-text"
+import { companionPointer, skillPointer, type SkillCompanion, type SkillPointerTarget } from "./pointer-text"
 
 export const MASS_ULW_CUSTOM_TYPE = "omo-mass-ulw:skill-pointer"
 export const ULW_PLAN_CUSTOM_TYPE = "omo-ulw-plan:skill-pointer"
@@ -19,7 +13,7 @@ export const ULW_LOOP_CUSTOM_TYPE = "omo-ulw-loop:skill-pointer"
 export const ULW_RESEARCH_CUSTOM_TYPE = "omo-ulw-research:skill-pointer"
 export const BROWSER_CUSTOM_TYPE = "omo-browser:skill-pointer"
 export const ULTIMATE_BROWSING_CUSTOM_TYPE = "omo-ultimate-browsing:skill-pointer"
-export const BUNSHIN_CUSTOM_TYPE = "omo-bunshin:skill-pointer"
+export const OMO_RELAY_CUSTOM_TYPE = "omo-omo-relay:skill-pointer"
 export const SKILL_POINTERS_DISABLED_FLAG = "omo-senpi-skill-pointers-disabled"
 
 const SKILL_COMMAND_PREFIX = "/skill:"
@@ -94,6 +88,10 @@ const MASS_KEYWORD = String.raw`(?:mass[\s-]*ulw|ulw[\s-]*mass|mulw)`
 // (`mass-ulw-refactor`, `senpi-ulw-loop`) and not part of a path or file name (`.omo/ulw-plan/`).
 const skillNamePattern = (body: string): RegExp =>
   new RegExp(String.raw`${NOT_AFTER_IDENTIFIER}\b${body}\b${NOT_INTO_IDENTIFIER}${NOT_BEFORE_PATH}`, "i")
+const anyOf = (...patterns: readonly RegExp[]): RegExp =>
+  new RegExp(patterns.map((pattern) => `(?:${pattern.source})`).join("|"), "i")
+// The account's other devices named as the user's own ("my other machine", "our other devices"), or the skill by name.
+const OTHER_DEVICES = String.raw`(?:(?:my|our)\s+other\s+(?:machines?|devices?|computers?|hosts?|boxes)(?!\s+learning)|omo[\s-]*relay)`
 const TARGETS: readonly SkillPointerTarget[] = [
   {
     skillName: "mass-ulw",
@@ -133,20 +131,22 @@ const TARGETS: readonly SkillPointerTarget[] = [
     ),
   },
   {
-    skillName: "bunshin",
-    customType: BUNSHIN_CUSTOM_TYPE,
+    skillName: "omo-relay",
+    customType: OMO_RELAY_CUSTOM_TYPE,
     // `fleet` alone is an ordinary word (a vehicle fleet, a "fleet dashboard"), so it counts only with a device
     // sense: the user's fleet as the object of the request (`my fleet(s)`, `our fleet(s)` followed by the end, punctuation or a
     // function word, so not `our fleet management UI` or `our fleet of delivery trucks`) or a fleet machine noun (`fleet hosts`,
     // `fleet box`, a host name such as `fleet-node-3`; `hosts` before an article is the verb) (#13446, #13467 review L3).
-    pattern: skillNamePattern(
-      String.raw`(?:bunshin|(?:my|our)\s+fleets?(?=\s*(?:$|[,.;:!?)]|(?:and|or|now|then|today|please|is|are|up|down|via|with|from|to|on|in|for)\b))|fleet[\s-]+(?:machines?|devices?|hosts?(?!\s+(?:a|an|the)\b)|nodes?|box(?:es)?)(?:-[a-z0-9]+)*|machine[\s-]*mesh)`,
+    pattern: anyOf(
+      skillNamePattern(
+        String.raw`(?:bunshin|(?:my|our)\s+fleets?(?=\s*(?:$|[,.;:!?)]|(?:and|or|now|then|today|please|is|are|up|down|via|with|from|to|on|in|for)\b))|fleet[\s-]+(?:machines?|devices?|hosts?(?!\s+(?:a|an|the)\b)|nodes?|box(?:es)?)(?:-[a-z0-9]+)*|machine[\s-]*mesh)`,
+      ),
+      skillNamePattern(OTHER_DEVICES),
     ),
-    expandedBlockPattern: /<skill\s+name="bunshin"/i,
-    instruction: "",
-    // The SDK ships inside the plugin, so the pointer teaches the eval import instead of a skill read; it carries
-    // the same only-discussed guard as every other conditional pointer.
-    pointer: `<omo-bunshin-pointer>This message mentions bunshin device operations. If the user of this session is asking to run work on their machines: ${BUNSHIN_TS_CELL_HINT} ${ignoreWhenOnlyDiscussed("bunshin")}</omo-bunshin-pointer>`,
+    expandedBlockPattern: /<skill\s+name="omo-relay"/i,
+    instruction: "work on the account's other machines and threads through its typed helpers",
+    // The skill teaches the binding; the pointer keeps only the sentences that stop a cell from ending the kernel.
+    extra: () => ` ${BUNSHIN_TS_IMPORT_SAFETY}`,
   },
 ]
 
