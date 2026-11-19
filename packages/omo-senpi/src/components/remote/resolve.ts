@@ -191,6 +191,7 @@ export function resolveMember(core: ClientCore): RemoteClient["sessions"]["resol
     remember(listed.value.rows, deviceId)
     const found = match(listed.value.rows, target, deviceId)
     if (found?.kind === "one") return { kind: "ok", value: found.row }
+    if (found?.kind === "many") return ambiguous(address, found.rows)
     // Only the named device could hold it: another device's silence says nothing about this miss.
     return miss(
       address,
