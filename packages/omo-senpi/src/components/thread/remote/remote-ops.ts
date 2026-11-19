@@ -86,7 +86,7 @@ export async function deviceOnline(remote: RemoteThreadSurface, device: string):
 }
 
 /** The account's devices, or a typed host_unavailable naming `device` when this device's service cannot list them. */
-export async function listedDevices(
+async function listedDevices(
   client: RemoteClient,
   device: string,
 ): Promise<{ readonly devices: readonly RemoteDevice[] } | Failure> {
@@ -103,7 +103,7 @@ export async function listedDevices(
 }
 
 /** deviceOnline over a device list the caller already read: not_found for an unknown id, device_offline for an offline one. */
-export function deviceRefusal(devices: readonly RemoteDevice[], device: string): Failure | undefined {
+function deviceRefusal(devices: readonly RemoteDevice[], device: string): Failure | undefined {
   const row = devices.find((candidate) => candidate.device === device)
   if (row === undefined)
     return fail(
