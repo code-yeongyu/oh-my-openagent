@@ -513,10 +513,12 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     if (typeof here === "object") return refuse(here)
     const replyTo = replySender(address, senders, here)
     if (replyTo !== undefined && "code" in replyTo) return refuse(replyTo)
+    const localFor = (text: string) => toThreadAddressEntries(sendAddressBook(options, current, text, true))
     const context = (local: readonly ThreadAddressEntry[], account = true) => ({
       remote: account ? options.remote : undefined,
       callerWorkspaceRoot: options.callerWorkspaceRoot(),
       local,
+      ...(match === "fuzzy" ? {} : { localFor }),
       callerId,
     })
     if (replyTo?.device !== undefined) {
@@ -551,7 +553,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     const entries =
       match === "fuzzy"
         ? resolveEntries(options, current)
-        : toThreadAddressEntries(sendAddressBook(options, current, address.replace(/^here\//, ""), true))
+        : localFor(address)
     // A reply to a sender on this device resolves among this device's entries only (A4.3.1), and only by the sender's
     // exact id or stated name: an id prefix never turns an approved reply into a send to another thread. A send never
     // targets its own caller, so an id prefix is resolved without it (UUIDv7 ids share 8 hex characters for ~65 s).

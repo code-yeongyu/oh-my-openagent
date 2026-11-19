@@ -32,9 +32,10 @@ export async function locateControl(
   // Decision 0027: the entries are the ones a send resolves against, session files no engine runs included, so every
   // tool finds the thread a send finds. A thread id no device lists gets the per-device probe (A4.3.3, #13215): a
   // session another device holds but runs nowhere is its ended row, so it answers not_live there as here.
-  const entries = toThreadAddressEntries(sendAddressBook(options, current, address.replace(/^here\//, ""), true))
+  const localFor = (text: string) => toThreadAddressEntries(sendAddressBook(options, current, text, true))
+  const entries = localFor(address)
   const resolved = await resolveAddress(
-    { remote: options.remote, callerWorkspaceRoot: options.callerWorkspaceRoot(), local: entries, callerId },
+    { remote: options.remote, callerWorkspaceRoot: options.callerWorkspaceRoot(), local: entries, localFor, callerId },
     address,
     { all_scope: allScope, probe: true, need: "online" },
   )

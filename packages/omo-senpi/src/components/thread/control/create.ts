@@ -123,9 +123,9 @@ export async function createThread(
         // #14049: an existing thread whose process exited is still this device's when its session file is here, so
         // the ladder sees the files an id or name names (the send address book), and an id nothing lists is looked
         // up once on every online device of the account (A4.3.3), as a send to that id is.
-        const known = toThreadAddressEntries(sendAddressBook(options, current, address.replace(/^here\//, ""), true))
+        const localFor = (text: string) => toThreadAddressEntries(sendAddressBook(options, current, text, true))
         const found = await resolveAddress(
-          { remote: options.remote, callerWorkspaceRoot: callerCwd, local: known, callerId },
+          { remote: options.remote, callerWorkspaceRoot: callerCwd, local: localFor(address), localFor, callerId },
           address,
           { all_scope: true, probe: true },
         )
