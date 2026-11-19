@@ -222,10 +222,9 @@ describe("#given unique_holder (#14048: a sender whose delivery names no device)
   )
 })
 
-describe("#given a device-qualified session part B has not listed #when it is resolved #then an id-shaped part is B's to answer and anything else is not_found (#13748)", () => {
+describe("#given a device-qualified session part B has not listed #when it is resolved #then a routing id or listing key passes through to B and anything else is not_found (#13748)", () => {
   const KEY22 = "AbCdEfGhIjKlMnOpQrStUv"
   test.each([
-    ["an unlisted thread id", T.nowhere, T.nowhere],
     ["an unlisted 22-character listing key", KEY22, KEY22],
     ["an unlisted routing id", "rpc-7", "rpc-7"],
   ])("#given %s #when <B>/<it> is resolved #then it passes through to B unresolved", async (_label, part, key) => {

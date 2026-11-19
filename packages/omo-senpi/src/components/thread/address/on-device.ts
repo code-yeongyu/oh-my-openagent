@@ -12,6 +12,7 @@ import { holderTarget } from "../remote/remote-ops"
 import type { Account } from "./account"
 import { deviceNameOf } from "./bare"
 import { ladder } from "./ladder"
+import { pinned } from "./probe"
 import { toolRefusal, withAddresses, type ThreadRefusal } from "./refusals"
 import type { Found, ResolveContext, ResolveOptions } from "./types"
 
@@ -55,19 +56,17 @@ export async function resolveOnDevice(
     const listed = rows.find((row) =>
       sameSession({ device: device.id, thread }, { device: row.device, thread: row.durable_id, key: row.session_id }),
     )
-    return {
-      kind: "ok",
-      entry: relayAddressEntry(listed ?? namedDeviceRow(device.id, thread)),
-      resolution: "id",
-      all_scope: true,
-    }
+    // Not listed: that one device is asked, as a pinned reply asks it (design section 3 step 8, review H1).
+    if (listed === undefined) return await pinned(remote, { device: device.id, thread })
+    return { kind: "ok", entry: relayAddressEntry(listed), resolution: "id", all_scope: true }
   }
   const hit = ladder(ctx, entries, thread, { ...opts, all_scope: true })
   if (hit.kind === "ok") return { ...hit, all_scope: true }
   if (hit.code === "ambiguous_target") return withAddresses(hit, account.here, names)
   const alias = await aliasOn(remote, account, device.id, thread)
   if (alias !== undefined) return alias
-  // A session id or listing key the device has not listed yet (#13748) is the device's to answer, as a thread id is.
+  // A routing id or listing key the device has not listed yet (#13748: a session opened a moment ago) is the only text
+  // passed through to the device unresolved.
   if (idShaped(thread)) {
     const { durable_id: _unknown, ...row } = namedDeviceRow(device.id, thread)
     return { kind: "ok", entry: relayAddressEntry(row), resolution: "session_id", all_scope: true }
