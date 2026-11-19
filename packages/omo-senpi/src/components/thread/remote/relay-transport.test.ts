@@ -407,3 +407,48 @@ describe("a person's waiting send names its prompt so its follow can anchor on t
     expect(prompts(a.sent).map((record) => "clientMessageId" in record)).toEqual([false])
   })
 })
+
+// #14358: b refuses the admission engine_capability_missing and names attach_required (the port already re-attached and
+// sent it once more): the send answers host_unavailable naming the cause, never "update omo and senpi".
+describe("an admission refused engine_capability_missing that names its cause", () => {
+  function refusing(detail: string | undefined) {
+    const a = account({ engine: { ...ENGINE, pending: 0 } })
+    const refusal = {
+      kind: "refused" as const,
+      reason: "engine_capability_missing",
+      ...(detail === undefined ? {} : { detail }),
+    }
+    const remote = {
+      ...a.remote,
+      sessions: {
+        ...a.remote.sessions,
+        sessionCommand: (...args: Parameters<typeof a.remote.sessions.sessionCommand>) =>
+          args[2]["type"] === "admit_external_message"
+            ? Promise.resolve(refusal)
+            : a.remote.sessions.sessionCommand(...args),
+      },
+    }
+    return transport(remote).relay
+  }
+
+  test("#given b refuses the admission naming attach_required #when a message is sent #then it answers host_unavailable naming the cause", async () => {
+    const relay = refusing("attach_required")
+    expect(await relay.deliver(delivery("to a session b serves from a terminal", "cm-attach"))).toMatchObject({
+      kind: "error",
+      error: {
+        code: "host_unavailable",
+        details: { device: "b", reason: "engine_capability_missing", cause: "attach_required" },
+      },
+    })
+    relay.dispose()
+  })
+
+  test("#given b refuses the admission naming no cause #when a message is sent #then it stays unsupported", async () => {
+    const relay = refusing(undefined)
+    expect(await relay.deliver(delivery("to an old engine", "cm-old"))).toMatchObject({
+      kind: "error",
+      error: { code: "unsupported" },
+    })
+    relay.dispose()
+  })
+})

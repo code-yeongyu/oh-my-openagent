@@ -13,7 +13,7 @@ import type { DeliveryWait, EffectiveLane, GatewayDeliveryDelivery, Provenance }
 import { UNKNOWN_CALLER } from "../tools/ports"
 import type { JsonObject, RemoteCommandOutcome, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 import { deviceOnline, replyData } from "./remote-ops"
-import { chainCountLimitFailure, outcomeFailure } from "./outcome"
+import { chainCountLimitFailure, engineNotReady, outcomeFailure } from "./outcome"
 import { holderView } from "./find-session"
 import { outsideCallDeadline } from "../../call-budget/call-deadline"
 
@@ -579,7 +579,11 @@ export function createRelayTransport(
         announced: true,
         refusal: outcomeFailure(sent, row.device),
       })
-    if (sent.kind === "refused" && (ADMIT_UNSUPPORTED.has(sent.reason) || sent.reason.startsWith("Unknown command")))
+    if (
+      sent.kind === "refused" &&
+      engineNotReady(sent) === undefined &&
+      (ADMIT_UNSUPPORTED.has(sent.reason) || sent.reason.startsWith("Unknown command"))
+    )
       return fail(
         "unsupported",
         `Device ${row.device} runs an engine without admit_external_message (${escapeForDisplay(sent.reason)}); a peer message cannot be delivered there as a delivery.`,

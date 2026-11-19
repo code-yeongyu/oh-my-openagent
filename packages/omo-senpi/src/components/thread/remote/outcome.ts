@@ -117,6 +117,28 @@ export function notSignedInFailure(reason: string, device: string): Failure | un
   )
 }
 
+/**
+ * The other device lists the session on a route that takes no delegated connections (a terminal endpoint, or one that
+ * serves the session while its delegated endpoint redials) and holds no attach of this device to it: nothing ran, and
+ * the command runs once this device attaches again (`receipt.reason` attach_required, relay-daemon tracked internally).
+ */
+export const attachRequired = (outcome: RemoteCommandOutcome): boolean =>
+  outcome.kind === "refused" && outcome.reason === "engine_capability_missing" && outcome.detail === "attach_required"
+
+// The causes an `engine_capability_missing` refusal can name that pass on their own: an attach the device no longer
+// counts (after this device re-attached once), or no omo engine came up there. No cause is an engine that never takes it.
+const ENGINE_NOT_READY: ReadonlySet<string> = new Set(["attach_required", "daemon_unavailable"])
+
+/** The transient cause an `engine_capability_missing` refusal names, if it names one. */
+export function engineNotReady(outcome: RemoteCommandOutcome): string | undefined {
+  return outcome.kind === "refused" &&
+    outcome.reason === "engine_capability_missing" &&
+    outcome.detail !== undefined &&
+    ENGINE_NOT_READY.has(outcome.detail)
+    ? outcome.detail
+    : undefined
+}
+
 export function outcomeFailure(
   outcome: Exclude<RemoteCommandOutcome, { readonly kind: "ok" }>,
   device: string,
@@ -180,6 +202,14 @@ export function outcomeFailure(
       `The thread is not running on device ${device} (${outcome.reason}).`,
       "Call thread_list (tool.thread_list() in an eval cell) to see the thread's current state, then retry when it runs again.",
       { device, reason: outcome.reason },
+    )
+  const notReady = engineNotReady(outcome)
+  if (notReady !== undefined)
+    return fail(
+      "host_unavailable",
+      `Device ${device} did not take the command now (${notReady}); nothing ran there.`,
+      notReady === "daemon_unavailable" ? "Start omo on that device, then retry." : "Retry in a few seconds.",
+      { device, reason: outcome.reason, cause: notReady },
     )
   if (outcome.reason === "chain_count_limit") return chainCountLimitFailure(device)
   if (outcome.reason === "record_too_large")
