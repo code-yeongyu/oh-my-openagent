@@ -2,7 +2,6 @@ import { type Static, Type } from "typebox"
 
 import {
   AllScope,
-  BindingId,
   ExpectedTurnId,
   IdempotencyKey,
   Message,
@@ -11,7 +10,6 @@ import {
   THREAD_READ_MAX_BYTES,
   ThreadAddress,
   ThreadDeliveryMode,
-  RelayText,
   thinkingLevel,
 } from "./fields"
 import { ThreadCreateParams } from "./create-params"
@@ -191,84 +189,6 @@ const ThreadArchiveParams = Type.Object({
   idempotency_key: IdempotencyKey,
 })
 
-export const ThreadReportParams = Type.Object({
-  binding_id: Type.Optional(
-    Type.String({
-      minLength: 1,
-      description:
-        "Binding to report to; defaults to the originating binding, the one the message this session is answering now arrived through; refused when that is ambiguous.",
-    }),
-  ),
-  kind: Type.Union(
-    [Type.Literal("milestone"), Type.Literal("report"), Type.Literal("question"), Type.Literal("completion")],
-    {
-      description:
-        "milestone updates the thread's progress message, report posts a result, question relays a pending question of this session and returns a reply_token, completion is written once when this session's run settles, with the run's real outcome.",
-    },
-  ),
-  text: RelayText,
-  request_id: Type.Optional(
-    Type.String({
-      minLength: 1,
-      description: "For kind question: the id of this session's pending extension UI request the answer resolves.",
-    }),
-  ),
-  request_kind: Type.Optional(
-    Type.Union(
-      [
-        Type.Literal("question"),
-        Type.Literal("select"),
-        Type.Literal("confirm"),
-        Type.Literal("input"),
-        Type.Literal("editor"),
-      ],
-      {
-        description:
-          "For kind question: which extension UI request request_id is. It decides the answer forms thread_answer (tool.thread_answer() in an eval cell) accepts: confirm takes yes/no (any case, surrounding spaces ignored), input and editor take any text including empty, question and select take non-blank text. Without it the answer goes out in every text form at once, so a question, select, input or editor each reads its own and the text must be non-blank; a yes/no word also goes out as the confirm field, so an undeclared confirm reads yes/no too (any other text reads as no).",
-      },
-    ),
-  ),
-  idempotency_key: IdempotencyKey,
-})
-
-export const ThreadOutboxParams = Type.Object({
-  binding_id: BindingId,
-  after_cursor: Type.Optional(
-    Type.Integer({
-      minimum: 0,
-      description: "Read rows after this cursor; unset continues after the binding's acknowledged cursor.",
-    }),
-  ),
-  limit: Type.Optional(
-    Type.Integer({ minimum: 1, maximum: 500, description: "Rows per read, default 100 and at most 500." }),
-  ),
-})
-
-export const ThreadOutboxAckParams = Type.Object({
-  binding_id: BindingId,
-  cursor: Type.Integer({
-    minimum: 1,
-    description: "Every outbox row up to this cursor is marked delivered; an older cursor changes nothing.",
-  }),
-  provider_message_id: Type.Optional(
-    Type.String({
-      minLength: 1,
-      maxLength: 256,
-      description:
-        "Platform id of the message posted for the row at cursor; the first one for a milestone becomes the progress message later milestones edit.",
-    }),
-  ),
-})
-
-export const ThreadAnswerParams = Type.Object({
-  binding_id: Type.String({
-    minLength: 1,
-    description: "Binding the answer arrived through; it must be the binding that asked the question.",
-  }),
-  reply_token: Type.String({ minLength: 1, description: "reply_token of the question row being answered." }),
-  answer: RelayText,
-})
-
 export type ThreadCreateInput = Static<typeof ThreadCreateParams>
 export type ThreadListInput = Static<typeof ThreadListParams>
 export type ThreadReadInput = Static<typeof ThreadReadParams>
@@ -280,10 +200,6 @@ export type ThreadRenameInput = Static<typeof ThreadRenameParams>
 export type ThreadSetModelInput = Static<typeof ThreadSetModelParams>
 export type ThreadSetReasoningInput = Static<typeof ThreadSetReasoningParams>
 export type ThreadArchiveInput = Static<typeof ThreadArchiveParams>
-export type ThreadReportInput = Static<typeof ThreadReportParams>
-export type ThreadOutboxInput = Static<typeof ThreadOutboxParams>
-export type ThreadOutboxAckInput = Static<typeof ThreadOutboxAckParams>
-export type ThreadAnswerInput = Static<typeof ThreadAnswerParams>
 
 export const threadToolParamSchemas = {
   thread_create: ThreadCreateParams,
@@ -297,10 +213,6 @@ export const threadToolParamSchemas = {
   thread_set_model: ThreadSetModelParams,
   thread_set_reasoning: ThreadSetReasoningParams,
   thread_archive: ThreadArchiveParams,
-  thread_report: ThreadReportParams,
-  thread_outbox: ThreadOutboxParams,
-  thread_outbox_ack: ThreadOutboxAckParams,
-  thread_answer: ThreadAnswerParams,
 } as const
 
 export type ThreadToolName = keyof typeof threadToolParamSchemas

@@ -148,10 +148,10 @@ describe("thread SDK runtime", () => {
     const probe = [
       `const { createThreadSdk } = await import(${JSON.stringify(pathToFileURL(join(plugin, "runtime", "thread-sdk", "sdk.js")).href)})`,
       `const sdk = createThreadSdk({ agentDir: ${JSON.stringify(agentDir)}, cwd: process.cwd(), uid: 501, user: "probe", engineStatusAll: async () => undefined })`,
-      "const listed = await sdk.bindings({})",
-      "const missing = await sdk.outbox({ binding_id: 'no-such-binding' })",
+      "const listed = await sdk.list({ all_scope: true })",
+      "const missing = await sdk.read({ thread: 'no-such-thread', all_scope: true })",
       "await sdk.dispose()",
-      "console.log(JSON.stringify({ listed: listed.kind, bindings: listed.bindings, missing: missing.kind === 'error' ? missing.error.code : missing.kind, principal: sdk.principal }))",
+      "console.log(JSON.stringify({ listed: listed.kind, threads: listed.threads, missing: missing.kind === 'error' ? missing.error.code : missing.kind, principal: sdk.principal }))",
     ].join("\n")
 
     // when: a connector script run inline, whose `--input-type` the store worker must not inherit
@@ -170,7 +170,7 @@ describe("thread SDK runtime", () => {
     expect({ exitCode, stderr: unexpectedStderr(stderr) }).toEqual({ exitCode: 0, stderr: "" })
     expect(JSON.parse(stdout.trim())).toEqual({
       listed: "ok",
-      bindings: [],
+      threads: [],
       missing: "not_found",
       principal: "cli:501",
     })

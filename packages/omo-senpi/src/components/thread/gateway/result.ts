@@ -16,10 +16,6 @@ export const REFUSAL_CODES: Readonly<Record<string, { readonly code: ThreadError
     code: "not_resumable",
     next: "The sending device is no longer admitted to this account; sign it in again, then send again.",
   },
-  binding_closed: {
-    code: "invalid_arguments",
-    next: "The binding this message was queued under was detached or rebound; re-read the binding and send again.",
-  },
 }
 
 export function resultFromRow(

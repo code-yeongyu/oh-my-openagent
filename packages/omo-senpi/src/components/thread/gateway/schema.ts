@@ -358,6 +358,19 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
     "INSERT OR IGNORE INTO extension_objects (type, name, owner) VALUES ('table', 'intake_marks', NULL)",
     "INSERT OR IGNORE INTO extension_objects (type, name, owner) VALUES ('table', 'intake_commands', NULL)",
   ],
+
+  // v15 (#14312): thread bindings are gone, with the outbox, its consumer cursors and the completion arms that only a
+  // binding fed. One-way: their rows are deleted. Re-runnable, like every step a rewound store runs again, so the
+  // binding-era `deliveries` columns (`binding_id`, `binding_revision`, `actor_user_id`) stay as unused nullable
+  // columns: SQLite has no DROP COLUMN IF EXISTS, and nothing reads or writes them.
+  [
+    "DROP TABLE IF EXISTS completion_arms",
+    "DROP TABLE IF EXISTS outbox_cursors",
+    "DROP TABLE IF EXISTS outbox",
+    "DROP TABLE IF EXISTS bindings",
+    `DELETE FROM extension_objects WHERE owner IS NULL AND NOT EXISTS
+     (SELECT 1 FROM sqlite_schema s WHERE s.type = extension_objects.type AND s.name = extension_objects.name COLLATE NOCASE)`,
+  ],
 ]
 
 export const GATEWAY_TABLES = [
@@ -367,11 +380,7 @@ export const GATEWAY_TABLES = [
   "causal_edges",
   "rate_buckets",
   "session_meta",
-  "bindings",
-  "outbox",
   "gateway_meta",
-  "outbox_cursors",
-  "completion_arms",
   "extension_schema",
   "extension_objects",
   "thread_creations",

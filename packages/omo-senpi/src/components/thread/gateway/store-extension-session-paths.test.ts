@@ -3,9 +3,7 @@ import { Database } from "bun:sqlite"
 import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 
-import { createGatewayRelay } from "./relay"
 import { gatewayDatabasePath } from "./paths"
-import type { GatewayStore } from "./store"
 import type { SessionCallableOp, StoreExtensionRegistration } from "./store-extensions"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
 
@@ -20,7 +18,7 @@ const migrations = [
   [
     "CREATE TABLE gw_opens (id INTEGER PRIMARY KEY, args TEXT NOT NULL)",
     "CREATE TABLE gw_requests (id TEXT PRIMARY KEY, status TEXT NOT NULL)",
-    "CREATE TABLE gw_items (binding_id TEXT PRIMARY KEY, status TEXT NOT NULL)",
+    "CREATE TABLE gw_items (item_id TEXT PRIMARY KEY, status TEXT NOT NULL)",
     "CREATE TABLE gw_leads (item TEXT PRIMARY KEY, lead TEXT NOT NULL)",
   ],
 ]
@@ -72,51 +70,10 @@ const registration = (overrides: Partial<StoreExtensionRegistration> = {}): Stor
   sessionCallable: [openOp, statusOp],
   ...overrides,
 })
-const bindTo = (store: GatewayStore, h: GatewayHarness, session: string, chat: string) =>
-  createGatewayRelay({
-    store,
-    engine: h.engineFor(store),
-    endpoints: { wake: async () => ({ admitted: [] }) },
-    locate: async () => null,
-    now: () => h.clock.now,
-  }).bind({
-    principal: `session:${session}`,
-    binding: { platform: "custom", account_id: "qa", chat_id: chat, thread_id: "t1", session_durable_id: session },
-  })
-
-test("#given a session bound with the core bind #when an op reads bindingsForSession in its transaction #then that binding is returned; another session gets none", async () => {
+test("#given a worker #when it names item B whose lead is another session #then the op refuses it, because the caller it sees is the engine's and cannot be the lead's", async () => {
   const h = (harness = createGatewayHarness())
   const store = h.store()
   await store.registerStoreExtension(registration())
-  expect(await bindTo(store, h, "bound", "chat-a")).toMatchObject({ kind: "ok" })
-  const bound = await store.extensionSessionAwait(
-    "gw",
-    "workItemStatus",
-    { status: "working" },
-    { callerDurableId: "bound" },
-  )
-  expect(bound).toMatchObject({ kind: "ok", value: { updated: true } })
-  expect(
-    await store.extensionSessionAwait("gw", "workItemStatus", { status: "working" }, { callerDurableId: "loose" }),
-  ).toMatchObject({ kind: "ok", value: { updated: false, reason: "no_binding" } })
-})
-
-test("#given a binding that expired #when bindingsForSession runs #then it is not returned", async () => {
-  const h = (harness = createGatewayHarness())
-  const store = h.store()
-  await store.registerStoreExtension(registration())
-  await bindTo(store, h, "bound", "chat-a")
-  h.clock.now += 400 * 24 * 60 * 60 * 1000
-  expect(
-    await store.extensionSessionAwait("gw", "workItemStatus", { status: "working" }, { callerDurableId: "bound" }),
-  ).toMatchObject({ kind: "ok", value: { updated: false, reason: "no_binding" } })
-})
-
-test("#given a worker bound to item A #when it names item B whose lead is another session #then the op refuses it, because the caller it sees is the engine's and cannot be the lead's", async () => {
-  const h = (harness = createGatewayHarness())
-  const store = h.store()
-  await store.registerStoreExtension(registration())
-  await bindTo(store, h, "worker-a", "chat-a")
   await store.extensionCall("gw", "sql", { sql: "INSERT INTO gw_leads (item, lead) VALUES ('item-b', 'lead-b')" })
   const named = await store.extensionSessionAwait(
     "gw",
@@ -132,14 +89,6 @@ test("#given a worker bound to item A #when it names item B whose lead is anothe
     { callerDurableId: "worker-a" },
   )
   expect(asLead).toMatchObject({ kind: "refused", code: "invalid_arguments" })
-  const own = await store.extensionSessionAwait(
-    "gw",
-    "workItemStatus",
-    { status: "done" },
-    { callerDurableId: "worker-a" },
-  )
-  expect(own).toMatchObject({ kind: "ok", value: { updated: true } })
-  expect((own as { value: { binding_id: string } }).value.binding_id).not.toBe("item-b")
 })
 
 test("#given the item's lead #when it names that item #then the op accepts it", async () => {
@@ -154,7 +103,7 @@ test("#given the item's lead #when it names that item #then the op accepts it", 
       { status: "failed", work_item_id: "item-b" },
       { callerDurableId: "lead-b" },
     ),
-  ).toMatchObject({ kind: "ok", value: { updated: true, binding_id: "item-b" } })
+  ).toMatchObject({ kind: "ok", value: { updated: true, item_id: "item-b" } })
 })
 
 test("#given a declared wake file #when a session call commits #then the marker is touched after the commit; a refused call and a rolled-back call do not touch it", async () => {

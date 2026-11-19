@@ -9,14 +9,7 @@ import { senderFacts } from "./envelope"
 import { resultFromRow } from "./result"
 import { resolveProvenance } from "./provenance-resolver"
 import type { GatewayStore } from "./store"
-import type {
-  DeliveryAuthority,
-  ExternalAuthor,
-  GatewayDeliveryMode,
-  GatewayDeliveryResult,
-  GatewaySender,
-  Provenance,
-} from "./types"
+import type { DeliveryAuthority, GatewayDeliveryMode, GatewayDeliveryResult, GatewaySender, Provenance } from "./types"
 
 export type GatewayTarget = {
   readonly durable_id: string
@@ -113,21 +106,17 @@ function argsHash(value: unknown): string {
 }
 
 /** The arguments a delivery receipt is keyed by: a retry with the same ones replays, different ones conflict. */
-export function deliveryArgsHash(fields: {
+function deliveryArgsHash(fields: {
   readonly target: string
   readonly text: string
   readonly mode: GatewayDeliveryMode
   readonly expected_turn_id: number | null
-  readonly binding: { readonly binding_id: string; readonly revision: number } | null
-  readonly author: ExternalAuthor | undefined
 }): string {
   return argsHash({
     target: fields.target,
     text: fields.text,
     mode: fields.mode,
     expected_turn_id: fields.expected_turn_id,
-    binding: fields.binding,
-    author: fields.author,
   })
 }
 
@@ -182,7 +171,6 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
       body: request.text,
       mode,
       expected_turn_id: request.expected_turn_id ?? null,
-      binding: facts.binding,
       receipt: {
         idempotency_key: idempotencyKey,
         args_hash: deliveryArgsHash({
@@ -190,8 +178,6 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
           text: request.text,
           mode,
           expected_turn_id: request.expected_turn_id ?? null,
-          binding: facts.binding,
-          author: request.sender.kind === "external" ? request.sender.origin.author : undefined,
         }),
       },
       endpoint_kind: endpoint?.kind ?? null,

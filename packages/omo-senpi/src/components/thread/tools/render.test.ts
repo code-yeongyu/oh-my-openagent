@@ -70,10 +70,6 @@ describe("thread tool call lines", () => {
       "thread_set_reasoning planner -> high (this turn)",
     ],
     ["thread_close", {}, "thread_close this thread"],
-    ["thread_report", { kind: "question", text: "ship it?\nmore" }, 'thread_report question "ship it?"'],
-    ["thread_outbox", { binding_id: "bnd-7" }, "thread_outbox bnd-7"],
-    ["thread_outbox_ack", { binding_id: "bnd-7", cursor: 12 }, "thread_outbox_ack bnd-7 through #12"],
-    ["thread_answer", { binding_id: "bnd-7", reply_token: "tok", answer: "yes" }, 'thread_answer "yes"'],
   ] as const)(
     "#given %s args #when the call renders #then it is one line: verb, target, message head",
     (name, args, expected) => {
@@ -421,89 +417,8 @@ describe("control and relay results", () => {
       { thread: "self", level: "high" },
       ["this thread reasoning: high for this turn"],
     ],
-    [
-      "thread_report",
-      {
-        kind: "ok",
-        binding_id: "bnd-7",
-        revision: 1,
-        event: "question",
-        cursor: 5,
-        reply_token: "tok",
-        armed: false,
-        deduplicated: false,
-      },
-      { kind: "question", text: "?" },
-      ["question sent; waiting for a reply"],
-    ],
-    [
-      "thread_report",
-      {
-        kind: "ok",
-        binding_id: "bnd-7",
-        revision: 1,
-        event: "completion",
-        cursor: null,
-        reply_token: null,
-        armed: true,
-        deduplicated: false,
-      },
-      { kind: "completion", text: "done" },
-      ["completion armed; sent when this run settles"],
-    ],
-    [
-      "thread_outbox_ack",
-      { kind: "ok", binding_id: "bnd-7", acked_cursor: 12, changed: true },
-      { binding_id: "bnd-7", cursor: 12 },
-      ["acked through #12"],
-    ],
-    [
-      "thread_outbox_ack",
-      { kind: "ok", binding_id: "bnd-7", acked_cursor: 12, changed: false },
-      { binding_id: "bnd-7", cursor: 9 },
-      ["already acked through #12"],
-    ],
-    [
-      "thread_answer",
-      { kind: "ok", binding_id: "bnd-7", cursor: 5, session_durable_id: PEER },
-      { binding_id: "bnd-7", reply_token: "tok", answer: "yes" },
-      ["answer delivered to the waiting question"],
-    ],
   ] as const)("#given a %s result #when it renders #then one outcome line", (name, value, args, expected) => {
     expect(result(name, value as ThreadToolResult, args)).toEqual([...expected])
-  })
-
-  test("#given outbox rows #when thread_outbox renders #then it counts pending rows and shows the newest heads", () => {
-    const row = (cursor: number, event: string, text: string, state: string) => ({
-      cursor,
-      binding_id: "bnd-7",
-      revision: 2,
-      event,
-      text,
-      state,
-      created_at: "t",
-      edit_message_id: null,
-      provider_message_id: null,
-      reply_token: null,
-      question_state: null,
-      outcome: null,
-      answered_by: null,
-      answer_state: null,
-    })
-    const outbox = {
-      kind: "ok",
-      binding_id: "bnd-7",
-      revision: 2,
-      status: "active",
-      rows: [row(3, "milestone", "50% done\nmore", "acked"), row(4, "question", "ship it?", "pending")],
-      next_cursor: 4,
-      acked_cursor: 3,
-    } as ThreadToolResult
-    expect(result("thread_outbox", outbox, { binding_id: "bnd-7" })).toEqual([
-      "2 outbox rows, 1 pending",
-      "  #3 milestone: 50% done",
-      "  #4 question: ship it?",
-    ])
   })
 
   test("#given fields carrying terminal escape codes #when the call and the result render #then no escape reaches the terminal", () => {

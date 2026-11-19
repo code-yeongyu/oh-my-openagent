@@ -55,9 +55,9 @@ function errorReasonOf(frame: RpcObject): unknown {
     : undefined
 }
 
-// Commands whose reply union carries the host's refusal (ReleaseSessionReply, UiAnswerReply): their callers branch
-// on the refusal code, so an attach refusal is answered as that command's own refusal frame instead of a throw.
-const TYPED_REFUSAL: ReadonlySet<string> = new Set(["release_session", "extension_ui_response"])
+// Commands whose reply union carries the host's refusal (ReleaseSessionReply): their callers branch on the refusal
+// code, so an attach refusal is answered as that command's own refusal frame instead of a throw.
+const TYPED_REFUSAL: ReadonlySet<string> = new Set(["release_session"])
 
 type AttachRefusal = { readonly code: string; readonly errorData?: unknown; readonly frame: RpcObject }
 

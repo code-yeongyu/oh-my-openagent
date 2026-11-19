@@ -49,6 +49,11 @@ describe("store extension migrations", () => {
       db.exec("ALTER TABLE deliveries DROP COLUMN ledger_id")
       db.exec("ALTER TABLE deliveries DROP COLUMN verbatim_text")
       db.exec("ALTER TABLE deliveries DROP COLUMN verbatim_display_text")
+      // v15 dropped the binding-era tables the v6 layout still had: recreate them from the v1..v6 steps.
+      for (const step of GATEWAY_MIGRATIONS.slice(0, 6))
+        for (const statement of step)
+          if (/\b(bindings|outbox|outbox_cursors|completion_arms)\b/.test(statement) && !statement.startsWith("INSERT"))
+            db.exec(statement)
       db.exec("DELETE FROM extension_objects WHERE owner IS NULL AND name NOT IN (SELECT name FROM sqlite_schema)")
       db.exec("PRAGMA user_version = 6")
     } finally {
@@ -307,66 +312,5 @@ describe("store extension calls", () => {
       message: expect.any(String),
     })
     expect(await store.list()).toEqual([])
-  })
-
-  test("#given an enqueue followed by a throw #when the op fails #then extension core rows and markers all roll back", async () => {
-    const h = (harness = createGatewayHarness())
-    h.phantom("target")
-    const store = h.store()
-    await store.registerStoreExtension(extension())
-    const bound = await store.extensionCall<{ kind: "ok"; binding: { binding_id: string } }>("alpha", "core", {
-      op: "bind",
-      request: bind,
-    })
-    if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
-    const result = await store.extensionCall("alpha", "enqueueThenThrow", {
-      request: {
-        binding_id: bound.value.binding.binding_id,
-        event_id: "rolled-back",
-        text: "hello",
-        author: { platform_user_id: "p1", display: "Alice", user_id: "u1" },
-      },
-      inbox: gatewayInboxDirectory(h.agentDir, "target"),
-    })
-    expect(result).toEqual({ kind: "refused", code: "extension_operation_failed", message: "rollback requested" })
-    expect(await store.list()).toEqual([])
-    expect(
-      existsSync(gatewayInboxDirectory(h.agentDir, "target"))
-        ? readdirSync(gatewayInboxDirectory(h.agentDir, "target"))
-        : [],
-    ).toEqual([])
-    expect(await store.extensionCall("alpha", "rows", { name: "alpha" })).toEqual({
-      kind: "ok",
-      value: [{ id: 0, value: "seed" }],
-    })
-  })
-
-  test("#given binding and inbound in one op #when committed #then binding reads actor attribution and markers are published", async () => {
-    const h = (harness = createGatewayHarness())
-    h.phantom("target")
-    const store = h.store()
-    await store.registerStoreExtension(extension())
-    const result = await store.extensionCall("alpha", "bindThenEnqueue", {
-      bind,
-      address: { platform: "custom", account_id: "bot", chat_id: "chat", thread_id: "@chat" },
-      send: { event_id: "sent", text: "hello", author: { platform_user_id: "p1", display: "Alice", user_id: "u1" } },
-    })
-    expect(result).toMatchObject({ kind: "ok", value: { found: { status: "active" }, sent: { kind: "ok" } } })
-    const rows = await store.list()
-    expect(rows).toHaveLength(1)
-    expect(rows[0].actor_user_id).toBe("u1")
-    expect(existsSync(join(gatewayInboxDirectory(h.agentDir, "target"), rows[0].delivery_id))).toBe(true)
-    const moved = await store.extensionCall("alpha", "rebindThenThrow", {
-      request: {
-        principal: "connector:test",
-        binding_id: rows[0].binding_id,
-        expected_revision: 1,
-        session_durable_id: "target2",
-      },
-      marker: join(gatewayInboxDirectory(h.agentDir, "target"), rows[0].delivery_id),
-    })
-    expect(moved).toEqual({ kind: "refused", code: "extension_operation_failed", message: "rollback requested" })
-    expect((await store.list())[0].state).toBe("queued")
-    expect(existsSync(join(gatewayInboxDirectory(h.agentDir, "target"), rows[0].delivery_id))).toBe(true)
   })
 })

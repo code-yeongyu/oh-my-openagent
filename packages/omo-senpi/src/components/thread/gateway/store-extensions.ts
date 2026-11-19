@@ -1,5 +1,3 @@
-import type { BindingRecord } from "./bindings"
-import type { GatewayRelay } from "./relay"
 import type { SqlRow, SqlValue } from "./sql"
 
 /**
@@ -83,20 +81,6 @@ export type StoreExtensionTransaction = {
   ) => readonly SqlRow[]
   readonly one: (columns: readonly string[], sql: string, params?: readonly SqlValue[]) => SqlRow | undefined
   readonly exec: (sql: string, params?: readonly SqlValue[]) => number
-  readonly enqueue: GatewayRelay["inbound"]
-  readonly outboxAck: GatewayRelay["ack"]
-  readonly bind: GatewayRelay["bind"]
-  readonly unbind: GatewayRelay["unbind"]
-  readonly rebind: GatewayRelay["rebind"]
-  readonly bindingFor: (request: {
-    readonly platform: string
-    readonly account_id: string
-    readonly chat_id: string
-    readonly thread_id: string
-  }) => Promise<BindingRecord | null>
-  /** The session's active bindings (not expired at the transaction's now), ordered by binding_id; a read in the op's own transaction. */
-  readonly bindingsForSession: (sessionDurableId: string) => Promise<readonly BindingRecord[]>
-  readonly outboxPending: GatewayRelay["outbox"]
 }
 
 /** Export each operation by name from the compiled module. Arguments/results must be structured-cloneable. */

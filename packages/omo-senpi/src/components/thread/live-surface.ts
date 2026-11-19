@@ -29,7 +29,6 @@ import type { ThreadHostView, ThreadHostViewRequest, ThreadSessionPort } from ".
 import type { SessionWatchHandlers, SessionWatchOutcome } from "./control/wait-settled"
 import type { JsonObject } from "./remote/ports"
 import { acceptedControls, LEGACY_TUI_COMMANDS, tuiCommandsFrom } from "./endpoint-controls"
-import { answerUiRequest } from "./ui-answer"
 import { fencedCommand } from "./attachment-fence"
 import { closeLadder, SESSION_GONE } from "./control/close-ladder"
 
@@ -928,16 +927,6 @@ export function createLiveThreadSurface(
       )
     },
     classifyLiveness: liveness,
-    respondUi: async (endpoint, answer) => {
-      kinds.set(resolve(endpoint.socket), endpoint.kind)
-      const sessionId = endpoint.kind === "rpc_host" ? await routingIdOf(endpoint) : endpoint.routing_id
-      if (sessionId === null && endpoint.kind === "rpc_host") return { delivered: false, error: "unknown_session" }
-      return await answerUiRequest(
-        (socket, type, data) => callFrame(socket, type, data, undefined, endpoint.durable_session_id),
-        { ...endpoint, routing_id: sessionId },
-        answer,
-      )
-    },
   }
 
   return {

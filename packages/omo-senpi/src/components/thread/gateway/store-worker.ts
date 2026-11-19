@@ -16,13 +16,12 @@ import { isClaimantDead, processStartTime } from "./process-identity"
 import { GatewaySchemaVersionError } from "./schema"
 import { isBusyError, Sql, type SqliteConnection, type SqlRow } from "./sql"
 import * as ops from "./store-ops"
-import * as relay from "./store-relay-ops"
+import * as receipts from "./store-tool-receipts"
 import * as ownership from "./store-ownership"
 import { StoreExtensions } from "./store-extension-ops"
 import * as sessions from "./store-extension-session-ops"
 import { listSessionOps } from "./extension-registrations"
 import { ExtensionTransactionEndedError } from "./extension-transaction"
-import type { GatewayResolution, GatewayResolve } from "./engine"
 import type { StoreExtensionRegistration } from "./store-extensions"
 import type {
   DeliveryRow,
@@ -31,7 +30,6 @@ import type {
   IntakeOutcome,
   IntakeRequest,
   ProcessIdentity,
-  Provenance,
   StoreRefusal,
 } from "./types"
 import type {
@@ -57,12 +55,6 @@ import type {
 
 type WorkerRequest = { readonly type: "request"; readonly id: number; readonly op: string; readonly args: unknown }
 type WorkerControl = { readonly type: "resume"; readonly hook: string }
-type ResolutionReply = { readonly type: "resolution"; readonly id: number } & (
-  { readonly ok: true; readonly value: GatewayResolution } | { readonly ok: false; readonly error: string }
-)
-type ProvenanceReply = { readonly type: "provenance_resolved"; readonly id: number } & (
-  { readonly ok: true; readonly value: Provenance } | { readonly ok: false; readonly error: string }
-)
 
 const port = parentPort
 if (port === null) throw new Error("the gateway store worker must run as a worker thread")
@@ -189,7 +181,6 @@ async function intake(ctx: ops.StoreContext, request: IntakeRequest): Promise<In
         body: record.text,
         mode: "follow_up",
         expected_turn_id: null,
-        binding: null,
         receipt: {
           idempotency_key: record.deliveryId,
           args_hash: argsHash({
@@ -250,28 +241,6 @@ let connection: SqliteConnection | undefined
 let extensions: StoreExtensions | undefined
 /** The extension whose registration or call ran most recently; a late error is attributed to it. */
 let lastExtensionActivity: string | undefined
-let nextResolution = 1
-const resolutions = new Map<
-  number,
-  { readonly resolve: (value: GatewayResolution) => void; readonly reject: (error: Error) => void }
->()
-const resolveTarget: GatewayResolve = (address, request) =>
-  new Promise((resolve, reject) => {
-    const id = nextResolution++
-    resolutions.set(id, { resolve, reject })
-    port.postMessage({ type: "resolve", id, address, request })
-  })
-const provenanceRequests = new Map<
-  number,
-  { readonly resolve: (value: Provenance) => void; readonly reject: (error: Error) => void }
->()
-const senderProvenance = (): Promise<Provenance> =>
-  new Promise((resolve, reject) => {
-    const id = nextResolution++
-    provenanceRequests.set(id, { resolve, reject })
-    port.postMessage({ type: "provenance", id })
-  })
-
 function lateTransactionError(error: unknown): void {
   if (error instanceof ExtensionTransactionEndedError) {
     emit({ kind: "extension_error", extension: error.extension, phase: "stale_transaction", error: error.message })
@@ -291,21 +260,7 @@ function lateTransactionError(error: unknown): void {
 process.on("uncaughtException", lateTransactionError)
 process.on("unhandledRejection", lateTransactionError)
 
-port.on("message", (message: WorkerRequest | WorkerControl | ResolutionReply | ProvenanceReply) => {
-  if (message.type === "provenance_resolved") {
-    const pending = provenanceRequests.get(message.id)
-    provenanceRequests.delete(message.id)
-    if (message.ok) pending?.resolve(message.value)
-    else pending?.reject(new Error(message.error))
-    return
-  }
-  if (message.type === "resolution") {
-    const pending = resolutions.get(message.id)
-    resolutions.delete(message.id)
-    if (message.ok) pending?.resolve(message.value)
-    else pending?.reject(new Error(message.error))
-    return
-  }
+port.on("message", (message: WorkerRequest | WorkerControl) => {
   if (message.type === "resume") {
     barriers.get(message.hook)?.()
     barriers.delete(message.hook)
@@ -941,18 +896,10 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
         readonly now: number
       }
       lastExtensionActivity = request.name
-      try {
-        if (extensions === undefined) return undefined
-        return op === "extension_call"
-          ? await extensions.call(request.name, request.op, request.args, request.now)
-          : await sessions.sessionCall(ctx, extensions, args as sessions.SessionCallRequest)
-      } finally {
-        for (const pending of resolutions.values()) pending.reject(new ExtensionTransactionEndedError(request.name))
-        resolutions.clear()
-        for (const pending of provenanceRequests.values())
-          pending.reject(new ExtensionTransactionEndedError(request.name))
-        provenanceRequests.clear()
-      }
+      if (extensions === undefined) return undefined
+      return op === "extension_call"
+        ? await extensions.call(request.name, request.op, request.args, request.now)
+        : await sessions.sessionCall(ctx, extensions, args as sessions.SessionCallRequest)
     }
     case "session_callable_ops":
       return listSessionOps(ctx)
@@ -976,10 +923,6 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
       return await ops.abandonReceipt(ctx, args as Parameters<typeof ops.abandonReceipt>[1])
     case "delivery_view":
       return ops.deliveryView(ctx, args as string)
-    case "delivery_receipt":
-      return ops.deliveryReceipt(ctx, args as Parameters<typeof ops.deliveryReceipt>[1])
-    case "recover_delivery":
-      return await ops.recoverDelivery(ctx, args as Parameters<typeof ops.recoverDelivery>[1])
     case "list":
       return ops.listDeliveries(ctx, args as Parameters<typeof ops.listDeliveries>[1])
     case "is_referenced":
@@ -989,51 +932,19 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
     case "stats":
       return ops.stats(ctx)
     case "tool_receipt_begin":
-      return await relay.toolReceiptBegin(ctx, args as Parameters<typeof relay.toolReceiptBegin>[1])
+      return await receipts.toolReceiptBegin(ctx, args as Parameters<typeof receipts.toolReceiptBegin>[1])
     case "tool_receipt_settle":
-      return await relay.toolReceiptSettle(ctx, args as Parameters<typeof relay.toolReceiptSettle>[1])
+      return await receipts.toolReceiptSettle(ctx, args as Parameters<typeof receipts.toolReceiptSettle>[1])
     case "tool_receipt_revise":
-      return await relay.toolReceiptRevise(ctx, args as Parameters<typeof relay.toolReceiptRevise>[1])
+      return await receipts.toolReceiptRevise(ctx, args as Parameters<typeof receipts.toolReceiptRevise>[1])
     case "tool_receipt_release":
-      return await relay.toolReceiptRelease(ctx, args as Parameters<typeof relay.toolReceiptRelease>[1])
-    case "bind":
-      return await relay.bindThread(ctx, args as Parameters<typeof relay.bindThread>[1])
-    case "unbind":
-      return await relay.unbindThread(ctx, args as Parameters<typeof relay.unbindThread>[1])
-    case "rebind":
-      return await relay.rebindThread(ctx, args as Parameters<typeof relay.rebindThread>[1])
-    case "list_bindings":
-      return await relay.listBindings(ctx, args as Parameters<typeof relay.listBindings>[1])
-    case "binding_view":
-      return await relay.bindingView(ctx, args as Parameters<typeof relay.bindingView>[1])
+      return await receipts.toolReceiptRelease(ctx, args as Parameters<typeof receipts.toolReceiptRelease>[1])
     case "register_incarnation":
       return await ownership.registerIncarnation(ctx, args as Parameters<typeof ownership.registerIncarnation>[1])
     case "clear_endpoint":
       return await ownership.clearEndpoint(ctx, args as Parameters<typeof ownership.clearEndpoint>[1])
     case "session_owner":
       return ownership.sessionOwner(ctx, args as string)
-    case "report":
-      return await relay.reportEvent(ctx, args as Parameters<typeof relay.reportEvent>[1])
-    case "emit_completions":
-      return await relay.emitCompletions(ctx, args as Parameters<typeof relay.emitCompletions>[1])
-    case "pending_completion_arms":
-      return relay.pendingCompletionArms(ctx, args as string)
-    case "latest_completion_arm":
-      return relay.latestCompletionArm(ctx, args as string)
-    case "read_outbox":
-      return await relay.readOutbox(ctx, args as Parameters<typeof relay.readOutbox>[1])
-    case "ack_outbox":
-      return await relay.ackOutbox(ctx, args as Parameters<typeof relay.ackOutbox>[1])
-    case "claim_answer":
-      return await relay.claimAnswer(ctx, args as Parameters<typeof relay.claimAnswer>[1])
-    case "release_answer":
-      return await relay.releaseAnswer(ctx, args as Parameters<typeof relay.releaseAnswer>[1])
-    case "confirm_answer":
-      return await relay.confirmAnswer(ctx, args as Parameters<typeof relay.confirmAnswer>[1])
-    case "mark_prior_delivered":
-      return await relay.markPriorDelivered(ctx, args as Parameters<typeof relay.markPriorDelivered>[1])
-    case "close_question":
-      return await relay.closeQuestion(ctx, args as Parameters<typeof relay.closeQuestion>[1])
     default:
       throw new Error(`unknown gateway store op: ${op}`)
   }
@@ -1088,7 +999,7 @@ async function open(request: { readonly config: GatewayStoreConfig; readonly now
   }
   try {
     await ops.migrate(context)
-    extensions = new StoreExtensions(context, resolveTarget, senderProvenance)
+    extensions = new StoreExtensions(context)
     const legacy = await ops.migrateLegacyMailboxes(context, request.now)
     context.stats.writes = 0
     context.stats.transactions = 0

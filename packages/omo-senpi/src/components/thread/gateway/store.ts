@@ -4,10 +4,8 @@ import { fileURLToPath } from "node:url"
 import { Worker } from "node:worker_threads"
 
 import { GATEWAY_BUSY_TIMEOUT_MS, GATEWAY_LOCK_WAIT_MAX_MS, GATEWAY_STORE_IDLE_RETIRE_MS } from "./constants"
-import type { GatewayResolve } from "./engine"
-import { resolveProvenance } from "./provenance-resolver"
 import type { GatewayStore } from "./store-api"
-export type { Deduplicated, DeliveryView, GatewayStore, OutboxPage, ReceiptScope } from "./store-api"
+export type { DeliveryView, GatewayStore, ReceiptScope } from "./store-api"
 import { createExtensionFacade, type ExtensionRegisterReply, type RetainedRegistration } from "./store-extension-facade"
 import { createIntakeMarkFacade, createSessionWaitFacade, createWokenFacade } from "./store-woken-facade"
 export type {
@@ -23,7 +21,7 @@ export type {
   StoreExtensionSessionApi,
   StoreExtensionTransaction,
 } from "./store-extensions"
-import type { GatewayStoreConfig, GatewayStoreEvent, GatewayStoreTestHooks, ProcessIdentity, Provenance } from "./types"
+import type { GatewayStoreConfig, GatewayStoreEvent, GatewayStoreTestHooks, ProcessIdentity } from "./types"
 
 export type GatewayStoreOptions = {
   readonly agentDir: string
@@ -34,14 +32,6 @@ export type GatewayStoreOptions = {
   readonly now?: () => number
   /** The module location the worker sidecar is resolved from when the facade does not run inside `omo.js` (the thread SDK runtime). */
   readonly workerModuleUrl?: string | URL
-  /**
-   * Resolves extension enqueue targets through the caller's live-and-disk address book (`createExtensionResolver`).
-   * The creator passes it: a store module that loaded the resolver itself would carry the engine's live surface into
-   * every bundle that opens a store, the shipped `omo` CLI included, which only writes receipts and never resolves.
-   */
-  readonly resolveTarget?: GatewayResolve
-  /** Sender-owned resolution for deliveries created by extension transactions. */
-  readonly senderProvenance?: () => Promise<Provenance>
   /** Test seams only: a shorter busy timeout and lock-wait bound, commit-boundary hooks, and the module location the worker is resolved from. */
   readonly _test?: GatewayStoreTestHooks & {
     readonly busyTimeoutMs?: number
@@ -78,13 +68,6 @@ type Pending = {
 }
 
 type WorkerMessage =
-  | {
-      readonly type: "resolve"
-      readonly id: number
-      readonly address: string
-      readonly request: Parameters<GatewayResolve>[1]
-    }
-  | { readonly type: "provenance"; readonly id: number }
   | { readonly type: "response"; readonly id: number; readonly ok: true; readonly value: unknown }
   | {
       readonly type: "response"
@@ -134,17 +117,8 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
   /** The close-and-terminate of a retired worker, until it settles: `dispose` waits for it. */
   let retiring: Promise<void> | undefined
   const idleRetireMs = options._test?.idleRetireMs ?? GATEWAY_STORE_IDLE_RETIRE_MS
-  const resolveTarget = options.resolveTarget
   /** The registrations the current worker holds, restored on the next worker after one exits. */
   const registrations = new Map<string, RetainedRegistration>()
-
-  const resolveExtensionTarget: GatewayResolve = async (address, request) => {
-    if (resolveTarget === undefined)
-      throw new Error(
-        "this gateway store was created without an extension resolver (resolveTarget); it cannot resolve an extension target",
-      )
-    return await resolveTarget(address, request)
-  }
 
   /** Fails the requests posted to one worker; a successor's requests are not its to fail. */
   function failAll(owner: Worker, error: Error): void {
@@ -182,41 +156,6 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     worker = spawned
     spawned.unref()
     spawned.on("message", (message: WorkerMessage) => {
-      if (message.type === "provenance") {
-        void (options.senderProvenance?.() ?? resolveProvenance({ cwd: process.cwd() })).then(
-          (value) => {
-            if (worker === spawned)
-              spawned.postMessage({ type: "provenance_resolved", id: message.id, ok: true, value })
-          },
-          (error: unknown) => {
-            if (worker === spawned)
-              spawned.postMessage({
-                type: "provenance_resolved",
-                id: message.id,
-                ok: false,
-                error: error instanceof Error ? error.message : String(error),
-              })
-          },
-        )
-        return
-      }
-      if (message.type === "resolve") {
-        void resolveExtensionTarget(message.address, message.request).then(
-          (value) => {
-            if (worker === spawned) spawned.postMessage({ type: "resolution", id: message.id, ok: true, value })
-          },
-          (error: unknown) => {
-            if (worker === spawned)
-              spawned.postMessage({
-                type: "resolution",
-                id: message.id,
-                ok: false,
-                error: error instanceof Error ? error.message : String(error),
-              })
-          },
-        )
-        return
-      }
       if (message.type === "event") {
         for (const listener of listeners) listener(message.event)
         return
@@ -365,8 +304,6 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     completeReceipt: (request) => call("complete_receipt", request),
     abandonReceipt: (request) => call("abandon_receipt", request),
     deliveryView: (deliveryId) => call("delivery_view", deliveryId),
-    deliveryReceipt: (request) => call("delivery_receipt", request),
-    recoverDelivery: (request) => call("recover_delivery", request),
     list: (filter = {}) => call("list", filter),
     isReferenced: (durableId) => call("is_referenced", durableId),
     journalMode: () => call("journal_mode"),
@@ -376,25 +313,9 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     toolReceiptSettle: (request) => call("tool_receipt_settle", request),
     toolReceiptRevise: (request) => call("tool_receipt_revise", request),
     toolReceiptRelease: (request) => call("tool_receipt_release", request),
-    bind: (request) => call("bind", request),
-    unbind: (request) => call("unbind", request),
-    rebind: (request) => call("rebind", request),
-    listBindings: (request) => call("list_bindings", request),
-    bindingView: (request) => call("binding_view", request),
     registerIncarnation: (request) => call("register_incarnation", request),
     clearEndpoint: (request) => call("clear_endpoint", request),
     sessionOwner: (durableId) => call("session_owner", durableId),
-    report: (request) => call("report", request),
-    emitCompletions: (request) => call("emit_completions", request),
-    pendingCompletionArms: (durableId) => call("pending_completion_arms", durableId),
-    latestCompletionArm: (durableId) => call("latest_completion_arm", durableId),
-    readOutbox: (request) => call("read_outbox", request),
-    ackOutbox: (request) => call("ack_outbox", request),
-    claimAnswer: (request) => call("claim_answer", request),
-    releaseAnswer: (request) => call("release_answer", request),
-    confirmAnswer: (request) => call("confirm_answer", request),
-    markPriorDelivered: (request) => call("mark_prior_delivered", request),
-    closeQuestion: (request) => call("close_question", request),
     onEvent: (listener) => {
       listeners.add(listener)
       return () => listeners.delete(listener)

@@ -1,5 +1,4 @@
 import type { ThreadErrorCode, ThreadToolFailure } from "../errors"
-import type { BindingRecord, OutboxRow } from "../gateway/bindings"
 import type { ThreadWorktree } from "../worktree/thread-worktree"
 import type { ThreadActivity, ThreadModel, ThreadState } from "./state"
 
@@ -357,49 +356,7 @@ export type ThreadSetReasoningResult =
     }
   | ThreadDataError
 
-export type ThreadBinding = BindingRecord
-
-export type ThreadOutboxRow = OutboxRow
-
-export type ThreadReportResult =
-  | {
-      readonly kind: "ok"
-      readonly binding_id: string
-      readonly revision: number
-      readonly event: "milestone" | "report" | "question" | "completion"
-      /** The outbox row written; null for a completion, which is written when the session settles. */
-      readonly cursor: number | null
-      readonly reply_token: string | null
-      readonly armed: boolean
-      readonly deduplicated: boolean
-    }
-  | ThreadDataError
-
-export type ThreadOutboxResult =
-  | {
-      readonly kind: "ok"
-      readonly binding_id: string
-      readonly revision: number
-      readonly status: ThreadBinding["status"]
-      readonly rows: readonly ThreadOutboxRow[]
-      readonly next_cursor: number
-      readonly acked_cursor: number
-    }
-  | ThreadDataError
-
-export type ThreadOutboxAckResult =
-  | { readonly kind: "ok"; readonly binding_id: string; readonly acked_cursor: number; readonly changed: boolean }
-  | ThreadDataError
-
-export type ThreadAnswerResult =
-  | { readonly kind: "ok"; readonly binding_id: string; readonly cursor: number; readonly session_durable_id: string }
-  | ThreadDataError
-
 export type ThreadToolResult =
-  | ThreadReportResult
-  | ThreadOutboxResult
-  | ThreadOutboxAckResult
-  | ThreadAnswerResult
   | ThreadCreateResult
   | ThreadListResult
   | ThreadReadResult

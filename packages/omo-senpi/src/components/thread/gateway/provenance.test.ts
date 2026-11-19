@@ -38,9 +38,6 @@ function delivery(): DeliveryRow {
     created_at: 1,
     updated_at: 1,
     expires_at: 2,
-    binding_id: null,
-    binding_revision: null,
-    actor_user_id: null,
   }
 }
 

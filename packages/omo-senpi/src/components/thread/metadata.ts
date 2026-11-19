@@ -60,7 +60,7 @@ export const THREAD_TOOL_METADATA: readonly ThreadToolEntry[] = [
     name: "thread_send",
     label: "Send message to session",
     description:
-      "Delivers a message into another session that is already running, for when the user wants to talk to that session mid-task; its reply comes back through thread_read, and a bound chat thread's replies through thread_report and thread_answer (in an eval cell: tool.thread_read(), tool.thread_report(), tool.thread_answer())" +
+      "Delivers a message into another session that is already running, for when the user wants to talk to that session mid-task; its reply comes back through thread_read (tool.thread_read() in an eval cell)" +
       ROUTE_TO_TASK,
     exposure: THREAD_TOOL_EXPOSURE,
   },
@@ -114,33 +114,6 @@ export const THREAD_TOOL_METADATA: readonly ThreadToolEntry[] = [
     label: "Archive session",
     description:
       "Archives or unarchives a session so the session list hides or shows it again, for when the user is finished with a session but wants to keep it",
-    exposure: THREAD_TOOL_EXPOSURE,
-  },
-  {
-    name: "thread_report",
-    label: "Report to chat thread",
-    description:
-      "Posts a milestone, result, question or completion from this session to its bound chat thread, for when the user wants progress relayed to that chat; replies flow back through thread_read, thread_report and thread_answer (in an eval cell: tool.thread_read(), tool.thread_report(), tool.thread_answer())",
-    exposure: THREAD_TOOL_EXPOSURE,
-  },
-  {
-    name: "thread_outbox",
-    label: "Read chat outbox",
-    description:
-      "Returns the reports waiting for a bound chat thread with a cursor, for when a connector collects what sessions posted",
-    exposure: THREAD_TOOL_EXPOSURE,
-  },
-  {
-    name: "thread_outbox_ack",
-    label: "Acknowledge chat outbox",
-    description: "Marks outbox rows up to a cursor as posted to the chat, for when a connector confirms delivery",
-    exposure: THREAD_TOOL_EXPOSURE,
-  },
-  {
-    name: "thread_answer",
-    label: "Answer relayed question",
-    description:
-      "Resolves a question a session relayed to a chat thread with the answer that arrived there, for when a connector hands back a chat user's reply",
     exposure: THREAD_TOOL_EXPOSURE,
   },
 ]

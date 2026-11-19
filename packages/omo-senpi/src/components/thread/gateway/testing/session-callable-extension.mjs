@@ -32,27 +32,14 @@ export function completeThreadOpen(tx, args) {
   return { completed: true }
 }
 
-export async function bindingsOf(tx, args) {
-  return await tx.bindingsForSession(args.session)
-}
-
-export async function workItemStatus(tx, args) {
-  if (args.work_item_id !== undefined) {
-    const lead = tx.one(["lead"], "SELECT lead FROM gw_leads WHERE item = ?", [args.work_item_id])
-    if (lead?.lead !== args.caller_session_durable_id) return { updated: false, reason: "not_item_lead" }
-    tx.exec(
-      "INSERT INTO gw_items (binding_id, status) VALUES (?, ?) ON CONFLICT(binding_id) DO UPDATE SET status = excluded.status",
-      [args.work_item_id, args.status],
-    )
-    return { updated: true, binding_id: args.work_item_id }
-  }
-  const [binding] = await tx.bindingsForSession(args.caller_session_durable_id)
-  if (binding === undefined) return { updated: false, reason: "no_binding" }
+export function workItemStatus(tx, args) {
+  const lead = tx.one(["lead"], "SELECT lead FROM gw_leads WHERE item = ?", [args.work_item_id])
+  if (lead?.lead !== args.caller_session_durable_id) return { updated: false, reason: "not_item_lead" }
   tx.exec(
-    "INSERT INTO gw_items (binding_id, status) VALUES (?, ?) ON CONFLICT(binding_id) DO UPDATE SET status = excluded.status",
-    [binding.binding_id, args.status],
+    "INSERT INTO gw_items (item_id, status) VALUES (?, ?) ON CONFLICT(item_id) DO UPDATE SET status = excluded.status",
+    [args.work_item_id, args.status],
   )
-  return { updated: true, binding_id: binding.binding_id }
+  return { updated: true, item_id: args.work_item_id }
 }
 
 export function sql(tx, args) {
@@ -68,7 +55,7 @@ export const migrations = [
   [
     "CREATE TABLE gw_opens (id INTEGER PRIMARY KEY, args TEXT NOT NULL)",
     "CREATE TABLE gw_requests (id TEXT PRIMARY KEY, status TEXT NOT NULL)",
-    "CREATE TABLE gw_items (binding_id TEXT PRIMARY KEY, status TEXT NOT NULL)",
+    "CREATE TABLE gw_items (item_id TEXT PRIMARY KEY, status TEXT NOT NULL)",
     "CREATE TABLE gw_leads (item TEXT PRIMARY KEY, lead TEXT NOT NULL)",
   ],
 ]

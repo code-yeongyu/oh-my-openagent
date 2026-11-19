@@ -14,7 +14,6 @@ import {
 } from "./adapter"
 import { createInboxDrain, type InboxDrain, type InboxDrainOptions } from "./drain"
 import { gatewayInboxDirectory } from "./paths"
-import { createExtensionResolver } from "./extension-resolver"
 import { createGatewayStore, type GatewayStore } from "./store"
 
 /**
@@ -126,12 +125,6 @@ export type ControlEndpointRegistrantOptions = {
   readonly runtimeInstance?: string
   /** The component's store, shared with the thread tools; the registrant then neither opens nor disposes one. */
   readonly store?: GatewayStore
-  /**
-   * Awaited before the drain pass of a wake another process asked for (a `wake` command): the edge
-   * on which the session learns of work written outside it, such as a completion armed from the CLI.
-   * Ordinary edges (idle, submission, the inbox watcher) never call it.
-   */
-  readonly onCommandWake?: (durableId: string) => Promise<void>
   /** Whether a row's sending device is admitted now (#13037 5.6); absent, every row from another device waits. */
   readonly admitIntake?: InboxDrainOptions["admitIntake"]
   readonly log?: (line: string) => void
@@ -225,7 +218,6 @@ export function createControlEndpointRegistrant(options: ControlEndpointRegistra
     // Creating the store opens nothing; its file is opened by its first operation, below.
     store ??= createGatewayStore({
       agentDir,
-      resolveTarget: createExtensionResolver(agentDir),
       ...(options.runtimeInstance === undefined ? {} : { runtimeInstance: options.runtimeInstance }),
     })
     const runtime: SessionRuntimePort = {
@@ -273,8 +265,6 @@ export function createControlEndpointRegistrant(options: ControlEndpointRegistra
       inboxDir: gatewayInboxDirectory(agentDir, session.durableId),
       drain: async (event) => {
         if (retired || !(await holder) || retired) return { admitted: [] }
-        if (event.reason === "command" || event.reasons.includes("command"))
-          await options.onCommandWake?.(session.durableId)
         return await drainOnce(event)
       },
       isSessionReferenced: () => drain.isSessionReferenced(),

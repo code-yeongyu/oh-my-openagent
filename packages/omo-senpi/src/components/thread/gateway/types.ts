@@ -6,7 +6,7 @@ export type DeliveryState = "queued" | "admitting" | "admitted" | "applied" | "r
 
 export type EffectiveLane = "steer" | "follow_up"
 
-export type RefusalReason = "not_steerable" | "turn_conflict" | "expired" | "binding_closed" | "sender_not_admitted"
+export type RefusalReason = "not_steerable" | "turn_conflict" | "expired" | "sender_not_admitted"
 
 export type ProcessIdentity = {
   readonly pid: number
@@ -16,25 +16,12 @@ export type ProcessIdentity = {
   readonly runtime_instance: string | null
 }
 
-/**
- * The human who wrote a binding inbound message (or answered a question), as the connector
- * authenticated them: the platform's user id, their display name, and optionally the omo user
- * the connector mapped them to. Validated at the relay boundary (`author.ts`).
- */
-export type ExternalAuthor = {
-  readonly platform_user_id: string
-  readonly display: string
-  readonly user_id?: string
-}
-
 export type ExternalOrigin = {
   readonly platform: string
   readonly account_id: string
   readonly chat_id: string
   readonly thread_id: string
   readonly message_id: string
-  /** Absent on a message sent without an author, and on every row written before authors existed. */
-  readonly author?: ExternalAuthor
 }
 
 export type EnvelopeOrigin = { readonly session: string } | { readonly external: ExternalOrigin }
@@ -102,9 +89,6 @@ export type DeliveryRow = {
   readonly created_at: number
   readonly updated_at: number
   readonly expires_at: number
-  readonly binding_id: string | null
-  readonly binding_revision: number | null
-  readonly actor_user_id: string | null
   /** The engine ledger key of a delivery taken in from another device (`device:<attested device>/<sender's id>`); null on every other row. */
   readonly ledger_id?: string | null
   /** The sender's rendered text and display text of such a delivery, handed to the engine unrendered; null on every other row. */
@@ -152,7 +136,7 @@ export type IntakeOutcome =
 
 /**
  * Who is sending. Every kind maps to one receipt/budget principal and one causal-graph node:
- * a session is `session:<durable id>`, the CLI is `cli:<uid>`, a connector is `binding:<id>`.
+ * a session is `session:<durable id>`, the CLI is `cli:<uid>`, a person is `person:<uid>`.
  * `turn_id` and `cause_delivery_id` come from the sender's runtime context, never from a model.
  */
 export type GatewaySender =
@@ -166,12 +150,6 @@ export type GatewaySender =
   | { readonly kind: "cli"; readonly uid: number; readonly user: string }
   /** The person at a terminal sending their own input to a session on another device (`omo remote send`): a prompt, never a delivery with an envelope. */
   | { readonly kind: "person"; readonly uid: number; readonly user: string }
-  | {
-      readonly kind: "external"
-      readonly origin: ExternalOrigin
-      readonly binding_id: string
-      readonly binding_revision: number
-    }
 
 export type EnqueueRequest = {
   readonly provenance: Provenance
@@ -179,7 +157,7 @@ export type EnqueueRequest = {
   readonly delivery_id: string
   readonly target_durable_id: string
   readonly sender_principal: string
-  /** The pair rate bucket's sender key; `sender_principal` when absent (a binding sender with an author is `binding:<id>#author:<platform user id>`). */
+  /** The pair rate bucket's sender key; `sender_principal` when absent. */
   readonly rate_principal?: string
   readonly sender_node: string
   readonly sender_turn: string | null
@@ -193,7 +171,6 @@ export type EnqueueRequest = {
   readonly body: string
   readonly mode: GatewayDeliveryMode
   readonly expected_turn_id: number | null
-  readonly binding: { readonly binding_id: string; readonly revision: number } | null
   readonly receipt: { readonly idempotency_key: string; readonly args_hash: string }
   readonly endpoint_kind: "rpc_host" | "tui" | null
 }

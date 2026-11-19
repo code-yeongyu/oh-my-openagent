@@ -30,12 +30,6 @@ const operations: readonly [string, (client: LiveThreadSurface, host: ContractHo
       client.gateway.releaseSession?.(endpoint(host), { reason: "takeover" }) ??
       Promise.reject(new Error("gateway.releaseSession is missing")),
   ],
-  [
-    "extension_ui_response",
-    (client, host) =>
-      client.gateway.respondUi?.(endpoint(host), { ui_request_id: "question", fields: { value: "yes" } }) ??
-      Promise.reject(new Error("gateway.respondUi is missing")),
-  ],
 ]
 
 /** Runs `exercise` while collecting the omo log lines and our lines written to stderr. */
@@ -60,8 +54,8 @@ async function capturingLogs(
 }
 
 describe("thread RPC attachment refusals and release outcomes (wire contract v1.1)", () => {
-  // release_session and extension_ui_response answer with a reply union that carries the host's refusal; the rest throw a typed error.
-  const typedRefusal = new Set(["release_session", "extension_ui_response"])
+  // release_session answers with a reply union that carries the host's refusal; the rest throw a typed error.
+  const typedRefusal = new Set(["release_session"])
   test.each(operations.filter(([command]) => !typedRefusal.has(command)))(
     "#given a draining host #when %s attaches #then a transient host_draining error surfaces and nothing is mutated, aborted or closed",
     async (_command, run) => {
@@ -109,18 +103,6 @@ describe("thread RPC attachment refusals and release outcomes (wire contract v1.
       })
     },
   )
-
-  test("#given a draining host #when a relayed UI answer attaches #then the session's host_draining refusal is the reply, not a thrown error", async () => {
-    await withContractHost({ auth: true, attachRefusal: "host_draining" }, async (host) => {
-      expect(
-        await surface(host).gateway.respondUi?.(endpoint(host), {
-          ui_request_id: "question",
-          fields: { value: "yes" },
-        }),
-      ).toEqual({ delivered: false, error: "host_draining" })
-      expect(host.mutations).toEqual([])
-    })
-  })
 
   test("#given a caller the host holds no connection for #when attach is refused session_not_attached #then a typed session_not_attached error surfaces", async () => {
     await withContractHost({ auth: true, attachRefusal: "session_not_attached" }, async (host) => {
@@ -184,15 +166,6 @@ describe("thread RPC attachment refusals and release outcomes (wire contract v1.
         await client.gateway.releaseSession?.({ ...endpoint(host), routing_id: null }, { reason: "takeover" }),
       { success: true },
     ],
-    [
-      "extension_ui_response",
-      async (client, host) =>
-        await client.gateway.respondUi?.(
-          { ...endpoint(host), routing_id: null },
-          { ui_request_id: "question", fields: { value: "yes" } },
-        ),
-      { delivered: true },
-    ],
   ]
   const hostShapes = [
     ["an attach-capable host", { auth: true }],
@@ -213,7 +186,7 @@ describe("thread RPC attachment refusals and release outcomes (wire contract v1.
     },
   )
 
-  test("#given an rpc_host endpoint with no routing id whose durable id no live session holds #when wake, release and a UI answer run #then each answers its typed not-routable result and nothing is sent without a session", async () => {
+  test("#given an rpc_host endpoint with no routing id whose durable id no live session holds #when wake and release run #then each answers its typed not-routable result and nothing is sent without a session", async () => {
     await withContractHost({ auth: true, durableId: "dur-replacement" }, async (host) => {
       const unrouted = { ...endpoint(host), routing_id: null }
       const client = surface(host)
@@ -223,13 +196,10 @@ describe("thread RPC attachment refusals and release outcomes (wire contract v1.
         error: "unknown_session",
       })
       expect(
-        await client.gateway.respondUi?.(unrouted, { ui_request_id: "question", fields: { value: "yes" } }),
-      ).toEqual({ delivered: false, error: "unknown_session" })
-      expect(
         host.frames
           .filter(({ frame }) => frame.type !== "get_protocol_info" && frame.type !== "authenticate")
           .map(({ frame }) => frame.type),
-      ).toEqual(["list_sessions", "list_sessions", "list_sessions"])
+      ).toEqual(["list_sessions", "list_sessions"])
     })
   })
 

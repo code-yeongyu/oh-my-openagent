@@ -206,14 +206,12 @@ const image = imageDetails(jsImage?.text)
 // stand on their own.
 const engineHidesGenerateImage = systemPrompt.includes("tool.generate_image(")
 const evalParagraph = systemPrompt.slice(systemPrompt.indexOf("Eval-only tools"))
-const namedForms = ["tool.thread_list(", "tool.thread_send(", "tool.thread_report(", "tool.generate_image("].filter(
-  (form) => evalParagraph.includes(form),
+const namedForms = ["tool.thread_list(", "tool.thread_send(", "tool.generate_image("].filter((form) =>
+  evalParagraph.includes(form),
 )
 report.assert(
   "system-prompt-names-thread-eval-forms",
-  namedForms.includes("tool.thread_list(") &&
-    namedForms.includes("tool.thread_send(") &&
-    namedForms.includes("tool.thread_report("),
+  namedForms.includes("tool.thread_list(") && namedForms.includes("tool.thread_send("),
   `named=${JSON.stringify(namedForms)} paragraph_head=${JSON.stringify(evalParagraph.slice(0, 200))}`,
 )
 if (engineHidesGenerateImage) {

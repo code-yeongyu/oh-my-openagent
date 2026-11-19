@@ -14,9 +14,8 @@ import {
   extensionSql,
   sqliteName,
 } from "./extension-sql"
-import { ExtensionArgumentError, extensionTransaction } from "./extension-transaction"
+import { extensionTransaction } from "./extension-transaction"
 import { singleExtensionStatement } from "./extension-statement"
-import type { GatewayEngineOptions, GatewayResolve } from "./engine"
 import { isLockWaitExceeded } from "./lock-wait"
 import { GatewaySchemaVersionError } from "./schema"
 import { transaction, type StoreContext } from "./store-ops"
@@ -38,11 +37,7 @@ function refusal(code: StoreExtensionRefusal["code"], message: string): StoreExt
 
 function fromError(error: unknown): StoreExtensionRefusal {
   const message = error instanceof Error ? error.message : String(error)
-  if (
-    error instanceof ExtensionSchemaViolation ||
-    error instanceof GatewaySchemaVersionError ||
-    error instanceof ExtensionArgumentError
-  )
+  if (error instanceof ExtensionSchemaViolation || error instanceof GatewaySchemaVersionError)
     return refusal(error.code, message)
   if (isLockWaitExceeded(error)) return refusal("gateway_lock_wait_exceeded", message)
   return refusal("extension_operation_failed", message)
@@ -61,11 +56,7 @@ export type ExtensionRun = {
 export class StoreExtensions {
   private readonly registered = new Map<string, Registered>()
 
-  constructor(
-    private readonly ctx: StoreContext,
-    private readonly resolveTarget: GatewayResolve,
-    private readonly senderProvenance: GatewayEngineOptions["senderProvenance"],
-  ) {}
+  constructor(private readonly ctx: StoreContext) {}
 
   /** `restoredAt`: a restarted worker replaying a registration this process made then (`persistDescriptor`). */
   async register(
@@ -224,13 +215,7 @@ export class StoreExtensions {
         const locked = Number(row?.version ?? 0)
         if (locked !== version) throw new GatewaySchemaVersionError(locked, request.descriptor.migrations.length, name)
         const before = extensionSchema(this.ctx.sql)
-        const scope = extensionTransaction(
-          { ...this.ctx, afterCommit: effects, afterRollback: compensations },
-          name,
-          now,
-          this.resolveTarget,
-          this.senderProvenance,
-        )
+        const scope = extensionTransaction({ ...this.ctx, afterCommit: effects, afterRollback: compensations }, name)
         let timer: ReturnType<typeof setTimeout> | undefined
         try {
           const run = async () => {

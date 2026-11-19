@@ -3,7 +3,6 @@ import type { GatewayEndpointPort, GatewayEndpointRef } from "../gateway/adapter
 import { createGatewayEngine, resolveFromEntries, type GatewayEngine, type GatewayResolve } from "../gateway/engine"
 import { createLocalTransport } from "../gateway/local-transport"
 import { createDeliveryPipeline, type DeliveryPipeline } from "../gateway/pipeline"
-import { createGatewayRelay, type GatewayRelay } from "../gateway/relay"
 import { createRelayTransport } from "../remote/lazy-ops"
 import type { GatewayStore } from "../gateway/store"
 import type { Provenance } from "../gateway/types"
@@ -26,30 +25,15 @@ export type GatewayServices = {
   readonly engine: GatewayEngine
   /** The one send path: the engine behind the local transport, the device service behind the relay transport. */
   readonly pipeline: DeliveryPipeline
-  readonly relay: GatewayRelay
   /** The calling session's workspace and project, as the engine stamps a delivery with them; a send to another device carries the same. */
   readonly senderProvenance: () => Promise<Provenance>
   /** The endpoint serving a session right now, or null when nothing answers for it. */
   readonly locate: (durableId: string) => Promise<GatewayEndpointRef | null>
 }
 
-/** The store-free live-and-disk resolver for extension calls, which run inside the store worker's transaction. */
-export function createGatewayResolver(
-  options: Omit<ThreadToolSurfaceOptions, "store">,
-  view: () => Promise<ThreadHostView>,
-): GatewayResolve {
-  return async (address, request) => {
-    const current = await view()
-    return await resolveFromEntries(
-      () => toGatewayAddressEntries(sendAddressBook(options, current, address, request.all_scope)),
-      options.callerWorkspaceRoot,
-    )(address, request)
-  }
-}
-
 /**
- * The one composition of the gateway over a thread surface: the caller's store, the engine resolving addresses through the address book of `view`, and
- * the relay. The agent tools and the `omo thread` SDK both build on it, so neither duplicates the
+ * The one composition of the gateway over a thread surface: the caller's store and the engine resolving addresses through
+ * the address book of `view`. The agent tools and the `omo thread` SDK both build on it, so neither duplicates the
  * engine; they differ only in the principal they pass. `view` is the send path's view (callers pass
  * one that answers even when nothing is live): a target no endpoint lists resolves from disk
  * (`sendAddressBook`) and is queued offline.
@@ -87,7 +71,6 @@ export function createGatewayServices(
     const entry = (await entries()).find((candidate) => candidate.thread_id === durableId)
     return entry === undefined || entry.liveness !== "routable" ? null : entry.endpoint
   }
-  const relay = createGatewayRelay({ store, engine, endpoints, locate, now })
   const pipeline = createDeliveryPipeline({
     local: createLocalTransport(engine, options.sameDeviceWake),
     ...(options.remote === undefined
@@ -103,5 +86,5 @@ export function createGatewayServices(
           }),
         }),
   })
-  return { store, endpoints, engine, pipeline, relay, senderProvenance, locate }
+  return { store, endpoints, engine, pipeline, senderProvenance, locate }
 }

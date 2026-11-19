@@ -27,7 +27,7 @@ import { relayAddressBook, type RelayAddressBook } from "./remote/address-book"
 import { withClosedRows } from "./remote/closed-rows"
 import { threadLink } from "./thread-link"
 export type { ThreadTranscriptEntry } from "./reader"
-import { hashArgs } from "./gateway/bindings"
+import { hashArgs } from "./gateway/hash-args"
 import { GATEWAY_RECEIPT_RETENTION_MS } from "./gateway/constants"
 import { isLockWaitExceeded } from "./gateway/lock-wait"
 import type { DeliveryPipeline } from "./gateway/pipeline"
@@ -37,7 +37,6 @@ import { createGatewayServices } from "./tools/gateway-services"
 import { listThreads, readThread } from "./tools/read-ops"
 import { archiveThread } from "./tools/archive-ops"
 import { rowState, threadModel } from "./tools/thread-state"
-import { createRelayTools } from "./tools/relay-tools"
 import { threadToolPermission } from "./tools/local-permission"
 import { withThreadRenderers } from "./tools/render"
 import { consumedSendersOf, threadSendPermission } from "./tools/reply-permission"
@@ -101,7 +100,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
 } {
   // One ledger of the threads these tools closed on other devices, read by every tool through the remote surface (#14170).
   const options = surface.remote === undefined ? surface : { ...surface, remote: withClosedRows(surface.remote) }
-  const { store, relay, pipeline } = createGatewayServices(options, () => view({ offline: true }))
+  const { store, pipeline } = createGatewayServices(options, () => view({ offline: true }))
   const now = options.now ?? store.now
   async function view(request?: ThreadHostViewRequest): Promise<ThreadHostView> {
     await options.ensureHost?.()
@@ -462,27 +461,12 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         archiveThread(options, current, value, callerId),
       ),
   }
-  const relayTools = createRelayTools({ options, relay, failure })
   const dispose = () => {
     pipeline.dispose()
     unanswered.clear()
-    relay.dispose()
   }
   return {
-    tools: [
-      create,
-      list,
-      read,
-      send,
-      interrupt,
-      close,
-      handoff,
-      rename,
-      setModel,
-      setReasoning,
-      archive,
-      ...relayTools,
-    ].map((tool) =>
+    tools: [create, list, read, send, interrupt, close, handoff, rename, setModel, setReasoning, archive].map((tool) =>
       withThreadRenderers({
         ...tool,
         permissionParser: tool.permissionParser ?? threadToolPermission(tool.name, options),
@@ -602,7 +586,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
  * reported the same way whatever carried it; a gateway row's `message_seq` exists only for a session
  * this device holds (an unreachable one is `queued_offline`, the row is durable), and `device` only names another one.
  * A chain may come back to a session it passed; only a session sending to itself is refused `loop_detected`. Answers
- * may also travel through thread_read, thread_report and thread_answer.
+ * may also travel through thread_read.
  */
 async function deliverThrough(
   options: ThreadToolSurfaceOptions,
@@ -723,9 +707,8 @@ async function deliverThrough(
 }
 
 /**
- * Registers the fourteen tools, a removed-tool hint for each chat-binding tool sessions no longer have, and with `pi.on`
- * the store extensions' session tools at each `session_start` (`tools/extension-tools.ts`); `dispose` (shutdown) cancels
- * the relay's background retries and drops the receipt-recovery keys.
+ * Registers the eleven tools, and with `pi.on` the store extensions' session tools at each `session_start`
+ * (`tools/extension-tools.ts`); `dispose` (shutdown) drops the receipt-recovery keys.
  */
 export function registerThreadTools(
   pi: ExtensionToolHost,

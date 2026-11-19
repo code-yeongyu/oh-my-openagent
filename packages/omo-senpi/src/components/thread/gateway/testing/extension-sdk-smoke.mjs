@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite"
 import assert from "node:assert/strict"
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
@@ -51,7 +51,6 @@ try {
     "gateway_schema_too_new",
   )
   assert.equal((await sdk.extensionCall("omo_gateway", "put", { bad: () => undefined })).code, "invalid_arguments")
-  assert.equal((await sdk.bindings({})).kind, "ok")
   assert.equal(
     (await sdk.registerStoreExtension({ name: "gateway", moduleUrl, migrations: [] })).code,
     "extension_schema_violation",
@@ -60,31 +59,6 @@ try {
     (await sdk.extensionCall("omo_gateway", "sql", { sql: "DELETE FROM gateway_meta" })).code,
     "extension_schema_violation",
   )
-  const bound = await sdk.extensionCall("alpha", "core", {
-    op: "bind",
-    request: {
-      principal: "fixture",
-      binding: {
-        platform: "custom",
-        account_id: "bot",
-        chat_id: "chat",
-        session_durable_id: "target",
-        ttl_seconds: null,
-      },
-    },
-  })
-  assert.equal(bound.kind, "ok")
-  assert.equal(bound.value.kind, "ok")
-  const request = {
-    binding_id: bound.value.binding.binding_id,
-    event_id: "rolled-back",
-    text: "hello",
-    author: { platform_user_id: "p1", display: "Alice", user_id: "u1" },
-  }
-  const inbox = join(agentDir, "gateway", "inbox", "target")
-  const failed = await sdk.extensionCall("alpha", "enqueueThenThrow", { request, inbox })
-  assert.deepEqual(failed, { kind: "refused", code: "extension_operation_failed", message: "rollback requested" })
-  assert.deepEqual(existsSync(inbox) ? readdirSync(inbox) : [], [])
   const db = new Database(dbPath, { readonly: true })
   try {
     assert.deepEqual(db.query("SELECT COUNT(*) AS n FROM deliveries").get(), { n: 0 })
@@ -98,39 +72,6 @@ try {
   } finally {
     db.close()
   }
-  const committed = await sdk.extensionCall("alpha", "core", {
-    op: "enqueue",
-    request: { ...request, event_id: "committed" },
-  })
-  assert.equal(committed.value.kind, "ok")
-  assert.equal(readdirSync(inbox).length, 1)
-  const missing = await sdk.extensionCall("alpha", "core", {
-    op: "bind",
-    request: {
-      principal: "fixture",
-      binding: {
-        platform: "custom",
-        account_id: "bot",
-        chat_id: "missing",
-        session_durable_id: "missing",
-        ttl_seconds: null,
-      },
-    },
-  })
-  const missingId = missing.value.binding.binding_id
-  assert.equal(
-    (await sdk.send({ binding_id: missingId, text: "no target", idempotency_key: "missing" })).error.code,
-    "not_found",
-  )
-  assert.equal(
-    (
-      await sdk.extensionCall("alpha", "core", {
-        op: "enqueue",
-        request: { binding_id: missingId, text: "no target", event_id: "missing" },
-      })
-    ).value.error.code,
-    "not_found",
-  )
   assert.deepEqual(await sdk.extensionCall("omo_gateway", "rows", { name: "omo_gateway" }), {
     kind: "ok",
     value: [

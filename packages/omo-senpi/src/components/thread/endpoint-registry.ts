@@ -46,7 +46,7 @@ export function controlSocketSecretPath(socket: string): string {
 }
 
 /** senpi `canonicalEndpointPath` on POSIX: the socket's directory resolved through its deepest existing ancestor. */
-export function canonicalEndpointPath(socket: string): string {
+function canonicalEndpointPath(socket: string): string {
   if (socket.startsWith("\0")) return socket
   return join(canonicalDirectory(dirname(socket)), basename(socket))
 }

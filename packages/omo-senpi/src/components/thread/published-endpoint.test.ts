@@ -63,21 +63,6 @@ test("registered exact-id SDK send delivers without global discovery", async () 
   expect(w.discovery()).toBe(0)
 }, 15000)
 
-test("bound exact-id SDK send validates its target without global discovery", async () => {
-  useTestTimeout(15000)
-  const w = await world()
-  const target = await w.owner("a")
-  const bound = await w.sdk.bind({
-    session: "target",
-    binding: { platform: "custom", account_id: "bot", chat_id: "chat" },
-  })
-  if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
-  const result = await w.sdk.send({ thread: "target", binding_id: bound.binding.binding_id, text: "hello bound" })
-  expect(result).toMatchObject({ kind: "ok", delivery: { kind: "started" } })
-  expect(target.runtime.enqueueCalls).toHaveLength(1)
-  expect(w.discovery()).toBe(0)
-}, 15000)
-
 test("cleanly closed target queues offline without global discovery", async () => {
   useTestTimeout(15000)
   const w = await world()
@@ -330,19 +315,3 @@ test("a terminal the engine still reports dead is offline to thread_list, send a
   // The verdict stands: a cached-dead terminal is never re-dialed inside the window, even to send.
   expect(target.frames.filter((frame) => frame === "list_sessions")).toHaveLength(0)
 }, 15000)
-
-test("a bound send to a never-answering owner settles within one listing budget", async () => {
-  useTestTimeout(30000)
-  const w = await world()
-  const target = await w.owner("a")
-  const bound = await w.sdk.bind({
-    session: "target",
-    binding: { platform: "custom", account_id: "bot", chat_id: "chat" },
-  })
-  if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
-  target.listing.answer = false
-  const started = performance.now()
-  const result = await w.sdk.send({ thread: "target", binding_id: bound.binding.binding_id, text: "hello bound" })
-  expect(result).toMatchObject({ kind: "ok", delivery: { kind: "queued_offline" } })
-  expect(performance.now() - started).toBeLessThan(ENDPOINT_LIST_TIMEOUT_MS * 1.5)
-}, 30000)

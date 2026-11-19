@@ -1,7 +1,6 @@
 import { Database } from "bun:sqlite"
 import { afterEach, describe, expect, test } from "bun:test"
 
-import { rfc3339 } from "./bindings"
 import { DELIVERY_RETENTION_MS, RETENTION_SWEEP_BATCH, RETENTION_SWEEP_INTERVAL_MS } from "./constants"
 import { gatewayDatabasePath } from "./paths"
 import type { GatewayStore } from "./store"
@@ -21,28 +20,11 @@ function insertDelivery(
   id: string,
   state: string,
   updatedAt: number,
-  extra: { readonly target?: string; readonly seq: number; readonly root?: string; readonly binding?: string },
+  extra: { readonly target?: string; readonly seq: number; readonly root?: string },
 ): void {
   db.run(
-    'INSERT INTO deliveries (delivery_id, target_durable_id, seq, sender, envelope, body, bytes, mode_requested, state, root_id, hop, created_at, updated_at, expires_at, binding_id) VALUES (?, ?, ?, \'session:A\', \'{"provenance":{"workspace":"Example","project":"project"}}\', \'body\', 4, \'auto\', ?, ?, 1, ?, ?, ?, ?)',
-    [
-      id,
-      extra.target ?? "B",
-      extra.seq,
-      state,
-      extra.root ?? "root-x",
-      updatedAt,
-      updatedAt,
-      updatedAt + DAY,
-      extra.binding ?? null,
-    ],
-  )
-}
-
-function insertBinding(db: Database, id: string, status: string, updatedAt: number, session = "B", chat = id): void {
-  db.run(
-    "INSERT INTO bindings (binding_id, revision, status, platform, account_id, chat_id, thread_id, session_realm_id, session_durable_id, direction_inbound, direction_outbound, inbound_mode, outbound_events, policy_id, created_at, updated_at, lease_started_at) VALUES (?, 1, ?, 'custom', 'bot', ?, '@chat', 'realm-x', ?, 1, 1, 'auto', '[\"report\"]', 'default', ?, ?, ?)",
-    [id, status, chat, session, rfc3339(updatedAt), rfc3339(updatedAt), rfc3339(updatedAt)],
+    'INSERT INTO deliveries (delivery_id, target_durable_id, seq, sender, envelope, body, bytes, mode_requested, state, root_id, hop, created_at, updated_at, expires_at) VALUES (?, ?, ?, \'session:A\', \'{"provenance":{"workspace":"Example","project":"project"}}\', \'body\', 4, \'auto\', ?, ?, 1, ?, ?, ?)',
+    [id, extra.target ?? "B", extra.seq, state, extra.root ?? "root-x", updatedAt, updatedAt, updatedAt + DAY],
   )
 }
 
@@ -53,30 +35,16 @@ function ids(db: Database, table: string, column: string): string[] {
     .map((row) => String((row as { id: unknown }).id))
 }
 
-/** A relay mutation: one write transaction, which runs the retention sweep when one is due. */
-async function bindSomething(store: GatewayStore, now: number, chat: string, keyed = false) {
-  const receipt = keyed
-    ? { principal: "session:A", operation: "thread_bind", idempotency_key: `bind-${chat}`, args_hash: "h" }
-    : null
-  const bound = await store.bind({
+/** A tool receipt admission: one write transaction, which runs the retention sweep when one is due. */
+async function toolCall(store: GatewayStore, now: number, key: string) {
+  const admitted = await store.toolReceiptBegin({
+    principal: "session:A",
+    operation: "thread_rename",
+    idempotency_key: `call-${key}`,
+    args_hash: "h",
     now,
-    receipt,
-    binding: {
-      platform: "custom",
-      account_id: "bot",
-      chat_id: chat,
-      thread_id: "@chat",
-      root_message_id: null,
-      progress_message_id: null,
-      session_durable_id: "C",
-      direction: { inbound: true, outbound: true },
-      inbound_mode: "auto",
-      outbound_events: ["report"],
-      policy_id: "default",
-      ttl_seconds: null,
-    },
   })
-  if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
+  if (admitted.kind !== "accepted") throw new Error(JSON.stringify(admitted))
 }
 
 describe("gateway store retention", () => {
@@ -102,7 +70,6 @@ describe("gateway store retention", () => {
       insertDelivery(db, "d-admitted", "admitted", t0, { seq: 4 })
       insertDelivery(db, "d-receipt", "applied", t0, { seq: 5 })
       insertDelivery(db, "d-recent", "applied", t0 + 30 * DAY, { seq: 6, root: "root-live" })
-      insertDelivery(db, "d-open-binding", "queued", t0, { seq: 7, binding: "bnd-in-flight" })
       db.run(
         "INSERT INTO receipts (principal, operation, idempotency_key, args_hash, status, delivery_id, owner_instance, created_at, updated_at, expires_at) VALUES ('session:A', 'deliver', 'k', 'h', 'completed', 'd-receipt', 'i', ?, ?, ?)",
         [t0, t0, t0 + 60 * DAY],
@@ -111,37 +78,20 @@ describe("gateway store retention", () => {
         "INSERT INTO rate_buckets (sender, target_durable_id, tokens, updated_at) VALUES ('session:A', 'B', 0, ?), ('session:C', 'B', 0, ?)",
         [t0, t0 + 31 * DAY - 1_000],
       )
-      insertBinding(db, "bnd-closed", "detached", t0)
-      insertBinding(db, "bnd-active", "active", t0, "B", "chat-active")
-      insertBinding(db, "bnd-acked-row", "detached", t0)
-      insertBinding(db, "bnd-in-flight", "expired", t0)
-      insertBinding(db, "bnd-recent", "detached", t0 + 20 * DAY)
-      db.run(
-        "INSERT INTO outbox (binding_id, revision, event_kind, payload, state, created_at, acked_at) VALUES ('bnd-acked-row', 1, 'report', '{}', 'acked', ?, ?)",
-        [t0, t0 + 30 * DAY],
-      )
-      db.run(
-        "INSERT INTO outbox_cursors (binding_id, acked_cursor, updated_at) VALUES ('bnd-closed', 1, ?), ('bnd-active', 0, ?)",
-        [t0, t0],
-      )
       db.run("INSERT INTO session_meta (durable_id, next_seq) VALUES ('B', 8), ('S-gone', 3)")
       h.clock.now = t0 + 31 * DAY
-      await bindSomething(store, h.clock.now, "trigger")
+      await toolCall(store, h.clock.now, "trigger")
       expect({
         deliveries: ids(db, "deliveries", "delivery_id"),
         causal_roots: ids(db, "causal_roots", "root_id"),
         causal_edges: ids(db, "causal_edges", "root_id"),
         rate_buckets: ids(db, "rate_buckets", "sender"),
-        bindings: ids(db, "bindings", "binding_id").filter((id) => !/^bnd-[0-9a-f]{8}-/.test(id)),
-        outbox_cursors: ids(db, "outbox_cursors", "binding_id"),
         session_meta: ids(db, "session_meta", "durable_id"),
       }).toEqual({
-        deliveries: ["d-admitted", "d-open-binding", "d-queued", "d-receipt", "d-recent"],
+        deliveries: ["d-admitted", "d-queued", "d-receipt", "d-recent"],
         causal_roots: ["root-live"],
         causal_edges: ["root-live"],
         rate_buckets: ["session:C"],
-        bindings: ["bnd-acked-row", "bnd-active", "bnd-in-flight", "bnd-recent"],
-        outbox_cursors: ["bnd-active"],
         session_meta: ["B"],
       })
     } finally {
@@ -164,9 +114,9 @@ describe("gateway store retention", () => {
         for (let seq = 1; seq <= total; seq++) insertDelivery(db, `d-${seq}`, "refused", t0, { seq })
       })()
       h.clock.now = t0 + DELIVERY_RETENTION_MS + 1
-      await bindSomething(store, h.clock.now, "first")
+      await toolCall(store, h.clock.now, "first")
       expect(ids(db, "deliveries", "delivery_id")).toHaveLength(total - RETENTION_SWEEP_BATCH)
-      await bindSomething(store, h.clock.now, "second")
+      await toolCall(store, h.clock.now, "second")
       expect(ids(db, "deliveries", "delivery_id")).toHaveLength(0)
     } finally {
       db.close()
@@ -191,19 +141,19 @@ describe("gateway store retention", () => {
         }
       })()
       h.clock.now = t0 + 2 * DAY
-      // Keyed binds: the receipt check of a keyed call clears only its own key's expired receipt.
-      await bindSomething(store, h.clock.now, "first", true)
+      // The receipt check of a keyed call clears only its own key's expired receipt.
+      await toolCall(store, h.clock.now, "first")
       expect(ids(db, "receipts", "idempotency_key").filter((key) => key.startsWith("k-"))).toHaveLength(
         total - RETENTION_SWEEP_BATCH,
       )
-      await bindSomething(store, h.clock.now, "second", true)
-      expect(ids(db, "receipts", "idempotency_key")).toEqual(["bind-first", "bind-second"])
+      await toolCall(store, h.clock.now, "second")
+      expect(ids(db, "receipts", "idempotency_key")).toEqual(["call-first", "call-second"])
     } finally {
       db.close()
     }
   })
 
-  test("#given more expired receipts than one sweep may delete #when only peer tool calls write (no enqueue, relay mutation or outbox read) #then each call deletes at most one batch, the backlog drains over successive calls, and a later backlog waits for the sweep interval", async () => {
+  test("#given more expired receipts than one sweep may delete #when only peer tool calls write (no enqueue) #then each call deletes at most one batch, the backlog drains over successive calls, and a later backlog waits for the sweep interval", async () => {
     const h = (harness = createGatewayHarness())
     const t0 = h.clock.now
     const store = h.store()
@@ -269,14 +219,6 @@ describe("gateway store retention", () => {
       },
     ],
     [
-      "keyed relay mutation",
-      {
-        principal: "session:A",
-        operation: "thread_bind",
-        call: async (h, key) => await bindSomething(h.get("A").store, h.clock.now, key.slice("bind-".length), true),
-      },
-    ],
-    [
       "keyed send",
       {
         principal: "session:A",
@@ -303,7 +245,7 @@ describe("gateway store retention", () => {
       h.session("B")
       expect(await h.get("A").store.journalMode()).toBe("wal")
       const db = new Database(gatewayDatabasePath(h.agentDir))
-      const prefix = entry.operation === "thread_bind" ? "bind" : "old"
+      const prefix = "old"
       const expired = () =>
         Number(
           (db.query("SELECT COUNT(*) AS n FROM receipts WHERE expires_at <= ?").get(h.clock.now) as { n: number }).n,
@@ -345,14 +287,14 @@ describe("gateway store retention", () => {
       db.run("PRAGMA busy_timeout = 5000")
       insertDelivery(db, "d-swept", "refused", t0, { seq: 1 })
       h.clock.now = t0 + DELIVERY_RETENTION_MS + 1
-      await bindSomething(store, h.clock.now, "first")
+      await toolCall(store, h.clock.now, "first")
       expect(ids(db, "deliveries", "delivery_id")).toEqual([])
       insertDelivery(db, "d-waits", "refused", t0, { seq: 2 })
       h.clock.now += RETENTION_SWEEP_INTERVAL_MS - 1
-      await bindSomething(store, h.clock.now, "second")
+      await toolCall(store, h.clock.now, "second")
       expect(ids(db, "deliveries", "delivery_id")).toEqual(["d-waits"])
       h.clock.now += 1
-      await bindSomething(store, h.clock.now, "third")
+      await toolCall(store, h.clock.now, "third")
       expect(ids(db, "deliveries", "delivery_id")).toEqual([])
     } finally {
       db.close()
