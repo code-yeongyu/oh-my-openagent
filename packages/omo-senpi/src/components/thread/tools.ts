@@ -189,10 +189,12 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     // A send owns its idempotency: the gateway engine's receipt is written in the delivery's own
     // transaction and answers a lost ACK with `idempotency_uncertain` + the row state.
     const receipted = !(name === "thread_send" || name === "thread_handoff")
+    // An earlier run under this key failed after it may have acted: only thread_create may run again, and it decides (#14060).
     let retrying: { readonly error_note: string | null } | undefined
     if (receipted) {
       // Nothing has run yet, so a store that cannot admit the receipt fails the call as data: the store
-      // lock held past its wait bound is `overloaded`, any other store failure `internal_error`.
+      // lock held past its wait bound is `overloaded`, a too-new schema is `store_schema_too_new`, any other
+      // store failure `internal_error`.
       const key = receiptKey(scope)
       const at = now()
       // The slot is taken before the admission is awaited, so overlapping calls cannot all pass the check.

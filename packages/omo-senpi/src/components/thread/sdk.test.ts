@@ -175,6 +175,24 @@ function countingRemote(remote: RemoteThreadSurface): {
   }
 }
 
+describe("a gateway store newer than this binary through the SDK (#13927)", () => {
+  test("#given a store whose schema version this binary does not know #when the CLI principal sends #then the refusal is typed, not internal_error", async () => {
+    const newer = new Error("Gateway schema 15 is newer than this binary's supported version 14.")
+    ;(newer as Error & { code?: string }).code = "gateway_schema_too_new"
+    const f = fixture({
+      store: (agentDir) => {
+        const real = createGatewayStore({ agentDir })
+        return { ...real, enqueue: async () => { throw newer } }
+      },
+    })
+    const outcome = await f.sdk.send({ thread: "my-tui", text: "hi" })
+    expect(outcome).toMatchObject({
+      kind: "error",
+      error: { code: "store_schema_too_new", next_action: "Update omo on this device, then retry." },
+    })
+  })
+})
+
 describe("thread SDK: options are checked at the boundary", () => {
   test.each([
     ["the bundled entry", createBundledThreadSdk],
