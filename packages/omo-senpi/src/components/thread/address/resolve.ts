@@ -233,12 +233,20 @@ export async function resolveAddress(
   if ("kind" in one) return one.kind === "none" ? await bare(text) : "error" in one ? asRefusal(one.error) : one
   const ref = { ...device.device, listing: one.listingOf(device.device.id) }
   const onDevice = await resolveOnDevice(ctx, remote, one, ref, parsed.thread, opts, ready())
-  // An id-shaped thread part reads nothing more when its device answers; a miss there may still be a name with "/".
-  if (onDevice.kind === "ok" && idShaped(parsed.thread)) return await finish(ctx, onDevice, one, opts)
+  if (onDevice.kind === "ok") {
+    // The device holds it: the whole text is checked against this device's book alone (a thread here literally named
+    // "<device>/<thread>"), never the account-wide round (#12709, design section 2). An id-shaped part needs no check.
+    if (idShaped(parsed.thread)) return await finish(ctx, onDevice, one, opts)
+    const here = await resolveBare({ ...ctx, remote: undefined }, text, opts, read)
+    return here.result.kind === "ok" && here.result.entry.thread_id !== onDevice.entry.thread_id
+      ? ambiguous(text, [onDevice, here.result], one)
+      : await finish(ctx, onDevice, one, opts)
+  }
+  // The device does not hold it. An id-shaped part is the device's to answer: no whole-text reading. Any other part may
+  // be a name with "/" (a bare name on dev): this device's book, then one account-wide round, before the device's refusal.
+  if (idShaped(parsed.thread)) return await finish(ctx, onDevice, one, opts)
   const whole = await resolveBare(ctx, text, opts, read)
-  if (onDevice.kind === "ok" && whole.result.kind === "ok" && whole.result.entry.thread_id !== onDevice.entry.thread_id)
-    return ambiguous(text, [onDevice, whole.result], one)
-  return onDevice.kind === "ok" || whole.result.kind !== "ok"
-    ? await finish(ctx, onDevice, one, opts)
-    : await finish(ctx, whole.result, whole.account, opts)
+  return whole.result.kind === "ok"
+    ? await finish(ctx, whole.result, whole.account, opts)
+    : await finish(ctx, onDevice, one, opts)
 }
