@@ -1,6 +1,7 @@
-import { accountDevices, asFailure, resolveAccountDevice } from "../thread/address"
+import { accountDevices, asFailure, resolveAccountDevice, resolveAddress, type Resolved } from "../thread/address"
 import { threadToolFailure, type ThreadToolFailure } from "../thread/errors"
-import type { RemoteDevice } from "../thread/remote/ports"
+import type { RemoteDevice, RemoteThreadSurface } from "../thread/remote/ports"
+import { UNKNOWN_CALLER } from "../thread/tools/ports"
 import type { RemoteClient } from "./client"
 
 /**
@@ -34,4 +35,24 @@ export async function resolveTypedDevice(
   return resolved.kind === "ok"
     ? { kind: "ok", device: resolved.device.id, devices: listed.devices }
     : { kind: "error", error: asFailure(resolved) }
+}
+
+/**
+ * Seam 4 (#14305, design section 2): the only resolver for a typed thread address, the one a person typed at this
+ * device. No caller identity (a terminal is no thread) and no local book (`omo remote` commands other devices'
+ * sessions): every form resolves over the account the surface reads - a bare thread id, name, alias or 8-hex id
+ * prefix, and `<device id | device name | 6+ char device id prefix | here>/<any of those>`. A refusal passes through
+ * typed, in the same shape `resolveTypedDevice` answers a device.
+ */
+export async function resolveTypedAddress(
+  remote: RemoteThreadSurface,
+  typed: string,
+  opts: { readonly need: "address" | "online" },
+): Promise<Resolved | { readonly kind: "error"; readonly error: ThreadToolFailure }> {
+  const resolved = await resolveAddress(
+    { remote, callerWorkspaceRoot: "", local: [], callerId: UNKNOWN_CALLER },
+    typed,
+    { all_scope: true, probe: true, need: opts.need },
+  )
+  return resolved.kind === "ok" ? resolved : { kind: "error", error: asFailure(resolved) }
 }
