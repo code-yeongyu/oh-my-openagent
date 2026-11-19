@@ -165,7 +165,8 @@ export type ThreadCreateResult =
   | (ThreadResultSummary & {
       readonly kind: "ok"
       readonly deduplicated: boolean
-      readonly prompt?: ThreadCreatePrompt
+      /** The first prompt's delivery, or null when the create was given none: nothing was sent. */
+      readonly prompt?: ThreadCreatePrompt | null
       readonly requested_skills?: readonly string[]
       /** The git worktree the new thread was started in, when thread_create asked for one. */
       readonly worktree?: ThreadWorktree

@@ -211,7 +211,9 @@ export async function createThread(
           }
     ) as ThreadToolResult
   })()
-  if (value.prompt === undefined || made.kind !== "ok" || opened === undefined) return made
+  // A create given no prompt says so (`prompt: null`), so a caller sees nothing was sent (the owner's lost-brief case).
+  if (value.prompt === undefined) return made.kind === "ok" ? ({ ...made, prompt: null } as ThreadToolResult) : made
+  if (made.kind !== "ok" || opened === undefined) return made
   if ((made as Extract<ThreadCreateResult, { kind: "ok" }>).deduplicated) return made
   const prompt = await promptThatRan(await firstPrompt(current, opened, value, context), opened, context)
   return "not_started" in prompt ? { kind: "error", error: prompt.not_started } : ({ ...made, prompt } as ThreadToolResult)
