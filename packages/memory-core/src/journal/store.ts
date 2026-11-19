@@ -66,10 +66,6 @@ function parseTranscriptRows(raw: string): TranscriptEntry[] {
     })
 }
 
-function sameJson(left: unknown, right: unknown): boolean {
-  return JSON.stringify(left) === JSON.stringify(right)
-}
-
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined
 }
@@ -122,7 +118,9 @@ export class TranscriptJournal {
   private readonly now: () => Date
   private readonly lock: JournalLock
   private readonly snapshotMaxBytes: number
-  private transcriptTail?: { byteOffset: number; entries: TranscriptEntry[] }
+  private transcriptTail?: { byteOffset: number; mtimeMs: number; entries: TranscriptEntry[] }
+  /** state.json as last read or written by this store; a settle whose derived state equals it writes nothing. */
+  private persistedStateJson?: string
 
   constructor(readonly options: TranscriptJournalOptions) {
     this.snapshotMaxBytes = options.snapshotMaxBytes ?? REFLECTION_SNAPSHOT_MAX_BYTES
@@ -315,7 +313,8 @@ export class TranscriptJournal {
     if (fresh.length > 0) {
       await appendFile(this.transcriptPath, `${fresh.map((entry) => JSON.stringify(entry)).join("\n")}\n`, "utf8")
       allEntries = [...existing, ...fresh]
-      this.transcriptTail = { byteOffset: (await stat(this.transcriptPath)).size, entries: [...allEntries] }
+      const appended = await stat(this.transcriptPath)
+      this.transcriptTail = { byteOffset: appended.size, mtimeMs: appended.mtimeMs, entries: [...allEntries] }
     } else {
       allEntries = existing
     }
@@ -354,8 +353,11 @@ export class TranscriptJournal {
 
   private async readEntriesUnlocked(): Promise<TranscriptEntry[]> {
     let size: number
+    let mtimeMs: number
     try {
-      size = (await stat(this.transcriptPath)).size
+      const stats = await stat(this.transcriptPath)
+      size = stats.size
+      mtimeMs = stats.mtimeMs
     } catch (error) {
       if (errorCode(error) !== "ENOENT") throw error
       this.transcriptTail = undefined
@@ -365,12 +367,13 @@ export class TranscriptJournal {
     // are the journal, and only a size change pays a read. Growth reads the appended tail alone;
     // a shrink (prune, rewrite, foreign writer) falls back to the full load.
     const cached = this.transcriptTail
-    if (cached !== undefined && size === cached.byteOffset) return cached.entries
+    // Same size is only "unchanged" with the same mtime: a prune that regrows to the old size is a new file.
+    if (cached !== undefined && size === cached.byteOffset && mtimeMs === cached.mtimeMs) return cached.entries
     if (cached !== undefined && size > cached.byteOffset) {
       const tail = await this.readTailEntriesUnlocked(size, cached.byteOffset)
       if (tail !== undefined) {
         const entries = [...cached.entries, ...tail]
-        this.transcriptTail = { byteOffset: size, entries }
+        this.transcriptTail = { byteOffset: size, mtimeMs, entries }
         return entries
       }
     }
@@ -383,7 +386,7 @@ export class TranscriptJournal {
       return []
     }
     const entries = parseTranscriptRows(raw)
-    this.transcriptTail = { byteOffset: size, entries }
+    this.transcriptTail = { byteOffset: size, mtimeMs, entries }
     return entries
   }
 
@@ -407,9 +410,14 @@ export class TranscriptJournal {
 
   private async readStateUnlocked(): Promise<ReflectionTranscriptState> {
     try {
-      return parseState(await readFile(this.statePath, "utf8"))
+      const persisted = parseState(await readFile(this.statePath, "utf8"))
+      this.persistedStateJson = JSON.stringify(persisted)
+      return persisted
     } catch (error) {
-      if (errorCode(error) === "ENOENT") return initialReflectionState()
+      if (errorCode(error) === "ENOENT") {
+        this.persistedStateJson = undefined
+        return initialReflectionState()
+      }
       throw error
     }
   }
@@ -429,11 +437,13 @@ export class TranscriptJournal {
     )
     // A no-op settle (nothing appended, counters unchanged) must not rewrite state.json: the
     // per-settle write was part of the omo#14351 mass-wake cost.
-    if (sameJson(derived, state)) return
+    const derivedJson = JSON.stringify(derived)
+    if (derivedJson === this.persistedStateJson) return
     const temporaryPath = `${this.statePath}.tmp-${randomUUID()}`
     await writeFile(temporaryPath, `${JSON.stringify(derived, null, 2)}\n`, "utf8")
     try {
       await (this.options.renameFile ?? rename)(temporaryPath, this.statePath)
+      this.persistedStateJson = derivedJson
     } catch (error) {
       // A refused rename must not strand the temporary copy beside state.json.
       try {
