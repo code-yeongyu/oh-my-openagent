@@ -11,7 +11,12 @@ export {
   type BootstrapOutcome,
   forgetDeviceService,
 } from "./bootstrap.ts"
-export { handDeviceKeys, type HeldDeviceCredential, readDeviceServiceStatus } from "./hand-device-keys.ts"
+export {
+  handDeviceKeys,
+  type HeldDeviceCredential,
+  readDeviceServiceDevices,
+  readDeviceServiceStatus,
+} from "./hand-device-keys.ts"
 export {
   type ColdWakeHost,
   type ColdWakeOutcome,
