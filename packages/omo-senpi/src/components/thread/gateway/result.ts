@@ -54,7 +54,7 @@ export function resultFromRow(
     const device = row.envelope.provenance?.device
     // senpi answers `held` when the session sits under a hold a peer cannot release (a Stop, an interrupted run, a
     // parent's run hold; senpi#7014): the delivery is kept and starts once that hold is released.
-    const wait = row.admission_kind === "held" ? "hold" : row.wait_kind
+    const wait: DeliveryWait["kind"] | null = row.admission_kind === "held" ? "hold" : row.wait_kind
     const waiting = wait === null ? {} : { waiting_on: { kind: wait, ...(device === undefined ? {} : { device }) } }
     return { ...base, delivery: { kind: "queued", queue_position: Math.max(queuePosition, 1), ...waiting } }
   }
