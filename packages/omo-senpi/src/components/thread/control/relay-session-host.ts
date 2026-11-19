@@ -7,6 +7,7 @@ import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "../remot
 import { notSignedInFailure, outcomeFailure } from "../remote/outcome"
 import { deviceOnline, replyData } from "../remote/remote-ops"
 import { prepareRemoteWorktree, removeRemoteWorktree } from "../worktree/remote-worktree"
+import { SESSION_GONE } from "./close-ladder"
 import { openedEngineId, openRefusal } from "./open-reply"
 import { threadLink } from "../thread-link"
 import type { ThreadHostSession } from "../tools/ports"
@@ -74,6 +75,35 @@ export function createRelaySessionHost(
     next: string,
     details?: Readonly<Record<string, unknown>>,
   ): SessionOpenOutcome => ({ kind: "error", error: threadToolFailure(code, message, next, details) })
+  /**
+   * A create whose new session b's route does not reach (#14394): end it on b through the endpoint that opened it, so
+   * nothing is left behind, and refuse typed. `created` says whether a thread still exists there (the end failed).
+   */
+  const unreachable = async (
+    reason: string,
+    routingId: string | undefined,
+    thread: string,
+  ): Promise<SessionOpenOutcome> => {
+    const ended =
+      routingId === undefined
+        ? undefined
+        : await remote.sessions.endpointCommand(device, {
+            type: "unload_session",
+            sessionId: routingId,
+            force: true,
+            children: "detach",
+          })
+    const created = !(ended?.kind === "ok" && replyData(ended.response)["outcome"] === "unloaded")
+    const shown = escapeForDisplay(reason)
+    return fail(
+      "host_unavailable",
+      created
+        ? `Device ${device} made thread ${thread}, but its route does not reach it (${shown}), and ending it there failed: it is left with no live owner.`
+        : `Device ${device} took the open, but its route does not reach the session it made (${shown}): no thread host there that this account reaches takes new threads. Nothing was left behind.`,
+      "Start omo on that device (an omo session, or omo daemon run), or create the thread on another device.",
+      { device, reason: shown, created, ...(created ? { thread } : {}) },
+    )
+  }
   return {
     device,
     visible: async (): Promise<readonly ThreadSummary[]> =>
@@ -160,13 +190,35 @@ export function createRelaySessionHost(
         threadId = located.kind === "ok" ? located.sessionId : engineId
       }
       let applied = name
-      if (name !== undefined) {
-        const named = await remote.sessions.sessionCommand(
-          device,
-          threadId,
-          { type: "set_session_name", sessionId: threadId, name },
-          { direct: true },
-        )
+      const named =
+        name === undefined
+          ? undefined
+          : await remote.sessions.sessionCommand(
+              device,
+              threadId,
+              { type: "set_session_name", sessionId: threadId, name },
+              { direct: true },
+            )
+      if (!reopens) {
+        // #14394: every later step (its name, its first prompt, every tool) reaches the new session through b's route.
+        // A route that answers it does not hold the session (a host the service does not route, such as the Desktop
+        // app's) leaves an orphan nothing can address: the create ends it where it was opened and refuses instead.
+        const reached =
+          named ??
+          (await remote.sessions.sessionCommand(
+            device,
+            threadId,
+            { type: "get_state", sessionId: threadId },
+            { direct: true },
+          ))
+        if (reached.kind === "refused" && SESSION_GONE.has(reached.reason))
+          return await unreachable(
+            reached.reason,
+            nonEmpty(data["sessionId"]),
+            nonEmpty(state["durableSessionId"]) ?? threadId,
+          )
+      }
+      if (named !== undefined) {
         if (named.kind !== "ok") {
           applied = undefined
           const failed = outcomeFailure(named, device).error
