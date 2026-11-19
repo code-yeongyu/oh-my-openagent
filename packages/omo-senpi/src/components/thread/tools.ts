@@ -46,7 +46,14 @@ import { accountDevices } from "./remote/account"
 import { listAcross } from "./remote/lazy-ops"
 import { locateControl } from "./control/locate"
 import { createThread } from "./control/create"
-import { closeThread, interruptThread, NOT_LIVE, setModelOn, setThinkingLevelOn } from "./control/operations"
+import {
+  closeOptions,
+  closeThread,
+  interruptThread,
+  NOT_LIVE,
+  setModelOn,
+  setThinkingLevelOn,
+} from "./control/operations"
 import { renameThread } from "./control/rename"
 import { controlIdentity, controlRefusalOf } from "./control/port"
 import { registerExtensionTools, type ExtensionToolHost } from "./tools/extension-tools"
@@ -413,7 +420,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         // Nothing live holds it: there is nothing to close, and the thread stays resumable from its session file.
         if (located.kind === "not_live")
           return { kind: "ok", ...controlIdentity(located), closed: false, reason: "not_live", dropped_deliveries: [] }
-        return await closeThread(located.control, value.force)
+        return await closeThread(located.control, closeOptions(value))
       }),
   }
   const handoff: AnyTool = {

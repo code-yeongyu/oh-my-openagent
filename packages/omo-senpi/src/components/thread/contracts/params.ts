@@ -104,6 +104,19 @@ const ThreadCloseParams = Type.Object({
         "Close even when the thread has messages it has not read yet; they are dropped and listed in dropped_deliveries.",
     }),
   ),
+  graceful: Type.Optional(
+    Type.Boolean({
+      description:
+        "Let the running turn end instead of stopping it; new messages are refused and unread ones go back to their senders. Monitors, loops and the goal stop cleanly. Also closes a terminal's thread, which then exits.",
+    }),
+  ),
+  wait_ms: Type.Optional(
+    Type.Integer({
+      minimum: 1,
+      maximum: 600_000,
+      description: "How long a graceful close waits for the turn (default 30000, cut to what the call has left).",
+    }),
+  ),
 })
 
 export const ThreadHandoffParams = Type.Object({

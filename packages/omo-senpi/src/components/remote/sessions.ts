@@ -3,7 +3,7 @@ import { userInfo } from "node:os"
 import type { DeviceService } from "@oh-my-opencode/device-service-core/device-service"
 import type { ThreadThinkingLevel, ThreadToolResult } from "../thread/contracts"
 import { isPermissionPreset, presetWithin } from "../thread/contracts/permission-presets"
-import { answered, closeThread, setModelOn, setThinkingLevelOn } from "../thread/control/operations"
+import { answered, closeOptions, closeThread, setModelOn, setThinkingLevelOn } from "../thread/control/operations"
 import { ControlRefusal, type SessionControl } from "../thread/control/port"
 import { createRelayControl } from "../thread/control/relay-control"
 import { createRelaySessionHost } from "../thread/control/relay-session-host"
@@ -792,8 +792,8 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       const target = resolved.value
       return core.member(stage(), DEADLINES.close, true, async (svc) => {
         if (await isThisDevice(svc, target.device))
-          return await onThisDevice(target.device, (local) => local.close(target, opts?.force === true))
-        const result = await answered(() => closeThread(controlOf(svc, target), opts?.force))
+          return await onThisDevice(target.device, (local) => local.close(target, closeOptions(opts ?? {})))
+        const result = await answered(() => closeThread(controlOf(svc, target), closeOptions(opts ?? {})))
         if (result.kind === "error") return fromThread(result.error)
         return ok({
           closed: "closed" in result && result.closed === true,

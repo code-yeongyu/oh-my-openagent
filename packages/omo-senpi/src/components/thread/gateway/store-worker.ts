@@ -970,6 +970,8 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
       return await ops.recordOutcome(ctx, args as Parameters<typeof ops.recordOutcome>[1])
     case "refuse_queued":
       return await ops.refuseQueued(ctx, args as Parameters<typeof ops.refuseQueued>[1])
+    case "refuse_returned":
+      return await ops.refuseReturned(ctx, args as Parameters<typeof ops.refuseReturned>[1])
     case "complete_receipt":
       return await ops.completeReceipt(ctx, args as Parameters<typeof ops.completeReceipt>[1])
     case "abandon_receipt":

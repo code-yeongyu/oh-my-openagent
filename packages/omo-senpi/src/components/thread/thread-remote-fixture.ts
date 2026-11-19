@@ -20,7 +20,7 @@ import type {
 import type { ThreadTranscriptEntry } from "./reader"
 import { answerGetEntries, senpiProjector, type FakeEntryLog } from "./thread-remote-entries-fixture"
 import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
-import type { ThreadCloseOutcome } from "./tools/ports"
+import type { ThreadCloseOptions, ThreadCloseOutcome } from "./tools/ports"
 import type { SessionWatchHandlers } from "./control/wait-settled"
 
 // The listing key (what b's connector assigned) deliberately differs from the durable id (audit class C8, #13017): a test
@@ -872,6 +872,7 @@ export function createRemoteThreadFixture() {
     })
     const closed: Array<readonly [string, string | undefined]> = []
     const forcedCloses: string[] = []
+    const closeRequests: ThreadCloseOptions[] = []
     // The interrupt records this device's endpoint received, as b's engine's arrive in `sent`.
     const interrupts: JsonObject[] = []
     const setSessionName = mock(async (_sessionId: string, _name: string) => {})
@@ -923,6 +924,7 @@ export function createRemoteThreadFixture() {
       closeSession: async (sessionId, durableId, options) => {
         closed.push([sessionId, durableId])
         if (options?.force === true) forcedCloses.push(sessionId)
+        closeRequests.push(options ?? {})
         return { outcome: extra.closeOutcome ?? "closed", dropped_deliveries: extra.closeDropped ?? [] }
       },
       ...(extra.archive === "absent" ? {} : { setSessionArchived }),
@@ -1012,6 +1014,7 @@ export function createRemoteThreadFixture() {
       store,
       closed,
       forcedCloses,
+      closeRequests,
       archived,
       interrupts,
       agentDir,

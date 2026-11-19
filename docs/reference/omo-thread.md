@@ -605,7 +605,7 @@ The SDK also controls threads, with the same arguments and results as the agent 
 | --- | --- | --- |
 | `create` | `thread_create` | `{ thread?, device?, alias?, name?, cwd?, worktree?, fork_from?, skills?, model?, reasoning?, permission_preset?, prompt?, delivery?, idempotency_key? }` |
 | `interrupt` | `thread_interrupt` | `{ thread, turn_id?, all_scope? }` |
-| `close` | `thread_close` | `{ thread?, all_scope?, idempotency_key? }` |
+| `close` | `thread_close` | `{ thread?, all_scope?, idempotency_key?, force?, graceful?, wait_ms? }` |
 | `rename` | `thread_rename` | `{ thread?, name?, alias?, all_scope?, idempotency_key? }` |
 | `set_model` | `thread_set_model` | `{ thread, model, provider?, all_scope?, idempotency_key? }` |
 

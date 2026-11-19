@@ -1042,6 +1042,24 @@ export async function refuseQueued(
   })
 }
 
+/**
+ * omo#14313: a delivery the engine took in (`admitting`/`admitted`) and then handed back unread when its session was
+ * closed gracefully. The row is refused with `reason`, so its sender reads it as not delivered instead of admitted.
+ * An `applied` row (the session read it) is never touched. Answers whether this call refused it.
+ */
+export async function refuseReturned(
+  ctx: StoreContext,
+  request: { readonly now: number; readonly delivery_id: string; readonly reason: RefusalReason },
+): Promise<boolean> {
+  return await transaction(ctx, "refuse_returned", () => {
+    const row = selectRow(ctx, request.delivery_id)
+    if (row === undefined || (row.state !== "admitting" && row.state !== "admitted")) return false
+    transition(ctx, row, "refused", request.now, { reason: request.reason })
+    unlinkMarker(ctx, row.target_durable_id, row.delivery_id)
+    return true
+  })
+}
+
 export async function completeReceipt(
   ctx: StoreContext,
   request: {

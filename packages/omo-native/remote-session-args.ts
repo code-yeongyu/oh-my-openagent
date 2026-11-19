@@ -36,8 +36,17 @@ export type SessionArgs =
     }
   | { readonly verb: "model"; readonly target: RemoteSessionTarget; readonly model: string }
   | { readonly verb: "interrupt"; readonly target: RemoteSessionTarget }
-  /** `force`: close even when the session has messages it has not read; they are dropped and listed (omo#14234). */
-  | { readonly verb: "close"; readonly target: RemoteSessionTarget; readonly force: boolean }
+  /**
+   * `force`: close even when the session has messages it has not read; they are dropped and listed (omo#14234).
+   * `graceful` (omo#14313): let its turn end instead, within `wait_ms`; unread messages go back to their senders.
+   */
+  | {
+      readonly verb: "close"
+      readonly target: RemoteSessionTarget
+      readonly force: boolean
+      readonly graceful?: true
+      readonly wait_ms?: number
+    }
 
 export function parseTarget(verb: string, value: string | undefined): RemoteSessionTarget {
   const slash = value?.indexOf("/") ?? -1
@@ -58,7 +67,7 @@ const SESSION_FLAGS: Readonly<
   send: { values: ["--timeout"], switches: ["--steer", "--follow-up", "--no-wait"] },
   model: { values: [], switches: [] },
   interrupt: { values: [], switches: [] },
-  close: { values: [], switches: ["--force"] },
+  close: { values: ["--wait-ms"], switches: ["--force", "--graceful"] },
 }
 
 export function parseSession(
@@ -163,6 +172,23 @@ export function parseSession(
       throw new UsageError("omo remote model: the model is required (provider/id)")
     return { json, session: { verb, target, model } }
   }
-  if (verb === "close") return { json, session: { verb, target, force: switches.has("--force") } }
+  if (verb === "close") {
+    const waitValue = values.get("--wait-ms")
+    const graceful = switches.has("--graceful")
+    if (waitValue !== undefined && (!graceful || !/^[1-9]\d{0,5}$/.test(waitValue) || Number(waitValue) > 600_000))
+      throw new UsageError("omo remote close: --wait-ms takes 1..600000 milliseconds and goes with --graceful")
+    if (graceful && switches.has("--force"))
+      throw new UsageError("omo remote close: --graceful and --force exclude each other")
+    return {
+      json,
+      session: {
+        verb,
+        target,
+        force: switches.has("--force"),
+        ...(graceful ? { graceful: true as const } : {}),
+        ...(waitValue === undefined ? {} : { wait_ms: Number(waitValue) }),
+      },
+    }
+  }
   return { json, session: { verb, target } }
 }

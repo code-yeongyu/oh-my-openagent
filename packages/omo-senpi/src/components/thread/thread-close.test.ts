@@ -190,6 +190,36 @@ describe("thread_close: close a thread on this device or on another one", () => 
     expect(closed).toEqual([])
   })
 
+  test("#given a thread held by an interactive terminal #when thread_close names it gracefully #then the terminal's endpoint is asked for a graceful close and the thread closes", async () => {
+    const terminal: ThreadHostSession = {
+      sessionId: "route-tui",
+      durableSessionId: "dur-tui",
+      cwd: process.cwd(),
+      name: "terminal",
+      status: "open",
+      endpoint_kind: "tui",
+    }
+    const { run, closed, closeRequests } = surface(undefined, { sessions: [terminal] })
+    expect(await run("thread_close", { thread: "dur-tui", graceful: true, wait_ms: 5000 })).toEqual({
+      kind: "ok",
+      thread: "dur-tui",
+      closed: true,
+      reason: "closed",
+      dropped_deliveries: [],
+    })
+    expect(closed).toEqual([["route-tui", "dur-tui"]])
+    expect(closeRequests).toEqual([{ graceful: true, wait_ms: 5000 }])
+  })
+
+  test("#given graceful and force together #when thread_close is called #then it is refused invalid_arguments and nothing is closed", async () => {
+    const { run, closed } = surface(undefined)
+    expect(await run("thread_close", { thread: "dur-local", graceful: true, force: true })).toMatchObject({
+      kind: "error",
+      error: { code: "invalid_arguments" },
+    })
+    expect(closed).toEqual([])
+  })
+
   test("#given b's engine refuses the unload with a reason the ladder does not know #when thread_close names b's thread #then it is typed unsupported naming the reason and b, and nothing else is sent", async () => {
     const a = account({ unloadReason: "attached" })
     const { run } = surface(a.remote)

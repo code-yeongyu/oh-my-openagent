@@ -1,6 +1,7 @@
 import { closeSync, fstatSync, openSync, readSync } from "node:fs"
 
 import { findDiskSessions } from "../address-book"
+import { SESSION_CLOSED_ENTRY } from "../gateway/graceful-close-returns"
 import { parseSessionLines, SESSION_FACTS_WINDOW_BYTES, summarizeSessionEntries } from "../session-facts"
 
 /** `unknown`: a header this classifier cannot read, or a `kind` this build does not know. Never woken. */
@@ -50,6 +51,22 @@ const RPC_EFFECT_ENTRY = "rpc_effect"
  * unload that carries an `effectId` (the close ladder sends one) to the transcript before it tears the session down, so
  * the holder knows the session was closed on request, and when, whichever device asked. An idle park writes nothing.
  */
+/**
+ * When one transcript entry records a close on request: an `rpc_effect` unload in state `done` (#14273), or the
+ * `session-closed` record a graceful close writes (omo#14313), which a terminal's own close leaves without an effect.
+ */
+function closeInstantOf(customType: unknown, data: Record<string, unknown>): number | undefined {
+  const stamp =
+    customType === RPC_EFFECT_ENTRY
+      ? data["kind"] === "unload" && data["state"] === "done"
+        ? data["updatedAt"]
+        : undefined
+      : customType === SESSION_CLOSED_ENTRY
+        ? data["at"]
+        : undefined
+  return typeof stamp === "string" ? Date.parse(stamp) : undefined
+}
+
 function closedAtOf(path: string): number | undefined {
   let fd: number
   try {
@@ -64,10 +81,9 @@ function closedAtOf(path: string): number | undefined {
     const read = readSync(fd, buffer, 0, buffer.length, start)
     let closedAt: number | undefined
     for (const entry of parseSessionLines(buffer.subarray(0, read).toString("utf8"), start > 0)) {
-      if (entry.type !== "custom" || entry.customType !== RPC_EFFECT_ENTRY || !record(entry.data)) continue
-      const { kind, state, updatedAt } = entry.data
-      if (kind !== "unload" || state !== "done" || typeof updatedAt !== "string") continue
-      const at = Date.parse(updatedAt)
+      if (entry.type !== "custom" || !record(entry.data)) continue
+      const at = closeInstantOf(entry.customType, entry.data)
+      if (at === undefined) continue
       if (Number.isFinite(at) && (closedAt === undefined || at > closedAt)) closedAt = at
     }
     return closedAt
