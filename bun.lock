@@ -53,6 +53,7 @@
         "@oh-my-opencode/skills-loader-core": "workspace:*",
         "@oh-my-opencode/team-core": "workspace:*",
         "@oh-my-opencode/telemetry-core": "workspace:*",
+        "@oh-my-opencode/thread-address-core": "workspace:*",
         "@oh-my-opencode/tmux-core": "workspace:*",
         "@oh-my-opencode/utils": "workspace:*",
         "@opencode-ai/plugin": "1.18.31",
@@ -389,6 +390,7 @@
         "@oh-my-opencode/skills-loader-core": "workspace:*",
         "@oh-my-opencode/team-core": "workspace:*",
         "@oh-my-opencode/telemetry-core": "workspace:*",
+        "@oh-my-opencode/thread-address-core": "workspace:*",
         "@oh-my-opencode/utils": "workspace:*",
         "@sinclair/typebox": "0.34.52",
         "typebox": "1.3.34",
@@ -569,6 +571,10 @@
         "@opentelemetry/core": "2.12.0",
         "posthog-node": "^5.52.4",
       },
+    },
+    "packages/thread-address-core": {
+      "name": "@oh-my-opencode/thread-address-core",
+      "version": "0.1.0",
     },
     "packages/tmux-core": {
       "name": "@oh-my-opencode/tmux-core",
@@ -993,6 +999,8 @@
     "@oh-my-opencode/team-core": ["@oh-my-opencode/team-core@workspace:packages/team-core"],
 
     "@oh-my-opencode/telemetry-core": ["@oh-my-opencode/telemetry-core@workspace:packages/telemetry-core"],
+
+    "@oh-my-opencode/thread-address-core": ["@oh-my-opencode/thread-address-core@workspace:packages/thread-address-core"],
 
     "@oh-my-opencode/tmux-core": ["@oh-my-opencode/tmux-core@workspace:packages/tmux-core"],
 

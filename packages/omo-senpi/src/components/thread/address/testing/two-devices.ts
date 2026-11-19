@@ -161,7 +161,7 @@ export function createTwoDevices(options: TwoDeviceOptions = {}) {
   })
   const withoutB = (listing: RemoteListing): RemoteListing => ({
     rows: listing.rows.filter((entry) => entry.device !== B.id),
-    incomplete: [...listing.incomplete, B.id],
+    incomplete: [...new Set([...listing.incomplete, B.id])],
   })
   let round = 0
   const listing = account.remote.sessions.listing

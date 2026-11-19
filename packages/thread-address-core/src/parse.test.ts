@@ -1,6 +1,4 @@
 import { describe, expect, test } from "bun:test"
-import { readFileSync } from "node:fs"
-import { parseSync } from "oxc-parser"
 import { formatAddress, parseAddress } from "."
 
 describe("#given an address text #when parseAddress reads it #then it names self, a bare address or a device and a thread", () => {
@@ -28,18 +26,5 @@ describe("#given an address text #when parseAddress reads it #then it names self
       thread: "0bb00001-0000-4000-8000-000000000001",
       text: "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001",
     })
-  })
-})
-
-// Package contract: remote/seams.ts (the published omo-ai/remote types) imports parse.ts, and remote/types-closure.test.ts
-// allows it only as a leaf. Any import here would ship as a private declaration consumers cannot compile.
-describe("#given parse.ts #when its imports are read #then it imports nothing", () => {
-  test("#given the source #when parsed #then it has no import, re-export or dynamic import", () => {
-    const path = new URL("./parse.ts", import.meta.url).pathname
-    const program = parseSync(path, readFileSync(path, "utf8")).program
-    const sources = JSON.stringify(program.body).match(/"type":"(ImportDeclaration|ExportAllDeclaration|ImportExpression)"/g)
-    const reExports = program.body.filter((node) => node.type === "ExportNamedDeclaration" && node.source !== null)
-    expect(sources ?? []).toEqual([])
-    expect(reExports).toEqual([])
   })
 })

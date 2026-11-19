@@ -1,20 +1,20 @@
 import { describe, expect, test } from "bun:test"
 import { resolveDevice } from "."
-import type { RemoteDevice } from "../remote/ports"
+import type { DeviceRow } from "./refusals"
 
-const devices: readonly RemoteDevice[] = [
-  { device: "here", label: "this mac", online: true },
-  { device: "b7c41e09d2a64f1e", label: "Studio Laptop", online: true },
-  { device: "b7c4aaaa00000000", label: "studio", online: false, last_seen_ms: 5 },
-  { device: "c0ffee5a1d2b3c4d", label: "attic", online: false, last_seen_ms: 7 },
-  { device: "d00d000000000001", label: "twin", online: false },
-  { device: "d00d000000000002", label: "Twin", online: true },
+const devices: readonly DeviceRow[] = [
+  { id: "here", name: "this mac", online: true },
+  { id: "b7c41e09d2a64f1e", name: "Studio Laptop", online: true },
+  { id: "b7c4aaaa00000000", name: "studio", online: false, last_seen_ms: 5 },
+  { id: "c0ffee5a1d2b3c4d", name: "attic", online: false, last_seen_ms: 7 },
+  { id: "d00d000000000001", name: "twin", online: false },
+  { id: "d00d000000000002", name: "Twin", online: true },
 ]
 const account = { here: "here", devices }
 
 const id = (text: string, online = false) => {
   const resolved = resolveDevice(account, text, { online })
-  return resolved.kind === "ok" ? resolved.device.id : resolved.code
+  return resolved.kind === "ok" ? resolved.device.id : resolved.refusal.code
 }
 
 describe("#given the account's devices #when resolveDevice reads a device part #then exact id > here > name > unique id prefix", () => {
@@ -34,17 +34,15 @@ describe("#given the account's devices #when resolveDevice reads a device part #
 
   test("#given two devices sharing a 6+ id prefix #when it is resolved #then ambiguous_target names both", () => {
     expect(resolveDevice(account, "d00d00", { online: false })).toMatchObject({
-      kind: "error",
-      code: "ambiguous_target",
-      details: { kind: "device" },
+      kind: "refusal",
+      refusal: { code: "ambiguous_target", details: { kind: "device" } },
     })
   })
 
   test("#given an offline device by id #when the caller needs it online #then device_offline with its name and last_seen", () => {
     expect(resolveDevice(account, "c0ffee5a1d2b3c4d", { online: true })).toMatchObject({
-      kind: "error",
-      code: "device_offline",
-      details: { device: "c0ffee5a1d2b3c4d", device_name: "attic", last_seen: 7 },
+      kind: "refusal",
+      refusal: { code: "device_offline", details: { device: "c0ffee5a1d2b3c4d", device_name: "attic", last_seen: 7 } },
     })
     expect(id("c0ffee5a1d2b3c4d")).toBe("c0ffee5a1d2b3c4d")
   })

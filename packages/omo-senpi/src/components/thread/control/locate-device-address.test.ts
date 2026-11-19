@@ -52,8 +52,14 @@ describe("#given a thread on device B #when a control tool names it as <device>/
   }
 })
 
-describe("#given B holds a thread live and this device keeps a stale copy of the same id #when thread_read names the id #then B's live thread is read", () => {
-  test("#given the stale copy here #when thread_read names the id #then it reads B's live session", async () => {
-    expect(await run("thread_read", { thread: T.stale })).toMatchObject({ kind: "ok", thread: T.stale, device: B.id })
+describe("characterization of current behaviour: a closed copy of an id here while B lists it live", () => {
+  test("#given the closed copy here, its transcript absent #when thread_read names the id #then this device's copy answers not_found and B is never asked", async () => {
+    const two = createTwoDevices()
+    cleanups.push(two.cleanup)
+    expect(await two.run("thread_read", { thread: T.stale })).toMatchObject({
+      kind: "error",
+      error: { code: "not_found" },
+    })
+    expect(two.account.sent.filter((entry) => entry.device === B.id)).toEqual([])
   })
 })

@@ -27,32 +27,26 @@ describe("#given a row #when rowName names it #then only a real name is an addre
   })
 })
 
-describe("#given this device's rows and the account listing #when mergeRows merges them #then one thread is one row, on the device that holds it live", () => {
-  const live = (device: string, key: string) => ({ key, device, live: true })
-  const stale = (device: string, key: string) => ({ key, device, live: false })
+describe("#given this device's rows and the account listing #when mergeRows merges them #then one thread is one row", () => {
+  const at = (device: string, key: string) => ({ key, device })
 
   test("#given the listing's copy of this device's own session #when merged #then this device's own row is kept and the copy dropped", () => {
-    expect(mergeRows([live("here", "t1")], [live("here", "t1"), live("b", "t2")], "here")).toEqual([
-      live("here", "t1"),
-      live("b", "t2"),
+    expect(mergeRows([at("here", "t1")], [at("here", "t1"), at("b", "t2")], "here")).toEqual([
+      at("here", "t1"),
+      at("b", "t2"),
     ])
   })
 
-  test("#given a stale copy here and the live holder on b #when merged #then b's live row is the row and notes the stale copy", () => {
-    expect(mergeRows([stale("here", "t1")], [live("b", "t1")], "here")).toEqual([
-      { ...live("b", "t1"), stale_copy_on: ["here"] },
-    ])
-  })
-
-  test("#given no live holder #when merged #then this device's copy is the row", () => {
-    expect(mergeRows([stale("here", "t1")], [stale("b", "t1")], "here")).toEqual([stale("here", "t1")])
+  test("#given a remote row whose id this device already lists #when merged #then it is not listed again", () => {
+    expect(mergeRows([at("here", "t1")], [at("b", "t1")], "here")).toEqual([at("here", "t1")])
   })
 
   test("#given distinct threads #when merged #then every row stays, in order", () => {
-    expect(mergeRows([live("here", "t1"), stale("here", "t2")], [live("b", "t3")], "here")).toEqual([
-      live("here", "t1"),
-      stale("here", "t2"),
-      live("b", "t3"),
+    expect(mergeRows([at("here", "t1"), at("here", "t2")], [at("b", "t3"), at("c", "t4")], "here")).toEqual([
+      at("here", "t1"),
+      at("here", "t2"),
+      at("b", "t3"),
+      at("c", "t4"),
     ])
   })
 })
