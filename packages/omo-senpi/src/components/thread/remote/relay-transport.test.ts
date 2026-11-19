@@ -413,13 +413,19 @@ describe("a person's waiting send names its prompt so its follow can anchor on t
 describe("an admission refused engine_capability_missing that names its cause", () => {
   function refusing(detail: string | undefined) {
     const a = account({ engine: { ...ENGINE, pending: 0 } })
-    const refusal = { kind: "refused" as const, reason: "engine_capability_missing", ...(detail === undefined ? {} : { detail }) }
+    const refusal = {
+      kind: "refused" as const,
+      reason: "engine_capability_missing",
+      ...(detail === undefined ? {} : { detail }),
+    }
     const remote = {
       ...a.remote,
       sessions: {
         ...a.remote.sessions,
         sessionCommand: (...args: Parameters<typeof a.remote.sessions.sessionCommand>) =>
-          args[2]["type"] === "admit_external_message" ? Promise.resolve(refusal) : a.remote.sessions.sessionCommand(...args),
+          args[2]["type"] === "admit_external_message"
+            ? Promise.resolve(refusal)
+            : a.remote.sessions.sessionCommand(...args),
       },
     }
     return transport(remote).relay
@@ -429,14 +435,20 @@ describe("an admission refused engine_capability_missing that names its cause", 
     const relay = refusing("attach_required")
     expect(await relay.deliver(delivery("to a session b serves from a terminal", "cm-attach"))).toMatchObject({
       kind: "error",
-      error: { code: "host_unavailable", details: { device: "b", reason: "engine_capability_missing", cause: "attach_required" } },
+      error: {
+        code: "host_unavailable",
+        details: { device: "b", reason: "engine_capability_missing", cause: "attach_required" },
+      },
     })
     relay.dispose()
   })
 
   test("#given b refuses the admission naming no cause #when a message is sent #then it stays unsupported", async () => {
     const relay = refusing(undefined)
-    expect(await relay.deliver(delivery("to an old engine", "cm-old"))).toMatchObject({ kind: "error", error: { code: "unsupported" } })
+    expect(await relay.deliver(delivery("to an old engine", "cm-old"))).toMatchObject({
+      kind: "error",
+      error: { code: "unsupported" },
+    })
     relay.dispose()
   })
 })
