@@ -25,6 +25,7 @@ export {
 export {
   deviceLabel,
   deviceNotAsked,
+  deviceOffline,
   devicesSilent,
   noDevice,
   noThreadOnDevice,

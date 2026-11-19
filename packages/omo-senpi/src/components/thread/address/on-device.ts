@@ -1,4 +1,5 @@
 import {
+  deviceOffline,
   devicesSilent,
   idShaped,
   noThreadOnDevice,
@@ -11,6 +12,7 @@ import { rowThreadId, type RemoteThreadSurface } from "../remote/ports"
 import { holderTarget } from "../remote/remote-ops"
 import type { Account, Ready } from "./account"
 import { deviceNameOf, listedEntry } from "./bare"
+import { deviceRows } from "./device"
 import { ladder } from "./ladder"
 import { pinned } from "./probe"
 import { toolRefusal, withAddresses, type ThreadRefusal } from "./refusals"
@@ -66,7 +68,14 @@ export async function resolveOnDevice(
       resolution: THREAD_ID_SHAPE.test(thread) ? "id" : "session_id",
       all_scope: true,
     }
+  // An offline device cannot answer: what the rows in hand do not resolve is device_offline, and nothing is sent to it
+  // (design section 5; review M2 of #14328).
+  const offline = (): ThreadRefusal => {
+    const row = deviceRows(account.roster ?? []).find((candidate) => candidate.id === device.id)
+    return toolRefusal(deviceOffline(device.name, row ?? { id: device.id, name: device.name, online: false }, []))
+  }
   // Not listed: that one device is asked, as a pinned reply asks it (design section 3 step 8, review H1).
+  if (THREAD_ID_SHAPE.test(thread) && !device.online) return offline()
   if (THREAD_ID_SHAPE.test(thread))
     return await pinned(remote, { device: device.id, thread }, ready, {
       listing: { rows, incomplete: account.incomplete },
@@ -82,6 +91,7 @@ export async function resolveOnDevice(
   if (hit.code === "ambiguous_target") return withAddresses(hit, account.here, names)
   const alias = await aliasOn(remote, account, device.id, thread)
   if (alias !== undefined) return alias
+  if (!device.online) return offline()
   // A routing id or listing key the device has not listed yet (#13748: a session opened a moment ago) is the only text
   // passed through to the device unresolved.
   if (idShaped(thread)) {
