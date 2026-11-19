@@ -829,6 +829,24 @@ describe("omo remote session verbs", () => {
     ])
   })
 
+  // A listing key the person typed names the session in every --json answer, the ended one and its link included, as
+  // before the address module (#14305 delta review 2, M2).
+  test("#given send <device>/<listing key> --json #when the session ends before its turn settles #then the answer names the session by that key only", async () => {
+    const a = fixture.account({ records: [{ type: "agent_settled", reason: "session_closed" }] })
+    const { code, out } = await run(
+      ["send", "b/rk-on-b", "hi", "--json"],
+      undefined,
+      SIGNED_IN,
+      testBootstrap(),
+      a.remote,
+    )
+    const answer = out.join("")
+    expect(code).toBe(REMOTE_EXIT.failed)
+    expect(answer).toContain('"kind":"session_ended"')
+    expect(answer).toContain('"thread":"rk-on-b"')
+    expect(answer).not.toContain("dur-on-b")
+  })
+
   test("send to a session that cannot be followed is refused before the message is sent", async () => {
     const a = fixture.account({ refuse: "host_not_answering" })
     const { code, err } = await run(["send", "b/dur-on-b", "hi"], undefined, SIGNED_IN, testBootstrap(), a.remote)
@@ -1029,6 +1047,13 @@ describe("omo remote session verbs", () => {
       ["send", "b/dur-on-b", "hi", "--no-wait"],
       "Sent to b/dur-on-b: turn turn-b started.",
       ["status", "status", "devices", "sessions:b", "command:prompt"],
+    ],
+    // A bare address reads the account once (status, listing, roster); the this-device holder check reuses those reads
+    // and asks for nothing more (#14305 delta review 2, M1).
+    [
+      ["send", "dur-on-b", "hi", "--no-wait"],
+      "Sent to b/dur-on-b: turn turn-b started.",
+      ["status", "status", "sessions", "devices", "command:prompt"],
     ],
     [["open", "b"], "b/dur-new-on-b", ["status", "devices", "endpoint:open_session", "locate"]],
   ])("%p makes only its remote op's calls and reports the answer", async (args, line, calls) => {
