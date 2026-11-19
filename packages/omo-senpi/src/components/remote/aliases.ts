@@ -2,6 +2,7 @@ import type { AliasError, AliasRegistry, AliasResult } from "../thread/remote/po
 import type { ClientCore, Outcome, RemoteClient } from "./client"
 import { nextActionFor, type RemoteCode, remoteFailure } from "./codes"
 import { DEADLINES, withinDeadline } from "./deadlines"
+import { listingIncomplete } from "./resolve"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
 import type { Opts, RemoteFailure, SessionRow } from "./types"
 
@@ -86,8 +87,9 @@ export function aliasMembers(core: ClientCore): RemoteClient["aliases"] {
       return aliases.kind === "error" ? aliasFailure(aliases.error) : await body(aliases.value)
     })
 
-  // The row `device` lists that `matches`. A device that missed the listing round is an outage, not a missing session:
-  // device_offline, as the thread tools answer it (thread/remote/remote-ops.ts holderTarget).
+  // The row `device` lists that `matches`. A device that missed the listing round is an outage, not a missing session
+  // (design section 5): an online one is listing_incomplete (the core's deviceListing), one the roster says is offline
+  // device_offline.
   const listedRow = async (
     device: string,
     matches: (row: SessionRow) => boolean,
@@ -98,7 +100,10 @@ export function aliasMembers(core: ClientCore): RemoteClient["aliases"] {
     if (listed.kind === "error") return listed
     const row = listed.value.rows.find(matches)
     if (row !== undefined) return { kind: "ok", value: row }
-    if (listed.value.unanswered.some((unanswered) => unanswered.id === device))
+    const silent = listed.value.unanswered.filter((unanswered) => unanswered.id === device)
+    const incomplete = listingIncomplete(device, silent)
+    if (incomplete !== undefined) return incomplete
+    if (silent.length > 0)
       return remoteFailure(
         "device_offline",
         `Device ${device} did not answer the session listing.`,
