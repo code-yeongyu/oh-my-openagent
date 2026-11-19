@@ -473,6 +473,63 @@ describe("a steer admission the receiver answers turn_conflict or not_steerable,
   )
 })
 
+describe("a held explicit steer whose background re-send is refused turn_conflict (#14320 review)", () => {
+  test("#given b's draft holds a steer of turn 3 and refuses its re-send turn_conflict #when the re-send settles #then a retry under the same key replays turn_conflict naming the delivery, and nothing more is sent", async () => {
+    const a = account({ heldDraft: 1, engine: { ...ENGINE, streaming: true, currentTurnId: "3", pending: 0 } })
+    const records: Array<Readonly<Record<string, unknown>>> = []
+    const remote = {
+      ...a.remote,
+      sessions: {
+        ...a.remote.sessions,
+        sessionCommand: (...args: Parameters<typeof a.remote.sessions.sessionCommand>) => {
+          if (args[2]["type"] === "admit_external_message") {
+            records.push(args[2])
+            if (records.length > 1) return Promise.resolve({ kind: "refused" as const, reason: "turn_conflict" })
+          }
+          return a.remote.sessions.sessionCommand(...args)
+        },
+      },
+    }
+    // Subscribed before the send: the re-send's failure line is written once it settled.
+    const log: string[] = []
+    let failed: () => void = () => undefined
+    const failure = new Promise<void>((resolve) => {
+      failed = resolve
+    })
+    const { relay } = transport(remote, {
+      log: (line) => {
+        log.push(line)
+        if (line.startsWith("relay_delivery_failed:")) failed()
+      },
+    })
+    const steer: OutboundDelivery = { ...delivery("steer me", "s9"), mode: "steer", expected_turn_id: "3" }
+    expect(await relay.deliver(steer)).toMatchObject({
+      kind: "ok",
+      delivery: { kind: "queued", queue_position: 1 },
+      effective_mode: "steer",
+    })
+    let breaker: ReturnType<typeof setTimeout> | undefined
+    await Promise.race([
+      failure,
+      new Promise<never>((_, reject) => {
+        breaker = setTimeout(
+          () => reject(new Error(`waited 5 s for the re-send's failure line; log: ${log.join(" | ")}`)),
+          5_000,
+        )
+      }),
+    ]).finally(() => clearTimeout(breaker))
+    expect(records.map((record) => record["deliverAs"])).toEqual(["steer", "steer"])
+    expect(new Set(records.map((record) => record["deliveryId"])).size).toBe(1)
+    const deliveryId = String(records[0]?.["deliveryId"])
+    expect(await relay.deliver(steer)).toMatchObject({
+      kind: "error",
+      error: { code: "turn_conflict", details: { device: "b", delivery_id: deliveryId } },
+    })
+    expect(records).toHaveLength(2)
+    expect(log.filter((line) => line.startsWith("relay_receipt_unrevised:"))).toEqual([])
+  })
+})
+
 describe("a person's waiting send names its prompt so its follow can anchor on the stored entry (#13272 review)", () => {
   const personSend = (key: string, clientMessageId?: string): OutboundDelivery => ({
     sender: { kind: "person", uid: 1, user: "u" },
