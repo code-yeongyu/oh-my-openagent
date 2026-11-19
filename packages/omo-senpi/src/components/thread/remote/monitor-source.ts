@@ -32,8 +32,11 @@ export function createRemoteMonitorSource(remote: RemoteThreadSurface): RpcRemot
       if (unavailable !== undefined) throw new Error(`${unavailable.error.code}: ${unavailable.error.message}`)
       if (target.session === "*") {
         const device = await resolveTypedDevice(remote.client, target.device)
-        if (device.kind === "error") throw new Error(`${device.error.code}: ${device.error.message}`)
-        return await openDevice(remote, device.device, handlers)
+        if (device.kind === "ok") return await openDevice(remote, device.device, handlers)
+        // A device that is offline or did not answer keeps its device-wide watch on restore: the listing rounds report it
+        // lost and resynced. not_found and ambiguous_target refuse.
+        if (!TRANSIENT.has(device.error.code)) throw new Error(`${device.error.code}: ${device.error.message}`)
+        return await openDevice(remote, await storedDevice(remote, target.device), handlers)
       }
       const { device, session } = await sessionOn(remote, target.device, target.session)
       return await openSession(remote, device, session, target.session, options.resumeFrom, handlers)
@@ -86,6 +89,16 @@ export async function resolveMonitorTarget(
  * or prefix online or not, the key its rows give for the thread, or a thread id as stored, and the watch's own reattach
  * waits for the device. A stored name that no row lists keeps the refusal; not_found and ambiguous_target refuse.
  */
+/** The refusals a restore outlives: the device is offline or did not answer now, and the watch's reattach waits for it. */
+const TRANSIENT: ReadonlySet<string> = new Set(["device_offline", "host_unavailable"])
+
+/** A stored device part as an id, by id, name or prefix whether or not it is online; the stored text only when that fails. */
+async function storedDevice(remote: RemoteThreadSurface, device: string): Promise<string> {
+  const roster = await accountDevices(remote.client).catch(() => undefined)
+  const named = roster === undefined ? undefined : resolveAccountDevice(roster, device, { online: false })
+  return named?.kind === "ok" ? named.device.id : device
+}
+
 async function sessionOn(
   remote: RemoteThreadSurface,
   device: string,
@@ -97,12 +110,8 @@ async function sessionOn(
     { all_scope: true, need: "online" },
   )
   if (resolved.kind === "error") {
-    if (resolved.code !== "device_offline" && resolved.code !== "host_unavailable")
-      throw new Error(`${resolved.code}: ${resolved.message}`)
-    // The device by id, name or prefix whether or not it is online; the stored text only when even that fails.
-    const roster = await accountDevices(remote.client).catch(() => undefined)
-    const named = roster === undefined ? undefined : resolveAccountDevice(roster, device, { online: false })
-    const id = named?.kind === "ok" ? named.device.id : device
+    if (!TRANSIENT.has(resolved.code)) throw new Error(`${resolved.code}: ${resolved.message}`)
+    const id = await storedDevice(remote, device)
     const rows = await remote.sessions.sessions({ device: id }).catch(() => [])
     const listed = rows.find((row) => row.device === id && (row.session_id === thread || row.durable_id === thread))
     // Only an id-shaped thread part reaches a device that does not list it (the module's rule): a name cannot be resolved
