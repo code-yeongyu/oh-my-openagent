@@ -42,8 +42,8 @@ export function withClosedRows(remote: RemoteThreadSurface): RemoteThreadSurface
     ...(listing === undefined
       ? {}
       : {
-          listing: async () => {
-            const listed = await listing()
+          listing: async (filter) => {
+            const listed = await listing(filter)
             return { ...listed, rows: listed.rows.map(settle) }
           },
         }),

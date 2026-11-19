@@ -233,7 +233,8 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
       device: "b",
       deduplicated: false,
     })
-    expect(a.sent).toEqual([
+    // The reopen then sets the thread's name on the session it located (#14274), a session command.
+    expect(a.sent.filter((entry) => entry.via === "endpoint")).toEqual([
       { via: "endpoint", device: "b", rpc: { type: "find_session", durableSessionId: "dur-on-b" } },
       { via: "endpoint", device: "b", rpc: { type: "open_session", retain_on_disconnect: true, sessionPath: B_FILE } },
     ])
@@ -258,7 +259,11 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
       device: "b",
       deduplicated: false,
     })
-    expect(a.sent.map((entry) => [entry.via, entry.device, entry.rpc?.["type"], entry.rpc?.["sessionPath"]])).toEqual([
+    expect(
+      a.sent
+        .filter((entry) => entry.via === "endpoint")
+        .map((entry) => [entry.via, entry.device, entry.rpc?.["type"], entry.rpc?.["sessionPath"]]),
+    ).toEqual([
       ["endpoint", "b", "find_session", undefined],
       ["endpoint", "b", "open_session", B_FILE],
     ])
@@ -323,6 +328,132 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     },
   )
 
+  test("#given b's primary engine predates find_session and another engine b lists serves it #when thread_create reopens b's closed thread #then the file is found on that engine, the primary is asked once, and the open goes to b's primary (#14271)", async () => {
+    const a = account({
+      rows: [{ ...B_ROW, state: "ended" }],
+      engines: { keys: ["primary", "shard"], serving: ["shard"], primary: "primary" },
+    })
+    const { run } = surface(a.remote)
+    expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({ kind: "ok", thread: "dur-on-b" })
+    const finds = a.sent.filter((entry) => entry.rpc?.["type"] === "find_session").map((entry) => entry.endpoint)
+    // The primary is named by key and was already asked; the fallback never asks it a second time (#14271 review L2).
+    expect(finds).toEqual([undefined, "shard"])
+    const opens = a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")
+    expect(opens.map((entry) => [entry.endpoint, entry.rpc?.["sessionPath"]])).toEqual([[undefined, B_FILE]])
+  })
+
+  test("#given b names its primary last and the serving engine is listed first #when thread_create reopens b's closed thread #then the primary is skipped by its key and the first-listed engine is asked (#14271 review M1)", async () => {
+    const a = account({
+      rows: [{ ...B_ROW, state: "ended" }],
+      engines: { keys: ["shard", "other", "primary"], serving: ["shard"], primary: "primary" },
+    })
+    const { run } = surface(a.remote)
+    expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({ kind: "ok", thread: "dur-on-b" })
+    const finds = a.sent.filter((entry) => entry.rpc?.["type"] === "find_session").map((entry) => entry.endpoint)
+    // The primary is last, so skipping keys[0] would skip the serving shard; the primary is skipped by its key instead.
+    expect(finds).toEqual([undefined, "shard"])
+    const opens = a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")
+    expect(opens.map((entry) => [entry.endpoint, entry.rpc?.["sessionPath"]])).toEqual([[undefined, B_FILE]])
+  })
+
+  test("#given an engine of another agent dir answers none before the serving engine #when thread_create reopens b's closed thread #then the none is passed over and the file is found on the serving engine (#14271 review M2)", async () => {
+    const a = account({
+      rows: [{ ...B_ROW, state: "ended" }],
+      engines: { keys: ["primary", "other", "shard"], serving: ["shard"], primary: "primary", none: ["other"] },
+    })
+    const { run } = surface(a.remote)
+    expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({ kind: "ok", thread: "dur-on-b" })
+    const finds = a.sent.filter((entry) => entry.rpc?.["type"] === "find_session").map((entry) => entry.endpoint)
+    expect(finds).toEqual([undefined, "other", "shard"])
+    const opens = a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")
+    expect(opens.map((entry) => [entry.endpoint, entry.rpc?.["sessionPath"]])).toEqual([[undefined, B_FILE]])
+  })
+
+  test("#given an engine b lists before the serving one does not answer find_session #when thread_create reopens b's closed thread #then the search passes it over and finds the file on the serving engine (#14271 review L1)", async () => {
+    const a = account({
+      rows: [{ ...B_ROW, state: "ended" }],
+      engines: { keys: ["primary", "slow", "shard"], serving: ["shard"], primary: "primary", timingOut: ["slow"] },
+    })
+    const { run } = surface(a.remote)
+    expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({ kind: "ok", thread: "dur-on-b" })
+    const finds = a.sent.filter((entry) => entry.rpc?.["type"] === "find_session").map((entry) => entry.endpoint)
+    expect(finds).toEqual([undefined, "slow", "shard"])
+    const opens = a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")
+    expect(opens.map((entry) => [entry.endpoint, entry.rpc?.["sessionPath"]])).toEqual([[undefined, B_FILE]])
+  })
+
+  test("#given every engine b lists gives a non-answer #when thread_create reopens b's closed thread #then unsupported says an engine did not answer and to retry, never that no engine can find it (#14271 review L1)", async () => {
+    const a = account({
+      rows: [{ ...B_ROW, state: "ended" }],
+      engines: { keys: ["primary", "slow"], serving: [], primary: "primary", timingOut: ["slow"] },
+    })
+    const { run } = surface(a.remote)
+    const result = await run("thread_create", { thread: "dur-on-b" })
+    expect(result).toMatchObject({ kind: "error", error: { code: "unsupported" } })
+    const message = result.kind === "error" ? result.error.message : ""
+    expect(message).toContain("could not be asked completely")
+    expect(message).toContain("Retry")
+    expect(message).not.toContain("No engine on device")
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")).toEqual([])
+  })
+
+  test("#given many engines b lists #when thread_create reopens b's closed thread #then each fallback call carries a wait budget no larger than the fallback total (#14271 review L1)", async () => {
+    const a = account({
+      rows: [{ ...B_ROW, state: "ended" }],
+      engines: { keys: ["primary", "a", "b", "c", "shard"], serving: ["shard"], primary: "primary" },
+    })
+    const { run } = surface(a.remote)
+    expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({ kind: "ok", thread: "dur-on-b" })
+    const waits = a.sent
+      .filter((entry) => entry.rpc?.["type"] === "find_session" && entry.endpoint !== undefined)
+      .map((entry) => entry.waitMs)
+    expect(waits.length).toBeGreaterThan(0)
+    for (const wait of waits) expect(wait).toBeLessThanOrEqual(15_000)
+  })
+
+  test("#given no engine b lists serves find_session #when thread_create reopens b's closed thread #then unsupported names b's primary as too old, never 'update omo' alone, and no open is sent (#14271)", async () => {
+    const a = account({
+      rows: [{ ...B_ROW, state: "ended" }],
+      engines: { keys: ["primary", "shard"], serving: [], primary: "primary" },
+    })
+    const { run } = surface(a.remote)
+    const result = await run("thread_create", { thread: "dur-on-b" })
+    expect(result).toMatchObject({
+      kind: "error",
+      error: { code: "unsupported", details: { device: "b", thread: "dur-on-b", reason: "method_unclassified" } },
+    })
+    // b listed its engines and none served the lookup: the message says so and names the primary as older (#14271 review L3).
+    const message = result.kind === "error" ? result.error.message : ""
+    expect(message).toContain("No engine on device b that it lists")
+    expect(message).toContain("primary engine is older")
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")).toEqual([])
+  })
+
+  test("#given b's primary predates find_session and b cannot list its engines #when thread_create reopens b's closed thread #then unsupported says the listing failed, never that no engine can find it (#14271 review L3)", async () => {
+    const a = account({ rows: [{ ...B_ROW, state: "ended" }], sessionFiles: "none" })
+    const { run } = surface(a.remote)
+    const result = await run("thread_create", { thread: "dur-on-b" })
+    expect(result).toMatchObject({ kind: "error", error: { code: "unsupported" } })
+    const message = result.kind === "error" ? result.error.message : ""
+    expect(message).toContain("could not list its engines")
+    expect(message).not.toContain("No engine on device")
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")).toEqual([])
+  })
+
+  test("#given b's primary predates find_session and listing its engines fails #when thread_create reopens b's closed thread #then unsupported says the listing failed, never that no engine can find it (#14271 review L3)", async () => {
+    const a = account({
+      rows: [{ ...B_ROW, state: "ended" }],
+      engines: { keys: ["primary", "shard"], serving: ["shard"], primary: "primary", listThrows: true },
+    })
+    const { run } = surface(a.remote)
+    const result = await run("thread_create", { thread: "dur-on-b" })
+    expect(result).toMatchObject({ kind: "error", error: { code: "unsupported" } })
+    const message = result.kind === "error" ? result.error.message : ""
+    expect(message).toContain("could not list its engines")
+    expect(message).not.toContain("No engine on device")
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")).toEqual([])
+  })
+
   test("#given b's thread is not running and this device cannot wake it there #when thread_send names it #then not_resumable at once naming the reopen, and no command waits on b (#14184)", async () => {
     const a = account({ rows: [{ ...B_ROW, state: "ended" }], live: [] })
     const { run } = surface(a.remote)
@@ -368,6 +499,55 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
         error: { code: "not_found", details: { device: "b", thread: "dur-on-b" } },
       })
       expect(a.sent.filter((entry) => entry.via === "session" || entry.via === "wake")).toEqual([])
+    },
+  )
+
+  // #14240: the listing still reads the thread live, but b's host parked it: a session command to it is refused
+  // route_unlisted. The send asks b again and takes the path b's answer names, at most once.
+  test.each(["auto", "follow_up"] as const)(
+    "#given b parked a thread its listing still reads live, and this device can wake it #when thread_send (%s) names it #then b is asked again and the session is woken with the delivery, under one delivery id (#14240)",
+    async (mode) => {
+      const a = account({ live: [], unlistedReason: "route_unlisted", wakeFeature: true })
+      const { run } = surface(a.remote)
+      expect(await run("thread_send", { thread: "dur-on-b", message: "wake up", mode })).toMatchObject({
+        kind: "ok",
+        thread: "dur-on-b",
+        delivery: { kind: "queued", waiting_on: { kind: "wake", device: "b" } },
+      })
+      const woken = a.sent.filter((entry) => entry.via === "wake")
+      expect(woken.map((entry) => entry.session)).toEqual(["dur-on-b"])
+      expect(a.sent.filter((entry) => entry.rpc?.["type"] === "find_session")).toHaveLength(1)
+      const ids = a.sent
+        .filter((entry) => entry.via === "wake" || entry.rpc?.["type"] === "admit_external_message")
+        .map((entry) => entry.rpc?.["deliveryId"])
+      expect(new Set(ids).size).toBe(1)
+      // The retry's record is stamped as the first attempt's was: one hop for the whole delivery, so the chain count the
+      // receiver sees does not grow across the retry.
+      expect(new Set(a.hops).size).toBe(1)
+      const stamped = a.sent
+        .filter((entry) => entry.via === "wake" || entry.rpc?.["type"] === "admit_external_message")
+        .map((entry) => entry.rpc?.["chainCount"])
+      expect(new Set(stamped).size).toBe(1)
+    },
+  )
+
+  test.each([
+    ["this device cannot wake it", {}, "not_resumable"],
+    ["b holds no session file for it", { wakeFeature: true, sessionFiles: {} }, "not_found"],
+  ] as const)(
+    "#given b parked a thread its listing still reads live, and %s #when thread_send names it #then a typed refusal from b's find_session answer after one re-ask, and nothing is woken (#14240)",
+    async (_case, extra, code) => {
+      const a = account({ live: [], unlistedReason: "route_unlisted", ...extra })
+      const { run } = surface(a.remote)
+      const result = await run("thread_send", { thread: "dur-on-b", message: "wake up" })
+      expect(result).toMatchObject({
+        kind: "error",
+        error: { code, details: { device: "b", thread: "dur-on-b" } },
+      })
+      // b answered, so the refusal is its answer's, never the route_unlisted one find_session was asked to look past.
+      expect(result).not.toMatchObject({ error: { details: { reason: "route_unlisted" } } })
+      expect(a.sent.filter((entry) => entry.via === "wake")).toEqual([])
+      expect(a.sent.filter((entry) => entry.rpc?.["type"] === "find_session")).toHaveLength(1)
     },
   )
 

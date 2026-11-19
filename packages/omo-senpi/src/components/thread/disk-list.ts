@@ -21,6 +21,9 @@ export type ListDiskSessionsOptions = {
 
 type SessionFile = { readonly path: string; readonly modified: number }
 
+/** The durable id senpi names a session file by: `<creation time>_<id>.jsonl`. */
+const fileDurableId = (path: string): string => basename(path, ".jsonl").split("_").at(-1) ?? ""
+
 function sessionPathsIn(directory: string): string[] {
   try {
     return readdirSync(directory)
@@ -44,19 +47,20 @@ function statSessionFile(path: string): SessionFile[] {
  * The session files a listing shows as inactive threads (a thread its engine closed stays listed): the session
  * directories of the caller's workspace (every workspace with `all_scope`): of the DISK_LIST_MAX_STATS newest files by
  * name (creation time), the newest by modification time first, at most DISK_LIST_MAX_SESSIONS of them read, each
- * through `readSessionFacts` (two bounded windows). `truncated` says more files were there.
+ * through `readSessionFacts` (two bounded windows). `unread` names the durable id of every file in scope it did not read
+ * (from the file name), so a listing can count the inactive threads it left out without reading them.
  */
 export function listDiskSessions(
   sessionsDir: string,
   opts: ListDiskSessionsOptions = {},
-): { readonly sessions: DiskSession[]; readonly truncated: boolean } {
+): { readonly sessions: DiskSession[]; readonly unread: readonly string[] } {
   let projectDirs: string[]
   try {
     projectDirs = readdirSync(sessionsDir, { withFileTypes: true })
       .filter((entry) => (entry.isDirectory() || entry.isSymbolicLink()) && /^--.*--$/.test(entry.name))
       .map((entry) => entry.name)
   } catch {
-    return { sessions: [], truncated: false }
+    return { sessions: [], unread: [] }
   }
   const prefixes = opts.all_scope === true ? undefined : (opts.workspaceRoots ?? []).map(sessionDirectoryPrefix)
   const paths = projectDirs
@@ -67,9 +71,12 @@ export function listDiskSessions(
     .slice(0, DISK_LIST_MAX_STATS)
     .flatMap(statSessionFile)
     .sort((left, right) => right.modified - left.modified || left.path.localeCompare(right.path))
-  const sessions = files.slice(0, DISK_LIST_MAX_SESSIONS).flatMap((file) => {
+  const read = files.slice(0, DISK_LIST_MAX_SESSIONS)
+  const sessions = read.flatMap((file) => {
     const session = readDiskSession(file.path, null)
     return session === null ? [] : [session]
   })
-  return { sessions, truncated: paths.length > DISK_LIST_MAX_SESSIONS }
+  const readPaths = new Set(read.map((file) => file.path))
+  const unread = paths.filter((path) => !readPaths.has(path)).map(fileDurableId)
+  return { sessions, unread }
 }

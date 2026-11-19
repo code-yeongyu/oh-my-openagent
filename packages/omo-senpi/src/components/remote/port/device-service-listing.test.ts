@@ -122,6 +122,26 @@ describe("device-service adapter: the account listing is shared across the reads
     expect(s.calls()).toBe(1)
   })
 
+  test("#given a round whose devices did not all answer in full #when it is listed #then every device the round did not mark answered is incomplete, so its rows are never read as the device's whole listing (#14295)", async () => {
+    const service = {
+      sessions: async () => ({
+        rows: [],
+        incomplete: ["d"],
+        revision: 1,
+        query_id: "q",
+        devices: { b: "answered", c: "page_cap", d: "skipped", e: "timed_out", f: "undelivered" },
+      }),
+      closed: new Promise(() => {}),
+      close: () => undefined,
+    } as unknown as DeviceService
+    const port = sessionsPort({
+      version: "0.0.0-test",
+      connect: async () => ({ conn: service, owned: true }),
+      now: () => 0,
+    })
+    expect((await port.listing?.())?.incomplete).toEqual(["d", "c", "e", "f"])
+  })
+
   test("#given a round that fails #when the next read comes within the reuse window #then it lists again instead of reusing the failure", async () => {
     let calls = 0
     const service = {

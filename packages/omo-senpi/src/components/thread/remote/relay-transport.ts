@@ -124,6 +124,22 @@ function engineStateOf(reply: JsonObject): EngineState {
 
 const WAITS: ReadonlySet<string> = new Set(["wake", "hold", "approval"])
 
+type SteerRefusal = "turn_conflict" | "not_steerable"
+
+/** A steer the receiving engine refused as a command because no running turn could take it (#14320). */
+const refusedSteer = (outcome: RemoteCommandOutcome): SteerRefusal | undefined =>
+  outcome.kind === "refused" && (outcome.reason === "turn_conflict" || outcome.reason === "not_steerable")
+    ? outcome.reason
+    : undefined
+
+/** The same race answered either way: as reply data (`data.kind`) or as a refused command (`reason`). */
+const steerConflict = (outcome: RemoteCommandOutcome): SteerRefusal | undefined =>
+  outcome.kind === "ok"
+    ? replyData(outcome.response)["kind"] === "turn_conflict"
+      ? "turn_conflict"
+      : undefined
+    : refusedSteer(outcome)
+
 // A refusal reason the receiving side sent. Every reason a receiving side produces is a lowercase machine code (the
 // consumer's and carrier's refusals, and the table below), so a reason is shown only when it has that shape; any other text
 // from that device becomes UNRECOGNISED_REASON and is never shown, in the message or in details.reason.
@@ -242,31 +258,36 @@ export function createRelayTransport(
         kind: "uncertain" as const,
         reason: error instanceof Error ? error.message : String(error),
       }))
+      const conflict = steerConflict(sent)
+      if (conflict !== undefined) {
+        // An explicit steer the draft held until its turn ended, answered as reply data or as a refused command (#14320).
+        // The sender was answered queued; its receipt now answers the refusal, so a retry under the same idempotency key
+        // reads what became of it (the local row's `refused`).
+        const turnId = sent.kind === "ok" ? replyData(sent.response)["turnId"] : undefined
+        await revise(
+          fail(
+            REFUSAL_CODES[conflict].code,
+            `Turn ${String(record["expectedTurnId"] ?? "?")} of ${row.session_id} on device ${row.device} ended while that session's open draft held the steer; it was not delivered.`,
+            REFUSAL_CODES[conflict].next,
+            {
+              device: row.device,
+              delivery_id: deliveryId,
+              ...(typeof turnId === "string" && turnId !== "" ? { current_turn_id: turnId } : {}),
+            },
+          ),
+        )
+        log(
+          `relay_delivery_failed: delivery ${deliveryId} to ${row.session_id} on device ${row.device}: re-send ${attempt + 1} ended ${conflict} (the steered turn ended while the draft held it); the send's receipt now answers that refusal.`,
+        )
+        return
+      }
       if (sent.kind !== "ok") {
         log(
           `relay_delivery_failed: delivery ${deliveryId} to ${row.session_id} on device ${row.device}: re-send ${attempt + 1} ended ${sent.kind} (${sent.reason}).`,
         )
         return
       }
-      const reply = replyData(sent.response)
-      if (reply["kind"] === "turn_conflict") {
-        // An explicit steer the draft held until its turn ended. The sender was answered queued; its receipt now answers
-        // the refusal, so a retry under the same idempotency key reads what became of it (the local row's `refused`).
-        const turnId = typeof reply["turnId"] === "string" ? reply["turnId"] : ""
-        await revise(
-          fail(
-            REFUSAL_CODES.turn_conflict.code,
-            `Turn ${String(record["expectedTurnId"] ?? "?")} of ${row.session_id} on device ${row.device} ended while that session's open draft held the steer; it was not delivered.`,
-            REFUSAL_CODES.turn_conflict.next,
-            { device: row.device, delivery_id: deliveryId, ...(turnId === "" ? {} : { current_turn_id: turnId }) },
-          ),
-        )
-        log(
-          `relay_delivery_failed: delivery ${deliveryId} to ${row.session_id} on device ${row.device}: re-send ${attempt + 1} ended turn_conflict (the steered turn ended while the draft held it); the send's receipt now answers that refusal.`,
-        )
-        return
-      }
-      if (reply["kind"] !== "held_draft") return
+      if (replyData(sent.response)["kind"] !== "held_draft") return
     }
     log(
       `relay_delivery_failed: delivery ${deliveryId} to ${row.session_id} on device ${row.device} was held behind that session's open draft through ${retryDelays.length} re-sends.`,
@@ -383,11 +404,16 @@ export function createRelayTransport(
    * listing's (a reopen elsewhere can run it under a new key; #14179 reviews L4, M1); one on disk takes the wake path when
    * this device has one, else `not_resumable` at once, as thread_read answers it. A holder that cannot say is treated as
    * holding it on disk: an ended row takes the wake path when there is one, anything else is `not_resumable`.
+   * `parked` (#14240): the row reads live but its host refused a command to it `route_unlisted` (it parked the session),
+   * so the listing is stale: `parked` is the answer that refusal maps to. The holder is asked as for a not-live row, and a
+   * session it holds on disk takes the wake path whatever the row's state. A holder that cannot say (find_session refused,
+   * unsupported or unanswered) taught nothing new, so the answer stays `parked`.
    */
   async function addressOf(
     listed: RemoteSessionRow,
+    parked?: SendOutcome,
   ): Promise<{ readonly row: RemoteSessionRow; readonly ended: boolean } | SendOutcome> {
-    if (rowStatus(listed) === "live") return { row: listed, ended: false }
+    if (parked === undefined && rowStatus(listed) === "live") return { row: listed, ended: false }
     const thread = rowThreadId(listed)
     const details = { device: listed.device, thread }
     const view = await holderView(remote, listed)
@@ -398,9 +424,11 @@ export function createRelayTransport(
         "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell).",
         details,
       )
+    if (parked !== undefined && view === "unknown") return parked
     if (view !== "running") {
       // omo#13037 5.4 / A4.5: a session no engine runs takes the wake path when this device's service can carry it.
-      if (listed.state === "ended" && (await remote.sessions.canWake?.()) === true) return { row: listed, ended: true }
+      const wakeable = parked !== undefined ? view === "on_disk" : listed.state === "ended"
+      if (wakeable && (await remote.sessions.canWake?.()) === true) return { row: listed, ended: true }
       return fail(
         "not_resumable",
         `${thread} on device ${listed.device} is not running, and this device cannot wake it there.`,
@@ -420,15 +448,30 @@ export function createRelayTransport(
     return { row: { ...listed, session_id: located.sessionId }, ended: false }
   }
 
+  /**
+   * `retry` (#14240): the second and last attempt, after the host refused the first `route_unlisted` for a row that read
+   * live; it re-addresses the row as parked and keeps the first attempt's delivery ids, so a repeat is never a second
+   * delivery. The refusal means nothing was dispatched there; `refusal` is what it answers unless the holder says more.
+   */
   async function send(
     delivery: OutboundDelivery,
     listed: RemoteSessionRow,
     later: Later,
     sending: () => void,
+    retry?: {
+      readonly ids: Awaited<ReturnType<typeof chain>> | undefined
+      readonly announced: boolean
+      readonly refusal: SendOutcome
+    },
   ): Promise<SendOutcome> {
     const offline = await deviceOnline(remote, listed.device)
     if (offline !== undefined) return offline
-    const addressed = await addressOf(listed)
+    const parkedHere = (outcome: RemoteCommandOutcome) =>
+      retry === undefined &&
+      rowStatus(listed) === "live" &&
+      outcome.kind === "refused" &&
+      outcome.reason === "route_unlisted"
+    const addressed = await addressOf(listed, retry?.refusal)
     if (!("row" in addressed)) return addressed
     // `ended`: the wake path (no lane probe; its state is offline in the decision table, so a steer is turn_conflict).
     const { row, ended } = addressed
@@ -450,7 +493,11 @@ export function createRelayTransport(
         type: "get_state",
         sessionId: row.session_id,
       })
-      if (probed.kind !== "ok") return probeFailure(probed, row.device)
+      if (probed.kind !== "ok") {
+        const refusal = probeFailure(probed, row.device)
+        if (!parkedHere(probed)) return refusal
+        return await send(delivery, listed, later, sending, { ids: undefined, announced: false, refusal })
+      }
       const state: EngineState = engineStateOf(replyData(probed.response))
       probedState = state
       const decision = decideDelivery(state.phase, delivery.mode, expected, state.turnEpoch)
@@ -473,7 +520,8 @@ export function createRelayTransport(
       }
     }
     const facts = senderFacts(delivery.sender, await options.senderProvenance())
-    const { delivery_id, root_id, hop } = await chain()
+    const ids = retry?.ids ?? (await chain())
+    const { delivery_id, root_id, hop } = ids
     const name = delivery.sender.kind === "session" ? delivery.sender.name?.trim() : undefined
     const recordFor = (effective: EffectiveLane) =>
       remote.chain.stamp(
@@ -528,21 +576,26 @@ export function createRelayTransport(
       delivery_id,
       effective_mode: lane,
     })
-    sending()
+    // One delivery is announced once: a retry after the first attempt's admission was refused does not announce it again.
+    if (retry?.announced !== true) sending()
     if (ended) return wakeAnswer(await woken(row, record), row, delivery_id, ok)
     let sent = await remote.sessions.sessionCommand(row.device, row.session_id, record)
-    if (
-      delivery.mode === "auto" &&
-      lane === "steer" &&
-      sent.kind === "ok" &&
-      replyData(sent.response)["kind"] === "turn_conflict"
-    ) {
+    if (delivery.mode === "auto" && lane === "steer" && steerConflict(sent) !== undefined) {
       // The turn the probe saw ended before the record arrived. The default never fails on that race: it takes the lane the
       // target has now (started when idle, queued behind a turn that began since), as a local drain re-decides at admission.
+      // The receiver may answer it as reply data or as a refused command (#14320); both take this one re-send.
       lane = "follow_up"
       record = recordFor(lane)
       sent = await remote.sessions.sessionCommand(row.device, row.session_id, record)
     }
+    // The retry re-stamps its own record (a wake addresses the durable id on the follow-up lane); `stamp` is a pure
+    // function of (record, hop) and the ids are the first attempt's, so the receiver sees one delivery.
+    if (sent.kind !== "ok" && parkedHere(sent))
+      return await send(delivery, listed, later, sending, {
+        ids,
+        announced: true,
+        refusal: outcomeFailure(sent, row.device),
+      })
     if (sent.kind === "refused" && (ADMIT_UNSUPPORTED.has(sent.reason) || sent.reason.startsWith("Unknown command")))
       return fail(
         "unsupported",
@@ -550,19 +603,24 @@ export function createRelayTransport(
         "Update omo and senpi on that device, then retry.",
         { device: row.device, reason: escapeForDisplay(sent.reason) },
       )
+    const conflict = steerConflict(sent)
+    if (conflict !== undefined) {
+      const current = sent.kind === "ok" ? replyData(sent.response)["turnId"] : undefined
+      return fail(
+        REFUSAL_CODES[conflict].code,
+        conflict === "turn_conflict"
+          ? `Turn ${delivery.expected_turn_id ?? "?"} is no longer the running turn of ${row.session_id} on device ${row.device}.`
+          : `A steer to ${row.session_id} on device ${row.device} was refused: not_steerable.`,
+        REFUSAL_CODES[conflict].next,
+        { device: row.device, ...(typeof current === "string" && current !== "" ? { current_turn_id: current } : {}) },
+      )
+    }
     if (sent.kind !== "ok") return outcomeFailure(sent, row.device)
     const reply = replyData(sent.response)
     const kind = reply["kind"]
     const turnId = typeof reply["turnId"] === "string" ? reply["turnId"] : ""
     if (kind === "started" || kind === "steered") return ok({ kind, turn_id: turnId })
-    if (kind === "turn_conflict")
-      return fail(
-        REFUSAL_CODES.turn_conflict.code,
-        `Turn ${delivery.expected_turn_id ?? "?"} is no longer the running turn of ${row.session_id} on device ${row.device}.`,
-        REFUSAL_CODES.turn_conflict.next,
-        { device: row.device, ...(turnId === "" ? {} : { current_turn_id: turnId }) },
-      )
-    if (kind !== "queued" && kind !== "held_draft" && kind !== "already_admitted")
+    if (kind !== "queued" && kind !== "held_draft" && kind !== "held" && kind !== "already_admitted")
       return fail(
         "idempotency_uncertain",
         `Device ${row.device} accepted the message but answered an unknown admission (${String(kind)}).`,
@@ -593,8 +651,9 @@ export function createRelayTransport(
     // engine's pendingMessageCount does not count an admitted delivery (senpi enqueues it straight into the agent's queue,
     // outside the user-input count), so a receiver that reports none still holds it, first in line: position 1.
     // A receiver parked on an approval (an open question its human must answer on that device) waits behind that
-    // approval (#12886); a paused or held one waits on its holds.
-    if (kind === "queued" && afterState?.held === true)
+    // approval (#12886); a paused or held one waits on its holds. `held` is the engine's own word for that: idle under a
+    // hold a peer cannot release (a Stop, an interrupted run, a parent's run hold; senpi#7014), kept until it is released.
+    if (kind === "held" || (kind === "queued" && afterState?.held === true))
       return ok({ kind: "queued", queue_position: pending ?? 1, waiting_on: { kind: "hold", device: row.device } })
     if (kind === "queued" && afterState?.parkedOnApproval === true)
       return ok({ kind: "queued", queue_position: pending ?? 1, waiting_on: { kind: "approval", device: row.device } })
@@ -649,6 +708,7 @@ export function createRelayTransport(
     const turnId = typeof data["turnId"] === "string" ? data["turnId"] : ""
     if (kind === "started" || kind === "steered") return ok({ kind, turn_id: turnId })
     if (kind === "already_admitted") return ok({ kind: "queued", queue_position: 1 }, true)
+    if (kind === "held") return ok({ kind: "queued", queue_position: 1, waiting_on: { kind: "hold", device } })
     return fail(
       "idempotency_uncertain",
       `Device ${device} accepted the message but answered an unknown admission (${String(kind)}).`,
@@ -716,11 +776,12 @@ export function createRelayTransport(
       )
       sending()
       const steered = await remote.sessions.sessionCommand(row.device, row.session_id, steer)
-      if (steered.kind === "refused" && (steered.reason === "turn_conflict" || steered.reason === "not_steerable"))
+      const refusal = refusedSteer(steered)
+      if (refusal !== undefined)
         return fail(
-          REFUSAL_CODES[steered.reason].code,
-          `A steer to ${row.session_id} was refused: ${steered.reason}.`,
-          REFUSAL_CODES[steered.reason].next,
+          REFUSAL_CODES[refusal].code,
+          `A steer to ${row.session_id} was refused: ${refusal}.`,
+          REFUSAL_CODES[refusal].next,
           { device: row.device },
         )
       if (steered.kind !== "ok") return outcomeFailure(steered, row.device)

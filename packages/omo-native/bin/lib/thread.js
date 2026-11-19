@@ -36,6 +36,9 @@ const USAGE = [
   "  outbox    <binding-id> [--after <cursor>] [--limit <n>] [--ack]",
   "  ack       <binding-id> <cursor> [--provider-message-id <id>]",
   "",
+  "  <target>/<session> takes a thread id, session id, alias, exact name, unique id prefix,",
+  "                or <device>/<thread> (device: id, here, name or unique device id prefix)",
+  "",
   "  --all-scope  resolve sessions in every workspace, not only this directory's",
   "  --json       print the result as one JSON value",
 ].join("\n")

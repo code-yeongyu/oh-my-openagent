@@ -4,7 +4,8 @@ import { type ClientCore, ok, type Outcome, type RemoteClient } from "./client"
 import { engineCode, nextActionFor, readFailureFromError, remoteFailure } from "./codes"
 import { DEADLINES, withinDeadline } from "./deadlines"
 import { attachAddressed } from "./port/device-service"
-import { canonicalizeThreadHandle } from "./seams"
+import { budget, idShapedSession, listingIncomplete, resolveRemoteDevice } from "./resolve"
+import { canonicalizeThreadHandle, handleOf } from "./seams"
 import type {
   AttachEvent,
   AttachHandle,
@@ -413,37 +414,76 @@ export async function openAttachment(core: ClientCore, thread: ThreadHandle, opt
       `${thread} does not name a session on a device.`,
       "Call sessions.resolve for the thread's handle, then attach to it.",
     )
+  // The device part through the core's resolver (id > here > name > 6+ id prefix), as every session member resolves it.
+  const stage = budget(core.timers, opts, DEADLINES.devices + DEADLINES.sessionsList + DEADLINES.attachOpen)
+  const resolved = await resolveRemoteDevice(core, target.device, stage)
+  if (resolved.kind === "error") return resolved
+  const device = resolved.value.ref.id
+  // On another device an id-shaped session part is located once by the device, as the thread tools do, so it answers
+  // not_found, never unsupported; any other text reaches the device only as the key of the row the device lists it by
+  // (its key or durable id), and a miss is judged as the session members judge it: listing_incomplete while the device
+  // missed the round, else not_found{session}.
+  let session = target.session
+  if (!resolved.value.ref.here && !idShapedSession(target.session)) {
+    const listed =
+      resolved.value.listed !== undefined
+        ? ok(resolved.value.listed)
+        : await core.sessionsList({ device }, stage(DEADLINES.sessionsList))
+    if (listed.kind === "error") return listed
+    const row = listed.value.rows.find(
+      (candidate) => candidate.thread === handleOf(device, target.session) || candidate.durable_id === target.session,
+    )
+    const keyed = row === undefined ? undefined : canonicalizeThreadHandle(row.thread, {})
+    if (keyed?.kind !== "ok" || keyed.value.target.kind !== "device_session")
+      return (
+        listingIncomplete(
+          thread,
+          listed.value.unanswered.filter((silent) => silent.id === device),
+        ) ??
+        remoteFailure("not_found", `Device ${device} holds no session ${target.session}.`, nextActionFor("not_found"), {
+          details: { kind: "session", device },
+        })
+      )
+    session = keyed.value.target.session
+  }
   let opened: RemoteAttach | undefined
   let abandoned = false
-  const outcome = await core.member(opts, DEADLINES.attachOpen, false, async (svc): Promise<Outcome<Attachment>> => {
-    // A session on this device: the device service cannot attach a device to itself, so its engine's operator endpoint
-    // serves it (RemoteClientDeps.localAttach), found by the durable id the listing names it by.
-    const self = await svc.thisDevice()
-    let attached: RemoteAttach
-    if (self !== null && self.id === target.device) {
-      const local = core.deps.localAttach
-      if (local === undefined)
-        return remoteFailure(
-          "unsupported",
-          "This client cannot attach to a session on its own device: it was built without a local attach.",
-          "Call attach on a client built with localAttach.",
-          { details: { feature: "local_attach" } },
-        )
-      const listed = await svc.sessions({ device: target.device })
-      const row = listed.rows.find((candidate) => candidate.session_id === target.session)
-      const durableId = row?.durable_id
-      if (durableId === undefined)
-        throw new LocalApiError("session_not_found", `this device lists no session ${target.session} with a durable id`)
-      attached = await local({ device: target.device, session: target.session, durableId })
-    } else {
-      // A mistyped id or a durable id is located once, as the thread tools do, so it answers not_found, never unsupported.
-      attached = (await attachAddressed(svc, target.device, target.session)).attached
-    }
-    opened = attached
-    if (abandoned) await attached.detach()
-    await attached.snapshot
-    return ok(createAttachment(core, attached, parsed.value.handle))
-  })
+  const outcome = await core.member(
+    stage(DEADLINES.attachOpen),
+    DEADLINES.attachOpen,
+    false,
+    async (svc): Promise<Outcome<Attachment>> => {
+      // A session on this device: the device service cannot attach a device to itself, so its engine's operator endpoint
+      // serves it (RemoteClientDeps.localAttach), found by the durable id the listing names it by.
+      const self = await svc.thisDevice()
+      let attached: RemoteAttach
+      if (self !== null && self.id === device) {
+        const local = core.deps.localAttach
+        if (local === undefined)
+          return remoteFailure(
+            "unsupported",
+            "This client cannot attach to a session on its own device: it was built without a local attach.",
+            "Call attach on a client built with localAttach.",
+            { details: { feature: "local_attach" } },
+          )
+        const listed = await svc.sessions({ device })
+        const row = listed.rows.find((candidate) => candidate.session_id === target.session)
+        const durableId = row?.durable_id
+        if (durableId === undefined)
+          throw new LocalApiError(
+            "session_not_found",
+            `this device lists no session ${target.session} with a durable id`,
+          )
+        attached = await local({ device, session: target.session, durableId })
+      } else {
+        attached = (await attachAddressed(svc, device, session)).attached
+      }
+      opened = attached
+      if (abandoned) await attached.detach()
+      await attached.snapshot
+      return ok(createAttachment(core, attached, handleOf(device, target.session)))
+    },
+  )
   // An attach that opens after the call gave up is detached, never left subscribed.
   if (outcome.kind === "error") {
     abandoned = true

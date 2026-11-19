@@ -42,6 +42,31 @@ describe("a session command refused route_unlisted by the device holding the thr
     },
   )
 
+  // #14240 re-asks b with find_session after a live-listed thread's send is refused route_unlisted. When b cannot answer
+  // that either (an older engine without it, its own route_unlisted, no answer), nothing new was learnt: the send answers
+  // the route_unlisted refusal it already had, even where this device could wake the thread.
+  test.each(["route_unlisted", "unsupported", "method_unclassified", "request_timeout"])(
+    "#given b's host no longer lists the thread's session and b's find_session is refused %s #when thread_send names it #then it is not_resumable naming b and route_unlisted, and nothing is woken (#14240)",
+    async (findSessionRefuse) => {
+      const a = account({
+        live: [],
+        unlistedReason: "route_unlisted",
+        sessionFiles: "none",
+        findSessionRefuse,
+        wakeFeature: true,
+      })
+      const { run } = surface(a.remote)
+      const result = await run("thread_send", { thread: "dur-on-b", message: "hello" })
+      expect(result).toMatchObject({
+        kind: "error",
+        error: { code: "not_resumable", details: { device: "b", reason: "route_unlisted" } },
+      })
+      expect(JSON.stringify(result)).not.toContain("Update omo")
+      expect(a.sent.filter((entry) => entry.rpc?.["type"] === "find_session")).toHaveLength(1)
+      expect(a.sent.filter((entry) => entry.via === "wake")).toEqual([])
+    },
+  )
+
   test("#given b's host lists no engine endpoint for the create, even on a fresh lookup #when thread_create opens on b #then it is host_unavailable naming b and route_unlisted, nothing opened, never an update-omo answer", async () => {
     const a = account({ openRefuse: "route_unlisted" })
     const { run } = surface(a.remote)

@@ -91,7 +91,7 @@ export async function buildExtensionTools(options: ThreadToolSurfaceOptions): Pr
 
 export type ExtensionToolHost = {
   registerTool(tool: Record<string, unknown>): void
-  on?(event: string, handler: () => void): void
+  on?(event: string, handler: (event: unknown, ctx?: unknown) => unknown): void
   /** senpi's tool registry for the session (builtins and every extension's tools). */
   getAllTools?(): readonly { readonly name: string }[]
 }

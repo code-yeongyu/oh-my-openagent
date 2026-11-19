@@ -1,15 +1,21 @@
-import { REMOTE_GRACEFUL_MAX_WAIT_MS, THINKING_LEVELS } from "../omo-senpi/src/components/thread/contracts/fields"
+import {
+  DEFAULT_THREAD_DELIVERY,
+  REMOTE_GRACEFUL_MAX_WAIT_MS,
+  THINKING_LEVELS,
+} from "../omo-senpi/src/components/thread/contracts/fields"
 import type { WorktreeRequest } from "../omo-senpi/src/components/thread/worktree/thread-worktree"
 import { UsageError } from "./remote-exit"
 import { isPermissionPreset, PERMISSION_PRESETS } from "./remote-permission-preset"
 
-// The arguments of `omo remote open|send|model|interrupt|close`, parsed before the service is contacted.
+// The arguments of `omo remote open|send|model|interrupt|close`, parsed before the service is contacted. The target
+// stays the typed text: one string the address module resolves (#14305, design section 2).
 export const SESSION_VERBS = ["open", "send", "model", "interrupt", "close"] as const
 export type SessionVerb = (typeof SESSION_VERBS)[number]
 export const isSessionVerb = (value: string): value is SessionVerb => SESSION_VERBS.some((verb) => verb === value)
 
-/** A durable thread id, optionally qualified with the device that holds it (`<device>/<session>`). */
-export type RemoteSessionTarget = { readonly device?: string; readonly session: string }
+/** A target a verb can resolve: not empty, and no `/` with nothing on one side of it (`/session`, `device/`). */
+export const isSessionTarget = (value: string | undefined): value is string =>
+  value !== undefined && value !== "" && !value.startsWith("/") && !value.endsWith("/")
 
 export type SessionArgs =
   | {
@@ -22,40 +28,31 @@ export type SessionArgs =
       readonly permissionPreset?: string
       readonly worktree?: WorktreeRequest
       readonly prompt?: string
-      /** How `prompt` is delivered; absent means auto. */
-      readonly delivery?: "auto" | "steer" | "follow_up"
+      /** How `prompt` is delivered: --steer, --follow-up, else the shared default (auto). */
+      readonly delivery: "auto" | "steer" | "follow_up"
     }
   | {
       readonly verb: "send"
-      readonly target: RemoteSessionTarget
+      readonly target: string
       readonly text: string
       readonly delivery: "auto" | "steer" | "follow_up"
       readonly wait: boolean
       /** #13425: how long a waiting send follows the turn it started, in seconds (1..600); default 120. */
       readonly timeout_seconds?: number
     }
-  | { readonly verb: "model"; readonly target: RemoteSessionTarget; readonly model: string }
-  | { readonly verb: "interrupt"; readonly target: RemoteSessionTarget }
+  | { readonly verb: "model"; readonly target: string; readonly model: string }
+  | { readonly verb: "interrupt"; readonly target: string }
   /**
    * `force`: close even when the session has messages it has not read; they are dropped and listed (omo#14234).
    * `graceful` (omo#14313): let its turn end instead, within `wait_ms`; unread messages go back to their senders.
    */
   | {
       readonly verb: "close"
-      readonly target: RemoteSessionTarget
+      readonly target: string
       readonly force: boolean
       readonly graceful?: true
       readonly wait_ms?: number
     }
-
-export function parseTarget(verb: string, value: string | undefined): RemoteSessionTarget {
-  const slash = value?.indexOf("/") ?? -1
-  if (value === undefined || value === "" || slash === 0 || slash === value.length - 1)
-    throw new UsageError(
-      `omo remote ${verb}: name the session as <device>/<session> (the SESSION column of omo remote sessions) or by the thread value open printed`,
-    )
-  return slash === -1 ? { session: value } : { device: value.slice(0, slash), session: value.slice(slash + 1) }
-}
 
 const SESSION_FLAGS: Readonly<
   Record<SessionVerb, { readonly values: readonly string[]; readonly switches: readonly string[] }>
@@ -124,7 +121,11 @@ export function parseSession(
       throw new UsageError("omo remote open: pass --steer or --follow-up, not both")
     if (prompt === undefined && (switches.has("--steer") || switches.has("--follow-up")))
       throw new UsageError("omo remote open: --steer and --follow-up name how --prompt is delivered; pass --prompt")
-    const delivery = switches.has("--steer") ? "steer" : switches.has("--follow-up") ? "follow_up" : "auto"
+    const delivery = switches.has("--steer")
+      ? "steer"
+      : switches.has("--follow-up")
+        ? "follow_up"
+        : DEFAULT_THREAD_DELIVERY
     return {
       json,
       session: {
@@ -142,13 +143,21 @@ export function parseSession(
       },
     }
   }
-  const target = parseTarget(verb, positional[0])
+  const target = positional[0]
+  if (!isSessionTarget(target))
+    throw new UsageError(
+      `omo remote ${verb}: name the session as <device>/<session> (the SESSION column of omo remote sessions) or by the thread value open printed`,
+    )
   if (verb === "send") {
     const text = positional[1]
     if (text === undefined || text === "") throw new UsageError("omo remote send: the message text is required")
     if (switches.has("--steer") && switches.has("--follow-up"))
       throw new UsageError("omo remote send: pass --steer or --follow-up, not both")
-    const delivery = switches.has("--steer") ? "steer" : switches.has("--follow-up") ? "follow_up" : "auto"
+    const delivery = switches.has("--steer")
+      ? "steer"
+      : switches.has("--follow-up")
+        ? "follow_up"
+        : DEFAULT_THREAD_DELIVERY
     const timeoutValue = values.get("--timeout")
     if (timeoutValue !== undefined && !/^[1-9][0-9]{0,3}$/.test(timeoutValue))
       throw new UsageError("omo remote send: --timeout is seconds, 1 to 600")
