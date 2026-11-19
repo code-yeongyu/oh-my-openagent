@@ -223,3 +223,40 @@ describe("#given an approved reply pinned to its sender's device #when it resolv
     expect(await resolve(pin.thread, { pin }, setup)).toMatchObject(expected)
   })
 })
+
+describe("#given <device>/<thread id> on B that B's listing does not show #when it resolves #then B itself is asked, as a pinned reply asks it (#14305 review H1)", () => {
+  test.each([
+    [
+      "B holds it on disk (its probe finds it)",
+      { probe: true },
+      { kind: "ok", thread: T.bProbe, where: { kind: "device", row: { device: B.id } } },
+      T.bProbe,
+    ],
+    [
+      "B answered and holds no such thread",
+      { probe: true },
+      { kind: "error", code: "not_found", details: { kind: "thread", device: B.id, device_name: B.name } },
+      T.nowhere,
+    ],
+    [
+      "B did not answer the probe",
+      { probe: true, silent: [B.id] },
+      { kind: "error", code: "host_unavailable", details: { reason: "host_not_answering", device: B.id } },
+      T.nowhere,
+    ],
+    [
+      "this device's service carries no wake, so B cannot be asked",
+      {},
+      { kind: "error", code: "host_unavailable", details: { reason: "wake_unavailable", device: B.id } },
+      T.nowhere,
+    ],
+    [
+      "B missed this listing round",
+      { probe: true, incomplete: true },
+      { kind: "error", code: "host_unavailable", details: { reason: "listing_incomplete", device: B.id } },
+      T.nowhere,
+    ],
+  ] as const)("%s", async (_label, setup, expected, thread) => {
+    expect(await resolve(`${B.id}/${thread}`, {}, setup)).toMatchObject(expected)
+  })
+})

@@ -89,12 +89,12 @@ describe("#given two devices of one account #when every input form names a threa
     await expectHit(text, expected)
   })
 
-  test("#given B lists no row for an id #when <device>/<thread id> names it #then B itself is asked for it, not the listing (a session opened a moment ago)", async () => {
-    const resolved = await resolve(`${B.id}/${T.nowhere}`)
+  test("#given B lists no row for an id it holds #when <device>/<thread id> names it #then B itself is asked for it and answers (a session no listing shows yet)", async () => {
+    const resolved = await resolve(`${B.id}/${T.bProbe}`, {}, { probe: true })
     expect(resolved).toMatchObject({
       kind: "ok",
-      thread: T.nowhere,
-      where: { kind: "device", row: { device: B.id, durable_id: T.nowhere } },
+      thread: T.bProbe,
+      where: { kind: "device", row: { device: B.id, durable_id: T.bProbe } },
     })
   })
 
