@@ -56,11 +56,17 @@ export function createUltraworkComponent(
   arming: SessionArming = sharedSessionArming(),
   loadSettings: keywordDetector.LoadKeywordDetectorSettings = keywordDetector.loadKeywordDetectorSettings,
 ): OmoSenpiComponent {
+  // A config edit reloads the extension (config-watch), which builds a fresh component, so one read per cwd is current.
+  const settingsByCwd = new Map<string, ReturnType<keywordDetector.LoadKeywordDetectorSettings>>()
+  const cachedSettings: keywordDetector.LoadKeywordDetectorSettings = (cwd) => {
+    if (!settingsByCwd.has(cwd)) settingsByCwd.set(cwd, loadSettings(cwd))
+    return settingsByCwd.get(cwd)
+  }
   return {
     name: "ultrawork",
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
       pi.on("input", (payload: unknown, eventCtx: unknown): SenpiInputEventResult =>
-        handleInput(pi, payload, ctx, arming, eventCtx, loadSettings),
+        handleInput(pi, payload, ctx, arming, eventCtx, cachedSettings),
       )
       // Input is transformed before a queued message drains. Select again at the
       // receiving boundary so a model switch or fallback cannot deliver its old policy.

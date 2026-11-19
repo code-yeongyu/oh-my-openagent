@@ -21,10 +21,15 @@ const NEGATED_INVOCATION =
   /\b(?:do\s+not|don['\u2019]t|dont|never)\s+(?:load|use|run|invoke|start|trigger|arm|enable)\b[^.;:!?\n]*?(?=[.;:!?\n]|\s(?:but|then|instead|however)\b|\s[\u2014\u2013-]\s|$)/gi
 
 // Advice that forbids the mode without a "do not use" verb ("avoid ulw", "no ultrawork", "skip ulw-loop",
-// "don't ulw this", a pasted rule list) is not a request either (#14389). The keyword must follow the
-// prohibition directly, so "avoid regressions, ulw the fix" and "no worries, ulw this" still arm.
-const PROHIBITED_KEYWORD =
-  /\b(?:avoid(?:ing)?|skip(?:ping)?|without|no|never|do\s+not|don['\u2019]t|dont)\s+(?:(?:using|use\s+of|the)\s+)?(?=(?:mass[-\s])?(?:ultrawork|ulw)\b)[^.;:!?\n]*?(?=[.;:!?\n]|\s(?:but|then|instead|however)\b|\s[\u2014\u2013-]\s|$)/gi
+// "don't ulw this", a pasted rule list) is not a request either (#14389). Only the keyword list the prohibition
+// names is masked: "ulw or mass-ulw", "ulw, ulw-loop and ultrawork". A comma that is not part of such a list ends it,
+// so "No ulw-loop, just ulw this" and "avoid regressions, ulw the fix" still arm.
+const PROHIBITED_ITEM = String.raw`(?:mass[-\s]?)?(?:ultrawork|ulw)(?:[-_](?:loop|plan|research|execute|mass))?\b`
+const PROHIBITED_KEYWORD = new RegExp(
+  String.raw`\b(?:avoid(?:ing)?|skip(?:ping)?|without|no|never|do\s+not|don['\u2019]t|dont)\s+(?:(?:using|use\s+of|the)\s+)?` +
+    String.raw`${PROHIBITED_ITEM}(?:(?:\s*,\s*${PROHIBITED_ITEM})*\s*,?\s*(?:or|and|nor|\/)\s*${PROHIBITED_ITEM})?`,
+  "gi",
+)
 
 // A keyword glued to a preceding identifier segment (`mass-ulw`, `senpi-ulw-loop`, `.omo/ulw/`, `v1.ulw`)
 // names something else; so does one that opens a path (`ulw-execute/ledger.jsonl`).

@@ -110,7 +110,7 @@ No default profiles ship. A profile exists only when you write one under `profil
   "device_service": { "enabled": true }, // the device service start-up bootstrap (Native harness), enabled by default
   "disabled_skills": [], // skill names hidden on every harness, unioned across layers
   "exclude_models": [], // models no category, agent, profile or task pin may run, unioned across layers (Native harness)
-  "keyword_detector": {}, // which prompt keywords switch on a mode (every harness)
+  "keyword_detector": {}, // which prompt keywords switch on a mode (OpenCode and Native harnesses)
   "[opencode]": {},     // OpenCode plugin config, freeform (see configuration.md)
   "[native]": {},       // OmO Native-only overrides, typed base keys
   "[codex]": {},        // Codex-only overrides, typed base keys
@@ -160,9 +160,9 @@ To see the effect, run `omo doctor --models`. It prints, for every category and 
 
 Security invariant: the OpenCode plugin honors `mcp_env_allowlist` and `browser_automation_engine.playwright_mcp_args` only from the user layer, including the user layer's own active profile block. Project layers cannot extend them.
 
-### `keyword_detector` (every harness)
+### `keyword_detector` (OpenCode and Native harnesses)
 
-Turns prompt keywords off. `disabled_keywords` lists the keyword types that must not fire; `enabled_expansions`, when set, lets only the listed types fire. The types are `ultrawork`, `team`, `hyperplan` and `hyperplan-ultrawork`. OmO Native arms only `ultrawork`, so it reads the `ultrawork` entries: either key can switch the `ulw` / `ultrawork` keyword off. A project file (`<project>/.omo/omo.jsonc`) turns it off for that project on every launch; the `--omo-senpi-ultrawork-disabled` launch flag still turns it off for one launch.
+Turns prompt keywords off. `disabled_keywords` lists the keyword types that must not fire; `enabled_expansions`, when set, lets only the listed types fire. The types are `ultrawork`, `team`, `hyperplan` and `hyperplan-ultrawork`. OmO Native arms only `ultrawork`, so it reads the `ultrawork` entries (the Codex edition does not read this key): either key can switch the `ulw` / `ultrawork` keyword off. A project file (`<project>/.omo/omo.jsonc`) turns it off for that project on every launch; the `--omo-senpi-ultrawork-disabled` launch flag still turns it off for one launch.
 
 ```jsonc
 // <project>/.omo/omo.jsonc

@@ -61,6 +61,7 @@ describe("omo-senpi ultrawork references do not arm", () => {
       "don't ulw this one",
       "never ultrawork a one-line change",
       "avoid using ulw or mass-ulw on this repo",
+      "skip ulw, ulw-loop and ultrawork here",
       "Rules from the guide:\n- avoid ulw on tiny tasks\n- no ultrawork for docs\n- skip ulw-loop when unsure",
     ]) {
       expect({ text, effective: classify(text).effective }).toEqual({ text, effective: false })
@@ -97,6 +98,10 @@ describe("omo-senpi ultrawork references do not arm", () => {
       "avoid regressions, ulw the fix",
       "no worries, ulw this",
       "skip the docs. ulw the fix",
+      // The prohibition covers only the keyword list it names; a comma then a request still arms (#14392 review M1).
+      "No ulw-loop, just ulw this",
+      "skip ulw-plan, ulw the fix",
+      "without ultrawork the answer was bad, so ulw this",
     ]) {
       expect({ text, effective: classify(text).effective }).toEqual({ text, effective: true })
     }

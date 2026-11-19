@@ -32,7 +32,7 @@ To stop `ulw` and `ultrawork` from starting the mode, add this to `.omo/omo.json
 }
 ```
 
-On OmO Native, the `--omo-senpi-ultrawork-disabled` launch flag does the same for one launch. See [`keyword_detector`](../reference/omo-json.md#keyword_detector-every-harness).
+On OmO Native, the `--omo-senpi-ultrawork-disabled` launch flag does the same for one launch. See [`keyword_detector`](../reference/omo-json.md#keyword_detector-opencode-and-native-harnesses).
 
 ## Related
 
