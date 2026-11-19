@@ -78,6 +78,14 @@ export async function createThread(
   const { operationId, callerId, retrying, view } = context
   const launch = createLaunch(value, options.remote?.permissionPreset?.())
   if ("kind" in launch) return launch
+  // #14050: a blank prompt is no first message (the schema's minLength counts spaces); it would open an empty thread.
+  if (value.prompt !== undefined && value.prompt.trim() === "")
+    return failure(
+      "invalid_arguments",
+      "prompt is blank, so it is no first message; nothing was created.",
+      "Pass the new thread's first message as prompt, or drop prompt and pass name to open an empty named thread.",
+      { field: "prompt" },
+    )
   // #14050: a new thread with no first prompt and no name is an empty session nobody asked for; refuse it as data.
   const named = (value.name?.trim() ?? "") !== "" || (value.alias?.trim() ?? "") !== ""
   if (value.thread === undefined && value.fork_from === undefined && value.prompt === undefined && !named)
