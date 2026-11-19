@@ -27,6 +27,8 @@
         "script/desktop-engine-ci-proof.ts",
         "script/desktop-engine-release.ts",
         "script/engine-trust-helper-smoke.ts",
+        // compiled by path by script/compiled-engine-identity.test.ts, not imported (senpi#7040)
+        "script/fixtures/compiled-engine-identity/entry.ts",
         "script/generate-changelog.ts",
         "script/install-codex-dev.ts",
         "script/installer/channel-maintenance.ts",
@@ -235,8 +237,6 @@
     "script/desktop-engine-ci-proof.ts": ["proveStagedDesktopEngine"],
     // pre-existing at origin dev 4686e425b5: unused export(s) citedPaths
     "script/docs-paths-exist.test.mjs": ["citedPaths"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) readSenpiPackageJson
-    "script/engine-build-defines.ts": ["readSenpiPackageJson"],
     // pre-existing at origin dev 4686e425b5: unused export(s) ENGINE_OPTIONAL_SIDECAR_PACKAGES
     "script/engine-sidecar-sources.ts": ["ENGINE_OPTIONAL_SIDECAR_PACKAGES"],
     // pre-existing at origin dev 4686e425b5: unused export(s) KEEP_BETAS
