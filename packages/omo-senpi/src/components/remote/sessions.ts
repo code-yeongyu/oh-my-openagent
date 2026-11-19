@@ -386,10 +386,6 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     const device = await resolveRemoteDevice(core, target.device, stage(DEADLINES.devices))
     if (device.kind === "error") return device
     const { ref, row: deviceRow } = device.value
-    if (deviceRow === undefined)
-      return remoteFailure("not_found", `No device has the id ${ref.id}.`, nextActionFor("not_found"), {
-        details: { kind: "device" },
-      })
     const listed = await core.sessionsList({ device: ref.id }, stage(DEADLINES.sessionsList))
     if (listed.kind === "error") return listed
     const rows = listed.value.rows.filter((row) => row.device.id === ref.id)

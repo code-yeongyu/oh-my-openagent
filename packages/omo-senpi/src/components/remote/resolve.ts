@@ -141,8 +141,7 @@ export async function resolveRemoteDevice(
   text: string,
   opts?: Opts,
 ): Promise<
-  | { readonly kind: "ok"; readonly value: { readonly ref: DeviceRef; readonly row: DeviceRow | undefined } }
-  | RemoteFailure
+  { readonly kind: "ok"; readonly value: { readonly ref: DeviceRef; readonly row: DeviceRow } } | RemoteFailure
 > {
   const roster = await core.devicesList(opts)
   if (roster.kind === "error") return roster
@@ -155,7 +154,10 @@ export async function resolveRemoteDevice(
   })
   const answer = ({ rows, resolved }: ReturnType<typeof over>) =>
     resolved.kind === "ok"
-      ? ok({ ref: resolved.device, row: rows.find((row) => row.id === resolved.device.id) })
+      ? ok({
+          ref: resolved.device,
+          row: rows.find((row) => row.id === resolved.device.id) ?? listingNamed(resolved.device.id),
+        })
       : deviceRefusal(resolved.refusal)
   const first = over(roster.value)
   if (first.resolved.kind === "ok" || first.resolved.refusal.reason !== "no_device") return answer(first)
