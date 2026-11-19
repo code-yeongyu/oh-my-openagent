@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import type { ThreadToolResult } from "../contracts"
+import { createRelaySessionHost } from "../control/relay-session-host"
 import { B_ROW, createRemoteThreadFixture } from "../thread-remote-fixture"
+import { relayAddressBook } from "./address-book"
+import { listAcross } from "./cross-device"
+import type { RemoteListing, RemoteThreadSurface } from "./ports"
 
 // #14305 U6 (design section 6): the list names every row by the same identity and the same name the resolver uses, so a
 // listed row is an address and the list and an address answer about the same row.
@@ -71,5 +75,29 @@ describe("one per-device listing state for the list and the resolver (#14305 U6)
     const missed = await run("thread_set_model", { thread: "no-such-thread-name", model: "opus" })
     expect(missed).toMatchObject({ kind: "error", error: { code: "host_unavailable" } })
     expect(JSON.stringify(missed)).toContain('"b"')
+  })
+})
+
+describe("thread_list keeps the last-listed memory the relay address book reads (#14172, review M1)", () => {
+  test("#given thread_list listed a thread on b #when the next round misses b and the relay address book resolves that thread #then it answers host_unavailable listing_incomplete naming b, never nothing", async () => {
+    const a = account()
+    const listing = a.remote.sessions.listing
+    if (listing === undefined) throw new Error("the fixture's sessions port has no listing")
+    let round: (filter?: { readonly device?: string }) => Promise<RemoteListing> = listing
+    const remote: RemoteThreadSurface = { ...a.remote, sessions: { ...a.remote.sessions, listing: (filter) => round(filter) } }
+    const listed = await listAcross(remote, { kind: "ok", threads: [], scope: "all" }, true)
+    expect(rows(listed).map((thread) => thread.thread)).toContain("dur-on-b")
+    round = async () => ({ rows: [], incomplete: ["b"] })
+    const book = await relayAddressBook(remote, "dur-on-b")
+    expect(book.incomplete).toMatchObject({ code: "host_unavailable", details: { reason: "listing_incomplete", devices: ["b"] } })
+  })
+})
+
+describe("an open on another device names that device by its id (review L1)", () => {
+  test("#given an id the roster misses that is another device's name #when the relay host opens a session on it #then not_found and nothing is opened on that other device", async () => {
+    const a = account()
+    const opened = await createRelaySessionHost(a.remote, "studio").open({ cwd: "/work/b" })
+    expect(opened).toMatchObject({ kind: "error", error: { code: "not_found", details: { device: "studio" } } })
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")).toEqual([])
   })
 })
