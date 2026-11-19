@@ -1,4 +1,13 @@
+import { readFileSync } from "node:fs"
+import { resolve } from "node:path"
 import { test, expect } from "@playwright/test"
+
+import { defaultLocale, locales } from "../i18n/config"
+
+/** The hero's download label in one locale, from that locale's own message file. */
+const heroDownloadLabel = (locale: string): string =>
+  JSON.parse(readFileSync(resolve(__dirname, `../messages/${locale}.json`), "utf8")).home.hero
+    .download
 
 // Production builds leave OMO_WEB_DESKTOP_DOWNLOAD unset: until the desktop app launches, nothing
 // on the site may lead to the download page. This spec runs against such a build
@@ -25,13 +34,17 @@ test.describe("Download page while the launch flag is off", () => {
   test("the hero links the public stable desktop page in every language, not this site's own page", async ({
     page,
   }) => {
-    for (const path of ["/", "/ko", "/de", "/zh"]) {
+    // Every locale the site serves, from the registry: the default at "/", the rest under their prefix.
+    expect(locales).toHaveLength(9)
+    for (const locale of locales) {
+      const path = locale === defaultLocale ? "/" : `/${locale}`
       await page.goto(path)
       await expect(page.getByTestId("hero-desktop-cta"), path).toHaveCount(0)
       await expect(page.locator('a[href$="/download"]'), path).toHaveCount(0)
       const cta = page.getByTestId("hero-desktop-stable-cta")
       await expect(cta, path).toHaveAttribute("href", "https://get.omo.dev/desktop/stable/")
-      await expect(cta, path).not.toContainText(/beta|Beta|ベータ|베타|测试版/)
+      await expect(cta, path).toHaveText(heroDownloadLabel(locale))
+      await expect(cta, path).not.toContainText(/beta|bêta|ベータ|베타|测试版/i)
     }
   })
 
