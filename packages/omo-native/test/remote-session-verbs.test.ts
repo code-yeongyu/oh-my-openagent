@@ -17,7 +17,20 @@ useRemoteCliCleanup()
 // an alias, a thread id prefix and every device spelling reach a session the way the thread tools' addresses do, and a
 // device that missed the listing round is host_unavailable, never "No session ... on this account".
 
-type JsonResult = { kind: string; thread?: string; error?: { code: string; details?: Record<string, unknown> } }
+type JsonResult = {
+  kind: string
+  thread?: string
+  error?: { code: string; next_action?: string; details?: Record<string, unknown> }
+}
+
+// The --json line parsed without throwing, so a regression fails on the typed assertion, not on the parse.
+const parsed = (out: readonly string[]): JsonResult | undefined => {
+  try {
+    return JSON.parse(out.join("")) as JsonResult
+  } catch {
+    return undefined
+  }
+}
 
 const sentTo = (td: ReturnType<typeof createTwoDevices>, device: string, session: string) =>
   td.account.sent.filter((entry) => entry.device === device && entry.session === session)
@@ -99,11 +112,52 @@ describe("omo remote session verbs take every address form", () => {
         td.remote,
       )
       expect(result.code).toBe(REMOTE_EXIT.failed)
-      expect(JSON.parse(result.out.join("") ?? "{}") as JsonResult).toMatchObject({
-        kind: "error",
-        error: { code: "not_found" },
-      })
+      expect(parsed(result.out)?.error?.code).toBe("not_found")
       expect(td.account.sent).toEqual([])
+    } finally {
+      await td.cleanup()
+    }
+  })
+
+  // #14305 delta review H1: omo remote needs the relay, so a device service that is off, signed out or not set up is
+  // host_unavailable naming its state for every verb, as before the address module, never a plain not_found.
+  test.each(
+    ["disabled", "signed_out", "not_configured", "sign_in_required"].flatMap((state) =>
+      [
+        ["send", `${B.id}/${T.bLive}`, "hello", "--no-wait"],
+        ["model", `${B.id}/${T.bLive}`, "anthropic/claude-opus"],
+        ["interrupt", `${B.id}/${T.bLive}`],
+        ["close", `${B.id}/${T.bLive}`],
+      ].map((args) => [state, args] as const),
+    ),
+  )(
+    "#given a device service in state %s #when %p runs #then it is host_unavailable naming that state and nothing is sent",
+    async (state, args) => {
+      const td = createTwoDevices({ plan: state })
+      try {
+        const result = await run([...args, "--json"], undefined, undefined, undefined, td.remote)
+        expect(result.code).toBe(REMOTE_EXIT.failed)
+        expect(parsed(result.out)?.error).toMatchObject({ code: "host_unavailable", details: { state } })
+        expect(td.account.sent).toEqual([])
+      } finally {
+        await td.cleanup()
+      }
+    },
+  )
+
+  // #14305 delta review L3: scripts read --json, so the eval-only thread_list advice is mapped there too.
+  test("#given here/<thread id> #when a verb answers --json #then its next_action names no eval-only tool", async () => {
+    const td = createTwoDevices()
+    try {
+      const result = await run(
+        ["interrupt", `here/${T.hereLive}`, "--json"],
+        undefined,
+        undefined,
+        undefined,
+        td.remote,
+      )
+      expect(parsed(result.out)?.error?.code).toBe("not_found")
+      expect(parsed(result.out)?.error?.next_action).not.toMatch(/\bthread_list\b/)
     } finally {
       await td.cleanup()
     }

@@ -5,6 +5,7 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { connectDeviceService, DEVICE_SERVICE_VERSION } from "../../device-service-core/src/index.ts"
+import type { Status } from "../../device-service-core/src/device-service.ts"
 import { deviceServiceAssetName } from "../../device-service-core/src/release/acquire.ts"
 import { startFakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
 import {
@@ -476,8 +477,13 @@ describe("omo remote attach", () => {
     running = true,
     account = SIGNED_IN,
     connect?: () => ReturnType<typeof connectDeviceService>,
+    state?: Status["state"],
   ) {
-    const owner = await startFakeOwner({ stateDir: privateDir(), world: defaultWorld() })
+    const world = defaultWorld()
+    const owner = await startFakeOwner({
+      stateDir: privateDir(),
+      world: state === undefined ? world : { ...world, status: { ...world.status, state } },
+    })
     owners.push(owner)
     if (!running) await owner.stop()
     const err: string[] = []
@@ -525,6 +531,18 @@ describe("omo remote attach", () => {
     expect(prepared).toBe(REMOTE_EXIT.failed)
     expect(owners.at(-1)?.state.log).not.toContain("session.attach")
   })
+
+  // #14305 delta review H1: attach needs the relay like every verb: a service that is off, signed out or not set up
+  // names its state, as before the address module, and nothing is attached.
+  test.each(["disabled", "signed_out", "not_configured", "sign_in_required"] as const)(
+    "#given a device service in state %s #when attach runs #then it names that state and nothing is attached",
+    async (state) => {
+      const { prepared, err } = await attach([`${PEER}/${SESSION_ID}`], true, SIGNED_IN, undefined, state)
+      expect(prepared).toBe(REMOTE_EXIT.failed)
+      expect(err[0] ?? "").toContain(`(${state})`)
+      expect(owners.at(-1)?.state.log).not.toContain("session.attach")
+    },
+  )
 
   test("checks omo account show before it looks for the service", async () => {
     const { prepared, err } = await attach([`${PEER}/${SESSION_ID}`], true, {
@@ -955,7 +973,7 @@ describe("omo remote session verbs", () => {
     expect([code, out, port.calls]).toEqual([
       REMOTE_EXIT.ok,
       ["Steered turn 3 on b/dur-on-b."],
-      ["status", "devices", "sessions:b", "command:get_state", "command:prompt"],
+      ["status", "status", "devices", "sessions:b", "command:get_state", "command:prompt"],
     ])
   })
 
@@ -988,25 +1006,29 @@ describe("omo remote session verbs", () => {
     expect(types(a.sent, "prompt").map((entry) => entry.rpc?.["streamingBehavior"])).toEqual(["followUp"])
   })
 
-  // A verb costs one relay status read (the address module's), ONE filtered listing of the device it names (sessions:b)
-  // and its remote op's round trips, never the device-less account listing whose round waits for the account's slowest
-  // device (#12709: ~10 s live; #14305).
+  // A verb costs two local relay status reads (the CLI's own check, then the address module's), ONE filtered listing of
+  // the device it names (sessions:b) and its remote op's round trips, never the device-less account listing whose round
+  // waits for the account's slowest device (#12709: ~10 s live; #14305).
   test.each([
     [
       ["model", "b/dur-on-b", "anthropic/claude-opus"],
       "b/dur-on-b now uses anthropic/claude-opus.",
-      ["status", "devices", "sessions:b", "command:get_available_models", "command:set_model"],
+      ["status", "status", "devices", "sessions:b", "command:get_available_models", "command:set_model"],
     ],
     [
       ["interrupt", "b/dur-on-b"],
       "Nothing was running on b/dur-on-b.",
-      ["status", "devices", "sessions:b", "command:interrupt"],
+      ["status", "status", "devices", "sessions:b", "command:interrupt"],
     ],
-    [["close", "b/dur-on-b"], "Closed b/dur-on-b.", ["status", "devices", "sessions:b", "command:unload_session"]],
+    [
+      ["close", "b/dur-on-b"],
+      "Closed b/dur-on-b.",
+      ["status", "status", "devices", "sessions:b", "command:unload_session"],
+    ],
     [
       ["send", "b/dur-on-b", "hi", "--no-wait"],
       "Sent to b/dur-on-b: turn turn-b started.",
-      ["status", "devices", "sessions:b", "command:prompt"],
+      ["status", "status", "devices", "sessions:b", "command:prompt"],
     ],
     [["open", "b"], "b/dur-new-on-b", ["status", "devices", "endpoint:open_session", "locate"]],
   ])("%p makes only its remote op's calls and reports the answer", async (args, line, calls) => {

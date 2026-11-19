@@ -17,7 +17,8 @@ useRemoteCliCleanup()
 const DURABLE = "durable-session-42"
 const MODEL = { provider: "test", id: "model" }
 
-async function owner(duplicate = false) {
+// `duplicate` lists DURABLE on a second device too: another device of the account, or this device ("dev-self").
+async function owner(duplicate: false | "other" | "self" = false) {
   const world = defaultWorld()
   const session = world.sessions[0]
   const row = world.listing.revisions.at(-1)?.rows.find((item) => item.device === PEER)
@@ -31,14 +32,16 @@ async function owner(duplicate = false) {
       service_version: "0.1.12",
       // A second holder is a device of the account: the module drops the rows of a device the roster no longer has.
       devices: world.devices.filter(
-        (device) => device.device === PEER || (duplicate && device.device === OFFLINE_PEER),
+        (device) => device.device === PEER || (duplicate === "other" && device.device === OFFLINE_PEER),
       ),
       listing: {
         revisions: [
           {
             rows: [
               { ...row, durable_id: DURABLE },
-              ...(duplicate ? [{ ...row, device: OFFLINE_PEER, durable_id: DURABLE }] : []),
+              ...(duplicate === false
+                ? []
+                : [{ ...row, device: duplicate === "other" ? OFFLINE_PEER : "dev-self", durable_id: DURABLE }]),
             ],
             incomplete: [],
           },
@@ -99,15 +102,26 @@ describe("#13010 remote CLI session identity", () => {
 
   // A session verb never picks one of two holders of one durable id (close --force must not land on a sealed copy):
   // ambiguous_target naming both, and nothing is sent (#14305 review L2, the module's unique_holder).
-  test("#given the same durable id listed by two devices #when a verb addresses it #then it refuses ambiguous_target and sends nothing", async () => {
-    const fake = await owner(true)
-    const result = await run(["interrupt", DURABLE, "--json"], fake.stateDir)
-    expect({ code: result.code, json: JSON.parse(result.out.join("")), commands: fake.state.commands }).toMatchObject({
-      code: REMOTE_EXIT.failed,
-      json: { kind: "error", error: { code: "ambiguous_target" } },
-      commands: [],
-    })
-  })
+  // #14305 delta review H2: this device counts as a holder too (a thread brought here leaves a sealed copy behind).
+  test.each([
+    ["other", ["interrupt", DURABLE]],
+    ["self", ["interrupt", DURABLE]],
+    ["self", ["close", DURABLE, "--force"]],
+    ["self", ["send", DURABLE, "hello", "--no-wait"]],
+  ] as const)(
+    "#given the same durable id listed by another device and %s #when %p addresses it #then it refuses ambiguous_target and sends nothing",
+    async (second, args) => {
+      const fake = await owner(second)
+      const result = await run([...args, "--json"], fake.stateDir)
+      expect({ code: result.code, json: JSON.parse(result.out.join("")), commands: fake.state.commands }).toMatchObject(
+        {
+          code: REMOTE_EXIT.failed,
+          json: { kind: "error", error: { code: "ambiguous_target" } },
+          commands: [],
+        },
+      )
+    },
+  )
 
   test.each([
     ["send", ["hello", "--no-wait"]],
