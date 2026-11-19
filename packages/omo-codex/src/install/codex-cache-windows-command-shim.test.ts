@@ -133,7 +133,7 @@ for (const [label, args] of [
     } finally {
       await rm(root, { recursive: true, force: true })
     }
-  }, 30_000)
+  })
 }
 
 for (const branch of ["OMO_RUNTIME=node", "no bun on PATH"] as const) {
@@ -196,5 +196,5 @@ for (const branch of ["OMO_RUNTIME=node", "no bun on PATH"] as const) {
     } finally {
       await rm(root, { recursive: true, force: true })
     }
-  }, 30_000)
+  })
 }
