@@ -44,6 +44,10 @@ type Sent = {
   readonly device: string
   readonly session?: string
   readonly rpc?: JsonObject
+  /** omo#14271: the engine key an endpoint command named; absent: the device's primary. */
+  readonly endpoint?: string
+  /** omo#14271: the wait budget the caller passed for this one call (the fallback shares one budget). */
+  readonly waitMs?: number
 }
 
 type Engine = {
@@ -278,6 +282,21 @@ export function createRemoteThreadFixture() {
       sessionFiles?: Readonly<Record<string, string | readonly [string, string]>> | "none"
       /** The free text b's engine without find_session refuses it with. Default: `Unknown command: find_session`. */
       findSessionRefuse?: string
+      /**
+       * omo#14271: b's primary engine predates find_session (b's service refuses it `method_unclassified`) while b lists
+       * these engine keys; find_session sent to one of the `serving` keys is answered as usual. An engine in `timingOut`
+       * does not answer the lookup (a timeout), and `listThrows` makes listing the engines fail.
+       */
+      engines?: {
+        readonly keys: readonly string[]
+        readonly serving: readonly string[]
+        /** The key the device names as its own (0.1.11+); the fallback skips it by key, never by position. */
+        readonly primary?: string
+        readonly timingOut?: readonly string[]
+        /** Engines of another agent dir: they truthfully answer `none` for a thread they do not hold. */
+        readonly none?: readonly string[]
+        readonly listThrows?: boolean
+      }
       /** b knows a session it just opened only by its relay key (relayKeys), not by its durable id: a listing that has not caught up yet. */
       relayKeyOnly?: boolean
       /** The device service throws on b's admit_external_message (a lost connection mid-delivery). */
@@ -654,10 +673,44 @@ export function createRemoteThreadFixture() {
                 incomplete: incomplete.filter((device) => device === filter.device),
               }
         },
-        endpointCommand: async (device, rpc) => {
-          sent.push({ via: "endpoint", device, rpc })
+        endpointCommand: async (device, rpc, endpointOptions) => {
+          const endpoint = endpointOptions?.endpoint
+          sent.push({
+            via: "endpoint",
+            device,
+            rpc,
+            ...(endpoint === undefined ? {} : { endpoint }),
+            ...(endpointOptions?.waitMs === undefined ? {} : { waitMs: endpointOptions.waitMs }),
+          })
+          const engines = options.engines
+          if (engines !== undefined && rpc["type"] === "find_session") {
+            if (engines.timingOut?.includes(endpoint ?? "")) return { kind: "uncertain", reason: "reply_lost" }
+            if (engines.none?.includes(endpoint ?? ""))
+              return {
+                kind: "ok",
+                response: {
+                  type: "response",
+                  id: null,
+                  command: "find_session",
+                  success: true,
+                  data: { unknown: true },
+                },
+              }
+            if (!engines.serving.includes(endpoint ?? "")) return { kind: "refused", reason: "method_unclassified" }
+          }
           return answer(rpc)
         },
+        ...(options.engines === undefined
+          ? {}
+          : {
+              endpointKeys: async () => {
+                if (options.engines?.listThrows === true) throw new Error("session.endpoints failed")
+                return {
+                  keys: options.engines?.keys ?? [],
+                  ...(options.engines?.primary === undefined ? {} : { primary: options.engines.primary }),
+                }
+              },
+            }),
         // This fake device lists a created session by the id its create reply names.
         locate: async (device, engineId) => {
           located.push({ device, session: engineId })
