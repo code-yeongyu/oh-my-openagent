@@ -128,10 +128,10 @@ test("#given a v14 store with no binding rows #when the current store opens it #
 /** Schema v15: train 6's store (the `deliveries` rebuild for the start lane), the one a released omo leaves before v16. */
 const V15 = 15
 
-test.each([
+test.each<[string, boolean, { name: string }[]]>([
   ["holding a binding", true, [{ name: "bindings" }]],
   ["with no binding rows", false, []],
-] as const)(
+])(
   "#given a v15 store %s #when the current store opens it #then it migrates to the current version and keeps the binding table only while it has rows",
   async (_label, bound, tables) => {
     const h = (harness = createGatewayHarness())
