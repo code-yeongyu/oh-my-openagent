@@ -18,8 +18,9 @@ import type { ThreadHostSession, ThreadHostView, ThreadToolSurfaceOptions } from
  * knows. A session no engine holds is still a thread, listed `inactive` from its JSONL: one whose
  * endpoint stopped answering (with the endpoint's failure in error_note), and one whose session file
  * is in the scanned session directories (the caller's workspace, every workspace with `all_scope`;
- * the newest files only, `inactive_truncated` when more were there) after its engine closed it.
- * `states` filters the rows; the default lists every state but archived.
+ * the newest files only) after its engine closed it. `inactive_dropped` counts the inactive threads of the files that
+ * listing did not read (with `inactive_truncated`), only when the filter shows inactive threads: a running or idle thread is
+ * listed from its endpoint, never dropped. `states` filters the rows; the default lists every state but archived.
  */
 export function listThreads(
   options: ThreadToolSurfaceOptions,
@@ -31,7 +32,7 @@ export function listThreads(
   const sessionsDirectory = options.sessionsDirectory?.()
   const scanned =
     sessionsDirectory === undefined
-      ? { sessions: [], truncated: false }
+      ? { sessions: [], unread: [] }
       : listDiskSessions(sessionsDirectory, { all_scope: allScope, workspaceRoots: workspaceDirectories(root) })
   const book = addressBook(options, current, scanned.sessions)
   const scoped = workspaceEntries(toThreadAddressEntries(book), root)
@@ -62,11 +63,13 @@ export function listThreads(
         (order.get(right.thread_id) ?? Number.MAX_SAFE_INTEGER),
     )
     .map((thread) => threadRow(thread))
+  const rowIds = new Set(threads.map((thread) => thread.thread))
+  const dropped = shown.has("inactive") ? scanned.unread.filter((id) => !listed.has(id) && !rowIds.has(id)).length : 0
   return {
     kind: "ok",
     threads,
     scope: allScope === true ? "all" : "workspace",
-    ...(scanned.truncated ? { inactive_truncated: true as const } : {}),
+    ...(dropped > 0 ? { inactive_truncated: true as const, inactive_dropped: dropped } : {}),
   }
 }
 

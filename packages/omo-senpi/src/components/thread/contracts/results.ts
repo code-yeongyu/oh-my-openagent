@@ -178,7 +178,8 @@ export type ThreadCreateResult =
 /**
  * One of the account's devices as `thread_list` reports it. `online` is the device's, never a thread's. `listing`:
  * `listed` when this listing holds the device's threads, `incomplete` when the device did not answer this round (its
- * threads are missing, not gone), `offline` when the device is not connected. `threads` counts the threads this result
+ * threads are missing, not gone; also a device the round marked anything but answered, such as one capped by the relay's
+ * page limit), `offline` when the device is not connected. `threads` counts the threads this result
  * lists on the device (this device's are the caller's scoped threads). This device's row is always present.
  */
 export type ThreadDevice = {
@@ -191,6 +192,8 @@ export type ThreadDevice = {
   readonly this_device: boolean
   readonly listing: "listed" | "incomplete" | "offline"
   readonly threads: number
+  /** On this device's row: the inactive threads this listing left out (`inactive_dropped`); absent when none were. */
+  readonly dropped?: number
 }
 
 export type ThreadListResult =
@@ -214,6 +217,8 @@ export type ThreadListResult =
       readonly aliases_unavailable?: "sign_in" | "host_unavailable" | "not_asked"
       /** More session files were in scope than one list reads (newest first): older inactive threads are left out. */
       readonly inactive_truncated?: true
+      /** With `inactive_truncated`: how many inactive threads this device's listing left out. */
+      readonly inactive_dropped?: number
     }
   | ThreadDataError
 
