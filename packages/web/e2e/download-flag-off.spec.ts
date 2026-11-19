@@ -22,14 +22,17 @@ test.describe("Download page while the launch flag is off", () => {
     expect(response.status()).toBe(404)
   })
 
-  test("the hero links the public desktop beta, not this site's own page", async ({ page }) => {
-    await page.goto("/")
-    await expect(page.getByTestId("hero-desktop-cta")).toHaveCount(0)
-    await expect(page.locator('a[href$="/download"]')).toHaveCount(0)
-    await expect(page.getByTestId("hero-desktop-beta-cta")).toHaveAttribute(
-      "href",
-      "https://get.omo.dev/desktop/beta/",
-    )
+  test("the hero links the public stable desktop page in every language, not this site's own page", async ({
+    page,
+  }) => {
+    for (const path of ["/", "/ko", "/de", "/zh"]) {
+      await page.goto(path)
+      await expect(page.getByTestId("hero-desktop-cta"), path).toHaveCount(0)
+      await expect(page.locator('a[href$="/download"]'), path).toHaveCount(0)
+      const cta = page.getByTestId("hero-desktop-stable-cta")
+      await expect(cta, path).toHaveAttribute("href", "https://get.omo.dev/desktop/stable/")
+      await expect(cta, path).not.toContainText(/beta|Beta|ベータ|베타|测试版/)
+    }
   })
 
   test("the sitemap leaves the download page out", async ({ request }) => {
