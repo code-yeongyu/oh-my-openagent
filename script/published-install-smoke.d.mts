@@ -4,6 +4,11 @@ export declare function isSupportedPackageSpec(packageSpec: string): boolean
 
 export declare function registryTarballUrl(name: string, version: string): string
 
+export declare function registryWaitFromEnv(env: Readonly<Record<string, string | undefined>>): {
+  deadlineMs: number
+  delayMs: number
+}
+
 export declare function resolveCommittedLatestSpec(
   packageSpec: string,
   options: {

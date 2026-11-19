@@ -9,6 +9,7 @@ import {
   isSupportedPackageSpec,
   parseSmokeArgs,
   registryTarballUrl,
+  registryWaitFromEnv,
   resolveCommittedLatestSpec,
 } from "./published-install-smoke.mjs"
 
@@ -16,7 +17,7 @@ const TARBALL = "https://registry.npmjs.org/oh-my-openagent/-/oh-my-openagent-5.
 
 // A fake registry whose tarball answers the given statuses in order (the last repeats), and a clock that
 // only moves when the waiter sleeps, so the deadline is reached without real time passing.
-function fakeRegistry(statuses: readonly number[]) {
+function fakeRegistry(statuses: readonly number[], deadlineMs = 20 * 60_000) {
   let clock = 0
   const probes: { url: string; method: string | undefined }[] = []
   const sleeps: number[] = []
@@ -26,7 +27,7 @@ function fakeRegistry(statuses: readonly number[]) {
     sleeps,
     views,
     options: {
-      deadlineMs: 20 * 60_000,
+      deadlineMs,
       delayMs: 15_000,
       viewVersion: (name: string, tag: string) => {
         views.push(`${name}@${tag}`)
@@ -144,6 +145,43 @@ describe("published install smoke", () => {
       new Error("registry not committed: oh-my-openagent@5.1.78 tarball 404 for 20 min"),
     )
     expect(registry.sleeps.reduce((total, ms) => total + ms, 0)).toBe(20 * 60_000)
+  })
+
+  test("#given a deadline under one minute #when the tarball never commits #then the failure names the wait in seconds", async () => {
+    // given
+    const registry = fakeRegistry([404], 30_000)
+
+    // when / then
+    await expect(resolveCommittedLatestSpec("oh-my-openagent@latest", registry.options)).rejects.toThrow(
+      new Error("registry not committed: oh-my-openagent@5.1.78 tarball 404 for 30 s"),
+    )
+  })
+
+  test("#given no wait overrides #when read from the env #then the 20 min deadline and 15 s poll apply", () => {
+    // given / when / then
+    expect(registryWaitFromEnv({})).toEqual({ deadlineMs: 1_200_000, delayMs: 15_000 })
+    expect(
+      registryWaitFromEnv({
+        PUBLISHED_SMOKE_REGISTRY_WAIT_SECONDS: "90",
+        PUBLISHED_SMOKE_REGISTRY_POLL_SECONDS: "2.5",
+      }),
+    ).toEqual({ deadlineMs: 90_000, delayMs: 2_500 })
+  })
+
+  test("#given a non-numeric, empty, zero or negative override #when read from the env #then it fails naming the variable and value", () => {
+    // given
+    const invalid: [string, string][] = [
+      ["PUBLISHED_SMOKE_REGISTRY_WAIT_SECONDS", "20m"],
+      ["PUBLISHED_SMOKE_REGISTRY_WAIT_SECONDS", ""],
+      ["PUBLISHED_SMOKE_REGISTRY_POLL_SECONDS", "0"],
+      ["PUBLISHED_SMOKE_REGISTRY_POLL_SECONDS", "-5"],
+      ["PUBLISHED_SMOKE_REGISTRY_POLL_SECONDS", "Infinity"],
+    ]
+
+    // when / then
+    for (const [key, value] of invalid) {
+      expect(() => registryWaitFromEnv({ [key]: value })).toThrow(new Error(`invalid ${key}: ${value}`))
+    }
   })
 
   test("#given the tarball is already committed #when resolved #then it proceeds without waiting", async () => {

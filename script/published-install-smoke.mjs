@@ -101,12 +101,27 @@ export async function resolveCommittedLatestSpec(
     const elapsed = now() - start
     const remaining = deadlineMs - elapsed
     if (remaining <= 0) {
-      throw new Error(
-        `registry not committed: ${name}@${version} tarball ${reason} for ${Math.floor(elapsed / 60_000)} min`,
-      )
+      const waited = elapsed < 60_000 ? `${Math.round(elapsed / 1000)} s` : `${Math.floor(elapsed / 60_000)} min`
+      throw new Error(`registry not committed: ${name}@${version} tarball ${reason} for ${waited}`)
     }
     log(`${name}@latest is ${version}; tarball ${reason}, ${Math.round(remaining / 1000)} s left`)
     await sleep(Math.min(delayMs, remaining))
+  }
+}
+
+// A non-numeric override would make the deadline NaN, which `remaining <= 0` never reaches, so the
+// smoke would poll forever; a bad value fails by name instead of falling back silently.
+export function registryWaitFromEnv(env) {
+  const seconds = (key, fallback) => {
+    const raw = env[key]
+    if (raw === undefined) return fallback
+    const value = raw.trim() === "" ? Number.NaN : Number(raw)
+    if (!Number.isFinite(value) || value <= 0) throw new Error(`invalid ${key}: ${raw}`)
+    return value
+  }
+  return {
+    deadlineMs: seconds("PUBLISHED_SMOKE_REGISTRY_WAIT_SECONDS", 1200) * 1000,
+    delayMs: seconds("PUBLISHED_SMOKE_REGISTRY_POLL_SECONDS", 15) * 1000,
   }
 }
 
@@ -146,10 +161,7 @@ async function runSmoke(argv) {
   try {
     let tarballPath = args.tarballPath === null ? null : resolve(args.tarballPath)
     if (tarballPath === null) {
-      const packageSpec = await resolveCommittedLatestSpec(args.packageSpec, {
-        deadlineMs: Number(process.env.PUBLISHED_SMOKE_REGISTRY_WAIT_SECONDS ?? 1200) * 1000,
-        delayMs: Number(process.env.PUBLISHED_SMOKE_REGISTRY_POLL_SECONDS ?? 15) * 1000,
-      })
+      const packageSpec = await resolveCommittedLatestSpec(args.packageSpec, registryWaitFromEnv(process.env))
       packPublishedTarball(packageSpec, sandbox)
       const packed = (await readdir(sandbox)).filter((entry) => entry.endsWith(".tgz"))
       if (packed.length !== 1) {
