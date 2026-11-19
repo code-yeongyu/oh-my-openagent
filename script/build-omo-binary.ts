@@ -32,7 +32,9 @@ import { parseBuildInfo, type EngineBuildStamp, type OmoBuildInfo } from "../pac
 import {
   compileDefinesForOmoBinary,
   engineBuildDefineArgs,
+  engineVersionDefineArgs,
   omoBinaryEngineStamp,
+  readSenpiPackageJson,
   releaseEngineBuildStamp,
 } from "./engine-build-defines"
 import { keychainHelperPayload, stageKeychainHelper } from "./release-keychain-helper-target"
@@ -721,6 +723,7 @@ export async function buildReleaseBinary(
           compileEntry,
           ...senpiWorkerCompileArgs(repoRoot),
           ...engineBuildDefineArgs(stamp),
+          ...engineVersionDefineArgs(readSenpiPackageJson(senpiPackageDir)),
           "--outfile",
           binaryPath,
         ],

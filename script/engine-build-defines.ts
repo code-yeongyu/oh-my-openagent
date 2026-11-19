@@ -25,6 +25,22 @@ export function engineBuildDefineArgs(stamp: EngineBuildStamp): readonly string[
   }
 }
 
+const SENPI_CALVER = /^20\d\d\.\d+\.\d+(?:-\d+)?$/
+
+/**
+ * bun `--define` for senpi's `SENPI_ENGINE_VERSION`: the pinned engine's own CalVer. The binary reads the stamped
+ * sibling package.json (`{ name: "omo", version: <omo-ai version> }`) as its version, so without this define its
+ * `engineOrdinal` was the omo version (`[5,1,78,0,0]`) instead of senpi CalVer (senpi#7040, omo#14314).
+ */
+export function engineVersionDefineArgs(senpiPackage: unknown): readonly string[] {
+  const version =
+    typeof senpiPackage === "object" && senpiPackage !== null ? Reflect.get(senpiPackage, "version") : undefined
+  if (typeof version !== "string" || !SENPI_CALVER.test(version)) {
+    throw new Error(`the pinned @code-yeongyu/senpi package.json has no senpi CalVer version: ${String(version)}`)
+  }
+  return ["--define", `SENPI_ENGINE_VERSION=${JSON.stringify(version)}`]
+}
+
 export function compileDefinesForOmoBinary(input: {
   readonly buildInfo?: OmoBuildInfo
   readonly senpiPackage?: unknown
