@@ -537,7 +537,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
           const across = await resolveAddress(
             resolveContext(toThreadAddressEntries(sendAddressBook(surface, offline, bareOf(request.thread), true))),
             request.thread,
-            { all_scope: request.all_scope, id_prefix: true },
+            { all_scope: request.all_scope },
           )
           if (across.kind === "error")
             return fail(
