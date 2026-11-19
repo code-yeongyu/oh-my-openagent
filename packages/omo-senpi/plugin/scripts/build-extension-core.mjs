@@ -283,7 +283,9 @@ const sdkExternalSpecifiers = [...builtinModuleNames, ...builtinModuleNames.map(
 // the compiled runtime ships no node_modules, so a bare `typebox` there cannot resolve. The sidecar inlines TypeBox
 // instead of leaning on the engine's loader alias. TypeBox 1.x tags schemas with plain `~kind` string keys, so the
 // sidecar's copy produces schemas the engine's TypeBox reads as its own.
-const TYPEBOX_LOADER_ALIASES = new Set(SENPI_LOADER_ALIASES.filter((specifier) => /^(@sinclair\/)?typebox(\/|$)/.test(specifier)))
+const TYPEBOX_LOADER_ALIASES = new Set(
+  SENPI_LOADER_ALIASES.filter((specifier) => /^(@sinclair\/)?typebox(\/|$)/.test(specifier)),
+)
 const threadClientExternalSpecifiers = externalSpecifiers.filter((specifier) => !TYPEBOX_LOADER_ALIASES.has(specifier))
 const BUILD_SETTINGS = JSON.stringify({
   target: "node",

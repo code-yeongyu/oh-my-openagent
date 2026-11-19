@@ -399,7 +399,13 @@ describe("checkExtensionCurrent", () => {
           'console.log("thread-client-ok")',
         ].join("\n"),
       )
-      const run = await runBoundedStage("node probe", "node", [probe], { cwd: parse(work).root }, PACKED_STAGE_CAPS.probe)
+      const run = await runBoundedStage(
+        "node probe",
+        "node",
+        [probe],
+        { cwd: parse(work).root },
+        PACKED_STAGE_CAPS.probe,
+      )
       expect(run.stdout, run.stderr).toContain("thread-client-ok")
       expect(run.status, run.stderr).toBe(0)
     } finally {
