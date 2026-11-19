@@ -51,11 +51,11 @@ The code expires. If it does, or the approval is denied, omo says so and you run
 | `omo login --device` | The same, stated explicitly |
 | `omo login --no-browser` | The same, and never opens a browser |
 | `omo login --replace` | Replace this computer's earlier device without asking (for scripts) |
-| `omo login --api <url>` | Use another OmO API origin. `OMO_SERVICE_API_URL` does the same. omo prints `OmO API: <url>` before any code when the origin is not the default |
+| `omo login --device --api <url>` | Use another OmO API origin. Setting `OMO_SERVICE_API_URL` does the same and also works with plain `omo login`. omo prints `OmO API: <url>` before any code when the origin is not the default |
 | `omo whoami [--api <url>]` | Print `Signed in to <api> as <email> (<device name>).` or `Not signed in.` |
 | `omo logout [--api <url>]` | Sign this computer's device out on the service and remove the stored credentials and device keys |
 
-While OmO accounts are not open to everyone, these are the only forms of `omo login`. Any other argument is refused with a message that names the device-code route. The service's approval page decides who may sign in.
+While OmO accounts are not open to everyone, these are the only forms of `omo login`. Any other argument is refused with a message that names the device-code route. That includes `--api` without `--device` or `--no-browser`. The service's approval page decides who may sign in.
 
 **One computer is one device.** The device is registered under the machine's name (on macOS the local host name), without a trailing `.local`.
 
