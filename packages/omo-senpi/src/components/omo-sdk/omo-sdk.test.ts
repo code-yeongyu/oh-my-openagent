@@ -8,7 +8,7 @@ import {
   KeychainLockedError,
   RequestFailure,
 } from "@oh-my-opencode/omo-opencode/service-auth"
-import { RelayTransportError } from "../../../vendor/bunshin-ts-relay/index.js"
+import { LocalApiError } from "@oh-my-opencode/device-service-core"
 import { createOmoSdk, type OmoResult, type OmoSdkPorts } from "."
 
 const ORIGIN = "https://accounts.example.test"
@@ -57,11 +57,7 @@ function fakes(overrides: Partial<{ store: Credentials | null; request: (path: s
         return path === "/v1/me" ? meBody : devicesBody
       },
     },
-    deviceServiceStatus: async () => ({
-      state: "connected",
-      connected: true,
-      device: { id: "dev_this", name: "device-a" },
-    }),
+    deviceServiceStatus: async () => ({ state: "connected", device: { id: "dev_this", name: "device-a" } }),
   }
   return { ports, calls, reads }
 }
@@ -210,9 +206,30 @@ describe("deviceService.status", () => {
     const { ports } = fakes()
     const sdk = sdkWith({
       ...ports,
-      deviceServiceStatus: async () => ({ state: null, device: null, connected: false }),
+      deviceServiceStatus: async () => "not_running",
     })
     expect(valueOf(await sdk.deviceService.status())).toEqual({ state: "not_running", connected: false, device: null })
+  })
+
+  test("#given a service that does not answer in time #when status runs #then it answers no_answer, not offline", async () => {
+    const { ports } = fakes()
+    const sdk = sdkWith({ ...ports, deviceServiceStatus: async () => "no_answer" })
+    expect(valueOf(await sdk.deviceService.status())).toEqual({ state: "no_answer", connected: false, device: null })
+  })
+
+  test("#given a caller signal #when status runs #then the port receives that signal", async () => {
+    const { ports } = fakes()
+    const seen: (AbortSignal | undefined)[] = []
+    const controller = new AbortController()
+    const sdk = sdkWith({
+      ...ports,
+      deviceServiceStatus: async ({ signal }) => {
+        seen.push(signal)
+        return "no_answer"
+      },
+    })
+    await sdk.deviceService.status({ signal: controller.signal })
+    expect(seen).toEqual([controller.signal])
   })
 
   test("#given OMO_DEVICE_SERVICE_STATE_DIR #when status runs #then the probe reads that state dir", async () => {
@@ -224,7 +241,7 @@ describe("deviceService.status", () => {
         ...ports,
         deviceServiceStatus: async ({ stateDir }) => {
           stateDirs.push(stateDir)
-          return { state: "offline", device: null, connected: false }
+          return { state: "offline", device: null }
         },
       },
     })
@@ -237,7 +254,7 @@ describe("deviceService.status", () => {
     const sdk = sdkWith({
       ...ports,
       deviceServiceStatus: async () => {
-        throw new RelayTransportError("server_proof_invalid", "proof failed")
+        throw new LocalApiError("server_proof_invalid", "proof failed")
       },
     })
     expect(errorOf(await sdk.deviceService.status())).toMatchObject({
