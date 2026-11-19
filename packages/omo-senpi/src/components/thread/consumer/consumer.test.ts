@@ -289,6 +289,30 @@ describe("a handed delivery", () => {
     },
   )
 
+  test("#given one device already handed this session 8 records #when a 9th follows at once #then the answer is pair_loop_guard with the burst, the window and the wait the sender maps", async () => {
+    const { sessions, service, consumer } = setup()
+    writeSessionFile(sessions, "t")
+    await consumer.start()
+    for (let index = 0; index < 8; index++) {
+      const reply = await service.inbound({
+        command_id: `c-${index}`,
+        sender_device: "dev-a",
+        durable_id: "t",
+        record: record(`d-${index}`),
+      })
+      expect(reply.data).toMatchObject({ kind: "queued" })
+    }
+    const ninth = await service.inbound({ command_id: "c-8", sender_device: "dev-a", durable_id: "t", record: record("d-8") })
+    expect(ninth.data).toEqual({
+      kind: "refused",
+      reason: "pair_loop_guard",
+      burst: 8,
+      window_ms: 40_000,
+      retry_after_ms: 5_000,
+    })
+    await consumer.idle()
+  })
+
   // #12766 review L2: a limit that cannot be read fails open, so the delivery is queued as before and the failure is reported.
   test("#given the chain count limit cannot be read #when a record is handed in #then it is queued, the session woken and the failure reported", async () => {
     const failure = new Error("settings barrel failed to load")

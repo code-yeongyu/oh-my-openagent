@@ -470,15 +470,15 @@ describe("causal_cycle_hop_and_rate_budgets", () => {
     for (let index = 1; index <= 8; index++)
       expect(summary(await send(h, "R", "S", `m${index}`, { idempotency_key: `r${index}` }))).toBe("queued_offline")
     const ninth = await send(h, "R", "S", "m9", { idempotency_key: "r9" })
-    expect(ninth.kind === "error" && { code: ninth.error.code, budget: ninth.error.details?.budget }).toEqual({
-      code: "overloaded",
-      budget: "pair_rate",
+    expect(ninth.kind === "error" && { code: ninth.error.code, guard: ninth.error.details?.guard }).toEqual({
+      code: "pair_loop_guard",
+      guard: "pair_loop",
     })
     const retry = await send(h, "R", "S", "m3", { idempotency_key: "r3" })
     expect(retry.kind === "ok" && retry.deduplicated).toBe(true)
     h.clock.now += 5_000
     expect(summary(await send(h, "R", "S", "m9", { idempotency_key: "r9" }))).toBe("queued_offline")
-    expect(summary(await send(h, "R", "S", "m10", { idempotency_key: "r10" }))).toBe("error:overloaded")
+    expect(summary(await send(h, "R", "S", "m10", { idempotency_key: "r10" }))).toBe("error:pair_loop_guard")
   })
 
   test("#given A sends to B in one burst #when the 9th send follows the 8th at once and the refill window then passes #then all 8 deliver, the 9th is refused pair_loop_guard with the measured burst and the wait, and the next send is accepted", async () => {

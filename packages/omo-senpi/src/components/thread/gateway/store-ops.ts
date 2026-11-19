@@ -28,6 +28,7 @@ import {
   TARGET_MAX_BYTES,
   TARGET_MAX_MESSAGES,
 } from "./constants"
+import { pairLoopGuardMessage } from "../errors"
 import { readLegacyMailbox } from "./legacy-mailbox"
 import { gatewayInboxDirectory } from "./paths"
 import { isClaimantDead, sameProcess } from "./process-identity"
@@ -569,11 +570,20 @@ function takePairToken(ctx: StoreContext, request: EnqueueRequest): StoreRefusal
           PAIR_BUCKET_BURST,
           Number(bucket.tokens) + Math.max(0, request.now - Number(bucket.updated_at)) / PAIR_BUCKET_REFILL_MS,
         )
+  // An empty bucket means the sender spent at least the whole burst on this target within the time the bucket takes to
+  // refill from empty: that is the burst the refusal reports, measured from the bucket it read.
   if (tokens < 1) {
-    return refused("overloaded", "Too many deliveries to this session; wait before sending again.", {
-      budget: "pair_rate",
-      retry_after_ms: Math.ceil((1 - tokens) * PAIR_BUCKET_REFILL_MS),
-    })
+    const windowMs = PAIR_BUCKET_BURST * PAIR_BUCKET_REFILL_MS
+    return refused(
+      "pair_loop_guard",
+      pairLoopGuardMessage(sender, request.target_durable_id, PAIR_BUCKET_BURST, windowMs),
+      {
+        guard: "pair_loop",
+        burst: PAIR_BUCKET_BURST,
+        window_ms: windowMs,
+        retry_after_ms: Math.ceil((1 - tokens) * PAIR_BUCKET_REFILL_MS),
+      },
+    )
   }
   write(
     ctx,

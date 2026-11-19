@@ -262,6 +262,7 @@ describe("thread error taxonomy", () => {
       "model_ambiguous",
       "thinking_level_unsupported",
       "loop_detected",
+      "pair_loop_guard",
       "chain_count_limit",
       "binding_conflict",
       "binding_mismatch",

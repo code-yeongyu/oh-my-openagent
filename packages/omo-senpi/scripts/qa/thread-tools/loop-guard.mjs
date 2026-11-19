@@ -8,8 +8,8 @@
  *    unless the user sets one, and A->B->A is allowed); A's row carries hop 3.
  * 2. Fan-out: one turn of A sends to 20 distinct live sessions (opened on one Desktop-thread shard
  *    host, `i-*`); every send is accepted (one turn has no cap on how many sessions it reaches).
- * 3. Burst: 9 concurrent `omo thread send`s to one target: 8 pass, the 9th is `overloaded`
- *    (`budget: "pair_rate"`, `retry_after_ms`); after 5 s of REAL wall time one more passes.
+ * 3. Burst: 9 concurrent `omo thread send`s to one target: 8 pass, the 9th is `pair_loop_guard`
+ *    (`guard: "pair_loop"`, `burst`, `retry_after_ms`); after 5 s of REAL wall time one more passes.
  *    TIME-UNDER-TEST EXCEPTION: the refill is the behavior under test, so this one wait is a
  *    deliberate 5 s wall-clock pause, recorded in the report; nothing else here waits on time.
  *
@@ -151,8 +151,9 @@ await runScenario(
     const refused = burst.filter(
       (result) =>
         result.json?.kind === "error" &&
-        result.json.error?.code === "overloaded" &&
-        result.json.error?.details?.budget === "pair_rate" &&
+        result.json.error?.code === "pair_loop_guard" &&
+        result.json.error?.details?.guard === "pair_loop" &&
+        result.json.error.details.burst === BURST &&
         result.json.error.details.retry_after_ms > 0,
     )
     const stamps = (
@@ -168,7 +169,7 @@ await runScenario(
     report.assert(
       "burst-8-then-refused",
       passed.length === allowed && refused.length === BURST + 1 - allowed && refused.length >= 1,
-      `passed=${passed.length} refused_pair_rate=${refused.length} allowed_by_clock=${allowed} spread_ms=${spreadMs} refusal=${JSON.stringify(refused[0]?.json?.error ?? null).slice(0, 200)}`,
+      `passed=${passed.length} refused_pair_loop_guard=${refused.length} allowed_by_clock=${allowed} spread_ms=${spreadMs} refusal=${JSON.stringify(refused[0]?.json?.error ?? null).slice(0, 200)}`,
     )
     report.log(
       `TIME-UNDER-TEST EXCEPTION: waiting ${REFILL_WAIT_MS} ms of real wall time for one pair-bucket token to refill`,
