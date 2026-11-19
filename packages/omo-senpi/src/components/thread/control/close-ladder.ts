@@ -163,8 +163,10 @@ async function gracefulClose(
       { command: "unload_session", capability: UNLOAD_GRACEFUL },
     )
   const requested = waitMs ?? GRACEFUL_WAIT_MS
-  const capped = legMaxWaitMs !== undefined && requested > legMaxWaitMs ? legMaxWaitMs : undefined
-  const wait = waitWithinCallBudget(capped ?? requested, GRACEFUL_ANSWER_RESERVE_MS)
+  const legCut = legMaxWaitMs !== undefined && requested > legMaxWaitMs ? legMaxWaitMs : undefined
+  const wait = waitWithinCallBudget(legCut ?? requested, GRACEFUL_ANSWER_RESERVE_MS)
+  // Only a drain the leg's cap bounded names the cap: when the call budget cut it shorter, the cap did not limit it.
+  const capped = legCut !== undefined && wait === legCut ? legCut : undefined
   if (wait <= 0)
     throw refuse(
       "unsupported",

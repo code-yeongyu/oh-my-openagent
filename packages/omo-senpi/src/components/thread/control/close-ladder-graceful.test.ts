@@ -144,4 +144,27 @@ describe("closeLadder { graceful: true }", () => {
     expect(Number(waitMs)).toBeGreaterThan(0)
     expect(Number(waitMs)).toBeLessThanOrEqual(15_000)
   })
+
+  test("#given a call budget shorter than the leg's cap #when the drain expires #then the answer does not name the cap (oh-my-openagent#14352)", async () => {
+    const { send } = engine({
+      capabilities: GRACEFUL_ENGINE,
+      unload: (rpc) => ({
+        outcome: "refused",
+        reason: "turn_active",
+        timed_out: true,
+        open: true,
+        turn: 3,
+        waited_ms: rpc["waitMs"],
+        dropped: { deliveries: [], user_messages: [] },
+      }),
+    })
+    const refusal = await refusalOf(() =>
+      withCallDeadline(Date.now() + 25_000, () =>
+        closeLadder("s1", send, { graceful: true, wait_ms: 120_000 }, 35_000),
+      ),
+    )
+    expect(refusal?.code).toBe("turn_active")
+    expect(Number(refusal?.details?.["waited_ms"])).toBeLessThan(35_000)
+    expect(refusal?.details?.["wait_capped"]).toBeUndefined()
+  })
 })
