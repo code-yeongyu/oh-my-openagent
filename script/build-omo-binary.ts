@@ -28,11 +28,14 @@ import { engineSidecarSources, resolvePackageDir, senpiPackageDir, type SidecarS
 import { CLAUDE_CODE_PIN_REL_PATH, claudeCodePinFor } from "./claude-code-pin"
 import nativeFixture from "./release-binary-native-fixture.json"
 import { senpiWorkerCompileArgs } from "./senpi-worker-compile"
-import { parseBuildInfo, type EngineBuildStamp, type OmoBuildInfo } from "../packages/omo-native/build-info"
+import {
+  parseBuildInfo,
+  resolveEngineBuildStamp,
+  type EngineBuildStamp,
+  type OmoBuildInfo,
+} from "../packages/omo-native/build-info"
 import {
   compileDefinesForOmoBinary,
-  engineBuildDefineArgs,
-  engineVersionDefineArgs,
   omoBinaryEngineStamp,
   readSenpiPackageJson,
   releaseEngineBuildStamp,
@@ -669,7 +672,8 @@ export async function buildReleaseBinary(
     // spelling. Basename is preserved, so embedded names stay
     // `${EMBEDDED_PAYLOAD_ROOT}/<relPath>`.
     const stageDir = realpathSync(stagedRoot)
-    const stamp = omoBinaryEngineStamp(options.buildInfo, senpiPackageDir)
+    const senpiPackage = readSenpiPackageJson(senpiPackageDir)
+    const stamp = resolveEngineBuildStamp({ buildInfo: options.buildInfo, senpiPackage })
     stageSidecarPayload(target, stageDir, options.omoAiVersion, options.buildInfo)
 
     const manifest = await buildRuntimeManifest(stageDir, {
@@ -722,8 +726,7 @@ export async function buildReleaseBinary(
           `--asset=${stageDir}`,
           compileEntry,
           ...senpiWorkerCompileArgs(repoRoot),
-          ...engineBuildDefineArgs(stamp),
-          ...engineVersionDefineArgs(readSenpiPackageJson(senpiPackageDir)),
+          ...compileDefinesForOmoBinary({ buildInfo: options.buildInfo, senpiPackage }),
           "--outfile",
           binaryPath,
         ],
