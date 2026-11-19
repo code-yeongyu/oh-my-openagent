@@ -107,6 +107,8 @@ export async function pinned(
   remote: RemoteThreadSurface | undefined,
   pin: { readonly device: string; readonly thread: string },
   ready?: Promise<Ready>,
+  /** That device's listing and the roster as the resolution already read them: the first pass reads nothing again. */
+  known?: { readonly listing: RemoteListing; readonly roster: readonly RemoteDevice[] | undefined },
 ): Promise<Found | ThreadRefusal> {
   if (remote === undefined)
     return toolRefusal(deviceNotAsked("remote_unavailable", pin.thread, { id: pin.device, name: pin.device }))
@@ -115,10 +117,12 @@ export async function pinned(
   if ("kind" in status) return asRefusal(status.error)
   const device = async () =>
     named(
-      await accountDevices(remote.client).then(
-        (read) => read.devices,
-        () => undefined,
-      ),
+      known !== undefined
+        ? known.roster
+        : await accountDevices(remote.client).then(
+            (read) => read.devices,
+            () => undefined,
+          ),
       pin.device,
     )
   // Every refusal of a pinned reply names the sender and its device.
@@ -128,10 +132,10 @@ export async function pinned(
   })
   // One read of the sender's device: its row, a refusal naming why the read could not tell, or undefined (it answered
   // and lists no such session).
-  const listed = async (): Promise<Found | ThreadRefusal | undefined> => {
+  const listed = async (given?: RemoteListing): Promise<Found | ThreadRefusal | undefined> => {
     let listing: RemoteListing
     try {
-      listing = await deviceListing(remote, pin.device)
+      listing = given ?? (await deviceListing(remote, pin.device))
     } catch (error) {
       return refusal(
         "host_unavailable",
@@ -151,7 +155,7 @@ export async function pinned(
       return onPin(toolRefusal(devicesSilent("listing_incomplete", [await device()])))
     return undefined
   }
-  const first = await listed()
+  const first = await listed(known?.listing)
   if (first !== undefined) return first
   // One rule for a probe-built ended row (probeMayBuildEndedRow): no probe while the wake cannot be carried.
   const mayProbe = await probeMayBuildEndedRow(remote.sessions)

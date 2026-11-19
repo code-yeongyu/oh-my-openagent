@@ -67,7 +67,11 @@ export async function resolveOnDevice(
       all_scope: true,
     }
   // Not listed: that one device is asked, as a pinned reply asks it (design section 3 step 8, review H1).
-  if (THREAD_ID_SHAPE.test(thread)) return await pinned(remote, { device: device.id, thread }, ready)
+  if (THREAD_ID_SHAPE.test(thread))
+    return await pinned(remote, { device: device.id, thread }, ready, {
+      listing: { rows, incomplete: account.incomplete },
+      roster: account.roster,
+    })
   const hit = ladder(
     ctx,
     rows.map((row) => listedEntry(row)),
