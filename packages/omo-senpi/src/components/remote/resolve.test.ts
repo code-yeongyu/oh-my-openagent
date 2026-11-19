@@ -213,4 +213,16 @@ describe("sessions.resolve", () => {
       details: { kind: "device", id: "nowhere", device: "nowhere", candidates: expect.any(Array) },
     })
   })
+
+  test("#given a device the roster misses but the listing names (#13402) #when its exact id is the device part #then its session resolves; a device nothing names stays not_found{device}", async () => {
+    const { client } = await account([listed(PEER, "rk-1", "dur-1", "Bot")], { devices: [] })
+    expect(await client.sessions.resolve(`${PEER}/dur-1`)).toMatchObject({
+      kind: "ok",
+      value: { thread: `${PEER}/rk-1`, durable_id: "dur-1" },
+    })
+    expect(failureOf(await client.sessions.resolve("dev-nowhere/dur-1"))).toMatchObject({
+      code: "not_found",
+      details: { kind: "device", id: "dev-nowhere" },
+    })
+  })
 })
