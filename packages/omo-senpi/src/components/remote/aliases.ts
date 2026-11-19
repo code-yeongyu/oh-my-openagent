@@ -91,6 +91,7 @@ export function aliasMembers(core: ClientCore): RemoteClient["aliases"] {
   // (design section 5): an online one is listing_incomplete (the core's deviceListing), one the roster says is offline
   // device_offline.
   const listedRow = async (
+    address: string,
     device: string,
     matches: (row: SessionRow) => boolean,
     missing: () => RemoteFailure,
@@ -101,7 +102,7 @@ export function aliasMembers(core: ClientCore): RemoteClient["aliases"] {
     const row = listed.value.rows.find(matches)
     if (row !== undefined) return { kind: "ok", value: row }
     const silent = listed.value.unanswered.filter((unanswered) => unanswered.id === device)
-    const incomplete = listingIncomplete(device, silent)
+    const incomplete = listingIncomplete(address, silent)
     if (incomplete !== undefined) return incomplete
     if (silent.length > 0)
       return remoteFailure(
@@ -121,6 +122,7 @@ export function aliasMembers(core: ClientCore): RemoteClient["aliases"] {
     opts: Opts | undefined,
   ): Promise<Outcome<string>> => {
     const found = await listedRow(
+      handleOf(target.device, target.session),
       target.device,
       (candidate) => candidate.thread === handleOf(target.device, target.session),
       () =>
@@ -154,7 +156,7 @@ export function aliasMembers(core: ClientCore): RemoteClient["aliases"] {
         remoteFailure("not_found", "No listed session holds that alias's durable id.", nextActionFor("not_found"), {
           details: { kind: "session", durable_id: durableId },
         })
-      const found = await listedRow(device, (candidate) => candidate.durable_id === durableId, missing, opts)
+      const found = await listedRow(alias, device, (candidate) => candidate.durable_id === durableId, missing, opts)
       if (found.kind === "error") return found
       return { kind: "ok", value: found.value.thread }
     },
