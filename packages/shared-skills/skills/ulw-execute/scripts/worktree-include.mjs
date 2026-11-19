@@ -1,9 +1,11 @@
+import { spawnSync } from "node:child_process"
 import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync } from "node:fs"
 import { dirname, isAbsolute, join, relative, sep } from "node:path"
 
 // Gitignored local config a fresh `git worktree add` leaves behind (#14391). Without an include file the
 // root `.env` and `.env.*` files are copied; `.worktreeinclude` replaces that default with its own list,
-// and an empty one copies nothing. A plain listed path is required: missing, it stops the run.
+// and an empty one copies nothing. A plain listed path is required: missing, it stops the run. Only paths git
+// ignores are copied; the copy keeps the source file's mode.
 const DEFAULT_PATTERNS = [".env", ".env.*"]
 const INCLUDE_FILE = ".worktreeinclude"
 
@@ -82,10 +84,16 @@ function isSymlink(path) {
   }
 }
 
+// Only a file git ignores may be copied: anything else would show up as untracked in the worktree and could be
+// staged and committed with the run's work, which for a secret means publishing it.
+function isGitIgnored(repo, path) {
+  return spawnSync("git", ["check-ignore", "-q", "--", path], { cwd: repo, stdio: "ignore" }).status === 0
+}
+
 function copyOne(repo, worktree, path, result) {
   const source = join(repo, path)
   const stat = lstatSync(source)
-  if (stat.isSymbolicLink() || !stat.isFile()) {
+  if (stat.isSymbolicLink() || !stat.isFile() || !isGitIgnored(repo, path)) {
     result.refused.push(path)
     return
   }

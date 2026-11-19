@@ -1,12 +1,14 @@
 import { describe, expect, onTestFinished, test } from "bun:test"
 import { execFileSync, spawnSync } from "node:child_process"
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   realpathSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs"
@@ -89,6 +91,19 @@ describe("ulw-execute worktrees helper", () => {
     expect(existsSync(join(wt, "linked.env"))).toBe(false)
     expect(result.json.missingRequired).toEqual(["config/local.json"])
     expect(result.json.refused.sort()).toEqual(["../outside", "/etc/passwd", "linked.env"])
+  })
+
+  test("#given an include entry git does not ignore #when provisioning #then it is refused so a copied secret can never be staged, and the copy keeps the source mode", () => {
+    const repo = fixtureRepo({ ".env": "TOKEN=dummy\n", "notes.txt": "n\n", ".worktreeinclude": ".env\nnotes.txt\n" })
+    chmodSync(join(repo, ".env"), 0o600)
+    const wt = join(repo, "..", "wt-e")
+
+    const result = run(repo, "add", "--path", wt, "--branch", "ulw/e")
+
+    expect(result.json.refused).toEqual(["notes.txt"])
+    expect(existsSync(join(wt, "notes.txt"))).toBe(false)
+    expect(statSync(join(wt, ".env")).mode & 0o777).toBe(0o600)
+    expect(git(wt, "status", "--porcelain")).toBe("")
   })
 
   test("#given an empty .worktreeinclude #when a worktree is added #then nothing is copied", () => {
