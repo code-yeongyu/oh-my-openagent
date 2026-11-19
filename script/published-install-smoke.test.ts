@@ -4,7 +4,47 @@ import { afterAll, describe, expect, test } from "bun:test"
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { findMissingInstalledArtifacts, isSupportedPackageSpec, parseSmokeArgs } from "./published-install-smoke.mjs"
+import {
+  findMissingInstalledArtifacts,
+  isSupportedPackageSpec,
+  parseSmokeArgs,
+  registryTarballUrl,
+  resolveCommittedLatestSpec,
+} from "./published-install-smoke.mjs"
+
+const TARBALL = "https://registry.npmjs.org/oh-my-openagent/-/oh-my-openagent-5.1.78.tgz"
+
+// A fake registry whose tarball answers the given statuses in order (the last repeats), and a clock that
+// only moves when the waiter sleeps, so the deadline is reached without real time passing.
+function fakeRegistry(statuses: readonly number[]) {
+  let clock = 0
+  const probes: { url: string; method: string | undefined }[] = []
+  const sleeps: number[] = []
+  const views: string[] = []
+  return {
+    probes,
+    sleeps,
+    views,
+    options: {
+      deadlineMs: 20 * 60_000,
+      delayMs: 15_000,
+      viewVersion: (name: string, tag: string) => {
+        views.push(`${name}@${tag}`)
+        return "5.1.78"
+      },
+      fetchImpl: async (url: string, init?: { method?: string }) => {
+        probes.push({ url, method: init?.method })
+        return new Response(null, { status: statuses[Math.min(probes.length - 1, statuses.length - 1)] })
+      },
+      now: () => clock,
+      sleep: async (ms: number) => {
+        sleeps.push(ms)
+        clock += ms
+      },
+      log: () => {},
+    },
+  }
+}
 
 const createdPluginPaths: string[] = []
 
@@ -75,6 +115,65 @@ describe("published install smoke", () => {
     for (const spec of hostile) {
       expect(isSupportedPackageSpec(spec)).toBe(false)
     }
+  })
+
+  test("#given latest points at a version whose tarball 404s then 200s #when resolved #then it waits and returns that exact version", async () => {
+    // given
+    const registry = fakeRegistry([404, 404, 200])
+
+    // when
+    const spec = await resolveCommittedLatestSpec("oh-my-openagent@latest", registry.options)
+
+    // then
+    expect(spec).toBe("oh-my-openagent@5.1.78")
+    expect(registry.views).toEqual(["oh-my-openagent@latest"])
+    expect(registry.probes).toEqual([
+      { url: TARBALL, method: "HEAD" },
+      { url: TARBALL, method: "HEAD" },
+      { url: TARBALL, method: "HEAD" },
+    ])
+    expect(registry.sleeps).toEqual([15_000, 15_000])
+  })
+
+  test("#given the tarball stays 404 past the deadline #when resolved #then it fails with the named registry reason", async () => {
+    // given
+    const registry = fakeRegistry([404])
+
+    // when / then
+    await expect(resolveCommittedLatestSpec("oh-my-openagent@latest", registry.options)).rejects.toThrow(
+      new Error("registry not committed: oh-my-openagent@5.1.78 tarball 404 for 20 min"),
+    )
+    expect(registry.sleeps.reduce((total, ms) => total + ms, 0)).toBe(20 * 60_000)
+  })
+
+  test("#given the tarball is already committed #when resolved #then it proceeds without waiting", async () => {
+    // given
+    const registry = fakeRegistry([200])
+
+    // when
+    const spec = await resolveCommittedLatestSpec("oh-my-openagent@latest", registry.options)
+
+    // then
+    expect(spec).toBe("oh-my-openagent@5.1.78")
+    expect(registry.probes).toHaveLength(1)
+    expect(registry.sleeps).toEqual([])
+  })
+
+  test("#given a beta or exact-version spec #when resolved #then it is returned untouched with no registry call", async () => {
+    // given
+    const registry = fakeRegistry([404])
+
+    // when / then
+    expect(await resolveCommittedLatestSpec("oh-my-openagent@beta", registry.options)).toBe("oh-my-openagent@beta")
+    expect(await resolveCommittedLatestSpec("lazycodex-ai@5.1.78", registry.options)).toBe("lazycodex-ai@5.1.78")
+    expect(registry.views).toEqual([])
+    expect(registry.probes).toEqual([])
+  })
+
+  test("#given scoped and unscoped packages #when the tarball url is built #then the scope stays only in the path prefix", () => {
+    // given / when / then
+    expect(registryTarballUrl("oh-my-openagent", "5.1.78")).toBe(TARBALL)
+    expect(registryTarballUrl("@scope/name", "1.2.3")).toBe("https://registry.npmjs.org/@scope/name/-/name-1.2.3.tgz")
   })
 
   test("#given plain dist-tag and exact-version specs #when they are checked #then both are accepted", () => {
