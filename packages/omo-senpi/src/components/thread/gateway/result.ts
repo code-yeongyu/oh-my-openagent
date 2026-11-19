@@ -22,6 +22,17 @@ export const REFUSAL_CODES: Readonly<Record<string, { readonly code: ThreadError
   },
 }
 
+/** What a row the receiver admitted to its queue waits on, if anything: the hold it was kept under, or the approval its receiver was parked on. */
+export function admittedWait(row: DeliveryRow): DeliveryWait | undefined {
+  // A row here was sent and is received on this install, so the device its sender stamped (#13004) is the one the
+  // receiver waits on (#13014); a row with no stamped device names none, so a replayed answer reads the same.
+  const device = row.envelope.provenance?.device
+  // An engine that keeps the delivery as a held notice (senpi#7014: a Stop, an interrupted run or a parent's hold) answers
+  // `held`: the delivery waits on that hold, and the sender is told so instead of a bare queued.
+  const waitKind = row.admission_kind === "held" ? "hold" : row.wait_kind
+  return waitKind === null ? undefined : { kind: waitKind, ...(device === undefined ? {} : { device }) }
+}
+
 export function resultFromRow(
   row: DeliveryRow,
   queuePosition: number,
@@ -49,14 +60,8 @@ export function resultFromRow(
     if (row.admission_kind === "started" || row.admission_kind === "steered") {
       return { ...base, delivery: { kind: row.admission_kind, turn_id: String(row.turn_epoch ?? 0) } }
     }
-    // A row here was sent and is received on this install, so the device its sender stamped (#13004) is the one the
-    // receiver waits on (#13014); a row with no stamped device names none, so a replayed answer reads the same.
-    const device = row.envelope.provenance?.device
-    // An engine that keeps the delivery as a held notice (senpi#7014: a Stop, an interrupted run or a parent's hold) answers
-    // `held`: the delivery waits on that hold, and the sender is told so instead of a bare queued.
-    const waitKind = row.admission_kind === "held" ? "hold" : row.wait_kind
-    const waiting: { readonly waiting_on?: DeliveryWait } =
-      waitKind === null ? {} : { waiting_on: { kind: waitKind, ...(device === undefined ? {} : { device }) } }
+    const wait = admittedWait(row)
+    const waiting: { readonly waiting_on?: DeliveryWait } = wait === undefined ? {} : { waiting_on: wait }
     return { ...base, delivery: { kind: "queued", queue_position: Math.max(queuePosition, 1), ...waiting } }
   }
   if (row.state === "refused") {

@@ -235,11 +235,14 @@ export async function createThread(
 
 /**
  * A created thread runs its first prompt, or the create fails (the held-thread report: an ok create whose prompt sat
- * queued for hours with nobody told). A prompt the send answered started or steered stands; one on this device that is
- * only queued is waited for, bounded by the call's budget, until its row starts a turn; one on another device has no row
- * here to wait on. A prompt that did not start answers `prompt_not_started`, which names the thread, the delivery and
- * its last state: the thread exists, so the recovery is a read and a send to it, never another create. A delivery that
- * failed outright stays the prompt's own error on the ok create, as before.
+ * queued for hours with nobody told). A prompt the send answered started or steered stands. So does one the thread
+ * admitted to its queue (behind a turn, a question or a hold), answered with what it waits on: it runs after that, and a
+ * resend would deliver it twice (#14363 review M1). On another device the engine answers queued only once it admitted
+ * the prompt, so only one still waiting for that device to wake the session is not taken; on this device a prompt not
+ * yet admitted is waited for, bounded by the call's budget, until its row is admitted. A prompt never admitted answers
+ * `prompt_not_started`, which names the thread, the delivery and its last state: the thread exists, so the recovery is
+ * a read and a send to it, never another create. A delivery that failed outright stays the prompt's own error on the
+ * ok create, as before.
  */
 async function promptThatRan(
   prompt: ThreadCreatePrompt,
@@ -250,10 +253,16 @@ async function promptThatRan(
   const { delivery } = prompt
   if (delivery.kind === "started" || delivery.kind === "steered") return prompt
   const local = thread.device === undefined
+  if (!local && delivery.kind === "queued" && delivery.waiting_on?.kind !== "wake") return prompt
   const waited =
     local && prompt.delivery_id !== undefined ? await context.awaitPromptStart(prompt.delivery_id) : undefined
   if (waited?.kind === "started") return { ...prompt, delivery: waited.delivery }
-  const state = waited?.state ?? delivery.kind
+  if (waited?.kind === "queued") {
+    const position = delivery.kind === "queued" ? delivery.queue_position : 1
+    const waiting = waited.waiting_on === undefined ? {} : { waiting_on: waited.waiting_on }
+    return { ...prompt, delivery: { kind: "queued", queue_position: position, ...waiting } }
+  }
+  const state = waited?.kind === "not_started" ? waited.state : delivery.kind
   const waitingOn = delivery.kind === "queued" ? delivery.waiting_on : undefined
   const where = local ? "" : ` on device ${thread.device}`
   return {
