@@ -551,6 +551,27 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     },
   )
 
+  // #14298: the target is LIVE on b, held by an engine that is not the one its listing row names (two engines on b, the
+  // thread run under another key), so b's host refuses the listed key route_unlisted. The send must reach the engine
+  // that runs it, never answer queued waiting on a wake for a thread that is running.
+  test.each(["auto", "follow_up"] as const)(
+    "#given b's listing reads a thread live under one key while an engine of b runs it under another #when thread_send (%s) names it #then b is asked who runs it and the delivery reaches that holder at once, nothing woken (#14298)",
+    async (delivery) => {
+      const a = account({
+        live: ["rk-held-elsewhere"],
+        relayKeys: new Map([["dur-on-b", "rk-held-elsewhere"]]),
+        unlistedReason: "route_unlisted",
+        wakeFeature: true,
+      })
+      const { run } = surface(a.remote)
+      const result = await run("thread_send", { thread: "dur-on-b", message: "are you there", delivery })
+      expect(result).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b", delivery: { kind: "started" } })
+      expect(a.sent.filter((entry) => entry.via === "wake")).toEqual([])
+      const admitted = a.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message")
+      expect(admitted.map((entry) => entry.session)).toEqual(["rk-held-elsewhere"])
+    },
+  )
+
   test("#given an online b that refuses the reopen of its listed thread (it holds no session file) #when thread_send names that thread next #then not_found at once, as the refused reopen said, and no session command waits on b (#14184, re-probe 2)", async () => {
     // A cached row of an online device that runs nothing under it: the reopen asks b, which holds no file; the send that
     // follows asks b again and answers at once, instead of attaching to the row's old key until b's deadline.
