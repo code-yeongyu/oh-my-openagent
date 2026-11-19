@@ -1,10 +1,17 @@
-import { expect, it } from "bun:test"
+import { spawnSync } from "node:child_process"
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+
+import { beforeAll, expect, it } from "bun:test"
 
 import {
   compare,
   countByFile,
   countsTowardRatchet,
   countSuppressions,
+  type Counts,
+  lint,
   ratchetedFiles,
   SUPPRESSION,
 } from "./lint-ratchet.ts"
@@ -130,4 +137,32 @@ it("still counts the omo-testing rules in real test files, and every other rule 
   expect(countsTowardRatchet("omo-testing/no-fixed-sleep", "packages/omo-native/test/x.test.ts")).toBe(true)
   expect(countsTowardRatchet("typescript/no-explicit-any", "packages/omo-senpi/plugin/extensions/omo.js")).toBe(true)
   expect(countsTowardRatchet("typescript/no-non-null-assertion", "packages/omo-senpi/plugin/runtime/sdk.js")).toBe(true)
+})
+
+// The ratchet's own lint run, on a scratch repo whose .eslintignore lists a violating test: oxlint
+// honours that file unless told not to, which would drop the test's counts without any rise.
+let ignoredRepoCounts: Counts = {}
+beforeAll(() => {
+  const dir = mkdtempSync(join(tmpdir(), "omo-lint-ratchet-ignore-"))
+  try {
+    for (const entry of ["node_modules", "script"]) symlinkSync(join(import.meta.dir, "..", entry), join(dir, entry))
+    const source = 'import { mock } from "bun:test"\nmock.module("./dep", () => ({}))\n'
+    for (const file of ["hidden.test.ts", "visible.test.ts"]) writeFileSync(join(dir, file), source)
+    writeFileSync(join(dir, ".eslintignore"), "hidden.test.ts\n")
+    for (const args of [
+      ["init", "-q"],
+      ["add", "--", "."],
+    ])
+      expect(spawnSync("git", args, { cwd: dir }).status).toBe(0)
+    ignoredRepoCounts = lint(dir).counts
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+}, 60_000)
+
+it("still counts a file that an ignore file lists", () => {
+  expect(ignoredRepoCounts).toEqual({
+    "hidden.test.ts": { "omo-testing/no-module-mock": 1 },
+    "visible.test.ts": { "omo-testing/no-module-mock": 1 },
+  })
 })
