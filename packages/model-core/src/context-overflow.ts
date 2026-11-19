@@ -1,4 +1,4 @@
-// Pattern table mirrored from /Volumes/mengmotaStorage/local-workspaces/senpi/packages/ai/src/utils/overflow.ts.
+// Pattern table mirrored from the senpi repository: packages/ai/src/utils/overflow.ts.
 const OVERFLOW_PATTERNS = [
   /prompt is too long/i,
   /request_too_large/i,
