@@ -13,7 +13,7 @@ import {
   PEER,
   type World,
 } from "../../../../device-service-core/test/local-api/conformance/world.ts"
-import { resolveMember } from "./resolve"
+import { budget, resolveMember, resolveRemoteDevice } from "./resolve"
 import { clientOn, closeClients, failureOf, fakeClock } from "./testing/fake-service"
 
 // sessions.resolve (#13414 unit U5) over the conformance fake owner: an address to its row from the listing the client
@@ -260,5 +260,39 @@ describe("sessions.resolve", () => {
     })
     await resolve(`${PEER}/dur-1`, {}, { deadlineMs: 1_000 })
     expect(deadlines).toEqual([400])
+  })
+
+  test("#given a device the roster misses but the listing names #when it is resolved #then the core sees it online and the row a member surfaces shows it offline, as sessions.list shows it", async () => {
+    const clock = fakeClock()
+    const unreached = () => Promise.reject(new Error("only the roster and the listing are read"))
+    const listedOn = (device: string) => ({
+      id: device,
+      name: device,
+      kind: "unknown",
+      platform: "unknown",
+      online: false,
+      last_seen_ms: null,
+      caps: { attach: true, machine: false, control: false },
+    })
+    const resolved = await resolveRemoteDevice(
+      {
+        sender: { kind: "person", uid: "user-1" },
+        timers: clock,
+        deps: { version: "5.1.70" },
+        dial: unreached,
+        member: unreached,
+        self: () => {
+          throw new Error("unreached")
+        },
+        localSessions: unreached,
+        devicesList: async () => ({ kind: "ok", value: [] }),
+        sessionsList: async () => ({ kind: "ok", value: { revision: 1, rows: [], unanswered: [listedOn(PEER)] } }),
+      },
+      PEER,
+      budget(clock, undefined, 1_000),
+    )
+    if (resolved.kind !== "ok") throw new Error(`expected a device, got ${JSON.stringify(resolved)}`)
+    expect(resolved.value.ref).toMatchObject({ id: PEER, online: true })
+    expect(resolved.value.row).toMatchObject({ id: PEER, online: false })
   })
 })
