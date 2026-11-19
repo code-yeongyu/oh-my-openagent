@@ -80,7 +80,10 @@ for (const config of ["quoted-node-path", "without-node-path", "missing-config"]
 // ! and ^ are left out: cmd.exe still eats them under delayed expansion, tracked in #11230.
 for (const [label, args] of [
   ["plain arguments", ["status", "--session-id", "s1", "--json"]],
-  ["a quoted argument with a space, an embedded quote, & and )", ["status", "--session-id", "s1", "--note", 'two words "quoted" & more)', "--json"]],
+  [
+    "a quoted argument with a space, an embedded quote, & and )",
+    ["status", "--session-id", "s1", "--note", 'two words "quoted" & more)', "--json"],
+  ],
 ] as const) {
   test(`generated Windows toolkit wrapper forwards ulw-loop ${label} once and returns the ulw-loop exit code`, async () => {
     if (process.platform !== "win32") return
@@ -95,11 +98,17 @@ for (const [label, args] of [
       await mkdir(join(repoRoot, "dist", "cli"), { recursive: true })
       await mkdir(pluginRoot, { recursive: true })
       await writeFile(join(repoRoot, "dist", "cli", "index.js"), "process.exit(99)\n")
-      await writeFile(join(pluginRoot, "ulw-loop.cjs"), "console.log(JSON.stringify(process.argv.slice(2)))\nprocess.exit(7)\n")
-      await writeFile(join(pluginRoot, "package.json"), JSON.stringify({
-        name: "windows-toolkit-ulw-loop-fixture",
-        bin: { "omo-ulw-loop": "ulw-loop.cjs" },
-      }))
+      await writeFile(
+        join(pluginRoot, "ulw-loop.cjs"),
+        "console.log(JSON.stringify(process.argv.slice(2)))\nprocess.exit(7)\n",
+      )
+      await writeFile(
+        join(pluginRoot, "package.json"),
+        JSON.stringify({
+          name: "windows-toolkit-ulw-loop-fixture",
+          bin: { "omo-ulw-loop": "ulw-loop.cjs" },
+        }),
+      )
       const runtime = await linkRootRuntimeBin({ repoRoot, binDir, codexHome, platform: "win32" })
       if (runtime === null) throw new Error("expected generated runtime wrapper")
       await linkCachedPluginBins({ pluginRoot, binDir, platform: "win32" })
@@ -142,18 +151,24 @@ for (const branch of ["OMO_RUNTIME=node", "no bun on PATH"] as const) {
       await mkdir(join(repoRoot, "dist", "cli"), { recursive: true })
       await mkdir(join(repoRoot, "dist", "cli-node"), { recursive: true })
       await writeFile(join(repoRoot, "dist", "cli", "index.js"), "process.exit(99)\n")
-      await writeFile(join(repoRoot, "dist", "cli-node", "index.js"), "console.log(JSON.stringify(process.argv.slice(2)))\nprocess.exit(7)\n")
+      await writeFile(
+        join(repoRoot, "dist", "cli-node", "index.js"),
+        "console.log(JSON.stringify(process.argv.slice(2)))\nprocess.exit(7)\n",
+      )
       const node = Bun.which("node")
       if (node === null) throw new Error("Windows wrapper proof requires node on PATH")
-      if (Bun.which("bun", { PATH: dirname(node) }) !== null) throw new Error("node's directory must not hold bun for the no-bun case")
+      if (Bun.which("bun", { PATH: dirname(node) }) !== null)
+        throw new Error("node's directory must not hold bun for the no-bun case")
       const runtime = await linkRootRuntimeBin({ repoRoot, binDir, codexHome, platform: "win32" })
       if (runtime === null) throw new Error("expected generated runtime wrapper")
 
       const env: Record<string, string | undefined> = { ...process.env, CODEX_HOME: codexHome }
       for (const key of Object.keys(env)) {
         const upper = key.toUpperCase()
-        if (upper === "NODE_REPL_NODE_PATH" || upper === "BUN_BINARY" || upper === "OMO_RUNTIME") Reflect.deleteProperty(env, key)
-        if (branch === "no bun on PATH" && (upper === "PATH" || upper === "USERPROFILE")) Reflect.deleteProperty(env, key)
+        if (upper === "NODE_REPL_NODE_PATH" || upper === "BUN_BINARY" || upper === "OMO_RUNTIME")
+          Reflect.deleteProperty(env, key)
+        if (branch === "no bun on PATH" && (upper === "PATH" || upper === "USERPROFILE"))
+          Reflect.deleteProperty(env, key)
       }
       if (branch === "OMO_RUNTIME=node") env.OMO_RUNTIME = "node"
       else {
@@ -183,4 +198,3 @@ for (const branch of ["OMO_RUNTIME=node", "no bun on PATH"] as const) {
     }
   }, 30_000)
 }
-
