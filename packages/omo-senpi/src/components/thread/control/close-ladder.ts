@@ -175,7 +175,7 @@ async function gracefulClose(sessionId: string, send: LadderSend, waitMs?: numbe
   if (data["timed_out"] === true)
     throw refuse(
       "turn_active",
-      `Thread ${sessionId} is still working on turn ${String(data["turn"])} after ${String(data["waited_ms"])} ms. It stays open and takes messages again; ${dropped.length} unread message(s) went back to their senders.`,
+      `Thread ${sessionId} is still working on turn ${String(data["turn"])} after ${String(data["waited_ms"])} ms. It stays open and takes messages again; the ${dropped.length} unread message(s) taken out of its queue are queued for it again.`,
       "Close it again with a longer wait_ms once its turn is nearly done, or with force: true to stop the turn.",
       {
         command: "unload_session",
