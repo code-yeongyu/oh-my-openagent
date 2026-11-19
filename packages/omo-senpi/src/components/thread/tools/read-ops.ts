@@ -65,11 +65,17 @@ export function listThreads(
     .map((thread) => threadRow(thread))
   const rowIds = new Set(threads.map((thread) => thread.thread))
   const dropped = shown.has("inactive") ? scanned.unread.filter((id) => !listed.has(id) && !rowIds.has(id)).length : 0
+  // An endpoint that did not answer (timed out, an auth or protocol failure) may hold threads this listing reads from their
+  // files as inactive; one known dead (its socket gone or refusing) holds none, so only the former makes it partial (#14308).
+  const unanswered = current.hosts.filter(
+    (host) => (host.error !== undefined || host.alive === false) && host.reason !== "dead",
+  ).length
   return {
     kind: "ok",
     threads,
     scope: allScope === true ? "all" : "workspace",
     ...(dropped > 0 ? { inactive_truncated: true as const, inactive_dropped: dropped } : {}),
+    ...(unanswered > 0 ? { listing: "incomplete" as const, unanswered_endpoints: unanswered } : {}),
   }
 }
 

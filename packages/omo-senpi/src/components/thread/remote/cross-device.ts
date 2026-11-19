@@ -167,7 +167,7 @@ function deviceRows(
   self: { readonly id: string | null; readonly name: string | null },
   incomplete: readonly string[],
   threads: readonly { readonly device?: string }[],
-  dropped: number | undefined,
+  local: { readonly dropped?: number; readonly incomplete: boolean },
 ): readonly ThreadDevice[] {
   const missing = new Set(incomplete)
   // The account roster leaves this device out (relayd lists only peers), so this device's row is made here.
@@ -195,9 +195,17 @@ function deviceRows(
       last_seen:
         row.last_seen_ms === undefined || row.last_seen_ms === null ? null : new Date(row.last_seen_ms).toISOString(),
       this_device: thisDevice,
-      listing: thisDevice ? "listed" : !row.online ? "offline" : missing.has(row.device) ? "incomplete" : "listed",
+      listing: thisDevice
+        ? local.incomplete
+          ? "incomplete"
+          : "listed"
+        : !row.online
+          ? "offline"
+          : missing.has(row.device)
+            ? "incomplete"
+            : "listed",
       threads: threads.filter((thread) => (thread.device ?? self.id) === row.device).length,
-      ...(thisDevice && dropped !== undefined ? { dropped } : {}),
+      ...(thisDevice && local.dropped !== undefined ? { dropped: local.dropped } : {}),
     }
   })
 }
@@ -262,13 +270,10 @@ export async function listAcross(
     threads,
     ...(roster.ok
       ? {
-          devices: deviceRows(
-            roster.devices,
-            { id: here, name: hereName },
-            listing.incomplete,
-            threads,
-            local.inactive_dropped,
-          ),
+          devices: deviceRows(roster.devices, { id: here, name: hereName }, listing.incomplete, threads, {
+            dropped: local.inactive_dropped,
+            incomplete: local.listing === "incomplete",
+          }),
         }
       : { remote_unavailable: "devices_unavailable" }),
   }
