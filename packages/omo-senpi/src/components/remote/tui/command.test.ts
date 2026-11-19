@@ -5,7 +5,7 @@ import { COMMAND_DEADLINE_MS, registerRemoteCommand, SEND_DEADLINE_MS } from "./
 import type { OmoRun, OmoRunner, OmoRunOptions } from "./run-omo"
 
 const DEVICES = [
-  { device: "dev_mac", label: "mengmota-mac", kind: "desktop", platform: "darwin", last_seen_ms: 1, online: true },
+  { device: "dev_mac", label: "studio-mac", kind: "desktop", platform: "darwin", last_seen_ms: 1, online: true },
   { device: "dev_ny2", label: "ny2", kind: "server", platform: "linux", last_seen_ms: null, online: false },
 ]
 const LISTING = {
@@ -32,7 +32,7 @@ const LISTING = {
 // {rows: SessionRow {thread,...}, unanswered: DeviceRow[]}, OpenResult {thread, device} and a flat RemoteFailure.
 const MODULE_SELF = {
   id: "dev_mac",
-  name: "mengmota-mac",
+  name: "studio-mac",
   kind: "cli",
   platform: "darwin",
   online: true,
@@ -161,7 +161,7 @@ describe("/remote", () => {
     // then
     expect(run.calls).toEqual([["remote", "devices", "--json"]])
     const printed = ui.notes.map((note) => note.message).join("\n")
-    expect(printed).toContain("mengmota-mac")
+    expect(printed).toContain("studio-mac")
     expect(printed).toContain("online")
     expect(printed).toContain("ny2")
     expect(printed).toContain("offline")
@@ -419,7 +419,7 @@ describe("/remote", () => {
     })
     const ui = fakeUi(
       [
-        (options) => options.find((option) => option.includes("mengmota-mac")),
+        (options) => options.find((option) => option.includes("studio-mac")),
         (options) => options.find((option) => option.includes("dev_mac/s1")),
         (options) => options.find((option) => option.startsWith("Send")),
       ],
@@ -439,6 +439,90 @@ describe("/remote", () => {
     expect((await reply).message).toBe("dev_mac/s1:\non it")
   })
 
+  // omo#14245: the TUI close carries thread_close's contract (#14234): unread messages refuse, the hint names /remote, a
+  // forced close lists what it dropped, and the picker offers the forced close.
+  const UNREAD = ["device:a/second", "device:a/third"]
+  const unreadRefusal = (pending: readonly string[] | "unavailable"): OmoRun => ({
+    code: 1,
+    stdout: `${JSON.stringify({
+      kind: "error",
+      error: {
+        code: "turn_active",
+        message: "Thread s1 has messages it has not read yet.",
+        next_action: "Run omo remote close dev_mac/s1 --force to close it anyway; those messages are dropped.",
+        details: { pending_deliveries: pending, retry_with: { force: true } },
+      },
+    })}\n`,
+    stderr: "",
+  })
+  const forcedClose = ok({
+    kind: "ok",
+    thread: "s1",
+    device: "dev_mac",
+    closed: true,
+    reason: "closed",
+    dropped_deliveries: UNREAD,
+  })
+
+  it.each([
+    [UNREAD, "messages it has not read: device:a/second, device:a/third"],
+    ["unavailable" as const, "message ids: unavailable on that device's engine"],
+  ])(
+    "#given a close refused for unread messages (%p) #when /remote close runs #then the hint names /remote close --force",
+    async (pending, ids) => {
+      const run = fakeRunner({ close: unreadRefusal(pending) })
+      const ui = fakeUi()
+      await invoke(run, "close dev_mac/s1", ui)
+      expect(ui.notes).toEqual([
+        {
+          message: `Thread s1 has messages it has not read yet.\n${ids}. /remote close dev_mac/s1 --force closes it anyway; those messages are dropped.`,
+          type: "error",
+        },
+      ])
+    },
+  )
+
+  it("#given a forced close #when /remote close --force runs #then the dropped messages are listed", async () => {
+    const run = fakeRunner({ close: forcedClose })
+    const ui = fakeUi()
+    await invoke(run, "close dev_mac/s1 --force", ui)
+    expect(run.calls).toEqual([["remote", "close", "dev_mac/s1", "--force", "--json"]])
+    expect(ui.notes).toEqual([
+      {
+        message: "Closed dev_mac/s1.\nDropped 2 message(s) it had not read: device:a/second, device:a/third.",
+        type: "info",
+      },
+    ])
+  })
+
+  it("#given a picked session with unread messages #when the person closes it and then chooses to close anyway #then a forced close runs and lists them", async () => {
+    const calls: string[][] = []
+    const run = Object.assign(
+      (args: readonly string[]) => {
+        calls.push([...args])
+        if (args[1] === "devices") return Promise.resolve(ok(DEVICES))
+        if (args[1] === "sessions") return Promise.resolve(ok(LISTING))
+        return Promise.resolve(args.includes("--force") ? forcedClose : unreadRefusal(UNREAD))
+      },
+      { calls, options: [] },
+    )
+    const ui = fakeUi([
+      (options) => options.find((option) => option.includes("studio-mac")),
+      (options) => options.find((option) => option.includes("dev_mac/s1")),
+      (options) => options.find((option) => option === "Close"),
+      (options) => options.find((option) => option.startsWith("Close anyway")),
+    ])
+    await invoke(run, "", ui)
+    expect(calls.slice(2)).toEqual([
+      ["remote", "close", "dev_mac/s1", "--json"],
+      ["remote", "close", "dev_mac/s1", "--force", "--json"],
+    ])
+    expect(ui.notes.at(-1)).toEqual({
+      message: "Closed dev_mac/s1.\nDropped 2 message(s) it had not read: device:a/second, device:a/third.",
+      type: "info",
+    })
+  })
+
   it("#given a device is picked #when the person opens a new session from the picker #then omo remote open runs on that device", async () => {
     // given
     const run = fakeRunner({
@@ -447,7 +531,7 @@ describe("/remote", () => {
       open: ok({ kind: "ok", thread: "s2", device: "dev_mac", deduplicated: false }),
     })
     const ui = fakeUi([
-      (options) => options.find((option) => option.includes("mengmota-mac")),
+      (options) => options.find((option) => option.includes("studio-mac")),
       (options) => options.find((option) => option.startsWith("Open a new session")),
     ])
 
@@ -470,7 +554,7 @@ describe("/remote", () => {
 
     // then
     const [devices, sessions] = ui.notes.map((note) => note.message)
-    expect(devices).toContain("mengmota-mac  dev_mac  online  (this device)")
+    expect(devices).toContain("studio-mac  dev_mac  online  (this device)")
     expect(devices).toContain("seoul  dev_seoul  online")
     expect(sessions).toContain("dev_seoul/s7  idle  nightly")
     expect(sessions).toContain("No answer from: ny2")
@@ -522,7 +606,7 @@ describe("/remote", () => {
   it("#given the person cancels the picker at each step #when /remote runs #then nothing past the listings runs", async () => {
     // given
     const script = { devices: ok(DEVICES), sessions: ok(LISTING) }
-    const pickMac = (options: readonly string[]) => options.find((option) => option.includes("mengmota-mac"))
+    const pickMac = (options: readonly string[]) => options.find((option) => option.includes("studio-mac"))
     const pickRow = (options: readonly string[]) => options.find((option) => option.includes("dev_mac/s1"))
     const pickSend = (options: readonly string[]) => options.find((option) => option.startsWith("Send"))
     const cancels = [
@@ -573,7 +657,7 @@ describe("/remote", () => {
       interrupt: ok({ kind: "ok", thread: "s1", device: "dev_mac", interrupted: false }),
     })
     const ui = fakeUi([
-      (options) => options.find((option) => option.includes("mengmota-mac")),
+      (options) => options.find((option) => option.includes("studio-mac")),
       (options) => options.find((option) => option.includes("dev_mac/s1")),
       (options) => options.find((option) => option.startsWith("Interrupt")),
     ])

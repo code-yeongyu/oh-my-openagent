@@ -37,6 +37,8 @@ export type EntryPageRead =
 export const CONTEXT_TAIL_MESSAGES = THREAD_TAIL_DEFAULT_ITEMS
 
 const CURSOR_VERSION = "t3"
+/** Entry cursors earlier builds issued (`t2`: revision and one entry id); their positions mean something else now (#14180). */
+const RETIRED_CURSOR_VERSIONS = new Set(["t2"])
 
 type EntryCursor = { readonly revision: string; readonly before: string; readonly floor: string }
 
@@ -53,7 +55,9 @@ function decodeCursor(raw: string): EntryCursor | null {
 
 /** Whether a cursor came from this reader (the other sources' cursors are answered by their own reader). */
 export function isEntryCursor(raw: string): boolean {
-  return decodeCursor(raw) !== null
+  if (decodeCursor(raw) !== null) return true
+  // A retired version is still this reader's cursor: `selectEntryPage` answers it cursor_stale, never cursor_invalid.
+  return RETIRED_CURSOR_VERSIONS.has(Buffer.from(raw, "base64url").toString("utf8").split("\n")[0] ?? "")
 }
 
 /** A cursor whose position the transcript no longer has, or that a holder which pages nothing cannot answer. */

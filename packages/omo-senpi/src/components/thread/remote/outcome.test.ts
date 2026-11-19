@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { outcomeFailure } from "./outcome"
 
 describe("outcomeFailure for a session the other device no longer runs", () => {
-  for (const reason of ["unknown_session", "session_not_found"]) {
+  for (const reason of ["unknown_session", "session_not_found", "route_unlisted"]) {
     test(`#given a command refused ${reason} #when it is explained #then it is not_resumable`, () => {
       const failure = outcomeFailure({ kind: "refused", reason }, "b")
       expect(failure.error.code).toBe("not_resumable")

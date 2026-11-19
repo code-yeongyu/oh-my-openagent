@@ -939,8 +939,11 @@ describe("device-service adapter: relay round trips per thread op", () => {
         history_truncated: false,
         oldest_entry_id: null,
       })
+    // The clock the port ages held reads by (#14252); a test moves it, nothing waits.
+    let clock = 1_000_000
     const port = sessionsPort({
       version: "0.0.0-test",
+      now: () => clock,
       connect: () =>
         connectDeviceService({ version: "0.0.0-test", stateDir: "/unused", connect: async () => dial() as never }).then(
           (conn) => ({ conn, owned: true }),
@@ -967,6 +970,9 @@ describe("device-service adapter: relay round trips per thread op", () => {
     return {
       port,
       surface,
+      advance: (ms: number) => {
+        clock += ms
+      },
       take,
       snapshot,
       removeModel,
@@ -1251,6 +1257,41 @@ describe("device-service adapter: relay round trips per thread op", () => {
       ["interrupt", ["session.command"]],
       ["close", ["session.command"]],
     ])
+  })
+
+  test("#given one remote session #when a close reads its engine's capabilities twice, and again after the host re-establishes the attach #then the attach holds the first answer and the third read goes to the device (#14234)", async () => {
+    const w = relayWorld()
+    const read = () =>
+      w.port.sessionCommand("b", row.session_id, {
+        type: "get_protocol_info",
+        sessionId: row.session_id,
+        observe: true,
+      })
+    w.take()
+    expect((await read()).kind).toBe("ok")
+    expect((await read()).kind).toBe("ok")
+    expect(w.take()).toEqual(["session.attach", "session.command"])
+    w.snapshot()
+    expect((await read()).kind).toBe("ok")
+    expect(w.take()).toEqual(["session.command"])
+  })
+
+  test("#given a held engine capability read #when the clock passes the 10-minute bound #then the next read goes to the device, and one inside the bound is answered locally (#14252)", async () => {
+    const w = relayWorld()
+    const read = () =>
+      w.port.sessionCommand("b", row.session_id, {
+        type: "get_protocol_info",
+        sessionId: row.session_id,
+        observe: true,
+      })
+    expect((await read()).kind).toBe("ok")
+    w.take()
+    w.advance(600_000)
+    expect(await read()).toMatchObject({ kind: "ok", local: true })
+    expect(w.take()).toEqual([])
+    w.advance(1)
+    expect((await read()).kind).toBe("ok")
+    expect(w.take()).toEqual(["session.command"])
   })
 
   test("#given a held catalog #when the host re-establishes the attach, or does so while the catalog is being read #then the next exact model switch reads the catalog again", async () => {

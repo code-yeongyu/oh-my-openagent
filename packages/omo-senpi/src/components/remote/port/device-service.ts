@@ -11,7 +11,7 @@ import {
   type EndpointCommandResult,
   type RemoteAttach,
 } from "@oh-my-opencode/device-service-core/device-service"
-import { CATALOG_RECORD, createAttachPool, type HeldAttach } from "../../thread/remote/attach-pool"
+import { createAttachPool, HELD_RECORDS, type HeldAttach } from "../../thread/remote/attach-pool"
 import type {
   DeviceServiceDial,
   JsonObject,
@@ -38,7 +38,7 @@ export type DeviceServiceSessionsOptions = {
   readonly retryDelay?: (ms: number) => Promise<void>
   /** Test seam: how long an attach no op or watch holds is kept before it is detached. */
   readonly attachIdleMs?: number
-  /** Test seam: the clock that ages a finished account listing. */
+  /** Test seam: the clock that ages a finished account listing and the reads an attach holds (attach-pool.ts). */
   readonly now?: () => number
 }
 
@@ -74,7 +74,12 @@ const sessionReason = (code: string): string => (code === "session_not_found" ? 
 
 // The engine records the thread tools send that change nothing on the other device (thread_read and its paged form,
 // the pre-send probe). Like the port's read, every failure of one is a typed refusal: there is nothing that may have run.
-const READ_ONLY_RECORDS: ReadonlySet<string> = new Set(["get_state", "get_messages", "get_entries"])
+const READ_ONLY_RECORDS: ReadonlySet<string> = new Set([
+  "get_state",
+  "get_messages",
+  "get_entries",
+  "get_protocol_info",
+])
 
 // How long a read-only record waits for its final state before it is refused request_timeout (the local API's own request
 // bound). Every other record keeps the attach's default bound: a lost final state never holds a tool call forever.
@@ -180,7 +185,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         throw error
       },
     )).then((dialed) => dialed.conn)
-  const pool = createAttachPool(svc, attachAddressed, options.attachIdleMs)
+  const pool = createAttachPool(svc, attachAddressed, options.attachIdleMs, options.now)
   const endpoints = new Map<string, string>()
   const sessionCommand: RemoteSessionsPort["sessionCommand"] = async (device, sessionId, rpc, commandOptions) => {
     // Before the command goes out nothing can have run: an attach that fails (session_not_found, as unknown_session; peer_not_found,
@@ -234,9 +239,9 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     try {
       const { attached, catalog } = held.session
       const readOnly = READ_ONLY_RECORDS.has(String(rpc["type"]))
-      const isCatalog = rpc["type"] === CATALOG_RECORD
+      const isHeld = HELD_RECORDS.has(String(rpc["type"]))
       const key = recordKey(record)
-      if (isCatalog && commandOptions?.fresh !== true) {
+      if (isHeld && commandOptions?.fresh !== true) {
         const kept = catalog.get(key)
         if (kept !== undefined) return { kind: "ok", response: kept, local: true }
       }
@@ -250,7 +255,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       if (waitMs <= 0) return { kind: "refused", reason: "request_timeout" }
       try {
         const outcome = outcomeOf(await attached.command(record, { ...marked, waitMs }))
-        if (isCatalog && outcome.kind === "ok") catalog.keep(key, outcome.response, sentAt)
+        if (isHeld && outcome.kind === "ok") catalog.keep(key, outcome.response, sentAt)
         return readOnly && outcome.kind === "uncertain" ? { kind: "refused", reason: outcome.reason } : outcome
       } catch (error) {
         // It left this device and its final state did not come back: the device has it, its answer was lost.

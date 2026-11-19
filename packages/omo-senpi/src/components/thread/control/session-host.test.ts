@@ -179,6 +179,18 @@ describe("thread_create refuses an empty create (#14050)", () => {
     expect(openFrames(a.sent)).toEqual([])
   })
 
+  test("#given a blank prompt, alone or with a name #when created here and on b #then invalid_arguments and nothing is opened", async () => {
+    const a = account()
+    const { run, openSession } = surface(a.remote)
+    for (const args of [{ prompt: "   " }, { prompt: "\n\t", device: "studio" }, { name: "named", prompt: " " }])
+      expect(await run("thread_create", args)).toMatchObject({
+        kind: "error",
+        error: { code: "invalid_arguments", details: { field: "prompt" } },
+      })
+    expect(openSession).not.toHaveBeenCalled()
+    expect(openFrames(a.sent)).toEqual([])
+  })
+
   test("#given a name, an alias or a prompt #when created #then each opens one thread", async () => {
     const a = account()
     const { run, openSession } = surface(a.remote)

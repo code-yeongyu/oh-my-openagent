@@ -178,7 +178,14 @@ export function sessionVerbLines(
       ...background.failed.map((job) => `Could not stop background job ${jobName(job)}: ${job.reason}.`),
     ]
   }
-  if (verb === "close" && "closed" in result) return [result.closed ? `Closed ${label}.` : `${label} was not open.`]
+  if (verb === "close" && "closed" in result) {
+    const dropped =
+      "dropped_deliveries" in result && Array.isArray(result.dropped_deliveries) ? result.dropped_deliveries : []
+    return [
+      result.closed ? `Closed ${label}.` : `${label} was not open.`,
+      ...(dropped.length === 0 ? [] : [`Dropped ${dropped.length} message(s) it had not read: ${dropped.join(", ")}.`]),
+    ]
+  }
   return []
 }
 

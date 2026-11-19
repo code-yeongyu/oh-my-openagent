@@ -41,6 +41,7 @@ import { loadJobWidgetHost, type JobWidgetHostApi } from "./job-widget-host"
 import { createTaskJobWidgetFeed } from "./job-widget-sources"
 import { createLeadPollerLifecycle, type LeadPollerLifecycle } from "./lead-poller-lifecycle"
 import { TEAM_MEMBER_LIVENESS_MESSAGE_TYPE } from "./member-liveness"
+import { registerModelRoutingRpc } from "./model-routing-rpc"
 import { TASK_COMPLETION_MESSAGE_TYPE } from "./parent-notifier"
 import { renderCategoryUnavailable, renderTaskCompletion, renderTeamMemberLiveness } from "./renderers"
 import { createResumptionChannelEmitter } from "./resumption-channel-emitter"
@@ -126,6 +127,19 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
         ...(ctx.idleCoordinator !== undefined && { coordinator: ctx.idleCoordinator }),
       })
 
+      // The same inputs the planner resolves a spawn against: the register-time cwd its live config reads,
+      // the agent table it was composed with, and the parent's service tier for the fast-tier step.
+      registerModelRoutingRpc(pi, {
+        cwd: () => cwd,
+        loadConfig: (projectDir) => loadConfig({ cwd: projectDir }),
+        registry: () => engine.runtime.modelRegistry(),
+        planner: () => ({
+          agents: engine.agents,
+          ...(engine.runtime.parentServiceTier() === undefined
+            ? {}
+            : { parentServiceTier: engine.runtime.parentServiceTier() }),
+        }),
+      })
       pi.registerMessageRenderer?.(TASK_COMPLETION_MESSAGE_TYPE, renderTaskCompletion)
       pi.registerMessageRenderer?.(TEAM_MEMBER_LIVENESS_MESSAGE_TYPE, renderTeamMemberLiveness)
       pi.registerMessageRenderer?.(CATEGORY_UNAVAILABLE_MESSAGE_TYPE, renderCategoryUnavailable)

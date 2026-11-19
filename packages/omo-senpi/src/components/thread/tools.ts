@@ -1,4 +1,4 @@
-import { TOOL_CALL_BUDGET_MS, withCallDeadline } from "../call-budget/call-deadline"
+import { TOOL_CALL_BUDGET_MS, withCallDeadline, withinCallBudget } from "../call-budget/call-deadline"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { gatewaySchemaRefusal, threadToolFailure } from "./errors"
 import type { ThreadToolFailure } from "./errors"
@@ -412,8 +412,8 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         if (located.kind === "error") return located.result
         // Nothing live holds it: there is nothing to close, and the thread stays resumable from its session file.
         if (located.kind === "not_live")
-          return { kind: "ok", ...controlIdentity(located), closed: false, reason: "not_live" }
-        return await closeThread(located.control)
+          return { kind: "ok", ...controlIdentity(located), closed: false, reason: "not_live", dropped_deliveries: [] }
+        return await closeThread(located.control, value.force)
       }),
   }
   const handoff: AnyTool = {
@@ -752,16 +752,23 @@ async function thisDeviceOf(
   senders: readonly ConsumedSender[],
 ): Promise<string | undefined | ThreadToolFailure> {
   if (options.remote === undefined || !senders.some((sender) => sender.device !== undefined)) return undefined
-  try {
-    return (await accountDevices(options.remote.client)).here ?? undefined
-  } catch (error) {
-    const devices = [...new Set(senders.flatMap((sender) => (sender.device === undefined ? [] : [sender.device])))]
-    return threadToolFailure(
+  const unavailable = (reason: string) =>
+    threadToolFailure(
       "host_unavailable",
       "This device's id could not be read, so a reply to a sender named by its device cannot be routed; nothing was sent.",
       "Retry when the device service is reachable.",
-      { devices, reason: error instanceof Error ? error.message : String(error) },
+      {
+        devices: [...new Set(senders.flatMap((sender) => (sender.device === undefined ? [] : [sender.device])))],
+        reason,
+      },
     )
+  try {
+    // #14226: the read is cut by what is left of the call's budget, not only by the device client's own deadline.
+    const listed = await withinCallBudget(accountDevices(options.remote.client))
+    if (listed === undefined) return unavailable("request_timeout")
+    return listed.here ?? undefined
+  } catch (error) {
+    return unavailable(error instanceof Error ? error.message : String(error))
   }
 }
 
