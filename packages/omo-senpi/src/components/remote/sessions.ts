@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { userInfo } from "node:os"
 import type { DeviceService } from "@oh-my-opencode/device-service-core/device-service"
-import { THREAD_ID_SHAPE } from "@oh-my-opencode/thread-address-core"
 import type { ThreadThinkingLevel, ThreadToolResult } from "../thread/contracts"
 import { isPermissionPreset, presetWithin } from "../thread/contracts/permission-presets"
 import { answered, closeThread, setModelOn, setThinkingLevelOn } from "../thread/control/operations"
@@ -24,7 +23,7 @@ import { type ClientCore, ok, type Outcome, type RemoteClient } from "./client"
 import { nextActionFor, readFailureFromError, remoteFailure } from "./codes"
 import { DEADLINES } from "./deadlines"
 import { createDeviceServiceSessions } from "./port/device-service"
-import { listingIncomplete, resolveRemoteDevice } from "./resolve"
+import { idShapedSession, listingIncomplete, resolveRemoteDevice } from "./resolve"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
 import { clientMessageIdOf } from "./client-message-id"
 import type { LocalSessions } from "./local-sessions"
@@ -178,11 +177,6 @@ const selfDelivery = (device: string): RemoteFailure =>
 
 /** How many idempotency keys a client remembers for replay, in each of its stores (opens, sends, send receipts). */
 const KEYS_KEPT = 256
-
-// An unmatched session part of a device-qualified address passes to its device only when id-shaped: a thread id, a
-// routing id, or a listing key the listing does not show yet (#13748); same rule as thread/address/on-device.ts.
-const idShapedSession = (text: string): boolean =>
-  THREAD_ID_SHAPE.test(text) || /^rpc-\d+$/.test(text) || /^[A-Za-z0-9_-]{22}$/.test(text)
 
 /**
  * Every idempotency store's one rule: `entry` is kept under `key` as the newest, and past KEYS_KEPT the oldest settled

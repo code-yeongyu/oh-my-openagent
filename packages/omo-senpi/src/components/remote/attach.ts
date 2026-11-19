@@ -4,7 +4,7 @@ import { type ClientCore, ok, type Outcome, type RemoteClient } from "./client"
 import { engineCode, nextActionFor, readFailureFromError, remoteFailure } from "./codes"
 import { DEADLINES, withinDeadline } from "./deadlines"
 import { attachAddressed } from "./port/device-service"
-import { resolveRemoteDevice } from "./resolve"
+import { idShapedSession, resolveRemoteDevice } from "./resolve"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
 import type {
   AttachEvent,
@@ -441,8 +441,16 @@ export async function openAttachment(core: ClientCore, thread: ThreadHandle, opt
         throw new LocalApiError("session_not_found", `this device lists no session ${target.session} with a durable id`)
       attached = await local({ device, session: target.session, durableId })
     } else {
-      // A mistyped id or a durable id is located once, as the thread tools do, so it answers not_found, never unsupported.
-      attached = (await attachAddressed(svc, device, target.session)).attached
+      // An id-shaped session part is located once, as the thread tools do, so it answers not_found, never unsupported; any
+      // other text reaches the device only as the key of the row the device lists it by (its key or durable id).
+      const session = idShapedSession(target.session)
+        ? target.session
+        : (await svc.sessions({ device })).rows.find(
+            (row) => row.session_id === target.session || row.durable_id === target.session,
+          )?.session_id
+      if (session === undefined)
+        throw new LocalApiError("session_not_found", `${device} lists no session ${target.session}`)
+      attached = (await attachAddressed(svc, device, session)).attached
     }
     opened = attached
     if (abandoned) await attached.detach()

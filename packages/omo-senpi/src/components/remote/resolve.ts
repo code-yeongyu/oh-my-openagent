@@ -4,6 +4,7 @@ import {
   devicesSilent,
   normalizeName,
   resolveDevice,
+  THREAD_ID_SHAPE,
   type AddressRefusal,
   type DeviceRef,
 } from "@oh-my-opencode/thread-address-core"
@@ -93,6 +94,11 @@ const deviceRefusal = (refusal: AddressRefusal): RemoteFailure => {
       )
   }
 }
+
+// An unmatched session part of a device-qualified address passes to its device only when id-shaped: a thread id, a
+// routing id, or a listing key the listing does not show yet (#13748); same rule as thread/address/on-device.ts.
+export const idShapedSession = (text: string): boolean =>
+  THREAD_ID_SHAPE.test(text) || /^rpc-\d+$/.test(text) || /^[A-Za-z0-9_-]{22}$/.test(text)
 
 /**
  * A miss while a device the core counts as incomplete this round (deviceListing) did not answer: host_unavailable naming
