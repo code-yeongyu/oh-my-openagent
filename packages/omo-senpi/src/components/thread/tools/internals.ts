@@ -253,10 +253,6 @@ export function degradedSummary(entry: AddressEntry): ThreadToolSummary & { read
   }
 }
 
-export function resolveEntries(options: ThreadToolSurfaceOptions, view: ThreadHostView): ThreadAddressEntry[] {
-  return toThreadAddressEntries(addressBook(options, view))
-}
-
 /** The per-session methods of the endpoint that listed `session`: routing ids are only unique per endpoint. */
 export function sessionPort(options: ThreadToolSurfaceOptions, session: ThreadHostSession): ThreadSessionPort {
   return session.socket !== undefined && options.host.endpoint !== undefined
