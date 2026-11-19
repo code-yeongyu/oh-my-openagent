@@ -830,8 +830,16 @@ describe("omo remote session verbs", () => {
   })
 
   // A listing key the person typed names the session in every --json answer, the ended one and its link included, as
-  // before the address module (#14305 delta review 2, M2).
-  test("#given send <device>/<listing key> --json #when the session ends before its turn settles #then the answer names the session by that key only", async () => {
+  // before the address module (#14305 delta review 2, M2); only those fields change, never the reply's text.
+  const sentJson = (out: readonly string[]): { thread?: string; link?: string; kind?: string; reply?: string } => {
+    try {
+      return JSON.parse(out.at(-1) ?? "") as { thread?: string; link?: string; kind?: string; reply?: string }
+    } catch {
+      return {}
+    }
+  }
+
+  test("#given send <device>/<listing key> --json #when the session ends before its turn settles #then its thread and link name that key", async () => {
     const a = fixture.account({ records: [{ type: "agent_settled", reason: "session_closed" }] })
     const { code, out } = await run(
       ["send", "b/rk-on-b", "hi", "--json"],
@@ -840,11 +848,35 @@ describe("omo remote session verbs", () => {
       testBootstrap(),
       a.remote,
     )
-    const answer = out.join("")
+    const answer = sentJson(out)
     expect(code).toBe(REMOTE_EXIT.failed)
-    expect(answer).toContain('"kind":"session_ended"')
-    expect(answer).toContain('"thread":"rk-on-b"')
-    expect(answer).not.toContain("dur-on-b")
+    expect(answer.kind).toBe("session_ended")
+    expect(answer.thread).toBe("rk-on-b")
+    expect(answer.link).toEndWith("(omo-thread://v1/rk-on-b)")
+  })
+
+  test("#given send <device>/<listing key> --json #when the reply text names the durable id #then thread and link name the key and the reply text is unchanged", async () => {
+    const a = fixture.account({
+      records: [
+        {
+          type: "message_update",
+          assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "my id is dur-on-b" },
+        },
+        { type: "agent_settled" },
+      ],
+    })
+    const { code, out } = await run(
+      ["send", "b/rk-on-b", "what is your thread id?", "--json"],
+      undefined,
+      SIGNED_IN,
+      testBootstrap(),
+      a.remote,
+    )
+    const answer = sentJson(out)
+    expect(code).toBe(REMOTE_EXIT.ok)
+    expect(answer.thread).toBe("rk-on-b")
+    expect(answer.link).toEndWith("(omo-thread://v1/rk-on-b)")
+    expect(answer.reply).toBe("my id is dur-on-b")
   })
 
   test("send to a session that cannot be followed is refused before the message is sent", async () => {
