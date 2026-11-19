@@ -49,7 +49,6 @@ type SessionMembers = Pick<
 >
 
 type Target = { readonly device: string; readonly session: string }
-/** The options of one stage of a call, under what is left of the call's one deadline (capped at `capMs`). */
 
 const isObject = (value: unknown): value is JsonObject =>
   typeof value === "object" && value !== null && !Array.isArray(value)
