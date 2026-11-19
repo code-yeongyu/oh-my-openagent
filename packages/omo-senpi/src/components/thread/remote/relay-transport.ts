@@ -620,7 +620,7 @@ export function createRelayTransport(
     const kind = reply["kind"]
     const turnId = typeof reply["turnId"] === "string" ? reply["turnId"] : ""
     if (kind === "started" || kind === "steered") return ok({ kind, turn_id: turnId })
-    if (kind !== "queued" && kind !== "held_draft" && kind !== "already_admitted")
+    if (kind !== "queued" && kind !== "held_draft" && kind !== "held" && kind !== "already_admitted")
       return fail(
         "idempotency_uncertain",
         `Device ${row.device} accepted the message but answered an unknown admission (${String(kind)}).`,
@@ -651,8 +651,9 @@ export function createRelayTransport(
     // engine's pendingMessageCount does not count an admitted delivery (senpi enqueues it straight into the agent's queue,
     // outside the user-input count), so a receiver that reports none still holds it, first in line: position 1.
     // A receiver parked on an approval (an open question its human must answer on that device) waits behind that
-    // approval (#12886); a paused or held one waits on its holds.
-    if (kind === "queued" && afterState?.held === true)
+    // approval (#12886); a paused or held one waits on its holds. `held` is the engine's own word for that: idle under a
+    // hold a peer cannot release (a Stop, an interrupted run, a parent's run hold; senpi#7014), kept until it is released.
+    if (kind === "held" || (kind === "queued" && afterState?.held === true))
       return ok({ kind: "queued", queue_position: pending ?? 1, waiting_on: { kind: "hold", device: row.device } })
     if (kind === "queued" && afterState?.parkedOnApproval === true)
       return ok({ kind: "queued", queue_position: pending ?? 1, waiting_on: { kind: "approval", device: row.device } })
@@ -707,6 +708,7 @@ export function createRelayTransport(
     const turnId = typeof data["turnId"] === "string" ? data["turnId"] : ""
     if (kind === "started" || kind === "steered") return ok({ kind, turn_id: turnId })
     if (kind === "already_admitted") return ok({ kind: "queued", queue_position: 1 }, true)
+    if (kind === "held") return ok({ kind: "queued", queue_position: 1, waiting_on: { kind: "hold", device } })
     return fail(
       "idempotency_uncertain",
       `Device ${device} accepted the message but answered an unknown admission (${String(kind)}).`,
