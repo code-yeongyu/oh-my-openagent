@@ -1,3 +1,5 @@
+import { isAbsolute } from "node:path"
+
 import { checkNameConflict } from "../addressing"
 import type {
   ThreadCreateInput,
@@ -176,11 +178,11 @@ export async function createThread(
       if (createdId === undefined) return undefined
       const found = await existingHere(options, await view(), createdId, callerId)
       if (found.kind === "live") return { kind: "ok", thread: found.thread }
-      return found.kind === "file" ? await plan.host.open({ sessionPath: found.sessionPath }) : undefined
+      return found.kind === "file" ? await plan.host.open(fileOpen(found)) : undefined
     }
     let outcome: SessionOpenOutcome
     if (earlier?.kind === "live") outcome = { kind: "ok", thread: earlier.thread }
-    else if (earlier?.kind === "file") outcome = await plan.host.open({ sessionPath: earlier.sessionPath })
+    else if (earlier?.kind === "file") outcome = await plan.host.open(fileOpen(earlier))
     else
       try {
         outcome = await plan.host.open({
@@ -473,7 +475,19 @@ async function existingHere(
       ),
     }
   const name = entry.name?.trim()
-  return name === undefined || name === ""
-    ? { kind: "file", sessionPath: entry.session_path }
-    : { kind: "file", sessionPath: entry.session_path, name }
+  return {
+    kind: "file",
+    sessionPath: entry.session_path,
+    ...(name === undefined || name === "" ? {} : { name }),
+    ...(isAbsolute(entry.cwd) ? { cwd: entry.cwd } : {}),
+  }
 }
+
+/**
+ * The open of a session file here: it names the folder the file records, so the engine resumes it there without probing
+ * the file's path on its loop, a probe that fails open_failed on a loaded host (#14296).
+ */
+const fileOpen = (file: Extract<LocalExisting, { readonly kind: "file" }>) => ({
+  sessionPath: file.sessionPath,
+  ...(file.cwd === undefined ? {} : { cwd: file.cwd }),
+})

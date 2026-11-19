@@ -1,3 +1,5 @@
+import { isAbsolute } from "node:path"
+
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import type { ThreadToolResult } from "../contracts"
 import { threadToolFailure } from "../errors"
@@ -130,7 +132,7 @@ export async function holderView(remote: RemoteThreadSurface, row: RemoteSession
 export async function sessionFileOf(
   remote: RemoteThreadSurface,
   row: RemoteSessionRow,
-): Promise<{ readonly path: string } | { readonly result: ThreadToolResult }> {
+): Promise<{ readonly path: string; readonly cwd?: string } | { readonly result: ThreadToolResult }> {
   if (row.session_file !== undefined && row.session_file !== "") return { path: row.session_file }
   const thread = rowThreadId(row)
   const details = { device: row.device, thread }
@@ -157,8 +159,12 @@ export async function sessionFileOf(
     )
   if (outcome.kind !== "ok") return { result: endpointOutcomeFailure(outcome, row.device) }
   const data = replyData(outcome.response)
-  const path = recordOf(data["found"])?.["sessionPath"]
-  if (typeof path === "string" && path !== "") return { path }
+  const found = recordOf(data["found"])
+  const path = found?.["sessionPath"]
+  // The folder the file records: a reopen names it, so b's engine opens it without probing the path (#14296).
+  const cwd = found?.["cwd"]
+  if (typeof path === "string" && path !== "")
+    return typeof cwd === "string" && isAbsolute(cwd) ? { path, cwd } : { path }
   if (data["ambiguous"] === true)
     return refusal(
       "ambiguous_target",
