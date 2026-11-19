@@ -136,6 +136,17 @@ describe("attach rows: open", () => {
     expect(owner.state.attaches.size).toBe(0)
   })
 
+  test("#given an online device that missed the listing round #when attach names a session on it by a name #then host_unavailable listing_incomplete naming it, as the session members answer, never not_found", async () => {
+    const world = worldWith(STATE)
+    const owner = await startOwner({ ...world, listing: { ...world.listing, revisions: [{ rows: [], incomplete: [PEER] }] } })
+    const client = clientOn(owner.stateDir, fakeClock())
+    expect(failureOf(await client.attach(handleOf(PEER, "my-thread")))).toMatchObject({
+      code: "host_unavailable",
+      details: { reason: "listing_incomplete", devices: [PEER] },
+    })
+    expect(owner.state.attaches.size).toBe(0)
+  })
+
   test("#given a mistyped session id and an unknown durable id #when attach opens #then each is not_found, never unsupported", async () => {
     // The device answers session.locate and holds no session by either id.
     const owner = await startOwner({ ...worldWith(STATE), located: { [PEER]: {} } })
