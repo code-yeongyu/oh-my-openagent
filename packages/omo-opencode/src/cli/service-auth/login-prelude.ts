@@ -35,4 +35,3 @@ export async function beginLogin(
   await refuseSecondMachineDevice(session, deviceService)
   return ensureServiceAvailable(session, api)
 }
-

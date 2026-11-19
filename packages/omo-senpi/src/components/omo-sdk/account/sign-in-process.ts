@@ -27,7 +27,11 @@ export function launcherSignInProcess(
   return ({ args, env, onLine, signal }) => {
     const [command, ...argv] = bin.endsWith(".js") ? [execPath, bin, ...args] : [bin, ...args]
     return new Promise((resolve, reject) => {
-      const child = spawn(command ?? bin, argv, { stdio: ["ignore", "pipe", "ignore"], env: { ...env }, windowsHide: true })
+      const child = spawn(command ?? bin, argv, {
+        stdio: ["ignore", "pipe", "ignore"],
+        env: { ...env },
+        windowsHide: true,
+      })
       createInterface({ input: child.stdout }).on("line", onLine)
       const stop = () => child.kill()
       const timer = setTimeout(stop, SIGN_IN_DEADLINE_MS)

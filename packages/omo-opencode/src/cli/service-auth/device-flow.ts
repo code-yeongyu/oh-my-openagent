@@ -23,11 +23,7 @@ export type DisplayCode = {
 
 /** Why a device sign-in stopped: callers branch on the code, never on the message. */
 export type DeviceSignInRefusalCode =
-  | "approval_denied"
-  | "approval_expired"
-  | "device_limit"
-  | "replace_unsupported"
-  | "replace_mismatch"
+  "approval_denied" | "approval_expired" | "device_limit" | "replace_unsupported" | "replace_mismatch"
 
 export class DeviceSignInRefused extends SignInError {
   constructor(
