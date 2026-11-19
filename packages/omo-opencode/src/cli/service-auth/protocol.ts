@@ -38,6 +38,8 @@ export const grantSchema = tokenSchema.extend({
   writerFloor: z.union([z.literal(1), z.literal(2)]).optional(),
   freshAuthorizationProof: nonempty.optional(),
 })
+/** #14032: the device-token reply, which also names the earlier device a replace sign-in signed out. Never stored. */
+export const deviceTokenGrantSchema = grantSchema.extend({ replacedDeviceId: nonempty.optional() })
 export const credentialSchema = grantSchema.extend({
   signingPrivateKey: nonempty,
   sealingPrivateKey: nonempty,
@@ -62,6 +64,12 @@ export const limitSchema = z.object({
   used: z.number().int().nonnegative(),
   limit: z.number().int().nonnegative(),
 })
+/** #14032: the earlier device a `machine_exists` refusal names, when the service names it. */
+export const machineDeviceSchema = z.object({ deviceId: nonempty.optional(), deviceName: nonempty.optional() })
+export type MachineDevice = z.infer<typeof machineDeviceSchema>
+/** #14032: a replace sign-in whose approved device is not this computer's (terminal: start a new sign-in). */
+export const replaceMismatchSchema = z.object({ reason: z.literal("replace_mismatch") })
+export type RefusalContext = { readonly machineDevice?: MachineDevice; readonly replaceMismatch?: boolean }
 export const deviceListSchema = z.object({
   devices: z.array(z.object({ id: nonempty, name: nonempty, revokedAt: timestamp.nullable() })),
 })
@@ -171,11 +179,13 @@ export class ApiRefusal extends SignInError {
   readonly code: RefusalCode
   readonly #detail: z.infer<typeof limitSchema> | undefined
   readonly #retryAfter: string | null
+  readonly #context: RefusalContext
   constructor(
     code: string,
     readonly status: number,
     detail?: z.infer<typeof limitSchema>,
     retryAfter: string | null = null,
+    context: RefusalContext = {},
   ) {
     const known: RefusalCode = isKnownRefusal(code) ? code : "unknown"
     // Server messages and unknown codes can contain credentials; never echo either.
@@ -183,9 +193,17 @@ export class ApiRefusal extends SignInError {
     this.code = known
     this.#detail = detail
     this.#retryAfter = retryAfter
+    this.#context = context
   }
   get detail() {
     return this.#detail
+  }
+  /** The earlier device a `machine_exists` refusal names; empty when the service names none. */
+  get machineDevice(): MachineDevice {
+    return this.#context.machineDevice ?? {}
+  }
+  get replaceMismatch(): boolean {
+    return this.#context.replaceMismatch === true
   }
   retryDelay(now: number, fallback: number): number {
     const raw = this.#retryAfter

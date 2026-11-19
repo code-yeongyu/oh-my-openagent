@@ -256,6 +256,12 @@ function createReceipts(now: () => number): RelayTransportOptions["store"] {
       known.result = request.result
       return true
     },
+    // A send that wrote nothing drops its unsettled receipt, so the same key runs again (the gateway store's rule, #12925).
+    toolReceiptRelease: async (request) => {
+      const known = held.get(keyOf(request))
+      if (known === undefined || known.settled) return false
+      return held.delete(keyOf(request))
+    },
     deliveryView: async () => null,
   }
 }
@@ -721,7 +727,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
         const reply = replyData(outcome.response)
         const turn = text(reply["turnId"])
         return ok({
-          thread_id: thread,
+          thread,
           ...(turn === undefined ? {} : { turn_id: turn }),
           interrupted: reply["interrupted"] === true,
           background: backgroundOf(reply["background"]),
@@ -786,16 +792,26 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       const target = resolved.value
       return core.member(stage(), DEADLINES.close, true, async (svc) => {
         if (await isThisDevice(svc, target.device))
-          return await onThisDevice(target.device, (local) => local.close(target))
-        const result = await answered(() => closeThread(controlOf(svc, target)))
+          return await onThisDevice(target.device, (local) => local.close(target, opts?.force === true))
+        const result = await answered(() => closeThread(controlOf(svc, target), opts?.force))
         if (result.kind === "error") return fromThread(result.error)
-        return ok({ closed: "closed" in result && result.closed === true })
+        return ok({
+          closed: "closed" in result && result.closed === true,
+          dropped_deliveries: "dropped_deliveries" in result ? [...result.dropped_deliveries] : [],
+        })
       })
     },
-    // No layer stores archive state: the listing (device-service-core), the engine (senpi) and the thread tools carry none.
-    archive: async () =>
-      remoteFailure("unsupported", "No layer stores a session's archive state yet.", nextActionFor("unsupported"), {
-        details: { feature: "archive" },
-      }),
+    // The thread tools' archive body: senpi set_session_archived on the session, which stays open and running.
+    archive: async (thread, archived, opts) =>
+      controlled(
+        thread,
+        opts,
+        async (control) => {
+          await control.setArchived(archived)
+          return { kind: "ok", ...(await control.listed(archived)), archived }
+        },
+        () => ({ archived }),
+        (target) => onThisDevice(target.device, (local) => local.archive(target, archived)),
+      ),
   }
 }

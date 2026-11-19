@@ -1,5 +1,5 @@
 import { mock } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { DeviceRow, RemoteClient, RemoteFailure, ServiceStatus } from "../remote"
@@ -18,18 +18,23 @@ import type {
   RemoteWatchHandlers,
 } from "./remote/ports"
 import type { ThreadTranscriptEntry } from "./reader"
+import { answerGetEntries, senpiProjector, type FakeEntryLog } from "./thread-remote-entries-fixture"
 import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
 import type { ThreadCloseOutcome } from "./tools/ports"
+import type { SessionWatchHandlers } from "./control/wait-settled"
 
 // The listing key (what b's connector assigned) deliberately differs from the durable id (audit class C8, #13017): a test
 // that passes with either id proves nothing about which one a tool path matched.
+// relayd lists a session's working folder as its `path` (connector catalog.ts: `cwd ?? sessionPath`), never its file
+// (#14170); the file is what b's engine names for itself (find_session, an unload's reply).
+export const B_FILE = "/home/b/.omo/agent/sessions/dur-on-b.jsonl"
 export const B_ROW: RemoteSessionRow = {
   device: "b",
   session_id: "rk-on-b",
   durable_id: "dur-on-b",
   title: "on b",
   project: "/work/b",
-  path: "/home/b/.omo/agent/sessions/dur-on-b.jsonl",
+  path: "/work/b",
   state: "idle",
   updated_ms: 1_700_000_000_000,
 }
@@ -154,7 +159,7 @@ export function fakeRemoteClient(account: {
 }
 
 export const comparable = (result: ThreadToolResult): unknown => {
-  const { thread_id: _id, link: _link, device: _device, ...rest } = result as Record<string, unknown>
+  const { thread: _thread, link: _link, device: _device, ...rest } = result as Record<string, unknown>
   return rest
 }
 
@@ -197,6 +202,7 @@ export function createRemoteThreadFixture() {
       promptOutcome?: RemoteCommandOutcome
       admitRefuse?: string
       admitOutcome?: RemoteCommandOutcome
+      stateOutcomes?: readonly RemoteCommandOutcome[]
       heldDraft?: number
       openData?: JsonObject
       failSessionsList?: boolean
@@ -205,6 +211,16 @@ export function createRemoteThreadFixture() {
       otherHolders?: number
       unwritten?: boolean
       unloadReason?: string
+      /** b's engine is running a turn (omo#14234): an unload without interrupt is refused turn_active. */
+      busy?: boolean
+      /** Deliveries b's engine admitted and has not written; an interrupting unload hands them back. */
+      unread?: readonly string[]
+      /** b's engine advertises unload_refuse_deliveries (senpi#7006); default true. false = an engine that ignores the field. */
+      refusesDeliveries?: boolean
+      /** The reason b's engine names when it refuses on unread deliveries (default work_pending). */
+      unreadReason?: "work_pending" | "turn_active"
+      /** b's engine does not answer get_protocol_info (the read times out). */
+      protocolInfoFails?: boolean
       terminal?: boolean
       rowState?: string
       live?: readonly string[]
@@ -214,10 +230,14 @@ export function createRemoteThreadFixture() {
       /** The turn finishes before its prompt's reply reaches the sender: its records go out at once, before the aim. */
       recordsBeforeReply?: boolean
       rows?: readonly RemoteSessionRow[]
+      /** b's session entries, which its engine pages through `get_entries` (#14047); absent: an engine that pages nothing. */
+      entries?: FakeEntryLog
       /** Devices the account listing names as not answering this round. */
       incomplete?: readonly string[]
       /** Extra devices the account lists beyond this one and b. */
       devices?: readonly RemoteDevice[]
+      /** Devices removed from the account: the listing still carries their cached rows, the roster no longer names them. */
+      removed?: readonly string[]
       /** The roster as relayd answers it: without this device (its row then comes from thisDeviceName). */
       rosterWithoutSelf?: boolean
       registryDown?: "refused" | "throws" | "signed_out"
@@ -225,6 +245,8 @@ export function createRemoteThreadFixture() {
       claimDown?: "refused" | "signed_out"
       chainCountLimit?: number
       relayKeys?: ReadonlyMap<string, string>
+      /** Every session.locate of a created session is refused with this reason (this device signed out mid-create). */
+      locateRefuse?: string
       /** omo#13037: sessions a device holds on disk but runs nowhere, by device then durable id, with that device's key. */
       ended?: Readonly<Record<string, Readonly<Record<string, string>>>>
       /** omo#13037: devices whose single-probe lookup gets no answer within the bound. */
@@ -247,18 +269,42 @@ export function createRemoteThreadFixture() {
       liveState?: JsonObject
       /** b's engine refuses every open_session with this error text (senpi names an unresolvable model `model_unavailable: ...`). */
       openRefuse?: string
+      /**
+       * #14170: b's session files by durable id, as its engine's `find_session` (senpi#6429) answers them; two files for one id
+       * answer ambiguous. Default: b's own session (`B_FILE`). `"none"`: b's engine predates find_session.
+       */
+      sessionFiles?: Readonly<Record<string, string | readonly [string, string]>> | "none"
+      /** The free text b's engine without find_session refuses it with. Default: `Unknown command: find_session`. */
+      findSessionRefuse?: string
       /** b knows a session it just opened only by its relay key (relayKeys), not by its durable id: a listing that has not caught up yet. */
       relayKeyOnly?: boolean
       /** The device service throws on b's admit_external_message (a lost connection mid-delivery). */
       admitThrows?: string
+      /** Every get_state after b admitted a delivery is refused with this reason (the read after the admission fails). */
+      stateRefusedAfterAdmit?: string
     } = {},
   ) {
     const engine = options.engine ?? ENGINE
+    // Every session b's listing names has its file on b (B_FILE for b's own), unless a test says otherwise.
+    const sessionFiles =
+      options.sessionFiles ??
+      Object.fromEntries([
+        ["dur-on-b", B_FILE],
+        ...(options.rows ?? [])
+          .filter((row) => row.durable_id !== undefined && row.durable_id !== "dur-on-b")
+          .map((row) => [row.durable_id as string, `/home/b/.omo/agent/sessions/${row.durable_id}.jsonl`]),
+        // A session a device holds on disk but runs nowhere (omo#13037) has its file there too.
+        ...Object.values(options.ended ?? {}).flatMap((held) =>
+          Object.keys(held).map((id) => [id, `/home/b/.omo/agent/sessions/${id}.jsonl`]),
+        ),
+      ])
     const sent: Sent[] = []
     // b's engine ledger of admitted delivery ids (senpi external-admission: a repeated id is already_admitted), and how many
     // admissions its user's open draft still holds (held_draft, taken by nothing).
     const admitted = new Set<string>()
     let heldDraft = options.heldDraft ?? 0
+    // How b's next get_state calls end before its engine answers them (a lost reply, a restarted hand), one per call.
+    const stateOutcomes = [...(options.stateOutcomes ?? [])]
     // The session's records a prompt makes it write, held until the follower first reads after the answer: the
     // engine's turn records follow its reply out over the wire, and the CLI's read is the first observable hop after
     // its own bookkeeping for that reply.
@@ -292,6 +338,10 @@ export function createRemoteThreadFixture() {
     const live = new Set(
       options.live ?? [B_ROW.session_id, ...(B_ROW.durable_id === undefined ? [] : [B_ROW.durable_id])],
     )
+    // b's engine's run and its unwritten deliveries (omo#14234); an interrupting unload ends the one and hands back the other.
+    let busy = options.busy === true
+    const unread = [...(options.unread ?? [])]
+    const capable = options.refusesDeliveries !== false
     const answer = (rpc: JsonObject, attachedTo?: string): RemoteCommandOutcome => {
       // The engine's real reply envelope, as the device service hands it back (device-service-core's CommandResult.response):
       // every field the tools read lives under `data`.
@@ -310,6 +360,10 @@ export function createRemoteThreadFixture() {
         if ((options.otherHolders ?? 0) === 0) live.delete(attachedTo)
         return ok({})
       }
+      if (rpc["type"] === "get_protocol_info") {
+        if (options.protocolInfoFails === true) return { kind: "refused", reason: "request_timeout" }
+        return ok({ capabilities: capable ? ["unload_session", "unload_refuse_deliveries"] : ["unload_session"] })
+      }
       if (rpc["type"] === "unload_session" && attachedTo !== undefined) {
         if (options.unloadReason !== undefined)
           return ok({ outcome: "refused", reason: options.unloadReason, detail: `refused: ${options.unloadReason}` })
@@ -317,17 +371,73 @@ export function createRemoteThreadFixture() {
           return ok({ outcome: "refused", reason: "unsupported", detail: "the session has no file to reopen it by" })
         if ((options.otherHolders ?? 0) > 0 && rpc["force"] !== true)
           return ok({ outcome: "refused", reason: "attached", detail: "1 other client(s) attached" })
+        // senpi session-unload.ts as of #7006 (an engine without the capability ignores `deliveries`).
+        const pending = capable ? { pending: { deliveries: [...unread] } } : {}
+        if (busy && unread.length > 0 && capable && rpc["deliveries"] === "refuse")
+          return ok({
+            outcome: "refused",
+            reason: options.unreadReason ?? "work_pending",
+            detail: "an admitted delivery not yet written",
+            ...pending,
+          })
+        if (busy && rpc["interrupt"] !== true)
+          return ok({ outcome: "refused", reason: "turn_active", detail: "an agent run" })
+        if (!busy && unread.length > 0 && rpc["interrupt"] !== true)
+          return ok({
+            outcome: "refused",
+            reason: "work_pending",
+            detail: "an admitted delivery not yet written",
+            ...pending,
+          })
+        const dropped = rpc["interrupt"] === true ? unread.splice(0) : []
+        busy = false
         live.delete(attachedTo)
-        return ok({ outcome: "unloaded", sessionPath: B_ROW.path })
+        return ok({
+          outcome: "unloaded",
+          sessionPath: B_FILE,
+          ...(dropped.length > 0 ? { dropped: { deliveries: dropped } } : {}),
+        })
       }
       if (rpc["type"] === "open_session" && options.openRefuse !== undefined)
         return { kind: "refused", reason: options.openRefuse }
+      // senpi reads a sessionPath that is a folder (or empty: its working folder) as a directory and fails (#14170).
+      if (
+        rpc["type"] === "open_session" &&
+        typeof rpc["sessionPath"] === "string" &&
+        !rpc["sessionPath"].endsWith(".jsonl")
+      )
+        return { kind: "refused", reason: "open_failed: EISDIR: illegal operation on a directory, read" }
+      if (rpc["type"] === "find_session") {
+        if (sessionFiles === "none")
+          return { kind: "refused", reason: options.findSessionRefuse ?? "Unknown command: find_session" }
+        const file = sessionFiles[String(rpc["durableSessionId"])]
+        if (file === undefined) return ok({ unknown: true })
+        if (typeof file !== "string") return ok({ ambiguous: true })
+        // `open`: an engine of b holds the session now, under the key its listing row names (or under its id).
+        const durable = String(rpc["durableSessionId"])
+        const keys = [B_ROW, ...(options.rows ?? [])]
+          .filter((row) => row.durable_id === durable)
+          .map((row) => row.session_id)
+        const relayKey = options.relayKeys?.get(durable)
+        const open =
+          live.has(durable) || keys.some((key) => live.has(key)) || (relayKey !== undefined && live.has(relayKey))
+        return ok({ found: { sessionPath: file, cwd: B_ROW.project, open } })
+      }
       if (rpc["type"] === "open_session") {
-        const opened = rpc["sessionPath"] === undefined ? "dur-new-on-b" : "dur-on-b"
+        // A reopened file resumes under the id it carries, as senpi's does.
+        const opened =
+          rpc["sessionPath"] === undefined
+            ? "dur-new-on-b"
+            : ((sessionFiles === "none"
+                ? undefined
+                : Object.entries(sessionFiles).find(([, file]) => file === rpc["sessionPath"])?.[0]) ?? "dur-on-b")
         const key = options.relayKeys?.get(opened) ?? opened
         for (const id of options.relayKeyOnly === true ? [key] : [opened, key]) live.add(id)
         return ok(options.openData ?? { sessionId: "rpc-9", state: { durableSessionId: opened } })
       }
+      if (rpc["type"] === "get_state" && stateOutcomes.length > 0) return stateOutcomes.shift() as RemoteCommandOutcome
+      if (rpc["type"] === "get_state" && options.stateRefusedAfterAdmit !== undefined && admitted.size > 0)
+        return { kind: "refused", reason: options.stateRefusedAfterAdmit }
       if (rpc["type"] === "get_state")
         return ok({
           isStreaming: engine.streaming,
@@ -338,6 +448,11 @@ export function createRemoteThreadFixture() {
           ...options.liveState,
         })
       if (rpc["type"] === "get_messages") return ok({ messages: [...engine.messages] })
+      if (rpc["type"] === "get_entries") {
+        if (options.entries === undefined) return { kind: "refused", reason: "unsupported" }
+        const paged = answerGetEntries(options.entries, rpc)
+        return "refused" in paged ? { kind: "refused", reason: paged.refused } : ok(paged.data)
+      }
       if (rpc["type"] === "interrupt") return ok(engine.interrupt)
       // b's user set `threads.chainCountLimit` (senpi S32): its engine answers `{success: false, errorCode: "chain_count_limit"}`,
       // which the device service hands back as this refusal (device-service.ts).
@@ -400,8 +515,11 @@ export function createRemoteThreadFixture() {
       ...Object.keys(options.ended ?? {}),
       ...(options.silent ?? []),
     ])
-      if (!devices.some((known) => known.device === device)) devices.push({ device, label: device, online: true })
+      if (!devices.some((known) => known.device === device) && !(options.removed ?? []).includes(device))
+        devices.push({ device, label: device, online: true })
     const registryCalls: string[] = []
+    /** Every session.locate probe the tools sent, by device. */
+    const located: { readonly device: string; readonly session: string }[] = []
     const accountReads: string[] = []
     const down = <T>(): Promise<AliasResult<T>> =>
       options.registryDown === "throws"
@@ -474,6 +592,7 @@ export function createRemoteThreadFixture() {
               },
     }
     const remote: RemoteThreadSurface = {
+      loadProjector: async () => senpiProjector,
       client: fakeRemoteClient({
         state: () => options.plan ?? "connected",
         // This device's own id comes from the same account read: unknown names no device, a failed read fails it.
@@ -532,9 +651,17 @@ export function createRemoteThreadFixture() {
           return answer(rpc)
         },
         // This fake device lists a created session by the id its create reply names.
-        locate: async (_device, engineId) => {
+        locate: async (device, engineId) => {
+          located.push({ device, session: engineId })
+          if (options.locateRefuse !== undefined) return { kind: "refused", reason: options.locateRefuse }
           // A device's relay connector keys each session it lists by a relay key, kept beside the durable id (relayKeys).
-          if (options.relayKeys === undefined) return { kind: "ok", sessionId: engineId }
+          // Without relay keys, the key the engine holds the session under now: a listed key it runs, else the id itself.
+          if (options.relayKeys === undefined) {
+            const listedKeys = [B_ROW, ...(options.rows ?? [])]
+              .filter((row) => row.durable_id === engineId)
+              .map((row) => row.session_id)
+            return { kind: "ok", sessionId: listedKeys.find((key) => live.has(key)) ?? engineId }
+          }
           const key = options.relayKeys.get(engineId)
           return key === undefined ? { kind: "refused", reason: "session_not_found" } : { kind: "ok", sessionId: key }
         },
@@ -650,6 +777,7 @@ export function createRemoteThreadFixture() {
       watching,
       endWatches,
       accountReads,
+      located,
     }
   }
 
@@ -658,6 +786,7 @@ export function createRemoteThreadFixture() {
     extra: {
       callerCause?: () => string | undefined
       callerChainHop?: () => number
+      callerWorkspaceRoot?: string
       callerName?: () => string | undefined
       callerReplyTargets?: () => readonly string[]
       callerReplySenders?: () => readonly {
@@ -671,10 +800,23 @@ export function createRemoteThreadFixture() {
       caller?: string
       diskSessions?: readonly string[]
       closeOutcome?: ThreadCloseOutcome
+      /** The deliveries this device's host hands back unread when it closes (omo#14234). */
+      closeDropped?: readonly string[]
+      /** How this device's engine takes `set_session_archived`: `absent` = a host port without it, `refused` = an older engine. */
+      archive?: "absent" | "refused"
       /** Look session files up where senpi writes them, `<agentDir>/sessions`, as the component does. */
       sessionsDirectory?: boolean
       /** This device's engine refuses every open_session with this error text, as its host client throws it. */
       openThrows?: string
+      /**
+       * #14060: the first N opens CREATE the session (under the asked `durableSessionId`, as a host with that capability
+       * does) and then lose the reply: the connection closes before the response arrives.
+       */
+      openLosesReply?: number
+      /** With `openLosesReply`: the next listing after a lost reply fails too, so the create cannot recover on the spot. */
+      listFailsAfterLostReply?: boolean
+      /** With `openLosesReply`: the host has no `durable_session_id` capability and creates under an id of its own. */
+      ignoresDurableSessionId?: boolean
     } = {},
   ) {
     const engine = extra.engine ?? ENGINE
@@ -686,30 +828,66 @@ export function createRemoteThreadFixture() {
       status: "open",
     }
     const sessions = extra.sessions ?? [local]
-    const openSession = mock(async (_request: Parameters<ThreadHost["openSession"]>[0]) => {
+    let lostReplies = extra.openLosesReply ?? 0
+    let listFails = false
+    const openSession = mock(async (request: Parameters<ThreadHost["openSession"]>[0]) => {
       if (extra.openThrows !== undefined) throw new Error(extra.openThrows)
+      // An engine opening a session file on disk resumes it under the id in that file's header, as senpi does.
+      const resumed =
+        "sessionPath" in request && typeof request.sessionPath === "string" && existsSync(request.sessionPath)
+          ? (JSON.parse(readFileSync(request.sessionPath, "utf8").split("\n")[0] ?? "{}") as { id?: string }).id
+          : undefined
+      const losing = extra.openLosesReply !== undefined
       const created: ThreadHostSession = {
-        sessionId: "route-created",
-        durableSessionId: "dur-created-here",
+        sessionId: losing ? `route-created-${sessions.length}` : "route-created",
+        durableSessionId:
+          resumed ??
+          (losing && extra.ignoresDurableSessionId !== true && request.durableSessionId !== undefined
+            ? request.durableSessionId
+            : losing
+              ? `dur-created-${sessions.length}`
+              : "dur-created-here"),
         cwd: process.cwd(),
         name: null,
         status: "open",
       }
       sessions.push(created)
+      if (lostReplies > 0) {
+        lostReplies -= 1
+        listFails = extra.listFailsAfterLostReply === true
+        throw new Error("thread RPC connection closed before the response arrived")
+      }
       return created
     })
     const closed: Array<readonly [string, string | undefined]> = []
+    const forcedCloses: string[] = []
     // The interrupt records this device's endpoint received, as b's engine's arrive in `sent`.
     const interrupts: JsonObject[] = []
     const setSessionName = mock(async (_sessionId: string, _name: string) => {})
+    const archived: Array<readonly [string, boolean, string | undefined]> = []
+    const setSessionArchived = async (sessionId: string, value: boolean, durableId?: string) => {
+      if (extra.archive === "refused") throw new Error("unsupported:set_session_archived")
+      archived.push([sessionId, value, durableId])
+    }
     // How often this device's endpoints were listed (the local enumeration a send can cost).
     let localListings = 0
     // How often a session on this device was prompted directly (a delivery never prompts; this counts any leak).
     let localPrompts = 0
+    // The session watches open on this device's endpoint, as b's are in `watchers`; `watching` settles at the first.
+    const watchers = new Set<SessionWatchHandlers>()
+    const ends = new Set<(reason: string) => void>()
+    let watchStarted: () => void = () => {}
+    const watching = new Promise<void>((resolve) => {
+      watchStarted = resolve
+    })
     const host: ThreadHost = {
       socket: "/tmp/thread-remote-test.sock",
       listSessions: async () => {
         localListings += 1
+        if (listFails) {
+          listFails = false
+          throw new Error("thread RPC connection closed before the response arrived")
+        }
         return sessions
       },
       openSession,
@@ -731,9 +909,31 @@ export function createRemoteThreadFixture() {
           throw new Error(`thinking_level_unsupported:Thinking level ${level} is not supported by the active model.`)
       },
       getAvailableThinkingLevels: async () => [...THINKING_LEVELS],
-      closeSession: async (sessionId, durableId) => {
+      closeSession: async (sessionId, durableId, options) => {
         closed.push([sessionId, durableId])
-        return extra.closeOutcome ?? "closed"
+        if (options?.force === true) forcedCloses.push(sessionId)
+        return { outcome: extra.closeOutcome ?? "closed", dropped_deliveries: extra.closeDropped ?? [] }
+      },
+      ...(extra.archive === "absent" ? {} : { setSessionArchived }),
+      watchSession: async (_sessionId, handlers) => {
+        watchers.add(handlers)
+        let end: (reason: string) => void = () => {}
+        const ended = new Promise<string>((resolve) => {
+          end = resolve
+        })
+        ends.add(end)
+        watchStarted()
+        return {
+          kind: "ok",
+          watch: {
+            ended,
+            initial: { status: engine.streaming ? "running" : "idle" },
+            stop: () => {
+              watchers.delete(handlers)
+              end("stopped")
+            },
+          },
+        }
       },
     }
     const agentDir = mkdtempSync(join(tmpdir(), "thread-remote-"))
@@ -752,12 +952,12 @@ export function createRemoteThreadFixture() {
     }))
     const caller = extra.caller ?? "dur-caller"
     // Every delivery the gateway takes for a session on this device, by target: a local thread_send's real call.
-    const enqueued: string[] = []
+    const enqueued: Array<Parameters<GatewayStore["enqueue"]>[0]> = []
     const countedStore = new Proxy(store, {
       get: (target, property, receiver) =>
         property === "enqueue"
           ? (request: Parameters<GatewayStore["enqueue"]>[0]) => {
-              enqueued.push(request.target_durable_id)
+              enqueued.push(request)
               return target.enqueue(request)
             }
           : Reflect.get(target, property, receiver),
@@ -769,7 +969,7 @@ export function createRemoteThreadFixture() {
       diskSessions: () => disk,
       ...(extra.sessionsDirectory === true ? { sessionsDirectory: () => join(agentDir, "sessions") } : {}),
       callerSessionId: () => caller,
-      callerWorkspaceRoot: () => process.cwd(),
+      callerWorkspaceRoot: () => extra.callerWorkspaceRoot ?? process.cwd(),
       remote,
       ...(extra.callerReplyTargets === undefined ? {} : { callerReplyTargets: extra.callerReplyTargets }),
       ...(extra.callerReplySenders === undefined ? {} : { callerReplySenders: extra.callerReplySenders }),
@@ -800,11 +1000,19 @@ export function createRemoteThreadFixture() {
       setSessionName,
       store,
       closed,
+      forcedCloses,
+      archived,
       interrupts,
       agentDir,
       listings: () => localListings,
       prompts: () => localPrompts,
-      enqueuedFor: (durableId: string) => enqueued.filter((target) => target === durableId).length,
+      watchers,
+      watching,
+      endWatches: (reason: string) => {
+        for (const end of [...ends]) end(reason)
+      },
+      enqueuedFor: (durableId: string) => enqueued.filter((request) => request.target_durable_id === durableId).length,
+      enqueuedRequests: (durableId: string) => enqueued.filter((request) => request.target_durable_id === durableId),
     }
   }
 

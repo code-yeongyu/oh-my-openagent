@@ -2,12 +2,17 @@ import { PROVENANCE_MIGRATION } from "./provenance-record"
 
 export class GatewaySchemaVersionError extends Error {
   readonly code = "gateway_schema_too_new"
-  constructor(
-    readonly found: number,
-    readonly supported: number,
-    scope = "Gateway",
-  ) {
-    super(`${scope} schema ${found} is newer than this binary's supported version ${supported}.`)
+  /**
+   * Both versions, carried across the store worker so a caller names them without reading the message. An extension's
+   * own schema names the extension, so its migration counts are never read as the gateway's (`errors.ts`
+   * `gatewaySchemaRefusal`).
+   */
+  readonly details: { readonly found: number; readonly supported: number; readonly extension?: string }
+  constructor(found: number, supported: number, extension?: string) {
+    super(
+      `${extension === undefined ? "Gateway" : `Extension ${extension}`} schema ${found} is newer than this binary's supported version ${supported}.`,
+    )
+    this.details = extension === undefined ? { found, supported } : { found, supported, extension }
   }
 }
 

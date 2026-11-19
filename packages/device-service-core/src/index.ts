@@ -19,6 +19,7 @@ export {
   ColdWakeUnitError,
   installColdWake,
   readColdWake,
+  refreshColdWake,
   type UnitState,
   SessionHostLaunch,
   uninstallColdWake,

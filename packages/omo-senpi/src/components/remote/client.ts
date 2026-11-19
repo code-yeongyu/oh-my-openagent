@@ -1,8 +1,10 @@
+import { lendConnection } from "./connection-of"
 import { existsSync } from "node:fs"
 import { hostname } from "node:os"
 import {
   connectDeviceService,
   deviceServiceEndpointPath,
+  deviceServiceAbsence,
   deviceServiceStateDir,
   realTimers,
   type DeviceService,
@@ -184,7 +186,25 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
 
   // A cold connect is bounded by the handshake plus CONNECT_SLACK_MS before the member's own clock starts.
   const connected = async (opts: Opts | undefined): Promise<Outcome<DeviceService> | "not_installed"> => {
-    if (!existsSync(deviceServiceEndpointPath(stateDir))) return "not_installed"
+    if (!existsSync(deviceServiceEndpointPath(stateDir))) {
+      // A signed-in device with no endpoint is a service not serving right now, never "not installed" (#14172): retryable
+      // while it restarts or updates, and a service to start when nothing holds its state.
+      const absence = deviceServiceAbsence(stateDir, timers.now())
+      if (absence === "not_installed") return "not_installed"
+      return absence === "restarting"
+        ? remoteFailure(
+            "host_unavailable",
+            "The device service is restarting; its endpoint is not up yet.",
+            nextActionFor("host_unavailable"),
+            { details: { phase: "connect", reason: "service_restarting" } },
+          )
+        : remoteFailure(
+            "host_unavailable",
+            "The device service is set up on this device but not running.",
+            "Start the device service (omo remote bootstrap), then retry.",
+            { details: { phase: "connect", reason: "service_not_running" } },
+          )
+    }
     const outcome = await withinDeadline(
       timers,
       opts?.signal === undefined ? undefined : { signal: opts.signal },
@@ -318,6 +338,7 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
     })
 
   let built: RemoteClient | undefined
+  let closed = false
   const self = (): RemoteClient => {
     if (built === undefined) throw new Error("the remote client was used before it was built")
     return built
@@ -408,6 +429,7 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
     attach: attachMember(core),
     aliases: aliasMembers(core),
     close: () => {
+      closed = true
       const open = service
       service = undefined
       void open?.then(
@@ -416,11 +438,25 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
       )
     },
   }
+  // The thread runtime's port rides this client's one connection (connection-of.ts). A connect failure is thrown as the
+  // port's own connect throws it (the typed local-API error), and a closed client opens nothing again.
+  lendConnection(built, {
+    shared: async () => {
+      if (closed) throw new Error("The remote client is closed.")
+      if (!existsSync(deviceServiceEndpointPath(stateDir)))
+        throw new Error("The device service is not installed on this device.")
+      return await connection()
+    },
+    dial: async () => {
+      if (closed) throw new Error("The remote client is closed.")
+      return await dial()
+    },
+  })
   return built
 }
 
-// The listing carries one display name per session (its title); archive state has no layer yet (E-archive), so every
-// row is unarchived. The handle is the `<device>/<session>` form seam 1 parses.
+// The listing carries one display name per session (its title), and from rows 4 its model and archived flag (a service
+// before rows 4 lists neither: unarchived, model unknown). The handle is the `<device>/<session>` form seam 1 parses.
 const sessionRow = (row: ListingRow, device: DeviceRow): SessionRow => ({
   thread: handleOf(row.device, row.session_id),
   ...durableIdOf(row),
@@ -430,7 +466,8 @@ const sessionRow = (row: ListingRow, device: DeviceRow): SessionRow => ({
   project: row.project,
   path: row.path,
   state: row.state,
-  archived: false,
+  archived: row.archived === true,
+  ...(row.model === undefined ? {} : { model: `${row.model.provider}/${row.model.id}` }),
   updated_ms: row.updated_ms,
   source: row.source,
 })

@@ -136,11 +136,21 @@ missing required field, or a field one variant of a message defines carried by a
 | `owner.shutdown_for_upgrade` | `target_version` (semver)                                                | `{}`                                                                 | installer clients only; the service then stops                        |
 | `control.attach.get`         |                                                                          | `{attached, changedAt}`                                              | desktop and CLI clients; never set reads attached with changedAt ""   |
 | `control.attach.set`         | `attached` (boolean)                                                     | `{attached, changedAt}`                                              | desktop and CLI clients; persists; detached refuses other devices     |
+| `control.session_wake.get`   |                                                                          | `{enabled, stored, changedAt, overridden}`                           | desktop and CLI clients; local only, never over the transport         |
+| `control.session_wake.set`   | `enabled` (boolean or null)                                              | `{enabled, stored, changedAt, overridden}`                           | desktop and CLI clients; persists; null follows the build default     |
 
 Keys for `device.adopt`: the standard base64 (padded) of the key's PKCS#8 DER, 48 bytes: the body of a PEM file without
 its header, footer and line breaks. The signing key is Ed25519 (OID 1.3.101.112), the sealing key X25519
 (OID 1.3.101.110); a key of the other algorithm, another length, or anything that is not exactly that encoding is
 refused `invalid_request`. The local API checks the shape only; the service checks the keys themselves.
+
+The wake switch (`control.session_wake.*`, omo#13037 A7.2.1) says whether a session on this device that is not running
+may be started by a message from another of the account's devices. `enabled` is the value in effect. `stored` is what the
+device holds: `true`, `false`, `null` (nothing stored, so the build default applies) or `"unreadable"` (a stored value
+that does not parse, or a read that failed); a set replaces it, which is how an unreadable value is repaired, and a set
+of `null` removes the stored value. `changedAt` is the RFC 3339 UTC time of the last set, or `""` when nothing was ever
+stored. `overridden` is true when this run of the service cannot carry the wake whatever the switch says. Any other
+client is refused `forbidden`.
 
 `environments` in `enforcement.report` is a list of `{environment_id, revoked, closed}` with unique ids and
 non-negative integer counts; `complete` is true only when every environment of that home reported for `generation`.
@@ -248,8 +258,12 @@ not know, kept as reported); absent means unknown, not interactive. `parent` is 
 was started from, on the same `device`, and `parent_listed` says whether that row is in this listing (false: show the
 link unresolved). `rows: 3` (#12996) gets the `rows: 2` fields and may also carry `durable_id`, the durable engine
 session id of the listed session (1-128 characters, as `session.locate`'s `engine_id`); a row without it comes from a
-host that does not report it. Below `rows: 3` a row never carries `durable_id`. A service before `rows` answers it
-`invalid_request`, and a service before `rows: 3` answers `rows: 3` the same way. `detached` reasons:
+host that does not report it. Below `rows: 3` a row never carries `durable_id`. `rows: 4` (omo-relay-spec#295) gets
+the `rows: 3` fields and may also carry `model` (`{provider, id}`, 1-64 and 1-128 characters: the session's current
+model as its engine names it; absent when the host does not report one) and `archived: true` (the engine archived the
+session; absent means not archived). Below `rows: 4` a row never carries either. A service before `rows` answers it
+`invalid_request`, and a service before `rows: 3` (or `rows: 4`) answers that version the same way; a client steps
+down one version and keeps listing. `detached` reasons:
 `authorization_expired`, `activation_pending`, `service_disabled`, `owner_transfer`, `peer_revoked`,
 `stream_key_pending`, `peer_detached`, `blob_failed`, `session_closed`, `session_replaced`. `session_closed` and
 `session_replaced` (decision 0013 amendment 2026-11-03) mean the host's engine closed the attached session, or now

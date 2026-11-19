@@ -16,6 +16,7 @@ export type {
   BuiltinCategoryDefinition,
   CategoryModelSelection,
   CategoryResolutionResult,
+  ModelSelectionSource,
   ResolveCategoryOptions,
   ResolvedChildSpec,
   SenpiModelPort,

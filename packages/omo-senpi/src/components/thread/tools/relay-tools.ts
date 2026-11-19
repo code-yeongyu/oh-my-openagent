@@ -10,7 +10,7 @@ import {
   type ThreadToolName,
   type ThreadToolResult,
 } from "../contracts"
-import type { ThreadErrorCode } from "../errors"
+import { gatewaySchemaRefusal, type ThreadErrorCode } from "../errors"
 import type { GatewayRelay } from "../gateway/relay"
 import { metadata, output, type AnyTool, type ToolOutput } from "./internals"
 import { UNKNOWN_CALLER, type ThreadToolSurfaceOptions } from "./ports"
@@ -26,21 +26,6 @@ export type RelayToolsContext = {
     next: string,
     details?: Readonly<Record<string, unknown>>,
   ) => ThreadToolResult
-}
-
-/**
- * The chat-binding tools a session no longer has. senpi answers a call to one of them with its hint instead of a bare
- * unknown-tool error, so a session that remembers the tool from an older transcript learns why it is gone.
- */
-const GATEWAY_BINDS =
-  "the always-on gateway keeps this session's chat binding, so a session never binds, rebinds or unbinds a chat thread. Report to the bound chat with thread_report."
-
-export const REMOVED_RELAY_TOOL_HINTS: Readonly<Record<string, string>> = {
-  thread_bind: `thread_bind was removed: ${GATEWAY_BINDS}`,
-  thread_unbind: `thread_unbind was removed: ${GATEWAY_BINDS}`,
-  thread_rebind: `thread_rebind was removed: ${GATEWAY_BINDS}`,
-  thread_bindings:
-    "thread_bindings was removed: thread_report finds this session's chat binding on its own, and when that is ambiguous its refusal lists the candidate binding_ids.",
 }
 
 type Call<T extends RelayToolName> = {
@@ -84,6 +69,8 @@ export function createRelayTools(context: RelayToolsContext): AnyTool[] {
       )
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
+      const schema = gatewaySchemaRefusal(error)
+      if (schema !== undefined) return output({ kind: "error", error: schema })
       if (message.startsWith("host_unavailable:"))
         return output(
           failure(
@@ -96,7 +83,7 @@ export function createRelayTools(context: RelayToolsContext): AnyTool[] {
         failure(
           "internal_error",
           `Thread relay operation failed: ${message}`,
-          "Retry; thread_report without binding_id uses the chat binding the gateway keeps for this session.",
+          "Retry; thread_report (tool.thread_report() in an eval cell) without binding_id uses the chat binding the gateway keeps for this session.",
         ),
       )
     }
@@ -146,7 +133,7 @@ export function createRelayTools(context: RelayToolsContext): AnyTool[] {
           return failure(
             "idempotency_uncertain",
             "An earlier completion report under this key was recorded without its arm sequence, and the session has no completion armed now: its completion was already written, or the arm is gone.",
-            "Read the binding's outbox with thread_outbox to see whether the completion was sent; to arm another, report again under a new idempotency_key.",
+            "Read the binding's outbox with thread_outbox (tool.thread_outbox() in an eval cell) to see whether the completion was sent; to arm another, report again under a new idempotency_key.",
           )
         options.onCompletionArmed?.(callerId, durableArmSeq)
       }

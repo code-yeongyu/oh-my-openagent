@@ -7,7 +7,7 @@
 
 #define CF_EPOCH_OFFSET 978307200.0
 
-store_options store = {NULL, false};
+store_options store = {NULL, false, false};
 
 static CFStringRef cf_string(const char *text) { return CFStringCreateWithCString(NULL, text, kCFStringEncodingUTF8); }
 
@@ -147,8 +147,28 @@ OSStatus unlock_holder(SecKeychainItemRef item) {
   return status;
 }
 
-// The decrypt list holds the helper's own designated requirement and nothing else; never an "any application" entry.
+// In OmO's own keychain (#13116 r2) the key file already hands every same-user process the keychain password, so an
+// item ACL there is no boundary: decrypt is open to any application, which keeps every helper copy prompt-free.
+static SecAccessRef any_application_access(OSStatus *status) {
+  CFStringRef description = cf_string(SERVICE);
+  SecAccessRef access = NULL;
+  *status = SecAccessCreate(description, NULL, &access);
+  CFArrayRef acls = *status == errSecSuccess ? SecAccessCopyMatchingACLList(access, kSecACLAuthorizationDecrypt) : NULL;
+  for (CFIndex i = 0; acls != NULL && i < CFArrayGetCount(acls) && *status == errSecSuccess; i++)
+    *status = SecACLSetContents((SecACLRef)CFArrayGetValueAtIndex(acls, i), NULL, description, 0);
+  if (acls != NULL) CFRelease(acls);
+  CFRelease(description);
+  if (*status != errSecSuccess && access != NULL) {
+    CFRelease(access);
+    access = NULL;
+  }
+  return access;
+}
+
+// The decrypt list holds the helper's own designated requirement and nothing else; never an "any application" entry
+// in the login keychain.
 static SecAccessRef owner_access(OSStatus *status) {
+  if (store.dedicated) return any_application_access(status);
   SecTrustedApplicationRef self = NULL;
   *status = SecTrustedApplicationCreateFromPath(NULL, &self);
   if (*status != errSecSuccess) return NULL;
@@ -214,10 +234,14 @@ OSStatus rename_item(const char *from, const char *to) {
   return status;
 }
 
+// Deletes the exact item the silent lookup found, so it is the one in the keychain that holds <account>. SecItemDelete
+// is not used: on a file keychain it first compares the caller's name with the item's decrypt list and answers
+// errSecInvalidOwnerEdit (-25244) itself, so a helper copy at another path (every launch copies the helper to a fresh
+// directory) could never sign out. SecKeychainItemDelete leaves the decision to the keychain, which allows it.
 OSStatus delete_item(const char *account) {
-  CFMutableDictionaryRef query = item_query(account, true);
-  scope_to_holder(query, account);
-  OSStatus status = SecItemDelete(query);
-  CFRelease(query);
+  item_state found = {0};
+  OSStatus status = lookup_attributes(account, &found);
+  if (status == errSecSuccess) status = found.item == NULL ? errSecItemNotFound : SecKeychainItemDelete(found.item);
+  item_state_release(&found);
   return status;
 }

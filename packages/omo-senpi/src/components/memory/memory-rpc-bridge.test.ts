@@ -799,7 +799,7 @@ describe("memory rpc bridge sync field (omo #10637)", () => {
   const cases: ReadonlyArray<readonly [string, SyncStatusReader, MemoryRpcSync | undefined]> = [
     [
       "synced",
-      async () => ({ kind: "synced", at: Date.parse("2026-10-22T10:00:00.000Z"), updatedWhileOffline: 0 }),
+      async () => ({ kind: "synced", at: Date.parse("2026-10-22T10:00:00.000Z") }),
       { state: "synced", lastSyncedAtISO: "2026-10-22T10:00:00.000Z" },
     ],
     ["never synced", async () => ({ kind: "never_synced" }), { state: "never_synced" }],
