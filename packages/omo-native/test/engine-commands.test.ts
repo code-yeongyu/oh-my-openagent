@@ -190,3 +190,34 @@ describe("the npm launcher hands engine commands over unchanged (#9572)", () => 
     expect(launched.argv).toEqual(["--extension", join(fixture.packageRoot, "plugin"), "models", "are", "great"])
   })
 })
+
+// omo#14253: the engine's entry (dist/cli.js) also dispatches one-shot verbs of its own before any session starts
+// (`dispatch<Name>Command(argv)`). Each one must reach it with the verb first; one that omo rewrote (a leading
+// `--extension`) silently became a chat launch, as session-of-pid did in 5.1.78. The verbs are read from the engine
+// itself, and the scan fails closed: finding fewer than the verbs known today means it could no longer read them.
+describe("every verb the engine entry dispatches reaches it with the verb first (omo#14253)", () => {
+  test("#given the installed engine's dist/cli.js dispatch calls #when each dispatched verb is routed #then omo hands it over unchanged or answers it before boot", () => {
+    // given
+    const entry = readFileSync(join(ENGINE_ROOT, "dist", "cli.js"), "utf8")
+    const modules = [...entry.matchAll(/import \{ (dispatch[A-Za-z]+Command) \} from "\.\/(cli\/[a-z-]+)\.js";/g)]
+      .filter((match) => new RegExp(`await ${match[1]}\\(`).test(entry))
+      .map((match) => match[2] ?? "")
+    const verbs = modules.map((module) => {
+      const source = readFileSync(join(ENGINE_ROOT, "dist", `${module}.js`), "utf8")
+      const first = /args\[0\] !== "([^"]+)"/.exec(source)?.[1]
+      const second = /args\[1\] !== "([^"]+)"/.exec(source)?.[1]
+      if (first === undefined) throw new Error(`cannot read the verb ${module} dispatches`)
+      return second === undefined ? [first] : [first, second]
+    })
+    // then: fail closed on a scan that reads less than today's verbs
+    expect(verbs).toEqual(expect.arrayContaining([["__kill-guard"], ["config", "agent-dir"], ["session-of-pid"]]))
+    for (const argv of verbs) {
+      // __kill-guard is answered by compile-entry.ts before any boot step (#13449), never by the engine entry
+      if (argv[0] === "__kill-guard") continue
+      expect({ argv, routed: buildSenpiArgs([...argv, "x"], "/omo").slice(0, argv.length) }).toEqual({
+        argv,
+        routed: argv,
+      })
+    }
+  })
+})
