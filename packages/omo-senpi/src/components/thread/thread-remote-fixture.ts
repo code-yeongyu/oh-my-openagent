@@ -307,6 +307,12 @@ export function createRemoteThreadFixture() {
       }
       /** b knows a session it just opened only by its relay key (relayKeys), not by its durable id: a listing that has not caught up yet. */
       relayKeyOnly?: boolean
+      /**
+       * #14394: b's engine takes an open_session, but b's route never lists the session it made (a Desktop host whose
+       * sessions the service does not route): every session command to it is refused (`unlistedReason`), while an
+       * endpoint command (the open's own path) still reaches the engine that holds it.
+       */
+      openUnrouted?: boolean
       /** The device service throws on b's admit_external_message (a lost connection mid-delivery). */
       admitThrows?: string
       /** Every get_state after b admitted a delivery is refused with this reason (the read after the admission fails). */
@@ -368,6 +374,8 @@ export function createRemoteThreadFixture() {
       options.live ?? [B_ROW.session_id, ...(B_ROW.durable_id === undefined ? [] : [B_ROW.durable_id])],
     )
     // b's engine's run and its unwritten deliveries (omo#14234); an interrupting unload ends the one and hands back the other.
+    // The sessions b's engine holds that b's route does not list (openUnrouted), by the engine's routing id.
+    const unrouted = new Set<string>()
     let busy = options.busy === true
     const unread = [...(options.unread ?? [])]
     const capable = options.refusesDeliveries !== false
@@ -394,6 +402,9 @@ export function createRemoteThreadFixture() {
         if (options.protocolInfoFails === true) return { kind: "refused", reason: "request_timeout" }
         return ok({ capabilities: capable ? ["unload_session", "unload_refuse_deliveries"] : ["unload_session"] })
       }
+      // An endpoint unload (no attach) of a session b's engine holds unrouted ends it there (#14394's rollback path).
+      if (rpc["type"] === "unload_session" && attachedTo === undefined && unrouted.delete(String(rpc["sessionId"])))
+        return ok({ outcome: "unloaded" })
       if (rpc["type"] === "unload_session" && attachedTo !== undefined) {
         if (options.unloadReason !== undefined)
           return ok({ outcome: "refused", reason: options.unloadReason, detail: `refused: ${options.unloadReason}` })
@@ -471,7 +482,8 @@ export function createRemoteThreadFixture() {
                 ? undefined
                 : Object.entries(sessionFiles).find(([, file]) => file === rpc["sessionPath"])?.[0]) ?? "dur-on-b")
         const key = options.relayKeys?.get(opened) ?? opened
-        for (const id of options.relayKeyOnly === true ? [key] : [opened, key]) live.add(id)
+        if (options.openUnrouted === true) unrouted.add("rpc-9")
+        else for (const id of options.relayKeyOnly === true ? [key] : [opened, key]) live.add(id)
         return ok(options.openData ?? { sessionId: "rpc-9", state: { durableSessionId: opened } })
       }
       if (rpc["type"] === "get_state" && stateOutcomes.length > 0) return stateOutcomes.shift() as RemoteCommandOutcome
