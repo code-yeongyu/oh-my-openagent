@@ -2,7 +2,7 @@ import { devicesSilent, THREAD_ID_SHAPE } from "@oh-my-opencode/thread-address-c
 import { fuzzyContenders, type ThreadAddressEntry } from "../addressing"
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import { relayAddressEntry } from "../remote/address-book"
-import type { RemoteThreadSurface } from "../remote/ports"
+import type { RemoteSessionRow, RemoteThreadSurface } from "../remote/ports"
 import { holderTarget } from "../remote/remote-ops"
 import type { Account, AccountRead } from "./account"
 import { ladder, type LadderResult } from "./ladder"
@@ -20,6 +20,15 @@ type Book = {
   readonly unavailable?: ThreadToolFailure
   /** The alias named a holder the account cannot reach right now (device_offline / not_found): answered as is. */
   readonly aliasFailure?: ThreadToolFailure
+}
+
+/**
+ * A listing row as an address entry. A row that publishes no thread id is addressed by its listing key alone, so the key
+ * is its session id (the ladder's session-id step); remote/address-book.ts relayAddressEntry gives it none.
+ */
+export function listedEntry(row: RemoteSessionRow, aliases?: readonly string[]): ThreadAddressEntry {
+  const entry = relayAddressEntry(row, aliases)
+  return entry.thread_id === "" && row.session_id !== "" ? { ...entry, session_ids: [row.session_id] } : entry
 }
 
 export const deviceNameOf =
@@ -46,7 +55,7 @@ async function accountBook(remote: RemoteThreadSurface, text: string, read: Acco
   if (read.kind === "none") return { entries: [] }
   if (read.kind === "unavailable") return { entries: [], unavailable: read.error }
   const account = read.account
-  const entries = account.rows.filter((row) => row.device !== account.here).map((row) => relayAddressEntry(row))
+  const entries = account.rows.filter((row) => row.device !== account.here).map((row) => listedEntry(row))
   const book = { entries, account }
   if (remote.aliases === undefined) return book
   const alias = await remote.aliases.resolve(text).catch(() => undefined)
@@ -73,7 +82,7 @@ async function accountBook(remote: RemoteThreadSurface, text: string, read: Acco
   const row = holder.row
   return {
     ...book,
-    entries: [...entries.filter((entry) => entry.transport?.row !== row), relayAddressEntry(row, [text])],
+    entries: [...entries.filter((entry) => entry.transport?.row !== row), listedEntry(row, [text])],
   }
 }
 

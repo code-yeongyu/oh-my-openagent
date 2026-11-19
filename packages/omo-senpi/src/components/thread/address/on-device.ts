@@ -7,10 +7,10 @@ import {
   type DeviceRef,
 } from "@oh-my-opencode/thread-address-core"
 import { namedDeviceRow, relayAddressEntry } from "../remote/address-book"
-import type { RemoteThreadSurface } from "../remote/ports"
+import { rowThreadId, type RemoteThreadSurface } from "../remote/ports"
 import { holderTarget } from "../remote/remote-ops"
 import type { Account } from "./account"
-import { deviceNameOf } from "./bare"
+import { deviceNameOf, listedEntry } from "./bare"
 import { ladder } from "./ladder"
 import { pinned } from "./probe"
 import { toolRefusal, withAddresses, type ThreadRefusal } from "./refusals"
@@ -27,7 +27,7 @@ async function aliasOn(
   if (held === undefined || held.kind === "error" || held.value.device !== device) return undefined
   const holder = await holderTarget(remote, held.value, account.here, account.rows, account.roster)
   return "where" in holder && holder.where === "remote"
-    ? { kind: "ok", entry: relayAddressEntry(holder.row, [alias]), resolution: "alias", all_scope: true }
+    ? { kind: "ok", entry: listedEntry(holder.row, [alias]), resolution: "alias", all_scope: true }
     : undefined
 }
 
@@ -51,16 +51,28 @@ export async function resolveOnDevice(
     return hit.kind === "ok" ? { ...hit, all_scope: opts.all_scope } : withAddresses(hit, account.here, names)
   }
   const rows = account.rows.filter((row) => row.device === device.id)
-  const entries = rows.map((row) => relayAddressEntry(row))
-  if (THREAD_ID_SHAPE.test(thread)) {
-    const listed = rows.find((row) =>
-      sameSession({ device: device.id, thread }, { device: row.device, thread: row.durable_id, key: row.session_id }),
-    )
-    // Not listed: that one device is asked, as a pinned reply asks it (design section 3 step 8, review H1).
-    if (listed === undefined) return await pinned(remote, { device: device.id, thread })
-    return { kind: "ok", entry: relayAddressEntry(listed), resolution: "id", all_scope: true }
-  }
-  const hit = ladder(ctx, entries, thread, { ...opts, all_scope: true })
+  // The device's own row for that thread id, or for that listing key when the row publishes no thread id.
+  const listed = rows.find((row) =>
+    sameSession(
+      { device: device.id, thread, key: thread },
+      { device: row.device, thread: rowThreadId(row), key: row.session_id },
+    ),
+  )
+  if (listed !== undefined)
+    return {
+      kind: "ok",
+      entry: listedEntry(listed),
+      resolution: THREAD_ID_SHAPE.test(thread) ? "id" : "session_id",
+      all_scope: true,
+    }
+  // Not listed: that one device is asked, as a pinned reply asks it (design section 3 step 8, review H1).
+  if (THREAD_ID_SHAPE.test(thread)) return await pinned(remote, { device: device.id, thread })
+  const hit = ladder(
+    ctx,
+    rows.map((row) => listedEntry(row)),
+    thread,
+    { ...opts, all_scope: true },
+  )
   if (hit.kind === "ok") return { ...hit, all_scope: true }
   if (hit.code === "ambiguous_target") return withAddresses(hit, account.here, names)
   const alias = await aliasOn(remote, account, device.id, thread)
