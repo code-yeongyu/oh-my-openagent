@@ -2,12 +2,7 @@ import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import type { ThreadToolResult } from "../contracts"
 import { threadToolFailure } from "../errors"
 import { endpointOutcomeFailure } from "./outcome"
-import {
-  type JsonObject,
-  type RemoteCommandOutcome,
-  type RemoteSessionRow,
-  type RemoteThreadSurface,
-} from "./ports"
+import { type JsonObject, type RemoteCommandOutcome, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
 import { replyData } from "./remote-ops"
 
 // What an engine that predates `find_session` (senpi#6429) answers it with; relayd refuses a record type the engine's

@@ -4,12 +4,7 @@ import { threadToolFailure } from "../errors"
 import { displayedThread } from "../control/relay-session-host"
 import { threadRow } from "../tools/thread-row"
 import { listedStates } from "../tools/thread-state"
-import {
-  type AliasRegistry,
-  type RemoteDevice,
-  type RemoteSessionRow,
-  type RemoteThreadSurface,
-} from "./ports"
+import { type AliasRegistry, type RemoteDevice, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
 import { remoteNotSetUp } from "./address-book"
 import { readAccount } from "../address/account"
 import type { WorktreeRequest } from "../worktree/thread-worktree"

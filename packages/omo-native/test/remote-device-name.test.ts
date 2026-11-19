@@ -118,7 +118,10 @@ describe("omo remote sessions takes the device the table prints (#14305)", () =>
       last_seen_ms: 1_790_000_000_000,
       online: true,
     }
-    const result = await run(["sessions", "--device", "Studio", "--json"], { ...world, devices: [...world.devices, twin] })
+    const result = await run(["sessions", "--device", "Studio", "--json"], {
+      ...world,
+      devices: [...world.devices, twin],
+    })
     // The exit the CLI unit pins for a typed ambiguous answer (remote-cli.test.ts): failed, with the answer on stdout.
     expect(result.code).toBe(REMOTE_EXIT.failed)
     const answer = JSON.parse(result.out.join("")) as {

@@ -317,7 +317,8 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
       const end = timers.now() + (opts?.deadlineMs ?? DEADLINES.sessionsList)
       // A device filter is resolved before the listing is read, within this one call (the CLI's one-call budget).
       const roster = filter?.device === undefined ? undefined : await listDevices(svc)
-      const device = roster === undefined || filter?.device === undefined ? filter?.device : deviceFilter(roster, filter.device)
+      const device =
+        roster === undefined || filter?.device === undefined ? filter?.device : deviceFilter(roster, filter.device)
       if (typeof device === "object") return device
       const [listing, devices] = await Promise.all([
         svc.sessions({
@@ -334,7 +335,8 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
       // This device's own sessions come from its own operator endpoint (#13787): the service's listing does not carry
       // the asking device's sessions.
       const self = devices.find((row) => row.self === true && row.kind !== "local")
-      const local = self === undefined || (device !== undefined && device !== self.id) ? [] : await localRowsBefore(end, self)
+      const local =
+        self === undefined || (device !== undefined && device !== self.id) ? [] : await localRowsBefore(end, self)
       // One thread, one row: this device's rows from its own endpoint, and a listing row whose thread this device already
       // lists is not listed again. A listing row of this device that its endpoint does not list stays: with no operator
       // endpoint running here (or one that did not answer) it is the only row of that session.

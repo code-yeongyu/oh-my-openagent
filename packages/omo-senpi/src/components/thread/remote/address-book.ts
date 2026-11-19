@@ -102,7 +102,7 @@ function rememberListed(port: object, rows: readonly RemoteSessionRow[]): void {
 }
 
 /** One account listing round with the devices it could not include; a port without `listing` reports none missing. */
-export async function accountListing(remote: RemoteThreadSurface): Promise<RemoteListing> {
+async function accountListing(remote: RemoteThreadSurface): Promise<RemoteListing> {
   const listing =
     remote.sessions.listing !== undefined
       ? await remote.sessions.listing()

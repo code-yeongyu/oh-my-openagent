@@ -32,9 +32,11 @@ describe("thread_list row identity (#14305 U6)", () => {
   test("#given b lists this device's thread under the same thread id #when thread_list runs #then the thread is one row, this device's", async () => {
     const copy = { ...B_ROW, session_id: "rk-copy", durable_id: "dur-local", title: "stale copy" }
     const listed = await surface(account({ rows: [B_ROW, copy] }).remote).run("thread_list", { all_scope: true })
-    expect(rows(listed).filter((thread) => thread.thread === "dur-local").map((thread) => thread.device)).toEqual([
-      undefined,
-    ])
+    expect(
+      rows(listed)
+        .filter((thread) => thread.thread === "dur-local")
+        .map((thread) => thread.device),
+    ).toEqual([undefined])
   })
 })
 
