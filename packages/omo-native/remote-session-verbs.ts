@@ -150,10 +150,12 @@ async function runSessionOn(
   json: boolean,
   dependencies: RemoteCommandDependencies,
 ): Promise<number> {
+  // Every --json line goes through `output`, so a listing key the person typed can name the session in all of them.
+  let output = dependencies.output
   const show: Show = (result, label) => {
     // A next action naming the agents' eval-only thread_list reads the CLI verb in --json too: scripts run the CLI.
     if (json)
-      dependencies.output(
+      output(
         JSON.stringify(
           result.kind === "error"
             ? { ...result, error: { ...result.error, next_action: personNextAction(result.error.next_action) } }
@@ -188,21 +190,23 @@ async function runSessionOn(
   })
   if (resolved.kind === "error") return show(resolved, args.target)
   const { row } = resolved.where
-  // A listing key the person typed is the session's name in the answer, as before the address module.
+  // A listing key the person typed names the session in every --json answer (the ended one and the link included), as
+  // before the address module; the row itself keeps its durable id.
   const typedKey = args.target === row.session_id || args.target.endsWith(`/${row.session_id}`)
-  const answer: Show = (result, label) =>
-    show(typedKey && result.kind === "ok" && "thread" in result ? { ...result, thread: row.session_id } : result, label)
+  const durable = row.durable_id
+  if (json && typedKey && durable !== undefined && durable !== "" && durable !== row.session_id)
+    output = (line) => dependencies.output(line.replaceAll(durable, row.session_id))
   // The output names the session by its address, whatever the person typed for it.
   const label = resolved.address
-  if (args.verb === "send") return sendTo(remote, row, args, { label, json, show: answer }, dependencies)
+  if (args.verb === "send") return sendTo(remote, row, args, { label, json, show }, { ...dependencies, output })
   const control = createRelayControl(remote, row)
   switch (args.verb) {
     case "model":
-      return answer(await answered(() => setModelOn(control, args.model, undefined)), label)
+      return show(await answered(() => setModelOn(control, args.model, undefined)), label)
     case "interrupt":
-      return answer(await answered(() => interruptThread(control, undefined)), label)
+      return show(await answered(() => interruptThread(control, undefined)), label)
     case "close":
-      return answer(cliClose(await answered(() => closeThread(control, args.force)), label), label)
+      return show(cliClose(await answered(() => closeThread(control, args.force)), label), label)
   }
 }
 
