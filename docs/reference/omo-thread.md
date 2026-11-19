@@ -67,11 +67,17 @@ agent tool `thread_create` calls) or launches `omo` itself, then binds that sess
 `omo thread bind`. A session that is not running is still bound, sent to (`queued_offline`) and
 reported for; it takes its messages when it next starts.
 
-A target or session is a durable session id, or an exact name. Without `--all-scope` only
-sessions in the current directory's workspace resolve (the same rule the agent tools apply);
-an id outside it is `scope_denied`. `--idempotency-key` on a mutation replays the first result
-instead of acting twice (`deduplicated: true`); reusing a key with other arguments is
-`idempotency_conflict`.
+Addresses: a `<target>` or `<session>` is `self`, a thread id, a session id, an account alias,
+an exact name, a unique thread-id prefix, or `<device>/<thread>` (the device part a device id,
+`here`, a device name or a unique device-id prefix; the thread part resolves among that device's
+threads only). Names match after Unicode normalization, case folding and whitespace collapsing,
+and an address may resolve to a thread on another of the account's devices: `send` and `read`
+reach it there, while the binding operations (`bind`, `rebind`, `bindings --session`, `report`)
+bind and report only sessions this device holds, answering `unsupported` naming the device
+otherwise. Without `--all-scope` only sessions in the current directory's workspace resolve (the
+same rule the agent tools apply); an id outside it is `scope_denied`. `--idempotency-key` on a
+mutation replays the first result instead of acting twice (`deduplicated: true`); reusing a key
+with other arguments is `idempotency_conflict`.
 
 ## Sending
 

@@ -3,14 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import {
-  B,
-  createTwoDevices,
-  NAMES,
-  ROUTE,
-  T,
-  type TwoDeviceOptions,
-} from "./address/testing/two-devices"
+import { B, createTwoDevices, NAMES, ROUTE, T, type TwoDeviceOptions } from "./address/testing/two-devices"
 import type { GatewayEndpointRef, ReleaseSessionRequest } from "./gateway/adapter"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { storeMigratedByNewerBuild } from "./gateway/testing/newer-schema"
@@ -101,15 +94,21 @@ function fixture(
       }
       const hosts = [
         ...new Map(
-          sessions.map((session) => [
-            session.socket,
-            {
-              socket: session.socket,
-              list_sessions: { sessions: sessions.filter((listed) => listed.socket === session.socket) },
-              endpoint_kind: session.endpoint_kind,
-              alive: true as const,
-            },
-          ]),
+          sessions.flatMap((session) =>
+            session.socket === undefined
+              ? []
+              : [
+                  [
+                    session.socket,
+                    {
+                      socket: session.socket,
+                      list_sessions: { sessions: sessions.filter((listed) => listed.socket === session.socket) },
+                      endpoint_kind: session.endpoint_kind,
+                      alive: true as const,
+                    },
+                  ],
+                ],
+          ),
         ).values(),
       ]
       return { sessions, hosts, disk: [] }
