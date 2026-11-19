@@ -271,6 +271,48 @@ describe("thread SDK: sessions", () => {
   })
 })
 
+describe("thread SDK: a send with no remote surface resolves through the address module (#14322)", () => {
+  const HEX = "0cc00001-0000-4000-8000-000000000001"
+  const hexSession: ThreadHostSession = {
+    sessionId: "rpc-7",
+    durableSessionId: HEX,
+    cwd: process.cwd(),
+    name: "hex lane",
+    status: "open",
+    socket: HOST_SOCKET,
+    endpoint_kind: "rpc_host",
+  }
+
+  test.each([
+    ["here/<thread id>", `here/${HEX}`],
+    ["a thread name", "hex lane"],
+    ["an 8-hex id prefix", HEX.slice(0, 8)],
+  ])(
+    "#given no remote surface #when the CLI sends to %s #then it is delivered to that local thread",
+    async (_form, thread) => {
+      const { sdk, store } = fixture({ sessions: [hexSession] })
+      expect(await sdk.send({ thread, text: "ping" })).toMatchObject({ kind: "ok" })
+      expect((await store.list({ target_durable_id: HEX })).length).toBe(1)
+    },
+  )
+
+  test("#given no remote surface #when the CLI sends to <other device>/<id> #then the address module's typed refusal answers and nothing is written", async () => {
+    const { sdk, store } = fixture({ sessions: [hexSession] })
+    expect(await sdk.send({ thread: `b7c41e09d2a64f1e/${HEX}`, text: "ping" })).toMatchObject({
+      kind: "error",
+      error: { code: "not_found", details: { kind: "thread" } },
+    })
+    expect(await store.list()).toEqual([])
+  })
+
+  test("#given an id this device's gateway store owns #when the CLI sends to it #then no host listing is read (the published-id shortcut)", async () => {
+    const { sdk, store, views } = fixture({ sessions: [hexSession] })
+    await store.registerIncarnation({ durable_id: HEX, incarnation: "runtime-1" })
+    expect(await sdk.send({ thread: HEX, text: "ping" })).toMatchObject({ kind: "ok" })
+    expect(views).toEqual([])
+  })
+})
+
 describe("thread SDK: a gateway store a newer omo build migrated", () => {
   test("#given the agent dir's store is at a schema newer than this binary's #when omo thread send runs #then it answers gateway_schema_too_new naming both schemas and the update command", async () => {
     let versions = { gateway: 0, binary: 0 }
