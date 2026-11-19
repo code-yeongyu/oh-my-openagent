@@ -264,3 +264,32 @@ describe("#given <device>/<thread id> on B that B's listing does not show #when 
     expect(await resolve(`${B.id}/${thread}`, {}, setup)).toMatchObject(expected)
   })
 })
+
+describe("#given a device that is offline #when <that device>/<thread> resolves #then rows already in hand still resolve, and anything else is device_offline with nothing sent (review M2 of #14328)", () => {
+  async function offline(text: string, setup: TwoDeviceOptions) {
+    const two = createTwoDevices(setup)
+    cleanups.push(two.cleanup)
+    const resolved = await resolveAddress(
+      { remote: two.remote, callerWorkspaceRoot: process.cwd(), local: two.entries, callerId: T.hereLive },
+      text,
+      { probe: true },
+    )
+    return { resolved, lookups: two.account.lookups.length }
+  }
+  test("#given B offline with its rows still listed #when <B>/<a listed id> resolves #then B's row answers", async () => {
+    const { resolved } = await offline(`${B.id}/${T.bLive}`, { bOffline: true, probe: true })
+    expect(resolved).toMatchObject({ kind: "ok", thread: T.bLive, where: { kind: "device" } })
+  })
+  test.each([
+    ["B offline, a thread id it does not list", `${B.id}/${T.nowhere}`, { bOffline: true, probe: true }, B.id],
+    ["B offline, a name it does not list", `${B.name}/no such thread`, { bOffline: true, probe: true }, B.id],
+    ["an offline device with no rows, a thread id", `${OFF.id}/${T.nowhere}`, { probe: true }, OFF.id],
+  ] as const)(
+    "#given %s #when resolved #then device_offline naming it, and no probe is sent",
+    async (_label, text, setup, device) => {
+      const { resolved, lookups } = await offline(text, setup)
+      expect(resolved).toMatchObject({ kind: "error", code: "device_offline", details: { device } })
+      expect(lookups).toBe(0)
+    },
+  )
+})
