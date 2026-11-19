@@ -255,7 +255,7 @@ test("host-observed web Worker exit allows its lock to be reclaimed", async () =
   })
   try {
     await ready
-    const closed = new Promise((resolve) => owner.addEventListener("close", resolve, { once: true }))
+    const closed = once(owner, "close", { signal: AbortSignal.timeout(5_000) })
     // when
     owner.terminate()
     await closed
@@ -266,7 +266,7 @@ test("host-observed web Worker exit allows its lock to be reclaimed", async () =
     owner.terminate()
     await f.close()
   }
-}, 30_000)
+})
 
 test("lock observation does not keep a finished worker alive", async () => {
   const f = await fixture()
