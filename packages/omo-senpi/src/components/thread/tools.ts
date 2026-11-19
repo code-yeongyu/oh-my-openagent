@@ -50,6 +50,7 @@ import { closeThread, interruptThread, NOT_LIVE, setModelOn, setThinkingLevelOn 
 import { renameThread } from "./control/rename"
 import { controlIdentity, controlRefusalOf } from "./control/port"
 import { registerExtensionTools, type ExtensionToolHost } from "./tools/extension-tools"
+import { createMonitorTargetResolver, installMonitorTargetResolution } from "./tools/monitor-target"
 export type { ThreadHost, ThreadHostSession, ThreadToolSurfaceOptions } from "./tools/ports"
 export { UNKNOWN_CALLER } from "./tools/ports"
 import {
@@ -735,8 +736,11 @@ export function registerThreadTools(
   const built = buildThreadTools(options)
   // Thread tools run on the loop side of a split session (engine `ToolDefinition.runs`).
   for (const tool of built.tools) pi.registerTool({ ...tool, runs: "brain" })
-  if (pi.on !== undefined)
-    registerExtensionTools(pi as ExtensionToolHost & Required<Pick<ExtensionToolHost, "on">>, options, log)
+  if (pi.on !== undefined) {
+    const host = pi as ExtensionToolHost & Required<Pick<ExtensionToolHost, "on">>
+    registerExtensionTools(host, options, log)
+    installMonitorTargetResolution(host, createMonitorTargetResolver(options), options.callerSessionId)
+  }
   return { dispose: built.dispose }
 }
 

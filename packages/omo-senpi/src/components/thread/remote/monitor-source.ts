@@ -1,6 +1,9 @@
+import { remoteMonitorTarget } from "../../../extension/senpi-seams"
 import type { RpcRemoteHandlers, RpcRemoteRow, RpcRemoteSource, RpcRemoteState } from "../../../extension/types"
-import type { JsonObject, RemoteSessionRow, RemoteSessionState, RemoteThreadSurface } from "./ports"
-import { remoteAvailable } from "./remote-ops"
+import type { ThreadResolveResult } from "../addressing"
+import type { MonitorTargetResolution } from "../tools/monitor-target"
+import { rowThreadId, type JsonObject, type RemoteSessionRow, type RemoteSessionState, type RemoteThreadSurface } from "./ports"
+import { deviceNamed, remoteAvailable } from "./remote-ops"
 
 // A device-wide target reads the account listing (running | idle | ended rows), round by round at senpi's own rescan
 // cadence (RPC_RESCAN_MS): coarse, and enough to wake. A session's content needs a session target.
@@ -27,6 +30,47 @@ export function createRemoteMonitorSource(remote: RemoteThreadSurface): RpcRemot
       return await openSession(remote, target.device, target.session, options.resumeFrom, handlers)
     },
   }
+}
+
+const KEEP: MonitorTargetResolution = { kind: "keep" }
+
+// senpi's own local targets (rpc-monitor-targets.ts `parseRpcTarget`): the lineage and account keywords, a task id, and a
+// session file path, which no thread address can spell.
+const SENPI_LOCAL_TARGET = /^(?:children|all|st_.*)$/
+const PATH_LIKE = /[/\\]|\.jsonl$/i
+
+/**
+ * What `monitor({type: "rpc", target})` arms (#14294). A bare address is resolved by `resolve`, the resolver every thread
+ * tool uses (`resolveAcross`, decision 0027): a thread id, alias, unique name or 8+ character id prefix on any device. The
+ * device part of `<device>/<session>` is a device id or the name the account lists it under (`deviceNamed`).
+ */
+export async function resolveMonitorTarget(
+  remote: RemoteThreadSurface | undefined,
+  target: string,
+  resolve: (address: string) => Promise<ThreadResolveResult>,
+): Promise<MonitorTargetResolution> {
+  const text = target.trim()
+  const armed = async (device: string | undefined, session: string): Promise<MonitorTargetResolution> => {
+    let armedTarget = session
+    if (device !== undefined) {
+      if (remote === undefined) return KEEP
+      const named = await deviceNamed(remote, device)
+      if ("kind" in named) return { kind: "refused", failure: named.error }
+      armedTarget = `${named.device}/${session}`
+    }
+    return armedTarget === text ? KEEP : { kind: "target", target: armedTarget }
+  }
+  if (text === "" || SENPI_LOCAL_TARGET.test(text)) return KEEP
+  const onDevice = remoteMonitorTarget(text)
+  if (onDevice !== undefined) return await armed(onDevice.device, onDevice.session)
+  if (PATH_LIKE.test(text)) return KEEP
+  const resolved = await resolve(text)
+  if (resolved.kind === "error") {
+    const { kind: _kind, ...failure } = resolved
+    return { kind: "refused", failure }
+  }
+  const row = resolved.entry.transport?.kind === "relay" ? resolved.entry.transport.row : undefined
+  return row === undefined ? await armed(undefined, resolved.entry.thread_id) : await armed(row.device, rowThreadId(row))
 }
 
 async function openSession(

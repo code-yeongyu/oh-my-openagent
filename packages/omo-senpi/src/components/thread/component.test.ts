@@ -241,7 +241,7 @@ async function holdWriteLock(databasePath: string) {
 }
 
 describe("thread component control endpoint registration", () => {
-  test("#given an engine without pi.session #when the component registers #then no control endpoint is registered and only the run, message, startup-arm and shutdown hooks exist", () => {
+  test("#given an engine without pi.session #when the component registers #then no control endpoint is registered and only the run, message, startup-arm, shutdown and monitor-target (tool_call) hooks exist", () => {
     const f = eventApi()
     createThreadComponent({
       host: host(),
@@ -256,6 +256,7 @@ describe("thread component control endpoint registration", () => {
       "message_start",
       "session_shutdown",
       "session_start",
+      "tool_call",
     ])
   })
 

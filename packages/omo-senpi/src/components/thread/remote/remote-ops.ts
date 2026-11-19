@@ -164,6 +164,30 @@ export async function deviceOnline(remote: RemoteThreadSurface, device: string):
   return "kind" in listed ? listed : deviceRefusal(listed.devices, device)
 }
 
+/**
+ * The online account device a `<device>/<thread>` address names (#14294): by id, else by the name the account lists it
+ * under, where two devices of that name are ambiguous_target. Unknown and offline devices answer as deviceOnline does.
+ */
+export async function deviceNamed(
+  remote: RemoteThreadSurface,
+  name: string,
+): Promise<{ readonly device: string } | Failure> {
+  const listed = await listedDevices(remote.client, name)
+  if ("kind" in listed) return listed
+  const named = listed.devices.some((candidate) => candidate.device === name)
+    ? [name]
+    : listed.devices.filter((candidate) => candidate.label === name).map((candidate) => candidate.device)
+  if (named.length > 1)
+    return fail(
+      "ambiguous_target",
+      `${named.length} devices on this account are named ${name}.`,
+      "Name the device by its id (<device id>/<thread>); thread_list with all_scope shows each device's id.",
+      { device: name, candidates: named },
+    )
+  const device = named[0] ?? name
+  return deviceRefusal(listed.devices, device) ?? { device }
+}
+
 /** The account's devices, or a typed host_unavailable naming `device` when this device's service cannot list them. */
 export async function listedDevices(
   client: RemoteClient,

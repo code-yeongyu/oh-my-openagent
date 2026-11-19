@@ -22,6 +22,7 @@ import { answerGetEntries, senpiProjector, type FakeEntryLog } from "./thread-re
 import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
 import type { ThreadCloseOutcome } from "./tools/ports"
 import type { SessionWatchHandlers } from "./control/wait-settled"
+import { createMonitorTargetResolver } from "./tools/monitor-target"
 
 // The listing key (what b's connector assigned) deliberately differs from the durable id (audit class C8, #13017): a test
 // that passes with either id proves nothing about which one a tool path matched.
@@ -962,7 +963,7 @@ export function createRemoteThreadFixture() {
             }
           : Reflect.get(target, property, receiver),
     })
-    const tools = createThreadTools({
+    const toolOptions: Parameters<typeof createThreadTools>[0] = {
       host,
       store: countedStore,
       stateDirectory: join(agentDir, "state"),
@@ -977,7 +978,9 @@ export function createRemoteThreadFixture() {
       ...(extra.callerChainHop === undefined ? {} : { callerChainHop: extra.callerChainHop }),
       ...(extra.callerName === undefined ? {} : { callerName: extra.callerName }),
       ...(extra.env === undefined ? {} : { env: extra.env }),
-    })
+    }
+    const tools = createThreadTools(toolOptions)
+    const resolveMonitorTarget = createMonitorTargetResolver(toolOptions)
     const run = async (name: ThreadToolName, args: unknown): Promise<ThreadToolResult> => {
       const tool = tools.find((candidate) => candidate.name === name)
       if (tool === undefined) throw new Error(`${name} is not registered`)
@@ -995,6 +998,8 @@ export function createRemoteThreadFixture() {
     }
     return {
       run,
+      /** What a `monitor({type: "rpc", target})` call by the caller arms on this surface (#14294). */
+      monitorTarget: async (target: string) => await resolveMonitorTarget(target, caller),
       permission,
       openSession,
       setSessionName,
