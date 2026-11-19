@@ -98,4 +98,16 @@ describe("#given the account's devices #when resolveDevice reads a device part #
       refusal: { code: "ambiguous_target", details: { kind: "device" } },
     })
   })
+
+  test.each([false, true])(
+    "#given no device id for this device #when here is resolved with online %p #then not_found kind device, never a device named here",
+    (online) => {
+      expect(
+        resolveDevice({ here: null, devices: devices.filter((row) => row.id !== "here") }, "here", { online }),
+      ).toMatchObject({
+        kind: "refusal",
+        refusal: { code: "not_found", details: { kind: "device", device: "here" } },
+      })
+    },
+  )
 })

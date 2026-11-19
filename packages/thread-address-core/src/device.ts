@@ -51,9 +51,10 @@ export function resolveDevice(
   if (byId !== undefined) return found(byId)
   if (text === HERE) {
     const self = roster.devices.find((row) => row.id === roster.here)
-    return self !== undefined
-      ? found(self)
-      : { kind: "ok", device: { id: roster.here ?? HERE, name: HERE, online: true, here: true, listing: "listed" } }
+    if (self !== undefined) return found(self)
+    return roster.here === null
+      ? refused(noDevice(text, roster.devices))
+      : { kind: "ok", device: { id: roster.here, name: HERE, online: true, here: true, listing: "listed" } }
   }
   const wanted = normalizeName(text)
   const named = roster.devices.filter((row) => normalizeName(row.name) === wanted)
