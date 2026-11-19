@@ -9,7 +9,7 @@ import {
 } from "@oh-my-opencode/thread-address-core"
 import { namedDeviceRow, relayAddressEntry } from "../remote/address-book"
 import { rowThreadId, type RemoteThreadSurface } from "../remote/ports"
-import { holderTarget } from "../remote/remote-ops"
+import { holderTarget } from "./holder"
 import type { Account, Ready } from "./account"
 import { deviceNameOf, listedEntry } from "./bare"
 import { deviceRows } from "./device"
