@@ -259,7 +259,11 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
       device: "b",
       deduplicated: false,
     })
-    expect(a.sent.filter((entry) => entry.via === "endpoint").map((entry) => [entry.via, entry.device, entry.rpc?.["type"], entry.rpc?.["sessionPath"]])).toEqual([
+    expect(
+      a.sent
+        .filter((entry) => entry.via === "endpoint")
+        .map((entry) => [entry.via, entry.device, entry.rpc?.["type"], entry.rpc?.["sessionPath"]]),
+    ).toEqual([
       ["endpoint", "b", "find_session", undefined],
       ["endpoint", "b", "open_session", B_FILE],
     ])

@@ -8,9 +8,14 @@ const { account, surface, cleanup } = createRemoteThreadFixture()
 afterEach(cleanup)
 
 const ENDED_ROW = { ...B_ROW, state: "ended" }
+// Another thread on b, live there, so a name given at reopen can collide with it (#14274 review L1).
+const TAKEN_ROW = { ...B_ROW, session_id: "rk-taken", durable_id: "dur-taken", title: "taken", state: "idle" }
 // The disk session's file, so the engine resumes it under the id its header carries, as senpi does.
 const writeSessionFile = (agentDir: string, id: string): void =>
-  writeFileSync(join(agentDir, `${id}.jsonl`), `${JSON.stringify({ type: "session", version: 3, id, cwd: process.cwd() })}\n`)
+  writeFileSync(
+    join(agentDir, `${id}.jsonl`),
+    `${JSON.stringify({ type: "session", version: 3, id, cwd: process.cwd() })}\n`,
+  )
 const namesSent = (sent: ReturnType<typeof account>["sent"]) =>
   sent.filter((entry) => entry.rpc?.["type"] === "set_session_name").map((entry) => entry.rpc?.["name"])
 
@@ -47,5 +52,29 @@ describe("thread_create keeps or applies a reopened thread's name (#14274)", () 
     const { run } = surface(a.remote)
     expect(await run("thread_create", { thread: "dur-on-b", name: "x" })).toMatchObject({ kind: "ok", name: "x" })
     expect(namesSent(a.sent)).toEqual(["x"])
+  })
+
+  test("#given a session file here and a thread named 'local peer' #when thread_create reopens it with that name #then the name is not applied and the result warns name_not_applied", async () => {
+    const { run, setSessionName, agentDir } = surface(account().remote, {
+      diskSessions: ["dur-on-disk"],
+      diskNames: { "dur-on-disk": "fix the build" },
+    })
+    writeSessionFile(agentDir, "dur-on-disk")
+    const result = await run("thread_create", { thread: "dur-on-disk", name: "local peer" })
+    expect(result).toMatchObject({ kind: "ok" })
+    expect(result).toMatchObject({
+      warnings: [{ code: "name_conflict", details: { reason: "name_not_applied", name: "local peer" } }],
+    })
+    expect(setSessionName).not.toHaveBeenCalled()
+  })
+
+  test("#given b's closed thread and another thread on b named 'taken' #when thread_create reopens it with that name #then it is name_conflict and nothing is set on b", async () => {
+    const a = account({ rows: [ENDED_ROW, TAKEN_ROW] })
+    const { run } = surface(a.remote)
+    expect(await run("thread_create", { thread: "dur-on-b", name: "taken" })).toMatchObject({
+      kind: "error",
+      error: { code: "name_conflict" },
+    })
+    expect(namesSent(a.sent)).toEqual([])
   })
 })

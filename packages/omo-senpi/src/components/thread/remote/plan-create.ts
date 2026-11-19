@@ -5,6 +5,7 @@ import type { HostedThread, SessionHost, SessionOpenRequest } from "../control/s
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import { openedResult } from "../tools/thread-row"
 import {
+  rowThreadId,
   rowStatus,
   type AliasError,
   type AliasHolder,
@@ -182,6 +183,8 @@ export type CreatePlan =
       readonly creates: boolean
       /** #14274: the name the existing thread had; the reopen sets it again unless a name was given. */
       readonly previousName?: string
+      /** #14274 review M1: the thread a reopen opens, so its own name is no conflict when a name is given. */
+      readonly reopenedId?: string
       readonly localAlias?: LocalAliasReason
     }
   | { readonly kind: "done"; readonly result: ThreadToolResult; readonly device?: string }
@@ -346,6 +349,7 @@ export async function planCreate(
       request: { sessionPath: file.path },
       creates: false,
       ...(target.row.title === "" ? {} : { previousName: target.row.title }),
+      ...(rowThreadId(target.row) === "" ? {} : { reopenedId: rowThreadId(target.row) }),
     }
   }
   if (value.fork_from !== undefined) {

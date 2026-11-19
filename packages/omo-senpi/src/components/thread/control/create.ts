@@ -141,8 +141,13 @@ export async function createThread(
     const earlier = createdId === undefined ? undefined : existingHere(options, current, createdId, callerId)
     // The thread an earlier run made may already carry this name: it is this create's own thread, not a conflict.
     // A reopen checks its name after the open, against every thread but itself (keepName): its own name is no conflict.
-    if (plan.creates && name !== undefined && earlier?.kind !== "live" && earlier?.kind !== "file") {
-      const conflict = checkNameConflict(await plan.host.visible(), name)
+    // A reopen on another device sets the name inside the open, so it checks before it, as a create does (#14274 review M1).
+    const checksNameBeforeOpen = plan.creates || plan.host.device !== undefined
+    if (checksNameBeforeOpen && name !== undefined && earlier?.kind !== "live" && earlier?.kind !== "file") {
+      const conflict = checkNameConflict(
+        (await plan.host.visible()).filter((thread) => thread.thread_id !== plan.reopenedId),
+        name,
+      )
       if (conflict.kind === "error") return { kind: "error", error: conflict } as ThreadToolResult
     }
     const preset = plan.creates ? launch.permissionPreset : undefined
