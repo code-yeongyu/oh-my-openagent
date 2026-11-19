@@ -118,7 +118,7 @@ describe("#given the same name on this device and on B #when it is resolved #the
     )
     for (const candidate of candidates) {
       expect(candidate.address).toBe(`${candidate.device}/${candidate.thread}`)
-      expect(await resolve(candidate.address)).toMatchObject({ kind: "ok", thread: candidate.thread })
+      expect(await resolve(candidate.address ?? "")).toMatchObject({ kind: "ok", thread: candidate.thread })
     }
   })
 

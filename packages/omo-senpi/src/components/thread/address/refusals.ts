@@ -5,8 +5,12 @@ import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from 
 /** A refusal as the thread tools answer it: a taxonomy code, the message, the recovery step and the details. */
 export type ThreadRefusal = ThreadAddressError & { readonly details?: Readonly<Record<string, unknown>> }
 
-/** The core's candidate shape on top of the ladder's: `address` resolves as written, `device_name` names the device. */
-export type AddressCandidate = ThreadCandidate & { readonly address: string; readonly device_name?: string }
+/**
+ * The core's candidate shape on top of the ladder's: `address` (`<device id>/<thread>`) resolves as written and
+ * `device_name` names the device. With no device id known the candidate carries no `address`: its `thread` is the
+ * address then, and one field names a session (#14044).
+ */
+export type AddressCandidate = ThreadCandidate & { readonly address?: string; readonly device_name?: string }
 
 export const refusal = (
   code: ThreadErrorCode,
@@ -16,6 +20,12 @@ export const refusal = (
 ): ThreadRefusal => ({ kind: "error", ...threadToolFailure(code, message, next, details) })
 
 export const asRefusal = (failure: ThreadToolFailure): ThreadRefusal => ({ kind: "error", ...failure })
+
+/** A refusal as the failure a tool result carries (`{ kind: "error", error }`). */
+export function asFailure(refused: ThreadRefusal): ThreadToolFailure {
+  const { kind: _kind, candidates: _candidates, ...failure } = refused
+  return failure
+}
 
 const LIST_ALL = "call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell)"
 const RETRY_LIST = "Retry the call; call thread_list (tool.thread_list() in an eval cell) to see which devices answered."
@@ -104,7 +114,7 @@ export function withAddresses(
     return {
       ...candidate,
       ...(device === undefined ? {} : { device }),
-      address: device === undefined ? candidate.thread : formatAddress(device, candidate.thread),
+      ...(device === undefined ? {} : { address: formatAddress(device, candidate.thread) }),
       ...(name === undefined ? {} : { device_name: name }),
     }
   })

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mergeRows, rowAddress, rowKey, rowName } from "."
+import { listingKey, mergeRows, rowAddress, rowKey, rowName, sameSession } from "."
 
 const row = (device: string, thread: string | undefined, key: string) => ({ device, durable_id: thread, session_id: key })
 
@@ -48,5 +48,25 @@ describe("#given this device's rows and the account listing #when mergeRows merg
       at("b", "t3"),
       at("c", "t4"),
     ])
+  })
+})
+
+describe("#given two records of a session #when sameSession compares them #then devices must match, then ids when both have one, else listing keys", () => {
+  test.each([
+    ["both ids, equal", { device: "b", thread: "t1", key: "k1" }, { device: "b", thread: "t1", key: "k2" }, true],
+    ["both ids, different, same key", { device: "b", thread: "t1", key: "k1" }, { device: "b", thread: "t2", key: "k1" }, false],
+    ["one id, equal keys", { device: "b", thread: "t1", key: "k1" }, { device: "b", key: "k1" }, true],
+    ["one id, different keys", { device: "b", thread: "t1", key: "k1" }, { device: "b", key: "k2" }, false],
+    ["no ids, equal keys", { device: "b", key: "k1" }, { device: "b", key: "k1" }, true],
+    ["no ids, no keys", { device: "b" }, { device: "b" }, false],
+    ["different devices, same id", { device: "b", thread: "t1" }, { device: "c", thread: "t1" }, false],
+  ] as const)("%s", (_label, a, b, expected) => {
+    expect(sameSession(a, b)).toBe(expected)
+    expect(sameSession(b, a)).toBe(expected)
+  })
+
+  test("#given a device and a listing key #when keyed #then the key is unique across devices", () => {
+    expect(listingKey("b", "rk-1")).not.toBe(listingKey("c", "rk-1"))
+    expect(listingKey("b", "rk-1")).toBe("b/rk-1")
   })
 })

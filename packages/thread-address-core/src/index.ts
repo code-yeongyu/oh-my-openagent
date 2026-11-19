@@ -11,7 +11,17 @@ export {
 export { normalizeName } from "./name"
 export { deviceListing, type DeviceListing, type ListingRound } from "./listing"
 export { resolveDevice, type DeviceRef, type DeviceResolution, type DeviceRoster } from "./device"
-export { mergeRows, rowAddress, rowKey, rowName, type KeyedRow, type NamedRow } from "./row"
+export {
+  listingKey,
+  mergeRows,
+  rowAddress,
+  rowKey,
+  rowName,
+  sameSession,
+  type KeyedRow,
+  type NamedRow,
+  type SessionRef,
+} from "./row"
 export {
   deviceCandidates,
   deviceLabel,

@@ -1,4 +1,4 @@
-import { devicesSilent, noThreadOnDevice, probeUnavailable } from "@oh-my-opencode/thread-address-core"
+import { devicesSilent, noThreadOnDevice, probeUnavailable, sameSession } from "@oh-my-opencode/thread-address-core"
 import { threadToolFailure } from "../errors"
 import { relayAddressEntry } from "../remote/address-book"
 import { endedRow, probeMayBuildEndedRow, rowThreadId, type RemoteDevice, type RemoteThreadSurface } from "../remote/ports"
@@ -89,7 +89,12 @@ export async function pinned(
   if (unavailable !== undefined) return asRefusal(unavailable.error)
   try {
     const rows = await remote.sessions.sessions({ device: pin.device })
-    const row = rows.find((candidate) => candidate.device === pin.device && rowThreadId(candidate) === pin.thread)
+    const row = rows.find((candidate) =>
+      sameSession(
+        { device: pin.device, thread: pin.thread },
+        { device: candidate.device, thread: rowThreadId(candidate), key: candidate.session_id },
+      ),
+    )
     if (row !== undefined) return { kind: "ok", entry: relayAddressEntry(row), resolution: "id", all_scope: true }
   } catch (error) {
     return refusal(

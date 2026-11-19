@@ -1,3 +1,5 @@
+import { parseAddress } from "@oh-my-opencode/thread-address-core"
+
 /**
  * The senpi `pi.*` seams omo feature-detects (#12861). Every guard in this package that probes the host
  * (`typeof pi.X`, `pi.X === undefined`, `pi.X?.`, `"X" in pi`, `pi.X ?? fallback`, `if (pi.X)`, `!pi.X`, `pi.X && ...`) degrades a feature silently when the seam is
@@ -71,19 +73,11 @@ export function absentSenpiSeamsNotice(surface: unknown): string | undefined {
 export const REMOTE_WAKE_SEAM = "registerRpcRemoteSource"
 export const REMOTE_WAKE_UNAVAILABLE = "remote_wake_unavailable"
 
-// senpi's remote-target shape (rpc-monitor-targets.ts `parseRpcTarget`, from 2026.11.6-2): one `/`, no leading `/`,
-// not a `.jsonl` path, not a drive letter. A senpi without the seam resolves every such target locally, so the
+// senpi's remote-target shape (rpc-monitor-targets.ts `parseRpcTarget`, from 2026.11.6-2) read by the one address
+// grammar (thread-address-core `parseAddress`). A senpi without the seam resolves every such target locally, so the
 // refusal must never catch a local path: a first segment only a path can have (`.`, `..`, `.hidden`, `~`, `~user`)
 // and a `.jsonl` file in any case stay local even where senpi's own shape would call them remote.
-const REMOTE_TARGET = /^([^/]+)\/[^/]+$/
-const DRIVE_LETTER = /^[A-Za-z]:$/
-const PATH_SEGMENT = /^[.~]/
-
-function isRemoteMonitorTarget(target: string): boolean {
-  const trimmed = target.trim()
-  const device = REMOTE_TARGET.exec(trimmed)?.[1]
-  return device !== undefined && !/\.jsonl$/i.test(trimmed) && !DRIVE_LETTER.test(device) && !PATH_SEGMENT.test(device)
-}
+const isRemoteMonitorTarget = (target: string): boolean => parseAddress(target).kind === "device"
 
 function remoteWakeUnavailable(
   surface: unknown,

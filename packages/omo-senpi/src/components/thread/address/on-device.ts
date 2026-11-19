@@ -1,6 +1,7 @@
 import {
   devicesSilent,
   noThreadOnDevice,
+  sameSession,
   THREAD_ID_SHAPE,
   type DeviceRef,
 } from "@oh-my-opencode/thread-address-core"
@@ -47,12 +48,15 @@ export async function resolveOnDevice(
     const hit = ladder(ctx, ctx.local, thread, opts)
     return hit.kind === "ok" ? { ...hit, all_scope: opts.all_scope } : withAddresses(hit, account.here, names)
   }
-  const entries = account.rows.filter((row) => row.device === device.id).map((row) => relayAddressEntry(row))
+  const rows = account.rows.filter((row) => row.device === device.id)
+  const entries = rows.map((row) => relayAddressEntry(row))
   if (THREAD_ID_SHAPE.test(thread)) {
-    const listed = entries.find((entry) => entry.thread_id === thread)
+    const listed = rows.find((row) =>
+      sameSession({ device: device.id, thread }, { device: row.device, thread: row.durable_id, key: row.session_id }),
+    )
     return {
       kind: "ok",
-      entry: listed ?? relayAddressEntry(namedDeviceRow(device.id, thread)),
+      entry: relayAddressEntry(listed ?? namedDeviceRow(device.id, thread)),
       resolution: "id",
       all_scope: true,
     }

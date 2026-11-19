@@ -42,3 +42,21 @@ export function mergeRows<R extends { readonly key: string; readonly device: str
   const listed = new Set(local.map((row) => row.key))
   return [...local, ...remote.filter((row) => row.device !== here && !listed.has(row.key))]
 }
+
+/** The key unique for every listed session, whether or not it publishes a thread id: `<device id>/<listing key>`. */
+export const listingKey = (deviceId: string, key: string): string => formatAddress(deviceId, key)
+
+/** A session as two records name it: its device, its thread id when published, its listing key when known. */
+export type SessionRef = { readonly device: string; readonly thread?: string; readonly key?: string }
+
+const present = (value: string | undefined): value is string => value !== undefined && value !== ""
+
+/**
+ * Whether two records name the same session: the same device, and the same thread id when both carry one, else the same
+ * listing key. The one copy of the "durable id or listing key on this device" match.
+ */
+export function sameSession(a: SessionRef, b: SessionRef): boolean {
+  if (a.device !== b.device) return false
+  if (present(a.thread) && present(b.thread)) return a.thread === b.thread
+  return present(a.key) && present(b.key) && a.key === b.key
+}

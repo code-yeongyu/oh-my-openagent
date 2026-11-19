@@ -1,6 +1,8 @@
 import { resolveDevice, type DeviceListing, type DeviceRef, type DeviceRow } from "@oh-my-opencode/thread-address-core"
-import type { RemoteDevice } from "../remote/ports"
-import { toolRefusal, type ThreadRefusal } from "./refusals"
+import type { ThreadToolResult } from "../contracts"
+import type { RemoteDevice, RemoteThreadSurface } from "../remote/ports"
+import { accountDevices } from "./account"
+import { asFailure, toolRefusal, type ThreadRefusal } from "./refusals"
 
 export const deviceRows = (devices: readonly RemoteDevice[]): readonly DeviceRow[] =>
   devices.map((row) => ({
@@ -30,4 +32,15 @@ export function resolveAccountDevice(
     opts,
   )
   return resolved.kind === "ok" ? resolved : toolRefusal(resolved.refusal)
+}
+
+/** The device a thread_create names (#14072): no id when it is this device, else its id; a typed refusal otherwise. */
+export async function targetDevice(
+  remote: RemoteThreadSurface,
+  text: string,
+): Promise<{ readonly id?: string } | { readonly result: ThreadToolResult }> {
+  const { here, devices } = await accountDevices(remote.client)
+  const resolved = resolveAccountDevice({ here, devices }, text, { online: false })
+  if (resolved.kind === "error") return { result: { kind: "error", error: asFailure(resolved) } }
+  return resolved.device.id === here ? {} : { id: resolved.device.id }
 }
