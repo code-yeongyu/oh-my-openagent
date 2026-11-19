@@ -1,7 +1,7 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import type { ThreadResolveOptions, ThreadResolveResult } from "../addressing"
-import { relayAddressBook, relayAddressEntry, type RelayAddressBook } from "../remote/address-book"
-import { endedRow, probeMayBuildEndedRow, rowThreadId, type RemoteSessionRow } from "../remote/ports"
+import { deviceListing, relayAddressBook, relayAddressEntry, type RelayAddressBook } from "../remote/address-book"
+import { endedRow, probeMayBuildEndedRow, rowThreadId, type RemoteListing } from "../remote/ports"
 import { accountDevices } from "../remote/account"
 import { remoteAvailable } from "../remote/remote-ops"
 import {
@@ -329,48 +329,79 @@ export function targetSession(view: ThreadHostView, durableId: string): ThreadHo
  * Amendment A4.3.1 of #13037: an approved reply to a sender whose delivery came from another device resolves on THAT
  * device and nowhere else: its listing row for that id when it lists one (a read of that one device, never the whole
  * account), else one probe of that device, which finds a session it holds but does not run as an `ended` row (A4.2).
- * No row there is not_found naming the device; a probe that got no answer is host_unavailable naming it.
+ *
+ * #14280: the listing finds the sender's key; it never decides the sender is gone. A row miss is re-read once on a fresh
+ * listing, and each refusal names its own reason: the device missed the listing round (`listing_incomplete`), this device
+ * cannot reach the account (`remote_unavailable`) or cannot ask the device (`wake_unavailable`, `lookup_unavailable`),
+ * the probe got no answer, or the listing failed are host_unavailable. not_found only when the device answered, twice, that
+ * it lists no such session and its probe answered that it holds none.
  */
 export async function replyOnDevice(
   options: ThreadToolSurfaceOptions,
   sender: { readonly session_id: string; readonly device: string },
 ): Promise<ThreadResolveResult> {
-  const missing = (): ThreadResolveResult =>
+  const refuse = (
+    code: "not_found" | "host_unavailable",
+    message: string,
+    next: string,
+    details: Record<string, unknown> = {},
+  ): ThreadResolveResult =>
     ({
       kind: "error",
-      ...threadToolFailure(
-        "not_found",
-        `The sender ${sender.session_id} is not listed on device ${sender.device}, the device its delivery came from.`,
-        "Retry when that session is running on its device, or send to another thread as a normal send.",
-        { thread: sender.session_id, device: sender.device },
-      ),
+      ...threadToolFailure(code, message, next, { thread: sender.session_id, device: sender.device, ...details }),
     }) as ThreadResolveResult
+  const cannotAsk = (reason: string, why: string): ThreadResolveResult =>
+    refuse(
+      "host_unavailable",
+      `Device ${sender.device}, where the sender's delivery came from, does not list ${sender.session_id}, and ${why}, so whether it still holds that session is unknown.`,
+      "Retry when the device service is reachable, or send to another thread as a normal send.",
+      { reason },
+    )
   const remote = options.remote
-  if (remote === undefined) return missing()
+  if (remote === undefined)
+    return refuse(
+      "host_unavailable",
+      `This device has no connection to the account's other devices, so device ${sender.device}, where the sender's delivery came from, could not be asked for ${sender.session_id}.`,
+      "Retry from a session whose device service is set up, or send to another thread as a normal send.",
+      { reason: "remote_unavailable" },
+    )
   const unavailable = await remoteAvailable(remote)
   if (unavailable !== undefined) return { kind: "error", ...unavailable.error } as ThreadResolveResult
-  let rows: readonly RemoteSessionRow[]
-  try {
-    rows = await remote.sessions.sessions({ device: sender.device })
-  } catch (error) {
-    return {
-      kind: "error",
-      ...threadToolFailure(
+  // One read of the sender's device: its row, a refusal naming why the read could not tell, or undefined (it answered
+  // and lists no such session).
+  const listed = async (): Promise<ThreadResolveResult | undefined> => {
+    let listing: RemoteListing
+    try {
+      listing = await deviceListing(remote, sender.device)
+    } catch (error) {
+      return {
+        kind: "error",
+        ...threadToolFailure(
+          "host_unavailable",
+          "The account's session listing could not be reached.",
+          "Retry when the device service is reachable.",
+          { reason: error instanceof Error ? error.message : String(error) },
+        ),
+      } as ThreadResolveResult
+    }
+    const row = listing.rows.find(
+      (candidate) => candidate.device === sender.device && rowThreadId(candidate) === sender.session_id,
+    )
+    if (row !== undefined) return { kind: "ok", entry: relayAddressEntry(row), resolution: "id" }
+    if (listing.incomplete.includes(sender.device))
+      return refuse(
         "host_unavailable",
-        "The account's session listing could not be reached.",
-        "Retry when the device service is reachable.",
-        { reason: error instanceof Error ? error.message : String(error) },
-      ),
-    } as ThreadResolveResult
+        `Device ${sender.device}, where the sender's delivery came from, did not answer this listing round.`,
+        "Retry the call; call thread_list (tool.thread_list() in an eval cell) to see which devices answered.",
+        { reason: "listing_incomplete", devices: [sender.device] },
+      )
+    return undefined
   }
-  const row = rows.find(
-    (candidate) => candidate.device === sender.device && rowThreadId(candidate) === sender.session_id,
-  )
-  if (row !== undefined) return { kind: "ok", entry: relayAddressEntry(row), resolution: "id" }
+  const first = await listed()
+  if (first !== undefined) return first
   // One rule for a probe-built ended row (probeMayBuildEndedRow): no probe while the wake cannot be carried.
-  const probed = (await probeMayBuildEndedRow(remote.sessions))
-    ? await remote.sessions.lookup?.(sender.device, sender.session_id)
-    : undefined
+  const mayProbe = await probeMayBuildEndedRow(remote.sessions)
+  const probed = mayProbe ? await remote.sessions.lookup?.(sender.device, sender.session_id) : undefined
   if (probed?.kind === "found")
     return {
       kind: "ok",
@@ -378,16 +409,22 @@ export async function replyOnDevice(
       resolution: "id",
     }
   if (probed?.kind === "silent")
-    return {
-      kind: "error",
-      ...threadToolFailure(
-        "host_unavailable",
-        `Device ${sender.device}, where the sender's delivery came from, did not answer whether it holds ${sender.session_id}.`,
-        "Retry when that device answers.",
-        { thread: sender.session_id, device: sender.device, reason: probed.reason },
-      ),
-    } as ThreadResolveResult
-  return missing()
+    return refuse(
+      "host_unavailable",
+      `Device ${sender.device}, where the sender's delivery came from, did not answer whether it holds ${sender.session_id}.`,
+      "Retry when that device answers.",
+      { reason: probed.reason },
+    )
+  const again = await listed()
+  if (again !== undefined) return again
+  if (!mayProbe) return cannotAsk("wake_unavailable", "this device's service cannot carry a wake, so it does not probe")
+  if (probed?.kind !== "none")
+    return cannotAsk("lookup_unavailable", "this device's service cannot make the single probe that would tell")
+  return refuse(
+    "not_found",
+    `The sender ${sender.session_id} is not on device ${sender.device}, the device its delivery came from: it lists no such session and holds none.`,
+    "Send to another thread as a normal send.",
+  )
 }
 
 /**
