@@ -307,6 +307,11 @@ export function createRemoteThreadFixture() {
       }
       /** b knows a session it just opened only by its relay key (relayKeys), not by its durable id: a listing that has not caught up yet. */
       relayKeyOnly?: boolean
+      /**
+       * #13031: b's engine forks on `open_session { forkFrom }` (senpi#7085, capability `open_session_fork`): a session
+       * file it holds (`sessionFiles`) becomes `dur-fork-on-b`; any other source is refused `fork_source_not_local`.
+       */
+      forks?: boolean
       /** The device service throws on b's admit_external_message (a lost connection mid-delivery). */
       admitThrows?: string
       /** Every get_state after b admitted a delivery is refused with this reason (the read after the admission fails). */
@@ -392,7 +397,12 @@ export function createRemoteThreadFixture() {
       }
       if (rpc["type"] === "get_protocol_info") {
         if (options.protocolInfoFails === true) return { kind: "refused", reason: "request_timeout" }
-        return ok({ capabilities: capable ? ["unload_session", "unload_refuse_deliveries"] : ["unload_session"] })
+        return ok({
+          capabilities: [
+            ...(capable ? ["unload_session", "unload_refuse_deliveries"] : ["unload_session"]),
+            ...(options.forks === true ? ["open_session_fork"] : []),
+          ],
+        })
       }
       if (rpc["type"] === "unload_session" && attachedTo !== undefined) {
         if (options.unloadReason !== undefined)
@@ -461,6 +471,12 @@ export function createRemoteThreadFixture() {
         const open =
           live.has(durable) || keys.some((key) => live.has(key)) || (relayKey !== undefined && live.has(relayKey))
         return ok({ found: { sessionPath: file, cwd: B_ROW.project, open } })
+      }
+      if (rpc["type"] === "open_session" && options.forks === true && typeof rpc["forkFrom"] === "string") {
+        if (sessionFiles === "none" || sessionFiles[rpc["forkFrom"]] === undefined)
+          return { kind: "refused", reason: `fork_source_not_local: ${rpc["forkFrom"]}` }
+        for (const id of ["dur-fork-on-b", options.relayKeys?.get("dur-fork-on-b") ?? "dur-fork-on-b"]) live.add(id)
+        return ok({ sessionId: "rpc-10", state: { durableSessionId: "dur-fork-on-b" } })
       }
       if (rpc["type"] === "open_session") {
         // A reopened file resumes under the id it carries, as senpi's does.
@@ -911,6 +927,11 @@ export function createRemoteThreadFixture() {
       createdNeverDrains?: boolean
       /** The live session here (`dur-local`) drains each delivery at once, in this phase (a busy turn, a question). */
       localDrainsIn?: RuntimePhase
+      /**
+       * #13031: this device's engine forks on `open_session { forkFrom }` (senpi#7085): a live session here becomes
+       * `dur-fork-here`; any other source is refused `fork_source_not_local`, as the host client throws it.
+       */
+      forks?: boolean
     } = {},
   ) {
     const engine = extra.engine ?? ENGINE
@@ -927,6 +948,19 @@ export function createRemoteThreadFixture() {
     const createdIds = new Set<string>()
     const openSession = mock(async (request: Parameters<ThreadHost["openSession"]>[0]) => {
       if (extra.openThrows !== undefined) throw new Error(extra.openThrows)
+      if (extra.forks === true && request.forkFrom !== undefined) {
+        if (!sessions.some((session) => session.durableSessionId === request.forkFrom))
+          throw new Error(`fork_source_not_local: ${request.forkFrom}`)
+        const fork: ThreadHostSession = {
+          sessionId: "route-fork",
+          durableSessionId: "dur-fork-here",
+          cwd: process.cwd(),
+          name: null,
+          status: "open",
+        }
+        sessions.push(fork)
+        return fork
+      }
       // An engine opening a session file on disk resumes it under the id in that file's header, as senpi does.
       const resumed =
         "sessionPath" in request && typeof request.sessionPath === "string" && existsSync(request.sessionPath)
@@ -979,6 +1013,7 @@ export function createRemoteThreadFixture() {
     })
     const host: ThreadHost = {
       socket: "/tmp/thread-remote-test.sock",
+      ...(extra.forks === true ? { capabilities: async () => ["open_session_fork"] } : {}),
       listSessions: async () => {
         localListings += 1
         if (listFails) {
