@@ -5,12 +5,13 @@ import { join } from "node:path"
 
 import { connectDeviceService } from "../../device-service-core/src/index.ts"
 import { startFakeOwner, type FakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
-import { defaultWorld } from "../../device-service-core/test/local-api/conformance/world.ts"
+import { defaultWorld, type World } from "../../device-service-core/test/local-api/conformance/world.ts"
 import { createRemoteThreadFixture } from "../../omo-senpi/src/components/thread/thread-remote-fixture"
 import { REMOTE_EXIT, runRemoteVerb } from "../remote-cli"
 
 // #13432: the session verbs take a device the way the device table prints it - its id, its NAME (compared as thread
 // names are), or a unique id prefix - through thread_create's one device resolver (thread/remote/plan-create.ts).
+// #14305: `sessions --device` takes the same spellings, through the shared address module.
 
 const SIGNED_IN = {
   exitCode: 0,
@@ -25,12 +26,12 @@ afterEach(async () => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
 
-async function run(args: readonly string[]) {
+async function run(args: readonly string[], world: World = defaultWorld()) {
   const a = fixture.account()
   const stateDir = mkdtempSync(join(tmpdir(), "omo-13432-owner-"))
   chmodSync(stateDir, 0o700)
   dirs.push(stateDir)
-  const owner = await startFakeOwner({ stateDir, world: defaultWorld() })
+  const owner = await startFakeOwner({ stateDir, world })
   owners.push(owner)
   const err: string[] = []
   const out: string[] = []
@@ -79,8 +80,8 @@ describe("omo remote session verbs take the device the table prints", () => {
   })
 
   test("#given a name/session address #when close runs #then the close reaches the session on that device", async () => {
-    const result = await run(["close", "studio/s1", "--json"])
-    expect(result.sent.filter((entry) => entry.device === "b" && entry.session === "s1").length).toBeGreaterThan(0)
+    const result = await run(["close", "studio/rk-on-b", "--json"])
+    expect(result.sent.filter((entry) => entry.device === "b" && entry.session === "rk-on-b").length).toBeGreaterThan(0)
     expect(result.sent.filter((entry) => entry.device === "studio")).toEqual([])
   })
 
@@ -95,5 +96,26 @@ describe("omo remote session verbs take the device the table prints", () => {
     expect(result.code).toBe(REMOTE_EXIT.failed)
     expect(result.opened).toEqual([])
     expect(JSON.parse(result.out[0] ?? "{}")).toMatchObject({ kind: "error", error: { code: "not_found" } })
+  })
+})
+
+describe("omo remote sessions takes the device the table prints", () => {
+  test("#given the NAME column's value #when sessions --device runs #then it lists that device's rows", async () => {
+    const result = await run(["sessions", "--device", "studio", "--json"])
+    expect(result.code).toBe(REMOTE_EXIT.ok)
+    const listing = JSON.parse(result.out.join("") ?? "{}") as { rows: { device: { id: string } }[] }
+    expect(listing.rows.map((row) => row.device.id)).toEqual(["dev-peer-1"])
+  })
+
+  test("#given two devices sharing a name #when sessions --device runs #then it names both and lists nothing", async () => {
+    const world = defaultWorld()
+    const twin = { device: "dev-peer-3", label: "Studio", kind: "desktop" as const, platform: "linux" as const, last_seen_ms: 1_790_000_000_000, online: true }
+    const result = await run(["sessions", "--device", "Studio"], {
+      ...world,
+      devices: [...world.devices, twin],
+    })
+    expect(result.code).toBe(REMOTE_EXIT.usage)
+    expect(result.err[0] ?? "").toContain("dev-peer-1")
+    expect(result.err[0] ?? "").toContain("dev-peer-3")
   })
 })

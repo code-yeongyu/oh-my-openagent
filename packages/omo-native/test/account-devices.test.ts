@@ -120,6 +120,56 @@ describe("omo account devices", () => {
     expect(calls.some((call) => call.startsWith("DELETE"))).toBe(false)
   })
 
+  test("#given another live device with a unique name #when revoking it by name #then the account deletes that device", async () => {
+    const { api, calls } = account([row(grant.device.id, grant.device.name, true), row("dev-twin", "twin")])
+
+    const result = await run(api, ["devices", "revoke", "twin"])
+
+    expect(result.code).toBe(ACCOUNT_EXIT.ok)
+    expect(result.out).toMatchObject([{ revoked: true, device: { id: "dev-twin" } }])
+    expect(calls.some((call) => call.startsWith("DELETE /v1/devices/dev-twin"))).toBe(true)
+  })
+
+  test("#given two live devices sharing a name #when revoking that name #then it is refused with the candidates and nothing is revoked", async () => {
+    const { api, calls } = account([
+      row(grant.device.id, grant.device.name, true),
+      row("dev-twin", "twin"),
+      row("dev-twin-2", "twin"),
+    ])
+
+    const result = await run(api, ["devices", "revoke", "twin"])
+
+    expect(result.code).toBe(ACCOUNT_EXIT.failed)
+    expect(result.out).toEqual([{ revoked: false, error: "ambiguous_target" }])
+    expect(result.err[0] ?? "").toContain("dev-twin")
+    expect(result.err[0] ?? "").toContain("dev-twin-2")
+    expect(calls.some((call) => call.startsWith("DELETE"))).toBe(false)
+  })
+
+  test("#given an id prefix two devices share #when revoking it #then it is refused with the candidates and nothing is revoked", async () => {
+    const { api, calls } = account([
+      row(grant.device.id, grant.device.name, true),
+      row("device-a1x", "left"),
+      row("device-a2y", "right"),
+    ])
+
+    const result = await run(api, ["devices", "revoke", "device-a"])
+
+    expect(result.code).toBe(ACCOUNT_EXIT.failed)
+    expect(result.out).toEqual([{ revoked: false, error: "ambiguous_target" }])
+    expect(calls.some((call) => call.startsWith("DELETE"))).toBe(false)
+  })
+
+  test("#given this device named as here #when revoking it #then it refuses as this device and deletes nothing", async () => {
+    const { api, calls } = account([row(grant.device.id, grant.device.name, true), row("dev-twin", "twin")])
+
+    const result = await run(api, ["devices", "revoke", "here"])
+
+    expect(result.code).toBe(ACCOUNT_EXIT.invalid)
+    expect(result.out).toMatchObject([{ revoked: false, error: "this_device" }])
+    expect(calls.some((call) => call.startsWith("DELETE"))).toBe(false)
+  })
+
   test("#given no stored sign-in #when listing #then it reports signed out with its own exit code", async () => {
     const { api, calls } = account([])
 

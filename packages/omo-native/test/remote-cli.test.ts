@@ -451,12 +451,21 @@ describe("omo remote attach", () => {
     expect(socket).toMatch(/[\\/]t-[0-9a-f]{16}\.sock$/)
   })
 
-  test.each([[[]], [["/session"]], [["device/"]], [[`${PEER}/${SESSION_ID}`, "extra"]]])(
+  test.each([[[]], [[`${PEER}/${SESSION_ID}`, "extra"]]])(
     "refuses the target %p as usage",
     async (target) => {
       const { prepared, err } = await attach(target)
       expect(prepared).toBe(REMOTE_EXIT.usage)
       expect(err[0]).toStartWith("usage: omo remote attach <device>/<session>")
+    },
+  )
+
+  test.each([["/session"], ["device/"]])(
+    "answers the target %p with a typed refusal instead of sending it (#14305)",
+    async (target) => {
+      const { prepared, err } = await attach([target])
+      expect(prepared).toBe(REMOTE_EXIT.failed)
+      expect(err[0]).toStartWith("omo remote: ")
     },
   )
 
@@ -1035,16 +1044,14 @@ describe("omo remote session verbs", () => {
     expect(err[0]).toBe(message)
   })
 
-  // A send is one round trip (#12320): the prompt is the first frame, and the device that does not hold the session
-  // refuses it, so the message reaches no session and nothing else is sent.
-  test("a session its device does not hold is named as unknown from the device's refusal of the one prompt, and nothing else is sent to it", async () => {
+  // #14305: the address module resolves the target before anything is sent, so a session its device does not hold is
+  // a typed not_found and nothing reaches the device.
+  test("a session its device does not hold is a typed not_found, and nothing is sent to that device", async () => {
     const a = fixture.account()
     const { code, err } = await run(["send", "b/dur-unknown", "hi"], undefined, SIGNED_IN, testBootstrap(), a.remote)
-    expect([code, err]).toEqual([
-      REMOTE_EXIT.failed,
-      ["omo remote: no session b/dur-unknown on this account.", "Run omo remote sessions to see them."],
-    ])
-    expect(a.sent.flatMap((entry) => (entry.rpc === undefined ? [] : [entry.rpc["type"]]))).toEqual(["prompt"])
+    expect(code).toBe(REMOTE_EXIT.failed)
+    expect(err[0]).toBe("omo remote: No thread dur-unknown on studio (b).")
+    expect(a.sent).toEqual([])
   })
 
   test("a refusal from the remote op is reported with its next step, and nothing is followed", async () => {
