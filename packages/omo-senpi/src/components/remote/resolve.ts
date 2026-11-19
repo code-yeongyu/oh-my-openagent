@@ -86,7 +86,7 @@ const deviceRefusal = (refusal: AddressRefusal): RemoteFailure => {
     default:
       return remoteFailure(
         refusal.code,
-        `${refusal.typed} does not name one device of this account.`,
+        "The device part does not name one device of this account.",
         nextActionFor(refusal.code),
         {
           details: refusal.details,
