@@ -1,4 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { randomBytes } from "node:crypto"
+import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { Socket } from "node:net"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { withContractHost } from "../../../../senpi-task/src/runners/rpc-host/testing/contract-host"
 import { defaultWorld, type World } from "../../../../device-service-core/test/local-api/conformance/world.ts"
 import { reader } from "./attach.test-support"
@@ -219,6 +224,86 @@ describe("a session on this device (local watch)", () => {
       await opened.value.detach()
     })
   })
+
+  /** Attach and follow on a self session both answer host_unavailable{local_engine} with this cause. */
+  const expectEngineFailure = async (
+    localAttach: ReturnType<typeof createLocalAttach>,
+    reason: "not_running" | "unreachable",
+  ): Promise<void> => {
+    const owner = await startOwner(selfWorld())
+    const client = clientOn(owner.stateDir, fakeClock(), undefined, { localAttach })
+    const engine = {
+      code: "host_unavailable",
+      details: { feature: "local_engine", reason, local_api_code: "refused" },
+    }
+    expect(failureOf(await client.attach(THREAD))).toMatchObject(engine)
+    expect(await drain(reader(client.sessions.follow(THREAD, { from: receipt("cm-9") })))).toEqual([
+      { kind: "failed", failure: expect.objectContaining(engine) },
+    ])
+  }
+  const withDir = async (body: (dir: string) => Promise<void>): Promise<void> => {
+    const dir = await mkdtemp(join(tmpdir(), "omo-le-"))
+    try {
+      await body(dir)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  }
+
+  // No engine runs on this device: no operator endpoint at all, or the stale one a killed engine left behind. On POSIX
+  // that is a socket file nobody listens on (ECONNREFUSED); on win32 the endpoint's `.secret` outlives the engine's pipe,
+  // so the pipe it names is gone (ENOENT on \\.\pipe\...).
+  const staleEndpoint = async (socket: string): Promise<void> => {
+    if (process.platform === "win32") return writeFile(`${socket}.secret`, randomBytes(32))
+    const engine = Bun.spawn(
+      [
+        process.execPath,
+        "-e",
+        `require("node:net").createServer().listen(${JSON.stringify(socket)}, () => console.log("listening"))`,
+      ],
+      { stdout: "pipe" },
+    )
+    await engine.stdout.getReader().read()
+    engine.kill("SIGKILL")
+    await engine.exited
+  }
+  test.each([
+    ["no operator endpoint", async (_socket: string) => undefined],
+    ["a stale operator endpoint", staleEndpoint],
+  ])(
+    "#given %s on this device #when attach and follow open a self session #then host_unavailable{local_engine, not_running}, not the device service",
+    (_how, prepare) =>
+      withDir(async (dir) => {
+        const socket = join(dir, "rpc.sock")
+        await prepare(socket)
+        await expectEngineFailure(createLocalAttach({ socket, keyRoot: dir }), "not_running")
+      }),
+  )
+
+  test("#given an operator endpoint this client may not open (EACCES) #when attach and follow open a self session #then host_unavailable{local_engine, unreachable}, not the device service", () =>
+    withDir(async (dir) => {
+      const connect = (address: string): Socket => {
+        const socket = new Socket()
+        queueMicrotask(() =>
+          socket.destroy(Object.assign(new Error(`connect EACCES ${address}`), { code: "EACCES", syscall: "connect" })),
+        )
+        return socket
+      }
+      await expectEngineFailure(
+        createLocalAttach({ socket: join(dir, "rpc.sock"), keyRoot: dir, connect }),
+        "unreachable",
+      )
+    }))
+
+  // POSIX endpoint authentication (win32's secret transport has no proof step): the engine refuses this client's proof.
+  test.skipIf(process.platform === "win32")(
+    "#given an engine that refuses this client's proof (auth_failed) #when attach and follow open a self session #then host_unavailable{local_engine, unreachable}, not the device service",
+    async () => {
+      await withContractHost({ auth: true, rejectProof: true }, (host) =>
+        expectEngineFailure(createLocalAttach({ socket: host.socket, keyRoot: host.root }), "unreachable"),
+      )
+    },
+  )
 
   test("#given a client built without a local attach #when it follows a self session #then unsupported{local_attach}, not the relay's peer_not_found", async () => {
     const owner = await startOwner(selfWorld())

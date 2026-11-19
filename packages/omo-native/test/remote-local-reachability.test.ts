@@ -132,7 +132,7 @@ const SPAWN_CALL_SITES = [
   'packages/omo-senpi/src/components/thread/gateway/store-worker.ts: takeOverWake(ctx; args as WokenRequest<"takeOver">)',
   "packages/omo-senpi/src/components/thread/gateway/store.ts: packages/omo-senpi/src/components/thread/gateway/provenance-resolver.ts#resolveProvenance({cwd}; -)",
   "packages/omo-senpi/src/components/thread/tools/internals.ts: packages/omo-senpi/src/components/thread/addressing.ts#workspaceDirectories(root; -)",
-  "packages/omo-senpi/src/components/thread/tools/internals.ts: sendAddressBook(options; current)",
+  "packages/omo-senpi/src/components/thread/tools/internals.ts: sendAddressBook(options; view)",
   "packages/utils/src/runtime/spawn.ts: bun.spawn(cmd; createBunSpawnOptions(options))",
   "packages/utils/src/runtime/spawn.ts: bun.spawnSync(cmd; createBunSpawnOptions(options))",
   "packages/utils/src/runtime/spawn.ts: node:child_process#spawn(bin; args)",

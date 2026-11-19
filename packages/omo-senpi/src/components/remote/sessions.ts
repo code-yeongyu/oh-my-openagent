@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto"
 import { userInfo } from "node:os"
 import type { DeviceService } from "@oh-my-opencode/device-service-core/device-service"
 import type { ThreadThinkingLevel, ThreadToolResult } from "../thread/contracts"
+import { DEFAULT_THREAD_DELIVERY } from "../thread/contracts/fields"
 import { isPermissionPreset, presetWithin } from "../thread/contracts/permission-presets"
 import { answered, closeThread, setModelOn, setThinkingLevelOn } from "../thread/control/operations"
 import { ControlRefusal, type SessionControl } from "../thread/control/port"
@@ -23,6 +24,7 @@ import { type ClientCore, ok, type Outcome, type RemoteClient } from "./client"
 import { nextActionFor, readFailureFromError, remoteFailure } from "./codes"
 import { DEADLINES } from "./deadlines"
 import { createDeviceServiceSessions } from "./port/device-service"
+import { budget, idShapedSession, listingIncomplete, resolveRemoteDevice, type Stage } from "./resolve"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
 import { clientMessageIdOf } from "./client-message-id"
 import type { LocalSessions } from "./local-sessions"
@@ -48,8 +50,6 @@ type SessionMembers = Pick<
 >
 
 type Target = { readonly device: string; readonly session: string }
-/** The options of one stage of a call, under what is left of the call's one deadline (capped at `capMs`). */
-type Stage = (capMs?: number) => Opts
 
 const isObject = (value: unknown): value is JsonObject =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -64,19 +64,6 @@ const fromThread = (error: ThreadToolFailure, extra: Partial<RemoteFailure> = {}
         ...(error.details === undefined ? {} : { details: error.details }),
         ...extra,
       })
-
-/** A session handle names its device; any other address is resolved first (sessions.resolve). */
-const targetOf = (thread: ThreadHandle): Target | RemoteFailure => {
-  const parsed = canonicalizeThreadHandle(thread, {})
-  if (parsed.kind === "error") return parsed
-  const { target } = parsed.value
-  if (target.kind === "device_session") return { device: target.device, session: target.session }
-  return remoteFailure(
-    "invalid_arguments",
-    `${thread} names no device; a session member takes a <device>/<session> handle.`,
-    "Call sessions.resolve for the thread's handle, then call this again.",
-  )
-}
 
 /** "provider/id", split at the first slash; anything else is not a model a session can run. */
 const splitModel = (model: string): { readonly provider: string; readonly modelId: string } | RemoteFailure => {
@@ -152,30 +139,12 @@ const unknownSession = (device: string, session?: string): RemoteFailure =>
 // session_not_found as unknown_session): a member answers them not_found{session}, never as a refusal to update for.
 const NO_SESSION: ReadonlySet<unknown> = new Set(["unknown_session", "session_not_found"])
 
-/** A resolved session: the session part a member sends to its device, and its listing row when the device lists it. */
-export type SessionTarget = { readonly device: string; readonly session: string; readonly row?: SessionRow }
-
-/**
- * The one resolution of a handle's session part (the device's listing key or the session's durable id), for every session
- * member and resolve.ts: the listed row with that key, else the listed row with that durable id; a session the listing
- * does not carry (yet) goes to its device as named, where the port's attach locates it (#13748).
- */
-export async function resolveSessionTarget(
-  core: ClientCore,
-  device: string,
-  session: string,
-  opts?: Opts,
-): Promise<Outcome<SessionTarget>> {
-  const listed = await core.sessionsList({ device }, opts)
-  if (listed.kind === "error") return listed
-  const rows = listed.value.rows.filter((row) => row.device.id === device)
-  const byKey = rows.find((row) => row.thread === handleOf(device, session))
-  if (byKey !== undefined) return ok({ device, session, row: byKey })
-  const byDurable = rows.find((row) => row.durable_id === session)
-  const keyed = byDurable === undefined ? undefined : canonicalizeThreadHandle(byDurable.thread, {})
-  if (byDurable !== undefined && keyed?.kind === "ok" && keyed.value.target.kind === "device_session")
-    return ok({ device, session: keyed.value.target.session, row: byDurable })
-  return ok({ device, session })
+/** A resolved session: the device's row, the session part a member sends to it, and its listing row when listed. */
+export type SessionTarget = {
+  readonly device: string
+  readonly session: string
+  readonly row?: SessionRow
+  readonly deviceRow: DeviceRow
 }
 
 /**
@@ -317,23 +286,9 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     return leg
   }
 
-  /**
-   * One deadline for a whole call (#13756 L3): its clock starts once, and each stage (the listing, the device row, the
-   * member) runs under what is left of it, a stage's own table default capping its share.
-   */
-  const budget = (opts: Opts | undefined, totalMs: number): Stage => {
-    const end = core.timers.now() + (opts?.deadlineMs ?? totalMs)
-    return (capMs) => {
-      const left = Math.max(1, end - core.timers.now())
-      return {
-        ...(opts?.signal === undefined ? {} : { signal: opts.signal }),
-        deadlineMs: capMs === undefined ? left : Math.min(capMs, left),
-      }
-    }
-  }
   // An open with a first prompt spends the create's and one send's default.
   const openBudget = (request: OpenRequest, opts: Opts | undefined): Stage =>
-    budget(opts, DEADLINES.openEndpoint + (request.first === undefined ? 0 : DEADLINES.drive))
+    budget(core.timers, opts, DEADLINES.openEndpoint + (request.first === undefined ? 0 : DEADLINES.drive))
 
   const deviceRow = async (id: string, opts: Opts | undefined): Promise<Outcome<DeviceRow>> => {
     const listed = await core.devicesList(opts)
@@ -398,10 +353,39 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     (await svc.thisDevice())?.id === device
 
   const resolve = async (thread: ThreadHandle, stage: Stage): Promise<Outcome<SessionTarget>> => {
-    const named = targetOf(thread)
-    return "kind" in named
-      ? named
-      : await resolveSessionTarget(core, named.device, named.session, stage(DEADLINES.sessionsList))
+    const parsed = canonicalizeThreadHandle(thread, {})
+    if (parsed.kind === "error") return parsed
+    const { target } = parsed.value
+    if (target.kind !== "device_session")
+      return remoteFailure(
+        "invalid_arguments",
+        `${thread} names no device; a session member takes a <device>/<session> handle.`,
+        "Call sessions.resolve for the thread's handle, then call this again.",
+      )
+    const device = await resolveRemoteDevice(core, target.device, stage)
+    if (device.kind === "error") return device
+    const { ref, row: deviceRow } = device.value
+    const listed =
+      device.value.listed !== undefined
+        ? ok(device.value.listed)
+        : await core.sessionsList({ device: ref.id }, stage(DEADLINES.sessionsList))
+    if (listed.kind === "error") return listed
+    const rows = listed.value.rows.filter((row) => row.device.id === ref.id)
+    const byKey = rows.find((row) => row.thread === handleOf(ref.id, target.session))
+    if (byKey !== undefined) return ok({ device: ref.id, session: target.session, row: byKey, deviceRow })
+    const byDurable = rows.find((row) => row.durable_id === target.session)
+    const keyed = byDurable === undefined ? undefined : canonicalizeThreadHandle(byDurable.thread, {})
+    if (byDurable !== undefined && keyed?.kind === "ok" && keyed.value.target.kind === "device_session")
+      return ok({ device: ref.id, session: keyed.value.target.session, row: byDurable, deviceRow })
+    // #13748: a session just opened is not in the listing yet; only an id-shaped session part passes to its device,
+    // where the port's attach locates it and its own typed refusal answers. Anything else is this resolver's refusal.
+    if (idShapedSession(target.session)) return ok({ device: ref.id, session: target.session, deviceRow })
+    return (
+      listingIncomplete(
+        thread,
+        listed.value.unanswered.filter((row) => row.id === ref.id),
+      ) ?? unknownSession(ref.id, target.session)
+    )
   }
 
   const controlled = async <T>(
@@ -411,7 +395,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     value: (result: ThreadToolResult) => T,
     onThisDevice: (target: SessionTarget) => Promise<Outcome<T>>,
   ): R<T> => {
-    const stage = budget(opts, DEADLINES.drive)
+    const stage = budget(core.timers, opts, DEADLINES.drive)
     const resolved = await resolve(thread, stage)
     if (resolved.kind === "error") return resolved
     const target = resolved.value
@@ -447,7 +431,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
   }
 
   const send = async (thread: ThreadHandle, request: SendRequest, opts?: Opts): R<SendReceipt> => {
-    const stage = budget(opts, DEADLINES.drive)
+    const stage = budget(core.timers, opts, DEADLINES.drive)
     const resolved = await resolve(thread, stage)
     if (resolved.kind === "error") return resolved
     return await deliverTo(thread, resolved.value, request, stage)
@@ -477,15 +461,14 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       )
     const from = gatewaySender()
     if ("kind" in from) return from
-    const device = await deviceRow(target.device, stage(DEADLINES.devices))
-    if (device.kind === "error") return device
+    const device = target.deviceRow
     return core.member<SendReceipt>(stage(), DEADLINES.drive, true, async (svc) => {
       if (await isThisDevice(svc, target.device))
         return from.sender.kind === "person"
-          ? await localSend(thread, target, device.value, request, from.caller)
+          ? await localSend(thread, target, device, request, from.caller)
           : selfDelivery(target.device)
       const row = namedDeviceRow(target.device, target.session)
-      const mode = request.mode ?? "auto"
+      const mode = request.mode ?? DEFAULT_THREAD_DELIVERY
       const expected = request.expected_turn_id === undefined ? undefined : String(request.expected_turn_id)
       // A person's followUp prompt carries a client message id, the receipt's delivery_id: every record of the turn that
       // answers it carries it too. The relay's steer record carries none, so a steer names none.
@@ -513,7 +496,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
         )
       const base = {
         thread,
-        device: device.value,
+        device,
         ...((sent.delivery_id ?? clientMessageId) === undefined
           ? {}
           : { delivery_id: sent.delivery_id ?? clientMessageId }),
@@ -638,11 +621,12 @@ export function sessionMembers(core: ClientCore): SessionMembers {
             }),
     )
     if (made.kind === "error") return made
-    const target = { device: made.value.device.id, session: made.value.key }
+    const device = made.value.device
+    const target = { device: device.id, session: made.value.key, deviceRow: device }
     const thread = handleOf(target.device, target.session)
     const result: OpenResult = {
       thread,
-      device: made.value.device,
+      device,
       ...(made.value.warnings.length === 0 ? {} : { warnings: made.value.warnings }),
     }
     if (request.first === undefined) return ok(result)
@@ -672,24 +656,23 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     open,
     send,
     get: async (thread, opts) => {
-      const stage = budget(opts, DEADLINES.observeRead)
+      const stage = budget(core.timers, opts, DEADLINES.observeRead)
       const resolved = await resolve(thread, stage)
       if (resolved.kind === "error") return resolved
       const target = resolved.value
       // A session the listing does not carry yet (one just opened) is read from its device as named, like every member:
       // only the device's own unknown_session makes it not_found.
       return core.member(stage(), DEADLINES.observeRead, false, async (svc) => {
-        const device = await deviceRow(target.device, stage(DEADLINES.devices))
-        if (device.kind === "error") return device
+        const device = target.deviceRow
         if (await isThisDevice(svc, target.device))
-          return await onThisDevice(target.device, (local) => local.get(target, thread, device.value))
+          return await onThisDevice(target.device, (local) => local.get(target, thread, device))
         const state = await engineState(svc, target)
         if (state.kind === "error") return state
-        return ok(sessionDetail(handleOf(target.device, target.session), device.value, target.row, state.value))
+        return ok(sessionDetail(handleOf(target.device, target.session), device, target.row, state.value))
       })
     },
     read: async (thread, page, opts) => {
-      const stage = budget(opts, DEADLINES.observeRead)
+      const stage = budget(core.timers, opts, DEADLINES.observeRead)
       const resolved = await resolve(thread, stage)
       if (resolved.kind === "error") return resolved
       const target = resolved.value
@@ -711,7 +694,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     },
     // The engine's interrupt record itself (relay-control's body drops the background report InterruptResult carries).
     interrupt: async (thread, opts) => {
-      const stage = budget(opts, DEADLINES.drive)
+      const stage = budget(core.timers, opts, DEADLINES.drive)
       const resolved = await resolve(thread, stage)
       if (resolved.kind === "error") return resolved
       const target = resolved.value
@@ -786,7 +769,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
         (target) => onThisDevice(target.device, (local) => local.setReasoning(target, level)),
       ),
     close: async (thread, opts) => {
-      const stage = budget(opts, DEADLINES.close)
+      const stage = budget(core.timers, opts, DEADLINES.close)
       const resolved = await resolve(thread, stage)
       if (resolved.kind === "error") return resolved
       const target = resolved.value

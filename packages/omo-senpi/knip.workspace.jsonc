@@ -355,6 +355,8 @@
         "scripts/qa/thread-tools/desktop-to-cli.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/draft-preservation.mjs",
+        // run by path from scripts/qa/thread-tools/run-all.mjs (#14333: no mode starts an idle TUI and steers a busy one)
+        "scripts/qa/thread-tools/default-delivery.mjs",
         // run by path as the free-plan cross-workspace thread-tools QA driver (#14201)
         "scripts/qa/thread-tools/free-plan-cross-workspace.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
@@ -875,6 +877,8 @@
     "packages/omo-senpi/src/components/thread/gateway/store-retention.ts": ["sweepRetention"],
     // pre-existing at origin dev 4686e425b5: unused export(s) matcherAwaits
     "packages/omo-senpi/src/components/thread/gateway/worker-reply-matchers.test.ts": ["matcherAwaits"],
+    // not pre-existing: unused since #14305 moved locate.ts to the address module; lazy-ops.ts is held by the monitor lane, unit U7 deletes it
+    "packages/omo-senpi/src/components/thread/remote/lazy-ops.ts": ["deviceOnline"],
     // pre-existing at origin dev 4686e425b5: unused export(s) messageText
     "packages/omo-senpi/src/components/thread/session-facts.ts": ["messageText"],
     // pre-existing at origin dev 4686e425b5: unused export(s) THREAD_LINK_SCHEME

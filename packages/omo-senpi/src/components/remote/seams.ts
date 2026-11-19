@@ -1,3 +1,4 @@
+import { formatAddress, parseAddress } from "../../../../thread-address-core/src/parse"
 import { nextActionFor, remoteFailure } from "./codes"
 import type { RemoteFailure, Scope, SessionRow, ThreadHandle } from "./types"
 
@@ -9,13 +10,6 @@ export type CanonicalThread = {
     | { readonly kind: "address"; readonly address: string }
   readonly scope: Scope
 }
-
-// senpi's remote monitor target shape (omo-senpi extension/senpi-seams.ts, from senpi rpc-monitor-targets.ts
-// `parseRpcTarget`): one `/`, no leading `/`, not a `.jsonl` path, not a drive letter, and a first segment no path-only
-// prefix (`.`, `..`, `.hidden`, `~`) can start, so a local path is never read as a device.
-const DEVICE_SESSION = /^([^/]+)\/([^/]+)$/
-const DRIVE_LETTER = /^[A-Za-z]:$/
-const PATH_SEGMENT = /^[.~]/
 
 /**
  * Seam 1 (design v8-core r2, B1): the ONLY parser of a thread address. It names no leg: the resolver that finds where
@@ -29,25 +23,22 @@ export function canonicalizeThreadHandle(
   const text = input.trim()
   if (text === "")
     return remoteFailure("invalid_arguments", "A thread address is empty.", nextActionFor("invalid_arguments"))
-  const match = DEVICE_SESSION.exec(text)
-  const device = match?.[1]
-  const session = match?.[2]
-  if (
-    device !== undefined &&
-    session !== undefined &&
-    !/\.jsonl$/i.test(text) &&
-    !DRIVE_LETTER.test(device) &&
-    !PATH_SEGMENT.test(device)
-  )
+  const parsed = parseAddress(text)
+  if (parsed.kind === "device")
     return {
       kind: "ok",
-      value: { handle: handleOf(device, session), target: { kind: "device_session", device, session }, scope },
+      value: {
+        handle: handleOf(parsed.device, parsed.thread),
+        target: { kind: "device_session", device: parsed.device, session: parsed.thread },
+        scope,
+      },
     }
   return { kind: "ok", value: { handle: text as ThreadHandle, target: { kind: "address", address: text }, scope } }
 }
 
 /** The handle of a session a device listed: `<device>/<session>`, the monitor target form. */
-export const handleOf = (device: string, session: string): ThreadHandle => `${device}/${session}` as ThreadHandle
+export const handleOf = (device: string, session: string): ThreadHandle =>
+  formatAddress(device, session) as ThreadHandle
 
 /** Seam 2: the only helper that names a thread to a person; every message and renderer goes through it. */
 export function describeThread(row: SessionRow): string {
