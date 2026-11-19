@@ -99,11 +99,25 @@ async function storedDevice(remote: RemoteThreadSurface, device: string): Promis
   return named?.kind === "ok" ? named.device.id : device
 }
 
+/** The key a device's rows give a stored thread (by listing key or thread id), else the thread as stored. */
+async function storedSession(remote: RemoteThreadSurface, device: string, thread: string) {
+  const rows = await remote.sessions.sessions({ device }).catch(() => [])
+  const listed = rows.find((row) => row.device === device && (row.session_id === thread || row.durable_id === thread))
+  return { device, session: listed?.session_id ?? thread, listed: listed !== undefined }
+}
+
 async function sessionOn(
   remote: RemoteThreadSurface,
   device: string,
   thread: string,
 ): Promise<{ readonly device: string; readonly session: string }> {
+  // <this device>/<thread>, stored before the tool hook armed targets: watched on this device's id, as it was (the module
+  // reads no local book here).
+  const here = await accountDevices(remote.client).then(
+    (roster) => roster.here,
+    () => null,
+  )
+  if (here !== null && (await storedDevice(remote, device)) === here) return await storedSession(remote, here, thread)
   const resolved = await resolveAddress(
     { remote, callerWorkspaceRoot: "", local: [], callerId: UNKNOWN_CALLER },
     formatAddress(device, thread),
@@ -111,13 +125,11 @@ async function sessionOn(
   )
   if (resolved.kind === "error") {
     if (!TRANSIENT.has(resolved.code)) throw new Error(`${resolved.code}: ${resolved.message}`)
-    const id = await storedDevice(remote, device)
-    const rows = await remote.sessions.sessions({ device: id }).catch(() => [])
-    const listed = rows.find((row) => row.device === id && (row.session_id === thread || row.durable_id === thread))
+    const stored = await storedSession(remote, await storedDevice(remote, device), thread)
     // Only an id-shaped thread part reaches a device that does not list it (the module's rule): a name cannot be resolved
     // without that device's listing, so it keeps the refusal.
-    if (listed === undefined && !THREAD_ID_SHAPE.test(thread)) throw new Error(`${resolved.code}: ${resolved.message}`)
-    return { device: id, session: listed?.session_id ?? thread }
+    if (!stored.listed && !THREAD_ID_SHAPE.test(thread)) throw new Error(`${resolved.code}: ${resolved.message}`)
+    return stored
   }
   if (resolved.where.kind !== "device")
     throw new Error(`not_found: ${thread} is a session on this device, which a remote watch does not follow.`)
