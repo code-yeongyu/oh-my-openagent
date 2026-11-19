@@ -21,6 +21,8 @@ export const B_TWIN = { id: "b7c4ffff00000000", name: "Studio Laptop" } as const
 export const OFF = { id: "c0ffee5a1d2b3c4d", name: "attic", last_seen_ms: 1_699_000_000_000 } as const
 /** A device whose name is the first part of a thread name that contains "/" ("fix/login"). */
 export const FIX = { id: "f1c5d00e77a8b9c0", name: "fix" } as const
+/** An online device with no threads that misses the later rounds together with B. */
+export const QUIET = { id: "c1a55e0000000001", name: "closet" } as const
 
 export const T = {
   hereLive: "0aa00001-0000-4000-8000-000000000001",
@@ -128,6 +130,8 @@ export type TwoDeviceOptions = {
   readonly bOffline?: boolean
   /** A second online device named like B. */
   readonly twin?: boolean
+  /** A third online device that misses every round B misses. */
+  readonly quietThird?: boolean
   /** A device named "fix" holding a thread named "login". */
   readonly fix?: boolean
   /** This device's service makes the single probe and may build an ended row (both omo#13037 gates open). */
@@ -149,6 +153,7 @@ export function createTwoDevices(options: TwoDeviceOptions = {}) {
     { device: OFF.id, label: OFF.name, online: false, last_seen_ms: OFF.last_seen_ms },
     ...(options.twin === true ? [{ device: B_TWIN.id, label: B_TWIN.name, online: true }] : []),
     ...(options.fix === true ? [{ device: FIX.id, label: FIX.name, online: true }] : []),
+    ...(options.quietThird === true ? [{ device: QUIET.id, label: QUIET.name, online: true }] : []),
   ]
   const rows = [...B_ROWS, ...(options.fix === true ? [FIX_ROW] : [])]
   const aliases = new Map<string, AliasHolder>([
@@ -167,7 +172,7 @@ export function createTwoDevices(options: TwoDeviceOptions = {}) {
   })
   const withoutB = (listing: RemoteListing): RemoteListing => ({
     rows: listing.rows.filter((entry) => entry.device !== B.id),
-    incomplete: [...new Set([...listing.incomplete, B.id])],
+    incomplete: [...new Set([...listing.incomplete, B.id, ...(options.quietThird === true ? [QUIET.id] : [])])],
   })
   let round = 0
   // The fixture's client reports no last_seen_ms; the account names when OFF was last seen.

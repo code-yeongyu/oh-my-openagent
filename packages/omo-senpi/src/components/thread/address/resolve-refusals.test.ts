@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { resolveAddress, type ResolveOptions } from "."
 import { UNKNOWN_CALLER } from "../tools/ports"
-import { B, B_TWIN, OFF, T, createTwoDevices, type TwoDeviceOptions } from "./testing/two-devices"
+import { B, B_TWIN, OFF, QUIET, T, createTwoDevices, type TwoDeviceOptions } from "./testing/two-devices"
 
 const cleanups: Array<() => Promise<void>> = []
 afterEach(async () => {
@@ -139,6 +139,22 @@ describe("#given the refusal table of design section 5 #when each condition is m
       code: "host_unavailable",
       details: { reason: "listing_incomplete", devices: [B.id] },
     })
+  })
+
+  test("#given B listed a thread in round 1 and B and a third device both miss round 2 #when ids are resolved #then the remembered device alone is named for that thread, both for an id never listed (#14172)", async () => {
+    const two = createTwoDevices({ dropsAfterFirstRound: true, quietThird: true })
+    cleanups.push(two.cleanup)
+    const context = { remote: two.remote, callerWorkspaceRoot: process.cwd(), local: two.entries, callerId: T.hereLive }
+    expect(await resolveAddress(context, T.bLive, {})).toMatchObject({ kind: "ok", thread: T.bLive })
+    expect(await resolveAddress(context, T.bLive, {})).toMatchObject({
+      kind: "error",
+      code: "host_unavailable",
+      details: { reason: "listing_incomplete", devices: [B.id] },
+    })
+    const never = await resolveAddress(context, T.nowhere, {})
+    expect(never).toMatchObject({ kind: "error", code: "host_unavailable", details: { reason: "listing_incomplete" } })
+    const devices = never.kind === "error" ? (never.details?.["devices"] as readonly string[] | undefined) : undefined
+    expect([...(devices ?? [])].sort()).toEqual([B.id, QUIET.id].sort())
   })
 
   test("#given two online devices named alike #when the name is the device part #then both are candidates with their ids", async () => {
