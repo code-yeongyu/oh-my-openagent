@@ -1,4 +1,4 @@
-import { closeSync, openSync, readSync } from "node:fs"
+import { closeSync, fstatSync, openSync, readSync } from "node:fs"
 
 import { findDiskSessions } from "../address-book"
 import { parseSessionLines, SESSION_FACTS_WINDOW_BYTES, summarizeSessionEntries } from "../session-facts"
@@ -14,6 +14,12 @@ export type WakeTarget =
       readonly session_path: string
       readonly cwd: string
       readonly session_kind: WakeSessionKind
+      /**
+       * When the session was last closed on request (#14273): the newest unload its transcript records as done, in ms on
+       * this device's clock. Absent when the transcript's tail records none (never closed that way, or by an omo that
+       * sent no effect id).
+       */
+      readonly closed_at?: number
     }
 
 function record(value: unknown): value is Record<string, unknown> {
@@ -31,6 +37,40 @@ function headerOf(path: string): Record<string, unknown> | null {
     const buffer = Buffer.alloc(SESSION_FACTS_WINDOW_BYTES)
     const read = readSync(fd, buffer, 0, buffer.length, 0)
     return summarizeSessionEntries(parseSessionLines(buffer.subarray(0, read).toString("utf8"), false, true)).header
+  } finally {
+    closeSync(fd)
+  }
+}
+
+/** senpi's transcript entry for a non-input effect (`effect-record.ts` `RPC_EFFECT_ENTRY`); an unload is one. */
+const RPC_EFFECT_ENTRY = "rpc_effect"
+
+/**
+ * The newest `unload_session` the session's transcript tail records as done (#14273): senpi writes the effect of an
+ * unload that carries an `effectId` (the close ladder sends one) to the transcript before it tears the session down, so
+ * the holder knows the session was closed on request, and when, whichever device asked. An idle park writes nothing.
+ */
+function closedAtOf(path: string): number | undefined {
+  let fd: number
+  try {
+    fd = openSync(path, "r")
+  } catch {
+    return undefined
+  }
+  try {
+    const size = fstatSync(fd).size
+    const start = Math.max(0, size - SESSION_FACTS_WINDOW_BYTES)
+    const buffer = Buffer.alloc(size - start)
+    const read = readSync(fd, buffer, 0, buffer.length, start)
+    let closedAt: number | undefined
+    for (const entry of parseSessionLines(buffer.subarray(0, read).toString("utf8"), start > 0)) {
+      if (entry.type !== "custom" || entry.customType !== RPC_EFFECT_ENTRY || !record(entry.data)) continue
+      const { kind, state, updatedAt } = entry.data
+      if (kind !== "unload" || state !== "done" || typeof updatedAt !== "string") continue
+      const at = Date.parse(updatedAt)
+      if (Number.isFinite(at) && (closedAt === undefined || at > closedAt)) closedAt = at
+    }
+    return closedAt
   } finally {
     closeSync(fd)
   }
@@ -55,10 +95,12 @@ export function resolveWakeTarget(sessionsDirectory: string, durableId: string):
   const [only] = found
   if (only === undefined) return { kind: "gone" }
   if (found.length > 1) return { kind: "ambiguous", session_paths: found.map((session) => session.session_path) }
+  const closedAt = closedAtOf(only.session_path)
   return {
     kind: "found",
     session_path: only.session_path,
     cwd: only.cwd,
     session_kind: sessionKindOf(headerOf(only.session_path)),
+    ...(closedAt === undefined ? {} : { closed_at: closedAt }),
   }
 }

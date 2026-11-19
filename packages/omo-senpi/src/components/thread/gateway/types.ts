@@ -6,7 +6,14 @@ export type DeliveryState = "queued" | "admitting" | "admitted" | "applied" | "r
 
 export type EffectiveLane = "steer" | "follow_up"
 
-export type RefusalReason = "not_steerable" | "turn_conflict" | "expired" | "binding_closed" | "sender_not_admitted"
+export type RefusalReason =
+  | "not_steerable"
+  | "turn_conflict"
+  | "expired"
+  | "binding_closed"
+  | "sender_not_admitted"
+  /** The target was closed on request after the row was queued, before it took the message (#14273). */
+  | "target_closed"
 
 export type ProcessIdentity = {
   readonly pid: number
