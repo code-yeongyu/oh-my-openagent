@@ -16,11 +16,11 @@ Every device signed in to the same account answers through the relay. From a js 
 
 ```js
 const relay = await import("<this skill's directory>/scripts/sdk/index.ts")
-const fleet = await relay.fleetFromEnv(env())        // the account's machines
+const fleet = relay.fleetFromSdk(await import(`${env("OMO_BUNSHIN_TS_SDK_ROOT")}/sdk.js`))  // the account's machines
 const threads = relay.threadPortFromTools(tool)      // the account's threads
 ```
 
-Use the directory you read this file from. `fleetFromEnv` throws `RelayBindError` with code `no_sdk_root` outside an omo session: there is no fleet client to reach then, so say so instead of retrying.
+Use the directory you read this file from. `OMO_BUNSHIN_TS_SDK_ROOT` is set only inside an omo session; outside one there is no fleet client to reach, so say so instead of retrying.
 
 ## Where to read next
 

@@ -23,7 +23,7 @@ export type EvalThreadTools = {
 }
 
 export class RelayBindError extends Error {
-  readonly code: "no_sdk_root" | "sdk_shape"
+  readonly code: "sdk_shape"
   readonly next_action: string
 
   constructor(code: RelayBindError["code"], message: string, nextAction: string) {
@@ -135,23 +135,18 @@ function isFleet(value: unknown): value is FleetPort<MachineRef> {
   return isFields(value) && typeof value["listMachines"] === "function" && typeof value["fanout"] === "function"
 }
 
-/** The account's fleet client from the shipped SDK this session publishes: `await fleetFromEnv(env())`. */
-export async function fleetFromEnv(env: Readonly<Record<string, string | undefined>>): Promise<FleetPort<MachineRef>> {
-  const root = env["OMO_BUNSHIN_TS_SDK_ROOT"]
-  if (root === undefined || root.length === 0) {
-    throw new RelayBindError(
-      "no_sdk_root",
-      "OMO_BUNSHIN_TS_SDK_ROOT is not set in this session",
-      "run this from an eval cell of an omo session; a plain shell has no fleet client",
-    )
-  }
-  const module: unknown = await import(`${root}/sdk.js`)
-  const fleet = isFields(module) ? module["bunshin"] : undefined
+/**
+ * The account's fleet client from the module the cell imported:
+ * `fleetFromSdk(await import(\`${env("OMO_BUNSHIN_TS_SDK_ROOT")}/sdk.js\`))`. The cell does the import so the skill
+ * holds no non-literal import() (the remote-module guard freezes those).
+ */
+export function fleetFromSdk(sdk: unknown): FleetPort<MachineRef> {
+  const fleet = isFields(sdk) ? sdk["bunshin"] : undefined
   if (!isFleet(fleet)) {
     throw new RelayBindError(
       "sdk_shape",
-      `${root}/sdk.js does not export a bunshin client with listMachines and fanout`,
-      "update omo; this skill and the shipped fleet client are out of step",
+      "the module passed in does not export a bunshin client with listMachines and fanout",
+      "in an omo session's eval cell, import sdk.js from OMO_BUNSHIN_TS_SDK_ROOT and pass that module; update omo if it still fails",
     )
   }
   return fleet

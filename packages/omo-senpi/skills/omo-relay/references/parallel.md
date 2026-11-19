@@ -37,7 +37,7 @@ Bind the port with `relay.threadPortFromTools(tool)`; each helper calls the thre
 | Any thread call on several threads | `relay.onThreads([thread, ...], (thread) => threads.read(thread), { concurrency? })` |
 | Every listed thread | `relay.onEveryThread(threads, (row) => ..., { list: { all_scope?, state? }, concurrency? })` |
 
-A thread is named by the `thread` value of a `thread_list` row. `onEveryThread` lists once and rejects only when that list fails (`ThreadListError` with its `code` and `next_action`): then nothing ran.
+A thread is named by the `thread` value of a `tool.thread_list()` row. `onEveryThread` lists once and rejects only when that list fails (`ThreadListError` with its `code` and `next_action`): then nothing ran.
 
 ## Report the batch
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { fleetFromEnv, RelayBindError, threadPortFromTools, type EvalThreadTools } from "./index.ts"
+import { fleetFromSdk, RelayBindError, threadPortFromTools, type EvalThreadTools } from "./index.ts"
 
 function tools(answers: {
   readonly list?: unknown
@@ -64,13 +64,23 @@ describe("threadPortFromTools", () => {
   })
 })
 
-describe("fleetFromEnv", () => {
-  test("#given no SDK root in the environment #when bound #then it throws RelayBindError no_sdk_root", async () => {
+describe("fleetFromSdk", () => {
+  test("#given a module without a bunshin client #when bound #then it throws RelayBindError sdk_shape", () => {
     // when
-    const bound = fleetFromEnv({})
+    const bind = () => fleetFromSdk({ bunshin: { listMachines: "nope" } })
 
     // then
-    await expect(bound).rejects.toBeInstanceOf(RelayBindError)
-    await expect(bound).rejects.toMatchObject({ code: "no_sdk_root" })
+    expect(bind).toThrow(RelayBindError)
+  })
+
+  test("#given a module with a bunshin client #when bound #then that client is the fleet", () => {
+    // given
+    const bunshin = { listMachines: async () => [], fanout: async function* () {} }
+
+    // when
+    const fleet = fleetFromSdk({ bunshin })
+
+    // then
+    expect(fleet).toBe(bunshin as unknown as typeof fleet)
   })
 })
