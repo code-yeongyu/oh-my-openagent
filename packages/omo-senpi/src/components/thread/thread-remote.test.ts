@@ -452,21 +452,59 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     ).toEqual([B_ROW.session_id])
   })
 
-  test("#given a closed session on b that b lists nowhere #when thread_create reopens it by session id #then the probe finds b, b names its file, and that file is opened on b (#14170)", async () => {
-    const closed = "0195f0c2-1a2b-7c3d-8e4f-00000000d001"
-    const file = `/home/b/.omo/agent/sessions/${closed}.jsonl`
-    const a = account({ wakeFeature: true, ended: { b: { [closed]: "rk-closed" } }, sessionFiles: { [closed]: file } })
-    const { run } = surface(a.remote)
-    expect(await run("thread_create", { thread: closed })).toMatchObject({
-      kind: "ok",
-      thread: closed,
-      device: "b",
-      deduplicated: false,
-    })
-    expect(
-      a.sent.filter((entry) => entry.rpc?.["type"] === "open_session").map((entry) => entry.rpc?.["sessionPath"]),
-    ).toEqual([file])
-  })
+  // #14170 and omo#14270 (#13017): a closed session its holder lists nowhere is found by id, its file opened on the holder,
+  // and a turn delivered there, whatever the file's place under the session root and whether the holder registers as a
+  // `cli` daemon or as the `desktop` app that is its device's only thread host.
+  test.each([
+    { name: "a session file at the sessions root", bKind: undefined, folder: "" },
+    { name: "a CLI TUI session file on a cli device", bKind: "cli", folder: "--home-b--/2026-11-19T02-05-00-000Z_" },
+    {
+      name: "a CLI TUI session file on a desktop device",
+      bKind: "desktop",
+      folder: "--home-b--/2026-11-19T02-05-00-000Z_",
+    },
+  ])(
+    "#given $name that b lists nowhere #when thread_create reopens it by id and a message follows #then b names its file, that file is opened on b and the turn starts there (#14170, #14270)",
+    async ({ bKind, folder }) => {
+      const closed = "0195f0c2-1a2b-7c3d-8e4f-00000000d270"
+      const file = `/home/b/.omo/agent/sessions/${folder}${closed}.jsonl`
+      const a = account({
+        ...(bKind === undefined ? {} : { bKind }),
+        wakeFeature: true,
+        ended: { b: { [closed]: "rk-closed" } },
+        sessionFiles: { [closed]: file },
+      })
+      const { run } = surface(a.remote)
+      // The holder's kind reaches the tools through the same device roster the reopen route reads.
+      const listed = await run("thread_list", {})
+      expect(listed.kind === "ok" && "devices" in listed && listed.devices?.find((d) => d.device === "b")?.kind).toBe(
+        bKind,
+      )
+      expect(await run("thread_create", { thread: closed })).toMatchObject({
+        kind: "ok",
+        thread: closed,
+        device: "b",
+        deduplicated: false,
+      })
+      expect(await run("thread_send", { thread: closed, message: "still there?" })).toMatchObject({
+        kind: "ok",
+        thread: closed,
+        delivery: { kind: "started" },
+      })
+      expect(
+        a.sent.flatMap((entry) =>
+          entry.rpc?.["type"] === "open_session"
+            ? [["open", entry.device, entry.rpc["sessionPath"]]]
+            : entry.rpc?.["type"] === "admit_external_message"
+              ? [["admit", entry.device]]
+              : [],
+        ),
+      ).toEqual([
+        ["open", "b", file],
+        ["admit", "b"],
+      ])
+    },
+  )
 
   test("#given b lists a thread with an empty title #when it is listed and then addressed #then it is listed under its folder's name, yet resolves by its thread id only: the derived label is display-only, never an address (#14043)", async () => {
     const a = account({ rows: [{ ...B_ROW, title: "" }] })
