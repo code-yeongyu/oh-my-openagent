@@ -27,7 +27,7 @@ export function createLocalControl(
     title,
     visible: async () => visible(),
     interrupt: (turnId) => interruptOver((request) => port.interrupt(routing, request, threadId), turnId),
-    close: async () => {
+    close: async (closeOptions) => {
       if (session.endpoint_kind === "tui")
         throw refuse(
           "unsupported",
@@ -42,7 +42,7 @@ export function createLocalControl(
           "Update omo on this device and restart its host.",
           { command: "close_session" },
         )
-      return await port.closeSession(routing, threadId)
+      return await port.closeSession(routing, threadId, closeOptions)
     },
     setName: (name) => port.setSessionName(routing, name, threadId),
     getAvailableModels: async () => ({ models: await port.getAvailableModels(routing), held: false }),

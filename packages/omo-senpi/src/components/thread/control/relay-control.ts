@@ -76,18 +76,22 @@ export function createRelayControl(
       }
     },
     interrupt: (turnId) => interruptOver((request) => command({ type: "interrupt", ...request }), turnId),
-    close: async () => {
+    close: async (closeOptions) => {
       try {
         // The unload's reply names the session file: a reopen from this surface needs it while the listing lags (#14170).
         let unloaded: string | undefined
-        const outcome = await closeLadder(sessionId, async (rpc) => {
-          const answered = await answer(rpc)
-          const path = answered.kind === "ok" ? answered.data["sessionPath"] : undefined
-          if (typeof path === "string" && path !== "") unloaded = path
-          return answered
-        })
-        if (outcome !== "held_elsewhere") remote.sessions.closed?.(row, unloaded)
-        return outcome
+        const closed = await closeLadder(
+          sessionId,
+          async (rpc) => {
+            const answered = await answer(rpc)
+            const path = answered.kind === "ok" ? answered.data["sessionPath"] : undefined
+            if (typeof path === "string" && path !== "") unloaded = path
+            return answered
+          },
+          closeOptions,
+        )
+        if (closed.outcome !== "held_elsewhere") remote.sessions.closed?.(row, unloaded)
+        return closed
       } catch (error) {
         throw error instanceof ControlRefusal
           ? new ControlRefusal({ ...error.failure, details: { device, ...error.failure.details } })

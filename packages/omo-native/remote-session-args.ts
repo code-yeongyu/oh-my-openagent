@@ -35,7 +35,9 @@ export type SessionArgs =
       readonly timeout_seconds?: number
     }
   | { readonly verb: "model"; readonly target: RemoteSessionTarget; readonly model: string }
-  | { readonly verb: "interrupt" | "close"; readonly target: RemoteSessionTarget }
+  | { readonly verb: "interrupt"; readonly target: RemoteSessionTarget }
+  /** `force`: close even when the session has messages it has not read; they are dropped and listed (omo#14234). */
+  | { readonly verb: "close"; readonly target: RemoteSessionTarget; readonly force: boolean }
 
 export function parseTarget(verb: string, value: string | undefined): RemoteSessionTarget {
   const slash = value?.indexOf("/") ?? -1
@@ -56,7 +58,7 @@ const SESSION_FLAGS: Readonly<
   send: { values: ["--timeout"], switches: ["--steer", "--follow-up", "--no-wait"] },
   model: { values: [], switches: [] },
   interrupt: { values: [], switches: [] },
-  close: { values: [], switches: [] },
+  close: { values: [], switches: ["--force"] },
 }
 
 export function parseSession(
@@ -161,5 +163,6 @@ export function parseSession(
       throw new UsageError("omo remote model: the model is required (provider/id)")
     return { json, session: { verb, target, model } }
   }
+  if (verb === "close") return { json, session: { verb, target, force: switches.has("--force") } }
   return { json, session: { verb, target } }
 }

@@ -65,7 +65,7 @@ const USAGE_ENTRIES: readonly { readonly verbs: readonly string[]; readonly text
   },
   {
     verbs: ["close"],
-    text: "  close <session>                          end the session; also takes <device>/<session>",
+    text: "  close <session> [--force]                end the session; --force also drops messages it has not read",
   },
 ]
 

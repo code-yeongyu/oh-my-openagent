@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, readFileSync, statSync } from "node:fs"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
+import * as fs from "node:fs"
+import { chmodSync, existsSync, readFileSync, statSync } from "node:fs"
 import { join } from "node:path"
 
 import { type ColdWakeHost, installColdWake, uninstallColdWake } from "../../src/cold-wake/index.ts"
@@ -37,11 +38,52 @@ describe("cold wake on Linux", () => {
     ])
   })
 
-  // systemd refuses a group- or world-writable unit; Windows has no POSIX modes (and no session host unit).
-  test.skipIf(process.platform === "win32")("writes the unit 0644", async () => {
+  // systemd refuses a group- or world-writable unit, and a 0600 one is unreadable to a manager running as another user;
+  // Windows has no POSIX modes (and no session host unit). The install runs in a child that sets umask 077 itself, so
+  // the mode cannot come from the runner's umask (omo#14247: a creation mode is ANDed with ~umask).
+  test.skipIf(process.platform === "win32")("writes the unit 0644 even under umask 077", () => {
+    const at = (file: string) => JSON.stringify(new URL(file, import.meta.url).pathname)
+    const script = [
+      "process.umask(0o077)",
+      `const { installColdWake } = await import(${at("../../src/cold-wake/index.ts")})`,
+      `const { fakeSystemd, LAUNCH, UNIT_DIR, removeTempHomes } = await import(${at("./cold-wake-fakes.ts")})`,
+      'const { statSync } = await import("node:fs")',
+      "const { host, home } = fakeSystemd()",
+      "await installColdWake(host, LAUNCH)",
+      'process.stdout.write((statSync(UNIT_DIR(home) + "/omo-session-host.service").mode & 0o777).toString(8))',
+      "removeTempHomes()",
+    ].join("\n")
+    const child = Bun.spawnSync([process.execPath, "-e", script], { stderr: "pipe" })
+    expect(child.stderr.toString()).toBe("")
+    expect(child.exitCode).toBe(0)
+    expect(child.stdout.toString()).toBe("644")
+  })
+
+  // A unit an older build wrote 0600 is repaired by the next install even though its text is unchanged (omo#14247).
+  test.skipIf(process.platform === "win32")("repairs an unchanged unit left 0600", async () => {
+    const { host, home, runs } = fakeSystemd()
+    await installColdWake(host, LAUNCH)
+    const unit = join(UNIT_DIR(home), "omo-session-host.service")
+    chmodSync(unit, 0o600)
+    runs.length = 0
+    expect(await installColdWake(host, LAUNCH)).toEqual({ kind: "installed", serviceRestarted: false })
+    expect(statSync(unit).mode & 0o777).toBe(0o644)
+    expect(runs.filter((r) => !r.includes(" show "))).toEqual([])
+  })
+
+  // The repair is best effort: a unit this user cannot chmod (another owner's, a read-only filesystem) still installs.
+  test.skipIf(process.platform === "win32")("installs an unchanged unit whose mode cannot be repaired", async () => {
     const { host, home } = fakeSystemd()
     await installColdWake(host, LAUNCH)
-    expect(statSync(join(UNIT_DIR(home), "omo-session-host.service")).mode & 0o777).toBe(0o644)
+    chmodSync(join(UNIT_DIR(home), "omo-session-host.service"), 0o600)
+    const denied = spyOn(fs, "chmodSync").mockImplementation(() => {
+      throw Object.assign(new Error("EPERM: operation not permitted, chmod"), { code: "EPERM" })
+    })
+    try {
+      expect(await installColdWake(host, LAUNCH)).toEqual({ kind: "installed", serviceRestarted: false })
+    } finally {
+      denied.mockRestore()
+    }
   })
 
   test("starts a unit that is not running without rewriting anything else", async () => {
