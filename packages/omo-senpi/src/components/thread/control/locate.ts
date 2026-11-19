@@ -16,8 +16,6 @@ export type LocatedControl =
   | { readonly kind: "not_live"; readonly thread_id: string; readonly title: string; readonly device?: string }
   | { readonly kind: "error"; readonly result: ThreadToolResult }
 
-const HERE_PREFIX = "here/"
-
 /**
  * The only place a control tool reads the device: an address resolved through this device's address book and the
  * account (`resolveAddress`, which takes `<device>/<thread>` too) becomes the control of the thread it names, over this
@@ -34,8 +32,7 @@ export async function locateControl(
   // Decision 0027: the entries are the ones a send resolves against, session files no engine runs included, so every
   // tool finds the thread a send finds. A thread id no device lists gets the per-device probe (A4.3.3, #13215): a
   // session another device holds but runs nowhere is its ended row, so it answers not_live there as here.
-  const local = address.startsWith(HERE_PREFIX) ? address.slice(HERE_PREFIX.length) : address
-  const entries = toThreadAddressEntries(sendAddressBook(options, current, local, true))
+  const entries = toThreadAddressEntries(sendAddressBook(options, current, address.replace(/^here\//, ""), true))
   const resolved = await resolveAddress(
     { remote: options.remote, callerWorkspaceRoot: options.callerWorkspaceRoot(), local: entries, callerId },
     address,
