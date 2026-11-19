@@ -201,7 +201,7 @@ describe("resolveSpawnItems", () => {
     // given
     const params = {
       prompt: "do it",
-      subagent_type: "plan-reviewer",
+      subagent_type: "my-reviewer",
       model: "anthropic/claude-opus-4",
       load_skills: ["a"],
     }
@@ -217,7 +217,7 @@ describe("resolveSpawnItems", () => {
     if (item === undefined) throw new Error("expected item")
     expect(item.kind).toBe("subagent_type")
     if (item.kind !== "subagent_type") throw new Error("expected subagent_type")
-    expect(item.subagentType).toBe("plan-reviewer")
+    expect(item.subagentType).toBe("my-reviewer")
     expect(item.prompt).toBe("do it")
     expect(item.model).toBe("anthropic/claude-opus-4")
     expect(item.load_skills).toEqual(["a"])
@@ -226,7 +226,7 @@ describe("resolveSpawnItems", () => {
   test("#given a 3-item batch w2val #when resolved #then inherits top-level model/subagent and item overrides win", () => {
     // given
     const params = {
-      subagent_type: "plan-reviewer",
+      subagent_type: "my-reviewer",
       model: "anthropic/claude-opus-4",
       load_skills: ["shared"],
       tasks: [
@@ -251,9 +251,9 @@ describe("resolveSpawnItems", () => {
     if (first.kind !== "subagent_type" || second.kind !== "subagent_type" || third.kind !== "subagent_type") {
       throw new Error("expected subagent_type")
     }
-    expect(first.subagentType).toBe("plan-reviewer")
-    expect(second.subagentType).toBe("plan-reviewer")
-    expect(third.subagentType).toBe("plan-reviewer")
+    expect(first.subagentType).toBe("my-reviewer")
+    expect(second.subagentType).toBe("my-reviewer")
+    expect(third.subagentType).toBe("my-reviewer")
     expect(first.model).toBe("anthropic/claude-opus-4")
     expect(second.model).toBe("anthropic/claude-haiku")
     expect(third.model).toBe("anthropic/claude-opus-4")
@@ -533,7 +533,7 @@ describe("resolveSpawnItems category+model exclusivity", () => {
   test("#given subagent items inheriting a top-level model #then resolves ok with the model attached", () => {
     // given / when
     const result = resolveSpawnItems({
-      subagent_type: "plan-reviewer",
+      subagent_type: "my-reviewer",
       model: "openai/gpt-5.6-sol",
       tasks: [{ prompt: "one" }],
     })
