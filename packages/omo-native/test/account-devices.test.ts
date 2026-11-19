@@ -140,9 +140,9 @@ describe("omo account devices", () => {
     const result = await run(api, ["devices", "revoke", "twin"])
 
     expect(result.code).toBe(ACCOUNT_EXIT.failed)
-    expect(result.out).toEqual([{ revoked: false, error: "ambiguous_target" }])
-    expect(result.err[0] ?? "").toContain("dev-twin")
-    expect(result.err[0] ?? "").toContain("dev-twin-2")
+    expect(result.out).toEqual([{ revoked: false, error: "ambiguous_target", candidates: ["dev-twin", "dev-twin-2"] }])
+    expect(result.err.filter((line) => line.includes("dev-twin ") || line.endsWith("dev-twin"))).toHaveLength(1)
+    expect(result.err.filter((line) => line.includes("dev-twin-2"))).toHaveLength(1)
     expect(calls.some((call) => call.startsWith("DELETE"))).toBe(false)
   })
 
@@ -156,7 +156,9 @@ describe("omo account devices", () => {
     const result = await run(api, ["devices", "revoke", "device-a"])
 
     expect(result.code).toBe(ACCOUNT_EXIT.failed)
-    expect(result.out).toEqual([{ revoked: false, error: "ambiguous_target" }])
+    expect(result.out).toEqual([
+      { revoked: false, error: "ambiguous_target", candidates: ["device-a1x", "device-a2y"] },
+    ])
     expect(calls.some((call) => call.startsWith("DELETE"))).toBe(false)
   })
 

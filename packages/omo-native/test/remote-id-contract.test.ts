@@ -89,15 +89,15 @@ describe("#13010 remote CLI session identity", () => {
     })
   })
 
-  // The duplicate-id ambiguity rule is withdrawn (measured 2026-11-19: no thread id is listed by two devices, 236
-  // rows, 0 duplicates; #14305): a duplicate resolves to the first holder, as today's order does.
-  test("#given the same durable id listed by two devices #when a verb addresses it #then the first holder answers", async () => {
+  // A session verb never picks one of two holders of one durable id (close --force must not land on a sealed copy):
+  // ambiguous_target naming both, and nothing is sent (#14305 review L2, the module's unique_holder).
+  test("#given the same durable id listed by two devices #when a verb addresses it #then it refuses ambiguous_target and sends nothing", async () => {
     const fake = await owner(true)
     const result = await run(["interrupt", DURABLE, "--json"], fake.stateDir)
     expect({ code: result.code, json: JSON.parse(result.out.join("")), commands: fake.state.commands }).toMatchObject({
-      code: REMOTE_EXIT.ok,
-      json: { kind: "ok" },
-      commands: [{ type: "interrupt" }],
+      code: REMOTE_EXIT.failed,
+      json: { kind: "error", error: { code: "ambiguous_target" } },
+      commands: [],
     })
   })
 
@@ -113,7 +113,8 @@ describe("#13010 remote CLI session identity", () => {
       expect({ target, code: result.code, json: result.out.map((line) => JSON.parse(line)) }).toMatchObject({
         target,
         code: REMOTE_EXIT.ok,
-        json: [{ kind: "ok", thread: DURABLE }],
+        // A listing key typed behind its device answers with that key, as before the address module (#14305 review L2).
+        json: [{ kind: "ok", thread: target === `${PEER}/${SESSION_ID}` ? SESSION_ID : DURABLE }],
       })
     }
   })

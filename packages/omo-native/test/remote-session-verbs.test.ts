@@ -1,6 +1,13 @@
 import { describe, expect, test } from "bun:test"
 
-import { B, createTwoDevices, KEY, T } from "../../omo-senpi/src/components/thread/address/testing/two-devices"
+import {
+  ALIAS,
+  B,
+  B_TWIN,
+  createTwoDevices,
+  KEY,
+  T,
+} from "../../omo-senpi/src/components/thread/address/testing/two-devices"
 import { REMOTE_EXIT } from "../remote-exit"
 import { run, useRemoteCliCleanup } from "./remote-cli-harness"
 
@@ -73,7 +80,43 @@ describe("omo remote session verbs take every address form", () => {
         kind: "error",
         error: { code: "not_found" },
       })
-      expect(td.account.sent.filter((entry) => entry.device === "here")).toEqual([])
+      expect(td.account.sent).toEqual([])
+    } finally {
+      await td.cleanup()
+    }
+  })
+
+  // #14305 review M2: a thread this device holds is outside omo remote's scope, whatever form reached it: the module's
+  // typed not_found, with nothing sent, never a host_unavailable that tells a script to retry.
+  test("#given an account alias this device holds #when send names it #then it answers not_found and sends nothing", async () => {
+    const td = createTwoDevices()
+    try {
+      const result = await run(
+        ["send", ALIAS.here, "hello", "--no-wait", "--json"],
+        undefined,
+        undefined,
+        undefined,
+        td.remote,
+      )
+      expect(result.code).toBe(REMOTE_EXIT.failed)
+      expect(JSON.parse(result.out.join("") ?? "{}") as JsonResult).toMatchObject({
+        kind: "error",
+        error: { code: "not_found" },
+      })
+      expect(td.account.sent).toEqual([])
+    } finally {
+      await td.cleanup()
+    }
+  })
+
+  // #14305 review M4: a person sees each candidate of an ambiguous device on its own line, so it can be typed back.
+  test("#given two online devices sharing a name #when a verb names that device without --json #then each candidate is printed on its own line and nothing runs", async () => {
+    const td = createTwoDevices({ twin: true })
+    try {
+      const result = await run(["interrupt", `${B.name}/${T.bLive}`], undefined, undefined, undefined, td.remote)
+      expect(result.code).toBe(REMOTE_EXIT.failed)
+      expect(result.err.filter((line) => line.includes(B.id) !== line.includes(B_TWIN.id))).toHaveLength(2)
+      expect(td.account.sent).toEqual([])
     } finally {
       await td.cleanup()
     }

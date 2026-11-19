@@ -111,36 +111,55 @@ describe("omo remote", () => {
     expect(self.code).toBe(REMOTE_EXIT.ok)
   })
 
-  test("sessions --device names the candidates of an ambiguous device, on the one call it makes (#14305)", async () => {
-    const calls: string[] = []
-    const client = {
-      devices: { list: async () => ({ kind: "ok", value: [] }) },
-      sessions: {
-        list: async () => {
-          calls.push("sessions.list")
-          return {
-            kind: "error",
-            code: "ambiguous_target",
-            message: "2 online devices are named studio.",
-            next_action: "Pass the device id.",
-            details: {
-              kind: "device",
-              candidates: [
-                { device: "dev-peer-1", name: "Studio", online: true },
-                { device: "dev-peer-3", name: "Studio", online: true },
-              ],
-            },
-          }
-        },
+  const ambiguousDeviceClient = (calls: string[]) => ({
+    devices: { list: async () => ({ kind: "ok", value: [] }) },
+    sessions: {
+      list: async () => {
+        calls.push("sessions.list")
+        return {
+          kind: "error",
+          code: "ambiguous_target",
+          message: "2 online devices are named studio.",
+          next_action: "Pass the device id.",
+          details: {
+            kind: "device",
+            candidates: [
+              { device: "dev-peer-1", name: "Studio", online: true },
+              { device: "dev-peer-3", name: "Studio", online: true },
+            ],
+          },
+        }
       },
-      close: () => {},
-    }
+    },
+    close: () => {},
+  })
+
+  test("sessions --device names the candidates of an ambiguous device one per line, on the one call it makes (#14305)", async () => {
+    const calls: string[] = []
     const { code, err } = await run(["sessions", "--device", "studio"], privateDir(), undefined, undefined, undefined, {
-      client: () => client as unknown as RemoteClient,
+      client: () => ambiguousDeviceClient(calls) as unknown as RemoteClient,
     })
     expect(code).toBe(REMOTE_EXIT.failed)
-    expect(err[0] ?? "").toContain("dev-peer-1")
-    expect(err[0] ?? "").toContain("dev-peer-3")
+    expect(err.filter((line) => line.includes("dev-peer-1") !== line.includes("dev-peer-3"))).toHaveLength(2)
+    expect(calls).toEqual(["sessions.list"])
+  })
+
+  test("sessions --device --json prints an ambiguous device's typed failure with its candidates on stdout (#14305 review M1)", async () => {
+    const calls: string[] = []
+    const { code, out } = await run(
+      ["sessions", "--device", "studio", "--json"],
+      privateDir(),
+      undefined,
+      undefined,
+      undefined,
+      { client: () => ambiguousDeviceClient(calls) as unknown as RemoteClient },
+    )
+    expect(code).toBe(REMOTE_EXIT.failed)
+    expect(JSON.parse(out.join(""))).toMatchObject({
+      kind: "error",
+      code: "ambiguous_target",
+      details: { candidates: [{ device: "dev-peer-1" }, { device: "dev-peer-3" }] },
+    })
     expect(calls).toEqual(["sessions.list"])
   })
 
@@ -491,14 +510,12 @@ describe("omo remote attach", () => {
     expect(err[0]).toStartWith("usage: omo remote attach <device>/<session>")
   })
 
-  test.each([["/session"], ["device/"]])(
-    "answers the target %p with a typed refusal instead of sending it (#14305)",
-    async (target) => {
-      const { prepared, err } = await attach([target])
-      expect(prepared).toBe(REMOTE_EXIT.failed)
-      expect(err[0]).toStartWith("omo remote: ")
-    },
-  )
+  // An address with an empty side is malformed: usage, as before the address module (#14305 review L2).
+  test.each([["/session"], ["device/"]])("refuses the malformed target %p as usage", async (target) => {
+    const { prepared, err } = await attach([target])
+    expect(prepared).toBe(REMOTE_EXIT.usage)
+    expect(err[0]).toStartWith("usage: omo remote attach <device>/<session>")
+  })
 
   // Every omo remote verb needs its device online (#14305): an offline device named by its name is refused at resolution,
   // so no attach reaches the service.
@@ -1079,6 +1096,10 @@ describe("omo remote session verbs", () => {
   })
 
   test.each([
+    [
+      ["send", "/session", "hi"],
+      "omo remote send: name the session as <device>/<session> (the SESSION column of omo remote sessions) or by the thread value open printed",
+    ],
     [
       ["send"],
       "omo remote send: name the session as <device>/<session> (the SESSION column of omo remote sessions) or by the thread value open printed",
