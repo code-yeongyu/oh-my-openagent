@@ -211,6 +211,16 @@ export function createRemoteThreadFixture() {
       otherHolders?: number
       unwritten?: boolean
       unloadReason?: string
+      /** b's engine is running a turn (omo#14234): an unload without interrupt is refused turn_active. */
+      busy?: boolean
+      /** Deliveries b's engine admitted and has not written; an interrupting unload hands them back. */
+      unread?: readonly string[]
+      /** b's engine advertises unload_refuse_deliveries (senpi#7006); default true. false = an engine that ignores the field. */
+      refusesDeliveries?: boolean
+      /** The reason b's engine names when it refuses on unread deliveries (default work_pending). */
+      unreadReason?: "work_pending" | "turn_active"
+      /** b's engine does not answer get_protocol_info (the read times out). */
+      protocolInfoFails?: boolean
       terminal?: boolean
       rowState?: string
       live?: readonly string[]
@@ -328,6 +338,10 @@ export function createRemoteThreadFixture() {
     const live = new Set(
       options.live ?? [B_ROW.session_id, ...(B_ROW.durable_id === undefined ? [] : [B_ROW.durable_id])],
     )
+    // b's engine's run and its unwritten deliveries (omo#14234); an interrupting unload ends the one and hands back the other.
+    let busy = options.busy === true
+    const unread = [...(options.unread ?? [])]
+    const capable = options.refusesDeliveries !== false
     const answer = (rpc: JsonObject, attachedTo?: string): RemoteCommandOutcome => {
       // The engine's real reply envelope, as the device service hands it back (device-service-core's CommandResult.response):
       // every field the tools read lives under `data`.
@@ -346,6 +360,10 @@ export function createRemoteThreadFixture() {
         if ((options.otherHolders ?? 0) === 0) live.delete(attachedTo)
         return ok({})
       }
+      if (rpc["type"] === "get_protocol_info") {
+        if (options.protocolInfoFails === true) return { kind: "refused", reason: "request_timeout" }
+        return ok({ capabilities: capable ? ["unload_session", "unload_refuse_deliveries"] : ["unload_session"] })
+      }
       if (rpc["type"] === "unload_session" && attachedTo !== undefined) {
         if (options.unloadReason !== undefined)
           return ok({ outcome: "refused", reason: options.unloadReason, detail: `refused: ${options.unloadReason}` })
@@ -353,8 +371,32 @@ export function createRemoteThreadFixture() {
           return ok({ outcome: "refused", reason: "unsupported", detail: "the session has no file to reopen it by" })
         if ((options.otherHolders ?? 0) > 0 && rpc["force"] !== true)
           return ok({ outcome: "refused", reason: "attached", detail: "1 other client(s) attached" })
+        // senpi session-unload.ts as of #7006 (an engine without the capability ignores `deliveries`).
+        const pending = capable ? { pending: { deliveries: [...unread] } } : {}
+        if (busy && unread.length > 0 && capable && rpc["deliveries"] === "refuse")
+          return ok({
+            outcome: "refused",
+            reason: options.unreadReason ?? "work_pending",
+            detail: "an admitted delivery not yet written",
+            ...pending,
+          })
+        if (busy && rpc["interrupt"] !== true)
+          return ok({ outcome: "refused", reason: "turn_active", detail: "an agent run" })
+        if (!busy && unread.length > 0 && rpc["interrupt"] !== true)
+          return ok({
+            outcome: "refused",
+            reason: "work_pending",
+            detail: "an admitted delivery not yet written",
+            ...pending,
+          })
+        const dropped = rpc["interrupt"] === true ? unread.splice(0) : []
+        busy = false
         live.delete(attachedTo)
-        return ok({ outcome: "unloaded", sessionPath: B_FILE })
+        return ok({
+          outcome: "unloaded",
+          sessionPath: B_FILE,
+          ...(dropped.length > 0 ? { dropped: { deliveries: dropped } } : {}),
+        })
       }
       if (rpc["type"] === "open_session" && options.openRefuse !== undefined)
         return { kind: "refused", reason: options.openRefuse }
@@ -758,6 +800,8 @@ export function createRemoteThreadFixture() {
       caller?: string
       diskSessions?: readonly string[]
       closeOutcome?: ThreadCloseOutcome
+      /** The deliveries this device's host hands back unread when it closes (omo#14234). */
+      closeDropped?: readonly string[]
       /** How this device's engine takes `set_session_archived`: `absent` = a host port without it, `refused` = an older engine. */
       archive?: "absent" | "refused"
       /** Look session files up where senpi writes them, `<agentDir>/sessions`, as the component does. */
@@ -816,6 +860,7 @@ export function createRemoteThreadFixture() {
       return created
     })
     const closed: Array<readonly [string, string | undefined]> = []
+    const forcedCloses: string[] = []
     // The interrupt records this device's endpoint received, as b's engine's arrive in `sent`.
     const interrupts: JsonObject[] = []
     const setSessionName = mock(async (_sessionId: string, _name: string) => {})
@@ -864,9 +909,10 @@ export function createRemoteThreadFixture() {
           throw new Error(`thinking_level_unsupported:Thinking level ${level} is not supported by the active model.`)
       },
       getAvailableThinkingLevels: async () => [...THINKING_LEVELS],
-      closeSession: async (sessionId, durableId) => {
+      closeSession: async (sessionId, durableId, options) => {
         closed.push([sessionId, durableId])
-        return extra.closeOutcome ?? "closed"
+        if (options?.force === true) forcedCloses.push(sessionId)
+        return { outcome: extra.closeOutcome ?? "closed", dropped_deliveries: extra.closeDropped ?? [] }
       },
       ...(extra.archive === "absent" ? {} : { setSessionArchived }),
       watchSession: async (_sessionId, handlers) => {
@@ -954,6 +1000,7 @@ export function createRemoteThreadFixture() {
       setSessionName,
       store,
       closed,
+      forcedCloses,
       archived,
       interrupts,
       agentDir,

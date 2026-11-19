@@ -98,6 +98,12 @@ const ThreadCloseParams = Type.Object({
   thread: SelfOrThread,
   idempotency_key: IdempotencyKey,
   all_scope: AllScope,
+  force: Type.Optional(
+    Type.Boolean({
+      description:
+        "Close even when the thread has messages it has not read yet; they are dropped and listed in dropped_deliveries.",
+    }),
+  ),
 })
 
 export const ThreadHandoffParams = Type.Object({
