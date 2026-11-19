@@ -1,4 +1,6 @@
-import { readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 import { stdin as processStdin, stdout as processStdout } from "node:process";
 
 import {
@@ -27,7 +29,11 @@ export type CodexPostToolUseInput = {
 
 export type CodexHookOptions = {
 	run?: CommentCheckerRunner;
+	pluginDataRoot?: string;
 };
+
+export const COMMENT_CHECKER_MISSING_NOTICE =
+	"[LazyCodex] comment-checker is not installed, so files edited in this session are not checked for comments. Tell the user once: the checker ships as an npm dependency of the plugin, which `npx lazycodex-ai install` installs and a Codex marketplace install (`codex plugin add`) does not.";
 
 const DEFAULT_MAX_HOOK_FEEDBACK_CHARS = 8000;
 const CONTEXT_PRESSURE_MAX_HOOK_FEEDBACK_CHARS = 1200;
@@ -54,6 +60,7 @@ export async function runCommentCheckerPostToolUse(
 
 	const runner = options.run ?? runCommentChecker;
 	const warnings: Array<{ filePath: string; message: string }> = [];
+	let checkerMissing = false;
 
 	for (const request of requests) {
 		const context = {
@@ -62,7 +69,11 @@ export async function runCommentCheckerPostToolUse(
 			...(input.transcript_path === null ? {} : { transcriptPath: input.transcript_path }),
 		};
 		const result = await runner(toHookInput(request, context));
-		if (result.status === "missing" || result.status === "pass") continue;
+		if (result.status === "missing") {
+			checkerMissing = true;
+			continue;
+		}
+		if (result.status === "pass") continue;
 		if (result.status === "error") continue;
 		const message = normalizeHookText(result.message);
 		if (message.length > 0) {
@@ -70,7 +81,9 @@ export async function runCommentCheckerPostToolUse(
 		}
 	}
 
-	if (warnings.length === 0) return "";
+	if (warnings.length === 0) {
+		return checkerMissing ? missingCheckerNotice(input.session_id, options.pluginDataRoot) : "";
+	}
 
 	return JSON.stringify({
 		decision: "block",
@@ -139,6 +152,25 @@ function formatWarnings(warnings: Array<{ filePath: string; message: string }>):
 	return warnings
 		.map((warning) => `comment-checker found issues in ${warning.filePath}:\n${warning.message}`)
 		.join("\n\n");
+}
+
+function missingCheckerNotice(sessionId: string, pluginDataRoot: string | undefined): string {
+	const markerPath = missingNoticeMarkerPath(sessionId, pluginDataRoot);
+	if (existsSync(markerPath)) return "";
+	try {
+		mkdirSync(dirname(markerPath), { recursive: true });
+		writeFileSync(markerPath, `${new Date().toISOString()}\n`);
+	} catch (error) {
+		if (!(error instanceof Error)) throw error;
+	}
+	return JSON.stringify({
+		hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: COMMENT_CHECKER_MISSING_NOTICE },
+	});
+}
+
+function missingNoticeMarkerPath(sessionId: string, pluginDataRoot: string | undefined): string {
+	const root = pluginDataRoot ?? process.env["PLUGIN_DATA"] ?? join(homedir(), ".codex", "codex-comment-checker");
+	return join(root, "comment-checker-missing", `${sessionId.replace(/[^A-Za-z0-9._-]/g, "_")}.seen`);
 }
 
 function normalizeHookText(value: string): string {

@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+	COMMENT_CHECKER_MISSING_NOTICE,
 	type CodexPostToolUseInput,
 	extractCodexCommentCheckRequests,
 	runCommentCheckerPostToolUse,
@@ -360,15 +361,47 @@ describe("runCommentCheckerPostToolUse", () => {
 		});
 	});
 
-	it("#given missing checker binary #when hook runs #then emits no hook output", async () => {
-		const output = await runCommentCheckerPostToolUse(postToolUseInput(), {
-			run: async () => ({
-				status: "missing",
-				message: "not installed",
-			}),
+	it("#given missing checker binary #when hook runs twice in one session #then tells Codex once without blocking", async () => {
+		// given
+		const pluginDataRoot = mkdtempSync(path.join(tmpdir(), "codex-comment-checker-missing-"));
+		tempDirs.push(pluginDataRoot);
+		const run = async () => ({ status: "missing" as const, message: "not installed" });
+
+		// when
+		const first = await runCommentCheckerPostToolUse(postToolUseInput(), { run, pluginDataRoot });
+		const second = await runCommentCheckerPostToolUse(postToolUseInput(), { run, pluginDataRoot });
+		const otherSession = await runCommentCheckerPostToolUse(postToolUseInput({ session_id: "thread-2" }), {
+			run,
+			pluginDataRoot,
 		});
 
-		expect(output).toBe("");
+		// then
+		const notice = {
+			hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: COMMENT_CHECKER_MISSING_NOTICE },
+		};
+		expect(JSON.parse(first)).toEqual(notice);
+		expect(COMMENT_CHECKER_MISSING_NOTICE).toContain("npx lazycodex-ai install");
+		expect(second).toBe("");
+		expect(JSON.parse(otherSession)).toEqual(notice);
+	});
+
+	it("#given missing checker binary and an unwritable plugin data dir #when hook runs #then still tells Codex", async () => {
+		// given
+		const root = mkdtempSync(path.join(tmpdir(), "codex-comment-checker-missing-"));
+		tempDirs.push(root);
+		const pluginDataRoot = path.join(root, "not-a-directory");
+		writeFileSync(pluginDataRoot, "");
+
+		// when
+		const output = await runCommentCheckerPostToolUse(postToolUseInput(), {
+			run: async () => ({ status: "missing", message: "not installed" }),
+			pluginDataRoot,
+		});
+
+		// then
+		expect(JSON.parse(output)).toEqual({
+			hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: COMMENT_CHECKER_MISSING_NOTICE },
+		});
 	});
 
 	it("#given transcript path #when hook runs #then forwards it to checker input", async () => {
