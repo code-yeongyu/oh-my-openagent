@@ -1,5 +1,6 @@
 import { syncRequestHeaders } from "@oh-my-opencode/memory-core/sync-capabilities"
 import { z } from "zod"
+import { jsonRequest } from "./protocol"
 import type { Session } from "./session"
 
 // The account's devices as `GET /v1/devices` lists them, read with this device's sign-in. One reader for every caller:
@@ -53,4 +54,18 @@ export async function listLiveDevices(session: Pick<Session, "accessToken" | "re
     .parse(body)
     .devices.filter((device) => device.revokedAt === null)
     .map(live)
+}
+
+/** Renames a device of this account; the service answers 404 `not_found` for an id the account does not have. */
+export async function renameDevice(
+  session: Pick<Session, "accessToken" | "request">,
+  id: string,
+  name: string,
+): Promise<void> {
+  const access = await session.accessToken()
+  await session.request(`/v1/devices/${encodeURIComponent(id)}`, {
+    ...jsonRequest({ name }),
+    method: "PATCH",
+    headers: { ...syncRequestHeaders(access), "content-type": "application/json" },
+  })
 }

@@ -41,7 +41,12 @@ describe("device authorization", () => {
     )
     expect(time.delays).toEqual([5000, 5000, 10000])
     expect(shown).toEqual([
-      { verificationUri: minted.verificationUri, userCode: minted.userCode, matchingCode: minted.matchingCode },
+      {
+        verificationUri: minted.verificationUri,
+        userCode: minted.userCode,
+        matchingCode: minted.matchingCode,
+        expiresAt: minted.expiresAt,
+      },
     ])
     expect(JSON.stringify(shown)).not.toContain(minted.deviceCode)
     expect((await secrets.store(api).read())?.accessToken).toBe(grant.accessToken)

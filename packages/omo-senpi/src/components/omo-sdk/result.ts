@@ -7,6 +7,13 @@ export type OmoErrorCode =
   | "service_unreachable"
   | "service_refused"
   | "device_service_unavailable"
+  | "not_found"
+  | "already_signed_in"
+  | "approval_expired"
+  | "approval_denied"
+  | "device_limit"
+  | "machine_exists"
+  | "accounts_unreachable"
   | "internal_error"
 
 export type OmoError = {

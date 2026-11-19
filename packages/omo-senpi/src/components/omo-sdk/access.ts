@@ -35,6 +35,8 @@ export type SignedIn = {
 
 export type AccountAccess = {
   readonly origin: string
+  /** Why no account call may run here at all (a closed SDK, a desktop launch); undefined when one may. */
+  readonly blockedReason: () => OmoResult<never> | undefined
   readonly signedIn: <T>(read: (signedIn: SignedIn) => Promise<T>) => Promise<OmoResult<T>>
   readonly close: () => void
 }
@@ -60,6 +62,8 @@ export function failure<T>(error: unknown): OmoResult<T> {
     return refused("service_unreachable", "a sign-in refresh is still being confirmed", "retry in a minute", {
       deadline: new Date(error.deadline).toISOString(),
     })
+  if (error instanceof ApiRefusal && error.status === 404 && error.code === "not_found")
+    return refused("not_found", "the account has no such device", "list the devices, then use one of their ids")
   if (error instanceof ApiRefusal)
     return error.status === 401
       ? refused("session_ended", "the account refused this device's sign-in", SIGN_IN, { code: error.code })
@@ -109,17 +113,23 @@ export function createAccountAccess(options: {
       signal: lifetime.signal,
       log: () => undefined,
     }))
+  const blockedReason = (): OmoResult<never> | undefined => {
+    if (lifetime.signal.aborted)
+      return refused("internal_error", "this SDK instance is closed", "create a new one with createOmoSdk")
+    if (desktopLaunch())
+      return refused(
+        "desktop_sign_in",
+        "a desktop launch uses the desktop app's own sign-in",
+        "read the account from the desktop app",
+      )
+    return undefined
+  }
   return {
     origin,
+    blockedReason,
     async signedIn(read) {
-      if (lifetime.signal.aborted)
-        return refused("internal_error", "this SDK instance is closed", "create a new one with createOmoSdk")
-      if (desktopLaunch())
-        return refused(
-          "desktop_sign_in",
-          "a desktop launch uses the desktop app's own sign-in",
-          "read the account from the desktop app",
-        )
+      const blocked = blockedReason()
+      if (blocked !== undefined) return blocked
       try {
         const credentials = await openStore().read()
         if (credentials === null) return refused("signed_out", "this device is not signed in", SIGN_IN)
