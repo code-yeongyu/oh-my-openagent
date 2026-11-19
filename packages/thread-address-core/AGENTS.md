@@ -4,7 +4,7 @@ The thread and device address rules every omo surface shares (#14305): the addre
 
 ## Rules
 
-- Zero runtime dependencies: no package import, no `node:` built-in, no Bun global. A source file imports only its sibling files (`./name`). `src/self-contained.test.ts` fails on anything else.
+- Zero runtime dependencies: no package import, no `node:` built-in, no Node or Bun global. `src/self-contained.test.ts` fails when a source file imports anything but a sibling file (`./name`); `tsconfig.json` (`"types": []`, tests excluded) fails the typecheck on a Node or Bun global in a source file. Tests typecheck under `tsconfig.test.json` with `bun-types`.
 - Plain data in, plain data out. No messages that name omo tools: a refusal is `{ code, reason, details }`, and the caller words it (omo-senpi: `thread/address/refusals.ts` `toolRefusal`).
 - `parse.ts` imports nothing at all: `components/remote/seams.ts` (the published omo-ai/remote types) reaches it, and `remote/types-closure.test.ts` allows it only as a leaf.
 

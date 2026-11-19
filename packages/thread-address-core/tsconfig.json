@@ -11,11 +11,12 @@
     "lib": [
       "ESNext"
     ],
-    "types": [
-      "bun-types"
-    ]
+    "types": []
   },
   "include": [
     "src/**/*"
+  ],
+  "exclude": [
+    "src/**/*.test.ts"
   ]
 }

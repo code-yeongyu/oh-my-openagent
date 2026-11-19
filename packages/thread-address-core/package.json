@@ -12,7 +12,7 @@
   },
   "types": "./src/index.ts",
   "scripts": {
-    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "typecheck": "tsgo --noEmit -p tsconfig.json && tsgo --noEmit -p tsconfig.test.json",
     "test": "bun test src/*.test.ts"
   },
   "sideEffects": false
