@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { createRemoteThreadFixture } from "../thread-remote-fixture"
 import type { RemoteSessionRow } from "../remote/ports"
+import type { ThreadAddressEntry } from "../addressing"
 import { resolveAddress, type AddressCandidate, type Resolution, type ResolveOptions } from "."
 import {
   ALIAS,
@@ -285,7 +286,7 @@ describe("#given a session file this device's book shows only when asked for it 
 })
 
 describe("#given <device>/<id-shaped thread> #when it resolves #then it reads at most that one device, never the account-wide listing round (#12709)", () => {
-  async function counted(text: string, setup: TwoDeviceOptions = {}) {
+  async function counted(text: string, setup: TwoDeviceOptions = {}, extraLocal: readonly ThreadAddressEntry[] = []) {
     const two = createTwoDevices(setup)
     cleanups.push(two.cleanup)
     let unfiltered = 0
@@ -321,7 +322,7 @@ describe("#given <device>/<id-shaped thread> #when it resolves #then it reads at
       },
     }
     const resolved = await resolveAddress(
-      { remote, callerWorkspaceRoot: process.cwd(), local: two.entries, callerId: T.hereLive },
+      { remote, callerWorkspaceRoot: process.cwd(), local: [...two.entries, ...extraLocal], callerId: T.hereLive },
       text,
       { probe: true },
     )
@@ -335,6 +336,53 @@ describe("#given <device>/<id-shaped thread> #when it resolves #then it reads at
     const { resolved, unfiltered, statuses } = await counted(text)
     expect(resolved).toMatchObject({ kind: "ok", where: { kind: "device", row: { device: B.id } } })
     expect({ unfiltered, statuses }).toEqual({ unfiltered: 0, statuses: 1 })
+  })
+
+  test("#given <device name>/<thread name> that B holds #when resolved #then only B's listing is read and the whole text is checked against this device's book alone", async () => {
+    const { resolved, unfiltered, statuses } = await counted(`${B.name}/${NAMES.bLive}`)
+    expect(resolved).toMatchObject({ kind: "ok", thread: T.bLive, where: { kind: "device" } })
+    expect({ unfiltered, statuses }).toEqual({ unfiltered: 0, statuses: 1 })
+  })
+
+  test("#given <device name>/<a name B does not hold> #when resolved #then the whole text is read once account-wide before not_found", async () => {
+    const { resolved, unfiltered } = await counted(`${B.name}/no such thread`)
+    expect(resolved).toMatchObject({ kind: "error", code: "not_found" })
+    expect(unfiltered).toBe(1)
+  })
+
+  test.each([
+    ["here/<name>", `here/${NAMES.hereLive}`],
+    ["<this device's id>/<name>", `${HERE.id}/${NAMES.hereLive}`],
+  ])("#given %s #when resolved #then this device's book answers with no account-wide read", async (_form, text) => {
+    const { resolved, unfiltered } = await counted(text)
+    expect(resolved).toMatchObject({ kind: "ok", thread: T.hereLive, where: { kind: "here" } })
+    expect(unfiltered).toBe(0)
+  })
+
+  test("#given <device>/<a thread id B does not hold> #when resolved #then B's answer stands, with no whole-text reading and no account-wide read", async () => {
+    const { resolved, unfiltered } = await counted(`${B.id}/${T.nowhere}`)
+    expect(resolved).toMatchObject({ kind: "error", details: { device: B.id } })
+    expect(unfiltered).toBe(0)
+  })
+
+  test("#given a thread here literally named <device name>/<name> that B does not hold #when resolved #then the whole text resolves to it, after one account-wide read", async () => {
+    const named: ThreadAddressEntry = {
+      thread_id: "0aa00009-0000-4000-8000-000000000009",
+      name: `${B.name}/notes`,
+      status: "live",
+      cwd: process.cwd(),
+      created_at: "2026-11-01T00:00:00Z",
+      updated_at: null,
+    }
+    const { resolved, unfiltered } = await counted(`${B.name}/notes`, {}, [named])
+    expect(resolved).toMatchObject({ kind: "ok", thread: named.thread_id, where: { kind: "here" } })
+    expect(unfiltered).toBe(1)
+  })
+
+  test("#given a device named fix holding login and a thread here named fix/login #when fix/login is resolved #then ambiguous_target from this device's book, with no account-wide read", async () => {
+    const { resolved, unfiltered } = await counted(NAMES.slash, { fix: true })
+    expect(resolved).toMatchObject({ kind: "error", code: "ambiguous_target" })
+    expect(unfiltered).toBe(0)
   })
 
   test("#given a bare thread id on B #when resolved #then the account-wide listing is read at most once, status once", async () => {
