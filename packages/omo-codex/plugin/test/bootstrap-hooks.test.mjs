@@ -1,5 +1,7 @@
 import assert from "node:assert/strict"
-import { readdir, readFile, stat } from "node:fs/promises"
+import { spawnSync } from "node:child_process"
+import { copyFile, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import test from "node:test"
 
@@ -16,8 +18,9 @@ const SKIPPED_DIRECTORY_NAMES = new Set([".git", "node_modules"])
 const EXPECTED_BOOTSTRAP_COMMAND = 'node "${PLUGIN_ROOT}/components/bootstrap/dist/cli.js" hook session-start'
 const EXPECTED_BOOTSTRAP_COMMAND_WINDOWS =
   'powershell -NoProfile -ExecutionPolicy Bypass -File "${PLUGIN_ROOT}\\components\\bootstrap\\scripts\\bootstrap.ps1"'
-const EXPECTED_NODE_DISPATCH_PREFIX =
-  'powershell -NoProfile -ExecutionPolicy Bypass -File "${PLUGIN_ROOT}\\components\\bootstrap\\scripts\\node-dispatch.ps1"'
+const EXPECTED_NODE_DISPATCH_PREFIX = 'cmd /d /c "${PLUGIN_ROOT}\\components\\bootstrap\\scripts\\node-dispatch.cmd" '
+const POSIX_NODE_COMMAND = /^node "\$\{PLUGIN_ROOT\}\/([^"]+)"(.*)$/
+const TOKEN_SHAPED_ARGUMENTS = /^( [\w.:-]+)*$/
 
 async function pathExists(absolutePath) {
   try {
@@ -201,9 +204,93 @@ test("#given non-bootstrap aggregate hook manifests #when commandWindows entries
   assert.deepEqual(
     offenders,
     [],
-    `Non-bootstrap aggregate hooks must use node-dispatch.ps1 on Windows:\n${offenders.join("\n")}`,
+    `Non-bootstrap aggregate hooks must use node-dispatch.cmd on Windows:\n${offenders.join("\n")}`,
   )
 })
+
+test("#given non-bootstrap aggregate hook manifests #when both platform commands are compared #then Windows runs the same target and arguments", async () => {
+  // given
+  const aggregateHooks = await readAggregateHookManifests()
+
+  // when
+  const mismatches = []
+  for (const manifest of aggregateHooks) {
+    for (const { handler } of collectCommandHooks(manifest.hooks, manifest.source)) {
+      if (handler.command === EXPECTED_BOOTSTRAP_COMMAND) continue
+      const posix = POSIX_NODE_COMMAND.exec(handler.command)
+      const expected =
+        posix === null ? null : `${EXPECTED_NODE_DISPATCH_PREFIX}${posix[1].replaceAll("/", "\\")}${posix[2]}`
+      if (handler.commandWindows !== expected) mismatches.push(`${manifest.source}: ${handler.commandWindows}`)
+    }
+  }
+
+  // then
+  assert.deepEqual(mismatches, [], "commandWindows must dispatch the target the POSIX command runs, with its arguments")
+})
+
+test("#given non-bootstrap aggregate hook manifests #when hook arguments are read #then each is one token node-dispatch.cmd forwards as written", async () => {
+  // given
+  const aggregateHooks = await readAggregateHookManifests()
+
+  // when
+  const offenders = []
+  for (const manifest of aggregateHooks) {
+    for (const { handler } of collectCommandHooks(manifest.hooks, manifest.source)) {
+      if (handler.command === EXPECTED_BOOTSTRAP_COMMAND) continue
+      const posix = POSIX_NODE_COMMAND.exec(handler.command)
+      if (posix !== null && !TOKEN_SHAPED_ARGUMENTS.test(posix[2])) offenders.push(`${manifest.source}: ${posix[2]}`)
+    }
+  }
+
+  // then
+  assert.deepEqual(
+    offenders,
+    [],
+    "hook arguments must be single tokens: cmd /c breaks a commandWindows line that quotes one",
+  )
+})
+
+test(
+  "#given the Windows Node dispatcher #when Codex runs a hook through cmd.exe #then the resolved Node gets the plugin-relative target, arguments, stdin and exit code",
+  { skip: process.platform !== "win32" },
+  async () => {
+    // given
+    const pluginRoot = await mkdtemp(join(tmpdir(), "omo dispatch "))
+    try {
+      const scripts = join(pluginRoot, "components", "bootstrap", "scripts")
+      await mkdir(scripts, { recursive: true })
+      await copyFile(
+        join(root, "components", "bootstrap", "scripts", "node-dispatch.cmd"),
+        join(scripts, "node-dispatch.cmd"),
+      )
+      await mkdir(join(pluginRoot, "components", "probe"), { recursive: true })
+      await writeFile(
+        join(pluginRoot, "components", "probe", "cli.js"),
+        'let input = ""\nprocess.stdin.on("data", (chunk) => { input += chunk })\nprocess.stdin.on("end", () => { console.log(JSON.stringify({ node: process.execPath, args: process.argv.slice(2), input })); process.exit(7) })\n',
+      )
+      const commandWindows = `${EXPECTED_NODE_DISPATCH_PREFIX.replace("${PLUGIN_ROOT}", pluginRoot)}components\\probe\\cli.js hook pre-tool-use`
+
+      // when
+      const result = spawnSync(process.env.ComSpec ?? "cmd.exe", ["/C", `"${commandWindows}"`], {
+        encoding: "utf8",
+        env: { ...process.env, NODE_REPL_NODE_PATH: process.execPath },
+        input: '{"hook_event_name":"PreToolUse"}',
+        windowsHide: true,
+        windowsVerbatimArguments: true,
+      })
+
+      // then
+      assert.equal(result.status, 7, result.stderr)
+      assert.deepEqual(JSON.parse(result.stdout), {
+        node: process.execPath,
+        args: ["hook", "pre-tool-use"],
+        input: '{"hook_event_name":"PreToolUse"}',
+      })
+    } finally {
+      await rm(pluginRoot, { recursive: true, force: true })
+    }
+  },
+)
 
 test("#given the built bootstrap bundle #when its module references are inspected #then it depends on Node built-ins only", async () => {
   // given

@@ -31,7 +31,7 @@ Escape hatches: after 3 blocked attempts (`MAX_ATTEMPTS`) the stop passes and st
 | Change receipt validation | `src/codex-hook.ts` (`getEvidenceReceiptFailure`, `extractEvidencePath`, `getEvidenceFileFailure`) |
 | Change the retry budget | `src/state.ts` `MAX_ATTEMPTS` |
 | Worker-side contract | `../ultrawork/agents/lazycodex-worker-{low,medium,high}.toml` instruct the final `EVIDENCE_RECORDED: <path>` line this hook parses |
-| Plugin-level wiring | `../../hooks/subagent-stop-verifying-lazycodex-executor-evidence.json` (adds `commandWindows` via `../bootstrap/scripts/node-dispatch.ps1`) |
+| Plugin-level wiring | `../../hooks/subagent-stop-verifying-lazycodex-executor-evidence.json` (adds `commandWindows` via `../bootstrap/scripts/node-dispatch.cmd`) |
 | Wiring + contract tests | `../../test/aggregate-hooks.test.mjs`, `../../test/component-hook-contract-cases.mjs`, `../../test/hook-status-message.test.mjs`, `../../test/component-bundled-cli.test.mjs` |
 
 ## NOTES
