@@ -78,7 +78,8 @@ naming the device. The binding operations (`bind`, `rebind`, `bindings --session
 bound send's target) resolve on this device first and bind and report only sessions this device
 holds: a session only another device holds answers `unsupported` with `details.reason:
 "session_on_other_device"` naming the device. `self` names the calling session, which `omo thread`
-(principal `cli:<uid>`) never is, so it answers `caller_context_missing` here. Without `--all-scope` only sessions in the current directory's workspace resolve (the
+(principal `cli:<uid>`) never is, so it answers `caller_context_missing` here. Without
+`--all-scope` only sessions in the current directory's workspace resolve (the
 same rule the agent tools apply); an id outside it is `scope_denied`. `--idempotency-key` on a
 mutation replays the first result instead of acting twice (`deduplicated: true`); reusing a key
 with other arguments is `idempotency_conflict`.
