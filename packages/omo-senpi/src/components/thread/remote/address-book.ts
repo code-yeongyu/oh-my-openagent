@@ -1,12 +1,12 @@
 import type { ThreadAddressEntry } from "../addressing"
-import { rowStatus, rowThreadId, type RemoteListing, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
+import { rowStatus, type RemoteListing, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
 
 // Decision 0027 section 1: the relay transport's address book. The account listing becomes entries of the SAME shape the
 // local book yields, so one resolver judges local and remote threads together: an exact durable id, then an account
 // alias, then the name ladder across every entry (two devices sharing a name are ambiguous_target naming each device).
 export function relayAddressEntry(row: RemoteSessionRow, aliases?: readonly string[]): ThreadAddressEntry {
   const updated = new Date(row.updated_ms).toISOString()
-  const thread_id = rowThreadId(row)
+  const thread_id = row.durable_id ?? ""
   const session_ids =
     thread_id.length > 0 && row.session_id.length > 0 && row.session_id !== thread_id ? [row.session_id] : undefined
   return {
