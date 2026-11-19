@@ -3,7 +3,6 @@ import type { RpcRemoteSource, SenpiExtensionAPI } from "../../../extension/type
 import type * as CrossDevice from "./cross-device"
 import type * as MonitorSource from "./monitor-source"
 import { rowThreadId } from "./ports"
-import type * as RemoteOps from "./remote-ops"
 import type * as RelayTransport from "./relay-transport"
 import type * as RelayControl from "../control/relay-control"
 import type { SessionControl } from "../control/port"
@@ -14,7 +13,6 @@ type Runtime = Pick<
   typeof CrossDevice,
   "claimCreatedAlias" | "listAcross" | "planCreate" | "renameAlias" | "withAlias"
 > &
-  Pick<typeof RemoteOps, "deviceOnline"> &
   Pick<typeof RelayTransport, "createRelayTransport"> &
   Pick<typeof RelayControl, "createRelayControl"> &
   Pick<typeof MonitorSource, "createRemoteMonitorSource" | "resolveMonitorTarget">
@@ -32,8 +30,6 @@ export const renameAlias = async (...args: Parameters<Runtime["renameAlias"]>) =
 export const withAlias = async (...args: Parameters<Runtime["withAlias"]>) => await (await runtime()).withAlias(...args)
 export const claimCreatedAlias = async (...args: Parameters<Runtime["claimCreatedAlias"]>) =>
   await (await runtime()).claimCreatedAlias(...args)
-export const deviceOnline = async (...args: Parameters<Runtime["deviceOnline"]>) =>
-  await (await runtime()).deviceOnline(...args)
 export const resolveMonitorTarget = async (...args: Parameters<Runtime["resolveMonitorTarget"]>) =>
   await (await runtime()).resolveMonitorTarget(...args)
 
