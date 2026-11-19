@@ -7,6 +7,7 @@ import { join } from "node:path"
 import type { JsonObject, ListingRow } from "../../../../device-service-core/src/local-api/protocol.ts"
 import {
   defaultWorld,
+  OFFLINE_PEER,
   PEER,
   SESSION_ID,
   type World,
@@ -492,9 +493,28 @@ describe("durable-id addressing", () => {
     const { located: _unprobed, ...withoutProbe } = world()
     const owner = await startOwner(withoutProbe)
     const client = clientOn(owner.stateDir, fakeClock())
+    // A hyphenated name of 16+ characters is no listing key: only exactly 22 characters are.
+    for (const session of ["review", "fix-the-login-flow"])
+      expect(failureOf(await client.sessions.get(handleOf(PEER, session)))).toMatchObject({
+        code: "not_found",
+        details: { kind: "session", device: PEER },
+      })
+  })
+
+  test("#given a device that did not answer the listing round #when a member addresses a session part no row lists #then an online device answers host_unavailable listing_incomplete naming it, an offline one today's not_found", async () => {
+    const base = world()
+    const owner = await startOwner({
+      ...base,
+      listing: { ...base.listing, revisions: [{ rows: [], incomplete: [PEER, OFFLINE_PEER] }] },
+    })
+    const client = clientOn(owner.stateDir, fakeClock())
     expect(failureOf(await client.sessions.get(handleOf(PEER, "review")))).toMatchObject({
+      code: "host_unavailable",
+      details: { reason: "listing_incomplete", devices: [PEER] },
+    })
+    expect(failureOf(await client.sessions.get(handleOf(OFFLINE_PEER, "review")))).toMatchObject({
       code: "not_found",
-      details: { kind: "session", device: PEER },
+      details: { kind: "session", device: OFFLINE_PEER },
     })
   })
 })
@@ -645,6 +665,10 @@ describe("an open on this device", () => {
   // own operator endpoint (the contract host, which names the session it opens dur-selected).
   const SELF = "dev-self"
   const SELF_SESSION = handleOf(SELF, "dur-selected")
+  // An id-shaped stand-in for the session the host opens, for the members that address it while no listing shows it:
+  // only an id-shaped session part passes unlisted to its device.
+  const UNLISTED_KEY = "c2VsZWN0ZWQta2V5LTAwMD"
+  const UNLISTED_SESSION = handleOf(SELF, UNLISTED_KEY)
   const selfWorld = world
   // The same world with this device on the account's roster, under the kind and platform the roster reports.
   const listedSelfWorld = (): World => {
@@ -870,14 +894,14 @@ describe("an open on this device", () => {
   })
 
   test("#given a session on this device #when setModel addresses it, or a session client sends to it #then each is refused, typed, before anything runs (#13787)", async () => {
-    await withContractHost({}, async (host) => {
+    await withContractHost({ durableId: UNLISTED_KEY }, async (host) => {
       const { owner, client } = await localClient(host)
-      expect(failureOf(await client.sessions.setModel(SELF_SESSION, "p/m"))).toMatchObject({
+      expect(failureOf(await client.sessions.setModel(UNLISTED_SESSION, "p/m"))).toMatchObject({
         code: "unsupported",
         details: { feature: "session_model_on_this_device" },
       })
       const session = clientOn(owner.stateDir, fakeClock(), { kind: "session", id: "dur-caller" })
-      expect(failureOf(await session.sessions.send(SELF_SESSION, { text: "x" })).code).toBe("local_only")
+      expect(failureOf(await session.sessions.send(UNLISTED_SESSION, { text: "x" })).code).toBe("local_only")
       expect(host.mutations).toEqual([])
       expect(owner.state.commands).toEqual([])
     })
@@ -1001,7 +1025,7 @@ describe("an open on this device", () => {
   })
 
   test("#given a client built without this device's operator endpoint #when sessions.list reads the whole account and members address a session here #then this device is unanswered, never dropped, and each member answers unsupported{local_sessions} with nothing sent to its host", async () => {
-    await withContractHost({}, async (host) => {
+    await withContractHost({ durableId: UNLISTED_KEY }, async (host) => {
       const { owner } = await localClient(host)
       const client = clientOn(owner.stateDir, fakeClock(), undefined, { localSessions: undefined })
       const listing = await valueOf(client.sessions.list())
@@ -1010,8 +1034,8 @@ describe("an open on this device", () => {
       expect(listing.unanswered).toContainEqual(expect.objectContaining({ id: SELF, self: true }))
       const absent = { code: "unsupported", details: { feature: "local_sessions", device: SELF } }
       expect(failureOf(await client.sessions.open({ device: SELF, workspace: host.root }))).toMatchObject(absent)
-      expect(failureOf(await client.sessions.send(SELF_SESSION, { text: "q" }))).toMatchObject(absent)
-      expect(failureOf(await client.sessions.close(SELF_SESSION))).toMatchObject(absent)
+      expect(failureOf(await client.sessions.send(UNLISTED_SESSION, { text: "q" }))).toMatchObject(absent)
+      expect(failureOf(await client.sessions.close(UNLISTED_SESSION))).toMatchObject(absent)
       expect(host.frames).toEqual([])
     })
   })

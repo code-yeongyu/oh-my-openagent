@@ -176,4 +176,23 @@ describe("sessions.resolve", () => {
       details: { reason: "listing_incomplete", devices: [PEER] },
     })
   })
+
+  test("#given another online device that did not answer the round #when a device-qualified address misses on a device that answered #then not_found on that device, never the other's silence", async () => {
+    const online = (device: string, label: string) => ({
+      device,
+      label,
+      kind: "desktop",
+      platform: "linux",
+      last_seen_ms: 1_790_000_000_000,
+      online: true,
+    })
+    const { client } = await account([listed(PEER, "rk-1", "dur-1", "Bot")], {
+      devices: [online(PEER, "Peer"), online("dev-quiet", "Quiet")],
+      incomplete: ["dev-quiet"],
+    })
+    expect(failureOf(await client.sessions.resolve(`${PEER}/dur-zz`))).toMatchObject({
+      code: "not_found",
+      details: { kind: "session" },
+    })
+  })
 })
