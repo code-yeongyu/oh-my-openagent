@@ -34,8 +34,9 @@ export type HolderView = "running" | "on_disk" | "absent" | "unknown"
  * The holder's own answer for a row this surface reads as not live, asked before any send path is chosen (#14184): the
  * listing and this surface's closed mark lag a reopen made elsewhere (#14179 review L4), and a wake of a session the
  * holder holds no file for waits out its deadline. An engine without the lookup, or one that does not answer, is
- * `unknown`, which the send treats as on disk: an ended row is woken when this device can, anything else is
- * `not_resumable`.
+ * `unknown`. For a row listed not live the send treats that as on disk: an ended row is woken when this device can,
+ * anything else is `not_resumable`. For a row listed live whose session command was refused `route_unlisted` (#14240)
+ * it learnt nothing new, so the send answers that first refusal.
  */
 export async function holderView(remote: RemoteThreadSurface, row: RemoteSessionRow): Promise<HolderView> {
   const thread = rowThreadId(row)
