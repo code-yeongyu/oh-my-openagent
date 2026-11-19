@@ -126,6 +126,16 @@ describe("attach rows: open", () => {
     })
   })
 
+  test("#given a session part that is no id shape and no listed key #when attach opens on a device whose locate would answer it #then not_found{session} and the device is never attached", async () => {
+    const owner = await startOwner({ ...worldWith(STATE), located: { [PEER]: { "my-thread": SESSION_ID } } })
+    const client = clientOn(owner.stateDir, fakeClock())
+    expect(failureOf(await client.attach(handleOf(PEER, "my-thread")))).toMatchObject({
+      code: "not_found",
+      details: { kind: "session" },
+    })
+    expect(owner.state.attaches.size).toBe(0)
+  })
+
   test("#given a mistyped session id and an unknown durable id #when attach opens #then each is not_found, never unsupported", async () => {
     // The device answers session.locate and holds no session by either id.
     const owner = await startOwner({ ...worldWith(STATE), located: { [PEER]: {} } })
