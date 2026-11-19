@@ -25,6 +25,59 @@ The former `omo` bin was removed from these packages in this major release. The 
 
 The `omo-agent-toolkit` npm bin stays with the wrapper packages above; `omo-ai` never declares it.
 
+### `omo login`, `omo logout`, `omo whoami` (OmO Native)
+
+`omo login` signs this computer in to OmO from the terminal with a device code. It is the route for a computer that has no OmO desktop app: a server, a container, or a machine you reach over SSH. Nothing has to open on that computer. You approve the sign-in in a browser on any other device.
+
+```bash
+omo login
+```
+
+```text
+Open <verification URL>
+User code: <code>
+Matching code: <code>
+```
+
+1. Open the URL on a phone or another computer and sign in to your OmO account there.
+2. Approve the sign-in on that page, using the codes the terminal printed.
+3. The terminal waits for the approval, then prints `Signed in to OmO as <email>.`
+
+The code expires. If it does, or the approval is denied, omo says so and you run `omo login` again for a new code. `Ctrl+C` cancels the wait.
+
+| Command | What it does |
+| --- | --- |
+| `omo login` | Device-code sign-in |
+| `omo login --device` | The same, stated explicitly |
+| `omo login --no-browser` | The same, and never opens a browser |
+| `omo login --replace` | Replace this computer's earlier device without asking (for scripts) |
+| `omo login --api <url>` | Use another OmO API origin. `OMO_SERVICE_API_URL` does the same. omo prints `OmO API: <url>` before any code when the origin is not the default |
+| `omo whoami [--api <url>]` | Print `Signed in to <api> as <email> (<device name>).` or `Not signed in.` |
+| `omo logout [--api <url>]` | Sign this computer's device out on the service and remove the stored credentials and device keys |
+
+While OmO accounts are not open to everyone, these are the only forms of `omo login`. Any other argument is refused with a message that names the device-code route. The service's approval page decides who may sign in.
+
+**One computer is one device.** The device is registered under the machine's name (on macOS the local host name), without a trailing `.local`.
+
+- A computer that is already signed in is not registered twice. This covers a stored sign-in and a device held by the OmO desktop app on the same computer. `omo login` stops and tells you to run `omo logout` first.
+- If the service reports that this computer already has a device, an interactive terminal asks whether to replace it (default No). A script passes `--replace`. You approve the replacement on the service's page, which then signs the earlier device out, and omo prints its id.
+- If your account is at its device limit, an interactive terminal lets you choose a device to remove. A script is told to run `omo login` in an interactive terminal.
+- `omo logout` signs the whole computer out, including the OmO desktop app when it shares this sign-in.
+
+**Where the sign-in is stored.** The credential goes into the operating system's credential store and is never written to a file:
+
+| Platform | Store |
+| --- | --- |
+| macOS | Keychain |
+| Linux | Secret Service (libsecret with an unlocked keyring) |
+| Windows | Credential Manager |
+
+A Linux machine with no Secret Service keyring, or with a locked one, cannot store the sign-in: omo reports the store as unavailable or locked and saves nothing. A Mac whose login keychain stays locked can use OmO's own keychain; see [`omo account store`](#omo-account-store-macos-opt-in) below.
+
+Before it prints a code, `omo login` checks that the OmO service answers, so an unreachable service fails at once.
+
+When the sign-in completes, omo turns remote sessions on for this device. See [Set up a device](./remote-sessions.md#set-up-a-device).
+
 ### `omo account` (OmO Native)
 
 `omo account show [--account <id>]`, `adopt [--replace]`, `token`, `export`, and
