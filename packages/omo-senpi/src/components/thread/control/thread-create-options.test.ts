@@ -183,7 +183,7 @@ describe("thread_create with a first prompt (#13410)", () => {
     const { run, enqueuedRequests } = surface(a.remote)
     const result = (await run("thread_create", { prompt: "build it" })) as { prompt?: Record<string, unknown> }
     expect(result).toMatchObject({ kind: "ok", thread: "dur-created-here" })
-    expect(result.prompt).toMatchObject({ delivery: { kind: expect.any(String) } })
+    expect(result.prompt).toMatchObject({ delivery: { kind: "started" } })
     // #14045: the row carries the creator's authority, so the new thread's drain admits it as its own first message;
     // a later thread_send from the same session does not.
     await run("thread_send", { thread: "dur-created-here", message: "and then this" })
@@ -228,7 +228,7 @@ describe("thread_create with a first prompt (#13410)", () => {
 describe("thread_create whose first prompt does not start", () => {
   test("#given a new session here whose control endpoint never drains #when created with a prompt #then the create fails prompt_not_started naming the thread, the delivery and its last state", async () => {
     const a = account()
-    const { run, enqueuedRequests } = surface(a.remote, { firstPromptWaitMs: 50 })
+    const { run, enqueuedRequests } = surface(a.remote, { firstPromptWaitMs: 50, createdNeverDrains: true })
     const result = await run("thread_create", { name: "never-drained", prompt: "build it" })
     expect(result).toMatchObject({
       kind: "error",

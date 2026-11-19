@@ -137,6 +137,8 @@ function fixture(
     host,
     ...(options.sdkOwnsStore === true ? {} : { store }),
     ...(options.remote === undefined ? {} : { remote: options.remote }),
+    // No session this fixture's host opens drains its inbox, so a create's first prompt is not waited for.
+    firstPromptWaitMs: 0,
   })
   sdks.push(sdk)
   return { sdk, store, wakes, releases, views }
@@ -874,7 +876,7 @@ describe("thread SDK: session controls (#13413)", () => {
     ])
   })
 
-  test("#given this device's host #when a script creates a thread with a first prompt #then the thread opens and the prompt is delivered to it as the script's own message", async () => {
+  test("#given this device's host #when a script creates a thread with a first prompt that no drain takes #then the thread opens, the prompt is the script's own row, and the create fails prompt_not_started", async () => {
     const { calls, controls, openSession } = controlled()
     // The host lists the session it opened, as a real one does once open_session answers.
     let listed: ThreadHostSession[] = []
@@ -895,10 +897,8 @@ describe("thread SDK: session controls (#13413)", () => {
     })
     const created = await sdk.create({ prompt: "start the nightly build", idempotency_key: "nightly-1" })
     expect(created).toMatchObject({
-      kind: "ok",
-      thread: "dur-new",
-      deduplicated: false,
-      prompt: { delivery: { kind: expect.any(String) }, deduplicated: false, delivery_id: expect.any(String) },
+      kind: "error",
+      error: { code: "prompt_not_started", details: { thread: "dur-new", delivery_id: expect.any(String) } },
     })
     expect(calls.filter(([what]) => what === "openSession")).toHaveLength(1)
     const rows = await store.list({ target_durable_id: "dur-new" })

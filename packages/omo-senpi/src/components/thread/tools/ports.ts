@@ -242,6 +242,11 @@ export type ThreadToolSurfaceOptions = {
   /** `thread_report {kind: "completion"}` armed a completion (`arm_seq`) for this session; the component writes it at the next settle. */
   readonly onCompletionArmed?: (durableId: string, armSeq: number) => void
   readonly now?: () => number
+  /**
+   * How long a create waits for its first prompt to start on this device (`control/prompt-start.ts`); absent,
+   * FIRST_PROMPT_START_WAIT_MS, cut to the call's budget. A test seam: a test with no drain sets it short.
+   */
+  readonly firstPromptWaitMs?: number
   /** Sessions on the account's other devices and the account-wide alias (O8, A3); absent, the tools reach only this device. */
   readonly remote?: RemoteThreadSurface
 }

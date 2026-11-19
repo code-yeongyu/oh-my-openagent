@@ -25,6 +25,7 @@ export const THREAD_ERROR_CODES = [
   "idempotency_in_progress",
   "idempotency_uncertain",
   "delivered_unconfirmed",
+  "prompt_not_started",
   "approval_unavailable",
   "approval_route_locked",
   "partial_commit",
