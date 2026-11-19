@@ -32,6 +32,7 @@ function service(answers: ReadonlyArray<ReadonlyArray<object>>, direct?: object)
       return {
         key,
         detached: new Promise(() => {}),
+        onEvent: () => () => {},
         detach: async () => {
           seen.detached = true
         },
