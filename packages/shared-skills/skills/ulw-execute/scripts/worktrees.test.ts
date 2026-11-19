@@ -110,7 +110,10 @@ describe("ulw-execute worktrees helper", () => {
     const outside = realpathSync(mkdtempSync(join(tmpdir(), "ulw-outside-")))
     onTestFinished(() => rmSync(outside, { recursive: true, force: true }))
     writeFileSync(join(outside, "secret.txt"), "outside\n")
-    const repo = fixtureRepo({ ".worktreeinclude": "secrets/secret.txt\nconfig/local.json\n", "config/local.json": "{}\n" })
+    const repo = fixtureRepo({
+      ".worktreeinclude": "secrets/secret.txt\nconfig/local.json\n",
+      "config/local.json": "{}\n",
+    })
     symlinkSync(outside, join(repo, "secrets"))
     const wt = join(repo, "..", "wt-f")
     git(repo, "worktree", "add", "-q", "-b", "ulw/f", wt)
