@@ -4,7 +4,7 @@ import { type ClientCore, ok, type Outcome, type RemoteClient } from "./client"
 import { engineCode, nextActionFor, readFailureFromError, remoteFailure } from "./codes"
 import { DEADLINES, withinDeadline } from "./deadlines"
 import { attachAddressed } from "./port/device-service"
-import { budget, idShapedSession, resolveRemoteDevice } from "./resolve"
+import { budget, idShapedSession, listingIncomplete, resolveRemoteDevice } from "./resolve"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
 import type {
   AttachEvent,
@@ -415,10 +415,37 @@ export async function openAttachment(core: ClientCore, thread: ThreadHandle, opt
       "Call sessions.resolve for the thread's handle, then attach to it.",
     )
   // The device part through the core's resolver (id > here > name > 6+ id prefix), as every session member resolves it.
-  const stage = budget(core.timers, opts, DEADLINES.devices + DEADLINES.attachOpen)
+  const stage = budget(core.timers, opts, DEADLINES.devices + DEADLINES.sessionsList + DEADLINES.attachOpen)
   const resolved = await resolveRemoteDevice(core, target.device, stage)
   if (resolved.kind === "error") return resolved
   const device = resolved.value.ref.id
+  // On another device an id-shaped session part is located once by the device, as the thread tools do, so it answers
+  // not_found, never unsupported; any other text reaches the device only as the key of the row the device lists it by
+  // (its key or durable id), and a miss is judged as the session members judge it: listing_incomplete while the device
+  // missed the round, else not_found{session}.
+  let session = target.session
+  if (!resolved.value.ref.here && !idShapedSession(target.session)) {
+    const listed =
+      resolved.value.listed !== undefined
+        ? ok(resolved.value.listed)
+        : await core.sessionsList({ device }, stage(DEADLINES.sessionsList))
+    if (listed.kind === "error") return listed
+    const row = listed.value.rows.find(
+      (candidate) => candidate.thread === handleOf(device, target.session) || candidate.durable_id === target.session,
+    )
+    const keyed = row === undefined ? undefined : canonicalizeThreadHandle(row.thread, {})
+    if (keyed?.kind !== "ok" || keyed.value.target.kind !== "device_session")
+      return (
+        listingIncomplete(
+          thread,
+          listed.value.unanswered.filter((silent) => silent.id === device),
+        ) ??
+        remoteFailure("not_found", `Device ${device} holds no session ${target.session}.`, nextActionFor("not_found"), {
+          details: { kind: "session", device },
+        })
+      )
+    session = keyed.value.target.session
+  }
   let opened: RemoteAttach | undefined
   let abandoned = false
   const outcome = await core.member(
@@ -449,15 +476,6 @@ export async function openAttachment(core: ClientCore, thread: ThreadHandle, opt
           )
         attached = await local({ device, session: target.session, durableId })
       } else {
-        // An id-shaped session part is located once, as the thread tools do, so it answers not_found, never unsupported; any
-        // other text reaches the device only as the key of the row the device lists it by (its key or durable id).
-        const session = idShapedSession(target.session)
-          ? target.session
-          : (await svc.sessions({ device })).rows.find(
-              (row) => row.session_id === target.session || row.durable_id === target.session,
-            )?.session_id
-        if (session === undefined)
-          throw new LocalApiError("session_not_found", `${device} lists no session ${target.session}`)
         attached = (await attachAddressed(svc, device, session)).attached
       }
       opened = attached
