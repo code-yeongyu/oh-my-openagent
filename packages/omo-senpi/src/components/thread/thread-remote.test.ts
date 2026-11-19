@@ -233,10 +233,15 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
       device: "b",
       deduplicated: false,
     })
-    // The reopen then sets the thread's name on the session it located (#14274), a session command.
+    // The reopen then sets the thread's name on the session it located (#14274), a session command. The open names the
+    // folder b's find_session reports beside the file, so b's engine never probes the file's path (#14296).
     expect(a.sent.filter((entry) => entry.via === "endpoint")).toEqual([
       { via: "endpoint", device: "b", rpc: { type: "find_session", durableSessionId: "dur-on-b" } },
-      { via: "endpoint", device: "b", rpc: { type: "open_session", retain_on_disconnect: true, sessionPath: B_FILE } },
+      {
+        via: "endpoint",
+        device: "b",
+        rpc: { type: "open_session", retain_on_disconnect: true, sessionPath: B_FILE, cwd: B_ROW.project },
+      },
     ])
   })
 
@@ -548,6 +553,27 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
       expect(result).not.toMatchObject({ error: { details: { reason: "route_unlisted" } } })
       expect(a.sent.filter((entry) => entry.via === "wake")).toEqual([])
       expect(a.sent.filter((entry) => entry.rpc?.["type"] === "find_session")).toHaveLength(1)
+    },
+  )
+
+  // #14298: the target is LIVE on b, held by an engine that is not the one its listing row names (two engines on b, the
+  // thread run under another key), so b's host refuses the listed key route_unlisted. The send must reach the engine
+  // that runs it, never answer queued waiting on a wake for a thread that is running.
+  test.each(["auto", "follow_up"] as const)(
+    "#given b's listing reads a thread live under one key while an engine of b runs it under another #when thread_send (%s) names it #then b is asked who runs it and the delivery reaches that holder at once, nothing woken (#14298)",
+    async (delivery) => {
+      const a = account({
+        live: ["rk-held-elsewhere"],
+        relayKeys: new Map([["dur-on-b", "rk-held-elsewhere"]]),
+        unlistedReason: "route_unlisted",
+        wakeFeature: true,
+      })
+      const { run } = surface(a.remote)
+      const result = await run("thread_send", { thread: "dur-on-b", message: "are you there", delivery })
+      expect(result).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b", delivery: { kind: "started" } })
+      expect(a.sent.filter((entry) => entry.via === "wake")).toEqual([])
+      const admitted = a.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message")
+      expect(admitted.map((entry) => entry.session)).toEqual(["rk-held-elsewhere"])
     },
   )
 

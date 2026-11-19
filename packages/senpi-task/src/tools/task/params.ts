@@ -64,7 +64,7 @@ export const TaskToolParams = Type.Object({
   model: Type.Optional(
     Type.String({
       description:
-        "Explicit model override, e.g. anthropic/claude-opus-4. Only valid with subagent_type; mutually exclusive with category: category-routed tasks take their model from omo.json (categories.<name>.models).",
+        "Explicit model override, e.g. anthropic/claude-opus-4, for a custom omo.json agent named by subagent_type. Refused with category (categories.<name>.models routes it) and with a builtin agent such as explore, librarian, plan-consultant or plan-reviewer, which runs on its designated chain (agents.<name>.models routes it).",
     }),
   ),
   load_skills: Type.Optional(
@@ -99,7 +99,7 @@ export const TaskToolParams = Type.Object({
         model: Type.Optional(
           Type.String({
             description:
-              "Model override for this task. Only valid when the item's effective target is subagent_type; rejected with a category target.",
+              "Model override for this task. Only valid when the item's effective target is a custom agent named by subagent_type; rejected with a category target or a builtin agent.",
           }),
         ),
         load_skills: Type.Optional(Type.Array(Type.String(), { description: "Skills loaded for this task." })),

@@ -83,7 +83,7 @@ export type RelayAddressBook = {
 const LAST_LISTED_MAX = 4096
 const lastListed = new WeakMap<object, Map<string, string>>()
 
-function rememberListed(port: object, rows: readonly RemoteSessionRow[]): void {
+export function rememberListed(port: object, rows: readonly RemoteSessionRow[]): void {
   let ids = lastListed.get(port)
   if (ids === undefined) {
     ids = new Map()
@@ -99,16 +99,6 @@ function rememberListed(port: object, rows: readonly RemoteSessionRow[]): void {
         if (oldest.done !== true) ids.delete(oldest.value)
       }
     }
-}
-
-/** One account listing round with the devices it could not include; a port without `listing` reports none missing. */
-export async function accountListing(remote: RemoteThreadSurface): Promise<RemoteListing> {
-  const listing =
-    remote.sessions.listing !== undefined
-      ? await remote.sessions.listing()
-      : { rows: await remote.sessions.sessions(), incomplete: [] }
-  rememberListed(remote.sessions, listing.rows)
-  return listing
 }
 
 /** One device's listing with whether it missed the round (#14280); a port without `listing` reports it answered. */
@@ -153,14 +143,18 @@ export async function relayAddressBook(remote: RemoteThreadSurface, address: str
   const { here } = ready
   // Read before this round is remembered, so the device is the one an EARLIER round named for the address.
   const listedOn = lastListed.get(remote.sessions)?.get(address)
+  // One account listing round with the devices it could not include (a port without `listing` reports none missing).
   // thread_list's rule: a removed device's cached rows address nothing; with no roster every row stays.
   const [listing, roster] = await Promise.all([
-    accountListing(remote),
+    remote.sessions.listing !== undefined
+      ? remote.sessions.listing()
+      : remote.sessions.sessions().then((rows): RemoteListing => ({ rows, incomplete: [] })),
     remote.sessions.devices().then(
       (devices) => devices,
       () => undefined,
     ),
   ])
+  rememberListed(remote.sessions, listing.rows)
   const rows = onAccount(listing.rows, roster, here)
   const missing = listing.incomplete
   const entries = rows.filter((row) => row.device !== here).map((row) => relayAddressEntry(row))
