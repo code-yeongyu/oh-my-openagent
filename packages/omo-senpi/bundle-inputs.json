@@ -1364,6 +1364,8 @@
     "packages/omo-senpi/src/components/native-badge/index.ts",
     "packages/omo-senpi/src/components/omo-sdk/access.ts",
     "packages/omo-senpi/src/components/omo-sdk/account/index.ts",
+    "packages/omo-senpi/src/components/omo-sdk/account/sign-in-process.ts",
+    "packages/omo-senpi/src/components/omo-sdk/account/sign-in.ts",
     "packages/omo-senpi/src/components/omo-sdk/config/index.ts",
     "packages/omo-senpi/src/components/omo-sdk/device-service/index.ts",
     "packages/omo-senpi/src/components/omo-sdk/devices/index.ts",
