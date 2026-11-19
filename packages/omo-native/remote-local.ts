@@ -27,7 +27,15 @@ import { readAccountInProcess } from "./account-show"
 import type { LocalStatus } from "./remote-cold-wake"
 import packageJson from "./package.json" with { type: "json" }
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
-import { controlLines, deviceLines, localRows, sessionLines, statusLines, wakeLines } from "./remote-render"
+import {
+  candidateLines,
+  controlLines,
+  deviceLines,
+  localRows,
+  sessionLines,
+  statusLines,
+  wakeLines,
+} from "./remote-render"
 import { isSessionVerb, parseSession, type SessionArgs } from "./remote-session-args"
 import { runSession } from "./remote-session-verbs"
 import { AFTER_LOGIN_FLAG } from "./remote-verbs"
@@ -219,26 +227,13 @@ async function runRead(client: RemoteClient, parsed: Parsed, dependencies: Remot
       return show(await client.devices.list(), (devices) => deviceLines(devices, now))
     case "sessions": {
       const listed = await client.sessions.list(parsed.filter)
-      // A typo in --device and a device with no sessions both used to list nothing: the client names the unknown device,
-      // and an ambiguous one names its candidates (#14305); nothing is listed until one device answers.
-      if (listed.kind === "error" && listed.details?.["kind"] === "device") {
-        if (listed.code === "not_found") {
-          dependencies.error(
-            `omo remote sessions: no device ${parsed.filter.device} on this account (see omo remote devices)`,
-          )
-          return REMOTE_EXIT.usage
-        }
-        if (listed.code === "ambiguous_target") {
-          const candidates = Array.isArray(listed.details["candidates"])
-            ? (listed.details["candidates"] as readonly { readonly device?: unknown }[])
-                .map((candidate) => (typeof candidate.device === "string" ? candidate.device : ""))
-                .filter((id) => id !== "")
-            : []
-          dependencies.error(
-            `omo remote sessions: ${candidates.length} devices match ${parsed.filter.device} (${candidates.join(", ")}); pass the device id`,
-          )
-          return exitCodeOf(listed)
-        }
+      // A typo in --device and a device with no sessions both used to list nothing: the client names the unknown device.
+      // An ambiguous one is a typed failure like any other: renderFailure prints its candidates (#14305).
+      if (listed.kind === "error" && listed.code === "not_found" && listed.details?.["kind"] === "device") {
+        dependencies.error(
+          `omo remote sessions: no device ${parsed.filter.device} on this account (see omo remote devices)`,
+        )
+        return REMOTE_EXIT.usage
       }
       return show(listed, (listing) => sessionLines(listing, now))
     }
@@ -308,6 +303,7 @@ function renderFailure(dependencies: RemoteCommandDependencies, failure: RemoteF
   }
   dependencies.error(`omo remote: ${failure.message}`)
   dependencies.error(withVerbs(failure.next_action))
+  for (const line of candidateLines(failure.details)) dependencies.error(line)
   return exitCodeOf(failure)
 }
 
