@@ -73,7 +73,6 @@ export function checkExtensionCurrent(
 >
 export const GATEWAY_STORE_WORKER_NAME: "gateway-store-worker.mjs"
 export const THREAD_SDK_RELATIVE_PATH: string
-export const OMO_SDK_RELATIVE_PATH: string
 export const SENPI_LOADER_ALIASES: readonly [
   "@earendil-works/pi-coding-agent",
   "@earendil-works/pi-agent-core",

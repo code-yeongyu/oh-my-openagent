@@ -39,7 +39,7 @@ export type AccountAccess = {
   readonly close: () => void
 }
 
-export const resolveOrigin = (api: string | undefined, env: Env): string =>
+const resolveOrigin = (api: string | undefined, env: Env): string =>
   serviceOrigin(api ?? env["OMO_SERVICE_API_URL"] ?? DEFAULT_SERVICE_API)
 
 const SIGN_IN = "sign this device in to OmO, then retry"
