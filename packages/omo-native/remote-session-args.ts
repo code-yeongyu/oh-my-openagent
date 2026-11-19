@@ -1,4 +1,4 @@
-import { THINKING_LEVELS } from "../omo-senpi/src/components/thread/contracts/fields"
+import { DEFAULT_THREAD_DELIVERY, THINKING_LEVELS } from "../omo-senpi/src/components/thread/contracts/fields"
 import type { WorktreeRequest } from "../omo-senpi/src/components/thread/worktree/thread-worktree"
 import { UsageError } from "./remote-exit"
 import { isPermissionPreset, PERMISSION_PRESETS } from "./remote-permission-preset"
@@ -24,8 +24,8 @@ export type SessionArgs =
       readonly permissionPreset?: string
       readonly worktree?: WorktreeRequest
       readonly prompt?: string
-      /** How `prompt` is delivered; absent means auto. */
-      readonly delivery?: "auto" | "steer" | "follow_up"
+      /** How `prompt` is delivered: --steer, --follow-up, else the shared default (auto). */
+      readonly delivery: "auto" | "steer" | "follow_up"
     }
   | {
       readonly verb: "send"
@@ -108,7 +108,11 @@ export function parseSession(
       throw new UsageError("omo remote open: pass --steer or --follow-up, not both")
     if (prompt === undefined && (switches.has("--steer") || switches.has("--follow-up")))
       throw new UsageError("omo remote open: --steer and --follow-up name how --prompt is delivered; pass --prompt")
-    const delivery = switches.has("--steer") ? "steer" : switches.has("--follow-up") ? "follow_up" : "auto"
+    const delivery = switches.has("--steer")
+      ? "steer"
+      : switches.has("--follow-up")
+        ? "follow_up"
+        : DEFAULT_THREAD_DELIVERY
     return {
       json,
       session: {
@@ -136,7 +140,11 @@ export function parseSession(
     if (text === undefined || text === "") throw new UsageError("omo remote send: the message text is required")
     if (switches.has("--steer") && switches.has("--follow-up"))
       throw new UsageError("omo remote send: pass --steer or --follow-up, not both")
-    const delivery = switches.has("--steer") ? "steer" : switches.has("--follow-up") ? "follow_up" : "auto"
+    const delivery = switches.has("--steer")
+      ? "steer"
+      : switches.has("--follow-up")
+        ? "follow_up"
+        : DEFAULT_THREAD_DELIVERY
     const timeoutValue = values.get("--timeout")
     if (timeoutValue !== undefined && !/^[1-9][0-9]{0,3}$/.test(timeoutValue))
       throw new UsageError("omo remote send: --timeout is seconds, 1 to 600")

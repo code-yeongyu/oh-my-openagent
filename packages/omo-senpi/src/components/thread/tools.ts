@@ -21,6 +21,7 @@ import {
   type ThreadArchiveInput,
   type ThreadToolName,
   type ThreadToolResult,
+  DEFAULT_THREAD_DELIVERY,
 } from "./contracts"
 import { THREAD_FAMILY_PROMPT_GUIDELINES } from "./metadata"
 import { withClosedRows } from "./remote/closed-rows"
@@ -647,7 +648,7 @@ async function deliverThrough(
     caller_id: callerId,
     target,
     text: value.message,
-    mode: value.delivery ?? "auto",
+    mode: value.delivery ?? DEFAULT_THREAD_DELIVERY,
     ...(value.expected_turn_id === undefined ? {} : { expected_turn_id: value.expected_turn_id }),
     idempotency_key: idempotencyKey,
     args: value,

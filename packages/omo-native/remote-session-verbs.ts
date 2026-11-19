@@ -267,7 +267,7 @@ async function openOn(
   const delivery = personDelivery(remote, dependencies)
   let sent: ThreadToolResult
   try {
-    sent = await delivery.deliver(row, label, args.prompt, args.delivery ?? "auto")
+    sent = await delivery.deliver(row, label, args.prompt, args.delivery)
   } finally {
     await delivery.dispose()
   }

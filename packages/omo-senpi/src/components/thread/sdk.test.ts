@@ -1125,9 +1125,14 @@ describe("thread SDK: session controls (#13413)", () => {
     })
     expect(calls.filter(([what]) => what === "openSession")).toHaveLength(1)
     const rows = await store.list({ target_durable_id: "dur-new" })
-    expect(rows.map((row) => ({ sender: row.sender, authority: row.envelope.authority, body: row.body }))).toEqual([
-      { sender: "cli:501", authority: "creator", body: "start the nightly build" },
-    ])
+    expect(
+      rows.map((row) => ({
+        sender: row.sender,
+        authority: row.envelope.authority,
+        body: row.body,
+        mode: row.mode_requested,
+      })),
+    ).toEqual([{ sender: "cli:501", authority: "creator", body: "start the nightly build", mode: "auto" }])
   })
 
   test("#given a script with no session of its own #when it addresses self #then every control verb answers caller_context_missing and nothing runs", async () => {
@@ -1242,4 +1247,19 @@ describe("thread SDK: the operator daemon's warm", () => {
       }
     },
   )
+})
+
+describe("#14333: the SDK's default delivery mode", () => {
+  test("#given a send that names no mode #when it is stored #then its requested mode is the shared default, auto; an explicit follow_up is kept", async () => {
+    const { sdk, store } = fixture()
+    expect(await sdk.send({ thread: "my-tui", text: "no mode" })).toMatchObject({ kind: "ok" })
+    expect(await sdk.send({ thread: "my-tui", text: "queued on purpose", mode: "follow_up" })).toMatchObject({
+      kind: "ok",
+    })
+    const rows = await store.list({ target_durable_id: "dur-tui" })
+    expect(rows.map((row) => [row.body, row.mode_requested])).toEqual([
+      ["no mode", "auto"],
+      ["queued on purpose", "follow_up"],
+    ])
+  })
 })

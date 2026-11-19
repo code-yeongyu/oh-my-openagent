@@ -10,6 +10,7 @@ import { resolveAddress } from "./address"
 import { toThreadAddressEntries, type AddressEntry } from "./address-book"
 import type { ThreadAddressEntry } from "./addressing"
 import {
+  DEFAULT_THREAD_DELIVERY,
   parseThreadParams,
   threadToolParamSchemas,
   type ThreadCloseInput,
@@ -556,7 +557,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
           caller_id: principal,
           target,
           text: request.text,
-          mode: request.mode ?? "auto",
+          mode: request.mode ?? DEFAULT_THREAD_DELIVERY,
           ...(request.expected_turn_id === undefined ? {} : { expected_turn_id: String(request.expected_turn_id) }),
           idempotency_key: request.idempotency_key ?? `auto:${randomUUID()}`,
           args: request,
@@ -710,7 +711,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
               caller_id: principal,
               target,
               text: send.message,
-              mode: send.delivery ?? "auto",
+              mode: send.delivery ?? DEFAULT_THREAD_DELIVERY,
               idempotency_key: key,
               args: send,
               authority: "creator",
