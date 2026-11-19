@@ -402,14 +402,19 @@ describe("#13012 route parity", () => {
     ["a name no device ever listed (a typo)", "relase planer"],
     ["a durable id no device ever listed", "0195f0c2-1a2b-7c3d-8e4f-0000000000ff"],
   ])(
-    "#given b missed this round #when %s is sent to #then it stays not_found, since nothing ties it to b",
+    "#given b missed this round #when %s is sent to #then it is host_unavailable naming b (b could hold it), never not_found (#14305 design section 5)",
     async (_case, thread) => {
       const { a, run } = missedSecondRound()
       expect(await run("thread_list", {})).toMatchObject({ kind: "ok" })
-      expect(await run("thread_send", { thread, message: "continue" })).toMatchObject({
+      const result = await run("thread_send", { thread, message: "continue" })
+      expect(result).toMatchObject({
         kind: "error",
-        error: { code: "not_found" },
+        error: { code: "host_unavailable", details: { reason: "listing_incomplete", devices: [B_ROW.device] } },
       })
+      const error = (result as { error: { message: string; next_action: string } }).error
+      expect(error.message).toContain("Nothing matched on the devices that answered")
+      expect(error.message).toContain(B_ROW.device)
+      expect(error.next_action).toContain("thread_list")
       expect(admits(a.sent)).toEqual([])
     },
   )
