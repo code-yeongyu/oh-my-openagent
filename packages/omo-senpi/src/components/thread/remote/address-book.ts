@@ -11,8 +11,8 @@ export function relayAddressEntry(row: RemoteSessionRow, aliases?: readonly stri
     thread_id.length > 0 && row.session_id.length > 0 && row.session_id !== thread_id ? [row.session_id] : undefined
   return {
     thread_id,
-    // The device's own title, never rowLabel's folder name: that label is display-only (thread_list), because folder
-    // names collide across threads and would turn into ambiguous addresses (#14043).
+    // The device's own title, never rowName's folder fallback: that fallback is display-only (thread_list, marked
+    // unnamed), because folder names collide across threads and would turn into ambiguous addresses (#14043).
     name: row.title,
     status: rowStatus(row),
     cwd: row.project,

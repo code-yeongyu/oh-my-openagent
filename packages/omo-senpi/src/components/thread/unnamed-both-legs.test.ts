@@ -24,10 +24,9 @@ describe("this device's unnamed thread is named as another device's is", () => {
     const listed = threads(await run("thread_list", { all_scope: true }))
     const here = (id: string) => listed.find((thread) => thread.thread === id)
     expect([here("dur-loc-anon")?.name, here("dur-loc-anon")?.unnamed]).toEqual(["anon-folder", true])
-    expect([here("dur-local")?.name, here("dur-local") !== undefined && "unnamed" in here("dur-local")!]).toEqual([
-      "local peer",
-      false,
-    ])
+    const local = here("dur-local")
+    if (local === undefined) throw new Error("thread_list did not list dur-local")
+    expect([local.name, "unnamed" in local]).toEqual(["local peer", false])
   })
 })
 
