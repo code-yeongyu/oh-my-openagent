@@ -84,7 +84,6 @@ export function remoteMonitorTarget(target: string): { readonly device: string; 
 }
 const isRemoteMonitorTarget = (target: string): boolean => remoteMonitorTarget(target) !== undefined
 
-
 export function remoteWakeUnavailable(
   surface: unknown,
   target: string,
