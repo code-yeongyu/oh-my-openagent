@@ -369,10 +369,12 @@ export async function migrate(ctx: StoreContext): Promise<void> {
   for (;;) {
     const version = schemaVersion(ctx)
     if (version >= GATEWAY_MIGRATIONS.length) return
-    // The CHECK-widening v7 rebuild must run with foreign_keys OFF, which SQLite only honors when
-    // the pragma is set OUTSIDE the transaction (a table drop would otherwise fire foreign-key
-    // actions from extension tables referencing `bindings`). The pragma is restored to its prior
-    // value afterwards, and foreign_key_check is verified from TypeScript before the bump commits.
+    // The CHECK-widening v7 rebuild and the v15 binding-table drop must run with foreign_keys OFF, which SQLite only
+    // honors when the pragma is set OUTSIDE the transaction (a table drop would otherwise fire foreign-key actions from
+    // extension tables referencing `bindings`: ON DELETE CASCADE empties them, a plain REFERENCES fails the step on every
+    // open). The pragma is restored to its prior value afterwards. v7 recreates `bindings`, so foreign_key_check is
+    // verified from TypeScript before its bump commits; v15 removes the table for good, so an extension table that still
+    // references it keeps its rows and must rebuild itself without the reference.
     const needsForeignKeysOff = GATEWAY_NEEDS_FK_OFF.has(version)
     const priorForeignKeys = needsForeignKeysOff
       ? Number(ctx.sql.one(["foreign_keys"], "SELECT foreign_keys FROM pragma_foreign_keys")?.foreign_keys ?? 1)
@@ -383,7 +385,7 @@ export async function migrate(ctx: StoreContext): Promise<void> {
         const current = schemaVersion(ctx)
         if (current !== version) return
         for (const statement of GATEWAY_MIGRATIONS[current]) ctx.sql.exec(statement)
-        if (needsForeignKeysOff) {
+        if (version === GATEWAY_V7_REBUILD) {
           const violations = ctx.sql.all(["parent"], "SELECT parent FROM pragma_foreign_key_check")
           const introduced = violations.filter((row) => row.parent === "bindings")
           if (introduced.length > 0) {
@@ -401,8 +403,11 @@ export async function migrate(ctx: StoreContext): Promise<void> {
   }
 }
 
+/** Migration indexes (0-based) of the v7 `bindings` rebuild and the v15 binding-table drop. */
+const GATEWAY_V7_REBUILD = 6
+const GATEWAY_V15_BINDING_DROP = 14
 /** Migration indexes (0-based) whose steps must run with foreign_keys OFF; see migrate(). */
-const GATEWAY_NEEDS_FK_OFF: ReadonlySet<number> = new Set([6])
+const GATEWAY_NEEDS_FK_OFF: ReadonlySet<number> = new Set([GATEWAY_V7_REBUILD, GATEWAY_V15_BINDING_DROP])
 
 type ReceiptRecord = {
   readonly args_hash: string

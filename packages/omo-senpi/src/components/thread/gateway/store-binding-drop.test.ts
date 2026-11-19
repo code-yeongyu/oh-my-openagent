@@ -16,7 +16,7 @@ afterEach(async () => {
 /** Schema v14: the last version that still had thread bindings. Pinned, not `length - 1`, because later migrations append. */
 const V14 = 14
 
-function v14Fixture(path: string): void {
+function v14Fixture(path: string, extra: readonly string[] = []): void {
   mkdirSync(dirname(path), { recursive: true })
   const db = new Database(path)
   db.exec("PRAGMA foreign_keys = ON")
@@ -37,6 +37,7 @@ function v14Fixture(path: string): void {
     state, root_id, hop, created_at, updated_at, expires_at, binding_id, binding_revision, actor_user_id)
     VALUES ('d-bound', 'target', 1, 'binding:bnd-1', '{"provenance":{"workspace":"w","project":"p"}}', 'from chat', 9,
     'auto', 'queued', 'root', 1, 1, 1, 9999999999999, 'bnd-1', 1, 'u1')`)
+  for (const statement of extra) db.exec(statement)
   db.close()
 }
 
@@ -84,3 +85,41 @@ test("#given a v14 store holding a binding, its outbox, cursor, completion arm a
     db.close()
   }
 })
+
+// The store's connection enforces foreign keys, so without foreign_keys OFF the drop would cascade-delete these rows
+// or fail the step on every open.
+test.each([
+  ["ON DELETE CASCADE", "REFERENCES bindings ON DELETE CASCADE"],
+  ["a plain REFERENCES", "REFERENCES bindings"],
+])(
+  "#given an extension table referencing bindings with %s #when the store migrates to v15 #then it opens at the current version and the extension rows stay",
+  async (_label, reference) => {
+    const h = (harness = createGatewayHarness())
+    const path = gatewayDatabasePath(h.agentDir)
+    v14Fixture(path, [
+      `CREATE TABLE alpha_refs (id INTEGER PRIMARY KEY, binding_seq INTEGER ${reference})`,
+      "INSERT INTO alpha_refs (id, binding_seq) VALUES (1, 1), (2, 1)",
+    ])
+    const store = h.store()
+    try {
+      await store.identity()
+    } finally {
+      await store.dispose()
+    }
+    const db = new Database(path, { readonly: true })
+    try {
+      expect({
+        version: (db.query("PRAGMA user_version").get() as { user_version: number }).user_version,
+        rows: db.query("SELECT id, binding_seq FROM alpha_refs ORDER BY id").all(),
+      }).toEqual({
+        version: GATEWAY_MIGRATIONS.length,
+        rows: [
+          { id: 1, binding_seq: 1 },
+          { id: 2, binding_seq: 1 },
+        ],
+      })
+    } finally {
+      db.close()
+    }
+  },
+)

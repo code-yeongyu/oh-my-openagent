@@ -107,7 +107,7 @@ export type ThreadSdk = StoreExtensionApi & {
   /** `cli:<uid>`: the principal every receipt, budget and send of this SDK is keyed by. */
   readonly principal: string
   /** `state`: the thread states to list; the default lists every state but archived. */
-  readonly list: (request: Scoped & { readonly state?: readonly ThreadState[] }) => Promise<ThreadToolResult>
+  readonly list: (request?: Scoped & { readonly state?: readonly ThreadState[] }) => Promise<ThreadToolResult>
   readonly read: (
     request: Scoped & { readonly thread: string; readonly max_bytes?: number; readonly cursor?: string },
   ) => Promise<ThreadToolResult>
@@ -188,7 +188,9 @@ function thrown(error: unknown): Failure {
  * A script names only the keys an operation reads: a misspelt one (`allScope` for `all_scope`) is refused by name
  * instead of silently ignored (#14316).
  */
-function unknownKeys(request: object, known: readonly string[]): Failure | undefined {
+function unknownKeys(request: unknown, known: readonly string[]): Failure | undefined {
+  if (typeof request !== "object" || request === null || Array.isArray(request))
+    return fail("invalid_arguments", "The options must be an object.", `Pass an object with ${known.join(", ")}.`)
   const unknown = Object.keys(request).filter((key) => !known.includes(key))
   if (unknown.length === 0) return undefined
   return fail(
@@ -284,7 +286,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     registerStoreExtension: store.registerStoreExtension,
     extensionCall: store.extensionCall,
     principal,
-    list: (request) =>
+    list: (request = {}) =>
       guarded(
         async () =>
           unknownKeys(request, LIST_KEYS) ??

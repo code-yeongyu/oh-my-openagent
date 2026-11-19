@@ -274,6 +274,15 @@ describe("thread SDK: sessions", () => {
 })
 
 describe("thread SDK: unknown option keys (#14316)", () => {
+  test("#given a script that passes no options object, or a non-object #when it calls the SDK #then list() lists and the others answer invalid_arguments", async () => {
+    const { sdk } = fixture()
+    const loose = sdk as unknown as Record<"list" | "read" | "send" | "locate", (request?: unknown) => Promise<unknown>>
+    expect(await loose.list()).toMatchObject({ kind: "ok" })
+    for (const method of ["read", "send", "locate"] as const)
+      for (const request of [undefined, null, "dur-tui", ["dur-tui"]])
+        expect(await loose[method](request)).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+  })
+
   test.each([
     ["send", { thread: "dur-tui", text: "ping", allScope: true }, ["allScope"]],
     ["read", { thread: "dur-tui", maxBytes: 10 }, ["maxBytes"]],

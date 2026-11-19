@@ -362,7 +362,8 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
   // v15 (#14312): thread bindings are gone, with the outbox, its consumer cursors and the completion arms that only a
   // binding fed. One-way: their rows are deleted. Re-runnable, like every step a rewound store runs again, so the
   // binding-era `deliveries` columns (`binding_id`, `binding_revision`, `actor_user_id`) stay as unused nullable
-  // columns: SQLite has no DROP COLUMN IF EXISTS, and nothing reads or writes them.
+  // columns: SQLite has no DROP COLUMN IF EXISTS, and nothing reads or writes them. It runs with foreign_keys OFF
+  // (store-ops.ts migrate), so an extension table referencing `bindings` keeps its rows.
   [
     "DROP TABLE IF EXISTS completion_arms",
     "DROP TABLE IF EXISTS outbox_cursors",
