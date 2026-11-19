@@ -371,6 +371,52 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     },
   )
 
+  // #14240: the listing still reads the thread live, but b's host parked it: a session command to it is refused
+  // route_unlisted. The send asks b again and takes the path b's answer names, at most once.
+  test.each(["auto", "follow_up"] as const)(
+    "#given b parked a thread its listing still reads live, and this device can wake it #when thread_send (%s) names it #then b is asked again and the session is woken with the delivery, under one delivery id (#14240)",
+    async (mode) => {
+      const a = account({ live: [], unlistedReason: "route_unlisted", wakeFeature: true })
+      const { run } = surface(a.remote)
+      expect(await run("thread_send", { thread: "dur-on-b", message: "wake up", mode })).toMatchObject({
+        kind: "ok",
+        thread: "dur-on-b",
+        delivery: { kind: "queued", waiting_on: { kind: "wake", device: "b" } },
+      })
+      const woken = a.sent.filter((entry) => entry.via === "wake")
+      expect(woken.map((entry) => entry.session)).toEqual(["dur-on-b"])
+      expect(a.sent.filter((entry) => entry.rpc?.["type"] === "find_session")).toHaveLength(1)
+      const ids = a.sent
+        .filter((entry) => entry.via === "wake" || entry.rpc?.["type"] === "admit_external_message")
+        .map((entry) => entry.rpc?.["deliveryId"])
+      expect(new Set(ids).size).toBe(1)
+      // The retry's record is stamped as the first attempt's was: one hop for the whole delivery, so the chain count the
+      // receiver sees does not grow across the retry.
+      expect(new Set(a.hops).size).toBe(1)
+      const stamped = a.sent
+        .filter((entry) => entry.via === "wake" || entry.rpc?.["type"] === "admit_external_message")
+        .map((entry) => entry.rpc?.["chainCount"])
+      expect(new Set(stamped).size).toBe(1)
+    },
+  )
+
+  test.each([
+    ["this device cannot wake it", {}, "not_resumable"],
+    ["b holds no session file for it", { wakeFeature: true, sessionFiles: {} }, "not_found"],
+  ] as const)(
+    "#given b parked a thread its listing still reads live, and %s #when thread_send names it #then a typed refusal after one re-ask, and nothing is woken (#14240)",
+    async (_case, extra, code) => {
+      const a = account({ live: [], unlistedReason: "route_unlisted", ...extra })
+      const { run } = surface(a.remote)
+      expect(await run("thread_send", { thread: "dur-on-b", message: "wake up" })).toMatchObject({
+        kind: "error",
+        error: { code, details: { device: "b", thread: "dur-on-b" } },
+      })
+      expect(a.sent.filter((entry) => entry.via === "wake")).toEqual([])
+      expect(a.sent.filter((entry) => entry.rpc?.["type"] === "find_session")).toHaveLength(1)
+    },
+  )
+
   test("#given an online b that refuses the reopen of its listed thread (it holds no session file) #when thread_send names that thread next #then not_found at once, as the refused reopen said, and no session command waits on b (#14184, re-probe 2)", async () => {
     // A cached row of an online device that runs nothing under it: the reopen asks b, which holds no file; the send that
     // follows asks b again and answers at once, instead of attaching to the row's old key until b's deadline.
