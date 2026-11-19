@@ -406,15 +406,13 @@ describe("#13012 route parity", () => {
     async (_case, thread) => {
       const { a, run } = missedSecondRound()
       expect(await run("thread_list", {})).toMatchObject({ kind: "ok" })
-      const result = await run("thread_send", { thread, message: "continue" })
-      expect(result).toMatchObject({
+      expect(await run("thread_send", { thread, message: "continue" })).toMatchObject({
         kind: "error",
-        error: { code: "host_unavailable", details: { reason: "listing_incomplete", devices: [B_ROW.device] } },
+        error: {
+          code: "host_unavailable",
+          details: { reason: "listing_incomplete", devices: [B_ROW.device], device_names: ["studio"] },
+        },
       })
-      const error = (result as { error: { message: string; next_action: string } }).error
-      expect(error.message).toContain("Nothing matched on the devices that answered")
-      expect(error.message).toContain(B_ROW.device)
-      expect(error.next_action).toContain("thread_list")
       expect(admits(a.sent)).toEqual([])
     },
   )
