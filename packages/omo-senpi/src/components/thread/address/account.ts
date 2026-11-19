@@ -101,19 +101,28 @@ export type AccountRead =
 const LAST_LISTED_MAX = 4096
 const lastListed = new WeakMap<object, Map<string, string>>()
 
-function remember(port: object, rows: readonly RemoteSessionRow[]): ReadonlyMap<string, string> {
-  const before = new Map(lastListed.get(port))
+// Updates the memory in place and returns how it read BEFORE this round: only the entries this round overwrote, added or
+// evicted are kept aside, so a resolution never copies the whole map.
+function remember(port: object, rows: readonly RemoteSessionRow[]): (id: string) => string | undefined {
   const ids = lastListed.get(port) ?? new Map<string, string>()
   lastListed.set(port, ids)
+  const before = new Map<string, string | undefined>()
+  const keep = (id: string) => {
+    if (!before.has(id)) before.set(id, ids.get(id))
+  }
   for (const row of rows)
     for (const id of new Set([rowThreadId(row), row.session_id])) {
       if (id.length === 0) continue
+      keep(id)
       ids.delete(id)
       ids.set(id, row.device)
       const oldest = ids.size > LAST_LISTED_MAX ? ids.keys().next() : undefined
-      if (oldest !== undefined && oldest.done !== true) ids.delete(oldest.value)
+      if (oldest !== undefined && oldest.done !== true) {
+        keep(oldest.value)
+        ids.delete(oldest.value)
+      }
     }
-  return before
+  return (id) => (before.has(id) ? before.get(id) : ids.get(id))
 }
 
 /**
@@ -150,7 +159,7 @@ export async function readAccount(remote: RemoteThreadSurface): Promise<AccountR
       incomplete: listing.incomplete,
       listingOf: (device) => deviceListing(device, listing, online),
       missedHolder: (id) => {
-        const device = earlier.get(id)
+        const device = earlier(id)
         return device !== undefined && device !== here && missing.has(device) ? device : undefined
       },
     },
