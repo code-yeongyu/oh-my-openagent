@@ -9,8 +9,8 @@ import {
   type RemoteListing,
   type RemoteThreadSurface,
 } from "../remote/ports"
-import { remoteAvailable } from "../remote/remote-ops"
-import { accountDevices } from "./account"
+import { remoteReady } from "../remote/remote-ops"
+import { accountDevices, type Ready } from "./account"
 import { asRefusal, refusal, toolRefusal, type ThreadRefusal } from "./refusals"
 import type { Found } from "./types"
 
@@ -106,11 +106,13 @@ export async function probeAcross(
 export async function pinned(
   remote: RemoteThreadSurface | undefined,
   pin: { readonly device: string; readonly thread: string },
+  ready?: Promise<Ready>,
 ): Promise<Found | ThreadRefusal> {
   if (remote === undefined)
     return toolRefusal(deviceNotAsked("remote_unavailable", pin.thread, { id: pin.device, name: pin.device }))
-  const unavailable = await remoteAvailable(remote)
-  if (unavailable !== undefined) return asRefusal(unavailable.error)
+  // The resolution's own status round when it already took one: one status read per resolution.
+  const status = await (ready ?? remoteReady(remote))
+  if ("kind" in status) return asRefusal(status.error)
   const device = async () =>
     named(
       await accountDevices(remote.client).then(

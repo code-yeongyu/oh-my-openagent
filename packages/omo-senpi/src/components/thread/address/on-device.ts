@@ -9,7 +9,7 @@ import {
 import { namedDeviceRow, relayAddressEntry } from "../remote/address-book"
 import { rowThreadId, type RemoteThreadSurface } from "../remote/ports"
 import { holderTarget } from "../remote/remote-ops"
-import type { Account } from "./account"
+import type { Account, Ready } from "./account"
 import { deviceNameOf, listedEntry } from "./bare"
 import { ladder } from "./ladder"
 import { pinned } from "./probe"
@@ -44,6 +44,7 @@ export async function resolveOnDevice(
   device: DeviceRef,
   thread: string,
   opts: ResolveOptions,
+  ready?: Promise<Ready>,
 ): Promise<Found | ThreadRefusal> {
   const names = deviceNameOf(account)
   if (device.here) {
@@ -66,7 +67,7 @@ export async function resolveOnDevice(
       all_scope: true,
     }
   // Not listed: that one device is asked, as a pinned reply asks it (design section 3 step 8, review H1).
-  if (THREAD_ID_SHAPE.test(thread)) return await pinned(remote, { device: device.id, thread })
+  if (THREAD_ID_SHAPE.test(thread)) return await pinned(remote, { device: device.id, thread }, ready)
   const hit = ladder(
     ctx,
     rows.map((row) => listedEntry(row)),

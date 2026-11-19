@@ -1,8 +1,16 @@
-import { formatAddress, HERE, noDevice, parseAddress, type DeviceRef } from "@oh-my-opencode/thread-address-core"
+import {
+  formatAddress,
+  HERE,
+  idShaped,
+  noDevice,
+  parseAddress,
+  type DeviceRef,
+} from "@oh-my-opencode/thread-address-core"
 import { threadToolFailure } from "../errors"
 import { relayAddressEntry } from "../remote/address-book"
 import { rowThreadId, type RemoteDevice, type RemoteThreadSurface } from "../remote/ports"
-import { accountDevices, readAccount, type Account } from "./account"
+import { remoteReady } from "../remote/remote-ops"
+import { accountDevices, readAccount, readRoster, rosterAccount, type Account, type Ready } from "./account"
 import { deviceNameOf, resolveBare, type AccountAttempt } from "./bare"
 import { deviceRows, resolveAccountDevice } from "./device"
 import { resolveOnDevice } from "./on-device"
@@ -10,13 +18,12 @@ import { pinned } from "./probe"
 import { asRefusal, toolRefusal, withAddresses, type ThreadRefusal } from "./refusals"
 import type { Found, ResolveContext, ResolveOptions, Resolved } from "./types"
 
-const attempt = (remote: RemoteThreadSurface): Promise<AccountAttempt> =>
-  readAccount(remote).catch((error: unknown) => ({ kind: "failed", error }))
+const failed = (error: unknown): AccountAttempt => ({ kind: "failed", error })
 
-/** Reads the account at most once per resolution, whichever step asks first. */
-function once(remote: RemoteThreadSurface): () => Promise<AccountAttempt> {
+/** Reads the account at most once per resolution, whichever step asks first, on the resolution's one status round. */
+function once(remote: RemoteThreadSurface, ready: () => Promise<Ready>): () => Promise<AccountAttempt> {
   let read: Promise<AccountAttempt> | undefined
-  return () => (read ??= attempt(remote))
+  return () => (read ??= readAccount(remote, { ready: ready() }).catch(failed))
 }
 
 const refOf = (row: RemoteDevice | undefined, id: string, here: string | null): DeviceRef => ({
@@ -185,7 +192,9 @@ export async function resolveAddress(
   if (opts.pin !== undefined) return await finish(ctx, await pinned(ctx.remote, opts.pin), undefined, opts)
   const parsed = parseAddress(text)
   const remote = ctx.remote
-  const read = remote === undefined ? async (): Promise<AccountAttempt> => ({ kind: "none" }) : once(remote)
+  let status: Promise<Ready> | undefined
+  const ready = (): Promise<Ready> => (status ??= remote === undefined ? Promise.reject() : remoteReady(remote))
+  const read = remote === undefined ? async (): Promise<AccountAttempt> => ({ kind: "none" }) : once(remote, ready)
   const bare = async (address: string, book = ctx) => {
     const resolved = await resolveBare(book, address, opts, read)
     const held =
@@ -195,22 +204,41 @@ export async function resolveAddress(
     return await finish(book, held ?? resolved.result, resolved.account, opts)
   }
   if (parsed.kind !== "device") return await bare(text)
-  const account = await read()
-  if (remote === undefined || account.kind !== "account")
+  // #12709: the device part is resolved from the roster alone, and the thread part from that one device's reads; the
+  // account-wide listing round is read only for the whole text's bare reading.
+  const roster = remote === undefined ? undefined : await readRoster(remote, ready()).catch(failed)
+  if (remote === undefined || roster?.kind !== "account")
     return parsed.device === HERE
       ? await bare(parsed.thread, { ...ctx, local: ctx.localFor?.(parsed.thread) ?? ctx.local })
       : await bare(text)
-  const device = resolveAccountDevice(account.account, parsed.device, { online: opts.need === "online" })
-  const whole = await resolveBare(ctx, text, opts, read)
-  if (device.kind === "error")
+  const device = resolveAccountDevice(roster.account, parsed.device, { online: opts.need === "online" })
+  if (device.kind === "error") {
+    const whole = await resolveBare(ctx, text, opts, read)
     return whole.result.kind === "ok" ? await finish(ctx, whole.result, whole.account, opts) : device
-  const onDevice = await resolveOnDevice(ctx, remote, account.account, device.device, parsed.thread, opts)
+  }
+  const one = device.device.here
+    ? roster.account
+    : await readAccount(remote, { ready: ready(), roster: roster.account.roster, device: device.device.id })
+        .then((read) => (read.kind === "account" ? read.account : read))
+        .catch((error: unknown) =>
+          asRefusal(
+            threadToolFailure(
+              "host_unavailable",
+              "The account's session listing could not be reached.",
+              "Retry when the device service is reachable.",
+              { reason: error instanceof Error ? error.message : String(error) },
+            ),
+          ),
+        )
+  if ("kind" in one) return one.kind === "none" ? await bare(text) : "error" in one ? asRefusal(one.error) : one
+  const ref = { ...device.device, listing: one.listingOf(device.device.id) }
+  const onDevice = await resolveOnDevice(ctx, remote, one, ref, parsed.thread, opts, ready())
+  // An id-shaped thread part reads nothing more when its device answers; a miss there may still be a name with "/".
+  if (onDevice.kind === "ok" && idShaped(parsed.thread)) return await finish(ctx, onDevice, one, opts)
+  const whole = await resolveBare(ctx, text, opts, read)
   if (onDevice.kind === "ok" && whole.result.kind === "ok" && whole.result.entry.thread_id !== onDevice.entry.thread_id)
-    return ambiguous(text, [onDevice, whole.result], account.account)
-  return await finish(
-    ctx,
-    onDevice.kind === "ok" || whole.result.kind !== "ok" ? onDevice : whole.result,
-    account.account,
-    opts,
-  )
+    return ambiguous(text, [onDevice, whole.result], one)
+  return onDevice.kind === "ok" || whole.result.kind !== "ok"
+    ? await finish(ctx, onDevice, one, opts)
+    : await finish(ctx, whole.result, whole.account, opts)
 }
