@@ -73,11 +73,19 @@ const identifier = (node: Node | undefined): string | null => {
   return target?.type === "Identifier" ? String(target["name"]) : null
 }
 
-// `require(x)` and `import(x)` load the same module as a static import.
+// A require function: `require` itself, or one made inline by `createRequire(import.meta.url)`.
+const isRequire = (initial: Node | undefined): boolean => {
+  const node = initial === undefined ? undefined : unwrap(initial)
+  if (node === undefined) return false
+  if (identifier(node) === "require") return true
+  return node.type === "CallExpression" && identifier(child(node, "callee")) === "createRequire"
+}
+
+// `require(x)`, `createRequire(...)(x)` and `import(x)` load the same module as a static import.
 const loadedModule = (initial: Node): string | null => {
   const node = unwrap(initial)
   if (node.type === "ImportExpression") return nameOf(child(node, "source"))
-  if (node.type !== "CallExpression" || identifier(child(node, "callee")) !== "require") return null
+  if (node.type !== "CallExpression" || !isRequire(child(node, "callee"))) return null
   return nameOf(nodes(node, "arguments")[0])
 }
 
