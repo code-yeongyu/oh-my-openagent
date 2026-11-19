@@ -1,3 +1,5 @@
+// #14341: must stay the first import, so a host supervisor enters its own scope before any engine module loads.
+import "./host-scope-entry"
 import { existsSync } from "node:fs"
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
