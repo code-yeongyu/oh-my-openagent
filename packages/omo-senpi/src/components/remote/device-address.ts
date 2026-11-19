@@ -1,6 +1,7 @@
 import { accountDevices, asFailure, resolveAccountDevice, resolveAddress, type Resolved } from "../thread/address"
 import { threadToolFailure, type ThreadToolFailure } from "../thread/errors"
-import type { RemoteDevice, RemoteThreadSurface } from "../thread/remote/ports"
+import { rowThreadId, type RemoteDevice, type RemoteThreadSurface } from "../thread/remote/ports"
+import { parseAddress } from "@oh-my-opencode/thread-address-core"
 import { UNKNOWN_CALLER } from "../thread/tools/ports"
 import type { RemoteClient } from "./client"
 
@@ -44,34 +45,59 @@ export async function resolveTypedDevice(
  * prefix, and `<device id | device name | 6+ char device id prefix | here>/<any of those>`. A refusal passes through
  * typed, in the same shape `resolveTypedDevice` answers a device.
  *
- * A durable id two devices list is ambiguous_target (`unique_holder`): a person's verb never picks one holder. A thread
- * this device holds (an account alias held here) is outside omo remote's scope: it answers what `here/<thread>` answers,
- * the module's own not_found, with `on_this_device` added to its details.
+ * A person's verb never picks one holder of a durable id: two other devices are the module's ambiguous_target
+ * (`unique_holder`), and so is this device plus one other, which the module cannot see with no local book (the copy a
+ * thread brought here leaves behind). A thread this device holds (an account alias held here) is outside omo remote's
+ * scope: not_found, with `on_this_device` in its details.
  */
 export async function resolveTypedAddress(
   remote: RemoteThreadSurface,
   typed: string,
   opts: { readonly need: "address" | "online" },
 ): Promise<RemoteResolved | { readonly kind: "error"; readonly error: ThreadToolFailure }> {
-  const resolve = (text: string) =>
-    resolveAddress({ remote, callerWorkspaceRoot: "", local: [], callerId: UNKNOWN_CALLER }, text, {
-      all_scope: true,
-      probe: true,
-      unique_holder: true,
-      need: opts.need,
-    })
-  const resolved = await resolve(typed)
+  const resolved = await resolveAddress(
+    { remote, callerWorkspaceRoot: "", local: [], callerId: UNKNOWN_CALLER },
+    typed,
+    { all_scope: true, probe: true, unique_holder: true, need: opts.need },
+  )
   if (resolved.kind !== "ok") return { kind: "error", error: asFailure(resolved) }
-  const { where } = resolved
-  if (where.kind === "device") return { ...resolved, where }
-  // This device's book is empty here, so `here/<thread>` always refuses.
-  const here = await resolve(`here/${resolved.thread}`)
-  if (here.kind === "ok") throw new Error(`here/${resolved.thread} resolved over an empty local book`)
-  const failure = asFailure(here)
+  const { where, thread } = resolved
+  if (where.kind !== "device")
+    return {
+      kind: "error",
+      error: threadToolFailure(
+        "not_found",
+        `Session ${thread} is on this device; omo remote commands the other devices' sessions.`,
+        `Reach it with omo thread send ${thread}.`,
+        { kind: "thread", thread, on_this_device: true },
+      ),
+    }
+  const here = parseAddress(typed).kind === "bare" && thread !== "" ? await copyHere(remote, thread) : undefined
+  if (here === undefined) return { ...resolved, where }
   return {
     kind: "error",
-    error: { ...failure, details: { ...failure.details, thread: resolved.thread, on_this_device: true } },
+    error: threadToolFailure(
+      "ambiguous_target",
+      `Session ${thread} is listed on this device and on ${where.row.device}; none was picked.`,
+      "Address the session on one device with <device>/<session id>.",
+      {
+        kind: "thread",
+        candidates: [
+          { thread, device: where.row.device, address: resolved.address },
+          { thread, device: here, address: `${here}/${thread}` },
+        ],
+      },
+    ),
   }
+}
+
+/**
+ * This device's id when the account listing (the round the bare resolution just read, reused) shows `thread` on this
+ * device too.
+ */
+async function copyHere(remote: RemoteThreadSurface, thread: string): Promise<string | undefined> {
+  const [rows, here] = await Promise.all([remote.sessions.sessions(), remote.sessions.thisDevice()])
+  return here !== null && rows.some((row) => row.device === here && rowThreadId(row) === thread) ? here : undefined
 }
 
 /** A resolved address on another device: the only kind an `omo remote` verb acts on. */
