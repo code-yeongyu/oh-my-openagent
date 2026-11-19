@@ -127,4 +127,18 @@ describe("what a queued row answers", () => {
     })
     expect(resultFromRow(started, 1, null, false, false)).toMatchObject({ delivery: { kind: "started" } })
   })
+
+  test("#given a row the engine answered held (a Stop or an interrupted run a peer cannot release, senpi#7014) #when it is answered #then it is queued waiting on a hold, never started", async () => {
+    const h = (harness = createGatewayHarness())
+    const sender = h.session("a")
+    h.phantom("t")
+    const sent = await sender.engine.deliver({ sender: { kind: "session", durable_id: "a" }, target: "t", text: "x" })
+    if (sent.kind !== "ok") throw new Error("send refused")
+    const [row] = await sender.store.list({ target_durable_id: "t" })
+    if (row === undefined) throw new Error("no row")
+    const held = { ...row, state: "admitted" as const, admission_kind: "held", turn_epoch: 0 }
+    expect(resultFromRow(held, 1, null, false, false)).toMatchObject({
+      delivery: { kind: "queued", queue_position: 1, waiting_on: { kind: "hold" } },
+    })
+  })
 })

@@ -155,8 +155,11 @@ export type RemoteSessionsPort = {
   readonly devices: () => Promise<readonly RemoteDevice[]>
   /** The account's session list; with `device`, that one device's rows only (no account-wide round). */
   readonly sessions: (filter?: { readonly device?: string }) => Promise<readonly RemoteSessionRow[]>
-  /** The account-wide list as `sessions` gives it, with the devices it could not include. Absent: every device counts as listed. */
-  readonly listing?: () => Promise<RemoteListing>
+  /**
+   * The account-wide list as `sessions` gives it, with the devices it could not include; with `device`, that one device's
+   * rows and whether it missed the round (no account-wide round). Absent: every device counts as listed.
+   */
+  readonly listing?: (filter?: { readonly device?: string }) => Promise<RemoteListing>
   /**
    * A session-less engine record (`open_session`, `list_sessions`) on `device`'s engine endpoint, with no
    * attach: the attach-less `session.command {device, endpoint, rpc}` shape (relay daemon #393). `locate` asks a
@@ -165,13 +168,20 @@ export type RemoteSessionsPort = {
    * record settles (#12777). Sent on the long-lived connection it would attach the host's delegated engine
    * connection to the session as well, and the engine would write each streamed delta twice; the attach that
    * follows rides the long-lived connection, which then carries one copy per delta. Every other record rides the
-   * long-lived connection.
+   * long-lived connection. `endpoint` sends to that listed engine key instead of the primary (omo#14271: a read-only
+   * lookup the primary cannot serve), and is never kept as the device's endpoint for later commands. `waitMs` bounds
+   * this one call (the fallback shares one budget across its engines).
    */
   readonly endpointCommand: (
     device: string,
     rpc: JsonObject,
-    options?: { readonly locate?: boolean },
+    options?: { readonly locate?: boolean; readonly endpoint?: string; readonly waitMs?: number },
   ) => Promise<RemoteCommandOutcome>
+  /**
+   * omo#14271: every engine endpoint key `device` lists, and the one it names as its own (0.1.11+). The primary is named
+   * by key, never by position. Absent: only the primary is ever asked.
+   */
+  readonly endpointKeys?: (device: string) => Promise<{ readonly keys: readonly string[]; readonly primary?: string }>
   /**
    * The id a session just created on `device` is addressed by (its listing row's `session_id`, the key an attach
    * takes), from the durable engine session id the create reply names; settles once that id attaches. A `knownKey` the

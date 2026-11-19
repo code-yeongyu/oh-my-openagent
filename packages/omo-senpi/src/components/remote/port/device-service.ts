@@ -322,7 +322,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         last_seen_ms: row.last_seen_ms,
       })),
     sessions: async (filter) => (filter?.device === undefined ? await round.listing() : await listing(filter)).rows,
-    listing: round.listing,
+    listing: async (filter) => (filter?.device === undefined ? await round.listing() : await listing(filter)),
     // create / open / fork on another device: relay daemon #393's attach-less `session.command {device, endpoint, rpc}`.
     // The endpoint lookup and every refusal answered before sending ran nothing; anything after sending may have.
     // An open_session goes on the endpoint dialer (a fresh owned connection per call by default), closed once it
@@ -370,6 +370,17 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         return outcomeOf(sent)
       }
       try {
+        // omo#14271: a named engine is asked as is, and never becomes the device's endpoint for later commands. A
+        // caller's `waitMs` (the fallback's shared budget) bounds this one call.
+        const named = endpointOptions?.endpoint
+        if (named !== undefined)
+          return outcomeOf(
+            await connected.endpointCommand(device, record, {
+              ...endpointOptions,
+              endpoint: named,
+              waitMs: endpointOptions?.waitMs ?? commandWaitMs(SEND_WAIT_MS),
+            }),
+          )
         const outcome = await send(endpoints.get(device))
         if (outcome !== UNLISTED_ENDPOINT) return outcome
         endpoints.delete(device)
@@ -387,6 +398,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         if (dialed.owned) connected.close()
       }
     },
+    endpointKeys: async (device) => await (await svc()).engineEndpoints(device),
     sessionCommand,
     read: async (device, sessionId, tail) => {
       // A read changes nothing on the other device, so every failure is a typed refusal, never uncertain.
