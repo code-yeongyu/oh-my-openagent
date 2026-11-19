@@ -58,6 +58,7 @@ function world(scripts: Scripts, overrides: Partial<EnrollPorts> & { readonly on
     machines: async () => [
       { id: "dev-new", state: now >= (overrides.onlineAfterMs ?? 0) ? ("online" as const) : ("offline" as const) },
     ],
+    doriterm: async () => ({ code: null, lines: [] }),
     clock: {
       now: () => now,
       sleep: async (ms) => {

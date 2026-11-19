@@ -1,4 +1,6 @@
+import { existsSync } from "node:fs"
 import { homedir } from "node:os"
+import { join } from "node:path"
 import { readDeviceServiceDevices } from "@oh-my-opencode/device-service-core"
 import { deviceServiceStateDir } from "@oh-my-opencode/device-service-core/state-dir"
 import { isDeviceRevoked, listLiveDevices } from "@oh-my-opencode/omo-opencode/service-auth"
@@ -49,5 +51,24 @@ export function defaultEnrollPorts(options: {
         : rows.map((row) => ({ id: row.id, state: row.online ? "online" : "offline" }))
     },
     clock: { now: Date.now, sleep },
+    doriterm: async (args) => {
+      // doriterm's checkout as its setup skill places it; a device without one has no mesh to attach to.
+      const cli = join(
+        options.home ?? homedir(),
+        ".local",
+        "share",
+        "doriface-host",
+        "src",
+        "apps",
+        "host",
+        "scripts",
+        "setup",
+        "cli.ts",
+      )
+      if (!existsSync(cli)) return { code: null, lines: [] }
+      const child = Bun.spawn(["bun", cli, ...args], { stdin: "ignore", stdout: "pipe", stderr: "ignore" })
+      const [code, stdout] = await Promise.all([child.exited, new Response(child.stdout).text()])
+      return { code, lines: stdout.split("\n").filter((line) => line !== "") }
+    },
   }
 }

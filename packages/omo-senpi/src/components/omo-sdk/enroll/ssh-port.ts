@@ -11,11 +11,18 @@ export type RemoteProgram =
   | { readonly kind: "account_show"; readonly origin: string }
   | { readonly kind: "sign_in_check"; readonly origin: string }
   | { readonly kind: "sign_in"; readonly origin: string }
+  | { readonly kind: "doriterm_prerequisites" }
+  | { readonly kind: "doriterm_install" }
+  | { readonly kind: "doriterm_join" }
 
 /** The one install line of the README. */
 export const INSTALL_LINE = "curl -fsSL https://get.omo.dev/install.sh | bash"
 
 const OMO = 'PATH="$HOME/.local/bin:$PATH" omo'
+// doriterm's checkout and setup command line, as its own setup skill fixes them (skills/doriterm-setup/SKILL.md).
+const DORITERM_SRC = '"$HOME/.local/share/doriface-host/src"'
+const DORITERM_SETUP = `bun ${DORITERM_SRC}/apps/host/scripts/setup/cli.ts`
+const BUN_PATH = 'export PATH="$HOME/.bun/bin:$PATH"'
 const quoteOrigin = (origin: string): string => {
   if (!/^https:\/\/[A-Za-z0-9.-]+(:\d+)?$|^http:\/\/127\.0\.0\.1:\d+$/.test(origin))
     throw new Error("the API origin is not a plain origin")
@@ -39,6 +46,29 @@ export function remoteCommand(program: RemoteProgram): string {
       return `OMO_SERVICE_API_URL=${quoteOrigin(program.origin)} ${OMO} account sign-in --check`
     case "sign_in":
       return `OMO_SERVICE_API_URL=${quoteOrigin(program.origin)} ${OMO} account sign-in --stdin`
+    case "doriterm_prerequisites":
+      return [
+        BUN_PATH,
+        "if git --version >/dev/null 2>&1; then echo git:present; else echo git:absent; fi",
+        "bun --version 2>/dev/null || echo bun:absent",
+      ].join("; ")
+    case "doriterm_install":
+      return [
+        BUN_PATH,
+        `if [ ! -d ${DORITERM_SRC}/.git ]; then git clone -q https://github.com/sisyphuslabs/doriterm.git ${DORITERM_SRC} && (cd ${DORITERM_SRC} && bun install --frozen-lockfile) || exit 3; fi`,
+        `${DORITERM_SETUP} install && ${DORITERM_SETUP} verify`,
+      ].join("; ")
+    case "doriterm_join":
+      // The join link arrives on stdin and lives in an owner-only file that the exit trap removes on every path,
+      // so a dropped connection leaves no link behind; the link never appears in argv.
+      return [
+        BUN_PATH,
+        "umask 077",
+        'f="$(mktemp "${TMPDIR:-/tmp}/doriterm-join.XXXXXX")" || exit 4',
+        "trap 'rm -f \"$f\"' EXIT",
+        'cat > "$f"',
+        `${DORITERM_SETUP} join --from "$f"`,
+      ].join("; ")
   }
 }
 
