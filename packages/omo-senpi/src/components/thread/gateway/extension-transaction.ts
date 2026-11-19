@@ -1,12 +1,33 @@
 import { checkExtensionSchema, extensionSchema, extensionSql } from "./extension-sql"
 import { orderByClause, orderByTerms, singleExtensionStatement } from "./extension-statement"
 import type * as ops from "./store-ops"
-import type { StoreExtensionTransaction } from "./store-extensions"
+import type { LegacyBinding, LegacyBindingWhere, StoreExtensionTransaction } from "./store-extensions"
 
 export class ExtensionTransactionEndedError extends Error {
   readonly code = "extension_operation_failed"
   constructor(readonly extension: string) {
     super(`The ${extension} extension transaction has ended.`)
+  }
+}
+
+function legacyBindingFor(ctx: ops.StoreContext, where: LegacyBindingWhere): LegacyBinding | null {
+  const place = [where?.platform, where?.account_id, where?.chat_id, where?.thread_id]
+  if (!place.every((part) => typeof part === "string"))
+    throw new TypeError("bindingFor needs string platform, account_id, chat_id and thread_id.")
+  if (ctx.sql.one(["name"], "SELECT name FROM sqlite_schema WHERE type = 'table' AND name = 'bindings'") === undefined)
+    return null
+  const row = ctx.sql.one(
+    ["binding_id", "policy_id", "session_durable_id"],
+    `SELECT binding_id, policy_id, session_durable_id FROM bindings
+     WHERE platform = ? AND account_id = ? AND chat_id = ? AND thread_id = ? AND status = 'active'
+       AND (expires_at IS NULL OR expires_at > ?)`,
+    [...place, new Date().toISOString()],
+  )
+  if (row === undefined) return null
+  return {
+    binding_id: String(row.binding_id),
+    policy_id: String(row.policy_id),
+    session_durable_id: String(row.session_durable_id),
   }
 }
 
@@ -44,6 +65,11 @@ export function extensionTransaction(ctx: ops.StoreContext, name: string) {
         return ctx.sql.one(columns, statement, params)
       }),
     exec: (statement, params) => sql(statement, () => ctx.sql.run(statement, params)),
+    bindingFor: async (where) => {
+      if (!active) throw new ExtensionTransactionEndedError(name)
+      if (failure !== undefined) throw failure
+      return legacyBindingFor(ctx, where)
+    },
   }
   return {
     tx,

@@ -16,7 +16,13 @@ afterEach(async () => {
 /** Schema v14: the last version that still had thread bindings. Pinned, not `length - 1`, because later migrations append. */
 const V14 = 14
 
-function v14Fixture(path: string, extra: readonly string[] = []): void {
+const moduleUrl = new URL("./testing/store-extension.mjs", import.meta.url).href
+
+function v14Fixture(
+  path: string,
+  extra: readonly string[] = [],
+  options: { readonly bound: boolean } = { bound: true },
+): void {
   mkdirSync(dirname(path), { recursive: true })
   const db = new Database(path)
   db.exec("PRAGMA foreign_keys = ON")
@@ -24,10 +30,15 @@ function v14Fixture(path: string, extra: readonly string[] = []): void {
   for (const step of GATEWAY_MIGRATIONS.slice(0, V14)) for (const statement of step) db.exec(statement)
   db.exec(`PRAGMA user_version = ${V14}`)
   db.exec("COMMIT")
+  if (!options.bound) {
+    for (const statement of extra) db.exec(statement)
+    db.close()
+    return
+  }
   db.exec(`INSERT INTO bindings (binding_id, revision, status, platform, account_id, chat_id, thread_id, session_realm_id,
     session_durable_id, direction_inbound, direction_outbound, inbound_mode, outbound_events, policy_id, created_at,
     updated_at, lease_started_at) VALUES ('bnd-1', 1, 'active', 'slack', 'acct', 'c1', 't1', 'realm', 'target', 1, 1,
-    'auto', '["report"]', 'default', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`)
+    'auto', '["report"]', 'dori:v1:route-1', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`)
   db.exec(`INSERT INTO outbox (binding_id, revision, event_kind, payload, state, created_at)
     VALUES ('bnd-1', 1, 'report', '{}', 'pending', 1)`)
   db.exec("INSERT INTO outbox_cursors (binding_id, acked_cursor, updated_at) VALUES ('bnd-1', 0, 1)")
@@ -41,7 +52,7 @@ function v14Fixture(path: string, extra: readonly string[] = []): void {
   db.close()
 }
 
-test("#given a v14 store holding a binding, its outbox, cursor, completion arm and a bound delivery #when the current store opens it #then the binding tables are gone, a second run of the step changes nothing, and the delivery stays", async () => {
+test("#given a v14 store holding a binding, its outbox, cursor, completion arm and a bound delivery #when the current store opens it #then the outbox tables are gone, the binding rows stay for an extension's import, a second run of the step changes nothing, and the delivery stays", async () => {
   const h = (harness = createGatewayHarness())
   const path = gatewayDatabasePath(h.agentDir)
   v14Fixture(path)
@@ -77,14 +88,69 @@ test("#given a v14 store holding a binding, its outbox, cursor, completion arm a
         .all(),
     }).toEqual({
       version: GATEWAY_MIGRATIONS.length,
-      tables: [],
+      tables: [{ name: "bindings" }],
       deliveries: [{ delivery_id: "d-bound", body: "from chat" }],
       staleCoreObjects: [],
     })
+    expect(db.query("SELECT binding_id, session_durable_id FROM bindings").all()).toEqual([
+      { binding_id: "bnd-1", session_durable_id: "target" },
+    ])
   } finally {
     db.close()
   }
 })
+
+test("#given a v14 store with no binding rows #when the current store opens it #then the bindings table is dropped too", async () => {
+  const h = (harness = createGatewayHarness())
+  const path = gatewayDatabasePath(h.agentDir)
+  v14Fixture(path, [], { bound: false })
+  const store = h.store()
+  try {
+    await store.identity()
+  } finally {
+    await store.dispose()
+  }
+  const db = new Database(path, { readonly: true })
+  try {
+    expect(
+      db
+        .query(
+          "SELECT name FROM sqlite_schema WHERE name IN ('bindings', 'outbox', 'outbox_cursors', 'completion_arms') ORDER BY name",
+        )
+        .all(),
+    ).toEqual([])
+  } finally {
+    db.close()
+  }
+})
+
+// dori-extension imports each thread route's owner from the binding rows through tx.bindingFor on its next open; a
+// store that dropped them first would lose every route.
+test.each([
+  ["holding the binding", true, { binding_id: "bnd-1", policy_id: "dori:v1:route-1", session_durable_id: "target" }],
+  ["with no binding rows", false, null],
+] as const)(
+  "#given a v14 store %s #when an extension reads the thread's legacy binding after v15 #then it gets the owner while the rows exist, else null",
+  async (_label, bound, expected) => {
+    const h = (harness = createGatewayHarness())
+    v14Fixture(gatewayDatabasePath(h.agentDir), [], { bound })
+    const store = h.store()
+    expect(
+      (
+        await store.registerStoreExtension({
+          name: "alpha",
+          moduleUrl,
+          migrations: [["CREATE TABLE alpha_items (id INTEGER PRIMARY KEY, value TEXT)"]],
+        })
+      ).kind,
+    ).toBe("ok")
+    expect(
+      await store.extensionCall("alpha", "legacyBinding", {
+        where: { platform: "slack", account_id: "acct", chat_id: "c1", thread_id: "t1" },
+      }),
+    ).toEqual({ kind: "ok", value: expected })
+  },
+)
 
 // The store's connection enforces foreign keys, so without foreign_keys OFF the drop would cascade-delete these rows
 // or fail the step on every open.

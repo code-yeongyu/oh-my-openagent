@@ -81,6 +81,24 @@ export type StoreExtensionTransaction = {
   ) => readonly SqlRow[]
   readonly one: (columns: readonly string[], sql: string, params?: readonly SqlValue[]) => SqlRow | undefined
   readonly exec: (sql: string, params?: readonly SqlValue[]) => number
+  /**
+   * Read-only, for importing routes an extension kept on pre-v15 core bindings: the thread's active, unexpired binding
+   * in the `bindings` table a store keeps while it holds rows (schema.ts v15), or null (none, or the table is gone).
+   */
+  readonly bindingFor: (where: LegacyBindingWhere) => Promise<LegacyBinding | null>
+}
+
+export type LegacyBindingWhere = {
+  readonly platform: string
+  readonly account_id: string
+  readonly chat_id: string
+  readonly thread_id: string
+}
+
+export type LegacyBinding = {
+  readonly binding_id: string
+  readonly policy_id: string
+  readonly session_durable_id: string
 }
 
 /** Export each operation by name from the compiled module. Arguments/results must be structured-cloneable. */

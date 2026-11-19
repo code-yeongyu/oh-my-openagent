@@ -11,6 +11,10 @@ export function sql(tx, args) {
   return args.columns ? tx.all(args.columns, args.sql, args.params, args.orderBy) : tx.exec(args.sql, args.params)
 }
 
+export async function legacyBinding(tx, args) {
+  return await tx.bindingFor(args.where)
+}
+
 export function swallow(tx, args) {
   if (args.before) tx.exec(args.before)
   try {

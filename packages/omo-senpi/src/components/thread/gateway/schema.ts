@@ -360,7 +360,10 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
   ],
 
   // v15 (#14312): thread bindings are gone, with the outbox, its consumer cursors and the completion arms that only a
-  // binding fed. One-way: their rows are deleted. Re-runnable, like every step a rewound store runs again, so the
+  // binding fed. One-way: their rows are deleted. `bindings` itself is dropped only when it holds no rows (store-ops.ts
+  // migrate): an extension that kept thread routes on core bindings imports their owners through the read-only
+  // `tx.bindingFor` on its next open (dori-extension#122), so the rows stay until a later step removes the table.
+  // Re-runnable, like every step a rewound store runs again, so the
   // binding-era `deliveries` columns (`binding_id`, `binding_revision`, `actor_user_id`) stay as unused nullable
   // columns: SQLite has no DROP COLUMN IF EXISTS, and nothing reads or writes them. It runs with foreign_keys OFF
   // (store-ops.ts migrate), so an extension table referencing `bindings` keeps its rows.
@@ -368,7 +371,6 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
     "DROP TABLE IF EXISTS completion_arms",
     "DROP TABLE IF EXISTS outbox_cursors",
     "DROP TABLE IF EXISTS outbox",
-    "DROP TABLE IF EXISTS bindings",
     `DELETE FROM extension_objects WHERE owner IS NULL AND NOT EXISTS
      (SELECT 1 FROM sqlite_schema s WHERE s.type = extension_objects.type AND s.name = extension_objects.name COLLATE NOCASE)`,
   ],

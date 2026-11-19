@@ -384,6 +384,7 @@ export async function migrate(ctx: StoreContext): Promise<void> {
       await transaction(ctx, "migrate", () => {
         const current = schemaVersion(ctx)
         if (current !== version) return
+        if (version === GATEWAY_V15_BINDING_DROP) dropEmptyBindings(ctx)
         for (const statement of GATEWAY_MIGRATIONS[current]) ctx.sql.exec(statement)
         if (version === GATEWAY_V7_REBUILD) {
           const violations = ctx.sql.all(["parent"], "SELECT parent FROM pragma_foreign_key_check")
@@ -401,6 +402,13 @@ export async function migrate(ctx: StoreContext): Promise<void> {
       if (needsForeignKeysOff) ctx.sql.exec(`PRAGMA foreign_keys = ${priorForeignKeys === 0 ? "OFF" : "ON"}`)
     }
   }
+}
+
+/** v15 drops `bindings` only once no row is left for an extension to import through `tx.bindingFor` (schema.ts v15). */
+function dropEmptyBindings(ctx: StoreContext): void {
+  if (ctx.sql.one(["name"], "SELECT name FROM sqlite_schema WHERE type = 'table' AND name = 'bindings'") === undefined)
+    return
+  if (ctx.sql.one(["seq"], "SELECT seq FROM bindings LIMIT 1") === undefined) ctx.sql.exec("DROP TABLE bindings")
 }
 
 /** Migration indexes (0-based) of the v7 `bindings` rebuild and the v15 binding-table drop. */
