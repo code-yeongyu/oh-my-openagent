@@ -29,7 +29,7 @@ export async function accountDevices(client: RemoteClient): Promise<AccountDevic
         device: row.id,
         label: row.name,
         online: row.online,
-        ...(row.last_seen_ms === undefined ? {} : { last_seen_ms: row.last_seen_ms }),
+        ...(typeof row.last_seen_ms === "number" ? { last_seen_ms: row.last_seen_ms } : {}),
       })),
   }
 }
