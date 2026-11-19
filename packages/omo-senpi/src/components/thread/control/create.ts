@@ -260,9 +260,9 @@ async function firstPrompt(
           : threadToolFailure(
               refusal.code,
               `The thread was created, but its first prompt was not delivered: this omo build reads gateway schema ${
-                (error as { readonly details?: { readonly found?: unknown } }).details?.found
-              }, while this machine's gateway store is at schema ${
                 (error as { readonly details?: { readonly supported?: unknown } }).details?.supported
+              }, while this machine's gateway store is at schema ${
+                (error as { readonly details?: { readonly found?: unknown } }).details?.found
               }: a newer omo build already upgraded it.`,
               `Update omo with \`omo update\`, then send the prompt with thread_send to ${thread.thread_id} (tool.thread_send({ thread, message }) in an eval cell).`,
               { ...refusal.details, thread: thread.thread_id },
