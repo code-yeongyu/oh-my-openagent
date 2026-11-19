@@ -47,13 +47,16 @@ describe("#given a thread on device B #when a control tool names it as <device>/
     })
   }
 
-  for (const [tool] of controls.filter(([name]) => name !== "thread_set_model")) {
-    test(`#given ${tool} #when the thread is here/<thread id> #then it acts on this device's thread`, async () => {
-      const result = await run(tool, { thread: `${HERE.id}/${T.hereLive}` })
-      expect(result).toMatchObject({ kind: "ok", thread: T.hereLive })
-      expect(result).not.toHaveProperty("device")
-    })
-  }
+  for (const [tool] of controls.filter(([name]) => name !== "thread_set_model"))
+    for (const [form, device] of [
+      ["here", "here"],
+      ["this device's id", HERE.id],
+    ] as const)
+      test(`#given ${tool} #when the thread is <${form}>/<thread id> #then it acts on this device's thread`, async () => {
+        const result = await run(tool, { thread: `${device}/${T.hereLive}` })
+        expect(result).toMatchObject({ kind: "ok", thread: T.hereLive })
+        expect(result).not.toHaveProperty("device")
+      })
 })
 
 describe("#given <device>/<thread id> on B that B's listing does not show #when thread_read names it #then B is asked and its answer decides (#14305 review H1)", () => {

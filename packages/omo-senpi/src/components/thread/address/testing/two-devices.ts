@@ -9,12 +9,32 @@ import type {
 import { createRemoteThreadFixture } from "../../thread-remote-fixture"
 import type { ThreadHostSession } from "../../tools"
 
-// Two devices of one account for the address module (#14305): this device ("here", the fixture's own id) and device B,
+// Two devices of one account for the address module (#14305): this device (a hex id of its own, so the `here` keyword and
+// this device's id are told apart; the base fixture's literal id "here" is renamed on the way out) and device B,
 // each with a live thread, an ended thread, a thread whose routing key differs from its durable id, one thread name both
 // share and one thread id both hold (a stale copy here, live on B). A third device is offline. Built on
 // createRemoteThreadFixture without changing it: every option below is one of its own.
 
-export const HERE = { id: "here", name: "this mac" } as const
+export const HERE = { id: "a11ce0de5e1f0123", name: "this mac" } as const
+
+/** The base fixture names this device "here"; every read of this device's id answers HERE.id instead. */
+const BASE_HERE = "here"
+const renamed = <T>(value: T): T => {
+  if (value === BASE_HERE) return HERE.id as T
+  if (Array.isArray(value)) return value.map(renamed) as T
+  if (value !== null && typeof value === "object")
+    return Object.fromEntries(Object.entries(value).map(([key, field]) => [key, renamed(field)])) as T
+  return value
+}
+const renaming = <T extends object>(target: T, methods: readonly (keyof T)[]): T => {
+  const wrapped: Record<PropertyKey, unknown> = Object.fromEntries(Object.entries(target))
+  for (const method of methods) {
+    const original = target[method]
+    if (typeof original === "function")
+      wrapped[method as PropertyKey] = async (...args: unknown[]) => renamed(await original.apply(target, args))
+  }
+  return wrapped as T
+}
 export const B = { id: "b7c41e09d2a64f1e", name: "Studio Laptop" } as const
 /** A second online device carrying B's name, for the ambiguous device name. */
 export const B_TWIN = { id: "b7c4ffff00000000", name: "Studio Laptop" } as const
@@ -170,16 +190,25 @@ export function createTwoDevices(options: TwoDeviceOptions = {}) {
     ...(options.probe === true ? { wakeFeature: true, ended: { [B.id]: { [T.bProbe]: KEY.bProbe } } } : {}),
     ...(options.silent === undefined ? {} : { silent: options.silent }),
   })
+  const base: RemoteThreadSurface = {
+    ...account.remote,
+    client: {
+      ...account.remote.client,
+      devices: renaming(account.remote.client.devices, ["list"]),
+      service: renaming(account.remote.client.service, ["status"]),
+    },
+    sessions: renaming(account.remote.sessions, ["thisDevice", "devices"]),
+  }
   const withoutB = (listing: RemoteListing): RemoteListing => ({
     rows: listing.rows.filter((entry) => entry.device !== B.id),
     incomplete: [...new Set([...listing.incomplete, B.id, ...(options.quietThird === true ? [QUIET.id] : [])])],
   })
   let round = 0
   // The fixture's client reports no last_seen_ms; the account names when OFF was last seen.
-  const client = account.remote.client
+  const client = base.client
   const devicesList = client.devices.list
   const seen: RemoteThreadSurface = {
-    ...account.remote,
+    ...base,
     client: {
       ...client,
       devices: {
