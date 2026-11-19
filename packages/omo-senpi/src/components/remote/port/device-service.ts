@@ -206,7 +206,8 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     // No connection means nothing was sent, as when the attach path cannot attach. A refusal before sending (the core
     // marks it NotSentError; a service older than #393 part B answers the `{session}` target `unsupported`) ran nothing,
     // so the record goes the attach way instead. Anything else may have run on the other device and is never resent.
-    if (commandOptions?.direct === true) {
+    // #14358 review M2: the retry goes the attach way only; a direct probe is never sent twice.
+    if (!reattached && commandOptions?.direct === true) {
       let connected: DeviceService
       try {
         connected = await svc()
