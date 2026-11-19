@@ -27,6 +27,7 @@ import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../
 import { createLateSendOutcomeDeliverer } from "./late-send-outcome"
 import { CATEGORY_UNAVAILABLE_MESSAGE_TYPE } from "./category-unavailable-warning"
 import { registerTaskCommands } from "./commands"
+import { registerTaskSessionStop } from "./session-stop"
 import { registerDagCommands } from "./dag-commands"
 import { createLiveConfigProvider } from "./live-config-provider"
 import { createDagReloadSource } from "./dag-reload-source"
@@ -175,6 +176,7 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
       registerTeamTools(pi, teamTools)
       registerRemovedTeamWaitHint(pi)
       registerTaskCommands(pi, engine.manager)
+      registerTaskSessionStop(pi, engine.manager)
       registerDagCommands(pi, {
         list: dagRuntime.manager.list,
         snapshot: dagRuntime.manager.snapshot,
