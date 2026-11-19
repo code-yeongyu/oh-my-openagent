@@ -172,24 +172,28 @@ export async function resolveRemoteDevice(
   const roster = await core.devicesList(stage(DEADLINES.devices))
   if (roster.kind === "error") return roster
   const here = roster.value.find((row) => row.self === true)?.id
-  const over = (rows: readonly DeviceRow[]) => ({
-    rows,
-    resolved: resolveDevice({ here: here === undefined || here === "local" ? null : here, devices: rows }, text, {
-      online: false,
-    }),
-  })
-  const answer = ({ rows, resolved }: ReturnType<typeof over>) =>
+  // What the core resolver sees: the roster, plus the listing-named device when one is added, online so it resolves.
+  const over = (named: readonly { readonly id: string; readonly name: string; readonly online: true }[]) =>
+    resolveDevice(
+      { here: here === undefined || here === "local" ? null : here, devices: [...roster.value, ...named] },
+      text,
+      {
+        online: false,
+      },
+    )
+  // The caller's row: the roster's, or (the one device the roster has no row for) the listing-named device's.
+  const answer = (resolved: ReturnType<typeof over>) =>
     resolved.kind === "ok"
       ? ok({
           ref: resolved.device,
-          row: rows.find((row) => row.id === resolved.device.id) ?? listingNamed(resolved.device.id),
+          row: roster.value.find((row) => row.id === resolved.device.id) ?? listingNamed(resolved.device.id),
         })
       : deviceRefusal(resolved.refusal)
-  const first = over(roster.value)
-  if (first.resolved.kind === "ok" || first.resolved.refusal.reason !== "no_device") return answer(first)
+  const first = over([])
+  if (first.kind === "ok" || first.refusal.reason !== "no_device") return answer(first)
   const named = await core.sessionsList({ device: text }, stage(DEADLINES.sessionsList))
   if (named.kind === "error") return named.code === "not_found" ? answer(first) : named
-  return answer(over([...roster.value, listingNamed(text)]))
+  return answer(over([{ id: text, name: text, online: true }]))
 }
 
 /**
