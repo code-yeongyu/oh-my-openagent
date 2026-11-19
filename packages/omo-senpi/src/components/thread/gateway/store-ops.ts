@@ -19,7 +19,6 @@ import { join } from "node:path"
 
 import {
   GATEWAY_RECEIPT_RETENTION_MS,
-  MAX_FANOUT_PER_TURN,
   PAIR_BUCKET_BURST,
   PAIR_BUCKET_REFILL_MS,
   QUEUED_TTL_MS,
@@ -556,21 +555,6 @@ function placeCausally(ctx: StoreContext, request: EnqueueRequest): CausalPlacem
   return placement
 }
 
-function checkFanout(ctx: StoreContext, request: EnqueueRequest): StoreRefusal | undefined {
-  if (request.sender_turn === null) return undefined
-  const targets = new Set(
-    ctx.sql
-      .all(
-        ["t"],
-        "SELECT DISTINCT target_durable_id AS t FROM deliveries WHERE sender = ? AND sender_turn = ? AND state != 'refused'",
-        [request.sender_principal, request.sender_turn],
-      )
-      .map((row) => String(row.t)),
-  )
-  if (targets.has(request.target_durable_id) || targets.size < MAX_FANOUT_PER_TURN) return undefined
-  return refused("overloaded", `One turn may reach at most ${MAX_FANOUT_PER_TURN} sessions.`, { budget: "fanout" })
-}
-
 function takePairToken(ctx: StoreContext, request: EnqueueRequest): StoreRefusal | undefined {
   const sender = request.rate_principal ?? request.sender_principal
   const bucket = ctx.sql.one(
@@ -697,7 +681,7 @@ export async function enqueue(
       rollbackQuietly(ctx)
       return placement
     }
-    const budget = checkFanout(ctx, request) ?? takePairToken(ctx, request)
+    const budget = takePairToken(ctx, request)
     if (budget !== undefined) {
       rollbackQuietly(ctx)
       return budget

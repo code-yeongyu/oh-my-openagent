@@ -213,7 +213,7 @@ export type ThreadToolSurfaceOptions = {
    * database.
    */
   readonly store: GatewayStore
-  /** The caller's current turn (the gateway's per-turn fan-out budget is keyed by it); absent outside a turn. */
+  /** The caller's current turn, recorded on each delivery as provenance; absent outside a turn. */
   readonly callerTurnId?: () => string | undefined
   /** The caller session's current name, shown to a receiver as "Sent by another agent · <name>"; absent when it has none. */
   readonly callerName?: () => string | undefined

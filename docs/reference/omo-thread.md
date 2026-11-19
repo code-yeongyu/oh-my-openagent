@@ -144,7 +144,6 @@ Every send is checked against fixed budgets, which no setting raises:
 | Message size | 1 MiB for `send` (with or without `--binding`); 32 KiB for `report` and `answer` text | `message_too_large` |
 | Backlog of one target | 128 undelivered messages or 1 MiB | `queue_full` |
 | One sender to one target | bursts of 8, then one every 5 s; a binding sender is keyed by binding and author (`binding:<id>#author:<platform user id>`), or by the binding alone when the message names no author | `overloaded` with `retry_after_ms` |
-| One turn | reaches at most 16 sessions | `overloaded` |
 | One causal chain (a message and the messages it caused) | no count limit; each delivery records its hop | - |
 | A send to itself | always refused | `loop_detected` |
 | An undelivered message | expires after 24 hours (or when its binding expires) | the row ends `refused` |
