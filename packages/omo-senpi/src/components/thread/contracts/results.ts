@@ -102,6 +102,12 @@ export type ThreadResultSummary = {
    */
   readonly as_of?: string
   readonly controls?: ThreadSummary["controls"]
+  /**
+   * The version of the engine holding the thread on this device, as its host names it (the engine's own version, else
+   * an older host's package version). Absent for a thread no engine holds, and for another device's row (its listing does
+   * not carry one yet).
+   */
+  readonly engine_version?: string
   /** Present only on a thread listed from disk because its endpoint stopped answering. */
   readonly error_note?: string
   /** `thread_create` only: the initial skills attached to the new thread (`initial-skills.ts`). */
