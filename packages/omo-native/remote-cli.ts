@@ -8,6 +8,8 @@ import { type BootstrapSetup, type DeviceLink, runBootstrapVerb, runEnableVerb }
 import { applyColdWake, type ColdWake } from "./remote-cold-wake"
 import type { RemoteOptOut } from "./remote-opt-out"
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
+import { candidateLines, personNextAction } from "./remote-render"
+import { isSessionTarget } from "./remote-session-args"
 import {
   accountNotice,
   isServiceStopped,
@@ -145,10 +147,7 @@ export async function prepareRemoteAttach(
     return REMOTE_EXIT.ok
   }
   const [target, ...extra] = args
-  try {
-    if (extra.length > 0 || target === undefined || target === "") throw new UsageError("unexpected arguments")
-  } catch (error) {
-    if (!(error instanceof UsageError)) throw error
+  if (extra.length > 0 || !isSessionTarget(target)) {
     dependencies.error("usage: omo remote attach <device>/<session>   (the SESSION column of omo remote sessions)")
     return REMOTE_EXIT.usage
   }
@@ -196,15 +195,8 @@ export async function prepareRemoteAttach(
     if (resolved.kind === "error") {
       service.close()
       dependencies.error(`omo remote: ${resolved.error.message}`)
-      dependencies.error(resolved.error.next_action)
-      return REMOTE_EXIT.failed
-    }
-    if (resolved.where.kind !== "device") {
-      service.close()
-      dependencies.error(
-        `omo remote: session ${resolved.thread} is on this device; attach opens the other devices' sessions.`,
-      )
-      dependencies.error(`Open it here with omo --session <its session file>.`)
+      dependencies.error(personNextAction(resolved.error.next_action))
+      for (const line of candidateLines(resolved.error.details)) dependencies.error(line)
       return REMOTE_EXIT.failed
     }
     const { attached: attach } = await attachAddressed(

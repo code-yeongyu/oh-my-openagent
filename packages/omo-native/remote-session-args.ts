@@ -9,6 +9,10 @@ export const SESSION_VERBS = ["open", "send", "model", "interrupt", "close"] as 
 export type SessionVerb = (typeof SESSION_VERBS)[number]
 export const isSessionVerb = (value: string): value is SessionVerb => SESSION_VERBS.some((verb) => verb === value)
 
+/** A target a verb can resolve: not empty, and no `/` with nothing on one side of it (`/session`, `device/`). */
+export const isSessionTarget = (value: string | undefined): value is string =>
+  value !== undefined && value !== "" && !value.startsWith("/") && !value.endsWith("/")
+
 export type SessionArgs =
   | {
       readonly verb: "open"
@@ -123,7 +127,7 @@ export function parseSession(
     }
   }
   const target = positional[0]
-  if (target === undefined || target === "")
+  if (!isSessionTarget(target))
     throw new UsageError(
       `omo remote ${verb}: name the session as <device>/<session> (the SESSION column of omo remote sessions) or by the thread value open printed`,
     )
