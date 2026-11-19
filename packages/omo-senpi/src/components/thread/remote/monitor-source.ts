@@ -1,7 +1,9 @@
-import { formatAddress } from "@oh-my-opencode/thread-address-core"
+import { formatAddress, THREAD_ID_SHAPE } from "@oh-my-opencode/thread-address-core"
 import { remoteMonitorTarget } from "../../../extension/senpi-seams"
 import type { RpcRemoteHandlers, RpcRemoteRow, RpcRemoteSource, RpcRemoteState } from "../../../extension/types"
 import { asFailure, resolveAddress, resolveTypedDevice, type Resolved, type ThreadRefusal } from "../address"
+import { accountDevices } from "../address/account"
+import { resolveAccountDevice } from "../address/device"
 import type { MonitorTargetResolution } from "../tools/monitor-target"
 import { UNKNOWN_CALLER } from "../tools/ports"
 import type { JsonObject, RemoteSessionRow, RemoteSessionState, RemoteThreadSurface } from "./ports"
@@ -80,8 +82,9 @@ export async function resolveMonitorTarget(
  * The session a raw `<device>/<thread>` open names (a restored monitor, or a target armed before it was read): the
  * module resolves the device by id, name or prefix, online, and the thread among that device's threads by id, listing
  * key, alias, name or prefix; only an id-shaped thread part reaches the device unlisted. A device that is offline or did
- * not answer is no reason to drop a restored monitor for good: the open then watches the key the device's rows give
- * (else the text as stored) and the watch's own reattach waits for the device. not_found and ambiguous_target refuse.
+ * not answer is no reason to drop a restored monitor for good: the open then watches, on the device resolved by id, name
+ * or prefix online or not, the key its rows give for the thread, or a thread id as stored, and the watch's own reattach
+ * waits for the device. A stored name that no row lists keeps the refusal; not_found and ambiguous_target refuse.
  */
 async function sessionOn(
   remote: RemoteThreadSurface,
@@ -96,9 +99,16 @@ async function sessionOn(
   if (resolved.kind === "error") {
     if (resolved.code !== "device_offline" && resolved.code !== "host_unavailable")
       throw new Error(`${resolved.code}: ${resolved.message}`)
-    const rows = await remote.sessions.sessions({ device }).catch(() => [])
-    const listed = rows.find((row) => row.device === device && (row.session_id === thread || row.durable_id === thread))
-    return { device, session: listed?.session_id ?? thread }
+    // The device by id, name or prefix whether or not it is online; the stored text only when even that fails.
+    const roster = await accountDevices(remote.client).catch(() => undefined)
+    const named = roster === undefined ? undefined : resolveAccountDevice(roster, device, { online: false })
+    const id = named?.kind === "ok" ? named.device.id : device
+    const rows = await remote.sessions.sessions({ device: id }).catch(() => [])
+    const listed = rows.find((row) => row.device === id && (row.session_id === thread || row.durable_id === thread))
+    // Only an id-shaped thread part reaches a device that does not list it (the module's rule): a name cannot be resolved
+    // without that device's listing, so it keeps the refusal.
+    if (listed === undefined && !THREAD_ID_SHAPE.test(thread)) throw new Error(`${resolved.code}: ${resolved.message}`)
+    return { device: id, session: listed?.session_id ?? thread }
   }
   if (resolved.where.kind !== "device")
     throw new Error(`not_found: ${thread} is a session on this device, which a remote watch does not follow.`)
