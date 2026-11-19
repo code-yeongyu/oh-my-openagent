@@ -26,7 +26,7 @@ describe("#given the account's devices #when resolveDevice reads a device part #
     ["a name an online and an offline device share: the online one", "twin", "d00d000000000002"],
     ["a unique 6+ character id prefix", "c0ffee", "c0ffee5a1d2b3c4d"],
     ["a prefix shorter than 6 characters", "c0ffe", "not_found"],
-    ["a name only an offline device carries", "attic", "device_offline"],
+    ["a name only an offline device carries, online not needed", "attic", "c0ffee5a1d2b3c4d"],
     ["nothing", "nowhere", "not_found"],
   ])("%s", (_label, text, expected) => {
     expect(id(text)).toBe(expected)
@@ -52,6 +52,50 @@ describe("#given the account's devices #when resolveDevice reads a device part #
     expect(resolved).toEqual({
       kind: "ok",
       device: { id: "b7c41e09d2a64f1e", name: "Studio Laptop", online: true, here: false, listing: "incomplete" },
+    })
+  })
+
+  test.each([
+    ["id", "c0ffee5a1d2b3c4d"],
+    ["name", "ATTIC"],
+    ["prefix", "c0ffee5a"],
+  ] as const)(
+    "#given an offline device named by %s #when online is or is not needed #then only the flag decides",
+    (_form, text) => {
+      expect(resolveDevice(account, text, { online: false })).toMatchObject({
+        kind: "ok",
+        device: { id: "c0ffee5a1d2b3c4d", online: false },
+      })
+      expect(resolveDevice(account, text, { online: true })).toMatchObject({
+        kind: "refusal",
+        refusal: { code: "device_offline", details: { device: "c0ffee5a1d2b3c4d" } },
+      })
+    },
+  )
+
+  test("#given here is offline in the roster #when online is or is not needed #then only the flag decides", () => {
+    const roster = { here: "here", devices: [{ id: "here", name: "this mac", online: false }] }
+    expect(resolveDevice(roster, "here", { online: false })).toMatchObject({
+      kind: "ok",
+      device: { id: "here", online: false },
+    })
+    expect(resolveDevice(roster, "here", { online: true })).toMatchObject({
+      kind: "refusal",
+      refusal: { code: "device_offline" },
+    })
+  })
+
+  test("#given two offline devices sharing a name and no online one #when the name is resolved #then ambiguous_target names both", () => {
+    const roster = {
+      here: null,
+      devices: [
+        { id: "e0000000000001", name: "box", online: false },
+        { id: "e0000000000002", name: "box", online: false },
+      ],
+    }
+    expect(resolveDevice(roster, "box", { online: false })).toMatchObject({
+      kind: "refusal",
+      refusal: { code: "ambiguous_target", details: { kind: "device" } },
     })
   })
 })

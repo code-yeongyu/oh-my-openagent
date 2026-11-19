@@ -23,10 +23,10 @@ export type DeviceResolution =
   { readonly kind: "ok"; readonly device: DeviceRef } | { readonly kind: "refusal"; readonly refusal: AddressRefusal }
 
 /**
- * The one device resolver (design section 3): exact id > `here` > name (of the devices sharing it the online ones count,
- * so an offline twin a re-registered machine left behind never shadows the live device; several online is
- * ambiguous_target, only offline ones device_offline) > a unique id prefix of 6+ characters. With `online`, a device
- * found offline by any form is device_offline too.
+ * The one device resolver (design section 3): exact id > `here` > name (of the devices sharing it the online ones win,
+ * so an offline twin a re-registered machine left behind never shadows the live device; several winners are
+ * ambiguous_target) > a unique id prefix of 6+ characters. Whether an offline device resolves depends only on
+ * `online`, never on the form: with it, a device found offline by any form is device_offline.
  */
 export function resolveDevice(
   roster: DeviceRoster,
@@ -58,10 +58,12 @@ export function resolveDevice(
   const wanted = normalizeName(text)
   const named = roster.devices.filter((row) => normalizeName(row.name) === wanted)
   const online = named.filter((row) => row.online)
-  const [only] = online.length > 0 ? online : named
-  if (online.length === 1 && only !== undefined) return found(only)
-  if (online.length > 1) return refused(devicesShare("devices_share_name", text, online))
-  if (only !== undefined) return refused(deviceOffline(text, only, named))
+  const winners = online.length > 0 ? online : named
+  const [offline] = named
+  if (opts.online && online.length === 0 && offline !== undefined) return refused(deviceOffline(text, offline, named))
+  const [only] = winners
+  if (winners.length === 1 && only !== undefined) return found(only)
+  if (winners.length > 1) return refused(devicesShare("devices_share_name", text, winners))
   const prefix =
     wanted.length >= DEVICE_PREFIX_MIN ? roster.devices.filter((row) => row.id.toLowerCase().startsWith(wanted)) : []
   const [match] = prefix

@@ -48,7 +48,7 @@ export function toolRefusal(core: AddressRefusal, thread?: string): ThreadRefusa
     case "devices_share_name":
       return refusal(
         "ambiguous_target",
-        `${core.details.candidates.length} online devices are named ${core.typed}; none was picked.`,
+        `${core.details.candidates.length} ${core.details.candidates.every((row) => row.online) ? "online " : ""}devices are named ${core.typed}; none was picked.`,
         "Pass the device id from candidates.",
         details,
       )

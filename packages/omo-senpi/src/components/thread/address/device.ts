@@ -40,7 +40,7 @@ export async function targetDevice(
   text: string,
 ): Promise<{ readonly id?: string } | { readonly result: ThreadToolResult }> {
   const { here, devices } = await accountDevices(remote.client)
-  const resolved = resolveAccountDevice({ here, devices }, text, { online: false })
+  const resolved = resolveAccountDevice({ here, devices }, text, { online: true })
   if (resolved.kind === "error") return { result: { kind: "error", error: asFailure(resolved) } }
   return resolved.device.id === here ? {} : { id: resolved.device.id }
 }
