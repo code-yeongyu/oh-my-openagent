@@ -5,6 +5,18 @@ export const THREAD_ID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}
 /** A session id: a host routing id (`rpc-N`) or another device's listing key. */
 export const SESSION_ID_SHAPE = /^(?:rpc-\d+|[A-Za-z0-9_-]{16,})$/
 /** The shortest text that names a thread by a prefix of its id: 8 hex characters, hyphens allowed after. */
+const ROUTING_ID_SHAPE = /^rpc-\d+$/
+/** A device-service listing key: exactly 22 characters of base64url. */
+const LISTING_KEY_SHAPE = /^[A-Za-z0-9_-]{22}$/
+
+/**
+ * A thread id, a host routing id (`rpc-N`) or a device-service listing key: a text a device can be asked for without
+ * listing it first (#13748). Narrower than SESSION_ID_SHAPE, so an unlisted hyphenated name ("release-planner-2") is
+ * never passed through. Residual: a name of exactly 22 characters with no spaces reads as a listing key.
+ */
+export const idShaped = (text: string): boolean =>
+  THREAD_ID_SHAPE.test(text) || ROUTING_ID_SHAPE.test(text) || LISTING_KEY_SHAPE.test(text)
+
 export const ID_PREFIX_SHAPE = /^[0-9a-f]{8}[0-9a-f-]*$/i
 /** The shortest device id prefix a device part accepts: shorter would match most of an account's ids by chance. */
 export const DEVICE_PREFIX_MIN = 6

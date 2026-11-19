@@ -221,3 +221,26 @@ describe("#given unique_holder (#14048: a sender whose delivery names no device)
     },
   )
 })
+
+describe("#given a device-qualified session part B has not listed #when it is resolved #then an id-shaped part is B's to answer and anything else is not_found (#13748)", () => {
+  const KEY22 = "AbCdEfGhIjKlMnOpQrStUv"
+  test.each([
+    ["an unlisted thread id", T.nowhere, T.nowhere],
+    ["an unlisted 22-character listing key", KEY22, KEY22],
+    ["an unlisted routing id", "rpc-7", "rpc-7"],
+  ])("#given %s #when <B>/<it> is resolved #then it passes through to B unresolved", async (_label, part, key) => {
+    const resolved = await resolve(`${B.id}/${part}`)
+    expect(resolved).toMatchObject({ kind: "ok", address: `${B.id}/${part}`, where: { kind: "device", row: { device: B.id, session_id: key } } })
+  })
+
+  test.each(["no such thread", "release-planner-2"])(
+    "#given a name B does not list (%s) #when <B>/<it> is resolved #then not_found on B, nothing passed through",
+    async (part) => {
+      expect(await resolve(`${B.name}/${part}`)).toMatchObject({
+        kind: "error",
+        code: "not_found",
+        details: { kind: "thread", device: B.id },
+      })
+    },
+  )
+})

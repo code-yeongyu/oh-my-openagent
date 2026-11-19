@@ -1,5 +1,6 @@
 import {
   devicesSilent,
+  idShaped,
   noThreadOnDevice,
   sameSession,
   THREAD_ID_SHAPE,
@@ -66,6 +67,11 @@ export async function resolveOnDevice(
   if (hit.code === "ambiguous_target") return withAddresses(hit, account.here, names)
   const alias = await aliasOn(remote, account, device.id, thread)
   if (alias !== undefined) return alias
+  // A session id or listing key the device has not listed yet (#13748) is the device's to answer, as a thread id is.
+  if (idShaped(thread)) {
+    const { durable_id: _unknown, ...row } = namedDeviceRow(device.id, thread)
+    return { kind: "ok", entry: relayAddressEntry(row), resolution: "session_id", all_scope: true }
+  }
   if (device.listing === "incomplete") return toolRefusal(devicesSilent("listing_incomplete", [device]))
   return toolRefusal(noThreadOnDevice(thread, device))
 }

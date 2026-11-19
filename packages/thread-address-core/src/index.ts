@@ -4,6 +4,7 @@ export {
   SESSION_ID_SHAPE,
   THREAD_ID_SHAPE,
   formatAddress,
+  idShaped,
   parseAddress,
   type ParsedAddress,
 } from "./parse"
