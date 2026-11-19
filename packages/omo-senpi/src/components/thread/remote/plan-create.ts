@@ -38,8 +38,11 @@ const invalid = (message: string, next: string): ThreadToolResult => ({
 /** What this device answers for an existing thread named to thread_create: it is live here, or its session file is here, or neither. */
 export type LocalExisting =
   | { readonly kind: "live"; readonly thread: HostedThread }
-  /** `name`: the name the thread had, so a reopen keeps it (#14274). */
-  | { readonly kind: "file"; readonly sessionPath: string; readonly name?: string }
+  /**
+   * `name`: the name the thread had, so a reopen keeps it (#14274). `cwd`: the folder its session records, which the
+   * reopen names so the engine does not probe the file's path on its loop (#14296).
+   */
+  | { readonly kind: "file"; readonly sessionPath: string; readonly name?: string; readonly cwd?: string }
   | { readonly kind: "error"; readonly result: ThreadToolResult }
 
 /** This device's side of placement: its name ladder, what it knows of an existing thread, and its SessionHost. */
@@ -85,11 +88,18 @@ export type CreatePlan =
       readonly reopenedId?: string
       readonly localAlias?: LocalAliasReason
     }
-  | { readonly kind: "done"; readonly result: ThreadToolResult; readonly device?: string }
+  | {
+      readonly kind: "done"
+      readonly result: ThreadToolResult
+      readonly device?: string
+      /** The thread the result answers, when it is live already: a create with a prompt sends it there (#14335). */
+      readonly thread?: HostedThread
+    }
 
 const alreadyLive = (thread: HostedThread, device?: string): CreatePlan => ({
   kind: "done",
   result: openedResult(thread, true),
+  thread,
   ...(device === undefined ? {} : { device }),
 })
 
@@ -127,7 +137,7 @@ export async function planCreate(
     return {
       kind: "open",
       host: local.host,
-      request: { sessionPath: existing.sessionPath },
+      request: { sessionPath: existing.sessionPath, ...(existing.cwd === undefined ? {} : { cwd: existing.cwd }) },
       creates: false,
       ...(existing.name === undefined ? {} : { previousName: existing.name }),
     }
@@ -244,7 +254,7 @@ export async function planCreate(
     return {
       kind: "open",
       host: createRelaySessionHost(remote, target.row.device, target.row),
-      request: { sessionPath: file.path },
+      request: { sessionPath: file.path, ...(file.cwd === undefined ? {} : { cwd: file.cwd }) },
       creates: false,
       ...(target.row.title === "" ? {} : { previousName: target.row.title }),
       ...(target.row.durable_id === undefined || target.row.durable_id === ""

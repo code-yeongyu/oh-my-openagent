@@ -1,8 +1,10 @@
 import { canonicalCategoryName } from "@oh-my-opencode/omo-config-core"
 
+import { BUILTIN_AGENTS } from "../../agents/builtin"
+import { canonicalAgentName } from "../../agents/builtin/legacy-agent-names"
 import type { ResolvedSpawnItem } from "./types"
 
-export type TaskTargetErrorCode = "both_targets" | "no_target" | "category_with_model"
+export type TaskTargetErrorCode = "both_targets" | "no_target" | "category_with_model" | "agent_with_model"
 
 export type TaskTargetError = {
   readonly code: TaskTargetErrorCode
@@ -76,7 +78,11 @@ export type RunInBackgroundResolution =
 const BOTH_TARGETS_MESSAGE = "Provide EITHER category OR subagent_type, not both. Remove one and retry."
 
 const CATEGORY_WITH_MODEL_MESSAGE =
-  "Provide EITHER category OR model, never both. A category-routed task always takes its model from the omo.json category config; a call-site model override would silently bypass that routing. Remove model and retry, or use subagent_type for an explicit-model spawn, or configure categories.<name>.models in omo.json."
+  "Provide EITHER category OR model, never both. A category-routed task always takes its model from the omo.json category config; a call-site model override would silently bypass that routing. Remove model and retry, or configure categories.<name>.model or categories.<name>.models in omo.json."
+
+function agentWithModelMessage(agent: string): string {
+  return `agent_with_model: "${agent}" is a builtin agent that runs on its designated model chain; a call-site model would replace that chain. Change it with agents.${agent}.model or agents.${agent}.models in omo.json. Remove model and retry.`
+}
 
 const NO_TARGET_MESSAGE =
   'You MUST provide EITHER category OR subagent_type. Omitting BOTH will FAIL. Example: task(category="quick", prompt="...") or task(subagent_type="plan-reviewer", prompt="...").'
@@ -104,6 +110,15 @@ export function validateTaskTarget(params: TargetInput): TaskTargetSelection {
   }
   if (hasCategory && present(params.model)) {
     return { kind: "error", error: { code: "category_with_model", message: CATEGORY_WITH_MODEL_MESSAGE } }
+  }
+  // Root cause (#14367): resolveAgent lets a call-site model replace an agent's chain outright, and
+  // every builtin agent has a designated chain or category route. Scope: builtin names only, so a
+  // custom omo.json agent keeps the explicit-model spawn.
+  if (hasSubagent && present(params.model)) {
+    const agent = canonicalAgentName(params.subagent_type.trim())
+    if (Object.hasOwn(BUILTIN_AGENTS, agent)) {
+      return { kind: "error", error: { code: "agent_with_model", message: agentWithModelMessage(agent) } }
+    }
   }
   if (present(params.category)) {
     // Canonicalized at the spawn boundary so the task record, telemetry, and renderers all carry the
