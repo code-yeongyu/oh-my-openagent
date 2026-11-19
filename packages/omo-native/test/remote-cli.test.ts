@@ -657,7 +657,9 @@ describe("omo remote session verbs", () => {
       status: () => note("status", port.status()),
       thisDevice: () => note("thisDevice", port.thisDevice()),
       devices: () => note("devices", port.devices()),
-      sessions: () => note("sessions", port.sessions()),
+      // A filtered read names its device, so a device-qualified address can be told from an account-wide listing (#12709).
+      sessions: (filter) =>
+        note(filter?.device === undefined ? "sessions" : `sessions:${filter.device}`, port.sessions(filter)),
       endpointCommand: (device, rpc, options) =>
         note(`endpoint:${String(rpc["type"])}`, port.endpointCommand(device, rpc, options)),
       locate: (device, engineId, knownKey) => note("locate", port.locate(device, engineId, knownKey)),
@@ -936,7 +938,7 @@ describe("omo remote session verbs", () => {
     expect([code, out, port.calls]).toEqual([
       REMOTE_EXIT.ok,
       ["Steered turn 3 on b/dur-on-b."],
-      ["status", "devices", "command:get_state", "command:prompt"],
+      ["status", "status", "devices", "sessions:b", "sessions", "command:get_state", "command:prompt"],
     ])
   })
 
@@ -969,20 +971,29 @@ describe("omo remote session verbs", () => {
     expect(types(a.sent, "prompt").map((entry) => entry.rpc?.["streamingBehavior"])).toEqual(["followUp"])
   })
 
-  // A verb costs its remote op's round trips and nothing account-wide: the session is addressed directly, never looked
-  // up in the account listing, whose round waits for the account's slowest device (#12709: ~10 s live).
+  // A verb costs its remote op's round trips plus ONE filtered listing of the device it names (sessions:b), never the
+  // device-less account listing whose round waits for the account's slowest device (#12709: ~10 s live). The trailing
+  // unfiltered "sessions" is the address module's "/"-in-a-name reading of a name-shaped thread part, due to go (#14305).
   test.each([
     [
       ["model", "b/dur-on-b", "anthropic/claude-opus"],
       "b/dur-on-b now uses anthropic/claude-opus.",
-      ["status", "devices", "command:get_available_models", "command:set_model"],
+      ["status", "status", "devices", "sessions:b", "sessions", "command:get_available_models", "command:set_model"],
     ],
-    [["interrupt", "b/dur-on-b"], "Nothing was running on b/dur-on-b.", ["status", "devices", "command:interrupt"]],
-    [["close", "b/dur-on-b"], "Closed b/dur-on-b.", ["status", "devices", "command:unload_session"]],
+    [
+      ["interrupt", "b/dur-on-b"],
+      "Nothing was running on b/dur-on-b.",
+      ["status", "status", "devices", "sessions:b", "sessions", "command:interrupt"],
+    ],
+    [
+      ["close", "b/dur-on-b"],
+      "Closed b/dur-on-b.",
+      ["status", "status", "devices", "sessions:b", "sessions", "command:unload_session"],
+    ],
     [
       ["send", "b/dur-on-b", "hi", "--no-wait"],
       "Sent to b/dur-on-b: turn turn-b started.",
-      ["status", "devices", "command:prompt"],
+      ["status", "status", "devices", "sessions:b", "sessions", "command:prompt"],
     ],
     [["open", "b"], "b/dur-new-on-b", ["status", "devices", "endpoint:open_session", "locate"]],
   ])("%p makes only its remote op's calls and reports the answer", async (args, line, calls) => {
