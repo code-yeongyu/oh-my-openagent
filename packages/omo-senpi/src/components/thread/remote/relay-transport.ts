@@ -124,6 +124,22 @@ function engineStateOf(reply: JsonObject): EngineState {
 
 const WAITS: ReadonlySet<string> = new Set(["wake", "hold", "approval"])
 
+type SteerRefusal = "turn_conflict" | "not_steerable"
+
+/** A steer the receiving engine refused as a command because no running turn could take it (#14320). */
+const refusedSteer = (outcome: RemoteCommandOutcome): SteerRefusal | undefined =>
+  outcome.kind === "refused" && (outcome.reason === "turn_conflict" || outcome.reason === "not_steerable")
+    ? outcome.reason
+    : undefined
+
+/** The same race answered either way: as reply data (`data.kind`) or as a refused command (`reason`). */
+const steerConflict = (outcome: RemoteCommandOutcome): SteerRefusal | undefined =>
+  outcome.kind === "ok"
+    ? replyData(outcome.response)["kind"] === "turn_conflict"
+      ? "turn_conflict"
+      : undefined
+    : refusedSteer(outcome)
+
 // A refusal reason the receiving side sent. Every reason a receiving side produces is a lowercase machine code (the
 // consumer's and carrier's refusals, and the table below), so a reason is shown only when it has that shape; any other text
 // from that device becomes UNRECOGNISED_REASON and is never shown, in the message or in details.reason.
@@ -559,14 +575,10 @@ export function createRelayTransport(
     if (retry?.announced !== true) sending()
     if (ended) return wakeAnswer(await woken(row, record), row, delivery_id, ok)
     let sent = await remote.sessions.sessionCommand(row.device, row.session_id, record)
-    if (
-      delivery.mode === "auto" &&
-      lane === "steer" &&
-      sent.kind === "ok" &&
-      replyData(sent.response)["kind"] === "turn_conflict"
-    ) {
+    if (delivery.mode === "auto" && lane === "steer" && steerConflict(sent) !== undefined) {
       // The turn the probe saw ended before the record arrived. The default never fails on that race: it takes the lane the
       // target has now (started when idle, queued behind a turn that began since), as a local drain re-decides at admission.
+      // The receiver may answer it as reply data or as a refused command (#14320); both take this one re-send.
       lane = "follow_up"
       record = recordFor(lane)
       sent = await remote.sessions.sessionCommand(row.device, row.session_id, record)
@@ -586,18 +598,23 @@ export function createRelayTransport(
         "Update omo and senpi on that device, then retry.",
         { device: row.device, reason: escapeForDisplay(sent.reason) },
       )
+    const conflict = steerConflict(sent)
+    if (conflict !== undefined) {
+      const current = sent.kind === "ok" ? replyData(sent.response)["turnId"] : undefined
+      return fail(
+        REFUSAL_CODES[conflict].code,
+        conflict === "turn_conflict"
+          ? `Turn ${delivery.expected_turn_id ?? "?"} is no longer the running turn of ${row.session_id} on device ${row.device}.`
+          : `A steer to ${row.session_id} on device ${row.device} was refused: not_steerable.`,
+        REFUSAL_CODES[conflict].next,
+        { device: row.device, ...(typeof current === "string" && current !== "" ? { current_turn_id: current } : {}) },
+      )
+    }
     if (sent.kind !== "ok") return outcomeFailure(sent, row.device)
     const reply = replyData(sent.response)
     const kind = reply["kind"]
     const turnId = typeof reply["turnId"] === "string" ? reply["turnId"] : ""
     if (kind === "started" || kind === "steered") return ok({ kind, turn_id: turnId })
-    if (kind === "turn_conflict")
-      return fail(
-        REFUSAL_CODES.turn_conflict.code,
-        `Turn ${delivery.expected_turn_id ?? "?"} is no longer the running turn of ${row.session_id} on device ${row.device}.`,
-        REFUSAL_CODES.turn_conflict.next,
-        { device: row.device, ...(turnId === "" ? {} : { current_turn_id: turnId }) },
-      )
     if (kind !== "queued" && kind !== "held_draft" && kind !== "already_admitted")
       return fail(
         "idempotency_uncertain",
@@ -752,11 +769,12 @@ export function createRelayTransport(
       )
       sending()
       const steered = await remote.sessions.sessionCommand(row.device, row.session_id, steer)
-      if (steered.kind === "refused" && (steered.reason === "turn_conflict" || steered.reason === "not_steerable"))
+      const refusal = refusedSteer(steered)
+      if (refusal !== undefined)
         return fail(
-          REFUSAL_CODES[steered.reason].code,
-          `A steer to ${row.session_id} was refused: ${steered.reason}.`,
-          REFUSAL_CODES[steered.reason].next,
+          REFUSAL_CODES[refusal].code,
+          `A steer to ${row.session_id} was refused: ${refusal}.`,
+          REFUSAL_CODES[refusal].next,
           { device: row.device },
         )
       if (steered.kind !== "ok") return outcomeFailure(steered, row.device)
