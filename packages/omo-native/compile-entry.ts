@@ -1,5 +1,3 @@
-// #14341: must stay the first import, so a host supervisor enters its own scope before any engine module loads.
-import "./host-scope-entry"
 import { existsSync } from "node:fs"
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
@@ -45,6 +43,7 @@ import {
   loadCompiledModelCatalog,
 } from "./compiled-diagnostic-runtime"
 import { isInternalSupervisorLaunch, runInternalSupervisor } from "./supervisor-fast-path"
+import { enterOwnHostScope } from "./host-scope"
 import { registerEngineRuntimeModules } from "./engine-runtime-modules"
 import { applyCachedClaudeCode } from "../omo-senpi/src/components/claude-code/index"
 import { buildSenpiArgs, shouldPrintCompiledBanner, trustLaunchKind } from "./compile-args"
@@ -554,7 +553,11 @@ async function main(): Promise<void> {
   process.argv.splice(2, process.argv.length - 2, ...buildSenpiArgs(process.argv.slice(2), execDir))
   Object.assign(process.env, remapSenpiEnvironment(process.env, execDir))
   applyCachedClaudeCode(process.env, execDir)
-  if (isInternalSupervisorLaunch(process.argv.slice(2)) && (await runInternalSupervisor(process.argv.slice(2)))) return
+  if (isInternalSupervisorLaunch(process.argv.slice(2))) {
+    // #14341: before the supervisor spawns its host, so the host and its tool children are born in the scope.
+    await enterOwnHostScope(process.argv.slice(2))
+    if (await runInternalSupervisor(process.argv.slice(2))) return
+  }
   await claimMemorySyncAtBoot(process.argv.slice(2))
   await registerEngineRuntimeModules()
   await import("../../node_modules/@code-yeongyu/senpi/dist/cli.js") // literal: see import note above

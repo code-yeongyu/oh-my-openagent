@@ -1,70 +1,129 @@
 import { describe, expect, test } from "bun:test"
+import { spawn } from "node:child_process"
+import { readFileSync } from "node:fs"
 
-import { hostScopeArgv, hostScopeUnitName, parseSystemdVersion, type HostScopeContext } from "../host-scope"
+import {
+  liveHostScopeProbes,
+  memoryMaxBytes,
+  moveIntoHostScope,
+  planHostScope,
+  startTransientScopeArgs,
+  type HostScopeProbes,
+} from "../host-scope"
+import { INTERNAL_SUPERVISOR_FLAG } from "../supervisor-fast-path"
 
-const SUPERVISOR_ARGV = [
-  "/home/u/.omo/binary-runtime/1/omo",
-  "--internal-rpc-host-supervisor",
-  "--socket",
-  "/tmp/p.sock",
-]
+const SUPERVISOR_ARGS = [INTERNAL_SUPERVISOR_FLAG, "--socket", "/tmp/p.sock"]
 
-function context(overrides: Partial<HostScopeContext> = {}): HostScopeContext {
-  return {
+function recordingProbes(overrides: Partial<HostScopeProbes> = {}): { probes: HostScopeProbes; calls: string[] } {
+  const calls: string[] = []
+  const probes: HostScopeProbes = {
     platform: "linux",
-    systemdRun: "/usr/bin/systemd-run",
-    managerVersion: 255,
-    cgroup: "0::/user.slice/user-1000.slice/user@1000.service/app.slice/omo-ensure.service",
-    unit: "omo-host-4242-abcd1234",
-    coordinated: true,
+    args: SUPERVISOR_ARGS,
+    ownsUserManager: () => {
+      calls.push("manager")
+      return true
+    },
+    findBusctl: () => {
+      calls.push("busctl")
+      return "/usr/bin/busctl"
+    },
+    memTotalBytes: () => {
+      calls.push("memory")
+      return 1_000
+    },
     ...overrides,
   }
+  return { probes, calls }
 }
 
-describe("host scope launch", () => {
-  test("wraps the supervisor argv in its own transient user scope on Linux with a user manager", () => {
-    // given a Linux supervisor launch with a systemd user manager that accepts OOMPolicy on scopes
-    // when
-    const argv = hostScopeArgv(SUPERVISOR_ARGV, context())
+describe("host scope decision", () => {
+  test("plans a StartTransientUnit call that moves the supervisor pid into its own scope", () => {
+    // given a Linux supervisor with its own user manager and busctl
+    const { probes } = recordingProbes()
 
-    // then systemd-run execs the unchanged argv in place, in a scope that survives one OOM-killed child
-    expect(argv).toEqual([
-      "/usr/bin/systemd-run",
+    // when
+    const plan = planHostScope(probes, 4242, "abcdef012345")
+
+    // then the call carries the pid, OOMPolicy=continue, the byte MemoryMax and --collect's CollectMode
+    expect(plan).toEqual({
+      busctl: "/usr/bin/busctl",
+      unit: "omo-host-4242-abcdef012345.scope",
+      pid: 4242,
+      argv: startTransientScopeArgs("omo-host-4242-abcdef012345.scope", 4242, 1_000),
+    })
+    expect(plan?.argv).toEqual([
       "--user",
-      "--scope",
-      "--collect",
-      "--quiet",
-      "--unit=omo-host-4242-abcd1234",
-      "-p",
-      "OOMPolicy=continue",
-      "-p",
-      "MemoryMax=90%",
-      "--",
-      ...SUPERVISOR_ARGV,
+      "call",
+      "org.freedesktop.systemd1",
+      "/org/freedesktop/systemd1",
+      "org.freedesktop.systemd1.Manager",
+      "StartTransientUnit",
+      "ssa(sv)a(sa(sv))",
+      "omo-host-4242-abcdef012345.scope",
+      "fail",
+      "4",
+      "PIDs",
+      "au",
+      "1",
+      "4242",
+      "OOMPolicy",
+      "s",
+      "continue",
+      "MemoryMax",
+      "t",
+      "1000",
+      "CollectMode",
+      "s",
+      "inactive-or-failed",
+      "0",
     ])
   })
 
   test.each([
-    ["macOS", { platform: "darwin" as const }],
-    ["Windows", { platform: "win32" as const }],
-    ["no systemd-run", { systemdRun: undefined }],
-    ["no reachable user manager", { managerVersion: undefined }],
-    ["a manager whose scopes reject OOMPolicy", { managerVersion: 252 }],
-    ["a launch without the engine's startup hand-off", { coordinated: false }],
-    ["a process already in its own host scope", { cgroup: "0::/user.slice/app.slice/omo-host-1-ffffffff.scope" }],
-  ])("keeps the direct launch for %s", (_label, overrides) => {
-    expect(hostScopeArgv(SUPERVISOR_ARGV, context(overrides))).toBe(SUPERVISOR_ARGV)
+    ["macOS", { platform: "darwin" as const }, []],
+    ["Windows", { platform: "win32" as const }, []],
+    ["a launch that is not a host supervisor", { args: ["--mode", "rpc"] }, []],
+    ["no user manager of its own", { ownsUserManager: () => false }, []],
+    ["no busctl", { findBusctl: () => undefined }, ["manager"]],
+    ["an unreadable MemTotal", { memTotalBytes: () => undefined }, ["manager", "busctl"]],
+  ])("keeps the launch where it is for %s, probing only what the cheaper checks allow", (_label, overrides, probed) => {
+    const { probes, calls } = recordingProbes(overrides)
+    expect(planHostScope(probes, 4242, "abcdef012345")).toBeUndefined()
+    expect(calls).toEqual(probed)
   })
 
-  test("names a valid unique unit per launch", () => {
-    const unit = hostScopeUnitName(4242, "AbCd-1234-ef")
-    expect(unit).toMatch(/^omo-host-4242-[A-Za-z0-9]+$/)
-    expect(hostScopeUnitName(4242, "other")).not.toBe(unit)
+  test("caps the scope at 90% of MemTotal in bytes", () => {
+    expect(memoryMaxBytes("MemTotal:       94535368 kB\nMemFree: 1 kB\n")).toBe(Math.floor(94535368 * 1024 * 0.9))
+    expect(memoryMaxBytes("MemFree: 1 kB\n")).toBeUndefined()
+  })
+})
+
+const live = liveHostScopeProbes(SUPERVISOR_ARGS, process.env)
+const hasUserManager = process.platform === "linux" && live.ownsUserManager() && live.findBusctl() !== undefined
+
+describe("host scope against the user manager", () => {
+  test.skipIf(!hasUserManager)("moves a running process into a scope with the requested limits", async () => {
+    // given a dummy process in this test's cgroup
+    const dummy = spawn("sleep", ["30"], { stdio: "ignore" })
+    const pid = dummy.pid
+    if (pid === undefined) throw new Error("sleep did not start")
+    try {
+      const plan = planHostScope(live, pid, `test${Date.now().toString(16)}`)
+      if (plan === undefined) throw new Error("no plan on a host with a user manager")
+
+      // when
+      const failure = await moveIntoHostScope(plan, process.env)
+
+      // then the kernel reports the dummy inside the new scope
+      expect(failure).toBeUndefined()
+      expect(readFileSync(`/proc/${pid}/cgroup`, "utf8")).toContain(`/${plan.unit}`)
+    } finally {
+      dummy.kill("SIGKILL")
+    }
   })
 
-  test("reads the manager major version from systemctl's Version property", () => {
-    expect(parseSystemdVersion("255.4-1ubuntu8.18\n")).toBe(255)
-    expect(parseSystemdVersion("253\n")).toBe(253)
-    expect(parseSystemdVersion("")).toBeUndefined()
+  test("reports a failing busctl instead of throwing", async () => {
+    const plan = { busctl: "/bin/false", argv: [], unit: "omo-host-1-x.scope", pid: process.pid }
+    expect(await moveIntoHostScope(plan, process.env)).toContain("exit 1")
   })
 })
