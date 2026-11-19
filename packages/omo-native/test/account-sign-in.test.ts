@@ -203,6 +203,14 @@ describe("omo account sign-in", () => {
     expect(names).toEqual(["device-b"])
   })
 
+  test("#given --check #when it runs #then it answers ready and contacts nobody", async () => {
+    const run = await signIn(() => undefined, ["--check"])
+    expect(run.code).toBe(ACCOUNT_EXIT.ok)
+    expect(run.events).toEqual([{ event: "ready" }])
+    expect(run.requests).toEqual([])
+    expect(run.setups).toEqual([])
+  })
+
   test("#given a malformed stdin options line #when it runs #then it answers usage and sends nothing", async () => {
     const run = await signIn(() => undefined, ["--stdin"], '{"deviceName": 5}')
     expect(run.code).toBe(ACCOUNT_EXIT.invalid)

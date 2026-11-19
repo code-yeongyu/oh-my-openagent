@@ -214,7 +214,7 @@ async function runVerb(dependencies: AccountCommandDependencies, args: readonly 
     }
     default:
       dependencies.error(
-        "usage: omo account show [--account <id>]|adopt [--replace]|token|export|forget [--device <id>]|devices [revoke <id>]|sign-in [--stdin]|retire-sync --account <id>|store status|enable|disable [--discard]",
+        "usage: omo account show [--account <id>]|adopt [--replace]|token|export|forget [--device <id>]|devices [revoke <id>]|sign-in [--stdin|--check]|retire-sync --account <id>|store status|enable|disable [--discard]",
       )
       return ACCOUNT_EXIT.invalid
   }
