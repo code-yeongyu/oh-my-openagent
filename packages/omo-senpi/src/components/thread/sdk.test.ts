@@ -591,6 +591,16 @@ describe("thread SDK: every address form through the shared resolver (#14305)", 
     expect(await store.list()).toEqual([])
   })
 
+  test("#given a name a local session and a thread on device B share #when bind and report name it #then they resolve to the local session, as before the module (#14322 review H1)", async () => {
+    const { sdk } = sdkOn(twoDevices())
+    const bound = await sdk.bind({
+      session: NAMES.shared,
+      binding: { platform: "custom", account_id: "qa", chat_id: "shared" },
+    })
+    expect(bound).toMatchObject({ kind: "ok", binding: { session_durable_id: T.hereShared } })
+    expect(await sdk.report({ session: NAMES.shared, kind: "milestone", text: "m" })).toMatchObject({ kind: "ok" })
+  })
+
   test("#given device B missed the listing round #when locate names a thread only B holds #then it answers host_unavailable naming B, never not_found", async () => {
     const { sdk } = sdkOn(twoDevices({ incomplete: true }))
     expect(await sdk.locate({ thread: NAMES.bLive })).toMatchObject({
