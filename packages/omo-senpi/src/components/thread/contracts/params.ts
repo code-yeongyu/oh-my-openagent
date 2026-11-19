@@ -25,6 +25,16 @@ export const ThreadListParams = Type.Object({
         "List this machine's threads from every workspace; the default returns only the caller's workspace here. The account's other devices' threads are always listed.",
     }),
   ),
+  state: Type.Optional(
+    Type.Array(
+      Type.Union([Type.Literal("running"), Type.Literal("idle"), Type.Literal("inactive"), Type.Literal("archived")]),
+      {
+        minItems: 1,
+        description:
+          "Thread states to list: running, idle, inactive (no engine holds it) or archived; the default lists every state but archived.",
+      },
+    ),
+  ),
 })
 
 /** The longest a `thread_read` waits for its thread to settle (#13417). */
@@ -35,7 +45,7 @@ export const ThreadReadParams = Type.Object({
   cursor: Type.Optional(
     Type.String({
       description:
-        "Opaque cursor from an earlier thread_read (tool.thread_read() in an eval cell) to continue a truncated transcript; a transcript revision that moved past it returns cursor_stale.",
+        "Opaque cursor from an earlier thread_read (tool.thread_read() in an eval cell) to page the older messages of a truncated read (a read without one returns the newest messages that fit max_bytes); a transcript revision that moved past it returns cursor_stale.",
     }),
   ),
   max_bytes: Type.Optional(
@@ -88,6 +98,12 @@ const ThreadCloseParams = Type.Object({
   thread: SelfOrThread,
   idempotency_key: IdempotencyKey,
   all_scope: AllScope,
+  force: Type.Optional(
+    Type.Boolean({
+      description:
+        "Close even when the thread has messages it has not read yet; they are dropped and listed in dropped_deliveries.",
+    }),
+  ),
 })
 
 export const ThreadHandoffParams = Type.Object({
@@ -157,6 +173,18 @@ export const ThreadSetReasoningParams = Type.Object({
     Type.Union([Type.Literal("session"), Type.Literal("turn")], {
       description:
         "session (default) or turn; either changes only this thread's level and never the level the device remembers for the model.",
+    }),
+  ),
+  all_scope: AllScope,
+  idempotency_key: IdempotencyKey,
+})
+
+const ThreadArchiveParams = Type.Object({
+  thread: ThreadAddress,
+  archived: Type.Optional(
+    Type.Boolean({
+      description:
+        "true (the default) archives the thread, so thread_list (tool.thread_list() in an eval cell) hides it unless state includes archived; false unarchives it.",
     }),
   ),
   all_scope: AllScope,
@@ -251,6 +279,7 @@ export type ThreadHandoffInput = Static<typeof ThreadHandoffParams>
 export type ThreadRenameInput = Static<typeof ThreadRenameParams>
 export type ThreadSetModelInput = Static<typeof ThreadSetModelParams>
 export type ThreadSetReasoningInput = Static<typeof ThreadSetReasoningParams>
+export type ThreadArchiveInput = Static<typeof ThreadArchiveParams>
 export type ThreadReportInput = Static<typeof ThreadReportParams>
 export type ThreadOutboxInput = Static<typeof ThreadOutboxParams>
 export type ThreadOutboxAckInput = Static<typeof ThreadOutboxAckParams>
@@ -267,6 +296,7 @@ export const threadToolParamSchemas = {
   thread_rename: ThreadRenameParams,
   thread_set_model: ThreadSetModelParams,
   thread_set_reasoning: ThreadSetReasoningParams,
+  thread_archive: ThreadArchiveParams,
   thread_report: ThreadReportParams,
   thread_outbox: ThreadOutboxParams,
   thread_outbox_ack: ThreadOutboxAckParams,

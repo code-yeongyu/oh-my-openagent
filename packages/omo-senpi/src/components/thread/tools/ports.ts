@@ -1,4 +1,5 @@
 import type { AddressBookHost, DiskSession } from "../address-book"
+import type { ThreadActivity } from "../contracts/state"
 import type { InterruptRequest } from "../control/interrupt"
 import type { ThreadControl } from "../endpoint-controls"
 import type { EndpointKind } from "../endpoint-registry"
@@ -24,6 +25,20 @@ export type ThreadHostSession = {
   readonly status?: "opening" | "open" | "closing" | "closed"
   /** senpi session kind (`interactive` | `worker`). */
   readonly kind?: string
+  /** The session file's archived flag; an engine from before `set_session_archived` lists none (not archived). */
+  readonly archived?: boolean
+  /**
+   * What the session is doing (senpi#6688): `running` while a turn is in flight, `queued` with steering or follow-up
+   * waiting, `awaiting_approval` on a pending question, `errored` after a turn failed. An older engine lists only
+   * `running` | `idle`, or none (idle).
+   */
+  readonly activity?: ThreadActivity
+  /** With `errored`: the failed turn's category (`auth`, `rate_limit`, `quota`, `network`, ...). */
+  readonly error_code?: string
+  /** The current or most recent turn's id, as the prompt response names it. */
+  readonly turn_id?: string
+  /** The session's current model; absent while unknown or on an older engine. */
+  readonly model?: { readonly provider: string; readonly id: string }
   readonly createdAt?: string
   readonly updatedAt?: string
   /** A terminal control endpoint reports its timestamps snake-cased. */
@@ -49,6 +64,7 @@ export type ThreadSessionPort = Pick<
   | "prompt"
   | "interrupt"
   | "setSessionName"
+  | "setSessionArchived"
   | "setModel"
   | "getAvailableModels"
   | "setThinkingLevel"
@@ -112,6 +128,8 @@ export type ThreadHost = {
     durable_session_id?: string,
   ) => Promise<Readonly<Record<string, unknown>>>
   readonly setSessionName: (sessionId: string, name: string, durable_session_id?: string) => Promise<void>
+  /** senpi `set_session_archived`: writes the flag into the session file. Absent on a port that cannot send it. */
+  readonly setSessionArchived?: (sessionId: string, archived: boolean, durable_session_id?: string) => Promise<void>
   readonly setModel: (
     sessionId: string,
     provider: string,
@@ -150,7 +168,11 @@ export type ThreadHost = {
     durable_session_id?: string,
   ) => Promise<SessionWatchOutcome>
   /** Ends one session on its host for every client that holds it; hosts only, a terminal keeps its own session. */
-  readonly closeSession?: (sessionId: string, durable_session_id?: string) => Promise<ThreadCloseOutcome>
+  readonly closeSession?: (
+    sessionId: string,
+    durable_session_id?: string,
+    options?: ThreadCloseOptions,
+  ) => Promise<ThreadCloseAnswer>
   /** Every endpoint at once; absent on a single-endpoint host, whose `listSessions` is the view. */
   readonly listView?: (request?: ThreadHostViewRequest) => Promise<ThreadHostView>
   /** Fresh identity validation on exactly one published endpoint, without enumeration. */
@@ -229,3 +251,9 @@ export const UNKNOWN_CALLER = "unknown-caller"
 
 /** How a close ended: the session ended, no live session held it any more, or another client still holds it. */
 export type ThreadCloseOutcome = "closed" | "not_live" | "held_elsewhere"
+
+/** `force`: close even when the session has messages it has not read; they are dropped and listed (omo#14234). */
+export type ThreadCloseOptions = { readonly force?: boolean }
+
+/** A close's outcome and the deliveries the engine handed back unwritten (empty when none). */
+export type ThreadCloseAnswer = { readonly outcome: ThreadCloseOutcome; readonly dropped_deliveries: readonly string[] }

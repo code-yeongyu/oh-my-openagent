@@ -247,3 +247,4 @@ export type RecoveryEvent =
   | "sync.recovery.recover_refused"
   | "sync.recovery.removed"
   | "sync.trust.root_changed"
+  | "sync.trust.root_check_skipped"

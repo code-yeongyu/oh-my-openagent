@@ -1,4 +1,6 @@
+import { waitWithinCallBudget } from "../../call-budget/call-deadline"
 import type { ThreadTranscriptEntry } from "../reader"
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { relayAddressEntry } from "../remote/address-book"
 import { rowThreadId } from "../remote/ports"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "../remote/ports"
@@ -11,6 +13,8 @@ import { closeLadder, SESSION_GONE, type RecordAnswer } from "./close-ladder"
 import { interruptOver } from "./interrupt"
 import { ControlRefusal, refuse, SESSION_ONLY_THINKING_SCOPE, type SessionControl } from "./port"
 import { waitForTurnEnd } from "./wait-settled"
+import { displayedThread } from "./relay-session-host"
+import { threadRow } from "../tools/thread-row"
 
 const isObject = (value: unknown): value is JsonObject =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -55,7 +59,8 @@ export function createRelayControl(
   return {
     thread_id: rowThreadId(row),
     device,
-    title: row.title,
+    // #13304: printed by thread_read; another device's own text.
+    title: escapeForDisplay(row.title),
     visible: async () => {
       try {
         return (await remote.sessions.sessions())
@@ -71,9 +76,22 @@ export function createRelayControl(
       }
     },
     interrupt: (turnId) => interruptOver((request) => command({ type: "interrupt", ...request }), turnId),
-    close: async () => {
+    close: async (closeOptions) => {
       try {
-        return await closeLadder(sessionId, answer)
+        // The unload's reply names the session file: a reopen from this surface needs it while the listing lags (#14170).
+        let unloaded: string | undefined
+        const closed = await closeLadder(
+          sessionId,
+          async (rpc) => {
+            const answered = await answer(rpc)
+            const path = answered.kind === "ok" ? answered.data["sessionPath"] : undefined
+            if (typeof path === "string" && path !== "") unloaded = path
+            return answered
+          },
+          closeOptions,
+        )
+        if (closed.outcome !== "held_elsewhere") remote.sessions.closed?.(row, unloaded)
+        return closed
       } catch (error) {
         throw error instanceof ControlRefusal
           ? new ControlRefusal({ ...error.failure, details: { device, ...error.failure.details } })
@@ -133,8 +151,17 @@ export function createRelayControl(
       waitForTurnEnd(
         (handlers) => remote.sessions.watch(device, sessionId, handlers, { baseline: true }),
         (reason) => new ControlRefusal(outcomeFailure({ kind: "refused", reason }, device).error),
-        timeoutMs,
+        // omo#14130 review round 2 (M2): inside a tool call the wait leaves the transcript read after it its share.
+        waitWithinCallBudget(timeoutMs),
         signal,
       ),
+    running: async () => row.state === "running" || (await command({ type: "get_state" }))["isStreaming"] === true,
+    setArchived: async (archived) => {
+      await command({ type: "set_session_archived", archived })
+    },
+    listed: async (archived) => {
+      const { archived: _was, ...rest } = row
+      return threadRow(displayedThread(archived ? { ...rest, archived: true } : rest))
+    },
   }
 }

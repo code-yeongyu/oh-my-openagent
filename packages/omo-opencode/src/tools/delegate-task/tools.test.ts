@@ -188,7 +188,7 @@ describe("sisyphus-task", () => {
 
       // when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBe("openai/gpt-6-astra")
+      expect(category.model).toBe("openai/gpt-6.2-astra")
       expect(category.variant).toBe("max")
     })
 
@@ -199,10 +199,10 @@ describe("sisyphus-task", () => {
 
       // when / #then
       expect(low).toBeDefined()
-      expect(low.model).toBe("openai/gpt-6.1-sol")
+      expect(low.model).toBe("openai/gpt-6.2-sol")
       expect(low.variant).toBe("medium")
       expect(high).toBeDefined()
-      expect(high.model).toBe("openai/gpt-6-astra")
+      expect(high.model).toBe("openai/gpt-6.2-astra")
       expect(high.variant).toBe("high")
     })
 
@@ -942,8 +942,8 @@ describe("sisyphus-task", () => {
       ["openai/gpt-5.6-sol-fast"],
       ["openai/gpt-5.6-sol"],
     ])("keeps deep-low open on any GPT-6.1 Sol or GPT-5.6 Sol tier (%s) while deep-high stays Astra-only", (solId) => {
-      // #given: deep-low gates on either GPT-6.1 Sol tier OR either GPT-5.6 Sol tier; the builtin default
-      // config is plain GPT-6.1 Sol and the runtime chain walk (category-resolver) picks the rung the registry carries
+      // #given: deep-low gates on any GPT-6.2, GPT-6.1 or GPT-5.6 Sol tier; the builtin default
+      // config is plain GPT-6.2 Sol and the runtime chain walk (category-resolver) picks the rung the registry carries
       const availableModels = new Set<string>([solId])
 
       // #when
@@ -954,7 +954,7 @@ describe("sisyphus-task", () => {
 
       // #then
       const resolved = expectResolvedCategoryConfig(result)
-      expect(resolved.config.model).toBe("openai/gpt-6.1-sol")
+      expect(resolved.config.model).toBe("openai/gpt-6.2-sol")
       expect(resolved.config.variant).toBe("medium")
       expect(
         resolveCategoryConfig("deep-high", { systemDefaultModel: SYSTEM_DEFAULT_MODEL, availableModels }),
@@ -988,7 +988,7 @@ describe("sisyphus-task", () => {
 
       // #then
       const resolved = expectResolvedCategoryConfig(result)
-      expect(resolved.config.model).toBe("openai/gpt-6-astra")
+      expect(resolved.config.model).toBe("openai/gpt-6.2-astra")
       expect(resolved.config.variant).toBe("high")
     })
 
@@ -4080,7 +4080,7 @@ describe("sisyphus-task", () => {
 
       // then - catalog model is used
       const category = expectResolvedCategoryConfig(resolved)
-      expect(category.config.model).toBe("openai/gpt-6-astra")
+      expect(category.config.model).toBe("openai/gpt-6.2-astra")
       expect(category.config.variant).toBe("max")
     })
 
@@ -4105,10 +4105,10 @@ describe("sisyphus-task", () => {
       // when
       const resolved = resolveCategoryConfig(categoryName, { inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
 
-      // then - category's built-in model wins (ultrabrain uses gpt-6-astra)
+      // then - category's built-in model wins (ultrabrain uses gpt-6.2-astra)
       const category = expectResolvedCategoryConfig(resolved)
       const actualModel = category.config.model
-      expect(actualModel).toBe("openai/gpt-6-astra")
+      expect(actualModel).toBe("openai/gpt-6.2-astra")
     })
 
     test("when user defines model - modelInfo should report user-defined regardless of inheritedModel", () => {
@@ -4171,12 +4171,12 @@ describe("sisyphus-task", () => {
       const categoryName = "ultrabrain"
       const inheritedModel = "anthropic/claude-opus-4-7"
 
-      // when category has a built-in model (gpt-6-astra for ultrabrain)
+      // when category has a built-in model (gpt-6.2-astra for ultrabrain)
       const resolved = resolveCategoryConfig(categoryName, { inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
 
       // then category's built-in model should be used, NOT inheritedModel
       const category = expectResolvedCategoryConfig(resolved)
-      expect(category.model).toBe("openai/gpt-6-astra")
+      expect(category.model).toBe("openai/gpt-6.2-astra")
     })
 
     test("FIXED: systemDefaultModel is used when no userConfig.model and no inheritedModel", () => {

@@ -19,6 +19,8 @@ import {
   SYNC_CLOSE_WAIT_EXCEEDED,
   SYNC_CONFIG_INVALID,
   SYNC_IDLE_NO_DEVICE_SESSION,
+  SYNC_IDLE_NOT_JOINED,
+  SYNC_IDLE_TURNED_OFF,
   SYNC_UNAVAILABLE,
   createSyncRunner,
   watchHeadLog,
@@ -439,4 +441,152 @@ test("a failed sync cycle the engine logs at warn reaches the logger's warn; rou
 
   expect(lines).toContain("warn sync cycle failed during push: SyncHttpError")
   expect(lines).toContain("info sync: journal retired")
+})
+
+/** A device with one running engine whose sync switch the test can turn off, as `omo sync disable` would. */
+async function switchableDevice(onStatusChange?: (repo: string) => void) {
+  const paths = await identity()
+  let off = false
+  const closed: string[] = []
+  const lines: string[] = []
+  const engineChanges: (() => void)[] = []
+  const runner = createSyncRunner({
+    logger: { info: (m: string) => lines.push(m), warn: () => undefined, error: () => undefined },
+    resolveSession: async () => ({ ...session, turnedOff: async () => off }),
+    open: async (o: OpenDeviceSyncOptions): Promise<DeviceSync> => {
+      if (o.onStatusChange !== undefined) engineChanges.push(o.onStatusChange)
+      return {
+        engine: { start: () => undefined } as unknown as DeviceSync["engine"],
+        status: async (): Promise<EngineStatus> => ({ kind: "never_synced" }),
+        notifyLocalCommit: () => undefined,
+        close: async () => {
+          closed.push(o.repoDir)
+        },
+      }
+    },
+    watchHead: () => () => undefined,
+    ...(onStatusChange === undefined ? {} : { onStatusChange }),
+  })
+  await runner.acquire("agent", paths, { enabled: true })
+  return {
+    paths,
+    runner,
+    closed,
+    lines,
+    turnOff: () => {
+      off = true
+    },
+    turnOn: () => {
+      off = false
+    },
+    engineStatusChanged: () => {
+      for (const changed of engineChanges) changed()
+    },
+  }
+}
+
+test("#given a running engine #when this device's sync is turned off and the runner is told #then the engine closes, the repo reads as not syncing and its session still releases", async () => {
+  const d = await switchableDevice()
+  d.turnOff()
+  await d.runner.idleTurnedOff()
+  expect(d.closed).toEqual([d.paths.repo])
+  expect(await d.runner.status(d.paths.repo)).toBeNull()
+  expect(d.lines).toEqual([SYNC_IDLE_TURNED_OFF])
+  await d.runner.release(d.paths.repo)
+  expect(d.closed).toEqual([d.paths.repo])
+})
+
+test("#given a running engine whose switch is still on #when the runner is told to idle turned-off devices #then the engine keeps running", async () => {
+  const d = await switchableDevice()
+  await d.runner.idleTurnedOff()
+  expect(d.closed).toEqual([])
+  expect(await d.runner.status(d.paths.repo)).toEqual({ kind: "never_synced" })
+  await d.runner.release(d.paths.repo)
+})
+
+test("#given a running engine #when its status changes after another OmO process turned this device off #then it goes idle before the change is reported", async () => {
+  const reported = Promise.withResolvers<string>()
+  const d = await switchableDevice((repo) => reported.resolve(repo))
+  d.turnOff()
+  d.engineStatusChanged()
+  expect(await reported.promise).toBe(d.paths.repo)
+  expect(d.closed).toEqual([d.paths.repo])
+  expect(await d.runner.status(d.paths.repo)).toBeNull()
+  await d.runner.release(d.paths.repo)
+})
+
+test("#given a running engine whose switch is on #when its status changes #then it keeps running and the change is reported", async () => {
+  const reported = Promise.withResolvers<string>()
+  const d = await switchableDevice((repo) => reported.resolve(repo))
+  d.engineStatusChanged()
+  expect(await reported.promise).toBe(d.paths.repo)
+  expect(d.closed).toEqual([])
+  expect(await d.runner.status(d.paths.repo)).toEqual({ kind: "never_synced" })
+  await d.runner.release(d.paths.repo)
+})
+
+test.each([
+  ["sync_off", SYNC_IDLE_TURNED_OFF],
+  ["no_pin", SYNC_IDLE_NOT_JOINED],
+] as const)(
+  "#given a session resolver that answers idle for %s #when a session binds #then the runner logs why in that reason's own words",
+  async (reason, line) => {
+    const paths = await identity()
+    const lines: string[] = []
+    const runner = createSyncRunner({
+      logger: { info: (m: string) => lines.push(m), warn: () => undefined, error: () => undefined },
+      resolveSession: async () => ({ idle: reason }),
+    })
+    await runner.acquire("agent", paths, { enabled: true })
+    expect(lines).toEqual([line])
+    expect(await runner.status(paths.repo)).toBeNull()
+    await runner.release(paths.repo)
+  },
+)
+
+test("#given a running engine #when the runner idles it because this device was turned off #then the change is reported for its repo, and a device still on reports nothing", async () => {
+  const reported: string[] = []
+  const d = await switchableDevice((repo) => reported.push(repo))
+  await d.runner.idleTurnedOff()
+  expect(reported).toEqual([])
+  d.turnOff()
+  await d.runner.idleTurnedOff()
+  expect(reported).toEqual([d.paths.repo])
+  // Already idle: a second call closes nothing and reports nothing.
+  await d.runner.idleTurnedOff()
+  expect(reported).toEqual([d.paths.repo])
+  expect(d.closed).toEqual([d.paths.repo])
+  await d.runner.release(d.paths.repo)
+})
+
+test("#given an engine idled because this device was turned off #when sync is turned on again and the runner resumes #then a fresh engine runs for the still-held repo and the change is reported", async () => {
+  const reported: string[] = []
+  const d = await switchableDevice((repo) => reported.push(repo))
+  d.turnOff()
+  await d.runner.idleTurnedOff()
+  expect(await d.runner.status(d.paths.repo)).toBeNull()
+  d.turnOn()
+  await d.runner.resumeIdle()
+  expect(await d.runner.status(d.paths.repo)).toEqual({ kind: "never_synced" })
+  expect(reported).toEqual([d.paths.repo, d.paths.repo])
+  // A running engine is left alone: resuming again opens nothing new.
+  await d.runner.resumeIdle()
+  expect(reported).toEqual([d.paths.repo, d.paths.repo])
+  await d.runner.release(d.paths.repo)
+  expect(d.closed).toEqual([d.paths.repo, d.paths.repo])
+})
+
+test("#given a held repo whose device is still off #when the runner resumes #then it stays idle and reports nothing", async () => {
+  const reported: string[] = []
+  const paths = await identity()
+  const runner = createSyncRunner({
+    logger: { info: () => undefined, warn: () => undefined, error: () => undefined },
+    resolveSession: async () => ({ idle: "sync_off" }),
+    onStatusChange: (repo) => reported.push(repo),
+  })
+  await runner.acquire("agent", paths, { enabled: true })
+  await runner.resumeIdle()
+  expect(await runner.status(paths.repo)).toBeNull()
+  expect(reported).toEqual([])
+  await runner.release(paths.repo)
 })

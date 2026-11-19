@@ -36,6 +36,11 @@ export class StatusTracker {
     return this.frozen === null ? null : `frozen\n${this.frozen.reason}`
   }
 
+  /** Whether the failure a UI shows is the unreachable service: the engine's own word for "this device is offline". */
+  offline(): boolean {
+    return this.shown?.failure.kind === "offline"
+  }
+
   succeeded(): void {
     this.failing = null
     this.shown = null

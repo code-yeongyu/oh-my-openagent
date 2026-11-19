@@ -77,6 +77,7 @@ const world = (): World => {
   return {
     ...base,
     endpoints: { [PEER]: ["ZW5kcG9pbnQta2V5LTAwMD"] },
+    primary: { [PEER]: "ZW5kcG9pbnQta2V5LTAwMD" },
     endpointCommand: {
       data: { sessionId: "engine-routing-1", state: { sessionId: ENGINE_ID, cwd: "/work" } },
       outcome: [{ state: "engine_applied", retryable: false }],
@@ -283,6 +284,25 @@ describe("sessions.send and sessions.read", () => {
     )
   })
 
+  test("#given a steer whose state read ends uncertain #when the same key is retried #then it reads the device again instead of replaying the failure, and sends no prompt (#12925)", async () => {
+    const base = world()
+    const owner = await startOwner({
+      ...base,
+      sessions: base.sessions.map((session) => ({
+        ...session,
+        outcome: [{ state: "uncertain", reason: "request_gone", retryable: false }],
+      })),
+    })
+    const sent = (type: string) => owner.state.commands.filter((rpc) => rpc["type"] === type)
+    const client = clientOn(owner.stateDir, fakeClock())
+    const steer = { text: "s", mode: "steer", idempotency_key: "k-probe" } as const
+    const first = failureOf(await client.sessions.send(LIVE, steer))
+    const second = failureOf(await client.sessions.send(LIVE, steer))
+    expect([first.code, second.code]).toEqual(["host_unavailable", "host_unavailable"])
+    expect(sent("get_state")).toHaveLength(2)
+    expect(sent("prompt")).toEqual([])
+  })
+
   test("#given a person's sends #when each is delivered #then its prompt carries a fresh clientMessageId, returned as the receipt's delivery_id", async () => {
     const { owner, sent } = await onWorld()
     const client = clientOn(owner.stateDir, fakeClock())
@@ -350,7 +370,10 @@ describe("sessions.send and sessions.read", () => {
 describe("sessions controls", () => {
   test("#given the live session #when sessions.close runs #then the close ladder unloads it", async () => {
     const { owner, sent } = await onWorld()
-    expect(await valueOf(clientOn(owner.stateDir, fakeClock()).sessions.close(LIVE))).toEqual({ closed: true })
+    expect(await valueOf(clientOn(owner.stateDir, fakeClock()).sessions.close(LIVE))).toEqual({
+      closed: true,
+      dropped_deliveries: [],
+    })
     expect(sent("unload_session")).toEqual([expect.objectContaining({ sessionId: SESSION_ID, force: true })])
   })
 
@@ -410,12 +433,15 @@ describe("sessions controls", () => {
     })
   })
 
-  test("#given no layer stores archive state #when sessions.archive runs #then unsupported{archive}", async () => {
-    const { owner } = await onWorld()
-    expect(failureOf(await clientOn(owner.stateDir, fakeClock()).sessions.archive(LIVE, true))).toMatchObject({
-      code: "unsupported",
-      details: { feature: "archive" },
-    })
+  test("#given the live session #when sessions.archive archives then unarchives it #then each sends set_session_archived to it and answers the flag", async () => {
+    const { owner, sent } = await onWorld()
+    const client = clientOn(owner.stateDir, fakeClock())
+    expect(await valueOf(client.sessions.archive(LIVE, true))).toEqual({ archived: true })
+    expect(await valueOf(client.sessions.archive(LIVE, false))).toEqual({ archived: false })
+    expect(sent("set_session_archived")).toEqual([
+      expect.objectContaining({ archived: true }),
+      expect.objectContaining({ archived: false }),
+    ])
   })
 })
 
@@ -439,7 +465,7 @@ describe("durable-id addressing", () => {
       expect(await valueOf(client.sessions.send(thread, { text: "go" }))).toMatchObject({ lane: "started" })
       expect(await valueOf(client.sessions.setModel(thread, "anthropic/claude"))).toEqual({ model: "anthropic/claude" })
       expect(await valueOf(client.sessions.interrupt(thread))).toMatchObject({ interrupted: true })
-      expect(await valueOf(client.sessions.close(thread))).toEqual({ closed: true })
+      expect(await valueOf(client.sessions.close(thread))).toEqual({ closed: true, dropped_deliveries: [] })
       for (const type of ["prompt", "set_model", "interrupt", "unload_session"])
         expect(sent(type).map((rpc) => rpc["sessionId"])).toEqual([NEW_KEY])
     })
@@ -839,7 +865,7 @@ describe("an open on this device", () => {
         device: SELF,
       })
       expect(await valueOf(client.sessions.setReasoning(SELF_SESSION, "high"))).toEqual({ reasoning: "high" })
-      expect(await valueOf(client.sessions.close(SELF_SESSION))).toEqual({ closed: true })
+      expect(await valueOf(client.sessions.close(SELF_SESSION))).toEqual({ closed: true, dropped_deliveries: [] })
       expect(host.mutations.map((frame) => frame["type"])).toEqual([
         "prompt",
         "interrupt",

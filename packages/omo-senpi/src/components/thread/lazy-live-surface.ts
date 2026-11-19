@@ -51,6 +51,11 @@ export function createLazyLiveThreadSurface(
         const port = await target()
         return await port.setSessionName(sessionId, name, durableId)
       },
+      setSessionArchived: async (sessionId, archived, durableId) => {
+        const port = await target()
+        if (port.setSessionArchived === undefined) throw new Error("unsupported:set_session_archived")
+        return await port.setSessionArchived(sessionId, archived, durableId)
+      },
       setModel: async (sessionId, provider, modelId, durableId) => {
         const port = await target()
         return await port.setModel(sessionId, provider, modelId, durableId)
@@ -77,10 +82,10 @@ export function createLazyLiveThreadSurface(
         if (port.releaseSession === undefined) throw new Error("unsupported:release_session")
         return await port.releaseSession(sessionId, request, durableId)
       },
-      closeSession: async (sessionId, durableId) => {
+      closeSession: async (sessionId, durableId, options) => {
         const port = await target()
         if (port.closeSession === undefined) throw new Error("unsupported:close_session")
-        return await port.closeSession(sessionId, durableId)
+        return await port.closeSession(sessionId, durableId, options)
       },
       watchSession: async (sessionId, handlers, durableId) => {
         const port = await target()

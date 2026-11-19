@@ -46,7 +46,8 @@ describe("omo doctor: keychain helper line (#11262 addendum Q1, row 9)", () => {
     expect(lines[0]).toContain("missing omo-keychain")
   })
 
-  describe("OmO's own keychain (#13116)", () => {
+  // The store is macOS-only and these cases judge real POSIX modes; NTFS chmod cannot make the folder private.
+  describe.skipIf(process.platform === "win32")("OmO's own keychain (#13116)", () => {
     let home = ""
     afterEach(() => rmSync(home, { recursive: true, force: true }))
     const storeLines = (layout: (root: string) => void) => {

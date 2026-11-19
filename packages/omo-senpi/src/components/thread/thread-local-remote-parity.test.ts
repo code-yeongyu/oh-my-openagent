@@ -153,7 +153,7 @@ const ENGINE_STATE = {
   endpoint_kind: "rpc_host",
   controls: ["send", "read"],
 }
-const SUMMARY_KEYS = ["created_at", "cwd", "link", "name", "status", "thread", "updated_at"]
+const SUMMARY_KEYS = ["created_at", "cwd", "link", "name", "state", "status", "thread", "updated_at"]
 const threadKeys = (result: ThreadToolResult) => {
   if (result.kind !== "ok" || !("thread" in result)) throw new Error(`expected a thread, got ${JSON.stringify(result)}`)
   return Object.keys(result)

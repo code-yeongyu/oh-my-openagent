@@ -89,8 +89,28 @@ function summarize(subcommand, parsed, exitCode) {
     return `daemon: running pid ${parsed.pid}${suffix}`
   }
   if (parsed === undefined) return `daemon: ${subcommand} failed`
+  if (parsed.action === "refuse") return `daemon: refuse${refusalDetail(parsed)}`
   const pid = parsed.pid === undefined ? "" : ` pid ${parsed.pid}`
   return `daemon: ${parsed.action ?? subcommand}${pid}`
+}
+
+/**
+ * omo#14191: why the engine refused, on which socket, and which host holds it - a bare `daemon: refuse` in a service
+ * unit's log said none of it.
+ */
+function refusalDetail(parsed) {
+  const host = parsed.host ?? {}
+  const holder = [
+    host.engineVersion ? `engine ${host.engineVersion}` : undefined,
+    host.generation != null ? `generation ${host.generation}` : undefined,
+    host.instanceId ? `instance ${host.instanceId}` : undefined,
+  ].filter((part) => part !== undefined)
+  return [
+    parsed.reason ? `: ${parsed.reason}` : "",
+    parsed.detail ? ` (${parsed.detail})` : "",
+    parsed.socket ? ` on ${parsed.socket}` : "",
+    holder.length > 0 ? `; held by ${holder.join(", ")}` : "",
+  ].join("")
 }
 
 /** `omo daemon adopt`: the thread SDK finds and releases the session; the result is an exit code or a launch. */

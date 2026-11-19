@@ -158,7 +158,8 @@ export function sessionVerbLines(
     if (delivery.kind === "steered") return [`Steered turn ${delivery.turn_id} on ${label}.`]
     return [`Sent to ${label}: turn ${delivery.turn_id} started.`]
   }
-  if (verb === "model" && "model" in result) return [`${label} now uses ${result.model.provider}/${result.model.id}.`]
+  if (verb === "model" && "model" in result && result.model !== undefined)
+    return [`${label} now uses ${result.model.provider}/${result.model.id}.`]
   if (verb === "interrupt" && "interrupted" in result) {
     if (!result.interrupted) return [`Nothing was running on ${label}.`]
     const { background } = result
@@ -177,7 +178,14 @@ export function sessionVerbLines(
       ...background.failed.map((job) => `Could not stop background job ${jobName(job)}: ${job.reason}.`),
     ]
   }
-  if (verb === "close" && "closed" in result) return [result.closed ? `Closed ${label}.` : `${label} was not open.`]
+  if (verb === "close" && "closed" in result) {
+    const dropped =
+      "dropped_deliveries" in result && Array.isArray(result.dropped_deliveries) ? result.dropped_deliveries : []
+    return [
+      result.closed ? `Closed ${label}.` : `${label} was not open.`,
+      ...(dropped.length === 0 ? [] : [`Dropped ${dropped.length} message(s) it had not read: ${dropped.join(", ")}.`]),
+    ]
+  }
   return []
 }
 

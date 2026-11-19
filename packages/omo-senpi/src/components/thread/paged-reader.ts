@@ -2,12 +2,14 @@
  * thread_read over the context tail of a session another device holds (#14047): the holder sends pages of its session
  * entries (`get_entries`), never the whole transcript, and this side projects them with the engine's own projector
  * (`remote/transcript-tail.ts`), so the messages are the ones `get_messages` answers: the current leaf's path, with its
- * compaction and branch summaries. The window rules are the live reader's (`reader.ts`): a first read starts at the
- * 60th message from the end and takes messages forward until the byte budget is spent; a cursor continues forward after
- * the last message it returned.
+ * compaction and branch summaries. The window rules are the live reader's (`reader.ts`): a first read takes the 60
+ * newest messages and fills the byte budget from the newest one backward, so it always ends at the latest message
+ * (#14173); its cursor pages the older messages of that window, each page again ending just before the oldest one the
+ * previous page returned.
  *
- * A cursor names that message by its projected entry and binds the revision it was issued at: the session's leaf, which
- * every append, compaction and branch move changes. A changed revision is `cursor_stale`, as on every other source.
+ * A cursor names that message and the window's first one by their projected entries and binds the revision it was
+ * issued at: the session's leaf, which every append, compaction and branch move changes. A changed revision is
+ * `cursor_stale`, as on every other source.
  */
 
 import { THREAD_READ_DEFAULT_BYTES } from "./contracts"
@@ -34,17 +36,19 @@ export type EntryPageRead =
 /** How many newest messages a tail must hold (unless the session has fewer) to answer every read. */
 export const CONTEXT_TAIL_MESSAGES = THREAD_TAIL_DEFAULT_ITEMS
 
-const CURSOR_VERSION = "t2"
+const CURSOR_VERSION = "t3"
 
-function encodeCursor(revision: string, after: string): string {
-  return Buffer.from(`${CURSOR_VERSION}\n${revision}\n${after}`, "utf8").toString("base64url")
+type EntryCursor = { readonly revision: string; readonly before: string; readonly floor: string }
+
+function encodeCursor({ revision, before, floor }: EntryCursor): string {
+  return Buffer.from(`${CURSOR_VERSION}\n${revision}\n${before}\n${floor}`, "utf8").toString("base64url")
 }
 
-function decodeCursor(raw: string): { readonly revision: string; readonly after: string } | null {
+function decodeCursor(raw: string): EntryCursor | null {
   const parts = Buffer.from(raw, "base64url").toString("utf8").split("\n")
-  if (parts.length !== 3 || parts[0] !== CURSOR_VERSION) return null
-  const [, revision = "", after = ""] = parts
-  return after === "" ? null : { revision, after }
+  if (parts.length !== 4 || parts[0] !== CURSOR_VERSION) return null
+  const [, revision = "", before = "", floor = ""] = parts
+  return before === "" || floor === "" ? null : { revision, before, floor }
 }
 
 /** Whether a cursor came from this reader (the other sources' cursors are answered by their own reader). */
@@ -68,24 +72,31 @@ export function selectEntryPage(
   read: { readonly max_bytes?: number; readonly cursor?: string },
 ): EntryPageRead {
   const { messages, revision } = tail
-  let start = Math.max(0, messages.length - CONTEXT_TAIL_MESSAGES)
+  let floor = Math.max(0, messages.length - CONTEXT_TAIL_MESSAGES)
+  let end = messages.length
   if (read.cursor !== undefined) {
     const cursor = decodeCursor(read.cursor)
     if (cursor === null || cursor.revision !== revision) return staleEntryCursor()
-    const index = messages.findIndex((entry) => entry.id === cursor.after)
-    if (index === -1) return staleEntryCursor()
-    start = index + 1
+    floor = messages.findIndex((entry) => entry.id === cursor.floor)
+    end = messages.findIndex((entry) => entry.id === cursor.before)
+    if (floor === -1 || end < floor) return staleEntryCursor()
   }
   const { selected } = takeWithinBudget(
-    messages.slice(start).map((entry) => entry.message),
+    messages.slice(floor, end).map((entry) => entry.message),
     read.max_bytes ?? THREAD_READ_DEFAULT_BYTES,
+    "end",
   )
-  const end = start + selected.length
-  const truncated = end < messages.length
+  const start = end - selected.length
+  const truncated = start > floor
+  const before = messages[start]?.id
+  const first = messages[floor]?.id
   return {
     kind: "ok",
     messages: selected,
     truncated,
-    next_cursor: truncated ? encodeCursor(revision, messages[end - 1]?.id ?? "") : null,
+    next_cursor:
+      truncated && before !== undefined && first !== undefined
+        ? encodeCursor({ revision, before, floor: first })
+        : null,
   }
 }

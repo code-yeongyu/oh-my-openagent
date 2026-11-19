@@ -1,3 +1,4 @@
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import type { RpcRemoteSource, SenpiExtensionAPI } from "../../../extension/types"
 import type * as CrossDevice from "./cross-device"
 import type * as MonitorSource from "./monitor-source"
@@ -63,18 +64,22 @@ export const createRelayControl = (remote: RemoteThreadSurface, row: RemoteSessi
   return {
     thread_id: rowThreadId(row),
     device: row.device,
-    title: row.title,
+    // #13304: printed by thread_read; another device's own text.
+    title: escapeForDisplay(row.title),
     visible: async () => await (await built).visible(),
     interrupt: async (turnId) => await (await built).interrupt(turnId),
-    close: async () => await (await built).close(),
+    close: async (options) => await (await built).close(options),
     setName: async (name) => await (await built).setName(name),
     getAvailableModels: async (options) => await (await built).getAvailableModels(options),
     setModel: async (provider, id) => await (await built).setModel(provider, id),
     getAvailableThinkingLevels: async () => await (await built).getAvailableThinkingLevels(),
-    setThinkingLevel: async (level, scope) => await (await built).setThinkingLevel(level, scope),
+    setThinkingLevel: async (level) => await (await built).setThinkingLevel(level),
     getMessages: async () => await (await built).getMessages(),
     readEntryPage: async (read) => await (await built).readEntryPage(read),
     waitSettled: async (timeoutMs, signal) => await (await built).waitSettled(timeoutMs, signal),
+    running: async () => await (await built).running(),
+    setArchived: async (archived) => await (await built).setArchived(archived),
+    listed: async (archived) => await (await built).listed(archived),
   }
 }
 

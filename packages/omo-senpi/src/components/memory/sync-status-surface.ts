@@ -46,7 +46,8 @@ export function createSyncStatusNotifier(read: SyncStatusReader): SyncStatusNoti
       const previous = announced.get(repo)
       if (failure === undefined) {
         announced.delete(repo)
-        if (previous !== undefined) ui?.notify(SYNC_RECOVERED_NOTICE, "info")
+        // A repo with no engine (sync turned off on this device, #14093) has no status: it did not recover.
+        if (previous !== undefined && status !== null) ui?.notify(SYNC_RECOVERED_NOTICE, "info")
         return
       }
       const key = `${failure.kind}\n${failure.action}`

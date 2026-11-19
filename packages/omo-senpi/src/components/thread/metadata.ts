@@ -76,7 +76,7 @@ export const THREAD_TOOL_METADATA: readonly ThreadToolEntry[] = [
     name: "thread_close",
     label: "Close session",
     description:
-      "Closes a session. Omit thread or pass self to close this session. thread accepts the thread value of a thread_list row (tool.thread_list() in an eval cell), an alias, or a unique name; the result is closed true or false plus a reason" +
+      "Closes a session. Omit thread or pass self to close this session. thread accepts the thread value of a thread_list row (tool.thread_list() in an eval cell), an alias, or a unique name; the result is closed true or false plus a reason. A thread with messages it has not read is refused, naming them; pass force: true to close it anyway (dropped_deliveries lists them)" +
       ROUTE_TO_TASK,
     exposure: THREAD_TOOL_EXPOSURE,
   },
@@ -107,6 +107,13 @@ export const THREAD_TOOL_METADATA: readonly ThreadToolEntry[] = [
     label: "Set session reasoning level",
     description:
       "Sets how much reasoning a session applies, for when the user asks to raise or lower the thinking effort of a session",
+    exposure: THREAD_TOOL_EXPOSURE,
+  },
+  {
+    name: "thread_archive",
+    label: "Archive session",
+    description:
+      "Archives or unarchives a session so the session list hides or shows it again, for when the user is finished with a session but wants to keep it",
     exposure: THREAD_TOOL_EXPOSURE,
   },
   {

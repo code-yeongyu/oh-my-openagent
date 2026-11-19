@@ -242,7 +242,7 @@ describe("thread tools across host endpoints", () => {
     expect(w.dialed).not.toContain(shard)
   })
 
-  test("#given a dead endpoint's session file longer than one byte window #when thread_read follows next_cursor #then the JSONL fallback pages forward to the end", async () => {
+  test("#given a dead endpoint's session file longer than one byte window #when thread_read follows next_cursor #then the JSONL fallback pages from the newest message back to the start", async () => {
     // given
     const dir = tempDir("thr-ep-")
     const legacy = join(dir, "rpc.sock")
@@ -257,20 +257,21 @@ describe("thread tools across host endpoints", () => {
     const w = world({ legacy, shard, reports: () => [report(legacy, true), report(shard, false, [desktopJsonl])] })
 
     // when
-    const contents: string[] = []
+    const pages: string[][] = []
     let reads = 0
     let cursor: string | undefined
     do {
       const page = await w.run("thread_read", { thread: "dur-desktop", max_bytes: 1000, ...(cursor === undefined ? {} : { cursor }) })
       expect(page).toMatchObject({ kind: "ok", source: "session_jsonl" })
       reads += 1
-      contents.push(...(page as { items: ReadonlyArray<{ content: string }> }).items.map((item) => item.content))
+      pages.push((page as { items: ReadonlyArray<{ content: string }> }).items.map((item) => item.content))
       cursor = (page as { next_cursor?: string }).next_cursor
     } while (cursor !== undefined && reads < 20)
 
     // then
     expect(reads).toBeGreaterThan(1)
-    expect(contents).toEqual(texts.map((text) => JSON.stringify(text)))
+    expect(pages[0]?.at(-1)).toBe(JSON.stringify(texts.at(-1)))
+    expect(pages.reverse().flat()).toEqual(texts.map((text) => JSON.stringify(text)))
   })
 
   test("#given the legacy endpoint stopped answering after it claimed a session file #when thread_list and thread_read run #then its thread is listed from disk as resumable on the legacy socket and reads from JSONL, while the live i-* thread stays live", async () => {

@@ -3,7 +3,7 @@ import type { ChainState } from "../crypto/chain.ts"
 import type { Authority } from "../crypto/fold.ts"
 import type { RecoveryKey } from "../crypto/parse.ts"
 import type { RejectionCounter } from "../crypto/rejection.ts"
-import { pinTrustAnchor, rootChangedSinceRetired, TrustPinError } from "../crypto/trust-pin.ts"
+import { pinTrustAnchor, rootChangeNotice, type RootChangeNotice, TrustPinError } from "../crypto/trust-pin.ts"
 import type {
   KeyringAppendRequest,
   RecoverBridgeResult,
@@ -106,7 +106,8 @@ export const rotationStored = async (
 
 /**
  * Pins the root the confirmed join proved (a ceremony pin), and reports whether it differs from the
- * root this device held before its keys were discarded (#12280): a notice, never a refusal.
+ * root this device held before its keys were discarded (#12280): a notice, never a refusal. A check
+ * that could not read the retired pins is reported as skipped (#12382), never as "unchanged".
  */
 export const pinRecoveredRoot = async (
   input: {
@@ -115,15 +116,15 @@ export const pinRecoveredRoot = async (
     readonly onEvent?: (event: RecoveryEvent) => void
   },
   pin: PinCandidate,
-): Promise<{ readonly ok: false } | { readonly ok: true; readonly changed: { readonly rootChanged?: true } }> => {
+): Promise<{ readonly ok: false } | { readonly ok: true; readonly changed: RootChangeNotice }> => {
   try {
     await pinTrustAnchor(input.stateDir, input.account, pin)
   } catch (error) {
     if (error instanceof TrustPinError && error.problem === "pin_conflict") return { ok: false }
     throw error
   }
-  if (!(await rootChangedSinceRetired(input.stateDir, input.account, pin.genesisDigest)))
-    return { ok: true, changed: {} }
-  input.onEvent?.("sync.trust.root_changed")
-  return { ok: true, changed: { rootChanged: true } }
+  const changed = await rootChangeNotice(input.stateDir, input.account, pin.genesisDigest)
+  if (changed.rootChanged === true) input.onEvent?.("sync.trust.root_changed")
+  if (changed.rootCheck !== undefined) input.onEvent?.("sync.trust.root_check_skipped")
+  return { ok: true, changed }
 }
