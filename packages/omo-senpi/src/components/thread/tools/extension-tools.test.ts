@@ -117,7 +117,7 @@ async function surface(
 /** A session's tool registry as senpi keeps it (one tool per name), with `session_start` fired by the test. */
 function sessionStartHost(preRegistered: Readonly<Record<string, Record<string, unknown>>>) {
   const tools = new Map(Object.entries(preRegistered))
-  const handlers: (() => void)[] = []
+  const handlers: ((event: unknown, ctx?: unknown) => unknown)[] = []
   let waiting: { readonly name: string; readonly done: () => void } | undefined
   return {
     tools,
@@ -127,7 +127,7 @@ function sessionStartHost(preRegistered: Readonly<Record<string, Record<string, 
       if (awaited !== undefined && awaited.name === tool.name) awaited.done()
     },
     getAllTools: () => [...tools.keys()].map((name) => ({ name })),
-    on(event: string, handler: () => void) {
+    on(event: string, handler: (event: unknown, ctx?: unknown) => unknown) {
       if (event === "session_start") handlers.push(handler)
     },
     /** Fires session_start and resolves once `until` is registered (the registration pass is one synchronous loop). */
@@ -135,7 +135,7 @@ function sessionStartHost(preRegistered: Readonly<Record<string, Record<string, 
       const done = new Promise<void>((resolve) => {
         waiting = { name: until, done: resolve }
       })
-      for (const handler of handlers) handler()
+      for (const handler of handlers) handler({ type: "session_start" })
       return done
     },
   }
@@ -431,9 +431,9 @@ test("#given a store at the previous schema version with data #when it opens #th
   const agentDir = tempDir("extension-tools-migrate-")
   const path = gatewayDatabasePath(agentDir)
   // Back to the store before v10 (toolkit_replay_receipts), v11 (deliveries.wait_kind), v12 (the intake columns), v13
-  // (woken_sessions), v14 (the wake state tables) and v15 (the binding-table drop; v13 to v15 are idempotent so their
-  // tables can stay): all re-run.
-  const previous = GATEWAY_MIGRATIONS.length - 6
+  // (woken_sessions), v14 (the wake state tables; v13 and v14 are idempotent so their tables can stay), v15 (the
+  // deliveries rebuild) and v16 (the binding-table drop; idempotent, so its tables can stay): all re-run. Pinned, not counted from the end, because later migrations append.
+  const previous = 9
   {
     const seed = storeAt(agentDir)
     await seed.identity()

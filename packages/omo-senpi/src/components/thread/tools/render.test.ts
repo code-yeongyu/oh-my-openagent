@@ -98,8 +98,14 @@ describe("thread_send / thread_handoff results", () => {
     }) as ThreadToolResult
 
   test("#given a delivery that started a turn #when it renders #then one outcome line names the thread and the turn only", () => {
-    expect(result("thread_send", sent({ kind: "started", turn_id: "306" }), sendArgs)).toEqual([
-      "-> planner  follow-up delivered (turn 306)",
+    expect(
+      result("thread_send", sent({ kind: "started", turn_id: "306" }, { effective_mode: "start" }), sendArgs),
+    ).toEqual(["-> planner  delivered (turn 306)"])
+  })
+
+  test("#given a follow-up that started the turn after the one it waited behind #when it renders #then it is labelled a follow-up", () => {
+    expect(result("thread_send", sent({ kind: "started", turn_id: "307" }), sendArgs)).toEqual([
+      "-> planner  follow-up delivered (turn 307)",
     ])
   })
 

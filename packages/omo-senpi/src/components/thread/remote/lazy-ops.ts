@@ -17,7 +17,7 @@ type Runtime = Pick<
   Pick<typeof RemoteOps, "deviceOnline"> &
   Pick<typeof RelayTransport, "createRelayTransport"> &
   Pick<typeof RelayControl, "createRelayControl"> &
-  Pick<typeof MonitorSource, "createRemoteMonitorSource">
+  Pick<typeof MonitorSource, "createRemoteMonitorSource" | "resolveMonitorTarget">
 
 // The cross-device half ships in the thread client sidecar (`#omo-thread-client-runtime`), which every thread
 // operation already loads for the live host, so `omo.js` carries none of it.
@@ -34,6 +34,8 @@ export const claimCreatedAlias = async (...args: Parameters<Runtime["claimCreate
   await (await runtime()).claimCreatedAlias(...args)
 export const deviceOnline = async (...args: Parameters<Runtime["deviceOnline"]>) =>
   await (await runtime()).deviceOnline(...args)
+export const resolveMonitorTarget = async (...args: Parameters<Runtime["resolveMonitorTarget"]>) =>
+  await (await runtime()).resolveMonitorTarget(...args)
 
 /** The relay transport lives in the sidecar too; it is built once per composition, on the first delivery, and keeps its state. */
 export const createRelayTransport = (

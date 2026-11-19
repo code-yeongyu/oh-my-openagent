@@ -13,7 +13,7 @@ afterEach(async () => {
   harness = undefined
 })
 
-/** Schema v14: the last version that still had thread bindings. Pinned, not `length - 1`, because later migrations append. */
+/** Schema v14: a store from before the v15 deliveries rebuild and the v16 binding drop. Pinned, not `length - 1`, because later migrations append. */
 const V14 = 14
 
 const moduleUrl = new URL("./testing/store-extension.mjs", import.meta.url).href
@@ -130,7 +130,7 @@ test.each([
   ["holding the binding", true, { binding_id: "bnd-1", policy_id: "dori:v1:route-1", session_durable_id: "target" }],
   ["with no binding rows", false, null],
 ] as const)(
-  "#given a v14 store %s #when an extension reads the thread's legacy binding after v15 #then it gets the owner while the rows exist, else null",
+  "#given a v14 store %s #when an extension reads the thread's legacy binding after v16 #then it gets the owner while the rows exist, else null",
   async (_label, bound, expected) => {
     const h = (harness = createGatewayHarness())
     v14Fixture(gatewayDatabasePath(h.agentDir), [], { bound })
@@ -158,7 +158,7 @@ test.each([
   ["ON DELETE CASCADE", "REFERENCES bindings ON DELETE CASCADE"],
   ["a plain REFERENCES", "REFERENCES bindings"],
 ])(
-  "#given an extension table referencing bindings with %s #when the store migrates to v15 #then it opens at the current version and the extension rows stay",
+  "#given an extension table referencing bindings with %s #when the store migrates to v16 #then it opens at the current version and the extension rows stay",
   async (_label, reference) => {
     const h = (harness = createGatewayHarness())
     const path = gatewayDatabasePath(h.agentDir)

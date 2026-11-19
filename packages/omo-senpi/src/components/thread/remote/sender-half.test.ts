@@ -229,7 +229,8 @@ describe("#13037 the sender half reaches a session on another device that is not
   // #13238 review: one rule for every probe that may build an `ended` row - only while this device's service can carry
   // the wake. With the single probe on and the wake off, a probe-built row would go down the live path instead.
   describe("lookup on with wake off: no probe builds an ended row", () => {
-    test("#given a reply to a sender on b that b no longer lists #when the run replies by id #then it is not_found naming b, with no probe and nothing sent", async () => {
+    // #14280: with no probe, b cannot be asked whether it still holds the sender, so the answer says so, never not_found.
+    test("#given a reply to a sender on b that b no longer lists #when the run replies by id #then it is host_unavailable (wake_unavailable) naming b, with no probe and nothing sent", async () => {
       const a = account({ rows: [B_ROW], ended: { b: { [GONE]: "rk-gone" } }, noWake: true })
       const { run } = fixture.surface(a.remote, {
         callerReplyTargets: () => [GONE],
@@ -237,7 +238,7 @@ describe("#13037 the sender half reaches a session on another device that is not
       })
       expect(await run("thread_send", { thread: GONE, message: "reply" })).toMatchObject({
         kind: "error",
-        error: { code: "not_found", details: { device: "b" } },
+        error: { code: "host_unavailable", details: { device: "b", reason: "wake_unavailable" } },
       })
       expect({ lookups: a.lookups, sent: a.sent }).toEqual({ lookups: [], sent: [] })
     })
@@ -257,12 +258,12 @@ describe("#13037 the sender half reaches a session on another device that is not
     const endedOnC = (extra: Parameters<Fixture["account"]>[0] = {}) =>
       account({ rows: [B_ROW, C_ROW], ended: { c: { [GONE]: "rk-c-gone" } }, ...extra })
 
-    test("#given an ended row #when it is sent to with the default mode #then no get_state is sent and the record is a follow-up", async () => {
+    test("#given an ended row #when it is sent to with the default mode #then no get_state is sent and the result names the start the wake makes", async () => {
       const a = endedOnC()
       const { run } = fixture.surface(a.remote)
       expect(await run("thread_send", { thread: GONE, message: "hi" })).toMatchObject({
         kind: "ok",
-        effective_mode: "follow_up",
+        effective_mode: "start",
       })
       expect(a.sent.some((entry) => entry.rpc?.["type"] === "get_state")).toBe(false)
     })
@@ -308,6 +309,13 @@ describe("#13037 the sender half reaches a session on another device that is not
       },
     )
 
+    test("#given the woken engine answered held under a person's Stop (senpi#7014) #then the result is queued waiting on a hold on the receiving device, not uncertain", async () => {
+      expect(await answered(queuedEnvelope({ kind: "held", holds: ["session_hold"], turnId: "0" }))).toMatchObject({
+        kind: "ok",
+        delivery: { kind: "queued", queue_position: 1, waiting_on: { kind: "hold", device: "c" } },
+      })
+    })
+
     test("#given the receiver answered an existing row #then the result is deduplicated", async () => {
       expect(
         await answered(
@@ -350,6 +358,32 @@ describe("#13037 the sender half reaches a session on another device that is not
             setting: "threads.chainCountLimit",
             chain_count: 4,
             limit: 3,
+          },
+        },
+      })
+    })
+
+    test("#given the receiving store refused it with its pair loop guard #then the tool answers pair_loop_guard with the burst and when the next send is accepted", async () => {
+      const result = await answered(
+        queuedEnvelope({
+          kind: "refused",
+          reason: "pair_loop_guard",
+          burst: 8,
+          window_ms: 40_000,
+          retry_after_ms: 4_000,
+        }),
+      )
+      expect(result).toMatchObject({
+        kind: "error",
+        error: {
+          code: "pair_loop_guard",
+          details: {
+            device: "c",
+            reason: "pair_loop_guard",
+            guard: "pair_loop",
+            burst: 8,
+            window_ms: 40_000,
+            retry_after_ms: 4_000,
           },
         },
       })
@@ -408,6 +442,18 @@ describe("#13037 the sender half reaches a session on another device that is not
       })
       const { run } = fixture.surface(a.remote)
       expect(await run("thread_send", { thread: "dur-on-b", message: "hi", delivery: "follow_up" })).toMatchObject({
+        kind: "ok",
+        delivery: { kind: "queued", waiting_on: { kind: "hold", device: "b" } },
+      })
+    })
+
+    test("#given an idle session on b under a hold a peer cannot release #when the engine answers held (senpi#7014) #then the result waits on a hold on b, not idempotency_uncertain", async () => {
+      const a = account({
+        rows: [B_ROW],
+        admitOutcome: queuedEnvelope({ kind: "held", holds: ["interrupted_run"], turnId: "0" }),
+      })
+      const { run } = fixture.surface(a.remote)
+      expect(await run("thread_send", { thread: "dur-on-b", message: "hi" })).toMatchObject({
         kind: "ok",
         delivery: { kind: "queued", waiting_on: { kind: "hold", device: "b" } },
       })

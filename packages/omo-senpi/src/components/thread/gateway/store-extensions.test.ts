@@ -49,7 +49,7 @@ describe("store extension migrations", () => {
       db.exec("ALTER TABLE deliveries DROP COLUMN ledger_id")
       db.exec("ALTER TABLE deliveries DROP COLUMN verbatim_text")
       db.exec("ALTER TABLE deliveries DROP COLUMN verbatim_display_text")
-      // v15 dropped the binding-era tables the v6 layout still had: recreate them from the v1..v6 steps.
+      // v16 dropped the binding-era tables the v6 layout still had: recreate them from the v1..v6 steps.
       for (const step of GATEWAY_MIGRATIONS.slice(0, 6))
         for (const statement of step)
           if (/\b(bindings|outbox|outbox_cursors|completion_arms)\b/.test(statement) && !statement.startsWith("INSERT"))

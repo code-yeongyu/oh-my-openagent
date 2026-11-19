@@ -125,7 +125,7 @@ async function settleRun(f: ReturnType<typeof eventApi>, durableId: string): Pro
 }
 
 describe("thread component control endpoint registration", () => {
-  test("#given an engine without pi.session #when the component registers #then no control endpoint is registered and only the run, message, startup and shutdown hooks exist", () => {
+  test("#given an engine without pi.session #when the component registers #then no control endpoint is registered and only the run, message, startup, shutdown and monitor-target (tool_call) hooks exist", () => {
     const f = eventApi()
     createThreadComponent({
       host: host(),
@@ -139,6 +139,7 @@ describe("thread component control endpoint registration", () => {
       "message_start",
       "session_shutdown",
       "session_start",
+      "tool_call",
     ])
   })
 

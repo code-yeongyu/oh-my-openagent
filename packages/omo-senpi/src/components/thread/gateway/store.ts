@@ -301,6 +301,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     claim: (request) => call("claim", request),
     recordOutcome: (request) => call("record_outcome", request),
     refuseQueued: (request) => call("refuse_queued", request),
+    refuseReturned: (request) => call("refuse_returned", request),
     completeReceipt: (request) => call("complete_receipt", request),
     abandonReceipt: (request) => call("abandon_receipt", request),
     deliveryView: (deliveryId) => call("delivery_view", deliveryId),

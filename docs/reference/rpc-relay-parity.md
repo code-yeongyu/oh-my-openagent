@@ -4,7 +4,7 @@
 record a relay verdict or a pair test in script/rpc-relay-parity.rows.json, then run `bun script/rpc-relay-parity.ts`. -->
 
 One row per inbound RPC record type the engine classifies: `RPC_METHOD_CLASS` in `@code-yeongyu/senpi`
-2026.11.18-3 (`dist/modes/rpc/method-classes.js`, read through `describeRpcMethodClasses()`; imported by
+2026.11.19-3 (`dist/modes/rpc/method-classes.js`, read through `describeRpcMethodClasses()`; imported by
 file because the package does not export it, so an engine that moves the file fails the test here), table version
 1, digest `27c8b985864be3f3a7d9605f4f8476e423613eb9fa2bba9b6820e0d0c1d3f9a6`. A method the engine adds, removes or reclassifies changes this
 table, and `script/rpc-relay-parity.test.ts` fails until it is regenerated (#13478).

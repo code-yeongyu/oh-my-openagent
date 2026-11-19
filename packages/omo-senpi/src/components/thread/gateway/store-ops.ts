@@ -19,7 +19,6 @@ import { join } from "node:path"
 
 import {
   GATEWAY_RECEIPT_RETENTION_MS,
-  MAX_FANOUT_PER_TURN,
   PAIR_BUCKET_BURST,
   PAIR_BUCKET_REFILL_MS,
   QUEUED_TTL_MS,
@@ -29,13 +28,14 @@ import {
   TARGET_MAX_BYTES,
   TARGET_MAX_MESSAGES,
 } from "./constants"
+import { pairLoopGuardMessage } from "../errors"
 import { readLegacyMailbox } from "./legacy-mailbox"
 import { gatewayInboxDirectory } from "./paths"
 import { isClaimantDead, sameProcess } from "./process-identity"
 import { deleteExpiredReceipt, sweepRetentionIfDue } from "./store-retention"
 import { resultFromRow } from "./result"
 import { isProvenance } from "./provenance-record"
-import { GATEWAY_MIGRATIONS, GatewaySchemaVersionError } from "./schema"
+import { GATEWAY_MIGRATIONS, GATEWAY_TABLE_REBUILDS, GatewaySchemaVersionError } from "./schema"
 import { lockWaitExceeded } from "./lock-wait"
 import { isBusyError, type Sql, type SqlRow, type SqlValue } from "./sql"
 import type {
@@ -369,13 +369,14 @@ export async function migrate(ctx: StoreContext): Promise<void> {
   for (;;) {
     const version = schemaVersion(ctx)
     if (version >= GATEWAY_MIGRATIONS.length) return
-    // The CHECK-widening v7 rebuild and the v15 binding-table drop must run with foreign_keys OFF, which SQLite only
-    // honors when the pragma is set OUTSIDE the transaction (a table drop would otherwise fire foreign-key actions from
-    // extension tables referencing `bindings`: ON DELETE CASCADE empties them, a plain REFERENCES fails the step on every
-    // open). The pragma is restored to its prior value afterwards. v7 recreates `bindings`, so foreign_key_check is
-    // verified from TypeScript before its bump commits; v15 removes the table for good, so an extension table that still
-    // references it keeps its rows and must rebuild itself without the reference.
-    const needsForeignKeysOff = GATEWAY_NEEDS_FK_OFF.has(version)
+    // A CHECK-widening rebuild (v7 `bindings`, v15 `deliveries`) and the v16 binding-table drop must run with
+    // foreign_keys OFF, which SQLite only honors when the pragma is set OUTSIDE the transaction (a table drop would
+    // otherwise fire foreign-key actions from extension tables referencing that table: ON DELETE CASCADE empties them, a
+    // plain REFERENCES fails the step on every open). The pragma is restored to its prior value afterwards. A rebuild
+    // verifies foreign_key_check from TypeScript before its bump commits; v16 removes `bindings` for good, so an extension
+    // table that still references it keeps its rows and must rebuild itself without the reference.
+    const rebuilt = GATEWAY_TABLE_REBUILDS.get(version)
+    const needsForeignKeysOff = rebuilt !== undefined || version === GATEWAY_V16_BINDING_DROP
     const priorForeignKeys = needsForeignKeysOff
       ? Number(ctx.sql.one(["foreign_keys"], "SELECT foreign_keys FROM pragma_foreign_keys")?.foreign_keys ?? 1)
       : 1
@@ -384,15 +385,15 @@ export async function migrate(ctx: StoreContext): Promise<void> {
       await transaction(ctx, "migrate", () => {
         const current = schemaVersion(ctx)
         if (current !== version) return
-        if (version === GATEWAY_V15_BINDING_DROP) dropEmptyBindings(ctx)
+        if (version === GATEWAY_V16_BINDING_DROP) dropEmptyBindings(ctx)
         for (const statement of GATEWAY_MIGRATIONS[current]) ctx.sql.exec(statement)
-        if (version === GATEWAY_V7_REBUILD) {
+        if (rebuilt !== undefined) {
           const violations = ctx.sql.all(["parent"], "SELECT parent FROM pragma_foreign_key_check")
-          const introduced = violations.filter((row) => row.parent === "bindings")
+          const introduced = violations.filter((row) => row.parent === rebuilt)
           if (introduced.length > 0) {
             throw new GatewayMigrationError(
               current + 1,
-              `gateway schema ${current + 1} would leave a foreign-key violation referencing bindings; staying at v${current}`,
+              `gateway schema ${current + 1} would leave a foreign-key violation referencing ${rebuilt}; staying at v${current}`,
             )
           }
         }
@@ -404,18 +405,15 @@ export async function migrate(ctx: StoreContext): Promise<void> {
   }
 }
 
-/** v15 drops `bindings` only once no row is left for an extension to import through `tx.bindingFor` (schema.ts v15). */
+/** v16 drops `bindings` only once no row is left for an extension to import through `tx.bindingFor` (schema.ts v16). */
 function dropEmptyBindings(ctx: StoreContext): void {
   if (ctx.sql.one(["name"], "SELECT name FROM sqlite_schema WHERE type = 'table' AND name = 'bindings'") === undefined)
     return
   if (ctx.sql.one(["seq"], "SELECT seq FROM bindings LIMIT 1") === undefined) ctx.sql.exec("DROP TABLE bindings")
 }
 
-/** Migration indexes (0-based) of the v7 `bindings` rebuild and the v15 binding-table drop. */
-const GATEWAY_V7_REBUILD = 6
-const GATEWAY_V15_BINDING_DROP = 14
-/** Migration indexes (0-based) whose steps must run with foreign_keys OFF; see migrate(). */
-const GATEWAY_NEEDS_FK_OFF: ReadonlySet<number> = new Set([GATEWAY_V7_REBUILD, GATEWAY_V15_BINDING_DROP])
+/** Migration index (0-based) of the v16 binding-table drop. */
+const GATEWAY_V16_BINDING_DROP = 15
 
 type ReceiptRecord = {
   readonly args_hash: string
@@ -560,21 +558,6 @@ function placeCausally(ctx: StoreContext, request: EnqueueRequest): CausalPlacem
   return placement
 }
 
-function checkFanout(ctx: StoreContext, request: EnqueueRequest): StoreRefusal | undefined {
-  if (request.sender_turn === null) return undefined
-  const targets = new Set(
-    ctx.sql
-      .all(
-        ["t"],
-        "SELECT DISTINCT target_durable_id AS t FROM deliveries WHERE sender = ? AND sender_turn = ? AND state != 'refused'",
-        [request.sender_principal, request.sender_turn],
-      )
-      .map((row) => String(row.t)),
-  )
-  if (targets.has(request.target_durable_id) || targets.size < MAX_FANOUT_PER_TURN) return undefined
-  return refused("overloaded", `One turn may reach at most ${MAX_FANOUT_PER_TURN} sessions.`, { budget: "fanout" })
-}
-
 function takePairToken(ctx: StoreContext, request: EnqueueRequest): StoreRefusal | undefined {
   const sender = request.rate_principal ?? request.sender_principal
   const bucket = ctx.sql.one(
@@ -589,11 +572,20 @@ function takePairToken(ctx: StoreContext, request: EnqueueRequest): StoreRefusal
           PAIR_BUCKET_BURST,
           Number(bucket.tokens) + Math.max(0, request.now - Number(bucket.updated_at)) / PAIR_BUCKET_REFILL_MS,
         )
+  // An empty bucket means the sender spent at least the whole burst on this target within the time the bucket takes to
+  // refill from empty: that is the burst the refusal reports, measured from the bucket it read.
   if (tokens < 1) {
-    return refused("overloaded", "Too many deliveries to this session; wait before sending again.", {
-      budget: "pair_rate",
-      retry_after_ms: Math.ceil((1 - tokens) * PAIR_BUCKET_REFILL_MS),
-    })
+    const windowMs = PAIR_BUCKET_BURST * PAIR_BUCKET_REFILL_MS
+    return refused(
+      "pair_loop_guard",
+      pairLoopGuardMessage(sender, request.target_durable_id, PAIR_BUCKET_BURST, windowMs),
+      {
+        guard: "pair_loop",
+        burst: PAIR_BUCKET_BURST,
+        window_ms: windowMs,
+        retry_after_ms: Math.ceil((1 - tokens) * PAIR_BUCKET_REFILL_MS),
+      },
+    )
   }
   write(
     ctx,
@@ -669,7 +661,7 @@ export async function enqueue(
       rollbackQuietly(ctx)
       return placement
     }
-    const budget = checkFanout(ctx, request) ?? takePairToken(ctx, request)
+    const budget = takePairToken(ctx, request)
     if (budget !== undefined) {
       rollbackQuietly(ctx)
       return budget
@@ -1005,6 +997,24 @@ export async function refuseQueued(
   return await transaction(ctx, "refuse", () => {
     const row = selectRow(ctx, request.delivery_id)
     if (row === undefined || row.state !== "queued") return false
+    transition(ctx, row, "refused", request.now, { reason: request.reason })
+    unlinkMarker(ctx, row.target_durable_id, row.delivery_id)
+    return true
+  })
+}
+
+/**
+ * omo#14313: a delivery the engine took in (`admitting`/`admitted`) and then handed back unread when its session was
+ * closed gracefully. The row is refused with `reason`, so its sender reads it as not delivered instead of admitted.
+ * An `applied` row (the session read it) is never touched. Answers whether this call refused it.
+ */
+export async function refuseReturned(
+  ctx: StoreContext,
+  request: { readonly now: number; readonly delivery_id: string; readonly reason: RefusalReason },
+): Promise<boolean> {
+  return await transaction(ctx, "refuse_returned", () => {
+    const row = selectRow(ctx, request.delivery_id)
+    if (row === undefined || (row.state !== "admitting" && row.state !== "admitted")) return false
     transition(ctx, row, "refused", request.now, { reason: request.reason })
     unlinkMarker(ctx, row.target_durable_id, row.delivery_id)
     return true

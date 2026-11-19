@@ -16,11 +16,15 @@ export { THREAD_EXIT } from "./thread-args.js"
  */
 
 const USAGE = [
-  "usage: omo thread <list|send|read> [options] [--json]",
+  "usage: omo thread <list|send|read|close> [options] [--json]",
   "",
   "  list      [--all-scope] [--state running|idle|inactive|archived[,...]]  (repeatable; default: all but archived)",
   "  send      <target> <text> [--mode auto|steer|follow_up] [--expected-turn <n>] [--idempotency-key <k>]",
   "  read      <target> [--limit <items>] [--max-bytes <n>] [--cursor <c>]",
+  "  close     <target> [--force | --graceful [--wait-ms <n>]] [--idempotency-key <k>]",
+  "",
+  "  <target>/<session> takes a thread id, session id, alias, exact name, unique id prefix,",
+  "                or <device>/<thread> (device: id, here, name or unique device id prefix)",
   "",
   "  --all-scope  resolve sessions in every workspace, not only this directory's",
   "  --json       print the result as one JSON value",
@@ -62,6 +66,21 @@ const COMMANDS = {
         await sdk.read({ ...scope, thread: p[0], max_bytes: integerOption(o, "--max-bytes"), cursor: o["--cursor"] }),
         integerOption(o, "--limit"),
       ),
+  },
+  close: {
+    values: ["--wait-ms", "--idempotency-key"],
+    booleans: ["--force", "--graceful"],
+    arity: [1, 1],
+    // omo#14313: the thread_close tool's body; --graceful lets the turn end and hands unread messages back.
+    call: (sdk, p, o, scope, flags) =>
+      sdk.close({
+        ...scope,
+        thread: p[0],
+        ...(flags.has("--force") ? { force: true } : {}),
+        ...(flags.has("--graceful") ? { graceful: true } : {}),
+        wait_ms: integerOption(o, "--wait-ms"),
+        idempotency_key: o["--idempotency-key"],
+      }),
   },
 }
 

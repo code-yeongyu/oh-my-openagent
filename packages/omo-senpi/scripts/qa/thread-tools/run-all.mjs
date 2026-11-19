@@ -44,11 +44,13 @@ const gateway = [
   ["stopped-target", "stopped-target.mjs"],
   ["sender-death", "sender-death.mjs"],
   ["held-then-exit", "held-then-exit.mjs"],
+  ["graceful-close", "graceful-close.mjs"],
   ["receiver-crash", "receiver-crash.mjs"],
   ["loop-guard", "loop-guard.mjs"],
   ["lost-ack", "lost-ack.mjs"],
   ["adopt", "adopt.mjs"],
   ["draft-preservation", "draft-preservation.mjs"],
+  ["default-delivery", "default-delivery.mjs"],
 ]
 
 const legacy = [

@@ -4,6 +4,7 @@ import { join } from "node:path"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
+import { returnedAtClose, settleGracefulClose } from "./gateway/graceful-close-returns"
 import { SESSION_CONTROL_DELIVERY_TYPE } from "./gateway/constants"
 import { loadProvenanceWorkspaces } from "./gateway/provenance-config"
 import { registerCreateReceivers } from "./create-receivers"
@@ -231,6 +232,17 @@ function waitingQuestionCallOf(event: unknown): string | undefined {
   return flag !== undefined && (args as Record<string, unknown> | null | undefined)?.[flag] === true
     ? toolCallId
     : undefined
+}
+
+/** senpi's `session_shutdown { closed: true }`: a graceful close ended the session on request (omo#14313). */
+const closedOnRequest = (event: unknown): boolean =>
+  typeof event === "object" && event !== null && (event as { readonly closed?: unknown }).closed === true
+
+function durableIdOf(eventCtx: unknown): string | undefined {
+  const manager = (eventCtx as { readonly sessionManager?: { readonly getSessionId?: () => unknown } } | undefined)
+    ?.sessionManager
+  const id = typeof manager?.getSessionId === "function" ? manager.getSessionId() : undefined
+  return typeof id === "string" && id.length > 0 ? id : undefined
 }
 
 /**
@@ -474,13 +486,20 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         // the work continues (noteInput).
         run.answered = true
       })
-      pi.on("session_shutdown", async () => {
+      pi.on("session_shutdown", async (event, eventCtx) => {
         tools.dispose()
         await registrant
           ?.stop()
           .catch((error: unknown) =>
             ctx.logger.warn(
               `thread gateway: control endpoint teardown failed: ${error instanceof Error ? error.message : String(error)}`,
+            ),
+          )
+        const durableId = durableIdOf(eventCtx)
+        if (closedOnRequest(event) && durableId !== undefined)
+          await settleGracefulClose(store, durableId, returnedAtClose(eventCtx)).catch((error: unknown) =>
+            ctx.logger.warn(
+              `thread gateway: the graceful close's unread messages were not answered: ${error instanceof Error ? error.message : String(error)}`,
             ),
           )
         if (options.store === undefined) await store.dispose().catch(() => undefined)
