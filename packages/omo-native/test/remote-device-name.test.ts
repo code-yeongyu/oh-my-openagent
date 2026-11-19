@@ -11,6 +11,7 @@ import { REMOTE_EXIT, runRemoteVerb } from "../remote-cli"
 
 // #13432: the session verbs take a device the way the device table prints it - its id, its NAME (compared as thread
 // names are), or a unique id prefix - through thread_create's one device resolver (thread/remote/plan-create.ts).
+// #14305: `sessions --device` takes the same spellings, through the shared address module.
 
 const SIGNED_IN = {
   exitCode: 0,
@@ -79,8 +80,8 @@ describe("omo remote session verbs take the device the table prints", () => {
   })
 
   test("#given a name/session address #when close runs #then the close reaches the session on that device", async () => {
-    const result = await run(["close", "studio/s1", "--json"])
-    expect(result.sent.filter((entry) => entry.device === "b" && entry.session === "s1").length).toBeGreaterThan(0)
+    const result = await run(["close", "studio/rk-on-b", "--json"])
+    expect(result.sent.filter((entry) => entry.device === "b" && entry.session === "rk-on-b").length).toBeGreaterThan(0)
     expect(result.sent.filter((entry) => entry.device === "studio")).toEqual([])
   })
 
@@ -97,3 +98,7 @@ describe("omo remote session verbs take the device the table prints", () => {
     expect(JSON.parse(result.out[0] ?? "{}")).toMatchObject({ kind: "error", error: { code: "not_found" } })
   })
 })
+
+// `sessions --device <name|prefix|here>` resolves inside the client's one sessions.list call, which belongs to the
+// roster lane (U6): the name and ambiguity cases of that resolution moved there with #14305. The CLI's own half -
+// printing the candidates the client answers - is pinned in remote-cli.test.ts over a spy client.
