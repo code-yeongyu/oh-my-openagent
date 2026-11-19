@@ -33,8 +33,8 @@ export function createRemoteMonitorSource(remote: RemoteThreadSurface): RpcRemot
         if (device.kind === "error") throw new Error(`${device.error.code}: ${device.error.message}`)
         return await openDevice(remote, device.device, handlers)
       }
-      const { row } = await sessionOn(remote, target.device, target.session)
-      return await openSession(remote, row.device, row.session_id, target.session, options.resumeFrom, handlers)
+      const { device, session } = await sessionOn(remote, target.device, target.session)
+      return await openSession(remote, device, session, target.session, options.resumeFrom, handlers)
     },
   }
 }
@@ -79,22 +79,30 @@ export async function resolveMonitorTarget(
 /**
  * The session a raw `<device>/<thread>` open names (a restored monitor, or a target armed before it was read): the
  * module resolves the device by id, name or prefix, online, and the thread among that device's threads by id, listing
- * key, alias, name or prefix; only an id-shaped thread part reaches the device unlisted.
+ * key, alias, name or prefix; only an id-shaped thread part reaches the device unlisted. A device that is offline or did
+ * not answer is no reason to drop a restored monitor for good: the open then watches the key the device's rows give
+ * (else the text as stored) and the watch's own reattach waits for the device. not_found and ambiguous_target refuse.
  */
 async function sessionOn(
   remote: RemoteThreadSurface,
   device: string,
   thread: string,
-): Promise<{ readonly row: RemoteSessionRow }> {
+): Promise<{ readonly device: string; readonly session: string }> {
   const resolved = await resolveAddress(
     { remote, callerWorkspaceRoot: "", local: [], callerId: UNKNOWN_CALLER },
     formatAddress(device, thread),
     { all_scope: true, need: "online" },
   )
-  if (resolved.kind === "error") throw new Error(`${resolved.code}: ${resolved.message}`)
+  if (resolved.kind === "error") {
+    if (resolved.code !== "device_offline" && resolved.code !== "host_unavailable")
+      throw new Error(`${resolved.code}: ${resolved.message}`)
+    const rows = await remote.sessions.sessions({ device }).catch(() => [])
+    const listed = rows.find((row) => row.device === device && (row.session_id === thread || row.durable_id === thread))
+    return { device, session: listed?.session_id ?? thread }
+  }
   if (resolved.where.kind !== "device")
     throw new Error(`not_found: ${thread} is a session on this device, which a remote watch does not follow.`)
-  return { row: resolved.where.row }
+  return { device: resolved.where.row.device, session: resolved.where.row.session_id }
 }
 
 async function openSession(

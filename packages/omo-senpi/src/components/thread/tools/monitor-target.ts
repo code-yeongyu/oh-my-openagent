@@ -21,7 +21,8 @@ export type MonitorTargetResolver = (target: string, callerId: string) => Promis
 /**
  * The monitor's target reading (`remote/monitor-source.ts` `resolveMonitorTarget`, in the thread client sidecar) over this
  * surface's address book and the account, through the one resolver every thread tool uses (`resolveAddress`): every
- * workspace, a thread id nothing lists probed once per device, and the device needed online.
+ * workspace and the device needed online. Only a thread-id-shaped target that nothing lists is probed (once per online
+ * device, bounded by the device service): a name, alias or prefix never waits on a probe in this preflight.
  */
 export function createMonitorTargetResolver(options: ThreadToolSurfaceOptions): MonitorTargetResolver {
   return async (target, callerId) =>
