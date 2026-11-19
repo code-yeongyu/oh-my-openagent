@@ -63,13 +63,18 @@ device    := device-id | "here" | device-name | device-id-prefix
 - A thread id is the `thread` value `open --json` prints; it is the canonical identity of the session. A session id
   is the listing key of the `SESSION` column. A name compares as thread names do (case and spacing folded). An id
   prefix is 8+ hex characters naming one thread; a device-id prefix is 6+ characters.
-- A bare address searches the account's listing; `<device>/<thread>` asks that device itself, so a session opened a
-  moment ago resolves there before any listing shows it: right after `open`, use `<device>/<thread>`.
-- `here` names this device. `omo remote` commands the OTHER devices' sessions; a thread this device holds answers
-  with the local tool that reaches it (`omo thread send <thread>`).
+- A bare address searches the account's listing; `<device>/<thread>` searches that device's sessions only. A thread id
+  or a listing key that device does not list yet (a session opened a moment ago) is asked of the device itself, when
+  this device's service is 0.1.31 or later; an older service answers `host_unavailable` (`wake_unavailable`) and
+  sends nothing, so wait for the session to appear in `omo remote sessions`, or update OmO. A name, an alias or an id
+  prefix is always taken from the listing.
+- `here` names this device. `omo remote` commands the OTHER devices' sessions: a thread this device holds, by any form,
+  answers `not_found` and nothing is sent; reach it with `omo thread send <thread>`.
 - Failures are typed. `model`, `interrupt`, `close` and `attach` need the device online and refuse `device_offline`
   without queueing. A device that missed this listing round answers `host_unavailable`, never an empty miss. An
-  ambiguous name or prefix names its candidates and nothing runs.
+  ambiguous device, name or prefix, or a thread id two devices list, is `ambiguous_target`: nothing runs, and the
+  candidates are printed one per line (in `--json`, under `details.candidates`). `/session` and `device/` are usage
+  errors.
 
 `send`
 with `--steer` goes into the running turn, and `--no-wait` returns once the session took the message
