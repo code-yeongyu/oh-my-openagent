@@ -390,6 +390,13 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
         .filter((entry) => entry.via === "wake" || entry.rpc?.["type"] === "admit_external_message")
         .map((entry) => entry.rpc?.["deliveryId"])
       expect(new Set(ids).size).toBe(1)
+      // The retry's record is stamped as the first attempt's was: one hop for the whole delivery, so the chain count the
+      // receiver sees does not grow across the retry.
+      expect(new Set(a.hops).size).toBe(1)
+      const stamped = a.sent
+        .filter((entry) => entry.via === "wake" || entry.rpc?.["type"] === "admit_external_message")
+        .map((entry) => entry.rpc?.["chainCount"])
+      expect(new Set(stamped).size).toBe(1)
     },
   )
 

@@ -435,12 +435,15 @@ export function createRelayTransport(
     listed: RemoteSessionRow,
     later: Later,
     sending: () => void,
-    retry?: { readonly ids: Awaited<ReturnType<typeof chain>> | undefined },
+    retry?: { readonly ids: Awaited<ReturnType<typeof chain>> | undefined; readonly announced: boolean },
   ): Promise<SendOutcome> {
     const offline = await deviceOnline(remote, listed.device)
     if (offline !== undefined) return offline
     const parkedHere = (outcome: { readonly kind: string; readonly reason?: string }) =>
-      retry === undefined && rowStatus(listed) === "live" && outcome.kind === "refused" && outcome.reason === "route_unlisted"
+      retry === undefined &&
+      rowStatus(listed) === "live" &&
+      outcome.kind === "refused" &&
+      outcome.reason === "route_unlisted"
     const addressed = await addressOf(listed, retry !== undefined)
     if (!("row" in addressed)) return addressed
     // `ended`: the wake path (no lane probe; its state is offline in the decision table, so a steer is turn_conflict).
@@ -463,7 +466,7 @@ export function createRelayTransport(
         type: "get_state",
         sessionId: row.session_id,
       })
-      if (parkedHere(probed)) return await send(delivery, listed, later, sending, { ids: undefined })
+      if (parkedHere(probed)) return await send(delivery, listed, later, sending, { ids: undefined, announced: false })
       if (probed.kind !== "ok") return probeFailure(probed, row.device)
       const state: EngineState = engineStateOf(replyData(probed.response))
       probedState = state
@@ -543,7 +546,8 @@ export function createRelayTransport(
       delivery_id,
       effective_mode: lane,
     })
-    sending()
+    // One delivery is announced once: a retry after the first attempt's admission was refused does not announce it again.
+    if (retry?.announced !== true) sending()
     if (ended) return wakeAnswer(await woken(row, record), row, delivery_id, ok)
     let sent = await remote.sessions.sessionCommand(row.device, row.session_id, record)
     if (
@@ -558,7 +562,9 @@ export function createRelayTransport(
       record = recordFor(lane)
       sent = await remote.sessions.sessionCommand(row.device, row.session_id, record)
     }
-    if (parkedHere(sent)) return await send(delivery, listed, later, sending, { ids })
+    // The retry re-stamps its own record (a wake addresses the durable id on the follow-up lane); `stamp` is a pure
+    // function of (record, hop) and the ids are the first attempt's, so the receiver sees one delivery.
+    if (parkedHere(sent)) return await send(delivery, listed, later, sending, { ids, announced: true })
     if (sent.kind === "refused" && (ADMIT_UNSUPPORTED.has(sent.reason) || sent.reason.startsWith("Unknown command")))
       return fail(
         "unsupported",
