@@ -6,7 +6,7 @@ import { parseSync } from "oxc-parser"
 // Package contract: omo-desktop-app vendors these files byte-for-byte and loads them in its web client, and
 // remote/seams.ts (the published omo-ai/remote types) reaches parse.ts. So no source file may import anything but a
 // sibling file of this package: no dependency, no node: built-in, no Bun module.
-const SRC = new URL(".", import.meta.url).pathname
+const SRC = import.meta.dir
 
 function specifiers(file: string): string[] {
   const found: string[] = []

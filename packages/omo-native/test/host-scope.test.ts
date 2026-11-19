@@ -160,8 +160,8 @@ describe("host scope against the user manager", () => {
     }
   })
 
-  test("reports a failing busctl instead of throwing", async () => {
-    // given a busctl stub that exits 1 (/bin/false is /usr/bin/false on macOS)
+  test.skipIf(process.platform === "win32")("reports a failing busctl instead of throwing", async () => {
+    // given a busctl stub that exits 1 (/bin/false is /usr/bin/false on macOS; a #! stub cannot run on Windows)
     const dir = mkdtempSync(join(tmpdir(), "omo-host-scope-"))
     const stub = join(dir, "busctl")
     writeFileSync(stub, "#!/bin/sh\nexit 1\n")
