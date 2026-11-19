@@ -260,6 +260,8 @@ export function createRemoteThreadFixture() {
       silent?: readonly string[]
       /** omo#13037: this device's service carries the wake mark and the single probe (both gates open). Off by default, as shipped. */
       wakeFeature?: boolean
+      /** omo#14270: what kind of device b registers as (`cli` daemon or `desktop` app); unset, b names none. */
+      bKind?: string
       /** omo#13037: this device's service makes no single probe (the lookup is never made). */
       noLookup?: boolean
       /** omo#13037 review: a sessions port as before the lookup existed (no lookup, no capability read). */
@@ -541,7 +543,12 @@ export function createRemoteThreadFixture() {
     }
     const devices: RemoteDevice[] = [
       ...(options.rosterWithoutSelf === true ? [] : [{ device: "here", label: "this mac", online: true }]),
-      { device: "b", label: "studio", online: options.online ?? true },
+      {
+        device: "b",
+        label: "studio",
+        online: options.online ?? true,
+        ...(options.bKind === undefined ? {} : { kind: options.bKind }),
+      },
       ...(options.devices ?? []),
     ]
     for (const device of [

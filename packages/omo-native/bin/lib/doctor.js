@@ -103,15 +103,7 @@ const MANAGED_MODE_FLAG = "--mode"
 const BINARY_RUNTIME_EXECUTABLE = String.raw`[\\/]binary-runtime[\\/][^\\/\s]+[\\/]omo(?:\.exe)?`
 const BINARY_ENGINE = new RegExp(String.raw`${BINARY_RUNTIME_EXECUTABLE}(?=\s|$)\s*(\S*)`)
 // omo's own commands; the engine's one-shot commands come from engine-commands.js (isEngineCommand).
-const BINARY_NON_ENGINE_COMMANDS = new Set([
-  "doctor",
-  "setup",
-  "daemon",
-  "upgrade",
-  "ulw-loop",
-  "--version",
-  "-v",
-])
+const BINARY_NON_ENGINE_COMMANDS = new Set(["doctor", "setup", "daemon", "upgrade", "ulw-loop", "--version", "-v"])
 
 function isBinaryEngine(command) {
   const match = BINARY_ENGINE.exec(command)
