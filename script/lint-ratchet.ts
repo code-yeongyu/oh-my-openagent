@@ -5,8 +5,8 @@ import * as NodeProcess from "node:process"
 
 import { parseSync } from "oxc-parser"
 
-// The strictness rules every repo enforces, plus the two landmines testing rules (ported from
-// interfere-inc/landmines, MIT). This repo still has hundreds of old sites, so they ratchet: each
+// The strictness rules every repo enforces, plus the landmines testing rules (ported from
+// interfere-inc/landmines, MIT; no-module-mock extends its no-test-doubles to bun's mock.module). This repo still has hundreds of old sites, so they ratchet: each
 // file's count must match the baseline exactly. A rise fails, and so does a drop until the baseline
 // is lowered in the same change, so a removed site cannot come back. The old sites are rewritten
 // package by package later, each reviewed as a behaviour change.
@@ -16,6 +16,7 @@ export const RATCHET_RULES = [
   "typescript/no-non-null-assertion",
   "omo-testing/no-fixed-sleep",
   "omo-testing/no-flake-masking",
+  "omo-testing/no-module-mock",
 ] as const
 
 // A disable comment hides a finding from the linter, so it is counted as an extra value: one that
@@ -24,7 +25,8 @@ export const SUPPRESSION = "disable-directive"
 // A directive is a comment whose text starts with the directive word, as oxlint reads it. The
 // comments come from the parser's tokens, so a directive inside a string or template never counts.
 const DIRECTIVE = /^[\s*]*(?:oxlint|eslint)-disable(?:-next-line|-line)?(?:\s|$)([\s\S]*)$/
-const NAMES_A_RULE = /\b(?:no-explicit-any|ban-ts-comment|no-non-null-assertion|no-fixed-sleep|no-flake-masking)\b/
+const NAMES_A_RULE =
+  /\b(?:no-explicit-any|ban-ts-comment|no-non-null-assertion|no-fixed-sleep|no-flake-masking|no-module-mock)\b/
 
 export const countSuppressions = (file: string, source: string): number => {
   let count = 0
