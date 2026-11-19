@@ -7,7 +7,8 @@ import { controlIdentity, controlRefusalOf, type SessionControl } from "../contr
 import { isEntryCursor, staleEntryCursor } from "../paged-reader"
 import { readTranscript, type ThreadTranscriptEntry } from "../reader"
 import { threadLink } from "../thread-link"
-import { addressBook, degradedSummary, failure, sendAddressBook, summary, transcriptRole } from "./internals"
+import { addressBook, degradedSummary, failure, sendAddressBook, summary } from "./internals"
+import { readItem } from "./read-item"
 import { threadRow } from "./thread-row"
 import { listedStates } from "./thread-state"
 import type { ThreadHostSession, ThreadHostView, ThreadToolSurfaceOptions } from "./ports"
@@ -147,11 +148,7 @@ async function pagedReadResult(control: SessionControl, value: ThreadReadInput):
 
 /** A live slice's messages as items, numbered from 1, on every leg. */
 function liveItems(messages: readonly ThreadTranscriptEntry[]) {
-  return messages.map((item, index) => ({
-    seq: index + 1,
-    role: transcriptRole(item.role),
-    content: JSON.stringify(item.content ?? item),
-  }))
+  return messages.map(readItem)
 }
 
 /** A live session's transcript through the bounded reader; the same window rules on this device and on another one. */
@@ -200,11 +197,7 @@ function readDegraded(
     if (item.type !== "message" || typeof message !== "object" || message === null || Array.isArray(message)) return []
     return message.role === "user" || message.role === "assistant" || message.role === "toolResult" ? [message] : []
   })
-  const items = messages.map((message, index) => ({
-    seq: index + 1,
-    role: transcriptRole(message.role),
-    content: JSON.stringify(message.content ?? message),
-  }))
+  const items = messages.map(readItem)
   return {
     kind: "ok",
     thread: threadId,

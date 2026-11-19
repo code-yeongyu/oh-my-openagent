@@ -53,6 +53,18 @@ export type ThreadSummary = {
  * in this shape too: `currentResult` (`tools/thread-row.ts`) maps its `thread_id` or nested `thread`, rows, candidates
  * and endpoint kind, and rebuilds a missing `link`.
  */
+/**
+ * A running thread asleep between provider retries (senpi#7025): `reason` is the engine's (`rate_limit` after a 429,
+ * `retry` after another retryable error), `until` when the next attempt starts, `attempt` of `max_attempts`.
+ */
+export type ThreadRetryWait = {
+  readonly kind: "retry"
+  readonly reason: "rate_limit" | "retry"
+  readonly until: string
+  readonly attempt: number
+  readonly max_attempts: number
+}
+
 export type ThreadResultSummary = {
   readonly thread: string
   readonly name: string
@@ -77,6 +89,11 @@ export type ThreadResultSummary = {
   readonly error_code?: string
   /** The current or most recent turn's id, as the prompt response names it. */
   readonly turn_id?: string
+  /**
+   * Set on a `running` thread whose engine sleeps between provider retries: it is waiting, not working, until `until`.
+   * Absent while it works, and on an engine that does not publish the wait (senpi before #7025, another device's row).
+   */
+  readonly waiting_on?: ThreadRetryWait
   /**
    * Set when the row comes from another device's cached listing (it did not answer this round): when that listing was
    * taken. Such a row is the device's last word, so it reads `inactive` (or `archived`), never `running`.
