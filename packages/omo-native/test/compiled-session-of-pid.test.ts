@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { mkdirSync, mkdtempSync, readdirSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { removeTree } from "../../../test-support/remove-tree"
@@ -25,17 +25,12 @@ function freshHome(name: string): string {
   return home
 }
 
-function listTree(dir: string): string[] {
-  return readdirSync(dir, { recursive: true, withFileTypes: true })
-    .map((entry) => join(entry.parentPath, entry.name).slice(dir.length))
-    .sort()
-}
-
-async function run(args: string[], home: string, extraEnv: Record<string, string> = {}) {
+async function run(args: string[], home: string) {
   const child = Bun.spawn([binary, ...args], {
     cwd: "/",
-    // Exactly what g13's session-attestation.ts spawns: cwd /, stdin ignored, and only PATH, LANG, LC_ALL and HOME.
-    env: { PATH: "/usr/bin:/bin", LANG: "C", LC_ALL: "C", HOME: home, ...extraEnv },
+    // What g13's session-attestation.ts spawns: cwd /, stdin ignored, and only PATH, LANG, LC_ALL and HOME; USERPROFILE
+    // keeps a Windows run's runtime provisioning inside the fixture home as HOME does on POSIX.
+    env: { PATH: "/usr/bin:/bin", LANG: "C", LC_ALL: "C", HOME: home, USERPROFILE: home },
     stdin: "ignore",
     stdout: "pipe",
     stderr: "pipe",
