@@ -325,7 +325,7 @@
     "relay": "unsafe-to-probe, harmless form: same: session unsupported_provider both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
   },
   "unload_session": {
-    "relay": "unsafe-to-probe, harmless form: missing: session ok locally, engine_refused malformed through the relay; endpoint ok locally, refused unsupported through the relay (#13880; measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
+    "relay": "unsafe-to-probe, harmless form: differs: session ok (outcome refused: unknown_session) locally, engine_refused malformed through the relay; endpoint ok (outcome refused: unknown_session) locally, refused unsupported through the relay (#13880; measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
   },
   "verify_api_key": {
     "relay": "unsafe-to-probe, harmless form: same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts)"
