@@ -38,7 +38,7 @@ export type DeviceServiceSessionsOptions = {
   readonly retryDelay?: (ms: number) => Promise<void>
   /** Test seam: how long an attach no op or watch holds is kept before it is detached. */
   readonly attachIdleMs?: number
-  /** Test seam: the clock that ages a finished account listing. */
+  /** Test seam: the clock that ages a finished account listing and the reads an attach holds (attach-pool.ts). */
   readonly now?: () => number
 }
 
@@ -185,7 +185,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         throw error
       },
     )).then((dialed) => dialed.conn)
-  const pool = createAttachPool(svc, attachAddressed, options.attachIdleMs)
+  const pool = createAttachPool(svc, attachAddressed, options.attachIdleMs, options.now)
   const endpoints = new Map<string, string>()
   const sessionCommand: RemoteSessionsPort["sessionCommand"] = async (device, sessionId, rpc, commandOptions) => {
     // Before the command goes out nothing can have run: an attach that fails (session_not_found, as unknown_session; peer_not_found,
