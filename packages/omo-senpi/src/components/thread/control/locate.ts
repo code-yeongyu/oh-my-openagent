@@ -1,11 +1,10 @@
 import type { ThreadToolResult } from "../contracts"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
-import { toThreadAddressEntries } from "../address-book"
 import { workspaceEntries } from "../addressing"
 import { resolveAddress } from "../address/lazy"
 import { rowThreadId } from "../remote/ports"
 import { createRelayControl } from "../remote/lazy-ops"
-import { sendAddressBook, targetSession } from "../tools/internals"
+import { sendBookFor, targetSession } from "../tools/internals"
 import type { ThreadHostView, ThreadToolSurfaceOptions } from "../tools/ports"
 import { createLocalControl } from "./local-control"
 import type { SessionControl } from "./port"
@@ -32,7 +31,7 @@ export async function locateControl(
   // Decision 0027: the entries are the ones a send resolves against, session files no engine runs included, so every
   // tool finds the thread a send finds. A thread id no device lists gets the per-device probe (A4.3.3, #13215): a
   // session another device holds but runs nowhere is its ended row, so it answers not_live there as here.
-  const localFor = (text: string) => toThreadAddressEntries(sendAddressBook(options, current, text, true))
+  const localFor = sendBookFor(options, current)
   const entries = localFor(address)
   const resolved = await resolveAddress(
     { remote: options.remote, callerWorkspaceRoot: options.callerWorkspaceRoot(), local: entries, localFor, callerId },

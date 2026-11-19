@@ -17,7 +17,15 @@ import { claimCreatedAlias, planCreate, withAlias } from "../remote/lazy-ops"
 import { threadLink } from "../thread-link"
 import { recordThreadCreator } from "../tools/extension-tools"
 import { resolveAddress } from "../address/lazy"
-import { failure, resolveEntries, sendAddressBook, summary, targetSession, uncertainFailure } from "../tools/internals"
+import {
+  failure,
+  resolveEntries,
+  sendAddressBook,
+  sendBookFor,
+  summary,
+  targetSession,
+  uncertainFailure,
+} from "../tools/internals"
 import type { ThreadHostView, ThreadToolSurfaceOptions } from "../tools/ports"
 import { openedResult } from "../tools/thread-row"
 import { createLaunch } from "./create-launch"
@@ -116,7 +124,7 @@ export async function createThread(
         // #14049: an existing thread whose process exited is still this device's when its session file is here, so
         // the ladder sees the files an id or name names (the send address book), and an id nothing lists is looked
         // up once on every online device of the account (A4.3.3), as a send to that id is.
-        const localFor = (text: string) => toThreadAddressEntries(sendAddressBook(options, current, text, true))
+        const localFor = sendBookFor(options, current)
         const found = await resolveAddress(
           { remote: options.remote, callerWorkspaceRoot: callerCwd, local: localFor(address), localFor, callerId },
           address,

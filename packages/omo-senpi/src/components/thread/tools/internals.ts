@@ -221,6 +221,12 @@ export function sendAddressBook(
   return found.length === 0 ? book : addressBook(options, view, found)
 }
 
+/** This device's send address book as the resolver asks it, for one address part at a time (`ResolveContext.localFor`). */
+export const sendBookFor =
+  (options: Omit<ThreadToolSurfaceOptions, "store">, view: ThreadHostView) =>
+  (address: string): ThreadAddressEntry[] =>
+    toThreadAddressEntries(sendAddressBook(options, view, address, true))
+
 /**
  * Resolves a session address for a store-only operation (bind, rebind, report, bindings by
  * session) the way a send resolves its target: with nothing live it is a view with no live

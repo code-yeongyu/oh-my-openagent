@@ -3,7 +3,6 @@ import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { gatewaySchemaRefusal, threadToolFailure } from "./errors"
 import type { ThreadToolFailure } from "./errors"
 import { type Static } from "typebox"
-import { toThreadAddressEntries } from "./address-book"
 import { type ThreadAddressEntry } from "./addressing"
 import { resolveAddress } from "./address/lazy"
 import {
@@ -66,6 +65,7 @@ import {
   output,
   resolveEntries,
   sendAddressBook,
+  sendBookFor,
   summary,
   targetSession,
   type AnyTool,
@@ -513,7 +513,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     if (typeof here === "object") return refuse(here)
     const replyTo = replySender(address, senders, here)
     if (replyTo !== undefined && "code" in replyTo) return refuse(replyTo)
-    const localFor = (text: string) => toThreadAddressEntries(sendAddressBook(options, current, text, true))
+    const localFor = sendBookFor(options, current)
     const context = (local: readonly ThreadAddressEntry[], account = true) => ({
       remote: account ? options.remote : undefined,
       callerWorkspaceRoot: options.callerWorkspaceRoot(),
