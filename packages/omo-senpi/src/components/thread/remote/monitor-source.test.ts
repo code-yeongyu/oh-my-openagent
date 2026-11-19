@@ -50,6 +50,28 @@ describe("monitor rpc remote targets (#12719): omo's RpcRemoteSource", () => {
     expect(lines).toEqual([])
   })
 
+  test("#given a target armed raw (a restored monitor) #when its device is named and its thread part is a name #then the module resolves both and the watch is b's listing key, under the label given (#14305)", async () => {
+    const a = account()
+    for (const [device, session] of [
+      ["studio", "dur-on-b"],
+      ["b", "on b"],
+    ] as const) {
+      const opened = await registered(a.remote).open({ device, session }, {}, capture().handlers)
+      opened.stop()
+      expect(opened.initial.rows.map((row) => row.sessionId)).toEqual([session])
+    }
+    expect(a.sent.filter((entry) => entry.via === "watch").map((entry) => [entry.device, entry.session])).toEqual([
+      ["b", "rk-on-b"],
+      ["b", "rk-on-b"],
+    ])
+  })
+
+  test("#given device b by its name #when the monitor opens <device name>/* #then it follows b's listing rows", async () => {
+    const opened = await registered(account().remote).open({ device: "studio", session: "*" }, {}, capture().handlers)
+    opened.stop()
+    expect(opened.initial.rows.map((row) => row.sessionId)).toEqual(["rk-on-b"])
+  })
+
   test("#given b's engine names its session by its routing id #when its records reach senpi #then each carries the target label, so senpi keys them with the rows it armed", async () => {
     const a = account()
     const { lines, handlers } = capture()
