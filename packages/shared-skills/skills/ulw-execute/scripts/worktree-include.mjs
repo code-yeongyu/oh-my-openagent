@@ -10,7 +10,7 @@ const DEFAULT_PATTERNS = [".env", ".env.*"]
 const INCLUDE_FILE = ".worktreeinclude"
 
 /** @returns {{ patterns: string[], explicit: boolean }} */
-export function readIncludeList(repo) {
+function readIncludeList(repo) {
   const file = join(repo, INCLUDE_FILE)
   if (!existsSync(file)) return { patterns: DEFAULT_PATTERNS, explicit: false }
   const patterns = readFileSync(file, "utf8")
