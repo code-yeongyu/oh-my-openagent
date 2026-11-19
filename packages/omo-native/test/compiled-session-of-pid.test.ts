@@ -5,10 +5,10 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { removeTree } from "../../../test-support/remove-tree"
 
-// Compiled-binary contract (omo#14253; built the way #13449's test builds it): inside a compiled binary the kill guard's shims run the binary itself as
-// `<binary> __kill-guard check --vantage <pid> -- <argv...>` (the engine leaves the judge entry empty there), so the
-// compiled entry must hand that hidden subcommand to the engine's judge before it boots anything. Only a real compiled
-// executable built from compile-entry.ts exercises that route; the embedded runtime is the smallest one it accepts.
+// Compiled-binary contract (omo#14253): `omo session-of-pid <pid> --json` reaches senpi's own command unchanged, so the
+// caller (a session attestation) reads the engine's one JSON line. Only a real compiled executable built from
+// compile-entry.ts exercises the route the release ships, so the test builds one the way #13449's test does (the
+// embedded runtime is the smallest one it accepts) and spawns it from / with a bare environment.
 const exe = process.platform === "win32" ? ".exe" : ""
 const root = mkdtempSync(join(tmpdir(), "omo-compiled-session-of-pid-"))
 const binary = join(root, "build", `omo${exe}`)

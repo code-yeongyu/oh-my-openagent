@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs"
 import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 import { canonicalAgentDir } from "./agent-dir.js"
+import { isEngineCommand } from "./engine-commands.js"
 import { fetchNpmDistTagsSync } from "./npm-dist-tags.js"
 import {
   channelDistTagVersion,
@@ -123,7 +124,9 @@ function isBinaryEngine(command) {
   if (!match) return false
   const first = match[1] ?? ""
   if (first.startsWith("--internal-") || /\.(?:m?js|cjs|ts)$/.test(first)) return false
-  return !BINARY_NON_ENGINE_COMMANDS.has(first)
+  // A one-shot command omo hands to the engine unchanged runs to completion and is never a session (#14336).
+  const args = command.slice(match.index + match[0].length - first.length).split(/\s+/)
+  return !BINARY_NON_ENGINE_COMMANDS.has(first) && !isEngineCommand(args)
 }
 
 function isEngine(entry) {

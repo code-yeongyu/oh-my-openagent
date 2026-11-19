@@ -226,6 +226,16 @@ describe("standalone binary engines", () => {
     expect([...result.stale, ...result.attached, ...result.managed]).toEqual([])
   })
 
+  // #14336: every one-shot command omo hands to the engine unchanged (bin/lib/engine-commands.js) exits on its own and is
+  // never a session, so the doctor reads it from that one list instead of a copy that drifted.
+  test.each(["session-of-pid 4242 --json", "schedule list", "remove npm:x", "models discover custom"])(
+    "#given the runtime running the one-shot engine command %p #when classified #then it is not an engine",
+    (args) => {
+      const result = classifyEngineProcesses([binary(`${runtime} ${args}`)])
+      expect([...result.stale, ...result.attached, ...result.managed]).toEqual([])
+    },
+  )
+
   test("#given the runtime in rpc mode #when classified #then it is managed, never stale", () => {
     const result = classifyEngineProcesses([binary(`${runtime} --mode rpc`)])
     expect(result.managed).toHaveLength(1)
