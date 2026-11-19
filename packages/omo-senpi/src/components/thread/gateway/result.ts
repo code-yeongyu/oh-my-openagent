@@ -18,7 +18,7 @@ export const REFUSAL_CODES: Readonly<Record<string, { readonly code: ThreadError
   },
   target_closed: {
     code: "not_resumable",
-    next: "The thread was closed before it read this message; reopen it (thread_create with its thread id) and send again if it still matters.",
+    next: "The thread was closed before it read this message; reopen it (tool.thread_create({ thread }) in an eval cell) and send again if it still matters.",
   },
   binding_closed: {
     code: "invalid_arguments",
