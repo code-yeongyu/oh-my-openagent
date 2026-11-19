@@ -51,7 +51,7 @@ describe("#given the refusal table of design section 5 #when each condition is m
       `${OFF.name}/${T.nowhere}`,
       { need: "online" },
       {},
-      { code: "device_offline", details: { device: OFF.id, device_name: OFF.name, last_seen: null } },
+      { code: "device_offline", details: { device: OFF.id, device_name: OFF.name, last_seen: OFF.last_seen_ms } },
     ],
     [
       "a thread on B while B is offline and the caller needs it online",

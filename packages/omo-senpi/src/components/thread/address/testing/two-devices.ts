@@ -170,14 +170,37 @@ export function createTwoDevices(options: TwoDeviceOptions = {}) {
     incomplete: [...new Set([...listing.incomplete, B.id])],
   })
   let round = 0
-  const listing = account.remote.sessions.listing
+  // The fixture's client reports no last_seen_ms; the account names when OFF was last seen.
+  const client = account.remote.client
+  const devicesList = client.devices.list
+  const seen: RemoteThreadSurface = {
+    ...account.remote,
+    client: {
+      ...client,
+      devices: {
+        ...client.devices,
+        list: async (...args) => {
+          const listed = await devicesList(...args)
+          return listed.kind === "ok"
+            ? {
+                ...listed,
+                value: listed.value.map((row) =>
+                  row.id === OFF.id ? { ...row, last_seen_ms: OFF.last_seen_ms } : row,
+                ),
+              }
+            : listed
+        },
+      },
+    },
+  }
+  const listing = seen.sessions.listing
   const remote: RemoteThreadSurface =
     listing === undefined || (options.incomplete !== true && options.dropsAfterFirstRound !== true)
-      ? account.remote
+      ? seen
       : {
-          ...account.remote,
+          ...seen,
           sessions: {
-            ...account.remote.sessions,
+            ...seen.sessions,
             listing: async () => {
               const full = await listing()
               round += 1
