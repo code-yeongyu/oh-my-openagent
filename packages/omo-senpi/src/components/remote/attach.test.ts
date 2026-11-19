@@ -111,6 +111,21 @@ describe("attach rows: open", () => {
     })
   })
 
+  test("#given a session on a device #when attach names the device by its name in any case #then it attaches to that session; a device no form names is not_found{device}", async () => {
+    const owner = await startOwner(worldWith(STATE))
+    const client = clientOn(owner.stateDir, fakeClock())
+    for (const device of ["Studio", "studio"]) {
+      const opened = await client.attach(handleOf(device, SESSION_ID))
+      if (opened.kind !== "ok") throw new Error(`expected an attach by ${device}, got ${JSON.stringify(opened)}`)
+      expect(opened.value.snapshot.state).toMatchObject({ sessionId: "engine-1" })
+      await opened.value.detach()
+    }
+    expect(failureOf(await client.attach(handleOf("Nowhere", SESSION_ID)))).toMatchObject({
+      code: "not_found",
+      details: { kind: "device", device: "Nowhere" },
+    })
+  })
+
   test("#given a mistyped session id and an unknown durable id #when attach opens #then each is not_found, never unsupported", async () => {
     // The device answers session.locate and holds no session by either id.
     const owner = await startOwner({ ...worldWith(STATE), located: { [PEER]: {} } })
