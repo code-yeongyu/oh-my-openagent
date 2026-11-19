@@ -57,7 +57,7 @@ async function deviceNamed(remote: RemoteThreadSurface, name: string): Promise<M
       failure: threadToolFailure(
         "ambiguous_target",
         `${named.length} devices on this account are named ${name}.`,
-        "Name the device by its id (<device id>/<thread>); thread_list with all_scope shows each device's id.",
+        "Name the device by its id (<device id>/<thread>); thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) shows each device's id.",
         { device: name, candidates: named },
       ),
     }
