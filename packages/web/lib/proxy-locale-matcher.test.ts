@@ -14,7 +14,7 @@ const redirectOf = (path: string) => {
 }
 
 // Shipped desktop builds open https://omo.dev/download (reinstall screen, deb update pill). While the
-// omo.dev page is off, that path must reach the public beta download page instead of a 404.
+// omo.dev page is off, that path must reach the public stable download page instead of a 404.
 describe("desktop download path while the omo.dev download page is off", () => {
   const saved = process.env.OMO_WEB_DESKTOP_DOWNLOAD
   beforeEach(() => {
@@ -27,8 +27,22 @@ describe("desktop download path while the omo.dev download page is off", () => {
 
   test.each([
     "/download",
-    "/download?channel=beta",
+    "/download?channel=stable",
+    "/download?channel=nightly",
     ...locales.map((locale) => `/${locale}/download`),
+  ])(
+    "#given %s #when requested #then it redirects temporarily to the public stable download page",
+    (path) => {
+      expect(redirectOf(path)).toEqual({
+        status: 307,
+        location: "https://get.omo.dev/desktop/stable/",
+      })
+    },
+  )
+
+  test.each([
+    "/download?channel=beta",
+    ...locales.map((locale) => `/${locale}/download?channel=beta`),
   ])(
     "#given %s #when requested #then it redirects temporarily to the public beta download page",
     (path) => {
