@@ -9,8 +9,29 @@
     "omo-testing/no-flake-masking": 1,
     "typescript/no-non-null-assertion": 1
   },
+  "packages/claude-code-compat-core/src/features/claude-code-mcp-loader/loader.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
+  "packages/claude-code-compat-core/src/features/claude-code-mcp-loader/scope-filtering.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
+  "packages/claude-code-compat-core/src/features/claude-code-plugin-loader/discovery-components.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
+  "packages/claude-code-compat-core/src/features/claude-code-plugin-loader/discovery-settings.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
+  "packages/claude-code-compat-core/src/features/claude-code-plugin-loader/discovery.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
   "packages/claude-code-compat-core/src/features/claude-code-plugin-loader/loader.test.ts": {
     "typescript/no-non-null-assertion": 2
+  },
+  "packages/claude-code-compat-core/src/features/claude-code-plugin-loader/mcp-server-loader.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
+  "packages/claude-code-compat-core/src/features/claude-code-plugin-loader/scope-filter.test.ts": {
+    "omo-testing/no-module-mock": 2
   },
   "packages/device-service-core/test/local-api/conformance/runner.ts": {
     "omo-testing/no-flake-masking": 2
@@ -68,6 +89,9 @@
   },
   "packages/lsp-core/src/lsp/workspace-document-state.test.ts": {
     "typescript/no-non-null-assertion": 10
+  },
+  "packages/lsp-daemon/test/request-routing.test.ts": {
+    "omo-testing/no-module-mock": 1
   },
   "packages/lsp-tools-mcp/test/initialize-timeout.test.ts": {
     "omo-testing/no-flake-masking": 2
@@ -160,6 +184,9 @@
   "packages/memory-core/src/git/exec.ts": {
     "typescript/no-non-null-assertion": 4
   },
+  "packages/memory-core/src/git/exec.windows-console.test.ts": {
+    "omo-testing/no-module-mock": 2
+  },
   "packages/memory-core/src/git/open-file-holders-slow-lsof.test.ts": {
     "omo-testing/no-flake-masking": 4
   },
@@ -204,6 +231,9 @@
   },
   "packages/memory-core/src/locks/candidate-sweep.test.ts": {
     "typescript/no-non-null-assertion": 1
+  },
+  "packages/memory-core/src/locks/process-identity.windows-console.test.ts": {
+    "omo-testing/no-module-mock": 4
   },
   "packages/memory-core/src/locks/process-start-time.test.ts": {
     "omo-testing/no-flake-masking": 1
@@ -460,6 +490,12 @@
   "packages/omo-codex/plugin/components/bootstrap/test/environment.test.ts": {
     "omo-testing/no-flake-masking": 1
   },
+  "packages/omo-codex/plugin/components/lsp/test/codex-hook-not-installed.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
+  "packages/omo-codex/plugin/components/ulw-loop/test/steering-batch.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
   "packages/omo-codex/src/install/codex-cache-install.test.ts": {
     "omo-testing/no-flake-masking": 6
   },
@@ -607,8 +643,21 @@
   "packages/omo-opencode/src/agents/per-agent-prompt-parity.test.ts": {
     "omo-testing/no-flake-masking": 1
   },
+  "packages/omo-opencode/src/cli/cli-installer.platform.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
+  "packages/omo-opencode/src/cli/cli-installer.telemetry.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
+  "packages/omo-opencode/src/cli/doctor/runner.test.ts": {
+    "omo-testing/no-module-mock": 2
+  },
   "packages/omo-opencode/src/cli/run/continuation-state.json-backend.test.ts": {
+    "omo-testing/no-module-mock": 4,
     "typescript/no-explicit-any": 1
+  },
+  "packages/omo-opencode/src/cli/run/runner.telemetry.test.ts": {
+    "omo-testing/no-module-mock": 12
   },
   "packages/omo-opencode/src/cli/run/stdin-suppression.ts": {
     "typescript/no-non-null-assertion": 2
@@ -653,6 +702,9 @@
   "packages/omo-opencode/src/dependency-security.test.ts": {
     "omo-testing/no-flake-masking": 1
   },
+  "packages/omo-opencode/src/features/background-agent/abort-with-timeout.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
   "packages/omo-opencode/src/features/background-agent/default-message-staleness-timeout.test.ts": {
     "typescript/no-explicit-any": 1
   },
@@ -672,9 +724,15 @@
   "packages/omo-opencode/src/features/background-agent/manager.ts": {
     "typescript/no-non-null-assertion": 5
   },
+  "packages/omo-opencode/src/features/background-agent/process-cleanup.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
   "packages/omo-opencode/src/features/background-agent/session-idle-event-handler.test.ts": {
     "omo-testing/no-fixed-sleep": 7,
     "typescript/no-non-null-assertion": 12
+  },
+  "packages/omo-opencode/src/features/background-agent/session-status-classifier.test.ts": {
+    "omo-testing/no-module-mock": 1
   },
   "packages/omo-opencode/src/features/background-agent/spawner.test.ts": {
     "omo-testing/no-fixed-sleep": 8
@@ -698,6 +756,15 @@
     "disable-directive": 4,
     "typescript/no-non-null-assertion": 8
   },
+  "packages/omo-opencode/src/features/hook-message-injector/injection-boundaries.test.ts": {
+    "omo-testing/no-module-mock": 2
+  },
+  "packages/omo-opencode/src/features/hook-message-injector/injector.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
+  "packages/omo-opencode/src/features/hook-message-injector/message-directory.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
   "packages/omo-opencode/src/features/mcp-oauth/callback-server.test.ts": {
     "omo-testing/no-flake-masking": 9
   },
@@ -709,25 +776,53 @@
     "typescript/no-non-null-assertion": 2
   },
   "packages/omo-opencode/src/features/team-mode/integration.test.ts": {
-    "omo-testing/no-flake-masking": 5
+    "omo-testing/no-flake-masking": 5,
+    "omo-testing/no-module-mock": 1
   },
   "packages/omo-opencode/src/features/team-mode/team-runtime/create.test.ts": {
     "omo-testing/no-flake-masking": 1,
+    "omo-testing/no-module-mock": 1,
     "typescript/no-non-null-assertion": 1
   },
   "packages/omo-opencode/src/features/team-mode/team-runtime/resolve-member.test.ts": {
+    "omo-testing/no-module-mock": 1,
     "typescript/no-explicit-any": 1
   },
   "packages/omo-opencode/src/features/tmux-subagent/manager.test.ts": {
+    "omo-testing/no-module-mock": 4,
     "typescript/no-non-null-assertion": 3
   },
+  "packages/omo-opencode/src/features/tmux-subagent/zombie-pane.test.ts": {
+    "omo-testing/no-module-mock": 3
+  },
+  "packages/omo-opencode/src/hooks/anthropic-context-window-limit-recovery/aggressive-truncation-strategy.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
+  "packages/omo-opencode/src/hooks/anthropic-context-window-limit-recovery/message-builder.test.ts": {
+    "omo-testing/no-module-mock": 6
+  },
   "packages/omo-opencode/src/hooks/anthropic-context-window-limit-recovery/recovery-deduplication.test.ts": {
+    "omo-testing/no-module-mock": 2,
     "typescript/no-non-null-assertion": 1
   },
+  "packages/omo-opencode/src/hooks/anthropic-context-window-limit-recovery/storage.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
+  "packages/omo-opencode/src/hooks/anthropic-context-window-limit-recovery/tool-result-storage.test.ts": {
+    "omo-testing/no-module-mock": 4
+  },
+  "packages/omo-opencode/src/hooks/atlas/background-task-retry.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
   "packages/omo-opencode/src/hooks/atlas/compaction-agent-filter.test.ts": {
+    "omo-testing/no-module-mock": 3,
     "typescript/no-explicit-any": 1
   },
+  "packages/omo-opencode/src/hooks/atlas/final-wave-approval-gate-regression.test.ts": {
+    "omo-testing/no-module-mock": 3
+  },
   "packages/omo-opencode/src/hooks/atlas/idle-event-persisted-lineage.test.ts": {
+    "omo-testing/no-module-mock": 3,
     "typescript/no-explicit-any": 1
   },
   "packages/omo-opencode/src/hooks/atlas/index.test.ts": {
@@ -736,11 +831,80 @@
   "packages/omo-opencode/src/hooks/atlas/session-last-agent.json.test.ts": {
     "typescript/no-explicit-any": 1
   },
+  "packages/omo-opencode/src/hooks/auto-update-checker/hook.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
   "packages/omo-opencode/src/hooks/category-skill-reminder/hook.ts": {
     "typescript/no-non-null-assertion": 1
   },
+  "packages/omo-opencode/src/hooks/claude-code-hooks/handlers/session-event-handler-retry.test.ts": {
+    "omo-testing/no-module-mock": 3
+  },
+  "packages/omo-opencode/src/hooks/claude-code-hooks/handlers/tool-execute-after-handler.test.ts": {
+    "omo-testing/no-module-mock": 4
+  },
+  "packages/omo-opencode/src/hooks/claude-code-hooks/handlers/tool-execute-before-handler.test.ts": {
+    "omo-testing/no-module-mock": 4
+  },
+  "packages/omo-opencode/src/hooks/comment-checker/__fixtures__/download-probe.fixture.ts": {
+    "omo-testing/no-module-mock": 1
+  },
+  "packages/omo-opencode/src/hooks/comment-checker/hook.apply-patch.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
+  "packages/omo-opencode/src/hooks/comment-checker/hook.lazy-init.test.ts": {
+    "omo-testing/no-module-mock": 2
+  },
+  "packages/omo-opencode/src/hooks/compaction-context-injector/index.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
+  "packages/omo-opencode/src/hooks/compaction-context-injector/prompt.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
+  "packages/omo-opencode/src/hooks/compaction-context-injector/tail.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
+  "packages/omo-opencode/src/hooks/compaction-todo-preserver/index.test.ts": {
+    "omo-testing/no-module-mock": 2
+  },
+  "packages/omo-opencode/src/hooks/directory-agents-injector/injector.test.ts": {
+    "omo-testing/no-module-mock": 2
+  },
+  "packages/omo-opencode/src/hooks/directory-readme-injector/finder.catch-fallbacks.test.ts": {
+    "omo-testing/no-module-mock": 2
+  },
+  "packages/omo-opencode/src/hooks/directory-readme-injector/injector.test.ts": {
+    "omo-testing/no-module-mock": 2
+  },
+  "packages/omo-opencode/src/hooks/interactive-bash-session/interactive-bash-session-tracker.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
+  "packages/omo-opencode/src/hooks/interactive-bash-session/storage.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
   "packages/omo-opencode/src/hooks/keyword-detector/default-mode-session-eviction.test.ts": {
     "typescript/no-non-null-assertion": 9
+  },
+  "packages/omo-opencode/src/hooks/legacy-plugin-toast/auto-migrate.test.ts": {
+    "omo-testing/no-module-mock": 2
+  },
+  "packages/omo-opencode/src/hooks/preemptive-compaction-degradation-monitor.regression.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
+  "packages/omo-opencode/src/hooks/preemptive-compaction.cache-write.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
+  "packages/omo-opencode/src/hooks/preemptive-compaction.context-limit-cache.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
+  "packages/omo-opencode/src/hooks/preemptive-compaction.degradation-monitor.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
+  "packages/omo-opencode/src/hooks/preemptive-compaction.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
+  "packages/omo-opencode/src/hooks/prometheus-md-only/index.test.ts": {
+    "omo-testing/no-module-mock": 1
   },
   "packages/omo-opencode/src/hooks/ralph-loop/dispatch-failure-invariant.test.ts": {
     "omo-testing/no-fixed-sleep": 1
@@ -751,8 +915,12 @@
   "packages/omo-opencode/src/hooks/ralph-loop/oracle-double-fire-race.test.ts": {
     "typescript/no-non-null-assertion": 1
   },
+  "packages/omo-opencode/src/hooks/runtime-fallback/hook.init.test.ts": {
+    "omo-testing/no-module-mock": 5
+  },
   "packages/omo-opencode/src/hooks/runtime-fallback/index.test.ts": {
-    "omo-testing/no-fixed-sleep": 3
+    "omo-testing/no-fixed-sleep": 3,
+    "omo-testing/no-module-mock": 1
   },
   "packages/omo-opencode/src/hooks/session-notification.test.ts": {
     "omo-testing/no-fixed-sleep": 17
@@ -766,6 +934,9 @@
   "packages/omo-opencode/src/hooks/team-session-events/team-idle-wake-hint.test.ts": {
     "omo-testing/no-flake-masking": 1
   },
+  "packages/omo-opencode/src/hooks/todo-continuation-enforcer/dispose.test.ts": {
+    "omo-testing/no-module-mock": 2
+  },
   "packages/omo-opencode/src/hooks/todo-continuation-enforcer/opencode-overload-continuation.test.ts": {
     "omo-testing/no-flake-masking": 1
   },
@@ -774,6 +945,9 @@
   },
   "packages/omo-opencode/src/hooks/write-existing-file-guard/index.test.ts": {
     "omo-testing/no-fixed-sleep": 1
+  },
+  "packages/omo-opencode/src/hooks/write-existing-file-guard/lazy-canonical-path-init.test.ts": {
+    "omo-testing/no-module-mock": 2
   },
   "packages/omo-opencode/src/hooks/zauc-sync-mocks/sync-package-json.test.ts": {
     "typescript/no-non-null-assertion": 1
@@ -784,8 +958,14 @@
   "packages/omo-opencode/src/index.test.ts": {
     "omo-testing/no-flake-masking": 1
   },
+  "packages/omo-opencode/src/mcp/zauc-mocks-mcp-index/index.test.ts": {
+    "omo-testing/no-module-mock": 2
+  },
   "packages/omo-opencode/src/plugin-handlers/config-handler.test.ts": {
     "omo-testing/no-flake-masking": 1
+  },
+  "packages/omo-opencode/src/plugin-handlers/hook-config-handler.test.ts": {
+    "omo-testing/no-module-mock": 1
   },
   "packages/omo-opencode/src/plugin/event.model-fallback-2941.test.ts": {
     "typescript/no-explicit-any": 1
@@ -819,6 +999,9 @@
   "packages/omo-opencode/src/shared/live-server-route.test.ts": {
     "omo-testing/no-flake-masking": 1
   },
+  "packages/omo-opencode/src/shared/logger.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
   "packages/omo-opencode/src/shared/markdown-link-audit.test.ts": {
     "omo-testing/no-flake-masking": 2
   },
@@ -834,8 +1017,17 @@
   "packages/omo-opencode/src/shared/opencode-coupling-audit.test.ts": {
     "omo-testing/no-flake-masking": 2
   },
+  "packages/omo-opencode/src/shared/opencode-message-dir.test.ts": {
+    "omo-testing/no-module-mock": 2
+  },
+  "packages/omo-opencode/src/shared/project-discovery-dirs.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
   "packages/omo-opencode/src/shared/prompt-tools.test.ts": {
     "typescript/no-explicit-any": 1
+  },
+  "packages/omo-opencode/src/shared/ripgrep-cli.test.ts": {
+    "omo-testing/no-module-mock": 3
   },
   "packages/omo-opencode/src/shared/session-cursor.ts": {
     "typescript/no-non-null-assertion": 1
@@ -845,6 +1037,24 @@
   },
   "packages/omo-opencode/src/shared/session-tools-store.test.ts": {
     "typescript/no-non-null-assertion": 1
+  },
+  "packages/omo-opencode/src/shared/tmux/tmux-utils/layout-runner.test.ts": {
+    "omo-testing/no-module-mock": 3
+  },
+  "packages/omo-opencode/src/shared/tmux/tmux-utils/pane-close-runner.test.ts": {
+    "omo-testing/no-module-mock": 4
+  },
+  "packages/omo-opencode/src/shared/tmux/tmux-utils/pane-dimensions.test.ts": {
+    "omo-testing/no-module-mock": 2
+  },
+  "packages/omo-opencode/src/shared/tmux/tmux-utils/session-kill-runner.test.ts": {
+    "omo-testing/no-module-mock": 4
+  },
+  "packages/omo-opencode/src/shared/tmux/tmux-utils/session-kill.test.ts": {
+    "omo-testing/no-module-mock": 4
+  },
+  "packages/omo-opencode/src/shared/tmux/tmux-utils/stale-session-sweep-runtime.test.ts": {
+    "omo-testing/no-module-mock": 5
   },
   "packages/omo-opencode/src/tools/delegate-task/builtin-categories.ts": {
     "typescript/no-non-null-assertion": 2
@@ -899,6 +1109,15 @@
   "packages/omo-opencode/src/tools/delegate-task/unstable-agent-timeout.test.ts": {
     "typescript/no-explicit-any": 1
   },
+  "packages/omo-opencode/src/tools/delegate-task/zauc-mocks-subagent-resolver/subagent-resolver-agent-overrides.test.ts": {
+    "omo-testing/no-module-mock": 2
+  },
+  "packages/omo-opencode/src/tools/delegate-task/zauc-mocks-subagent-resolver/subagent-resolver-claude-code-agents-toggle.test.ts": {
+    "omo-testing/no-module-mock": 3
+  },
+  "packages/omo-opencode/src/tools/delegate-task/zauc-mocks-subagent-resolver/subagent-resolver.test.ts": {
+    "omo-testing/no-module-mock": 8
+  },
   "packages/omo-opencode/src/tools/hashline-edit/formatter-trigger.test.ts": {
     "typescript/no-non-null-assertion": 4
   },
@@ -909,8 +1128,23 @@
   "packages/omo-opencode/src/tools/session-manager/sdk-storage.ts": {
     "typescript/no-non-null-assertion": 7
   },
+  "packages/omo-opencode/src/tools/session-manager/session-paging.test.ts": {
+    "omo-testing/no-module-mock": 3
+  },
+  "packages/omo-opencode/src/tools/session-manager/storage-fallback.test.ts": {
+    "omo-testing/no-module-mock": 3
+  },
+  "packages/omo-opencode/src/tools/session-manager/storage.test.ts": {
+    "omo-testing/no-module-mock": 12
+  },
   "packages/omo-opencode/src/tools/skill/zauc-mocks-skill-tools/short-name-resolution.test.ts": {
     "typescript/no-non-null-assertion": 1
+  },
+  "packages/omo-opencode/src/tools/skill/zauc-mocks-skill-tools/test-support.ts": {
+    "omo-testing/no-module-mock": 1
+  },
+  "packages/omo-opencode/src/tui.test.ts": {
+    "omo-testing/no-module-mock": 1
   },
   "packages/omo-senpi/plugin/scripts/bounded-stage.test.mjs": {
     "omo-testing/no-flake-masking": 3
@@ -1117,6 +1351,9 @@
   "packages/omo-senpi/src/components/memory/index-engine.test.ts": {
     "omo-testing/no-flake-masking": 2
   },
+  "packages/omo-senpi/src/components/memory/index-selection.fixture.ts": {
+    "omo-testing/no-module-mock": 4
+  },
   "packages/omo-senpi/src/components/memory/index-selection.test.ts": {
     "omo-testing/no-flake-masking": 10
   },
@@ -1275,6 +1512,9 @@
   },
   "packages/omo-senpi/src/components/memory/wiring.test.ts": {
     "omo-testing/no-flake-masking": 3
+  },
+  "packages/omo-senpi/src/components/memory/worker/__fixtures__/supervisor-admission-contention.ts": {
+    "omo-testing/no-module-mock": 1
   },
   "packages/omo-senpi/src/components/memory/worker/dream-dispatch.integration.test.ts": {
     "omo-testing/no-flake-masking": 5
@@ -1473,6 +1713,9 @@
   "packages/omo-senpi/src/components/telemetry/omo-native-disabled-load.test.ts": {
     "omo-testing/no-flake-masking": 4
   },
+  "packages/omo-senpi/src/components/telemetry/session-summary-legacy-rollups-swap.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
   "packages/omo-senpi/src/components/thread/component.test.ts": {
     "omo-testing/no-flake-masking": 3
   },
@@ -1575,8 +1818,26 @@
   "packages/omo-senpi/test-support/split-local-session.test.ts": {
     "omo-testing/no-flake-masking": 2
   },
+  "packages/openclaw-core/src/__tests__/reply-listener-daemon-resolution.test.ts": {
+    "omo-testing/no-module-mock": 3
+  },
   "packages/openclaw-core/src/__tests__/reply-listener-process.real-process.test.ts": {
     "omo-testing/no-flake-masking": 1
+  },
+  "packages/openclaw-core/src/__tests__/reply-listener-restart-persisted-config.test.ts": {
+    "omo-testing/no-module-mock": 3
+  },
+  "packages/openclaw-core/src/__tests__/reply-listener-restart-runtime-signature.test.ts": {
+    "omo-testing/no-module-mock": 3
+  },
+  "packages/openclaw-core/src/__tests__/reply-listener-restart-timeout.test.ts": {
+    "omo-testing/no-module-mock": 3
+  },
+  "packages/openclaw-core/src/__tests__/reply-listener-startup.test.ts": {
+    "omo-testing/no-module-mock": 3
+  },
+  "packages/openclaw-core/src/__tests__/reply-listener-state-stop.test.ts": {
+    "omo-testing/no-module-mock": 3
   },
   "packages/openclaw-core/src/runtime-dispatch.ts": {
     "typescript/no-non-null-assertion": 2
@@ -1894,6 +2155,9 @@
   "packages/utils/src/ast-grep/sg-resolution.test.ts": {
     "omo-testing/no-flake-masking": 1
   },
+  "packages/utils/src/contains-path.test.ts": {
+    "omo-testing/no-module-mock": 1
+  },
   "packages/utils/src/git-worktree/collect-git-diff-stats.test.ts": {
     "typescript/no-non-null-assertion": 3
   },
@@ -1966,6 +2230,12 @@
   },
   "script/engine-sidecar-sources.test.ts": {
     "omo-testing/no-flake-masking": 1
+  },
+  "script/fixtures/senpi-hooks-state-error-runner.ts": {
+    "omo-testing/no-module-mock": 1
+  },
+  "script/fixtures/senpi-hooks-state-legacy-reader.ts": {
+    "omo-testing/no-module-mock": 2
   },
   "script/gpt-mini-reference-audit.test.ts": {
     "omo-testing/no-flake-masking": 1
