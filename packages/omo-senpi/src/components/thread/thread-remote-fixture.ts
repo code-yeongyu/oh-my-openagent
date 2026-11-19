@@ -744,6 +744,7 @@ export function createRemoteThreadFixture() {
     extra: {
       callerCause?: () => string | undefined
       callerChainHop?: () => number
+      callerWorkspaceRoot?: string
       callerName?: () => string | undefined
       callerReplyTargets?: () => readonly string[]
       callerReplySenders?: () => readonly {
@@ -922,7 +923,7 @@ export function createRemoteThreadFixture() {
       diskSessions: () => disk,
       ...(extra.sessionsDirectory === true ? { sessionsDirectory: () => join(agentDir, "sessions") } : {}),
       callerSessionId: () => caller,
-      callerWorkspaceRoot: () => process.cwd(),
+      callerWorkspaceRoot: () => extra.callerWorkspaceRoot ?? process.cwd(),
       remote,
       ...(extra.callerReplyTargets === undefined ? {} : { callerReplyTargets: extra.callerReplyTargets }),
       ...(extra.callerReplySenders === undefined ? {} : { callerReplySenders: extra.callerReplySenders }),
