@@ -24,7 +24,6 @@ import {
   type ThreadToolResult,
 } from "./contracts"
 import { THREAD_FAMILY_PROMPT_GUIDELINES } from "./metadata"
-import { relayAddressBook, type RelayAddressBook } from "./remote/address-book"
 import { withClosedRows } from "./remote/closed-rows"
 import { threadLink } from "./thread-link"
 export type { ThreadTranscriptEntry } from "./reader"
@@ -576,11 +575,10 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         match,
         probe: true,
         id_prefix: false,
+        unique_holder: true,
       })
       if (resolved.kind === "ok" && resolved.where.kind === "device") {
         if (resolved.thread !== replyTo.session_id) return refuse(replyTargetFailure(address, resolved.entry))
-        const ambiguous = await unattestedSenderAmbiguity(options, entries, replyTo.session_id)
-        if (ambiguous !== undefined) return refuse(ambiguous)
         return { kind: "remote", row: resolved.where.row }
       }
     }
@@ -783,38 +781,6 @@ async function thisDeviceOf(
   } catch (error) {
     return unavailable(error instanceof Error ? error.message : String(error))
   }
-}
-
-/**
- * #14048: the refusal of a reply to an unattested sender whose durable id more than one device lists (this device's entries
- * and the account listing), as the account-wide lookup answers several holders; undefined when one device lists it.
- */
-async function unattestedSenderAmbiguity(
-  options: ThreadToolSurfaceOptions,
-  local: readonly ThreadAddressEntry[],
-  sessionId: string,
-): Promise<ThreadToolFailure | undefined> {
-  if (options.remote === undefined) return undefined
-  const book = await relayAddressBook(options.remote, sessionId).catch((error: unknown): RelayAddressBook => ({
-    entries: [],
-    unavailable: threadToolFailure(
-      "host_unavailable",
-      "The account's session listing could not be read again to confirm the sender's device.",
-      "Retry when the device service is reachable.",
-      { reason: error instanceof Error ? error.message : String(error) },
-    ),
-  }))
-  if (book.unavailable !== undefined) return book.unavailable
-  const devices = [
-    ...new Set([...local, ...book.entries].filter((e) => e.thread_id === sessionId).map((e) => e.device ?? "")),
-  ]
-  if (devices.length <= 1) return undefined
-  return threadToolFailure(
-    "ambiguous_target",
-    `Session ${sessionId} is listed on more than one device and this run's delivery names none; nothing was sent.`,
-    "Address the session on one device with <device>/<session id>.",
-    { candidates: devices.map((device) => ({ id: sessionId, ...(device === "" ? {} : { device }) })) },
-  )
 }
 
 /**
