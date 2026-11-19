@@ -101,16 +101,6 @@ function rememberListed(port: object, rows: readonly RemoteSessionRow[]): void {
     }
 }
 
-/** One account listing round with the devices it could not include; a port without `listing` reports none missing. */
-async function accountListing(remote: RemoteThreadSurface): Promise<RemoteListing> {
-  const listing =
-    remote.sessions.listing !== undefined
-      ? await remote.sessions.listing()
-      : { rows: await remote.sessions.sessions(), incomplete: [] }
-  rememberListed(remote.sessions, listing.rows)
-  return listing
-}
-
 /** One device's listing with whether it missed the round (#14280); a port without `listing` reports it answered. */
 export async function deviceListing(remote: RemoteThreadSurface, device: string): Promise<RemoteListing> {
   return remote.sessions.listing !== undefined
@@ -153,14 +143,18 @@ export async function relayAddressBook(remote: RemoteThreadSurface, address: str
   const { here } = ready
   // Read before this round is remembered, so the device is the one an EARLIER round named for the address.
   const listedOn = lastListed.get(remote.sessions)?.get(address)
+  // One account listing round with the devices it could not include (a port without `listing` reports none missing).
   // thread_list's rule: a removed device's cached rows address nothing; with no roster every row stays.
   const [listing, roster] = await Promise.all([
-    accountListing(remote),
+    remote.sessions.listing !== undefined
+      ? remote.sessions.listing()
+      : remote.sessions.sessions().then((rows): RemoteListing => ({ rows, incomplete: [] })),
     remote.sessions.devices().then(
       (devices) => devices,
       () => undefined,
     ),
   ])
+  rememberListed(remote.sessions, listing.rows)
   const rows = onAccount(listing.rows, roster, here)
   const missing = listing.incomplete
   const entries = rows.filter((row) => row.device !== here).map((row) => relayAddressEntry(row))
