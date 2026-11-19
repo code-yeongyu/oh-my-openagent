@@ -98,7 +98,17 @@ Write `.omo/boulder.json` before implementation starts. Prefix session ids with 
 }
 ```
 
-Every phase (plan wave) runs in its own task-owned worktree with its own goal: before the wave's first dispatch, record the wave's goal — its checkboxes and their acceptance criteria — as a ledger entry, then `git worktree add <repo>-wt/<plan>-<wave> <branch off the integration base>` (or verify a `--worktree` path with `git worktree list --porcelain`), store the absolute path as `worktree_path`, run every edit, command, test, and evidence capture inside it; the wave lands on the integration base once each of its checkboxes is verified or `[~]` (direct merge, or the PR under `--make-pr`/`--ship`; a `[~]` row's unverified changes do not land: a dispatched worker reverts them in the wave worktree before landing, and the `unmet` entry records the revert), and the next wave branches from that landed base. Use the bundled ultrawork directive’s Task resources and todo rules at wave/worktree creation; read those sections if absent from context.
+Every phase (plan wave) runs in its own task-owned worktree with its own goal: before the wave's first dispatch, record the wave's goal — its checkboxes and their acceptance criteria — as a ledger entry, then create it with `node <this skill's directory>/scripts/worktrees.mjs add --path <repo>-wt/<plan>-<wave> --branch <branch> --base <integration base>` (see Worktree setup and teardown; or verify a `--worktree` path with `git worktree list --porcelain` and run the script's `provision --path <it>`), store the absolute path as `worktree_path`, run every edit, command, test, and evidence capture inside it; the wave lands on the integration base once each of its checkboxes is verified or `[~]` (direct merge, or the PR under `--make-pr`/`--ship`; a `[~]` row's unverified changes do not land: a dispatched worker reverts them in the wave worktree before landing, and the `unmet` entry records the revert), and the next wave branches from that landed base. Use the bundled ultrawork directive’s Task resources and todo rules at wave/worktree creation; read those sections if absent from context.
+
+### Worktree setup and teardown
+
+A fresh `git worktree add` has none of the main checkout's gitignored files, so a worktree without `.env` looks like a project with no credentials. Create every run worktree through `scripts/worktrees.mjs` in this skill's directory. It prints one JSON line:
+
+- `add --path <abs> --branch <name> [--base <ref>]` creates the worktree, copies the main checkout's ignored local config into it, and records it in `.omo/ulw-execute/worktrees.json`. By default it copies the root `.env` and `.env.*` files. A `.worktreeinclude` file at the repository root replaces that default with its own list (one repo-relative path or last-segment glob per line, `#` comments), and an empty one copies nothing. A file already in the worktree is never overwritten. Symlinks and paths outside the repository are refused.
+- A plain path listed in `.worktreeinclude` is required. When one is missing, the script exits 3 and names it in `missingRequired`. **Stop and ask the user for it.** Never continue as though external access were unavailable, and never simulate it. A worker that needs a credential the worktree lacks reports BLOCKED and names the missing file or variable; it does not mock the service.
+- `teardown [--into <branch>]` runs after the run's work has landed. It removes every recorded worktree whose branch is merged into the integration branch, deletes that branch, and keeps (with a reason) anything unmerged or dirty. Worktrees and branches the run did not create are never touched.
+
+Keep the count bounded: one worktree per wave, plus one per lane only for truly independent PR lanes. Remove a wave's worktree as soon as it has landed, so the run never holds more worktrees than the lanes it is running.
 
 ## Parallel delivery lanes (teams and worktrees)
 
@@ -233,9 +243,9 @@ Only after verification passes:
 When all top-level checkboxes in `## TODOs` and `## Final Verification Wave` are complete:
 
 1. Run the plan's final verification commands.
-2. Under `--make-pr` or `--ship`, finish the lifecycle from the last phase's worktree: sync `.omo/` state back to the main repo, create or update the PR, and wait for review/verification gates. Then follow the delivery mode: `--ship` merges per the repository's merge policy; `--make-pr` hands off with the PR URL and merges only if the user asks. Remove the worktree only after a successful merge or that explicit handoff. Finish directory teardown per Task resources and record its receipts.
+2. Under `--make-pr` or `--ship`, finish the lifecycle from the last phase's worktree: sync `.omo/` state back to the main repo, create or update the PR, and wait for review/verification gates. Then follow the delivery mode: `--ship` merges per the repository's merge policy; `--make-pr` hands off with the PR URL and merges only if the user asks. Remove the worktrees only after a successful merge or that explicit handoff: run `scripts/worktrees.mjs teardown`, and under `--ship` end with zero run worktrees left (`git worktree list`). Anything it kept is named with its reason. Finish directory teardown per Task resources and record its receipts.
 3. Remove or mark the Boulder work as completed.
-4. Print an `ORCHESTRATION COMPLETE` block with the plan path, verification commands, artifacts, and cleanup receipts.
+4. Print an `ORCHESTRATION COMPLETE` block with the plan path, verification commands, artifacts, and cleanup receipts, including every worktree and branch `teardown` removed or kept.
 
 ## Hard rules
 
