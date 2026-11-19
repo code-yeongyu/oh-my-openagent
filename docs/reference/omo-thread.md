@@ -53,7 +53,8 @@ omo thread ack <binding-id> <cursor> [--provider-message-id <id>]
 `omo thread list` lists this device's threads (in this directory's workspace, or every workspace with `--all-scope`)
 together with the threads on the account's other devices, each with its `device`. With `--json` it prints the whole
 result as one object: `threads`, `devices` (each device's name, platform, kind, `online`, `last_seen`, `this_device`,
-its thread count and `listing`: `listed`, `incomplete` when it did not answer this listing, or `offline`) and
+its thread count and `listing`: `listed`, `incomplete` when it did not answer this listing or answered only part of
+it, or `offline`; this device's row carries `dropped`, the inactive or archived threads the listing left unread) and
 `remote_unavailable` when other devices could not be listed, and `aliases_unavailable` when a thread listed without an
 alias may still hold one: `sign_in` or `host_unavailable` when the account's aliases could not be read, `not_asked` when
 the account's other devices cannot be reached from here: this device's device service is not connected, or it answered

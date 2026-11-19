@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -9,6 +9,7 @@ import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import type { RemoteSessionRow } from "./remote/ports"
 import { B_ROW, createRemoteThreadFixture } from "./thread-remote-fixture"
 import { createThreadTools } from "./tools"
+import { listAcross } from "./remote/cross-device"
 import { listThreads } from "./tools/read-ops"
 import { threadState } from "./tools/thread-state"
 import type { ThreadHost, ThreadHostSession, ThreadHostView, ThreadToolSurfaceOptions } from "./tools/ports"
@@ -173,6 +174,46 @@ describe("thread state on this device's rows", () => {
       "d-archived": { state: "archived", status: "resumable", model: null },
       "d-unarchived": { state: "inactive", status: "resumable", model: null },
     })
+  })
+
+  test("#given more session files than one listing reads, one of the unread threads live #when listed #then the result counts the inactive threads it left out, never the live one, and a filter without inactive counts none (#14295)", async () => {
+    const directory = scratch()
+    const sessionsDirectory = join(directory, "sessions")
+    const project = join(sessionsDirectory, "--work--")
+    mkdirSync(project, { recursive: true })
+    const ids: string[] = []
+    for (let index = 0; index < 203; index += 1) {
+      const id = `0195f0c2-1a2b-7c3d-8e4f-${index.toString(16).padStart(12, "0")}`
+      const created = new Date(Date.UTC(2026, 0, 1) + index * 1000).toISOString()
+      const file = join(project, `${created.replace(/[:.]/g, "-")}_${id}.jsonl`)
+      writeFileSync(file, `${JSON.stringify({ type: "session", id, cwd: "/work", timestamp: created })}\n`)
+      // The listing reads the newest by modification time: older files are touched earlier.
+      utimesSync(file, 1_800_000_000 + index, 1_800_000_000 + index)
+      ids.push(id)
+    }
+    // The three oldest files are left unread; the oldest of them runs on this device's endpoint.
+    const running: ThreadHostSession = {
+      sessionId: "route-old",
+      durableSessionId: ids[0] ?? "",
+      cwd: "/work",
+      status: "open",
+      activity: "running",
+    }
+    const options = { ...surfaceOptions(directory), sessionsDirectory: () => sessionsDirectory }
+    const view: ThreadHostView = { sessions: [running], hosts: [], disk: [] }
+    expect(listThreads(options, view, true)).toMatchObject({ inactive_truncated: true, inactive_dropped: 2 })
+    expect(rows(listThreads(options, view, true)).map((row) => row.thread)).toContain(ids[0])
+    expect(listThreads(options, view, true, ["running", "idle"])).not.toHaveProperty("inactive_dropped")
+    // An unread file may be archived: a listing of archived threads is as partial as one of inactive threads.
+    expect(listThreads(options, view, true, ["archived"])).toMatchObject({
+      inactive_truncated: true,
+      inactive_dropped: 2,
+    })
+    // With an account, the count is this device's own: its device row carries it.
+    const across = await listAcross(remoteFixture.account({}).remote, listThreads(options, view, true), true)
+    const devices = across.kind === "ok" && "devices" in across ? (across.devices ?? []) : []
+    expect(devices.find((device) => device.this_device)).toMatchObject({ device: "here", dropped: 2 })
+    expect(devices.filter((device) => !device.this_device).every((device) => device.dropped === undefined)).toBe(true)
   })
 
   test("#given the same rows #when listed by default #then archived threads are hidden; state archived shows only them", () => {
