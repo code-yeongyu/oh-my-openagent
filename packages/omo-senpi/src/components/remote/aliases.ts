@@ -3,7 +3,7 @@ import type { ClientCore, Outcome, RemoteClient } from "./client"
 import { nextActionFor, type RemoteCode, remoteFailure } from "./codes"
 import { DEADLINES, withinDeadline } from "./deadlines"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
-import type { Opts, RemoteFailure, SessionRow, ThreadHandle } from "./types"
+import type { Opts, RemoteFailure, SessionRow } from "./types"
 
 const noServiceAccess = (): RemoteFailure =>
   remoteFailure(
@@ -86,11 +86,6 @@ export function aliasMembers(core: ClientCore): RemoteClient["aliases"] {
       return aliases.kind === "error" ? aliasFailure(aliases.error) : await body(aliases.value)
     })
 
-  const sessionOf = (thread: ThreadHandle) => {
-    const parsed = canonicalizeThreadHandle(thread, {})
-    return parsed.kind === "ok" && parsed.value.target.kind === "device_session" ? parsed.value.target : undefined
-  }
-
   // The row `device` lists that `matches`. A device that missed the listing round is an outage, not a missing session:
   // device_offline, as the thread tools answer it (thread/remote/remote-ops.ts holderTarget).
   const listedRow = async (
@@ -114,17 +109,15 @@ export function aliasMembers(core: ClientCore): RemoteClient["aliases"] {
   }
 
   // The registry holds a session by its durable id, as the thread tools do (cross-device.ts), never by its session key:
-  // the listed row on the handle's device names it.
+  // the listed row on the handle's device names it. A row's thread value is that row's own handle
+  // (client.ts sessionRow), so the row is found by it directly.
   const durableIdOf = async (
     target: { readonly device: string; readonly session: string },
     opts: Opts | undefined,
   ): Promise<Outcome<string>> => {
     const found = await listedRow(
       target.device,
-      (candidate) => {
-        const listedAt = sessionOf(candidate.thread)
-        return listedAt?.device === target.device && listedAt.session === target.session
-      },
+      (candidate) => candidate.thread === handleOf(target.device, target.session),
       () =>
         remoteFailure("not_found", "No listed session has that handle.", nextActionFor("not_found"), {
           details: { kind: "session" },
@@ -158,13 +151,14 @@ export function aliasMembers(core: ClientCore): RemoteClient["aliases"] {
         })
       const found = await listedRow(device, (candidate) => candidate.durable_id === durableId, missing, opts)
       if (found.kind === "error") return found
-      const session = sessionOf(found.value.thread)
-      return session === undefined ? missing() : { kind: "ok", value: handleOf(session.device, session.session) }
+      return { kind: "ok", value: found.value.thread }
     },
     // Claim when the thread holds no alias, else rename it (thread/remote/cross-device.ts renameAlias).
     set: async (thread, alias, opts) => {
-      const target = sessionOf(thread)
-      if (target === undefined) return notASession()
+      const parsed = canonicalizeThreadHandle(thread, {})
+      if (parsed.kind === "error") return parsed
+      if (parsed.value.target.kind !== "device_session") return notASession()
+      const target = parsed.value.target
       const durable = await durableIdOf(target, opts)
       if (durable.kind === "error") return durable
       return run(opts, true, async (aliases) => {
@@ -186,8 +180,10 @@ export function aliasMembers(core: ClientCore): RemoteClient["aliases"] {
       })
     },
     clear: async (thread, opts) => {
-      const target = sessionOf(thread)
-      if (target === undefined) return notASession()
+      const parsed = canonicalizeThreadHandle(thread, {})
+      if (parsed.kind === "error") return parsed
+      if (parsed.value.target.kind !== "device_session") return notASession()
+      const target = parsed.value.target
       const durable = await durableIdOf(target, opts)
       if (durable.kind === "error") return durable
       return run(opts, true, async (aliases) => {
