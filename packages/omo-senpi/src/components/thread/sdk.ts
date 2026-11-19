@@ -54,7 +54,7 @@ import { createLiveThreadSurface, parseHostStatusAll } from "./live-surface"
 import { resolveThreadSocket } from "./live-surface-paths"
 import { createGatewayResolver, createGatewayServices } from "./tools/gateway-services"
 import { addressBook, hostView, sendAddressBook } from "./tools/internals"
-import { UNKNOWN_CALLER, type ThreadHost, type ThreadHostView, type ThreadToolSurfaceOptions } from "./tools/ports"
+import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "./tools/ports"
 import { listThreads, readThread } from "./tools/read-ops"
 import { sendView } from "./tools/send-view"
 import { listAcross } from "./remote/cross-device"
@@ -331,12 +331,9 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     now,
   }
   const view = () => hostView(surface)
-  // The offline view a send resolved its address over: the gateway's own lookup of the resolved id reads it again instead
-  // of listing the host a second time.
-  let sendListing: Promise<ThreadHostView> | undefined
   const { relay, endpoints, locate, pipeline } = createGatewayServices(
     { ...surface, ...(options.remote === undefined ? {} : { remote: options.remote }) },
-    () => sendListing ?? hostView(surface, { offline: true }),
+    () => hostView(surface, { offline: true }),
   )
   // An extension call resolves its target while the store worker runs that call's transaction, so it
   // takes the store-free live-and-disk resolver: the send path's `resolve` first asks this same store
@@ -532,8 +529,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
           ...(request.all_scope === undefined ? {} : { all_scope: request.all_scope }),
         }
         if ((await store.sessionOwner(request.thread)) === null) {
-          sendListing = hostView(surface, { offline: true })
-          const offline = await sendListing
+          const offline = await hostView(surface, { offline: true })
           const across = await resolveAddress(
             resolveContext(toThreadAddressEntries(sendAddressBook(surface, offline, bareOf(request.thread), true))),
             request.thread,
