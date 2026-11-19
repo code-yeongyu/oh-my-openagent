@@ -91,17 +91,6 @@ const NO_LOCAL_VIEW: ThreadHostView = { sessions: [], hosts: [], disk: [] }
  */
 const DEVICE_READ = new WeakMap<ThreadHostView, string | undefined | ThreadToolFailure>()
 
-// The store worker's error crosses as a plain Error whose code survives (gateway/store.ts); a schema this
-// binary does not know must refuse typed, never as internal_error with a retry that cannot succeed (#13927).
-const storeSchemaTooNew = (error: unknown): boolean =>
-  (error as { readonly code?: unknown } | null)?.code === "gateway_schema_too_new"
-const storeSchemaTooNewFailure = (message: string) =>
-  failure(
-    "store_schema_too_new",
-    `The gateway store on this device was written by a newer omo (${message})`,
-    "Update omo on this device, then retry.",
-  )
-
 export function createThreadTools(options: ThreadToolSurfaceOptions): readonly AnyTool[] {
   return buildThreadTools(options).tools
 }
@@ -193,8 +182,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     let retrying: { readonly error_note: string | null } | undefined
     if (receipted) {
       // Nothing has run yet, so a store that cannot admit the receipt fails the call as data: the store
-      // lock held past its wait bound is `overloaded`, a too-new schema is `store_schema_too_new`, any other
-      // store failure `internal_error`.
+      // lock held past its wait bound is `overloaded`, any other store failure `internal_error`.
       const key = receiptKey(scope)
       const at = now()
       // The slot is taken before the admission is awaited, so overlapping calls cannot all pass the check.
@@ -214,7 +202,6 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         admission = await store.toolReceiptBegin({ ...scope, now: at, args_hash: hashArgs(value) })
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
-        if (storeSchemaTooNew(error)) return output(storeSchemaTooNewFailure(message))
         if (isLockWaitExceeded(error))
           return output(
             failure(
@@ -310,13 +297,11 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         )
       }
       return output(
-        storeSchemaTooNew(error)
-          ? storeSchemaTooNewFailure(message)
-          : failure(
-              "internal_error",
-              `Thread operation failed: ${message}`,
-              "Call thread_list (tool.thread_list() in an eval cell) and retry after checking the target.",
-            ),
+        failure(
+          "internal_error",
+          `Thread operation failed: ${message}`,
+          "Call thread_list (tool.thread_list() in an eval cell) and retry after checking the target.",
+        ),
       )
     }
     let result: ThreadToolResult

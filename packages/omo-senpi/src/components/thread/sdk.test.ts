@@ -176,9 +176,10 @@ function countingRemote(remote: RemoteThreadSurface): {
 }
 
 describe("a gateway store newer than this binary through the SDK (#13927)", () => {
-  test("#given a store whose schema version this binary does not know #when the CLI principal sends #then the refusal is typed, not internal_error", async () => {
-    const newer = new Error("Gateway schema 15 is newer than this binary's supported version 14.")
-    ;(newer as Error & { code?: string }).code = "gateway_schema_too_new"
+  test("#given a store whose schema version this binary does not know #when the CLI principal sends #then the refusal is typed in the tool surfaces' shape", async () => {
+    const newer = new Error("This omo build reads gateway schema 14, but this machine's gateway store is at schema 15.")
+    ;(newer as Error & { code?: string; details?: { found: number; supported: number } }).code = "gateway_schema_too_new"
+    ;(newer as Error & { details?: { found: number; supported: number } }).details = { found: 15, supported: 14 }
     const f = fixture({
       store: (agentDir) => {
         const real = createGatewayStore({ agentDir })
@@ -188,7 +189,11 @@ describe("a gateway store newer than this binary through the SDK (#13927)", () =
     const outcome = await f.sdk.send({ thread: "my-tui", text: "hi" })
     expect(outcome).toMatchObject({
       kind: "error",
-      error: { code: "store_schema_too_new", next_action: "Update omo on this device, then retry." },
+      error: {
+        code: "gateway_schema_too_new",
+        next_action: expect.stringContaining("omo update"),
+        details: { gateway_schema: 15, binary_schema: 14 },
+      },
     })
   })
 })

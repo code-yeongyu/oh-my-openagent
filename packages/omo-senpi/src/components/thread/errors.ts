@@ -30,7 +30,6 @@ export const THREAD_ERROR_CODES = [
   "partial_commit",
   "unsupported",
   "overloaded",
-  "store_schema_too_new",
   "transport_closed",
   "host_unavailable",
   "internal_error",

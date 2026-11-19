@@ -255,7 +255,6 @@ describe("thread error taxonomy", () => {
       "partial_commit",
       "unsupported",
       "overloaded",
-      "store_schema_too_new",
       "transport_closed",
       "host_unavailable",
       "internal_error",

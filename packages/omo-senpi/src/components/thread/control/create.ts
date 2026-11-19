@@ -8,7 +8,7 @@ import type {
   ThreadSummary,
   ThreadToolResult,
 } from "../contracts"
-import { threadToolFailure, type ThreadErrorCode } from "../errors"
+import { gatewaySchemaRefusal, threadToolFailure, type ThreadErrorCode } from "../errors"
 import type { DeliveryTarget } from "../gateway/transport"
 import { checkInitialSkills } from "../initial-skills"
 import { createdDeviceRow } from "../remote/address-book"
@@ -244,22 +244,19 @@ async function firstPrompt(
     sent = await context.deliverPrompt(current, target, send, `${context.operationId}:prompt`)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    // A store schema this binary does not know refuses typed here too (#13927).
+    // A store schema this binary does not know refuses typed here too (#13927), in the same shape as every other
+    // surface: dev's gatewaySchemaRefusal names both schemas and the update command.
+    const refusal = gatewaySchemaRefusal(error)
     return {
       error:
-        (error as { readonly code?: unknown } | null)?.code === "gateway_schema_too_new"
+        refusal === undefined
           ? threadToolFailure(
-              "store_schema_too_new",
-              `The thread was created, but its first prompt was not delivered: the gateway store on this device was written by a newer omo (${message})`,
-              `Update omo on this device, then send the prompt with thread_send (tool.thread_send({ thread, message }) in an eval cell).`,
-              { thread: thread.thread_id },
-            )
-          : threadToolFailure(
               "internal_error",
               `The thread was created, but its first prompt was not delivered: ${message}.`,
               `Send it with thread_send to ${thread.thread_id} (tool.thread_send({ thread, message }) in an eval cell); read the thread first if the prompt may have arrived.`,
               { thread: thread.thread_id },
-            ),
+            )
+          : { ...refusal, details: { ...refusal.details, thread: thread.thread_id } },
     }
   }
   if (sent.kind === "error") return { error: sent.error }
