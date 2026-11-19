@@ -240,7 +240,13 @@ describe("thread_create whose first prompt does not start", () => {
   test("#given b answers the prompt queued behind a turn #when created on b with a prompt #then the create fails prompt_not_started, not ok", async () => {
     const queued = {
       kind: "ok",
-      response: { type: "response", id: null, command: "admit_external_message", success: true, data: { kind: "queued", turnId: "turn-b" } },
+      response: {
+        type: "response",
+        id: null,
+        command: "admit_external_message",
+        success: true,
+        data: { kind: "queued", turnId: "turn-b" },
+      },
     } as const
     const a = account({ admitOutcome: queued })
     const { run } = surface(a.remote)

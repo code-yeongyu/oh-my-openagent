@@ -228,7 +228,9 @@ export async function createThread(
   if (value.prompt === undefined) return made.kind === "ok" ? ({ ...made, prompt: null } as ThreadToolResult) : made
   if (made.kind !== "ok" || opened === undefined) return made
   const prompt = await promptThatRan(await firstPrompt(current, opened, value, context), opened, context)
-  return "not_started" in prompt ? { kind: "error", error: prompt.not_started } : ({ ...made, prompt } as ThreadToolResult)
+  return "not_started" in prompt
+    ? { kind: "error", error: prompt.not_started }
+    : ({ ...made, prompt } as ThreadToolResult)
 }
 
 /**
@@ -248,7 +250,8 @@ async function promptThatRan(
   const { delivery } = prompt
   if (delivery.kind === "started" || delivery.kind === "steered") return prompt
   const local = thread.device === undefined
-  const waited = local && prompt.delivery_id !== undefined ? await context.awaitPromptStart(prompt.delivery_id) : undefined
+  const waited =
+    local && prompt.delivery_id !== undefined ? await context.awaitPromptStart(prompt.delivery_id) : undefined
   if (waited?.kind === "started") return { ...prompt, delivery: waited.delivery }
   const state = waited?.state ?? delivery.kind
   const waitingOn = delivery.kind === "queued" ? delivery.waiting_on : undefined
