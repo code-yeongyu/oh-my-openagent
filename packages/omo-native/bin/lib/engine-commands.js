@@ -11,6 +11,8 @@ const ENGINE_COMMANDS = new Set([
   "auth",
   "host",
   "schedule",
+  // senpi#6972: `session-of-pid <pid> --json`, which a gate runs with the session host's own binary.
+  "session-of-pid",
 ])
 
 export function isEngineCommand(args) {

@@ -80,11 +80,15 @@ describe("every one-shot engine command reaches the engine with the command firs
   })
 })
 
+// senpi#6972: a gate asks the session host's own binary which session owns a pid.
+const SESSION_OF_PID = ["session-of-pid", "4242", "--json"]
+
 describe("the compiled entry hands engine commands over unchanged (#9572)", () => {
   for (const args of [
     ["models", "discover", "custom"],
     ["schedule", "list"],
     ["uninstall", "source"],
+    SESSION_OF_PID,
   ]) {
     test(`#given ${args.join(" ")} #when the compiled binary builds the engine argv #then it is unchanged and prints no banner`, () => {
       expect(buildSenpiArgs([...args], "/provisioned")).toEqual(args)
@@ -170,6 +174,7 @@ describe("the npm launcher hands engine commands over unchanged (#9572)", () => 
     ["models", "discover", "custom"],
     ["schedule", "list"],
     ["uninstall", "source"],
+    SESSION_OF_PID,
   ]) {
     test(`#given omo ${args.join(" ")} #when launched #then the engine receives exactly those arguments`, () => {
       // given
