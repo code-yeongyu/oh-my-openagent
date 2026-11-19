@@ -86,3 +86,10 @@ export const ThreadDeliveryMode = Type.Union([Type.Literal("auto"), Type.Literal
   description:
     "Omitted: auto. auto steers the running turn when one is active and starts a new turn otherwise; steer requires expected_turn_id and becomes turn_conflict when the active turn changed; follow_up queues the message behind the running turn (pass it only when the message must wait for that turn to end).",
 })
+
+/**
+ * The longest drain a graceful close of a thread on another device can wait for: its record waits 45 s for the holder's
+ * answer (`remote/port/device-service.ts` SEND_WAIT_MS), less the answer's reserve. A longer drain would outlive that
+ * wait and end as an untyped lost reply while the holder still drains (omo#14324 review M1).
+ */
+export const REMOTE_GRACEFUL_MAX_WAIT_MS = 35_000

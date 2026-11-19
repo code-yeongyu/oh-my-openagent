@@ -257,8 +257,28 @@ export const UNKNOWN_CALLER = "unknown-caller"
 /** How a close ended: the session ended, no live session held it any more, or another client still holds it. */
 export type ThreadCloseOutcome = "closed" | "not_live" | "held_elsewhere"
 
-/** `force`: close even when the session has messages it has not read; they are dropped and listed (omo#14234). */
-export type ThreadCloseOptions = { readonly force?: boolean }
+/**
+ * `force`: close even when the session has messages it has not read; they are dropped and listed (omo#14234).
+ * `graceful` (omo#14313): let the running turn end instead, within `wait_ms`, handing unread messages back to their
+ * senders; the engine stops the session's monitors, loops and goal cleanly, so a reopen comes back unheld.
+ */
+export type ThreadCloseOptions = {
+  readonly force?: boolean
+  readonly graceful?: boolean
+  readonly wait_ms?: number
+}
+
+/** What a graceful close waited for and stopped (senpi `unload_session { graceful }` `graceful` and `dropped`). */
+export type ThreadCloseGraceful = {
+  readonly turn: number
+  readonly waited_ms: number
+  readonly stopped_wake_sources: readonly string[]
+  readonly returned_user_messages: readonly string[]
+}
 
 /** A close's outcome and the deliveries the engine handed back unwritten (empty when none). */
-export type ThreadCloseAnswer = { readonly outcome: ThreadCloseOutcome; readonly dropped_deliveries: readonly string[] }
+export type ThreadCloseAnswer = {
+  readonly outcome: ThreadCloseOutcome
+  readonly dropped_deliveries: readonly string[]
+  readonly graceful?: ThreadCloseGraceful
+}

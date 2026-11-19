@@ -16,13 +16,14 @@ export { THREAD_EXIT } from "./thread-args.js"
  */
 
 const USAGE = [
-  "usage: omo thread <list|send|read|bind|unbind|rebind|bindings|report|answer|outbox|ack> [options] [--json]",
+  "usage: omo thread <list|send|read|close|bind|unbind|rebind|bindings|report|answer|outbox|ack> [options] [--json]",
   "",
   "  list      [--all-scope] [--state running|idle|inactive|archived[,...]]  (repeatable; default: all but archived)",
   "  send      <target> <text> [--mode auto|steer|follow_up] [--expected-turn <n>] [--idempotency-key <k>]",
   "  send      --binding <id> [<target>] <text> [--idempotency-key <event-id>] [--mode auto|follow_up]",
   "            [--author-id <platform-user-id> --author-name <display> [--author-user-id <id>]]",
   "  read      <target> [--limit <items>] [--max-bytes <n>] [--cursor <c>]",
+  "  close     <target> [--force | --graceful [--wait-ms <n>]] [--idempotency-key <k>]",
   "  bind      <session> --platform <p> --account <id> --chat <id> [--thread <id>] [--root-message <id>]",
   "            [--progress-message <id>] [--direction in|out|both] [--inbound-mode auto|follow_up]",
   "            [--events <kind,...>] [--policy <id>] [--ttl <seconds>|none] [--idempotency-key <k>]",
@@ -80,6 +81,21 @@ const COMMANDS = {
         await sdk.read({ ...scope, thread: p[0], max_bytes: integerOption(o, "--max-bytes"), cursor: o["--cursor"] }),
         integerOption(o, "--limit"),
       ),
+  },
+  close: {
+    values: ["--wait-ms", "--idempotency-key"],
+    booleans: ["--force", "--graceful"],
+    arity: [1, 1],
+    // omo#14313: the thread_close tool's body; --graceful lets the turn end and hands unread messages back.
+    call: (sdk, p, o, scope, flags) =>
+      sdk.close({
+        ...scope,
+        thread: p[0],
+        ...(flags.has("--force") ? { force: true } : {}),
+        ...(flags.has("--graceful") ? { graceful: true } : {}),
+        wait_ms: integerOption(o, "--wait-ms"),
+        idempotency_key: o["--idempotency-key"],
+      }),
   },
   bind: {
     values: [

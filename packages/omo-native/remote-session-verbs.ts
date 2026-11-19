@@ -3,6 +3,7 @@ import type { ThreadToolResult } from "../omo-senpi/src/components/thread/contra
 import { createRelaySessionHost } from "../omo-senpi/src/components/thread/control/relay-session-host"
 import {
   answered,
+  closeOptions,
   closeThread,
   interruptThread,
   setModelOn,
@@ -225,7 +226,7 @@ async function runSessionOn(
     case "interrupt":
       return answer(await answered(() => interruptThread(control, undefined)), label)
     case "close":
-      return answer(cliClose(await answered(() => closeThread(control, args.force)), label), label)
+      return answer(cliClose(await answered(() => closeThread(control, closeOptions(args))), label), label)
   }
 }
 

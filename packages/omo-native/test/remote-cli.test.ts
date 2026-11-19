@@ -1185,6 +1185,10 @@ describe("omo remote session verbs", () => {
     [["open"], "omo remote open: the device is required (the DEVICE column of omo remote devices)"],
     [["open", "b", "--project"], "omo remote open: --project needs a value"],
     [["close", "b/dur-on-b", "--steer"], "omo remote close: unknown argument --steer"],
+    [
+      ["close", "b/dur-on-b", "--graceful", "--wait-ms", "35001"],
+      "omo remote close: --wait-ms takes 1..35000 milliseconds and goes with --graceful",
+    ],
   ])("refuses %p as usage before contacting the service", async (args, message) => {
     const { code, err } = await run(args, join(privateDir(), "absent"))
     expect(code).toBe(REMOTE_EXIT.usage)

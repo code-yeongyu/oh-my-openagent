@@ -23,7 +23,7 @@ import {
 } from "./contracts"
 import { createThread } from "./control/create"
 import { locateControl } from "./control/locate"
-import { answered, closeThread, interruptThread, NOT_LIVE, setModelOn } from "./control/operations"
+import { answered, closeOptions, closeThread, interruptThread, NOT_LIVE, setModelOn } from "./control/operations"
 import { renameThread } from "./control/rename"
 import { controlIdentity } from "./control/port"
 import { gatewaySchemaRefusal, threadToolFailure, type ThreadToolFailure } from "./errors"
@@ -736,7 +736,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
         // Nothing live holds it: there is nothing to close, and the thread stays resumable from its session file.
         if (found.kind === "not_live")
           return { kind: "ok", ...controlIdentity(found), closed: false, reason: "not_live", dropped_deliveries: [] }
-        return await closeThread(found.control, value.force)
+        return await closeThread(found.control, closeOptions(value))
       }),
     rename: (request) =>
       control(threadToolParamSchemas.thread_rename, request, async (value) =>

@@ -326,7 +326,9 @@ export type ThreadInterruptResult =
 /**
  * `closed` is whether this call shut the session down. `reason` is always set: `closed` when it did,
  * `not_live` when nothing live held it (the session stays as it was). `dropped_deliveries` is always set: the
- * deliveries the close handed back unread (their senders redeliver them), empty when none (omo#14234).
+ * deliveries the close handed back unread (their senders redeliver them), empty when none (omo#14234). `graceful` is
+ * set when a graceful close ended the session (omo#14313): the turn it waited for, how long, the work it stopped and the
+ * person's queued text it handed back.
  */
 export type ThreadCloseResult =
   | {
@@ -335,6 +337,12 @@ export type ThreadCloseResult =
       readonly closed: boolean
       readonly reason: "closed" | "not_live"
       readonly dropped_deliveries: readonly string[]
+      readonly graceful?: {
+        readonly turn: number
+        readonly waited_ms: number
+        readonly stopped_wake_sources: readonly string[]
+        readonly returned_user_messages: readonly string[]
+      }
       readonly device?: string
     }
   | ThreadDataError

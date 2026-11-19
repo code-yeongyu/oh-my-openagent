@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto"
 
 import type { JsonObject } from "../remote/ports"
-import type { ThreadCloseAnswer, ThreadCloseOutcome } from "../tools/ports"
+import { waitWithinCallBudget } from "../../call-budget/call-deadline"
+import type { ThreadCloseAnswer, ThreadCloseGraceful, ThreadCloseOptions, ThreadCloseOutcome } from "../tools/ports"
 import { refuse } from "./port"
 
 /**
@@ -10,6 +11,12 @@ import { refuse } from "./port"
  */
 export type RecordAnswer =
   { readonly kind: "ok"; readonly data: JsonObject } | { readonly kind: "gone"; readonly reason: string }
+
+/**
+ * One engine record of the ladder. `waitMs`: how long the engine may take to answer it (a graceful close's drain); a leg
+ * whose own request bound is shorter (a terminal's control socket) waits that long instead.
+ */
+export type LadderSend = (rpc: JsonObject, options?: { readonly waitMs?: number }) => Promise<RecordAnswer>
 
 /**
  * The refusals that mean the session was not on its host when the record arrived: the engine's, and the device service's
@@ -27,7 +34,16 @@ export const SESSION_GONE: ReadonlySet<string> = new Set([
 /** senpi#7006 (senpi#7004): the engine takes `unload_session { deliveries: "refuse" }` and names the unwritten deliveries it refuses on. */
 const UNLOAD_REFUSE_DELIVERIES = "unload_refuse_deliveries"
 
+/** senpi `unload_session { graceful, waitMs }` (omo#14313). */
+const UNLOAD_GRACEFUL = "unload_graceful"
+
+/** A graceful close's wait when the caller names none, and what of the tool call's budget it leaves for the answer. */
+const GRACEFUL_WAIT_MS = 30_000
+const GRACEFUL_ANSWER_RESERVE_MS = 10_000
+
 const UNLOAD = { type: "unload_session", force: true, children: "detach" } as const
+
+const closeEffectId = (): string => `omo-thread-close:${randomUUID()}`
 
 const strings = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []
@@ -58,19 +74,25 @@ const deliveriesOf = (value: unknown): string[] | undefined =>
  * Every unload carries its own `effectId` (#14273): senpi then writes the unload to the session's transcript on its
  * holder, so the holder's wake sweep knows the session was closed on request, and when, whichever device closed it
  * (`wake/session-target.ts` `closed_at`). An engine without the effect ledger ignores the field.
+ *
+ * `graceful` (omo#14313) is one record of its own, `gracefulClose`. `legMaxWaitMs`: the longest drain the leg can wait
+ * for its answer (`REMOTE_GRACEFUL_MAX_WAIT_MS` on the relay leg); a longer `wait_ms` is cut to it and an expired drain
+ * says so (`wait_capped`).
  */
 export async function closeLadder(
   sessionId: string,
-  send: (rpc: JsonObject) => Promise<RecordAnswer>,
-  options: { readonly force?: boolean } = {},
+  send: LadderSend,
+  options: ThreadCloseOptions = {},
+  legMaxWaitMs?: number,
 ): Promise<ThreadCloseAnswer> {
+  if (options.graceful === true) return await gracefulClose(sessionId, send, options.wait_ms, legMaxWaitMs)
   const done = (outcome: ThreadCloseOutcome, data?: JsonObject): ThreadCloseAnswer => ({
     outcome,
     dropped_deliveries: deliveriesOf(data?.["dropped"]) ?? [],
   })
   type Unloaded = { readonly done: ThreadCloseAnswer } | { readonly refused: JsonObject }
   const unload = async (record: JsonObject): Promise<Unloaded> => {
-    const answered = await send({ ...UNLOAD, sessionId, effectId: `omo-thread-close:${randomUUID()}`, ...record })
+    const answered = await send({ ...UNLOAD, sessionId, effectId: closeEffectId(), ...record })
     if (answered.kind === "gone") return { done: done("not_live") }
     if (answered.data["outcome"] === "unloaded") return { done: done("closed", answered.data) }
     if (answered.data["reason"] === "session_closing") return { done: done("not_live", answered.data) }
@@ -81,7 +103,7 @@ export async function closeLadder(
   let refused = first.refused
   if (options.force !== true && (refused["reason"] === "turn_active" || refused["reason"] === "work_pending")) {
     const pending = deliveriesOf(refused["pending"])
-    if (pending === undefined && !(await refusesDeliveries(sessionId, send)))
+    if (pending === undefined && !(await advertises(sessionId, send, UNLOAD_REFUSE_DELIVERIES)))
       throw refuse(
         "turn_active",
         refused["reason"] === "turn_active"
@@ -119,24 +141,104 @@ export async function closeLadder(
 const describe = (data: JsonObject): string =>
   typeof data["detail"] === "string" ? `${String(data["reason"])}: ${data["detail"]}` : String(data["reason"])
 
-/** Whether the session's engine advertises `unload_refuse_deliveries`; anything it cannot answer counts as an older engine. */
-async function refusesDeliveries(
+/**
+ * omo#14313: one `unload_session { graceful, waitMs }`. The engine refuses new messages at once (their senders read
+ * `session_closing`), hands the unread ones back (`dropped_deliveries`; each sender's row settles `target_closed` on the
+ * holder), lets the running turn end, stops monitors, loops and the goal cleanly and ends the session. The wait is cut to
+ * what the tool call's budget leaves (`waitWithinCallBudget`), so an expired drain is answered typed inside the call:
+ * `turn_active` with `still_running`, the session still open and taking messages again. An engine without
+ * `unload_graceful` is refused before anything is sent: a graceful close never falls back to an interrupting one.
+ */
+async function gracefulClose(
   sessionId: string,
-  send: (rpc: JsonObject) => Promise<RecordAnswer>,
-): Promise<boolean> {
+  send: LadderSend,
+  waitMs: number | undefined,
+  legMaxWaitMs: number | undefined,
+): Promise<ThreadCloseAnswer> {
+  if (!(await advertises(sessionId, send, UNLOAD_GRACEFUL)))
+    throw refuse(
+      "unsupported",
+      `The engine holding thread ${sessionId} cannot close it gracefully: it runs a senpi from before graceful close.`,
+      "Update omo on that device and restart its host, or close the thread with force: true (its running turn is stopped).",
+      { command: "unload_session", capability: UNLOAD_GRACEFUL },
+    )
+  const requested = waitMs ?? GRACEFUL_WAIT_MS
+  const capped = legMaxWaitMs !== undefined && requested > legMaxWaitMs ? legMaxWaitMs : undefined
+  const wait = waitWithinCallBudget(capped ?? requested, GRACEFUL_ANSWER_RESERVE_MS)
+  if (wait <= 0)
+    throw refuse(
+      "unsupported",
+      `This call has no time left to wait for thread ${sessionId}'s turn.`,
+      "Close it again in a new call.",
+      { command: "unload_session" },
+    )
+  const answered = await send(
+    { ...UNLOAD, sessionId, effectId: closeEffectId(), graceful: true, waitMs: wait },
+    { waitMs: wait },
+  )
+  if (answered.kind === "gone") return { outcome: "not_live", dropped_deliveries: [] }
+  const { data } = answered
+  const dropped = deliveriesOf(data["dropped"]) ?? []
+  if (data["outcome"] === "unloaded")
+    return { outcome: "closed", dropped_deliveries: dropped, graceful: gracefulOf(data) }
+  if (data["reason"] === "session_closing") return { outcome: "not_live", dropped_deliveries: dropped }
+  if (data["timed_out"] === true)
+    throw refuse(
+      "turn_active",
+      `Thread ${sessionId} is still working on turn ${String(data["turn"])} after ${String(data["waited_ms"])} ms${capped === undefined ? "" : ` (the most a thread on another device can wait, not the ${String(requested)} ms asked for)`}. It stays open and takes messages again; the ${dropped.length} unread message(s) taken out of its queue are queued for it again.`,
+      capped === undefined
+        ? "Close it again with a longer wait_ms once its turn is nearly done, or with force: true to stop the turn."
+        : "Close it again once its turn is nearly done, or with force: true to stop the turn.",
+      {
+        ...(capped === undefined ? {} : { wait_capped: { requested_ms: requested, max_ms: capped } }),
+        command: "unload_session",
+        reason: "turn_active",
+        still_running: true,
+        open: true,
+        turn: data["turn"],
+        waited_ms: data["waited_ms"],
+        returned_deliveries: dropped,
+        retry_with: { force: true },
+      },
+    )
+  if (data["reason"] === "composer_draft")
+    throw refuse(
+      "unsupported",
+      `Thread ${sessionId}'s terminal has unsent text in its composer, and a close would discard it.`,
+      "Ask the person at that terminal to send or clear it, then close the thread again.",
+      { command: "unload_session", reason: "composer_draft" },
+    )
+  return await refusedUnload(sessionId, data, send)
+}
+
+function gracefulOf(data: JsonObject): ThreadCloseGraceful {
+  const graceful = data["graceful"]
+  const facts = typeof graceful === "object" && graceful !== null && !Array.isArray(graceful) ? graceful : {}
+  const dropped = data["dropped"]
+  const stopped = "stopped" in facts ? facts.stopped : undefined
+  return {
+    turn: "turn" in facts && typeof facts.turn === "number" ? facts.turn : 0,
+    waited_ms: "waited_ms" in facts && typeof facts.waited_ms === "number" ? facts.waited_ms : 0,
+    stopped_wake_sources:
+      typeof stopped === "object" && stopped !== null && "wake_sources" in stopped ? strings(stopped.wake_sources) : [],
+    returned_user_messages:
+      typeof dropped === "object" && dropped !== null && "user_messages" in dropped
+        ? strings(dropped.user_messages)
+        : [],
+  }
+}
+
+/** Whether the session's engine advertises `capability`; anything it cannot answer counts as an older engine. */
+async function advertises(sessionId: string, send: LadderSend, capability: string): Promise<boolean> {
   try {
     const info = await send({ type: "get_protocol_info", sessionId, observe: true })
-    return info.kind === "ok" && strings(info.data["capabilities"]).includes(UNLOAD_REFUSE_DELIVERIES)
+    return info.kind === "ok" && strings(info.data["capabilities"]).includes(capability)
   } catch {
     return false
   }
 }
 
-async function refusedUnload(
-  sessionId: string,
-  refused: JsonObject,
-  send: (rpc: JsonObject) => Promise<RecordAnswer>,
-): Promise<ThreadCloseAnswer> {
+async function refusedUnload(sessionId: string, refused: JsonObject, send: LadderSend): Promise<ThreadCloseAnswer> {
   const reason = refused["reason"]
   if (reason === "host_draining")
     throw refuse(
