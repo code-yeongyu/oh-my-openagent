@@ -337,7 +337,9 @@ describe("#13037 the sender half reaches a session on another device that is not
       ["sender_not_allowed", "unsupported", {}],
       ["chain_count_limit", "chain_count_limit", { reason: "chain_count_limit", setting: "threads.chainCountLimit" }],
       ["queue_full", "queue_full", {}],
-      ["wake_limit_reached", "overloaded", { reason: "wake_limit_reached" }],
+      // #14405: the device service's only overloaded answer is its bound on hand-offs in flight (in total and per
+      // sender); the answer names that budget, never a woken-session cap the service does not have.
+      ["overloaded", "overloaded", { reason: "overloaded", budget: "hand_off" }],
     ] as const)("#given the receiver refused it with %s #then the tool answers %s", async (reason, code, details) => {
       expect(await answered(queuedEnvelope({ kind: "refused", reason }))).toMatchObject({
         kind: "error",
@@ -573,7 +575,6 @@ describe("#13037 the sender half reaches a session on another device that is not
       "sender_not_admitted",
       "queue_full",
       "overloaded",
-      "wake_limit_reached",
       "wake_unavailable",
       "wake_unsupported",
     ])("#given the known code %s #then its reason is the code itself", async (code) => {
