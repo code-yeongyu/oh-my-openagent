@@ -144,5 +144,6 @@ changing the extension's automation settings.
 | Session methods, targets, options, error codes | [references/commands.md](references/commands.md) |
 | Installing: CLI, daemon, extension, the one human step, blocklisted extension | [references/install.md](references/install.md) |
 | Agent on one machine, browser on another | [references/remote.md](references/remote.md) |
+| What the attached engine sends over the network, and the pinned update check | [references/network.md](references/network.md) |
 | Owned engine: launch, snapshot ladder, network, frames, human handoff | [references/owned-engine/README.md](references/owned-engine/README.md) |
 | Reading a 1Password vault the user has unlocked | [references/recipes/1password.md](references/recipes/1password.md) |

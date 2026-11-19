@@ -55,7 +55,8 @@ may have enabled); remove one only when the user asks, with omowright's `unregis
 node "<skill-root>/scripts/browser-install.mjs" [--browser=<id>] [--json] [--wait-ms=180000]
 ```
 
-In order it: runs upstream's official `install.sh` / `install.ps1` into `~/.local/bin` (any PATH
+In order it: runs upstream's official `install.sh` / `install.ps1` from the bsk release omowright pins
+([network.md](network.md)) into `~/.local/bin` (any PATH
 line the installer appends to a shell rc file is reverted — the library calls the binary by
 absolute path); starts the daemon with `bsk status`; and, for **the one browser the user actually
 uses**, registers the Web Store listing as an external extension:
