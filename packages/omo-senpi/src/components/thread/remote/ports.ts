@@ -155,8 +155,11 @@ export type RemoteSessionsPort = {
   readonly devices: () => Promise<readonly RemoteDevice[]>
   /** The account's session list; with `device`, that one device's rows only (no account-wide round). */
   readonly sessions: (filter?: { readonly device?: string }) => Promise<readonly RemoteSessionRow[]>
-  /** The account-wide list as `sessions` gives it, with the devices it could not include. Absent: every device counts as listed. */
-  readonly listing?: () => Promise<RemoteListing>
+  /**
+   * The account-wide list as `sessions` gives it, with the devices it could not include; with `device`, that one device's
+   * rows and whether it missed the round (no account-wide round). Absent: every device counts as listed.
+   */
+  readonly listing?: (filter?: { readonly device?: string }) => Promise<RemoteListing>
   /**
    * A session-less engine record (`open_session`, `list_sessions`) on `device`'s engine endpoint, with no
    * attach: the attach-less `session.command {device, endpoint, rpc}` shape (relay daemon #393). `locate` asks a

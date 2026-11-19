@@ -229,7 +229,8 @@ describe("#13037 the sender half reaches a session on another device that is not
   // #13238 review: one rule for every probe that may build an `ended` row - only while this device's service can carry
   // the wake. With the single probe on and the wake off, a probe-built row would go down the live path instead.
   describe("lookup on with wake off: no probe builds an ended row", () => {
-    test("#given a reply to a sender on b that b no longer lists #when the run replies by id #then it is not_found naming b, with no probe and nothing sent", async () => {
+    // #14280: with no probe, b cannot be asked whether it still holds the sender, so the answer says so, never not_found.
+    test("#given a reply to a sender on b that b no longer lists #when the run replies by id #then it is host_unavailable (wake_unavailable) naming b, with no probe and nothing sent", async () => {
       const a = account({ rows: [B_ROW], ended: { b: { [GONE]: "rk-gone" } }, noWake: true })
       const { run } = fixture.surface(a.remote, {
         callerReplyTargets: () => [GONE],
@@ -237,7 +238,7 @@ describe("#13037 the sender half reaches a session on another device that is not
       })
       expect(await run("thread_send", { thread: GONE, message: "reply" })).toMatchObject({
         kind: "error",
-        error: { code: "not_found", details: { device: "b" } },
+        error: { code: "host_unavailable", details: { device: "b", reason: "wake_unavailable" } },
       })
       expect({ lookups: a.lookups, sent: a.sent }).toEqual({ lookups: [], sent: [] })
     })

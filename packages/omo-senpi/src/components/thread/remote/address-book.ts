@@ -111,6 +111,13 @@ export async function accountListing(remote: RemoteThreadSurface): Promise<Remot
   return listing
 }
 
+/** One device's listing with whether it missed the round (#14280); a port without `listing` reports it answered. */
+export async function deviceListing(remote: RemoteThreadSurface, device: string): Promise<RemoteListing> {
+  return remote.sessions.listing !== undefined
+    ? await remote.sessions.listing({ device })
+    : { rows: await remote.sessions.sessions({ device }), incomplete: [] }
+}
+
 const listingIncomplete = (device: string): ThreadToolFailure =>
   threadToolFailure(
     "host_unavailable",
