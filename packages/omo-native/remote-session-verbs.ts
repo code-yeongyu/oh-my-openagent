@@ -87,6 +87,9 @@ const deviceServiceSurface = (
  * The command's one device-service connection, lent to its remote client: the client's account reads ride it, and the
  * client's close() leaves it open for the command, which closes it itself.
  */
+/** The relay failure every `omo remote` verb answers before resolving, attach included (#14305 delta review H1). */
+export const relayUnavailable = remoteAvailable
+
 export const borrowedService = (service: DeviceService): DeviceService =>
   new Proxy(service, {
     get: (target, key) => {
@@ -148,7 +151,15 @@ async function runSessionOn(
   dependencies: RemoteCommandDependencies,
 ): Promise<number> {
   const show: Show = (result, label) => {
-    if (json) dependencies.output(JSON.stringify(result))
+    // A next action naming the agents' eval-only thread_list reads the CLI verb in --json too: scripts run the CLI.
+    if (json)
+      dependencies.output(
+        JSON.stringify(
+          result.kind === "error"
+            ? { ...result, error: { ...result.error, next_action: personNextAction(result.error.next_action) } }
+            : result,
+        ),
+      )
     if (result.kind === "error") {
       if (!json && label !== "" && NO_SUCH_SESSION.has(String(result.error.details?.["reason"]))) {
         dependencies.error(`omo remote: no session ${label} on this account.`)
@@ -163,34 +174,35 @@ async function runSessionOn(
     if (!json) for (const line of sessionVerbLines(args.verb, label, result)) dependencies.output(line)
     return REMOTE_EXIT.ok
   }
-  if (args.verb === "open") {
-    const unavailable = await remoteAvailable(remote)
-    if (unavailable !== undefined) return show(unavailable, "")
-    return await openOn(remote, args, { json, show }, dependencies)
-  }
-  // The typed text is resolved by the one address resolver (#14305), which reads the relay state first and answers an
-  // unavailable relay as remoteAvailable does: a bare thread id, name, alias or id prefix, or `<device>/<thread>` with
-  // the device by id, name, prefix or `here`. A send needs only the address (its delivery queues); the control verbs
-  // need the device online, refused there by the resolver itself.
+  // omo remote needs the relay: a device service that is off, signed out or not set up is host_unavailable naming its
+  // state, for every verb. The address module would read those states as "no relay here" and search this device's
+  // (empty) book, answering not_found (#14305 delta review H1).
+  const unavailable = await remoteAvailable(remote)
+  if (unavailable !== undefined) return show(unavailable, "")
+  if (args.verb === "open") return await openOn(remote, args, { json, show }, dependencies)
+  // The typed text is resolved by the one address resolver (#14305): a bare thread id, name, alias or id prefix, or
+  // `<device>/<thread>` with the device by id, name, prefix or `here`. A send needs only the address (its delivery
+  // queues); the control verbs need the device online, refused there by the resolver itself.
   const resolved = await resolveTypedAddress(remote, args.target, {
     need: args.verb === "send" ? "address" : "online",
   })
   if (resolved.kind === "error") return show(resolved, args.target)
-  // A listing key the person typed names the session by that key, as before the address module.
-  const { row: listed } = resolved.where
-  const typedKey = args.target === listed.session_id || args.target.endsWith(`/${listed.session_id}`)
-  const row = typedKey ? { ...listed, durable_id: listed.session_id } : listed
+  const { row } = resolved.where
+  // A listing key the person typed is the session's name in the answer, as before the address module.
+  const typedKey = args.target === row.session_id || args.target.endsWith(`/${row.session_id}`)
+  const answer: Show = (result, label) =>
+    show(typedKey && result.kind === "ok" && "thread" in result ? { ...result, thread: row.session_id } : result, label)
   // The output names the session by its address, whatever the person typed for it.
   const label = resolved.address
-  if (args.verb === "send") return sendTo(remote, row, args, { label, json, show }, dependencies)
+  if (args.verb === "send") return sendTo(remote, row, args, { label, json, show: answer }, dependencies)
   const control = createRelayControl(remote, row)
   switch (args.verb) {
     case "model":
-      return show(await answered(() => setModelOn(control, args.model, undefined)), label)
+      return answer(await answered(() => setModelOn(control, args.model, undefined)), label)
     case "interrupt":
-      return show(await answered(() => interruptThread(control, undefined)), label)
+      return answer(await answered(() => interruptThread(control, undefined)), label)
     case "close":
-      return show(cliClose(await answered(() => closeThread(control, args.force)), label), label)
+      return answer(cliClose(await answered(() => closeThread(control, args.force)), label), label)
   }
 }
 

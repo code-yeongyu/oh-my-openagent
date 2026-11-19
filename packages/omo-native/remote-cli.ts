@@ -1,4 +1,4 @@
-import { borrowedService } from "./remote-session-verbs"
+import { borrowedService, relayUnavailable } from "./remote-session-verbs"
 import { remoteClientForPerson, resolveTypedAddress } from "../omo-senpi/src/components/remote/index"
 import { existsSync } from "node:fs"
 
@@ -191,7 +191,10 @@ export async function prepareRemoteAttach(
     // prefix, or `<device>/<thread>` with the device by id, name, prefix or `here`; the device must be online, because
     // attaching opens it now. Only the resolve reads through the surface; its client (on the command's borrowed
     // connection) is released after it.
-    const resolved = await resolveTypedAddress(remote, target, { need: "online" }).finally(() => remote.client.close())
+    const resolved = await (async () =>
+      (await relayUnavailable(remote)) ?? (await resolveTypedAddress(remote, target, { need: "online" })))().finally(
+      () => remote.client.close(),
+    )
     if (resolved.kind === "error") {
       service.close()
       dependencies.error(`omo remote: ${resolved.error.message}`)
