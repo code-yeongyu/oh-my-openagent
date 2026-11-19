@@ -77,13 +77,13 @@ export const REMOTE_WAKE_UNAVAILABLE = "remote_wake_unavailable"
 // grammar (thread-address-core `parseAddress`). A senpi without the seam resolves every such target locally, so the
 // refusal must never catch a local path: a first segment only a path can have (`.`, `..`, `.hidden`, `~`, `~user`)
 // and a `.jsonl` file in any case stay local even where senpi's own shape would call them remote.
-/** The device and session a `<device>/<session>` monitor target names, as senpi reads it; undefined for a local target. */
+/** The device and session a `<device>/<session>` monitor target names, by the one address grammar; undefined for a local target. */
 export function remoteMonitorTarget(target: string): { readonly device: string; readonly session: string } | undefined {
-  const address = parseAddress(target)
-  return address.kind === "device" ? { device: address.device, session: address.thread } : undefined
+  const parsed = parseAddress(target)
+  return parsed.kind === "device" ? { device: parsed.device, session: parsed.thread } : undefined
 }
-
 const isRemoteMonitorTarget = (target: string): boolean => remoteMonitorTarget(target) !== undefined
+
 
 export function remoteWakeUnavailable(
   surface: unknown,
