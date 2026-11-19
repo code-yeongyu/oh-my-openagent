@@ -104,6 +104,14 @@ export function createRelaySessionHost(
       }
       const resolved = resolveAccountDevice(account, device, { online: true })
       if (resolved.kind === "error") return { kind: "error", error: asFailure(resolved) }
+      // The host is for the device with this id: a name or id prefix that matched another device names no device here.
+      if (resolved.device.id !== device)
+        return fail(
+          "not_found",
+          `No device named ${device} is signed in to this account.`,
+          "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to see the account's devices and threads.",
+          { device },
+        )
       const { name, initialSkills, permissionPreset, worktree, ...asked } = request
       const made =
         worktree === undefined ? undefined : await prepareRemoteWorktree(remote, device, asked.cwd ?? "", worktree)

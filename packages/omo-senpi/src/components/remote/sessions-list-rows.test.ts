@@ -89,6 +89,24 @@ describe("sessions.list rows (#14305 U6)", () => {
   })
 })
 
+describe("sessions.list unanswered devices (#14305 U6, review L5)", () => {
+  test("#given a device the round names incomplete and not answered #when sessions.list runs #then it is listed unanswered once", async () => {
+    const world = defaultWorld()
+    const missed: World = {
+      ...world,
+      listing: {
+        ...world.listing,
+        revisions: world.listing.revisions.map((revision) => ({ ...revision, incomplete: [PEER] })),
+        devices: { ...world.listing.devices, [PEER]: "undelivered" },
+      },
+    }
+    const client = await listOn(missed, [])
+    const settled = await client.sessions.list()
+    if (settled.kind !== "ok") throw new Error(`expected a listing, got ${JSON.stringify(settled)}`)
+    expect(settled.value.unanswered.filter((row) => row.id === PEER)).toHaveLength(1)
+  })
+})
+
 describe("sessions.list --device by name (#14305 U6)", () => {
   test("#given two online devices sharing a name #when sessions.list filters by that name #then it answers ambiguous_target with both devices as candidates", async () => {
     const world = defaultWorld()

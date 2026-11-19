@@ -355,7 +355,7 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
         incomplete: [...listing.incomplete, ...(self !== undefined && local === undefined ? [self.id] : [])],
         states: listing.devices,
       }
-      const unanswered = [...new Set([...listing.incomplete, ...Object.keys(listing.devices), ...round.incomplete])]
+      const unanswered = [...new Set([...Object.keys(listing.devices), ...round.incomplete])]
         .filter((id) => deviceListing(id, round, []) === "incomplete")
         .map(deviceOf)
       // Only a real name is an address, so a name filter never matches a fallback.

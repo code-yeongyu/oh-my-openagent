@@ -83,7 +83,7 @@ export type RelayAddressBook = {
 const LAST_LISTED_MAX = 4096
 const lastListed = new WeakMap<object, Map<string, string>>()
 
-function rememberListed(port: object, rows: readonly RemoteSessionRow[]): void {
+export function rememberListed(port: object, rows: readonly RemoteSessionRow[]): void {
   let ids = lastListed.get(port)
   if (ids === undefined) {
     ids = new Map()

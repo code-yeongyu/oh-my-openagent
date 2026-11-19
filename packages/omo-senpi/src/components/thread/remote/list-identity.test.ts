@@ -59,8 +59,14 @@ describe("thread_list row names (#14305 U6)", () => {
   })
 
   test("#given b lists a session with no name #when its folder name is used as an address #then it is no address: only a real name is", async () => {
-    const { run } = surface(account({ rows: [{ ...B_ROW, title: "" }] }).remote)
-    expect(await run("thread_set_model", { thread: "b", model: "opus" })).toMatchObject({ kind: "error" })
+    const a = account({ rows: [{ ...B_ROW, title: "", project: "/work/notes" }] })
+    const { run } = surface(a.remote)
+    expect(onB(await run("thread_list", {})).map((thread) => thread.name)).toEqual(["notes"])
+    expect(await run("thread_set_model", { thread: "notes", model: "opus" })).toMatchObject({
+      kind: "error",
+      error: { code: "not_found" },
+    })
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "set_model")).toEqual([])
   })
 })
 
@@ -84,12 +90,18 @@ describe("thread_list keeps the last-listed memory the relay address book reads 
     const listing = a.remote.sessions.listing
     if (listing === undefined) throw new Error("the fixture's sessions port has no listing")
     let round: (filter?: { readonly device?: string }) => Promise<RemoteListing> = listing
-    const remote: RemoteThreadSurface = { ...a.remote, sessions: { ...a.remote.sessions, listing: (filter) => round(filter) } }
+    const remote: RemoteThreadSurface = {
+      ...a.remote,
+      sessions: { ...a.remote.sessions, listing: (filter) => round(filter) },
+    }
     const listed = await listAcross(remote, { kind: "ok", threads: [], scope: "all" }, true)
     expect(rows(listed).map((thread) => thread.thread)).toContain("dur-on-b")
     round = async () => ({ rows: [], incomplete: ["b"] })
     const book = await relayAddressBook(remote, "dur-on-b")
-    expect(book.incomplete).toMatchObject({ code: "host_unavailable", details: { reason: "listing_incomplete", devices: ["b"] } })
+    expect(book.incomplete).toMatchObject({
+      code: "host_unavailable",
+      details: { reason: "listing_incomplete", devices: ["b"] },
+    })
   })
 })
 
