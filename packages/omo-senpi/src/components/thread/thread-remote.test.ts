@@ -233,10 +233,15 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
       device: "b",
       deduplicated: false,
     })
-    // The reopen then sets the thread's name on the session it located (#14274), a session command.
+    // The reopen then sets the thread's name on the session it located (#14274), a session command. The open names the
+    // folder b's find_session reports beside the file, so b's engine never probes the file's path (#14296).
     expect(a.sent.filter((entry) => entry.via === "endpoint")).toEqual([
       { via: "endpoint", device: "b", rpc: { type: "find_session", durableSessionId: "dur-on-b" } },
-      { via: "endpoint", device: "b", rpc: { type: "open_session", retain_on_disconnect: true, sessionPath: B_FILE } },
+      {
+        via: "endpoint",
+        device: "b",
+        rpc: { type: "open_session", retain_on_disconnect: true, sessionPath: B_FILE, cwd: B_ROW.project },
+      },
     ])
   })
 
