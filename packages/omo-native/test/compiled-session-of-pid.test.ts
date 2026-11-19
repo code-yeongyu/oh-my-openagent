@@ -96,7 +96,7 @@ describe("compiled omo session-of-pid (omo#14253)", () => {
     expect(result.output).not.toContain("Unknown option")
     expect(jsonOnly(result.stdout)).toMatchObject({ version: 1, ok: true, pid: process.pid })
     expect([0, 1]).toContain(result.code)
-  }, 120_000)
+  })
 
   test.each([
     ["a non-numeric pid", ["session-of-pid", "abc", "--json"]],
@@ -108,12 +108,11 @@ describe("compiled omo session-of-pid (omo#14253)", () => {
       expect(jsonOnly(result.stdout)).toMatchObject({ version: 1, ok: false, code: "invalid_arguments" })
       expect(result.code).toBe(2)
     },
-    120_000,
   )
 
   test("#given the flag before the verb #when the compiled binary is asked #then it is not the command's form and nothing answers as it", async () => {
     const result = await run(["--json", "session-of-pid", "1"], freshHome("home-flag"))
     expect(result.stdout).not.toContain('"version":1')
     expect(result.code).not.toBe(0)
-  }, 120_000)
+  })
 })
