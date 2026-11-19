@@ -21,6 +21,11 @@ export type ResolveOptions = {
   readonly probe?: boolean
   /** An approved reply: resolve only `thread` on `device`, the device its delivery came from. */
   readonly pin?: { readonly device: string; readonly thread: string }
+  /**
+   * #14048: the resolved thread must be listed by one device only (this device's book included); a sender whose delivery
+   * names no device cannot be told from a copy of its id elsewhere, so two holders are ambiguous_target.
+   */
+  readonly unique_holder?: boolean
   /** `online`: a thread on a device that is offline is device_offline, nothing is queued. */
   readonly need?: "address" | "online"
 }

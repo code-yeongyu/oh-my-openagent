@@ -1,8 +1,9 @@
 import { formatAddress, HERE, noDevice, parseAddress, type DeviceRef } from "@oh-my-opencode/thread-address-core"
 import { threadToolFailure } from "../errors"
-import type { RemoteDevice, RemoteThreadSurface } from "../remote/ports"
+import { relayAddressEntry } from "../remote/address-book"
+import { rowThreadId, type RemoteDevice, type RemoteThreadSurface } from "../remote/ports"
 import { accountDevices, readAccount, type Account } from "./account"
-import { resolveBare, type AccountAttempt } from "./bare"
+import { deviceNameOf, resolveBare, type AccountAttempt } from "./bare"
 import { deviceRows, resolveAccountDevice } from "./device"
 import { resolveOnDevice } from "./on-device"
 import { pinned } from "./probe"
@@ -116,6 +117,61 @@ const ambiguous = (text: string, readings: readonly Found[], account: Account): 
   )
 
 /**
+ * #14048 (`unique_holder`): the refusal when more than one device lists the resolved thread id, this device's book
+ * included, one candidate per device; undefined when one device does. Read from the resolution's own account read.
+ */
+async function otherHolder(
+  ctx: ResolveContext,
+  hit: Found,
+  read: () => Promise<AccountAttempt>,
+): Promise<ThreadRefusal | undefined> {
+  const attempt = await read()
+  if (attempt.kind === "none") return undefined
+  if (attempt.kind === "unavailable") return asRefusal(attempt.error)
+  if (attempt.kind === "failed")
+    return asRefusal(
+      threadToolFailure(
+        "host_unavailable",
+        "The account's session listing could not be read to confirm the session's device.",
+        "Retry when the device service is reachable.",
+        { reason: attempt.error instanceof Error ? attempt.error.message : String(attempt.error) },
+      ),
+    )
+  const account = attempt.account
+  const thread = hit.entry.thread_id
+  const byDevice = new Map(
+    [
+      ...ctx.local.filter((entry) => entry.thread_id === thread),
+      ...account.rows
+        .filter((row) => row.device !== account.here && rowThreadId(row) === thread)
+        .map((row) => relayAddressEntry(row)),
+    ].map((entry) => [entry.transport?.row.device ?? "here", entry] as const),
+  )
+  if (byDevice.size <= 1) return undefined
+  return withAddresses(
+    {
+      kind: "error",
+      ...threadToolFailure(
+        "ambiguous_target",
+        `Session ${thread} is listed on more than one device and nothing names which one sent it; none was picked.`,
+        "Address the session on one device with <device>/<session id>.",
+      ),
+      candidates: [...byDevice].map(([device, entry]) => ({
+        thread,
+        name: entry.name,
+        cwd: entry.cwd,
+        preview: entry.preview ?? "",
+        updatedAt: entry.updated_at,
+        state: entry.status,
+        device,
+      })),
+    },
+    account.here,
+    deviceNameOf(account),
+  )
+}
+
+/**
  * The one resolver (design sections 2-5): `self`, a bare address, or `<device>/<thread>`, over this device's book and
  * the account, read at most once. A device reading is taken only when the first part names a device; when it misses
  * there, or names no device, the whole text is resolved as a bare address (a thread name may contain `/`), and the
@@ -132,7 +188,11 @@ export async function resolveAddress(
   const read = remote === undefined ? async (): Promise<AccountAttempt> => ({ kind: "none" }) : once(remote)
   const bare = async (address: string) => {
     const resolved = await resolveBare(ctx, address, opts, read)
-    return await finish(ctx, resolved.result, resolved.account, opts)
+    const held =
+      opts.unique_holder === true && resolved.result.kind === "ok"
+        ? await otherHolder(ctx, resolved.result, read)
+        : undefined
+    return await finish(ctx, held ?? resolved.result, resolved.account, opts)
   }
   if (parsed.kind !== "device") return await bare(text)
   const account = await read()

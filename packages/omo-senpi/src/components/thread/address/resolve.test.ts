@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { createRemoteThreadFixture } from "../thread-remote-fixture"
+import type { RemoteSessionRow } from "../remote/ports"
 import { resolveAddress, type AddressCandidate, type Resolution, type ResolveOptions } from "."
 import {
   ALIAS,
@@ -166,4 +168,56 @@ describe("characterization of current behaviour: a closed copy of an id here whi
   test("#given a thread only this device holds, not live #when resolved #then this device's copy answers", async () => {
     await expectHit(T.hereEnded, hit(T.hereEnded, "here", "id"))
   })
+})
+
+describe("#given unique_holder (#14048: a sender whose delivery names no device) #when the resolved id is listed by one or several devices #then only one holder resolves", () => {
+  test("#given one device lists the id #when it is resolved with unique_holder #then it resolves there", async () => {
+    await expectHit(T.bLive, hit(T.bLive, "device", "id", B.id), { unique_holder: true, id_prefix: false })
+  })
+
+  test("#given a copy here and B's row #when the id is resolved with unique_holder #then ambiguous_target names this device and B", async () => {
+    const resolved = await resolve(T.stale, { unique_holder: true, id_prefix: false })
+    expect(resolved).toMatchObject({ kind: "error", code: "ambiguous_target" })
+    const candidates = (resolved.kind === "error" ? (resolved.details?.["candidates"] ?? []) : []) as readonly AddressCandidate[]
+    expect(candidates.map((candidate) => candidate.device).sort()).toEqual([B.id, HERE.id].sort())
+  })
+
+  const C = { id: "c3d4e5f60718293a", name: "garage" } as const
+  const onDevice = (device: string, key: string): RemoteSessionRow => ({
+    device,
+    session_id: key,
+    durable_id: T.nowhere,
+    title: "copy",
+    project: "/work",
+    path: "/work",
+    state: "idle",
+    updated_ms: 1,
+  })
+  test.each([
+    ["B, then C", [onDevice(B.id, "rk-b"), onDevice(C.id, "rk-c")]],
+    ["C, then B", [onDevice(C.id, "rk-c"), onDevice(B.id, "rk-b")]],
+  ] as const)(
+    "#given B and C both list the id (listing order %s) #when it is resolved with unique_holder #then ambiguous_target names both, one candidate each",
+    async (_order, rows) => {
+      const fixture = createRemoteThreadFixture()
+      cleanups.push(fixture.cleanup)
+      const account = fixture.account({
+        rows,
+        devices: [
+          { device: B.id, label: B.name, online: true },
+          { device: C.id, label: C.name, online: true },
+        ],
+      })
+      const resolved = await resolveAddress(
+        { remote: account.remote, callerWorkspaceRoot: process.cwd(), local: [], callerId: T.hereLive },
+        T.nowhere,
+        { unique_holder: true, id_prefix: false },
+      )
+      expect(resolved).toMatchObject({ kind: "error", code: "ambiguous_target" })
+      const candidates = (resolved.kind === "error" ? (resolved.details?.["candidates"] ?? []) : []) as readonly AddressCandidate[]
+      expect(candidates.map((candidate) => candidate.address).sort()).toEqual(
+        [`${B.id}/${T.nowhere}`, `${C.id}/${T.nowhere}`].sort(),
+      )
+    },
+  )
 })
