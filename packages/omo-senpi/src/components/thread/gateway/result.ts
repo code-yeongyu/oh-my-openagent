@@ -55,7 +55,7 @@ export function resultFromRow(
     // An engine that keeps the delivery as a held notice (senpi#7014: a Stop, an interrupted run or a parent's hold) answers
     // `held`: the delivery waits on that hold, and the sender is told so instead of a bare queued.
     const waitKind = row.admission_kind === "held" ? "hold" : row.wait_kind
-    const waiting =
+    const waiting: { readonly waiting_on?: DeliveryWait } =
       waitKind === null ? {} : { waiting_on: { kind: waitKind, ...(device === undefined ? {} : { device }) } }
     return { ...base, delivery: { kind: "queued", queue_position: Math.max(queuePosition, 1), ...waiting } }
   }
