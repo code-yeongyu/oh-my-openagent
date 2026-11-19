@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test"
-import { spawn } from "node:child_process"
-import { readFileSync } from "node:fs"
+import { execFileSync, spawn } from "node:child_process"
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 import {
   liveHostScopeProbes,
@@ -19,6 +21,10 @@ function recordingProbes(overrides: Partial<HostScopeProbes> = {}): { probes: Ho
   const probes: HostScopeProbes = {
     platform: "linux",
     args: SUPERVISOR_ARGS,
+    hasUserBus: () => {
+      calls.push("bus")
+      return true
+    },
     ownsUserManager: () => {
       calls.push("manager")
       return true
@@ -83,9 +89,10 @@ describe("host scope decision", () => {
     ["macOS", { platform: "darwin" as const }, []],
     ["Windows", { platform: "win32" as const }, []],
     ["a launch that is not a host supervisor", { args: ["--mode", "rpc"] }, []],
-    ["no user manager of its own", { ownsUserManager: () => false }, []],
-    ["no busctl", { findBusctl: () => undefined }, ["manager"]],
-    ["an unreadable MemTotal", { memTotalBytes: () => undefined }, ["manager", "busctl"]],
+    ["no user bus", { hasUserBus: () => false }, []],
+    ["no user manager of its own", { ownsUserManager: () => false }, ["bus"]],
+    ["no busctl", { findBusctl: () => undefined }, ["bus", "manager"]],
+    ["an unreadable MemTotal", { memTotalBytes: () => undefined }, ["bus", "manager", "busctl"]],
   ])("keeps the launch where it is for %s, probing only what the cheaper checks allow", (_label, overrides, probed) => {
     const { probes, calls } = recordingProbes(overrides)
     expect(planHostScope(probes, 4242, "abcdef012345")).toBeUndefined()
@@ -99,7 +106,8 @@ describe("host scope decision", () => {
 })
 
 const live = liveHostScopeProbes(SUPERVISOR_ARGS, process.env)
-const hasUserManager = process.platform === "linux" && live.ownsUserManager() && live.findBusctl() !== undefined
+const hasUserManager =
+  process.platform === "linux" && live.hasUserBus() && live.ownsUserManager() && live.findBusctl() !== undefined
 
 describe("host scope against the user manager", () => {
   test.skipIf(!hasUserManager)("moves a running process into a scope with the requested limits", async () => {
@@ -117,8 +125,37 @@ describe("host scope against the user manager", () => {
       // then the kernel reports the dummy inside the new scope
       expect(failure).toBeUndefined()
       expect(readFileSync(`/proc/${pid}/cgroup`, "utf8")).toContain(`/${plan.unit}`)
+      const shown = execFileSync("systemctl", ["--user", "show", plan.unit, "-p", "OOMPolicy,MemoryMax", "--value"], {
+        encoding: "utf8",
+      })
+      expect(shown.trim().split("\n")).toEqual(["continue", String(live.memTotalBytes())])
     } finally {
       dummy.kill("SIGKILL")
+    }
+  })
+
+  test.skipIf(process.platform !== "linux")("kills a hanging busctl at the bound and reports it", async () => {
+    // given a busctl stub that records its pid and then hangs
+    const dir = mkdtempSync(join(tmpdir(), "omo-host-scope-"))
+    const stub = join(dir, "busctl")
+    writeFileSync(stub, `#!/bin/sh\necho $ > ${join(dir, "pid")}\nexec sleep 30\n`)
+    chmodSync(stub, 0o755)
+    try {
+      const startedAt = Date.now()
+
+      // when
+      const failure = await moveIntoHostScope(
+        { busctl: stub, argv: [], unit: "omo-host-1-x.scope", pid: 1 },
+        process.env,
+      )
+
+      // then it gives up within the bound and the stub is gone
+      expect(failure).toContain("SIGKILL")
+      expect(Date.now() - startedAt).toBeLessThan(3_000)
+      const stubPid = Number(readFileSync(join(dir, "pid"), "utf8"))
+      expect(() => process.kill(stubPid, 0)).toThrow()
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
     }
   })
 

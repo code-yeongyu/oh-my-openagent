@@ -3,7 +3,9 @@
 // unit's OOMPolicy then decides the host's fate: one OOM-killed tool child stops the unit and SIGTERMs every session.
 // A compiled supervisor therefore asks its user manager to move its own pid into a fresh transient scope before it
 // spawns its host, so the host and every tool child inherit the scope. The supervisor keeps running in place; any
-// failure (no manager, a refused unit, an old systemd, a slow bus) only leaves it where it was.
+// failure (no manager, a refused unit, an old systemd, a slow bus) only leaves it where it was. busctl reaches the
+// manager through the user message bus, so a host with a user manager but no user bus (no dbus-user-session or
+// dbus-broker) keeps the direct placement.
 
 import { spawn } from "node:child_process"
 import { randomBytes } from "node:crypto"
@@ -20,6 +22,7 @@ const MEMORY_MAX_SHARE = 0.9
 export interface HostScopeProbes {
   readonly platform: NodeJS.Platform
   readonly args: readonly string[]
+  readonly hasUserBus: () => boolean
   readonly ownsUserManager: () => boolean
   readonly findBusctl: () => string | undefined
   readonly memTotalBytes: () => number | undefined
@@ -32,7 +35,7 @@ export interface HostScopePlan {
   readonly pid: number
 }
 
-export function hostScopeUnitName(pid: number, nonce: string): string {
+function hostScopeUnitName(pid: number, nonce: string): string {
   return `omo-host-${pid}-${nonce}.scope`
 }
 
@@ -41,7 +44,7 @@ export function memoryMaxBytes(meminfo: string): number | undefined {
   return kib === undefined ? undefined : Math.floor(Number(kib) * 1024 * MEMORY_MAX_SHARE)
 }
 
-/** `systemd-run --user --scope --collect -p OOMPolicy=continue -p MemoryMax=<n>` for an already running pid. */
+/** busctl's StartTransientUnit equivalent of `systemd-run --scope --collect`, for an already running pid. */
 export function startTransientScopeArgs(unit: string, pid: number, memoryMax: number): readonly string[] {
   return [
     "--user",
@@ -71,10 +74,10 @@ export function startTransientScopeArgs(unit: string, pid: number, memoryMax: nu
   ]
 }
 
-/** Cheap checks first: no process is probed unless this is a Linux supervisor with a user manager of its own. */
+/** Cheap checks first: nothing is spawned unless this is a Linux supervisor with a user bus and manager of its own. */
 export function planHostScope(probes: HostScopeProbes, pid: number, nonce: string): HostScopePlan | undefined {
   if (probes.platform !== "linux" || !isInternalSupervisorLaunch(probes.args)) return undefined
-  if (!probes.ownsUserManager()) return undefined
+  if (!probes.hasUserBus() || !probes.ownsUserManager()) return undefined
   const busctl = probes.findBusctl()
   if (busctl === undefined) return undefined
   const memoryMax = probes.memTotalBytes()
@@ -116,10 +119,29 @@ function ownsUserManager(env: NodeJS.ProcessEnv): boolean {
   }
 }
 
+function isSocket(path: string): boolean {
+  try {
+    return statSync(path).isSocket()
+  } catch {
+    return false
+  }
+}
+
+/** The bus busctl --user connects to: `DBUS_SESSION_BUS_ADDRESS`'s unix paths, else `$XDG_RUNTIME_DIR/bus`. */
+function hasUserBus(env: NodeJS.ProcessEnv): boolean {
+  const paths = [...(env.DBUS_SESSION_BUS_ADDRESS ?? "").matchAll(/unix:(?:[^;]*,)?path=([^,;]+)/g)].map(
+    (match) => match[1] ?? "",
+  )
+  if (paths.some(isSocket)) return true
+  const runtimeDir = env.XDG_RUNTIME_DIR
+  return runtimeDir !== undefined && runtimeDir !== "" && isSocket(join(runtimeDir, "bus"))
+}
+
 export function liveHostScopeProbes(args: readonly string[], env: NodeJS.ProcessEnv): HostScopeProbes {
   return {
     platform: process.platform,
     args,
+    hasUserBus: () => hasUserBus(env),
     ownsUserManager: () => ownsUserManager(env),
     findBusctl: () => onPath("busctl", env),
     memTotalBytes: () => memoryMaxBytes(readText("/proc/meminfo") ?? ""),
