@@ -134,7 +134,7 @@ describe("intake", () => {
     const ninth = await target.store.intake(
       request(h, {}, { deliveryId: "d-8", sender: { kind: "agent", session_id: "claimed-8" } }),
     )
-    expect(ninth).toMatchObject({ kind: "refused", code: "overloaded", details: { budget: "pair_rate" } })
+    expect(ninth).toMatchObject({ kind: "refused", code: "pair_loop_guard", details: { guard: "pair_loop", burst: 8 } })
     expect((await target.store.intake(request(h, { attested_device: "dev-b" }, { deliveryId: "d-8" }))).kind).toBe(
       "queued",
     )

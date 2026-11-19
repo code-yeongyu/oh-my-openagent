@@ -218,7 +218,7 @@ export type ThreadToolSurfaceOptions = {
    * database.
    */
   readonly store: GatewayStore
-  /** The caller's current turn (the gateway's per-turn fan-out budget is keyed by it); absent outside a turn. */
+  /** The caller's current turn, recorded on each delivery as provenance; absent outside a turn. */
   readonly callerTurnId?: () => string | undefined
   /** The caller session's current name, shown to a receiver as "Sent by another agent · <name>"; absent when it has none. */
   readonly callerName?: () => string | undefined
@@ -247,6 +247,11 @@ export type ThreadToolSurfaceOptions = {
   /** `thread_report {kind: "completion"}` armed a completion (`arm_seq`) for this session; the component writes it at the next settle. */
   readonly onCompletionArmed?: (durableId: string, armSeq: number) => void
   readonly now?: () => number
+  /**
+   * How long a create waits for its first prompt to start on this device (`control/prompt-start.ts`); absent,
+   * FIRST_PROMPT_START_WAIT_MS, cut to the call's budget. A test seam: a test with no drain sets it short.
+   */
+  readonly firstPromptWaitMs?: number
   /** Sessions on the account's other devices and the account-wide alias (O8, A3); absent, the tools reach only this device. */
   readonly remote?: RemoteThreadSurface
 }

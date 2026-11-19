@@ -25,6 +25,7 @@ import { connectDeliveryServicePort } from "../consumer/device-service-port"
 import { startDeliveryConsumer, type ServingConsumer } from "./consumer-start"
 import { engineDropsRetainedRecord } from "./engine-minimum"
 import { engineHostEnsure, type EngineLauncher } from "./host-ensure"
+import { readHostMemoryHeadroom } from "./memory-headroom"
 
 /** How long a dead delivery consumer waits before it is started again (#13457's MEDIUM: never restarting left remote
  * wake off for the engine's life whenever the service was late or restarted). */
@@ -57,6 +58,8 @@ export type ThreadWakeOptions = {
   readonly minimumEngine?: string | null
   /** Replaces the engine's own `threads.chainCountLimit` read (`SettingsManager.getThreadChainCountLimit`) for a cwd. */
   readonly chainCountLimit?: (cwd: string) => Promise<number | undefined>
+  /** Replaces the host memory probe (`memory-headroom.ts`) the carrier reads before it starts a woken session. */
+  readonly memoryHeadroom?: () => number | undefined
   readonly schedule?: (run: () => void, ms: number) => () => void
   readonly onWake?: (durableId: string, outcome: CarrierWakeOutcome) => void
 }
@@ -262,6 +265,7 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart, scope:
     // Owner ruling 2026-11-14: a device whose service serves this engine's consumer wakes; no switch has to be told on.
     remoteWake: () => consumer?.serving() ?? false,
     admitIntake: carrierAdmission,
+    memoryHeadroom: options.memoryHeadroom ?? (() => readHostMemoryHeadroom()),
     schedule: options.schedule ?? unrefSchedule,
     onEvent: (event) => {
       if (ENDED.has(event.outcome.kind))

@@ -19,7 +19,6 @@ import { join } from "node:path"
 
 import {
   GATEWAY_RECEIPT_RETENTION_MS,
-  MAX_FANOUT_PER_TURN,
   PAIR_BUCKET_BURST,
   PAIR_BUCKET_REFILL_MS,
   QUEUED_TTL_MS,
@@ -29,6 +28,7 @@ import {
   TARGET_MAX_BYTES,
   TARGET_MAX_MESSAGES,
 } from "./constants"
+import { pairLoopGuardMessage } from "../errors"
 import { readLegacyMailbox } from "./legacy-mailbox"
 import { gatewayInboxDirectory } from "./paths"
 import { isClaimantDead, sameProcess } from "./process-identity"
@@ -554,21 +554,6 @@ function placeCausally(ctx: StoreContext, request: EnqueueRequest): CausalPlacem
   return placement
 }
 
-function checkFanout(ctx: StoreContext, request: EnqueueRequest): StoreRefusal | undefined {
-  if (request.sender_turn === null) return undefined
-  const targets = new Set(
-    ctx.sql
-      .all(
-        ["t"],
-        "SELECT DISTINCT target_durable_id AS t FROM deliveries WHERE sender = ? AND sender_turn = ? AND state != 'refused'",
-        [request.sender_principal, request.sender_turn],
-      )
-      .map((row) => String(row.t)),
-  )
-  if (targets.has(request.target_durable_id) || targets.size < MAX_FANOUT_PER_TURN) return undefined
-  return refused("overloaded", `One turn may reach at most ${MAX_FANOUT_PER_TURN} sessions.`, { budget: "fanout" })
-}
-
 function takePairToken(ctx: StoreContext, request: EnqueueRequest): StoreRefusal | undefined {
   const sender = request.rate_principal ?? request.sender_principal
   const bucket = ctx.sql.one(
@@ -583,11 +568,20 @@ function takePairToken(ctx: StoreContext, request: EnqueueRequest): StoreRefusal
           PAIR_BUCKET_BURST,
           Number(bucket.tokens) + Math.max(0, request.now - Number(bucket.updated_at)) / PAIR_BUCKET_REFILL_MS,
         )
+  // An empty bucket means the sender spent at least the whole burst on this target within the time the bucket takes to
+  // refill from empty: that is the burst the refusal reports, measured from the bucket it read.
   if (tokens < 1) {
-    return refused("overloaded", "Too many deliveries to this session; wait before sending again.", {
-      budget: "pair_rate",
-      retry_after_ms: Math.ceil((1 - tokens) * PAIR_BUCKET_REFILL_MS),
-    })
+    const windowMs = PAIR_BUCKET_BURST * PAIR_BUCKET_REFILL_MS
+    return refused(
+      "pair_loop_guard",
+      pairLoopGuardMessage(sender, request.target_durable_id, PAIR_BUCKET_BURST, windowMs),
+      {
+        guard: "pair_loop",
+        burst: PAIR_BUCKET_BURST,
+        window_ms: windowMs,
+        retry_after_ms: Math.ceil((1 - tokens) * PAIR_BUCKET_REFILL_MS),
+      },
+    )
   }
   write(
     ctx,
@@ -695,7 +689,7 @@ export async function enqueue(
       rollbackQuietly(ctx)
       return placement
     }
-    const budget = checkFanout(ctx, request) ?? takePairToken(ctx, request)
+    const budget = takePairToken(ctx, request)
     if (budget !== undefined) {
       rollbackQuietly(ctx)
       return budget

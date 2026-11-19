@@ -330,7 +330,8 @@ describe("#13012 route parity", () => {
             }),
         }),
       })
-      expect(await surface(remote).run(tool, { thread: "local peeer", message: "continue" })).toMatchObject({
+      const args = tool === "thread_send" ? { thread: "local peeer", message: "continue" } : { thread: "local peeer" }
+      expect(await surface(remote).run(tool, args)).toMatchObject({
         kind: "error",
         error: { code: "not_found" },
       })
@@ -447,7 +448,8 @@ describe("#13012 route parity", () => {
         },
       })
       for (const tool of ["thread_read", "thread_send"] as const) {
-        expect(await run(tool, { thread: "local peeer", message: "continue" })).toMatchObject({
+        const args = tool === "thread_send" ? { thread: "local peeer", message: "continue" } : { thread: "local peeer" }
+        expect(await run(tool, args)).toMatchObject({
           kind: "error",
           error: { code: "not_found" },
         })

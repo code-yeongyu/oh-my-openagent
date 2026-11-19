@@ -183,7 +183,7 @@ describe("thread_create with a first prompt (#13410)", () => {
     const { run, enqueuedRequests } = surface(a.remote)
     const result = (await run("thread_create", { prompt: "build it" })) as { prompt?: Record<string, unknown> }
     expect(result).toMatchObject({ kind: "ok", thread: "dur-created-here" })
-    expect(result.prompt).toMatchObject({ delivery: { kind: expect.any(String) } })
+    expect(result.prompt).toMatchObject({ delivery: { kind: "started" } })
     // #14045: the row carries the creator's authority, so the new thread's drain admits it as its own first message;
     // a later thread_send from the same session does not.
     await run("thread_send", { thread: "dur-created-here", message: "and then this" })
@@ -220,5 +220,79 @@ describe("thread_create with a first prompt (#13410)", () => {
     }
     expect(result).toMatchObject({ kind: "ok", thread: "dur-new-on-b" })
     expect(result.prompt).toMatchObject({ error: { code: expect.any(String) } })
+  })
+})
+
+// The held-thread report: thread_create({ prompt }) answered ok while its first prompt never ran (no client attached, the
+// new session's control endpoint never drained the row). A create with a prompt either runs it or fails, typed.
+describe("thread_create whose first prompt does not start", () => {
+  test("#given a new session here whose control endpoint never drains #when created with a prompt #then the create fails prompt_not_started naming the thread, the delivery and its last state", async () => {
+    const a = account()
+    const { run, enqueuedRequests } = surface(a.remote, { firstPromptWaitMs: 50, createdNeverDrains: true })
+    const result = await run("thread_create", { name: "never-drained", prompt: "build it" })
+    expect(result).toMatchObject({
+      kind: "error",
+      error: {
+        code: "prompt_not_started",
+        details: { thread: "dur-created-here", delivery_id: expect.any(String), state: "queued" },
+      },
+    })
+    // The prompt was taken once: the thread exists and the next step is a read or a send to it, never a second create.
+    expect(enqueuedRequests("dur-created-here")).toHaveLength(1)
+  })
+
+  test("#given b answers the prompt queued behind a turn #when created on b with a prompt #then the create fails prompt_not_started, not ok", async () => {
+    const queued = {
+      kind: "ok",
+      response: { type: "response", id: null, command: "admit_external_message", success: true, data: { kind: "queued", turnId: "turn-b" } },
+    } as const
+    const a = account({ admitOutcome: queued })
+    const { run } = surface(a.remote)
+    expect(await run("thread_create", { device: "studio", prompt: "build it" })).toMatchObject({
+      kind: "error",
+      error: { code: "prompt_not_started", details: { thread: "dur-new-on-b", device: "b", state: "queued" } },
+    })
+  })
+})
+
+// The owner's live lost-prompt case: thread_create({ ..., message: "<brief>" }) answered ok with no prompt and no error,
+// because an unknown field was dropped silently. A field a tool does not take is refused, naming it and the field meant.
+describe("thread tool fields the tool does not take", () => {
+  test("#given a create that passes its brief as message #when created #then invalid_arguments names message, suggests prompt, and nothing is created", async () => {
+    const a = account()
+    const { run, openSession } = surface(a.remote)
+    const here = await run("thread_create", { name: "misnamed-here", message: "build it" })
+    const there = await run("thread_create", { name: "misnamed-there", device: "studio", message: "build it" })
+    for (const result of [here, there])
+      expect(result).toMatchObject({
+        kind: "error",
+        error: { code: "invalid_arguments", details: { field: "message", suggestion: "prompt" } },
+      })
+    expect(openSession).not.toHaveBeenCalled()
+    expect(a.sent).toEqual([])
+  })
+
+  test("#given a create with a name and no prompt #when created #then the result says prompt null: nothing was sent", async () => {
+    const a = account()
+    const { run } = surface(a.remote)
+    expect(await run("thread_create", { name: "no-prompt-here" })).toMatchObject({ kind: "ok", prompt: null })
+    expect(await run("thread_create", { name: "no-prompt-there", device: "studio" })).toMatchObject({
+      kind: "ok",
+      prompt: null,
+    })
+  })
+
+  test("#given a send with a field thread_send does not take #when sent #then invalid_arguments names the field and nothing is delivered", async () => {
+    const a = account()
+    const { run, enqueuedFor } = surface(a.remote)
+    expect(await run("thread_send", { thread: "dur-local", message: "hi", priority: "high" })).toMatchObject({
+      kind: "error",
+      error: { code: "invalid_arguments", details: { field: "priority" } },
+    })
+    expect(await run("thread_send", { thread: "dur-local", prompt: "hi" })).toMatchObject({
+      kind: "error",
+      error: { code: "invalid_arguments", details: { field: "prompt", suggestion: "message" } },
+    })
+    expect(enqueuedFor("dur-local")).toBe(0)
   })
 })

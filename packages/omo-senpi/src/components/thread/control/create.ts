@@ -7,7 +7,7 @@ import type {
   ThreadSummary,
   ThreadToolResult,
 } from "../contracts"
-import { gatewaySchemaRefusal, threadToolFailure, type ThreadErrorCode } from "../errors"
+import { gatewaySchemaRefusal, threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from "../errors"
 import type { DeliveryTarget } from "../gateway/transport"
 import { checkInitialSkills } from "../initial-skills"
 import { createdDeviceRow } from "../remote/address-book"
@@ -30,6 +30,7 @@ import { openedResult } from "../tools/thread-row"
 import { createLaunch } from "./create-launch"
 import { createLocalSessionHost, workspaceNote } from "./local-session-host"
 import { locateControl } from "./locate"
+import type { PromptStart } from "./prompt-start"
 import { controlRefusalOf } from "./port"
 import { createdThreadId, type HostedThread, type SessionOpenOutcome } from "./session-host"
 
@@ -59,6 +60,8 @@ export type CreateContext = {
     send: CreatePromptSend,
     idempotencyKey: string,
   ) => Promise<ThreadToolResult>
+  /** Waits, bounded by the call's budget, for the first prompt's gateway delivery on this device to start a turn. */
+  readonly awaitPromptStart: (deliveryId: string) => Promise<PromptStart>
 }
 
 /**
@@ -231,12 +234,50 @@ export async function createThread(
           }
     ) as ThreadToolResult
   })()
-  if (value.prompt === undefined || made.kind !== "ok" || opened === undefined) return made
+  // A create given no prompt says so (`prompt: null`), so a caller sees nothing was sent (the owner's lost-brief case).
+  if (value.prompt === undefined) return made.kind === "ok" ? ({ ...made, prompt: null } as ThreadToolResult) : made
+  if (made.kind !== "ok" || opened === undefined) return made
   if ((made as Extract<ThreadCreateResult, { kind: "ok" }>).deduplicated) return made
+  const prompt = await promptThatRan(await firstPrompt(current, opened, value, context), opened, context)
+  return "not_started" in prompt ? { kind: "error", error: prompt.not_started } : ({ ...made, prompt } as ThreadToolResult)
+}
+
+/**
+ * A created thread runs its first prompt, or the create fails (the held-thread report: an ok create whose prompt sat
+ * queued for hours with nobody told). A prompt the send answered started or steered stands; one on this device that is
+ * only queued is waited for, bounded by the call's budget, until its row starts a turn; one on another device has no row
+ * here to wait on. A prompt that did not start answers `prompt_not_started`, which names the thread, the delivery and
+ * its last state: the thread exists, so the recovery is a read and a send to it, never another create. A delivery that
+ * failed outright stays the prompt's own error on the ok create, as before.
+ */
+async function promptThatRan(
+  prompt: ThreadCreatePrompt,
+  thread: HostedThread,
+  context: CreateContext,
+): Promise<ThreadCreatePrompt | { readonly not_started: ThreadToolFailure }> {
+  if ("error" in prompt) return prompt
+  const { delivery } = prompt
+  if (delivery.kind === "started" || delivery.kind === "steered") return prompt
+  const local = thread.device === undefined
+  const waited = local && prompt.delivery_id !== undefined ? await context.awaitPromptStart(prompt.delivery_id) : undefined
+  if (waited?.kind === "started") return { ...prompt, delivery: waited.delivery }
+  const state = waited?.state ?? delivery.kind
+  const waitingOn = delivery.kind === "queued" ? delivery.waiting_on : undefined
+  const where = local ? "" : ` on device ${thread.device}`
   return {
-    ...made,
-    prompt: await firstPrompt(current, opened, value, context),
-  } as ThreadToolResult
+    not_started: threadToolFailure(
+      "prompt_not_started",
+      `Thread ${thread.thread_id} was created${where}, but its first prompt did not start a turn (its delivery is ${state}${waitingOn === undefined ? "" : `, waiting on its ${waitingOn.kind}`}).`,
+      `The thread exists: read it with thread_read (tool.thread_read({ thread }) in an eval cell) to see whether the prompt ran, then send the prompt again with thread_send to ${thread.thread_id} (tool.thread_send({ thread, message }) in an eval cell) if it did not. Do not create the thread again.`,
+      {
+        thread: thread.thread_id,
+        ...(thread.device === undefined ? {} : { device: thread.device }),
+        ...(prompt.delivery_id === undefined ? {} : { delivery_id: prompt.delivery_id }),
+        state,
+        ...(waitingOn === undefined ? {} : { waiting_on: waitingOn }),
+      },
+    ),
+  }
 }
 
 /**

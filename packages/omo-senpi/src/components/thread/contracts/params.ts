@@ -35,6 +35,7 @@ export const ThreadListParams = Type.Object({
       },
     ),
   ),
+  idempotency_key: IdempotencyKey,
 })
 
 /** The longest a `thread_read` waits for its thread to settle (#13417). */
@@ -63,6 +64,7 @@ export const ThreadReadParams = Type.Object({
     }),
   ),
   all_scope: AllScope,
+  idempotency_key: IdempotencyKey,
 })
 
 export const ThreadSendParams = Type.Object({
@@ -84,6 +86,7 @@ export const ThreadInterruptParams = Type.Object({
     }),
   ),
   all_scope: AllScope,
+  idempotency_key: IdempotencyKey,
 })
 
 const SelfOrThread = Type.Optional(
@@ -255,6 +258,7 @@ export const ThreadOutboxParams = Type.Object({
   limit: Type.Optional(
     Type.Integer({ minimum: 1, maximum: 500, description: "Rows per read, default 100 and at most 500." }),
   ),
+  idempotency_key: IdempotencyKey,
 })
 
 export const ThreadOutboxAckParams = Type.Object({
@@ -271,6 +275,7 @@ export const ThreadOutboxAckParams = Type.Object({
         "Platform id of the message posted for the row at cursor; the first one for a milestone becomes the progress message later milestones edit.",
     }),
   ),
+  idempotency_key: IdempotencyKey,
 })
 
 export const ThreadAnswerParams = Type.Object({
@@ -280,6 +285,7 @@ export const ThreadAnswerParams = Type.Object({
   }),
   reply_token: Type.String({ minLength: 1, description: "reply_token of the question row being answered." }),
   answer: RelayText,
+  idempotency_key: IdempotencyKey,
 })
 
 export type ThreadCreateInput = Static<typeof ThreadCreateParams>

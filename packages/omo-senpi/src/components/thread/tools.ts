@@ -1,4 +1,4 @@
-import { TOOL_CALL_BUDGET_MS, withCallDeadline, withinCallBudget } from "../call-budget/call-deadline"
+import { TOOL_CALL_BUDGET_MS, waitWithinCallBudget, withCallDeadline, withinCallBudget } from "../call-budget/call-deadline"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { gatewaySchemaRefusal, threadToolFailure } from "./errors"
 import type { ThreadToolFailure } from "./errors"
@@ -46,6 +46,7 @@ import { accountDevices } from "./remote/account"
 import { listAcross } from "./remote/lazy-ops"
 import { locateControl } from "./control/locate"
 import { createThread } from "./control/create"
+import { awaitPromptStart, FIRST_PROMPT_START_RESERVE_MS, FIRST_PROMPT_START_WAIT_MS } from "./control/prompt-start"
 import {
   closeOptions,
   closeThread,
@@ -360,6 +361,15 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
           view: () => view(),
           deliverPrompt: (prompted, target, send, key) =>
             deliverThrough(options, pipeline, prompted, target, send, key, callerId, undefined, "creator"),
+          awaitPromptStart: (deliveryId) =>
+            awaitPromptStart(
+              store,
+              deliveryId,
+              waitWithinCallBudget(
+                options.firstPromptWaitMs ?? FIRST_PROMPT_START_WAIT_MS,
+                FIRST_PROMPT_START_RESERVE_MS,
+              ),
+            ),
         }),
       ),
   }

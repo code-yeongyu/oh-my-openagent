@@ -561,3 +561,30 @@ describe("a person's waiting send names its prompt so its follow can anchor on t
     expect(prompts(a.sent).map((record) => "clientMessageId" in record)).toEqual([false])
   })
 })
+
+describe("a receiver whose engine holds the delivery answers the hold, never an uncertain admission", () => {
+  // senpi#7014: an idle held receiver answers admit_external_message with `held` and its hold kinds; the engine keeps the
+  // delivery as a held notice. The sender must read that typed wait, not idempotency_uncertain (a re-send would duplicate).
+  test("#given b's engine answers held (a person's Stop) #when a message is sent #then the send is queued waiting on that hold on b", async () => {
+    const a = account({
+      engine: { ...ENGINE, pending: 0 },
+      admitOutcome: {
+        kind: "ok" as const,
+        response: {
+          type: "response",
+          command: "admit_external_message",
+          success: true,
+          data: { kind: "held", holds: ["session_hold"], turnId: "4" },
+        },
+      },
+    })
+    const { relay } = transport(a.remote)
+    expect(await relay.deliver(delivery("to a held b", "k-held"))).toMatchObject({
+      kind: "ok",
+      device: "b",
+      delivery: { kind: "queued", queue_position: 1, waiting_on: { kind: "hold", device: "b" } },
+    })
+    expect(admits(a.sent)).toHaveLength(1)
+    relay.dispose()
+  })
+})

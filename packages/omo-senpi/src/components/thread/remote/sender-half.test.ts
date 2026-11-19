@@ -363,6 +363,19 @@ describe("#13037 the sender half reaches a session on another device that is not
       })
     })
 
+    test("#given the receiving store refused it with its pair loop guard #then the tool answers pair_loop_guard with the burst and when the next send is accepted", async () => {
+      const result = await answered(
+        queuedEnvelope({ kind: "refused", reason: "pair_loop_guard", burst: 8, window_ms: 40_000, retry_after_ms: 4_000 }),
+      )
+      expect(result).toMatchObject({
+        kind: "error",
+        error: {
+          code: "pair_loop_guard",
+          details: { device: "c", reason: "pair_loop_guard", guard: "pair_loop", burst: 8, window_ms: 40_000, retry_after_ms: 4_000 },
+        },
+      })
+    })
+
     test("#given the receiver refused it overloaded #then the tool answers overloaded with retry_after_ms", async () => {
       expect(
         await answered(queuedEnvelope({ kind: "refused", reason: "overloaded", retry_after_ms: 4_000 })),

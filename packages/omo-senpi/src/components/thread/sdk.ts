@@ -22,6 +22,7 @@ import {
   type ThreadToolResult,
 } from "./contracts"
 import { createThread } from "./control/create"
+import { awaitPromptStart, FIRST_PROMPT_START_RESERVE_MS, FIRST_PROMPT_START_WAIT_MS } from "./control/prompt-start"
 import { locateControl } from "./control/locate"
 import { answered, closeOptions, closeThread, interruptThread, NOT_LIVE, setModelOn } from "./control/operations"
 import { renameThread } from "./control/rename"
@@ -59,7 +60,7 @@ import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "
 import { listThreads, readThread } from "./tools/read-ops"
 import { sendView } from "./tools/send-view"
 import { listAcross } from "./remote/cross-device"
-import { TOOL_CALL_BUDGET_MS, withCallDeadline } from "../call-budget/call-deadline"
+import { TOOL_CALL_BUDGET_MS, waitWithinCallBudget, withCallDeadline } from "../call-budget/call-deadline"
 import type { RemoteThreadSurface } from "./remote/ports"
 import { stampThisDevice } from "./remote/this-device"
 
@@ -81,6 +82,8 @@ export type ThreadSdkOptions = {
   readonly workerModuleUrl?: string | URL
   readonly host?: ThreadHost
   readonly store?: GatewayStore
+  /** How long a create waits for its first prompt to start on this device; absent, FIRST_PROMPT_START_WAIT_MS (test seam). */
+  readonly firstPromptWaitMs?: number
   readonly now?: () => number
   /**
    * The account's other devices and its alias registry (the CLI passes the thread client sidecar's `createCliRemoteSurface`):
@@ -720,6 +723,15 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
             const { thread_id, ...facts } = sent
             return { ...facts, thread: thread_id } as ThreadToolResult
           },
+          awaitPromptStart: (deliveryId) =>
+            awaitPromptStart(
+              store,
+              deliveryId,
+              waitWithinCallBudget(
+                options.firstPromptWaitMs ?? FIRST_PROMPT_START_WAIT_MS,
+                FIRST_PROMPT_START_RESERVE_MS,
+              ),
+            ),
         }),
       ),
     interrupt: (request) =>

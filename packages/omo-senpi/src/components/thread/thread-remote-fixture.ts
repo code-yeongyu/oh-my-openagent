@@ -4,7 +4,9 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { DeviceRow, RemoteClient, RemoteFailure, ServiceStatus } from "../remote"
 import type { ThreadToolName, ThreadToolResult } from "./contracts"
+import { createInboxDrain } from "./gateway/drain"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
+import { FakeSessionRuntime } from "./gateway/testing/fake-runtime"
 import type {
   AliasHolder,
   AliasRegistry,
@@ -899,6 +901,13 @@ export function createRemoteThreadFixture() {
       listFailsAfterLostReply?: boolean
       /** With `openLosesReply`: the host has no `durable_session_id` capability and creates under an id of its own. */
       ignoresDurableSessionId?: boolean
+      /** How long a create waits for its first prompt to start on this device; 0 by default (the drain below is synchronous). */
+      firstPromptWaitMs?: number
+      /**
+       * A session this device's host creates drains its inbox as a live new session does (its control endpoint
+       * registered); with this set it never does, so a delivery to it stays queued (the held-thread report).
+       */
+      createdNeverDrains?: boolean
     } = {},
   ) {
     const engine = extra.engine ?? ENGINE
@@ -912,6 +921,7 @@ export function createRemoteThreadFixture() {
     const sessions = extra.sessions ?? [local]
     let lostReplies = extra.openLosesReply ?? 0
     let listFails = false
+    const createdIds = new Set<string>()
     const openSession = mock(async (request: Parameters<ThreadHost["openSession"]>[0]) => {
       if (extra.openThrows !== undefined) throw new Error(extra.openThrows)
       // An engine opening a session file on disk resumes it under the id in that file's header, as senpi does.
@@ -934,6 +944,7 @@ export function createRemoteThreadFixture() {
         status: "open",
       }
       sessions.push(created)
+      if (created.durableSessionId !== undefined) createdIds.add(created.durableSessionId)
       if (lostReplies > 0) {
         lostReplies -= 1
         listFails = extra.listFailsAfterLostReply === true
@@ -1037,12 +1048,23 @@ export function createRemoteThreadFixture() {
     const caller = extra.caller ?? "dur-caller"
     // Every delivery the gateway takes for a session on this device, by target: a local thread_send's real call.
     const enqueued: Array<Parameters<GatewayStore["enqueue"]>[0]> = []
+    // A session this device's host created drains a delivery as its registered control endpoint does: one idle runtime
+    // per pass, so its first prompt starts.
+    const drainCreated = async (durableId: string): Promise<void> => {
+      const runtime = new FakeSessionRuntime(join(agentDir, `${durableId}.jsonl`), durableId, process.cwd())
+      const drain = createInboxDrain({ store, runtime, durableId, sessionPath: () => runtime.sessionPath })
+      await drain.drain({ reason: "command" })
+      drain.stop()
+    }
     const countedStore = new Proxy(store, {
       get: (target, property, receiver) =>
         property === "enqueue"
-          ? (request: Parameters<GatewayStore["enqueue"]>[0]) => {
+          ? async (request: Parameters<GatewayStore["enqueue"]>[0]) => {
               enqueued.push(request)
-              return target.enqueue(request)
+              const outcome = await target.enqueue(request)
+              if (outcome.kind === "inserted" && createdIds.has(request.target_durable_id) && extra.createdNeverDrains !== true)
+                await drainCreated(request.target_durable_id)
+              return outcome
             }
           : Reflect.get(target, property, receiver),
     })
@@ -1061,6 +1083,7 @@ export function createRemoteThreadFixture() {
       ...(extra.callerChainHop === undefined ? {} : { callerChainHop: extra.callerChainHop }),
       ...(extra.callerName === undefined ? {} : { callerName: extra.callerName }),
       ...(extra.env === undefined ? {} : { env: extra.env }),
+      firstPromptWaitMs: extra.firstPromptWaitMs ?? 0,
     }
     const tools = createThreadTools(toolOptions)
     const resolveMonitorTarget = createMonitorTargetResolver(toolOptions)

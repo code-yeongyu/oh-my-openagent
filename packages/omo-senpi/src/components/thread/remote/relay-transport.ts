@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { rowStatus, rowThreadId } from "./ports"
-import { threadToolFailure, type ThreadToolFailure } from "../errors"
+import { pairLoopGuardMessage, pairLoopGuardNextAction, threadToolFailure, type ThreadToolFailure } from "../errors"
 import { hashArgs } from "../gateway/bindings"
 import { decideDelivery, effectiveLaneOf } from "../gateway/decision"
 import { senderFacts } from "../gateway/envelope"
@@ -187,6 +187,28 @@ function wakeRefusal(received: string, device: string, data: JsonObject = {}): F
         ...details,
         ...(typeof retry === "number" ? { retry_after_ms: retry } : {}),
       })
+    }
+    case "pair_loop_guard": {
+      // The receiving store's pair loop guard (`store-ops.ts` `takePairToken`): the same answer a send on this device gets.
+      const burst = typeof data["burst"] === "number" ? data["burst"] : undefined
+      const windowMs = typeof data["window_ms"] === "number" ? data["window_ms"] : undefined
+      const retry = typeof data["retry_after_ms"] === "number" ? data["retry_after_ms"] : undefined
+      return fail(
+        "pair_loop_guard",
+        burst !== undefined && windowMs !== undefined
+          ? pairLoopGuardMessage("this device", `the session on device ${device}`, burst, windowMs)
+          : `Device ${device} held this send back: this device sent that session its whole burst; it was not delivered.`,
+        retry !== undefined
+          ? pairLoopGuardNextAction(retry)
+          : "This looks like a send loop between these two sessions; wait before sending to that session again.",
+        {
+          ...details,
+          guard: "pair_loop",
+          ...(burst === undefined ? {} : { burst }),
+          ...(windowMs === undefined ? {} : { window_ms: windowMs }),
+          ...(retry === undefined ? {} : { retry_after_ms: retry }),
+        },
+      )
     }
     case "wake_limit_reached":
       return fail(

@@ -7,6 +7,8 @@ import type { RpcObject } from "@oh-my-opencode/senpi-task/rpc-socket-client"
 import type { CarrierHostConnection } from "./carrier-connection"
 import { settleClosedIntake } from "./closed-intake"
 import { readEngineState, type EngineView } from "./engine-state"
+import { WAKE_MEMORY_FLOOR_BYTES } from "./memory-headroom"
+import { waitBlocksDelivery } from "../gateway/session-wait-types"
 import { resolveWakeTarget, type WakeSessionKind } from "./session-target"
 
 /** A person's wait that arose after admission is closed after this long with only the carrier attached (A3.2.6). */
@@ -25,7 +27,8 @@ export type CarrierWakeOutcome =
   | { readonly kind: "gone" }
   | { readonly kind: "ambiguous"; readonly session_paths: readonly string[] }
   | { readonly kind: "not_wakeable"; readonly session_kind: Exclude<WakeSessionKind, "interactive"> }
-  | { readonly kind: "overloaded" }
+  /** The host's measured memory headroom is below the floor; the row stays requested and the sweep retries it. */
+  | { readonly kind: "host_memory_pressure"; readonly available_bytes: number; readonly floor_bytes: number }
   | { readonly kind: "not_yet"; readonly next_attempt_at: number }
   | { readonly kind: "busy"; readonly code: string }
   | { readonly kind: "deferred"; readonly attempts: number }
@@ -72,6 +75,12 @@ export type CarrierOptions = {
    * lost admission between the accept check and the retry or lease takeover starts nothing.
    */
   readonly admitIntake?: (device: string) => Promise<IntakeAdmission>
+  /**
+   * The host's memory headroom in bytes (`memory-headroom.ts` `readHostMemoryHeadroom` in production), read before a
+   * row is started: the only admission a wake has is real capacity, never a count. Undefined (no reading, or no probe)
+   * never defers a wake.
+   */
+  readonly memoryHeadroom?: () => number | undefined
   readonly schedule: (run: () => void, ms: number) => () => void
   readonly onEvent?: (event: CarrierEvent) => void
 }
@@ -354,7 +363,8 @@ export function createCarrier(options: CarrierOptions): Carrier {
     if (target.kind === "gone" || target.kind === "ambiguous") return target
     if (target.session_kind !== "interactive") return { kind: "not_wakeable", session_kind: target.session_kind }
     const wait = await store.sessionWait.read({ durable_id: durableId })
-    if (wait?.wait === "held" && wait.file_size === fileSize(target.session_path)) return { kind: "held" }
+    if (wait?.wait === "held" && waitBlocksDelivery(wait) && wait.file_size === fileSize(target.session_path))
+      return { kind: "held" }
     const allowance = await openAllowance(durableId, target)
     if (allowance !== "open") {
       if (allowance === "nothing_queued") {
@@ -374,8 +384,13 @@ export function createCarrier(options: CarrierOptions): Carrier {
       return { kind: "wake_limit_reached" }
 
     await store.woken.request({ durable_id: durableId, session_file: target.session_path })
+    // Read outside the store's transaction: a short host defers the wake with its row requested (the send keeps
+    // answering waiting on the wake), and the sweep starts it once the headroom is back.
+    const available = options.memoryHeadroom?.()
+    if (available !== undefined && available < WAKE_MEMORY_FLOOR_BYTES)
+      return { kind: "host_memory_pressure", available_bytes: available, floor_bytes: WAKE_MEMORY_FLOOR_BYTES }
     const started = await store.woken.start({ durable_id: durableId })
-    if (started.kind === "overloaded" || started.kind === "not_yet") return started
+    if (started.kind === "not_yet") return started
     if (started.kind !== "started") return { kind: "busy", code: "wake_in_progress" }
     const fence = { durable_id: durableId, generation: started.row.generation }
 
