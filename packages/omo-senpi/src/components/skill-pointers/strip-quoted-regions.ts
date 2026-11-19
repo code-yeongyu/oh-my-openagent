@@ -20,6 +20,12 @@ const URL_SPAN = /(?<![a-z0-9+.-])[a-z][a-z0-9+.-]*:\/\/[^\s<>"'`]+/gi
 const NEGATED_INVOCATION =
   /\b(?:do\s+not|don['\u2019]t|dont|never)\s+(?:load|use|run|invoke|start|trigger|arm|enable)\b[^.;:!?\n]*?(?=[.;:!?\n]|\s(?:but|then|instead|however)\b|\s[\u2014\u2013-]\s|$)/gi
 
+// Advice that forbids the mode without a "do not use" verb ("avoid ulw", "no ultrawork", "skip ulw-loop",
+// "don't ulw this", a pasted rule list) is not a request either (#14389). The keyword must follow the
+// prohibition directly, so "avoid regressions, ulw the fix" and "no worries, ulw this" still arm.
+const PROHIBITED_KEYWORD =
+  /\b(?:avoid(?:ing)?|skip(?:ping)?|without|no|never|do\s+not|don['\u2019]t|dont)\s+(?:(?:using|use\s+of|the)\s+)?(?=(?:mass[-\s])?(?:ultrawork|ulw)\b)[^.;:!?\n]*?(?=[.;:!?\n]|\s(?:but|then|instead|however)\b|\s[\u2014\u2013-]\s|$)/gi
+
 // A keyword glued to a preceding identifier segment (`mass-ulw`, `senpi-ulw-loop`, `.omo/ulw/`, `v1.ulw`)
 // names something else; so does one that opens a path (`ulw-execute/ledger.jsonl`).
 export const NOT_AFTER_IDENTIFIER = String.raw`(?<![A-Za-z0-9][-_.]|[/\\])`
@@ -60,7 +66,7 @@ export function stripQuotedSpans(text: string): string {
 }
 
 export function maskNegatedInvocations(text: string): string {
-  return text.replace(NEGATED_INVOCATION, mask)
+  return text.replace(NEGATED_INVOCATION, mask).replace(PROHIBITED_KEYWORD, mask)
 }
 
 export function stripQuotedRegions(text: string): string {

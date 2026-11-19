@@ -19,7 +19,20 @@ A few words in your message switch OmO into a special way of working. You don't 
 - Case doesn't matter, and a space, a hyphen or no gap all count: `ulw loop`, `ulw-loop` and `ulwloop` are the same.
 - Only whole words count. `ulw` inside a longer word, such as `ulwx`, does nothing.
 - Words inside `inline code` or a code block are ignored, so you can write about a keyword without starting it.
+- A keyword you forbid doesn't start anything either: "don't use ulw", "avoid ulw", "no ultrawork", "skip ulw-loop" and "without ultrawork" are advice, not a request. Quoted text and lines that start with `>` are ignored the same way.
 - Mentioning a keyword only asks OmO to check whether you want that mode. If you are just talking about it, OmO carries on as normal.
+
+## Turning ultrawork off
+
+To stop `ulw` and `ultrawork` from starting the mode, add this to `.omo/omo.jsonc` in your project (or `~/.omo/omo.jsonc` for every project):
+
+```jsonc
+{
+  "keyword_detector": { "disabled_keywords": ["ultrawork"] }
+}
+```
+
+On OmO Native, the `--omo-senpi-ultrawork-disabled` launch flag does the same for one launch. See [`keyword_detector`](../reference/omo-json.md#keyword_detector-every-harness).
 
 ## Related
 
