@@ -83,13 +83,13 @@ const deviceServiceSurface = (
   chain: { stamp: (record) => record },
 })
 
+// The relay failure every `omo remote` verb answers before resolving, attach included (#14305 delta review H1).
+export { remoteAvailable }
+
 /**
  * The command's one device-service connection, lent to its remote client: the client's account reads ride it, and the
  * client's close() leaves it open for the command, which closes it itself.
  */
-/** The relay failure every `omo remote` verb answers before resolving, attach included (#14305 delta review H1). */
-export const relayUnavailable = remoteAvailable
-
 export const borrowedService = (service: DeviceService): DeviceService =>
   new Proxy(service, {
     get: (target, key) => {
