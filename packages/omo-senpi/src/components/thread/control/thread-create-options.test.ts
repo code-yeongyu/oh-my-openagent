@@ -254,3 +254,45 @@ describe("thread_create whose first prompt does not start", () => {
     })
   })
 })
+
+// The owner's live lost-prompt case: thread_create({ ..., message: "<brief>" }) answered ok with no prompt and no error,
+// because an unknown field was dropped silently. A field a tool does not take is refused, naming it and the field meant.
+describe("thread tool fields the tool does not take", () => {
+  test("#given a create that passes its brief as message #when created #then invalid_arguments names message, suggests prompt, and nothing is created", async () => {
+    const a = account()
+    const { run, openSession } = surface(a.remote)
+    const here = await run("thread_create", { name: "misnamed-here", message: "build it" })
+    const there = await run("thread_create", { name: "misnamed-there", device: "studio", message: "build it" })
+    for (const result of [here, there])
+      expect(result).toMatchObject({
+        kind: "error",
+        error: { code: "invalid_arguments", details: { field: "message", suggestion: "prompt" } },
+      })
+    expect(openSession).not.toHaveBeenCalled()
+    expect(a.sent).toEqual([])
+  })
+
+  test("#given a create with a name and no prompt #when created #then the result says prompt null: nothing was sent", async () => {
+    const a = account()
+    const { run } = surface(a.remote)
+    expect(await run("thread_create", { name: "no-prompt-here" })).toMatchObject({ kind: "ok", prompt: null })
+    expect(await run("thread_create", { name: "no-prompt-there", device: "studio" })).toMatchObject({
+      kind: "ok",
+      prompt: null,
+    })
+  })
+
+  test("#given a send with a field thread_send does not take #when sent #then invalid_arguments names the field and nothing is delivered", async () => {
+    const a = account()
+    const { run, enqueuedFor } = surface(a.remote)
+    expect(await run("thread_send", { thread: "dur-local", message: "hi", priority: "high" })).toMatchObject({
+      kind: "error",
+      error: { code: "invalid_arguments", details: { field: "priority" } },
+    })
+    expect(await run("thread_send", { thread: "dur-local", prompt: "hi" })).toMatchObject({
+      kind: "error",
+      error: { code: "invalid_arguments", details: { field: "prompt", suggestion: "message" } },
+    })
+    expect(enqueuedFor("dur-local")).toBe(0)
+  })
+})
