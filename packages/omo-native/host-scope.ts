@@ -127,7 +127,11 @@ function isSocket(path: string): boolean {
   }
 }
 
-/** The bus busctl --user connects to: `DBUS_SESSION_BUS_ADDRESS`'s unix paths, else `$XDG_RUNTIME_DIR/bus`. */
+/**
+ * A cheap pre-check for the bus busctl --user connects to: a live socket among `DBUS_SESSION_BUS_ADDRESS`'s unix paths, or
+ * `$XDG_RUNTIME_DIR/bus`. busctl itself uses only the address when it is set, so this can pass where busctl then fails fast
+ * (stale or abstract address); that only costs one failed, bounded call, and the host stays where it was.
+ */
 function hasUserBus(env: NodeJS.ProcessEnv): boolean {
   const paths = [...(env.DBUS_SESSION_BUS_ADDRESS ?? "").matchAll(/unix:(?:[^;]*,)?path=([^,;]+)/g)].map(
     (match) => match[1] ?? "",

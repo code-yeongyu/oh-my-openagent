@@ -138,7 +138,7 @@ describe("host scope against the user manager", () => {
     // given a busctl stub that records its pid and then hangs
     const dir = mkdtempSync(join(tmpdir(), "omo-host-scope-"))
     const stub = join(dir, "busctl")
-    writeFileSync(stub, `#!/bin/sh\necho $ > ${join(dir, "pid")}\nexec sleep 30\n`)
+    writeFileSync(stub, `#!/bin/sh\necho $$ > ${join(dir, "pid")}\nexec sleep 30\n`)
     chmodSync(stub, 0o755)
     try {
       const startedAt = Date.now()
@@ -153,6 +153,7 @@ describe("host scope against the user manager", () => {
       expect(failure).toContain("SIGKILL")
       expect(Date.now() - startedAt).toBeLessThan(3_000)
       const stubPid = Number(readFileSync(join(dir, "pid"), "utf8"))
+      expect(Number.isInteger(stubPid) && stubPid > 1).toBe(true)
       expect(() => process.kill(stubPid, 0)).toThrow()
     } finally {
       rmSync(dir, { recursive: true, force: true })
