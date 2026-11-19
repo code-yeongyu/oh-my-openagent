@@ -384,14 +384,15 @@ export function createRelayTransport(
    * this device has one, else `not_resumable` at once, as thread_read answers it. A holder that cannot say is treated as
    * holding it on disk: an ended row takes the wake path when there is one, anything else is `not_resumable`.
    * `parked` (#14240): the row reads live but its host refused a command to it `route_unlisted` (it parked the session),
-   * so the listing is stale: the holder is asked as for a not-live row, and a session it holds on disk takes the wake
-   * path whatever the row's state; one it cannot say anything of is `not_resumable`.
+   * so the listing is stale: `parked` is the answer that refusal maps to. The holder is asked as for a not-live row, and a
+   * session it holds on disk takes the wake path whatever the row's state. A holder that cannot say (find_session refused,
+   * unsupported or unanswered) taught nothing new, so the answer stays `parked`.
    */
   async function addressOf(
     listed: RemoteSessionRow,
-    parked = false,
+    parked?: SendOutcome,
   ): Promise<{ readonly row: RemoteSessionRow; readonly ended: boolean } | SendOutcome> {
-    if (!parked && rowStatus(listed) === "live") return { row: listed, ended: false }
+    if (parked === undefined && rowStatus(listed) === "live") return { row: listed, ended: false }
     const thread = rowThreadId(listed)
     const details = { device: listed.device, thread }
     const view = await holderView(remote, listed)
@@ -402,9 +403,10 @@ export function createRelayTransport(
         "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell).",
         details,
       )
+    if (parked !== undefined && view === "unknown") return parked
     if (view !== "running") {
       // omo#13037 5.4 / A4.5: a session no engine runs takes the wake path when this device's service can carry it.
-      const wakeable = parked ? view === "on_disk" : listed.state === "ended"
+      const wakeable = parked !== undefined ? view === "on_disk" : listed.state === "ended"
       if (wakeable && (await remote.sessions.canWake?.()) === true) return { row: listed, ended: true }
       return fail(
         "not_resumable",
@@ -428,23 +430,27 @@ export function createRelayTransport(
   /**
    * `retry` (#14240): the second and last attempt, after the host refused the first `route_unlisted` for a row that read
    * live; it re-addresses the row as parked and keeps the first attempt's delivery ids, so a repeat is never a second
-   * delivery. The refusal means nothing was dispatched there.
+   * delivery. The refusal means nothing was dispatched there; `refusal` is what it answers unless the holder says more.
    */
   async function send(
     delivery: OutboundDelivery,
     listed: RemoteSessionRow,
     later: Later,
     sending: () => void,
-    retry?: { readonly ids: Awaited<ReturnType<typeof chain>> | undefined; readonly announced: boolean },
+    retry?: {
+      readonly ids: Awaited<ReturnType<typeof chain>> | undefined
+      readonly announced: boolean
+      readonly refusal: SendOutcome
+    },
   ): Promise<SendOutcome> {
     const offline = await deviceOnline(remote, listed.device)
     if (offline !== undefined) return offline
-    const parkedHere = (outcome: { readonly kind: string; readonly reason?: string }) =>
+    const parkedHere = (outcome: RemoteCommandOutcome) =>
       retry === undefined &&
       rowStatus(listed) === "live" &&
       outcome.kind === "refused" &&
       outcome.reason === "route_unlisted"
-    const addressed = await addressOf(listed, retry !== undefined)
+    const addressed = await addressOf(listed, retry?.refusal)
     if (!("row" in addressed)) return addressed
     // `ended`: the wake path (no lane probe; its state is offline in the decision table, so a steer is turn_conflict).
     const { row, ended } = addressed
@@ -466,8 +472,11 @@ export function createRelayTransport(
         type: "get_state",
         sessionId: row.session_id,
       })
-      if (parkedHere(probed)) return await send(delivery, listed, later, sending, { ids: undefined, announced: false })
-      if (probed.kind !== "ok") return probeFailure(probed, row.device)
+      if (probed.kind !== "ok") {
+        const refusal = probeFailure(probed, row.device)
+        if (!parkedHere(probed)) return refusal
+        return await send(delivery, listed, later, sending, { ids: undefined, announced: false, refusal })
+      }
       const state: EngineState = engineStateOf(replyData(probed.response))
       probedState = state
       const decision = decideDelivery(state.phase, delivery.mode, expected, state.turnEpoch)
@@ -564,7 +573,12 @@ export function createRelayTransport(
     }
     // The retry re-stamps its own record (a wake addresses the durable id on the follow-up lane); `stamp` is a pure
     // function of (record, hop) and the ids are the first attempt's, so the receiver sees one delivery.
-    if (parkedHere(sent)) return await send(delivery, listed, later, sending, { ids, announced: true })
+    if (sent.kind !== "ok" && parkedHere(sent))
+      return await send(delivery, listed, later, sending, {
+        ids,
+        announced: true,
+        refusal: outcomeFailure(sent, row.device),
+      })
     if (sent.kind === "refused" && (ADMIT_UNSUPPORTED.has(sent.reason) || sent.reason.startsWith("Unknown command")))
       return fail(
         "unsupported",
