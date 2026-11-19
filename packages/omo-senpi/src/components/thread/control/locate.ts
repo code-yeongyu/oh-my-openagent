@@ -2,7 +2,7 @@ import type { ThreadToolResult } from "../contracts"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { workspaceEntries } from "../addressing"
 import { resolveAddress } from "../address/lazy"
-import { rowThreadId } from "../remote/ports"
+import { rowKey } from "@oh-my-opencode/thread-address-core"
 import { createRelayControl } from "../remote/lazy-ops"
 import { sendBookFor, targetSession } from "../tools/internals"
 import type { ThreadHostView, ThreadToolSurfaceOptions } from "../tools/ports"
@@ -42,7 +42,7 @@ export async function locateControl(
   if (resolved.where.kind === "device" && options.remote !== undefined) {
     const row = resolved.where.row
     if (row.state === "ended")
-      return { kind: "not_live", thread_id: rowThreadId(row), title: escapeForDisplay(row.title), device: row.device }
+      return { kind: "not_live", thread_id: rowKey(row), title: escapeForDisplay(row.title), device: row.device }
     return { kind: "control", control: createRelayControl(options.remote, row) }
   }
   const session = targetSession(current, resolved.thread)

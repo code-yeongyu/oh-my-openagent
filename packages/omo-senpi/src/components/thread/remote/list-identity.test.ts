@@ -16,12 +16,12 @@ const ANON = { ...B_ROW, session_id: "rk-anon", durable_id: undefined, title: "a
 
 describe("thread_list row identity (#14305 U6)", () => {
   test("#given b lists a session that publishes no thread id #when thread_list runs #then its thread is <device id>/<listing key>, never empty, and that thread addresses it", async () => {
-    const a = account({ rows: [B_ROW, ANON] })
+    const a = account({ rows: [B_ROW, ANON], live: ["rk-on-b", "dur-on-b", "rk-anon"] })
     const { run } = surface(a.remote)
     const listed = await run("thread_list", { all_scope: true })
     const anon = onB(listed).find((thread) => thread.name === "anon on b")
     expect(anon?.thread).toBe("b/rk-anon")
-    expect(anon?.link).toContain("b/rk-anon")
+    expect(anon?.link).toContain(encodeURIComponent("b/rk-anon"))
     const changed = await run("thread_set_model", { thread: anon?.thread ?? "", model: "opus" })
     expect(changed).toMatchObject({ kind: "ok", device: "b" })
     expect(a.sent.filter((entry) => entry.rpc?.["type"] === "set_model").map((entry) => entry.session)).toEqual([

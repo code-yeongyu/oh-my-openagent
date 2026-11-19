@@ -3,7 +3,6 @@ import type { ThreadToolResult } from "../contracts"
 import { threadToolFailure } from "../errors"
 import { endpointOutcomeFailure } from "./outcome"
 import {
-  rowThreadId,
   type JsonObject,
   type RemoteCommandOutcome,
   type RemoteSessionRow,
@@ -111,7 +110,8 @@ export type HolderView = "running" | "on_disk" | "absent" | "unknown"
  * `not_resumable`.
  */
 export async function holderView(remote: RemoteThreadSurface, row: RemoteSessionRow): Promise<HolderView> {
-  const thread = rowThreadId(row)
+  // find_session looks a session up by its durable id; a row without one cannot be looked up.
+  const thread = row.durable_id ?? ""
   if (thread === "") return "unknown"
   const { outcome } = await findSession(remote, row.device, thread)
   if (outcome.kind !== "ok") return "unknown"
@@ -132,7 +132,7 @@ export async function sessionFileOf(
   row: RemoteSessionRow,
 ): Promise<{ readonly path: string } | { readonly result: ThreadToolResult }> {
   if (row.session_file !== undefined && row.session_file !== "") return { path: row.session_file }
-  const thread = rowThreadId(row)
+  const thread = row.durable_id ?? ""
   const details = { device: row.device, thread }
   if (thread === "")
     return refusal(

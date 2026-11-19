@@ -1,11 +1,15 @@
 import type { ThreadSummary } from "../contracts"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
-import { rowLabel, rowStatus, rowThreadId } from "../remote/ports"
+import { rowKey, rowName } from "@oh-my-opencode/thread-address-core"
+import { rowStatus } from "../remote/ports"
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import { INITIAL_SKILLS_CONTEXT_KEY } from "../initial-skills"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "../remote/ports"
 import { notSignedInFailure, outcomeFailure } from "../remote/outcome"
-import { deviceOnline, replyData } from "../remote/remote-ops"
+import { replyData } from "../remote/remote-ops"
+import { accountDevices } from "../address/account"
+import { resolveAccountDevice } from "../address/device"
+import { asFailure } from "../address/refusals"
 import { prepareRemoteWorktree, removeRemoteWorktree } from "../worktree/remote-worktree"
 import { openedEngineId, openRefusal } from "./open-reply"
 import { threadLink } from "../thread-link"
@@ -38,12 +42,16 @@ export function displayedThread(row: RemoteSessionRow): HostedThread {
 
 function listedThread(row: RemoteSessionRow): HostedThread {
   const seen = new Date(row.updated_ms).toISOString()
-  // D2 (decision 0027): the id a caller sees and may pass back is the durable id; the listing key stays inside sessionId
-  // for the relay transport. A device that publishes no durable id lists an empty id: address its threads by name.
+  // Design section 6: the id a caller sees and may pass back is the row's key, its durable id, else
+  // `<device id>/<listing key>` for a session whose device publishes none; the listing key stays inside sessionId for the
+  // relay transport. Its name is the one naming function's: a session with none shows its folder's name, marked unnamed.
+  const thread = rowKey(row)
+  const { name, unnamed } = rowName({ name: row.title, folder: row.project })
   return {
     sessionId: row.session_id,
-    thread_id: rowThreadId(row),
-    name: rowLabel(row),
+    thread_id: thread,
+    name,
+    ...(unnamed ? { unnamed: true as const } : {}),
     status: rowStatus(row),
     state: rowState(row),
     ...threadModel(row.model),
@@ -52,7 +60,7 @@ function listedThread(row: RemoteSessionRow): HostedThread {
     updated_at: seen,
     device: row.device,
     ...(row.source === "cache" && row.as_of !== undefined ? { as_of: new Date(row.as_of).toISOString() } : {}),
-    link: threadLink(rowThreadId(row), rowLabel(row)),
+    link: threadLink(thread, name),
   }
 }
 
@@ -81,8 +89,21 @@ export function createRelaySessionHost(
         .filter((row) => row.device === device && row.state !== "ended")
         .map(listedThread),
     open: async (request: SessionOpenRequest): Promise<SessionOpenOutcome> => {
-      const offline = await deviceOnline(remote, device)
-      if (offline !== undefined) return offline
+      // The device resolved as the address module resolves one with need "online": unknown is not_found, offline is
+      // device_offline (A3: nothing is queued for it), and a roster that cannot be read is host_unavailable.
+      let account: Awaited<ReturnType<typeof accountDevices>>
+      try {
+        account = await accountDevices(remote.client)
+      } catch (error) {
+        return fail(
+          "host_unavailable",
+          "This device's device service could not list the account's devices.",
+          "Retry when the device service is reachable.",
+          { device, reason: error instanceof Error ? error.message : String(error) },
+        )
+      }
+      const resolved = resolveAccountDevice(account, device, { online: true })
+      if (resolved.kind === "error") return { kind: "error", error: asFailure(resolved) }
       const { name, initialSkills, permissionPreset, worktree, ...asked } = request
       const made =
         worktree === undefined ? undefined : await prepareRemoteWorktree(remote, device, asked.cwd ?? "", worktree)
