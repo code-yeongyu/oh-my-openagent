@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto"
+import { rowKey } from "@oh-my-opencode/thread-address-core"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
-import { rowStatus, rowThreadId } from "./ports"
+import { rowStatus } from "./ports"
 import { pairLoopGuardMessage, pairLoopGuardNextAction, threadToolFailure, type ThreadToolFailure } from "../errors"
 import { hashArgs } from "../gateway/bindings"
 import { decideDelivery, effectiveLaneOf } from "../gateway/decision"
@@ -438,7 +439,8 @@ export function createRelayTransport(
     parked?: SendOutcome,
   ): Promise<{ readonly row: RemoteSessionRow; readonly ended: boolean } | SendOutcome> {
     if (parked === undefined && rowStatus(listed) === "live") return { row: listed, ended: false }
-    const thread = rowThreadId(listed)
+    // The row as a caller addresses it (its thread id, else <device id>/<listing key>); locate reads the thread id itself.
+    const thread = rowKey(listed)
     const details = { device: listed.device, thread }
     const view = await holderView(remote, listed)
     if (view === "absent")
@@ -460,7 +462,7 @@ export function createRelayTransport(
         details,
       )
     }
-    const located = await remote.sessions.locate(listed.device, thread)
+    const located = await remote.sessions.locate(listed.device, listed.durable_id ?? "")
     if (located.kind !== "ok")
       return fail(
         "not_resumable",
@@ -502,7 +504,7 @@ export function createRelayTransport(
     if (ended && delivery.mode === "steer")
       return fail(
         REFUSAL_CODES.turn_conflict.code,
-        `${rowThreadId(row)} on device ${row.device} is not running, so no turn of it can be steered.`,
+        `${rowKey(row)} on device ${row.device} is not running, so no turn of it can be steered.`,
         REFUSAL_CODES.turn_conflict.next,
         { device: row.device },
       )
@@ -603,7 +605,7 @@ export function createRelayTransport(
     let resentLane: EffectiveLane | undefined
     const ok = (kind: GatewayDeliveryDelivery, deduplicated = false): RelayDeliverySuccess => ({
       kind: "ok",
-      thread_id: rowThreadId(row),
+      thread_id: rowKey(row),
       delivery: kind,
       deduplicated,
       device: row.device,
@@ -776,7 +778,7 @@ export function createRelayTransport(
     if (offline !== undefined) return offline
     const ok = (kind: GatewayDeliveryDelivery): RelayDeliverySuccess => ({
       kind: "ok",
-      thread_id: rowThreadId(row),
+      thread_id: rowKey(row),
       delivery: kind,
       deduplicated: false,
       device: row.device,
