@@ -204,6 +204,11 @@ describe("thread state on this device's rows", () => {
     expect(listThreads(options, view, true)).toMatchObject({ inactive_truncated: true, inactive_dropped: 2 })
     expect(rows(listThreads(options, view, true)).map((row) => row.thread)).toContain(ids[0])
     expect(listThreads(options, view, true, ["running", "idle"])).not.toHaveProperty("inactive_dropped")
+    // An unread file may be archived: a listing of archived threads is as partial as one of inactive threads.
+    expect(listThreads(options, view, true, ["archived"])).toMatchObject({
+      inactive_truncated: true,
+      inactive_dropped: 2,
+    })
     // With an account, the count is this device's own: its device row carries it.
     const across = await listAcross(remoteFixture.account({}).remote, listThreads(options, view, true), true)
     const devices = across.kind === "ok" && "devices" in across ? (across.devices ?? []) : []

@@ -192,7 +192,7 @@ export type ThreadDevice = {
   readonly this_device: boolean
   readonly listing: "listed" | "incomplete" | "offline"
   readonly threads: number
-  /** On this device's row: the inactive threads this listing left out (`inactive_dropped`); absent when none were. */
+  /** On this device's row: the inactive or archived threads this listing left out (`inactive_dropped`); absent when none were. */
   readonly dropped?: number
 }
 
@@ -217,7 +217,10 @@ export type ThreadListResult =
       readonly aliases_unavailable?: "sign_in" | "host_unavailable" | "not_asked"
       /** More session files were in scope than one list reads (newest first): older inactive threads are left out. */
       readonly inactive_truncated?: true
-      /** With `inactive_truncated`: how many inactive threads this device's listing left out. */
+      /**
+       * With `inactive_truncated`: how many threads this device's listing left out unread, each inactive or archived; set
+       * when the filter shows either state.
+       */
       readonly inactive_dropped?: number
     }
   | ThreadDataError
