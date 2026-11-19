@@ -270,9 +270,15 @@ export function createRemoteThreadFixture() {
       findSessionRefuse?: string
       /**
        * omo#14271: b's primary engine predates find_session (b's service refuses it `method_unclassified`) while b lists
-       * these engine keys; find_session sent to one of the `serving` keys is answered as usual.
+       * these engine keys; find_session sent to one of the `serving` keys is answered as usual. An engine in `timingOut`
+       * does not answer the lookup (a timeout), and `listThrows` makes listing the engines fail.
        */
-      engines?: { readonly keys: readonly string[]; readonly serving: readonly string[] }
+      engines?: {
+        readonly keys: readonly string[]
+        readonly serving: readonly string[]
+        readonly timingOut?: readonly string[]
+        readonly listThrows?: boolean
+      }
       /** b knows a session it just opened only by its relay key (relayKeys), not by its durable id: a listing that has not caught up yet. */
       relayKeyOnly?: boolean
       /** The device service throws on b's admit_external_message (a lost connection mid-delivery). */
@@ -615,11 +621,20 @@ export function createRemoteThreadFixture() {
           const endpoint = endpointOptions?.endpoint
           sent.push({ via: "endpoint", device, rpc, ...(endpoint === undefined ? {} : { endpoint }) })
           const engines = options.engines
-          if (engines !== undefined && rpc["type"] === "find_session" && !engines.serving.includes(endpoint ?? ""))
-            return { kind: "refused", reason: "method_unclassified" }
+          if (engines !== undefined && rpc["type"] === "find_session") {
+            if (engines.timingOut?.includes(endpoint ?? "")) return { kind: "uncertain", reason: "reply_lost" }
+            if (!engines.serving.includes(endpoint ?? "")) return { kind: "refused", reason: "method_unclassified" }
+          }
           return answer(rpc)
         },
-        ...(options.engines === undefined ? {} : { endpointKeys: async () => options.engines?.keys ?? [] }),
+        ...(options.engines === undefined
+          ? {}
+          : {
+              endpointKeys: async () => {
+                if (options.engines?.listThrows === true) throw new Error("session.endpoints failed")
+                return options.engines?.keys ?? []
+              },
+            }),
         // This fake device lists a created session by the id its create reply names.
         locate: async (device, engineId) => {
           located.push({ device, session: engineId })
