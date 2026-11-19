@@ -1,7 +1,7 @@
 import { failed as fail, type Failed as Failure } from "../address/refusals"
 import type { CommandResult } from "@oh-my-opencode/device-service-core"
 import type { RemoteClient } from "../../remote"
-import { accountDevices, accountState } from "./account"
+import { accountDevices, accountState } from "../address/account"
 import { outcomeFailure, READ_UNCERTAIN } from "./outcome"
 import {
   type AliasError,
@@ -11,9 +11,6 @@ import {
   type RemoteSessionRow,
   type RemoteThreadSurface,
 } from "./ports"
-
-// remote/address-book.ts (the list unit moves it) still imports holderTarget from here; this line goes with it.
-export { holderTarget } from "../address/holder"
 
 /** A5: the relay is paid only; on any other plan the remote path answers this, never a silent failure or a queue. */
 export async function remoteAvailable(remote: RemoteThreadSurface): Promise<Failure | undefined> {

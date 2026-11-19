@@ -1,4 +1,4 @@
-import { accountDevices } from "../remote/account"
+import { accountDevices } from "./account"
 import { notSignedInFailure } from "../remote/outcome"
 import {
   endedRow,

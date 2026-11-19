@@ -1,4 +1,4 @@
-export { accountDevices, accountState, onAccount, type Account, type AccountDevices, type AccountRead } from "./account"
+export { accountDevices, accountState, type Account, type AccountDevices, type AccountRead } from "./account"
 export { resolveTypedDevice, targetDevice } from "./device"
 export { asFailure, type AddressCandidate, type ThreadRefusal } from "./refusals"
 export { resolveAddress } from "./resolve"

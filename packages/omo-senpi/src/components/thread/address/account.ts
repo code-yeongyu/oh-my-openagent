@@ -50,7 +50,7 @@ async function rosterOf(client: RemoteClient): Promise<readonly RemoteDevice[]> 
  * device out). A removed device's cached rows go (#13505); an offline one keeps its rows. With no roster (`undefined`)
  * nothing can be judged, so every row stays.
  */
-export function onAccount(
+function onAccount(
   rows: readonly RemoteSessionRow[],
   roster: readonly RemoteDevice[] | undefined,
   here: string | null,
