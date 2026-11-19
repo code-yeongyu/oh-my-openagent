@@ -208,7 +208,10 @@ describe("createOmoSdk refusals", () => {
 describe("deviceService.status", () => {
   test("#given no service listening #when status runs #then it answers not_running", async () => {
     const { ports } = fakes()
-    const sdk = sdkWith({ ...ports, deviceServiceStatus: async () => ({ state: null, device: null, connected: false }) })
+    const sdk = sdkWith({
+      ...ports,
+      deviceServiceStatus: async () => ({ state: null, device: null, connected: false }),
+    })
     expect(valueOf(await sdk.deviceService.status())).toEqual({ state: "not_running", connected: false, device: null })
   })
 

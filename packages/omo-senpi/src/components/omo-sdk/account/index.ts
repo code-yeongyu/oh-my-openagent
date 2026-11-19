@@ -13,8 +13,14 @@ export type WhoAmI = {
 export type AccountApi = { readonly whoami: () => Promise<OmoResult<WhoAmI>> }
 
 const meSchema = z.object({
-  user: z.object({ email: z.string().min(1) }).partial().optional(),
-  account: z.object({ id: z.string().min(1) }).partial().optional(),
+  user: z
+    .object({ email: z.string().min(1) })
+    .partial()
+    .optional(),
+  account: z
+    .object({ id: z.string().min(1) })
+    .partial()
+    .optional(),
 })
 
 export function createAccountApi(access: AccountAccess): AccountApi {

@@ -17,7 +17,8 @@ export type OmoError = {
 }
 
 /** Every SDK call answers data in the shape thread tool results use; nothing is thrown at the caller. */
-export type OmoResult<T> = { readonly kind: "ok"; readonly value: T } | { readonly kind: "error"; readonly error: OmoError }
+export type OmoResult<T> =
+  { readonly kind: "ok"; readonly value: T } | { readonly kind: "error"; readonly error: OmoError }
 
 export const ok = <T>(value: T): OmoResult<T> => ({ kind: "ok", value })
 

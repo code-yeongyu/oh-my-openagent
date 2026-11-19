@@ -68,11 +68,20 @@ export function failure<T>(error: unknown): OmoResult<T> {
           code: error.code,
         })
   if (error instanceof RequestFailure)
-    return refused("service_unreachable", "the account service could not be reached", "check the connection, then retry")
+    return refused(
+      "service_unreachable",
+      "the account service could not be reached",
+      "check the connection, then retry",
+    )
   if (error instanceof SignInError || (error instanceof Error && error.name === "ZodError"))
-    return refused("service_refused", "the account service sent an answer this SDK cannot read", "update omo, then retry", {
-      code: "invalid_response",
-    })
+    return refused(
+      "service_refused",
+      "the account service sent an answer this SDK cannot read",
+      "update omo, then retry",
+      {
+        code: "invalid_response",
+      },
+    )
   return refused("internal_error", "the omo SDK failed unexpectedly", "retry; report it if it repeats", {
     name: error instanceof Error ? error.name : typeof error,
   })
