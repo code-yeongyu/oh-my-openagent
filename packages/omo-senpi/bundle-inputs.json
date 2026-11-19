@@ -1763,6 +1763,7 @@
     "packages/omo-senpi/src/components/thread/tools/model-match.ts",
     "packages/omo-senpi/src/components/thread/tools/monitor-target.ts",
     "packages/omo-senpi/src/components/thread/tools/ports.ts",
+    "packages/omo-senpi/src/components/thread/tools/read-item.ts",
     "packages/omo-senpi/src/components/thread/tools/read-ops.ts",
     "packages/omo-senpi/src/components/thread/tools/relay-tools.ts",
     "packages/omo-senpi/src/components/thread/tools/render.ts",
