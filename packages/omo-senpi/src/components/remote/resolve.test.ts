@@ -205,4 +205,12 @@ describe("sessions.resolve", () => {
       expect.objectContaining({ thread: `${PEER}/dur-1` }),
     ])
   })
+
+  test("#given a device part no device answers to #when it is resolved #then not_found keeps sessions.list's details.id, with device and candidates added beside it", async () => {
+    const { client } = await account([listed(PEER, "rk-1", "dur-1", "Bot")])
+    expect(failureOf(await client.sessions.resolve("nowhere/dur-1"))).toMatchObject({
+      code: "not_found",
+      details: { kind: "device", id: "nowhere", device: "nowhere", candidates: expect.any(Array) },
+    })
+  })
 })
