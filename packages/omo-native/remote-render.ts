@@ -45,8 +45,16 @@ const isEntry = (value: unknown): value is Readonly<Record<string, unknown>> =>
  * The candidates of a typed refusal (an ambiguous device, name or prefix), one per line - the address or device id a
  * person can type back, then its name (#14305 review M4). A refusal with no candidates prints nothing.
  */
-export function candidateLines(details: Readonly<Record<string, unknown>> | undefined): string[] {
-  const listed: unknown = details?.["candidates"]
+/**
+ * A refusal's candidates as lines to choose from. An offline device is one device the person named, not a choice, so a
+ * device_offline refusal prints none (its typed details keep them for a caller that reads data).
+ */
+export function candidateLines(refusal: {
+  readonly code: string
+  readonly details?: Readonly<Record<string, unknown>> | undefined
+}): string[] {
+  if (refusal.code === "device_offline") return []
+  const listed: unknown = refusal.details?.["candidates"]
   if (!Array.isArray(listed)) return []
   return listed.filter(isEntry).flatMap((candidate) => {
     const id = textOf(candidate["address"]) ?? textOf(candidate["device"]) ?? textOf(candidate["thread"])

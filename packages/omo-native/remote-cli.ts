@@ -199,7 +199,7 @@ export async function prepareRemoteAttach(
       service.close()
       dependencies.error(`omo remote: ${resolved.error.message}`)
       dependencies.error(personNextAction(resolved.error.next_action))
-      for (const line of candidateLines(resolved.error.details)) dependencies.error(line)
+      for (const line of candidateLines(resolved.error)) dependencies.error(line)
       return REMOTE_EXIT.failed
     }
     const { attached: attach } = await attachAddressed(

@@ -13,7 +13,8 @@ import type { DeliveryOutcome, DeliveryTransport, OutboundDelivery, RelayDeliver
 import type { DeliveryWait, EffectiveLane, GatewayDeliveryDelivery, Provenance } from "../gateway/types"
 import { UNKNOWN_CALLER } from "../tools/ports"
 import type { JsonObject, RemoteCommandOutcome, RemoteSessionRow, RemoteThreadSurface } from "./ports"
-import { deviceOnline, replyData } from "./remote-ops"
+import { replyData } from "./remote-ops"
+import { resolveTypedDevice } from "../address/device"
 import { chainCountLimitFailure, outcomeFailure } from "./outcome"
 import { holderView } from "./find-session"
 import { outsideCallDeadline } from "../../call-budget/call-deadline"
@@ -490,8 +491,8 @@ export function createRelayTransport(
       readonly refusal: SendOutcome
     },
   ): Promise<SendOutcome> {
-    const offline = await deviceOnline(remote, listed.device)
-    if (offline !== undefined) return offline
+    const online = await resolveTypedDevice(remote.client, listed.device)
+    if (online.kind === "error") return online
     const parkedHere = (outcome: RemoteCommandOutcome) =>
       retry === undefined &&
       rowStatus(listed) === "live" &&
@@ -774,8 +775,8 @@ export function createRelayTransport(
     row: RemoteSessionRow,
     sending: () => void,
   ): Promise<SendOutcome> => {
-    const offline = await deviceOnline(remote, row.device)
-    if (offline !== undefined) return offline
+    const online = await resolveTypedDevice(remote.client, row.device)
+    if (online.kind === "error") return online
     const ok = (kind: GatewayDeliveryDelivery): RelayDeliverySuccess => ({
       kind: "ok",
       thread_id: rowKey(row),
