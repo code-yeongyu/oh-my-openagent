@@ -2,7 +2,12 @@ import { expect, test } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
-import { type DeviceService, deviceServiceEndpointPath, readDeviceServiceStatus } from "../src/index.ts"
+import {
+  type DeviceService,
+  deviceServiceEndpointPath,
+  readDeviceServiceDevices,
+  readDeviceServiceStatus,
+} from "../src/index.ts"
 
 const withStateDir = async (endpoint: boolean, use: (stateDir: string) => Promise<void>): Promise<void> => {
   const stateDir = mkdtempSync(join(tmpdir(), "omo-read-status-"))
@@ -59,5 +64,25 @@ test("#given a connection that opens after the caller aborts #when the status is
     expect(await answer).toBe("no_answer")
     late.resolve(service)
     await closed.promise
+  })
+})
+
+test("#given a running service #when its devices are read #then each row answers its id and online state and the connection is closed", async () => {
+  await withStateDir(true, async (stateDir) => {
+    let closed = 0
+    const service = {
+      devices: async () => [
+        { device: "dev-a", label: "device-a", kind: "cli", platform: "linux", last_seen_ms: 1, online: true },
+        { device: "dev-b", label: "device-b", kind: "cli", platform: "macos", last_seen_ms: null, online: false },
+      ],
+      close: () => {
+        closed++
+      },
+    } as unknown as DeviceService
+    expect(await readDeviceServiceDevices({ stateDir, version: "0.0.0-test", connect: async () => service })).toEqual([
+      { id: "dev-a", online: true },
+      { id: "dev-b", online: false },
+    ])
+    expect(closed).toBe(1)
   })
 })

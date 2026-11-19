@@ -46,20 +46,25 @@ export const connectOrNotRunning = async (
   }
 }
 
-/**
- * One read of this machine's device service status for a caller that only reports it (the omo SDK): it connects, reads
- * and closes, and never installs, starts or changes the service. No endpoint file, or one a dead service left behind, is
- * "not_running"; a service that does not answer in time is "no_answer" (unknown, never offline); a service that refuses
- * the connection, fails the mutual proof or sits in an unsafe state dir throws. A signed-out service answers its status.
- */
-export const readDeviceServiceStatus = async (options: {
+type OneShotOptions = {
   readonly stateDir: string
   readonly version: string
   /** The caller stops waiting: the read answers "no_answer" and a connection that opens afterwards is closed. */
   readonly signal?: AbortSignal
   /** Test seam: the connection (connectDeviceService by default). */
   readonly connect?: () => Promise<DeviceService>
-}): Promise<Status | "not_running" | "no_answer"> => {
+}
+
+/**
+ * One read through this machine's device service for a caller that only reports it (the omo SDK): connect, read, close,
+ * plain data, never install, start or change the service. No endpoint file, or one a dead service left behind, is
+ * "not_running"; a service that does not answer in time is "no_answer" (unknown, never offline); a service that refuses
+ * the connection, fails the mutual proof or sits in an unsafe state dir throws.
+ */
+const readOnce = async <T>(
+  options: OneShotOptions,
+  read: (service: DeviceService) => Promise<T>,
+): Promise<T | "not_running" | "no_answer"> => {
   const { signal } = options
   if (signal?.aborted === true) return "no_answer"
   if (!existsSync(deviceServiceEndpointPath(options.stateDir))) return "not_running"
@@ -84,7 +89,7 @@ export const readDeviceServiceStatus = async (options: {
     return "no_answer"
   }
   try {
-    return await Promise.race([service.status(), aborted])
+    return await Promise.race([read(service), aborted])
   } catch (error) {
     if (connectFailure(error).cause === "timed_out") return "no_answer"
     throw error
@@ -92,6 +97,16 @@ export const readDeviceServiceStatus = async (options: {
     service.close()
   }
 }
+
+/** This machine's device service status (a signed-out service answers its own status). */
+export const readDeviceServiceStatus = (options: OneShotOptions): Promise<Status | "not_running" | "no_answer"> =>
+  readOnce(options, (service) => service.status())
+
+/** The account's devices as this machine's device service sees them, each with its online state. */
+export const readDeviceServiceDevices = (
+  options: OneShotOptions,
+): Promise<readonly { readonly id: string; readonly online: boolean }[] | "not_running" | "no_answer"> =>
+  readOnce(options, async (service) => (await service.devices()).map((row) => ({ id: row.device, online: row.online })))
 
 /** A device credential a client already holds in memory for its own work, with the account it belongs to. */
 export type HeldDeviceCredential = DeviceCredential & { readonly account: string }
