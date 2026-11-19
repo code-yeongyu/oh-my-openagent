@@ -423,15 +423,70 @@ describe("validateTaskTarget category+model exclusivity", () => {
     expect(result.error.message).toContain("omo.json")
   })
 
-  test("#given subagent_type with model #when validated #then resolves to a subagent selection", () => {
+  test("#given a custom subagent_type with model #when validated #then resolves to a subagent selection", () => {
     // given
-    const params = { prompt: "p", subagent_type: "plan-reviewer", model: "openai/gpt-5.6-sol" }
+    const params = { prompt: "p", subagent_type: "my-reviewer", model: "openai/gpt-5.6-sol" }
 
     // when
     const result = validateTaskTarget(params)
 
     // then
-    expect(result).toEqual({ kind: "subagent_type", subagentType: "plan-reviewer" })
+    expect(result).toEqual({ kind: "subagent_type", subagentType: "my-reviewer" })
+  })
+})
+
+describe("validateTaskTarget builtin agent+model refusal", () => {
+  const builtinNames = [
+    "explore",
+    "librarian",
+    "plan-consultant",
+    "plan-reviewer",
+    "omo-native-code-reviewer",
+    "omo-native-qa-executor",
+    "omo-native-gate-reviewer",
+    // a retired spelling resolves to the same builtin, so it is refused the same way
+    "omo-senpi-code-reviewer",
+  ]
+
+  for (const name of builtinNames) {
+    test(`#given subagent_type ${name} with a model #when validated #then the error code is agent_with_model`, () => {
+      // given
+      const params = { prompt: "p", subagent_type: name, model: "anthropic/claude-opus-5-5" }
+
+      // when
+      const result = validateTaskTarget(params)
+
+      // then
+      expect(result.kind).toBe("error")
+      if (result.kind !== "error") throw new Error("expected error")
+      expect(result.error.code).toBe("agent_with_model")
+    })
+  }
+
+  test("#given subagent_type explore without a model #when validated #then resolves to a subagent selection", () => {
+    // given
+    const params = { prompt: "p", subagent_type: "explore" }
+
+    // when
+    const result = validateTaskTarget(params)
+
+    // then
+    expect(result).toEqual({ kind: "subagent_type", subagentType: "explore" })
+  })
+
+  test("#given a batch whose second item names explore with a model #when resolved #then it fails as item_target at index 1", () => {
+    // given / when
+    const result = resolveSpawnItems({
+      tasks: [
+        { prompt: "one", subagent_type: "explore" },
+        { prompt: "two", subagent_type: "explore", model: "anthropic/claude-opus-5-5" },
+      ],
+    })
+
+    // then
+    expect(result.kind).toBe("error")
+    if (result.kind !== "error") throw new Error("expected error")
+    expect(result.error).toMatchObject({ code: "item_target", index: 1 })
   })
 })
 
