@@ -23,7 +23,7 @@ import { type ClientCore, ok, type Outcome, type RemoteClient } from "./client"
 import { nextActionFor, readFailureFromError, remoteFailure } from "./codes"
 import { DEADLINES } from "./deadlines"
 import { createDeviceServiceSessions } from "./port/device-service"
-import { idShapedSession, listingIncomplete, resolveRemoteDevice } from "./resolve"
+import { budget, idShapedSession, listingIncomplete, resolveRemoteDevice, type Stage } from "./resolve"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
 import { clientMessageIdOf } from "./client-message-id"
 import type { LocalSessions } from "./local-sessions"
@@ -50,7 +50,6 @@ type SessionMembers = Pick<
 
 type Target = { readonly device: string; readonly session: string }
 /** The options of one stage of a call, under what is left of the call's one deadline (capped at `capMs`). */
-type Stage = (capMs?: number) => Opts
 
 const isObject = (value: unknown): value is JsonObject =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -287,23 +286,9 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     return leg
   }
 
-  /**
-   * One deadline for a whole call (#13756 L3): its clock starts once, and each stage (the listing, the device row, the
-   * member) runs under what is left of it, a stage's own table default capping its share.
-   */
-  const budget = (opts: Opts | undefined, totalMs: number): Stage => {
-    const end = core.timers.now() + (opts?.deadlineMs ?? totalMs)
-    return (capMs) => {
-      const left = Math.max(1, end - core.timers.now())
-      return {
-        ...(opts?.signal === undefined ? {} : { signal: opts.signal }),
-        deadlineMs: capMs === undefined ? left : Math.min(capMs, left),
-      }
-    }
-  }
   // An open with a first prompt spends the create's and one send's default.
   const openBudget = (request: OpenRequest, opts: Opts | undefined): Stage =>
-    budget(opts, DEADLINES.openEndpoint + (request.first === undefined ? 0 : DEADLINES.drive))
+    budget(core.timers, opts, DEADLINES.openEndpoint + (request.first === undefined ? 0 : DEADLINES.drive))
 
   const deviceRow = async (id: string, opts: Opts | undefined): Promise<Outcome<DeviceRow>> => {
     const listed = await core.devicesList(opts)
@@ -377,7 +362,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
         `${thread} names no device; a session member takes a <device>/<session> handle.`,
         "Call sessions.resolve for the thread's handle, then call this again.",
       )
-    const device = await resolveRemoteDevice(core, target.device, stage(DEADLINES.devices))
+    const device = await resolveRemoteDevice(core, target.device, stage)
     if (device.kind === "error") return device
     const { ref, row: deviceRow } = device.value
     const listed = await core.sessionsList({ device: ref.id }, stage(DEADLINES.sessionsList))
@@ -407,7 +392,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     value: (result: ThreadToolResult) => T,
     onThisDevice: (target: SessionTarget) => Promise<Outcome<T>>,
   ): R<T> => {
-    const stage = budget(opts, DEADLINES.drive)
+    const stage = budget(core.timers, opts, DEADLINES.drive)
     const resolved = await resolve(thread, stage)
     if (resolved.kind === "error") return resolved
     const target = resolved.value
@@ -443,7 +428,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
   }
 
   const send = async (thread: ThreadHandle, request: SendRequest, opts?: Opts): R<SendReceipt> => {
-    const stage = budget(opts, DEADLINES.drive)
+    const stage = budget(core.timers, opts, DEADLINES.drive)
     const resolved = await resolve(thread, stage)
     if (resolved.kind === "error") return resolved
     return await deliverTo(thread, resolved.value, request, stage)
@@ -668,7 +653,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     open,
     send,
     get: async (thread, opts) => {
-      const stage = budget(opts, DEADLINES.observeRead)
+      const stage = budget(core.timers, opts, DEADLINES.observeRead)
       const resolved = await resolve(thread, stage)
       if (resolved.kind === "error") return resolved
       const target = resolved.value
@@ -684,7 +669,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       })
     },
     read: async (thread, page, opts) => {
-      const stage = budget(opts, DEADLINES.observeRead)
+      const stage = budget(core.timers, opts, DEADLINES.observeRead)
       const resolved = await resolve(thread, stage)
       if (resolved.kind === "error") return resolved
       const target = resolved.value
@@ -706,7 +691,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     },
     // The engine's interrupt record itself (relay-control's body drops the background report InterruptResult carries).
     interrupt: async (thread, opts) => {
-      const stage = budget(opts, DEADLINES.drive)
+      const stage = budget(core.timers, opts, DEADLINES.drive)
       const resolved = await resolve(thread, stage)
       if (resolved.kind === "error") return resolved
       const target = resolved.value
@@ -781,7 +766,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
         (target) => onThisDevice(target.device, (local) => local.setReasoning(target, level)),
       ),
     close: async (thread, opts) => {
-      const stage = budget(opts, DEADLINES.close)
+      const stage = budget(core.timers, opts, DEADLINES.close)
       const resolved = await resolve(thread, stage)
       if (resolved.kind === "error") return resolved
       const target = resolved.value

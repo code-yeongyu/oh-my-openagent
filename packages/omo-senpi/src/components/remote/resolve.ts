@@ -9,9 +9,28 @@ import {
   type DeviceRef,
 } from "@oh-my-opencode/thread-address-core"
 import { type ClientCore, ok, type RemoteClient } from "./client"
+import { DEADLINES } from "./deadlines"
 import { nextActionFor, remoteFailure } from "./codes"
 import { canonicalizeThreadHandle, handleOf, type CanonicalThread } from "./seams"
 import type { DeviceRow, Opts, RemoteFailure, Scope, SessionRow } from "./types"
+
+/** What is left of one call's deadline, a stage's own table default capping its share. */
+export type Stage = (capMs?: number) => Opts
+
+/**
+ * One deadline for a whole call (#13756 L3): its clock starts once, and each stage (the roster, the listing, the member)
+ * runs under what is left of it.
+ */
+export const budget = (timers: ClientCore["timers"], opts: Opts | undefined, totalMs: number): Stage => {
+  const end = timers.now() + (opts?.deadlineMs ?? totalMs)
+  return (capMs) => {
+    const left = Math.max(1, end - timers.now())
+    return {
+      ...(opts?.signal === undefined ? {} : { signal: opts.signal }),
+      deadlineMs: capMs === undefined ? left : Math.min(capMs, left),
+    }
+  }
+}
 
 type Match =
   { readonly kind: "one"; readonly row: SessionRow } | { readonly kind: "many"; readonly rows: readonly SessionRow[] }
@@ -146,11 +165,11 @@ const listingNamed = (id: string): DeviceRow => ({
 export async function resolveRemoteDevice(
   core: ClientCore,
   text: string,
-  opts?: Opts,
+  stage: Stage,
 ): Promise<
   { readonly kind: "ok"; readonly value: { readonly ref: DeviceRef; readonly row: DeviceRow } } | RemoteFailure
 > {
-  const roster = await core.devicesList(opts)
+  const roster = await core.devicesList(stage(DEADLINES.devices))
   if (roster.kind === "error") return roster
   const here = roster.value.find((row) => row.self === true)?.id
   const over = (rows: readonly DeviceRow[]) => ({
@@ -168,7 +187,7 @@ export async function resolveRemoteDevice(
       : deviceRefusal(resolved.refusal)
   const first = over(roster.value)
   if (first.resolved.kind === "ok" || first.resolved.refusal.reason !== "no_device") return answer(first)
-  const named = await core.sessionsList({ device: text }, opts)
+  const named = await core.sessionsList({ device: text }, stage(DEADLINES.sessionsList))
   if (named.kind === "error") return named.code === "not_found" ? answer(first) : named
   return answer(over([...roster.value, listingNamed(text)]))
 }
@@ -193,8 +212,9 @@ export function resolveMember(core: ClientCore): RemoteClient["sessions"]["resol
     const target = canonical.value
     const hit = cached(index, target)
     if (hit !== undefined) return { kind: "ok", value: hit }
+    const stage = budget(core.timers, opts, DEADLINES.devices + DEADLINES.sessionsList)
     if (target.target.kind !== "device_session") {
-      const listed = await core.sessionsList(undefined, opts)
+      const listed = await core.sessionsList(undefined, stage(DEADLINES.sessionsList))
       if (listed.kind === "error") return listed
       remember(listed.value.rows, undefined)
       const found = match(listed.value.rows, target, undefined)
@@ -202,10 +222,10 @@ export function resolveMember(core: ClientCore): RemoteClient["sessions"]["resol
       if (found?.kind === "many") return ambiguous(address, found.rows)
       return miss(address, listed.value.unanswered)
     }
-    const device = await resolveRemoteDevice(core, target.target.device, opts)
+    const device = await resolveRemoteDevice(core, target.target.device, stage)
     if (device.kind === "error") return device
     const deviceId = device.value.ref.id
-    const listed = await core.sessionsList({ device: deviceId }, opts)
+    const listed = await core.sessionsList({ device: deviceId }, stage(DEADLINES.sessionsList))
     if (listed.kind === "error") return listed
     remember(listed.value.rows, deviceId)
     const found = match(listed.value.rows, target, deviceId)
