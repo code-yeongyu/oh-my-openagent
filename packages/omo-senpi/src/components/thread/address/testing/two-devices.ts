@@ -1,5 +1,11 @@
 import type { ThreadAddressEntry } from "../../addressing"
-import type { AliasHolder, RemoteDevice, RemoteListing, RemoteSessionRow, RemoteThreadSurface } from "../../remote/ports"
+import type {
+  AliasHolder,
+  RemoteDevice,
+  RemoteListing,
+  RemoteSessionRow,
+  RemoteThreadSurface,
+} from "../../remote/ports"
 import { createRemoteThreadFixture } from "../../thread-remote-fixture"
 import type { ThreadHostSession } from "../../tools"
 

@@ -1,7 +1,11 @@
 import { describe, expect, test } from "bun:test"
 import { listingKey, mergeRows, rowAddress, rowKey, rowName, sameSession } from "."
 
-const row = (device: string, thread: string | undefined, key: string) => ({ device, durable_id: thread, session_id: key })
+const row = (device: string, thread: string | undefined, key: string) => ({
+  device,
+  durable_id: thread,
+  session_id: key,
+})
 
 describe("#given a listing row #when its identity is read #then rowKey and rowAddress name it the way every tool accepts", () => {
   test("#given a row with a thread id #when keyed #then the key is the thread id and the address is <device>/<thread id>", () => {
@@ -20,7 +24,11 @@ describe("#given a listing row #when its identity is read #then rowKey and rowAd
 describe("#given a row #when rowName names it #then only a real name is an address", () => {
   test.each([
     ["a real name", { name: "beta", first_message: "hello", folder: "/work/b" }, { name: "beta", unnamed: false }],
-    ["no name, a first message", { name: "", first_message: "fix the login page", folder: "/work/b" }, { name: "fix the login page", unnamed: true }],
+    [
+      "no name, a first message",
+      { name: "", first_message: "fix the login page", folder: "/work/b" },
+      { name: "fix the login page", unnamed: true },
+    ],
     ["no name and no message", { name: null, folder: "/work/b" }, { name: "b", unnamed: true }],
   ] as const)("%s", (_label, input, expected) => {
     expect(rowName(input)).toEqual(expected)
@@ -54,7 +62,12 @@ describe("#given this device's rows and the account listing #when mergeRows merg
 describe("#given two records of a session #when sameSession compares them #then devices must match, then ids when both have one, else listing keys", () => {
   test.each([
     ["both ids, equal", { device: "b", thread: "t1", key: "k1" }, { device: "b", thread: "t1", key: "k2" }, true],
-    ["both ids, different, same key", { device: "b", thread: "t1", key: "k1" }, { device: "b", thread: "t2", key: "k1" }, false],
+    [
+      "both ids, different, same key",
+      { device: "b", thread: "t1", key: "k1" },
+      { device: "b", thread: "t2", key: "k1" },
+      false,
+    ],
     ["one id, equal keys", { device: "b", thread: "t1", key: "k1" }, { device: "b", key: "k1" }, true],
     ["one id, different keys", { device: "b", thread: "t1", key: "k1" }, { device: "b", key: "k2" }, false],
     ["no ids, equal keys", { device: "b", key: "k1" }, { device: "b", key: "k1" }, true],

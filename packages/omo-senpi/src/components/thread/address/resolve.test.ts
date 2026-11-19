@@ -1,6 +1,17 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { resolveAddress, type AddressCandidate, type Resolution, type ResolveOptions } from "."
-import { ALIAS, B, FIX, HERE, KEY, NAMES, ROUTE, T, createTwoDevices, type TwoDeviceOptions } from "./testing/two-devices"
+import {
+  ALIAS,
+  B,
+  FIX,
+  HERE,
+  KEY,
+  NAMES,
+  ROUTE,
+  T,
+  createTwoDevices,
+  type TwoDeviceOptions,
+} from "./testing/two-devices"
 
 const cleanups: Array<() => Promise<void>> = []
 afterEach(async () => {
@@ -57,8 +68,16 @@ describe("#given two devices of one account #when every input form names a threa
     ["an 8-hex id prefix on B", T.bLive.slice(0, 8), hit(T.bLive, "device", "id_prefix", B.id)],
     ["self", "self", hit(T.hereLive, "here", "self")],
     ["<device id>/<thread id> on B", `${B.id}/${T.bLive}`, hit(T.bLive, "device", "id", B.id)],
-    ["<device name>/<thread name> on B, NFKC and spacing folded", "studio   LAPTOP/beta", hit(T.bLive, "device", "name", B.id)],
-    ["<device id prefix>/<thread id prefix> on B", `${B.id.slice(0, 6)}/${T.bLive.slice(0, 8)}`, hit(T.bLive, "device", "id_prefix", B.id)],
+    [
+      "<device name>/<thread name> on B, NFKC and spacing folded",
+      "studio   LAPTOP/beta",
+      hit(T.bLive, "device", "name", B.id),
+    ],
+    [
+      "<device id prefix>/<thread id prefix> on B",
+      `${B.id.slice(0, 6)}/${T.bLive.slice(0, 8)}`,
+      hit(T.bLive, "device", "id_prefix", B.id),
+    ],
     ["<device>/<listing key> on B", `${B.id}/${KEY.bLive}`, hit(T.bLive, "device", "session_id", B.id)],
     ["<device>/<alias> on B", `${B.name}/${ALIAS.onB}`, hit(T.bLive, "device", "alias", B.id)],
     ["here/<thread id>", `here/${T.hereLive}`, hit(T.hereLive, "here", "id", HERE.id)],
@@ -70,7 +89,11 @@ describe("#given two devices of one account #when every input form names a threa
 
   test("#given B lists no row for an id #when <device>/<thread id> names it #then B itself is asked for it, not the listing (a session opened a moment ago)", async () => {
     const resolved = await resolve(`${B.id}/${T.nowhere}`)
-    expect(resolved).toMatchObject({ kind: "ok", thread: T.nowhere, where: { kind: "device", row: { device: B.id, durable_id: T.nowhere } } })
+    expect(resolved).toMatchObject({
+      kind: "ok",
+      thread: T.nowhere,
+      where: { kind: "device", row: { device: B.id, durable_id: T.nowhere } },
+    })
   })
 
   test("#given an ended thread on B #when it is named by id #then it resolves to B's ended row", async () => {
@@ -80,7 +103,11 @@ describe("#given two devices of one account #when every input form names a threa
   test("#given an id resolved on B #when the result is read #then its address resolves as written to the same thread", async () => {
     const first = await resolve(NAMES.bLive)
     if (first.kind !== "ok") throw new Error(first.code)
-    expect(await resolve(first.address)).toMatchObject({ kind: "ok", thread: T.bLive, device: { id: B.id, name: B.name } })
+    expect(await resolve(first.address)).toMatchObject({
+      kind: "ok",
+      thread: T.bLive,
+      device: { id: B.id, name: B.name },
+    })
   })
 })
 
@@ -92,7 +119,9 @@ describe("#given a thread name that contains a slash #when it is resolved #then 
   test("#given a device named fix holding a thread named login #when fix/login is resolved #then both readings resolve, to different threads, so it is ambiguous_target naming both", async () => {
     const resolved = await resolve(NAMES.slash, {}, { fix: true })
     expect(resolved).toMatchObject({ kind: "error", code: "ambiguous_target" })
-    const candidates = (resolved.kind === "error" ? (resolved.details?.["candidates"] ?? []) : []) as readonly AddressCandidate[]
+    const candidates = (
+      resolved.kind === "error" ? (resolved.details?.["candidates"] ?? []) : []
+    ) as readonly AddressCandidate[]
     expect(candidates.map((candidate) => candidate.thread).sort()).toEqual([T.fixLogin, T.hereSlash].sort())
   })
 
@@ -109,7 +138,9 @@ describe("#given the same name on this device and on B #when it is resolved #the
   test("#given the shared name #when resolved #then both candidates carry address, device and device_name", async () => {
     const resolved = await resolve(NAMES.shared)
     expect(resolved).toMatchObject({ kind: "error", code: "ambiguous_target", details: { kind: "thread" } })
-    const candidates = (resolved.kind === "error" ? (resolved.details?.["candidates"] ?? []) : []) as readonly AddressCandidate[]
+    const candidates = (
+      resolved.kind === "error" ? (resolved.details?.["candidates"] ?? []) : []
+    ) as readonly AddressCandidate[]
     expect(candidates.map((candidate) => [candidate.thread, candidate.device_name])).toEqual(
       expect.arrayContaining([
         [T.hereShared, HERE.name],

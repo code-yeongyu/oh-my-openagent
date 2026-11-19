@@ -28,7 +28,8 @@ export function asFailure(refused: ThreadRefusal): ThreadToolFailure {
 }
 
 const LIST_ALL = "call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell)"
-const RETRY_LIST = "Retry the call; call thread_list (tool.thread_list() in an eval cell) to see which devices answered."
+const RETRY_LIST =
+  "Retry the call; call thread_list (tool.thread_list() in an eval cell) to see which devices answered."
 
 const labels = (ids: readonly string[], names: readonly string[]): string =>
   ids.map((id, index) => deviceLabel({ id, name: names[index] ?? "" })).join(", ")

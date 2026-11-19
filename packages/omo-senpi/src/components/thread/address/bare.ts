@@ -58,12 +58,23 @@ async function accountBook(remote: RemoteThreadSurface, text: string, read: Acco
       ...book,
       entries: [
         ...entries,
-        { thread_id: holder.session_id, name: text, status: "live", cwd: "", created_at: "", updated_at: null, aliases: [text] },
+        {
+          thread_id: holder.session_id,
+          name: text,
+          status: "live",
+          cwd: "",
+          created_at: "",
+          updated_at: null,
+          aliases: [text],
+        },
       ],
     }
   if (holder.where !== "remote") return book
   const row = holder.row
-  return { ...book, entries: [...entries.filter((entry) => entry.transport?.row !== row), relayAddressEntry(row, [text])] }
+  return {
+    ...book,
+    entries: [...entries.filter((entry) => entry.transport?.row !== row), relayAddressEntry(row, [text])],
+  }
 }
 
 const found = (hit: Extract<LadderResult, { readonly kind: "ok" }>, allScope: boolean | undefined): Found => ({
@@ -95,7 +106,8 @@ export async function resolveBare(
       ),
     }
   const here = ladder(ctx, ctx.local, text, opts)
-  const exactHere = here.kind === "ok" && here.resolution !== "alias" && here.resolution !== "name" && here.resolution !== "id_prefix"
+  const exactHere =
+    here.kind === "ok" && here.resolution !== "alias" && here.resolution !== "name" && here.resolution !== "id_prefix"
   if (here.kind === "ok" && (ctx.remote === undefined || exactHere)) return { result: found(here, opts.all_scope) }
   if (ctx.remote === undefined)
     return { result: here.kind === "ok" ? found(here, opts.all_scope) : withAddresses(here, null, () => undefined) }

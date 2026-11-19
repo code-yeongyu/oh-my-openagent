@@ -20,8 +20,7 @@ export type DeviceRoster = {
 }
 
 export type DeviceResolution =
-  | { readonly kind: "ok"; readonly device: DeviceRef }
-  | { readonly kind: "refusal"; readonly refusal: AddressRefusal }
+  { readonly kind: "ok"; readonly device: DeviceRef } | { readonly kind: "refusal"; readonly refusal: AddressRefusal }
 
 /**
  * The one device resolver (design section 3): exact id > `here` > name (of the devices sharing it the online ones count,

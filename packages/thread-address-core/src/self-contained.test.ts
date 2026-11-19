@@ -14,7 +14,12 @@ function specifiers(file: string): string[] {
     if (typeof node !== "object" || node === null) return
     if (Array.isArray(node)) return node.forEach(visit)
     const type = Reflect.get(node, "type")
-    if (type === "ImportDeclaration" || type === "ExportAllDeclaration" || type === "ExportNamedDeclaration" || type === "ImportExpression") {
+    if (
+      type === "ImportDeclaration" ||
+      type === "ExportAllDeclaration" ||
+      type === "ExportNamedDeclaration" ||
+      type === "ImportExpression"
+    ) {
       const source: unknown = Reflect.get(node, "source")
       const value = typeof source === "object" && source !== null ? Reflect.get(source, "value") : undefined
       if (typeof value === "string") found.push(value)

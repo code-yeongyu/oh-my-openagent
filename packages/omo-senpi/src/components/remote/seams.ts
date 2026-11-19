@@ -37,7 +37,8 @@ export function canonicalizeThreadHandle(
 }
 
 /** The handle of a session a device listed: `<device>/<session>`, the monitor target form. */
-export const handleOf = (device: string, session: string): ThreadHandle => formatAddress(device, session) as ThreadHandle
+export const handleOf = (device: string, session: string): ThreadHandle =>
+  formatAddress(device, session) as ThreadHandle
 
 /** Seam 2: the only helper that names a thread to a person; every message and renderer goes through it. */
 export function describeThread(row: SessionRow): string {

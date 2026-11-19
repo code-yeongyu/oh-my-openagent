@@ -24,7 +24,11 @@ const controls = [
 describe("#given a thread on device B #when a control tool names it as <device>/<thread> #then the tool reaches B's thread (#14305)", () => {
   for (const [tool, extra] of controls) {
     test(`#given ${tool} #when the thread is <device name>/<thread id> #then it acts on B's thread`, async () => {
-      expect(await run(tool, { thread: onB.name, ...extra })).toMatchObject({ kind: "ok", thread: T.bLive, device: B.id })
+      expect(await run(tool, { thread: onB.name, ...extra })).toMatchObject({
+        kind: "ok",
+        thread: T.bLive,
+        device: B.id,
+      })
     })
 
     test(`#given ${tool} #when the thread is <device id prefix>/<thread id prefix> #then it acts on B's thread`, async () => {

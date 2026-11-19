@@ -18,11 +18,7 @@ const named = (text: string, hit: Extract<ThreadResolveResult, { readonly kind: 
   kind: "ok",
   entry: hit.entry,
   resolution:
-    text === "self"
-      ? "self"
-      : hit.resolution === "id" && hit.entry.thread_id !== text
-        ? "session_id"
-        : hit.resolution,
+    text === "self" ? "self" : hit.resolution === "id" && hit.entry.thread_id !== text ? "session_id" : hit.resolution,
 })
 
 /** `self` -> the caller, then the pure ladder (id, session id, alias, name, id prefix) of addressing.ts. */

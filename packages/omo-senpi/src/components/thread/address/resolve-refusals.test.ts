@@ -32,8 +32,20 @@ describe("#given the refusal table of design section 5 #when each condition is m
   test.each([
     ["empty text", "", {}, {}, { code: "invalid_arguments" }],
     ["a control character", "a\u0001b", {}, {}, { code: "invalid_arguments" }],
-    ["a device part that matches no device", "nowhere-device/beta", {}, {}, { code: "not_found", details: { kind: "device" } }],
-    ["a device name two online devices carry", `${B.name}/beta`, {}, { twin: true }, { code: "ambiguous_target", details: { kind: "device" } }],
+    [
+      "a device part that matches no device",
+      "nowhere-device/beta",
+      {},
+      {},
+      { code: "not_found", details: { kind: "device" } },
+    ],
+    [
+      "a device name two online devices carry",
+      `${B.name}/beta`,
+      {},
+      { twin: true },
+      { code: "ambiguous_target", details: { kind: "device" } },
+    ],
     [
       "an offline device when the caller needs it online",
       `${OFF.name}/${T.nowhere}`,
@@ -76,7 +88,13 @@ describe("#given the refusal table of design section 5 #when each condition is m
       {},
       { code: "not_found", details: { kind: "thread", device: B.id, device_name: B.name } },
     ],
-    ["nothing matches and every device answered", "no thread is named so", {}, {}, { code: "not_found", details: { kind: "thread" } }],
+    [
+      "nothing matches and every device answered",
+      "no thread is named so",
+      {},
+      {},
+      { code: "not_found", details: { kind: "thread" } },
+    ],
     ["a name two threads carry", "shared", {}, {}, { code: "ambiguous_target", details: { kind: "thread" } }],
   ] as const)("%s", async (_label, text, opts, setup, expected) => {
     expect(await resolve(text, opts, setup)).toMatchObject({ kind: "error", ...expected })
@@ -127,9 +145,7 @@ describe("#given the refusal table of design section 5 #when each condition is m
     const resolved = await resolve(`${B.name}/beta`, {}, { twin: true })
     const details = resolved.kind === "error" ? resolved.details : undefined
     const candidates = (details?.["candidates"] ?? []) as readonly { readonly device: string }[]
-    expect(candidates.map((row) => row.device).sort()).toEqual(
-      [B.id, B_TWIN.id].sort(),
-    )
+    expect(candidates.map((row) => row.device).sort()).toEqual([B.id, B_TWIN.id].sort())
   })
 })
 
@@ -162,7 +178,12 @@ describe("#given a thread id nothing lists #when the per-device probe runs #then
 describe("#given an approved reply pinned to its sender's device #when it resolves #then only that device is asked", () => {
   test.each([
     ["the sender listed on B", { device: B.id, thread: T.bLive }, {}, { kind: "ok", thread: T.bLive }],
-    ["the sender held on B's disk", { device: B.id, thread: T.bProbe }, { probe: true }, { kind: "ok", thread: T.bProbe }],
+    [
+      "the sender held on B's disk",
+      { device: B.id, thread: T.bProbe },
+      { probe: true },
+      { kind: "ok", thread: T.bProbe },
+    ],
     [
       "B silent on the probe",
       { device: B.id, thread: T.nowhere },

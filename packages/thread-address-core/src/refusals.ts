@@ -40,13 +40,21 @@ export type AddressRefusal =
       readonly code: "not_found"
       readonly reason: "no_device"
       readonly typed: string
-      readonly details: { readonly kind: "device"; readonly device: string; readonly candidates: readonly DeviceCandidate[] }
+      readonly details: {
+        readonly kind: "device"
+        readonly device: string
+        readonly candidates: readonly DeviceCandidate[]
+      }
     }
   | {
       readonly code: "ambiguous_target"
       readonly reason: "devices_share_name" | "devices_share_prefix"
       readonly typed: string
-      readonly details: { readonly kind: "device"; readonly device: string; readonly candidates: readonly DeviceCandidate[] }
+      readonly details: {
+        readonly kind: "device"
+        readonly device: string
+        readonly candidates: readonly DeviceCandidate[]
+      }
     }
   | {
       readonly code: "device_offline"
@@ -81,7 +89,12 @@ export type AddressRefusal =
   | {
       readonly code: "not_found"
       readonly reason: "no_thread_on_device"
-      readonly details: { readonly kind: "thread"; readonly thread: string; readonly device: string; readonly device_name: string }
+      readonly details: {
+        readonly kind: "thread"
+        readonly thread: string
+        readonly device: string
+        readonly device_name: string
+      }
     }
 
 const CANDIDATE_LIMIT = 10
@@ -132,13 +145,19 @@ export const devicesSilent = (
   details: { reason, devices: devices.map((device) => device.id), device_names: devices.map((device) => device.name) },
 })
 
-export const probeUnavailable = (thread: string, device: { readonly id: string; readonly name: string }): AddressRefusal => ({
+export const probeUnavailable = (
+  thread: string,
+  device: { readonly id: string; readonly name: string },
+): AddressRefusal => ({
   code: "host_unavailable",
   reason: "probe_unavailable",
   details: { reason: "probe_unavailable", thread, device: device.id, device_name: device.name },
 })
 
-export const noThreadOnDevice = (thread: string, device: { readonly id: string; readonly name: string }): AddressRefusal => ({
+export const noThreadOnDevice = (
+  thread: string,
+  device: { readonly id: string; readonly name: string },
+): AddressRefusal => ({
   code: "not_found",
   reason: "no_thread_on_device",
   details: { kind: "thread", thread, device: device.id, device_name: device.name },

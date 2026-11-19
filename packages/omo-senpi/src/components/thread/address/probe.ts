@@ -1,7 +1,13 @@
 import { devicesSilent, noThreadOnDevice, probeUnavailable, sameSession } from "@oh-my-opencode/thread-address-core"
 import { threadToolFailure } from "../errors"
 import { relayAddressEntry } from "../remote/address-book"
-import { endedRow, probeMayBuildEndedRow, rowThreadId, type RemoteDevice, type RemoteThreadSurface } from "../remote/ports"
+import {
+  endedRow,
+  probeMayBuildEndedRow,
+  rowThreadId,
+  type RemoteDevice,
+  type RemoteThreadSurface,
+} from "../remote/ports"
 import { remoteAvailable } from "../remote/remote-ops"
 import { accountDevices } from "./account"
 import { asRefusal, refusal, toolRefusal, type ThreadRefusal } from "./refusals"
@@ -39,10 +45,17 @@ export async function probeAcross(
   )
   if (answers.some(({ answer }) => answer.kind === "unavailable")) return undefined
   // Found over silent, by choice: a device that hangs must not block a thread another device can take (A4.3.5).
-  const holders = answers.flatMap(({ device, answer }) => (answer.kind === "found" ? [{ device, key: answer.key }] : []))
+  const holders = answers.flatMap(({ device, answer }) =>
+    answer.kind === "found" ? [{ device, key: answer.key }] : [],
+  )
   const [only] = holders
   if (holders.length === 1 && only !== undefined)
-    return { kind: "ok", entry: relayAddressEntry(endedRow(only.device, only.key, thread)), resolution: "probe", all_scope: true }
+    return {
+      kind: "ok",
+      entry: relayAddressEntry(endedRow(only.device, only.key, thread)),
+      resolution: "probe",
+      all_scope: true,
+    }
   if (holders.length > 1) {
     const candidates = holders.map((holder) => ({
       thread,
@@ -83,7 +96,13 @@ export async function pinned(
   remote: RemoteThreadSurface | undefined,
   pin: { readonly device: string; readonly thread: string },
 ): Promise<Found | ThreadRefusal> {
-  const roster = async () => (remote === undefined ? undefined : await accountDevices(remote.client).then((read) => read.devices, () => undefined))
+  const roster = async () =>
+    remote === undefined
+      ? undefined
+      : await accountDevices(remote.client).then(
+          (read) => read.devices,
+          () => undefined,
+        )
   if (remote === undefined) return toolRefusal(noThreadOnDevice(pin.thread, { id: pin.device, name: pin.device }))
   const unavailable = await remoteAvailable(remote)
   if (unavailable !== undefined) return asRefusal(unavailable.error)

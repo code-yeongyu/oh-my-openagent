@@ -1,6 +1,10 @@
 import { formatAddress } from "./parse"
 
-const folderName = (folder: string): string => folder.split(/[\\/]/).filter((part) => part !== "").at(-1) ?? folder
+const folderName = (folder: string): string =>
+  folder
+    .split(/[\\/]/)
+    .filter((part) => part !== "")
+    .at(-1) ?? folder
 
 /** What row identity reads of a listing row: its device, its thread id when it publishes one, its listing key. */
 export type KeyedRow = { readonly device: string; readonly durable_id?: string; readonly session_id: string }

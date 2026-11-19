@@ -65,15 +65,21 @@ async function finish(
       all_scope: hit.all_scope,
     }
   }
-  const roster = opts.need === "online" || account === undefined ? await rosterFor(ctx.remote, account, row.device) : account.roster
+  const roster =
+    opts.need === "online" || account === undefined ? await rosterFor(ctx.remote, account, row.device) : account.roster
   if (roster !== undefined && "kind" in roster) return roster
   const listed = roster?.find((device) => device.device === row.device)
   if (opts.need === "online") {
     if (listed === undefined) return toolRefusal(noDevice(row.device, deviceRows(roster ?? [])))
-    const online = resolveAccountDevice({ here: account?.here ?? null, devices: [listed] }, row.device, { online: true })
+    const online = resolveAccountDevice({ here: account?.here ?? null, devices: [listed] }, row.device, {
+      online: true,
+    })
     if (online.kind === "error") return online
   }
-  const device = { ...refOf(listed, row.device, account?.here ?? null), ...(account === undefined ? {} : { listing: account.listingOf(row.device) }) }
+  const device = {
+    ...refOf(listed, row.device, account?.here ?? null),
+    ...(account === undefined ? {} : { listing: account.listingOf(row.device) }),
+  }
   return {
     kind: "ok",
     thread: hit.entry.thread_id,
@@ -134,9 +140,15 @@ export async function resolveAddress(
     return await bare(parsed.device === HERE ? parsed.thread : text)
   const device = resolveAccountDevice(account.account, parsed.device, { online: opts.need === "online" })
   const whole = await resolveBare(ctx, text, opts, read)
-  if (device.kind === "error") return whole.result.kind === "ok" ? await finish(ctx, whole.result, whole.account, opts) : device
+  if (device.kind === "error")
+    return whole.result.kind === "ok" ? await finish(ctx, whole.result, whole.account, opts) : device
   const onDevice = await resolveOnDevice(ctx, remote, account.account, device.device, parsed.thread, opts)
   if (onDevice.kind === "ok" && whole.result.kind === "ok" && whole.result.entry.thread_id !== onDevice.entry.thread_id)
     return ambiguous(text, [onDevice, whole.result], account.account)
-  return await finish(ctx, onDevice.kind === "ok" || whole.result.kind !== "ok" ? onDevice : whole.result, account.account, opts)
+  return await finish(
+    ctx,
+    onDevice.kind === "ok" || whole.result.kind !== "ok" ? onDevice : whole.result,
+    account.account,
+    opts,
+  )
 }
