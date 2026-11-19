@@ -313,6 +313,11 @@ export function createRemoteThreadFixture() {
        * endpoint command (the open's own path) still reaches the engine that holds it.
        */
       openUnrouted?: boolean
+      /**
+       * #14397 review L3: b's route lists a session it just opened only after this many session commands to it: until
+       * then each is refused `unlistedReason` (`route_unlisted`), though the session is live and reachable after.
+       */
+      routeLag?: number
       /** The device service throws on b's admit_external_message (a lost connection mid-delivery). */
       admitThrows?: string
       /** Every get_state after b admitted a delivery is refused with this reason (the read after the admission fails). */
@@ -376,6 +381,9 @@ export function createRemoteThreadFixture() {
     // b's engine's run and its unwritten deliveries (omo#14234); an interrupting unload ends the one and hands back the other.
     // The sessions b's engine holds that b's route does not list (openUnrouted), by the engine's routing id.
     const unrouted = new Set<string>()
+    // The session commands b's route still refuses for the session it opened last (routeLag).
+    let lagging = 0
+    let lagged: string | undefined
     let busy = options.busy === true
     const unread = [...(options.unread ?? [])]
     const capable = options.refusesDeliveries !== false
@@ -387,6 +395,10 @@ export function createRemoteThreadFixture() {
         response: { type: "response", id: null, command: rpc["type"] ?? null, success: true, data },
       })
       if (options.refuse !== undefined) return { kind: "refused", reason: options.refuse }
+      if (attachedTo !== undefined && attachedTo === lagged && lagging > 0) {
+        lagging -= 1
+        return { kind: "refused", reason: options.unlistedReason ?? "route_unlisted" }
+      }
       if (attachedTo !== undefined && !live.has(attachedTo))
         return { kind: "refused", reason: options.unlistedReason ?? "unknown_session" }
       // A terminal's engine takes no session lifecycle record (live-surface.ts `unsupported:` on this device): it answers the
@@ -482,6 +494,10 @@ export function createRemoteThreadFixture() {
                 ? undefined
                 : Object.entries(sessionFiles).find(([, file]) => file === rpc["sessionPath"])?.[0]) ?? "dur-on-b")
         const key = options.relayKeys?.get(opened) ?? opened
+        if (options.routeLag !== undefined) {
+          lagging = options.routeLag
+          lagged = key
+        }
         if (options.openUnrouted === true) unrouted.add("rpc-9")
         else for (const id of options.relayKeyOnly === true ? [key] : [opened, key]) live.add(id)
         return ok(options.openData ?? { sessionId: "rpc-9", state: { durableSessionId: opened } })
