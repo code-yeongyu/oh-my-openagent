@@ -650,4 +650,54 @@ describe("omo-senpi task component wiring", () => {
     )
     expect(skipWarnings).toHaveLength(1)
   })
+
+  it("#given the session cwd moves after registration #when omo.modelRouting.resolve is asked #then rows read the register-time project the planner's live config reads", async () => {
+    // given: two projects that route quick differently; the component registers in the first
+    const registered = tempProject()
+    const moved = tempProject()
+    for (const [dir, model] of [
+      [registered, "user-lab/registered-model"],
+      [moved, "user-lab/moved-model"],
+    ] as const) {
+      mkdirSync(join(dir, ".omo"), { recursive: true })
+      writeFileSync(join(dir, ".omo", "omo.jsonc"), JSON.stringify({ categories: { quick: { model } } }))
+    }
+    const models = [
+      { provider: "user-lab", id: "registered-model" },
+      { provider: "user-lab", id: "moved-model" },
+    ]
+    const handlers = new Map<string, (data: unknown) => unknown>()
+    const pi = new FakeExtensionAPI()
+    Object.assign(pi, {
+      rpc: {
+        emit: () => {},
+        handle: (name: string, handler: (data: unknown) => unknown) => handlers.set(name, handler),
+      },
+    })
+    await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost, resolveCwd: () => registered }).register(
+      pi,
+      ctxFor(pi, createLogger()),
+    )
+
+    // when: the live context reports another cwd
+    await pi.dispatch(
+      "session_start",
+      { type: "session_start", reason: "startup" },
+      {
+        cwd: moved,
+        modelRegistry: {
+          getAvailable: () => models,
+          find: (provider: string, id: string) =>
+            models.find((model) => model.provider === provider && model.id === id),
+        },
+      },
+    )
+    const answer = (await handlers.get("omo.modelRouting.resolve")?.(undefined)) as {
+      readonly rows?: ReadonlyArray<{ readonly kind: string; readonly name: string; readonly effective: string | null }>
+    }
+
+    // then
+    const quick = answer.rows?.find((candidate) => candidate.kind === "category" && candidate.name === "quick")
+    expect(quick?.effective).toBe("user-lab/registered-model")
+  })
 })

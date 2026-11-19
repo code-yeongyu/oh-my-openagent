@@ -1,6 +1,6 @@
 import { GatewayMigrationError } from "../gateway/store-ops"
 import type { GatewayStore } from "../gateway/store"
-import type { IntakeRecord } from "../gateway/types"
+import type { IntakeOutcome, IntakeRecord } from "../gateway/types"
 import { findDiskSessions } from "../address-book"
 import { resolveWakeTarget } from "../wake/session-target"
 import { decodeServeAck, refusalCode, type DeliveryInboundEvent, type DeliveryServicePort } from "./port"
@@ -14,6 +14,12 @@ export type DeliveryConsumerOptions = {
   readonly port: DeliveryServicePort
   readonly agentDir: string
   readonly sessionsDirectory: string
+  /**
+   * The user's `threads.chainCountLimit` for the target session's cwd, read at each intake as the running engine reads
+   * it at each admission (senpi `admitInputChain` over `SettingsManager.getThreadChainCountLimit`), so a queued delivery
+   * past the limit is refused like a live one. `undefined` means the user set no limit.
+   */
+  readonly chainCountLimit: (cwd: string) => Promise<number | undefined>
   /** Starts the session (the carrier's wake); called only after the sender passed the admission check. */
   readonly wake: (durableId: string) => Promise<void>
   /** A tracked step that failed (a wake, an answer, a held reply): reported here, never left as an unhandled rejection. */
@@ -56,6 +62,20 @@ function intakeRecord(event: DeliveryInboundEvent): IntakeRecord | undefined {
 }
 
 const UNKNOWN_SHAPE = new Set(["unknown_type", "unsupported"])
+
+/**
+ * The answer for a record the intake refused. The store names the precise cause in `details.reason` (for example
+ * `chain_count_limit`, with `chain_count` and `limit`); the sender maps that reason (`relay-transport.ts` `wakeRefusal`),
+ * so it is sent in place of the coarse tool code, which stays the reason only when the store named none.
+ */
+function intakeRefusal(refusal: Extract<IntakeOutcome, { kind: "refused" }>): Record<string, unknown> {
+  const details = refusal.details ?? {}
+  const reason = typeof details["reason"] === "string" ? details["reason"] : refusal.code
+  const counts = Object.fromEntries(
+    ["chain_count", "limit"].flatMap((key) => (typeof details[key] === "number" ? [[key, details[key]]] : [])),
+  )
+  return { kind: "refused", reason, ...counts }
+}
 
 /**
  * The engine side of the delivery protocol (#13037 5.4, 5.12, A2.4, A2.14). A handed record is resolved here first
@@ -117,19 +137,30 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
             : undefined
     const pair = { sender_device: event.sender_device, command_id: event.command_id }
     const record = intakeRecord(event)
-    if (reason !== undefined || record === undefined) {
+    if (target.kind !== "found" || reason !== undefined || record === undefined) {
       await answer(pair, { kind: "refused", reason: reason ?? "invalid_record" })
       return
     }
+    // A limit that cannot be read (the settings barrel failed to load) fails open: the delivery is queued as it was before
+    // the limit was wired, and the failure is reported, so the sender never waits on a delivery nobody answered.
+    const chainCountLimit = await options.chainCountLimit(target.cwd).catch((error: unknown) => {
+      options.onError?.(error)
+      return undefined
+    })
     const outcome = await store.intake({
       now: store.now(),
       attested_device: event.sender_device,
       record,
       provenance: { workspace: "remote", project: "remote" },
       target_session_kind: "interactive",
+      ...(chainCountLimit === undefined ? {} : { chain_count_limit: chainCountLimit }),
     })
-    if (outcome.kind !== "queued") {
-      await answer(pair, { kind: "refused", reason: outcome.kind === "busy" ? "busy" : outcome.code })
+    if (outcome.kind === "busy") {
+      await answer(pair, { kind: "refused", reason: "busy" })
+      return
+    }
+    if (outcome.kind === "refused") {
+      await answer(pair, intakeRefusal(outcome))
       return
     }
     if (!outcome.deduplicated)

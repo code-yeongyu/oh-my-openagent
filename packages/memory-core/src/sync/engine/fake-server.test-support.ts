@@ -4,6 +4,7 @@
 
 import { createHash } from "node:crypto"
 
+import { SyncNetworkError } from "./adapters/http-transport"
 import type { AppendResult, PullPage, PulledEntry, SnapshotRef, StreamHandlers, Transport } from "./ports"
 
 export const sha256Hex = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex")
@@ -31,6 +32,8 @@ export class FakeSyncServer {
   private readonly replays: PulledEntry[] = []
   /** Runs once, just before the next append is served: another device's push racing this one. */
   beforeNextAppend: (() => Promise<void>) | null = null
+  /** Authors whose requests cannot reach the service: every pull fails as the network would. */
+  readonly unreachable = new Set<string>()
 
   get head(): number {
     return this.entries.at(-1)?.seq ?? this.trimmedThrough
@@ -38,7 +41,10 @@ export class FakeSyncServer {
 
   transport(author: string): Transport {
     return {
-      pull: async (after, limit) => this.pull(after, limit),
+      pull: async (after, limit) => {
+        if (this.unreachable.has(author)) throw new SyncNetworkError(new TypeError("fetch failed"))
+        return this.pull(after, limit)
+      },
       download: async (objectId) => {
         const bytes = this.objects.get(objectId)
         if (bytes === undefined) throw new Error(`no object ${objectId}`)

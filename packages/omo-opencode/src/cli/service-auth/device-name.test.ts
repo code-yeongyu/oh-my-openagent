@@ -7,7 +7,7 @@ import { clock, fakeApi, grant, memorySecrets, minted, temporaryHome } from "./t
 describe("default device name", () => {
   test("strips format characters and Hangul fillers before minting", async () => {
     const name = deviceName("host\u200D\u202E\u00AD\u2060\u{E0001}\u3164\u115F\u1160\uFFA0\n\u2028\u2029")
-    expect(name).toBe("omo CLI on host")
+    expect(name).toBe("host")
     let sent = false
     const api = fakeApi(async (request) => {
       if (request.url.endsWith("/code")) {
@@ -35,6 +35,11 @@ describe("default device name", () => {
       },
     )
     expect(sent).toBe(true)
+  })
+
+  test("is the machine name, without macOS's .local suffix", () => {
+    expect(deviceName("Qs-MacBook-Air.local")).toBe("Qs-MacBook-Air")
+    expect(deviceName("build-box")).toBe("build-box")
   })
 
   test.each(["", " \u200D\u3164 ", "a".repeat(100), "😀".repeat(100)])(

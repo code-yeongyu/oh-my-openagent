@@ -2,16 +2,23 @@
 // footer reads, so the desktop shows what the TUI shows. Omitted while this device does not sync the
 // repository (sync off, signed out, or another process holds the engine), and when the read fails.
 
-import type { SyncFailureKind } from "@oh-my-opencode/memory-core/sync-engine"
+import type { SyncFailureCause, SyncFailureKind } from "@oh-my-opencode/memory-core/sync-engine"
 
 import type { SyncStatusReader } from "./sync-status-surface"
 
 /** The failure kinds the desktop's status schema accepts (omo-desktop-app contracts); any other kind fails its whole status call. */
-type DesktopFailureKind = Exclude<SyncFailureKind, "oversized_item">
+export type DesktopFailureKind = Extract<SyncFailureKind, "stranded_lock" | "auth_expired" | "offline" | "unknown">
 
 export interface MemoryRpcSync {
   readonly state: "never_synced" | "synced" | "paused" | "failing" | "unavailable"
   readonly lastSyncedAtISO?: string
+  /**
+   * The memories the catch-up after this device's latest offline gap updated (#14093). The engine defines the gap
+   * (memory-core sync/engine/engine.ts): it started over a memory that had synced before, or its status showed
+   * this device as offline. Absent when the latest entries this device received came in with no gap before them;
+   * zero when a gap brought nothing new.
+   */
+  readonly appliedWhileOffline?: number
   /** For `failing`, and for `paused` while files are held out of the push too (#12284). */
   readonly failure?: {
     readonly kind: DesktopFailureKind
@@ -24,6 +31,11 @@ export interface MemoryRpcSync {
     readonly keys?: readonly string[]
     readonly stuckKeys?: readonly string[]
     readonly limitBytes?: number
+    /**
+     * What failed, for a failure the engine could not name or named from its error (#13635): the error class, an
+     * errno or service code, the HTTP status, a git exit code and the cycle stage. Never message text or paths.
+     */
+    readonly cause?: SyncFailureCause
   }
 }
 
@@ -43,7 +55,11 @@ export async function readMemoryRpcSync(
         ? { state: "paused" }
         : (await import("#omo-memory-sync-runtime")).failureRpcSync(status)
     case "synced":
-      return { state: "synced", lastSyncedAtISO: new Date(status.at).toISOString() }
+      return {
+        state: "synced",
+        lastSyncedAtISO: new Date(status.at).toISOString(),
+        ...(status.updatedWhileOffline === undefined ? {} : { appliedWhileOffline: status.updatedWhileOffline }),
+      }
     // Both exist only while the engine runs, so their mapping ships with it (sync-status-copy.ts).
     case "failing":
     case "frozen":

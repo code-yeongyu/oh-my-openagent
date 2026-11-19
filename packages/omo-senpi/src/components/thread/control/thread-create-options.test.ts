@@ -20,23 +20,34 @@ describe("thread_create with a model and a reasoning level (#13409)", () => {
     const a = account()
     const { run, openSession } = surface(a.remote)
     const options = { model: "anthropic/claude-opus-5-5", reasoning: "high" }
-    expect(await run("thread_create", options)).toMatchObject({ kind: "ok", thread: { thread_id: "dur-created-here" } })
-    expect(await run("thread_create", { device: "studio", ...options })).toMatchObject({
+    expect(await run("thread_create", { name: "with-model-here", ...options })).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-new-on-b", device: "b" },
+      thread: "dur-created-here",
+    })
+    expect(
+      await run("thread_create", { name: "thread-create-options-24", device: "studio", ...options }),
+    ).toMatchObject({
+      kind: "ok",
+      thread: "dur-new-on-b",
+      device: "b",
     })
     const launch = { provider: "anthropic", modelId: "claude-opus-5-5", thinkingLevel: "high" }
     expect(localOpens(openSession)).toEqual([expect.objectContaining(launch)])
     expect(openFrames(a.sent)).toEqual([expect.objectContaining(launch)])
-    expect(types(a.sent)).toEqual(["open_session"])
+    // The name a create needs (#14050) is set after the open on b; no set_model follows.
+    expect(types(a.sent)).toEqual(["open_session", "set_session_name"])
   })
 
   test("#given a model the engine cannot resolve #when created here and on b #then each answers model_not_found and opens nothing", async () => {
     const refusal = "model_unavailable: no model anthropic/nope"
     const a = account({ openRefuse: refusal })
     const { run } = surface(a.remote, { openThrows: refusal })
-    const here = await run("thread_create", { model: "anthropic/nope" })
-    const there = await run("thread_create", { device: "studio", model: "anthropic/nope" })
+    const here = await run("thread_create", { name: "thread-create-options-38", model: "anthropic/nope" })
+    const there = await run("thread_create", {
+      name: "thread-create-options-39",
+      device: "studio",
+      model: "anthropic/nope",
+    })
     for (const result of [here, there])
       expect(result).toMatchObject({
         kind: "error",
@@ -49,11 +60,13 @@ describe("thread_create with a model and a reasoning level (#13409)", () => {
     const a = account()
     const { run, openSession } = surface(a.remote)
     for (const model of ["opus", "/opus", "anthropic/"])
-      expect(await run("thread_create", { device: "studio", model })).toMatchObject({
+      expect(await run("thread_create", { name: "thread-create-options-52", device: "studio", model })).toMatchObject({
         kind: "error",
         error: { code: "invalid_arguments" },
       })
-    expect(await run("thread_create", { model: "opus" })).toMatchObject({ kind: "error" })
+    expect(await run("thread_create", { name: "thread-create-options-56", model: "opus" })).toMatchObject({
+      kind: "error",
+    })
     expect(a.sent).toEqual([])
     expect(openSession).not.toHaveBeenCalled()
   })
@@ -93,7 +106,11 @@ describe("thread_create with an approval mode (#13409): the creator may keep or 
     test(`#given a creator in ${creator ?? "an unknown mode"} #when it asks for ${asked} on b #then ${allowed ? "the frame names it" : "scope_denied, nothing opened"}`, async () => {
       const a = account()
       const { run } = surface(creator === undefined ? a.remote : { ...a.remote, permissionPreset: () => creator })
-      const result = await run("thread_create", { device: "studio", permission_preset: asked })
+      const result = await run("thread_create", {
+        name: "thread-create-options-96",
+        device: "studio",
+        permission_preset: asked,
+      })
       if (allowed) {
         expect(result).toMatchObject({ kind: "ok" })
         expect(openFrames(a.sent)).toEqual([expect.objectContaining({ permissionPreset: asked })])
@@ -109,7 +126,9 @@ describe("thread_create with an approval mode (#13409): the creator may keep or 
   test("#given a creator in workspace #when it asks for read-only here #then this device's open names read-only", async () => {
     const a = account()
     const { run, openSession } = surface({ ...a.remote, permissionPreset: () => "workspace" })
-    expect(await run("thread_create", { permission_preset: "read-only" })).toMatchObject({ kind: "ok" })
+    expect(
+      await run("thread_create", { name: "thread-create-options-112", permission_preset: "read-only" }),
+    ).toMatchObject({ kind: "ok" })
     expect(localOpens(openSession)).toEqual([expect.objectContaining({ permissionPreset: "read-only" })])
   })
 })
@@ -122,12 +141,28 @@ describe("thread_create with a first prompt (#13410)", () => {
       ThreadToolResult,
       { kind: "ok" }
     > & { prompt?: Record<string, unknown> }
-    expect(result).toMatchObject({ kind: "ok", thread: { thread_id: "dur-new-on-b", device: "b" } })
+    expect(result).toMatchObject({ kind: "ok", thread: "dur-new-on-b", device: "b" })
     expect(result.prompt).toMatchObject({ delivery: { kind: "started" }, deduplicated: false })
     // A peer session's message is an admitted delivery on b, as thread_send makes it (#12882), never a raw prompt.
     const admitted = a.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message")
     expect(admitted).toEqual([expect.objectContaining({ via: "session", device: "b" })])
-    expect(JSON.stringify(admitted[0]?.rpc)).toContain("build it")
+    // #14045: the creator's brief is the new thread's own first message, not a relayed peer message under the gateway header.
+    const text = String(admitted[0]?.rpc?.["text"])
+    expect(text).toStartWith("build it")
+    expect(text).not.toContain("OMO_GATEWAY")
+    expect(admitted[0]?.rpc?.["displayText"]).toBe("build it")
+  })
+
+  test("#given a thread_send to a thread on b after a create there #when delivered #then it keeps the gateway header: only the create's prompt carries the creator's authority (#14045)", async () => {
+    const a = account()
+    const { run } = surface(a.remote)
+    await run("thread_create", { device: "studio", prompt: "build it" })
+    await run("thread_send", { thread: "dur-on-b", message: "and then this" })
+    const texts = a.sent
+      .filter((entry) => entry.rpc?.["type"] === "admit_external_message")
+      .map((entry) => String(entry.rpc?.["text"]))
+    expect(texts).toHaveLength(2)
+    expect(texts[1]).toContain("OMO_GATEWAY")
   })
 
   // Found by the two-device relay proof: b knows a session it opened a moment ago only by the relay key its open reply named.
@@ -145,11 +180,14 @@ describe("thread_create with a first prompt (#13410)", () => {
 
   test("#given a prompt #when created here #then the gateway takes one delivery for the new thread", async () => {
     const a = account()
-    const { run, enqueuedFor } = surface(a.remote)
+    const { run, enqueuedRequests } = surface(a.remote)
     const result = (await run("thread_create", { prompt: "build it" })) as { prompt?: Record<string, unknown> }
-    expect(result).toMatchObject({ kind: "ok", thread: { thread_id: "dur-created-here" } })
+    expect(result).toMatchObject({ kind: "ok", thread: "dur-created-here" })
     expect(result.prompt).toMatchObject({ delivery: { kind: expect.any(String) } })
-    expect(enqueuedFor("dur-created-here")).toBe(1)
+    // #14045: the row carries the creator's authority, so the new thread's drain admits it as its own first message;
+    // a later thread_send from the same session does not.
+    await run("thread_send", { thread: "dur-created-here", message: "and then this" })
+    expect(enqueuedRequests("dur-created-here").map((request) => request.authority)).toEqual(["creator", undefined])
   })
 
   test("#given one idempotency key #when the create with a prompt runs twice #then b opens once and is prompted once", async () => {
@@ -163,13 +201,24 @@ describe("thread_create with a first prompt (#13410)", () => {
     expect(types(a.sent).filter((type) => type === "admit_external_message")).toHaveLength(1)
   })
 
+  // Review L1 at 0571de8: a delivery that throws (not a typed refusal) must not turn the created thread into internal_error.
+  test("#given the prompt's delivery throws #when created with one #then the thread is answered and the failure is the prompt's outcome", async () => {
+    const a = account({ admitThrows: "connection lost" })
+    const { run } = surface(a.remote)
+    const result = (await run("thread_create", { device: "studio", prompt: "build it" })) as {
+      prompt?: Record<string, unknown>
+    }
+    expect(result).toMatchObject({ kind: "ok", thread: "dur-new-on-b" })
+    expect(result.prompt).toMatchObject({ error: { code: "internal_error" } })
+  })
+
   test("#given b refuses the prompt #when created with one #then the thread is answered and the refusal is the prompt's outcome", async () => {
     const a = account({ admitRefuse: "session_busy" })
     const { run } = surface(a.remote)
     const result = (await run("thread_create", { device: "studio", prompt: "build it" })) as {
       prompt?: Record<string, unknown>
     }
-    expect(result).toMatchObject({ kind: "ok", thread: { thread_id: "dur-new-on-b" } })
+    expect(result).toMatchObject({ kind: "ok", thread: "dur-new-on-b" })
     expect(result.prompt).toMatchObject({ error: { code: expect.any(String) } })
   })
 })

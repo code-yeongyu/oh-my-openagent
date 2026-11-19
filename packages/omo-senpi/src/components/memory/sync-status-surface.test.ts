@@ -205,3 +205,44 @@ test.each([
     expect(notices[0]?.startsWith(`${prefix} `)).toBe(true)
   },
 )
+
+test.each([
+  { errorClass: "GitCommandError", exitCode: 128, stage: "apply" },
+  { errorClass: "Error", code: "EMFILE", stage: "capture" },
+] as const)(
+  "#given sync stops on an error the engine cannot name #when the notice is shown #then it carries every safe cause field (%o, #13635)",
+  async (cause) => {
+    const notices: string[] = []
+    const notifier = createSyncStatusNotifier(async () => ({
+      kind: "failing",
+      since: 0,
+      attempts: 1,
+      failure: { kind: "unknown", reason: "r", action: "a", cause },
+    }))
+
+    await notifier.changed("/repo", { notify: (message) => notices.push(message) })
+
+    expect(notices).toHaveLength(1)
+    for (const value of Object.values(cause)) expect(notices[0]).toContain(String(value))
+  },
+)
+
+test("#given an announced failure #when the engine stops because sync was turned off on this device #then nothing says sync is working again, and a later failure is announced afresh (#14093)", async () => {
+  let status: EngineStatus | null = failing("offline", "Cannot reach the service.", "Check your connection.")
+  const notices: Array<{ message: string; level: string }> = []
+  const ui = { notify: (message: string, level: "info" | "warning" | "error") => notices.push({ message, level }) }
+  const notifier = createSyncStatusNotifier(async () => status)
+  await notifier.changed("/repo", ui)
+
+  // A repo with no engine has no status at all: it did not recover.
+  status = null
+  await notifier.changed("/repo", ui)
+  expect(notices.map((notice) => notice.message)).not.toContain(SYNC_RECOVERED_NOTICE)
+
+  status = failing("offline", "Cannot reach the service.", "Check your connection.")
+  await notifier.changed("/repo", ui)
+  expect(notices).toEqual([
+    { message: "Memory sync is blocked. Cannot reach the service. Check your connection.", level: "warning" },
+    { message: "Memory sync is blocked. Cannot reach the service. Check your connection.", level: "warning" },
+  ])
+})

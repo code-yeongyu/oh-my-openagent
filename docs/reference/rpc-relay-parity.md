@@ -4,9 +4,9 @@
 record a relay verdict or a pair test in script/rpc-relay-parity.rows.json, then run `bun script/rpc-relay-parity.ts`. -->
 
 One row per inbound RPC record type the engine classifies: `RPC_METHOD_CLASS` in `@code-yeongyu/senpi`
-2026.11.15-2 (`dist/modes/rpc/method-classes.js`, read through `describeRpcMethodClasses()`; imported by
+2026.11.18-3 (`dist/modes/rpc/method-classes.js`, read through `describeRpcMethodClasses()`; imported by
 file because the package does not export it, so an engine that moves the file fails the test here), table version
-1, digest `bca41dd6cac2eff3dc82c24d763e4143d90f44ee75920da9bca1c2c8a98c5156`. A method the engine adds, removes or reclassifies changes this
+1, digest `27c8b985864be3f3a7d9605f4f8476e423613eb9fa2bba9b6820e0d0c1d3f9a6`. A method the engine adds, removes or reclassifies changes this
 table, and `script/rpc-relay-parity.test.ts` fails until it is regenerated (#13478).
 
 - **Engine class**: the engine's own class for the record (`dynamic` when the class depends on the record's fields).
@@ -16,7 +16,7 @@ table, and `script/rpc-relay-parity.test.ts` fails until it is regenerated (#134
   otherwise `not verified`.
 - **Pair test**: the test that proves the local and relay answers agree, or `none`.
 
-128 methods: 1 with a pair test, 15 excluded, 112 with neither.
+137 methods: 1 with a pair test, 15 excluded, 121 with neither.
 
 | Method | Engine class | Local | Through the relay | Pair test |
 | --- | --- | --- | --- | --- |
@@ -67,6 +67,8 @@ table, and `script/rpc-relay-parity.test.ts` fails until it is regenerated (#134
 | `navigate_tree` | drive | served (not measured) | unsafe-to-probe, harmless form: same: session not_found both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts) | none |
 | `set_label` | drive | served (not measured) | same: session Entry rpcpar-none not found both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts) | none |
 | `set_session_name` | drive | served (not measured) | same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts) | none |
+| `set_session_archived` | drive | served (not measured) | not verified | none |
+| `set_session_settled` | drive | served (not measured) | not verified | none |
 | `set_thinking_level` | dynamic | served (not measured) | same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts) | none |
 | `set_model` | dynamic | served (not measured) | same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts) | none |
 | `set_auto_compaction` | drive | served (not measured) | same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts) | none |
@@ -102,6 +104,7 @@ table, and `script/rpc-relay-parity.test.ts` fails until it is regenerated (#134
 | `reload` | device_admin | served (not measured) | same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts) | none |
 | `check_reload_veto` | device_admin | served (not measured) | same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts) | none |
 | `resolve_path` | device_admin | served (not measured) | same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts) | none |
+| `find_session` | device_admin | served (not measured) | not verified | none |
 | `login_start` | device_admin | served (not measured) | unsafe-to-probe, harmless form: same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts) | none |
 | `login_cancel` | device_admin | served (not measured) | unsafe-to-probe, harmless form: same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts) | none |
 | `login_api_key` | device_admin | served (not measured) | unsafe-to-probe, harmless form: same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts) | none |
@@ -127,6 +130,12 @@ table, and `script/rpc-relay-parity.test.ts` fails until it is regenerated (#134
 | `set_project_setting` | device_admin | served (not measured) | unsafe-to-probe, harmless form: same: session project_cwd_mismatch both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts) | none |
 | `read_project_file` | device_admin | served (not measured) | same: session project_file_not_allowed both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts) | none |
 | `write_project_file` | device_admin | served (not measured) | unsafe-to-probe, harmless form: same: session project_cwd_mismatch both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts) | none |
+| `get_project_mcp_servers` | device_admin | served (not measured) | not verified | none |
+| `set_project_mcp_servers` | device_admin | served (not measured) | not verified | none |
+| `read_project_skill_file` | device_admin | served (not measured) | not verified | none |
+| `write_project_skill_file` | device_admin | served (not measured) | not verified | none |
+| `read_user_skill_file` | device_admin | served (not measured) | not verified | none |
+| `write_user_skill_file` | device_admin | served (not measured) | not verified | none |
 | `edit_assistant_message` | device_admin | served (not measured) | unsafe-to-probe, harmless form: same: session not_found both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts) | none |
 | `send_custom_message` | device_admin | served (not measured) | same: session ok both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts) | none |
 | `switch_session` | device_admin | served (not measured) | unsafe-to-probe, harmless form: same: session EACCES both; endpoint missing_session_id both (measured 2026-11-16 on 5.1.72; harness script/rpc-relay-parity-sweep.test.ts) | none |

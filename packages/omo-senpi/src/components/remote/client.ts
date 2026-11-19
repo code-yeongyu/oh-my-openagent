@@ -1,8 +1,10 @@
+import { lendConnection } from "./connection-of"
 import { existsSync } from "node:fs"
 import { hostname } from "node:os"
 import {
   connectDeviceService,
   deviceServiceEndpointPath,
+  deviceServiceAbsence,
   deviceServiceStateDir,
   realTimers,
   type DeviceService,
@@ -17,6 +19,7 @@ import { failureFromError, nextActionFor, remoteFailure } from "./codes"
 import { BOUNDS, CONNECT_SLACK_MS, DEADLINES, withinDeadline } from "./deadlines"
 import { streamMembers } from "./follow"
 import { resolveMember } from "./resolve"
+import type { LocalSessions } from "./local-sessions"
 import { handleOf } from "./seams"
 import { sessionMembers } from "./sessions"
 import { thisDeviceRow } from "./this-device-row"
@@ -35,7 +38,16 @@ import type {
 import { unknownDevice } from "./unknown-device"
 
 /** The client's deps over the device service SDK's own connection and attach (types.ts `RemoteClientDeps`). */
-export type RemoteClientDeps = RemoteClientDepsOver<DeviceService, RemoteAttach>
+export type RemoteClientDeps = RemoteClientDepsOver<DeviceService, RemoteAttach> & {
+  /**
+   * This device's own operator endpoint (`local-sessions.ts` `createLocalSessions`), where its sessions are listed, opened
+   * and driven (#13787). It opens sockets, so a caller outside `omo remote`'s local-only graph (#13440) injects it, and
+   * may load it lazily: it is loaded once, on the first member that needs it. Absent, sessions.list names this device
+   * unanswered (its sessions are missing from the listing, as when its host does not answer), and every other session
+   * member on this device answers `unsupported{feature:"local_sessions"}`.
+   */
+  readonly localSessions?: () => Promise<LocalSessions>
+}
 export type { RemoteClient }
 
 export type Outcome<T> = { readonly kind: "ok"; readonly value: T } | RemoteFailure
@@ -58,13 +70,14 @@ export type ClientCore = {
   ) => R<T>
   readonly sessionsList: (filter?: SessionsListFilter, opts?: Opts) => R<SessionsList>
   readonly devicesList: (opts?: Opts) => R<readonly DeviceRow[]>
+  /**
+   * The client these members belong to, for the thread bodies a member runs (they read the account through a client):
+   * valid once the client is built, which is before any member can be called.
+   */
+  readonly self: () => RemoteClient
+  /** This device's operator endpoint leg (RemoteClientDeps.localSessions), loaded once; undefined when not injected. */
+  readonly localSessions: () => Promise<LocalSessions | undefined>
 }
-
-/** The answer of a member whose part has not landed yet. */
-export const notYet = (member: string): RemoteFailure =>
-  remoteFailure("unsupported", `${member} is not available in this build.`, nextActionFor("unsupported"), {
-    details: { feature: member },
-  })
 
 const hostSlug = (): string =>
   hostname()
@@ -144,6 +157,13 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
   const timers = deps.timers ?? realTimers
   const stateDir = deps.stateDir ?? deviceServiceStateDir()
   let service: Promise<DeviceService> | undefined
+  let localLeg: Promise<LocalSessions> | undefined
+  const localSessions = async (): Promise<LocalSessions | undefined> => {
+    const load = deps.localSessions
+    if (load === undefined) return undefined
+    localLeg ??= load()
+    return await localLeg
+  }
   const dial = (): Promise<DeviceService> =>
     (deps.connect ?? connectDeviceService)({ version: deps.version, stateDir, timers })
   const connection = (): Promise<DeviceService> => {
@@ -166,7 +186,25 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
 
   // A cold connect is bounded by the handshake plus CONNECT_SLACK_MS before the member's own clock starts.
   const connected = async (opts: Opts | undefined): Promise<Outcome<DeviceService> | "not_installed"> => {
-    if (!existsSync(deviceServiceEndpointPath(stateDir))) return "not_installed"
+    if (!existsSync(deviceServiceEndpointPath(stateDir))) {
+      // A signed-in device with no endpoint is a service not serving right now, never "not installed" (#14172): retryable
+      // while it restarts or updates, and a service to start when nothing holds its state.
+      const absence = deviceServiceAbsence(stateDir, timers.now())
+      if (absence === "not_installed") return "not_installed"
+      return absence === "restarting"
+        ? remoteFailure(
+            "host_unavailable",
+            "The device service is restarting; its endpoint is not up yet.",
+            nextActionFor("host_unavailable"),
+            { details: { phase: "connect", reason: "service_restarting" } },
+          )
+        : remoteFailure(
+            "host_unavailable",
+            "The device service is set up on this device but not running.",
+            "Start the device service (omo remote bootstrap), then retry.",
+            { details: { phase: "connect", reason: "service_not_running" } },
+          )
+    }
     const outcome = await withinDeadline(
       timers,
       opts?.signal === undefined ? undefined : { signal: opts.signal },
@@ -235,8 +273,23 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
       () => ok([localSelfRow()]),
     )
 
+  /**
+   * This device's own sessions, under a bound of their own that ends before the listing's (#13787 review L1): a host that
+   * takes list_sessions and never answers leaves this device unanswered, never the whole listing a timeout.
+   */
+  const localRowsBefore = async (end: number, self: DeviceRow): Promise<readonly SessionRow[] | undefined> => {
+    const ms = Math.max(0, Math.min(DEADLINES.sessionsListLocal, end - timers.now() - 1))
+    const answered = await withinDeadline(timers, undefined, ms, false, async () => {
+      const leg = await localSessions()
+      return ok(leg === undefined ? undefined : await leg.rows(self))
+    })
+    return answered.kind === "ok" ? answered.value : undefined
+  }
+
   const sessionsList = (filter?: SessionsListFilter, opts?: Opts): R<SessionsList> =>
     member(opts, DEADLINES.sessionsList, false, async (svc) => {
+      // The listing's own deadline, whose clock member starts as this body does.
+      const end = timers.now() + (opts?.deadlineMs ?? DEADLINES.sessionsList)
       const [listing, devices] = await Promise.all([
         svc.sessions({
           ...(filter?.device === undefined ? {} : { device: filter.device }),
@@ -250,8 +303,21 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
       if (unknown !== undefined) return unknown
       const deviceOf = (id: string): DeviceRow => byId.get(id) ?? unlistedDevice(id)
       const wanted = filter?.name?.toLowerCase()
-      const rows = listing.rows
-        .map((row) => sessionRow(row, deviceOf(row.device)))
+      // This device's own sessions come from its own operator endpoint (#13787): the service's listing does not carry
+      // the asking device's sessions. One it already lists by the same durable id keeps the service's row.
+      const self = devices.find((row) => row.self === true && row.kind !== "local")
+      const listed = listing.rows.map((row) => sessionRow(row, deviceOf(row.device)))
+      const local =
+        self === undefined || (filter?.device !== undefined && filter.device !== self.id)
+          ? []
+          : await localRowsBefore(end, self)
+      const known = new Set(listed.flatMap((row) => (row.durable_id === undefined ? [] : [row.durable_id])))
+      const rows = [
+        ...listed,
+        ...(local ?? []).filter((row) => row.durable_id === undefined || !known.has(row.durable_id)),
+      ]
+        .filter((row) => filter?.state === undefined || row.state === filter.state)
+        .filter((row) => filter?.project === undefined || row.project === filter.project)
         .filter(
           (row) =>
             (filter?.archived === undefined || row.archived === filter.archived) &&
@@ -264,14 +330,22 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
           ...Object.entries(listing.devices)
             .filter(([, state]) => state !== "answered")
             .map(([id]) => id),
+          // This device's own host did not answer: its sessions are missing from this listing.
+          ...(self !== undefined && local === undefined ? [self.id] : []),
         ]),
       ].map(deviceOf)
       return ok({ revision: listing.revision, rows, unanswered })
     })
 
-  const core: ClientCore = { sender, timers, deps, dial, member, sessionsList, devicesList }
+  let built: RemoteClient | undefined
+  let closed = false
+  const self = (): RemoteClient => {
+    if (built === undefined) throw new Error("the remote client was used before it was built")
+    return built
+  }
+  const core: ClientCore = { sender, timers, deps, dial, member, sessionsList, devicesList, localSessions, self }
 
-  return {
+  built = {
     service: {
       info: (opts) =>
         member(opts, DEADLINES.service, false, async (svc) =>
@@ -355,6 +429,7 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
     attach: attachMember(core),
     aliases: aliasMembers(core),
     close: () => {
+      closed = true
       const open = service
       service = undefined
       void open?.then(
@@ -363,10 +438,25 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
       )
     },
   }
+  // The thread runtime's port rides this client's one connection (connection-of.ts). A connect failure is thrown as the
+  // port's own connect throws it (the typed local-API error), and a closed client opens nothing again.
+  lendConnection(built, {
+    shared: async () => {
+      if (closed) throw new Error("The remote client is closed.")
+      if (!existsSync(deviceServiceEndpointPath(stateDir)))
+        throw new Error("The device service is not installed on this device.")
+      return await connection()
+    },
+    dial: async () => {
+      if (closed) throw new Error("The remote client is closed.")
+      return await dial()
+    },
+  })
+  return built
 }
 
-// The listing carries one display name per session (its title); archive state has no layer yet (E-archive), so every
-// row is unarchived. The handle is the `<device>/<session>` form seam 1 parses.
+// The listing carries one display name per session (its title), and from rows 4 its model and archived flag (a service
+// before rows 4 lists neither: unarchived, model unknown). The handle is the `<device>/<session>` form seam 1 parses.
 const sessionRow = (row: ListingRow, device: DeviceRow): SessionRow => ({
   thread: handleOf(row.device, row.session_id),
   ...durableIdOf(row),
@@ -376,7 +466,8 @@ const sessionRow = (row: ListingRow, device: DeviceRow): SessionRow => ({
   project: row.project,
   path: row.path,
   state: row.state,
-  archived: false,
+  archived: row.archived === true,
+  ...(row.model === undefined ? {} : { model: `${row.model.provider}/${row.model.id}` }),
   updated_ms: row.updated_ms,
   source: row.source,
 })

@@ -38,6 +38,7 @@ async function owner(duplicate = false) {
         devices: { [PEER]: "answered" },
       },
       endpoints: { [PEER]: [SESSION_ID] },
+      primary: { [PEER]: SESSION_ID },
       located: { [PEER]: { [DURABLE]: SESSION_ID } },
       endpointCommand: { data: { state: { durableSessionId: DURABLE } }, outcome: applied },
       sessions: [
@@ -73,7 +74,7 @@ describe("#13010 remote CLI session identity", () => {
     const result = await run(["open", PEER, "--model", "test/model", "--json"], fake.stateDir)
     expect({ code: result.code, json: JSON.parse(result.out.join("")) }).toMatchObject({
       code: REMOTE_EXIT.ok,
-      json: { kind: "ok", thread: { thread_id: DURABLE, sessionId: SESSION_ID } },
+      json: { kind: "ok", thread: DURABLE, model: MODEL },
     })
     expect(JSON.stringify(fake.state.commands)).not.toContain("set_model")
   })
@@ -103,7 +104,7 @@ describe("#13010 remote CLI session identity", () => {
       expect({ target, code: result.code, json: result.out.map((line) => JSON.parse(line)) }).toMatchObject({
         target,
         code: REMOTE_EXIT.ok,
-        json: [{ kind: "ok", thread_id: target === `${PEER}/${SESSION_ID}` ? SESSION_ID : DURABLE }],
+        json: [{ kind: "ok", thread: target === `${PEER}/${SESSION_ID}` ? SESSION_ID : DURABLE }],
       })
     }
   })

@@ -1,3 +1,5 @@
+import { borrowedService } from "./remote-session-verbs"
+import { remoteClientForPerson } from "../omo-senpi/src/components/remote/index"
 import { existsSync } from "node:fs"
 
 import { type DeviceService, deviceServiceEndpointPath } from "../device-service-core/src/index.ts"
@@ -67,7 +69,13 @@ export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: 
   // switch, the device link and the session host unit. It reaches the network, so it is not a local-only verb.
   if (parsed.command === "enable") {
     try {
-      return await runEnableVerb(dependencies, dependencies.bootstrap, dependencies, parsed.json)
+      return await runEnableVerb(
+        dependencies,
+        dependencies.bootstrap,
+        dependencies,
+        parsed.json,
+        parsed.afterLogin === true,
+      )
     } catch (error) {
       return reportFailure(dependencies, error)
     }
@@ -92,7 +100,11 @@ export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: 
   }
   const localUnits = parsed.command === "status" ? await dependencies.coldWake.status() : undefined
   const code = await runLocalRemoteVerb(
-    localUnits === undefined ? dependencies : { ...dependencies, localUnits },
+    {
+      ...dependencies,
+      localSessions: dependencies.localSessions ?? thisDeviceSessions,
+      ...(localUnits === undefined ? {} : { localUnits }),
+    },
     parsed,
   )
   // After the verb's connection is closed (a changed table restarts the device service, which would cut it), and whatever
@@ -114,6 +126,11 @@ export function disableNotSavedNotice(reason: string, switchedOff: boolean): str
     ? `omo remote disable: remote is off now, but the choice could not be saved (${reason}); the next omo login will turn it on again.`
     : `omo remote disable: the choice could not be saved (${reason}) and remote could not be turned off, so it may still be on. Fix the error above, then run omo remote disable again.`
 }
+
+// This device's own sessions (`sessions` lists them) come from its operator endpoint, a socket: loaded here, on first
+// use, outside remote-local's graph (omo#13440), and handed to the person client.
+const thisDeviceSessions = async () =>
+  (await import("../omo-senpi/src/components/remote/local-sessions")).createLocalSessions()
 
 export type RemoteAttachLaunch = { readonly engineArgs: readonly string[] }
 
@@ -165,10 +182,18 @@ export async function prepareRemoteAttach(
           version: connected.serviceVersion,
           connect: async () => ({ conn: connected, owned: false }),
         }),
+        // `omo remote` is a person at this device; the account reads go through the one remote client (#13414).
+        client: remoteClientForPerson({
+          version: connected.serviceVersion,
+          stateDir: dependencies.stateDir,
+          connect: async () => borrowedService(connected),
+          localSessions: dependencies.localSessions ?? thisDeviceSessions,
+        }),
         chain: { stamp: (record: JsonObject) => record },
       }))
     )(service)
-    const resolved = await resolveSessionTarget(remote, parsedTarget)
+    // Only the resolve reads through the surface; its client (on the command's borrowed connection) is released after it.
+    const resolved = await resolveSessionTarget(remote, parsedTarget).finally(() => remote.client.close())
     if (resolved.kind === "error") {
       service.close()
       dependencies.error(`omo remote: ${resolved.error.message}`)

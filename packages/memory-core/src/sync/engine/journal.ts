@@ -97,8 +97,11 @@ export interface EngineState {
   /** The entry the pull stopped at; cleared once a later pull verifies past it. */
   readonly paused: { readonly seq: number; readonly code: RefusalCode } | null
   readonly lastSyncedAt: number | null
-  /** Memories the last refusal-free cycle updated on this device. */
-  readonly updatedWhileOffline: number
+  /**
+   * The memories the catch-up after this device's latest offline gap updated (engine.ts says what a gap is); null
+   * when the latest entries it received came in with no gap before them, or it has received none.
+   */
+  readonly updatedWhileOffline: number | null
   /** The device peer this journal was created under. */
   readonly peer: string | null
   /**
@@ -118,7 +121,7 @@ const EMPTY_STATE: EngineState = {
   cycle: null,
   paused: null,
   lastSyncedAt: null,
-  updatedWhileOffline: 0,
+  updatedWhileOffline: null,
   peer: null,
   space: null,
 }
@@ -144,6 +147,30 @@ export class SyncJournal {
     const next = { ...(await this.state()), ...patch }
     await writeJson(join(this.dir, "state.json"), next)
     return next
+  }
+
+  /**
+   * A journal names the device peer it was created under. One from another peer arrived with a
+   * copied repo: its pending ops are that device's to push, so it is retired, never resumed.
+   * A journal also names the space it syncs: the account feed carries every space, so its cursor,
+   * outbox and item docs mean nothing in another one. After the repository moves to a new space
+   * (#13720) the journal is retired, and the caller reloads the item store empty so the next capture
+   * adopts the whole working tree into the new space. Answers whether the store must be reloaded.
+   */
+  async claim(peer: string, space: string, legacySpace?: string, log?: (line: string) => void): Promise<boolean> {
+    const state = await this.state()
+    const owner = state.peer
+    const otherPeer = owner !== null && owner !== peer
+    const otherSpace = state.space !== null ? state.space !== space : owner !== null && legacySpace !== undefined
+    if (otherPeer) {
+      log?.(`sync: journal belongs to peer ${owner}, this device is ${peer}; retiring it`)
+      await this.retire()
+    } else if (otherSpace) {
+      log?.("sync: journal belongs to another memory space; retiring it and adopting the working tree")
+      await this.retire()
+    }
+    if (owner !== peer || state.space !== space || otherSpace) await this.updateState({ peer, space })
+    return otherSpace && !otherPeer
   }
 
   /**

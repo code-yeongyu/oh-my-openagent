@@ -85,14 +85,37 @@ async function terminateWindowsProcessTree(child: ChildProcess, pid: number): Pr
     stdio: "ignore",
     windowsHide: true,
   })
-  await new Promise<void>((resolve, reject) => {
-    taskkill.once("error", reject)
-    taskkill.once("close", () => resolve())
+  // taskkill.exe itself is a process that can hang (AV hooks, a tree member it cannot open): its own
+  // completion is not the cleanup contract. The child's exit EVENT is. Race the tool's close against
+  // the child's exit and the shared observation window, then reap the tool best-effort (#14300: the
+  // open-ended taskkill close held a cleanup hook for 46.8 s, hosted run 44461756495 job 135350180742,
+  // after the exit-event wait below was already bounded for run 44169815547).
+  let observationWindow: ReturnType<typeof setTimeout> | undefined
+  await Promise.race([
+    new Promise<void>((resolve, reject) => {
+      taskkill.once("error", reject)
+      taskkill.once("close", () => resolve())
+    }),
+    exited,
+    new Promise<void>((resolve) => {
+      observationWindow = setTimeout(() => resolve(), PROCESS_EXIT_OBSERVATION_TIMEOUT_MS)
+      observationWindow.unref?.()
+    }),
+  ]).finally(() => {
+    if (observationWindow) clearTimeout(observationWindow)
   })
+  // A still-running tree kill is left to finish detached: killing the tool would stop /T /F partway
+  // and orphan descendants the child's own exit cannot reach (#14300 review M1).
+  if (taskkill.exitCode === null) taskkill.unref()
   if (!hasExited(child)) {
     child.kill("SIGKILL")
   }
-  await exited
+  // taskkill /T /F and the SIGKILL fallback both force OS-level termination, but the ChildProcess exit
+  // event is a runtime courtesy, not a guarantee: Bun on Windows can leave it undelivered when the
+  // stdio pipes outlive the process, and the unbounded wait held a cleanup hook for 46.8 s until its
+  // bound (hosted run 44169815547, job 134346049552). The POSIX path already races post-kill liveness
+  // against an observation window; Windows now matches: bounded observation, never an open-ended wait.
+  await waitForExitOrDelay(exited, PROCESS_EXIT_OBSERVATION_TIMEOUT_MS)
 }
 
 function childExit(child: ChildProcess): Promise<void> {

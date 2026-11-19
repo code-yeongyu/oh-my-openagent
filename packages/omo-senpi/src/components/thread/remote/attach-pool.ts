@@ -1,29 +1,34 @@
 import type { DeviceService, RemoteAttach } from "@oh-my-opencode/device-service-core/device-service"
 import type { JsonObject } from "./ports"
 
-// The one read a session's attach holds: its model catalog (`get_available_models`). The catalog does not change with
-// what the session does, so it is held until the attach shows a new snapshot (the host re-established it) or ends, and
-// is bounded in age; it only decides an exact provider/id that set_model then confirms (remote-controls.ts). Status and
-// transcript reads (`get_state`, `get_messages`) are never held: the engine's in-memory state changes with no record on
-// the attach (a live run held isStreaming false for 17 s of a running turn), so they always go to the device.
-export const CATALOG_RECORD = "get_available_models"
+// The reads a session's attach holds: its model catalog (`get_available_models`) and its engine's protocol info
+// (`get_protocol_info`: the capabilities a close checks, omo#14234). Neither changes with what the session does, so each
+// is held until the attach shows a new snapshot (the host re-established it, possibly as another engine) or ends, and is
+// bounded in age; the catalog only decides an exact provider/id that set_model then confirms (remote-controls.ts), and a
+// capability is only ever read as "may refuse instead of drop". Status and transcript reads (`get_state`,
+// `get_messages`) are never held: the engine's in-memory state changes with no record on the attach (a live run held
+// isStreaming false for 17 s of a running turn), so they always go to the device.
+const CATALOG_RECORD = "get_available_models"
+export const HELD_RECORDS: ReadonlySet<string> = new Set([CATALOG_RECORD, "get_protocol_info"])
 const CATALOG_MAX_AGE_MS = 600_000
 
-/** One remote session's held catalog; a catalog read that a new snapshot raced is not kept. */
+/** One remote session's held reads, one per record; a read that a new snapshot raced is not kept. */
 function createCatalogHold(attached: RemoteAttach) {
-  let held: { readonly key: string; readonly response: JsonObject; readonly at: number } | undefined
+  const held = new Map<string, { readonly response: JsonObject; readonly at: number }>()
   let snapshots = 0
   attached.onEvent((event) => {
     if (event.kind !== "snapshot") return
     snapshots += 1
-    held = undefined
+    held.clear()
   })
   return {
     snapshots: () => snapshots,
-    get: (key: string): JsonObject | undefined =>
-      held !== undefined && held.key === key && Date.now() - held.at <= CATALOG_MAX_AGE_MS ? held.response : undefined,
+    get: (key: string): JsonObject | undefined => {
+      const kept = held.get(key)
+      return kept !== undefined && Date.now() - kept.at <= CATALOG_MAX_AGE_MS ? kept.response : undefined
+    },
     keep: (key: string, response: JsonObject, sentAt: number): void => {
-      if (sentAt === snapshots) held = { key, response, at: Date.now() }
+      if (sentAt === snapshots) held.set(key, { response, at: Date.now() })
     },
   }
 }

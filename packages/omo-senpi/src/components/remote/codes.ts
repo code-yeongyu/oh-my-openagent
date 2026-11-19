@@ -120,6 +120,8 @@ const NEXT_ACTION: Partial<Record<RemoteCode, string>> = {
   transport_expired: "It may have run; read the session's current state before resending.",
   unconfirmed: "It may have run; read the session's current state before resending.",
   host_error: "It may have run; read the session's current state before resending.",
+  delivered_unconfirmed:
+    "The relay accepted it for the device, so it may have run or may still run; read the session's current state before resending.",
   invalid_arguments: "Fix the arguments and call it again.",
 }
 
@@ -147,6 +149,18 @@ export const failureFromError = (error: unknown, mutating: boolean): RemoteFailu
       ...(error.action === null ? {} : { action: error.action }),
     },
   })
+}
+
+/**
+ * A history read's thrown error as a typed failure. session.read carries nothing of the caller's but its page (`before`,
+ * `tail`), so the device service refusing it invalid_request is the caller's argument, as the engine's own refusal of
+ * an unknown `before` or a bad page size is for a session on this device (local-attach.ts): both are invalid_arguments.
+ */
+export const readFailureFromError = (error: unknown): RemoteFailure => {
+  const failure = failureFromError(error, false)
+  return error instanceof LocalApiError && error.code === "invalid_request"
+    ? { ...failure, code: "invalid_arguments", next_action: nextActionFor("invalid_arguments") }
+    : failure
 }
 
 /**
