@@ -5,8 +5,9 @@ import type { RemoteClient } from "./client"
 
 /**
  * The device a person typed - its id, `here`, the name the device table prints, or a unique id prefix - through the one
- * device resolver (thread address module, #14305), with the account's device list it read, so a caller checks the
- * device online from that same listing instead of reading it again.
+ * device resolver (thread address module, #14305), with the account's device list it read. Every omo remote verb needs
+ * the device online (attach would otherwise start work on an offline device), so an offline device is device_offline
+ * here by every form.
  */
 export async function resolveTypedDevice(
   client: RemoteClient,
@@ -29,7 +30,7 @@ export async function resolveTypedDevice(
       ),
     }
   }
-  const resolved = resolveAccountDevice(listed, typed, { online: false })
+  const resolved = resolveAccountDevice(listed, typed, { online: true })
   return resolved.kind === "ok"
     ? { kind: "ok", device: resolved.device.id, devices: listed.devices }
     : { kind: "error", error: asFailure(resolved) }
