@@ -6261,7 +6261,7 @@
       ]
      },
      "setStatus:memory": {
-      "count": 7,
+      "count": 4,
       "snapshots": [
        {
         "type": "extension_ui_request",
@@ -6281,32 +6281,11 @@
         "id": "<uuid:35>",
         "method": "setStatus",
         "statusKey": "memory",
-        "statusText": "mem:<memory-identity:1> just now"
-       },
-       {
-        "type": "extension_ui_request",
-        "id": "<uuid:36>",
-        "method": "setStatus",
-        "statusKey": "memory",
-        "statusText": "mem:<memory-identity:1> just now*"
-       },
-       {
-        "type": "extension_ui_request",
-        "id": "<uuid:37>",
-        "method": "setStatus",
-        "statusKey": "memory",
-        "statusText": "mem:<memory-identity:1> just now"
-       },
-       {
-        "type": "extension_ui_request",
-        "id": "<uuid:38>",
-        "method": "setStatus",
-        "statusKey": "memory",
         "statusText": "mem:<memory-identity:1> just now (+1)"
        },
        {
         "type": "extension_ui_request",
-        "id": "<uuid:39>",
+        "id": "<uuid:36>",
         "method": "setStatus",
         "statusKey": "memory"
        }
@@ -6317,7 +6296,7 @@
       "snapshots": [
        {
         "type": "extension_ui_request",
-        "id": "<uuid:40>",
+        "id": "<uuid:37>",
         "method": "setStatus",
         "statusKey": "loop"
        }
