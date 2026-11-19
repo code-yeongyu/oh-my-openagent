@@ -507,7 +507,7 @@ describe("/remote", () => {
       { calls, options: [] },
     )
     const ui = fakeUi([
-      (options) => options.find((option) => option.includes("mengmota-mac")),
+      (options) => options.find((option) => option.includes("studio-mac")),
       (options) => options.find((option) => option.includes("dev_mac/s1")),
       (options) => options.find((option) => option === "Close"),
       (options) => options.find((option) => option.startsWith("Close anyway")),
