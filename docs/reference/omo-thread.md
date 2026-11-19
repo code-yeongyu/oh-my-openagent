@@ -67,11 +67,22 @@ agent tool `thread_create` calls) or launches `omo` itself, then binds that sess
 `omo thread bind`. A session that is not running is still bound, sent to (`queued_offline`) and
 reported for; it takes its messages when it next starts.
 
-A target or session is a durable session id, or an exact name. Without `--all-scope` only
-sessions in the current directory's workspace resolve (the same rule the agent tools apply);
-an id outside it is `scope_denied`. `--idempotency-key` on a mutation replays the first result
-instead of acting twice (`deduplicated: true`); reusing a key with other arguments is
-`idempotency_conflict`.
+Addresses: a `<target>` or `<session>` is a thread id, a session id, an account alias,
+an exact name, a unique thread-id prefix, or `<device>/<thread>` (the device part a device id,
+`here`, a device name or a unique device-id prefix; the thread part resolves among that device's
+threads only). Names match after Unicode normalization, case folding and whitespace collapsing,
+and an address may resolve to a thread on another of the account's devices: `read` and `locate`
+reach it there. `send` resolves it too, but the other device's engine admits no command-line
+sender, so a bindingless send answers `unsupported` with `details.reason: "sender_not_allowed"`
+naming the device. The binding operations (`bind`, `rebind`, `bindings --session`, `report`, and a
+bound send's target) resolve on this device first and bind and report only sessions this device
+holds: a session only another device holds answers `unsupported` with `details.reason:
+"session_on_other_device"` naming the device. `self` names the calling session, which `omo thread`
+(principal `cli:<uid>`) never is, so it answers `caller_context_missing` here. Without
+`--all-scope` only sessions in the current directory's workspace resolve (the
+same rule the agent tools apply); an id outside it is `scope_denied`. `--idempotency-key` on a
+mutation replays the first result instead of acting twice (`deduplicated: true`); reusing a key
+with other arguments is `idempotency_conflict`.
 
 ## Sending
 
@@ -573,10 +584,10 @@ The failures the CLI answers itself use the same shape: a usage error is `invali
 | Code | Meaning |
 | --- | --- |
 | 0 | done |
-| 1 | the gateway refused (read `error.code`: `not_found`, `scope_denied`, `binding_mismatch`, `turn_conflict`, `loop_detected`, `answer_in_progress` (retry after a moment), `already_answered` (stop), `invalid_arguments` for a `--mode` above the binding's `inbound_mode` or an author field that is empty, too long or not one line, ...) |
+| 1 | the gateway refused (read `error.code`: `not_found`, `scope_denied`, `unsupported` with `details.reason` `sender_not_allowed` or `session_on_other_device`, `binding_mismatch`, `turn_conflict`, `loop_detected`, `answer_in_progress` (retry after a moment), `already_answered` (stop), `invalid_arguments` for a `--mode` above the binding's `inbound_mode` or an author field that is empty, too long or not one line, ...) |
 | 2 | usage: unknown subcommand or option, a missing required flag, a non-integer where a number goes, a `--mode` other than `auto`/`steer`/`follow_up` (or `steer`/`--expected-turn` with `--binding`), a `--direction` other than `in`/`out`/`both`, an empty or whitespace-only `send` text, `--author-*` without `--binding` or without both `--author-id` and `--author-name` (the SDK is not loaded) |
-| 3 | `host_unavailable`: no endpoint answered where one was needed: `list`, `read` of a live session, `answer`. Never for `send` (it queues offline), nor for `bind`, `rebind`, `report` or `bindings --session`, which resolve the session like a send, including one known only from its session file |
-| 4 | unsupported: win32 (no unix sockets), or a runtime without `node:sqlite` |
+| 3 | `host_unavailable`: no endpoint answered where one was needed: `list`, `read` of a live session, `answer`; or, with the account's devices, an address this device does not hold that a device which did not answer may hold (`details.reason` `listing_incomplete` or `device_unanswered`). A `send` to a session this device holds, or knows from its session file, never answers it (it queues offline); nor do `bind`, `rebind`, `report` or `bindings --session` for such a session |
+| 4 | the CLI cannot run here: win32 (no unix sockets), or a runtime without `node:sqlite`. A gateway answer with code `unsupported` exits 1 |
 | 5 | `internal_error`, also when the plugin's thread SDK cannot be loaded (a broken install; with `--json` still one JSON error) |
 
 ## For scripts in JavaScript
