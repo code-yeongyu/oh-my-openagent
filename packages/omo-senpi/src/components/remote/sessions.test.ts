@@ -16,7 +16,7 @@ import { createLiveThreadSurface } from "../thread/live-surface"
 import { DEADLINES } from "./deadlines"
 import { createLocalSessions } from "./local-sessions"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
-import { personIdentity, resolveSessionTarget } from "./sessions"
+import { personIdentity } from "./sessions"
 import {
   clientOn,
   closeClients,
@@ -447,7 +447,7 @@ describe("sessions controls", () => {
 
 describe("durable-id addressing", () => {
   // A handle's session part is the device's listing key or the session's durable id (what open's engine reply names);
-  // every session member resolves it through resolveSessionTarget to the key the device lists it by.
+  // every session member resolves it to the key the device lists it by, and no unresolved session part reaches a device.
   const opened = async () => {
     const { owner, sent } = await onWorld()
     const client = clientOn(owner.stateDir, fakeClock())
@@ -486,25 +486,15 @@ describe("durable-id addressing", () => {
     }
   })
 
-  test("#given resolveSessionTarget #when it takes a durable id the listing carries #then it answers the listing key and row", async () => {
-    // The resolver resolve.ts reuses, at its own seam: a person client's core is what sessionMembers is built from.
-    const { owner } = await onWorld()
+  test("#given a session part no id shape matches and no row lists #when a member addresses it #then the resolver's typed not_found answers, never the device's", async () => {
+    // Without a locate probe the device's own refusal chain answers unsupported for text no listing resolves; the
+    // resolver must refuse it before the device is asked.
+    const { located: _unprobed, ...withoutProbe } = world()
+    const owner = await startOwner(withoutProbe)
     const client = clientOn(owner.stateDir, fakeClock())
-    const core = {
-      sender: { kind: "person", uid: "user-1" },
-      timers: fakeClock(),
-      deps: { version: "5.1.70" },
-      dial: () => Promise.reject(new Error("the listing alone resolves a listed durable id")),
-      member: () => Promise.reject(new Error("the listing alone resolves a listed durable id")),
-      sessionsList: client.sessions.list,
-      devicesList: client.devices.list,
-      self: () => client,
-      localSessions: () => Promise.reject(new Error("the listing alone resolves a listed durable id")),
-    } as const
-    expect(await valueOf(resolveSessionTarget(core, PEER, ENGINE_ID))).toMatchObject({
-      device: PEER,
-      session: NEW_KEY,
-      row: { title: "review", durable_id: ENGINE_ID },
+    expect(failureOf(await client.sessions.get(handleOf(PEER, "review")))).toMatchObject({
+      code: "not_found",
+      details: { kind: "session", device: PEER },
     })
   })
 })
