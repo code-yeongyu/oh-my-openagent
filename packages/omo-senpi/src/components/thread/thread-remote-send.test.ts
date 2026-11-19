@@ -62,9 +62,9 @@ describe("#12882: a send to another device is one admit_external_message, admitt
     expect(await run("thread_send", { thread: "dur-on-b", message })).toMatchObject({ kind: "ok", device: "b" })
     const [record = {}] = admits(a.sent)
     const remote = String(record["text"])
-    // The local receiver's drain renders the row once its lane is decided (an idle target admits auto as follow_up).
-    expect(withoutMintedIds(remote)).toBe(withoutMintedIds(renderDeliveryText({ ...row, mode_effective: "follow_up" })))
-    expect(remote).toContain(" requested=auto effective=follow_up ")
+    // The local receiver's drain renders the row once its lane is decided (an idle target starts a turn: start).
+    expect(withoutMintedIds(remote)).toBe(withoutMintedIds(renderDeliveryText({ ...row, mode_effective: "start" })))
+    expect(remote).toContain(" requested=auto effective=start ")
     expect(remote.split("\n")).toHaveLength(3)
     expect(remote.split("\n")[1]).toBe(`${GATEWAY_PROVENANCE_SENTENCE} ${GATEWAY_PEER_REPLY_SENTENCE}`)
     expect(record["deliveryId"]).toBe(remote.match(/delivery=(\S+)/)?.[1])
@@ -126,8 +126,8 @@ describe("remote == local: the same call answers the same on b as on this device
         expect(result).toHaveProperty("effective_mode")
         expect(result).not.toHaveProperty("endpoint")
       }
-      // b was idle, so the default mode took the follow_up lane its record carried.
-      expect(there).toMatchObject({ delivery_id: record["deliveryId"], effective_mode: "follow_up" })
+      // b was idle, so the default mode started a turn there, the lane its record carried.
+      expect(there).toMatchObject({ delivery_id: record["deliveryId"], effective_mode: "start" })
     },
   )
 
@@ -356,6 +356,8 @@ describe("remote == local, round 2: send modes, handoff and the unknown caller",
       kind: "ok",
       device: "b",
       delivery: { kind: "started" },
+      // The result names the lane b's answer proves; the header went out before b answered and keeps the lane asked for.
+      effective_mode: "start",
     })
     expect(commands(a.sent)).toEqual(["get_state", ADMIT, ADMIT])
     expect(admits(a.sent).map((record) => [record["deliverAs"], record["expectedTurnId"] ?? null])).toEqual([

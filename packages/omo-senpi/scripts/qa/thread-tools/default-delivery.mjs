@@ -3,17 +3,20 @@
  * default-delivery (#14333): a session on a shard host sends to a real pty TUI through the thread_send TOOL with no
  * delivery mode, and once with an explicit follow_up.
  *
- * 1. Idle TUI, no mode: the delivery starts a turn there (`started`), recorded as requested `auto`.
+ * 1. Idle TUI, no mode: the delivery starts a turn there (`started`), recorded as requested `auto`, effective `start`:
+ *    the tool result, the row and the header the TUI's model reads all say start, never follow_up.
  * 2. TUI mid-turn (its answer held open), no mode: the delivery is steered into the running turn (`steered`),
  *    recorded as requested `auto`, effective `steer`, inside that turn.
  * 3. TUI mid-turn, explicit follow_up: the delivery waits behind the running turn (never `steered`) and is answered
- *    only after that turn's answer.
+ *    only after that turn's answer, recorded and reported as effective `follow_up`.
  */
 import {
   assistantTexts,
   awaitToolResult,
   awaitTuiEndpoint,
   callDirective,
+  deliveryEntries,
+  deliveryIdOf,
   deliveryRow,
   holdDirective,
   openHostSession,
@@ -21,6 +24,13 @@ import {
   startShardHost,
   waitFor,
 } from "./lib/gateway.mjs"
+import { parseDeliveryText } from "./lib/delivery-text.mjs"
+
+function entryText(entry) {
+  const content = entry?.message?.content ?? entry?.content
+  if (typeof content === "string") return content
+  return Array.isArray(content) ? content.map((part) => part?.text ?? "").join("") : ""
+}
 
 await runScenario("default-delivery", async ({ report, fake, scratch, install, startTui }) => {
   const tui = await startTui("tui-target")
@@ -53,6 +63,11 @@ await runScenario("default-delivery", async ({ report, fake, scratch, install, s
       label: `tui answers ${needle}`,
     })
   const answerIndex = (needle) => assistantTexts(target.sessionPath).findIndex((text) => text.includes(needle))
+  // The header the TUI's session recorded for a delivery: the text its model reads, parsed as a receiver parses it.
+  const headerOf = (deliveryId) => {
+    const text = entryText(deliveryEntries(target.sessionPath).find((entry) => deliveryIdOf(entry) === deliveryId))
+    return { parsed: parseDeliveryText(text)?.header, line: text.split("\n")[0] ?? "" }
+  }
 
   // 1. idle, no mode
   const idle = await hostSend("QA-TOKEN-idle")
@@ -62,6 +77,12 @@ await runScenario("default-delivery", async ({ report, fake, scratch, install, s
     "idle-no-mode-starts",
     idle.kind === "ok" && idleRow.admission_kind === "started" && idleRow.mode_requested === "auto",
     `result=${JSON.stringify(idle).slice(0, 200)} admission=${idleRow.admission_kind} requested=${idleRow.mode_requested}`,
+  )
+  const idleHeader = headerOf(idle.delivery_id)
+  report.assert(
+    "idle-reports-effective-start",
+    idle.effective_mode === "start" && idleRow.mode_effective === "start" && idleHeader.parsed?.effective === "start",
+    `result.effective_mode=${idle.effective_mode} row.mode_effective=${idleRow.mode_effective} header.effective=${idleHeader.parsed?.effective} line=${idleHeader.line.slice(-220)}`,
   )
 
   // 2. mid-turn, no mode
@@ -76,6 +97,24 @@ await runScenario("default-delivery", async ({ report, fake, scratch, install, s
   )
   report.assert("release-busy-1", fake.release("busy-1"), "held turn released")
   await answered("QA-ACK QA-TOKEN-steer")
+  // The steered turn has settled only when its delivery is applied, both its answers are written and the TUI itself
+  // reports no running turn and nothing pending; a prompt submitted before that is taken as a steer, not a new turn.
+  const settledState = await waitFor(
+    async () => {
+      const row = await deliveryRow(scratch.agentDir, steer.delivery_id)
+      if (row?.state !== "applied") return undefined
+      const texts = assistantTexts(target.sessionPath)
+      if (!texts.some((text) => text.includes("QA-RELEASED busy-1"))) return undefined
+      const state = (await target.client.request({ type: "get_state" })).data
+      return state?.isStreaming === false && (state.pendingMessageCount ?? 0) === 0 ? state : undefined
+    },
+    { label: "steered turn settled (row applied, busy-1 answered, tui idle)" },
+  )
+  report.assert(
+    "steered-turn-settled",
+    settledState.isStreaming === false,
+    `isStreaming=${settledState.isStreaming} pending=${settledState.pendingMessageCount ?? 0}`,
+  )
 
   // 3. mid-turn, explicit follow_up
   await tui.submit(`${holdDirective("busy-2")} QA-TOKEN-busy-2`)
@@ -84,7 +123,10 @@ await runScenario("default-delivery", async ({ report, fake, scratch, install, s
   const queuedRow = await admitted(queued.delivery_id)
   report.assert(
     "busy-follow-up-waits",
-    queuedRow.admission_kind === "queued" && queuedRow.mode_requested === "follow_up",
+    queuedRow.admission_kind === "queued" &&
+      queuedRow.mode_requested === "follow_up" &&
+      queuedRow.mode_effective === "follow_up" &&
+      queued.effective_mode === "follow_up",
     `admission=${queuedRow.admission_kind} requested=${queuedRow.mode_requested} effective=${queuedRow.mode_effective}`,
   )
   report.assert("release-busy-2", fake.release("busy-2"), "held turn released")

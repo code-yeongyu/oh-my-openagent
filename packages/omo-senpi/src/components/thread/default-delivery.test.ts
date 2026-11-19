@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { DEFAULT_THREAD_DELIVERY, ThreadDeliveryMode } from "./contracts"
-import { ENGINE, createRemoteThreadFixture } from "./thread-remote-fixture"
+import { B_ROW, ENGINE, createRemoteThreadFixture } from "./thread-remote-fixture"
 
 /**
  * #14333: a send that names no delivery mode steers a running turn and starts an idle one on every surface, from the
@@ -38,19 +38,48 @@ describe("#14333: the default delivery mode is auto on every send surface", () =
   )
 
   test.each(["thread_send", "thread_handoff"] as const)(
-    "#given an idle receiver #when %s names no mode #then it starts a turn there, on the followUp lane that starts an idle session",
+    "#given an idle receiver #when %s names no mode #then it starts a turn there, and the result and the header both say start",
     async (tool) => {
       const a = account()
       const { run } = surface(a.remote)
       expect(await run(tool, { thread: "dur-on-b", message: "x" })).toMatchObject({
         kind: "ok",
         delivery: { kind: "started" },
-        effective_mode: "follow_up",
+        effective_mode: "start",
       })
       const [record = {}] = admits(a.sent)
-      expect(String(record["text"])).toContain(" requested=auto effective=follow_up ")
+      // An idle session is started through the engine's followUp lane; the lane the message took is a start.
+      expect(record["deliverAs"]).toBe("followUp")
+      expect(String(record["text"])).toContain(" requested=auto effective=start ")
     },
   )
+
+  test("#given an idle receiver #when thread_send asks for follow_up #then nothing waits, so the result and the header say start, not follow_up", async () => {
+    const a = account()
+    const { run } = surface(a.remote)
+    expect(await run("thread_send", { thread: "dur-on-b", message: "x", delivery: "follow_up" })).toMatchObject({
+      kind: "ok",
+      delivery: { kind: "started" },
+      effective_mode: "start",
+    })
+    const [record = {}] = admits(a.sent)
+    expect(record["deliverAs"]).toBe("followUp")
+    expect(String(record["text"])).toContain(" requested=follow_up effective=start ")
+  })
+
+  test("#given a session b holds but runs nowhere #when thread_send names no mode #then the wake path starts it, and the result and the header say start", async () => {
+    const ENDED = "0195f0c2-1a2b-7c3d-8e4f-00000000e001"
+    const a = account({ rows: [B_ROW], ended: { b: { [ENDED]: "rk-ended" } }, wakeFeature: true })
+    const { run } = surface(a.remote)
+    expect(await run("thread_send", { thread: ENDED, message: "x" })).toMatchObject({
+      kind: "ok",
+      delivery: { kind: "queued", waiting_on: { kind: "wake" } },
+      effective_mode: "start",
+    })
+    const [record = {}] = a.sent.filter((entry) => entry.via === "wake").map((entry) => entry.rpc ?? {})
+    expect(record["deliverAs"]).toBe("followUp")
+    expect(String(record["text"])).toContain(" requested=auto effective=start ")
+  })
 
   test("#given a receiver mid-turn #when thread_send asks for follow_up #then the message queues behind that turn instead of steering it", async () => {
     const a = account({ engine: MID_TURN })

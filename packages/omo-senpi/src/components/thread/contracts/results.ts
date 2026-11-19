@@ -124,12 +124,12 @@ export type ThreadDelivery =
 
 /**
  * What a send through the session gateway adds to a delivery result: the durable `delivery_id` and the lane the target
- * used (`steer` / `follow_up`, or the requested mode while it waits). The kind of endpoint that served the target is an
+ * used (`start` for a turn it began on an idle session, `steer`, `follow_up`; the requested mode while it waits). The kind of endpoint that served the target is an
  * endpoint internal (#14044): only the SDK's send (`endpoint_kind`, for `omo thread send` and connectors) reports it.
  */
 export type ThreadGatewayDeliveryFacts = {
   readonly delivery_id?: string
-  readonly effective_mode?: "auto" | "steer" | "follow_up"
+  readonly effective_mode?: "auto" | "start" | "steer" | "follow_up"
 }
 
 export type ThreadAddressResolution = "id" | "exact_name" | "fuzzy"

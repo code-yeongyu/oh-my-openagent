@@ -371,6 +371,8 @@
         "scripts/qa/thread-tools/lib/gateway.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/lib/harness.mjs",
+        // run by name from run-all.mjs, which knip does not trace
+        "scripts/qa/thread-tools/default-delivery.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/loop-guard.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
