@@ -101,8 +101,8 @@ const ENDED: ReadonlySet<CarrierEvaluation["kind"]> = new Set(["released", "hand
 
 /**
  * `session_wake` as the machine's omo configuration says it now, read at each send and each open. The `same_device`
- * switch is read for the TARGET session's cwd (its project's configuration); every other read (such as `wake_limit`)
- * falls back to the caller's workspace root, the first registering session's.
+ * switch is read for the TARGET session's cwd (its project's configuration); a read with no target falls back to the
+ * caller's workspace root, the first registering session's.
  */
 export function wakeSettingsReader(
   options: ThreadWakeOptions,
@@ -260,7 +260,6 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart, scope:
           keyRoot: () => env.SENPI_RPC_KEY_ROOT?.trim() || resolveAgentHome({ env }),
           background: true,
         })),
-    wakeLimit: () => input.settings().wakeLimit,
     sameDevice: (cwd) => input.settings(cwd).sameDevice,
     // Owner ruling 2026-11-14: a device whose service serves this engine's consumer wakes; no switch has to be told on.
     remoteWake: () => consumer?.serving() ?? false,

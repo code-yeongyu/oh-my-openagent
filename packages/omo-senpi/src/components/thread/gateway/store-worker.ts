@@ -654,42 +654,6 @@ function waitingOn(ctx: ops.StoreContext, request: WaitKey): QueuedWaitingOn | n
   return Number(woken?.n ?? 0) > 0 ? { kind: "wake" } : null
 }
 
-async function countWake(
-  ctx: ops.StoreContext,
-  request: WaitKey & { readonly human_input_revision: number | null },
-): Promise<{ readonly count: number }> {
-  return await ops.transaction(ctx, "wake_count", () => {
-    const found = ctx.sql.one(
-      ["count", "human_input_revision"],
-      "SELECT count, human_input_revision FROM wake_counts WHERE durable_id = ?",
-      [request.durable_id],
-    )
-    const stored = found?.human_input_revision ?? null
-    const moved =
-      found === undefined || (request.human_input_revision !== null && Number(stored) !== request.human_input_revision)
-    const count = moved ? 1 : Number(found?.count ?? 0) + 1
-    ops.write(
-      ctx,
-      `INSERT INTO wake_counts (durable_id, count, human_input_revision) VALUES (?, ?, ?)
-       ON CONFLICT (durable_id) DO UPDATE SET count = excluded.count, human_input_revision = excluded.human_input_revision`,
-      [request.durable_id, count, request.human_input_revision ?? (stored === null ? null : Number(stored))],
-    )
-    return { count }
-  })
-}
-
-function wakeCount(ctx: ops.StoreContext, request: WaitKey): number {
-  return Number(
-    ctx.sql.one(["count"], "SELECT count FROM wake_counts WHERE durable_id = ?", [request.durable_id])?.count ?? 0,
-  )
-}
-
-async function resetCount(ctx: ops.StoreContext, request: WaitKey): Promise<void> {
-  await ops.transaction(ctx, "wake_count_reset", () => {
-    ops.write(ctx, "DELETE FROM wake_counts WHERE durable_id = ?", [request.durable_id])
-  })
-}
-
 function sessionWorkOf(ctx: ops.StoreContext, request: WaitKey): SessionWork {
   const count = (state: string): number =>
     Number(
@@ -869,12 +833,6 @@ async function dispatchWoken(ctx: ops.StoreContext, op: string, args: unknown): 
       return await endWake(ctx, args as WokenRequest<"end">)
     case "woken_clear_waiting":
       return await clearWaiting(ctx, args as WokenRequest<"clearWaiting">)
-    case "woken_count_wake":
-      return await countWake(ctx, args as WokenRequest<"countWake">)
-    case "woken_wake_count":
-      return wakeCount(ctx, args as WokenRequest<"wakeCount">)
-    case "woken_reset_count":
-      return await resetCount(ctx, args as WokenRequest<"resetCount">)
     case "woken_session_work":
       return sessionWorkOf(ctx, args as WokenRequest<"sessionWork">)
     case "woken_wait_write":

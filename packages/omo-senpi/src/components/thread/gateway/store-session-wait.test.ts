@@ -48,19 +48,6 @@ describe("the wait state of a session", () => {
   })
 })
 
-describe("the count of consecutive wakes (A3.5.3)", () => {
-  test("#given wakes at one input revision #when a person's input moves the revision #then the count starts again at one, and a reset clears it", async () => {
-    const h = (harness = createGatewayHarness())
-    const store = h.store()
-    expect(await store.woken.countWake({ durable_id: "s1", human_input_revision: 3 })).toEqual({ count: 1 })
-    expect(await store.woken.countWake({ durable_id: "s1", human_input_revision: 3 })).toEqual({ count: 2 })
-    expect(await store.woken.countWake({ durable_id: "s1", human_input_revision: 4 })).toEqual({ count: 1 })
-    expect(await store.woken.wakeCount({ durable_id: "s1" })).toBe(1)
-    await store.woken.resetCount({ durable_id: "s1" })
-    expect(await store.woken.wakeCount({ durable_id: "s1" })).toBe(0)
-  })
-})
-
 describe("intake marks (delivery.pending / delivery.drained)", () => {
   test("#given two deliveries from one device queued in turn #when the first is applied #then the pair is still pending with the newest command, and it drains with that command once both are applied", async () => {
     const h = (harness = createGatewayHarness())

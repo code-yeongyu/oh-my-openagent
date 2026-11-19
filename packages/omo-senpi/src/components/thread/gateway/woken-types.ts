@@ -76,12 +76,6 @@ export type WokenSessionStore = {
   /** True only for an `opening` row whose lease is live: the later drain admits nothing for such a session (A3.1.5). */
   readonly gated: (request: WokenSessionKey) => Promise<boolean>
   readonly list: () => Promise<readonly WokenSessionRow[]>
-  /** Counts a wake that opened the session (A3.5.3); a moved input revision starts the count again at one. */
-  readonly countWake: (request: WokenSessionKey & { readonly human_input_revision: number | null }) => Promise<{
-    readonly count: number
-  }>
-  readonly wakeCount: (request: WokenSessionKey) => Promise<number>
-  readonly resetCount: (request: WokenSessionKey) => Promise<void>
   /** The session's rows the store still holds open: queued, claimed (`admitting`), admitted and not yet applied. */
   readonly sessionWork: (request: WokenSessionKey) => Promise<SessionWork>
 }

@@ -21,7 +21,7 @@ export type WakeAtSessionInput = {
   readonly options: ThreadWakeOptions
   readonly agentDir: () => string
   readonly sessionsDirectory: () => string
-  /** The caller's workspace root: the fallback cwd every non-target read (such as `wake_limit`) uses. */
+  /** The caller's workspace root: the cwd the settings are read for when no target session names one. */
   readonly cwd: () => string
   readonly engineVersion: string | undefined
   readonly ensureHost: (() => Promise<void>) | undefined

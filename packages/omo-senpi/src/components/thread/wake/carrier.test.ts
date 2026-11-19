@@ -56,7 +56,6 @@ type Setup = {
 
 async function setup(
   options: FakeEngineOptions & {
-    readonly wakeLimit?: number
     readonly sameDevice?: () => boolean
     readonly remoteWake?: () => boolean
     readonly admitIntake?: (device: string) => Promise<IntakeAdmission>
@@ -91,7 +90,6 @@ async function setup(
     sessionsDirectory: sessions,
     ensureHost: async () => undefined,
     connect: () => connectCarrierHost({ socket: fake.socketPath, keyRoot: () => h.agentDir }),
-    wakeLimit: () => options.wakeLimit ?? 0,
     sameDevice: options.sameDevice ?? (() => true),
     ...(options.remoteWake === undefined ? {} : { remoteWake: options.remoteWake }),
     ...(options.admitIntake === undefined ? {} : { admitIntake: options.admitIntake }),
@@ -300,16 +298,14 @@ describe("the carrier lifts, reads finished, and hands back", () => {
     expect(await carrier.evaluate("s1")).toEqual({ kind: "released" })
   })
 
-  test("#given a person's client attached meanwhile #when the carrier looks #then it hands the session over: own attachment released, row gone, wake count reset", async () => {
-    const { fake, store, carrier, path } = await setup({ wakeLimit: 5 })
+  test("#given a person's client attached meanwhile #when the carrier looks #then it hands the session over: own attachment released, row gone", async () => {
+    const { fake, store, carrier, path } = await setup()
     path("s1")
     await carrier.wake("s1")
-    expect(await store.woken.wakeCount({ durable_id: "s1" })).toBe(1)
     fake.session(path("s1")).others = 1
     expect(await carrier.evaluate("s1")).toEqual({ kind: "handed_over" })
     expect(sent(fake, "release_attachment")).toHaveLength(1)
     expect(await store.woken.list()).toEqual([])
-    expect(await store.woken.wakeCount({ durable_id: "s1" })).toBe(0)
   })
 
   test("#given a host that answers the release as an unknown command #when the carrier closes #then the close failed, the row ends and the session is left to the host", async () => {
@@ -841,31 +837,6 @@ describe("the bound on woken turns (A3.5.3)", () => {
       expect(await carrier.wake("s1")).toMatchObject({ kind: "open" })
       expect(await carrier.evaluate("s1")).toEqual({ kind: "released" })
     }
-  })
-
-  test("#given the setting at 2 #when the third consecutive wake comes #then it is refused with the typed outcome and nothing opens", async () => {
-    const { fake, carrier, path } = await setup({ wakeLimit: 2 })
-    path("s1")
-    for (let round = 0; round < 2; round++) {
-      await carrier.wake("s1")
-      await carrier.evaluate("s1")
-    }
-    const opens = sent(fake, "open_session").length
-    expect(await carrier.wake("s1")).toEqual({ kind: "wake_limit_reached" })
-    expect(sent(fake, "open_session")).toHaveLength(opens)
-  })
-
-  test("#given the setting at 2 #when a person's input moved the session's input revision between wakes #then the count starts again", async () => {
-    const { fake, carrier, path } = await setup({ wakeLimit: 2 })
-    path("s1")
-    await carrier.wake("s1")
-    await carrier.evaluate("s1")
-    fake.setSnapshot(path("s1"), { ...FINISHED, lifecycle: { ...FINISHED.lifecycle, humanInputRevision: 7 } })
-    await carrier.wake("s1")
-    await carrier.evaluate("s1")
-    expect(await carrier.wake("s1")).toMatchObject({ kind: "open" })
-    await carrier.evaluate("s1")
-    expect(await carrier.wake("s1")).toEqual({ kind: "wake_limit_reached" })
   })
 })
 

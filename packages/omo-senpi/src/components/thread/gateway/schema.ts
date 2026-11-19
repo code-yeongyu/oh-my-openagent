@@ -360,7 +360,8 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
 
   // v14 (#13037): what the carrier and the consumer keep beside the woken row. `session_wait`: a session found held or
   // waiting for a person, with its hold kinds and the size of its file then (a changed size allows one new probe).
-  // `wake_counts`: consecutive wakes per session, and the input revision they were counted at; it outlives the row.
+  // `wake_counts`: consecutive wakes per session, counted for the wake limit that #14405 removed; nothing reads or
+  // writes it any more, and it stays defined so the store's schema version does not move.
   // `intake_marks`: per sender device and session, the newest command that committed a new intake row; `intake_commands`:
   // the command id each intake row was committed under (A5.3: an answer names it, a deduplicated repeat included). Idempotent.
   [

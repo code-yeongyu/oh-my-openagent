@@ -23,7 +23,6 @@ export type CarrierWakeOutcome =
   | { readonly kind: "open"; readonly session_id: string; readonly generation: number }
   | { readonly kind: "held" }
   | { readonly kind: "waiting" }
-  | { readonly kind: "wake_limit_reached" }
   | { readonly kind: "gone" }
   | { readonly kind: "ambiguous"; readonly session_paths: readonly string[] }
   | { readonly kind: "not_wakeable"; readonly session_kind: Exclude<WakeSessionKind, "interactive"> }
@@ -60,8 +59,6 @@ export type CarrierOptions = {
   readonly sessionsDirectory: string
   readonly ensureHost: () => Promise<void>
   readonly connect: () => Promise<CarrierHostConnection>
-  /** `session_wake.wake_limit`; 0 means no bound (A3.5.3). */
-  readonly wakeLimit?: () => number
   /**
    * `session_wake.same_device`, read at the moment of the open for the TARGET session's cwd (its project's
    * configuration); the caller passes the resolved setting (on by default).
@@ -236,7 +233,6 @@ export function createCarrier(options: CarrierOptions): Carrier {
     if (await attachedOthers(entry)) {
       await releaseOwn(entry)
       await store.woken.end(fence)
-      await store.woken.resetCount({ durable_id: durableId })
       forget(entry)
       return { kind: "handed_over" }
     }
@@ -280,7 +276,6 @@ export function createCarrier(options: CarrierOptions): Carrier {
       if (released.code === "attached") {
         await releaseOwn(entry)
         await store.woken.end(fence)
-        await store.woken.resetCount({ durable_id: durableId })
         forget(entry)
         return { kind: "handed_over" }
       }
@@ -381,10 +376,6 @@ export function createCarrier(options: CarrierOptions): Carrier {
       await store.woken.request({ durable_id: durableId, session_file: target.session_path })
       return { kind: "switched_off" }
     }
-    const limit = options.wakeLimit?.() ?? 0
-    if (limit > 0 && (await store.woken.wakeCount({ durable_id: durableId })) >= limit)
-      return { kind: "wake_limit_reached" }
-
     await store.woken.request({ durable_id: durableId, session_file: target.session_path })
     // Read outside the store's transaction: a short host defers the wake with its row requested (the send keeps
     // answering waiting on the wake), and the sweep starts it once the headroom is back.
@@ -430,7 +421,6 @@ export function createCarrier(options: CarrierOptions): Carrier {
       return { kind: "waiting" }
     }
     await store.sessionWait.clear({ durable_id: durableId })
-    await store.woken.countWake({ durable_id: durableId, human_input_revision: opened.view.humanInputRevision })
     const lifted = await store.woken.setState({ ...fence, state: "open" })
     if (lifted.kind === "lost_lease") {
       await releaseOwn(entry)

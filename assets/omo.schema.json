@@ -49,11 +49,6 @@
       "properties": {
         "same_device": {
           "type": "boolean"
-        },
-        "wake_limit": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
         }
       },
       "additionalProperties": false
@@ -2772,11 +2767,6 @@
           "properties": {
             "same_device": {
               "type": "boolean"
-            },
-            "wake_limit": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 9007199254740991
             }
           },
           "additionalProperties": false
@@ -5259,11 +5249,6 @@
           "properties": {
             "same_device": {
               "type": "boolean"
-            },
-            "wake_limit": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 9007199254740991
             }
           },
           "additionalProperties": false
@@ -7746,11 +7731,6 @@
           "properties": {
             "same_device": {
               "type": "boolean"
-            },
-            "wake_limit": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 9007199254740991
             }
           },
           "additionalProperties": false
@@ -10239,11 +10219,6 @@
             "properties": {
               "same_device": {
                 "type": "boolean"
-              },
-              "wake_limit": {
-                "type": "integer",
-                "minimum": 0,
-                "maximum": 9007199254740991
               }
             },
             "additionalProperties": false
@@ -12726,11 +12701,6 @@
                 "properties": {
                   "same_device": {
                     "type": "boolean"
-                  },
-                  "wake_limit": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 9007199254740991
                   }
                 },
                 "additionalProperties": false
@@ -15213,11 +15183,6 @@
                 "properties": {
                   "same_device": {
                     "type": "boolean"
-                  },
-                  "wake_limit": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 9007199254740991
                   }
                 },
                 "additionalProperties": false
@@ -17700,11 +17665,6 @@
                 "properties": {
                   "same_device": {
                     "type": "boolean"
-                  },
-                  "wake_limit": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 9007199254740991
                   }
                 },
                 "additionalProperties": false

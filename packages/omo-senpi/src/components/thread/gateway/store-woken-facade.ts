@@ -18,9 +18,6 @@ export function createWokenFacade(call: Call, now: () => number): WokenSessionSt
     end: (request) => stamped("woken_end", request),
     gated: (request) => stamped("woken_gated", request),
     list: () => call("woken_list"),
-    countWake: (request) => stamped("woken_count_wake", request),
-    wakeCount: (request) => stamped("woken_wake_count", request),
-    resetCount: (request) => stamped("woken_reset_count", request),
     sessionWork: (request) => stamped("woken_session_work", request),
   }
 }

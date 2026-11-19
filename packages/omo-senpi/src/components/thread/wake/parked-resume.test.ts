@@ -84,7 +84,7 @@ async function parkedSession() {
       },
     },
   }
-  const settings = () => ({ sameDevice: true, wakeLimit: 0 })
+  const settings = () => ({ sameDevice: true })
   const wakes = signals<CarrierWakeOutcome>()
   const latch: ThreadWakeLatch = {}
   startThreadWakeAtSession(

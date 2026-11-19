@@ -182,11 +182,15 @@ function wakeRefusal(received: string, device: string, data: JsonObject = {}): F
     case "queue_full":
       return fail("queue_full", `The session on device ${device} has a full backlog.`, "Retry later.", details)
     case "overloaded": {
+      // #14405: the device service's only overloaded answer is its bound on hand-offs in flight (in total and per
+      // sender). It was refused before anything was handed over, so nothing is queued there; a retry is safe.
       const retry = data["retry_after_ms"]
-      return fail("overloaded", `Device ${device} is waking too many sessions now.`, "Retry after the given delay.", {
-        ...details,
-        ...(typeof retry === "number" ? { retry_after_ms: retry } : {}),
-      })
+      return fail(
+        "overloaded",
+        `Device ${device} is handing too many messages to its sessions at once; this one was not delivered and nothing was queued.`,
+        typeof retry === "number" ? "Retry after the given delay." : "Retry shortly.",
+        { ...details, budget: "hand_off", ...(typeof retry === "number" ? { retry_after_ms: retry } : {}) },
+      )
     }
     case "pair_loop_guard": {
       // The receiving store's pair loop guard (`store-ops.ts` `takePairToken`): the same answer a send on this device gets.
@@ -210,13 +214,6 @@ function wakeRefusal(received: string, device: string, data: JsonObject = {}): F
         },
       )
     }
-    case "wake_limit_reached":
-      return fail(
-        "overloaded",
-        `The session on device ${device} reached its limit of unattended wakes; the message stays queued there.`,
-        "Wait for a person to use that session.",
-        details,
-      )
     case "wake_unavailable":
       return fail(
         "host_unavailable",
