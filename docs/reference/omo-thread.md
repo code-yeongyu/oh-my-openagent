@@ -78,7 +78,8 @@ instead of acting twice (`deduplicated: true`); reusing a key with other argumen
 A bindingless `send` delivers as `cli:<uid>`. `--mode auto` (the default) steers a running turn:
 the message enters the turn in flight, as typing into its terminal does, with that running turn as
 its expected turn (`delivery.kind: "steered"`, `effective_mode: "steer"`). On an idle session it
-starts a turn. It queues behind only what cannot be steered: a question the session waits on, a
+starts a turn (`effective_mode: "start"`, and `effective=start` in the delivery header the receiver reads); a
+message that waits behind a turn reports `follow_up`. It queues behind only what cannot be steered: a question the session waits on, a
 compaction, or a running turn whose epoch the engine does not report. If the turn ends before the
 steer reaches it, `auto` does not fail: it takes the lane the target has now (a new turn when idle,
 queued behind a turn that began since). `--mode follow_up` always queues behind the running turn.
@@ -547,7 +548,7 @@ every other subcommand prints the full result.
 | Subcommand | `--json` on success |
 | --- | --- |
 | `list` | `[{thread, name, state: running\|idle\|inactive\|archived, model?: {provider, id}, status: live\|resumable (deprecated: resumable exactly when no engine holds the thread), machine?, cwd, created_at, updated_at: <ISO 8601 string>\|null, link, surface?: tui\|desktop\|child\|daemon, as_of?, controls?, error_note?, device?, alias?}]`; `--state` (repeatable or comma-separated) picks the states listed, and the default lists every state except `archived`; a thread its engine closed stays listed `inactive` from its session file (the newest 200 files in scope); `thread` is the address `read` and `send` take back. Live and degraded rows use the same bounded final-record policy, so `updated_at` is null rather than an older timestamp when the final complete valid entry's timestamp cannot be proved. After live and degraded rows are combined, the public list sorts known `updated_at` newest first, then unknown activity last, with `thread` ascending for ties. Routing ids, socket and session-file paths are not shown (#14044) |
-| `send` | `{kind:"ok", thread, delivery_id, message_seq, delivery: {kind: queued\|queued_offline\|started\|steered, ...}, effective_mode, endpoint_kind: rpc_host\|tui\|null, deduplicated}` |
+| `send` | `{kind:"ok", thread, delivery_id, message_seq, delivery: {kind: queued\|queued_offline\|started\|steered, ...}, effective_mode: start\|steer\|follow_up (the requested mode while it waits for a receiver), endpoint_kind: rpc_host\|tui\|null, deduplicated}` |
 | `read` | `{kind:"ok", thread, link, items: [{seq, role: user\|assistant\|tool\|system, content}], truncated, next_cursor?, source, source_incomplete?, error_note?}` |
 | `bind` | `{kind:"ok", binding: <binding>, deduplicated}` |
 | `unbind` | `{kind:"ok", binding, already_closed, in_flight: [delivery ids], deduplicated}` |

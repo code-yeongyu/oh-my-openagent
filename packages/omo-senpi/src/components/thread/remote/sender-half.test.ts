@@ -253,12 +253,12 @@ describe("#13037 the sender half reaches a session on another device that is not
     const endedOnC = (extra: Parameters<Fixture["account"]>[0] = {}) =>
       account({ rows: [B_ROW, C_ROW], ended: { c: { [GONE]: "rk-c-gone" } }, ...extra })
 
-    test("#given an ended row #when it is sent to with the default mode #then no get_state is sent and the record is a follow-up", async () => {
+    test("#given an ended row #when it is sent to with the default mode #then no get_state is sent and the result names the start the wake makes", async () => {
       const a = endedOnC()
       const { run } = fixture.surface(a.remote)
       expect(await run("thread_send", { thread: GONE, message: "hi" })).toMatchObject({
         kind: "ok",
-        effective_mode: "follow_up",
+        effective_mode: "start",
       })
       expect(a.sent.some((entry) => entry.rpc?.["type"] === "get_state")).toBe(false)
     })

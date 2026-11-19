@@ -35,7 +35,7 @@ import { isClaimantDead, sameProcess } from "./process-identity"
 import { deleteExpiredReceipt, sweepRetentionIfDue } from "./store-retention"
 import { resultFromRow } from "./result"
 import { isProvenance } from "./provenance-record"
-import { GATEWAY_MIGRATIONS, GatewaySchemaVersionError } from "./schema"
+import { GATEWAY_MIGRATIONS, GATEWAY_TABLE_REBUILDS, GatewaySchemaVersionError } from "./schema"
 import { lockWaitExceeded } from "./lock-wait"
 import { isBusyError, type Sql, type SqlRow, type SqlValue } from "./sql"
 import type {
@@ -378,11 +378,12 @@ export async function migrate(ctx: StoreContext): Promise<void> {
   for (;;) {
     const version = schemaVersion(ctx)
     if (version >= GATEWAY_MIGRATIONS.length) return
-    // The CHECK-widening v7 rebuild must run with foreign_keys OFF, which SQLite only honors when
-    // the pragma is set OUTSIDE the transaction (a table drop would otherwise fire foreign-key
-    // actions from extension tables referencing `bindings`). The pragma is restored to its prior
-    // value afterwards, and foreign_key_check is verified from TypeScript before the bump commits.
-    const needsForeignKeysOff = GATEWAY_NEEDS_FK_OFF.has(version)
+    // A CHECK-widening rebuild (v7 `bindings`, v15 `deliveries`) must run with foreign_keys OFF, which SQLite only
+    // honors when the pragma is set OUTSIDE the transaction (a table drop would otherwise fire foreign-key actions from
+    // extension tables referencing the rebuilt table). The pragma is restored to its prior value afterwards, and
+    // foreign_key_check is verified from TypeScript before the bump commits.
+    const rebuilt = GATEWAY_TABLE_REBUILDS.get(version)
+    const needsForeignKeysOff = rebuilt !== undefined
     const priorForeignKeys = needsForeignKeysOff
       ? Number(ctx.sql.one(["foreign_keys"], "SELECT foreign_keys FROM pragma_foreign_keys")?.foreign_keys ?? 1)
       : 1
@@ -392,13 +393,13 @@ export async function migrate(ctx: StoreContext): Promise<void> {
         const current = schemaVersion(ctx)
         if (current !== version) return
         for (const statement of GATEWAY_MIGRATIONS[current]) ctx.sql.exec(statement)
-        if (needsForeignKeysOff) {
+        if (rebuilt !== undefined) {
           const violations = ctx.sql.all(["parent"], "SELECT parent FROM pragma_foreign_key_check")
-          const introduced = violations.filter((row) => row.parent === "bindings")
+          const introduced = violations.filter((row) => row.parent === rebuilt)
           if (introduced.length > 0) {
             throw new GatewayMigrationError(
               current + 1,
-              `gateway schema ${current + 1} would leave a foreign-key violation referencing bindings; staying at v${current}`,
+              `gateway schema ${current + 1} would leave a foreign-key violation referencing ${rebuilt}; staying at v${current}`,
             )
           }
         }
@@ -409,9 +410,6 @@ export async function migrate(ctx: StoreContext): Promise<void> {
     }
   }
 }
-
-/** Migration indexes (0-based) whose steps must run with foreign_keys OFF; see migrate(). */
-const GATEWAY_NEEDS_FK_OFF: ReadonlySet<number> = new Set([6])
 
 type ReceiptRecord = {
   readonly args_hash: string

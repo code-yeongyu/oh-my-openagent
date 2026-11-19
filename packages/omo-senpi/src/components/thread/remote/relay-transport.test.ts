@@ -92,7 +92,7 @@ describe("a delivery the receiver's open draft holds is queued at once, like a s
     expect(admitWaits.slice(1)).toEqual([45_000])
   })
 
-  test("#given b's user has a draft open that holds two admissions #when a message is sent #then the send answers queued at b's pending count at once, the same record reaches b three times, and the third is taken", async () => {
+  test("#given idle b's user has a draft open that holds two admissions #when a message is sent #then the send answers a follow-up queued at b's pending count at once, the record reaches b three times as a follow-up after the first start, and the third is taken", async () => {
     const a = account({ heldDraft: 2, engine: { ...ENGINE, pending: 2 } })
     const { relay, log } = transport(a.remote)
     const first = await relay.deliver(delivery("hold me", "k1"))
@@ -101,15 +101,18 @@ describe("a delivery the receiver's open draft holds is queued at once, like a s
       device: "b",
       delivery: { kind: "queued", queue_position: 2 },
       deduplicated: false,
+      effective_mode: "follow_up",
     })
     await admitted(a.sent, 3)
     const records = admits(a.sent)
     expect(new Set(records.map((record) => record["deliveryId"])).size).toBe(1)
-    expect(records.map((record) => record["text"])).toEqual([
-      records[0]?.["text"],
-      records[0]?.["text"],
-      records[0]?.["text"],
+    // The probe found b idle, so the first record starts a turn; the draft held it, so the re-sends wait behind it.
+    expect(records.map((record) => /effective=(\S+)/.exec(String(record["text"]))?.[1])).toEqual([
+      "start",
+      "follow_up",
+      "follow_up",
     ])
+    expect(records[2]?.["text"]).toBe(records[1]?.["text"])
     expect(log.filter((line) => line.startsWith("relay_delivery_held:"))).toHaveLength(2)
     expect(log.filter((line) => line.startsWith("relay_delivery_failed:"))).toEqual([])
     // The receiver took the third; nothing more is sent and a retry of the send under its key replays the first answer.
