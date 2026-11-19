@@ -74,4 +74,31 @@ describe("resolveTypedDevice", () => {
       ],
     })
   })
+
+  // #14318 review H2: every omo remote verb (attach included) needs the device online, so an offline device is refused
+  // at resolution by every form, before any work starts.
+  test.each([
+    ["its name", "Attic"],
+    ["its id", "dev-cccccc"],
+  ])(
+    "#given an offline device named by %s #when it is resolved #then device_offline, before any work",
+    async (_form, typed) => {
+      const result = await resolveTypedDevice(
+        clientListing([device("dev-aaaaaa", "Studio", true), device("dev-cccccc", "Attic", false)]),
+        typed,
+      )
+      expect(result).toMatchObject({
+        kind: "error",
+        error: { code: "device_offline", details: { device: "dev-cccccc" } },
+      })
+    },
+  )
+
+  test("#given two offline devices sharing a name #when the name is resolved #then device_offline, not ambiguous_target", async () => {
+    const result = await resolveTypedDevice(
+      clientListing([device("dev-dddddd", "box", false), device("dev-eeeeee", "box", false)]),
+      "box",
+    )
+    expect(result).toMatchObject({ kind: "error", error: { code: "device_offline" } })
+  })
 })
