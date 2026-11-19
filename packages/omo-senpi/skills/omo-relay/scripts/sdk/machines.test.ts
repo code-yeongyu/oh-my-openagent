@@ -30,7 +30,12 @@ function fakeFleet(machines: readonly FakeMachine[] = rows): FleetPort<FakeMachi
           list.map(async (machine, index): Promise<WaveOutcome<FakeMachine, Value>> => {
             if (machine.state === "offline") return { kind: "skipped", machine, reason: "machine_offline", index }
             try {
-              return { kind: "fulfilled", machine, value: await fn(machine, { signal: new AbortController().signal }), index }
+              return {
+                kind: "fulfilled",
+                machine,
+                value: await fn(machine, { signal: new AbortController().signal }),
+                index,
+              }
             } catch (thrown) {
               if (thrown instanceof Error) return { kind: "rejected", machine, error: thrown, index }
               throw thrown
@@ -74,7 +79,8 @@ describe("onMachines", () => {
 
     // when
     const batch = await onMachines(fleet, ["device-c", "id-b", "device-a"], async (machine) => {
-      if (machine.id === "id-b") throw Object.assign(new Error("denied"), { code: "capability_missing", next_action: "ask" })
+      if (machine.id === "id-b")
+        throw Object.assign(new Error("denied"), { code: "capability_missing", next_action: "ask" })
       return machine.id
     })
 

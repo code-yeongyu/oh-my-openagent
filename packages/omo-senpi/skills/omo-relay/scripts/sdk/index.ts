@@ -1,1 +1,5 @@
-export {}
+export { fleetFromEnv, RelayBindError, threadPortFromTools, type EvalThreadTools, type ToolText } from "./bind-eval.ts"
+export { onEveryMachine, onMachine, onMachines, type MachineLabel, type MachineOp } from "./machines.ts"
+export { batchOf, portErrorOf, type BatchOptions, type BatchResult, type Settled } from "./outcome.ts"
+export type * from "./ports.ts"
+export { onEveryThread, onThreads, readThreads, sendToThreads, ThreadListError, type ThreadOp } from "./threads.ts"

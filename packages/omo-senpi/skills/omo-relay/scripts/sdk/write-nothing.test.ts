@@ -3,7 +3,7 @@ import { createHash } from "node:crypto"
 import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, relative } from "node:path"
-import { createSkillSourceCopyFilter } from "../../../../../shared-skills/skill-source-filter.mjs"
+import { createSkillSourceCopyFilter } from "@oh-my-opencode/shared-skills/skill-source-filter"
 import type { FleetPort, MachineRef, ThreadPort } from "./ports.ts"
 
 // Package contract (#11373): the skills tree ships inside the signed desktop bundle, so running a bundled
@@ -38,7 +38,12 @@ const fleet: FleetPort<MachineRef> = {
   listMachines: async () => [machine],
   fanout: (_targets, fn) =>
     (async function* () {
-      yield { kind: "fulfilled" as const, machine, value: await fn(machine, { signal: new AbortController().signal }), index: 0 }
+      yield {
+        kind: "fulfilled" as const,
+        machine,
+        value: await fn(machine, { signal: new AbortController().signal }),
+        index: 0,
+      }
     })(),
 }
 const threads: ThreadPort = {

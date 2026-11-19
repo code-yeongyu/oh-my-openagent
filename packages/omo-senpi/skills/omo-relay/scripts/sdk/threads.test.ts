@@ -6,12 +6,25 @@ function fakeThreads(overrides: Partial<ThreadPort> = {}): ThreadPort & { readon
   const sent: string[] = []
   return {
     sent,
-    list: async () => ({ kind: "ok", threads: [{ thread: "t-1", name: "one" }, { thread: "t-2", name: "two", machine: "device-b" }] }),
-    read: async (thread): Promise<PortAnswer<ThreadReadValue>> => ({ kind: "ok", thread, items: [{ text: `pong from ${thread}` }] }),
+    list: async () => ({
+      kind: "ok",
+      threads: [
+        { thread: "t-1", name: "one" },
+        { thread: "t-2", name: "two", machine: "device-b" },
+      ],
+    }),
+    read: async (thread): Promise<PortAnswer<ThreadReadValue>> => ({
+      kind: "ok",
+      thread,
+      items: [{ text: `pong from ${thread}` }],
+    }),
     send: async (thread, message): Promise<PortAnswer<ThreadSendValue>> => {
       sent.push(`${thread}:${message}`)
       if (thread === "t-missing")
-        return { kind: "error", error: { code: "not_found", message: "no such thread", next_action: "call thread_list" } }
+        return {
+          kind: "error",
+          error: { code: "not_found", message: "no such thread", next_action: "call thread_list" },
+        }
       return { kind: "ok", thread }
     },
     ...overrides,
@@ -28,7 +41,11 @@ describe("sendToThreads", () => {
 
     // then
     expect(batch.outcomes.map((outcome) => outcome.kind)).toEqual(["fulfilled", "rejected", "fulfilled"])
-    expect(batch.rejected[0]?.error).toEqual({ code: "not_found", message: "no such thread", next_action: "call thread_list" })
+    expect(batch.rejected[0]?.error).toEqual({
+      code: "not_found",
+      message: "no such thread",
+      next_action: "call thread_list",
+    })
     expect(threads.sent).toEqual(["t-1:status", "t-missing:status", "t-2:status"])
   })
 })
@@ -69,7 +86,10 @@ describe("readThreads", () => {
 
     // then
     expect(batch.ok).toBe(true)
-    expect(batch.fulfilled.map((outcome) => outcome.value.items)).toEqual([[{ text: "pong from t-1" }], [{ text: "pong from t-2" }]])
+    expect(batch.fulfilled.map((outcome) => outcome.value.items)).toEqual([
+      [{ text: "pong from t-1" }],
+      [{ text: "pong from t-2" }],
+    ])
   })
 })
 
@@ -88,7 +108,10 @@ describe("onEveryThread", () => {
   test("#given a list that fails #when run #then it rejects with the list's code and nothing runs", async () => {
     // given
     const threads = fakeThreads({
-      list: async () => ({ kind: "error", error: { code: "host_unavailable", message: "down", next_action: "retry later" } }),
+      list: async () => ({
+        kind: "error",
+        error: { code: "host_unavailable", message: "down", next_action: "retry later" },
+      }),
     })
     let ran = 0
 
