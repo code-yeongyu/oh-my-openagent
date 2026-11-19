@@ -20,7 +20,7 @@ import {
   type FakeEngineHost,
   type FakeEngineOptions,
 } from "./testing/fake-engine-host"
-import { writeSessionFile } from "./testing/fake-wake-host"
+import { recordUnloadEffect, writeSessionFile } from "./testing/fake-wake-host"
 
 // The carrier (#13037 A3.1.3 to A3.1.8, A3.2): it lifts a woken session's gate, sends the engine's wake, reads
 // "finished" and hands the session back quietly, and follows the held rule and the 30 minute rule, over a real store
@@ -193,6 +193,28 @@ describe("the carrier lifts, reads finished, and hands back", () => {
     expect(release).not.toHaveProperty("force")
     expect(sent(fake, "detach_connection")).toHaveLength(1)
     expect(await store.woken.list()).toEqual([])
+  })
+
+  test("#given rows queued for a session that was then closed on request #when it is woken #then nothing opens, the rows are refused target_closed, and a send after the close opens it (#14273)", async () => {
+    const { fake, h, store, carrier, path, intakeRow } = await setup({
+      remoteWake: () => true,
+      admitIntake: async () => "admitted",
+    })
+    const file = path("s1")
+    await intakeRow("s1", "d-before")
+    h.clock.now += 60_000
+    recordUnloadEffect(file, "s1", h.clock.now, "done")
+    h.clock.now += 60_000
+
+    expect(await carrier.wake("s1")).toEqual({ kind: "nothing_queued" })
+    expect(sent(fake, "open_session")).toEqual([])
+    expect((await store.list({ target_durable_id: "s1" })).map((row) => [row.state, row.reason])).toEqual([
+      ["refused", "target_closed"],
+      ["refused", "target_closed"],
+    ])
+
+    await intakeRow("s1", "d-after")
+    expect(await carrier.wake("s1")).toMatchObject({ kind: "open" })
   })
 
   test("#given a streaming turn #when the carrier looks #then it sends no release and keeps the row, and releases once the turn settled", async () => {

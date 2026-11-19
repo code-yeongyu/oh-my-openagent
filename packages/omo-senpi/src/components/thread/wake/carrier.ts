@@ -5,6 +5,7 @@ import type { IntakeAdmission } from "../gateway/intake-admission"
 import type { GatewayStore } from "../gateway/store"
 import type { RpcObject } from "@oh-my-opencode/senpi-task/rpc-socket-client"
 import type { CarrierHostConnection } from "./carrier-connection"
+import { settleClosedIntake } from "./closed-intake"
 import { readEngineState, type EngineView } from "./engine-state"
 import { resolveWakeTarget, type WakeSessionKind } from "./session-target"
 
@@ -354,7 +355,7 @@ export function createCarrier(options: CarrierOptions): Carrier {
     if (target.session_kind !== "interactive") return { kind: "not_wakeable", session_kind: target.session_kind }
     const wait = await store.sessionWait.read({ durable_id: durableId })
     if (wait?.wait === "held" && wait.file_size === fileSize(target.session_path)) return { kind: "held" }
-    const allowance = await openAllowance(durableId, target.cwd)
+    const allowance = await openAllowance(durableId, target)
     if (allowance !== "open") {
       if (allowance === "nothing_queued") {
         // Only a record that is still `requested` is ended, compared on its generation: another carrier's record that
@@ -433,7 +434,7 @@ export function createCarrier(options: CarrierOptions): Carrier {
     }
     // A takeover opens only what a wake would open (the switches and the sender's admission included); with nothing
     // to open for, or a row that no longer allows it, the record ends and the queued rows wait for the next wake.
-    const allowance = await openAllowance(durableId, target.cwd)
+    const allowance = await openAllowance(durableId, target)
     if (allowance !== "open") {
       await store.woken.end({ durable_id: durableId, generation: taken.row.generation })
       return
@@ -451,14 +452,17 @@ export function createCarrier(options: CarrierOptions): Carrier {
    * opens a session only when the session holds a queued row whose own switch allows the open. A row from another
    * device (it carries the intake's ledger id) reads the wake the consumer was told and its sender's admission NOW,
    * failing closed when the answer is unknown or refused (#13456's noted follow-up); a same-device row reads
-   * `session_wake.same_device` for the TARGET session's cwd. All are read here, at the moment of the open.
+   * `session_wake.same_device` for the TARGET session's cwd. All are read here, at the moment of the open. A row queued
+   * before the session was closed on request is settled `target_closed` first and opens nothing (#14273).
    */
-  const openAllowance = async (durableId: string, cwd: string): Promise<"open" | "switched_off" | "nothing_queued"> => {
-    const sameDevice = options.sameDevice?.(cwd) ?? false
+  const openAllowance = async (
+    durableId: string,
+    target: { readonly cwd: string; readonly closed_at?: number },
+  ): Promise<"open" | "switched_off" | "nothing_queued"> => {
+    const sameDevice = options.sameDevice?.(target.cwd) ?? false
     const remoteWake = options.remoteWake?.() ?? false
     let queued = false
-    for (const row of await store.list({ target_durable_id: durableId })) {
-      if (row.state !== "queued") continue
+    for (const row of await settleClosedIntake(store, durableId, target.closed_at)) {
       queued = true
       if (typeof row.ledger_id !== "string") {
         if (sameDevice) return "open"

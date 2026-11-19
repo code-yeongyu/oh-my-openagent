@@ -39,6 +39,8 @@ export const B_ROW: RemoteSessionRow = {
   state: "idle",
   updated_ms: 1_700_000_000_000,
 }
+/** When b's engine records an unload of its session (the effect's `updatedAt`), on b's clock: after B_ROW's activity. */
+export const B_UNLOADED_MS = B_ROW.updated_ms + 60_000
 
 type Sent = {
   readonly via: "endpoint" | "session" | "read" | "watch" | "wake"
@@ -415,10 +417,19 @@ export function createRemoteThreadFixture() {
         const dropped = rpc["interrupt"] === true ? unread.splice(0) : []
         busy = false
         live.delete(attachedTo)
+        // senpi effect-commands.ts `effectAnswer`: an unload with an `effectId` answers its effect, stamped on b's clock.
+        const effectId = rpc["effectId"]
         return ok({
           outcome: "unloaded",
           sessionPath: B_FILE,
           ...(dropped.length > 0 ? { dropped: { deliveries: dropped } } : {}),
+          ...(typeof effectId === "string"
+            ? {
+                effectId,
+                state: "done",
+                effect: { effectId, kind: "unload", state: "done", updatedAt: new Date(B_UNLOADED_MS).toISOString() },
+              }
+            : {}),
         })
       }
       if (rpc["type"] === "open_session" && options.openRefuse !== undefined)

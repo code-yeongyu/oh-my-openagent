@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto"
+
 import type { JsonObject } from "../remote/ports"
 import type { ThreadCloseAnswer, ThreadCloseOutcome } from "../tools/ports"
 import { refuse } from "./port"
@@ -52,6 +54,10 @@ const deliveriesOf = (value: unknown): string[] | undefined =>
  * A session with no file yet cannot be unloaded (`unsupported`), so it gets an attached `close_session`, which releases
  * only this hold, and one `get_state` probe: still answered, another client holds it; gone, it ended. A draining host is
  * `host_unavailable`; any other unload refusal is typed `unsupported` naming the engine's reason.
+ *
+ * Every unload carries its own `effectId` (#14273): senpi then writes the unload to the session's transcript on its
+ * holder, so the holder's wake sweep knows the session was closed on request, and when, whichever device closed it
+ * (`wake/session-target.ts` `closed_at`). An engine without the effect ledger ignores the field.
  */
 export async function closeLadder(
   sessionId: string,
@@ -64,7 +70,7 @@ export async function closeLadder(
   })
   type Unloaded = { readonly done: ThreadCloseAnswer } | { readonly refused: JsonObject }
   const unload = async (record: JsonObject): Promise<Unloaded> => {
-    const answered = await send({ ...UNLOAD, sessionId, ...record })
+    const answered = await send({ ...UNLOAD, sessionId, effectId: `omo-thread-close:${randomUUID()}`, ...record })
     if (answered.kind === "gone") return { done: done("not_live") }
     if (answered.data["outcome"] === "unloaded") return { done: done("closed", answered.data) }
     if (answered.data["reason"] === "session_closing") return { done: done("not_live", answered.data) }
