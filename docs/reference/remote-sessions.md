@@ -86,7 +86,7 @@ for every stop, including a failed verification or install.
 
 ## Set up a device
 
-Remote sessions are **on by default**. When `omo login` completes, it turns them on for this device. What it prints
+Remote sessions are **on by default**. When `omo login` completes, it turns them on for this device ([how to sign in from a terminal](./cli.md#omo-login-omo-logout-omo-whoami-omo-native)). What it prints
 depends on whether this device already runs the current device service.
 
 If it does, login switches remote sessions on right away and prints:

@@ -69,7 +69,8 @@ export type CreateContext = {
  * (#12884): the shape checks, then placement (the only step that reads the device), then the name checked against the
  * threads the target device sees, then one open through the SessionHost - a created or forked session starting in its
  * creator's approval mode on either device - then the creator record, the alias, and the first prompt. An existing
- * thread that is live already is answered from placement (`deduplicated`), so no second open reaches it anywhere.
+ * thread that is live already is answered from placement (`deduplicated`), so no second open reaches it anywhere -
+ * but its prompt, when one was given, is sent to it and the create answers that delivery (#14335).
  */
 export async function createThread(
   options: ThreadToolSurfaceOptions,
@@ -141,7 +142,11 @@ export async function createThread(
       },
       existing: (address) => existingHere(options, current, address, callerId),
     })
-    if (plan.kind === "done") return await withAlias(options.remote, value.alias, plan.result, plan.device)
+    if (plan.kind === "done") {
+      // A thread live already answers from placement (deduplicated); its prompt, if any, still goes to it (#14335).
+      if (plan.thread !== undefined && plan.result.kind === "ok") opened = plan.thread
+      return await withAlias(options.remote, value.alias, plan.result, plan.device)
+    }
     // An alias no account holds names the thread on its device instead (#13104); a given name wins.
     // Trimmed like thread_rename's alias-as-name, so " x " and "x" name the thread the same way.
     const name = plan.localAlias === undefined ? value.name : (value.name ?? value.alias?.trim())
@@ -237,7 +242,6 @@ export async function createThread(
   // A create given no prompt says so (`prompt: null`), so a caller sees nothing was sent (the owner's lost-brief case).
   if (value.prompt === undefined) return made.kind === "ok" ? ({ ...made, prompt: null } as ThreadToolResult) : made
   if (made.kind !== "ok" || opened === undefined) return made
-  if ((made as Extract<ThreadCreateResult, { kind: "ok" }>).deduplicated) return made
   const prompt = await promptThatRan(await firstPrompt(current, opened, value, context), opened, context)
   return "not_started" in prompt
     ? { kind: "error", error: prompt.not_started }
@@ -246,11 +250,15 @@ export async function createThread(
 
 /**
  * A created thread runs its first prompt, or the create fails (the held-thread report: an ok create whose prompt sat
- * queued for hours with nobody told). A prompt the send answered started or steered stands; one on this device that is
- * only queued is waited for, bounded by the call's budget, until its row starts a turn; one on another device has no row
- * here to wait on. A prompt that did not start answers `prompt_not_started`, which names the thread, the delivery and
- * its last state: the thread exists, so the recovery is a read and a send to it, never another create. A delivery that
- * failed outright stays the prompt's own error on the ok create, as before.
+ * queued for hours with nobody told). A prompt the send answered started or steered stands. So does one the thread
+ * admitted to its queue (behind a turn, a question or a hold), answered with what it waits on: it runs after that, and a
+ * resend would deliver it twice (#14363 review M1). So does one stored for a session that is woken with it, here or on
+ * another device: it runs when the wake does, the same state a thread_send to it answers, with a next_action not to
+ * send it again (#14363 delta review L1). On another device the engine answers queued only once it took the prompt; on
+ * this device a prompt not yet admitted is waited for, bounded by the call's budget, until its row is admitted. A
+ * prompt no device stored or admitted answers `prompt_not_started`, which names the thread, the delivery and its last state: the thread exists, so the recovery is
+ * a read and a send to it, never another create. A delivery that failed outright stays the prompt's own error on the
+ * ok create, as before.
  */
 async function promptThatRan(
   prompt: ThreadCreatePrompt,
@@ -261,10 +269,21 @@ async function promptThatRan(
   const { delivery } = prompt
   if (delivery.kind === "started" || delivery.kind === "steered") return prompt
   const local = thread.device === undefined
+  if (delivery.kind === "queued" && delivery.waiting_on?.kind === "wake")
+    return {
+      ...prompt,
+      next_action: `The prompt is stored${local ? "" : ` on device ${thread.device}`} and runs when ${thread.thread_id} wakes: do not send it again. Check it with thread_read (tool.thread_read({ thread }) in an eval cell).`,
+    }
+  if (!local && delivery.kind === "queued") return prompt
   const waited =
     local && prompt.delivery_id !== undefined ? await context.awaitPromptStart(prompt.delivery_id) : undefined
   if (waited?.kind === "started") return { ...prompt, delivery: waited.delivery }
-  const state = waited?.state ?? delivery.kind
+  if (waited?.kind === "queued") {
+    const position = delivery.kind === "queued" ? delivery.queue_position : 1
+    const waiting = waited.waiting_on === undefined ? {} : { waiting_on: waited.waiting_on }
+    return { ...prompt, delivery: { kind: "queued", queue_position: position, ...waiting } }
+  }
+  const state = waited?.kind === "not_started" ? waited.state : delivery.kind
   const waitingOn = delivery.kind === "queued" ? delivery.waiting_on : undefined
   const where = local ? "" : ` on device ${thread.device}`
   return {

@@ -81,6 +81,8 @@ export type CarrierOptions = {
    * never defers a wake.
    */
   readonly memoryHeadroom?: () => number | undefined
+  /** The headroom a wake needs (`readWakeMemoryFloor` in production); `WAKE_MEMORY_FLOOR_BYTES` when absent. */
+  readonly memoryFloor?: () => number
   readonly schedule: (run: () => void, ms: number) => () => void
   readonly onEvent?: (event: CarrierEvent) => void
 }
@@ -387,8 +389,9 @@ export function createCarrier(options: CarrierOptions): Carrier {
     // Read outside the store's transaction: a short host defers the wake with its row requested (the send keeps
     // answering waiting on the wake), and the sweep starts it once the headroom is back.
     const available = options.memoryHeadroom?.()
-    if (available !== undefined && available < WAKE_MEMORY_FLOOR_BYTES)
-      return { kind: "host_memory_pressure", available_bytes: available, floor_bytes: WAKE_MEMORY_FLOOR_BYTES }
+    const floor = available === undefined ? undefined : (options.memoryFloor?.() ?? WAKE_MEMORY_FLOOR_BYTES)
+    if (available !== undefined && floor !== undefined && available < floor)
+      return { kind: "host_memory_pressure", available_bytes: available, floor_bytes: floor }
     const started = await store.woken.start({ durable_id: durableId })
     if (started.kind === "not_yet") return started
     if (started.kind !== "started") return { kind: "busy", code: "wake_in_progress" }
