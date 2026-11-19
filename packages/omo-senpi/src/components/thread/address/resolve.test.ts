@@ -283,3 +283,111 @@ describe("#given a session file this device's book shows only when asked for it 
     })
   })
 })
+
+describe("#given <device>/<id-shaped thread> #when it resolves #then it reads at most that one device, never the account-wide listing round (#12709)", () => {
+  async function counted(text: string, setup: TwoDeviceOptions = {}) {
+    const two = createTwoDevices(setup)
+    cleanups.push(two.cleanup)
+    let unfiltered = 0
+    let statuses = 0
+    const sessions = two.remote.sessions
+    const listing = sessions.listing
+    const remote = {
+      ...two.remote,
+      client: {
+        ...two.remote.client,
+        service: {
+          ...two.remote.client.service,
+          status: async (...args: Parameters<typeof two.remote.client.service.status>) => {
+            statuses += 1
+            return await two.remote.client.service.status(...args)
+          },
+        },
+      },
+      sessions: {
+        ...sessions,
+        sessions: async (filter?: { readonly device?: string }) => {
+          if (filter?.device === undefined) unfiltered += 1
+          return await sessions.sessions(filter)
+        },
+        ...(listing === undefined
+          ? {}
+          : {
+              listing: async (filter?: { readonly device?: string }) => {
+                if (filter?.device === undefined) unfiltered += 1
+                return await listing(filter)
+              },
+            }),
+      },
+    }
+    const resolved = await resolveAddress(
+      { remote, callerWorkspaceRoot: process.cwd(), local: two.entries, callerId: T.hereLive },
+      text,
+      { probe: true },
+    )
+    return { resolved, unfiltered, statuses }
+  }
+  test.each([
+    ["<device id>/<thread id>", `${B.id}/${T.bLive}`],
+    ["<device name>/<thread id>", `${B.name}/${T.bLive}`],
+    ["<device>/<22-character key B has not listed>", `${B.id}/AbCdEfGhIjKlMnOpQrStUv`],
+  ])("#given %s #when resolved #then no unfiltered listing is read and status once", async (_form, text) => {
+    const { resolved, unfiltered, statuses } = await counted(text)
+    expect(resolved).toMatchObject({ kind: "ok", where: { kind: "device", row: { device: B.id } } })
+    expect({ unfiltered, statuses }).toEqual({ unfiltered: 0, statuses: 1 })
+  })
+
+  test("#given a bare thread id on B #when resolved #then the account-wide listing is read at most once, status once", async () => {
+    const { resolved, unfiltered, statuses } = await counted(T.bLive)
+    expect(resolved).toMatchObject({ kind: "ok", thread: T.bLive })
+    expect(unfiltered).toBeLessThanOrEqual(1)
+    expect(statuses).toBe(1)
+  })
+})
+
+describe("#given a listing row on B that publishes no thread id #when it is addressed by its listing key #then it resolves, and its address is <device id>/<listing key>", () => {
+  const KEYLESS = "c2Vzc2lvbi1rZXktMDAwMQ"
+  const keyless: RemoteSessionRow = {
+    device: B.id,
+    session_id: KEYLESS,
+    title: "keyless",
+    project: "/work/b",
+    path: "/work/b",
+    state: "idle",
+    updated_ms: 1,
+  }
+  function account() {
+    const fixture = createRemoteThreadFixture()
+    cleanups.push(fixture.cleanup)
+    return {
+      fixture,
+      account: fixture.account({
+        rows: [keyless],
+        devices: [{ device: B.id, label: B.name, online: true }],
+        live: [KEYLESS],
+      }),
+    }
+  }
+  test.each([
+    ["<device id>/<key>", `${B.id}/${KEYLESS}`],
+    ["<device name>/<key>", `${B.name}/${KEYLESS}`],
+    ["the bare key", KEYLESS],
+  ])("#given %s #when resolved #then the keyless row answers", async (_form, text) => {
+    const { account: a } = account()
+    const resolved = await resolveAddress(
+      { remote: a.remote, callerWorkspaceRoot: process.cwd(), local: [], callerId: T.hereLive },
+      text,
+    )
+    expect(resolved).toMatchObject({
+      kind: "ok",
+      address: `${B.id}/${KEYLESS}`,
+      where: { kind: "device", row: { device: B.id, session_id: KEYLESS, title: "keyless" } },
+    })
+  })
+
+  test("#given the keyless row #when thread_read names it as <device>/<key> #then B's session is read", async () => {
+    const { fixture, account: a } = account()
+    const { run } = fixture.surface(a.remote)
+    expect(await run("thread_read", { thread: `${B.id}/${KEYLESS}` })).toMatchObject({ kind: "ok", device: B.id })
+  })
+})
