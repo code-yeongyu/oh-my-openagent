@@ -264,7 +264,7 @@ export function sessionPort(options: ThreadToolSurfaceOptions, session: ThreadHo
     : options.host
 }
 
-export function resolution(
+function resolution(
   options: ThreadToolSurfaceOptions,
   entries: readonly ThreadAddressEntry[],
   target: string,
