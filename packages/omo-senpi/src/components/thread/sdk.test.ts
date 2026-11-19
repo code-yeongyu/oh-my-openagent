@@ -311,6 +311,23 @@ describe("thread SDK: a send with no remote surface resolves through the address
     expect(await sdk.send({ thread: HEX, text: "ping" })).toMatchObject({ kind: "ok" })
     expect(views).toEqual([])
   })
+
+  test("#given one SDK object that sent to a session before it started #when the session starts and is then bound and reported to #then the completion wakes the session that is live now (#14322 delta review N1)", async () => {
+    const sessions: ThreadHostSession[] = []
+    const { sdk, wakes } = fixture({ sessions, diskOnly: [HEX] })
+    expect(await sdk.send({ thread: HEX, text: "before it runs" })).toMatchObject({
+      kind: "ok",
+      delivery: { kind: "queued_offline" },
+    })
+    sessions.push(hexSession)
+    const bound = await sdk.bind({ session: HEX, binding: { platform: "custom", account_id: "qa", chat_id: "late" } })
+    expect(bound).toMatchObject({ kind: "ok" })
+    expect(await sdk.report({ session: HEX, kind: "completion", text: "done" })).toMatchObject({
+      kind: "ok",
+      wake: { reached: true },
+    })
+    expect(wakes.map((wake) => wake.endpoint.kind)).toEqual(["rpc_host"])
+  })
 })
 
 describe("thread SDK: a gateway store a newer omo build migrated", () => {
