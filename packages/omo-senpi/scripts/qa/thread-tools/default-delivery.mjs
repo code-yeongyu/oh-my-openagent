@@ -5,7 +5,7 @@
  *
  * 1. Idle TUI, no mode: the delivery starts a turn there (`started`), recorded as requested `auto`.
  * 2. TUI mid-turn (its answer held open), no mode: the delivery is steered into the running turn (`steered`),
- *    recorded as requested `auto`, effective `steer`, and answered before the held turn is released.
+ *    recorded as requested `auto`, effective `steer`, inside that turn.
  * 3. TUI mid-turn, explicit follow_up: the delivery waits behind the running turn (never `steered`) and is answered
  *    only after that turn's answer.
  */
@@ -84,7 +84,7 @@ await runScenario("default-delivery", async ({ report, fake, scratch, install, s
   const queuedRow = await admitted(queued.delivery_id)
   report.assert(
     "busy-follow-up-waits",
-    queuedRow.admission_kind !== "steered" && queuedRow.mode_requested === "follow_up",
+    queuedRow.admission_kind === "queued" && queuedRow.mode_requested === "follow_up",
     `admission=${queuedRow.admission_kind} requested=${queuedRow.mode_requested} effective=${queuedRow.mode_effective}`,
   )
   report.assert("release-busy-2", fake.release("busy-2"), "held turn released")

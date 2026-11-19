@@ -19,7 +19,7 @@ const MID_TURN = { ...ENGINE, streaming: true, pending: 0, currentTurnId: "3" }
 describe("#14333: the default delivery mode is auto on every send surface", () => {
   test("#given the delivery field #when its schema is read #then it declares the one shared default, auto", () => {
     expect(DEFAULT_THREAD_DELIVERY).toBe("auto")
-    expect((ThreadDeliveryMode as { default?: unknown }).default).toBe(DEFAULT_THREAD_DELIVERY)
+    expect((ThreadDeliveryMode as { default?: unknown }).default).toBe("auto")
   })
 
   test.each(["thread_send", "thread_handoff"] as const)(

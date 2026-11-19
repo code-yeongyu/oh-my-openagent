@@ -8,7 +8,6 @@ import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { storeMigratedByNewerBuild } from "./gateway/testing/newer-schema"
 import type { RemoteThreadSurface } from "./remote/ports"
 import { createThreadSdk as createBundledThreadSdk } from "../../extension/thread-sdk"
-import { DEFAULT_THREAD_DELIVERY } from "./contracts"
 import { createThreadSdk, type ThreadSdk } from "./sdk"
 import { createRemoteThreadFixture, fakeRemoteClient } from "./thread-remote-fixture"
 import type { ThreadHost, ThreadHostSession } from "./tools"
@@ -903,9 +902,14 @@ describe("thread SDK: session controls (#13413)", () => {
     })
     expect(calls.filter(([what]) => what === "openSession")).toHaveLength(1)
     const rows = await store.list({ target_durable_id: "dur-new" })
-    expect(rows.map((row) => ({ sender: row.sender, authority: row.envelope.authority, body: row.body }))).toEqual([
-      { sender: "cli:501", authority: "creator", body: "start the nightly build" },
-    ])
+    expect(
+      rows.map((row) => ({
+        sender: row.sender,
+        authority: row.envelope.authority,
+        body: row.body,
+        mode: row.mode_requested,
+      })),
+    ).toEqual([{ sender: "cli:501", authority: "creator", body: "start the nightly build", mode: "auto" }])
   })
 
   test("#given a script with no session of its own #when it addresses self #then every control verb answers caller_context_missing and nothing runs", async () => {
@@ -1031,7 +1035,7 @@ describe("#14333: the SDK's default delivery mode", () => {
     })
     const rows = await store.list({ target_durable_id: "dur-tui" })
     expect(rows.map((row) => [row.body, row.mode_requested])).toEqual([
-      ["no mode", DEFAULT_THREAD_DELIVERY],
+      ["no mode", "auto"],
       ["queued on purpose", "follow_up"],
     ])
   })
