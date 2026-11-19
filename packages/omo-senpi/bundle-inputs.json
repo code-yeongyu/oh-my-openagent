@@ -1775,6 +1775,7 @@
     "packages/omo-senpi/src/components/thread/ui-answer.ts",
     "packages/omo-senpi/src/components/thread/wake/carrier-connection.ts",
     "packages/omo-senpi/src/components/thread/wake/carrier.ts",
+    "packages/omo-senpi/src/components/thread/wake/closed-intake.ts",
     "packages/omo-senpi/src/components/thread/wake/consumer-start.ts",
     "packages/omo-senpi/src/components/thread/wake/engine-minimum.ts",
     "packages/omo-senpi/src/components/thread/wake/engine-state.ts",
