@@ -959,9 +959,6 @@ describe("omob build info stamping", () => {
 })
 
 describe("engine build identity compile defines", () => {
-  // senpi#7040: every compile also carries the pinned engine's own CalVer.
-  const versionDefine = ["--define", 'SENPI_ENGINE_VERSION="2026.9.17"']
-  const senpiPackage = { name: "@code-yeongyu/senpi", version: "2026.9.17" }
   const buildInfo = {
     command: "omob",
     omo: {
@@ -977,19 +974,15 @@ describe("engine build identity compile defines", () => {
   }
 
   test("#given buildInfo #when compile defines are resolved #then SENPI_BUILD_EPOCH and SENPI_BUILD_SHA7 are present", () => {
-    const args = binaryBuilder.compileDefinesForOmoBinary({ buildInfo, senpiPackage })
-    expect(args).toEqual([
-      "--define",
-      "SENPI_BUILD_EPOCH=1788486552",
-      "--define",
-      'SENPI_BUILD_SHA7="7fd18df"',
-      ...versionDefine,
-    ])
+    const args = binaryBuilder.compileDefinesForOmoBinary({ buildInfo })
+    expect(args).toEqual(["--define", "SENPI_BUILD_EPOCH=1788486552", "--define", 'SENPI_BUILD_SHA7="7fd18df"'])
   })
 
-  test("#given no buildInfo and no senpi git metadata #when compile defines are resolved #then the epoch defines are omitted", () => {
-    const args = binaryBuilder.compileDefinesForOmoBinary({ senpiPackage })
-    expect(args).toEqual(versionDefine)
+  test("#given no buildInfo and no senpi git metadata #when compile defines are resolved #then they are omitted", () => {
+    const args = binaryBuilder.compileDefinesForOmoBinary({
+      senpiPackage: { name: "@code-yeongyu/senpi", version: "2026.9.17" },
+    })
+    expect(args).toEqual([])
   })
 
   test("#given no buildInfo and senpi gitHead plus committedAt #when compile defines are resolved #then they come from the package", () => {
@@ -1001,16 +994,10 @@ describe("engine build identity compile defines", () => {
         committedAt: "2026-09-04T10:49:12+09:00",
       },
     })
-    expect(args).toEqual([
-      "--define",
-      "SENPI_BUILD_EPOCH=1788486552",
-      "--define",
-      'SENPI_BUILD_SHA7="7fd18df"',
-      ...versionDefine,
-    ])
+    expect(args).toEqual(["--define", "SENPI_BUILD_EPOCH=1788486552", "--define", 'SENPI_BUILD_SHA7="7fd18df"'])
   })
 
-  test("#given gitHead without a committedAt #when compile defines are resolved #then the epoch defines are omitted rather than inventing an epoch", () => {
+  test("#given gitHead without a committedAt #when compile defines are resolved #then they are omitted rather than inventing an epoch", () => {
     const args = binaryBuilder.compileDefinesForOmoBinary({
       senpiPackage: {
         name: "@code-yeongyu/senpi",
@@ -1018,19 +1005,15 @@ describe("engine build identity compile defines", () => {
         gitHead: "7fd18dfeec7a7db89a983b2c3cb90835b8c3c5f7",
       },
     })
-    expect(args).toEqual(versionDefine)
+    expect(args).toEqual([])
   })
 
-  test("#given the currently pinned senpi package #when compile defines are resolved #then the epoch defines are omitted (no gitHead)", () => {
+  test("#given the currently pinned senpi package #when compile defines are resolved #then they are omitted (no gitHead)", () => {
     const pkg = JSON.parse(readFileSync(join(repoRoot, "node_modules/@code-yeongyu/senpi/package.json"), "utf8")) as {
       gitHead?: unknown
-      version: string
     }
     expect(pkg.gitHead).toBeUndefined()
-    expect(binaryBuilder.compileDefinesForOmoBinary({ senpiPackage: pkg })).toEqual([
-      "--define",
-      `SENPI_ENGINE_VERSION=${JSON.stringify(pkg.version)}`,
-    ])
+    expect(binaryBuilder.compileDefinesForOmoBinary({ senpiPackage: pkg })).toEqual([])
   })
 
   test("#given buildInfo define args #when bun compiles a probe #then the binary reports scheme epoch", () => {
@@ -1050,7 +1033,7 @@ describe("engine build identity compile defines", () => {
       ].join("\n"),
       "utf8",
     )
-    const args = binaryBuilder.compileDefinesForOmoBinary({ buildInfo, senpiPackage })
+    const args = binaryBuilder.compileDefinesForOmoBinary({ buildInfo })
     const built = spawnSync("bun", ["build", "--compile", ...args, entry, "--outfile", outfile], { encoding: "utf8" })
     expect(built.status).toBe(0)
     const ran = spawnSync(outfile, [], { encoding: "utf8" })
@@ -1075,8 +1058,10 @@ describe("engine build identity compile defines", () => {
       ].join("\n"),
       "utf8",
     )
-    const args = binaryBuilder.compileDefinesForOmoBinary({ senpiPackage })
-    expect(args).toEqual(versionDefine)
+    const args = binaryBuilder.compileDefinesForOmoBinary({
+      senpiPackage: { name: "@code-yeongyu/senpi", version: "2026.9.17" },
+    })
+    expect(args).toEqual([])
     const built = spawnSync("bun", ["build", "--compile", ...args, entry, "--outfile", outfile], { encoding: "utf8" })
     expect(built.status).toBe(0)
     const ran = spawnSync(outfile, [], { encoding: "utf8" })
