@@ -157,7 +157,12 @@ export type ThreadWorkspaceNote = { readonly workspace_scope?: "outside"; readon
  * reports it, or the failure that stopped it. The thread exists either way.
  */
 export type ThreadCreatePrompt =
-  | ({ readonly delivery: ThreadDelivery; readonly deduplicated: boolean } & ThreadGatewayDeliveryFacts)
+  | ({
+      readonly delivery: ThreadDelivery
+      readonly deduplicated: boolean
+      /** Set when the prompt is stored for a session that runs it once it is woken: do not send it again. */
+      readonly next_action?: string
+    } & ThreadGatewayDeliveryFacts)
   | { readonly error: ThreadToolFailure }
 
 /** `thread_create` answers the thread it made or opened flat: its `thread` is the address to pass back. */

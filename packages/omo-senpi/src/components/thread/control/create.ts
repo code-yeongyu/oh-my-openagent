@@ -237,10 +237,11 @@ export async function createThread(
  * A created thread runs its first prompt, or the create fails (the held-thread report: an ok create whose prompt sat
  * queued for hours with nobody told). A prompt the send answered started or steered stands. So does one the thread
  * admitted to its queue (behind a turn, a question or a hold), answered with what it waits on: it runs after that, and a
- * resend would deliver it twice (#14363 review M1). On another device the engine answers queued only once it admitted
- * the prompt, so only one still waiting for that device to wake the session is not taken; on this device a prompt not
- * yet admitted is waited for, bounded by the call's budget, until its row is admitted. A prompt never admitted answers
- * `prompt_not_started`, which names the thread, the delivery and its last state: the thread exists, so the recovery is
+ * resend would deliver it twice (#14363 review M1). So does one stored for a session that is woken with it, here or on
+ * another device: it runs when the wake does, the same state a thread_send to it answers, with a next_action not to
+ * send it again (#14363 delta review L1). On another device the engine answers queued only once it took the prompt; on
+ * this device a prompt not yet admitted is waited for, bounded by the call's budget, until its row is admitted. A
+ * prompt no device stored or admitted answers `prompt_not_started`, which names the thread, the delivery and its last state: the thread exists, so the recovery is
  * a read and a send to it, never another create. A delivery that failed outright stays the prompt's own error on the
  * ok create, as before.
  */
@@ -253,7 +254,12 @@ async function promptThatRan(
   const { delivery } = prompt
   if (delivery.kind === "started" || delivery.kind === "steered") return prompt
   const local = thread.device === undefined
-  if (!local && delivery.kind === "queued" && delivery.waiting_on?.kind !== "wake") return prompt
+  if (delivery.kind === "queued" && delivery.waiting_on?.kind === "wake")
+    return {
+      ...prompt,
+      next_action: `The prompt is stored${local ? "" : ` on device ${thread.device}`} and runs when ${thread.thread_id} wakes: do not send it again. Check it with thread_read (tool.thread_read({ thread }) in an eval cell).`,
+    }
+  if (!local && delivery.kind === "queued") return prompt
   const waited =
     local && prompt.delivery_id !== undefined ? await context.awaitPromptStart(prompt.delivery_id) : undefined
   if (waited?.kind === "started") return { ...prompt, delivery: waited.delivery }

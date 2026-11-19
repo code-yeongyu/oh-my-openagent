@@ -8,7 +8,9 @@ import { readFileSync } from "node:fs"
  * memory than four times that, the floor is a quarter of it (`readWakeMemoryFloor`), so a small limit still wakes.
  */
 export const WAKE_MEMORY_FLOOR_BYTES = 1024 ** 3
-/** Under a small limit the floor is this share of it: a cgroup of 768 MiB wakes with 192 MiB of room (#14363 review L1). */
+/** One woken session's measured first-turn cost (408.7 MB RSS, rounded up): no floor goes below it (#14363 delta review L2). */
+export const WAKE_SESSION_COST_BYTES = 409 * 1024 ** 2
+/** Under a small limit the floor is this share of it, never below one wake's cost (#14363 review L1). */
 const FLOOR_SHARE_OF_LIMIT = 4
 
 export type MemoryProbeSources = {
@@ -67,7 +69,9 @@ export function readHostMemoryHeadroom(
 
 /**
  * The headroom a wake needs: `WAKE_MEMORY_FLOOR_BYTES`, or a quarter of the memory this process may use (the smaller of
- * its cgroup v2 limit and the host's `MemTotal`) when that is less. With nothing readable it is the 1 GiB cap.
+ * its cgroup v2 limit and the host's `MemTotal`) when that is less, but never less than `WAKE_SESSION_COST_BYTES`: a
+ * limit that cannot hold one wake defers it `host_memory_pressure` with both numbers. With nothing readable it is the
+ * 1 GiB cap.
  */
 export function readWakeMemoryFloor(
   sources: MemoryProbeSources = { platform: process.platform, readFile: (path) => readFileSync(path, "utf8") },
@@ -75,5 +79,6 @@ export function readWakeMemoryFloor(
   if (sources.platform !== "linux") return WAKE_MEMORY_FLOOR_BYTES
   const sizes = [cgroupMemory(sources)?.limit, meminfo(sources, "MemTotal")].filter((value) => value !== undefined)
   if (sizes.length === 0) return WAKE_MEMORY_FLOOR_BYTES
-  return Math.min(WAKE_MEMORY_FLOOR_BYTES, Math.floor(Math.min(...sizes) / FLOOR_SHARE_OF_LIMIT))
+  const share = Math.floor(Math.min(...sizes) / FLOOR_SHARE_OF_LIMIT)
+  return Math.min(WAKE_MEMORY_FLOOR_BYTES, Math.max(WAKE_SESSION_COST_BYTES, share))
 }
