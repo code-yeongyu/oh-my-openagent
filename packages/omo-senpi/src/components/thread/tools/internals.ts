@@ -41,7 +41,6 @@ import {
   type ThreadSessionPort,
   type ThreadToolSurfaceOptions,
 } from "./ports"
-
 import { activityDetail, threadModel, threadState } from "./thread-state"
 
 // biome-ignore lint/suspicious/noExplicitAny: the tool definitions are heterogeneous by design.
