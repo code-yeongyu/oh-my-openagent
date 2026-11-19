@@ -35,7 +35,7 @@ const labels = (ids: readonly string[], names: readonly string[]): string =>
   ids.map((id, index) => deviceLabel({ id, name: names[index] ?? "" })).join(", ")
 
 /** The core's plain refusal, worded for the thread tools; `thread` is the address part that missed, when one did. */
-export function toolRefusal(core: AddressRefusal, thread?: string): ThreadRefusal {
+export function toolRefusal(core: AddressRefusal, thread?: string, answered?: readonly string[]): ThreadRefusal {
   const details = core.details
   switch (core.reason) {
     case "no_device":
@@ -76,15 +76,23 @@ export function toolRefusal(core: AddressRefusal, thread?: string): ThreadRefusa
     case "device_unanswered":
       return refusal(
         "host_unavailable",
-        `No device that answered holds ${thread === undefined ? "it" : `session ${thread}`}, and ${labels(core.details.devices, core.details.device_names)} did not answer.`,
+        `No device that answered${answered === undefined || answered.length === 0 ? "" : ` (${answered.join(", ")})`} holds ${thread === undefined ? "it" : `session ${thread}`}, and ${labels(core.details.devices, core.details.device_names)} did not answer.`,
         "Retry when that device answers.",
-        { ...details, ...(thread === undefined ? {} : { thread }) },
+        { ...details, ...(thread === undefined ? {} : { thread }), ...(answered === undefined ? {} : { answered }) },
       )
-    case "probe_unavailable":
+    case "remote_unavailable":
       return refusal(
         "host_unavailable",
-        `${deviceLabel({ id: core.details.device, name: core.details.device_name })} does not list ${core.details.thread}, and this device's service cannot ask it.`,
-        "Retry when that device lists the thread.",
+        `This device has no connection to the account's other devices, so ${deviceLabel({ id: core.details.device, name: core.details.device_name })} could not be asked for ${core.details.thread}.`,
+        "Retry from a session whose device service is set up, or send to another thread as a normal send.",
+        details,
+      )
+    case "wake_unavailable":
+    case "lookup_unavailable":
+      return refusal(
+        "host_unavailable",
+        `${deviceLabel({ id: core.details.device, name: core.details.device_name })} does not list ${core.details.thread}, and ${core.reason === "wake_unavailable" ? "this device's service cannot carry a wake, so it does not probe" : "this device's service cannot make the single probe that would tell"}, so whether it still holds that session is unknown.`,
+        "Retry when the device service is reachable, or send to another thread as a normal send.",
         details,
       )
     case "no_thread_on_device":

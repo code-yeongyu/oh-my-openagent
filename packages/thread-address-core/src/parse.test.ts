@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { formatAddress, parseAddress } from "."
+import { formatAddress, idShaped, parseAddress } from "."
 
 describe("#given an address text #when parseAddress reads it #then it names self, a bare address or a device and a thread", () => {
   test.each([
@@ -30,5 +30,19 @@ describe("#given an address text #when parseAddress reads it #then it names self
       thread: "0bb00001-0000-4000-8000-000000000001",
       text: "b7c41e09d2a64f1e/0bb00001-0000-4000-8000-000000000001",
     })
+  })
+})
+
+describe("#given a thread part #when idShaped reads it #then only a thread id or a session id is id-shaped", () => {
+  test.each([
+    ["a thread id", "0bb00001-0000-4000-8000-000000000001", true],
+    ["a 22-character listing key", "AbCdEfGhIjKlMnOpQrStUv", true],
+    ["a routing id", "rpc-7", true],
+    ["a name", "beta old", false],
+    ["a 16+ character hyphenated name", "release-planner-2", false],
+    ["a 16-character name of key characters", "nothing-named-so", false],
+    ["a short word", "beta", false],
+  ] as const)("%s", (_label, text, expected) => {
+    expect(idShaped(text)).toBe(expected)
   })
 })

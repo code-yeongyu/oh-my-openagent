@@ -47,13 +47,48 @@ describe("#given a thread on device B #when a control tool names it as <device>/
     })
   }
 
-  for (const [tool] of controls.filter(([name]) => name !== "thread_set_model")) {
-    test(`#given ${tool} #when the thread is here/<thread id> #then it acts on this device's thread`, async () => {
-      const result = await run(tool, { thread: `${HERE.id}/${T.hereLive}` })
-      expect(result).toMatchObject({ kind: "ok", thread: T.hereLive })
-      expect(result).not.toHaveProperty("device")
+  for (const [tool] of controls.filter(([name]) => name !== "thread_set_model"))
+    for (const [form, device] of [
+      ["here", "here"],
+      ["this device's id", HERE.id],
+    ] as const)
+      test(`#given ${tool} #when the thread is <${form}>/<thread id> #then it acts on this device's thread`, async () => {
+        const result = await run(tool, { thread: `${device}/${T.hereLive}` })
+        expect(result).toMatchObject({ kind: "ok", thread: T.hereLive })
+        expect(result).not.toHaveProperty("device")
+      })
+})
+
+describe("#given <device>/<thread id> on B that B's listing does not show #when thread_read names it #then B is asked and its answer decides (#14305 review H1)", () => {
+  test.each([
+    [
+      "B answered and holds no such thread",
+      { probe: true },
+      { code: "not_found", details: { kind: "thread", device: B.id } },
+    ],
+    [
+      "B did not answer the probe",
+      { probe: true, silent: [B.id] },
+      { code: "host_unavailable", details: { reason: "host_not_answering" } },
+    ],
+    ["B cannot be asked", {}, { code: "host_unavailable", details: { reason: "wake_unavailable" } }],
+    [
+      "B missed this listing round",
+      { probe: true, incomplete: true },
+      { code: "host_unavailable", details: { reason: "listing_incomplete" } },
+    ],
+  ] as const)("%s", async (_label, setup, error) => {
+    expect(await run("thread_read", { thread: `${B.name}/${T.nowhere}` }, setup)).toMatchObject({
+      kind: "error",
+      error,
     })
-  }
+  })
+
+  test("#given B holds a thread only on disk #when thread_read names it as <device>/<thread id> #then it answers as the bare id does", async () => {
+    const qualified = await run("thread_read", { thread: `${B.name}/${T.bProbe}` }, { probe: true })
+    const bare = await run("thread_read", { thread: T.bProbe }, { probe: true })
+    expect(qualified).toEqual(bare)
+  })
 })
 
 describe("characterization of current behaviour: a closed copy of an id here while B lists it live", () => {

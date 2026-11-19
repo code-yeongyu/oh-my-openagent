@@ -1,21 +1,29 @@
-import { formatAddress, HERE, noDevice, parseAddress, type DeviceRef } from "@oh-my-opencode/thread-address-core"
+import {
+  formatAddress,
+  HERE,
+  idShaped,
+  noDevice,
+  parseAddress,
+  type DeviceRef,
+} from "@oh-my-opencode/thread-address-core"
 import { threadToolFailure } from "../errors"
-import type { RemoteDevice, RemoteThreadSurface } from "../remote/ports"
-import { accountDevices, readAccount, type Account } from "./account"
-import { resolveBare, type AccountAttempt } from "./bare"
+import { relayAddressEntry } from "../remote/address-book"
+import { rowThreadId, type RemoteDevice, type RemoteThreadSurface } from "../remote/ports"
+import { remoteReady } from "../remote/remote-ops"
+import { accountDevices, readAccount, readRoster, rosterAccount, type Account, type Ready } from "./account"
+import { deviceNameOf, resolveBare, type AccountAttempt } from "./bare"
 import { deviceRows, resolveAccountDevice } from "./device"
 import { resolveOnDevice } from "./on-device"
 import { pinned } from "./probe"
 import { asRefusal, toolRefusal, withAddresses, type ThreadRefusal } from "./refusals"
 import type { Found, ResolveContext, ResolveOptions, Resolved } from "./types"
 
-const attempt = (remote: RemoteThreadSurface): Promise<AccountAttempt> =>
-  readAccount(remote).catch((error: unknown) => ({ kind: "failed", error }))
+const failed = (error: unknown): AccountAttempt => ({ kind: "failed", error })
 
-/** Reads the account at most once per resolution, whichever step asks first. */
-function once(remote: RemoteThreadSurface): () => Promise<AccountAttempt> {
+/** Reads the account at most once per resolution, whichever step asks first, on the resolution's one status round. */
+function once(remote: RemoteThreadSurface, ready: () => Promise<Ready>): () => Promise<AccountAttempt> {
   let read: Promise<AccountAttempt> | undefined
-  return () => (read ??= attempt(remote))
+  return () => (read ??= readAccount(remote, { ready: ready() }).catch(failed))
 }
 
 const refOf = (row: RemoteDevice | undefined, id: string, here: string | null): DeviceRef => ({
@@ -116,6 +124,61 @@ const ambiguous = (text: string, readings: readonly Found[], account: Account): 
   )
 
 /**
+ * #14048 (`unique_holder`): the refusal when more than one device lists the resolved thread id, this device's book
+ * included, one candidate per device; undefined when one device does. Read from the resolution's own account read.
+ */
+async function otherHolder(
+  ctx: ResolveContext,
+  hit: Found,
+  read: () => Promise<AccountAttempt>,
+): Promise<ThreadRefusal | undefined> {
+  const attempt = await read()
+  if (attempt.kind === "none") return undefined
+  if (attempt.kind === "unavailable") return asRefusal(attempt.error)
+  if (attempt.kind === "failed")
+    return asRefusal(
+      threadToolFailure(
+        "host_unavailable",
+        "The account's session listing could not be read to confirm the session's device.",
+        "Retry when the device service is reachable.",
+        { reason: attempt.error instanceof Error ? attempt.error.message : String(attempt.error) },
+      ),
+    )
+  const account = attempt.account
+  const thread = hit.entry.thread_id
+  const byDevice = new Map(
+    [
+      ...ctx.local.filter((entry) => entry.thread_id === thread),
+      ...account.rows
+        .filter((row) => row.device !== account.here && rowThreadId(row) === thread)
+        .map((row) => relayAddressEntry(row)),
+    ].map((entry) => [entry.transport?.row.device ?? "here", entry] as const),
+  )
+  if (byDevice.size <= 1) return undefined
+  return withAddresses(
+    {
+      kind: "error",
+      ...threadToolFailure(
+        "ambiguous_target",
+        `Session ${thread} is listed on more than one device and nothing names which one sent it; none was picked.`,
+        "Address the session on one device with <device>/<session id>.",
+      ),
+      candidates: [...byDevice].map(([device, entry]) => ({
+        thread,
+        name: entry.name,
+        cwd: entry.cwd,
+        preview: entry.preview ?? "",
+        updatedAt: entry.updated_at,
+        state: entry.status,
+        device,
+      })),
+    },
+    account.here,
+    deviceNameOf(account),
+  )
+}
+
+/**
  * The one resolver (design sections 2-5): `self`, a bare address, or `<device>/<thread>`, over this device's book and
  * the account, read at most once. A device reading is taken only when the first part names a device; when it misses
  * there, or names no device, the whole text is resolved as a bare address (a thread name may contain `/`), and the
@@ -129,26 +192,61 @@ export async function resolveAddress(
   if (opts.pin !== undefined) return await finish(ctx, await pinned(ctx.remote, opts.pin), undefined, opts)
   const parsed = parseAddress(text)
   const remote = ctx.remote
-  const read = remote === undefined ? async (): Promise<AccountAttempt> => ({ kind: "none" }) : once(remote)
-  const bare = async (address: string) => {
-    const resolved = await resolveBare(ctx, address, opts, read)
-    return await finish(ctx, resolved.result, resolved.account, opts)
+  let status: Promise<Ready> | undefined
+  const ready = (): Promise<Ready> => (status ??= remote === undefined ? Promise.reject() : remoteReady(remote))
+  const read = remote === undefined ? async (): Promise<AccountAttempt> => ({ kind: "none" }) : once(remote, ready)
+  const bare = async (address: string, book = ctx) => {
+    const resolved = await resolveBare(book, address, opts, read)
+    const held =
+      opts.unique_holder === true && resolved.result.kind === "ok"
+        ? await otherHolder(book, resolved.result, read)
+        : undefined
+    return await finish(book, held ?? resolved.result, resolved.account, opts)
   }
   if (parsed.kind !== "device") return await bare(text)
-  const account = await read()
-  if (remote === undefined || account.kind !== "account")
-    return await bare(parsed.device === HERE ? parsed.thread : text)
-  const device = resolveAccountDevice(account.account, parsed.device, { online: opts.need === "online" })
-  const whole = await resolveBare(ctx, text, opts, read)
-  if (device.kind === "error")
+  // #12709: the device part is resolved from the roster alone, and the thread part from that one device's reads; the
+  // account-wide listing round is read only for the whole text's bare reading.
+  const roster = remote === undefined ? undefined : await readRoster(remote, ready()).catch(failed)
+  if (remote === undefined || roster?.kind !== "account")
+    return parsed.device === HERE
+      ? await bare(parsed.thread, { ...ctx, local: ctx.localFor?.(parsed.thread) ?? ctx.local })
+      : await bare(text)
+  const device = resolveAccountDevice(roster.account, parsed.device, { online: opts.need === "online" })
+  if (device.kind === "error") {
+    const whole = await resolveBare(ctx, text, opts, read)
     return whole.result.kind === "ok" ? await finish(ctx, whole.result, whole.account, opts) : device
-  const onDevice = await resolveOnDevice(ctx, remote, account.account, device.device, parsed.thread, opts)
-  if (onDevice.kind === "ok" && whole.result.kind === "ok" && whole.result.entry.thread_id !== onDevice.entry.thread_id)
-    return ambiguous(text, [onDevice, whole.result], account.account)
-  return await finish(
-    ctx,
-    onDevice.kind === "ok" || whole.result.kind !== "ok" ? onDevice : whole.result,
-    account.account,
-    opts,
-  )
+  }
+  const one = device.device.here
+    ? roster.account
+    : await readAccount(remote, { ready: ready(), roster: roster.account.roster, device: device.device.id })
+        .then((read) => (read.kind === "account" ? read.account : read))
+        .catch((error: unknown) =>
+          asRefusal(
+            threadToolFailure(
+              "host_unavailable",
+              "The account's session listing could not be reached.",
+              "Retry when the device service is reachable.",
+              { reason: error instanceof Error ? error.message : String(error) },
+            ),
+          ),
+        )
+  if ("kind" in one) return one.kind === "none" ? await bare(text) : "error" in one ? asRefusal(one.error) : one
+  const ref = { ...device.device, listing: one.listingOf(device.device.id) }
+  const onDevice = await resolveOnDevice(ctx, remote, one, ref, parsed.thread, opts, ready())
+  if (onDevice.kind === "ok") {
+    // The device holds it: the whole text is checked against this device's book alone (a thread here literally named
+    // "<device>/<thread>"), never the account-wide round (#12709, design section 2). An id-shaped part needs no check.
+    if (idShaped(parsed.thread)) return await finish(ctx, onDevice, one, opts)
+    const here = await resolveBare({ ...ctx, remote: undefined }, text, opts, read)
+    return here.result.kind === "ok" && here.result.entry.thread_id !== onDevice.entry.thread_id
+      ? ambiguous(text, [onDevice, here.result], one)
+      : await finish(ctx, onDevice, one, opts)
+  }
+  // The device does not hold it. An id-shaped part is the device's to answer: no whole-text reading. Any other part may
+  // be a name with "/" (a bare name on dev): this device's book, then one account-wide round, before the device's refusal.
+  if (idShaped(parsed.thread)) return await finish(ctx, onDevice, one, opts)
+  const whole = await resolveBare(ctx, text, opts, read)
+  return whole.result.kind === "ok"
+    ? await finish(ctx, whole.result, whole.account, opts)
+    : await finish(ctx, onDevice, one, opts)
 }

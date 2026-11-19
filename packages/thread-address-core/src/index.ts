@@ -4,6 +4,7 @@ export {
   SESSION_ID_SHAPE,
   THREAD_ID_SHAPE,
   formatAddress,
+  idShaped,
   parseAddress,
   type ParsedAddress,
 } from "./parse"
@@ -23,12 +24,14 @@ export {
 } from "./row"
 export {
   deviceLabel,
+  deviceNotAsked,
+  deviceOffline,
   devicesSilent,
   noDevice,
   noThreadOnDevice,
-  probeUnavailable,
   type AddressRefusal,
   type DeviceCandidate,
   type DeviceRow,
+  type NotAskedReason,
   type RefusalCode,
 } from "./refusals"

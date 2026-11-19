@@ -1,4 +1,3 @@
-import { toThreadAddressEntries } from "../address-book"
 import { checkNameConflict } from "../addressing"
 import type {
   ThreadCreateInput,
@@ -16,12 +15,12 @@ import type { LocalExisting } from "../remote/cross-device"
 import { claimCreatedAlias, planCreate, withAlias } from "../remote/lazy-ops"
 import { threadLink } from "../thread-link"
 import { recordThreadCreator } from "../tools/extension-tools"
+import { resolveAddress } from "../address/lazy"
 import {
   failure,
-  resolution,
-  resolveAcross,
   resolveEntries,
   sendAddressBook,
+  sendBookFor,
   summary,
   targetSession,
   uncertainFailure,
@@ -98,7 +97,7 @@ export async function createThread(
   // the key derives is on this device; otherwise (a create on another device, a host that ignored the derived id)
   // a thread may exist that nothing here can find, so the retry is refused as any other uncertain operation is.
   if (retrying !== undefined) {
-    const derived = existingHere(options, current, createdThreadId(callerId, operationId), callerId)
+    const derived = await existingHere(options, current, createdThreadId(callerId, operationId), callerId)
     if (derived.kind !== "live" && derived.kind !== "file") return uncertainFailure(retrying.error_note)
   }
   // The session the open answered, with its listing key: a first prompt to a thread on another device needs it.
@@ -119,21 +118,23 @@ export async function createThread(
     const plan = await planCreate(options.remote, value, {
       host: createLocalSessionHost(options.host, entries),
       ...(callerCwd.trim() === "" ? {} : { callerCwd }),
-      resolve: (address) => resolution(options, entries, address, callerId, true),
       // Decision 0027: an existing thread or a fork source is found by the same resolver every send uses, not by a second ladder.
       locate: async (address) => {
         // #14049: an existing thread whose process exited is still this device's when its session file is here, so
         // the ladder sees the files an id or name names (the send address book), and an id nothing lists is looked
         // up once on every online device of the account (A4.3.3), as a send to that id is.
-        const known = toThreadAddressEntries(sendAddressBook(options, current, address, true))
-        const found = await resolveAcross(options, known, address, callerId, true, "exact", true)
-        if (found.kind === "error")
-          return { kind: "error", result: { kind: "error", error: found } as ThreadToolResult }
+        const localFor = sendBookFor(options, current)
+        const found = await resolveAddress(
+          { remote: options.remote, callerWorkspaceRoot: callerCwd, local: localFor(address), localFor, callerId },
+          address,
+          { all_scope: true, probe: true },
+        )
+        if (found.kind === "error") return { kind: "error", result: { kind: "error", error: found } }
         // A row with no file path (a probe's ended row, a snapshot, a session listed before its file existed) has its
         // file found on its device by placement, whatever its state (#14170); it is never opened by an empty path.
-        return found.entry.transport?.kind === "relay"
-          ? { kind: "remote", row: found.entry.transport.row }
-          : { kind: "local", address: found.entry.thread_id, accountWide: true }
+        return found.where.kind === "device"
+          ? { kind: "remote", row: found.where.row }
+          : { kind: "local", address: found.thread, accountWide: true }
       },
       existing: (address) => existingHere(options, current, address, callerId),
     })
@@ -146,7 +147,7 @@ export async function createThread(
     // spot, and by a retry under the same key, which reopens or reuses that thread and admits its prompt once.
     const createdId =
       plan.creates && plan.host.device === undefined ? createdThreadId(callerId, operationId) : undefined
-    const earlier = createdId === undefined ? undefined : existingHere(options, current, createdId, callerId)
+    const earlier = createdId === undefined ? undefined : await existingHere(options, current, createdId, callerId)
     // The thread an earlier run made may already carry this name: it is this create's own thread, not a conflict.
     // A reopen checks its name after the open, against every thread but itself (keepName): its own name is no conflict.
     // A reopen on another device sets the name inside the open, so it checks before it, as a create does (#14274 review M1).
@@ -165,7 +166,7 @@ export async function createThread(
     const openName = plan.creates ? name : plan.host.device === undefined ? undefined : kept
     const reopened = async (): Promise<SessionOpenOutcome | undefined> => {
       if (createdId === undefined) return undefined
-      const found = existingHere(options, await view(), createdId, callerId)
+      const found = await existingHere(options, await view(), createdId, callerId)
       if (found.kind === "live") return { kind: "ok", thread: found.thread }
       return found.kind === "file" ? await plan.host.open({ sessionPath: found.sessionPath }) : undefined
     }
@@ -370,20 +371,35 @@ async function nameCreatedThread(
   return undefined
 }
 
-/** An existing thread this device is asked to open: live in the view, a session file the address book names, or neither. */
-function existingHere(
+/**
+ * An existing thread this device is asked to open: live in the view, a session file the address book names, or neither.
+ * Resolved among this device's book only (no account): placement already chose this device.
+ */
+async function existingHere(
   options: ThreadToolSurfaceOptions,
   current: ThreadHostView,
   address: string,
   callerId: string,
-): LocalExisting {
-  const book = sendAddressBook(options, current, address, true)
-  const resolved = resolution(options, toThreadAddressEntries(book), address, callerId, true)
-  if (resolved.kind === "error")
-    return { kind: "error", result: { kind: "error", error: resolved } as ThreadToolResult }
-  const live = targetSession(current, resolved.entry.thread_id)
+): Promise<LocalExisting> {
+  const localFor = sendBookFor(options, current)
+  const resolved = await resolveAddress(
+    {
+      remote: undefined,
+      callerWorkspaceRoot: options.callerWorkspaceRoot(),
+      local: localFor(address),
+      localFor,
+      callerId,
+    },
+    address,
+    { all_scope: true },
+  )
+  if (resolved.kind === "error") return { kind: "error", result: { kind: "error", error: resolved } }
+  const live = targetSession(current, resolved.thread)
   if (live !== undefined) return { kind: "live", thread: summary(live) }
-  const entry = book.find((candidate) => candidate.thread_id === resolved.entry.thread_id)
+  // The book as the resolved thread names it, so a session file found by its thread part carries its path.
+  const entry = sendAddressBook(options, current, resolved.thread, true).find(
+    (candidate) => candidate.thread_id === resolved.thread,
+  )
   if (entry?.session_path === undefined || entry.session_path === null)
     return {
       kind: "error",

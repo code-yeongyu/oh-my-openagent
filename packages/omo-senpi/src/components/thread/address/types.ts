@@ -8,6 +8,11 @@ export type ResolveContext = {
   readonly callerWorkspaceRoot: string
   /** This device's address book (live sessions and session files). */
   readonly local: readonly ThreadAddressEntry[]
+  /**
+   * This device's book as asked for one address (the send address book adds the session files an address names): the
+   * resolver asks it with the thread part once the device part named this device. Absent: `local` serves every part.
+   */
+  readonly localFor?: (text: string) => readonly ThreadAddressEntry[]
   readonly callerId: string
 }
 
@@ -21,6 +26,11 @@ export type ResolveOptions = {
   readonly probe?: boolean
   /** An approved reply: resolve only `thread` on `device`, the device its delivery came from. */
   readonly pin?: { readonly device: string; readonly thread: string }
+  /**
+   * #14048: the resolved thread must be listed by one device only (this device's book included); a sender whose delivery
+   * names no device cannot be told from a copy of its id elsewhere, so two holders are ambiguous_target.
+   */
+  readonly unique_holder?: boolean
   /** `online`: a thread on a device that is offline is device_offline, nothing is queued. */
   readonly need?: "address" | "online"
 }

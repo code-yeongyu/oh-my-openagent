@@ -1,5 +1,4 @@
-import type { ThreadCandidate } from "../addressing"
-import type { ThreadLocalAliasNote, ThreadStatus, ThreadToolResult } from "../contracts"
+import type { ThreadLocalAliasNote, ThreadToolResult } from "../contracts"
 import { createRelaySessionHost, displayedThread } from "../control/relay-session-host"
 import type { HostedThread, SessionHost, SessionOpenRequest } from "../control/session-host"
 import { threadToolFailure } from "../errors"
@@ -16,18 +15,6 @@ import {
 import { accountDevices, targetDevice } from "../address"
 import { sessionFileOf } from "./find-session"
 import { aliasFailure, deviceOnline, holderDetails, remoteAvailable } from "./remote-ops"
-
-type LocalEntry = {
-  readonly thread_id: string
-  readonly name?: string
-  readonly cwd?: string
-  readonly preview?: string
-  readonly updated_at?: string | null
-  readonly status?: ThreadStatus
-}
-type LocalResolution =
-  | { readonly kind: "error"; readonly code: string; readonly candidates?: readonly ThreadCandidate[] }
-  | { readonly kind: "ok"; readonly entry: LocalEntry }
 
 export type CrossTarget =
   /** `accountWide`: found through the account (an alias, or an id in the account list), so the workspace scope does not apply. */
@@ -65,10 +52,9 @@ export type LocalPlacement = {
    * process happens to run in. Absent when the caller's folder is unknown.
    */
   readonly callerCwd?: string
-  readonly resolve: (address: string) => LocalResolution
   /** Decision 0027: the ONE resolver (local + relay address books) for an existing thread or a fork source; omitted = local only. */
   readonly locate: (address: string) => Promise<CrossTarget>
-  readonly existing: (address: string) => LocalExisting
+  readonly existing: (address: string) => Promise<LocalExisting>
 }
 
 /**
@@ -135,8 +121,8 @@ export async function planCreate(
     const cwd = value.cwd ?? (host === local.host ? local.callerCwd : undefined)
     return { kind: "open", host, request: cwd === undefined ? {} : { cwd }, creates: true }
   }
-  const openHere = (address: string): CreatePlan => {
-    const existing = local.existing(address)
+  const openHere = async (address: string): Promise<CreatePlan> => {
+    const existing = await local.existing(address)
     if (existing.kind === "error") return { kind: "done", result: existing.result }
     if (existing.kind === "live") return alreadyLive(existing.thread)
     return {
@@ -176,7 +162,7 @@ export async function planCreate(
           ),
         },
       }
-    if (value.thread !== undefined) return openHere(value.thread)
+    if (value.thread !== undefined) return await openHere(value.thread)
     const plan =
       value.fork_from === undefined
         ? create(local.host)
@@ -247,7 +233,7 @@ export async function planCreate(
   if (value.thread !== undefined) {
     const target = await locateThread(value.thread)
     if (target.kind === "error") return { kind: "done", result: target.result }
-    if (target.kind === "local") return openHere(target.address)
+    if (target.kind === "local") return await openHere(target.address)
     // Only a row its device listed live this round is answered as already live (B's engine holds it). An ended row, or a
     // cached snapshot of a device that did not answer (#14043), is opened again from its session file, which no listing
     // row names (#14170: its path is the session's folder); an offline device refuses before anything is asked.

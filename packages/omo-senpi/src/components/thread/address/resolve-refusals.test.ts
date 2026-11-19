@@ -204,7 +204,8 @@ describe("#given an approved reply pinned to its sender's device #when it resolv
       "B silent on the probe",
       { device: B.id, thread: T.nowhere },
       { probe: true, silent: [B.id] },
-      { kind: "error", code: "host_unavailable", details: { reason: "device_unanswered", devices: [B.id] } },
+      // #14280: a silent probe keeps the service's own reason.
+      { kind: "error", code: "host_unavailable", details: { reason: "host_not_answering", devices: [B.id] } },
     ],
     [
       "B answered and holds no such thread",
@@ -213,12 +214,82 @@ describe("#given an approved reply pinned to its sender's device #when it resolv
       { kind: "error", code: "not_found", details: { kind: "thread", device: B.id, device_name: B.name } },
     ],
     [
-      "B cannot be asked (no probe)",
+      "B cannot be asked (this device's service carries no wake, so no probe)",
       { device: B.id, thread: T.nowhere },
       {},
-      { kind: "error", code: "host_unavailable", details: { reason: "probe_unavailable", device: B.id } },
+      {
+        kind: "error",
+        code: "host_unavailable",
+        details: { reason: "wake_unavailable", device: B.id, thread: T.nowhere },
+      },
     ],
   ] as const)("%s", async (_label, pin, setup, expected) => {
     expect(await resolve(pin.thread, { pin }, setup)).toMatchObject(expected)
   })
+})
+
+describe("#given <device>/<thread id> on B that B's listing does not show #when it resolves #then B itself is asked, as a pinned reply asks it (#14305 review H1)", () => {
+  test.each([
+    [
+      "B holds it on disk (its probe finds it)",
+      { probe: true },
+      { kind: "ok", thread: T.bProbe, where: { kind: "device", row: { device: B.id } } },
+      T.bProbe,
+    ],
+    [
+      "B answered and holds no such thread",
+      { probe: true },
+      { kind: "error", code: "not_found", details: { kind: "thread", device: B.id, device_name: B.name } },
+      T.nowhere,
+    ],
+    [
+      "B did not answer the probe",
+      { probe: true, silent: [B.id] },
+      { kind: "error", code: "host_unavailable", details: { reason: "host_not_answering", device: B.id } },
+      T.nowhere,
+    ],
+    [
+      "this device's service carries no wake, so B cannot be asked",
+      {},
+      { kind: "error", code: "host_unavailable", details: { reason: "wake_unavailable", device: B.id } },
+      T.nowhere,
+    ],
+    [
+      "B missed this listing round",
+      { probe: true, incomplete: true },
+      { kind: "error", code: "host_unavailable", details: { reason: "listing_incomplete", device: B.id } },
+      T.nowhere,
+    ],
+  ] as const)("%s", async (_label, setup, expected, thread) => {
+    expect(await resolve(`${B.id}/${thread}`, {}, setup)).toMatchObject(expected)
+  })
+})
+
+describe("#given a device that is offline #when <that device>/<thread> resolves #then rows already in hand still resolve, and anything else is device_offline with nothing sent (review M2 of #14328)", () => {
+  async function offline(text: string, setup: TwoDeviceOptions) {
+    const two = createTwoDevices(setup)
+    cleanups.push(two.cleanup)
+    const resolved = await resolveAddress(
+      { remote: two.remote, callerWorkspaceRoot: process.cwd(), local: two.entries, callerId: T.hereLive },
+      text,
+      { probe: true },
+    )
+    return { resolved, lookups: two.account.lookups.length }
+  }
+  test("#given B offline with its rows still listed #when <B>/<a listed id> resolves #then B's row answers", async () => {
+    const { resolved } = await offline(`${B.id}/${T.bLive}`, { bOffline: true, probe: true })
+    expect(resolved).toMatchObject({ kind: "ok", thread: T.bLive, where: { kind: "device" } })
+  })
+  test.each([
+    ["B offline, a thread id it does not list", `${B.id}/${T.nowhere}`, { bOffline: true, probe: true }, B.id],
+    ["B offline, a name it does not list", `${B.name}/no such thread`, { bOffline: true, probe: true }, B.id],
+    ["an offline device with no rows, a thread id", `${OFF.id}/${T.nowhere}`, { probe: true }, OFF.id],
+  ] as const)(
+    "#given %s #when resolved #then device_offline naming it, and no probe is sent",
+    async (_label, text, setup, device) => {
+      const { resolved, lookups } = await offline(text, setup)
+      expect(resolved).toMatchObject({ kind: "error", code: "device_offline", details: { device } })
+      expect(lookups).toBe(0)
+    },
+  )
 })

@@ -2,6 +2,7 @@ import { deviceListing, type DeviceListing } from "@oh-my-opencode/thread-addres
 import type { RemoteClient, RemoteFailure } from "../../remote"
 import type { ThreadToolFailure } from "../errors"
 import { remoteReady } from "../remote/remote-ops"
+import { deviceListing as oneDeviceListing } from "../remote/address-book"
 import { rowThreadId, type RemoteDevice, type RemoteSessionRow, type RemoteThreadSurface } from "../remote/ports"
 
 const LOCAL_ONLY = "local"
@@ -125,25 +126,68 @@ function remember(port: object, rows: readonly RemoteSessionRow[]): (id: string)
   return (id) => (before.has(id) ? before.get(id) : ids.get(id))
 }
 
+/** The status round of a resolution: this device's id, or why the relay cannot be used. */
+export type Ready = Awaited<ReturnType<typeof remoteReady>>
+
+/** What a resolution already read and hands in, so it reads each thing once. */
+export type AccountReads = {
+  /** The resolution's one status round. */
+  readonly ready?: Promise<Ready>
+  /** The roster as already read (`undefined`: it could not be read). */
+  readonly roster?: readonly RemoteDevice[] | undefined
+  /** Read only this device's listing (#12709): a device-qualified address never waits on the whole round. */
+  readonly device?: string
+}
+
+const notReady = (ready: Exclude<Ready, { readonly here: string | null }>): AccountRead =>
+  ready.error.code === "host_unavailable" && notSetUp(ready.error.details?.["state"])
+    ? { kind: "none" }
+    : { kind: "unavailable", error: ready.error }
+
+const rosterRead = (remote: RemoteThreadSurface): Promise<readonly RemoteDevice[] | undefined> =>
+  rosterOf(remote.client).then(
+    (devices) => devices,
+    () => undefined,
+  )
+
+/** The account from a roster alone, no listing read: what a resolution on this device's own book needs. */
+export function rosterAccount(here: string | null, roster: readonly RemoteDevice[] | undefined): Account {
+  const listing = { rows: [], incomplete: [] }
+  const online = (roster ?? []).map((device) => ({ id: device.device, online: device.online }))
+  return {
+    here,
+    devices: roster ?? [],
+    roster,
+    rows: [],
+    incomplete: [],
+    listingOf: (device) => deviceListing(device, listing, online),
+    missedHolder: () => undefined,
+  }
+}
+
+/** The status round and the roster, no listing: enough to resolve a device part (#12709). */
+export async function readRoster(remote: RemoteThreadSurface, ready: Promise<Ready>): Promise<AccountRead> {
+  const read = await ready
+  if ("kind" in read) return notReady(read)
+  return { kind: "account", account: rosterAccount(read.here, await rosterRead(remote)) }
+}
+
 /**
  * ONE status read, ONE roster read and ONE listing round (design section 1): this device's id, the account's devices, the
- * listing rows of devices still on the account, and how this round listed each device. A roster that cannot be read
- * judges no row (every row stays) and lists every device as the listing names it.
+ * listing rows of devices still on it, and how this round listed each device. A roster that cannot be read judges no row
+ * (every row stays) and lists every device as the listing names it. `given` hands in what the resolution already read,
+ * and `device` narrows the listing to that one device.
  */
-export async function readAccount(remote: RemoteThreadSurface): Promise<AccountRead> {
-  const ready = await remoteReady(remote)
-  if ("kind" in ready)
-    return ready.error.code === "host_unavailable" && notSetUp(ready.error.details?.["state"])
-      ? { kind: "none" }
-      : { kind: "unavailable", error: ready.error }
+export async function readAccount(remote: RemoteThreadSurface, given: AccountReads = {}): Promise<AccountRead> {
+  const ready = await (given.ready ?? remoteReady(remote))
+  if ("kind" in ready) return notReady(ready)
   const [listing, roster] = await Promise.all([
-    remote.sessions.listing !== undefined
-      ? remote.sessions.listing()
-      : remote.sessions.sessions().then((rows) => ({ rows, incomplete: [] as readonly string[] })),
-    rosterOf(remote.client).then(
-      (devices) => devices,
-      () => undefined,
-    ),
+    given.device !== undefined
+      ? oneDeviceListing(remote, given.device)
+      : remote.sessions.listing !== undefined
+        ? remote.sessions.listing()
+        : remote.sessions.sessions().then((rows) => ({ rows, incomplete: [] as readonly string[] })),
+    "roster" in given ? Promise.resolve(given.roster) : rosterRead(remote),
   ])
   const earlier = remember(remote.sessions, listing.rows)
   const here = ready.here

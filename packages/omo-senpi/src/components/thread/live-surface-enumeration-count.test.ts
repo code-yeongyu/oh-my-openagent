@@ -108,8 +108,20 @@ describe("what one send to a thread on another device asks for, by path (#12989)
     const account = fixture.account()
     const base = account.remote
     const listing = base.sessions.listing
+    // The roster is read through the remote client (`devices.list`, the address module's one account read) or the
+    // sessions port's `devices`: both are one device-service round trip and both count as device_list.
     const remote: RemoteThreadSurface = {
       ...base,
+      client: {
+        ...base.client,
+        devices: {
+          ...base.client.devices,
+          list: async (...args: Parameters<typeof base.client.devices.list>) => (
+            bump("device_list"),
+            await base.client.devices.list(...args)
+          ),
+        },
+      },
       sessions: {
         ...base.sessions,
         status: async () => (bump("device_status"), await base.sessions.status()),
@@ -167,18 +179,19 @@ describe("what one send to a thread on another device asks for, by path (#12989)
     }
     // The fake registry counts a resolve for every address; the real client sends none for a session-id-shaped key
     // (remote/alias-registry.ts brokenRule), so on a device the by-id paths make one request fewer than the by-name ones.
-    // A send resolves across devices from one account listing round plus the roster read beside it (#13539: a removed
-    // device's cached rows address nothing), with no device status read. A reply lists the account once more (listing and
-    // roster) and resolves the alias once more for its reply-allowance check.
+    // A send resolves across devices from one account read (#14305: one listing round plus the roster beside it, #13539: a
+    // removed device's cached rows address nothing), with no device status read; device_list counts every roster
+    // read of the send, through either port. A reply resolves from the same one account read: its sender's
+    // one-holder check (#14048) reads nothing more.
     const first = {
       enumerations: 1,
       device_status: 0,
-      device_list: 1,
+      device_list: 3,
       account_sessions: 1,
       alias_resolve: 1,
       session_commands: 2,
     }
-    const reply = { ...first, account_sessions: 2, device_list: 2, alias_resolve: 2 }
+    const reply = first
     expect(counts).toEqual({ first_by_name: first, first_by_id: first, reply_by_name: reply, reply_by_id: reply })
   })
 })
