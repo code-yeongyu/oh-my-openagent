@@ -21,7 +21,7 @@ export type GatewayEndpointRef = {
 }
 
 export type ExternalAdmissionKind =
-  "started" | "queued" | "steered" | "turn_conflict" | "held_draft" | "already_admitted"
+  "started" | "queued" | "steered" | "turn_conflict" | "held_draft" | "already_admitted" | "held"
 
 export type GatewayAdmissionKind = ExternalAdmissionKind | "not_steerable" | "expired" | "sender_not_admitted"
 

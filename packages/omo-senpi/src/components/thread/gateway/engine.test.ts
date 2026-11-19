@@ -647,3 +647,17 @@ describe("held_draft_quiescence", () => {
     }).toEqual({ state: "applied", marker: false, entries: 1 })
   })
 })
+
+describe("held_target", () => {
+  // senpi#7014: an idle session under a hold that is not only `unattended` keeps a peer delivery as a held notice and
+  // answers admission `held`. The sender is told the delivery waits on that hold; it is never answered started.
+  test("#given an idle target whose engine holds it #when A sends auto #then the answer is queued waiting on the hold and no turn starts", async () => {
+    const h = open()
+    h.session("A")
+    const target = h.session("T")
+    target.runtime.sessionHolds = ["session_hold"]
+    const result = await send(h, "A", "T", "are you there")
+    expect(result).toMatchObject({ kind: "ok", delivery: { kind: "queued", waiting_on: { kind: "hold" } } })
+    expect(target.runtime.enqueueCalls).toEqual([])
+  })
+})
