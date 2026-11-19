@@ -1751,6 +1751,7 @@
     "packages/omo-senpi/src/components/thread/tools/internals.ts",
     "packages/omo-senpi/src/components/thread/tools/local-permission.ts",
     "packages/omo-senpi/src/components/thread/tools/model-match.ts",
+    "packages/omo-senpi/src/components/thread/tools/monitor-target.ts",
     "packages/omo-senpi/src/components/thread/tools/ports.ts",
     "packages/omo-senpi/src/components/thread/tools/read-ops.ts",
     "packages/omo-senpi/src/components/thread/tools/relay-tools.ts",
