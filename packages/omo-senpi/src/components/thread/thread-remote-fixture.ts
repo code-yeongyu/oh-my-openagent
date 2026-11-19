@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { DeviceRow, RemoteClient, RemoteFailure, ServiceStatus } from "../remote"
 import type { ThreadToolName, ThreadToolResult } from "./contracts"
+import type { RuntimePhase } from "./gateway/adapter"
 import { createInboxDrain } from "./gateway/drain"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { FakeSessionRuntime } from "./gateway/testing/fake-runtime"
@@ -829,6 +830,8 @@ export function createRemoteThreadFixture() {
        * registered); with this set it never does, so a delivery to it stays queued (the held-thread report).
        */
       createdNeverDrains?: boolean
+      /** The live session here (`dur-local`) drains each delivery at once, in this phase (a busy turn, a question). */
+      localDrainsIn?: RuntimePhase
     } = {},
   ) {
     const engine = extra.engine ?? ENGINE
@@ -969,8 +972,9 @@ export function createRemoteThreadFixture() {
     const enqueued: Array<Parameters<GatewayStore["enqueue"]>[0]> = []
     // A session this device's host created drains a delivery as its registered control endpoint does: one idle runtime
     // per pass, so its first prompt starts.
-    const drainCreated = async (durableId: string): Promise<void> => {
+    const drainCreated = async (durableId: string, phase?: RuntimePhase): Promise<void> => {
       const runtime = new FakeSessionRuntime(join(agentDir, `${durableId}.jsonl`), durableId, process.cwd())
+      if (phase !== undefined) runtime.phaseValue = phase
       const drain = createInboxDrain({ store, runtime, durableId, sessionPath: () => runtime.sessionPath })
       await drain.drain({ reason: "command" })
       drain.stop()
@@ -981,8 +985,18 @@ export function createRemoteThreadFixture() {
           ? async (request: Parameters<GatewayStore["enqueue"]>[0]) => {
               enqueued.push(request)
               const outcome = await target.enqueue(request)
-              if (outcome.kind === "inserted" && createdIds.has(request.target_durable_id) && extra.createdNeverDrains !== true)
+              if (
+                outcome.kind === "inserted" &&
+                createdIds.has(request.target_durable_id) &&
+                extra.createdNeverDrains !== true
+              )
                 await drainCreated(request.target_durable_id)
+              if (
+                outcome.kind === "inserted" &&
+                request.target_durable_id === local.durableSessionId &&
+                extra.localDrainsIn !== undefined
+              )
+                await drainCreated(request.target_durable_id, extra.localDrainsIn)
               return outcome
             }
           : Reflect.get(target, property, receiver),
