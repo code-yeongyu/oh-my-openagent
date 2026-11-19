@@ -47,7 +47,7 @@ export async function resolveOnDevice(
 ): Promise<Found | ThreadRefusal> {
   const names = deviceNameOf(account)
   if (device.here) {
-    const hit = ladder(ctx, ctx.local, thread, opts)
+    const hit = ladder(ctx, ctx.localFor?.(thread) ?? ctx.local, thread, opts)
     return hit.kind === "ok" ? { ...hit, all_scope: opts.all_scope } : withAddresses(hit, account.here, names)
   }
   const rows = account.rows.filter((row) => row.device === device.id)

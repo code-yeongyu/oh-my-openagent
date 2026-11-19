@@ -186,18 +186,20 @@ export async function resolveAddress(
   const parsed = parseAddress(text)
   const remote = ctx.remote
   const read = remote === undefined ? async (): Promise<AccountAttempt> => ({ kind: "none" }) : once(remote)
-  const bare = async (address: string) => {
-    const resolved = await resolveBare(ctx, address, opts, read)
+  const bare = async (address: string, book = ctx) => {
+    const resolved = await resolveBare(book, address, opts, read)
     const held =
       opts.unique_holder === true && resolved.result.kind === "ok"
-        ? await otherHolder(ctx, resolved.result, read)
+        ? await otherHolder(book, resolved.result, read)
         : undefined
-    return await finish(ctx, held ?? resolved.result, resolved.account, opts)
+    return await finish(book, held ?? resolved.result, resolved.account, opts)
   }
   if (parsed.kind !== "device") return await bare(text)
   const account = await read()
   if (remote === undefined || account.kind !== "account")
-    return await bare(parsed.device === HERE ? parsed.thread : text)
+    return parsed.device === HERE
+      ? await bare(parsed.thread, { ...ctx, local: ctx.localFor?.(parsed.thread) ?? ctx.local })
+      : await bare(text)
   const device = resolveAccountDevice(account.account, parsed.device, { online: opts.need === "online" })
   const whole = await resolveBare(ctx, text, opts, read)
   if (device.kind === "error")

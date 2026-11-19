@@ -8,6 +8,11 @@ export type ResolveContext = {
   readonly callerWorkspaceRoot: string
   /** This device's address book (live sessions and session files). */
   readonly local: readonly ThreadAddressEntry[]
+  /**
+   * This device's book as asked for one address (the send address book adds the session files an address names): the
+   * resolver asks it with the thread part once the device part named this device. Absent: `local` serves every part.
+   */
+  readonly localFor?: (text: string) => readonly ThreadAddressEntry[]
   readonly callerId: string
 }
 
