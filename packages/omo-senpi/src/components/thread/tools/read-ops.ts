@@ -18,8 +18,8 @@ import type { ThreadHostSession, ThreadHostView, ThreadToolSurfaceOptions } from
  * knows. A session no engine holds is still a thread, listed `inactive` from its JSONL: one whose
  * endpoint stopped answering (with the endpoint's failure in error_note), and one whose session file
  * is in the scanned session directories (the caller's workspace, every workspace with `all_scope`;
- * the newest files only) after its engine closed it. `inactive_dropped` counts the inactive threads of the files that
- * listing did not read (with `inactive_truncated`), only when the filter shows inactive threads: a running or idle thread is
+ * the newest files only) after its engine closed it. `inactive_dropped` counts the threads of the files that listing did not
+ * read, each inactive or archived (with `inactive_truncated`), when the filter shows either: a running or idle thread is
  * listed from its endpoint, never dropped. `states` filters the rows; the default lists every state but archived.
  */
 export function listThreads(
@@ -64,7 +64,11 @@ export function listThreads(
     )
     .map((thread) => threadRow(thread))
   const rowIds = new Set(threads.map((thread) => thread.thread))
-  const dropped = shown.has("inactive") ? scanned.unread.filter((id) => !listed.has(id) && !rowIds.has(id)).length : 0
+  // An unread file's thread is inactive or archived (only its file knows which), so a filter showing either is partial.
+  const dropped =
+    shown.has("inactive") || shown.has("archived")
+      ? scanned.unread.filter((id) => !listed.has(id) && !rowIds.has(id)).length
+      : 0
   // An endpoint that did not answer (timed out, an auth or protocol failure) may hold threads this listing reads from their
   // files as inactive; one known dead (its socket gone or refusing) holds none, so only the former makes it partial (#14308).
   const unanswered = current.hosts.filter(

@@ -114,7 +114,7 @@ export async function accountListing(remote: RemoteThreadSurface): Promise<Remot
 const listingIncomplete = (device: string): ThreadToolFailure =>
   threadToolFailure(
     "host_unavailable",
-    `The thread was last listed on ${device}, which did not answer this listing round.`,
+    `The thread was last listed on ${device}, whose threads this listing round did not include in full.`,
     "Retry the call; call thread_list (tool.thread_list() in an eval cell) to see which devices answered.",
     { reason: "listing_incomplete", devices: [device] },
   )
