@@ -42,7 +42,7 @@ import {
 import { followRemote, remoteAvailable } from "../omo-senpi/src/components/thread/remote/remote-ops"
 import type { RemoteCommandDependencies } from "./remote-local"
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
-import { sendWaitNotice, sessionVerbLines } from "./remote-render"
+import { candidateLines, personNextAction, sendWaitNotice, sessionVerbLines } from "./remote-render"
 import { localPermissionPreset } from "./remote-permission-preset"
 import type { SessionArgs } from "./remote-session-args"
 
@@ -155,36 +155,31 @@ async function runSessionOn(
         dependencies.error("Run omo remote sessions to see them.")
       } else if (!json) {
         dependencies.error(`omo remote: ${result.error.message}`)
-        dependencies.error(result.error.next_action)
+        dependencies.error(personNextAction(result.error.next_action))
+        for (const line of candidateLines(result.error.details)) dependencies.error(line)
       }
       return REMOTE_EXIT.failed
     }
     if (!json) for (const line of sessionVerbLines(args.verb, label, result)) dependencies.output(line)
     return REMOTE_EXIT.ok
   }
-  const unavailable = await remoteAvailable(remote)
-  if (unavailable !== undefined) return show(unavailable, "")
-  if (args.verb === "open") return await openOn(remote, args, { json, show }, dependencies)
-  // The typed text is resolved by the one address resolver (#14305): a bare thread id, name, alias or id prefix, or
-  // `<device>/<thread>` with the device by id, name, prefix or `here`. A send needs only the address (its delivery
-  // queues); the control verbs need the device online, refused there by the resolver itself.
+  if (args.verb === "open") {
+    const unavailable = await remoteAvailable(remote)
+    if (unavailable !== undefined) return show(unavailable, "")
+    return await openOn(remote, args, { json, show }, dependencies)
+  }
+  // The typed text is resolved by the one address resolver (#14305), which reads the relay state first and answers an
+  // unavailable relay as remoteAvailable does: a bare thread id, name, alias or id prefix, or `<device>/<thread>` with
+  // the device by id, name, prefix or `here`. A send needs only the address (its delivery queues); the control verbs
+  // need the device online, refused there by the resolver itself.
   const resolved = await resolveTypedAddress(remote, args.target, {
     need: args.verb === "send" ? "address" : "online",
   })
   if (resolved.kind === "error") return show(resolved, args.target)
-  if (resolved.where.kind !== "device")
-    return show(
-      {
-        kind: "error",
-        error: {
-          code: "host_unavailable",
-          message: `Session ${resolved.thread} is on this device; omo remote commands the other devices' sessions.`,
-          next_action: `Reach it with omo thread send ${resolved.thread}.`,
-        },
-      },
-      args.target,
-    )
-  const { row } = resolved.where
+  // A listing key the person typed names the session by that key, as before the address module.
+  const { row: listed } = resolved.where
+  const typedKey = args.target === listed.session_id || args.target.endsWith(`/${listed.session_id}`)
+  const row = typedKey ? { ...listed, durable_id: listed.session_id } : listed
   // The output names the session by its address, whatever the person typed for it.
   const label = resolved.address
   if (args.verb === "send") return sendTo(remote, row, args, { label, json, show }, dependencies)
