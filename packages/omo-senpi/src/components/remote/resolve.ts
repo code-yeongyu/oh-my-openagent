@@ -71,9 +71,8 @@ const deviceRefusal = (refusal: AddressRefusal): RemoteFailure => {
         refusal.code,
         `No device of this account answers to ${refusal.typed}.`,
         nextActionFor(refusal.code),
-        {
-          details: refusal.details,
-        },
+        // sessions.list({ device }) answers { kind, id } for the same miss (unknown-device.ts); the core's fields are added.
+        { details: { ...refusal.details, id: refusal.typed } },
       )
     case "devices_share_name":
     case "devices_share_prefix":
