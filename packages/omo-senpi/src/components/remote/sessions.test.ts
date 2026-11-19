@@ -370,7 +370,10 @@ describe("sessions.send and sessions.read", () => {
 describe("sessions controls", () => {
   test("#given the live session #when sessions.close runs #then the close ladder unloads it", async () => {
     const { owner, sent } = await onWorld()
-    expect(await valueOf(clientOn(owner.stateDir, fakeClock()).sessions.close(LIVE))).toEqual({ closed: true })
+    expect(await valueOf(clientOn(owner.stateDir, fakeClock()).sessions.close(LIVE))).toEqual({
+      closed: true,
+      dropped_deliveries: [],
+    })
     expect(sent("unload_session")).toEqual([expect.objectContaining({ sessionId: SESSION_ID, force: true })])
   })
 
@@ -462,7 +465,7 @@ describe("durable-id addressing", () => {
       expect(await valueOf(client.sessions.send(thread, { text: "go" }))).toMatchObject({ lane: "started" })
       expect(await valueOf(client.sessions.setModel(thread, "anthropic/claude"))).toEqual({ model: "anthropic/claude" })
       expect(await valueOf(client.sessions.interrupt(thread))).toMatchObject({ interrupted: true })
-      expect(await valueOf(client.sessions.close(thread))).toEqual({ closed: true })
+      expect(await valueOf(client.sessions.close(thread))).toEqual({ closed: true, dropped_deliveries: [] })
       for (const type of ["prompt", "set_model", "interrupt", "unload_session"])
         expect(sent(type).map((rpc) => rpc["sessionId"])).toEqual([NEW_KEY])
     })
@@ -862,7 +865,7 @@ describe("an open on this device", () => {
         device: SELF,
       })
       expect(await valueOf(client.sessions.setReasoning(SELF_SESSION, "high"))).toEqual({ reasoning: "high" })
-      expect(await valueOf(client.sessions.close(SELF_SESSION))).toEqual({ closed: true })
+      expect(await valueOf(client.sessions.close(SELF_SESSION))).toEqual({ closed: true, dropped_deliveries: [] })
       expect(host.mutations.map((frame) => frame["type"])).toEqual([
         "prompt",
         "interrupt",

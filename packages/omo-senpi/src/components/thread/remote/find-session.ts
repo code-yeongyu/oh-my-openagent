@@ -1,7 +1,7 @@
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import type { ThreadToolResult } from "../contracts"
 import { threadToolFailure } from "../errors"
-import { outcomeFailure } from "./outcome"
+import { endpointOutcomeFailure } from "./outcome"
 import {
   rowThreadId,
   type JsonObject,
@@ -125,7 +125,7 @@ export async function sessionFileOf(
       "On that device, restart its default engine host with the current omo (omo daemon status there shows which engine runs it) or update omo there; or open the thread on that device.",
       { ...details, reason: escapeForDisplay(outcome.reason) },
     )
-  if (outcome.kind !== "ok") return { result: outcomeFailure(outcome, row.device) }
+  if (outcome.kind !== "ok") return { result: endpointOutcomeFailure(outcome, row.device) }
   const data = replyData(outcome.response)
   const path = recordOf(data["found"])?.["sessionPath"]
   if (typeof path === "string" && path !== "") return { path }

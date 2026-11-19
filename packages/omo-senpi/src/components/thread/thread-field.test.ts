@@ -50,7 +50,7 @@ function tools(sessions: ThreadHostSession[]) {
     getAvailableModels: async () => [{ provider: "openai", id: "gpt-x", name: "GPT X" }],
     setThinkingLevel: async () => {},
     getAvailableThinkingLevels: async () => ["off", "high"],
-    closeSession: async () => "closed",
+    closeSession: async () => ({ outcome: "closed", dropped_deliveries: [] }),
   }
   const agentDir = mkdtempSync(join(tmpdir(), "thread-field-"))
   directories.push(agentDir)

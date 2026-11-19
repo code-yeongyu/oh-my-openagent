@@ -412,8 +412,8 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         if (located.kind === "error") return located.result
         // Nothing live holds it: there is nothing to close, and the thread stays resumable from its session file.
         if (located.kind === "not_live")
-          return { kind: "ok", ...controlIdentity(located), closed: false, reason: "not_live" }
-        return await closeThread(located.control)
+          return { kind: "ok", ...controlIdentity(located), closed: false, reason: "not_live", dropped_deliveries: [] }
+        return await closeThread(located.control, value.force)
       }),
   }
   const handoff: AnyTool = {
