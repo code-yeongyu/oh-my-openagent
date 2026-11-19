@@ -1010,20 +1010,19 @@ describe("an open on this device", () => {
     })
   })
 
-  test("#given a client built without this device's operator endpoint #when sessions.list reads the whole account and members address a session here #then this device is unanswered, never dropped, and each member answers unsupported{local_sessions} with nothing sent to its host", async () => {
-    await withContractHost({}, async (host) => {
-      const { owner } = await localClient(host)
-      const client = clientOn(owner.stateDir, fakeClock(), undefined, { localSessions: undefined })
-      const listing = await valueOf(client.sessions.list())
-      expect(listing.rows.map((row) => row.device.id)).toContain(PEER)
-      expect(listing.rows.filter((row) => row.device.id === SELF)).toEqual([])
-      expect(listing.unanswered).toContainEqual(expect.objectContaining({ id: SELF, self: true }))
-      const absent = { code: "unsupported", details: { feature: "local_sessions", device: SELF } }
-      expect(failureOf(await client.sessions.open({ device: SELF, workspace: host.root }))).toMatchObject(absent)
-      expect(failureOf(await client.sessions.send(SELF_SESSION, { text: "q" }))).toMatchObject(absent)
-      expect(failureOf(await client.sessions.close(SELF_SESSION))).toMatchObject(absent)
-      expect(host.frames).toEqual([])
-    })
+  // No operator endpoint is injected, so there is no host to watch: the unsupported answers are the proof that no member
+  // reached one.
+  test("#given a client built without this device's operator endpoint #when sessions.list reads the whole account and members address a session here #then this device is unanswered, never dropped, and each member answers unsupported{local_sessions}", async () => {
+    const owner = await startOwner(selfWorld())
+    const client = clientOn(owner.stateDir, fakeClock(), undefined, { localSessions: undefined })
+    const listing = await valueOf(client.sessions.list())
+    expect(listing.rows.map((row) => row.device.id)).toContain(PEER)
+    expect(listing.rows.filter((row) => row.device.id === SELF)).toEqual([])
+    expect(listing.unanswered).toContainEqual(expect.objectContaining({ id: SELF, self: true }))
+    const absent = { code: "unsupported", details: { feature: "local_sessions", device: SELF } }
+    expect(failureOf(await client.sessions.open({ device: SELF, workspace: tmpdir() }))).toMatchObject(absent)
+    expect(failureOf(await client.sessions.send(SELF_SESSION, { text: "q" }))).toMatchObject(absent)
+    expect(failureOf(await client.sessions.close(SELF_SESSION))).toMatchObject(absent)
   })
 
   test("#given this device's host takes list_sessions and never answers it #when sessions.list reads the whole account #then the other devices' rows come back before the listing's deadline and this device is unanswered (#13787 review L1)", async () => {

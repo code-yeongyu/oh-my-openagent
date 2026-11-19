@@ -3,38 +3,33 @@
 // the gateway store worker, and the runtime pruning run after the verb - reach the network only through the local API
 // transport, and start processes only at the pinned sites. A new network import or call, a new spawn import, call site
 // or argv literal, or a second worker anywhere in that graph fails here, so the engine-trust stage can be skipped for
-// these verbs without a call slipping onto unfiltered trust. Each root's graph comes from Bun's own bundler metafile;
-// a missing or empty graph, one that lacks its sentinels, or a detector that misses a known positive control fails
-// rather than passes. The pinned sets below are the detector's own output; update them only with a security review.
+// these verbs without a call slipping onto unfiltered trust. Each root's graph comes from Bun's own bundler metafile
+// (remote-graph-scan.ts); a missing or empty graph, one that lacks its sentinels, or a detector that misses a known
+// positive control fails rather than passes. The pinned sets below are the detector's own output; update them only
+// with a security review.
 import { describe, expect, test } from "bun:test"
-import { readFileSync } from "node:fs"
-import { join, relative } from "node:path"
-import { parseSync } from "oxc-parser"
+import {
+  builtin,
+  connectCalls,
+  importersOf,
+  LOCAL_ONLY_ROOTS,
+  NETWORK_MODULES,
+  repoRoot,
+  rootsGraph,
+  scanSources,
+  sourcesOf,
+  spawnModule,
+  STORE_WORKER,
+  TRANSPORT,
+} from "./remote-graph-scan"
 import { spawnCallSites } from "./spawn-call-sites"
 
-const repoRoot = join(import.meta.dir, "..", "..", "..")
-const at = (path: string) => join(repoRoot, path)
-
-const TRANSPORT = "packages/device-service-core/src/local-api/transport.ts"
 // The vendored transport has no unref'd mode (omo#13475), so the delivery consumer's long-lived connection opens through
 // device-service-core's own copy of the same two loopback connects; both are pinned to CONNECT_CALLS below.
 const BACKGROUND_TRANSPORT = "packages/device-service-core/src/background-transport.ts"
 const STORE = "packages/omo-senpi/src/components/thread/gateway/store.ts"
-const STORE_WORKER = "packages/omo-senpi/src/components/thread/gateway/store-worker.ts"
-const ROOTS: Record<string, readonly string[]> = {
-  "packages/omo-native/remote-local.ts": [
-    "packages/omo-native/remote-local.ts",
-    TRANSPORT,
-    "packages/omo-native/remote-session-verbs.ts",
-  ],
-  [STORE_WORKER]: [STORE_WORKER],
-  "packages/omo-native/runtime-prune.ts": ["packages/omo-native/runtime-prune.ts"],
-}
 // Outside the roots, read as a fixture: the account service request module, whose fetch the matcher must see.
 const FETCH_FIXTURE = "packages/omo-opencode/src/cli/service-auth/protocol-request.ts"
-const NETWORK_MODULES = new Set(["tls", "https", "http", "http2", "dgram", "dns"])
-const SPAWN_SHIM = "packages/omo-opencode/src/shared/bun-spawn-shim.ts"
-const RUNTIME_WRAPPERS = "packages/utils/src/runtime/"
 
 // Rule 1: every reachable file importing node:child_process or a spawn wrapper (the utils runtime, the Bun spawn shim).
 const SPAWN_IMPORTERS = [
@@ -143,92 +138,15 @@ const CONNECT_CALLS = [
   "createConnection({ path: join(stateDir, SOCKET_FILE) })",
 ]
 
-const NETWORK_CALL =
-  /(?<![.\w$])fetch\s*\(|\?\?\s*(?:globalThis\.)?fetch\b|globalThis\.fetch\b|\boptions\.fetch\b|\bnew\s+WebSocket\b|\bBun\.(?:connect|listen|fetch)\b/g
-const WORKER = /\bnew\s+Worker\b/g
-const BUN_PRIMITIVE = /\bBun\s*\.\s*(?:spawnSync|spawn|\$)/g
-
-type Input = {
-  readonly imports: readonly { readonly path: string; readonly external?: boolean }[]
-}
-
-async function graph(root: string): Promise<Record<string, Input>> {
-  const built = (await Bun.build({
-    entrypoints: [at(root)],
-    target: "bun",
-    metafile: true,
-    throw: false,
-    root: repoRoot,
-  } as Parameters<typeof Bun.build>[0])) as Awaited<ReturnType<typeof Bun.build>> & {
-    readonly metafile?: { readonly inputs: Record<string, Input> }
-  }
-  expect(built.success).toBe(true)
-  const inputs = built.metafile?.inputs
-  if (inputs === undefined || Object.keys(inputs).length === 0)
-    throw new Error(`the bundler returned no module graph for ${root}`)
-  return Object.fromEntries(
-    Object.entries(inputs).map(([file, input]) => [relative(repoRoot, at(file)).replaceAll("\\", "/"), input]),
-  )
-}
-
-const importersOf = (inputs: Record<string, Input>, matches: (path: string) => boolean): string[] =>
-  Object.entries(inputs)
-    .filter(([, input]) => input.imports.some((entry) => matches(entry.path.replaceAll("\\", "/"))))
-    .map(([file]) => file)
-    .sort()
-const builtin = (name: string) => (path: string) => path.replace(/^node:/, "") === name
-
-const withoutComments = (source: string): string =>
-  source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`\\])\/\/.*$/gm, "$1")
-
-function connectCalls(file: string): string[] {
-  const source = readFileSync(at(file), "utf8")
-  const found: string[] = []
-  const visit = (node: unknown): void => {
-    if (typeof node !== "object" || node === null) return
-    if (Array.isArray(node)) {
-      for (const item of node) visit(item)
-      return
-    }
-    const callee: unknown = Reflect.get(node, "callee")
-    if (
-      Reflect.get(node, "type") === "CallExpression" &&
-      typeof callee === "object" &&
-      callee !== null &&
-      Reflect.get(callee, "name") === "createConnection"
-    )
-      found.push(source.slice(Number(Reflect.get(node, "start")), Number(Reflect.get(node, "end"))))
-    for (const value of Object.values(node)) visit(value)
-  }
-  visit(parseSync(file, source).program)
-  return found.sort()
-}
-
 describe("remote local-path reachability", () => {
   test("#given the local-only roots' module graphs #when they are scanned #then the network is reached only through the local API transport and processes start only at the pinned sites", async () => {
     // given
-    const inputs: Record<string, Input> = {}
-    for (const [root, sentinels] of Object.entries(ROOTS)) {
-      const own = await graph(root)
-      for (const sentinel of sentinels) expect(Object.keys(own)).toContain(sentinel)
-      Object.assign(inputs, own)
-    }
-    const sources = Object.keys(inputs).filter(
-      (file) => /\.(?:ts|js|mjs)$/.test(file) && !file.includes("node_modules/"),
-    )
+    const inputs = await rootsGraph(LOCAL_ONLY_ROOTS)
+    const sources = sourcesOf(inputs)
 
     // when
-    const calls: string[] = []
-    const workers: string[] = []
-    const bunPrimitives: Record<string, number> = {}
-    for (const file of sources) {
-      const source = withoutComments(readFileSync(at(file), "utf8"))
-      for (const match of source.matchAll(NETWORK_CALL)) calls.push(`${file}: ${match[0]}`)
-      if ((source.match(WORKER) ?? []).length > 0) workers.push(file)
-      const primitives = (source.match(BUN_PRIMITIVE) ?? []).length
-      if (primitives > 0) bunPrimitives[file] = primitives
-    }
-    const fixtureCalls = [...withoutComments(readFileSync(at(FETCH_FIXTURE), "utf8")).matchAll(NETWORK_CALL)]
+    const { calls, workers, bunPrimitives } = scanSources(sources)
+    const fixtureCalls = scanSources([FETCH_FIXTURE]).calls
 
     // then: the positive controls are seen, so an empty result below is not a blind detector
     expect(fixtureCalls.length).toBeGreaterThan(0)
@@ -240,12 +158,7 @@ describe("remote local-path reachability", () => {
     expect(connectCalls(TRANSPORT)).toEqual(CONNECT_CALLS)
     expect(connectCalls(BACKGROUND_TRANSPORT)).toEqual(CONNECT_CALLS)
     // then: the spawn rules
-    expect(
-      importersOf(
-        inputs,
-        (path) => builtin("child_process")(path) || path.startsWith(RUNTIME_WRAPPERS) || path === SPAWN_SHIM,
-      ),
-    ).toEqual([...SPAWN_IMPORTERS].sort())
+    expect(importersOf(inputs, spawnModule)).toEqual([...SPAWN_IMPORTERS].sort())
     expect(bunPrimitives).toEqual(BUN_PRIMITIVE_USES)
     expect(spawnCallSites(repoRoot, sources)).toEqual([...SPAWN_CALL_SITES].sort())
     // then: worker_threads only for the store pair and the team lock registry (BroadcastChannel, no Worker built)
