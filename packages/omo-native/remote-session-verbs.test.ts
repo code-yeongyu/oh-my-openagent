@@ -7,6 +7,7 @@ import type { DeviceService } from "../device-service-core/src/index.ts"
 import { createRemoteThreadFixture, fakeRemoteClient } from "../omo-senpi/src/components/thread/thread-remote-fixture"
 import type { RemoteCommandDependencies } from "./remote-cli"
 import { REMOTE_EXIT } from "./remote-exit"
+import { DEFAULT_THREAD_DELIVERY } from "../omo-senpi/src/components/thread/contracts"
 import { parseSession } from "./remote-session-args"
 import { personSenderProvenance, runSession } from "./remote-session-verbs"
 
@@ -264,5 +265,13 @@ describe("omo remote send bounded settle (#13425)", () => {
     } finally {
       await remoteFixture.cleanup()
     }
+  })
+})
+
+describe("#14333: omo remote send and open default to auto", () => {
+  test("#given no --steer or --follow-up #when send and open --prompt are parsed #then both carry the shared default; --follow-up is kept", () => {
+    expect(parseSession("send", ["b/rk-on-b", "ping"]).session).toMatchObject({ delivery: DEFAULT_THREAD_DELIVERY })
+    expect(parseSession("open", ["b", "--prompt", "go"]).session).toMatchObject({ delivery: DEFAULT_THREAD_DELIVERY })
+    expect(parseSession("send", ["--follow-up", "b/rk-on-b", "ping"]).session).toMatchObject({ delivery: "follow_up" })
   })
 })

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { userInfo } from "node:os"
 import type { DeviceService } from "@oh-my-opencode/device-service-core/device-service"
-import type { ThreadThinkingLevel, ThreadToolResult } from "../thread/contracts"
+import { DEFAULT_THREAD_DELIVERY, type ThreadThinkingLevel, type ThreadToolResult } from "../thread/contracts"
 import { isPermissionPreset, presetWithin } from "../thread/contracts/permission-presets"
 import { answered, closeThread, setModelOn, setThinkingLevelOn } from "../thread/control/operations"
 import { ControlRefusal, type SessionControl } from "../thread/control/port"
@@ -485,7 +485,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
           ? await localSend(thread, target, device.value, request, from.caller)
           : selfDelivery(target.device)
       const row = namedDeviceRow(target.device, target.session)
-      const mode = request.mode ?? "auto"
+      const mode = request.mode ?? DEFAULT_THREAD_DELIVERY
       const expected = request.expected_turn_id === undefined ? undefined : String(request.expected_turn_id)
       // A person's followUp prompt carries a client message id, the receipt's delivery_id: every record of the turn that
       // answers it carries it too. The relay's steer record carries none, so a steer names none.

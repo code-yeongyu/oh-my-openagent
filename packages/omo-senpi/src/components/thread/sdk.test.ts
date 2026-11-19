@@ -8,6 +8,7 @@ import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { storeMigratedByNewerBuild } from "./gateway/testing/newer-schema"
 import type { RemoteThreadSurface } from "./remote/ports"
 import { createThreadSdk as createBundledThreadSdk } from "../../extension/thread-sdk"
+import { DEFAULT_THREAD_DELIVERY } from "./contracts"
 import { createThreadSdk, type ThreadSdk } from "./sdk"
 import { createRemoteThreadFixture, fakeRemoteClient } from "./thread-remote-fixture"
 import type { ThreadHost, ThreadHostSession } from "./tools"
@@ -1019,4 +1020,19 @@ describe("thread SDK: the operator daemon's warm", () => {
       }
     },
   )
+})
+
+describe("#14333: the SDK's default delivery mode", () => {
+  test("#given a send that names no mode #when it is stored #then its requested mode is the shared default, auto; an explicit follow_up is kept", async () => {
+    const { sdk, store } = fixture()
+    expect(await sdk.send({ thread: "my-tui", text: "no mode" })).toMatchObject({ kind: "ok" })
+    expect(await sdk.send({ thread: "my-tui", text: "queued on purpose", mode: "follow_up" })).toMatchObject({
+      kind: "ok",
+    })
+    const rows = await store.list({ target_durable_id: "dur-tui" })
+    expect(rows.map((row) => [row.body, row.mode_requested])).toEqual([
+      ["no mode", DEFAULT_THREAD_DELIVERY],
+      ["queued on purpose", "follow_up"],
+    ])
+  })
 })

@@ -1,5 +1,5 @@
 import type { DeviceService } from "../device-service-core/src/index.ts"
-import type { ThreadToolResult } from "../omo-senpi/src/components/thread/contracts"
+import { DEFAULT_THREAD_DELIVERY, type ThreadToolResult } from "../omo-senpi/src/components/thread/contracts"
 import { createRelaySessionHost } from "../omo-senpi/src/components/thread/control/relay-session-host"
 import {
   answered,
@@ -230,7 +230,7 @@ async function openOn(
   const delivery = personDelivery(remote, dependencies)
   let sent: ThreadToolResult
   try {
-    sent = await delivery.deliver(row, label, args.prompt, args.delivery ?? "auto")
+    sent = await delivery.deliver(row, label, args.prompt, args.delivery ?? DEFAULT_THREAD_DELIVERY)
   } finally {
     await delivery.dispose()
   }
