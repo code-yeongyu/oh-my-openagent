@@ -290,13 +290,22 @@ describe("#given <device>/<id-shaped thread> #when it resolves #then it reads at
     const two = createTwoDevices(setup)
     cleanups.push(two.cleanup)
     let unfiltered = 0
+    let filtered = 0
     let statuses = 0
+    let rosters = 0
     const sessions = two.remote.sessions
     const listing = sessions.listing
     const remote = {
       ...two.remote,
       client: {
         ...two.remote.client,
+        devices: {
+          ...two.remote.client.devices,
+          list: async (...args: Parameters<typeof two.remote.client.devices.list>) => {
+            rosters += 1
+            return await two.remote.client.devices.list(...args)
+          },
+        },
         service: {
           ...two.remote.client.service,
           status: async (...args: Parameters<typeof two.remote.client.service.status>) => {
@@ -309,6 +318,7 @@ describe("#given <device>/<id-shaped thread> #when it resolves #then it reads at
         ...sessions,
         sessions: async (filter?: { readonly device?: string }) => {
           if (filter?.device === undefined) unfiltered += 1
+          else filtered += 1
           return await sessions.sessions(filter)
         },
         ...(listing === undefined
@@ -316,6 +326,7 @@ describe("#given <device>/<id-shaped thread> #when it resolves #then it reads at
           : {
               listing: async (filter?: { readonly device?: string }) => {
                 if (filter?.device === undefined) unfiltered += 1
+                else filtered += 1
                 return await listing(filter)
               },
             }),
@@ -326,7 +337,7 @@ describe("#given <device>/<id-shaped thread> #when it resolves #then it reads at
       text,
       { probe: true },
     )
-    return { resolved, unfiltered, statuses }
+    return { resolved, unfiltered, filtered, statuses, rosters }
   }
   test.each([
     ["<device id>/<thread id>", `${B.id}/${T.bLive}`],
@@ -383,6 +394,18 @@ describe("#given <device>/<id-shaped thread> #when it resolves #then it reads at
     const { resolved, unfiltered } = await counted(NAMES.slash, { fix: true })
     expect(resolved).toMatchObject({ kind: "error", code: "ambiguous_target" })
     expect(unfiltered).toBe(0)
+  })
+
+  test("#given a thread id B holds only on disk #when <B>/<id> resolves #then B's listing is read once and the roster once (review M1 of #14328)", async () => {
+    const { resolved, filtered, rosters } = await counted(`${B.id}/${T.bProbe}`, { probe: true })
+    expect(resolved).toMatchObject({ kind: "ok", thread: T.bProbe })
+    expect({ filtered, rosters }).toEqual({ filtered: 1, rosters: 1 })
+  })
+
+  test("#given a thread id nobody holds #when <B>/<id> resolves #then B's listing is read once and re-read once (#14280), the roster once (review M1 of #14328)", async () => {
+    const { resolved, filtered, rosters } = await counted(`${B.id}/${T.nowhere}`, { probe: true })
+    expect(resolved).toMatchObject({ kind: "error", code: "not_found" })
+    expect({ filtered, rosters }).toEqual({ filtered: 2, rosters: 1 })
   })
 
   test("#given a bare thread id on B #when resolved #then the account-wide listing is read at most once, status once", async () => {
