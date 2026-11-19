@@ -181,11 +181,18 @@ export type CreatePlan =
       readonly creates: boolean
       readonly localAlias?: LocalAliasReason
     }
-  | { readonly kind: "done"; readonly result: ThreadToolResult; readonly device?: string }
+  | {
+      readonly kind: "done"
+      readonly result: ThreadToolResult
+      readonly device?: string
+      /** The thread the result answers, when it is live already: a create with a prompt sends it there (#14335). */
+      readonly thread?: HostedThread
+    }
 
 const alreadyLive = (thread: HostedThread, device?: string): CreatePlan => ({
   kind: "done",
   result: openedResult(thread, true),
+  thread,
   ...(device === undefined ? {} : { device }),
 })
 

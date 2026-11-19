@@ -71,14 +71,10 @@ describe("thread_create with a model and a reasoning level (#13409)", () => {
     expect(openSession).not.toHaveBeenCalled()
   })
 
-  test("#given create options with an existing thread #when opened #then invalid_arguments: they apply to a new thread only", async () => {
+  test("#given launch options with an existing thread #when opened #then invalid_arguments: they apply to a new thread only; a prompt is not a launch option and goes to the thread (#14335)", async () => {
     const a = account()
     const { run } = surface(a.remote)
     expect(await run("thread_create", { thread: "dur-on-b", model: "anthropic/claude-opus-5-5" })).toMatchObject({
-      kind: "error",
-      error: { code: "invalid_arguments" },
-    })
-    expect(await run("thread_create", { thread: "dur-on-b", prompt: "go" })).toMatchObject({
       kind: "error",
       error: { code: "invalid_arguments" },
     })
@@ -252,6 +248,36 @@ describe("thread_create whose first prompt does not start", () => {
       kind: "error",
       error: { code: "prompt_not_started", details: { thread: "dur-new-on-b", device: "b", state: "queued" } },
     })
+  })
+})
+
+// #14335 / #14289: a create that opens a thread live already answered `deduplicated` from placement and returned
+// before its prompt was sent: ok, with the prompt dropped. The prompt goes to the live thread and the create answers
+// its real delivery, or fails prompt_not_started.
+describe("thread_create naming a thread that is live already, with a prompt", () => {
+  test("#given b runs the thread #when thread_create opens it with a prompt #then nothing is opened, the prompt is admitted on b once, and the create answers its delivery", async () => {
+    const a = account()
+    const { run } = surface(a.remote)
+    const result = await run("thread_create", { thread: "dur-on-b", prompt: "carry on" })
+    expect(result).toMatchObject({
+      kind: "ok",
+      thread: "dur-on-b",
+      deduplicated: true,
+      prompt: { delivery: { kind: "started" } },
+    })
+    expect(types(a.sent).filter((type) => type === "open_session")).toEqual([])
+    expect(types(a.sent).filter((type) => type === "admit_external_message")).toHaveLength(1)
+  })
+
+  test("#given a thread live here that does not drain #when thread_create opens it with a prompt #then the prompt is taken once and the create fails prompt_not_started, never ok with the prompt dropped", async () => {
+    const a = account()
+    const { run, openSession, enqueuedRequests } = surface(a.remote)
+    expect(await run("thread_create", { thread: "dur-local", prompt: "carry on" })).toMatchObject({
+      kind: "error",
+      error: { code: "prompt_not_started", details: { thread: "dur-local", state: "queued" } },
+    })
+    expect(openSession).not.toHaveBeenCalled()
+    expect(enqueuedRequests("dur-local")).toHaveLength(1)
   })
 })
 

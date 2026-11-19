@@ -6,17 +6,17 @@ import { failure } from "../tools/internals"
 export type LaunchProfile = { readonly provider?: string; readonly modelId?: string; readonly thinkingLevel?: string }
 
 /**
- * The new thread's launch options from a thread_create call (#13409, #13410), checked before anything is opened: they
- * name a new thread only; the model is an exact provider/id; the approval mode is the creator's own (`creator`) or one
- * that allows less, never more, so a session cannot start a thread that may do what it may not.
+ * The new thread's launch options from a thread_create call (#13409, #13410), checked before anything is opened: the
+ * launch fields name a new thread only; the model is an exact provider/id; the approval mode is the creator's own
+ * (`creator`) or one that allows less, never more, so a session cannot start a thread that may do what it may not.
+ * `prompt` and `delivery` are not launch fields: a create that opens an existing thread sends its prompt to it
+ * (#14335), so they are taken with `thread` too.
  */
 export function createLaunch(
   value: ThreadCreateInput,
   creator: string | undefined,
 ): ThreadToolResult | { readonly permissionPreset?: string; readonly profile: LaunchProfile } {
-  const named = (["model", "reasoning", "permission_preset", "prompt", "delivery"] as const).filter(
-    (key) => value[key] !== undefined,
-  )
+  const named = (["model", "reasoning", "permission_preset"] as const).filter((key) => value[key] !== undefined)
   if (value.thread !== undefined && named.length > 0)
     return failure(
       "invalid_arguments",

@@ -70,7 +70,8 @@ export type CreateContext = {
  * (#12884): the shape checks, then placement (the only step that reads the device), then the name checked against the
  * threads the target device sees, then one open through the SessionHost - a created or forked session starting in its
  * creator's approval mode on either device - then the creator record, the alias, and the first prompt. An existing
- * thread that is live already is answered from placement (`deduplicated`), so no second open reaches it anywhere.
+ * thread that is live already is answered from placement (`deduplicated`), so no second open reaches it anywhere -
+ * but its prompt, when one was given, is sent to it and the create answers that delivery (#14335).
  */
 export async function createThread(
   options: ThreadToolSurfaceOptions,
@@ -140,7 +141,11 @@ export async function createThread(
       },
       existing: (address) => existingHere(options, current, address, callerId),
     })
-    if (plan.kind === "done") return await withAlias(options.remote, value.alias, plan.result, plan.device)
+    if (plan.kind === "done") {
+      // A thread live already answers from placement (deduplicated); its prompt, if any, still goes to it (#14335).
+      if (plan.thread !== undefined && plan.result.kind === "ok") opened = plan.thread
+      return await withAlias(options.remote, value.alias, plan.result, plan.device)
+    }
     // An alias no account holds names the thread on its device instead (#13104); a given name wins.
     // Trimmed like thread_rename's alias-as-name, so " x " and "x" name the thread the same way.
     const name = plan.localAlias === undefined ? value.name : (value.name ?? value.alias?.trim())
@@ -222,7 +227,6 @@ export async function createThread(
   // A create given no prompt says so (`prompt: null`), so a caller sees nothing was sent (the owner's lost-brief case).
   if (value.prompt === undefined) return made.kind === "ok" ? ({ ...made, prompt: null } as ThreadToolResult) : made
   if (made.kind !== "ok" || opened === undefined) return made
-  if ((made as Extract<ThreadCreateResult, { kind: "ok" }>).deduplicated) return made
   const prompt = await promptThatRan(await firstPrompt(current, opened, value, context), opened, context)
   return "not_started" in prompt ? { kind: "error", error: prompt.not_started } : ({ ...made, prompt } as ThreadToolResult)
 }
