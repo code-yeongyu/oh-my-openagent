@@ -14,6 +14,7 @@ import { prepareRemoteWorktree, removeRemoteWorktree } from "../worktree/remote-
 import { openedEngineId, openRefusal } from "./open-reply"
 import { threadLink } from "../thread-link"
 import type { ThreadHostSession } from "../tools/ports"
+import type { ThreadWorktree } from "../worktree/thread-worktree"
 import { rowState, threadModel } from "../tools/thread-state"
 import {
   openedThread,
@@ -22,6 +23,9 @@ import {
   type SessionOpenOutcome,
   type SessionOpenRequest,
 } from "./session-host"
+
+/** The device service's own refusal: its route lists no such session, so nothing was dispatched to an engine. */
+const ROUTE_UNLISTED = "route_unlisted"
 
 const nonEmpty = (value: unknown): string | undefined =>
   typeof value === "string" && value.length > 0 ? value : undefined
@@ -82,13 +86,62 @@ export function createRelaySessionHost(
     next: string,
     details?: Readonly<Record<string, unknown>>,
   ): SessionOpenOutcome => ({ kind: "error", error: threadToolFailure(code, message, next, details) })
+  /**
+   * A create whose new session b's route does not reach (#14394): end it on b through the endpoint that opened it, so
+   * nothing is left behind, and refuse typed. `created` says whether a thread still exists there (the end failed).
+   */
+  const unreachable = async (
+    reason: string,
+    routingId: string | undefined,
+    thread: string,
+    worktree: ThreadWorktree | undefined,
+  ): Promise<SessionOpenOutcome> => {
+    const ended =
+      routingId === undefined
+        ? undefined
+        : await remote.sessions.endpointCommand(device, {
+            type: "unload_session",
+            sessionId: routingId,
+            force: true,
+            children: "detach",
+          })
+    const created = !(ended?.kind === "ok" && replyData(ended.response)["outcome"] === "unloaded")
+    // #14397 review M1: a worktree this call made on b for the session is removed with it; one b does not remove is
+    // named in the answer, never covered by "nothing was left behind".
+    const left = worktree === undefined ? undefined : await removeRemoteWorktree(remote, device, worktree)
+    const shown = escapeForDisplay(reason)
+    const session = created
+      ? routingId === undefined
+        ? `Device ${device} made thread ${thread}, but its route does not reach it (${shown}), and its open named no routing id to end it by: it is left with no live owner.`
+        : `Device ${device} made thread ${thread}, but its route does not reach it (${shown}), and ending it there failed: it is left with no live owner.`
+      : `Device ${device} took the open, but its route does not reach the session it made (${shown}): no thread host there that this account reaches takes new threads.`
+    const remains =
+      left !== undefined && worktree !== undefined
+        ? ` The worktree ${worktree.path} made for it is still on that device.`
+        : created
+          ? ""
+          : " Nothing was left behind."
+    return fail(
+      "host_unavailable",
+      `${session}${remains}`,
+      "Start omo on that device (an omo session, or omo daemon run), or create the thread on another device.",
+      {
+        device,
+        reason: shown,
+        created,
+        ...(created ? { thread } : {}),
+        ...(created && routingId === undefined ? { unload: "no_routing_id" } : {}),
+        ...(left === undefined || worktree === undefined ? {} : { worktree, cleanup: left.error }),
+      },
+    )
+  }
   return {
     device,
     visible: async (): Promise<readonly ThreadSummary[]> =>
       (await remote.sessions.sessions())
         .filter((row) => row.device === device && row.state !== "ended")
         .map(listedThread),
-    open: async (request: SessionOpenRequest): Promise<SessionOpenOutcome> => {
+    open: async (request: SessionOpenRequest, options): Promise<SessionOpenOutcome> => {
       // The device resolved as the address module resolves one with need "online": unknown is not_found, offline is
       // device_offline (A3: nothing is queued for it), and a roster that cannot be read is host_unavailable.
       let account: Awaited<ReturnType<typeof accountDevices>>
@@ -189,13 +242,43 @@ export function createRelaySessionHost(
         threadId = located.kind === "ok" ? located.sessionId : engineId
       }
       let applied = name
-      if (name !== undefined) {
-        const named = await remote.sessions.sessionCommand(
-          device,
-          threadId,
-          { type: "set_session_name", sessionId: threadId, name },
-          { direct: true },
-        )
+      // The first command a create sends the new session through b's route: its name, else (a create that goes on to
+      // use the session) the state read its first prompt would make anyway.
+      const firstStep = (key: string) =>
+        name !== undefined
+          ? remote.sessions.sessionCommand(
+              device,
+              key,
+              { type: "set_session_name", sessionId: key, name },
+              { direct: true },
+            )
+          : !reopens && options?.confirmReach === true
+            ? remote.sessions.sessionCommand(device, key, { type: "get_state", sessionId: key }, { direct: true })
+            : undefined
+      let reached = await firstStep(threadId)
+      // #14394: every later step (its name, its first prompt, every tool) reaches the new session through b's route. A
+      // route that does not list it (a host the service does not route, such as the Desktop app's) leaves an orphan
+      // nothing can address: the create ends it where it was opened and refuses, before anything records the thread.
+      // Only the service's own route_unlisted counts: an engine's answer about the key is no route verdict. A session b
+      // opened a moment ago may not be routed yet (#14397 review L3), so one such refusal is not the verdict: b is asked
+      // again where the session is, and only a second route_unlisted ends it.
+      if (!reopens && reached?.kind === "refused" && reached.reason === ROUTE_UNLISTED) {
+        const engineId = openedEngineId(data, state)
+        const relocated = engineId === undefined ? undefined : await remote.sessions.locate(device, engineId)
+        if (relocated?.kind === "ok") {
+          threadId = relocated.sessionId
+          reached = await firstStep(threadId)
+        }
+        if (reached?.kind === "refused" && reached.reason === ROUTE_UNLISTED)
+          return await unreachable(
+            reached.reason,
+            nonEmpty(data["sessionId"]),
+            nonEmpty(state["durableSessionId"]) ?? threadId,
+            made?.worktree,
+          )
+      }
+      const named = name === undefined ? undefined : reached
+      if (named !== undefined) {
         if (named.kind !== "ok") {
           applied = undefined
           const failed = outcomeFailure(named, device).error
