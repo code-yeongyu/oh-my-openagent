@@ -426,7 +426,12 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     async (bKind) => {
       const closed = "0195f0c2-1a2b-7c3d-8e4f-00000000d270"
       const file = `/home/b/.omo/agent/sessions/--home-b--/2026-11-19T02-05-00-000Z_${closed}.jsonl`
-      const a = account({ bKind, wakeFeature: true, ended: { b: { [closed]: "rk-closed" } }, sessionFiles: { [closed]: file } })
+      const a = account({
+        bKind,
+        wakeFeature: true,
+        ended: { b: { [closed]: "rk-closed" } },
+        sessionFiles: { [closed]: file },
+      })
       const { run } = surface(a.remote)
       expect(await run("thread_create", { thread: closed })).toMatchObject({ kind: "ok", thread: closed, device: "b" })
       expect(await run("thread_send", { thread: closed, message: "still there?" })).toMatchObject({
