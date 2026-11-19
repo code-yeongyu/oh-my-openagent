@@ -66,6 +66,21 @@ describe("monitor rpc remote targets (#12719): omo's RpcRemoteSource", () => {
     ])
   })
 
+  test.each([
+    ["offline", { online: false }],
+    ["missing from this listing round", { incomplete: ["b"] }],
+  ] as const)(
+    "#given a persistent monitor restored on <device id>/<thread id> while b is %s #when it re-opens #then it watches b's listing key, leaving reachability to the watch, never a lost monitor",
+    async (_case, options) => {
+      const a = account(options)
+      const opened = await registered(a.remote).open({ device: "b", session: "dur-on-b" }, {}, capture().handlers)
+      opened.stop()
+      expect(a.sent.filter((entry) => entry.via === "watch").map((entry) => [entry.device, entry.session])).toEqual([
+        ["b", "rk-on-b"],
+      ])
+    },
+  )
+
   test("#given device b by its name #when the monitor opens <device name>/* #then it follows b's listing rows", async () => {
     const opened = await registered(account().remote).open({ device: "studio", session: "*" }, {}, capture().handlers)
     opened.stop()
