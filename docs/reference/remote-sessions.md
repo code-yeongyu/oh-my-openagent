@@ -48,13 +48,28 @@ open). The agent tool `thread_create` takes the same options as `model`, `reason
 `permission_preset`, `worktree`, `prompt` and `delivery`; there `permission_preset` may only keep or
 narrow the calling session's own mode.
 
-The canonical session identity is the `thread` value that `open --json` returns. Pass it
-directly to `send`, `model`, `interrupt`, `close` or `attach`; the CLI finds its device in the account
-listing. All five also take `<device>/<session>`, with either the durable id or the listing key in the
-`SESSION` column; an explicit device skips the account listing, and a durable id that device has not
-listed yet (a session opened a moment ago) is located on that device. A bare id is found through the
-account listing, which can lag a session opened a moment ago: right after `open`, use
-`<device>/<thread>`.
+## Addresses
+
+Every session verb - `send`, `model`, `interrupt`, `close`, `attach` - takes one address, resolved by the one
+resolver the thread tools use (#14305), so the same text works everywhere:
+
+```text
+address   := bare | device "/" thread
+bare      := thread-id | session-id | alias | name | id-prefix
+thread    := bare                      (resolved among that device's sessions only)
+device    := device-id | "here" | device-name | device-id-prefix
+```
+
+- A thread id is the `thread` value `open --json` prints; it is the canonical identity of the session. A session id
+  is the listing key of the `SESSION` column. A name compares as thread names do (case and spacing folded). An id
+  prefix is 8+ hex characters naming one thread; a device-id prefix is 6+ characters.
+- A bare address searches the account's listing; `<device>/<thread>` asks that device itself, so a session opened a
+  moment ago resolves there before any listing shows it: right after `open`, use `<device>/<thread>`.
+- `here` names this device. `omo remote` commands the OTHER devices' sessions; a thread this device holds answers
+  with the local tool that reaches it (`omo thread send <thread>`).
+- Failures are typed. `model`, `interrupt`, `close` and `attach` need the device online and refuse `device_offline`
+  without queueing. A device that missed this listing round answers `host_unavailable`, never an empty miss. An
+  ambiguous name or prefix names its candidates and nothing runs.
 
 `send`
 with `--steer` goes into the running turn, and `--no-wait` returns once the session took the message
