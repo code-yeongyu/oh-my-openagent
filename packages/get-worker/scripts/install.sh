@@ -15,7 +15,7 @@ cat >"$omo_bash_script" <<'OMO_INSTALL_BASH'
 #   OMO_INSTALL_DIR        launcher directory (default ~/.local/bin)
 #   OMO_NO_MODIFY_PATH=1   never edit shell profiles
 #   OMO_INSTALL_BASE_URL   mirror base (default https://get.omo.dev); GitHub is the fallback
-#   OMO_INSTALL_ALLOW_SUDO=1  allow running as root
+#   OMO_INSTALL_ALLOW_SUDO=1  allow installing into root's home from sudo/doas (a plain root shell needs no override)
 # The whole body runs from main() on the last line, so a truncated download never runs half a script.
 set -euo pipefail
 
@@ -254,6 +254,14 @@ write_receipt() { # write_receipt <channel> <version> <asset> <launcher> <profil
   mv -f "$tmp" "$HOME/.omo/install.json"
 }
 
+refuse_sudo_install() { # sudo/doas from a user would install into root's home; a root-only shell (proot-distro, containers) is its own user (#14344)
+  local invoker="${SUDO_USER:-${DOAS_USER:-root}}"
+  [ "$(id -u)" = 0 ] && [ "$invoker" != root ] && [ "${OMO_INSTALL_ALLOW_SUDO:-}" != 1 ] || return 0
+  fail "refusing to install into root's home from sudo/doas started by ${invoker}.
+  Run it as ${invoker}: curl -fsSL https://get.omo.dev/install.sh | bash
+  To install for root anyway: curl -fsSL https://get.omo.dev/install.sh | OMO_INSTALL_ALLOW_SUDO=1 bash"
+}
+
 main() {
   local want="" remove_other_installs=0 arg base="${OMO_INSTALL_BASE_URL:-https://get.omo.dev}"
   for arg in "$@"; do
@@ -269,9 +277,7 @@ main() {
   done
   want="${want:-latest}"
   base="${base%/}"
-  if [ "$(id -u)" = 0 ] && [ "${OMO_INSTALL_ALLOW_SUDO:-}" != 1 ]; then
-    fail "refusing to run as root; run it as your user (set OMO_INSTALL_ALLOW_SUDO=1 to override)"
-  fi
+  refuse_sudo_install
   [ -n "${HOME:-}" ] || fail "HOME is not set"
 
   local asset version dir launcher work expected actual profile channel

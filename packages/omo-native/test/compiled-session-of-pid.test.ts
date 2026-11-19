@@ -1,14 +1,14 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { mkdirSync, mkdtempSync, readdirSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { removeTree } from "../../../test-support/remove-tree"
 
-// Compiled-binary contract (omo#14253; built the way #13449's test builds it): inside a compiled binary the kill guard's shims run the binary itself as
-// `<binary> __kill-guard check --vantage <pid> -- <argv...>` (the engine leaves the judge entry empty there), so the
-// compiled entry must hand that hidden subcommand to the engine's judge before it boots anything. Only a real compiled
-// executable built from compile-entry.ts exercises that route; the embedded runtime is the smallest one it accepts.
+// Compiled-binary contract (omo#14253): `omo session-of-pid <pid> --json` reaches senpi's own command unchanged, so the
+// caller (a session attestation) reads the engine's one JSON line. Only a real compiled executable built from
+// compile-entry.ts exercises the route the release ships, so the test builds one the way #13449's test does (the
+// embedded runtime is the smallest one it accepts) and spawns it from / with a bare environment.
 const exe = process.platform === "win32" ? ".exe" : ""
 const root = mkdtempSync(join(tmpdir(), "omo-compiled-session-of-pid-"))
 const binary = join(root, "build", `omo${exe}`)
@@ -25,17 +25,12 @@ function freshHome(name: string): string {
   return home
 }
 
-function listTree(dir: string): string[] {
-  return readdirSync(dir, { recursive: true, withFileTypes: true })
-    .map((entry) => join(entry.parentPath, entry.name).slice(dir.length))
-    .sort()
-}
-
-async function run(args: string[], home: string, extraEnv: Record<string, string> = {}) {
+async function run(args: string[], home: string) {
   const child = Bun.spawn([binary, ...args], {
     cwd: "/",
-    // Exactly what g13's session-attestation.ts spawns: cwd /, stdin ignored, and only PATH, LANG, LC_ALL and HOME.
-    env: { PATH: "/usr/bin:/bin", LANG: "C", LC_ALL: "C", HOME: home, ...extraEnv },
+    // What g13's session-attestation.ts spawns: cwd /, stdin ignored, and only PATH, LANG, LC_ALL and HOME; USERPROFILE
+    // keeps a Windows run's runtime provisioning inside the fixture home as HOME does on POSIX.
+    env: { PATH: "/usr/bin:/bin", LANG: "C", LC_ALL: "C", HOME: home, USERPROFILE: home },
     stdin: "ignore",
     stdout: "pipe",
     stderr: "pipe",
