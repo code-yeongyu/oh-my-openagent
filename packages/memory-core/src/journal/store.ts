@@ -1,5 +1,6 @@
+import { Buffer } from "node:buffer"
 import { randomUUID } from "node:crypto"
-import { appendFile, mkdir, readFile, rename, rm, stat, writeFile } from "../fs/resilient"
+import { appendFile, mkdir, open, readFile, rename, rm, stat, writeFile, type FileHandle } from "../fs/resilient"
 import { join } from "node:path"
 
 import {
@@ -54,6 +55,21 @@ function isTranscriptEntry(value: unknown): value is TranscriptEntry {
   )
 }
 
+function parseTranscriptRows(raw: string): TranscriptEntry[] {
+  return raw
+    .split("\n")
+    .filter((line) => line.trim().length > 0)
+    .map((line) => {
+      const parsed: unknown = JSON.parse(line)
+      if (!isTranscriptEntry(parsed)) throw new Error("Invalid transcript journal row")
+      return parsed
+    })
+}
+
+function sameJson(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right)
+}
+
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined
 }
@@ -106,6 +122,7 @@ export class TranscriptJournal {
   private readonly now: () => Date
   private readonly lock: JournalLock
   private readonly snapshotMaxBytes: number
+  private transcriptTail?: { byteOffset: number; entries: TranscriptEntry[] }
 
   constructor(readonly options: TranscriptJournalOptions) {
     this.snapshotMaxBytes = options.snapshotMaxBytes ?? REFLECTION_SNAPSHOT_MAX_BYTES
@@ -294,10 +311,14 @@ export class TranscriptJournal {
         fresh.push(entry)
       }
     }
+    let allEntries: readonly TranscriptEntry[]
     if (fresh.length > 0) {
       await appendFile(this.transcriptPath, `${fresh.map((entry) => JSON.stringify(entry)).join("\n")}\n`, "utf8")
+      allEntries = [...existing, ...fresh]
+      this.transcriptTail = { byteOffset: (await stat(this.transcriptPath)).size, entries: [...allEntries] }
+    } else {
+      allEntries = existing
     }
-    const allEntries = [...existing, ...fresh]
     const state = await this.readStateUnlocked()
     const rebuilt = existing.length === 0 && fresh.length > 0 && state.transcript_pruned_at !== undefined
     await this.writeStateUnlocked(rebuilt ? this.reanchorAfterPrune(state, allEntries) : state, allEntries)
@@ -332,21 +353,56 @@ export class TranscriptJournal {
   }
 
   private async readEntriesUnlocked(): Promise<TranscriptEntry[]> {
+    let size: number
+    try {
+      size = (await stat(this.transcriptPath)).size
+    } catch (error) {
+      if (errorCode(error) !== "ENOENT") throw error
+      this.transcriptTail = undefined
+      return []
+    }
+    // Steady-state settles (the mass-wake hot path, omo#14351) append nothing: the cached rows
+    // are the journal, and only a size change pays a read. Growth reads the appended tail alone;
+    // a shrink (prune, rewrite, foreign writer) falls back to the full load.
+    const cached = this.transcriptTail
+    if (cached !== undefined && size === cached.byteOffset) return cached.entries
+    if (cached !== undefined && size > cached.byteOffset) {
+      const tail = await this.readTailEntriesUnlocked(size, cached.byteOffset)
+      if (tail !== undefined) {
+        const entries = [...cached.entries, ...tail]
+        this.transcriptTail = { byteOffset: size, entries }
+        return entries
+      }
+    }
     let raw: string
     try {
       raw = await readFile(this.transcriptPath, "utf8")
     } catch (error) {
       if (errorCode(error) !== "ENOENT") throw error
+      this.transcriptTail = undefined
       return []
     }
-    return raw
-      .split("\n")
-      .filter((line) => line.trim().length > 0)
-      .map((line) => {
-        const parsed: unknown = JSON.parse(line)
-        if (!isTranscriptEntry(parsed)) throw new Error("Invalid transcript journal row")
-        return parsed
-      })
+    const entries = parseTranscriptRows(raw)
+    this.transcriptTail = { byteOffset: size, entries }
+    return entries
+  }
+
+  private async readTailEntriesUnlocked(
+    size: number,
+    byteOffset: number,
+  ): Promise<readonly TranscriptEntry[] | undefined> {
+    let handle: FileHandle | undefined
+    try {
+      handle = await open(this.transcriptPath, "r")
+      const length = size - byteOffset
+      const buffer = Buffer.alloc(length)
+      const { bytesRead } = await handle.read(buffer, 0, length, byteOffset)
+      return parseTranscriptRows(buffer.subarray(0, bytesRead).toString("utf8"))
+    } catch {
+      return undefined
+    } finally {
+      await handle?.close().catch(() => {})
+    }
   }
 
   private async readStateUnlocked(): Promise<ReflectionTranscriptState> {
@@ -371,6 +427,9 @@ export class TranscriptJournal {
       },
       entries,
     )
+    // A no-op settle (nothing appended, counters unchanged) must not rewrite state.json: the
+    // per-settle write was part of the omo#14351 mass-wake cost.
+    if (sameJson(derived, state)) return
     const temporaryPath = `${this.statePath}.tmp-${randomUUID()}`
     await writeFile(temporaryPath, `${JSON.stringify(derived, null, 2)}\n`, "utf8")
     try {
