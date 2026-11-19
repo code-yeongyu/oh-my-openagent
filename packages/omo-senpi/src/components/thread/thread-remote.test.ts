@@ -404,14 +404,17 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     ["this device cannot wake it", {}, "not_resumable"],
     ["b holds no session file for it", { wakeFeature: true, sessionFiles: {} }, "not_found"],
   ] as const)(
-    "#given b parked a thread its listing still reads live, and %s #when thread_send names it #then a typed refusal after one re-ask, and nothing is woken (#14240)",
+    "#given b parked a thread its listing still reads live, and %s #when thread_send names it #then a typed refusal from b's find_session answer after one re-ask, and nothing is woken (#14240)",
     async (_case, extra, code) => {
       const a = account({ live: [], unlistedReason: "route_unlisted", ...extra })
       const { run } = surface(a.remote)
-      expect(await run("thread_send", { thread: "dur-on-b", message: "wake up" })).toMatchObject({
+      const result = await run("thread_send", { thread: "dur-on-b", message: "wake up" })
+      expect(result).toMatchObject({
         kind: "error",
         error: { code, details: { device: "b", thread: "dur-on-b" } },
       })
+      // b answered, so the refusal is its answer's, never the route_unlisted one find_session was asked to look past.
+      expect(result).not.toMatchObject({ error: { details: { reason: "route_unlisted" } } })
       expect(a.sent.filter((entry) => entry.via === "wake")).toEqual([])
       expect(a.sent.filter((entry) => entry.rpc?.["type"] === "find_session")).toHaveLength(1)
     },
