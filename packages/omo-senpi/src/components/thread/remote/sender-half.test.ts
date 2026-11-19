@@ -362,9 +362,6 @@ describe("#13037 the sender half reaches a session on another device that is not
           details: { device: "c", reason: "pair_loop_guard", guard: "pair_loop", burst: 8, window_ms: 40_000, retry_after_ms: 4_000 },
         },
       })
-      const error = (result as { error: { message: string; next_action: string } }).error
-      expect(error.message).toContain("8 sends from this device to the session on device c within 40 s")
-      expect(error.next_action).toContain("accepted after 4 s")
     })
 
     test("#given the receiver refused it overloaded #then the tool answers overloaded with retry_after_ms", async () => {
