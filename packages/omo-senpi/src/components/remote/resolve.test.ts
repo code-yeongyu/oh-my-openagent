@@ -195,4 +195,14 @@ describe("sessions.resolve", () => {
       details: { kind: "session" },
     })
   })
+
+  test("#given two rows on one device that both answer a session part #when a device-qualified address names it #then ambiguous_target with both candidates, as a bare address answers", async () => {
+    const { client } = await account([listed(PEER, "rk-1", "dur-1", "Bot"), listed(PEER, "dur-1", "dur-9", "Other")])
+    const failure = failureOf(await client.sessions.resolve(`${PEER}/dur-1`))
+    expect(failure.code).toBe("ambiguous_target")
+    expect(failure.details?.["candidates"]).toEqual([
+      expect.objectContaining({ thread: `${PEER}/rk-1` }),
+      expect.objectContaining({ thread: `${PEER}/dur-1` }),
+    ])
+  })
 })
