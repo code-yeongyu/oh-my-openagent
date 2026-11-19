@@ -233,7 +233,8 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
       device: "b",
       deduplicated: false,
     })
-    expect(a.sent).toEqual([
+    // The reopen then sets the thread's name on the session it located (#14274), a session command.
+    expect(a.sent.filter((entry) => entry.via === "endpoint")).toEqual([
       { via: "endpoint", device: "b", rpc: { type: "find_session", durableSessionId: "dur-on-b" } },
       { via: "endpoint", device: "b", rpc: { type: "open_session", retain_on_disconnect: true, sessionPath: B_FILE } },
     ])
@@ -258,7 +259,11 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
       device: "b",
       deduplicated: false,
     })
-    expect(a.sent.map((entry) => [entry.via, entry.device, entry.rpc?.["type"], entry.rpc?.["sessionPath"]])).toEqual([
+    expect(
+      a.sent
+        .filter((entry) => entry.via === "endpoint")
+        .map((entry) => [entry.via, entry.device, entry.rpc?.["type"], entry.rpc?.["sessionPath"]]),
+    ).toEqual([
       ["endpoint", "b", "find_session", undefined],
       ["endpoint", "b", "open_session", B_FILE],
     ])
