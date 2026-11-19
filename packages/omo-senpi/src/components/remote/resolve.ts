@@ -13,8 +13,7 @@ import { canonicalizeThreadHandle, handleOf, type CanonicalThread } from "./seam
 import type { DeviceRow, Opts, RemoteFailure, Scope, SessionRow } from "./types"
 
 type Match =
-  | { readonly kind: "one"; readonly row: SessionRow }
-  | { readonly kind: "many"; readonly rows: readonly SessionRow[] }
+  { readonly kind: "one"; readonly row: SessionRow } | { readonly kind: "many"; readonly rows: readonly SessionRow[] }
 
 // A name match is held to the caller's workspace unless all_scope; an id or `<device>/<session>` names one session
 // account-wide, as on this device (thread/addressing.ts).
@@ -68,9 +67,14 @@ const ambiguous = (address: string, rows: readonly SessionRow[]): RemoteFailure 
 const deviceRefusal = (refusal: AddressRefusal): RemoteFailure => {
   switch (refusal.reason) {
     case "no_device":
-      return remoteFailure(refusal.code, `No device of this account answers to ${refusal.typed}.`, nextActionFor(refusal.code), {
-        details: refusal.details,
-      })
+      return remoteFailure(
+        refusal.code,
+        `No device of this account answers to ${refusal.typed}.`,
+        nextActionFor(refusal.code),
+        {
+          details: refusal.details,
+        },
+      )
     case "devices_share_name":
     case "devices_share_prefix":
       return remoteFailure(
@@ -80,35 +84,42 @@ const deviceRefusal = (refusal: AddressRefusal): RemoteFailure => {
         { details: refusal.details },
       )
     default:
-      return remoteFailure(refusal.code, `${refusal.typed} does not name one device of this account.`, nextActionFor(refusal.code), {
-        details: refusal.details,
-      })
+      return remoteFailure(
+        refusal.code,
+        `${refusal.typed} does not name one device of this account.`,
+        nextActionFor(refusal.code),
+        {
+          details: refusal.details,
+        },
+      )
   }
 }
 
-// Design section 5: not_found is said only when every device that could hold the thread answered this round. Which
-// unanswered device counts is the core's rule (deviceListing) over the round the listing read: an offline device is
-// expected to stay silent and keeps today's answer; an online one that missed the round makes the miss host_unavailable.
-function miss(address: string, unanswered: readonly DeviceRow[]): RemoteFailure {
-  const roster = unanswered.map((row) => ({ id: row.id, online: row.online }))
+/**
+ * A miss while a device the core counts as incomplete this round (deviceListing) did not answer: host_unavailable naming
+ * it, never not_found. An offline device is expected to stay silent and keeps the plain miss; undefined then.
+ */
+export function listingIncomplete(address: string, unanswered: readonly DeviceRow[]): RemoteFailure | undefined {
   const round = { incomplete: unanswered.map((row) => row.id) }
-  const silent = unanswered.filter((row) => deviceListing(row.id, round, roster) === "incomplete")
-  if (silent.length > 0) {
-    const refusal = devicesSilent("listing_incomplete", silent)
-    return remoteFailure(
-      refusal.code,
-      `No session of this account answers to ${address} on the devices that answered; ${silent.map((row) => deviceLabel(row)).join(", ")} did not answer this round.`,
-      nextActionFor(refusal.code),
-      { details: refusal.details },
-    )
-  }
-  return remoteFailure("not_found", `No session of this account answers to ${address}.`, nextActionFor("not_found"), {
+  const silent = unanswered.filter((row) => deviceListing(row.id, round, unanswered) === "incomplete")
+  if (silent.length === 0) return undefined
+  const refusal = devicesSilent("listing_incomplete", silent)
+  return remoteFailure(
+    refusal.code,
+    `No session of this account answers to ${address} on the devices that answered; ${silent.map((row) => deviceLabel(row)).join(", ")} did not answer this round.`,
+    nextActionFor(refusal.code),
+    { details: refusal.details },
+  )
+}
+
+const miss = (address: string, unanswered: readonly DeviceRow[]): RemoteFailure =>
+  listingIncomplete(address, unanswered) ??
+  remoteFailure("not_found", `No session of this account answers to ${address}.`, nextActionFor("not_found"), {
     details: {
       kind: "session",
       ...(unanswered.length === 0 ? {} : { unanswered: unanswered.map((row) => row.id) }),
     },
   })
-}
 
 /**
  * The core's device resolver over the client's roster (one devices.list round): id > here > name (normalizeName) >
@@ -180,6 +191,10 @@ export function resolveMember(core: ClientCore): RemoteClient["sessions"]["resol
     remember(listed.value.rows, deviceId)
     const found = match(listed.value.rows, target, deviceId)
     if (found?.kind === "one") return { kind: "ok", value: found.row }
-    return miss(address, listed.value.unanswered)
+    // Only the named device could hold it: another device's silence says nothing about this miss.
+    return miss(
+      address,
+      listed.value.unanswered.filter((row) => row.id === deviceId),
+    )
   }
 }
