@@ -37,6 +37,11 @@ export type ThreadHostSession = {
   readonly error_code?: string
   /** The current or most recent turn's id, as the prompt response names it. */
   readonly turn_id?: string
+  /**
+   * senpi#7025: while a running session sleeps between provider retries,
+   * `{kind: "rate_limit" | "retry", attempt, maxAttempts, delayMs, until, error?}`; an older engine lists none.
+   */
+  readonly waiting?: unknown
   /** The session's current model; absent while unknown or on an older engine. */
   readonly model?: { readonly provider: string; readonly id: string }
   readonly createdAt?: string

@@ -24,6 +24,7 @@ import {
 import type {
   ThreadActivity,
   ThreadModel,
+  ThreadRetryWait,
   ThreadState,
   ThreadToolName,
   ThreadToolResult,
@@ -42,7 +43,7 @@ import {
   type ThreadToolSurfaceOptions,
 } from "./ports"
 import { sendView } from "./send-view"
-import { activityDetail, threadModel, threadState } from "./thread-state"
+import { activityDetail, retryWait, threadModel, threadState } from "./thread-state"
 
 // biome-ignore lint/suspicious/noExplicitAny: the tool definitions are heterogeneous by design.
 export type AnyTool = ToolDefinition<any, any>
@@ -88,6 +89,7 @@ export type ThreadToolSummary = Omit<
   | "error_code"
   | "turn_id"
   | "model"
+  | "waiting"
 > & {
   readonly thread_id: string
   readonly name: string
@@ -100,6 +102,8 @@ export type ThreadToolSummary = Omit<
   readonly error_code?: string
   /** The current or most recent turn's id. */
   readonly turn_id?: string
+  /** A running thread asleep between provider retries (senpi#7025). */
+  readonly waiting_on?: ThreadRetryWait
   readonly model?: ThreadModel
   readonly created_at: string
   readonly updated_at: string | null
@@ -140,6 +144,7 @@ export function summary(session: ThreadHostSession, entry?: AddressEntry): Threa
     error_code,
     turn_id,
     model,
+    waiting,
     ...rest
   } = session
   const created = entry?.created_at ?? session.created_at ?? session.createdAt ?? new Date().toISOString()
@@ -152,6 +157,7 @@ export function summary(session: ThreadHostSession, entry?: AddressEntry): Threa
     state: threadState({ archived, held, activity }),
     ...threadModel(model),
     ...activityDetail(held && archived !== true, activity, error_code, turn_id),
+    ...retryWait(held && archived !== true && activity === "running", waiting),
     created_at: created,
     updated_at: entry === undefined ? (session.updated_at ?? session.updatedAt ?? created) : entry.updated_at,
     ...(entry === undefined ? {} : { endpoint: entry.endpoint, surface: entry.surface }),

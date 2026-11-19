@@ -240,6 +240,38 @@ describe("thread state on this device's rows", () => {
     }
     expect(seen).toEqual(expected)
   })
+
+  test("#given an engine publishing senpi#7025's retry wait on list_sessions #when listed #then a running thread sleeping in a backoff carries waiting_on retry with its kind, until and attempts, and no other row carries one (#14278)", () => {
+    const until = "2026-11-19T05:00:45.000Z"
+    const wait = (kind: string) => ({ kind, attempt: 2, maxAttempts: 5, delayMs: 45_000, until, error: "429 too many" })
+    const row = (id: string, fields: Record<string, unknown>): ThreadHostSession =>
+      ({ sessionId: id, durableSessionId: id, cwd: "/w", name: id, status: "open", ...fields }) as ThreadHostSession
+    const sessions = [
+      row("rate-limited", { activity: "running", waiting: wait("rate_limit") }),
+      row("retrying", { activity: "running", waiting: wait("retry") }),
+      row("working", { activity: "running" }),
+      // A wait on a thread that is not running, or one of a shape this build does not know, is not a wait.
+      row("idle-stale", { activity: "idle", waiting: wait("rate_limit") }),
+      row("unknown-kind", { activity: "running", waiting: wait("quota") }),
+      row("closed", { status: "closed", activity: "running", waiting: wait("rate_limit") }),
+    ]
+    const result = listThreads(surfaceOptions(scratch()), { sessions, hosts: [], disk: [] }, true, [
+      "running",
+      "idle",
+      "inactive",
+    ])
+    const waits = Object.fromEntries(
+      rows(result).map((listed) => [listed.thread, (listed as { waiting_on?: unknown }).waiting_on ?? null]),
+    )
+    expect(waits).toEqual({
+      "rate-limited": { kind: "retry", reason: "rate_limit", until, attempt: 2, max_attempts: 5 },
+      retrying: { kind: "retry", reason: "retry", until, attempt: 2, max_attempts: 5 },
+      working: null,
+      "idle-stale": null,
+      "unknown-kind": null,
+      closed: null,
+    })
+  })
 })
 
 const remoteRow = (id: string, fields: Partial<RemoteSessionRow>): RemoteSessionRow => ({
