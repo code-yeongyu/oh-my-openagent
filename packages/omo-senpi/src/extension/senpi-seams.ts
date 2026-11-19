@@ -84,7 +84,9 @@ export function remoteMonitorTarget(target: string): { readonly device: string; 
   const trimmed = target.trim()
   const [, device, session] = REMOTE_TARGET.exec(trimmed) ?? []
   if (device === undefined || session === undefined) return undefined
-  return /\.jsonl$/i.test(trimmed) || DRIVE_LETTER.test(device) || PATH_SEGMENT.test(device) ? undefined : { device, session }
+  return /\.jsonl$/i.test(trimmed) || DRIVE_LETTER.test(device) || PATH_SEGMENT.test(device)
+    ? undefined
+    : { device, session }
 }
 
 const isRemoteMonitorTarget = (target: string): boolean => remoteMonitorTarget(target) !== undefined
@@ -118,13 +120,18 @@ export function installRemoteWakeRefusal(pi: {
 
 /** The input and target of a `tool_call` payload that opens a `monitor` rpc watch; undefined for any other call. */
 export function monitorRpcOpen(payload: unknown): { readonly input: object; readonly target: string } | undefined {
-  if (typeof payload !== "object" || payload === null || Reflect.get(payload, "toolName") !== "monitor") return undefined
+  if (typeof payload !== "object" || payload === null || Reflect.get(payload, "toolName") !== "monitor")
+    return undefined
   const input: unknown = Reflect.get(payload, "input")
   if (typeof input !== "object" || input === null) return undefined
   const action: unknown = Reflect.get(input, "action")
   const type: unknown = Reflect.get(input, "type")
   const target: unknown = Reflect.get(input, "target")
-  if ((action !== undefined && action !== "create") || (type !== undefined && type !== "rpc") || typeof target !== "string")
+  if (
+    (action !== undefined && action !== "create") ||
+    (type !== undefined && type !== "rpc") ||
+    typeof target !== "string"
+  )
     return undefined
   return { input, target }
 }

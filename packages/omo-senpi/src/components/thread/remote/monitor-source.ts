@@ -2,7 +2,13 @@ import { remoteMonitorTarget } from "../../../extension/senpi-seams"
 import type { RpcRemoteHandlers, RpcRemoteRow, RpcRemoteSource, RpcRemoteState } from "../../../extension/types"
 import type { ThreadResolveResult } from "../addressing"
 import type { MonitorTargetResolution } from "../tools/monitor-target"
-import { rowThreadId, type JsonObject, type RemoteSessionRow, type RemoteSessionState, type RemoteThreadSurface } from "./ports"
+import {
+  rowThreadId,
+  type JsonObject,
+  type RemoteSessionRow,
+  type RemoteSessionState,
+  type RemoteThreadSurface,
+} from "./ports"
 import { threadToolFailure } from "../errors"
 import { deviceRefusal, listedDevices, remoteAvailable } from "./remote-ops"
 
@@ -96,7 +102,9 @@ export async function resolveMonitorTarget(
     return { kind: "refused", failure }
   }
   const row = resolved.entry.transport?.kind === "relay" ? resolved.entry.transport.row : undefined
-  return row === undefined ? await armed(undefined, resolved.entry.thread_id) : await armed(row.device, rowThreadId(row))
+  return row === undefined
+    ? await armed(undefined, resolved.entry.thread_id)
+    : await armed(row.device, rowThreadId(row))
 }
 
 async function openSession(
