@@ -686,8 +686,8 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
         if (found.kind === "error") return found.result
         // Nothing live holds it: there is nothing to close, and the thread stays resumable from its session file.
         if (found.kind === "not_live")
-          return { kind: "ok", ...controlIdentity(found), closed: false, reason: "not_live" }
-        return await closeThread(found.control)
+          return { kind: "ok", ...controlIdentity(found), closed: false, reason: "not_live", dropped_deliveries: [] }
+        return await closeThread(found.control, value.force)
       }),
     rename: (request) =>
       control(threadToolParamSchemas.thread_rename, request, async (value) =>

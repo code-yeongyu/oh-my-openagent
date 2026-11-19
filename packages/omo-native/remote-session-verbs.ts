@@ -188,7 +188,7 @@ async function runSessionOn(
     case "interrupt":
       return show(await answered(() => interruptThread(control, undefined)), label)
     case "close":
-      return show(await answered(() => closeThread(control)), label)
+      return show(cliClose(await answered(() => closeThread(control, args.force)), label), label)
   }
 }
 
@@ -430,5 +430,24 @@ async function sendTo(
     // Every exit, early refusals included, releases the follow and the store worker this send opened.
     if (follow !== undefined && !("kind" in follow)) follow.stop()
     await delivery.dispose()
+  }
+}
+
+/**
+ * A close the engine refused because the thread has messages it has not read (omo#14234) names the CLI's own option:
+ * the tool's hint says `force: true`, which this command takes as `--force`, and the ids (or `unavailable`) are printed.
+ */
+function cliClose(result: ThreadToolResult, label: string): ThreadToolResult {
+  if (result.kind !== "error" || result.error.details?.["pending_deliveries"] === undefined) return result
+  const pending = result.error.details["pending_deliveries"]
+  const ids = Array.isArray(pending)
+    ? `messages it has not read: ${pending.join(", ")}`
+    : "message ids: unavailable on that device's engine"
+  return {
+    ...result,
+    error: {
+      ...result.error,
+      next_action: `${ids}. Run omo remote close ${label} --force to close it anyway; those messages are dropped.`,
+    },
   }
 }

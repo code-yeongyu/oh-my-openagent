@@ -37,8 +37,8 @@ export async function interruptThread(control: SessionControl, turnId: string | 
   }
 }
 
-export async function closeThread(control: SessionControl): Promise<ThreadToolResult> {
-  const outcome = await control.close()
+export async function closeThread(control: SessionControl, force?: boolean): Promise<ThreadToolResult> {
+  const { outcome, dropped_deliveries } = await control.close(force === true ? { force } : {})
   if (outcome === "held_elsewhere")
     return failure(
       "foreign_live_owner",
@@ -47,7 +47,13 @@ export async function closeThread(control: SessionControl): Promise<ThreadToolRe
       control.device === undefined ? undefined : { device: control.device },
     )
   const closed = outcome === "closed"
-  return { kind: "ok", ...controlIdentity(control), closed, reason: closed ? "closed" : "not_live" }
+  return {
+    kind: "ok",
+    ...controlIdentity(control),
+    closed,
+    reason: closed ? "closed" : "not_live",
+    dropped_deliveries: [...dropped_deliveries],
+  }
 }
 
 /**

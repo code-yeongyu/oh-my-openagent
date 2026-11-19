@@ -89,9 +89,10 @@ it("counts a disable comment that names one of the omo-testing rules", () => {
   const source = [
     `${line} oxlint-disable-next-line omo-testing/no-fixed-sleep`,
     `${line} eslint-disable-next-line omo-testing/no-flake-masking -- unrelated rule, not counted`,
+    `${line} oxlint-disable-next-line omo-testing/no-module-mock`,
     `${line} oxlint-disable-next-line eslint/no-console`,
   ].join("\n")
-  expect(countSuppressions("probe.ts", source)).toBe(2)
+  expect(countSuppressions("probe.ts", source)).toBe(3)
 })
 
 it("skips generated sources by path, so only hand-written files are ratcheted", () => {
