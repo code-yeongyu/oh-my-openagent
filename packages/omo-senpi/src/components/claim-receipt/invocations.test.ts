@@ -70,7 +70,7 @@ describe("claim-receipt invocations", () => {
 
   describe("#given checks run remotely, in a loop or through CI readouts", () => {
     it("#then the remote command of ssh is parsed", () => {
-      expect(invokedKinds("ssh -o BatchMode=yes -p 22 mengmota 'cd w && bun test x'")).toEqual(["test"])
+      expect(invokedKinds("ssh -o BatchMode=yes -p 22 studio-mac 'cd w && bun test x'")).toEqual(["test"])
       expect(invokedKinds("ssh host cd w '&&' tsgo --noEmit")).toEqual(["typecheck"])
       expect(invokedKinds("ssh host uptime")).toEqual([])
     })
