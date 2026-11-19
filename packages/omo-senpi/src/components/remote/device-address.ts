@@ -1,4 +1,11 @@
-import { accountDevices, asFailure, resolveAccountDevice, resolveAddress, type Resolved } from "../thread/address"
+import {
+  accountDevices,
+  accountState,
+  asFailure,
+  resolveAccountDevice,
+  resolveAddress,
+  type Resolved,
+} from "../thread/address"
 import { threadToolFailure, type ThreadToolFailure } from "../thread/errors"
 import { rowThreadId, type RemoteDevice, type RemoteThreadSurface } from "../thread/remote/ports"
 import { parseAddress } from "@oh-my-opencode/thread-address-core"
@@ -55,8 +62,9 @@ export async function resolveTypedAddress(
   typed: string,
   opts: { readonly need: "address" | "online" },
 ): Promise<RemoteResolved | { readonly kind: "error"; readonly error: ThreadToolFailure }> {
+  const read = readOnce(remote)
   const resolved = await resolveAddress(
-    { remote, callerWorkspaceRoot: "", local: [], callerId: UNKNOWN_CALLER },
+    { remote: read, callerWorkspaceRoot: "", local: [], callerId: UNKNOWN_CALLER },
     typed,
     { all_scope: true, probe: true, unique_holder: true, need: opts.need },
   )
@@ -72,7 +80,7 @@ export async function resolveTypedAddress(
         { kind: "thread", thread, on_this_device: true },
       ),
     }
-  const here = parseAddress(typed).kind === "bare" && thread !== "" ? await copyHere(remote, thread) : undefined
+  const here = parseAddress(typed).kind === "bare" && thread !== "" ? await copyHere(read, thread) : undefined
   if (here === undefined) return { ...resolved, where }
   return {
     kind: "error",
@@ -92,11 +100,40 @@ export async function resolveTypedAddress(
 }
 
 /**
- * This device's id when the account listing (the round the bare resolution just read, reused) shows `thread` on this
- * device too.
+ * The surface one resolution reads: the relay status and the account-wide listing are each asked once, so the holder
+ * check below answers from what the resolution already read and makes no request of its own.
  */
-async function copyHere(remote: RemoteThreadSurface, thread: string): Promise<string | undefined> {
-  const [rows, here] = await Promise.all([remote.sessions.sessions(), remote.sessions.thisDevice()])
+function readOnce(remote: RemoteThreadSurface): RemoteThreadSurface {
+  const { client, sessions } = remote
+  let status: ReturnType<typeof client.service.status> | undefined
+  let rows: ReturnType<typeof sessions.sessions> | undefined
+  let listed: ReturnType<NonNullable<typeof sessions.listing>> | undefined
+  const { listing } = sessions
+  return {
+    ...remote,
+    client: { ...client, service: { ...client.service, status: () => (status ??= client.service.status()) } },
+    sessions: {
+      ...sessions,
+      sessions: (filter) => (filter?.device === undefined ? (rows ??= sessions.sessions()) : sessions.sessions(filter)),
+      ...(listing === undefined
+        ? {}
+        : {
+            listing: (filter?: { readonly device?: string }) =>
+              filter?.device === undefined ? (listed ??= listing()) : listing(filter),
+          }),
+    },
+  }
+}
+
+/** This device's id when the account listing the resolution read shows `thread` on this device too. */
+async function copyHere(read: RemoteThreadSurface, thread: string): Promise<string | undefined> {
+  const [state, rows] = await Promise.all([
+    accountState(read.client),
+    read.sessions.listing === undefined
+      ? read.sessions.sessions()
+      : read.sessions.listing().then((round) => round.rows),
+  ])
+  const here = "kind" in state ? null : state.here
   return here !== null && rows.some((row) => row.device === here && rowThreadId(row) === thread) ? here : undefined
 }
 
