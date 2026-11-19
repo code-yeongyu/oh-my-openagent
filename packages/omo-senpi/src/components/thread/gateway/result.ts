@@ -52,8 +52,11 @@ export function resultFromRow(
     // A row here was sent and is received on this install, so the device its sender stamped (#13004) is the one the
     // receiver waits on (#13014); a row with no stamped device names none, so a replayed answer reads the same.
     const device = row.envelope.provenance?.device
+    // An engine that keeps the delivery as a held notice (senpi#7014: a Stop, an interrupted run or a parent's hold) answers
+    // `held`: the delivery waits on that hold, and the sender is told so instead of a bare queued.
+    const waitKind = row.admission_kind === "held" ? "hold" : row.wait_kind
     const waiting =
-      row.wait_kind === null ? {} : { waiting_on: { kind: row.wait_kind, ...(device === undefined ? {} : { device }) } }
+      waitKind === null ? {} : { waiting_on: { kind: waitKind, ...(device === undefined ? {} : { device }) } }
     return { ...base, delivery: { kind: "queued", queue_position: Math.max(queuePosition, 1), ...waiting } }
   }
   if (row.state === "refused") {

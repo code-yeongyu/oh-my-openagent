@@ -555,6 +555,9 @@ export function createRelayTransport(
     const kind = reply["kind"]
     const turnId = typeof reply["turnId"] === "string" ? reply["turnId"] : ""
     if (kind === "started" || kind === "steered") return ok({ kind, turn_id: turnId })
+    // senpi#7014: the engine kept the delivery as a held notice (a Stop, an interrupted run, a parent's hold); it is
+    // delivered when that hold is released, so the send waits on the hold there and is never uncertain.
+    if (kind === "held") return ok({ kind: "queued", queue_position: 1, waiting_on: { kind: "hold", device: row.device } })
     if (kind === "turn_conflict")
       return fail(
         REFUSAL_CODES.turn_conflict.code,
@@ -649,6 +652,7 @@ export function createRelayTransport(
     const turnId = typeof data["turnId"] === "string" ? data["turnId"] : ""
     if (kind === "started" || kind === "steered") return ok({ kind, turn_id: turnId })
     if (kind === "already_admitted") return ok({ kind: "queued", queue_position: 1 }, true)
+    if (kind === "held") return ok({ kind: "queued", queue_position: 1, waiting_on: { kind: "hold", device } })
     return fail(
       "idempotency_uncertain",
       `Device ${device} accepted the message but answered an unknown admission (${String(kind)}).`,
