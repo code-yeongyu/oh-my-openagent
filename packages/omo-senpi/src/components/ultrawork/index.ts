@@ -1,31 +1,29 @@
 import { isGpt6AstraModel } from "@oh-my-opencode/model-core"
-import { readSessionRole, type SessionRole } from "@oh-my-opencode/senpi-task"
+import { readSessionRole } from "@oh-my-opencode/senpi-task"
 
 import { transformContextText } from "../../extension/context-text-transform"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
-import {
-  maskNegatedInvocations,
-  NOT_AFTER_IDENTIFIER,
-  NOT_BEFORE_PATH,
-  NOT_INTO_IDENTIFIER,
-  stripQuotedRegions,
-  stripQuotedSpans,
-} from "../skill-pointers/strip-quoted-regions"
+import { classifyUltraworkInput, isUltraworkInput, type InputSource } from "./classify-input"
 import { SENPI_ASTRA_ULTRAWORK_DIRECTIVE, SENPI_ULTRAWORK_DIRECTIVE } from "./generated-directive"
+import * as keywordDetector from "./keyword-detector-settings"
+import { type SessionArming, sharedSessionArming, snapshotSessionArming } from "./session-arming"
 
-// The keyword arms only as a word of its own: "ulw", "ulw loop", a leading "ulw-loop" or "ulw-plan." do;
-// "ulwfoo", "ulw_helper", "mass-ulw-refactor", "ulw-plan.md" and ".omo/ulw/" do not (#9738). Quoted,
-// injected, relayed and negated regions are blanked before this pattern runs.
-const ULTRAWORK_KEYWORD = /\b(?:ultrawork|ulw)\b/i
-const ULTRAWORK_CURRENT_PROMPT_PATTERN = new RegExp(
-  String.raw`${NOT_AFTER_IDENTIFIER}\b(?:ultrawork|ulw)\b${NOT_INTO_IDENTIFIER}${NOT_BEFORE_PATH}`,
-  "i",
-)
-const ULTRAWORK_DISABLED_FLAG = "omo-senpi-ultrawork-disabled"
-const ULTRAWORK_MODE_OPEN_TAG = "<ultrawork-mode>"
-const ULTRAWORK_MODE_CLOSE_TAG = "</ultrawork-mode>"
-const SKILL_COMMAND_PREFIX = "/skill:"
-const ULTRAWORK_SKILL_NAME = "ultrawork"
+export {
+  classifyUltraworkInput,
+  isUltraworkInput,
+  type UltraworkClassification,
+  type UltraworkInvocationStage,
+  type UltraworkRoute,
+  type UltraworkSuppressionReason,
+} from "./classify-input"
+export {
+  armingSnapshot,
+  createSessionArming,
+  sharedSessionArming,
+  type ArmingSnapshot,
+  type SessionArming,
+} from "./session-arming"
+
 const ULTRAWORK_CUSTOM_TYPE = "omo-ultrawork:directive"
 
 // Re-arm nudge for a session whose transcript already holds the full directive:
@@ -38,36 +36,8 @@ const ULTRAWORK_REMINDER =
 interface SenpiInputEvent {
   type: "input"
   text: string
-  source: "interactive" | "rpc" | "extension"
+  source: InputSource
   streamingBehavior?: "steer" | "followUp"
-}
-
-export interface ArmingSnapshot {
-  readonly wasArmed: boolean
-  readonly compactRearmPending: boolean
-}
-
-export type UltraworkInvocationStage = "none" | "first_arm" | "remention" | "post_compact_rearm"
-export type UltraworkRoute = "none" | "direct" | "skill_args" | "skill_expansion" | "embedded_directive"
-export type UltraworkSuppressionReason =
-  | "none"
-  | "extension_source"
-  | "child_session"
-  | "no_keyword"
-  | "identifier_reference"
-  | "negated_mention"
-  | "skill_name_only"
-  | "skill_expansion"
-  | "embedded_directive"
-
-export interface UltraworkClassification {
-  readonly matchedUlw: boolean
-  readonly matchedUltrawork: boolean
-  readonly occurrenceCount: number
-  readonly effective: boolean
-  readonly stage: UltraworkInvocationStage
-  readonly route: UltraworkRoute
-  readonly suppressionReason: UltraworkSuppressionReason
 }
 
 type SenpiInputEventResult = { action: "continue" } | { action: "transform"; text: string }
@@ -82,82 +52,26 @@ interface SessionEventContext {
   }
 }
 
-export interface SessionArming {
-  trackSession(sessionId: string | undefined): void
-  currentSessionId(): string | undefined
-  rearmOnCompact(sessionId: string | undefined): void
-  isArmed(sessionId: string | undefined): boolean
-  isCompactRearmPending?(sessionId: string | undefined): boolean
-  markArmed(sessionId: string | undefined): void
-}
-
-// Senpi tears down the extension runner and re-registers every component during
-// a session switch or resume, and it loads PACKAGED extensions through an
-// uncached importer (Jiti `moduleCache: false` in core/extensions/loader.ts), so
-// every module-scope binding in this bundle is reconstructed on each load. A
-// ledger held at module scope — or inside register() — forgets every armed
-// session there and re-injects the full ~17KB directive on the next trigger, the
-// exact token burn this guard exists to stop. The default ledger therefore hangs
-// off globalThis (process-lifetime, survives re-evaluation), keyed by a
-// registered symbol so every evaluation of the bundle shares one ledger — but
-// ONLY while the directive text matches exactly: a slot left by an older bundle
-// armed its sessions against a directive their transcripts may no longer hold,
-// so a directive mismatch must start a fresh ledger, not reuse the stale one.
-// Tests inject isolated ledgers through the factory parameter instead.
-const ARMING_LEDGER_KEY = Symbol.for("omo.ultrawork.arming")
-
-interface SharedArmingSlot {
-  readonly directive: string
-  readonly astraDirective: string
-  readonly arming: SessionArming
-}
-
-function isCurrentArmingSlot(value: unknown): value is SharedArmingSlot {
-  if (typeof value !== "object" || value === null) {
-    return false
+export function createUltraworkComponent(
+  arming: SessionArming = sharedSessionArming(),
+  loadSettings: keywordDetector.LoadKeywordDetectorSettings = keywordDetector.loadKeywordDetectorSettings,
+): OmoSenpiComponent {
+  // A config edit reloads the extension (config-watch), which builds a fresh component, so one read per cwd is current.
+  const settingsByCwd = new Map<string, ReturnType<keywordDetector.LoadKeywordDetectorSettings>>()
+  const cachedSettings: keywordDetector.LoadKeywordDetectorSettings = (cwd) => {
+    if (!settingsByCwd.has(cwd)) settingsByCwd.set(cwd, loadSettings(cwd))
+    return settingsByCwd.get(cwd)
   }
-  const slot = value as SharedArmingSlot
-  // The slot stores the directive TEXT itself, not a hash: string `===` compares
-  // by value, so a re-evaluated bundle's fresh constant still matches, while any
-  // edit to the directive (or a hash collision between distinct directives, which
-  // a 32-bit FNV-1a revision demonstrably allowed) can never reuse stale arming.
-  // A bare ledger from a pre-slot bundle has no directive to match, so it is
-  // discarded here exactly like a mismatched one.
-  return (
-    slot.directive === SENPI_ULTRAWORK_DIRECTIVE &&
-    slot.astraDirective === SENPI_ASTRA_ULTRAWORK_DIRECTIVE &&
-    typeof slot.arming === "object" &&
-    slot.arming !== null
-  )
-}
-
-export function sharedSessionArming(): SessionArming {
-  const registry = globalThis as unknown as Record<symbol, unknown>
-  const existing = registry[ARMING_LEDGER_KEY]
-  if (isCurrentArmingSlot(existing)) {
-    return existing.arming
-  }
-  const created = createSessionArming()
-  const slot: SharedArmingSlot = {
-    directive: SENPI_ULTRAWORK_DIRECTIVE,
-    astraDirective: SENPI_ASTRA_ULTRAWORK_DIRECTIVE,
-    arming: created,
-  }
-  registry[ARMING_LEDGER_KEY] = slot
-  return created
-}
-
-export function createUltraworkComponent(arming: SessionArming = sharedSessionArming()): OmoSenpiComponent {
   return {
     name: "ultrawork",
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
       pi.on("input", (payload: unknown, eventCtx: unknown): SenpiInputEventResult =>
-        handleInput(pi, payload, ctx, arming, eventCtx),
+        handleInput(pi, payload, ctx, arming, eventCtx, cachedSettings),
       )
       // Input is transformed before a queued message drains. Select again at the
       // receiving boundary so a model switch or fallback cannot deliver its old policy.
       pi.on("context", (payload: unknown, eventCtx: unknown) => {
-        if (ctx.config.getFlag(ULTRAWORK_DISABLED_FLAG) === true) return
+        if (keywordDetector.isUltraworkFlagDisabled(ctx)) return
         if (
           typeof payload !== "object" ||
           payload === null ||
@@ -211,171 +125,15 @@ export function createUltraworkComponent(arming: SessionArming = sharedSessionAr
   }
 }
 
-export function isUltraworkInput(text: string): boolean {
-  return ULTRAWORK_CURRENT_PROMPT_PATTERN.test(stripQuotedRegions(text))
-}
-
-export function armingSnapshot(sessionId: string | undefined): ArmingSnapshot {
-  const registry = globalThis as unknown as Record<symbol, unknown>
-  const existing = registry[ARMING_LEDGER_KEY]
-  if (!isCurrentArmingSlot(existing)) {
-    return { wasArmed: false, compactRearmPending: false }
-  }
-  return snapshotSessionArming(existing.arming, sessionId)
-}
-
-export function classifyUltraworkInput(
-  input: { readonly text: string; readonly source: SenpiInputEvent["source"]; readonly sessionRole?: SessionRole },
-  snapshot: ArmingSnapshot,
-): UltraworkClassification {
-  const quotedText = stripQuotedSpans(input.text)
-  const visibleText = maskNegatedInvocations(quotedText)
-  const matches = [...visibleText.matchAll(new RegExp(ULTRAWORK_CURRENT_PROMPT_PATTERN.source, "gi"))]
-  let matchedUlw = false
-  let matchedUltrawork = false
-  for (const match of matches) {
-    if (match[0].toLowerCase() === "ulw") {
-      matchedUlw = true
-    } else {
-      matchedUltrawork = true
-    }
-  }
-
-  const base = {
-    matchedUlw,
-    matchedUltrawork,
-    occurrenceCount: matches.length,
-  }
-
-  if (input.sessionRole !== undefined) {
-    return { ...base, effective: false, stage: "none", route: "none", suppressionReason: "child_session" }
-  }
-
-  if (input.source === "extension") {
-    return { ...base, effective: false, stage: "none", route: "none", suppressionReason: "extension_source" }
-  }
-
-  if (matches.length === 0) {
-    const suppressionReason = ULTRAWORK_KEYWORD.test(visibleText)
-      ? "identifier_reference"
-      : ULTRAWORK_KEYWORD.test(quotedText)
-        ? "negated_mention"
-        : "no_keyword"
-    return { ...base, effective: false, stage: "none", route: "none", suppressionReason }
-  }
-
-  if (input.text.includes(ULTRAWORK_MODE_OPEN_TAG) && input.text.includes(ULTRAWORK_MODE_CLOSE_TAG)) {
-    return {
-      ...base,
-      effective: false,
-      stage: "none",
-      route: "embedded_directive",
-      suppressionReason: "embedded_directive",
-    }
-  }
-
-  let route: UltraworkRoute = "direct"
-  if (input.text.startsWith(SKILL_COMMAND_PREFIX)) {
-    const spaceIndex = input.text.indexOf(" ")
-    const skillName =
-      spaceIndex === -1
-        ? input.text.slice(SKILL_COMMAND_PREFIX.length)
-        : input.text.slice(SKILL_COMMAND_PREFIX.length, spaceIndex)
-    if (skillName === ULTRAWORK_SKILL_NAME) {
-      return {
-        ...base,
-        effective: false,
-        stage: "none",
-        route: "skill_expansion",
-        suppressionReason: "skill_expansion",
-      }
-    }
-
-    const argsStart = spaceIndex === -1 ? input.text.length : spaceIndex + 1
-    const matchedInArgs = matches.some((match) => (match.index ?? -1) >= argsStart)
-    if (!matchedInArgs) {
-      return { ...base, effective: false, stage: "none", route: "none", suppressionReason: "skill_name_only" }
-    }
-    route = "skill_args"
-  }
-
-  const stage: UltraworkInvocationStage = snapshot.compactRearmPending
-    ? "post_compact_rearm"
-    : snapshot.wasArmed
-      ? "remention"
-      : "first_arm"
-  return { ...base, effective: true, stage, route, suppressionReason: "none" }
-}
-
-/**
- * Once-per-session arming ledger. The full directive rides in on a session's FIRST
- * trigger; later triggers in that same session get the short reminder because the
- * transcript already holds every rule. Only an accepted compaction re-arms a
- * session (its transcript loses the directive block there). Switching sessions
- * never re-arms: a session switched back into still holds its directive, and
- * deleting the id on switch would recreate the per-turn accumulation this guards
- * against. Hosts that expose no session id anywhere fall back to one anonymous
- * ledger slot, reset by the same compaction event.
- */
-export function createSessionArming(): SessionArming {
-  const armedSessionIds = new Set<string>()
-  const compactRearmPendingSessionIds = new Set<string>()
-  let currentSessionId: string | undefined
-  let anonymousArmed = false
-  let anonymousCompactRearmPending = false
-
-  return {
-    trackSession(sessionId) {
-      currentSessionId = sessionId
-    },
-    currentSessionId() {
-      return currentSessionId
-    },
-    rearmOnCompact(sessionId) {
-      const target = sessionId ?? currentSessionId
-      if (target === undefined) {
-        anonymousArmed = false
-        anonymousCompactRearmPending = true
-        return
-      }
-      armedSessionIds.delete(target)
-      compactRearmPendingSessionIds.add(target)
-    },
-    isArmed(sessionId) {
-      if (sessionId === undefined) return anonymousArmed
-      return armedSessionIds.has(sessionId)
-    },
-    isCompactRearmPending(sessionId) {
-      if (sessionId === undefined) return anonymousCompactRearmPending
-      return compactRearmPendingSessionIds.has(sessionId)
-    },
-    markArmed(sessionId) {
-      if (sessionId === undefined) {
-        anonymousArmed = true
-        anonymousCompactRearmPending = false
-        return
-      }
-      armedSessionIds.add(sessionId)
-      compactRearmPendingSessionIds.delete(sessionId)
-    },
-  }
-}
-
-function snapshotSessionArming(arming: SessionArming, sessionId: string | undefined): ArmingSnapshot {
-  return {
-    wasArmed: arming.isArmed(sessionId),
-    compactRearmPending: arming.isCompactRearmPending?.(sessionId) ?? false,
-  }
-}
-
 function handleInput(
   pi: SenpiExtensionAPI,
   payload: unknown,
   ctx: ComponentContext,
   arming: SessionArming,
   eventCtx: unknown,
+  loadSettings: keywordDetector.LoadKeywordDetectorSettings,
 ): SenpiInputEventResult {
-  if (ctx.config.getFlag(ULTRAWORK_DISABLED_FLAG) === true) {
+  if (keywordDetector.isUltraworkFlagDisabled(ctx)) {
     return { action: "continue" }
   }
 
@@ -387,7 +145,10 @@ function handleInput(
     return { action: "continue" }
   }
 
-  if (!isUltraworkInput(payload.text)) {
+  if (
+    !isUltraworkInput(payload.text) ||
+    keywordDetector.isUltraworkKeywordDisabled(loadSettings(pi.cwd ?? process.cwd()))
+  ) {
     return { action: "continue" }
   }
 

@@ -435,8 +435,6 @@
     "packages/omo-opencode/src/config/schema/fallback-models.ts": ["FallbackModelStringArraySchema", "FallbackModelObjectArraySchema", "FallbackModelMixedArraySchema"],
     // pre-existing at origin dev 4686e425b5: unused export(s) PermissionValueSchema
     "packages/omo-opencode/src/config/schema/internal/permission.ts": ["PermissionValueSchema"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) KeywordTypeSchema
-    "packages/omo-opencode/src/config/schema/keyword-detector.ts": ["KeywordTypeSchema"],
     // pre-existing at origin dev 4686e425b5: unused export(s) OpenClawGatewaySchema, OpenClawHookSchema, OpenClawReplyListenerConfigSchema
     "packages/omo-opencode/src/config/schema/openclaw.ts": ["OpenClawGatewaySchema", "OpenClawHookSchema", "OpenClawReplyListenerConfigSchema"],
     // pre-existing at origin dev 4686e425b5: unused export(s) RalphLoopConfigSchema

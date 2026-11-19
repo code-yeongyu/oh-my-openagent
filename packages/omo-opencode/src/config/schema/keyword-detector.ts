@@ -1,11 +1,6 @@
-import { z } from "zod"
-
-export const KeywordTypeSchema = z.enum(["ultrawork", "team", "hyperplan", "hyperplan-ultrawork"])
-export type KeywordType = z.infer<typeof KeywordTypeSchema>
-
-export const KeywordDetectorConfigSchema = z.object({
-  enabled_expansions: z.array(KeywordTypeSchema).optional(),
-  disabled_keywords: z.array(KeywordTypeSchema).optional(),
-})
-
-export type KeywordDetectorConfig = z.infer<typeof KeywordDetectorConfigSchema>
+// One definition for every harness: OmO Native reads the same omo.jsonc key (#14389).
+export {
+  OmoKeywordDetectorSettingsSchema as KeywordDetectorConfigSchema,
+  type KeywordType,
+  type OmoKeywordDetectorSettings as KeywordDetectorConfig,
+} from "@oh-my-opencode/omo-config-core"
