@@ -71,7 +71,7 @@ test("#given a v14 store holding a binding, its outbox, cursor, completion arm a
   } finally {
     await reopened.dispose()
   }
-  const db = new Database(path, { readonly: true })
+  const db = new Database(path)
   try {
     expect({
       version: (db.query("PRAGMA user_version").get() as { user_version: number }).user_version,
@@ -110,7 +110,7 @@ test("#given a v14 store with no binding rows #when the current store opens it #
   } finally {
     await store.dispose()
   }
-  const db = new Database(path, { readonly: true })
+  const db = new Database(path)
   try {
     expect(
       db
@@ -172,7 +172,7 @@ test.each([
     } finally {
       await store.dispose()
     }
-    const db = new Database(path, { readonly: true })
+    const db = new Database(path)
     try {
       expect({
         version: (db.query("PRAGMA user_version").get() as { user_version: number }).user_version,
