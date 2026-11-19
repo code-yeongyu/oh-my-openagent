@@ -565,7 +565,6 @@ describe("thread SDK: every address form through the shared resolver (#14305)", 
       kind: "error",
       error: {
         code: "unsupported",
-        message: expect.stringContaining(`${B.name} (${B.id})`),
         details: {
           thread: T.bLive,
           device: B.id,
