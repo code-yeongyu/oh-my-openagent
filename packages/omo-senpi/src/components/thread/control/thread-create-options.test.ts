@@ -298,6 +298,26 @@ describe("thread_create whose first prompt the thread admitted to its queue", ()
     ).toMatchObject({ kind: "ok", deduplicated: true, prompt: { delivery: { kind: "queued" } } })
   })
 
+  // #14363 delta review L1: b stored the prompt for a session its host parked and wakes it with the delivery, as a
+  // thread_send to it answers. The create answers that same state, never prompt_not_started with a resend that would
+  // wake the session with two copies.
+  test("#given b parked the thread its listing reads live #when thread_create opens it with a prompt, twice under one key #then ok, the prompt queued waiting on b's wake with a do-not-resend next_action, and one wake carries it", async () => {
+    const a = account({ live: [], unlistedReason: "route_unlisted", wakeFeature: true })
+    const { run } = surface(a.remote)
+    const args = { thread: "dur-on-b", prompt: "carry on", idempotency_key: "create-wake-1" }
+    const first = await run("thread_create", args)
+    expect(first).toMatchObject({
+      kind: "ok",
+      deduplicated: true,
+      prompt: { delivery: { kind: "queued", waiting_on: { kind: "wake", device: "b" } } },
+    })
+    expect((first as { prompt?: { next_action?: string } }).prompt?.next_action).toEqual(
+      expect.stringContaining("thread_read"),
+    )
+    expect(await run("thread_create", args)).toEqual(first)
+    expect(a.sent.filter((entry) => entry.via === "wake")).toHaveLength(1)
+  })
+
   test("#given the live thread on b waits on a question #when thread_create opens it with a prompt #then ok, the prompt queued waiting on that approval on b", async () => {
     const a = account({
       engine: {
