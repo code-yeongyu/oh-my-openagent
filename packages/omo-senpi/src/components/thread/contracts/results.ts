@@ -239,6 +239,13 @@ export type ThreadListResult =
        * when the filter shows either state.
        */
       readonly inactive_dropped?: number
+      /**
+       * `incomplete` when an engine endpoint of this device did not answer the listing (a timeout, an auth or protocol
+       * failure, not a socket that is gone): its threads may read `inactive` from their files although an engine holds
+       * them. `unanswered_endpoints` counts those endpoints. Absent when every endpoint answered.
+       */
+      readonly listing?: "incomplete"
+      readonly unanswered_endpoints?: number
     }
   | ThreadDataError
 

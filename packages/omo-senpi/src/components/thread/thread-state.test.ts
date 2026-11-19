@@ -216,6 +216,51 @@ describe("thread state on this device's rows", () => {
     expect(devices.filter((device) => !device.this_device).every((device) => device.dropped === undefined)).toBe(true)
   })
 
+  test("#given an engine endpoint of this device that did not answer the listing in time #when listed #then the result and this device's row say the listing is incomplete, while a listing whose only failed endpoint is known dead stays complete (#14308)", async () => {
+    const directory = scratch()
+    const live = "/tmp/thread-state-14308-live.sock"
+    const slow = "/tmp/thread-state-14308-slow.sock"
+    const dead = "/tmp/thread-state-14308-dead.sock"
+    const running: ThreadHostSession = {
+      sessionId: "r1",
+      durableSessionId: "t-running",
+      cwd: directory,
+      status: "open",
+      activity: "running",
+      socket: live,
+    }
+    const answered = {
+      socket: live,
+      endpoint_kind: "rpc_host" as const,
+      alive: true,
+      list_sessions: { sessions: [running] },
+    }
+    const view = (failed: ThreadHostView["hosts"]): ThreadHostView => ({
+      sessions: [running],
+      hosts: [answered, ...failed],
+      disk: [],
+    })
+    const timedOut = {
+      socket: slow,
+      endpoint_kind: "rpc_host" as const,
+      alive: false,
+      reason: "live_unresponsive" as const,
+      error: "thread RPC request timed out",
+    }
+    const gone = { socket: dead, endpoint_kind: "tui" as const, alive: false, reason: "dead" as const, error: "dead" }
+    const options = surfaceOptions(directory)
+
+    const partial = listThreads(options, view([timedOut, gone]), true)
+    expect(partial).toMatchObject({ listing: "incomplete", unanswered_endpoints: 1 })
+    const across = await listAcross(remoteFixture.account({}).remote, partial, true)
+    const devices = across.kind === "ok" && "devices" in across ? (across.devices ?? []) : []
+    expect(devices.find((device) => device.this_device)?.listing).toBe("incomplete")
+
+    const complete = listThreads(options, view([gone]), true)
+    expect(complete).not.toHaveProperty("listing")
+    expect(complete).not.toHaveProperty("unanswered_endpoints")
+  })
+
   test("#given the same rows #when listed by default #then archived threads are hidden; state archived shows only them", () => {
     const directory = scratch()
     const options = surfaceOptions(directory)
