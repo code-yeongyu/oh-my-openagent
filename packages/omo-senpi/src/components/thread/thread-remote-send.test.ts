@@ -3,6 +3,7 @@ import { GATEWAY_PEER_REPLY_SENTENCE, GATEWAY_PROVENANCE_SENTENCE } from "./gate
 import { deliveryProvenanceLine, renderDeliveryText } from "./gateway/provenance"
 import { UNKNOWN_CALLER } from "./tools"
 import { ENGINE, comparable, createRemoteThreadFixture } from "./thread-remote-fixture"
+import { B, HERE, NAMES, T, createTwoDevices, type TwoDeviceOptions } from "./address/testing/two-devices"
 
 const { account, surface, cleanup } = createRemoteThreadFixture()
 afterEach(cleanup)
@@ -414,5 +415,64 @@ describe("K8: a send continues the chain the caller's run consumed, on both legs
     expect(await run("thread_send", { thread: "dur-on-b", message: "x" })).toMatchObject({ kind: "ok" })
     expect(admits(a.sent).map((record) => record["chainCount"])).toEqual([3])
     expect(a.hops).toEqual([3])
+  })
+})
+
+describe("#14305: thread_send and thread_handoff take every address form the address module resolves", () => {
+  const twos: Array<() => Promise<void>> = []
+  afterEach(async () => {
+    for (const done of twos.splice(0)) await done()
+  })
+  async function two(setup: TwoDeviceOptions = {}) {
+    const devices = createTwoDevices(setup)
+    twos.push(devices.cleanup)
+    return devices
+  }
+  const admittedOn = (sent: readonly { readonly device?: string; readonly rpc?: Readonly<Record<string, unknown>> }[]) =>
+    sent.filter((entry) => entry.rpc?.["type"] === ADMIT).map((entry) => entry.device)
+
+  test.each([
+    ["<device name>/<thread id>", `${B.name}/${T.bLive}`],
+    ["<device id prefix>/<thread id prefix>", `${B.id.slice(0, 6)}/${T.bLive.slice(0, 8)}`],
+    ["<device name>/<thread name>", `${B.name}/${NAMES.bLive}`],
+  ])("#given B's live thread #when thread_send names it as %s #then the message is admitted on B", async (_form, thread) => {
+    const { run, account: b } = await two()
+    expect(await run("thread_send", { thread, message: "x" })).toMatchObject({ kind: "ok", thread: T.bLive, device: B.id })
+    expect(admittedOn(b.sent)).toEqual([B.id])
+  })
+
+  test("#given a thread on this device #when thread_send names it as here/<thread id> #then it is delivered here and nothing reaches B", async () => {
+    const { run, account: b } = await two()
+    const result = await run("thread_send", { thread: `${HERE.id}/${T.hereShared}`, message: "x" })
+    expect(result).toMatchObject({ kind: "ok", thread: T.hereShared })
+    expect(result).not.toHaveProperty("device")
+    expect(admittedOn(b.sent)).toEqual([])
+  })
+
+  test("#given a thread here named with a slash and no device of that name #when thread_send names it #then it still resolves by name", async () => {
+    const { run } = await two()
+    expect(await run("thread_send", { thread: NAMES.slash, message: "x" })).toMatchObject({
+      kind: "ok",
+      thread: T.hereSlash,
+    })
+  })
+
+  test("#given B missed this listing round #when thread_send names B's thread as <device name>/<thread name> #then host_unavailable names B and nothing is admitted", async () => {
+    const { run, account: b } = await two({ incomplete: true })
+    expect(await run("thread_send", { thread: `${B.name}/${NAMES.bLive}`, message: "x" })).toMatchObject({
+      kind: "error",
+      error: { code: "host_unavailable", details: { reason: "listing_incomplete", devices: [B.id] } },
+    })
+    expect(admittedOn(b.sent)).toEqual([])
+  })
+
+  test("#given B's live thread #when thread_handoff names it as <device name>/<thread id> #then the receipt names B's thread", async () => {
+    const { run } = await two()
+    expect(await run("thread_handoff", { thread: `${B.name}/${T.bLive}`, message: "take this" })).toMatchObject({
+      kind: "ok",
+      resolved_by: "exact_name",
+      thread: T.bLive,
+      device: B.id,
+    })
   })
 })
