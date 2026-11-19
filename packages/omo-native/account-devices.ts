@@ -76,13 +76,14 @@ async function revoke(dependencies: AccountDevicesDependencies, session: Session
       return reply(dependencies, { revoked: false, error: "not_found" }, ACCOUNT_EXIT.failed)
     }
     const { candidates } = refusal.details
-    const ids = candidates.map((candidate) => candidate.device).join(", ")
     dependencies.error(
       refusal.reason === "devices_share_name"
-        ? `omo account devices revoke: ${candidates.length} live devices are named ${id} (${ids}); pass the device id`
-        : `omo account devices revoke: ${candidates.length} live device ids start with ${id} (${ids}); pass the full id`,
+        ? `omo account devices revoke: ${candidates.length} live devices are named ${id}; pass one device id:`
+        : `omo account devices revoke: ${candidates.length} live device ids start with ${id}; pass one full id:`,
     )
-    return reply(dependencies, { revoked: false, error: "ambiguous_target" }, ACCOUNT_EXIT.failed)
+    for (const candidate of candidates) dependencies.error(`  ${candidate.device}  ${candidate.name}`)
+    const ids = candidates.map((candidate) => candidate.device)
+    return reply(dependencies, { revoked: false, error: "ambiguous_target", candidates: ids }, ACCOUNT_EXIT.failed)
   }
   const target = before.find((row) => row.id === resolved.device.id)
   if (target === undefined) {
