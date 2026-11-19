@@ -1062,7 +1062,11 @@ export function createRemoteThreadFixture() {
           ? async (request: Parameters<GatewayStore["enqueue"]>[0]) => {
               enqueued.push(request)
               const outcome = await target.enqueue(request)
-              if (outcome.kind === "inserted" && createdIds.has(request.target_durable_id) && extra.createdNeverDrains !== true)
+              if (
+                outcome.kind === "inserted" &&
+                createdIds.has(request.target_durable_id) &&
+                extra.createdNeverDrains !== true
+              )
                 await drainCreated(request.target_durable_id)
               return outcome
             }

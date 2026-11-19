@@ -1,12 +1,7 @@
 import { createHash, randomUUID } from "node:crypto"
 
 import { resolveTarget, type ThreadAddressEntry } from "../addressing"
-import {
-  pairLoopGuardNextAction,
-  threadToolFailure,
-  type ThreadErrorCode,
-  type ThreadToolFailure,
-} from "../errors"
+import { pairLoopGuardNextAction, threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from "../errors"
 import type { EndpointLiveness, GatewayEndpointPort, GatewayEndpointRef } from "./adapter"
 import { DEFAULT_THREAD_DELIVERY } from "../contracts/fields"
 import { TARGET_MAX_BYTES } from "./constants"

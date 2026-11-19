@@ -9,7 +9,12 @@ import { FakeSessionRuntime } from "../gateway/testing/fake-runtime"
 import type { DeliveryOutcome } from "../gateway/transport"
 import { connectCarrierHost } from "./carrier-connection"
 import type { CarrierWakeOutcome } from "./carrier"
-import { processSameDeviceWake, startThreadWakeAtSession, type RunningThreadWake, type ThreadWakeLatch } from "./runtime"
+import {
+  processSameDeviceWake,
+  startThreadWakeAtSession,
+  type RunningThreadWake,
+  type ThreadWakeLatch,
+} from "./runtime"
 import { HOST_STAMPED, FINISHED, startFakeEngineHost, type FakeEngineHost } from "./testing/fake-engine-host"
 import { writeSessionFile } from "./testing/fake-wake-host"
 
@@ -111,7 +116,13 @@ async function parkedSession() {
   running = latch.running?.get(h.agentDir)
   const transport = createLocalTransport(
     sender.engine,
-    processSameDeviceWake({ options: { latch }, store, agentDir: () => h.agentDir, sessionsDirectory: () => sessions, settings }),
+    processSameDeviceWake({
+      options: { latch },
+      store,
+      agentDir: () => h.agentDir,
+      sessionsDirectory: () => sessions,
+      settings,
+    }),
   )
   const send = (key: string): Promise<DeliveryOutcome> =>
     transport.deliver({

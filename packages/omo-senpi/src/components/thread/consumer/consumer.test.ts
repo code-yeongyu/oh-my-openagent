@@ -302,7 +302,12 @@ describe("a handed delivery", () => {
       })
       expect(reply.data).toMatchObject({ kind: "queued" })
     }
-    const ninth = await service.inbound({ command_id: "c-8", sender_device: "dev-a", durable_id: "t", record: record("d-8") })
+    const ninth = await service.inbound({
+      command_id: "c-8",
+      sender_device: "dev-a",
+      durable_id: "t",
+      record: record("d-8"),
+    })
     expect(ninth.data).toEqual({
       kind: "refused",
       reason: "pair_loop_guard",

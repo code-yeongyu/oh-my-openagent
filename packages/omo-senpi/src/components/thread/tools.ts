@@ -1,4 +1,9 @@
-import { TOOL_CALL_BUDGET_MS, waitWithinCallBudget, withCallDeadline, withinCallBudget } from "../call-budget/call-deadline"
+import {
+  TOOL_CALL_BUDGET_MS,
+  waitWithinCallBudget,
+  withCallDeadline,
+  withinCallBudget,
+} from "../call-budget/call-deadline"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { gatewaySchemaRefusal, threadToolFailure } from "./errors"
 import type { ThreadToolFailure } from "./errors"
