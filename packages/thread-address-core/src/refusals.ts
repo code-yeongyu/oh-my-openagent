@@ -99,7 +99,7 @@ export type AddressRefusal =
 
 const CANDIDATE_LIMIT = 10
 
-export const deviceCandidates = (rows: readonly DeviceRow[]): readonly DeviceCandidate[] =>
+const deviceCandidates = (rows: readonly DeviceRow[]): readonly DeviceCandidate[] =>
   rows.slice(0, CANDIDATE_LIMIT).map((row) => ({ device: row.id, name: row.name, online: row.online }))
 
 /** A device as every message names it: `name (id)`, or the id alone when its name is empty or the id itself. */

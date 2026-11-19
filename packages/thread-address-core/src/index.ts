@@ -1,5 +1,4 @@
 export {
-  DEVICE_PREFIX_MIN,
   HERE,
   ID_PREFIX_SHAPE,
   SESSION_ID_SHAPE,
@@ -23,10 +22,7 @@ export {
   type SessionRef,
 } from "./row"
 export {
-  deviceCandidates,
   deviceLabel,
-  deviceOffline,
-  devicesShare,
   devicesSilent,
   noDevice,
   noThreadOnDevice,

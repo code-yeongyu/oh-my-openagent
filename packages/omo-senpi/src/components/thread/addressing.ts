@@ -121,7 +121,7 @@ export type ThreadFuzzyResult =
 
 export type ThreadNameConflictResult = { readonly kind: "ok" } | ThreadAddressError
 
-export const AMBIGUOUS_CANDIDATE_LIMIT = 10
+const AMBIGUOUS_CANDIDATE_LIMIT = 10
 const FUZZY_MIN_QUERY_LENGTH = 3
 const FUZZY_MAX_CANDIDATES = 500
 const FUZZY_PREVIEW_WEIGHT = 0.85

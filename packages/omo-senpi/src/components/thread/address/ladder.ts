@@ -22,7 +22,7 @@ const named = (text: string, hit: Extract<ThreadResolveResult, { readonly kind: 
 })
 
 /** `self` -> the caller, then the pure ladder (id, session id, alias, name, id prefix) of addressing.ts. */
-export function exactLadder(
+function exactLadder(
   ctx: ResolveContext,
   entries: readonly ThreadAddressEntry[],
   text: string,

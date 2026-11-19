@@ -68,7 +68,7 @@ const row = (id: string, key: string, title: string, state = "idle", device: str
   updated_ms: UPDATED,
 })
 
-export const B_ROWS: readonly RemoteSessionRow[] = [
+const B_ROWS: readonly RemoteSessionRow[] = [
   row(T.bLive, KEY.bLive, NAMES.bLive),
   row(T.bEnded, KEY.bEnded, NAMES.bEnded, "ended"),
   row(T.bShared, KEY.bShared, NAMES.shared),
@@ -85,13 +85,13 @@ const session = (id: string, route: string, name: string): ThreadHostSession => 
 })
 
 /** This device's live sessions, as its endpoint lists them. */
-export const HERE_SESSIONS: readonly ThreadHostSession[] = [
+const HERE_SESSIONS: readonly ThreadHostSession[] = [
   session(T.hereLive, ROUTE.hereLive, NAMES.hereLive),
   session(T.hereShared, ROUTE.hereShared, NAMES.shared),
   session(T.hereSlash, ROUTE.hereSlash, NAMES.slash),
 ]
 /** Session files on this device that no engine runs: an ended thread and the stale copy of B's live thread. */
-export const HERE_DISK: readonly string[] = [T.hereEnded, T.stale]
+const HERE_DISK: readonly string[] = [T.hereEnded, T.stale]
 
 const live = (id: string, route: string, name: string): ThreadAddressEntry => ({
   thread_id: id,
@@ -112,7 +112,7 @@ const stored = (id: string): ThreadAddressEntry => ({
 })
 
 /** The same threads as this device's address book holds them, for resolving without the tools. */
-export const HERE_ENTRIES: readonly ThreadAddressEntry[] = [
+const HERE_ENTRIES: readonly ThreadAddressEntry[] = [
   live(T.hereLive, ROUTE.hereLive, NAMES.hereLive),
   live(T.hereShared, ROUTE.hereShared, NAMES.shared),
   live(T.hereSlash, ROUTE.hereSlash, NAMES.slash),
