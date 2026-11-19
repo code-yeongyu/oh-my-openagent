@@ -26,8 +26,6 @@ export const GATEWAY_STORE_IDLE_RETIRE_MS = 60_000
 export const PAIR_BUCKET_BURST = 8
 export const PAIR_BUCKET_REFILL_MS = 5_000
 
-/** At most this many woken sessions past `requested` per store (one store per agent directory, #13037 A3.1.2). */
-export const WOKEN_SESSION_CAP = 4
 /** How long a carrier's lease on a woken session lasts (#13037 A3.1.3). */
 export const WAKE_LEASE_MS = 60_000
 

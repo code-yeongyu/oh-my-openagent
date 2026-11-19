@@ -9,7 +9,7 @@ import { dirname, join } from "node:path"
 import { setTimeout as delay } from "node:timers/promises"
 import { parentPort } from "node:worker_threads"
 
-import { WAKE_LEASE_MS, WOKEN_SESSION_CAP } from "./constants"
+import { WAKE_LEASE_MS } from "./constants"
 import { lockWaitExceeded } from "./lock-wait"
 import { gatewayDatabasePath, gatewayRootDirectory, gatewayWakeMarkerPath } from "./paths"
 import { isClaimantDead, processStartTime } from "./process-identity"
@@ -355,8 +355,9 @@ function requireContext(): ops.StoreContext {
 }
 
 // The record of woken sessions (#13037 A3.1). Every write is one `BEGIN IMMEDIATE` transaction: a row leaves `requested`
-// in the transaction that counts the cap, so two processes cannot both pass at the cap, and every later write is a
-// compare-and-set on the generation a takeover raises, so a carrier that lost its lease writes nothing.
+// in one transaction, with no count on how many rows may be past it (the carrier defers a start only on measured host
+// memory, `wake/memory-headroom.ts`), and every later write is a compare-and-set on the generation a takeover raises, so
+// a carrier that lost its lease writes nothing.
 const WOKEN_COLUMNS = [
   "durable_id",
   "session_file",
@@ -463,10 +464,6 @@ async function startWake(ctx: ops.StoreContext, request: Timed<WokenSessionKey>)
     if (row.state !== "requested") return { kind: "in_progress", row }
     if (row.next_attempt_at !== null && row.next_attempt_at > request.now)
       return { kind: "not_yet", next_attempt_at: row.next_attempt_at }
-    const taken = Number(
-      ctx.sql.one(["n"], "SELECT COUNT(*) AS n FROM woken_sessions WHERE state <> 'requested'")?.n ?? 0,
-    )
-    if (taken >= WOKEN_SESSION_CAP) return { kind: "overloaded" }
     ops.write(
       ctx,
       "UPDATE woken_sessions SET state = 'opening', lease_owner = ?, lease_expires_at = ?, generation = generation + 1, next_attempt_at = NULL WHERE durable_id = ?",
