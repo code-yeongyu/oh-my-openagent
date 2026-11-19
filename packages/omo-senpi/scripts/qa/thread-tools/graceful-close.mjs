@@ -28,6 +28,15 @@ const custom = (path, type) =>
 const closingHoldAdded = (path) =>
   custom(path, "session-hold").some((entry) => entry.data?.op === "add" && entry.data?.key === "closing")
 
+/** Resolves once the close fenced the session; throws with the close's own answer when it settled first. */
+async function fenced(closing, path, label) {
+  const early = closing.then((answer) => {
+    throw new Error(`${label} close answered before it fenced: ${answer.stdout.trim().slice(0, 600)}`)
+  })
+  await Promise.race([waitFor(() => closingHoldAdded(path), { label: `${label} close fenced` }), early])
+  early.catch(() => undefined)
+}
+
 async function refusedClosed(agentDir, deliveryId) {
   return await waitFor(
     async () => {
@@ -94,7 +103,7 @@ async function busyDaemonSession({ report, scratch, install, fake }) {
   report.assert("daemon-send-queued-while-busy", queued.json?.delivery?.kind === "queued", queued.stdout.slice(0, 300))
 
   const closing = omo(scratch, install, ["thread", "close", target.durableId, ...GRACEFUL_CLOSE])
-  await waitFor(() => closingHoldAdded(target.sessionPath), { label: "daemon close fenced" })
+  await fenced(closing, target.sessionPath, "daemon")
   const during = await cliSend(scratch, install, target.durableId, "QA-TOKEN-d-during", ["--mode", "follow_up"])
   report.log(`send during drain: ${during.stdout.trim().slice(0, 300)}`)
   report.assert("daemon-turn-still-running-under-fence", fake.release("d-busy"), "held d-busy released by the rig")
@@ -138,7 +147,7 @@ async function busyTerminal({ report, scratch, install, fake, startTui }) {
   report.log(`send to busy terminal: ${queued.stdout.trim().slice(0, 200)}`)
 
   const closing = omo(scratch, install, ["thread", "close", endpoint.durableId, ...GRACEFUL_CLOSE])
-  await waitFor(() => closingHoldAdded(endpoint.sessionPath), { label: "terminal close fenced" })
+  await fenced(closing, endpoint.sessionPath, "terminal")
   writeFileSync(gate, "go")
   const closed = await closing
   report.log(`terminal close answered: ${closed.stdout.trim().slice(0, 600)}`)
