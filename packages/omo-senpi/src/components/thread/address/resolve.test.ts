@@ -243,3 +243,35 @@ describe("#given a device-qualified session part B has not listed #when it is re
     },
   )
 })
+
+describe("#given a session file this device's book shows only when asked for it by name or id #when <this device>/<thread> names it #then the book is asked for the thread part (#14305 review M2)", () => {
+  // The send address book adds the session files an address names; asked with the whole "<device>/<thread>" text it
+  // finds none, so the resolver asks with the thread part once the device part resolved to this device.
+  async function resolveFile(text: string) {
+    const two = createTwoDevices()
+    cleanups.push(two.cleanup)
+    const visible = two.entries.filter((entry) => entry.thread_id !== T.hereEnded)
+    const file = two.entries.filter((entry) => entry.thread_id === T.hereEnded)
+    return await resolveAddress(
+      {
+        remote: two.remote,
+        callerWorkspaceRoot: process.cwd(),
+        local: visible,
+        localFor: (part) => (part === T.hereEnded ? [...visible, ...file] : visible),
+        callerId: T.hereLive,
+      },
+      text,
+    )
+  }
+  test.each([
+    ["here", "here"],
+    ["this device's id", HERE.id],
+    ["this device's name", HERE.name],
+  ])("#given <%s>/<the file's id> #when resolved #then the file answers", async (_form, device) => {
+    expect(await resolveFile(`${device}/${T.hereEnded}`)).toMatchObject({
+      kind: "ok",
+      thread: T.hereEnded,
+      where: { kind: "here" },
+    })
+  })
+})
