@@ -797,7 +797,7 @@ describe("thread SDK: session controls (#13413)", () => {
       },
       closeSession: async (...args) => {
         calls.push(["closeSession", ...args])
-        return "closed"
+        return { outcome: "closed", dropped_deliveries: [] }
       },
       setSessionName: async (...args) => {
         calls.push(["setSessionName", ...args])
@@ -835,12 +835,13 @@ describe("thread SDK: session controls (#13413)", () => {
       thread: "dur-host",
       closed: true,
       reason: "closed",
+      dropped_deliveries: [],
     })
     expect(await sdk.close({ thread: "my-tui" })).toMatchObject({
       kind: "error",
       error: { code: "unsupported", details: { command: "close_session" } },
     })
-    expect(calls).toEqual([["closeSession", "rpc-1", "dur-host"]])
+    expect(calls).toEqual([["closeSession", "rpc-1", "dur-host", {}]])
   })
 
   test("#given a host session here #when a script renames it, then to a name another thread holds, then with nothing to change #then the first is set on the host and the others are refused as data before anything changes", async () => {
@@ -974,6 +975,7 @@ describe("thread SDK: session controls (#13413)", () => {
       device: "b",
       closed: true,
       reason: "closed",
+      dropped_deliveries: [],
     })
     expect(
       account.sent
@@ -995,6 +997,7 @@ describe("thread SDK: session controls (#13413)", () => {
       device: "b",
       closed: false,
       reason: "not_live",
+      dropped_deliveries: [],
     })
     expect(account.sent.filter((entry) => entry.via === "session")).toEqual([])
   })

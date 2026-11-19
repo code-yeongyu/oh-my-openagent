@@ -167,9 +167,14 @@ export function outcomeFailure(
       "Retry; nothing needs to be checked first.",
       { device, reason },
     )
-  // The session ended on that device after it was listed (its terminal closed, its host exited): nothing there runs it, and
-  // no update changes that. Same code a control tool answers for a thread with no live owner.
-  if (outcome.reason === "unknown_session" || outcome.reason === "session_not_found")
+  // The session ended on that device after it was listed (its terminal closed, its host exited), or its host no longer
+  // lists it (`route_unlisted`, relay-spec 0018 section 5: it parked; nothing was dispatched, omo#14233): nothing there
+  // runs it, and no update changes that. Same code a control tool answers for a thread with no live owner.
+  if (
+    outcome.reason === "unknown_session" ||
+    outcome.reason === "session_not_found" ||
+    outcome.reason === "route_unlisted"
+  )
     return fail(
       "not_resumable",
       `The thread is not running on device ${device} (${outcome.reason}).`,
@@ -190,4 +195,23 @@ export function outcomeFailure(
     "Update omo on that device, or address a thread on this device.",
     { device, reason },
   )
+}
+
+/**
+ * A refused record sent to another device's engine endpoint (`endpointCommand`: an open, a `find_session`). There a
+ * `route_unlisted` that survived the fresh endpoint lookup names the endpoint, not a session: the engine the device named
+ * went away before the record reached it (its host restarted). Nothing ran, and no omo update helps (omo#14233).
+ */
+export function endpointOutcomeFailure(
+  outcome: Exclude<RemoteCommandOutcome, { readonly kind: "ok" }>,
+  device: string,
+): Failure {
+  if (outcome.kind === "refused" && outcome.reason === "route_unlisted")
+    return fail(
+      "host_unavailable",
+      `Device ${device} no longer lists the engine it named (route_unlisted); nothing was sent there.`,
+      "Retry; if it repeats, restart omo on that device.",
+      { device, reason: "route_unlisted" },
+    )
+  return outcomeFailure(outcome, device)
 }

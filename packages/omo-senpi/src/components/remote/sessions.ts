@@ -792,10 +792,13 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       const target = resolved.value
       return core.member(stage(), DEADLINES.close, true, async (svc) => {
         if (await isThisDevice(svc, target.device))
-          return await onThisDevice(target.device, (local) => local.close(target))
-        const result = await answered(() => closeThread(controlOf(svc, target)))
+          return await onThisDevice(target.device, (local) => local.close(target, opts?.force === true))
+        const result = await answered(() => closeThread(controlOf(svc, target), opts?.force))
         if (result.kind === "error") return fromThread(result.error)
-        return ok({ closed: "closed" in result && result.closed === true })
+        return ok({
+          closed: "closed" in result && result.closed === true,
+          dropped_deliveries: "dropped_deliveries" in result ? [...result.dropped_deliveries] : [],
+        })
       })
     },
     // The thread tools' archive body: senpi set_session_archived on the session, which stays open and running.

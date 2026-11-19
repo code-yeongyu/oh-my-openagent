@@ -76,7 +76,7 @@ export const THREAD_TOOL_METADATA: readonly ThreadToolEntry[] = [
     name: "thread_close",
     label: "Close session",
     description:
-      "Closes a session. Omit thread or pass self to close this session. thread accepts the thread value of a thread_list row (tool.thread_list() in an eval cell), an alias, or a unique name; the result is closed true or false plus a reason" +
+      "Closes a session. Omit thread or pass self to close this session. thread accepts the thread value of a thread_list row (tool.thread_list() in an eval cell), an alias, or a unique name; the result is closed true or false plus a reason. A thread with messages it has not read is refused, naming them; pass force: true to close it anyway (dropped_deliveries lists them)" +
       ROUTE_TO_TASK,
     exposure: THREAD_TOOL_EXPOSURE,
   },

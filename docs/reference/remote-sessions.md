@@ -27,7 +27,7 @@ omo remote send <session> <text> [--steer|--follow-up] [--no-wait] [--json]
                                  # send a message and print the answer as it arrives
 omo remote model <session> <provider/id> [--json]   # switch the session's model
 omo remote interrupt <session> [--json]   # stop the session's running turn
-omo remote close <session> [--json]       # end the session on its device
+omo remote close <session> [--force] [--json]  # end the session on its device; --force also drops messages it has not read
 ```
 
 `devices` lists this device first. With `--json`, every row has `id`, `name`, `platform`, `online`,
