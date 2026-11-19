@@ -1,8 +1,8 @@
 import { waitWithinCallBudget } from "../../call-budget/call-deadline"
 import type { ThreadTranscriptEntry } from "../reader"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
+import { rowKey } from "@oh-my-opencode/thread-address-core"
 import { relayAddressEntry } from "../remote/address-book"
-import { rowThreadId } from "../remote/ports"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "../remote/ports"
 import { outcomeFailure } from "../remote/outcome"
 import { readContextTail } from "../remote/transcript-tail"
@@ -61,7 +61,7 @@ export function createRelayControl(
     return { kind: "ok", data: replyData(outcome.response) }
   }
   return {
-    thread_id: rowThreadId(row),
+    thread_id: rowKey(row),
     device,
     // #13304: printed by thread_read; another device's own text.
     title: escapeForDisplay(row.title),

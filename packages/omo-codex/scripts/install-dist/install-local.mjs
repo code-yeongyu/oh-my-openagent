@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:96923fe207b17bca9432e6f15a04307b37f56bc35d8b7f03323aacc4b217256b:58ebd1bcd7b27c53b9a7a8e528ba638f6d78f036d3cd70b819f1c9ac55328c01
+// omo-codex-install:8d153f80d15877b20532f1d5cee15f58917ac8e9f904ece79f21a1e7ce7b49a7:9d2be30d05e5d0a06215ddbe5c85698c7e207d3c3af848d13e575e97aeacc7d8
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -19753,13 +19753,6 @@ var OmoGitMasterSettingsSchema = OmoGitMasterSettingsLayerSchema.extend({
   git_env_prefix: GitEnvPrefixSchema.default("GIT_MASTER=1")
 }).strict();
 
-// packages/omo-config-core/src/schema/keyword-detector.ts
-var KeywordTypeSchema = _enum(["ultrawork", "team", "hyperplan", "hyperplan-ultrawork"]);
-var OmoKeywordDetectorSettingsSchema = object({
-  enabled_expansions: array(KeywordTypeSchema).optional(),
-  disabled_keywords: array(KeywordTypeSchema).optional()
-});
-
 // packages/omo-config-core/src/schema/harness.ts
 var HARNESS_IDS = ["codex", "opencode", "omo"];
 var OMO_CONFIG_HARNESS_IDS = ["opencode", "native", "codex"];
@@ -20386,7 +20379,6 @@ var OmoTypedHarnessConfigSchema = object({
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
-  keyword_detector: OmoKeywordDetectorSettingsSchema.optional(),
   exclude_models: OmoExcludedModelsSchema.optional()
 }).strict();
 var OmoConfigProfileSchema = object({
@@ -20408,7 +20400,6 @@ var OmoConfigProfileSchema = object({
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
-  keyword_detector: OmoKeywordDetectorSettingsSchema.optional(),
   exclude_models: OmoExcludedModelsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
   "[native]": OmoTypedHarnessConfigSchema.optional(),
@@ -20435,7 +20426,6 @@ var OmoConfigSchema = object({
   side_panel: OmoSidePanelSettingsSchema.optional(),
   computer: OmoComputerSettingsSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
-  keyword_detector: OmoKeywordDetectorSettingsSchema.optional(),
   exclude_models: OmoExcludedModelsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
   "[native]": OmoTypedHarnessConfigSchema.optional(),
@@ -20465,7 +20455,6 @@ var OmoConfigLayerSchema = object({
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
   computer: OmoComputerSettingsLayerSchema.optional(),
   disabled_skills: OmoDisabledSkillsSchema.optional(),
-  keyword_detector: OmoKeywordDetectorSettingsSchema.optional(),
   exclude_models: OmoExcludedModelsSchema.optional(),
   "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
   "[native]": OmoTypedHarnessConfigSchema.optional(),

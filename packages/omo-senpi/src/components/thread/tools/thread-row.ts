@@ -8,6 +8,7 @@ type RowSource = Pick<ThreadSummary, "thread_id" | "name" | "status" | "cwd" | "
   Partial<
     Pick<
       ThreadResultSummary,
+      | "unnamed"
       | "model"
       | "activity"
       | "error_code"
@@ -32,6 +33,7 @@ type RowSource = Pick<ThreadSummary, "thread_id" | "name" | "status" | "cwd" | "
  */
 export function threadRow(thread: RowSource, machine?: string): ThreadResultSummary {
   const {
+    unnamed,
     model,
     activity,
     error_code,
@@ -48,6 +50,7 @@ export function threadRow(thread: RowSource, machine?: string): ThreadResultSumm
   return {
     thread: thread.thread_id,
     name: thread.name,
+    ...(unnamed === undefined ? {} : { unnamed }),
     status: thread.status,
     state: thread.state,
     ...(model === undefined ? {} : { model: { provider: model.provider, id: model.id } }),

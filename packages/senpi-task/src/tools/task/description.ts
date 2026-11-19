@@ -59,7 +59,7 @@ A subagent_type that names no loaded agent fails with unknown_target; a category
 Blank provider padding is normalized automatically; do not add filler values.
 load_skills prepends named skills. run_in_background=true returns the task id at once and the child's result arrives later as a message; false blocks this turn until the child finishes.
 run_in_background is batch-wide: set it once at the top level. An item-level copy must agree with the top-level value and every other item, or the call fails with invalid_arguments.
-name is an optional stable handle. model is an explicit override for subagent_type spawns ONLY.
+name is an optional stable handle. model is an explicit override for a custom agent named by subagent_type ONLY; a builtin agent (explore, librarian, plan-consultant, plan-reviewer, the reviewer agents) refuses it with agent_with_model because it runs on its designated chain (agents.<name>.models in omo.json).
 isolated runs a child in a checkout clone; it defaults to task.isolation.enabled. apply controls merge-back; false retains artifacts only. merge selects patch or branch. Batch items inherit these three options unless overridden. apply and merge require isolation to be enabled.
 NEVER combine model with category: a category-routed task always takes its model from omo.json (categories.<name>.models), so passing both fails with invalid_arguments.
 task_send continues an existing child; task always spawns.
