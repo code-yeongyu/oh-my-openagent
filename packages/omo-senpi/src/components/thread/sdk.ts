@@ -268,11 +268,7 @@ function thrown(error: unknown): Failure {
       "Use thread read to follow the session.",
       { command: message.slice("unsupported:".length) },
     )
-  // A store schema this binary does not know refuses typed here too (the CLI surface of #13927), in the
-  // same shape as the tool surfaces: gatewaySchemaRefusal names both schemas and the update command.
-  const schemaRefusal = gatewaySchemaRefusal(error)
-  if (schemaRefusal !== undefined)
-    return fail("gateway_schema_too_new", schemaRefusal.message, schemaRefusal.next_action, schemaRefusal.details)
+  return fail("gateway_schema_too_new", schemaRefusal.message, schemaRefusal.next_action, schemaRefusal.details)
   return fail(
     "internal_error",
     `Thread operation failed: ${message}`,

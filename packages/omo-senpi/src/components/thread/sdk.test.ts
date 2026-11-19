@@ -175,12 +175,7 @@ function countingRemote(remote: RemoteThreadSurface): {
   }
 }
 
-describe("a gateway store newer than this binary through the SDK (#13927)", () => {
-  test("#given a store whose schema version this binary does not know #when the CLI principal sends #then the refusal is typed in the tool surfaces' shape", async () => {
-    const newer = new Error("This omo build reads gateway schema 14, but this machine's gateway store is at schema 15.")
-    ;(newer as Error & { code?: string; details?: { found: number; supported: number } }).code =
-      "gateway_schema_too_new"
-    ;(newer as Error & { details?: { found: number; supported: number } }).details = { found: 15, supported: 14 }
+.details = { found: 15, supported: 14 }
     const f = fixture({
       store: (agentDir) => {
         const real = createGatewayStore({ agentDir })
