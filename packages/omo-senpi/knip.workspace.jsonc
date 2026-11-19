@@ -853,10 +853,10 @@
     "packages/omo-senpi/src/components/thread/gateway/store-ops.ts": ["migrate", "reconcile", "claim", "recordOutcome", "refuseQueued", "listDeliveries", "isReferenced", "journalMode", "stats", "migrateLegacyMailboxes", "OPEN_STATES", "enqueue", "completeReceipt", "abandonReceipt", "deliveryView"],
     // pre-existing at origin dev 4686e425b5: unused export(s) registerIncarnation, clearEndpoint, sessionOwner
     "packages/omo-senpi/src/components/thread/gateway/store-ownership.ts": ["registerIncarnation", "clearEndpoint", "sessionOwner"],
-    // store-worker.ts, which runs as a worker thread knip does not reach, is the only caller (#12925)
-    "packages/omo-senpi/src/components/thread/gateway/store-tool-receipts.ts": ["toolReceiptBegin", "toolReceiptSettle", "toolReceiptRevise", "toolReceiptRelease"],
     // pre-existing at origin dev 4686e425b5: unused export(s) sweepRetention
     "packages/omo-senpi/src/components/thread/gateway/store-retention.ts": ["sweepRetention"],
+    // store-worker.ts, which runs as a worker thread knip does not reach, is the only caller (#12925)
+    "packages/omo-senpi/src/components/thread/gateway/store-tool-receipts.ts": ["toolReceiptBegin", "toolReceiptSettle", "toolReceiptRevise", "toolReceiptRelease"],
     // pre-existing at origin dev 4686e425b5: unused export(s) matcherAwaits
     "packages/omo-senpi/src/components/thread/gateway/worker-reply-matchers.test.ts": ["matcherAwaits"],
     // pre-existing at origin dev 4686e425b5: unused export(s) messageText
