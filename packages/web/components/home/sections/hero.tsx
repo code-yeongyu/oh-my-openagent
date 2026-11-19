@@ -5,7 +5,7 @@ import { Icon } from "@/components/home/icons"
 import { DORI_URL, DORITERM_URL } from "@/components/home/links"
 import { DagPanel } from "@/components/home/dag-panel"
 import { Link } from "@/i18n/routing"
-import { desktopDownloadEnabled, PUBLIC_DESKTOP_BETA_URL } from "@/lib/desktop-download"
+import { desktopDownloadEnabled, PUBLIC_DESKTOP_STABLE_URL } from "@/lib/desktop-download"
 
 /**
  * doriterm.com's live hero: centred two-tone headline over a static dot field, one solid button, the makers line,
@@ -38,10 +38,10 @@ export async function HeroSection(): Promise<JSX.Element> {
           ) : (
             <a
               className="btn btn--ghost"
-              href={PUBLIC_DESKTOP_BETA_URL}
-              data-testid="hero-desktop-beta-cta"
+              href={PUBLIC_DESKTOP_STABLE_URL}
+              data-testid="hero-desktop-stable-cta"
             >
-              {t("beta")} <Icon name="arrow" className="arrow" />
+              {t("download")} <Icon name="arrow" className="arrow" />
             </a>
           )}
         </div>
