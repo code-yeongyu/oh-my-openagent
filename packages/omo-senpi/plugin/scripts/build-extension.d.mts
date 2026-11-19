@@ -7,6 +7,7 @@ export interface BuildExtensionOptions {
   sidePanelRuntimeOutputPath?: string
   toolkitSdkOutputPath?: string
   bunshinTsOutputPath?: string
+  omoSdkOutputPath?: string
   rollbackRuntimeOutputPath?: string
   memoryDoctorOutputPath?: string
   memoryMemfsOutputPath?: string
@@ -55,6 +56,7 @@ export function buildExtension(options?: BuildExtensionOptions): Promise<{
   computerRunWorkerInputs: string[]
   toolkitSdkInputs: string[]
   bunshinTsInputs: string[]
+  omoSdkInputs: string[]
   rollbackRuntimeInputs: string[]
   gatewayStoreWorkerInputs: string[]
   threadSdkInputs: string[]
@@ -71,6 +73,7 @@ export function checkExtensionCurrent(
 >
 export const GATEWAY_STORE_WORKER_NAME: "gateway-store-worker.mjs"
 export const THREAD_SDK_RELATIVE_PATH: string
+export const OMO_SDK_RELATIVE_PATH: string
 export const SENPI_LOADER_ALIASES: readonly [
   "@earendil-works/pi-coding-agent",
   "@earendil-works/pi-agent-core",
