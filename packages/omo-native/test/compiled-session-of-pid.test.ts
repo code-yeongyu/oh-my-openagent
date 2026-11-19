@@ -34,7 +34,8 @@ function listTree(dir: string): string[] {
 async function run(args: string[], home: string, extraEnv: Record<string, string> = {}) {
   const child = Bun.spawn([binary, ...args], {
     cwd: "/",
-    env: { PATH: process.env.PATH, HOME: home, USERPROFILE: home, DO_NOT_TRACK: "1", ...extraEnv },
+    // Exactly what g13's session-attestation.ts spawns: cwd /, stdin ignored, and only PATH, LANG, LC_ALL and HOME.
+    env: { PATH: "/usr/bin:/bin", LANG: "C", LC_ALL: "C", HOME: home, ...extraEnv },
     stdin: "ignore",
     stdout: "pipe",
     stderr: "pipe",
