@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { registerSyncRpc } from "./sync-rpc-registration"
 import type { SyncRpcContext, SyncRpcOptions, SyncRpcRegistration } from "./sync-rpc-ports"
 
-const verbs = ["enable", "pending", "approve", "status", "devices"] as const
+const verbs = ["enable", "pending", "approve", "status", "devices", "disable"] as const
 type Handler = Parameters<SyncRpcRegistration["handle"]>[1]
 
 function fixture() {
@@ -23,6 +23,9 @@ function fixture() {
       },
       approveDevice: async () => {
         throw new Error("unexpected approval")
+      },
+      disableSync: async () => {
+        throw new Error("unexpected disable")
       },
     },
     claims: {

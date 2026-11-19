@@ -188,14 +188,16 @@ const DEEP_HIGH_CATEGORY_CALLER_GUIDANCE = `<Selection_Gate>Route here only when
 
 // The GPT flagship gate: either id present in the live registry keeps ultrabrain available. Each deep
 // lane is a single rung with no model fallback, so it gates on its own model and disappears without it.
-const GPT_FLAGSHIP_GATE_MODELS = [LATEST_MODEL_BY_FAMILY.gptAstra, "gpt-5.6-sol"] as const
+const GPT_FLAGSHIP_GATE_MODELS = [LATEST_MODEL_BY_FAMILY.gptAstra, "gpt-6-astra", "gpt-5.6-sol"] as const
 const DEEP_LOW_GATE_MODELS = [
   LATEST_MODEL_BY_FAMILY.gptSol,
   LATEST_MODEL_BY_FAMILY.gptSolFast,
+  "gpt-6.1-sol",
+  "gpt-6.1-sol-fast",
   "gpt-5.6-sol-fast",
   "gpt-5.6-sol",
 ] as const
-const DEEP_HIGH_GATE_MODEL = LATEST_MODEL_BY_FAMILY.gptAstra
+const DEEP_HIGH_GATE_MODELS = [LATEST_MODEL_BY_FAMILY.gptAstra, "gpt-6-astra"] as const
 
 export const OPENAI_CATEGORIES = [
   {
@@ -225,7 +227,7 @@ export const OPENAI_CATEGORIES = [
     callerGuidance: DEEP_HIGH_CATEGORY_CALLER_GUIDANCE,
     promptAppend: DEEP_HIGH_CATEGORY_PROMPT_APPEND,
     resolvePromptAppend: resolveDeepHighCategoryPromptAppend,
-    requiresModel: DEEP_HIGH_GATE_MODEL,
+    requiresModel: DEEP_HIGH_GATE_MODELS,
   },
   {
     name: "quick",

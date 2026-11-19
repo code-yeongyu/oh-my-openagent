@@ -12,11 +12,11 @@ describe("an alias with no account", () => {
     const result = await run("thread_create", { alias: "about-me" })
     expect(result).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-created-here" },
+      thread: "dur-created-here",
       alias_scope: "local",
       alias_unavailable: "sign_in",
     })
-    expect(result.kind === "ok" && "thread" in result ? result.thread.alias : "no thread").toBeUndefined()
+    expect(result.kind === "ok" ? (result as { alias?: string }).alias : "no thread").toBeUndefined()
     expect(openSession).toHaveBeenCalledTimes(1)
     expect(openSession.mock.calls[0]?.[0]).toMatchObject({ name: "about-me" })
     expect(a.registryCalls).toEqual(["resolve"])
@@ -55,7 +55,7 @@ describe("an alias with no account", () => {
     const { run, openSession } = surface(undefined)
     expect(await run("thread_create", { alias: "about-me" })).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-created-here" },
+      thread: "dur-created-here",
       alias_scope: "local",
       alias_unavailable: "no_remote",
     })
@@ -71,7 +71,7 @@ describe("an alias with no account", () => {
     const { run, setSessionName } = surface(a.remote)
     expect(await run("thread_rename", { thread: "local peer", alias: "about-me" })).toMatchObject({
       kind: "ok",
-      thread_id: "dur-local",
+      thread: "dur-local",
       name: "about-me",
       alias_scope: "local",
       alias_unavailable: "sign_in",
@@ -98,7 +98,7 @@ describe("an alias with no account", () => {
     expect(renames()).toStrictEqual([])
     expect(await run("thread_rename", { thread: "dur-on-b", alias: "  about-me " })).toMatchObject({
       kind: "ok",
-      thread_id: "dur-on-b",
+      thread: "dur-on-b",
       device: "b",
       name: "about-me",
       alias_scope: "local",

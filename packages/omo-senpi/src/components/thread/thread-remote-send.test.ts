@@ -25,7 +25,7 @@ describe("#12882: a send to another device is one admit_external_message, admitt
     const { run } = surface(a.remote, { callerName: () => "planner", env: ENV })
     expect(await run("thread_send", { thread: "dur-on-b", message: "do the thing" })).toMatchObject({
       kind: "ok",
-      thread_id: "dur-on-b",
+      thread: "dur-on-b",
       device: "b",
       delivery: { kind: "started", turn_id: "turn-b" },
       deduplicated: false,
@@ -123,7 +123,7 @@ describe("remote == local: the same call answers the same on b as on this device
         expect(result).toMatchObject({ kind: "ok" })
         expect(result).toHaveProperty("delivery_id", expect.stringMatching(UUID))
         expect(result).toHaveProperty("effective_mode")
-        expect(result).toHaveProperty("endpoint")
+        expect(result).not.toHaveProperty("endpoint")
       }
       // b was idle, so the default mode took the follow_up lane its record carried.
       expect(there).toMatchObject({ delivery_id: record["deliveryId"], effective_mode: "follow_up" })
@@ -155,19 +155,30 @@ describe("remote == local: the same call answers the same on b as on this device
     expect(commands(a.sent)).toEqual(["get_state", ADMIT, "get_state"])
   })
 
-  test("#given the record's reply is lost on the way back #when a message is sent #then the send is idempotency_uncertain naming the reason, and nothing else is sent", async () => {
-    const a = account({ admitOutcome: { kind: "uncertain", reason: "reply_lost" } })
-    const { run } = surface(a.remote)
-    expect(await run("thread_send", { thread: "dur-on-b", message: "x" })).toMatchObject({
-      kind: "error",
-      error: { code: "idempotency_uncertain", details: { device: "b", reason: "reply_lost" } },
-    })
-    expect(commands(a.sent)).toEqual(["get_state", ADMIT])
-  })
+  // omo#14130: a record that reached the device and lost its answer is delivered_unconfirmed (never resend it); one with
+  // no such evidence stays idempotency_uncertain.
+  test.each([
+    ["reply_lost", "idempotency_uncertain"],
+    ["delivered_unconfirmed", "delivered_unconfirmed"],
+  ] as const)(
+    "#given the record's reply is lost on the way back (%s) #when a message is sent #then the send answers %s naming the reason, and nothing else is sent",
+    async (reason, code) => {
+      const a = account({ admitOutcome: { kind: "uncertain", reason } })
+      const { run } = surface(a.remote)
+      expect(await run("thread_send", { thread: "dur-on-b", message: "x" })).toMatchObject({
+        kind: "error",
+        error: { code, details: { device: "b", reason } },
+      })
+      expect(commands(a.sent)).toEqual(["get_state", ADMIT])
+    },
+  )
 
   test.each([
     ["capability_missing", "scope_denied"],
     ["host_detached", "host_unavailable"],
+    // This device's relay sign-in lapsed (the device service answers sign_in_required at once): not attached, never "update omo".
+    ["sign_in_required", "host_unavailable"],
+    ["signed_out", "host_unavailable"],
   ])(
     "#given b refuses with %s #when a send reaches it #then the tool answers %s, as data, with the device named",
     async (reason, code) => {
@@ -256,6 +267,54 @@ describe("remote == local, round 2: send modes, handoff and the unknown caller",
     expect(String(record["text"])).toContain(" requested=steer effective=steer ")
   })
 
+  test("#given b's get_state ends uncertain #when a steer probes b #then nothing was written, so it is host_unavailable with no admit record, and a retry under the same key probes again and steers", async () => {
+    const a = account({
+      engine: { ...ENGINE, streaming: true, pending: 0, currentTurnId: "3" },
+      stateOutcomes: [{ kind: "uncertain", reason: "unconfirmed" }],
+    })
+    const { run } = surface(a.remote)
+    const args = {
+      thread: "dur-on-b",
+      message: "x",
+      delivery: "steer",
+      expected_turn_id: "3",
+      idempotency_key: "k-probe",
+    } as const
+    expect(await run("thread_send", args)).toMatchObject({
+      kind: "error",
+      error: { code: "host_unavailable", details: { device: "b", reason: "unconfirmed" } },
+    })
+    expect(commands(a.sent)).toEqual(["get_state"])
+    expect(await run("thread_send", args)).toMatchObject({
+      kind: "ok",
+      device: "b",
+      deduplicated: false,
+      delivery: { kind: "steered", turn_id: "3" },
+    })
+    expect(commands(a.sent)).toEqual(["get_state", "get_state", ADMIT])
+  })
+
+  test("#given b's get_state ends uncertain #when a default-mode send probes b #then nothing was written, so it is host_unavailable with no admit record, and a retry under the same key probes again and sends", async () => {
+    const a = account({
+      engine: { ...ENGINE, streaming: true, pending: 0, currentTurnId: "3" },
+      stateOutcomes: [{ kind: "uncertain", reason: "unconfirmed" }],
+    })
+    const { run } = surface(a.remote)
+    const args = { thread: "dur-on-b", message: "x", idempotency_key: "k-probe-auto" } as const
+    expect(await run("thread_send", args)).toMatchObject({
+      kind: "error",
+      error: { code: "host_unavailable", details: { device: "b", reason: "unconfirmed" } },
+    })
+    expect(commands(a.sent)).toEqual(["get_state"])
+    expect(await run("thread_send", args)).toMatchObject({
+      kind: "ok",
+      device: "b",
+      deduplicated: false,
+      delivery: { kind: "steered", turn_id: "3" },
+    })
+    expect(commands(a.sent)).toEqual(["get_state", "get_state", ADMIT])
+  })
+
   test("#given b is mid-turn on another turn #when a steer names an older turn #then it is turn_conflict and nothing is admitted", async () => {
     const a = account({ engine: { ...ENGINE, streaming: true, pending: 0, currentTurnId: "4" } })
     const { run } = surface(a.remote)
@@ -324,7 +383,8 @@ describe("remote == local, round 2: send modes, handoff and the unknown caller",
     expect(await run("thread_handoff", { thread: "dur-on-b", message: "take this" })).toMatchObject({
       kind: "ok",
       resolved_by: "exact_name",
-      thread: { thread_id: "dur-on-b", device: "b" },
+      thread: "dur-on-b",
+      device: "b",
       delivery: { kind: "started" },
     })
     expect(admits(a.sent).map((record) => String(record["text"]).split("\n").at(-1))).toEqual([

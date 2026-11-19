@@ -1,12 +1,14 @@
 # omo thread - the session gateway from scripts and connectors
 
 `omo thread` runs every thread operation the agent tools offer (`thread_list`, `thread_send`,
-`thread_read`, `thread_bind` ... `thread_answer`) without an agent session. It is how a script,
+`thread_read`, `thread_report` ... `thread_answer`) without an agent session, plus the binding
+operations (`bind`, `unbind`, `rebind`, `bindings`) that are not session tools: the always-on
+gateway binds chat threads, and a script can do the same here. It is how a script,
 a cron job or a chat connector talks to running OmO sessions: terminal sessions (`tui`),
 Desktop threads and task children on their hosts (`rpc_host`).
 
-It never starts a host. Sessions are listed from what the engine enumerates
-(`host status --all`), and bindings, the outbox and delivery receipts live in the gateway store
+It never starts a host. Sessions are listed from the endpoints the engine's registry names
+(`<agent dir>/rpc-host-daemon/`, read in-process; each endpoint's `list_sessions` says whether it is live), and bindings, the outbox and delivery receipts live in the gateway store
 (`<agent dir>/gateway/`). Every call runs as the principal `cli:<uid>`: receipts, loop budgets
 and bindingless sends are keyed by it, and a delivered message carries the provenance header
 `source=external`, `actor=<os user>`.
@@ -27,7 +29,7 @@ keeps legacy discovery.
 Listing, name ambiguity and fuzzy matching still use broad discovery. No TTL or setting changes.
 
 ```bash
-omo thread list [--all-scope] [--json]
+omo thread list [--all-scope] [--state running|idle|inactive|archived[,...]] [--json]
 omo thread send <target> <text> [--mode auto|steer|follow_up] [--expected-turn <n>] [--idempotency-key <k>] [--json]
 omo thread send --binding <id> [<target>] <text> [--idempotency-key <event-id>] [--mode auto|follow_up]
                 [--author-id <platform-user-id> --author-name <display> [--author-user-id <id>]] [--json]
@@ -52,7 +54,10 @@ omo thread ack <binding-id> <cursor> [--provider-message-id <id>]
 together with the threads on the account's other devices, each with its `device`. With `--json` it prints the whole
 result as one object: `threads`, `devices` (each device's name, platform, kind, `online`, `last_seen`, `this_device`,
 its thread count and `listing`: `listed`, `incomplete` when it did not answer this listing, or `offline`) and
-`remote_unavailable` when other devices could not be listed.
+`remote_unavailable` when other devices could not be listed, and `aliases_unavailable` when a thread listed without an
+alias may still hold one: `sign_in` or `host_unavailable` when the account's aliases could not be read, `not_asked` when
+the account's other devices cannot be reached from here: this device's device service is not connected, or it answered
+that the account's plan has no relay (a Free plan). Aliases are only read while other devices can be reached.
 
 `omo thread` does not create or resume sessions: session lifecycle belongs to the engine's host
 API, and a connector cannot start a session for a new chat thread through `omo thread` alone. To
@@ -70,10 +75,15 @@ instead of acting twice (`deduplicated: true`); reusing a key with other argumen
 
 ## Sending
 
-A bindingless `send` delivers as `cli:<uid>`. `--mode auto` (the default) starts a turn on an idle
-session and otherwise queues behind the running turn, like `follow_up`; only `steer` enters a
-running turn, and it needs `--expected-turn` (the target's turn epoch): a missing epoch is
-`invalid_arguments`, a changed one `turn_conflict`. A target with no live endpoint gets
+A bindingless `send` delivers as `cli:<uid>`. `--mode auto` (the default) steers a running turn:
+the message enters the turn in flight, as typing into its terminal does, with that running turn as
+its expected turn (`delivery.kind: "steered"`, `effective_mode: "steer"`). On an idle session it
+starts a turn. It queues behind only what cannot be steered: a question the session waits on, a
+compaction, or a running turn whose epoch the engine does not report. If the turn ends before the
+steer reaches it, `auto` does not fail: it takes the lane the target has now (a new turn when idle,
+queued behind a turn that began since). `--mode follow_up` always queues behind the running turn.
+`--mode steer` steers only the turn you name with `--expected-turn` (the target's turn epoch): a
+missing epoch is `invalid_arguments`, a changed one `turn_conflict`. A target with no live endpoint gets
 `delivery.kind: "queued_offline"`: the row is durable and the session takes it when it runs again,
 exactly once. That holds whether its terminal exited, was killed or is stopped, and when no endpoint
 of the agent dir is running at all: for a send, nothing live is the offline case, never
@@ -94,7 +104,9 @@ message is admitted once. A target, when given, must be the binding's session.
   a `follow_up` binding is refused `invalid_arguments` (exit 1, `details: {binding_id, mode,
   inbound_mode}`). It is never silently downgraded. So one binding per thread can deliver the
   owner's messages as `auto` and everyone else's as `follow_up`. `--mode steer` and
-  `--expected-turn` are usage errors (exit 2): a binding message never steers.
+  `--expected-turn` are usage errors (exit 2): a binding message never names a turn to steer. An
+  `auto` message still steers a running turn, as an unbound `auto` send does; a `follow_up`
+  binding keeps every message queued behind it.
 - **Author.** `--author-id <platform-user-id> --author-name <display>` (plus an optional
   `--author-user-id <id>`, the omo user the connector mapped them to) names the human who wrote the
   message, as the connector authenticated them. Author flags are accepted only with `--binding`, and
@@ -114,7 +126,7 @@ What the receiving session does with a delivery depends on its state when its dr
 | State | `auto` | `steer` | `follow_up` |
 | --- | --- | --- | --- |
 | idle | starts a turn (`started`) | refused `not_steerable` | starts a turn (`started`) |
-| mid-turn | queued behind the turn (`queued`) | steered into the turn when `--expected-turn` is the current epoch (`steered`), else `turn_conflict` | queued behind the turn (`queued`) |
+| mid-turn | steered into the running turn (`steered`) | steered into the turn when `--expected-turn` is the current epoch (`steered`), else `turn_conflict` | queued behind the turn (`queued`) |
 | waiting on a question | queued (`queued`) | refused `not_steerable` | queued (`queued`) |
 | compacting | queued (`queued`) | refused `not_steerable` | queued (`queued`) |
 | offline (no live endpoint) | kept for the next run (`queued_offline`) | refused `turn_conflict` | kept for the next run (`queued_offline`) |
@@ -534,9 +546,9 @@ every other subcommand prints the full result.
 
 | Subcommand | `--json` on success |
 | --- | --- |
-| `list` | `[{thread_id, name, status: live\|resumable, cwd, created_at, updated_at: <ISO 8601 string>\|null, surface: tui\|desktop\|child\|daemon, endpoint: {kind: rpc_host\|tui, socket, routing_id}, alive, error_note?, ...}]`; live and degraded rows use the same bounded final-record policy, so `updated_at` is null rather than an older timestamp when the final complete valid entry's timestamp cannot be proved. After live and degraded rows are combined, the public list sorts known `updated_at` newest first, then unknown activity last, with `thread_id` ascending for ties. A live row also carries its endpoint's own `list_sessions` fields (`sessionId`, the routing handle; `durableSessionId`, `sessionPath`, `attachments`, `kind`, `socket`, `endpoint_kind`) |
-| `send` | `{kind:"ok", thread_id, delivery_id, message_seq, delivery: {kind: queued\|queued_offline\|started\|steered, ...}, effective_mode, endpoint_kind: rpc_host\|tui\|null, deduplicated}` |
-| `read` | `{kind:"ok", thread_id, items: [{seq, role: user\|assistant\|tool\|system, content}], truncated, next_cursor?, source, source_incomplete?, error_note?}` |
+| `list` | `[{thread, name, state: running\|idle\|inactive\|archived, model?: {provider, id}, status: live\|resumable (deprecated: resumable exactly when no engine holds the thread), machine?, cwd, created_at, updated_at: <ISO 8601 string>\|null, link, surface?: tui\|desktop\|child\|daemon, as_of?, controls?, error_note?, device?, alias?}]`; `--state` (repeatable or comma-separated) picks the states listed, and the default lists every state except `archived`; a thread its engine closed stays listed `inactive` from its session file (the newest 200 files in scope); `thread` is the address `read` and `send` take back. Live and degraded rows use the same bounded final-record policy, so `updated_at` is null rather than an older timestamp when the final complete valid entry's timestamp cannot be proved. After live and degraded rows are combined, the public list sorts known `updated_at` newest first, then unknown activity last, with `thread` ascending for ties. Routing ids, socket and session-file paths are not shown (#14044) |
+| `send` | `{kind:"ok", thread, delivery_id, message_seq, delivery: {kind: queued\|queued_offline\|started\|steered, ...}, effective_mode, endpoint_kind: rpc_host\|tui\|null, deduplicated}` |
+| `read` | `{kind:"ok", thread, link, items: [{seq, role: user\|assistant\|tool\|system, content}], truncated, next_cursor?, source, source_incomplete?, error_note?}` |
 | `bind` | `{kind:"ok", binding: <binding>, deduplicated}` |
 | `unbind` | `{kind:"ok", binding, already_closed, in_flight: [delivery ids], deduplicated}` |
 | `rebind` | `{kind:"ok", binding, closed: [delivery ids], deduplicated}` |
@@ -582,6 +594,36 @@ try {
 ```
 
 `pluginRoot` is `<omo-ai install>/plugin`. Every method resolves to the same data union as the
-CLI's JSON; nothing throws for a refusal. Pass `engineStatusAll` (a function returning the stdout of
-`omo host status --all --include-workers --json`) to choose how the engine is run; without it the SDK runs
-the engine CLI itself, and when no engine can enumerate it falls back to the endpoint registry on disk.
+CLI's JSON; nothing throws for a refusal. Endpoints come from the endpoint registry on disk; pass
+`engineStatusAll` (a function returning the stdout of `omo host status --all --include-workers --json`) only to
+enumerate from that report instead. Neither the SDK nor `omo thread` runs that command itself: it is a full
+diagnostic pass that took 8-9 s on a host with about 50 endpoints.
+
+The SDK also controls threads, with the same arguments and results as the agent tools of the same name:
+
+| Method | Tool | Arguments |
+| --- | --- | --- |
+| `create` | `thread_create` | `{ thread?, device?, alias?, name?, cwd?, worktree?, fork_from?, skills?, model?, reasoning?, permission_preset?, prompt?, delivery?, idempotency_key? }` |
+| `interrupt` | `thread_interrupt` | `{ thread, turn_id?, all_scope? }` |
+| `close` | `thread_close` | `{ thread?, all_scope?, idempotency_key? }` |
+| `rename` | `thread_rename` | `{ thread?, name?, alias?, all_scope?, idempotency_key? }` |
+| `set_model` | `thread_set_model` | `{ thread, model, provider?, all_scope?, idempotency_key? }` |
+
+Each reaches the thread wherever it runs, on this device or another device of the account, through the
+same code as the tool. Invalid arguments answer `invalid_arguments`, a thread no session holds answers
+`not_resumable` (`close` answers `closed: false, reason: "not_live"`), and every other refusal is the tool's
+error code. A script acts as itself, never as a session: `self` (and a `close` or `rename` with no `thread`)
+answers `caller_context_missing`, a thread it creates records no creator session, and a `create` `prompt` is
+sent as the script's own command-line message with the creator's authority. `create` makes a new thread on this
+device under an id derived from `idempotency_key`, so a repeat under the same key reopens that thread instead of
+making another, and `rename` passes the key to the alias registry; the SDK keeps no tool receipt, so any other
+repeated call runs again.
+
+```js
+const created = await sdk.create({ name: "nightly-build" })
+if (created.kind === "ok") {
+  await sdk.set_model({ thread: created.thread, model: "opus" })
+  await sdk.interrupt({ thread: "nightly-build" })
+  await sdk.close({ thread: "nightly-build" })
+}
+```
