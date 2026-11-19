@@ -21,14 +21,15 @@ const moduleUrl = new URL("./testing/store-extension.mjs", import.meta.url).href
 function v14Fixture(
   path: string,
   extra: readonly string[] = [],
-  options: { readonly bound: boolean } = { bound: true },
+  options: { readonly bound: boolean; readonly version?: number } = { bound: true },
 ): void {
+  const version = options.version ?? V14
   mkdirSync(dirname(path), { recursive: true })
   const db = new Database(path)
   db.exec("PRAGMA foreign_keys = ON")
   db.exec("BEGIN")
-  for (const step of GATEWAY_MIGRATIONS.slice(0, V14)) for (const statement of step) db.exec(statement)
-  db.exec(`PRAGMA user_version = ${V14}`)
+  for (const step of GATEWAY_MIGRATIONS.slice(0, version)) for (const statement of step) db.exec(statement)
+  db.exec(`PRAGMA user_version = ${version}`)
   db.exec("COMMIT")
   if (!options.bound) {
     for (const statement of extra) db.exec(statement)
@@ -123,6 +124,40 @@ test("#given a v14 store with no binding rows #when the current store opens it #
     db.close()
   }
 })
+
+/** Schema v15: train 6's store (the `deliveries` rebuild for the start lane), the one a released omo leaves before v16. */
+const V15 = 15
+
+test.each([
+  ["holding a binding", true, [{ name: "bindings" }]],
+  ["with no binding rows", false, []],
+] as const)(
+  "#given a v15 store %s #when the current store opens it #then it migrates to the current version and keeps the binding table only while it has rows",
+  async (_label, bound, tables) => {
+    const h = (harness = createGatewayHarness())
+    const path = gatewayDatabasePath(h.agentDir)
+    v14Fixture(path, [], { bound, version: V15 })
+    const store = h.store()
+    try {
+      await store.identity()
+    } finally {
+      await store.dispose()
+    }
+    const db = new Database(path)
+    try {
+      expect({
+        version: (db.query("PRAGMA user_version").get() as { user_version: number }).user_version,
+        tables: db
+          .query(
+            "SELECT name FROM sqlite_schema WHERE name IN ('bindings', 'outbox', 'outbox_cursors', 'completion_arms') ORDER BY name",
+          )
+          .all(),
+      }).toEqual({ version: GATEWAY_MIGRATIONS.length, tables })
+    } finally {
+      db.close()
+    }
+  },
+)
 
 // dori-extension imports each thread route's owner from the binding rows through tx.bindingFor on its next open; a
 // store that dropped them first would lose every route.
