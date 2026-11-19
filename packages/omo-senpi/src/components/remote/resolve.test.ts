@@ -295,4 +295,10 @@ describe("sessions.resolve", () => {
     expect(resolved.value.ref).toMatchObject({ id: PEER, online: true })
     expect(resolved.value.row).toMatchObject({ id: PEER, online: false })
   })
+
+  test("#given a device the roster misses but the listing names #when a device-qualified address resolves on it #then the listing is read once", async () => {
+    const { client, listings } = await account([listed(PEER, "rk-1", "dur-1", "Bot")], { devices: [] })
+    expect(await client.sessions.resolve(`${PEER}/dur-1`)).toMatchObject({ kind: "ok", value: { durable_id: "dur-1" } })
+    expect(listings()).toBe(1)
+  })
 })
