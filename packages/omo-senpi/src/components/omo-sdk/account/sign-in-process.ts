@@ -5,6 +5,8 @@ import { createInterface } from "node:readline"
 /** One run of `omo account sign-in`, its stdout delivered line by line while it waits for approval. */
 export type SignInProcess = (input: {
   readonly args: readonly string[]
+  /** One line written to the process's stdin, then closed. */
+  readonly stdin: string
   readonly env: Readonly<Record<string, string | undefined>>
   readonly onLine: (line: string) => void
   readonly signal: AbortSignal
@@ -24,14 +26,15 @@ export function launcherSignInProcess(
 ): SignInProcess | undefined {
   const bin = omoBin?.trim()
   if (bin === undefined || bin === "" || !isAbsolute(bin)) return undefined
-  return ({ args, env, onLine, signal }) => {
+  return ({ args, stdin, env, onLine, signal }) => {
     const [command, ...argv] = bin.endsWith(".js") ? [execPath, bin, ...args] : [bin, ...args]
     return new Promise((resolve, reject) => {
       const child = spawn(command ?? bin, argv, {
-        stdio: ["ignore", "pipe", "ignore"],
+        stdio: ["pipe", "pipe", "ignore"],
         env: { ...env },
         windowsHide: true,
       })
+      child.stdin.end(`${stdin}\n`)
       createInterface({ input: child.stdout }).on("line", onLine)
       const stop = () => child.kill()
       const timer = setTimeout(stop, SIGN_IN_DEADLINE_MS)
