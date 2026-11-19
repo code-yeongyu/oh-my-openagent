@@ -1,24 +1,27 @@
 import { randomUUID } from "node:crypto"
-import { rowThreadId } from "./ports"
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
+import { rowStatus, rowThreadId } from "./ports"
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import { hashArgs } from "../gateway/bindings"
 import { decideDelivery } from "../gateway/decision"
 import { senderFacts } from "../gateway/envelope"
-import { deliveryProvenanceLine, renderDeliveryText } from "../gateway/provenance"
+import { renderDeliveryDisplayText, renderDeliveryText } from "../gateway/provenance"
 import { REFUSAL_CODES } from "../gateway/result"
 import type { GatewayStore } from "../gateway/store"
 import type { DeliveryOutcome, DeliveryTransport, OutboundDelivery, RelayDeliverySuccess } from "../gateway/transport"
-import type { EffectiveLane, GatewayDeliveryDelivery, Provenance } from "../gateway/types"
+import type { DeliveryWait, EffectiveLane, GatewayDeliveryDelivery, Provenance } from "../gateway/types"
 import { UNKNOWN_CALLER } from "../tools/ports"
-import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./ports"
+import type { JsonObject, RemoteCommandOutcome, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 import { deviceOnline, replyData } from "./remote-ops"
-import { outcomeFailure } from "./outcome"
+import { chainCountLimitFailure, outcomeFailure } from "./outcome"
+import { holderView } from "./find-session"
+import { outsideCallDeadline } from "../../call-budget/call-deadline"
 
 export type RelayTransportOptions = {
   readonly remote: RemoteThreadSurface
   readonly store: Pick<
     GatewayStore,
-    "now" | "toolReceiptBegin" | "toolReceiptSettle" | "toolReceiptRevise" | "deliveryView"
+    "now" | "toolReceiptBegin" | "toolReceiptSettle" | "toolReceiptRevise" | "toolReceiptRelease" | "deliveryView"
   >
   readonly now?: () => number
   readonly senderProvenance: () => Promise<Provenance>
@@ -80,11 +83,25 @@ function abortableDelay(ms: number, signal: AbortSignal): Promise<void> {
 
 const ADMIT_RECORD = "admit_external_message"
 
+// The get_state probe is read-only and runs before any record is sent: one that ends uncertain changed nothing on that
+// device, so it is a transport failure that is safe to retry, never idempotency_uncertain (#12925).
+function probeFailure(outcome: Exclude<RemoteCommandOutcome, { readonly kind: "ok" }>, device: string): Failure {
+  if (outcome.kind !== "uncertain") return outcomeFailure(outcome, device)
+  return fail(
+    "host_unavailable",
+    `Device ${device} did not answer the state read (${outcome.reason}); nothing was sent there.`,
+    "Retry; nothing needs to be checked first.",
+    { device, reason: outcome.reason },
+  )
+}
+
 type EngineState = {
   readonly phase: "idle" | "mid_turn"
   readonly turnEpoch: number | null
   readonly pending: number | null
   readonly parkedOnApproval: boolean
+  /** The session is paused or carries holds (senpi get_state `paused`, `holds`): a queued message waits on them (A2.6). */
+  readonly held: boolean
 }
 
 function engineStateOf(reply: JsonObject): EngineState {
@@ -101,6 +118,93 @@ function engineStateOf(reply: JsonObject): EngineState {
     turnEpoch,
     pending: typeof pending === "number" && Number.isInteger(pending) && pending >= 1 ? pending : null,
     parkedOnApproval,
+    held: reply["paused"] === true || open(reply["holds"]),
+  }
+}
+
+const WAITS: ReadonlySet<string> = new Set(["wake", "hold", "approval"])
+
+// A refusal reason the receiving side sent. Every reason a receiving side produces is a lowercase machine code (the
+// consumer's and carrier's refusals, and the table below), so a reason is shown only when it has that shape; any other text
+// from that device becomes UNRECOGNISED_REASON and is never shown, in the message or in details.reason.
+const REASON_CODE = /^[a-z0-9][a-z0-9_.-]{0,63}$/
+const UNRECOGNISED_REASON = "unrecognised"
+const shownReason = (reason: string): string => (REASON_CODE.test(reason) ? reason : UNRECOGNISED_REASON)
+
+/**
+ * omo#13037 section 5.1: what a session that is not running answers, from the receiving consumer (`data.kind` "refused")
+ * or from the receiving device service itself (the command's receipt). One mapping for both.
+ */
+function wakeRefusal(received: string, device: string, data: JsonObject = {}): Failure {
+  const reason = shownReason(received)
+  const details = { device, reason }
+  switch (reason) {
+    case "session_gone":
+      return fail(
+        "not_found",
+        `Device ${device} holds no session file for that id.`,
+        "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell).",
+        details,
+      )
+    case "ambiguous_session":
+      return fail(
+        "ambiguous_target",
+        `Device ${device} holds more than one session file with that id; none was picked.`,
+        "Address another thread, or resolve the duplicate on that device.",
+        details,
+      )
+    case "not_wakeable":
+    case "sender_not_admitted":
+      return fail(
+        "not_resumable",
+        `Device ${device} cannot wake that session (${reason}).`,
+        "Address another thread.",
+        details,
+      )
+    case "queue_full":
+      return fail("queue_full", `The session on device ${device} has a full backlog.`, "Retry later.", details)
+    case "overloaded": {
+      const retry = data["retry_after_ms"]
+      return fail("overloaded", `Device ${device} is waking too many sessions now.`, "Retry after the given delay.", {
+        ...details,
+        ...(typeof retry === "number" ? { retry_after_ms: retry } : {}),
+      })
+    }
+    case "wake_limit_reached":
+      return fail(
+        "overloaded",
+        `The session on device ${device} reached its limit of unattended wakes; the message stays queued there.`,
+        "Wait for a person to use that session.",
+        details,
+      )
+    case "wake_unavailable":
+      return fail(
+        "host_unavailable",
+        `No omo process on device ${device} can take the message now.`,
+        "Start omo once on that device, then retry.",
+        details,
+      )
+    case "chain_count_limit": {
+      // The receiving store's own chain limit (`store-worker.ts`): the same refusal the running engine answers.
+      const counts = Object.fromEntries(
+        ["chain_count", "limit"].flatMap((key) => (typeof data[key] === "number" ? [[key, data[key]]] : [])),
+      )
+      return chainCountLimitFailure(device, counts)
+    }
+    case "wake_unsupported":
+      return fail(
+        "unsupported",
+        `Device ${device} cannot wake a session that is not running.`,
+        "Update omo on that device.",
+        details,
+      )
+    default:
+      return fail(
+        "unsupported",
+        `Device ${device} refused the message (${reason === UNRECOGNISED_REASON ? "unrecognised reason" : reason}).`,
+        "Address another thread.",
+        details,
+      )
   }
 }
 
@@ -179,7 +283,7 @@ export function createRelayTransport(
     callerId: string,
     idempotencyKey: string,
     args: unknown,
-    run: (later: Later) => Promise<SendOutcome>,
+    run: (later: Later, sending: () => void) => Promise<SendOutcome>,
   ): Promise<SendOutcome> {
     const scope = { principal: `session:${callerId}`, operation: "thread_send:remote", idempotency_key: idempotencyKey }
     const admission = await store.toolReceiptBegin({ ...scope, now: now(), args_hash: hashArgs(args) })
@@ -221,16 +325,32 @@ export function createRelayTransport(
     }
     let result: SendOutcome
     const tasks: Array<(revise: Revise) => Promise<void>> = []
+    let sent = false
+    // A receipt that cannot be dropped is settled as before, so a retry still answers instead of waiting on it.
+    const release = async (settle: () => Promise<unknown>) => {
+      if (!(await store.toolReceiptRelease(scope).catch(() => false))) await settle()
+    }
     try {
-      result = await run((task) => {
-        tasks.push(task)
-      })
+      result = await run(
+        (task) => {
+          tasks.push(task)
+        },
+        () => {
+          sent = true
+        },
+      )
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      await store
-        .toolReceiptSettle({ ...scope, now: now(), error_note: message })
-        .catch(unrecorded(`the send failed (${message})`))
+      const settle = () =>
+        store
+          .toolReceiptSettle({ ...scope, now: now(), error_note: message })
+          .catch(unrecorded(`the send failed (${message})`))
+      await (sent ? settle() : release(settle))
       throw error
+    }
+    if (!sent) {
+      await release(() => store.toolReceiptSettle({ ...scope, now: now(), result }).catch(unrecorded("the send ran")))
+      return result
     }
     await store.toolReceiptSettle({ ...scope, now: now(), result }).catch(unrecorded("the send ran"))
     const revise: Revise = async (later) => {
@@ -240,13 +360,12 @@ export function createRelayTransport(
       })
       if (!revised) log(`relay_receipt_unrevised: ${idempotencyKey}: no settled receipt of this process to revise.`)
     }
-    for (const task of tasks) void task(revise)
+    // omo#14130 review H1: a queued task (a held re-send) runs past this call, so never under its budget.
+    for (const task of tasks) void outsideCallDeadline(() => task(revise))
     return result
   }
 
-  async function chain(
-    callerId: string,
-  ): Promise<{ readonly delivery_id: string; readonly root_id: string; readonly hop: number }> {
+  async function chain(): Promise<{ readonly delivery_id: string; readonly root_id: string; readonly hop: number }> {
     const cause = options.callerCause?.()
     const prior = cause === undefined ? undefined : (await store.deliveryView(cause))?.row
     return {
@@ -256,21 +375,108 @@ export function createRelayTransport(
     }
   }
 
-  async function send(delivery: OutboundDelivery, row: RemoteSessionRow, later: Later): Promise<SendOutcome> {
-    const offline = await deviceOnline(remote, row.device)
+  /**
+   * #14184: where a send to `listed` goes. A live row is sent to as listed. For a row that is not live (ended, or a
+   * cached snapshot) its holder is asked first (`find_session`), because a command to the listing key, or a wake of a
+   * session the holder holds no file for, waits out the device's own deadline (about 60 s): no file is `not_found` at
+   * once (as the refused reopen says); one it runs is addressed by the key its device locates it by now, never the
+   * listing's (a reopen elsewhere can run it under a new key; #14179 reviews L4, M1); one on disk takes the wake path when
+   * this device has one, else `not_resumable` at once, as thread_read answers it. A holder that cannot say is treated as
+   * holding it on disk: an ended row takes the wake path when there is one, anything else is `not_resumable`.
+   * `parked` (#14240): the row reads live but its host refused a command to it `route_unlisted` (it parked the session),
+   * so the listing is stale: `parked` is the answer that refusal maps to. The holder is asked as for a not-live row, and a
+   * session it holds on disk takes the wake path whatever the row's state. A holder that cannot say (find_session refused,
+   * unsupported or unanswered) taught nothing new, so the answer stays `parked`.
+   */
+  async function addressOf(
+    listed: RemoteSessionRow,
+    parked?: SendOutcome,
+  ): Promise<{ readonly row: RemoteSessionRow; readonly ended: boolean } | SendOutcome> {
+    if (parked === undefined && rowStatus(listed) === "live") return { row: listed, ended: false }
+    const thread = rowThreadId(listed)
+    const details = { device: listed.device, thread }
+    const view = await holderView(remote, listed)
+    if (view === "absent")
+      return fail(
+        "not_found",
+        `Device ${listed.device} holds no session file for ${thread}.`,
+        "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell).",
+        details,
+      )
+    if (parked !== undefined && view === "unknown") return parked
+    if (view !== "running") {
+      // omo#13037 5.4 / A4.5: a session no engine runs takes the wake path when this device's service can carry it.
+      const wakeable = parked !== undefined ? view === "on_disk" : listed.state === "ended"
+      if (wakeable && (await remote.sessions.canWake?.()) === true) return { row: listed, ended: true }
+      return fail(
+        "not_resumable",
+        `${thread} on device ${listed.device} is not running, and this device cannot wake it there.`,
+        "Open it again with thread_create (tool.thread_create({ thread }) in an eval cell), then send.",
+        details,
+      )
+    }
+    const located = await remote.sessions.locate(listed.device, thread)
+    if (located.kind !== "ok")
+      return fail(
+        "not_resumable",
+        `Device ${listed.device} runs ${thread}, but the key it runs under cannot be found there (${escapeForDisplay(located.reason)}).`,
+        "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell), then send again.",
+        { ...details, reason: escapeForDisplay(located.reason) },
+      )
+    remote.sessions.reopened?.(listed, located.sessionId)
+    return { row: { ...listed, session_id: located.sessionId }, ended: false }
+  }
+
+  /**
+   * `retry` (#14240): the second and last attempt, after the host refused the first `route_unlisted` for a row that read
+   * live; it re-addresses the row as parked and keeps the first attempt's delivery ids, so a repeat is never a second
+   * delivery. The refusal means nothing was dispatched there; `refusal` is what it answers unless the holder says more.
+   */
+  async function send(
+    delivery: OutboundDelivery,
+    listed: RemoteSessionRow,
+    later: Later,
+    sending: () => void,
+    retry?: {
+      readonly ids: Awaited<ReturnType<typeof chain>> | undefined
+      readonly announced: boolean
+      readonly refusal: SendOutcome
+    },
+  ): Promise<SendOutcome> {
+    const offline = await deviceOnline(remote, listed.device)
     if (offline !== undefined) return offline
+    const parkedHere = (outcome: RemoteCommandOutcome) =>
+      retry === undefined &&
+      rowStatus(listed) === "live" &&
+      outcome.kind === "refused" &&
+      outcome.reason === "route_unlisted"
+    const addressed = await addressOf(listed, retry?.refusal)
+    if (!("row" in addressed)) return addressed
+    // `ended`: the wake path (no lane probe; its state is offline in the decision table, so a steer is turn_conflict).
+    const { row, ended } = addressed
+    if (ended && delivery.mode === "steer")
+      return fail(
+        REFUSAL_CODES.turn_conflict.code,
+        `${rowThreadId(row)} on device ${row.device} is not running, so no turn of it can be steered.`,
+        REFUSAL_CODES.turn_conflict.next,
+        { device: row.device },
+      )
     const expected = delivery.expected_turn_id === undefined ? null : Number(delivery.expected_turn_id)
     let lane: EffectiveLane = "follow_up"
     let steerTurn: number | null = null
     let probedState: EngineState | undefined
     // One get_state decides the lane the way the local drain does (gateway/decision.ts): a steer must name the running
     // turn, and the default (auto) steers whatever turn is running and starts one when the target is idle.
-    if (delivery.mode === "steer" || delivery.mode === "auto") {
+    if (!ended && (delivery.mode === "steer" || delivery.mode === "auto")) {
       const probed = await remote.sessions.sessionCommand(row.device, row.session_id, {
         type: "get_state",
         sessionId: row.session_id,
       })
-      if (probed.kind !== "ok") return outcomeFailure(probed, row.device)
+      if (probed.kind !== "ok") {
+        const refusal = probeFailure(probed, row.device)
+        if (!parkedHere(probed)) return refusal
+        return await send(delivery, listed, later, sending, { ids: undefined, announced: false, refusal })
+      }
       const state: EngineState = engineStateOf(replyData(probed.response))
       probedState = state
       const decision = decideDelivery(state.phase, delivery.mode, expected, state.turnEpoch)
@@ -278,7 +484,7 @@ export function createRelayTransport(
         const reason = decision.kind === "refuse" ? decision.reason : "turn_conflict"
         const mapped = REFUSAL_CODES[reason] ?? {
           code: "internal_error" as const,
-          next: "Call thread_list and check the target.",
+          next: "Call thread_list (tool.thread_list() in an eval cell) and check the target.",
         }
         return fail(
           mapped.code,
@@ -293,13 +499,15 @@ export function createRelayTransport(
       }
     }
     const facts = senderFacts(delivery.sender, await options.senderProvenance())
-    const { delivery_id, root_id, hop } = await chain(delivery.caller_id)
+    const ids = retry?.ids ?? (await chain())
+    const { delivery_id, root_id, hop } = ids
     const name = delivery.sender.kind === "session" ? delivery.sender.name?.trim() : undefined
     const recordFor = (effective: EffectiveLane) =>
       remote.chain.stamp(
         {
           type: ADMIT_RECORD,
-          sessionId: row.session_id,
+          // A woken session is addressed by its durable id: no listing maps it to a key (5.4).
+          sessionId: ended ? (row.durable_id ?? row.session_id) : row.session_id,
           deliveryId: delivery_id,
           text: renderDeliveryText({
             delivery_id,
@@ -311,6 +519,7 @@ export function createRelayTransport(
               root_id,
               hop,
               delivery_id,
+              ...(delivery.authority === undefined ? {} : { authority: delivery.authority }),
             },
             body: delivery.text,
             mode_requested: delivery.mode,
@@ -318,7 +527,13 @@ export function createRelayTransport(
             binding_id: null,
             binding_revision: null,
           }),
-          displayText: `${deliveryProvenanceLine(facts.provenance)}\n${delivery.text}`,
+          displayText: renderDeliveryDisplayText({
+            envelope: {
+              provenance: facts.provenance,
+              ...(delivery.authority === undefined ? {} : { authority: delivery.authority }),
+            },
+            body: delivery.text,
+          }),
           sender: {
             kind: "agent",
             session_id: delivery.caller_id,
@@ -340,6 +555,9 @@ export function createRelayTransport(
       delivery_id,
       effective_mode: lane,
     })
+    // One delivery is announced once: a retry after the first attempt's admission was refused does not announce it again.
+    if (retry?.announced !== true) sending()
+    if (ended) return wakeAnswer(await woken(row, record), row, delivery_id, ok)
     let sent = await remote.sessions.sessionCommand(row.device, row.session_id, record)
     if (
       delivery.mode === "auto" &&
@@ -353,12 +571,20 @@ export function createRelayTransport(
       record = recordFor(lane)
       sent = await remote.sessions.sessionCommand(row.device, row.session_id, record)
     }
+    // The retry re-stamps its own record (a wake addresses the durable id on the follow-up lane); `stamp` is a pure
+    // function of (record, hop) and the ids are the first attempt's, so the receiver sees one delivery.
+    if (sent.kind !== "ok" && parkedHere(sent))
+      return await send(delivery, listed, later, sending, {
+        ids,
+        announced: true,
+        refusal: outcomeFailure(sent, row.device),
+      })
     if (sent.kind === "refused" && (ADMIT_UNSUPPORTED.has(sent.reason) || sent.reason.startsWith("Unknown command")))
       return fail(
         "unsupported",
-        `Device ${row.device} runs an engine without admit_external_message (${sent.reason}); a peer message cannot be delivered there as a delivery.`,
+        `Device ${row.device} runs an engine without admit_external_message (${escapeForDisplay(sent.reason)}); a peer message cannot be delivered there as a delivery.`,
         "Update omo and senpi on that device, then retry.",
-        { device: row.device, reason: sent.reason },
+        { device: row.device, reason: escapeForDisplay(sent.reason) },
       )
     if (sent.kind !== "ok") return outcomeFailure(sent, row.device)
     const reply = replyData(sent.response)
@@ -399,27 +625,83 @@ export function createRelayTransport(
       }
       later((revise) => retryHeld(row, record, delivery_id, revise))
     }
-    // An idle receiver reports pendingMessageCount 0 while it holds (held_draft) or already took (already_admitted) the
-    // delivery: the message is still first in line there, so those two kinds answer position 1, never uncertain.
-    // A receiver parked on an approval (an open question its human must answer on that device) reports no queue
-    // position while it holds the message: the delivery is not uncertain, it waits behind that approval (#12886).
+    // Each of these kinds is the engine's own receipt that it holds the delivery, so none of them is uncertain. The
+    // engine's pendingMessageCount does not count an admitted delivery (senpi enqueues it straight into the agent's queue,
+    // outside the user-input count), so a receiver that reports none still holds it, first in line: position 1.
+    // A receiver parked on an approval (an open question its human must answer on that device) waits behind that
+    // approval (#12886); a paused or held one waits on its holds.
+    if (kind === "queued" && afterState?.held === true)
+      return ok({ kind: "queued", queue_position: pending ?? 1, waiting_on: { kind: "hold", device: row.device } })
     if (kind === "queued" && afterState?.parkedOnApproval === true)
       return ok({ kind: "queued", queue_position: pending ?? 1, waiting_on: { kind: "approval", device: row.device } })
-    if (kind === "queued" && pending === null)
+    return ok({ kind: "queued", queue_position: pending ?? 1 }, kind === "already_admitted")
+  }
+
+  const woken = (row: RemoteSessionRow, record: JsonObject) =>
+    remote.sessions.wake?.(row.device, row.durable_id ?? row.session_id, record) ??
+    Promise.resolve({ kind: "unavailable" as const })
+
+  /** The wake path's answers (5.1), mapped once: the consumer's envelope, the service's own refusals, a lost reply. */
+  function wakeAnswer(
+    sent: Awaited<ReturnType<typeof woken>>,
+    row: RemoteSessionRow,
+    deliveryId: string,
+    ok: (kind: GatewayDeliveryDelivery, deduplicated?: boolean) => RelayDeliverySuccess,
+  ): SendOutcome {
+    const device = row.device
+    if (sent.kind === "unavailable") return wakeRefusal("wake_unsupported", device)
+    if (sent.kind === "uncertain")
+      // The receiving device may still hold the delivery and run it when it wakes the session: never "read the thread".
       return fail(
         "idempotency_uncertain",
-        `Device ${row.device} accepted the message but did not report where it waits.`,
-        "Read the thread before deciding whether to send again.",
-        { device: row.device, delivery_id },
+        `Delivery ${deliveryId} to device ${device} may still be delivered when that device wakes the session (${sent.reason}).`,
+        "Retry with the same idempotency_key; a repeat of this delivery is never delivered twice.",
+        { device, delivery_id: deliveryId, reason: sent.reason, pending_wake: true },
       )
-    return ok({ kind: "queued", queue_position: pending ?? 1 }, kind === "already_admitted")
+    if (sent.kind === "refused") {
+      if (sent.reason === "unsupported") return wakeRefusal("wake_unsupported", device)
+      if (sent.reason === "engine_capability_missing" && sent.detail !== undefined)
+        return wakeRefusal(sent.detail, device)
+      // The service's refusal can carry the other device's free-form error text: the same allowlist (#13277 review).
+      return outcomeFailure({ ...sent, reason: shownReason(sent.reason) }, device)
+    }
+    const data = replyData(sent.response)
+    const kind = data["kind"]
+    if (kind === "queued") {
+      const wait = (data["waiting_on"] as JsonObject | undefined)?.["kind"]
+      return ok(
+        {
+          kind: "queued",
+          queue_position: 1,
+          waiting_on: {
+            kind: typeof wait === "string" && WAITS.has(wait) ? (wait as DeliveryWait["kind"]) : "wake",
+            device,
+          },
+        },
+        data["deduplicated"] === true,
+      )
+    }
+    if (kind === "refused") return wakeRefusal(String(data["reason"] ?? "refused"), device, data)
+    const turnId = typeof data["turnId"] === "string" ? data["turnId"] : ""
+    if (kind === "started" || kind === "steered") return ok({ kind, turn_id: turnId })
+    if (kind === "already_admitted") return ok({ kind: "queued", queue_position: 1 }, true)
+    return fail(
+      "idempotency_uncertain",
+      `Device ${device} accepted the message but answered an unknown admission (${String(kind)}).`,
+      "Retry with the same idempotency_key; a repeat of this delivery is never delivered twice.",
+      { device, delivery_id: deliveryId },
+    )
   }
 
   // The person at a terminal sends their own input: the engine's `prompt` record, raw text with no envelope (they are
   // that session's user, not a peer), kept by design (#12885). The same preflight as a session's steer, the same
   // idempotency through the tool receipt store, and the same outcome mapping as every other relay request. A person's
   // steer that names no turn steers the one this preflight reads (#13016): the state is read once, here.
-  const prompt = async (delivery: OutboundDelivery, row: RemoteSessionRow): Promise<SendOutcome> => {
+  const prompt = async (
+    delivery: OutboundDelivery,
+    row: RemoteSessionRow,
+    sending: () => void,
+  ): Promise<SendOutcome> => {
     const offline = await deviceOnline(remote, row.device)
     if (offline !== undefined) return offline
     const ok = (kind: GatewayDeliveryDelivery): RelayDeliverySuccess => ({
@@ -435,7 +717,7 @@ export function createRelayTransport(
         type: "get_state",
         sessionId: row.session_id,
       })
-      if (state.kind !== "ok") return outcomeFailure(state, row.device)
+      if (state.kind !== "ok") return probeFailure(state, row.device)
       const engine = engineStateOf(replyData(state.response))
       if (engine.phase !== "mid_turn")
         return fail(
@@ -468,6 +750,7 @@ export function createRelayTransport(
         },
         1,
       )
+      sending()
       const steered = await remote.sessions.sessionCommand(row.device, row.session_id, steer)
       if (steered.kind === "refused" && (steered.reason === "turn_conflict" || steered.reason === "not_steerable"))
         return fail(
@@ -480,11 +763,18 @@ export function createRelayTransport(
       return ok({ kind: "steered", turn_id: String(engine.turnEpoch) })
     }
     // One round trip: the engine starts a followUp prompt on an idle session and queues it behind a running turn.
+    sending()
     const sent = await remote.sessions.sessionCommand(
       row.device,
       row.session_id,
       remote.chain.stamp(
-        { type: "prompt", sessionId: row.session_id, message: delivery.text, streamingBehavior: "followUp" },
+        {
+          type: "prompt",
+          sessionId: row.session_id,
+          message: delivery.text,
+          streamingBehavior: "followUp",
+          ...(delivery.client_message_id === undefined ? {} : { clientMessageId: delivery.client_message_id }),
+        },
         1,
       ),
     )
@@ -534,7 +824,9 @@ export function createRelayTransport(
           "Read the target again and steer with the turn_id a started or steered result returned.",
         )
       if (delivery.sender.kind === "person")
-        return await once(delivery.caller_id, delivery.idempotency_key, delivery.args, () => prompt(delivery, row))
+        return await once(delivery.caller_id, delivery.idempotency_key, delivery.args, (_later, sending) =>
+          prompt(delivery, row, sending),
+        )
       if (delivery.mode === "steer" && delivery.expected_turn_id === undefined)
         return fail(
           "invalid_arguments",
@@ -547,8 +839,8 @@ export function createRelayTransport(
           "A gateway send needs the calling session's durable id.",
           "Retry from a session that passes its execution context.",
         )
-      return await once(delivery.caller_id, delivery.idempotency_key, delivery.args, (later) =>
-        send(delivery, row, later),
+      return await once(delivery.caller_id, delivery.idempotency_key, delivery.args, (later, sending) =>
+        send(delivery, row, later, sending),
       )
     },
     dispose: () => disposed.abort(),

@@ -1,4 +1,6 @@
 import type { AddressBookHost, DiskSession } from "../address-book"
+import type { ThreadActivity } from "../contracts/state"
+import type { InterruptRequest } from "../control/interrupt"
 import type { ThreadControl } from "../endpoint-controls"
 import type { EndpointKind } from "../endpoint-registry"
 import type {
@@ -8,9 +10,11 @@ import type {
   ReleaseSessionRequest,
 } from "../gateway/adapter"
 import type { ProvenanceRuntime } from "../gateway/provenance-resolver"
+import type { SameDeviceWake } from "../gateway/same-device-wake"
 import type { GatewayStore } from "../gateway/store"
 import type { ThreadTranscriptEntry } from "../reader"
 import type { RemoteThreadSurface } from "../remote/ports"
+import type { SessionWatchHandlers, SessionWatchOutcome } from "../control/wait-settled"
 
 export type ThreadHostSession = {
   readonly sessionId: string
@@ -21,6 +25,20 @@ export type ThreadHostSession = {
   readonly status?: "opening" | "open" | "closing" | "closed"
   /** senpi session kind (`interactive` | `worker`). */
   readonly kind?: string
+  /** The session file's archived flag; an engine from before `set_session_archived` lists none (not archived). */
+  readonly archived?: boolean
+  /**
+   * What the session is doing (senpi#6688): `running` while a turn is in flight, `queued` with steering or follow-up
+   * waiting, `awaiting_approval` on a pending question, `errored` after a turn failed. An older engine lists only
+   * `running` | `idle`, or none (idle).
+   */
+  readonly activity?: ThreadActivity
+  /** With `errored`: the failed turn's category (`auth`, `rate_limit`, `quota`, `network`, ...). */
+  readonly error_code?: string
+  /** The current or most recent turn's id, as the prompt response names it. */
+  readonly turn_id?: string
+  /** The session's current model; absent while unknown or on an older engine. */
+  readonly model?: { readonly provider: string; readonly id: string }
   readonly createdAt?: string
   readonly updatedAt?: string
   /** A terminal control endpoint reports its timestamps snake-cased. */
@@ -46,6 +64,7 @@ export type ThreadSessionPort = Pick<
   | "prompt"
   | "interrupt"
   | "setSessionName"
+  | "setSessionArchived"
   | "setModel"
   | "getAvailableModels"
   | "setThinkingLevel"
@@ -53,6 +72,7 @@ export type ThreadSessionPort = Pick<
   | "wake"
   | "releaseSession"
   | "closeSession"
+  | "watchSession"
 >
 
 /**
@@ -86,6 +106,12 @@ export type ThreadHost = {
     readonly forkFrom?: string
     readonly initialSkills?: readonly string[]
     readonly permissionPreset?: string
+    /** The engine's launch profile: the model (`provider` + `modelId`) and thinking level the new session starts on. */
+    readonly provider?: string
+    readonly modelId?: string
+    readonly thinkingLevel?: string
+    /** The id a NEW session is created under (host capability `durable_session_id`; ignored on resume, #14060). */
+    readonly durableSessionId?: string
   }) => Promise<ThreadHostSession>
   readonly getMessages: (sessionId: string) => Promise<readonly ThreadTranscriptEntry[]>
   readonly getState: (sessionId: string) => Promise<{ readonly isStreaming?: boolean; readonly activeTurnId?: string }>
@@ -95,12 +121,15 @@ export type ThreadHost = {
     options?: { readonly streamingBehavior?: "steer" | "followUp" },
     durable_session_id?: string,
   ) => Promise<{ readonly turnId?: string }>
+  /** The engine's `interrupt` record with `request`'s fields (`control/interrupt.ts`); answers the engine's reply data. */
   readonly interrupt: (
     sessionId: string,
-    turnId?: string,
+    request: InterruptRequest,
     durable_session_id?: string,
-  ) => Promise<{ readonly interrupted?: boolean; readonly turnId?: string }>
+  ) => Promise<Readonly<Record<string, unknown>>>
   readonly setSessionName: (sessionId: string, name: string, durable_session_id?: string) => Promise<void>
+  /** senpi `set_session_archived`: writes the flag into the session file. Absent on a port that cannot send it. */
+  readonly setSessionArchived?: (sessionId: string, archived: boolean, durable_session_id?: string) => Promise<void>
   readonly setModel: (
     sessionId: string,
     provider: string,
@@ -129,8 +158,21 @@ export type ThreadHost = {
     request: ReleaseSessionRequest,
     durable_session_id?: string,
   ) => Promise<ReleaseSessionReply>
+  /**
+   * Follows one session's status and run records on the endpoint's observing `subscribe_sessions` stream (never an
+   * attachment), until the watch is stopped or the session closes; `thread_read`'s `wait_ms` waits on it.
+   */
+  readonly watchSession?: (
+    sessionId: string,
+    handlers: SessionWatchHandlers,
+    durable_session_id?: string,
+  ) => Promise<SessionWatchOutcome>
   /** Ends one session on its host for every client that holds it; hosts only, a terminal keeps its own session. */
-  readonly closeSession?: (sessionId: string, durable_session_id?: string) => Promise<ThreadCloseOutcome>
+  readonly closeSession?: (
+    sessionId: string,
+    durable_session_id?: string,
+    options?: ThreadCloseOptions,
+  ) => Promise<ThreadCloseAnswer>
   /** Every endpoint at once; absent on a single-endpoint host, whose `listSessions` is the view. */
   readonly listView?: (request?: ThreadHostViewRequest) => Promise<ThreadHostView>
   /** Fresh identity validation on exactly one published endpoint, without enumeration. */
@@ -162,6 +204,8 @@ export type ThreadToolSurfaceOptions = {
    */
   readonly sessionsDirectory?: () => string
   readonly ensureHost?: () => Promise<void>
+  /** A same-device send to a session that is not running becomes a wake (#13037 5.3); absent, it is queued offline. */
+  readonly sameDeviceWake?: SameDeviceWake
   /**
    * The gateway store: the tools' idempotency receipts, bindings and outbox. The component passes
    * the one store it shares with the session's control endpoint; the SDK passes the one it opened
@@ -186,8 +230,13 @@ export type ThreadToolSurfaceOptions = {
   /** The agent sessions whose deliveries the caller's current run took in: a `thread_send` back to one asks for no permission (#12886). */
   readonly callerReplyTargets?: () => readonly string[]
   /** The senders of the deliveries the current run consumed, as each delivery stated them (decision 0027 section 6): a reply
-   * to one of them, by durable id or by the stated name, is approved from that evidence alone and must resolve to it. */
-  readonly callerReplySenders?: () => readonly { readonly session_id: string; readonly name?: string }[]
+   * to one of them, by durable id or by the stated name, is approved from that evidence alone and must resolve to it, on
+   * `device`: the device the delivery came from, parsed from its id (absent = this device; amendment A4.3.1 of #13037). */
+  readonly callerReplySenders?: () => readonly {
+    readonly session_id: string
+    readonly name?: string
+    readonly device?: string
+  }[]
   /** A `user` message (typed in the caller's terminal, or an extension's) is part of that same answer (`RunContext.local`); with a bound delivery there and another outbound binding, a report without `binding_id` is refused. */
   readonly callerRunHasLocalInput?: () => boolean
   /** `thread_report {kind: "completion"}` armed a completion (`arm_seq`) for this session; the component writes it at the next settle. */
@@ -202,3 +251,9 @@ export const UNKNOWN_CALLER = "unknown-caller"
 
 /** How a close ended: the session ended, no live session held it any more, or another client still holds it. */
 export type ThreadCloseOutcome = "closed" | "not_live" | "held_elsewhere"
+
+/** `force`: close even when the session has messages it has not read; they are dropped and listed (omo#14234). */
+export type ThreadCloseOptions = { readonly force?: boolean }
+
+/** A close's outcome and the deliveries the engine handed back unwritten (empty when none). */
+export type ThreadCloseAnswer = { readonly outcome: ThreadCloseOutcome; readonly dropped_deliveries: readonly string[] }

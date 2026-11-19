@@ -43,11 +43,20 @@ export function serveWorkerPort(selection: Promise<MemorySyncSelection>, port: M
 function serveDesktopWorker(channel: DesktopSyncEngineWire, port: MessagePort, closed: AbortSignal): void {
   if (closed.aborted) return
   const owned = new Set<string>()
+  // Counts main's `retired` events: a handle begun before one belongs to an account that has ended.
+  let accounts = 0
   const post = (message: HostToWorker) => {
     if (!closed.aborted) port.postMessage(message)
   }
   const stopEvents = channel.onEvent((event) => {
-    if (event.event !== "retired" && owned.has(event.handle)) post({ kind: "event", event })
+    if (event.event !== "retired") {
+      if (owned.has(event.handle)) post({ kind: "event", event })
+      return
+    }
+    // Main's account retired, not the channel (#13325): every Worker's account on it ends, and its handles with it.
+    accounts += 1
+    owned.clear()
+    post({ kind: "event", event })
   })
   closed.addEventListener(
     "abort",
@@ -74,9 +83,17 @@ function serveDesktopWorker(channel: DesktopSyncEngineWire, port: MessagePort, c
       return
     }
     void (async () => {
+      const account = accounts
       try {
         const value = await channel.request(request)
-        if (request.op === "operationBegin") owned.add(decodeSyncHandle(value).handle)
+        if (request.op === "operationBegin") {
+          // Its reply crossed main's retirement: the handle died with the old account, so it is never owned.
+          if (account !== accounts) {
+            post({ kind: "reply", id, ok: false })
+            return
+          }
+          owned.add(decodeSyncHandle(value).handle)
+        }
         if (request.op === "operationEnd") owned.delete(request.handle)
         post({ kind: "reply", id, ok: true, value })
       } catch {

@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { endpointKindOf, listRegistryEndpoints } from "./endpoint-registry"
+import { claimedSessionPaths, endpointKindOf, listRegistryEndpoints } from "./endpoint-registry"
 
 const scratch: string[] = []
 afterEach(() => {
@@ -123,5 +123,32 @@ describe("endpoint registry reader (endpoint.json, layout 2)", () => {
     expect(endpointKindOf(recorded, registry)).toBe("tui")
     expect(endpointKindOf(join(root, "rpc", "rpc.sock"), registry)).toBe("rpc_host")
     expect(endpointKindOf("/anywhere/p-0123456789abcdef.sock", registry)).toBe("rpc_host")
+  })
+})
+
+// #13452 review L2: a dead endpoint's claims are the record of its threads; a claim that names no session file is skipped,
+// never an error and never an empty path that a reader would then try to open.
+describe("claimed session paths of an endpoint directory", () => {
+  test("#given readable, blank, unreadable and non-claim files under reservations #when read #then only the named session files come back, in claim-file order", async () => {
+    // given
+    const dir = writeEndpoint(agentDir(), "0123456789abcdef", {
+      "reservations/b0000000000000000.json": { sessionPath: "/s/b.jsonl" },
+      "reservations/a0000000000000000.json": { sessionPath: "/s/a.jsonl" },
+      "reservations/c0000000000000000.json": { sessionPath: "" },
+      "reservations/d0000000000000000.json": { sessionPath: 7 },
+      "reservations/e0000000000000000.json": {},
+      "reservations/notes.txt": { sessionPath: "/s/not-a-claim.jsonl" },
+    })
+    writeFileSync(join(dir, "reservations", "f0000000000000000.json"), "{ not json")
+
+    // when
+    const paths = await claimedSessionPaths(dir)
+
+    // then
+    expect(paths).toEqual(["/s/a.jsonl", "/s/b.jsonl"])
+  })
+
+  test("#given an endpoint directory with no reservations #when read #then nothing is claimed", async () => {
+    expect(await claimedSessionPaths(writeEndpoint(agentDir(), "fedcba9876543210", {}))).toEqual([])
   })
 })

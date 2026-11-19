@@ -9,6 +9,7 @@ import { resolveProvenance } from "./provenance-resolver"
 import type { GatewayStore } from "./store-api"
 export type { Deduplicated, DeliveryView, GatewayStore, OutboxPage, ReceiptScope } from "./store-api"
 import { createExtensionFacade, type ExtensionRegisterReply, type RetainedRegistration } from "./store-extension-facade"
+import { createIntakeMarkFacade, createSessionWaitFacade, createWokenFacade } from "./store-woken-facade"
 export type {
   DeclaredSessionOp,
   SessionCallableOp,
@@ -89,7 +90,12 @@ type WorkerMessage =
       readonly type: "response"
       readonly id: number
       readonly ok: false
-      readonly error: { readonly message: string; readonly stack?: string; readonly code?: string }
+      readonly error: {
+        readonly message: string
+        readonly stack?: string
+        readonly code?: string
+        readonly details?: Readonly<Record<string, unknown>>
+      }
     }
   | { readonly type: "event"; readonly event: GatewayStoreEvent }
 
@@ -225,6 +231,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
           Object.assign(new Error(message.error.message), {
             workerStack: message.error.stack,
             ...(message.error.code === undefined ? {} : { code: message.error.code }),
+            ...(message.error.details === undefined ? {} : { details: message.error.details }),
           }),
         )
     })
@@ -347,6 +354,10 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     now,
     identity: () => track(async () => (await start()).self),
     enqueue: (request) => call("enqueue", request),
+    intake: (request) => call("intake", request),
+    woken: createWokenFacade(call, now),
+    sessionWait: createSessionWaitFacade(call, now),
+    intakeMarks: createIntakeMarkFacade(call, now),
     reconcile: (request) => call("reconcile", request),
     claim: (request) => call("claim", request),
     recordOutcome: (request) => call("record_outcome", request),
@@ -364,6 +375,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     toolReceiptBegin: (request) => call("tool_receipt_begin", request),
     toolReceiptSettle: (request) => call("tool_receipt_settle", request),
     toolReceiptRevise: (request) => call("tool_receipt_revise", request),
+    toolReceiptRelease: (request) => call("tool_receipt_release", request),
     bind: (request) => call("bind", request),
     unbind: (request) => call("unbind", request),
     rebind: (request) => call("rebind", request),

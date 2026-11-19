@@ -6,7 +6,7 @@ Native Senpi skills authored directly against the Senpi tool surface (not ported
 
 | Skill | Role |
 |-------|------|
-| `mass-ulw/` | Dag orchestration at repo scale (one run per phase with every stage chained up front, file handoff between nodes, size formula, node categories). `references/planning.md` is REQUIRED reading before building any dag: stage doctrine, node prompt contract, failure playbook. |
+| `mass-ulw/` | Dag orchestration at repo scale (a graph sized to the request, one run per phase, file handoff between nodes, size formula, node categories). `references/planning.md` is read before the first dag: sizing, node prompt contract, verification, failure playbook. |
 | `ultrawork/` | Senpi-native ultrawork directive source; its body is embedded into `src/components/ultrawork/generated-directive.ts` by `plugin/scripts/embed-directive.mjs` (build fails on non-senpi harness tokens). Blocks wrapped in `<!-- omo-ultrawork-astra:<name>:start/end -->` are swapped for the matching `## <name>` section of `references/astra-variant.md` in the GPT-6 Astra variant the ultrawork component selects by receiving model; the baseline strips only the marker lines, so every other model reads the skill body verbatim. |
 | `ulw-plan/` | Read-only planning lifecycle: draft -> plan with explicit approval; `scripts/scaffold-plan.mjs` scaffolds guarded `.omo` artifacts. |
 | `ulw-loop/` | Goal/QA lifecycle loop; component-owned native source, shipped verbatim. |
@@ -15,20 +15,20 @@ Native Senpi skills authored directly against the Senpi tool surface (not ported
 | `init-deep/` | Hierarchical AGENTS.md generation via a size-formula dag map-reduce (quick scanners -> high writers, ALWAYS-REDUCE); senpi-local override shadowing the shared-pool copy. |
 | `dag-library/` | Store a dag definition once and re-run it by name; loads through `plugin/runtime/dag/library.js`. |
 | `onboarding/` | First-run onboarding; `qa-validator.sh` pins the skill contract (front matter `name: onboarding`), `qa-savings-fixture.sh` expects `qa-savings-fixture: OK`. |
-| `visualize/` | Builds a self-contained HTML page to show inline in a thread (`show_html_page` / `html_preview` / `html_render`): a short router to `data-scientist` (figures, traceable query) and `frontend` (design), plus the inline-page constraints (no network, host theme tokens, scripts-off render, render-and-look in both themes at 390 px and the reply width). |
+| `visualize/` | Builds a self-contained HTML page to show inline in a thread (`show_html_page`, previewed with the OmO desktop's `desktop_html_preview`): a short router to `data-scientist` (figures, traceable query) and `frontend` (design), plus the inline-page constraints (no network, host theme tokens, scripts-off render, render-and-look in both themes at 390 px and the reply width). |
 | `give-me-tips/` | Explains any senpi tip in depth (`Tip:` lines incl. the Fable-5-refusal fallback tip and the kibitzer `Aha moment!` recall notice); queries the product's tip list first (`omo --list-tips` on OmO Native, `senpi --list-tips` on a plain senpi install), checks what THIS user can see, verifies feature code before explaining. |
 
 ## CONVENTIONS
 
 - Every skill is a directory with a mandatory `SKILL.md` (YAML front matter, `name:` pinned by the onboarding validator). Supporting material splits into `references/` (loaded selectively by the parent skill) and `scripts/`.
-- Orchestration contracts are prose plus exact templates: standalone node prompts with TASK/SCOPE/VERIFY/STOP WHEN, `category` routing, disjoint write scopes, bounded fan-in, final verification node. `dependsOn` is ordering only; data flows through files or eval-generated prompts.
+- Orchestration contracts are prose plus exact templates: standalone node prompts with TASK/SCOPE/VERIFY/STOP WHEN, `category` routing, disjoint write scopes, bounded fan-in, a real check on the deliverable (a verification node only when the check needs one). `dependsOn` is ordering only; data flows through files or eval-generated prompts.
 - Markdown headings, serialized field names, and documented paths are contracts: `PLAN_SECTION_HEADERS`, `.omo/drafts/<slug>.md`, `.omo/plans/<slug>.md`, `claim-graph.md`, `verified-claims`, `team_run_id`.
 - `scaffold-plan.mjs` targets Node and Bun, `node:*` built-ins only, deterministic output, refuses unsafe paths, symlinks, non-`.md` targets, and invalid slugs; preserves edited artifacts unless `--reset [--force]`.
 
 ## ANTI-PATTERNS
 
 - init-deep: the main session NEVER reads raw chunk reports or node outputs (ALWAYS-REDUCE); scanners never write AGENTS.md; existing files are read before overwrite; generated managed blocks are never hand-edited.
-- mass-ulw: no dag before reading `references/planning.md`; no dependency edge for a fact the orchestrator already knows (paste it into the prompt); no code-changing graph without a final verification node.
+- mass-ulw: no dag before reading `references/planning.md`; no dependency edge for a fact the orchestrator already knows (paste it into the prompt); no done report before the deliverable passes a real check; no fan-out wider than the request asks for.
 - ulw-plan: no self-activation; no implementer dispatch (read-only lane); waits for explicit approval; never begins execution.
 - ulw-loop: no sleep/timed polling for async state. ultrawork: no `tmux capture-pane` as visual evidence; paired cleanup required.
 - Workers never edit outside the assigned scope and never commit.

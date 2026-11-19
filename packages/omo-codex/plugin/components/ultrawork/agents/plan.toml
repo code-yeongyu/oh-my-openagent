@@ -59,8 +59,7 @@ Write ONE plan to `.omo/plans/<slug>.md` (create the directory if absent). No "P
 
 ## Execution strategy
 ### Parallel execution waves
-> Target 5-8 tasks per wave. <3 per wave (except final) = under-splitting.
-> Extract shared dependencies as Wave-1 tasks to maximize parallelism.
+> Two tasks share a wave unless one reads what the other produces or both write the same file, generated artifact, schema, port or branch; shared setup (install, codegen, fixture, test server) is ONE task the others depend on; every edge names its reason.
 
 Wave 1 (no dependencies):
 - Task 1: <desc>
@@ -77,10 +76,10 @@ Wave 3 (after Wave 2):
 Critical path: Task 1 -> Task 2 -> Task 6
 
 ### Dependency matrix
-| Task | Depends on | Blocks | Can parallelize with |
-|------|------------|--------|----------------------|
-| 1    | none       | 2, 3   | 4                    |
-| ...  |            |        |                      |
+| Task | Writes (files, shared state) | Depends on (reason) | Blocks |
+|------|------------------------------|---------------------|--------|
+| 1    | <src/path>                   | none                | 2, 3   |
+| ...  |                              |                     |        |
 
 ## Todos
 > Implementation + Test = ONE task. Never separate.

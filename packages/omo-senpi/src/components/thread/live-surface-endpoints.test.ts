@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { once } from "node:events"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { createConnection, createServer, type Server, type Socket } from "node:net"
 import { join } from "node:path"
 import { fakeHostTransport } from "../../../../senpi-task/src/runners/rpc-host/__fixtures__/fake-host-transport"
@@ -91,7 +91,7 @@ type World = {
   readonly run: (name: ThreadToolName, args: unknown) => Promise<ThreadToolResult>
 }
 
-function world(options: { readonly reports: () => readonly HostEndpointReport[] | undefined; readonly legacy: string; readonly shard: string; readonly now?: () => number }): World {
+function world(options: { readonly reports: () => readonly HostEndpointReport[] | undefined; readonly legacy: string; readonly shard: string; readonly now?: () => number; readonly callerWorkspaceRoot?: string }): World {
   const dialed: string[] = []
   const statusCalls = { count: 0 }
   const surface = createLiveThreadSurface({} as never, {
@@ -105,7 +105,7 @@ function world(options: { readonly reports: () => readonly HostEndpointReport[] 
   // closed before its directory is removed: win32 cannot delete the open database
   const store = createGatewayStore({ agentDir: stateDirectory })
   cleanups.push(() => store.dispose())
-  const tools = createThreadTools({ host: surface, store, stateDirectory, callerSessionId: () => "caller", callerWorkspaceRoot: () => process.cwd() })
+  const tools = createThreadTools({ host: surface, store, stateDirectory, callerSessionId: () => "caller", callerWorkspaceRoot: () => options.callerWorkspaceRoot ?? process.cwd() })
   let calls = 0
   return {
     legacy: options.legacy,
@@ -124,7 +124,7 @@ function world(options: { readonly reports: () => readonly HostEndpointReport[] 
 const report = (socket: string, reachable: boolean, sessionPaths: readonly string[] = []): HostEndpointReport => ({ socket, reachable, session_paths: sessionPaths })
 
 describe("thread tools across host endpoints", () => {
-  test("#given host status --all answering the legacy endpoint and an i-* shard with one session each #when thread_list runs #then both threads are listed with their own sockets", async () => {
+  test("#given host status --all answering the legacy endpoint and an i-* shard with one session each #when thread_list runs #then both threads are listed, each with its own endpoint's surface", async () => {
     // given
     const dir = tempDir("thr-ep-")
     const legacy = join(dir, "rpc.sock")
@@ -138,8 +138,8 @@ describe("thread tools across host endpoints", () => {
 
     // then
     expect(listed.kind).toBe("ok")
-    const threads = (listed as Extract<ThreadToolResult, { kind: "ok"; threads: unknown }>).threads as ReadonlyArray<{ thread_id: string; socket?: string; status: string }>
-    expect(threads.map((thread) => [thread.thread_id, thread.socket, thread.status]).sort()).toEqual([["dur-desktop", shard, "live"], ["dur-terminal", legacy, "live"]])
+    const threads = (listed as Extract<ThreadToolResult, { kind: "ok"; threads: unknown }>).threads as ReadonlyArray<{ thread: string; surface?: string; status: string }>
+    expect(threads.map((thread) => [thread.thread, thread.surface, thread.status]).sort()).toEqual([["dur-desktop", "desktop", "live"], ["dur-terminal", "daemon", "live"]])
   })
 
   test("#given both endpoints hold a session routed as rpc-1 #when thread_send and thread_read target the i-* thread #then every per-session request dials the i-* socket and none reaches the legacy one", async () => {
@@ -157,7 +157,7 @@ describe("thread tools across host endpoints", () => {
 
     // then
     // The fake host answers the wake with nothing admitted and runs no drain, so nothing will start the message (#12486).
-    expect(sent).toMatchObject({ kind: "ok", thread_id: "dur-desktop", delivery: { kind: "queued_offline" }, endpoint: { kind: "rpc_host" } })
+    expect(sent).toMatchObject({ kind: "ok", thread: "dur-desktop", delivery: { kind: "queued_offline" } })
     expect(read).toMatchObject({ kind: "ok", source: "live_host", items: [{ role: "assistant", content: JSON.stringify("from dur-desktop") }] })
     const perSession = new Set(["wake", "get_messages"])
     const shardPerSession = shardHost.frames.filter((frame) => perSession.has(String(frame.type)))
@@ -167,7 +167,7 @@ describe("thread tools across host endpoints", () => {
     expect(w.dialed.filter((path) => path === shard).length).toBeGreaterThanOrEqual(3)
   })
 
-  test("#given two live endpoints #when thread_create runs #then open_session is sent to the legacy socket and the created thread names it", async () => {
+  test("#given two live endpoints #when thread_create runs #then open_session is sent to the legacy socket and the created thread is its session, without the endpoint facts", async () => {
     // given
     const dir = tempDir("thr-ep-")
     const legacy = join(dir, "rpc.sock")
@@ -177,12 +177,38 @@ describe("thread tools across host endpoints", () => {
     const w = world({ legacy, shard, reports: () => [report(legacy, true), report(shard, true)] })
 
     // when
-    const created = await w.run("thread_create", {})
+    const created = await w.run("thread_create", { name: "live-surface-endpoints-180" })
 
     // then
-    expect(created).toMatchObject({ kind: "ok", thread: { sessionId: "rpc-2", socket: legacy } })
+    expect(created).toMatchObject({ kind: "ok", thread: "rpc-2" })
+    expect((created as { thread?: object }).thread).not.toHaveProperty("socket")
     expect(legacyHost.frames.some((frame) => frame.type === "open_session")).toBe(true)
     expect(shardHost.frames.some((frame) => frame.type === "open_session")).toBe(false)
+  })
+
+  test("#given a desktop thread with no project, working in its own scratch folder, and an engine started in the user's home #when it runs thread_create with no cwd and no alias #then the child opens in the caller's folder, not the engine's", async () => {
+    // given: the desktop backs a thread with no project with a folder of its own under its scratch root, and its
+    // engine runs from the user's home. The engine opens a session with no cwd in its own folder
+    // (`command.cwd ?? host.defaults.cwd`), which is where the packaged-app QA child landed.
+    const dir = tempDir("thr-ep-")
+    const legacy = join(dir, "rpc.sock")
+    const shard = join(dir, "i-0123456789abcdef.sock")
+    const engineHome = join(dir, "home")
+    const scratchFolder = join(engineHome, ".omo", "desktop", "scratch", "2026-11-11-qa-thread-chip-check-use-01a1ca0d")
+    mkdirSync(scratchFolder, { recursive: true })
+    const terminal = hostWith("dur-terminal", "terminal", join(dir, "terminal.jsonl"))
+    const legacyHost = await endpoint(legacy, (frame) => frame.type === "open_session"
+      ? { data: { sessionId: "rpc-2", state: { cwd: typeof frame.cwd === "string" ? frame.cwd : engineHome } } }
+      : terminal(frame))
+    await endpoint(shard, hostWith("dur-desktop", "desktop", join(dir, "desktop.jsonl")))
+    const w = world({ legacy, shard, reports: () => [report(legacy, true), report(shard, true)], callerWorkspaceRoot: scratchFolder })
+
+    // when
+    const created = await w.run("thread_create", { name: "QA chip check" })
+
+    // then
+    expect(legacyHost.frames.filter((frame) => frame.type === "open_session").map((frame) => frame.cwd)).toEqual([scratchFolder])
+    expect(created).toMatchObject({ kind: "ok", cwd: scratchFolder })
   })
 
   test("#given the i-* endpoint stopped answering after it claimed a session file #when the tools run #then its thread comes from disk with error_note, reads from JSONL, and the legacy thread still takes sends", async () => {
@@ -201,22 +227,22 @@ describe("thread tools across host endpoints", () => {
     const sent = await w.run("thread_send", { thread: "dur-terminal", message: "still here" })
 
     // then
-    const threads = (listed as Extract<ThreadToolResult, { kind: "ok"; threads: unknown }>).threads as ReadonlyArray<{ thread_id: string; status: string; socket?: string; error_note?: string }>
-    const desktop = threads.find((thread) => thread.thread_id === "dur-desktop")
-    expect(desktop).toMatchObject({ status: "resumable", socket: shard, error_note: `host_unavailable:${shard}` })
-    expect(threads.find((thread) => thread.thread_id === "dur-terminal")).toMatchObject({ status: "live", socket: legacy })
+    const threads = (listed as Extract<ThreadToolResult, { kind: "ok"; threads: unknown }>).threads as ReadonlyArray<{ thread: string; status: string; surface?: string; error_note?: string }>
+    const desktop = threads.find((thread) => thread.thread === "dur-desktop")
+    expect(desktop).toMatchObject({ status: "resumable", surface: "desktop", error_note: `host_unavailable:${shard}` })
+    expect(threads.find((thread) => thread.thread === "dur-terminal")).toMatchObject({ status: "live", surface: "daemon" })
     expect(read).toMatchObject({ kind: "ok", source: "session_jsonl", source_incomplete: true, error_note: `host_unavailable:${shard}` })
     expect((read as { items: ReadonlyArray<{ seq: number; role: string; content: string }> }).items).toEqual([
       { seq: 1, role: "user", content: JSON.stringify("hello from disk") },
       { seq: 2, role: "assistant", content: JSON.stringify([{ type: "toolCall", id: "c1", name: "read", arguments: {} }]) },
       { seq: 3, role: "tool", content: JSON.stringify([{ type: "text", text: "file body" }]) },
     ])
-    expect(sent).toMatchObject({ kind: "ok", thread_id: "dur-terminal" })
+    expect(sent).toMatchObject({ kind: "ok", thread: "dur-terminal" })
     expect(legacyHost.frames.some((frame) => frame.type === "wake")).toBe(true)
     expect(w.dialed).not.toContain(shard)
   })
 
-  test("#given a dead endpoint's session file longer than one byte window #when thread_read follows next_cursor #then the JSONL fallback pages forward to the end", async () => {
+  test("#given a dead endpoint's session file longer than one byte window #when thread_read follows next_cursor #then the JSONL fallback pages from the newest message back to the start", async () => {
     // given
     const dir = tempDir("thr-ep-")
     const legacy = join(dir, "rpc.sock")
@@ -231,20 +257,21 @@ describe("thread tools across host endpoints", () => {
     const w = world({ legacy, shard, reports: () => [report(legacy, true), report(shard, false, [desktopJsonl])] })
 
     // when
-    const contents: string[] = []
+    const pages: string[][] = []
     let reads = 0
     let cursor: string | undefined
     do {
       const page = await w.run("thread_read", { thread: "dur-desktop", max_bytes: 1000, ...(cursor === undefined ? {} : { cursor }) })
       expect(page).toMatchObject({ kind: "ok", source: "session_jsonl" })
       reads += 1
-      contents.push(...(page as { items: ReadonlyArray<{ content: string }> }).items.map((item) => item.content))
+      pages.push((page as { items: ReadonlyArray<{ content: string }> }).items.map((item) => item.content))
       cursor = (page as { next_cursor?: string }).next_cursor
     } while (cursor !== undefined && reads < 20)
 
     // then
     expect(reads).toBeGreaterThan(1)
-    expect(contents).toEqual(texts.map((text) => JSON.stringify(text)))
+    expect(pages[0]?.at(-1)).toBe(JSON.stringify(texts.at(-1)))
+    expect(pages.reverse().flat()).toEqual(texts.map((text) => JSON.stringify(text)))
   })
 
   test("#given the legacy endpoint stopped answering after it claimed a session file #when thread_list and thread_read run #then its thread is listed from disk as resumable on the legacy socket and reads from JSONL, while the live i-* thread stays live", async () => {
@@ -262,9 +289,9 @@ describe("thread tools across host endpoints", () => {
     const read = await w.run("thread_read", { thread: "dur-terminal" })
 
     // then
-    const threads = (listed as Extract<ThreadToolResult, { kind: "ok"; threads: unknown }>).threads as ReadonlyArray<{ thread_id: string; status: string; socket?: string; error_note?: string }>
-    expect(threads.find((thread) => thread.thread_id === "dur-terminal")).toMatchObject({ status: "resumable", socket: legacy, error_note: `host_unavailable:${legacy}` })
-    expect(threads.find((thread) => thread.thread_id === "dur-desktop")).toMatchObject({ status: "live", socket: shard })
+    const threads = (listed as Extract<ThreadToolResult, { kind: "ok"; threads: unknown }>).threads as ReadonlyArray<{ thread: string; status: string; surface?: string; error_note?: string }>
+    expect(threads.find((thread) => thread.thread === "dur-terminal")).toMatchObject({ status: "resumable", surface: "daemon", error_note: `host_unavailable:${legacy}` })
+    expect(threads.find((thread) => thread.thread === "dur-desktop")).toMatchObject({ status: "live", surface: "desktop" })
     expect(read).toMatchObject({ kind: "ok", source: "session_jsonl", items: [{ seq: 1, role: "user", content: JSON.stringify("hello from the legacy host") }, expect.anything(), expect.anything()] })
   })
 
@@ -301,7 +328,7 @@ describe("thread tools across host endpoints", () => {
     // when
     const results = [
       await w.run("thread_list", {}),
-      await w.run("thread_create", {}),
+      await w.run("thread_create", { name: "live-surface-endpoints-330" }),
       await w.run("thread_read", { thread: "anything" }),
     ]
     const sent = await w.run("thread_send", { thread: "anything", message: "x" })
@@ -323,7 +350,7 @@ describe("thread tools across host endpoints", () => {
     const listed = await w.run("thread_list", { all_scope: true })
 
     // then
-    expect(listed).toMatchObject({ kind: "ok", threads: [{ thread_id: "dur-terminal", socket: legacy }] })
+    expect(listed).toMatchObject({ kind: "ok", threads: [{ thread: "dur-terminal", surface: "daemon" }] })
   })
 
   test("#given repeated calls #when they land inside and then past the cache window #then host status --all runs once per window", async () => {

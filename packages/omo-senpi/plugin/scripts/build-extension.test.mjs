@@ -379,6 +379,80 @@ describe("checkExtensionCurrent", () => {
     expect(threadClientInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))).toBe(true)
   })
 
+  // #14204: `omo thread` and `omo daemon` import the thread client with a plain dynamic import, outside the engine,
+  // so no senpi loader alias resolves a bare `typebox` there, and the compiled runtime ships no node_modules.
+  test("#given the thread client copied into a plugin layout with no node_modules #when Node imports it the way the omo CLI does #then it loads and exposes the CLI remote surface", async () => {
+    const { threadClientOutputPath } = await sharedOutputs()
+    const work = await mkdtemp(join(tmpdir(), "omo-thread-client-cli-load-"))
+    try {
+      const sidecar = join(work, "plugin", "extensions", "omo-thread-client.js")
+      await mkdir(dirname(sidecar), { recursive: true })
+      await cp(join(pluginRoot, "package.json"), join(work, "plugin", "package.json"))
+      await cp(threadClientOutputPath, sidecar)
+      const probe = join(work, "thread-client-probe.mjs")
+      await writeFile(
+        probe,
+        [
+          'import { pathToFileURL } from "node:url"',
+          `const client = await import(pathToFileURL(${JSON.stringify(sidecar)}).href)`,
+          'if (typeof client.createCliRemoteSurface !== "function") throw new Error("createCliRemoteSurface missing")',
+          'console.log("thread-client-ok")',
+        ].join("\n"),
+      )
+      const run = await runBoundedStage(
+        "node probe",
+        "node",
+        [probe],
+        { cwd: parse(work).root },
+        PACKED_STAGE_CAPS.probe,
+      )
+      expect(run.stdout, run.stderr).toContain("thread-client-ok")
+      expect(run.status, run.stderr).toBe(0)
+    } finally {
+      removeTestRootBestEffort(work)
+    }
+  })
+
+  test("#given the lazy session wake #when bundle inputs are inspected #then the carrier, the consumer and the device-service client are confined to their sidecar", async () => {
+    const { mainInputs, wakeInputs } = await sharedOutputs()
+    for (const suffix of [
+      "/components/thread/wake/wake-runtime.ts",
+      "/components/thread/wake/runtime.ts",
+      "/components/thread/wake/carrier.ts",
+      "/components/thread/wake/carrier-connection.ts",
+      "/components/thread/wake/consumer-start.ts",
+      "/components/thread/consumer/consumer.ts",
+      "/components/thread/consumer/device-service-port.ts",
+      "/components/thread/gateway/same-device-wake.ts",
+    ]) {
+      expect(
+        mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(false)
+      expect(
+        wakeInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),
+        suffix,
+      ).toBe(true)
+    }
+  })
+
+  test("#given thread_create's folder and worktree code #when bundle inputs are inspected #then it lives only in the thread client sidecar", async () => {
+    const { mainInputs, threadClientInputs } = await sharedOutputs()
+    for (const suffix of [
+      "/components/thread/control/local-open.ts",
+      "/components/thread/worktree/thread-worktree.ts",
+      "/components/thread/worktree/discard-worktree.ts",
+      "/components/thread/worktree/failures.ts",
+      "/components/thread/worktree/worktree-rpc.ts",
+      "/components/thread/worktree/remote-worktree.ts",
+      "/components/thread/remote/create-folder.ts",
+      "/components/thread/remote/plan-create.ts",
+    ]) {
+      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))).toBe(false)
+      expect(threadClientInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))).toBe(true)
+    }
+  })
+
   test("#given lazy session-summary recovery #when bundle inputs are inspected #then the recovery sweep is confined to its sidecar", async () => {
     const { mainInputs, telemetryRecoveryInputs } = await sharedOutputs()
     const suffix = "/components/telemetry/session-summary-recovery.ts"
@@ -718,6 +792,7 @@ describe("checkExtensionCurrent", () => {
     expect(main).toContain('import("#omo-telemetry-posthog-runtime")')
     expect(main).toContain('import("#omo-telemetry-otlp-runtime")')
     expect(main).toContain('import("#omo-thread-client-runtime")')
+    expect(main).toContain('import("#omo-wake-runtime")')
     expect(main).toContain('import("#omo-telemetry-recovery-runtime")')
     expect(posthog).toContain('import("#telemetry-immediate-send")')
     expect(main).toContain('import("#omo-memory-sync-runtime")')
@@ -747,6 +822,7 @@ describe("checkExtensionCurrent", () => {
       "#omo-desktop-toolkit-runtime": "./extensions/omo-desktop-toolkit.js",
       "#omo-claim-receipt-runtime": "./extensions/omo-claim-receipt.js",
       "#omo-thread-client-runtime": "./extensions/omo-thread-client.js",
+      "#omo-wake-runtime": "./extensions/omo-wake.js",
       "#omo-telemetry-recovery-runtime": "./extensions/omo-telemetry-recovery.js",
       "#telemetry-immediate-send": "./extensions/omo-telemetry-recovery.js",
       "#omo-agent-toolkit-sdk": "./runtime/agent-toolkit-sdk/sdk.js",

@@ -28,6 +28,7 @@ import { createLateSendOutcomeDeliverer } from "./late-send-outcome"
 import { CATEGORY_UNAVAILABLE_MESSAGE_TYPE } from "./category-unavailable-warning"
 import { registerTaskCommands } from "./commands"
 import { registerDagCommands } from "./dag-commands"
+import { createLiveConfigProvider } from "./live-config-provider"
 import { createDagReloadSource } from "./dag-reload-source"
 import { createDagRuntime, type DagRuntime } from "./dag-runtime"
 import { registerDagTool } from "./register-workflow-tool"
@@ -40,6 +41,7 @@ import { loadJobWidgetHost, type JobWidgetHostApi } from "./job-widget-host"
 import { createTaskJobWidgetFeed } from "./job-widget-sources"
 import { createLeadPollerLifecycle, type LeadPollerLifecycle } from "./lead-poller-lifecycle"
 import { TEAM_MEMBER_LIVENESS_MESSAGE_TYPE } from "./member-liveness"
+import { registerModelRoutingRpc } from "./model-routing-rpc"
 import { TASK_COMPLETION_MESSAGE_TYPE } from "./parent-notifier"
 import { renderCategoryUnavailable, renderTaskCompletion, renderTeamMemberLiveness } from "./renderers"
 import { createResumptionChannelEmitter } from "./resumption-channel-emitter"
@@ -105,15 +107,39 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
       const loaded = loadConfig({ cwd })
       const loadSkills = options.loadSkills ?? createTaskSkillLoader({ logger: ctx.logger })
 
+      const getLiveOmoConfig = createLiveConfigProvider({
+        cwd,
+        loadConfig,
+        initialResult: loaded,
+        logger: ctx.logger,
+      })
+
       const engine = composeTaskEngine({
         pi,
         omoConfig: loaded.config,
+        // Re-read the user/project chain per plan so mid-session omo.json(c) category edits
+        // reach the planner seam instead of pinning the register-time snapshot forever, while
+        // caching within the plan window and retaining the last good config on diagnostics.
+        getOmoConfig: getLiveOmoConfig,
         cwd,
         loadSkills,
         sharedParentTools: () => ctx.getCapturedTools?.() ?? [],
         ...(ctx.idleCoordinator !== undefined && { coordinator: ctx.idleCoordinator }),
       })
 
+      // The same inputs the planner resolves a spawn against: the register-time cwd its live config reads,
+      // the agent table it was composed with, and the parent's service tier for the fast-tier step.
+      registerModelRoutingRpc(pi, {
+        cwd: () => cwd,
+        loadConfig: (projectDir) => loadConfig({ cwd: projectDir }),
+        registry: () => engine.runtime.modelRegistry(),
+        planner: () => ({
+          agents: engine.agents,
+          ...(engine.runtime.parentServiceTier() === undefined
+            ? {}
+            : { parentServiceTier: engine.runtime.parentServiceTier() }),
+        }),
+      })
       pi.registerMessageRenderer?.(TASK_COMPLETION_MESSAGE_TYPE, renderTaskCompletion)
       pi.registerMessageRenderer?.(TEAM_MEMBER_LIVENESS_MESSAGE_TYPE, renderTeamMemberLiveness)
       pi.registerMessageRenderer?.(CATEGORY_UNAVAILABLE_MESSAGE_TYPE, renderCategoryUnavailable)

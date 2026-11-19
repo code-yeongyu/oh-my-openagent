@@ -48,6 +48,7 @@ const USAGE = [
   "",
   "  --json            print the engine's JSON line instead of a summary",
   "  --no-upgrade      never hand off, even from an older build",
+  "  --pinned          with run, the host it starts never idle-exits (the always-on session host unit)",
   "  --include-workers include subagent sessions in status",
   "  --all             apply stop to every discovered endpoint",
   "  --wait            with stop --drain --all, wait for generations and claims to end",
@@ -88,8 +89,28 @@ function summarize(subcommand, parsed, exitCode) {
     return `daemon: running pid ${parsed.pid}${suffix}`
   }
   if (parsed === undefined) return `daemon: ${subcommand} failed`
+  if (parsed.action === "refuse") return `daemon: refuse${refusalDetail(parsed)}`
   const pid = parsed.pid === undefined ? "" : ` pid ${parsed.pid}`
   return `daemon: ${parsed.action ?? subcommand}${pid}`
+}
+
+/**
+ * omo#14191: why the engine refused, on which socket, and which host holds it - a bare `daemon: refuse` in a service
+ * unit's log said none of it.
+ */
+function refusalDetail(parsed) {
+  const host = parsed.host ?? {}
+  const holder = [
+    host.engineVersion ? `engine ${host.engineVersion}` : undefined,
+    host.generation != null ? `generation ${host.generation}` : undefined,
+    host.instanceId ? `instance ${host.instanceId}` : undefined,
+  ].filter((part) => part !== undefined)
+  return [
+    parsed.reason ? `: ${parsed.reason}` : "",
+    parsed.detail ? ` (${parsed.detail})` : "",
+    parsed.socket ? ` on ${parsed.socket}` : "",
+    holder.length > 0 ? `; held by ${holder.join(", ")}` : "",
+  ].join("")
 }
 
 /** `omo daemon adopt`: the thread SDK finds and releases the session; the result is an exit code or a launch. */
@@ -241,12 +262,48 @@ export function runDaemonCommand(args, options) {
     if (outcome !== undefined) return outcome
   }
   const engineArgs = buildArgs(subcommand, args, { specPath, policy: resolvePolicy(args, config) })
-  const result = engine.run(engineArgs, { env: hostCommandEnvironment(env, agentDir, config) })
+  const commandEnv = hostCommandEnvironment(env, agentDir, config)
+  // omo#13594: the session host unit's run. Only the host this ensure starts is pinned; task hosts drop the variable.
+  if (subcommand === "run" && args.includes("--pinned")) commandEnv.SENPI_RPC_HOST_COLD_START = "persistent"
+  const result = engine.run(engineArgs, { env: commandEnv })
   const parsed = parseEngineLine(result.stdout ?? "")
 
   if (result.stderr) stderr.write(result.stderr)
 
   if (args.includes("--json") && result.stdout) stdout.write(result.stdout.trim() + "\n")
   else stdout.write(`${summarize(subcommand, parsed, result.exitCode)}\n`)
+  if (subcommand === "run" && result.exitCode === DAEMON_EXIT.ok) return warmAfterRun(options)
   return result.exitCode
+}
+
+/**
+ * `omo daemon run` ends with senpi's `warm` on the daemon it ensured. A multi-session host loads omo only for an open
+ * or a warm, and once it has loaded omo the operator daemon declares the delivery consumer, so a daemon the device
+ * service cold-starts can be handed deliveries before any session runs (#13037 cold wake). A warm that fails is
+ * reported and changes nothing about the run's answer: the consumer then starts with the daemon's first session.
+ */
+async function warmAfterRun(options) {
+  const report = (reason) =>
+    options.stderr.write(
+      `omo daemon: the daemon did not load omo (${reason}); its delivery consumer starts with its first session\n`,
+    )
+  const loaded = await (options.threadSdk ?? loadThreadSdk)({ ...options, cwd: options.cwd ?? process.cwd() })
+  if (loaded.error !== undefined) {
+    report(loaded.error)
+    return DAEMON_EXIT.ok
+  }
+  try {
+    const answer = await loaded.sdk.warmDaemon()
+    if (answer.kind === "refused") report(answer.code)
+    else if (answer.kind === "unsupported") report("the engine has no warm")
+  } catch (error) {
+    report(error instanceof Error ? error.message : String(error))
+  } finally {
+    await loaded.sdk
+      .dispose()
+      .catch((error) =>
+        report(`closing the gateway store failed: ${error instanceof Error ? error.message : String(error)}`),
+      )
+  }
+  return DAEMON_EXIT.ok
 }

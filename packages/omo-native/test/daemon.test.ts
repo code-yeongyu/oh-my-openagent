@@ -46,13 +46,35 @@ function capture() {
   return { chunks, write: (text: string) => void chunks.push(text), text: () => chunks.join("") }
 }
 
+type WarmAnswer =
+  { kind: "warm"; state: "warmed" | "already_warm" } | { kind: "unsupported" } | { kind: "refused"; code: string }
+
+/** The thread SDK `omo daemon run` warms the daemon through after its ensure: records each warm and each dispose. */
+function warmingSdk(answer: WarmAnswer = { kind: "warm", state: "warmed" }) {
+  const events: string[] = []
+  return {
+    events,
+    threadSdk: async () => ({
+      sdk: {
+        warmDaemon: async () => {
+          events.push("warm")
+          return answer
+        },
+        dispose: async () => {
+          events.push("dispose")
+        },
+      },
+    }),
+  }
+}
+
 describe("omo daemon", () => {
-  test("run delegates to the engine with the launch spec and the resolved policy", () => {
+  test("run delegates to the engine with the launch spec and the resolved policy", async () => {
     const { pluginRoot, agentDir } = workspace()
     const engine = fakeEngine({ exitCode: 0, stdout: JSON.stringify({ action: "start", pid: 4242 }) })
     const stdout = capture()
 
-    const exitCode = runDaemonCommand(["run"], {
+    const exitCode = await runDaemonCommand(["run"], {
       engine,
       pluginRoot,
       agentDir,
@@ -60,6 +82,7 @@ describe("omo daemon", () => {
       stdout,
       stderr: capture(),
       platform: "darwin",
+      threadSdk: warmingSdk().threadSdk,
     })
 
     expect(exitCode).toBe(0)
@@ -90,6 +113,7 @@ describe("omo daemon", () => {
       stdout,
       stderr: capture(),
       platform: "darwin",
+      threadSdk: warmingSdk().threadSdk,
     })
 
     expect(stdout.text().trim()).toBe(line)
@@ -107,6 +131,7 @@ describe("omo daemon", () => {
       stdout: capture(),
       stderr: capture(),
       platform: "darwin",
+      threadSdk: warmingSdk().threadSdk,
     })
 
     expect(engine.calls[0]?.args).toContain("never")
@@ -124,6 +149,7 @@ describe("omo daemon", () => {
       stdout: capture(),
       stderr: capture(),
       platform: "darwin",
+      threadSdk: warmingSdk().threadSdk,
     })
 
     expect(engine.calls[0]?.args).toContain("fallback")
@@ -141,17 +167,18 @@ describe("omo daemon", () => {
       stdout: capture(),
       stderr: capture(),
       platform: "darwin",
+      threadSdk: warmingSdk().threadSdk,
     })
 
     expect(engine.calls[0]?.args).not.toContain("--idle-exit-ms")
     expect(engine.calls[0]?.env.SENPI_RPC_HOST_IDLE_EXIT_MS).toBe("900000")
   })
 
-  test("--persistent stays an accepted wrapper-only no-op for the adopted engine", () => {
+  test("--persistent stays an accepted wrapper-only no-op for the adopted engine", async () => {
     const { pluginRoot, agentDir } = workspace()
     const engine = fakeEngine({ exitCode: 0, stdout: JSON.stringify({ action: "start", pid: 9 }) })
 
-    const exitCode = runDaemonCommand(["run", "--persistent"], {
+    const exitCode = await runDaemonCommand(["run", "--persistent"], {
       engine,
       pluginRoot,
       agentDir,
@@ -159,10 +186,107 @@ describe("omo daemon", () => {
       stdout: capture(),
       stderr: capture(),
       platform: "darwin",
+      threadSdk: warmingSdk().threadSdk,
     })
 
     expect(exitCode).toBe(0)
     expect(engine.calls[0]?.args).not.toContain("--persistent")
+  })
+
+  // #13037 cold wake: a multi-session host loads omo only for an open or a warm, so `run` warms the daemon it ensured
+  // and the daemon declares the delivery consumer with no session running.
+  test("run warms the daemon it ensured through the thread SDK, then closes the SDK", async () => {
+    const { pluginRoot, agentDir } = workspace()
+    const engine = fakeEngine({ exitCode: 0, stdout: JSON.stringify({ action: "start", pid: 9 }) })
+    const stderr = capture()
+    const warm = warmingSdk()
+
+    const exitCode = await runDaemonCommand(["run"], {
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout: capture(),
+      stderr,
+      platform: "darwin",
+      threadSdk: warm.threadSdk,
+    })
+
+    expect(exitCode).toBe(0)
+    expect(warm.events).toEqual(["warm", "dispose"])
+    expect(stderr.text()).toBe("")
+  })
+
+  test.each([
+    ["refuses the warm", { kind: "refused", code: "host_draining" } as const, "host_draining"],
+    ["has no warm", { kind: "unsupported" } as const, "the engine has no warm"],
+  ])("a daemon that %s is reported and the run still exits 0", async (_what, answer, reason) => {
+    const { pluginRoot, agentDir } = workspace()
+    const engine = fakeEngine({ exitCode: 0, stdout: JSON.stringify({ action: "reuse", pid: 9 }) })
+    const stderr = capture()
+
+    const exitCode = await runDaemonCommand(["run"], {
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout: capture(),
+      stderr,
+      platform: "darwin",
+      threadSdk: warmingSdk(answer).threadSdk,
+    })
+
+    expect(exitCode).toBe(0)
+    expect(stderr.text()).toContain(reason)
+  })
+
+  test("a run whose ensure the engine refused warms nothing", async () => {
+    const { pluginRoot, agentDir } = workspace()
+    const engine = fakeEngine({ exitCode: 3, stdout: JSON.stringify({ action: "refuse" }) })
+    const warm = warmingSdk()
+
+    const exitCode = await runDaemonCommand(["run"], {
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout: capture(),
+      stderr: capture(),
+      platform: "darwin",
+      threadSdk: warm.threadSdk,
+    })
+
+    expect(exitCode).toBe(3)
+    expect(warm.events).toEqual([])
+  })
+
+  // omo#14191: a bare `daemon: refuse` in the session host unit's log hid why every ensure was refused for days.
+  test("a refused run says why, where, and which host holds the socket", async () => {
+    const { pluginRoot, agentDir } = workspace()
+    const refusal = {
+      action: "refuse",
+      reason: "endpoint_occupied",
+      detail: "no host registration names this socket",
+      socket: "/h/.omo/agent/rpc/rpc.sock",
+      host: { engineVersion: "2026.11.15-2", generation: 15, instanceId: "8b27df13" },
+    }
+    const engine = fakeEngine({ exitCode: 3, stdout: JSON.stringify(refusal) })
+    const stdout = capture()
+
+    const exitCode = await runDaemonCommand(["run", "--pinned"], {
+      engine,
+      pluginRoot,
+      agentDir,
+      env: {},
+      stdout,
+      stderr: capture(),
+      platform: "darwin",
+      threadSdk: warmingSdk().threadSdk,
+    })
+
+    expect(exitCode).toBe(3)
+    for (const part of [refusal.reason, refusal.detail, refusal.socket, "2026.11.15-2", "8b27df13"])
+      expect(stdout.text()).toContain(part)
   })
 
   test("--foreground fails clearly because the adopted engine always detaches", () => {
