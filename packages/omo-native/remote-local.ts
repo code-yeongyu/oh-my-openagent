@@ -7,7 +7,6 @@ import {
 } from "../device-service-core/src/account-state.ts"
 import {
   connectDeviceService,
-  type DeviceRow,
   type DeviceService,
   deviceServiceEndpointPath,
   deviceServiceStateDir,
@@ -15,7 +14,6 @@ import {
   SESSION_ROW_STATES,
   type SessionFilter,
   type SessionRowState,
-  type Status,
 } from "../device-service-core/src/device-service.ts"
 import {
   exitCodeOf,
@@ -221,12 +219,26 @@ async function runRead(client: RemoteClient, parsed: Parsed, dependencies: Remot
       return show(await client.devices.list(), (devices) => deviceLines(devices, now))
     case "sessions": {
       const listed = await client.sessions.list(parsed.filter)
-      // A typo in --device and a device with no sessions both used to list nothing: the client names the unknown device.
-      if (listed.kind === "error" && listed.code === "not_found" && listed.details?.["kind"] === "device") {
-        dependencies.error(
-          `omo remote sessions: no device ${parsed.filter.device} on this account (see omo remote devices)`,
-        )
-        return REMOTE_EXIT.usage
+      // A typo in --device and a device with no sessions both used to list nothing: the client names the unknown device,
+      // and an ambiguous one names its candidates (#14305); nothing is listed until one device answers.
+      if (listed.kind === "error" && listed.details?.["kind"] === "device") {
+        if (listed.code === "not_found") {
+          dependencies.error(
+            `omo remote sessions: no device ${parsed.filter.device} on this account (see omo remote devices)`,
+          )
+          return REMOTE_EXIT.usage
+        }
+        if (listed.code === "ambiguous_target") {
+          const candidates = Array.isArray(listed.details["candidates"])
+            ? (listed.details["candidates"] as readonly { readonly device?: unknown }[])
+                .map((candidate) => (typeof candidate.device === "string" ? candidate.device : ""))
+                .filter((id) => id !== "")
+            : []
+          dependencies.error(
+            `omo remote sessions: ${candidates.length} devices match ${parsed.filter.device} (${candidates.join(", ")}); pass the device id`,
+          )
+          return exitCodeOf(listed)
+        }
       }
       return show(listed, (listing) => sessionLines(listing, now))
     }

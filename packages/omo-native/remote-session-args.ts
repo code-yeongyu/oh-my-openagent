@@ -3,13 +3,11 @@ import type { WorktreeRequest } from "../omo-senpi/src/components/thread/worktre
 import { UsageError } from "./remote-exit"
 import { isPermissionPreset, PERMISSION_PRESETS } from "./remote-permission-preset"
 
-// The arguments of `omo remote open|send|model|interrupt|close`, parsed before the service is contacted.
+// The arguments of `omo remote open|send|model|interrupt|close`, parsed before the service is contacted. The target
+// stays the typed text: one string the address module resolves (#14305, design section 2).
 export const SESSION_VERBS = ["open", "send", "model", "interrupt", "close"] as const
 export type SessionVerb = (typeof SESSION_VERBS)[number]
 export const isSessionVerb = (value: string): value is SessionVerb => SESSION_VERBS.some((verb) => verb === value)
-
-/** A durable thread id, optionally qualified with the device that holds it (`<device>/<session>`). */
-export type RemoteSessionTarget = { readonly device?: string; readonly session: string }
 
 export type SessionArgs =
   | {
@@ -27,26 +25,17 @@ export type SessionArgs =
     }
   | {
       readonly verb: "send"
-      readonly target: RemoteSessionTarget
+      readonly target: string
       readonly text: string
       readonly delivery: "auto" | "steer" | "follow_up"
       readonly wait: boolean
       /** #13425: how long a waiting send follows the turn it started, in seconds (1..600); default 120. */
       readonly timeout_seconds?: number
     }
-  | { readonly verb: "model"; readonly target: RemoteSessionTarget; readonly model: string }
-  | { readonly verb: "interrupt"; readonly target: RemoteSessionTarget }
+  | { readonly verb: "model"; readonly target: string; readonly model: string }
+  | { readonly verb: "interrupt"; readonly target: string }
   /** `force`: close even when the session has messages it has not read; they are dropped and listed (omo#14234). */
-  | { readonly verb: "close"; readonly target: RemoteSessionTarget; readonly force: boolean }
-
-export function parseTarget(verb: string, value: string | undefined): RemoteSessionTarget {
-  const slash = value?.indexOf("/") ?? -1
-  if (value === undefined || value === "" || slash === 0 || slash === value.length - 1)
-    throw new UsageError(
-      `omo remote ${verb}: name the session as <device>/<session> (the SESSION column of omo remote sessions) or by the thread value open printed`,
-    )
-  return slash === -1 ? { session: value } : { device: value.slice(0, slash), session: value.slice(slash + 1) }
-}
+  | { readonly verb: "close"; readonly target: string; readonly force: boolean }
 
 const SESSION_FLAGS: Readonly<
   Record<SessionVerb, { readonly values: readonly string[]; readonly switches: readonly string[] }>
@@ -133,7 +122,11 @@ export function parseSession(
       },
     }
   }
-  const target = parseTarget(verb, positional[0])
+  const target = positional[0]
+  if (target === undefined || target === "")
+    throw new UsageError(
+      `omo remote ${verb}: name the session as <device>/<session> (the SESSION column of omo remote sessions) or by the thread value open printed`,
+    )
   if (verb === "send") {
     const text = positional[1]
     if (text === undefined || text === "") throw new UsageError("omo remote send: the message text is required")

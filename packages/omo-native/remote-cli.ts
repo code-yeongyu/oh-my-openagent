@@ -1,5 +1,5 @@
 import { borrowedService } from "./remote-session-verbs"
-import { remoteClientForPerson } from "../omo-senpi/src/components/remote/index"
+import { remoteClientForPerson, resolveTypedAddress } from "../omo-senpi/src/components/remote/index"
 import { existsSync } from "node:fs"
 
 import { type DeviceService, deviceServiceEndpointPath } from "../device-service-core/src/index.ts"
@@ -19,8 +19,6 @@ import {
 } from "./remote-local"
 import { isHelpFlag, REMOTE_USAGE, verbUsage } from "./remote-usage"
 import { VERBS } from "./remote-verbs"
-import { parseTarget, type RemoteSessionTarget } from "./remote-session-args"
-import { resolveSessionTarget } from "./remote-session-target"
 import { attachAddressed, createDeviceServiceSessions } from "../omo-senpi/src/components/remote/port/device-service"
 import type { JsonObject } from "../omo-senpi/src/components/thread/remote/ports"
 
@@ -147,10 +145,8 @@ export async function prepareRemoteAttach(
     return REMOTE_EXIT.ok
   }
   const [target, ...extra] = args
-  let parsedTarget: RemoteSessionTarget
   try {
-    if (extra.length > 0) throw new UsageError("unexpected arguments")
-    parsedTarget = parseTarget("attach", target)
+    if (extra.length > 0 || target === undefined || target === "") throw new UsageError("unexpected arguments")
   } catch (error) {
     if (!(error instanceof UsageError)) throw error
     dependencies.error("usage: omo remote attach <device>/<session>   (the SESSION column of omo remote sessions)")
@@ -192,17 +188,32 @@ export async function prepareRemoteAttach(
         chain: { stamp: (record: JsonObject) => record },
       }))
     )(service)
-    // Only the resolve reads through the surface; its client (on the command's borrowed connection) is released after it.
-    const resolved = await resolveSessionTarget(remote, parsedTarget).finally(() => remote.client.close())
+    // The typed target is resolved by the one address resolver (#14305): a durable id, a name, an alias, an id
+    // prefix, or `<device>/<thread>` with the device by id, name, prefix or `here`; the device must be online, because
+    // attaching opens it now. Only the resolve reads through the surface; its client (on the command's borrowed
+    // connection) is released after it.
+    const resolved = await resolveTypedAddress(remote, target, { need: "online" }).finally(() => remote.client.close())
     if (resolved.kind === "error") {
       service.close()
       dependencies.error(`omo remote: ${resolved.error.message}`)
       dependencies.error(resolved.error.next_action)
       return REMOTE_EXIT.failed
     }
-    const { attached: attach } = await attachAddressed(service, resolved.row.device, resolved.row.session_id)
+    if (resolved.where.kind !== "device") {
+      service.close()
+      dependencies.error(
+        `omo remote: session ${resolved.thread} is on this device; attach opens the other devices' sessions.`,
+      )
+      dependencies.error(`Open it here with omo --session <its session file>.`)
+      return REMOTE_EXIT.failed
+    }
+    const { attached: attach } = await attachAddressed(
+      service,
+      resolved.where.row.device,
+      resolved.where.row.session_id,
+    )
     await attach.snapshot
-    const endpoint = await serveRemoteAttach(attach, { label: target ?? parsedTarget.session })
+    const endpoint = await serveRemoteAttach(attach, { label: resolved.address })
     void service.closed.then(() => endpoint.close())
     return { engineArgs: ["--attach", endpoint.socketPath, "--session", endpoint.sessionRef, "--no-extensions"] }
   } catch (error) {

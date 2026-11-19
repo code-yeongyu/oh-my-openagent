@@ -79,16 +79,25 @@ describe("#13010 remote CLI session identity", () => {
     expect(JSON.stringify(fake.state.commands)).not.toContain("set_model")
   })
 
-  test.each([
-    ["missing-session", false, "not_found"],
-    [DURABLE, true, "ambiguous_target"],
-  ] as const)("refuses %s without sending a command when resolution answers %s", async (target, duplicate, error) => {
-    const fake = await owner(duplicate)
-    const result = await run(["interrupt", target, "--json"], fake.stateDir)
+  test("#given a session no device lists #when a verb addresses it #then it refuses not_found without sending a command", async () => {
+    const fake = await owner()
+    const result = await run(["interrupt", "missing-session", "--json"], fake.stateDir)
     expect({ code: result.code, json: JSON.parse(result.out.join("")), commands: fake.state.commands }).toMatchObject({
       code: REMOTE_EXIT.failed,
-      json: { kind: "error", error: { code: error } },
+      json: { kind: "error", error: { code: "not_found" } },
       commands: [],
+    })
+  })
+
+  // The duplicate-id ambiguity rule is withdrawn (measured 2026-11-19: no thread id is listed by two devices, 236
+  // rows, 0 duplicates; #14305): a duplicate resolves to the first holder, as today's order does.
+  test("#given the same durable id listed by two devices #when a verb addresses it #then the first holder answers", async () => {
+    const fake = await owner(true)
+    const result = await run(["interrupt", DURABLE, "--json"], fake.stateDir)
+    expect({ code: result.code, json: JSON.parse(result.out.join("")), commands: fake.state.commands }).toMatchObject({
+      code: REMOTE_EXIT.ok,
+      json: { kind: "ok" },
+      commands: [{ type: "interrupt" }],
     })
   })
 
@@ -104,7 +113,7 @@ describe("#13010 remote CLI session identity", () => {
       expect({ target, code: result.code, json: result.out.map((line) => JSON.parse(line)) }).toMatchObject({
         target,
         code: REMOTE_EXIT.ok,
-        json: [{ kind: "ok", thread: target === `${PEER}/${SESSION_ID}` ? SESSION_ID : DURABLE }],
+        json: [{ kind: "ok", thread: DURABLE }],
       })
     }
   })

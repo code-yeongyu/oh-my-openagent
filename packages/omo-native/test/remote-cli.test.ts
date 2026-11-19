@@ -20,6 +20,7 @@ import {
   SESSION_ID,
 } from "../../device-service-core/test/local-api/conformance/world.ts"
 import { createCredentialStore } from "../../omo-opencode/src/cli/service-auth/keystore"
+import type { RemoteClient } from "../../omo-senpi/src/components/remote/index"
 import type { RemoteSessionsPort, RemoteThreadSurface } from "../../omo-senpi/src/components/thread/remote/ports"
 import { createRemoteThreadFixture, ENGINE } from "../../omo-senpi/src/components/thread/thread-remote-fixture"
 import { runAccountVerb } from "../account-cli"
@@ -108,6 +109,39 @@ describe("omo remote", () => {
     expect(typo.err).toEqual(["omo remote sessions: no device no-such-device on this account (see omo remote devices)"])
     const self = await run(["sessions", "--device", "dev-self", "--json"])
     expect(self.code).toBe(REMOTE_EXIT.ok)
+  })
+
+  test("sessions --device names the candidates of an ambiguous device, on the one call it makes (#14305)", async () => {
+    const calls: string[] = []
+    const client = {
+      devices: { list: async () => ({ kind: "ok", value: [] }) },
+      sessions: {
+        list: async () => {
+          calls.push("sessions.list")
+          return {
+            kind: "error",
+            code: "ambiguous_target",
+            message: "2 online devices are named studio.",
+            next_action: "Pass the device id.",
+            details: {
+              kind: "device",
+              candidates: [
+                { device: "dev-peer-1", name: "Studio", online: true },
+                { device: "dev-peer-3", name: "Studio", online: true },
+              ],
+            },
+          }
+        },
+      },
+      close: () => {},
+    }
+    const { code, err } = await run(["sessions", "--device", "studio"], privateDir(), undefined, undefined, undefined, {
+      client: () => client as unknown as RemoteClient,
+    })
+    expect(code).toBe(REMOTE_EXIT.failed)
+    expect(err[0] ?? "").toContain("dev-peer-1")
+    expect(err[0] ?? "").toContain("dev-peer-3")
+    expect(calls).toEqual(["sessions.list"])
   })
 
   test("sessions --device accepts a device the roster misses when the listing still has its rows", async () => {
@@ -451,14 +485,11 @@ describe("omo remote attach", () => {
     expect(socket).toMatch(/[\\/]t-[0-9a-f]{16}\.sock$/)
   })
 
-  test.each([[[]], [[`${PEER}/${SESSION_ID}`, "extra"]]])(
-    "refuses the target %p as usage",
-    async (target) => {
-      const { prepared, err } = await attach(target)
-      expect(prepared).toBe(REMOTE_EXIT.usage)
-      expect(err[0]).toStartWith("usage: omo remote attach <device>/<session>")
-    },
-  )
+  test.each([[[]], [[`${PEER}/${SESSION_ID}`, "extra"]]])("refuses the target %p as usage", async (target) => {
+    const { prepared, err } = await attach(target)
+    expect(prepared).toBe(REMOTE_EXIT.usage)
+    expect(err[0]).toStartWith("usage: omo remote attach <device>/<session>")
+  })
 
   test.each([["/session"], ["device/"]])(
     "answers the target %p with a typed refusal instead of sending it (#14305)",
@@ -468,6 +499,15 @@ describe("omo remote attach", () => {
       expect(err[0]).toStartWith("omo remote: ")
     },
   )
+
+  // Every omo remote verb needs its device online (#14305): an offline device named by its name is refused at resolution,
+  // so no attach reaches the service.
+  // (The device_offline code itself is pinned at the resolver seam, remote/device-address.test.ts.)
+  test("#given an offline device named by its name #when attach addresses a session on it #then it fails and nothing is attached", async () => {
+    const { prepared } = await attach([`Laptop/${SESSION_ID}`])
+    expect(prepared).toBe(REMOTE_EXIT.failed)
+    expect(owners.at(-1)?.state.log).not.toContain("session.attach")
+  })
 
   test("checks omo account show before it looks for the service", async () => {
     const { prepared, err } = await attach([`${PEER}/${SESSION_ID}`], true, {
@@ -1029,7 +1069,7 @@ describe("omo remote session verbs", () => {
 
   test.each([
     [
-      ["send", "/session", "hi"],
+      ["send"],
       "omo remote send: name the session as <device>/<session> (the SESSION column of omo remote sessions) or by the thread value open printed",
     ],
     [["send", "b/dur-on-b"], "omo remote send: the message text is required"],

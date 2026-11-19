@@ -1,11 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  B,
-  createTwoDevices,
-  KEY,
-  T,
-} from "../../omo-senpi/src/components/thread/address/testing/two-devices"
+import { B, createTwoDevices, KEY, T } from "../../omo-senpi/src/components/thread/address/testing/two-devices"
 import { REMOTE_EXIT } from "../remote-exit"
 import { run, useRemoteCliCleanup } from "./remote-cli-harness"
 
@@ -24,7 +19,13 @@ describe("omo remote session verbs take every address form", () => {
   test("#given a thread name on another device #when send names it #then the message reaches that thread's device", async () => {
     const td = createTwoDevices()
     try {
-      const result = await run(["send", "beta", "hello", "--no-wait", "--json"], undefined, undefined, undefined, td.remote)
+      const result = await run(
+        ["send", "beta", "hello", "--no-wait", "--json"],
+        undefined,
+        undefined,
+        undefined,
+        td.remote,
+      )
       expect(result.code).toBe(REMOTE_EXIT.ok)
       expect(JSON.parse(result.out.join("") ?? "{}") as JsonResult).toMatchObject({
         kind: "ok",
@@ -60,7 +61,13 @@ describe("omo remote session verbs take every address form", () => {
   test("#given here/<thread id> #when a verb addresses this device #then it answers the typed not_found and sends nothing there", async () => {
     const td = createTwoDevices()
     try {
-      const result = await run(["interrupt", `here/${T.hereLive}`, "--json"], undefined, undefined, undefined, td.remote)
+      const result = await run(
+        ["interrupt", `here/${T.hereLive}`, "--json"],
+        undefined,
+        undefined,
+        undefined,
+        td.remote,
+      )
       expect(result.code).toBe(REMOTE_EXIT.failed)
       expect(JSON.parse(result.out.join("") ?? "{}") as JsonResult).toMatchObject({
         kind: "error",
@@ -75,7 +82,13 @@ describe("omo remote session verbs take every address form", () => {
   test("#given a device that missed the listing round #when send names its thread by id #then it answers host_unavailable, not a plain miss", async () => {
     const td = createTwoDevices({ incomplete: true })
     try {
-      const result = await run(["send", T.bLive, "hello", "--no-wait", "--json"], undefined, undefined, undefined, td.remote)
+      const result = await run(
+        ["send", T.bLive, "hello", "--no-wait", "--json"],
+        undefined,
+        undefined,
+        undefined,
+        td.remote,
+      )
       expect(result.code).toBe(REMOTE_EXIT.failed)
       expect(JSON.parse(result.out.join("") ?? "{}") as JsonResult).toMatchObject({
         kind: "error",
