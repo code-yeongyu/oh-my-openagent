@@ -41,7 +41,7 @@ const RENDER = {
   ],
   read: (result) => [
     ...result.items.map((item) => `[${item.role}] ${item.content}`),
-    ...(result.truncated ? [`(truncated; continue with --cursor ${result.next_cursor})`] : []),
+    ...(result.truncated ? [`(truncated; older messages: --cursor ${result.next_cursor})`] : []),
   ],
   bind: (result) => [`bound ${bindingLine(result.binding)}${result.deduplicated ? " (already bound)" : ""}`],
   unbind: (result) => [`unbound ${bindingLine(result.binding)}${result.already_closed ? " (already closed)" : ""}`],
