@@ -42,6 +42,7 @@ import type {
   SessionWaitState,
   SessionWork,
 } from "./session-wait-types"
+import { waitBlocksDelivery } from "./session-wait-types"
 import type {
   LostLease,
   WakeRequestOutcome,
@@ -646,7 +647,7 @@ async function clearWait(ctx: ops.StoreContext, request: WaitKey): Promise<void>
 /** A hold is reported before the wake, and a person's wait reads as approval (A2.6). */
 function waitingOn(ctx: ops.StoreContext, request: WaitKey): QueuedWaitingOn | null {
   const wait = readWait(ctx, request)
-  if (wait !== null) return { kind: wait.wait === "held" ? "hold" : "approval" }
+  if (wait !== null && waitBlocksDelivery(wait)) return { kind: wait.wait === "held" ? "hold" : "approval" }
   const woken = ctx.sql.one(["n"], "SELECT COUNT(*) AS n FROM woken_sessions WHERE durable_id = ?", [
     request.durable_id,
   ])

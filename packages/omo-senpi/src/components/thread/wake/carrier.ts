@@ -7,6 +7,7 @@ import type { RpcObject } from "@oh-my-opencode/senpi-task/rpc-socket-client"
 import type { CarrierHostConnection } from "./carrier-connection"
 import { readEngineState, type EngineView } from "./engine-state"
 import { WAKE_MEMORY_FLOOR_BYTES } from "./memory-headroom"
+import { waitBlocksDelivery } from "../gateway/session-wait-types"
 import { resolveWakeTarget, type WakeSessionKind } from "./session-target"
 
 /** A person's wait that arose after admission is closed after this long with only the carrier attached (A3.2.6). */
@@ -361,7 +362,12 @@ export function createCarrier(options: CarrierOptions): Carrier {
     if (target.kind === "gone" || target.kind === "ambiguous") return target
     if (target.session_kind !== "interactive") return { kind: "not_wakeable", session_kind: target.session_kind }
     const wait = await store.sessionWait.read({ durable_id: durableId })
-    if (wait?.wait === "held" && wait.file_size === fileSize(target.session_path)) return { kind: "held" }
+    if (
+      wait?.wait === "held" &&
+      waitBlocksDelivery(wait) &&
+      wait.file_size === fileSize(target.session_path)
+    )
+      return { kind: "held" }
     const allowance = await openAllowance(durableId, target.cwd)
     if (allowance !== "open") {
       if (allowance === "nothing_queued") {
