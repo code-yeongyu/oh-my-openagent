@@ -1,5 +1,5 @@
 import { afterAll, afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
-import { cp, mkdir, mkdtemp, rm } from "node:fs/promises"
+import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { spawn } from "node:child_process"
 import { join } from "node:path"
@@ -145,13 +145,20 @@ describe("thread SDK runtime", () => {
     await cp(outputs.threadSdkOutputPath, join(plugin, "runtime", "thread-sdk", "sdk.js"))
     await cp(outputs.gatewayStoreWorkerOutputPath, join(plugin, "extensions", "gateway-store-worker.mjs"))
     const agentDir = join(plugin, "agent")
+    // A thread no host serves, known from its session file: a send to it is stored queued_offline by the worker.
+    const sessionsDir = join(agentDir, "sessions", "--probe--")
+    await mkdir(sessionsDir, { recursive: true })
+    await writeFile(
+      join(sessionsDir, "epoch_dur-off.jsonl"),
+      `${JSON.stringify({ type: "session", id: "dur-off", cwd: process.cwd(), timestamp: "2026-10-02T00:00:00Z" })}\n`,
+    )
     const probe = [
       `const { createThreadSdk } = await import(${JSON.stringify(pathToFileURL(join(plugin, "runtime", "thread-sdk", "sdk.js")).href)})`,
       `const sdk = createThreadSdk({ agentDir: ${JSON.stringify(agentDir)}, cwd: process.cwd(), uid: 501, user: "probe", engineStatusAll: async () => undefined })`,
-      "const listed = await sdk.list({ all_scope: true })",
-      "const missing = await sdk.read({ thread: 'no-such-thread', all_scope: true })",
+      "const sent = await sdk.send({ thread: 'dur-off', text: 'ping', all_scope: true })",
+      "const missing = await sdk.send({ thread: 'no-such-thread', text: 'ping', all_scope: true })",
       "await sdk.dispose()",
-      "console.log(JSON.stringify({ listed: listed.kind, threads: listed.threads, missing: missing.kind === 'error' ? missing.error.code : missing.kind, principal: sdk.principal }))",
+      "console.log(JSON.stringify({ sent: sent.kind === 'ok' ? sent.delivery.kind : sent.error.code, missing: missing.kind === 'error' ? missing.error.code : missing.kind, principal: sdk.principal }))",
     ].join("\n")
 
     // when: a connector script run inline, whose `--input-type` the store worker must not inherit
@@ -169,8 +176,7 @@ describe("thread SDK runtime", () => {
     // then
     expect({ exitCode, stderr: unexpectedStderr(stderr) }).toEqual({ exitCode: 0, stderr: "" })
     expect(JSON.parse(stdout.trim())).toEqual({
-      listed: "ok",
-      threads: [],
+      sent: "queued_offline",
       missing: "not_found",
       principal: "cli:501",
     })
