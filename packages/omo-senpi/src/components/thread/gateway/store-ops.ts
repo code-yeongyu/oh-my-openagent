@@ -373,8 +373,8 @@ export async function migrate(ctx: StoreContext): Promise<void> {
     // foreign_keys OFF, which SQLite only honors when the pragma is set OUTSIDE the transaction (a table drop would
     // otherwise fire foreign-key actions from extension tables referencing that table: ON DELETE CASCADE empties them, a
     // plain REFERENCES fails the step on every open). The pragma is restored to its prior value afterwards. A rebuild
-    // verifies foreign_key_check from TypeScript before its bump commits; v16 removes `bindings` for good, so an extension
-    // table that still references it keeps its rows and must rebuild itself without the reference.
+    // verifies foreign_key_check from TypeScript before its bump commits; v16 keeps `bindings` while any table still
+    // declares a foreign key to it (dropEmptyBindings), so such an extension table keeps both its rows and its writes.
     const rebuilt = GATEWAY_TABLE_REBUILDS.get(version)
     const needsForeignKeysOff = rebuilt !== undefined || version === GATEWAY_V16_BINDING_DROP
     const priorForeignKeys = needsForeignKeysOff
@@ -405,11 +405,21 @@ export async function migrate(ctx: StoreContext): Promise<void> {
   }
 }
 
-/** v16 drops `bindings` only once no row is left for an extension to import through `tx.bindingFor` (schema.ts v16). */
+/**
+ * v16 drops `bindings` only once no row is left for an extension to import through `tx.bindingFor` (schema.ts v16), and
+ * only while no table declares a foreign key to it: with the table gone, every later insert into such a table would
+ * fail with "no such table: main.bindings" once foreign keys are back on.
+ */
 function dropEmptyBindings(ctx: StoreContext): void {
   if (ctx.sql.one(["name"], "SELECT name FROM sqlite_schema WHERE type = 'table' AND name = 'bindings'") === undefined)
     return
-  if (ctx.sql.one(["seq"], "SELECT seq FROM bindings LIMIT 1") === undefined) ctx.sql.exec("DROP TABLE bindings")
+  if (ctx.sql.one(["seq"], "SELECT seq FROM bindings LIMIT 1") !== undefined) return
+  const referenced = ctx.sql.one(
+    ["name"],
+    `SELECT m.name AS name FROM sqlite_schema m, pragma_foreign_key_list(m.name) f
+     WHERE m.type = 'table' AND f."table" = 'bindings' COLLATE NOCASE LIMIT 1`,
+  )
+  if (referenced === undefined) ctx.sql.exec("DROP TABLE bindings")
 }
 
 /** Migration index (0-based) of the v16 binding-table drop. */

@@ -187,20 +187,25 @@ test.each([
   },
 )
 
-// The store's connection enforces foreign keys, so without foreign_keys OFF the drop would cascade-delete these rows
-// or fail the step on every open.
+// An extension table that still declares a foreign key to `bindings` keeps it usable: v16 leaves an empty `bindings` in
+// place while any table references it, because dropping it would make every later insert into that table fail with
+// "no such table: main.bindings" once foreign keys are back on.
 test.each([
   ["ON DELETE CASCADE", "REFERENCES bindings ON DELETE CASCADE"],
   ["a plain REFERENCES", "REFERENCES bindings"],
 ])(
-  "#given an extension table referencing bindings with %s #when the store migrates to v16 #then it opens at the current version and the extension rows stay",
+  "#given an empty bindings table and an extension table referencing it with %s #when the store migrates to v16 #then bindings stays, the extension rows stay, and the extension table still takes writes",
   async (_label, reference) => {
     const h = (harness = createGatewayHarness())
     const path = gatewayDatabasePath(h.agentDir)
-    v14Fixture(path, [
-      `CREATE TABLE alpha_refs (id INTEGER PRIMARY KEY, binding_seq INTEGER ${reference})`,
-      "INSERT INTO alpha_refs (id, binding_seq) VALUES (1, 1), (2, 1)",
-    ])
+    v14Fixture(
+      path,
+      [
+        `CREATE TABLE alpha_refs (id INTEGER PRIMARY KEY, binding_seq INTEGER ${reference})`,
+        "INSERT INTO alpha_refs (id, binding_seq) VALUES (1, NULL), (2, NULL)",
+      ],
+      { bound: false },
+    )
     const store = h.store()
     try {
       await store.identity()
@@ -209,15 +214,16 @@ test.each([
     }
     const db = new Database(path)
     try {
+      db.exec("PRAGMA foreign_keys = ON")
+      db.exec("INSERT INTO alpha_refs (id, binding_seq) VALUES (3, NULL)")
       expect({
         version: (db.query("PRAGMA user_version").get() as { user_version: number }).user_version,
-        rows: db.query("SELECT id, binding_seq FROM alpha_refs ORDER BY id").all(),
+        bindings: db.query("SELECT name FROM sqlite_schema WHERE type = 'table' AND name = 'bindings'").all(),
+        rows: db.query("SELECT id FROM alpha_refs ORDER BY id").all(),
       }).toEqual({
         version: GATEWAY_MIGRATIONS.length,
-        rows: [
-          { id: 1, binding_seq: 1 },
-          { id: 2, binding_seq: 1 },
-        ],
+        bindings: [{ name: "bindings" }],
+        rows: [{ id: 1 }, { id: 2 }, { id: 3 }],
       })
     } finally {
       db.close()
