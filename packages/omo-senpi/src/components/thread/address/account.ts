@@ -25,13 +25,23 @@ export async function accountDevices(client: RemoteClient): Promise<AccountDevic
     here,
     devices: listed.value
       .filter((row) => row.id !== LOCAL_ONLY)
-      .map((row) => ({
-        device: row.id,
-        label: row.name,
-        online: row.online,
-        ...(typeof row.last_seen_ms === "number" ? { last_seen_ms: row.last_seen_ms } : {}),
-      })),
+      .map((row) => ({ device: row.id, label: row.name, online: row.online })),
   }
+}
+
+// The roster readAccount keeps: accountDevices' rows plus when each device was last seen (a device_offline refusal names
+// it). Kept apart from accountDevices because that one ships in omo.js, which has no byte budget left for the field.
+async function rosterOf(client: RemoteClient): Promise<readonly RemoteDevice[]> {
+  const listed = await client.devices.list()
+  if (listed.kind === "error") throw new Error(listed.message)
+  return listed.value
+    .filter((row) => row.id !== LOCAL_ONLY)
+    .map((row) => ({
+      device: row.id,
+      label: row.name,
+      online: row.online,
+      ...(typeof row.last_seen_ms === "number" ? { last_seen_ms: row.last_seen_ms } : {}),
+    }))
 }
 
 /**
@@ -121,8 +131,8 @@ export async function readAccount(remote: RemoteThreadSurface): Promise<AccountR
     remote.sessions.listing !== undefined
       ? remote.sessions.listing()
       : remote.sessions.sessions().then((rows) => ({ rows, incomplete: [] as readonly string[] })),
-    accountDevices(remote.client).then(
-      (read) => read.devices,
+    rosterOf(remote.client).then(
+      (devices) => devices,
       () => undefined,
     ),
   ])
