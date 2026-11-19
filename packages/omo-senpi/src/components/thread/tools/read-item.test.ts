@@ -20,6 +20,13 @@ describe("readItem", () => {
     })
   })
 
+  test("#given a provider-error message with no content field and a long error #when it is read #then the item carries only the capped error, never the whole message with the uncapped text", () => {
+    const error = `429 ${"x".repeat(2000)}`
+    const item = readItem({ role: "assistant", stopReason: "error", errorMessage: error }, 0)
+
+    expect(item.content).toBe(JSON.stringify([{ type: "error", text: error.slice(0, 500) }]))
+  })
+
   test("#given an ordinary message #when it is read #then its content is rendered as before", () => {
     const content = [{ type: "text", text: "hello" }]
 
