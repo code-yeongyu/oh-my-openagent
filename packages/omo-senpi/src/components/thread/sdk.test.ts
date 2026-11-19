@@ -175,30 +175,6 @@ function countingRemote(remote: RemoteThreadSurface): {
   }
 }
 
-.details = { found: 15, supported: 14 }
-    const f = fixture({
-      store: (agentDir) => {
-        const real = createGatewayStore({ agentDir })
-        return {
-          ...real,
-          enqueue: async () => {
-            throw newer
-          },
-        }
-      },
-    })
-    const outcome = await f.sdk.send({ thread: "my-tui", text: "hi" })
-    expect(outcome).toMatchObject({
-      kind: "error",
-      error: {
-        code: "gateway_schema_too_new",
-        next_action: expect.stringContaining("omo update"),
-        details: { gateway_schema: 15, binary_schema: 14 },
-      },
-    })
-  })
-})
-
 describe("thread SDK: options are checked at the boundary", () => {
   test.each([
     ["the bundled entry", createBundledThreadSdk],

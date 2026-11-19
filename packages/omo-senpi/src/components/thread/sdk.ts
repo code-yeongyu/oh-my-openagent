@@ -268,7 +268,6 @@ function thrown(error: unknown): Failure {
       "Use thread read to follow the session.",
       { command: message.slice("unsupported:".length) },
     )
-  return fail("gateway_schema_too_new", schemaRefusal.message, schemaRefusal.next_action, schemaRefusal.details)
   return fail(
     "internal_error",
     `Thread operation failed: ${message}`,
