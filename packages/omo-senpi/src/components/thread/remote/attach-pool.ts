@@ -52,7 +52,12 @@ export type HeldAttach = { readonly session: PooledSession; readonly release: ()
 // the held catalog), while a watch that stopped long ago no longer pins a remote stream. The catalog's own bound.
 const ATTACH_IDLE_MS = CATALOG_MAX_AGE_MS
 
-type Entry = { readonly opened: Promise<PooledSession>; holders: number; idle?: ReturnType<typeof setTimeout> }
+type Entry = {
+  readonly opened: Promise<PooledSession>
+  holders: number
+  idle?: ReturnType<typeof setTimeout>
+  evicted?: true
+}
 
 /**
  * One attach per remote session on the port's connection, counted by its holders (ops in flight and watches). When the
@@ -104,7 +109,9 @@ export function createAttachPool(
         if (released) return
         released = true
         held.holders -= 1
-        if (held.holders > 0 || entries.get(key) !== held) return
+        if (held.holders > 0) return
+        if (held.evicted === true) return void session.attached.detach().catch(() => {})
+        if (entries.get(key) !== held) return
         held.idle = setTimeout(() => {
           if (held.holders > 0 || entries.get(key) !== held) return
           entries.delete(key)
@@ -116,6 +123,23 @@ export function createAttachPool(
   }
   return {
     hold,
+    /**
+     * The other device no longer counts this attach (a command on it was refused attach_required): the next holder
+     * attaches again, and this one is detached once its last holder lets go.
+     */
+    evict: (device: string, sessionId: string) => {
+      const key = `${device}\u0000${sessionId}`
+      const entry = entries.get(key)
+      if (entry === undefined) return
+      entries.delete(key)
+      clearTimeout(entry.idle)
+      entry.evicted = true
+      if (entry.holders === 0)
+        void entry.opened.then(
+          (session) => session.attached.detach().catch(() => {}),
+          () => {},
+        )
+    },
     clear: () => {
       for (const entry of entries.values()) clearTimeout(entry.idle)
       entries.clear()
