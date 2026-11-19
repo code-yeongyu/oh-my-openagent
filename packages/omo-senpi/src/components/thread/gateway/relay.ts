@@ -490,13 +490,21 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
         }
         if (recovered?.kind === "refused") return failure(recovered.code, recovered.message, recovered.details)
       }
+      // Only a connector delivers inbound, so these refusals name its next step, not the session-facing defaults.
       if (binding.status !== "active")
-        return failure("binding_inactive", `The binding is ${binding.status}.`, {
-          binding_id: binding.binding_id,
-          status: binding.status,
-        })
+        return failure(
+          "binding_inactive",
+          `The binding is ${binding.status}.`,
+          { binding_id: binding.binding_id, status: binding.status },
+          "The binding is closed: deliver the message through the binding the gateway keeps for this chat now.",
+        )
       if (!binding.direction.inbound)
-        return failure("unsupported", "The binding carries no inbound direction.", { binding_id: binding.binding_id })
+        return failure(
+          "unsupported",
+          "The binding carries no inbound direction.",
+          { binding_id: binding.binding_id },
+          "This binding takes no inbound messages: deliver through a binding with an inbound direction, such as the one the gateway keeps for this chat.",
+        )
       const mode = request.mode ?? binding.inbound_mode
       if (mode === "auto" && binding.inbound_mode === "follow_up") {
         return failure(

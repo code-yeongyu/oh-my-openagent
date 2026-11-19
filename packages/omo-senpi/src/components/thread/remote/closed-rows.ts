@@ -12,9 +12,11 @@ const wrapped = new WeakMap<RemoteSessionsPort, RemoteSessionsPort>()
 
 /**
  * #14170: the account listing lags a close and a reopen (it can serve a session's last snapshot for minutes), and it
- * never names a session's file. A thread this surface closed reads `ended` and carries the file its unload named
- * (`session_file`), so it is neither answered as already live nor reopened from a folder, until the listing shows newer
- * activity on it (someone reopened it). A thread this surface reopened reads live under the key its device located it
+ * never names a session's file. A thread this surface closed, or one its holder answered nothing runs (#14273), reads
+ * `ended` and carries the file its unload named (`session_file`), so it is neither answered as already live nor reopened
+ * from a folder, until the listing shows activity newer than the close (someone reopened it). The close itself is
+ * activity on the holder (its unload is written to the transcript), so the mark is measured from the holder's own record
+ * of the close when the unload answered one, never from the row as it was listed before the close. A thread this surface reopened reads live under the key its device located it
  * by, so the next op reaches the reopened session instead of the closed one's key, until the listing shows that key.
  */
 export function withClosedRows(remote: RemoteThreadSurface): RemoteThreadSurface {
@@ -40,16 +42,16 @@ export function withClosedRows(remote: RemoteThreadSurface): RemoteThreadSurface
     ...(listing === undefined
       ? {}
       : {
-          listing: async () => {
-            const listed = await listing()
+          listing: async (filter) => {
+            const listed = await listing(filter)
             return { ...listed, rows: listed.rows.map(settle) }
           },
         }),
-    closed: (row, file) => {
+    closed: (row, file, at) => {
       const known = file ?? row.session_file
       marks.set(rowKey(row), {
         kind: "closed",
-        updated_ms: row.updated_ms,
+        updated_ms: Math.max(row.updated_ms, at ?? row.updated_ms),
         ...(known === undefined ? {} : { file: known }),
       })
     },

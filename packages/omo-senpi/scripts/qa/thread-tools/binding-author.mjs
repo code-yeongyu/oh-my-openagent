@@ -75,7 +75,8 @@ await runScenario("binding-author", async ({ report, scratch, install, startTui 
   ])
   report.assert(
     "send-with-author-accepted",
-    sent.code === 0 && sent.json?.kind === "ok" && sent.json.effective_mode === "follow_up",
+    // A follow_up-capped message never steers: it starts the idle target's turn (start, #14333) or waits (follow_up).
+    sent.code === 0 && sent.json?.kind === "ok" && ["start", "follow_up"].includes(sent.json.effective_mode),
     `exit=${sent.code} ${sent.stdout.trim().slice(0, 300)}`,
   )
   await waitFor(() => assistantTexts(target.sessionPath).some((text) => text.includes(`QA-ACK ${TOKEN}`)), {

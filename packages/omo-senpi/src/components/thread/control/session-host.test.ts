@@ -161,7 +161,7 @@ describe("SessionHost: opening an existing thread on both legs", () => {
     expect(here).toMatchObject({ kind: "ok", thread: "dur-created-here", deduplicated: false })
     expect(there).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b", deduplicated: false })
     expect(localOpenFrames(openSession)).toEqual([{ sessionPath: expect.stringContaining("dur-on-disk.jsonl") }])
-    expect(a.sent).toEqual([
+    expect(a.sent.filter((entry) => entry.via === "endpoint")).toEqual([
       { via: "endpoint", device: "b", rpc: { type: "find_session", durableSessionId: "dur-on-b" } },
       { via: "endpoint", device: "b", rpc: { type: "open_session", retain_on_disconnect: true, sessionPath: B_FILE } },
     ])
@@ -227,6 +227,13 @@ describe("thread_create reopens a thread whose process exited (#14049)", () => {
       expect(localOpenFrames(openSession)).toEqual([{ sessionPath: file }])
       expect(a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")).toEqual([])
     })
+
+  test("#given only the session file of an exited thread and no account #when thread_create opens it as here/<id> #then it is opened from that file (review L3 of #14328)", async () => {
+    const { run, openSession, agentDir } = surface(undefined, { sessionsDirectory: true })
+    const file = sessionFile(agentDir, exited)
+    expect(await run("thread_create", { thread: `here/${exited}` })).toMatchObject({ kind: "ok", thread: exited })
+    expect(localOpenFrames(openSession)).toEqual([{ sessionPath: file }])
+  })
 
   test("#given an id no device holds #when thread_create opens it #then a typed not_found and nothing is opened", async () => {
     const a = account()

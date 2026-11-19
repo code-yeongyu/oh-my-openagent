@@ -4,6 +4,7 @@ import { join } from "node:path"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
+import { returnedAtClose, settleGracefulClose } from "./gateway/graceful-close-returns"
 import { createCompletionTracker, type AgentEndFacts } from "./gateway/completion"
 import { SESSION_CONTROL_DELIVERY_TYPE } from "./gateway/constants"
 import { gatewayDatabasePath } from "./gateway/paths"
@@ -304,6 +305,10 @@ function relayedQuestionOf(event: unknown): { readonly call: string; readonly re
     ? { call: toolCallId, request: request_id }
     : undefined
 }
+
+/** senpi's `session_shutdown { closed: true }`: a graceful close ended the session on request (omo#14313). */
+const closedOnRequest = (event: unknown): boolean =>
+  typeof event === "object" && event !== null && (event as { readonly closed?: unknown }).closed === true
 
 function durableIdOf(eventCtx: unknown): string | undefined {
   const manager = (eventCtx as { readonly sessionManager?: { readonly getSessionId?: () => unknown } } | undefined)
@@ -681,7 +686,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
           COMPLETION_SETTLE_WAIT_MS,
         )
       })
-      pi.on("session_shutdown", async () => {
+      pi.on("session_shutdown", async (event, eventCtx) => {
         completions.dispose()
         tools.dispose()
         await registrant
@@ -689,6 +694,13 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
           .catch((error: unknown) =>
             ctx.logger.warn(
               `thread gateway: control endpoint teardown failed: ${error instanceof Error ? error.message : String(error)}`,
+            ),
+          )
+        const durableId = durableIdOf(eventCtx)
+        if (closedOnRequest(event) && durableId !== undefined)
+          await settleGracefulClose(store, durableId, returnedAtClose(eventCtx)).catch((error: unknown) =>
+            ctx.logger.warn(
+              `thread gateway: the graceful close's unread messages were not answered: ${error instanceof Error ? error.message : String(error)}`,
             ),
           )
         if (options.store === undefined) await store.dispose().catch(() => undefined)

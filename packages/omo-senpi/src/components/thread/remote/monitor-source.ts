@@ -1,6 +1,16 @@
+import { remoteMonitorTarget } from "../../../extension/senpi-seams"
 import type { RpcRemoteHandlers, RpcRemoteRow, RpcRemoteSource, RpcRemoteState } from "../../../extension/types"
-import type { JsonObject, RemoteSessionRow, RemoteSessionState, RemoteThreadSurface } from "./ports"
-import { remoteAvailable } from "./remote-ops"
+import type { ThreadResolveResult } from "../addressing"
+import type { MonitorTargetResolution } from "../tools/monitor-target"
+import {
+  rowThreadId,
+  type JsonObject,
+  type RemoteSessionRow,
+  type RemoteSessionState,
+  type RemoteThreadSurface,
+} from "./ports"
+import { threadToolFailure } from "../errors"
+import { deviceRefusal, listedDevices, remoteAvailable } from "./remote-ops"
 
 // A device-wide target reads the account listing (running | idle | ended rows), round by round at senpi's own rescan
 // cadence (RPC_RESCAN_MS): coarse, and enough to wake. A session's content needs a session target.
@@ -27,6 +37,74 @@ export function createRemoteMonitorSource(remote: RemoteThreadSurface): RpcRemot
       return await openSession(remote, target.device, target.session, options.resumeFrom, handlers)
     },
   }
+}
+
+const KEEP: MonitorTargetResolution = { kind: "keep" }
+
+/**
+ * The online account device a `<device>/<thread>` target names (#14294): by id, else by the name the account lists it
+ * under, where two devices of that name are ambiguous_target. Unknown and offline devices answer as deviceOnline does.
+ */
+async function deviceNamed(remote: RemoteThreadSurface, name: string): Promise<MonitorTargetResolution | string> {
+  const listed = await listedDevices(remote.client, name)
+  if ("kind" in listed) return { kind: "refused", failure: listed.error }
+  const named = listed.devices.some((candidate) => candidate.device === name)
+    ? [name]
+    : listed.devices.filter((candidate) => candidate.label === name).map((candidate) => candidate.device)
+  if (named.length > 1)
+    return {
+      kind: "refused",
+      failure: threadToolFailure(
+        "ambiguous_target",
+        `${named.length} devices on this account are named ${name}.`,
+        "Name the device by its id (<device id>/<thread>); thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) shows each device's id.",
+        { device: name, candidates: named },
+      ),
+    }
+  const device = named[0] ?? name
+  const refusal = deviceRefusal(listed.devices, device)
+  return refusal === undefined ? device : { kind: "refused", failure: refusal.error }
+}
+
+// senpi's own local targets (rpc-monitor-targets.ts `parseRpcTarget`): the lineage and account keywords, a task id, and a
+// session file path, which no thread address can spell.
+const SENPI_LOCAL_TARGET = /^(?:children|all|st_.*)$/
+const PATH_LIKE = /[/\\]|\.jsonl$/i
+
+/**
+ * What `monitor({type: "rpc", target})` arms (#14294). A bare address is resolved by `resolve`, the resolver every thread
+ * tool uses (`resolveAcross`, decision 0027): a thread id, alias, unique name or 8+ character id prefix on any device. The
+ * device part of `<device>/<session>` is a device id or the name the account lists it under (`deviceNamed`).
+ */
+export async function resolveMonitorTarget(
+  remote: RemoteThreadSurface | undefined,
+  target: string,
+  resolve: (address: string) => Promise<ThreadResolveResult>,
+): Promise<MonitorTargetResolution> {
+  const text = target.trim()
+  const armed = async (device: string | undefined, session: string): Promise<MonitorTargetResolution> => {
+    let armedTarget = session
+    if (device !== undefined) {
+      if (remote === undefined) return KEEP
+      const named = await deviceNamed(remote, device)
+      if (typeof named !== "string") return named
+      armedTarget = `${named}/${session}`
+    }
+    return armedTarget === text ? KEEP : { kind: "target", target: armedTarget }
+  }
+  if (text === "" || SENPI_LOCAL_TARGET.test(text)) return KEEP
+  const onDevice = remoteMonitorTarget(text)
+  if (onDevice !== undefined) return await armed(onDevice.device, onDevice.session)
+  if (PATH_LIKE.test(text)) return KEEP
+  const resolved = await resolve(text)
+  if (resolved.kind === "error") {
+    const { kind: _kind, ...failure } = resolved
+    return { kind: "refused", failure }
+  }
+  const row = resolved.entry.transport?.kind === "relay" ? resolved.entry.transport.row : undefined
+  return row === undefined
+    ? await armed(undefined, resolved.entry.thread_id)
+    : await armed(row.device, rowThreadId(row))
 }
 
 async function openSession(

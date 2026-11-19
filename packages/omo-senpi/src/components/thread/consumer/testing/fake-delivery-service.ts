@@ -10,6 +10,10 @@ export type AnswerEnvelope = {
     /** A `chain_count_limit` refusal's counts. */
     readonly chain_count?: number
     readonly limit?: number
+    /** A `pair_loop_guard` refusal's burst, window and wait. */
+    readonly burst?: number
+    readonly window_ms?: number
+    readonly retry_after_ms?: number
     readonly delivery_id?: string
     readonly stored_command_id?: string
     readonly queue_position?: number

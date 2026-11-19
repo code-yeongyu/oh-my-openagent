@@ -9,6 +9,7 @@ import { readContextTail } from "../remote/transcript-tail"
 import { selectEntryPage } from "../paged-reader"
 import { replyData } from "../remote/remote-ops"
 import type { ModelChoice } from "../tools/model-match"
+import { REMOTE_GRACEFUL_MAX_WAIT_MS } from "../contracts/fields"
 import { closeLadder, SESSION_GONE, type RecordAnswer } from "./close-ladder"
 import { interruptOver } from "./interrupt"
 import { ControlRefusal, refuse, SESSION_ONLY_THINKING_SCOPE, type SessionControl } from "./port"
@@ -45,6 +46,9 @@ export function createRelayControl(
   const { device, session_id: sessionId } = row
   const commandOutcome = async (rpc: JsonObject, options?: { readonly fresh?: boolean }) => {
     const outcome = await remote.sessions.sessionCommand(device, sessionId, { ...rpc, sessionId }, options)
+    // The holder answered that nothing runs the session the listing still shows: until the listing moves on, this surface
+    // lists it ended instead of live (#14273's stale listing).
+    if (outcome.kind === "refused" && SESSION_GONE.has(outcome.reason)) remote.sessions.closed?.(row, undefined)
     if (outcome.kind !== "ok") throw new ControlRefusal(outcomeFailure(outcome, device).error)
     return outcome
   }
@@ -79,18 +83,25 @@ export function createRelayControl(
     close: async (closeOptions) => {
       try {
         // The unload's reply names the session file: a reopen from this surface needs it while the listing lags (#14170).
+        // Its effect names when the holder recorded the close, on the holder's clock (#14273).
         let unloaded: string | undefined
+        let closedAt: number | undefined
         const closed = await closeLadder(
           sessionId,
           async (rpc) => {
             const answered = await answer(rpc)
             const path = answered.kind === "ok" ? answered.data["sessionPath"] : undefined
             if (typeof path === "string" && path !== "") unloaded = path
+            const effect = answered.kind === "ok" ? answered.data["effect"] : undefined
+            const at =
+              isObject(effect) && typeof effect["updatedAt"] === "string" ? Date.parse(effect["updatedAt"]) : NaN
+            if (Number.isFinite(at)) closedAt = at
             return answered
           },
           closeOptions,
+          REMOTE_GRACEFUL_MAX_WAIT_MS,
         )
-        if (closed.outcome !== "held_elsewhere") remote.sessions.closed?.(row, unloaded)
+        if (closed.outcome !== "held_elsewhere") remote.sessions.closed?.(row, unloaded, closedAt)
         return closed
       } catch (error) {
         throw error instanceof ControlRefusal

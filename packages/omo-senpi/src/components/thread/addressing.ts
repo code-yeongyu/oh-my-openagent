@@ -35,6 +35,12 @@
  */
 
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
+import {
+  ID_PREFIX_SHAPE,
+  normalizeName,
+  SESSION_ID_SHAPE,
+  THREAD_ID_SHAPE as DURABLE_ID_SHAPE,
+} from "@oh-my-opencode/thread-address-core"
 import { execFileSync } from "node:child_process"
 import type { RemoteSessionRow } from "./remote/ports"
 import { realpathSync } from "node:fs"
@@ -115,7 +121,7 @@ export type ThreadFuzzyResult =
 
 export type ThreadNameConflictResult = { readonly kind: "ok" } | ThreadAddressError
 
-export const AMBIGUOUS_CANDIDATE_LIMIT = 10
+const AMBIGUOUS_CANDIDATE_LIMIT = 10
 const FUZZY_MIN_QUERY_LENGTH = 3
 const FUZZY_MAX_CANDIDATES = 500
 const FUZZY_PREVIEW_WEIGHT = 0.85
@@ -128,14 +134,8 @@ const FUZZY_ACCEPT_MARGIN = 0.08
 // garbage an address must never silently match.
 const UNFOLDABLE_CONTROLS = /[\u0000-\u0008\u000e-\u001f\u007f]/
 
-/**
- * NFKC-normalize, trim, lowercase, and collapse internal whitespace. The
- * single canonical name form used by every comparison in this module, so a
- * composed and a decomposed spelling of the same name are one name.
- */
-export function normalizeThreadName(value: string): string {
-  return value.normalize("NFKC").trim().toLowerCase().replace(/\s+/g, " ")
-}
+/** The one name comparison of threads and devices (thread-address-core `normalizeName`). */
+export const normalizeThreadName = normalizeName
 
 type Guarded =
   { readonly ok: true; readonly normalized: string } | { readonly ok: false; readonly error: ThreadAddressError }
@@ -329,13 +329,6 @@ function scopedIdHit(
     "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to confirm the id, then retry with all_scope set, or target a thread in this workspace.",
   )
 }
-
-const SESSION_ID_SHAPE = /^(?:rpc-\d+|[A-Za-z0-9_-]{16,})$/
-/** A durable session id is the thread_id itself: a miss on one is never a routing key passed by mistake (#14049). */
-const DURABLE_ID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-/** The shortest address that may name a thread by a prefix of its durable id: 8 hex characters, hyphens allowed after. */
-const ID_PREFIX_SHAPE = /^[0-9a-f]{8}[0-9a-f-]*$/i
 
 function notFound(target: string, scope: string, visible: readonly ThreadAddressEntry[]): ThreadAddressError {
   const base = `No visible thread matches "${target}" in ${scope}.`
