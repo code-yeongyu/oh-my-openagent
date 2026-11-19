@@ -12,6 +12,7 @@ import { threadLink } from "../thread-link"
 import type { ThreadHostSession } from "../tools/ports"
 import { rowState, threadModel } from "../tools/thread-state"
 import {
+  OPEN_SESSION_FORK,
   openedThread,
   type HostedThread,
   type SessionHost,
@@ -80,6 +81,13 @@ export function createRelaySessionHost(
       (await remote.sessions.sessions())
         .filter((row) => row.device === device && row.state !== "ended")
         .map(listedThread),
+    // Asked of the device's engine endpoint, as every capability is (an observing read); an engine that does not answer
+    // is taken not to fork, so the create refuses fork_from rather than open a blank session there.
+    forks: async () => {
+      const info = await remote.sessions.endpointCommand(device, { type: "get_protocol_info", observe: true })
+      const names = info.kind === "ok" ? replyData(info.response)["capabilities"] : undefined
+      return Array.isArray(names) && names.includes(OPEN_SESSION_FORK)
+    },
     open: async (request: SessionOpenRequest): Promise<SessionOpenOutcome> => {
       const offline = await deviceOnline(remote, device)
       if (offline !== undefined) return offline
@@ -101,7 +109,7 @@ export function createRelaySessionHost(
       const outcome = await remote.sessions.endpointCommand(device, frame, { locate: true })
       if (outcome.kind !== "ok") {
         const model = request.provider === undefined ? undefined : `${request.provider}/${request.modelId ?? ""}`
-        const refused = openRefusal(outcome, device, open.cwd, model)
+        const refused = openRefusal(outcome, device, open.cwd, model, request.forkFrom)
         // A refused open ran nothing on b: undo the worktree this call made there. An uncertain one may have opened in
         // it, so the worktree stays and the failure names it.
         if (made === undefined) return refused

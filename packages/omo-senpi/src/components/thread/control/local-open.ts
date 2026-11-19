@@ -1,6 +1,6 @@
 import type { ThreadHost } from "../tools/ports"
 import { folderFailure } from "../worktree/failures"
-import { modelRefusal } from "./open-reply"
+import { forkRefusal, modelRefusal } from "./open-reply"
 import { discardWorktree } from "../worktree/discard-worktree"
 import { checkFolder, createThreadWorktree, runGit } from "../worktree/thread-worktree"
 import { openedThread, type SessionOpenOutcome, type SessionOpenRequest } from "./session-host"
@@ -21,7 +21,11 @@ export async function openLocally(
   }
   const model = request.provider === undefined ? undefined : `${request.provider}/${request.modelId ?? ""}`
   // A model the engine cannot run refuses the open (`model_unavailable`); that is the caller's argument to fix.
-  const unrunnable = (error: unknown) => modelRefusal(error instanceof Error ? error.message : String(error), model)
+  // A source this engine cannot fork refuses the open too (senpi#7085): no thread was created.
+  const unrunnable = (error: unknown) => {
+    const text = error instanceof Error ? error.message : String(error)
+    return modelRefusal(text, model) ?? forkRefusal(text, request.forkFrom)
+  }
   if (worktree === undefined) {
     try {
       return { kind: "ok", thread: openedThread(await host.openSession(request)) }

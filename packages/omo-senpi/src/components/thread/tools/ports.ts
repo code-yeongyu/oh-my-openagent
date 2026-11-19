@@ -103,6 +103,8 @@ export type ThreadHostViewRequest = {
 export type ThreadHost = {
   readonly socket: string
   readonly listSessions: () => Promise<readonly ThreadHostSession[]>
+  /** The host's own `get_protocol_info` capabilities (an observing read); absent on a host port that cannot read them. */
+  readonly capabilities?: () => Promise<readonly string[]>
   /** `permissionPreset` is the approval mode the new session starts in (its creator's, #12884); absent, the host's default applies. */
   readonly openSession: (params: {
     readonly cwd?: string

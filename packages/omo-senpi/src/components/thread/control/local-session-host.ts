@@ -3,7 +3,7 @@ import { resolveAgentHome } from "../../agent-home/resolve-agent-home"
 import { workspaceEntries } from "../addressing"
 import type { ThreadSummary, ThreadWorkspaceNote } from "../contracts"
 import type { ThreadHost } from "../tools/ports"
-import type { HostedThread, SessionHost } from "./session-host"
+import { OPEN_SESSION_FORK, type HostedThread, type SessionHost } from "./session-host"
 
 /**
  * A thread this device opened in a folder outside the caller's workspace is `scope_denied` to the caller (its
@@ -35,6 +35,7 @@ export function createLocalSessionHost(
 ): SessionHost {
   return {
     visible: async () => visible,
+    forks: async () => (await host.capabilities?.())?.includes(OPEN_SESSION_FORK) === true,
     open: async (request) =>
       await (await import("#omo-thread-client-runtime")).openLocally(host, request, worktreeRoot),
   }

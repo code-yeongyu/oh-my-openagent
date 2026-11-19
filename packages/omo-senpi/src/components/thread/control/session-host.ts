@@ -39,6 +39,9 @@ export function createdThreadId(callerId: string, idempotencyKey: string): strin
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-8${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`
 }
 
+/** The engine capability that says `open_session` forks a session on `forkFrom` (senpi#7085). */
+export const OPEN_SESSION_FORK = "open_session_fork"
+
 /** A thread as the tools report it, with `device` when it is on another of the account's devices. */
 /** `warnings`: steps after the session was created that failed; the thread exists and is answered anyway. */
 export type HostedThread = ThreadToolSummary & {
@@ -82,5 +85,10 @@ export type SessionHost = {
   readonly device?: string
   /** The threads visible on that device: this device's address book, or the account listing's live rows of that device. */
   readonly visible: () => Promise<readonly ThreadSummary[]>
+  /**
+   * Whether that device's engine forks on `open_session { forkFrom }` (capability `open_session_fork`, #13031). An
+   * engine without it opens a blank session instead, so thread_create refuses `fork_from` there before any open.
+   */
+  readonly forks: () => Promise<boolean>
   readonly open: (request: SessionOpenRequest) => Promise<SessionOpenOutcome>
 }
