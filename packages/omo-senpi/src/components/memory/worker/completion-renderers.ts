@@ -52,8 +52,10 @@ function reflectionNoticeSpec(record: ReflectionCompletionEntry): NoticeSpec {
 
 /**
  * The report's own summary, cut to its first sentence: the reflection persona writes a numbered
- * "**Summary**:" item first, so that sentence is what the run learned. Markdown markers around
- * the label are dropped; a report without a summary item contributes its first prose line.
+ * "**Summary**:" item first, so that sentence is what the run learned. Emphasis, backtick, heading,
+ * and bullet markers are dropped, but a leading number is kept: it reads the same whether it marks
+ * a list item or belongs to the text ("2024."), so a report without a summary item keeps its own
+ * numbering.
  */
 export function reflectionHeadline(text: string): string | undefined {
   const lines = sanitizeReflectionReport(text)
