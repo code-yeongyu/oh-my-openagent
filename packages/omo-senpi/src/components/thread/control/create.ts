@@ -1,4 +1,3 @@
-import { toThreadAddressEntries } from "../address-book"
 import { checkNameConflict } from "../addressing"
 import type {
   ThreadCreateInput,
@@ -322,12 +321,13 @@ async function existingHere(
   address: string,
   callerId: string,
 ): Promise<LocalExisting> {
-  const book = sendAddressBook(options, current, address, true)
+  const localFor = sendBookFor(options, current)
   const resolved = await resolveAddress(
     {
       remote: undefined,
       callerWorkspaceRoot: options.callerWorkspaceRoot(),
-      local: toThreadAddressEntries(book),
+      local: localFor(address),
+      localFor,
       callerId,
     },
     address,
@@ -336,7 +336,10 @@ async function existingHere(
   if (resolved.kind === "error") return { kind: "error", result: { kind: "error", error: resolved } }
   const live = targetSession(current, resolved.thread)
   if (live !== undefined) return { kind: "live", thread: summary(live) }
-  const entry = book.find((candidate) => candidate.thread_id === resolved.thread)
+  // The book as the resolved thread names it, so a session file found by its thread part carries its path.
+  const entry = sendAddressBook(options, current, resolved.thread, true).find(
+    (candidate) => candidate.thread_id === resolved.thread,
+  )
   if (entry?.session_path === undefined || entry.session_path === null)
     return {
       kind: "error",
