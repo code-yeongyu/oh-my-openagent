@@ -192,7 +192,8 @@ export async function createThread(
             ...(plan.creates ? launch.profile : {}),
             ...(createdId === undefined ? {} : { durableSessionId: createdId }),
           },
-          { promptFollows: plan.creates && value.prompt !== undefined },
+          // #14397 review L1: every create, a prompt-only and an alias-only one included, is checked for reach.
+          { confirmReach: plan.creates },
         )
       } catch (error) {
         const found = await reopened()

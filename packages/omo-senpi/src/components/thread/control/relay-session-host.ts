@@ -10,6 +10,7 @@ import { prepareRemoteWorktree, removeRemoteWorktree } from "../worktree/remote-
 import { openedEngineId, openRefusal } from "./open-reply"
 import { threadLink } from "../thread-link"
 import type { ThreadHostSession } from "../tools/ports"
+import type { ThreadWorktree } from "../worktree/thread-worktree"
 import { rowState, threadModel } from "../tools/thread-state"
 import {
   openedThread,
@@ -85,6 +86,7 @@ export function createRelaySessionHost(
     reason: string,
     routingId: string | undefined,
     thread: string,
+    worktree: ThreadWorktree | undefined,
   ): Promise<SessionOpenOutcome> => {
     const ended =
       routingId === undefined
@@ -96,14 +98,33 @@ export function createRelaySessionHost(
             children: "detach",
           })
     const created = !(ended?.kind === "ok" && replyData(ended.response)["outcome"] === "unloaded")
+    // #14397 review M1: a worktree this call made on b for the session is removed with it; one b does not remove is
+    // named in the answer, never covered by "nothing was left behind".
+    const left = worktree === undefined ? undefined : await removeRemoteWorktree(remote, device, worktree)
     const shown = escapeForDisplay(reason)
+    const session = created
+      ? routingId === undefined
+        ? `Device ${device} made thread ${thread}, but its route does not reach it (${shown}), and its open named no routing id to end it by: it is left with no live owner.`
+        : `Device ${device} made thread ${thread}, but its route does not reach it (${shown}), and ending it there failed: it is left with no live owner.`
+      : `Device ${device} took the open, but its route does not reach the session it made (${shown}): no thread host there that this account reaches takes new threads.`
+    const remains =
+      left !== undefined && worktree !== undefined
+        ? ` The worktree ${worktree.path} made for it is still on that device.`
+        : created
+          ? ""
+          : " Nothing was left behind."
     return fail(
       "host_unavailable",
-      created
-        ? `Device ${device} made thread ${thread}, but its route does not reach it (${shown}), and ending it there failed: it is left with no live owner.`
-        : `Device ${device} took the open, but its route does not reach the session it made (${shown}): no thread host there that this account reaches takes new threads. Nothing was left behind.`,
+      `${session}${remains}`,
       "Start omo on that device (an omo session, or omo daemon run), or create the thread on another device.",
-      { device, reason: shown, created, ...(created ? { thread } : {}) },
+      {
+        device,
+        reason: shown,
+        created,
+        ...(created ? { thread } : {}),
+        ...(created && routingId === undefined ? { unload: "no_routing_id" } : {}),
+        ...(left === undefined || worktree === undefined ? {} : { worktree, cleanup: left.error }),
+      },
     )
   }
   return {
@@ -192,38 +213,42 @@ export function createRelaySessionHost(
         threadId = located.kind === "ok" ? located.sessionId : engineId
       }
       let applied = name
-      const named =
-        name === undefined
-          ? undefined
-          : await remote.sessions.sessionCommand(
+      // The first command a create sends the new session through b's route: its name, else (a create that goes on to
+      // use the session) the state read its first prompt would make anyway.
+      const firstStep = (key: string) =>
+        name !== undefined
+          ? remote.sessions.sessionCommand(
               device,
-              threadId,
-              { type: "set_session_name", sessionId: threadId, name },
+              key,
+              { type: "set_session_name", sessionId: key, name },
               { direct: true },
             )
+          : !reopens && options?.confirmReach === true
+            ? remote.sessions.sessionCommand(device, key, { type: "get_state", sessionId: key }, { direct: true })
+            : undefined
+      let reached = await firstStep(threadId)
       // #14394: every later step (its name, its first prompt, every tool) reaches the new session through b's route. A
       // route that does not list it (a host the service does not route, such as the Desktop app's) leaves an orphan
       // nothing can address: the create ends it where it was opened and refuses, before anything records the thread.
-      // The name is the first such step; with no name, the state read its first prompt would make anyway asks the same
-      // route now. Only the service's own route_unlisted counts: an engine's answer about the key is no route verdict.
-      if (!reopens) {
-        const reached =
-          named ??
-          (options?.promptFollows === true
-            ? await remote.sessions.sessionCommand(
-                device,
-                threadId,
-                { type: "get_state", sessionId: threadId },
-                { direct: true },
-              )
-            : undefined)
+      // Only the service's own route_unlisted counts: an engine's answer about the key is no route verdict. A session b
+      // opened a moment ago may not be routed yet (#14397 review L3), so one such refusal is not the verdict: b is asked
+      // again where the session is, and only a second route_unlisted ends it.
+      if (!reopens && reached?.kind === "refused" && reached.reason === ROUTE_UNLISTED) {
+        const engineId = openedEngineId(data, state)
+        const relocated = engineId === undefined ? undefined : await remote.sessions.locate(device, engineId)
+        if (relocated?.kind === "ok") {
+          threadId = relocated.sessionId
+          reached = await firstStep(threadId)
+        }
         if (reached?.kind === "refused" && reached.reason === ROUTE_UNLISTED)
           return await unreachable(
             reached.reason,
             nonEmpty(data["sessionId"]),
             nonEmpty(state["durableSessionId"]) ?? threadId,
+            made?.worktree,
           )
       }
+      const named = name === undefined ? undefined : reached
       if (named !== undefined) {
         if (named.kind !== "ok") {
           applied = undefined
