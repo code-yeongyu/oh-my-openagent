@@ -1,9 +1,19 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { createRemoteThreadFixture } from "./thread-remote-fixture"
 
 const { account, surface, cleanup } = createRemoteThreadFixture()
-afterEach(cleanup)
+// A relative cwd resolves under the caller's workspace root, which defaults to the process cwd: a
+// test that leans on that default passes only when the suite runs from the repo root (#14238). Tests
+// that need a relative path to resolve own their folder instead, and this file removes what it owns
+// alongside the fixture cleanup (bun:test already awaits an async hook, so cleanup stays awaited).
+const ownedFolders: string[] = []
+afterEach(async () => {
+  await cleanup()
+  for (const folder of ownedFolders.splice(0)) rmSync(folder, { recursive: true, force: true })
+})
 
 const failure = (result: unknown) =>
   (result as { error?: { code: string; next_action: string; details?: object } }).error
@@ -11,13 +21,20 @@ const failure = (result: unknown) =>
 describe("thread_create: the folder a new thread starts in", () => {
   test("#given a relative cwd #when the thread is created on this device #then it starts in that folder under the caller's folder", async () => {
     const a = account()
-    const { run, openSession } = surface(a.remote)
+    const callerFolder = mkdtempSync(join(tmpdir(), "omo-thread-create-folder-"))
+    ownedFolders.push(callerFolder)
+    mkdirSync(join(callerFolder, "packages"))
+    const { run, openSession } = surface(a.remote, { callerWorkspaceRoot: callerFolder })
     expect(await run("thread_create", { name: "thread-create-folder-15", cwd: "packages" })).toMatchObject({
       kind: "ok",
     })
     // A create here asks for the id its call derives (#14060).
     expect(openSession.mock.calls.map((call) => call[0])).toEqual([
-      { cwd: join(process.cwd(), "packages"), name: "thread-create-folder-15", durableSessionId: expect.any(String) },
+      {
+        cwd: join(callerFolder, "packages"),
+        name: "thread-create-folder-15",
+        durableSessionId: expect.any(String),
+      },
     ])
   })
 
