@@ -1,3 +1,4 @@
+import { z } from "zod"
 import { DeviceSignInRefused, loginDevice } from "../omo-opencode/src/cli/service-auth/device-flow"
 import { deviceName, devicePlatform } from "../omo-opencode/src/cli/service-auth/device-name"
 import {
@@ -63,6 +64,7 @@ export interface SignInVerbDependencies {
   readonly deviceService?: DeviceServiceHandoff
   /** The device-service setup a fresh `omo login` runs; its human lines go to stderr. */
   readonly setUpDeviceService: () => Promise<DeviceServiceOutcome>
+  readonly readStdin: () => Promise<string>
   readonly output: (line: string) => void
   readonly error: (line: string) => void
   readonly now?: () => number
@@ -70,7 +72,8 @@ export interface SignInVerbDependencies {
   readonly machineDigest?: () => Promise<string | undefined>
 }
 
-const USAGE = "omo account sign-in: use sign-in [--replace] [--name <device name>]"
+const USAGE =
+  'omo account sign-in: use sign-in, or sign-in --stdin with one JSON line {"deviceName"?: string, "replace"?: boolean}'
 
 type Refusal = Extract<SignInEvent, { event: "refused" }>
 
@@ -139,23 +142,35 @@ function refusalOf(error: unknown, limitDevices: readonly ListedDevice[] | undef
   })
 }
 
-function parseFlags(flags: readonly string[]): { readonly replace: boolean; readonly name?: string } | undefined {
-  let replace = false
-  let name: string | undefined
-  for (let index = 0; index < flags.length; index++) {
-    const flag = flags[index]
-    if (flag === "--replace" && !replace) replace = true
-    else if (flag === "--name" && name === undefined) {
-      const value = flags[++index]
-      if (value === undefined || value.trim() === "" || value.startsWith("--")) return undefined
-      name = value
-    } else return undefined
+const optionsSchema = z
+  .object({ deviceName: z.string().trim().min(1).max(128).optional(), replace: z.boolean().optional() })
+  .strict()
+
+// The options arrive as one JSON line on stdin, never on the command line: a device name is the caller's text, and
+// argv is visible to every process on the target.
+async function readOptions(
+  flags: readonly string[],
+  readStdin: () => Promise<string>,
+): Promise<{ readonly replace: boolean; readonly name?: string } | undefined> {
+  if (flags.length === 0) return { replace: false }
+  if (flags.length !== 1 || flags[0] !== "--stdin") return undefined
+  const line = (await readStdin()).trim()
+  if (line === "") return { replace: false }
+  let raw: unknown
+  try {
+    raw = JSON.parse(line)
+  } catch {
+    return undefined
   }
-  return name === undefined ? { replace } : { replace, name }
+  const parsed = optionsSchema.safeParse(raw)
+  if (!parsed.success) return undefined
+  return parsed.data.deviceName === undefined
+    ? { replace: parsed.data.replace === true }
+    : { replace: parsed.data.replace === true, name: parsed.data.deviceName }
 }
 
 export async function runSignInVerb(dependencies: SignInVerbDependencies, flags: readonly string[]): Promise<number> {
-  const parsed = parseFlags(flags)
+  const parsed = await readOptions(flags, dependencies.readStdin)
   if (parsed === undefined) {
     dependencies.error(USAGE)
     return ACCOUNT_EXIT.invalid

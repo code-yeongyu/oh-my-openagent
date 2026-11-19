@@ -18,6 +18,7 @@ type Answer = Response | undefined
 async function signIn(
   handler: (request: Request, path: string) => Answer | Promise<Answer>,
   flags: readonly string[] = [],
+  stdin = "",
 ) {
   const time = clock()
   const secrets = memorySecrets()
@@ -40,6 +41,7 @@ async function signIn(
         setups.push("setup")
         return "on"
       },
+      readStdin: async () => stdin,
       output: (line) => lines.push(line),
       error: () => undefined,
       ...time,
@@ -170,6 +172,7 @@ describe("omo account sign-in", () => {
           beforeKeysDiscarded: async () => undefined,
         }),
         setUpDeviceService: async () => "on",
+        readStdin: async () => "",
         output: (line) => lines.push(line),
         error: () => undefined,
       },
@@ -179,6 +182,32 @@ describe("omo account sign-in", () => {
     expect(lines.map((line) => JSON.parse(line))).toEqual([
       expect.objectContaining({ event: "refused", code: "accounts_unreachable" }),
     ])
+  })
+
+  test("#given options on stdin #when it runs #then the device name reaches the code request and nothing is on argv", async () => {
+    const names: unknown[] = []
+    const run = await signIn(
+      async (request, path) => {
+        if (path === "/v1/device/code") {
+          const body = (await request.json()) as { client: { name: string } }
+          names.push(body.client.name)
+          return Response.json(minted)
+        }
+        if (path === "/v1/device/token") return Response.json(grant)
+        return undefined
+      },
+      ["--stdin"],
+      JSON.stringify({ deviceName: "device-b" }),
+    )
+    expect(run.code).toBe(ACCOUNT_EXIT.ok)
+    expect(names).toEqual(["device-b"])
+  })
+
+  test("#given a malformed stdin options line #when it runs #then it answers usage and sends nothing", async () => {
+    const run = await signIn(() => undefined, ["--stdin"], '{"deviceName": 5}')
+    expect(run.code).toBe(ACCOUNT_EXIT.invalid)
+    expect(run.lines).toEqual([])
+    expect(run.requests).toEqual([])
   })
 
   test("#given an unknown flag #when the verb is dispatched #then it answers usage and signs nothing in", async () => {

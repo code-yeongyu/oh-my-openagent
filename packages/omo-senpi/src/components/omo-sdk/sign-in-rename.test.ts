@@ -10,14 +10,18 @@ const code: UserCode = {
   expiresAt: "2030-01-01T00:05:00.000Z",
 }
 
-type Run = { readonly args: readonly string[]; readonly env: Readonly<Record<string, string | undefined>> }
+type Run = {
+  readonly args: readonly string[]
+  readonly stdin: string
+  readonly env: Readonly<Record<string, string | undefined>>
+}
 
 function scripted(lines: readonly unknown[], exit = 0): { process: SignInProcess; runs: Run[] } {
   const runs: Run[] = []
   return {
     runs,
-    process: async ({ args, env, onLine }) => {
-      runs.push({ args, env })
+    process: async ({ args, stdin, env, onLine }) => {
+      runs.push({ args, stdin, env })
       for (const line of lines) onLine(typeof line === "string" ? line : JSON.stringify(line))
       return { code: exit }
     },
@@ -56,7 +60,8 @@ describe("account.signIn", () => {
       value: { device: { id: "dev-new", name: "device-b" }, deviceService: "on" },
     })
     expect(shown).toEqual([code])
-    expect(runs.map((run) => run.args)).toEqual([["account", "sign-in", "--replace", "--name", "device-b"]])
+    expect(runs.map((run) => run.args)).toEqual([["account", "sign-in", "--stdin"]])
+    expect(runs.map((run) => JSON.parse(run.stdin))).toEqual([{ deviceName: "device-b", replace: true }])
     expect(runs[0]?.env["OMO_SERVICE_API_URL"]).toBe(ORIGIN)
   })
 

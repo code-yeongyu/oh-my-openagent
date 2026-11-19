@@ -92,14 +92,13 @@ export async function runSignIn(
       outcome = refused(parsed.code, parsed.message, parsed.next_action, parsed.details)
     }
   }
-  const args = [
-    "account",
-    "sign-in",
-    ...(options.replace === true ? ["--replace"] : []),
-    ...(options.deviceName === undefined ? [] : ["--name", options.deviceName]),
-  ]
+  const args = ["account", "sign-in", "--stdin"]
+  const stdin = JSON.stringify({
+    ...(options.deviceName === undefined ? {} : { deviceName: options.deviceName }),
+    ...(options.replace === true ? { replace: true } : {}),
+  })
   try {
-    await run({ args, env: { ...input.env, OMO_SERVICE_API_URL: input.origin }, onLine, signal })
+    await run({ args, stdin, env: { ...input.env, OMO_SERVICE_API_URL: input.origin }, onLine, signal })
     await callback
   } catch {
     return refused("internal_error", "the omo sign-in process could not run", "check the omo install, then retry")
