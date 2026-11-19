@@ -8,7 +8,7 @@ import type {
   ThreadSummary,
   ThreadToolResult,
 } from "../contracts"
-import { threadToolFailure, type ThreadErrorCode } from "../errors"
+import { gatewaySchemaRefusal, threadToolFailure, type ThreadErrorCode } from "../errors"
 import type { DeliveryTarget } from "../gateway/transport"
 import { checkInitialSkills } from "../initial-skills"
 import { createdDeviceRow } from "../remote/address-book"
@@ -265,13 +265,30 @@ async function firstPrompt(
   try {
     sent = await context.deliverPrompt(current, target, send, `${context.operationId}:prompt`)
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    // A store schema this binary does not know refuses typed here too (#13927). The generic refusal says
+    // "nothing was sent or changed" and "restart this session"; neither holds for a create whose thread
+    // exists, so this keeps the code and details but says what actually happened and what to do.
+    const refusal = gatewaySchemaRefusal(error)
     return {
-      error: threadToolFailure(
-        "internal_error",
-        `The thread was created, but its first prompt was not delivered: ${error instanceof Error ? error.message : String(error)}.`,
-        `Send it with thread_send to ${thread.thread_id} (tool.thread_send({ thread, message }) in an eval cell); read the thread first if the prompt may have arrived.`,
-        { thread: thread.thread_id },
-      ),
+      error:
+        refusal === undefined
+          ? threadToolFailure(
+              "internal_error",
+              `The thread was created, but its first prompt was not delivered: ${message}.`,
+              `Send it with thread_send to ${thread.thread_id} (tool.thread_send({ thread, message }) in an eval cell); read the thread first if the prompt may have arrived.`,
+              { thread: thread.thread_id },
+            )
+          : threadToolFailure(
+              refusal.code,
+              `The thread was created, but its first prompt was not delivered: this omo build reads gateway schema ${
+                (error as { readonly details?: { readonly supported?: unknown } }).details?.supported
+              }, while this machine's gateway store is at schema ${
+                (error as { readonly details?: { readonly found?: unknown } }).details?.found
+              }: a newer omo build already upgraded it.`,
+              `Update omo with \`omo update\`, then send the prompt with thread_send to ${thread.thread_id} (tool.thread_send({ thread, message }) in an eval cell).`,
+              { ...refusal.details, thread: thread.thread_id },
+            ),
     }
   }
   if (sent.kind === "error") return { error: sent.error }
