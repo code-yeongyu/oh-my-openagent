@@ -5,7 +5,7 @@ import type { ThreadHostSession } from "./tools"
 const { account, surface, cleanup } = createRemoteThreadFixture()
 afterEach(cleanup)
 
-const UNLOAD = { type: "unload_session", sessionId: "rk-on-b", force: true, interrupt: true, children: "detach" }
+const UNLOAD = { type: "unload_session", sessionId: "rk-on-b", force: true, children: "detach", deliveries: "refuse" }
 
 describe("thread_close: close a thread on this device or on another one", () => {
   test("#given a live thread on this device #when thread_close names it and is retried #then its host closes it once and the retry replays the answer", async () => {
@@ -17,12 +17,14 @@ describe("thread_close: close a thread on this device or on another one", () => 
       thread: "dur-local",
       closed: true,
       reason: "closed",
+      dropped_deliveries: [],
     })
     expect(await run("thread_close", input)).toEqual({
       kind: "ok",
       thread: "dur-local",
       closed: true,
       reason: "closed",
+      dropped_deliveries: [],
     })
     expect(closed).toEqual([["route-local", "dur-local"]])
     expect(a.sent).toEqual([])
@@ -35,6 +37,7 @@ describe("thread_close: close a thread on this device or on another one", () => 
       thread: "dur-local",
       closed: false,
       reason: "not_live",
+      dropped_deliveries: [],
     })
   })
 
@@ -54,6 +57,7 @@ describe("thread_close: close a thread on this device or on another one", () => 
       thread: "dur-on-b",
       closed: true,
       reason: "closed",
+      dropped_deliveries: [],
       device: "b",
     })
     expect(a.live.has("rk-on-b")).toBe(false)
@@ -69,6 +73,7 @@ describe("thread_close: close a thread on this device or on another one", () => 
       thread: "dur-on-b",
       closed: true,
       reason: "closed",
+      dropped_deliveries: [],
       device: "b",
     })
     expect(a.live.has("rk-on-b")).toBe(false)
@@ -97,6 +102,7 @@ describe("thread_close: close a thread on this device or on another one", () => 
       thread: "dur-on-b",
       closed: false,
       reason: "not_live",
+      dropped_deliveries: [],
       device: "b",
     })
     expect(a.sent).toEqual([])
@@ -110,6 +116,7 @@ describe("thread_close: close a thread on this device or on another one", () => 
       thread: "dur-on-b",
       closed: false,
       reason: "not_live",
+      dropped_deliveries: [],
       device: "b",
     })
   })
@@ -122,6 +129,7 @@ describe("thread_close: close a thread on this device or on another one", () => 
       thread: "dur-saved",
       closed: false,
       reason: "not_live",
+      dropped_deliveries: [],
     })
     expect(closed).toEqual([])
   })
@@ -171,6 +179,7 @@ describe("thread_close: close a thread on this device or on another one", () => 
       thread: "dur-local",
       closed: true,
       reason: "closed",
+      dropped_deliveries: [],
     })
     expect(closed).toEqual([["route-local", "dur-local"]])
   })
@@ -183,6 +192,7 @@ describe("thread_close: close a thread on this device or on another one", () => 
       thread: "dur-local",
       closed: true,
       reason: "closed",
+      dropped_deliveries: [],
     })
     expect(closed).toEqual([["route-local", "dur-local"]])
   })
@@ -195,6 +205,7 @@ describe("thread_close: close a thread on this device or on another one", () => 
       thread: "dur-on-b",
       closed: true,
       reason: "closed",
+      dropped_deliveries: [],
       device: "b",
     })
     expect(a.sent.map((entry) => [entry.via, entry.device, entry.rpc])).toEqual([["session", "b", UNLOAD]])

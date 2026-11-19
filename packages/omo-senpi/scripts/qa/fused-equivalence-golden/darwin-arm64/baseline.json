@@ -1,12 +1,12 @@
 {
  "repo": {
-  "head": "cba38a26328b061cb2209e2bb6f56e6db87ff2b3",
+  "head": "9a2e4dec0decb589dc3d6d80a2a10208e1cb9d59",
   "harness": "5ab795e3392325c961596d7944a1740f4d0a9e20"
  },
  "platform": "darwin-arm64",
  "runtimes": {
   "harness": "node@24.22.0",
-  "child": "bun@1.4.4 @code-yeongyu/senpi@2026.11.18-2 (pinned)"
+  "child": "bun@1.4.4 @code-yeongyu/senpi@2026.11.18-3 (pinned)"
  },
  "hashes": {
   "driver": "sha256:641a42d1f3de87b4cf64b3486a03b6c39d9049e66f1d5776208b108883fe0428",

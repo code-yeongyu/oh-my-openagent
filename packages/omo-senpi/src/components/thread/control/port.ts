@@ -3,7 +3,7 @@ import type { EntryPageRead } from "../paged-reader"
 import type { ThreadTranscriptEntry } from "../reader"
 import type { InterruptOutcome } from "./interrupt"
 import type { ModelChoice } from "../tools/model-match"
-import type { ThreadCloseOutcome } from "../tools/ports"
+import type { ThreadCloseAnswer, ThreadCloseOptions } from "../tools/ports"
 import type { ThreadResultSummary, ThreadSummary, ThreadWaitOutcome } from "../contracts"
 
 /**
@@ -23,7 +23,7 @@ export type SessionControl = {
   /** `interruptOver` on this leg's transport: an idle session answers `interrupted: false`. */
   readonly interrupt: (turnId?: string) => Promise<InterruptOutcome>
   /** The one close ladder (`close-ladder.ts`) on the thread's engine. */
-  readonly close: () => Promise<ThreadCloseOutcome>
+  readonly close: (options?: ThreadCloseOptions) => Promise<ThreadCloseAnswer>
   readonly setName: (name: string) => Promise<void>
   /**
    * The session's model catalog. `held`: answered from a copy the leg keeps (bounded in age), on which only an exact
