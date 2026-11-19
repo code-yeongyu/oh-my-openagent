@@ -62,6 +62,7 @@ async function setup(
     readonly admitIntake?: (device: string) => Promise<IntakeAdmission>
     readonly storeWrap?: (store: GatewayStore) => GatewayStore
     readonly schedule?: (run: () => void, ms: number) => () => void
+    readonly memoryHeadroom?: () => number | undefined
   } = {},
 ): Promise<Setup> {
   const h = (harness = createGatewayHarness())
@@ -93,6 +94,7 @@ async function setup(
     sameDevice: options.sameDevice ?? (() => true),
     ...(options.remoteWake === undefined ? {} : { remoteWake: options.remoteWake }),
     ...(options.admitIntake === undefined ? {} : { admitIntake: options.admitIntake }),
+    ...(options.memoryHeadroom === undefined ? {} : { memoryHeadroom: options.memoryHeadroom }),
     schedule: options.schedule ?? (() => () => undefined),
     onEvent: (event) => {
       events.push(event)
@@ -840,5 +842,43 @@ describe("the bound on woken turns (A3.5.3)", () => {
     expect(await carrier.wake("s1")).toMatchObject({ kind: "open" })
     await carrier.evaluate("s1")
     expect(await carrier.wake("s1")).toEqual({ kind: "wake_limit_reached" })
+  })
+})
+
+const GIB = 1024 ** 3
+
+describe("the carrier admits wakes on measured host memory, never on a count", () => {
+  test("#given 9 sessions a host restart parked, each with a delivery and a requested wake #when the carrier sweeps with plenty of memory #then all 9 are opened and woken", async () => {
+    const { fake, store, carrier, path } = await setup({ memoryHeadroom: () => 64 * GIB })
+    const ids = Array.from({ length: 9 }, (_, index) => `parked-${index + 1}`)
+    for (const id of ids) await store.woken.request({ durable_id: id, session_file: path(id) })
+
+    await carrier.sweep()
+
+    const rows = await store.woken.list()
+    expect(rows.map((row) => [row.durable_id, row.state]).sort()).toEqual(ids.map((id) => [id, "open"]).sort())
+    expect(sent(fake, "open_session")).toHaveLength(9)
+    expect(sent(fake, "wake")).toHaveLength(9)
+  })
+
+  test("#given host memory headroom below the floor #when a session is woken #then the wake is deferred typed host_memory_pressure with the numbers, nothing opens, the row stays requested, and it opens once the probe reports enough", async () => {
+    let available = 512 * 1024 * 1024
+    const { fake, store, carrier, path } = await setup({ memoryHeadroom: () => available })
+    path("s1")
+
+    expect(await carrier.wake("s1")).toEqual({
+      kind: "host_memory_pressure",
+      available_bytes: 512 * 1024 * 1024,
+      floor_bytes: GIB,
+    })
+    expect(sent(fake, "open_session")).toEqual([])
+    expect(await store.woken.list()).toMatchObject([{ durable_id: "s1", state: "requested" }])
+    expect(await store.sessionWait.waitingOn({ durable_id: "s1" })).toEqual({ kind: "wake" })
+
+    available = 8 * GIB
+    await carrier.sweep()
+    expect(await store.woken.list()).toMatchObject([{ durable_id: "s1", state: "open" }])
+    expect(sent(fake, "open_session")).toHaveLength(1)
+    expect(sent(fake, "wake")).toHaveLength(1)
   })
 })
