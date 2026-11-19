@@ -13,6 +13,7 @@ import {
   PEER,
   type World,
 } from "../../../../device-service-core/test/local-api/conformance/world.ts"
+import { resolveMember } from "./resolve"
 import { clientOn, closeClients, failureOf, fakeClock } from "./testing/fake-service"
 
 // sessions.resolve (#13414 unit U5) over the conformance fake owner: an address to its row from the listing the client
@@ -224,5 +225,40 @@ describe("sessions.resolve", () => {
       code: "not_found",
       details: { kind: "device", id: "dev-nowhere" },
     })
+  })
+
+  test("#given a caller deadline #when a device-qualified address reads the roster and then the listing #then the listing runs under what is left of that one deadline", async () => {
+    const clock = fakeClock()
+    const deadlines: (number | undefined)[] = []
+    const roster = {
+      id: PEER,
+      name: "Peer",
+      platform: "linux",
+      online: true,
+      last_seen_ms: null,
+      caps: { attach: true, machine: false, control: false },
+    }
+    const unreached = () => Promise.reject(new Error("resolve reads only the roster and the listing"))
+    const resolve = resolveMember({
+      sender: { kind: "person", uid: "user-1" },
+      timers: clock,
+      deps: { version: "5.1.70" },
+      dial: unreached,
+      member: unreached,
+      self: () => {
+        throw new Error("unreached")
+      },
+      localSessions: unreached,
+      devicesList: async () => {
+        clock.advance(600)
+        return { kind: "ok", value: [roster] }
+      },
+      sessionsList: async (_filter, opts) => {
+        deadlines.push(opts?.deadlineMs)
+        return { kind: "ok", value: { revision: 1, rows: [], unanswered: [] } }
+      },
+    })
+    await resolve(`${PEER}/dur-1`, {}, { deadlineMs: 1_000 })
+    expect(deadlines).toEqual([400])
   })
 })
