@@ -10,7 +10,7 @@ import * as fs from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { loadOmoConfig } from "@oh-my-opencode/omo-config-core"
+import { loadOmoConfig, type OmoConfig } from "@oh-my-opencode/omo-config-core"
 import type { ManagedChildHandle, ManagedRunner, ManagedStartSpec, RunnerOutcome } from "@oh-my-opencode/senpi-task"
 import { createDagFileStore, createDagManager, type DagRunId } from "@oh-my-opencode/senpi-task/dag"
 
@@ -56,7 +56,7 @@ function assembleRuntime(cwd: string, runner: CompletingRunner, warnings: unknow
   const pi = new FakeExtensionAPI()
   const engine = composeTaskEngine({
     pi,
-    omoConfig: loadOmoConfig({ cwd }).config,
+    omoConfig: qaConfig(cwd),
     cwd,
     sharedParentTools: () => [],
     runnerFactories: { inProcess: () => runner, process: () => runner },
@@ -75,6 +75,13 @@ function assembleRuntime(cwd: string, runner: CompletingRunner, warnings: unknow
   })
 }
 
+// The node routes by agent with a mock call-site model. A builtin agent refuses a call-site model
+// (#14367), so it names this custom agent instead.
+function qaConfig(cwd: string): OmoConfig {
+  const config = loadOmoConfig({ cwd }).config
+  return { ...config, agents: { ...config.agents, "dag-worker": { description: "dag qa worker" } } }
+}
+
 const root = fs.mkdtempSync(join(tmpdir(), "dag-lease-handoff-qa-"))
 const predecessor = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)"], { stdio: "ignore" })
 await new Promise((resolve) => setTimeout(resolve, 200))
@@ -89,7 +96,7 @@ try {
     definition: {
       key: "lease-handoff-qa",
       name: "lease handoff",
-      nodes: [{ id: "resume", prompt: "resume", subagent_type: "explore", model: "omo-mock/mock-1" }],
+      nodes: [{ id: "resume", prompt: "resume", subagent_type: "dag-worker", model: "omo-mock/mock-1" }],
     },
   })
 
