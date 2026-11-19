@@ -35,6 +35,7 @@ export type SignInRefusalCode =
   | "internal_error"
 
 export type SignInEvent =
+  | { readonly event: "ready" }
   | {
       readonly event: "code"
       readonly verificationUri: string
@@ -170,6 +171,11 @@ async function readOptions(
 }
 
 export async function runSignInVerb(dependencies: SignInVerbDependencies, flags: readonly string[]): Promise<number> {
+  // A probe for a program that drives this verb (enroll): it answers that the verb exists and touches nothing.
+  if (flags.length === 1 && flags[0] === "--check") {
+    dependencies.output(JSON.stringify({ event: "ready" } satisfies SignInEvent))
+    return ACCOUNT_EXIT.ok
+  }
   const parsed = await readOptions(flags, dependencies.readStdin)
   if (parsed === undefined) {
     dependencies.error(USAGE)
