@@ -222,3 +222,35 @@ describe("thread_create with a first prompt (#13410)", () => {
     expect(result.prompt).toMatchObject({ error: { code: expect.any(String) } })
   })
 })
+
+// The held-thread report: thread_create({ prompt }) answered ok while its first prompt never ran (no client attached, the
+// new session's control endpoint never drained the row). A create with a prompt either runs it or fails, typed.
+describe("thread_create whose first prompt does not start", () => {
+  test("#given a new session here whose control endpoint never drains #when created with a prompt #then the create fails prompt_not_started naming the thread, the delivery and its last state", async () => {
+    const a = account()
+    const { run, enqueuedRequests } = surface(a.remote, { firstPromptWaitMs: 50 })
+    const result = await run("thread_create", { name: "never-drained", prompt: "build it" })
+    expect(result).toMatchObject({
+      kind: "error",
+      error: {
+        code: "prompt_not_started",
+        details: { thread: "dur-created-here", delivery_id: expect.any(String), state: "queued" },
+      },
+    })
+    // The prompt was taken once: the thread exists and the next step is a read or a send to it, never a second create.
+    expect(enqueuedRequests("dur-created-here")).toHaveLength(1)
+  })
+
+  test("#given b answers the prompt queued behind a turn #when created on b with a prompt #then the create fails prompt_not_started, not ok", async () => {
+    const queued = {
+      kind: "ok",
+      response: { type: "response", id: null, command: "admit_external_message", success: true, data: { kind: "queued", turnId: "turn-b" } },
+    } as const
+    const a = account({ admitOutcome: queued })
+    const { run } = surface(a.remote)
+    expect(await run("thread_create", { device: "studio", prompt: "build it" })).toMatchObject({
+      kind: "error",
+      error: { code: "prompt_not_started", details: { thread: "dur-new-on-b", device: "b", state: "queued" } },
+    })
+  })
+})

@@ -817,6 +817,8 @@ export function createRemoteThreadFixture() {
       listFailsAfterLostReply?: boolean
       /** With `openLosesReply`: the host has no `durable_session_id` capability and creates under an id of its own. */
       ignoresDurableSessionId?: boolean
+      /** How long a create waits for its first prompt to start on this device; 0 by default (nothing here drains). */
+      firstPromptWaitMs?: number
     } = {},
   ) {
     const engine = extra.engine ?? ENGINE
@@ -977,6 +979,7 @@ export function createRemoteThreadFixture() {
       ...(extra.callerChainHop === undefined ? {} : { callerChainHop: extra.callerChainHop }),
       ...(extra.callerName === undefined ? {} : { callerName: extra.callerName }),
       ...(extra.env === undefined ? {} : { env: extra.env }),
+      firstPromptWaitMs: extra.firstPromptWaitMs ?? 0,
     })
     const run = async (name: ThreadToolName, args: unknown): Promise<ThreadToolResult> => {
       const tool = tools.find((candidate) => candidate.name === name)
