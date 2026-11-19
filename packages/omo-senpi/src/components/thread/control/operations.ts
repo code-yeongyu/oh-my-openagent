@@ -1,6 +1,7 @@
 import type { ThreadSetReasoningInput, ThreadToolResult } from "../contracts"
 import { failure } from "../tools/internals"
 import { exactModel, matchModel, modelPatternFailure } from "../tools/model-match"
+import type { ThreadCloseOptions } from "../tools/ports"
 import { controlIdentity, controlRefusalOf, type SessionControl } from "./port"
 
 /** A control's answer for a thread no engine holds live, on this device or another. */
@@ -37,8 +38,36 @@ export async function interruptThread(control: SessionControl, turnId: string | 
   }
 }
 
-export async function closeThread(control: SessionControl, force?: boolean): Promise<ThreadToolResult> {
-  const { outcome, dropped_deliveries } = await control.close(force === true ? { force } : {})
+/** The close options a `thread_close` input names, absent ones left out. */
+export function closeOptions(value: {
+  readonly force?: boolean | undefined
+  readonly graceful?: boolean | undefined
+  readonly wait_ms?: number | undefined
+}): ThreadCloseOptions {
+  return {
+    ...(value.force === undefined ? {} : { force: value.force }),
+    ...(value.graceful === undefined ? {} : { graceful: value.graceful }),
+    ...(value.wait_ms === undefined ? {} : { wait_ms: value.wait_ms }),
+  }
+}
+
+export async function closeThread(
+  control: SessionControl,
+  options: ThreadCloseOptions = {},
+): Promise<ThreadToolResult> {
+  if (options.graceful === true && options.force === true)
+    return failure(
+      "invalid_arguments",
+      "graceful and force exclude each other: a graceful close lets the turn end, a forced one stops it.",
+      "Pass one of them.",
+    )
+  if (options.wait_ms !== undefined && options.graceful !== true)
+    return failure(
+      "invalid_arguments",
+      "wait_ms only bounds a graceful close: a close without graceful does not wait for the turn.",
+      "Pass graceful: true with wait_ms, or drop wait_ms.",
+    )
+  const { outcome, dropped_deliveries, graceful } = await control.close(options)
   if (outcome === "held_elsewhere")
     return failure(
       "foreign_live_owner",
@@ -53,6 +82,7 @@ export async function closeThread(control: SessionControl, force?: boolean): Pro
     closed,
     reason: closed ? "closed" : "not_live",
     dropped_deliveries: [...dropped_deliveries],
+    ...(graceful === undefined ? {} : { graceful }),
   }
 }
 

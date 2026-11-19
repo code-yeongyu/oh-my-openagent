@@ -86,6 +86,7 @@
     "packages/skills-loader-core/src/shared/skill-path-resolver.ts",
     "packages/telemetry-core/src/posthog-immediate-send.ts",
     "packages/utils/src/logger.ts",
-    "script/omo-native-trust-mutations.ts"
+    "script/omo-native-trust-mutations.ts",
+    "script/qa/rpc-relay-parity-live.ts"
   ]
 }

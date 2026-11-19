@@ -13,6 +13,7 @@ const BUNDLE_INPUT_SOURCES = [
   "senpi-task/src",
   "omo-config-core/src",
   "delegate-core/src",
+  "thread-address-core/src",
   "team-core/src",
   "boulder-state/src",
   "comment-checker-core/src",

@@ -4,9 +4,20 @@ export type GatewayDeliveryMode = "auto" | "steer" | "follow_up"
 
 export type DeliveryState = "queued" | "admitting" | "admitted" | "applied" | "refused" | "uncertain"
 
-export type EffectiveLane = "steer" | "follow_up"
+/**
+ * The lane a delivery took at its receiver: `start` began a turn on an idle session (through the engine's followUp lane),
+ * `steer` joined the running turn, `follow_up` waits behind a turn or a hold.
+ */
+export type EffectiveLane = "start" | "steer" | "follow_up"
 
-export type RefusalReason = "not_steerable" | "turn_conflict" | "expired" | "binding_closed" | "sender_not_admitted"
+export type RefusalReason =
+  | "not_steerable"
+  | "turn_conflict"
+  | "expired"
+  | "binding_closed"
+  | "sender_not_admitted"
+  /** The target was closed on request after the row was queued, before it took the message (#14273). */
+  | "target_closed"
 
 export type ProcessIdentity = {
   readonly pid: number

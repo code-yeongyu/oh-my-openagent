@@ -37,6 +37,28 @@ function renderTable(header: readonly string[], rows: readonly (readonly string[
   return [line(header), ...rows.map(line)]
 }
 
+const textOf = (value: unknown): string | undefined => (typeof value === "string" && value !== "" ? value : undefined)
+const isEntry = (value: unknown): value is Readonly<Record<string, unknown>> =>
+  typeof value === "object" && value !== null
+
+/**
+ * The candidates of a typed refusal (an ambiguous device, name or prefix), one per line - the address or device id a
+ * person can type back, then its name (#14305 review M4). A refusal with no candidates prints nothing.
+ */
+export function candidateLines(details: Readonly<Record<string, unknown>> | undefined): string[] {
+  const listed: unknown = details?.["candidates"]
+  if (!Array.isArray(listed)) return []
+  return listed.filter(isEntry).flatMap((candidate) => {
+    const id = textOf(candidate["address"]) ?? textOf(candidate["device"]) ?? textOf(candidate["thread"])
+    const name = textOf(candidate["device_name"]) ?? textOf(candidate["name"])
+    return id === undefined ? [] : [`  ${id}${name === undefined ? "" : `  ${name}`}`]
+  })
+}
+
+// A refusal's next action may name the agents' eval-only thread_list tool; a person at a terminal runs the CLI verb.
+export const personNextAction = (text: string): string =>
+  /\bthread_list\b/.test(text) ? "Run omo remote sessions to see the account's sessions." : text
+
 export function ago(ms: number | null, now: number): string {
   if (ms === null) return "never"
   const seconds = Math.max(0, Math.round((now - ms) / 1000))

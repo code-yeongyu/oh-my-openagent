@@ -1,8 +1,9 @@
 import { createHash, randomUUID } from "node:crypto"
 
 import { resolveTarget, type ThreadAddressEntry } from "../addressing"
-import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from "../errors"
+import { pairLoopGuardNextAction, threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from "../errors"
 import type { EndpointLiveness, GatewayEndpointPort, GatewayEndpointRef } from "./adapter"
+import { DEFAULT_THREAD_DELIVERY } from "../contracts/fields"
 import { TARGET_MAX_BYTES } from "./constants"
 import { decideDelivery } from "./decision"
 import { senderFacts } from "./envelope"
@@ -102,7 +103,10 @@ function fail(
     error: threadToolFailure(
       code,
       message,
-      NEXT_ACTION[code] ?? "Call thread_list (tool.thread_list() in an eval cell) and retry after checking the target.",
+      code === "pair_loop_guard"
+        ? pairLoopGuardNextAction(Number(details?.["retry_after_ms"]))
+        : (NEXT_ACTION[code] ??
+            "Call thread_list (tool.thread_list() in an eval cell) and retry after checking the target."),
       details,
     ),
   }
@@ -142,7 +146,7 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
   const now = options.now ?? store.now
 
   async function deliver(request: GatewayDeliverRequest): Promise<GatewayDeliveryResult> {
-    const mode = request.mode ?? "auto"
+    const mode = request.mode ?? DEFAULT_THREAD_DELIVERY
     if (mode === "steer" && request.expected_turn_id === undefined)
       return fail("invalid_arguments", "A steer needs expected_turn_id (the target's current turn_epoch).")
     const bytes = Buffer.byteLength(request.text)
