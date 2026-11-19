@@ -44,6 +44,8 @@ type Sent = {
   readonly device: string
   readonly session?: string
   readonly rpc?: JsonObject
+  /** omo#14271: the engine key an endpoint command named; absent: the device's primary. */
+  readonly endpoint?: string
 }
 
 type Engine = {
@@ -266,6 +268,11 @@ export function createRemoteThreadFixture() {
       sessionFiles?: Readonly<Record<string, string | readonly [string, string]>> | "none"
       /** The free text b's engine without find_session refuses it with. Default: `Unknown command: find_session`. */
       findSessionRefuse?: string
+      /**
+       * omo#14271: b's primary engine predates find_session (b's service refuses it `method_unclassified`) while b lists
+       * these engine keys; find_session sent to one of the `serving` keys is answered as usual.
+       */
+      engines?: { readonly keys: readonly string[]; readonly serving: readonly string[] }
       /** b knows a session it just opened only by its relay key (relayKeys), not by its durable id: a listing that has not caught up yet. */
       relayKeyOnly?: boolean
       /** The device service throws on b's admit_external_message (a lost connection mid-delivery). */
@@ -604,10 +611,15 @@ export function createRemoteThreadFixture() {
             incomplete: options.incomplete ?? [],
           }
         },
-        endpointCommand: async (device, rpc) => {
-          sent.push({ via: "endpoint", device, rpc })
+        endpointCommand: async (device, rpc, endpointOptions) => {
+          const endpoint = endpointOptions?.endpoint
+          sent.push({ via: "endpoint", device, rpc, ...(endpoint === undefined ? {} : { endpoint }) })
+          const engines = options.engines
+          if (engines !== undefined && rpc["type"] === "find_session" && !engines.serving.includes(endpoint ?? ""))
+            return { kind: "refused", reason: "method_unclassified" }
           return answer(rpc)
         },
+        ...(options.engines === undefined ? {} : { endpointKeys: async () => options.engines?.keys ?? [] }),
         // This fake device lists a created session by the id its create reply names.
         locate: async (device, engineId) => {
           located.push({ device, session: engineId })

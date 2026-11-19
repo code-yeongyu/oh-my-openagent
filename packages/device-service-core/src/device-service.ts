@@ -232,6 +232,11 @@ export type DeviceService = {
   ) => Promise<ListingResult>
   readonly attach: (device: string, sessionId: string) => Promise<RemoteAttach>
   /**
+   * omo#14271: every engine endpoint key `device` lists (`session.endpoints` without `primary`). A read-only lookup its
+   * primary cannot serve (an older engine took over the device's default host) can go to another of them by key.
+   */
+  readonly engineEndpoints: (device: string) => Promise<readonly string[]>
+  /**
    * Sends one session-less engine record (`open_session`, `list_sessions`, ...) to `device`'s engine endpoint with no
    * attach: relay daemon #393's `session.command {device, endpoint, rpc}`, on the device's primary engine endpoint
    * (`engineEndpointOf`, omo#14195); only behind a service older than 0.1.11, which cannot ask, its lone endpoint.
@@ -435,6 +440,7 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
               attached.command(rpc, options?.waitMs === undefined ? undefined : { waitMs: options.waitMs }),
           }
     },
+    engineEndpoints: async (device) => (await client.request("session.endpoints", { device })).endpoints,
     endpointCommand: async (device, rpc, options) => {
       // The endpoint lookup runs before any session.command is written, so whatever fails it (a timeout, a closed
       // connection, a refusal) dispatched nothing: it is marked not_sent, unlike a timeout after sending.

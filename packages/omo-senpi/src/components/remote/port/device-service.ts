@@ -365,6 +365,16 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         return outcomeOf(sent)
       }
       try {
+        // omo#14271: a named engine is asked as is, and never becomes the device's endpoint for later commands.
+        const named = endpointOptions?.endpoint
+        if (named !== undefined)
+          return outcomeOf(
+            await connected.endpointCommand(device, record, {
+              ...endpointOptions,
+              endpoint: named,
+              waitMs: commandWaitMs(SEND_WAIT_MS),
+            }),
+          )
         const outcome = await send(endpoints.get(device))
         if (outcome !== UNLISTED_ENDPOINT) return outcome
         endpoints.delete(device)
@@ -382,6 +392,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         if (dialed.owned) connected.close()
       }
     },
+    endpointKeys: async (device) => await (await svc()).engineEndpoints(device),
     sessionCommand,
     read: async (device, sessionId, tail) => {
       // A read changes nothing on the other device, so every failure is a typed refusal, never uncertain.

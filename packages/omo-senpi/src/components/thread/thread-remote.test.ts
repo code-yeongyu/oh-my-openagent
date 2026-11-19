@@ -323,6 +323,27 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     },
   )
 
+  test("#given b's primary engine predates find_session and another engine b lists serves it #when thread_create reopens b's closed thread #then the file is found on that engine and the open goes to b's primary (#14271)", async () => {
+    const a = account({ rows: [{ ...B_ROW, state: "ended" }], engines: { keys: ["primary", "shard"], serving: ["shard"] } })
+    const { run } = surface(a.remote)
+    expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({ kind: "ok", thread: "dur-on-b" })
+    const finds = a.sent.filter((entry) => entry.rpc?.["type"] === "find_session").map((entry) => entry.endpoint)
+    expect(finds).toEqual([undefined, "primary", "shard"])
+    const opens = a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")
+    expect(opens.map((entry) => [entry.endpoint, entry.rpc?.["sessionPath"]])).toEqual([[undefined, B_FILE]])
+  })
+
+  test("#given no engine b lists serves find_session #when thread_create reopens b's closed thread #then unsupported names b's primary as too old, never 'update omo' alone, and no open is sent (#14271)", async () => {
+    const a = account({ rows: [{ ...B_ROW, state: "ended" }], engines: { keys: ["primary", "shard"], serving: [] } })
+    const { run } = surface(a.remote)
+    const result = await run("thread_create", { thread: "dur-on-b" })
+    expect(result).toMatchObject({
+      kind: "error",
+      error: { code: "unsupported", details: { device: "b", thread: "dur-on-b", reason: "method_unclassified" } },
+    })
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")).toEqual([])
+  })
+
   test("#given b's thread is not running and this device cannot wake it there #when thread_send names it #then not_resumable at once naming the reopen, and no command waits on b (#14184)", async () => {
     const a = account({ rows: [{ ...B_ROW, state: "ended" }], live: [] })
     const { run } = surface(a.remote)

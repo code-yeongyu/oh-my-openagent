@@ -2,7 +2,13 @@ import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import type { ThreadToolResult } from "../contracts"
 import { threadToolFailure } from "../errors"
 import { outcomeFailure } from "./outcome"
-import { rowThreadId, type JsonObject, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
+import {
+  rowThreadId,
+  type JsonObject,
+  type RemoteCommandOutcome,
+  type RemoteSessionRow,
+  type RemoteThreadSurface,
+} from "./ports"
 import { replyData } from "./remote-ops"
 
 // What an engine that predates `find_session` (senpi#6429) answers it with; relayd refuses a record type the engine's
@@ -14,6 +20,33 @@ const NO_FIND_SESSION: ReadonlySet<string> = new Set([
   "unsupported",
   "find_session_unsupported",
 ])
+
+const lacksFindSession = (outcome: RemoteCommandOutcome): boolean =>
+  outcome.kind === "refused" && (NO_FIND_SESSION.has(outcome.reason) || outcome.reason.startsWith("Unknown command"))
+
+/**
+ * omo#14271: `find_session` on `device`'s primary engine, else on each other engine it lists. The primary can be older
+ * than the lookup (an older desktop runtime that took over the device's default host) while an engine beside it serves
+ * it; every engine of one agent dir reads the same session files, and the lookup only reads, so asking another is safe.
+ * The primary's own answer stands when no engine serves it, or when the device cannot list its engines.
+ */
+async function findSession(remote: RemoteThreadSurface, device: string, thread: string): Promise<RemoteCommandOutcome> {
+  const rpc = { type: "find_session", durableSessionId: thread }
+  const primary = await remote.sessions.endpointCommand(device, rpc)
+  if (!lacksFindSession(primary) || remote.sessions.endpointKeys === undefined) return primary
+  let keys: readonly string[]
+  try {
+    keys = await remote.sessions.endpointKeys(device)
+  } catch {
+    // Listing its engines failed: the device answers only through its primary, whose refusal is the answer.
+    return primary
+  }
+  for (const endpoint of keys) {
+    const outcome = await remote.sessions.endpointCommand(device, rpc, { endpoint })
+    if (!lacksFindSession(outcome)) return outcome
+  }
+  return primary
+}
 
 const refusal = (
   code: Parameters<typeof threadToolFailure>[0],
@@ -40,7 +73,7 @@ export type HolderView = "running" | "on_disk" | "absent" | "unknown"
 export async function holderView(remote: RemoteThreadSurface, row: RemoteSessionRow): Promise<HolderView> {
   const thread = rowThreadId(row)
   if (thread === "") return "unknown"
-  const outcome = await remote.sessions.endpointCommand(row.device, { type: "find_session", durableSessionId: thread })
+  const outcome = await findSession(remote, row.device, thread)
   if (outcome.kind !== "ok") return "unknown"
   const data = replyData(outcome.response)
   const found = recordOf(data["found"])
@@ -68,15 +101,12 @@ export async function sessionFileOf(
       "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) and open the thread by the id it lists.",
       details,
     )
-  const outcome = await remote.sessions.endpointCommand(row.device, { type: "find_session", durableSessionId: thread })
-  if (
-    outcome.kind === "refused" &&
-    (NO_FIND_SESSION.has(outcome.reason) || outcome.reason.startsWith("Unknown command"))
-  )
+  const outcome = await findSession(remote, row.device, thread)
+  if (lacksFindSession(outcome) && outcome.kind === "refused")
     return refusal(
       "unsupported",
-      `Device ${row.device} cannot find the session file of closed thread ${thread} by its id (find_session), so it cannot be opened from here.`,
-      "Update omo on that device, or open the thread there.",
+      `No engine on device ${row.device} can find the session file of closed thread ${thread} by its id (find_session): its primary engine is older than that lookup (for example an older desktop app runtime running its default host), so the thread cannot be opened from here.`,
+      "On that device, restart its default engine host with the current omo (omo daemon status there shows which engine runs it) or update omo there; or open the thread on that device.",
       { ...details, reason: escapeForDisplay(outcome.reason) },
     )
   if (outcome.kind !== "ok") return { result: outcomeFailure(outcome, row.device) }

@@ -165,13 +165,16 @@ export type RemoteSessionsPort = {
    * record settles (#12777). Sent on the long-lived connection it would attach the host's delegated engine
    * connection to the session as well, and the engine would write each streamed delta twice; the attach that
    * follows rides the long-lived connection, which then carries one copy per delta. Every other record rides the
-   * long-lived connection.
+   * long-lived connection. `endpoint` sends to that listed engine key instead of the primary (omo#14271: a read-only
+   * lookup the primary cannot serve), and is never kept as the device's endpoint for later commands.
    */
   readonly endpointCommand: (
     device: string,
     rpc: JsonObject,
-    options?: { readonly locate?: boolean },
+    options?: { readonly locate?: boolean; readonly endpoint?: string },
   ) => Promise<RemoteCommandOutcome>
+  /** omo#14271: every engine endpoint key `device` lists, its primary among them. Absent: only the primary is ever asked. */
+  readonly endpointKeys?: (device: string) => Promise<readonly string[]>
   /**
    * The id a session just created on `device` is addressed by (its listing row's `session_id`, the key an attach
    * takes), from the durable engine session id the create reply names; settles once that id attaches. A `knownKey` the
