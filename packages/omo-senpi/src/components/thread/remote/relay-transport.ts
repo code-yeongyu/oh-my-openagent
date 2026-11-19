@@ -258,31 +258,36 @@ export function createRelayTransport(
         kind: "uncertain" as const,
         reason: error instanceof Error ? error.message : String(error),
       }))
+      const conflict = steerConflict(sent)
+      if (conflict !== undefined) {
+        // An explicit steer the draft held until its turn ended, answered as reply data or as a refused command (#14320).
+        // The sender was answered queued; its receipt now answers the refusal, so a retry under the same idempotency key
+        // reads what became of it (the local row's `refused`).
+        const turnId = sent.kind === "ok" ? replyData(sent.response)["turnId"] : undefined
+        await revise(
+          fail(
+            REFUSAL_CODES[conflict].code,
+            `Turn ${String(record["expectedTurnId"] ?? "?")} of ${row.session_id} on device ${row.device} ended while that session's open draft held the steer; it was not delivered.`,
+            REFUSAL_CODES[conflict].next,
+            {
+              device: row.device,
+              delivery_id: deliveryId,
+              ...(typeof turnId === "string" && turnId !== "" ? { current_turn_id: turnId } : {}),
+            },
+          ),
+        )
+        log(
+          `relay_delivery_failed: delivery ${deliveryId} to ${row.session_id} on device ${row.device}: re-send ${attempt + 1} ended ${conflict} (the steered turn ended while the draft held it); the send's receipt now answers that refusal.`,
+        )
+        return
+      }
       if (sent.kind !== "ok") {
         log(
           `relay_delivery_failed: delivery ${deliveryId} to ${row.session_id} on device ${row.device}: re-send ${attempt + 1} ended ${sent.kind} (${sent.reason}).`,
         )
         return
       }
-      const reply = replyData(sent.response)
-      if (reply["kind"] === "turn_conflict") {
-        // An explicit steer the draft held until its turn ended. The sender was answered queued; its receipt now answers
-        // the refusal, so a retry under the same idempotency key reads what became of it (the local row's `refused`).
-        const turnId = typeof reply["turnId"] === "string" ? reply["turnId"] : ""
-        await revise(
-          fail(
-            REFUSAL_CODES.turn_conflict.code,
-            `Turn ${String(record["expectedTurnId"] ?? "?")} of ${row.session_id} on device ${row.device} ended while that session's open draft held the steer; it was not delivered.`,
-            REFUSAL_CODES.turn_conflict.next,
-            { device: row.device, delivery_id: deliveryId, ...(turnId === "" ? {} : { current_turn_id: turnId }) },
-          ),
-        )
-        log(
-          `relay_delivery_failed: delivery ${deliveryId} to ${row.session_id} on device ${row.device}: re-send ${attempt + 1} ended turn_conflict (the steered turn ended while the draft held it); the send's receipt now answers that refusal.`,
-        )
-        return
-      }
-      if (reply["kind"] !== "held_draft") return
+      if (replyData(sent.response)["kind"] !== "held_draft") return
     }
     log(
       `relay_delivery_failed: delivery ${deliveryId} to ${row.session_id} on device ${row.device} was held behind that session's open draft through ${retryDelays.length} re-sends.`,
