@@ -370,14 +370,15 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         return outcomeOf(sent)
       }
       try {
-        // omo#14271: a named engine is asked as is, and never becomes the device's endpoint for later commands.
+        // omo#14271: a named engine is asked as is, and never becomes the device's endpoint for later commands. A
+        // caller's `waitMs` (the fallback's shared budget) bounds this one call.
         const named = endpointOptions?.endpoint
         if (named !== undefined)
           return outcomeOf(
             await connected.endpointCommand(device, record, {
               ...endpointOptions,
               endpoint: named,
-              waitMs: commandWaitMs(SEND_WAIT_MS),
+              waitMs: endpointOptions?.waitMs ?? commandWaitMs(SEND_WAIT_MS),
             }),
           )
         const outcome = await send(endpoints.get(device))

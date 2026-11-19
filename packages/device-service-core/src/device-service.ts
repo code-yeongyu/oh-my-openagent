@@ -26,7 +26,7 @@ import { randomBytes } from "node:crypto"
 import { minimumInEffect, type MinimumsOption } from "./minimum-in-effect.ts"
 import { compareVersions } from "./release/version.ts"
 import { deviceServiceStateDir } from "./state-dir.ts"
-import { engineEndpointOf } from "./engine-endpoint.ts"
+import { engineEndpointOf, engineEndpointsOf, type EngineEndpoints } from "./engine-endpoint.ts"
 import { deadlineTimerOf, realTimers, type Timers } from "./timers.ts"
 
 // A host sends no command state at all for a route it does not list toward a sender it does not grant (docs/local-api.md
@@ -232,10 +232,10 @@ export type DeviceService = {
   ) => Promise<ListingResult>
   readonly attach: (device: string, sessionId: string) => Promise<RemoteAttach>
   /**
-   * omo#14271: every engine endpoint key `device` lists (`session.endpoints` without `primary`). A read-only lookup its
-   * primary cannot serve (an older engine took over the device's default host) can go to another of them by key.
+   * omo#14271: every engine endpoint key `device` lists, and the one it names as its own (0.1.11+). A read-only lookup
+   * its primary cannot serve (an older engine took over the device's default host) can go to another of them by key.
    */
-  readonly engineEndpoints: (device: string) => Promise<readonly string[]>
+  readonly engineEndpoints: (device: string) => Promise<EngineEndpoints>
   /**
    * Sends one session-less engine record (`open_session`, `list_sessions`, ...) to `device`'s engine endpoint with no
    * attach: relay daemon #393's `session.command {device, endpoint, rpc}`, on the device's primary engine endpoint
@@ -440,7 +440,7 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
               attached.command(rpc, options?.waitMs === undefined ? undefined : { waitMs: options.waitMs }),
           }
     },
-    engineEndpoints: async (device) => (await client.request("session.endpoints", { device })).endpoints,
+    engineEndpoints: async (device) => await engineEndpointsOf(client, device),
     endpointCommand: async (device, rpc, options) => {
       // The endpoint lookup runs before any session.command is written, so whatever fails it (a timeout, a closed
       // connection, a refusal) dispatched nothing: it is marked not_sent, unlike a timeout after sending.

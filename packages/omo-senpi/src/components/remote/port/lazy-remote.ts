@@ -136,7 +136,7 @@ export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThrea
       return loaded.listing === undefined ? { rows: await loaded.sessions(), incomplete: [] } : await loaded.listing()
     },
     endpointCommand: async (device, rpc, options) => await (await load()).endpointCommand(device, rpc, options),
-    endpointKeys: async (device) => (await (await load()).endpointKeys?.(device)) ?? [],
+    endpointKeys: async (device) => (await (await load()).endpointKeys?.(device)) ?? { keys: [] },
     locate: async (device, engineId, knownKey) => await (await load()).locate(device, engineId, knownKey),
     sessionCommand: async (device, sessionId, rpc, options) =>
       await (await load()).sessionCommand(device, sessionId, rpc, options),

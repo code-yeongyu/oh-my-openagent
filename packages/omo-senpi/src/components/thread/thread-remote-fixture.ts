@@ -46,6 +46,8 @@ type Sent = {
   readonly rpc?: JsonObject
   /** omo#14271: the engine key an endpoint command named; absent: the device's primary. */
   readonly endpoint?: string
+  /** omo#14271: the wait budget the caller passed for this one call (the fallback shares one budget). */
+  readonly waitMs?: number
 }
 
 type Engine = {
@@ -286,7 +288,11 @@ export function createRemoteThreadFixture() {
       engines?: {
         readonly keys: readonly string[]
         readonly serving: readonly string[]
+        /** The key the device names as its own (0.1.11+); the fallback skips it by key, never by position. */
+        readonly primary?: string
         readonly timingOut?: readonly string[]
+        /** Engines of another agent dir: they truthfully answer `none` for a thread they do not hold. */
+        readonly none?: readonly string[]
         readonly listThrows?: boolean
       }
       /** b knows a session it just opened only by its relay key (relayKeys), not by its durable id: a listing that has not caught up yet. */
@@ -661,10 +667,27 @@ export function createRemoteThreadFixture() {
         },
         endpointCommand: async (device, rpc, endpointOptions) => {
           const endpoint = endpointOptions?.endpoint
-          sent.push({ via: "endpoint", device, rpc, ...(endpoint === undefined ? {} : { endpoint }) })
+          sent.push({
+            via: "endpoint",
+            device,
+            rpc,
+            ...(endpoint === undefined ? {} : { endpoint }),
+            ...(endpointOptions?.waitMs === undefined ? {} : { waitMs: endpointOptions.waitMs }),
+          })
           const engines = options.engines
           if (engines !== undefined && rpc["type"] === "find_session") {
             if (engines.timingOut?.includes(endpoint ?? "")) return { kind: "uncertain", reason: "reply_lost" }
+            if (engines.none?.includes(endpoint ?? ""))
+              return {
+                kind: "ok",
+                response: {
+                  type: "response",
+                  id: null,
+                  command: "find_session",
+                  success: true,
+                  data: { unknown: true },
+                },
+              }
             if (!engines.serving.includes(endpoint ?? "")) return { kind: "refused", reason: "method_unclassified" }
           }
           return answer(rpc)
@@ -674,7 +697,10 @@ export function createRemoteThreadFixture() {
           : {
               endpointKeys: async () => {
                 if (options.engines?.listThrows === true) throw new Error("session.endpoints failed")
-                return options.engines?.keys ?? []
+                return {
+                  keys: options.engines?.keys ?? [],
+                  ...(options.engines?.primary === undefined ? {} : { primary: options.engines.primary }),
+                }
               },
             }),
         // This fake device lists a created session by the id its create reply names.

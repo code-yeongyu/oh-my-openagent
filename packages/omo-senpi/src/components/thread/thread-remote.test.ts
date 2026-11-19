@@ -326,13 +326,40 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
   test("#given b's primary engine predates find_session and another engine b lists serves it #when thread_create reopens b's closed thread #then the file is found on that engine, the primary is asked once, and the open goes to b's primary (#14271)", async () => {
     const a = account({
       rows: [{ ...B_ROW, state: "ended" }],
-      engines: { keys: ["primary", "shard"], serving: ["shard"] },
+      engines: { keys: ["primary", "shard"], serving: ["shard"], primary: "primary" },
     })
     const { run } = surface(a.remote)
     expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({ kind: "ok", thread: "dur-on-b" })
     const finds = a.sent.filter((entry) => entry.rpc?.["type"] === "find_session").map((entry) => entry.endpoint)
-    // The primary is the first endpoint b lists and was already asked; the fallback never asks it a second time (#14271 review L2).
+    // The primary is named by key and was already asked; the fallback never asks it a second time (#14271 review L2).
     expect(finds).toEqual([undefined, "shard"])
+    const opens = a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")
+    expect(opens.map((entry) => [entry.endpoint, entry.rpc?.["sessionPath"]])).toEqual([[undefined, B_FILE]])
+  })
+
+  test("#given b names its primary last and the serving engine is listed first #when thread_create reopens b's closed thread #then the primary is skipped by its key and the first-listed engine is asked (#14271 review M1)", async () => {
+    const a = account({
+      rows: [{ ...B_ROW, state: "ended" }],
+      engines: { keys: ["shard", "other", "primary"], serving: ["shard"], primary: "primary" },
+    })
+    const { run } = surface(a.remote)
+    expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({ kind: "ok", thread: "dur-on-b" })
+    const finds = a.sent.filter((entry) => entry.rpc?.["type"] === "find_session").map((entry) => entry.endpoint)
+    // The primary is last, so skipping keys[0] would skip the serving shard; the primary is skipped by its key instead.
+    expect(finds).toEqual([undefined, "shard"])
+    const opens = a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")
+    expect(opens.map((entry) => [entry.endpoint, entry.rpc?.["sessionPath"]])).toEqual([[undefined, B_FILE]])
+  })
+
+  test("#given an engine of another agent dir answers none before the serving engine #when thread_create reopens b's closed thread #then the none is passed over and the file is found on the serving engine (#14271 review M2)", async () => {
+    const a = account({
+      rows: [{ ...B_ROW, state: "ended" }],
+      engines: { keys: ["primary", "other", "shard"], serving: ["shard"], primary: "primary", none: ["other"] },
+    })
+    const { run } = surface(a.remote)
+    expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({ kind: "ok", thread: "dur-on-b" })
+    const finds = a.sent.filter((entry) => entry.rpc?.["type"] === "find_session").map((entry) => entry.endpoint)
+    expect(finds).toEqual([undefined, "other", "shard"])
     const opens = a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")
     expect(opens.map((entry) => [entry.endpoint, entry.rpc?.["sessionPath"]])).toEqual([[undefined, B_FILE]])
   })
@@ -340,7 +367,7 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
   test("#given an engine b lists before the serving one does not answer find_session #when thread_create reopens b's closed thread #then the search passes it over and finds the file on the serving engine (#14271 review L1)", async () => {
     const a = account({
       rows: [{ ...B_ROW, state: "ended" }],
-      engines: { keys: ["primary", "slow", "shard"], serving: ["shard"], timingOut: ["slow"] },
+      engines: { keys: ["primary", "slow", "shard"], serving: ["shard"], primary: "primary", timingOut: ["slow"] },
     })
     const { run } = surface(a.remote)
     expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({ kind: "ok", thread: "dur-on-b" })
@@ -350,8 +377,40 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     expect(opens.map((entry) => [entry.endpoint, entry.rpc?.["sessionPath"]])).toEqual([[undefined, B_FILE]])
   })
 
+  test("#given every engine b lists gives a non-answer #when thread_create reopens b's closed thread #then unsupported says an engine did not answer and to retry, never that no engine can find it (#14271 review L1)", async () => {
+    const a = account({
+      rows: [{ ...B_ROW, state: "ended" }],
+      engines: { keys: ["primary", "slow"], serving: [], primary: "primary", timingOut: ["slow"] },
+    })
+    const { run } = surface(a.remote)
+    const result = await run("thread_create", { thread: "dur-on-b" })
+    expect(result).toMatchObject({ kind: "error", error: { code: "unsupported" } })
+    const message = result.kind === "error" ? result.error.message : ""
+    expect(message).toContain("could not be asked completely")
+    expect(message).toContain("Retry")
+    expect(message).not.toContain("No engine on device")
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")).toEqual([])
+  })
+
+  test("#given many engines b lists #when thread_create reopens b's closed thread #then each fallback call carries a wait budget no larger than the fallback total (#14271 review L1)", async () => {
+    const a = account({
+      rows: [{ ...B_ROW, state: "ended" }],
+      engines: { keys: ["primary", "a", "b", "c", "shard"], serving: ["shard"], primary: "primary" },
+    })
+    const { run } = surface(a.remote)
+    expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({ kind: "ok", thread: "dur-on-b" })
+    const waits = a.sent
+      .filter((entry) => entry.rpc?.["type"] === "find_session" && entry.endpoint !== undefined)
+      .map((entry) => entry.waitMs)
+    expect(waits.length).toBeGreaterThan(0)
+    for (const wait of waits) expect(wait).toBeLessThanOrEqual(15_000)
+  })
+
   test("#given no engine b lists serves find_session #when thread_create reopens b's closed thread #then unsupported names b's primary as too old, never 'update omo' alone, and no open is sent (#14271)", async () => {
-    const a = account({ rows: [{ ...B_ROW, state: "ended" }], engines: { keys: ["primary", "shard"], serving: [] } })
+    const a = account({
+      rows: [{ ...B_ROW, state: "ended" }],
+      engines: { keys: ["primary", "shard"], serving: [], primary: "primary" },
+    })
     const { run } = surface(a.remote)
     const result = await run("thread_create", { thread: "dur-on-b" })
     expect(result).toMatchObject({
@@ -379,7 +438,7 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
   test("#given b's primary predates find_session and listing its engines fails #when thread_create reopens b's closed thread #then unsupported says the listing failed, never that no engine can find it (#14271 review L3)", async () => {
     const a = account({
       rows: [{ ...B_ROW, state: "ended" }],
-      engines: { keys: ["primary", "shard"], serving: ["shard"], listThrows: true },
+      engines: { keys: ["primary", "shard"], serving: ["shard"], primary: "primary", listThrows: true },
     })
     const { run } = surface(a.remote)
     const result = await run("thread_create", { thread: "dur-on-b" })
