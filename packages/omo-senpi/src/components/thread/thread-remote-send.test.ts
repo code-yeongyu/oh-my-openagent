@@ -355,7 +355,8 @@ describe("remote == local, round 2: send modes, handoff and the unknown caller",
       kind: "ok",
       device: "b",
       delivery: { kind: "started" },
-      effective_mode: "follow_up",
+      // The result names the lane b's answer proves; the header went out before b answered and keeps the lane asked for.
+      effective_mode: "start",
     })
     expect(commands(a.sent)).toEqual(["get_state", ADMIT, ADMIT])
     expect(admits(a.sent).map((record) => [record["deliverAs"], record["expectedTurnId"] ?? null])).toEqual([

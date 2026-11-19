@@ -453,9 +453,15 @@ export function createRelayTransport(
         type: "get_state",
         sessionId: row.session_id,
       })
-      if (probed.kind !== "ok") return probeFailure(probed, row.device)
-      const state: EngineState = engineStateOf(replyData(probed.response))
+      // Only a steer or the default needs the probe to pick its lane. An explicit follow_up is delivered whatever the
+      // target is doing, so a lost or refused probe leaves its lane unknown instead of failing the send.
+      if (probed.kind !== "ok" && delivery.mode !== "follow_up") return probeFailure(probed, row.device)
+      const state: EngineState | undefined =
+        probed.kind === "ok" ? engineStateOf(replyData(probed.response)) : undefined
       probedState = state
+    }
+    if (probedState !== undefined) {
+      const state = probedState
       const decision = decideDelivery(state.phase, delivery.mode, expected, state.turnEpoch)
       if (decision.kind !== "admit") {
         const reason = decision.kind === "refuse" ? decision.reason : "turn_conflict"
@@ -521,6 +527,8 @@ export function createRelayTransport(
         hop,
       )
     let record = recordFor(lane)
+    // A delivery the receiver's draft holds is re-sent later on the lane its record names; that lane is the true one.
+    let resentLane: EffectiveLane | undefined
     const ok = (kind: GatewayDeliveryDelivery, deduplicated = false): RelayDeliverySuccess => ({
       kind: "ok",
       thread_id: rowThreadId(row),
@@ -528,7 +536,7 @@ export function createRelayTransport(
       deduplicated,
       device: row.device,
       delivery_id,
-      effective_mode: lane,
+      effective_mode: resentLane ?? effectiveLaneOfAnswer(kind),
     })
     sending()
     if (ended) return wakeAnswer(await woken(row, record), row, delivery_id, ok)
@@ -589,6 +597,7 @@ export function createRelayTransport(
         lane = "follow_up"
         record = recordFor(lane)
       }
+      resentLane = lane
       later((revise) => retryHeld(row, record, delivery_id, revise))
     }
     // Each of these kinds is the engine's own receipt that it holds the delivery, so none of them is uncertain. The
@@ -601,6 +610,17 @@ export function createRelayTransport(
     if (kind === "queued" && afterState?.parkedOnApproval === true)
       return ok({ kind: "queued", queue_position: pending ?? 1, waiting_on: { kind: "approval", device: row.device } })
     return ok({ kind: "queued", queue_position: pending ?? 1 }, kind === "already_admitted")
+  }
+
+  /**
+   * The lane the receiver's answer proves. The probe only chooses what to ask for: a turn can begin or end before the
+   * record lands, so a started answer is a start, a steered one a steer, and a queued one a follow-up. A delivery that
+   * waits only for its device to wake the session starts that session's turn when it opens.
+   */
+  const effectiveLaneOfAnswer = (answer: GatewayDeliveryDelivery): EffectiveLane => {
+    if (answer.kind === "started") return "start"
+    if (answer.kind === "steered") return "steer"
+    return answer.kind === "queued" && answer.waiting_on?.kind === "wake" ? "start" : "follow_up"
   }
 
   const woken = (row: RemoteSessionRow, record: JsonObject) =>

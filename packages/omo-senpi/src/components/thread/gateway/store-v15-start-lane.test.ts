@@ -11,7 +11,8 @@ import { settled } from "./testing/settled"
 /**
  * Storage contract of schema v15 (#14333): `deliveries.mode_effective` records `start`, the lane an idle session's
  * delivery takes. SQLite cannot widen a CHECK in place, so v15 rebuilds `deliveries`; a store the v14 build left must
- * come through with every row, column, index and trigger as it was, and that v14 build must refuse the result.
+ * come through with every row, column, index and trigger as it was. A build that does not know the store's schema
+ * refuses it and leaves it untouched.
  */
 const V14 = 14
 
@@ -173,17 +174,20 @@ test("#given an extension row orphaned on deliveries #when migrated #then foreig
   })
 })
 
-test("#given a store the current build migrated to v15 #when the v14 build's worker opens it #then it is refused as gateway_schema_too_new and the store is untouched", async () => {
+test("#given a store one schema ahead of this build #when this build's worker opens it #then it is refused as gateway_schema_too_new and the store is untouched", async () => {
   const h = (harness = createGatewayHarness())
   const path = gatewayDatabasePath(h.agentDir)
   v14Fixture(path)
   await openAndMigrate(h)
-  const migrated = snapshot(path)
+  const ahead = GATEWAY_MIGRATIONS.length + 1
+  const db = new Database(path)
+  db.exec(`PRAGMA user_version = ${ahead}`)
+  db.close()
+  const newer = snapshot(path)
 
-  const old = h.store({ workerModuleUrl: new URL("./testing/v14/gateway-store-worker.mjs", import.meta.url) })
-  const listed = await settled(old.list())
-  await old.dispose()
+  const store = h.store()
+  const listed = await settled(store.list())
+  await store.dispose()
   expect(listed.error).toMatchObject({ code: "gateway_schema_too_new" })
-  expect(String(listed.error)).toContain(`schema ${V14 + 1} is newer than this binary's supported version ${V14}`)
-  expect(snapshot(path)).toEqual(migrated)
+  expect(snapshot(path)).toEqual(newer)
 })

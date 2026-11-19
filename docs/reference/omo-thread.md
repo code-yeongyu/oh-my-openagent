@@ -78,7 +78,10 @@ instead of acting twice (`deduplicated: true`); reusing a key with other argumen
 A bindingless `send` delivers as `cli:<uid>`. `--mode auto` (the default) steers a running turn:
 the message enters the turn in flight, as typing into its terminal does, with that running turn as
 its expected turn (`delivery.kind: "steered"`, `effective_mode: "steer"`). On an idle session it
-starts a turn (`effective_mode: "start"`, and `effective=start` in the delivery header the receiver reads); a
+starts a turn (`effective_mode: "start"`, and `effective=start` in the delivery header the receiver reads). The result's
+`effective_mode` is the lane the receiver's answer proves (`started` is `start`, `steered` is `steer`, a queued answer is
+`follow_up`, except a delivery waiting only for a wake, which starts the woken session). The header is written before
+the receiver answers, so when a turn begins or ends in between, the header keeps the lane that was asked for; a
 message that waits behind a turn reports `follow_up`. It queues behind only what cannot be steered: a question the session waits on, a
 compaction, or a running turn whose epoch the engine does not report. If the turn ends before the
 steer reaches it, `auto` does not fail: it takes the lane the target has now (a new turn when idle,
