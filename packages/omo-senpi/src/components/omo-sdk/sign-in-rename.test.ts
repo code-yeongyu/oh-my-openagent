@@ -25,7 +25,10 @@ function scripted(lines: readonly unknown[], exit = 0): { process: SignInProcess
 }
 
 const sdkWith = (ports: OmoSdkPorts) =>
-  createOmoSdk({ env: { OMO_SERVICE_API_URL: ORIGIN, PATH: "/usr/bin" }, ports: { desktopLaunch: () => false, ...ports } })
+  createOmoSdk({
+    env: { OMO_SERVICE_API_URL: ORIGIN, PATH: "/usr/bin" },
+    ports: { desktopLaunch: () => false, ...ports },
+  })
 
 const errorOf = <T>(result: OmoResult<T>) => {
   if (result.kind !== "error") throw new Error(`expected an error, got ${JSON.stringify(result)}`)
@@ -69,9 +72,9 @@ describe("account.signIn", () => {
 
   test("#given the verb exits without an outcome #when signIn runs #then it answers internal_error", async () => {
     const { process } = scripted([{ event: "code", ...code }], 1)
-    expect(errorOf(await sdkWith({ signInProcess: process }).account.signIn({ onUserCode: () => undefined })).code).toBe(
-      "internal_error",
-    )
+    expect(
+      errorOf(await sdkWith({ signInProcess: process }).account.signIn({ onUserCode: () => undefined })).code,
+    ).toBe("internal_error")
   })
 
   test("#given an engine the omo launcher did not start #when signIn runs #then it refuses without running anything", async () => {

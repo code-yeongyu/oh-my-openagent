@@ -6,7 +6,10 @@ import {
   type CredentialStore,
 } from "../omo-opencode/src/cli/service-auth/keystore"
 import { AccountsUnreachable, beginLogin } from "../omo-opencode/src/cli/service-auth/login-prelude"
-import { MachineAlreadySignedIn, MachineCredentialUnreadable } from "../omo-opencode/src/cli/service-auth/machine-device"
+import {
+  MachineAlreadySignedIn,
+  MachineCredentialUnreadable,
+} from "../omo-opencode/src/cli/service-auth/machine-device"
 import { advertisesMachineIdentity, readMachineDigest } from "../omo-opencode/src/cli/service-auth/machine-digest"
 import { ApiRefusal, type ListedDevice, RequestFailure } from "../omo-opencode/src/cli/service-auth/protocol"
 import type { DeviceServiceHandoff, Session } from "../omo-opencode/src/cli/service-auth/session"
