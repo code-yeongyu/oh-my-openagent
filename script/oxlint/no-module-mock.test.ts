@@ -25,6 +25,17 @@ describe("no-module-mock through the ratchet lint configuration", () => {
       1,
     ],
     ["a mock.module above its import", 'mock.module("./a", () => ({})); import { mock } from "bun:test";', 1],
+    [
+      "a bun mock from an inline createRequire",
+      'const { mock } = createRequire(import.meta.url)("bun:test"); mock.module("./a", () => ({}));',
+      1,
+    ],
+    ["a mock read off require", 'require("bun:test").mock.module("./a", () => ({}));', 1],
+    [
+      "a namespace from an inline createRequire",
+      'createRequire(import.meta.url)("bun:test").mock.module("./a", () => ({}));',
+      1,
+    ],
     ["bun's vi.mock alias", 'import { vi } from "bun:test"; vi.mock("./a", () => ({}));', 1],
     ["vitest vi.mock and vi.doMock", 'import { vi } from "vitest"; vi.mock("./a"); vi.doMock("./b");', 2],
     ["a global vi.mock", 'vi.mock("./a", () => ({}));', 1],

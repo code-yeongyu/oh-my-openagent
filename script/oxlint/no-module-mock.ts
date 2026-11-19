@@ -124,6 +124,11 @@ const noModuleMock = {
     const declarators: Node[] = []
     const calls: Node[] = []
 
+    const loadedTestModule = (node: Node): string | null => {
+      const module = loadedModule(node)
+      return module !== null && testModules.has(module) ? module : null
+    }
+
     const objectOf = (initial: Node): Mocker | undefined => {
       const node = unwrap(initial)
       if (node.type === "Identifier") {
@@ -132,12 +137,8 @@ const noModuleMock = {
         return mockers.find((mocker) => mocker.global && mocker.name === name)
       }
       if (node.type !== "MemberExpression") return undefined
-      return mockerOf(namespaces.get(identifier(child(node, "object")) ?? "") ?? null, propertyName(node))
-    }
-
-    const loadedTestModule = (node: Node): string | null => {
-      const module = loadedModule(node)
-      return module !== null && testModules.has(module) ? module : null
+      const object = child(node, "object") as Node
+      return mockerOf(namespaces.get(identifier(object) ?? "") ?? loadedTestModule(object), propertyName(node))
     }
 
     const namespaceOf = (node: Node): string | null =>
