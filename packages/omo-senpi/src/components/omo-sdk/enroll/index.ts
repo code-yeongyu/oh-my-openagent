@@ -1,10 +1,12 @@
 import { deviceServiceHost } from "@oh-my-opencode/device-service-core"
 import { z } from "zod"
 import type { UserCode } from "../account/sign-in"
+import { attachDoriterm, type DoritermLocal, type DoritermOutcome } from "./doriterm-attach"
 import { type EnrolledDevice, type EnrollOutcome, type EnrollStep, type StepReceipt, StepRefusal } from "./outcome"
 import { type EnrollRequest, requestProblem } from "./request"
 import type { RemoteProgram, SshExit, SshPort } from "./ssh-port"
 
+export type { DoritermLocal, DoritermOutcome } from "./doriterm-attach"
 export type { EnrollCode, EnrollOutcome, EnrollStep, StepReceipt } from "./outcome"
 export type { EnrollRequest, SshTarget } from "./request"
 export type { RemoteProgram, SshExit, SshPort, SshSession } from "./ssh-port"
@@ -26,6 +28,8 @@ export type EnrollPorts = {
   /** What the fleet client sees through this device's device service. */
   readonly machines: () => Promise<readonly MachineSighting[]>
   readonly clock: EnrollClock
+  /** doriterm's setup command line on this device. */
+  readonly doriterm: DoritermLocal
 }
 
 // The read-back's deadline only: the device service's first install on a new machine can take minutes
@@ -337,7 +341,21 @@ export async function enrollDevice(request: EnrollRequest, ports: EnrollPorts): 
       await ports.clock.sleep(READ_BACK_INTERVAL_MS, signal)
     }
     pass("read_back")
-    return { kind: "enrolled", api, device, already, steps }
+    let doriterm: DoritermOutcome | undefined
+    if (request.doriterm === "attach-if-present") {
+      current = "doriterm"
+      doriterm = await attachDoriterm({
+        local: ports.doriterm,
+        remote: (program, stdin) => run(program, stdin),
+        sleep: (ms) => ports.clock.sleep(ms, signal),
+      })
+      pass(
+        "doriterm",
+        doriterm.kind === "failed" ? doriterm.code : doriterm.kind,
+        doriterm.kind === "failed" ? "refused" : "ok",
+      )
+    }
+    return { kind: "enrolled", api, device, already, ...(doriterm === undefined ? {} : { doriterm }), steps }
   } catch (error) {
     const refusal =
       error instanceof StepRefusal

@@ -17,7 +17,8 @@ export type EnrollRequest = {
   /** Called once with the code a person approves; the only place the codes leave the SDK. */
   readonly onUserCode: (code: UserCode) => void | Promise<void>
   readonly signal?: AbortSignal
-  readonly doriterm?: "skip"
+  /** "attach-if-present" joins the new machine to this device's doriterm mesh when it has one; off by default. */
+  readonly doriterm?: "skip" | "attach-if-present"
 }
 
 // A destination word is passed to ssh after `--`, but a value that starts with "-", or holds whitespace, a control

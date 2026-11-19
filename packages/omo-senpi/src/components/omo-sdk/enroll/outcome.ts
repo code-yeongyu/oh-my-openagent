@@ -1,3 +1,5 @@
+import type { DoritermOutcome } from "./doriterm-attach"
+
 export const ENROLL_STEPS = [
   "request",
   "reach",
@@ -7,6 +9,7 @@ export const ENROLL_STEPS = [
   "sign_in",
   "device_service",
   "read_back",
+  "doriterm",
 ] as const
 export type EnrollStep = (typeof ENROLL_STEPS)[number]
 
@@ -47,6 +50,8 @@ export type EnrollOutcome =
       readonly api: string
       readonly device: EnrolledDevice
       readonly already: boolean
+      /** Present when the request asked to attach doriterm; a failed attach never refuses the enrollment. */
+      readonly doriterm?: DoritermOutcome
       readonly steps: readonly StepReceipt[]
     }
   | {
