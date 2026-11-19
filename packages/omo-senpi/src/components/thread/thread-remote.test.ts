@@ -375,10 +375,10 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
   // route_unlisted. The send asks b again and takes the path b's answer names, at most once.
   test.each(["auto", "follow_up"] as const)(
     "#given b parked a thread its listing still reads live, and this device can wake it #when thread_send (%s) names it #then b is asked again and the session is woken with the delivery, under one delivery id (#14240)",
-    async (mode) => {
+    async (delivery) => {
       const a = account({ live: [], unlistedReason: "route_unlisted", wakeFeature: true })
       const { run } = surface(a.remote)
-      expect(await run("thread_send", { thread: "dur-on-b", message: "wake up", mode })).toMatchObject({
+      expect(await run("thread_send", { thread: "dur-on-b", message: "wake up", delivery })).toMatchObject({
         kind: "ok",
         thread: "dur-on-b",
         delivery: { kind: "queued", waiting_on: { kind: "wake", device: "b" } },
