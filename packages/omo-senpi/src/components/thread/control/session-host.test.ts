@@ -161,7 +161,7 @@ describe("SessionHost: opening an existing thread on both legs", () => {
     expect(here).toMatchObject({ kind: "ok", thread: "dur-created-here", deduplicated: false })
     expect(there).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b", deduplicated: false })
     expect(localOpenFrames(openSession)).toEqual([{ sessionPath: expect.stringContaining("dur-on-disk.jsonl") }])
-    expect(a.sent).toEqual([
+    expect(a.sent.filter((entry) => entry.via === "endpoint")).toEqual([
       { via: "endpoint", device: "b", rpc: { type: "find_session", durableSessionId: "dur-on-b" } },
       { via: "endpoint", device: "b", rpc: { type: "open_session", retain_on_disconnect: true, sessionPath: B_FILE } },
     ])

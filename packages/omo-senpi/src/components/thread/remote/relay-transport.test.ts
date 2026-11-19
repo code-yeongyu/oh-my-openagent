@@ -379,6 +379,157 @@ describe("a delivery the receiver's open draft holds is queued at once, like a s
   })
 })
 
+// #14320: b's engine can answer a steer whose turn is no longer the running one as reply data (`data.kind`) or as a refused
+// command (`reason`). Both forms are the same race and the sender answers them alike, never as an unsupported device.
+describe("a steer admission the receiver answers turn_conflict or not_steerable, in either form (#14320)", () => {
+  type Outcome = Awaited<ReturnType<Parameters<typeof createRelayTransport>[0]["remote"]["sessions"]["sessionCommand"]>>
+  const replyConflict: Outcome = {
+    kind: "ok",
+    response: {
+      type: "response",
+      command: "admit_external_message",
+      success: true,
+      data: { kind: "turn_conflict", turnId: "4" },
+    },
+  }
+  const forms: ReadonlyArray<readonly [string, Outcome]> = [
+    ["reply data turn_conflict", replyConflict],
+    ["refused turn_conflict", { kind: "refused", reason: "turn_conflict" }],
+    ["refused not_steerable", { kind: "refused", reason: "not_steerable" }],
+  ]
+
+  /** b streams turn 3; its steer admissions answer `answer` (the first `times` of them), every other record reaches the fixture. */
+  function racing(answer: Outcome, times = Number.POSITIVE_INFINITY) {
+    const a = account({ engine: { ...ENGINE, streaming: true, currentTurnId: "3", pending: 0 } })
+    const records: Array<Readonly<Record<string, unknown>>> = []
+    let answered = 0
+    const remote = {
+      ...a.remote,
+      sessions: {
+        ...a.remote.sessions,
+        sessionCommand: (...args: Parameters<typeof a.remote.sessions.sessionCommand>) => {
+          const rpc = args[2]
+          if (rpc["type"] !== "admit_external_message") return a.remote.sessions.sessionCommand(...args)
+          records.push(rpc)
+          if (rpc["deliverAs"] === "steer" && answered < times) {
+            answered += 1
+            return Promise.resolve(answer)
+          }
+          if (rpc["deliverAs"] !== "steer" && times === Number.POSITIVE_INFINITY) return Promise.resolve(answer)
+          return a.remote.sessions.sessionCommand(...args)
+        },
+      },
+    }
+    return { remote, records }
+  }
+
+  test.each(forms)(
+    "#given b streams turn 3 and its steer admission answers %s #when a default-mode message is sent #then it is re-sent once on the follow-up lane under the same delivery id and answered queued with effective_mode follow_up",
+    async (_form, answer) => {
+      const { remote, records } = racing(answer, 1)
+      const { relay } = transport(remote)
+      const sent = await relay.deliver(delivery("race the turn", "r1"))
+      expect(sent).toMatchObject({
+        kind: "ok",
+        device: "b",
+        effective_mode: "follow_up",
+        delivery: { kind: "queued", queue_position: 1 },
+      })
+      expect(records.map((record) => [record["deliverAs"], record["expectedTurnId"] ?? null])).toEqual([
+        ["steer", "3"],
+        ["followUp", null],
+      ])
+      expect(new Set(records.map((record) => record["deliveryId"])).size).toBe(1)
+      relay.dispose()
+    },
+  )
+
+  test("#given b refuses the steer turn_conflict and then the follow-up re-send turn_conflict too #when a default-mode message is sent #then that refusal is the answer with its own code, after exactly two records", async () => {
+    const { remote, records } = racing({ kind: "refused", reason: "turn_conflict" })
+    const { relay } = transport(remote)
+    expect(await relay.deliver(delivery("race twice", "r2"))).toMatchObject({
+      kind: "error",
+      error: { code: "turn_conflict", details: { device: "b" } },
+    })
+    expect(records.map((record) => record["deliverAs"])).toEqual(["steer", "followUp"])
+    relay.dispose()
+  })
+
+  test.each([
+    [forms[0]?.[0], "turn_conflict", forms[0]?.[1]],
+    [forms[1]?.[0], "turn_conflict", forms[1]?.[1]],
+    [forms[2]?.[0], "not_steerable", forms[2]?.[1]],
+  ] as const)(
+    "#given b streams turn 3 and its steer admission answers %s #when an explicit steer of turn 3 is sent #then it answers %s naming the device, with no re-send",
+    async (_form, code, answer) => {
+      const { remote, records } = racing(answer as Outcome)
+      const { relay } = transport(remote)
+      expect(
+        await relay.deliver({ ...delivery("steer turn 3", "r3"), mode: "steer", expected_turn_id: "3" }),
+      ).toMatchObject({ kind: "error", error: { code, details: { device: "b" } } })
+      expect(records.map((record) => record["deliverAs"])).toEqual(["steer"])
+      relay.dispose()
+    },
+  )
+})
+
+describe("a held explicit steer whose background re-send is refused turn_conflict (#14320 review)", () => {
+  test("#given b's draft holds a steer of turn 3 and refuses its re-send turn_conflict #when the re-send settles #then a retry under the same key replays turn_conflict naming the delivery, and nothing more is sent", async () => {
+    const a = account({ heldDraft: 1, engine: { ...ENGINE, streaming: true, currentTurnId: "3", pending: 0 } })
+    const records: Array<Readonly<Record<string, unknown>>> = []
+    const remote = {
+      ...a.remote,
+      sessions: {
+        ...a.remote.sessions,
+        sessionCommand: (...args: Parameters<typeof a.remote.sessions.sessionCommand>) => {
+          if (args[2]["type"] === "admit_external_message") {
+            records.push(args[2])
+            if (records.length > 1) return Promise.resolve({ kind: "refused" as const, reason: "turn_conflict" })
+          }
+          return a.remote.sessions.sessionCommand(...args)
+        },
+      },
+    }
+    // Subscribed before the send: the re-send's failure line is written once it settled.
+    const log: string[] = []
+    let failed: () => void = () => undefined
+    const failure = new Promise<void>((resolve) => {
+      failed = resolve
+    })
+    const { relay } = transport(remote, {
+      log: (line) => {
+        log.push(line)
+        if (line.startsWith("relay_delivery_failed:")) failed()
+      },
+    })
+    const steer: OutboundDelivery = { ...delivery("steer me", "s9"), mode: "steer", expected_turn_id: "3" }
+    expect(await relay.deliver(steer)).toMatchObject({
+      kind: "ok",
+      delivery: { kind: "queued", queue_position: 1 },
+      effective_mode: "steer",
+    })
+    let breaker: ReturnType<typeof setTimeout> | undefined
+    await Promise.race([
+      failure,
+      new Promise<never>((_, reject) => {
+        breaker = setTimeout(
+          () => reject(new Error(`waited 5 s for the re-send's failure line; log: ${log.join(" | ")}`)),
+          5_000,
+        )
+      }),
+    ]).finally(() => clearTimeout(breaker))
+    expect(records.map((record) => record["deliverAs"])).toEqual(["steer", "steer"])
+    expect(new Set(records.map((record) => record["deliveryId"])).size).toBe(1)
+    const deliveryId = String(records[0]?.["deliveryId"])
+    expect(await relay.deliver(steer)).toMatchObject({
+      kind: "error",
+      error: { code: "turn_conflict", details: { device: "b", delivery_id: deliveryId } },
+    })
+    expect(records).toHaveLength(2)
+    expect(log.filter((line) => line.startsWith("relay_receipt_unrevised:"))).toEqual([])
+  })
+})
+
 describe("a person's waiting send names its prompt so its follow can anchor on the stored entry (#13272 review)", () => {
   const personSend = (key: string, clientMessageId?: string): OutboundDelivery => ({
     sender: { kind: "person", uid: 1, user: "u" },

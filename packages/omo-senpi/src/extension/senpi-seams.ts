@@ -75,17 +75,23 @@ export const REMOTE_WAKE_UNAVAILABLE = "remote_wake_unavailable"
 // not a `.jsonl` path, not a drive letter. A senpi without the seam resolves every such target locally, so the
 // refusal must never catch a local path: a first segment only a path can have (`.`, `..`, `.hidden`, `~`, `~user`)
 // and a `.jsonl` file in any case stay local even where senpi's own shape would call them remote.
-const REMOTE_TARGET = /^([^/]+)\/[^/]+$/
+const REMOTE_TARGET = /^([^/]+)\/([^/]+)$/
 const DRIVE_LETTER = /^[A-Za-z]:$/
 const PATH_SEGMENT = /^[.~]/
 
-function isRemoteMonitorTarget(target: string): boolean {
+/** The device and session a `<device>/<session>` monitor target names, as senpi reads it; undefined for a local target. */
+export function remoteMonitorTarget(target: string): { readonly device: string; readonly session: string } | undefined {
   const trimmed = target.trim()
-  const device = REMOTE_TARGET.exec(trimmed)?.[1]
-  return device !== undefined && !/\.jsonl$/i.test(trimmed) && !DRIVE_LETTER.test(device) && !PATH_SEGMENT.test(device)
+  const [, device, session] = REMOTE_TARGET.exec(trimmed) ?? []
+  if (device === undefined || session === undefined) return undefined
+  return /\.jsonl$/i.test(trimmed) || DRIVE_LETTER.test(device) || PATH_SEGMENT.test(device)
+    ? undefined
+    : { device, session }
 }
 
-function remoteWakeUnavailable(
+const isRemoteMonitorTarget = (target: string): boolean => remoteMonitorTarget(target) !== undefined
+
+export function remoteWakeUnavailable(
   surface: unknown,
   target: string,
 ): { readonly code: typeof REMOTE_WAKE_UNAVAILABLE; readonly message: string } | undefined {
@@ -106,20 +112,26 @@ export function installRemoteWakeRefusal(pi: {
 }): void {
   if (seamPresent(pi, REMOTE_WAKE_SEAM, "function")) return
   pi.on("tool_call", (payload) => {
-    if (typeof payload !== "object" || payload === null || Reflect.get(payload, "toolName") !== "monitor")
-      return undefined
-    const input: unknown = Reflect.get(payload, "input")
-    if (typeof input !== "object" || input === null) return undefined
-    const action: unknown = Reflect.get(input, "action")
-    const type: unknown = Reflect.get(input, "type")
-    const target: unknown = Reflect.get(input, "target")
-    if (
-      (action !== undefined && action !== "create") ||
-      (type !== undefined && type !== "rpc") ||
-      typeof target !== "string"
-    )
-      return undefined
-    const refusal = remoteWakeUnavailable(pi, target)
+    const call = monitorRpcOpen(payload)
+    const refusal = call === undefined ? undefined : remoteWakeUnavailable(pi, call.target)
     return refusal === undefined ? undefined : { block: true, reason: refusal.message }
   })
+}
+
+/** The input and target of a `tool_call` payload that opens a `monitor` rpc watch; undefined for any other call. */
+export function monitorRpcOpen(payload: unknown): { readonly input: object; readonly target: string } | undefined {
+  if (typeof payload !== "object" || payload === null || Reflect.get(payload, "toolName") !== "monitor")
+    return undefined
+  const input: unknown = Reflect.get(payload, "input")
+  if (typeof input !== "object" || input === null) return undefined
+  const action: unknown = Reflect.get(input, "action")
+  const type: unknown = Reflect.get(input, "type")
+  const target: unknown = Reflect.get(input, "target")
+  if (
+    (action !== undefined && action !== "create") ||
+    (type !== undefined && type !== "rpc") ||
+    typeof target !== "string"
+  )
+    return undefined
+  return { input, target }
 }
