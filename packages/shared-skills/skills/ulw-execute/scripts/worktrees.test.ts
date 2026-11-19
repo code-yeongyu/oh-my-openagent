@@ -106,6 +106,25 @@ describe("ulw-execute worktrees helper", () => {
     expect(git(wt, "status", "--porcelain")).toBe("")
   })
 
+  test("#given an entry under a symlinked directory #when provisioning #then the escape is refused on both the source and the worktree side", () => {
+    const outside = realpathSync(mkdtempSync(join(tmpdir(), "ulw-outside-")))
+    onTestFinished(() => rmSync(outside, { recursive: true, force: true }))
+    writeFileSync(join(outside, "secret.txt"), "outside\n")
+    const repo = fixtureRepo({ ".worktreeinclude": "secrets/secret.txt\nconfig/local.json\n", "config/local.json": "{}\n" })
+    symlinkSync(outside, join(repo, "secrets"))
+    const wt = join(repo, "..", "wt-f")
+    git(repo, "worktree", "add", "-q", "-b", "ulw/f", wt)
+    rmSync(join(wt, "config"), { recursive: true, force: true })
+    symlinkSync(outside, join(wt, "config"))
+    writeFileSync(join(repo, ".gitignore"), ".env\n.env.*\n.omo/\nsecrets\nsecrets/\nconfig/local.json\n")
+
+    const result = run(repo, "provision", "--path", wt)
+
+    expect(result.json.refused.sort()).toEqual(["config/local.json", "secrets/secret.txt"])
+    expect(existsSync(join(wt, "secrets"))).toBe(false)
+    expect(existsSync(join(outside, "local.json"))).toBe(false)
+  })
+
   test("#given an empty .worktreeinclude #when a worktree is added #then nothing is copied", () => {
     const repo = fixtureRepo({ ".env": "TOKEN=dummy\n", ".worktreeinclude": "" })
     const wt = join(repo, "..", "wt-c")

@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process"
-import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync } from "node:fs"
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync } from "node:fs"
 import { dirname, isAbsolute, join, relative, sep } from "node:path"
 
 // Gitignored local config a fresh `git worktree add` leaves behind (#14391). Without an include file the
@@ -90,14 +90,28 @@ function isGitIgnored(repo, path) {
   return spawnSync("git", ["check-ignore", "-q", "--", path], { cwd: repo, stdio: "ignore" }).status === 0
 }
 
+function within(root, path) {
+  const rel = relative(realpathSync(root), path)
+  return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel)
+}
+
+// The nearest existing ancestor of a path, resolved through symlinks: a symlinked directory on the way
+// (in the repo or in the worktree) must not carry the copy outside its tree.
+function resolvedAncestor(path) {
+  let current = path
+  while (!existsSync(current)) current = dirname(current)
+  return realpathSync(current)
+}
+
 function copyOne(repo, worktree, path, result) {
   const source = join(repo, path)
   const stat = lstatSync(source)
-  if (stat.isSymbolicLink() || !stat.isFile() || !isGitIgnored(repo, path)) {
+  const target = join(worktree, path)
+  const escapes = !within(repo, realpathSync(source)) || !within(worktree, join(resolvedAncestor(dirname(target)), "x"))
+  if (stat.isSymbolicLink() || !stat.isFile() || escapes || !isGitIgnored(repo, path)) {
     result.refused.push(path)
     return
   }
-  const target = join(worktree, path)
   if (existsSync(target)) {
     result.skipped.push(path)
     return
