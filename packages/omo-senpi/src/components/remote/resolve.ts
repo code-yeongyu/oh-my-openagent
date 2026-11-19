@@ -96,7 +96,8 @@ const deviceRefusal = (refusal: AddressRefusal): RemoteFailure => {
 }
 
 // An unmatched session part of a device-qualified address passes to its device only when id-shaped: a thread id, a
-// routing id, or a listing key the listing does not show yet (#13748); same rule as thread/address/on-device.ts.
+// routing id, or a listing key the listing does not show yet (#13748). It is the rule the address module applies (core
+// idShaped); this local copy switches to the core's export when the thread-tools PR lands it.
 export const idShapedSession = (text: string): boolean =>
   THREAD_ID_SHAPE.test(text) || /^rpc-\d+$/.test(text) || /^[A-Za-z0-9_-]{22}$/.test(text)
 
