@@ -41,14 +41,16 @@ const MAX_FIELD_CHARS = 120
 // surrogate pair is never cut in half.
 // biome-ignore lint/suspicious/noControlCharactersInRegex: the class strips exactly the control characters
 const UNSAFE =
-  /[\u0000-\u001f\u007f-\u009f\u00ad\u061c\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\ufff9-\ufffb]/g
+  /[\u0000-\u001f\u007f-\u009f\u00ad\u034f\u061c\u115f\u1160\u180e\u200b\u200e\u200f\u2028-\u202e\u2060-\u206f\u3164\ufeff\uffa0\ufff9-\ufffb]/g
+// ZWNJ and ZWJ shape Persian, Indic and emoji labels, so they stay; a label made only of them still counts as blank.
+const JOINERS = /[\u200c\u200d]/g
 const clean = (value: string): string => Array.from(value.replace(UNSAFE, "")).slice(0, MAX_FIELD_CHARS).join("")
 
 const blockerOf = (value: unknown): PhraseKeyBlocker | null => {
   if (typeof value !== "object" || value === null) return null
   const row = value as Record<string, unknown>
   const label = typeof row["label"] === "string" ? clean(row["label"]) : ""
-  if (label.trim().length === 0) return null
+  if (label.replace(JOINERS, "").trim().length === 0) return null
   const text = (key: string) => (typeof row[key] === "string" ? clean(row[key] as string) : "")
   return {
     label,

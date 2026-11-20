@@ -14,12 +14,19 @@ const gateWith = (serviceFloor: PhraseGate["serviceFloor"]): PhraseGate => ({
 test("#given a blocker label carrying bidi overrides, isolates and zero-width characters #when it is decoded #then none of them reach the label (review L3)", () => {
   const [row] = phraseKeyBlockersOf([
     {
-      label: "\u202eevil\u202c \u2066box\u2069\u200b\u200d\ufeff\u2060 mac",
+      label: "\u202eevil\u202c \u2066box\u2069\u200b\ufeff\u2060\u3164 mac",
       kind: "cli\u200f",
       platform: "\u061clinux",
     },
   ])
   expect(row).toEqual({ label: "evil box mac", kind: "cli", platform: "linux", lastSyncAt: "" })
+})
+
+test("#given labels that need ZWNJ or ZWJ, and one made only of joiners and fillers #when they are decoded #then the joiners are kept and the invisible label is dropped (review L1 at 6e86b2b)", () => {
+  const persian = "\u0645\u06cc\u200c\u062e\u0648\u0627\u0647\u0645"
+  const coder = "\u{1f469}\u200d\u{1f4bb} laptop"
+  const rows = phraseKeyBlockersOf([{ label: persian }, { label: coder }, { label: "\u200d\u200c\u115f\u3164\uffa0 " }])
+  expect(rows.map((row) => row.label)).toEqual([persian, coder])
 })
 
 test("#given a label whose cap falls inside a surrogate pair #when it is decoded #then the cap counts code points and never leaves half a pair (review L3)", () => {
