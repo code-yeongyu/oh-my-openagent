@@ -10,6 +10,15 @@ export function isGptModel(model: string): boolean {
   return modelName.includes("gpt")
 }
 
+/**
+ * DeepSeek V4.1 Flash under every published id shape (deepseek-flash, v4.1 / v4p1 / v4-1, with a
+ * provider prefix or a tier, snapshot or mode suffix). V4 Flash, its 0731 snapshot and V4 Pro are
+ * other weights and do not match.
+ */
+export function isDeepseekV41FlashModel(model: string): boolean {
+  return /^deepseek-(?:v4(?:[.-]1|p1)-)?flash(?:$|[-:@])/.test(extractModelName(model).toLowerCase())
+}
+
 export function isGpt6AstraModel(model: string | undefined): boolean {
   if (!model) return false
   const { modelID, variant } = parseVariantFromModelID(model.toLowerCase(), { allowMaxSuffix: true })
