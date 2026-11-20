@@ -1,7 +1,7 @@
 import type { ThreadSummary } from "../contracts"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { rowKey, rowName } from "@oh-my-opencode/thread-address-core"
-import { rowStatus } from "../remote/ports"
+import { rowFolder, rowStatus } from "../remote/ports"
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import { INITIAL_SKILLS_CONTEXT_KEY } from "../initial-skills"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "../remote/ports"
@@ -57,7 +57,7 @@ function listedThread(row: RemoteSessionRow): HostedThread {
     status: rowStatus(row),
     state: rowState(row),
     ...threadModel(row.model),
-    cwd: row.project,
+    cwd: rowFolder(row),
     created_at: seen,
     updated_at: seen,
     device: row.device,
@@ -297,7 +297,7 @@ export function createRelaySessionHost(
         ...facts,
         sessionId: threadId,
         ...(durable === undefined ? {} : { durableSessionId: durable }),
-        cwd: escapeForDisplay(nonEmpty(state["cwd"]) ?? open.cwd ?? listed?.project ?? ""),
+        cwd: escapeForDisplay(nonEmpty(state["cwd"]) ?? open.cwd ?? (listed === undefined ? "" : rowFolder(listed))),
         name: applied ?? remoteName(nonEmpty(state["sessionName"]) ?? listed?.title),
       }
       const extras = {
