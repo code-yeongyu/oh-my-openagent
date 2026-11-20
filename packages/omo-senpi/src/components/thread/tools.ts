@@ -49,7 +49,7 @@ import { consumedSendersOf, threadSendPermission } from "./tools/reply-permissio
 import { otherDevice, replyTargetFailure, replyTargetMismatch } from "./tools/reply-target"
 import { accountDevices } from "./remote/account"
 import { listAcross } from "./remote/lazy-ops"
-import { rowCreatedAt } from "./remote/ports"
+import { rowCreatedAt, rowFolder } from "./remote/ports"
 import { locateControl } from "./control/locate"
 import { createThread } from "./control/create"
 import { awaitPromptStart, FIRST_PROMPT_START_RESERVE_MS, FIRST_PROMPT_START_WAIT_MS } from "./control/prompt-start"
@@ -707,7 +707,7 @@ async function deliverThrough(
         status: "live",
         state: rowState(row),
         ...threadModel(row.model),
-        cwd: escapeForDisplay(row.project),
+        cwd: escapeForDisplay(rowFolder(row)),
         created_at: rowCreatedAt(row),
         updated_at: seen,
         device: row.device,

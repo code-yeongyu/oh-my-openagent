@@ -3,6 +3,7 @@ import type { ThreadToolFailure } from "../errors"
 import { threadToolFailure } from "../errors"
 import {
   rowCreatedAt,
+  rowFolder,
   rowStatus,
   rowThreadId,
   type RemoteListing,
@@ -26,7 +27,7 @@ export function relayAddressEntry(row: RemoteSessionRow, aliases?: readonly stri
     // names collide across threads and would turn into ambiguous addresses (#14043).
     name: row.title,
     status: rowStatus(row),
-    cwd: row.project,
+    cwd: rowFolder(row),
     created_at: rowCreatedAt(row),
     updated_at: updated,
     device: row.device,
