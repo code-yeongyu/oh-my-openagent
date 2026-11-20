@@ -1,7 +1,9 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
+import { devicesSilent } from "@oh-my-opencode/thread-address-core"
+import { toolRefusal } from "../address/refusals"
 import type { ThreadResolveOptions, ThreadResolveResult } from "../addressing"
 import { relayAddressBook, relayAddressEntry, type RelayAddressBook } from "../remote/address-book"
-import { endedRow, probeMayBuildEndedRow } from "../remote/ports"
+import { endedRow, probeMayBuildEndedRow, type RemoteDevice } from "../remote/ports"
 import { accountDevices } from "../remote/account"
 import {
   assembleAddressBook,
@@ -422,7 +424,7 @@ const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 
 /**
  * omo#13037 A4.3.3: a session id that this device and the account listing both miss is looked up with one single-probe
- * query to each ONLINE device of the account other than this one, in parallel (the device service bounds each at 3 s).
+ * query to each ONLINE device other than this one, in parallel (the client waits up to 3,500 ms for each locate reply).
  * One device holds it: its ended row. None and every device answered: not_found. None and a device stayed silent:
  * host_unavailable naming it. Several: ambiguous_target naming the devices. Undefined when this device's service makes
  * no single probe: the caller answers as before. Never a background scan; nothing is cached.
@@ -436,7 +438,7 @@ async function lookupAcross(
   const probe = remote.sessions.lookup
   if (probe === undefined || (await remote.sessions.canLookup?.().catch(() => false)) !== true) return undefined
   if (!(await probeMayBuildEndedRow(remote.sessions))) return undefined
-  let online: readonly { readonly device: string; readonly online: boolean }[]
+  let online: readonly RemoteDevice[]
   let self: string | null
   try {
     const { here, devices } = await accountDevices(remote.client)
@@ -446,7 +448,7 @@ async function lookupAcross(
     return undefined
   }
   const answers = await Promise.all(
-    online.map(async (device) => ({ device: device.device, answer: await probe(device.device, address) })),
+    online.map(async ({ device, label }) => ({ device, label, answer: await probe(device, address) })),
   )
   if (answers.some(({ answer }) => answer.kind === "unavailable")) return undefined
   // Found over silent, by choice: one device holding the id is used even when another did not answer within the bound or
@@ -479,23 +481,16 @@ async function lookupAcross(
       candidates,
     } as ThreadResolveResult
   }
-  const silent = answers.flatMap(({ device, answer }) => (answer.kind === "silent" ? [device] : []))
+  const silent = answers.flatMap(({ device, label, answer }) =>
+    answer.kind === "silent" ? [{ id: device, name: label, reason: answer.reason }] : [],
+  )
   // omo#14270: name who answered "not held", this device first (its own miss came before this lookup), so a miss on the
   // device that really keeps the file shows instead of reading as "wait for the silent one".
   const answered = [
     ...(self === null ? [] : [self]),
     ...answers.flatMap(({ device, answer }) => (answer.kind === "silent" ? [] : [device])),
   ]
-  if (silent.length > 0)
-    return {
-      kind: "error",
-      ...threadToolFailure(
-        "host_unavailable",
-        `Session ${address} is not held by ${answered.join(", ") || "any device that answered"}; ${silent.join(", ")} did not answer and may hold it.`,
-        "Retry when that device answers. If the session should be on a device that answered, its file is not where that device looks for sessions.",
-        { thread: address, devices: silent, answered },
-      ),
-    } as ThreadResolveResult
+  if (silent.length > 0) return toolRefusal(devicesSilent("device_unanswered", silent), address, answered)
   return {
     kind: "error",
     ...threadToolFailure(

@@ -21,8 +21,8 @@ const named = (devices: readonly RemoteDevice[] | undefined, id: string) => ({
 
 /**
  * omo#13037 A4.3.3: a thread id this device and the account listing both miss is looked up with one single-probe query
- * to each ONLINE device other than this one, in parallel (the device service bounds each at 3 s). One holder: its ended
- * row. Several: ambiguous_target. None and a device stayed silent: device_unanswered. None, every device answered:
+ * to each ONLINE device other than this one, in parallel (the client waits up to 3,500 ms for each locate reply).
+ * One holder: its ended row. Several: ambiguous_target. None and a device stayed silent: device_unanswered. None, every device answered:
  * not_found. Undefined when this device's service makes no single probe: the caller answers as before.
  */
 export async function probeAcross(
@@ -78,7 +78,9 @@ export async function probeAcross(
       candidates,
     }
   }
-  const silent = answers.flatMap(({ device, answer }) => (answer.kind === "silent" ? [named(devices, device)] : []))
+  const silent = answers.flatMap(({ device, answer }) =>
+    answer.kind === "silent" ? [{ ...named(devices, device), reason: answer.reason }] : [],
+  )
   // omo#14270: who answered "not held", this device first (its own miss came before the probe), so a miss on the device
   // that really keeps the file shows instead of reading as "wait for the silent one".
   const answered = [
@@ -168,9 +170,10 @@ export async function pinned(
       all_scope: true,
     }
   if (probed?.kind === "silent")
-    return onPin(toolRefusal(devicesSilent("device_unanswered", [await device()]), pin.thread), {
-      reason: probed.reason,
-    })
+    return onPin(
+      toolRefusal(devicesSilent("device_unanswered", [{ ...(await device()), reason: probed.reason }]), pin.thread),
+      { reason: probed.reason },
+    )
   const again = await listed()
   if (again !== undefined) return again
   if (!mayProbe) return toolRefusal(deviceNotAsked("wake_unavailable", pin.thread, await device()))

@@ -68,6 +68,7 @@ export type AddressRefusal =
         readonly reason: "listing_incomplete" | "device_unanswered"
         readonly devices: readonly string[]
         readonly device_names: readonly string[]
+        readonly device_reasons?: Readonly<Record<string, string>>
       }
     }
   | {
@@ -132,12 +133,22 @@ export const deviceOffline = (typed: string, device: DeviceRow, matched: readonl
 
 export const devicesSilent = (
   reason: "listing_incomplete" | "device_unanswered",
-  devices: readonly { readonly id: string; readonly name: string }[],
-): AddressRefusal => ({
-  code: "host_unavailable",
-  reason,
-  details: { reason, devices: devices.map((device) => device.id), device_names: devices.map((device) => device.name) },
-})
+  devices: readonly { readonly id: string; readonly name: string; readonly reason?: string }[],
+): AddressRefusal => {
+  const reasons = devices.flatMap((device) =>
+    device.reason === undefined ? [] : [[device.id, device.reason] as const],
+  )
+  return {
+    code: "host_unavailable",
+    reason,
+    details: {
+      reason,
+      devices: devices.map((device) => device.id),
+      device_names: devices.map((device) => device.name),
+      ...(reasons.length === 0 ? {} : { device_reasons: Object.fromEntries(reasons) }),
+    },
+  }
+}
 
 export const deviceNotAsked = (
   reason: NotAskedReason,
