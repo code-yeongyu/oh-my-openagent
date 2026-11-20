@@ -21,6 +21,8 @@ export const b64urlOfHex = (hex: string): string => Buffer.from(hex, "hex").toSt
 export const hexOfB64url = (b64url: string): string => Buffer.from(b64url, "base64url").toString("hex")
 
 const STREAM_RETRY_MS = 5_000
+/** omo-service contract SYNC_INLINE_BATCH_MAX_BYTES (#1315). */
+const INLINE_BATCH_MAX_BYTES = 262_144
 const STREAM_CONNECT_MS = 3_000
 /** A stream that lived this long before the service closed it resumes at once; a shorter one waits STREAM_RETRY_MS. */
 const STREAM_RESUME_MIN_MS = 1_000
@@ -70,6 +72,7 @@ interface WireRow {
 
 interface WireState {
   readonly head: { readonly seq: number }
+  readonly accepts_inline_batches?: boolean
   readonly oldest_retained_seq: number
   readonly snapshot: { readonly covers_seq: number; readonly chunk_object_ids: readonly string[] } | null
 }
@@ -101,8 +104,13 @@ export function createHttpTransport(options: HttpTransportOptions): Transport {
     )
     throw new SyncHttpError(response.status >= 500 ? "unavailable" : code, response.status, response.status >= 500)
   }
-  const readState = async (): Promise<WireState> =>
-    (await request("GET", "/v1/sync/state")).json() as Promise<WireState>
+  // The service's answer on the latest state read: whether an append may carry its object inline (omo-service #1315).
+  let inlineAccepted = false
+  const readState = async (): Promise<WireState> => {
+    const state = (await (await request("GET", "/v1/sync/state")).json()) as WireState
+    inlineAccepted = state.accepts_inline_batches === true
+    return state
+  }
   const entryOf = (row: WireRow): PulledEntry => ({
     seq: row.seq,
     kind: row.kind,
@@ -147,9 +155,12 @@ export function createHttpTransport(options: HttpTransportOptions): Transport {
     async upload(uploadId, bytes) {
       await request("PUT", `/v1/sync/uploads/${uploadId}`, bytes, false)
     },
+    inlineBytes: () => (inlineAccepted ? INLINE_BATCH_MAX_BYTES : 0),
     async append(req: AppendRequest): Promise<AppendResult> {
       const body = JSON.stringify({
-        upload_id: req.uploadId,
+        ...(req.inline === undefined
+          ? { upload_id: req.uploadId }
+          : { inline: Buffer.from(req.inline).toString("base64url") }),
         digest: b64urlOfHex(req.digest),
         base_seq: req.baseSeq,
         idempotency_key: req.batchId,

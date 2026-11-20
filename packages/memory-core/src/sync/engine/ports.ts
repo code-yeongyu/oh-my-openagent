@@ -50,6 +50,8 @@ export interface AppendRequest {
   readonly epoch: number
   readonly link: string
   readonly recordSig: string
+  /** The sealed object itself, sent in the append instead of an upload (`uploadId` is then ignored). */
+  readonly inline?: Uint8Array
 }
 
 export interface StreamHandlers {
@@ -112,6 +114,8 @@ export interface Transport {
    * that its own landed append has already moved, and answering "stale" there would duplicate it.
    */
   append(request: AppendRequest): Promise<AppendResult>
+  /** The largest batch the service takes inline in the append; 0 or absent when it does not (send an upload). */
+  inlineBytes?(): number
   /** Subscribe to the account event stream; returns the unsubscribe. */
   subscribe(handlers: StreamHandlers): () => void
 }
