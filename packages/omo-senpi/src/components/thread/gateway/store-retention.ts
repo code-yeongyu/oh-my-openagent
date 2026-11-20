@@ -17,12 +17,13 @@ import {
   RETENTION_SWEEP_INTERVAL_MS,
 } from "./constants"
 import type { Sql } from "./sql"
-import { type StoreContext, write } from "./store-ops"
+import { refuseExpiredQueued, type StoreContext, unlinkMarker, write } from "./store-ops"
 
 /** Keyed by the connection: an extension call joins core operations through a derived context. */
 const nextSweepDue = new WeakMap<Sql, number>()
 
 export type RetentionSweep = {
+  readonly expired_queued: number
   readonly receipts: number
   readonly deliveries: number
   readonly causal_edges: number
@@ -67,6 +68,9 @@ export function sweepRetentionIfDue(ctx: StoreContext, now: number, receiptsDele
 
 export function sweepRetention(ctx: StoreContext, now: number, receiptBatch = RETENTION_SWEEP_BATCH): RetentionSweep {
   const batch = RETENTION_SWEEP_BATCH
+  // A target that is not running never reaches its own drain, the other place a queued row past its TTL is refused.
+  const expired = refuseExpiredQueued(ctx, now, batch)
+  for (const gone of expired) unlinkMarker(ctx, gone.target_durable_id, gone.delivery_id)
   // A receipt check clears only an expired receipt under its own key; the backlog goes here, a batch at a time.
   const receipts = write(
     ctx,
@@ -124,6 +128,7 @@ export function sweepRetention(ctx: StoreContext, now: number, receiptBatch = RE
     [batch],
   )
   return {
+    expired_queued: expired.length,
     receipts,
     deliveries,
     causal_edges: causalEdges,

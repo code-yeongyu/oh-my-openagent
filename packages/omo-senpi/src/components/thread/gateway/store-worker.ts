@@ -986,7 +986,7 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
     case "is_referenced":
       return ops.isReferenced(ctx, args as string)
     case "backlogs":
-      return readTargetBacklogs(ctx, args as readonly string[])
+      return readTargetBacklogs(ctx, args as Parameters<typeof readTargetBacklogs>[1])
     case "journal_mode":
       return ops.journalMode(ctx)
     case "stats":

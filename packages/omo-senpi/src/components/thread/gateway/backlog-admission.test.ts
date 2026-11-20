@@ -166,6 +166,7 @@ describe("omo#14428 target backlog admission", () => {
     const h = (harness = createGatewayHarness())
     h.session("lead", { drainRegistered: false })
     const sender = h.session("notifier")
+    const firstAt = h.clock.now
     await fillFollowUps(h, sender, TARGET_MAX_MESSAGES)
 
     expect(await send(sender, "one more")).toMatchObject({
@@ -176,6 +177,8 @@ describe("omo#14428 target backlog admission", () => {
           held_by_session: 0,
           waiting_in_gateway: TARGET_MAX_MESSAGES,
           reason: "session_not_draining",
+          target_running: true,
+          frees_at: firstAt + QUEUED_TTL_MS,
         },
       },
     })
@@ -231,6 +234,18 @@ describe("omo#14428 target backlog admission", () => {
       oldest_at: new Date(firstAt).toISOString(),
     })
     expect(listed.threads[1]).not.toHaveProperty("backlog")
+  })
+
+  test("#given a follow-up lane filled with rows that are now past their lifetime #when a follow-up is sent #then the expired rows do not count and it is accepted", async () => {
+    const h = (harness = createGatewayHarness())
+    h.session("lead", { drainRegistered: false })
+    const sender = h.session("notifier")
+    await fillFollowUps(h, sender, TARGET_MAX_MESSAGES)
+    expect(await send(sender, "while the lane is full")).toMatchObject({ kind: "error", error: { code: "queue_full" } })
+
+    h.clock.now += QUEUED_TTL_MS
+
+    expect(await send(sender, "after every seeded row expired")).toMatchObject({ kind: "ok" })
   })
 
   test("#given a gateway store that cannot be read #when threads are listed #then the listing is returned without backlog details", async () => {

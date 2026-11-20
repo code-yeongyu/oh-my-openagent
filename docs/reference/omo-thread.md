@@ -161,11 +161,11 @@ Every send is checked against fixed budgets, which no setting raises:
 | Guard | Limit | Answer |
 | --- | --- | --- |
 | Message size | 1 MiB for `send` (with or without `--binding`); 32 KiB for `report` and `answer` text | `message_too_large` |
-| Backlog of one target | 128 undelivered follow-up/auto messages or 1 MiB; steers have their own 16 / 256 KiB | `queue_full` (details: held count, how many the session holds vs the gateway, oldest age, reason) |
+| Backlog of one target | 128 undelivered follow-up/auto messages or 1 MiB; steers have their own 16 / 256 KiB; an expired message no longer counts, also while the target is not running | `queue_full` (details: held count, how many the session holds vs the gateway, oldest age, reason, `target_running`, and `frees_at`: when the oldest queued message expires and frees a slot) |
 | One sender to one target (the loop guard) | bursts of 8, then one every 5 s; a binding sender is keyed by binding and author (`binding:<id>#author:<platform user id>`), or by the binding alone when the message names no author | `pair_loop_guard` with `burst`, `window_ms` and `retry_after_ms` |
 | One causal chain (a message and the messages it caused) | no count limit; each delivery records its hop | - |
 | A send to itself | always refused | `loop_detected` |
-| An undelivered message | expires after 24 hours (or when its binding expires) | the row ends `refused` |
+| An undelivered message | expires after 24 hours (or when its binding expires), whether or not the target is running | the row ends `refused` |
 
 A sender that repeats one message (an alert re-sent every few minutes) passes `--collapse-key <k>`
 (`collapse_key` on `thread_send`): the send replaces the sender's earlier undelivered message under
