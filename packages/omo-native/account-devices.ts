@@ -27,10 +27,11 @@ const listedSchema = z.object({
       current: z.boolean().optional(),
       revokedAt: timestamp.nullable(),
       machineBound: z.boolean().optional(),
+      syncing: z.boolean().optional(),
     }),
   ),
 })
-type Listed = z.infer<typeof listedSchema>["devices"][number]
+export type Listed = z.infer<typeof listedSchema>["devices"][number]
 
 export type AccountDevicesDependencies = SessionOutcomeDependencies
 
@@ -52,7 +53,7 @@ const view = (device: Listed) => ({
   current: device.current === true,
 })
 
-async function liveDevices(session: Session): Promise<Listed[]> {
+export async function liveDevices(session: Pick<Session, "accessToken" | "request">): Promise<Listed[]> {
   const access = await session.accessToken()
   const body = await session.request("/v1/devices", { headers: syncRequestHeaders(access) })
   return listedSchema.parse(body).devices.filter((device) => device.revokedAt === null)
