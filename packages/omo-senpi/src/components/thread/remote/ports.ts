@@ -282,6 +282,18 @@ export type RemoteThreadSurface = {
  */
 export const rowThreadId = (row: RemoteSessionRow): string => row.durable_id ?? ""
 
+// A UUIDv7 carries its creation time in its first 48 bits (RFC 9562 section 5.7); engine durable ids are UUIDv7.
+const UUID_V7 = /^([0-9a-f]{8})-([0-9a-f]{4})-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+/**
+ * A listing row's creation time. The row carries none and its `updated_ms` is not one (#14474), so it is the time a
+ * UUIDv7 durable id encodes; a row without such an id keeps `updated_ms`.
+ */
+export function rowCreatedAt(row: RemoteSessionRow): string {
+  const match = UUID_V7.exec(rowThreadId(row))
+  return new Date(match === null ? row.updated_ms : Number.parseInt(`${match[1]}${match[2]}`, 16)).toISOString()
+}
+
 /**
  * A listing row's thread status. Live only when its device answered this round with a non-ended state: a cached row of a
  * device that did not answer is a snapshot (often days old, of sessions long gone), never proof the session runs (#14043).

@@ -1,7 +1,14 @@
 import type { ThreadAddressEntry } from "../addressing"
 import type { ThreadToolFailure } from "../errors"
 import { threadToolFailure } from "../errors"
-import { rowStatus, rowThreadId, type RemoteListing, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
+import {
+  rowCreatedAt,
+  rowStatus,
+  rowThreadId,
+  type RemoteListing,
+  type RemoteSessionRow,
+  type RemoteThreadSurface,
+} from "./ports"
 import { onAccount } from "./account"
 import { holderTarget, remoteReady } from "./remote-ops"
 
@@ -20,7 +27,7 @@ export function relayAddressEntry(row: RemoteSessionRow, aliases?: readonly stri
     name: row.title,
     status: rowStatus(row),
     cwd: row.project,
-    created_at: updated,
+    created_at: rowCreatedAt(row),
     updated_at: updated,
     device: row.device,
     ...(aliases === undefined ? {} : { aliases }),
