@@ -1,16 +1,18 @@
 #!/usr/bin/env node
 // ulw-execute worktree lifecycle (#14391): `add` creates a task-owned worktree, copies the gitignored local
 // config into it and records it; `provision` re-copies into an existing one; `teardown` removes every
-// recorded worktree and its branch once the branch is merged. Prints one JSON line. Exit 3: listed config is missing, or
-// with no .worktreeinclude, unlisted local config (.env, .env.*) exists: ask the user before going on.
-import { execFileSync } from "node:child_process"
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs"
+// recorded worktree and its branch once the branch has landed. Prints one JSON line. Exit 3: listed config is missing,
+// or with no .worktreeinclude, unlisted local config (.env, .env.*) exists: ask the user before going on.
+import { execFileSync, spawnSync } from "node:child_process"
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
 
 import { provision } from "./worktree-include.mjs"
 
 const EXIT_MISSING_REQUIRED = 3
+const LOCK_TIMEOUT_MS = 30_000
+const LOCK_RETRY_MS = 25
 
 function git(cwd, args) {
   return execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim()
@@ -27,53 +29,85 @@ function readManifest(repo) {
 
 function writeManifest(repo, manifest) {
   const path = manifestPath(repo)
-  mkdirSync(dirname(path), { recursive: true })
-  writeFileSync(`${path}.tmp`, `${JSON.stringify(manifest, null, 2)}\n`)
-  renameSync(`${path}.tmp`, path)
+  const tmp = `${path}.${process.pid}.tmp`
+  writeFileSync(tmp, `${JSON.stringify(manifest, null, 2)}\n`)
+  renameSync(tmp, path)
+}
+
+// Parallel lanes run `add` at the same time: the manifest's read-edit-write holds an exclusive lock file so no
+// entry is lost (a lost entry is a worktree teardown never removes).
+function withManifestLock(repo, update) {
+  const lock = `${manifestPath(repo)}.lock`
+  mkdirSync(dirname(lock), { recursive: true })
+  const deadline = Date.now() + LOCK_TIMEOUT_MS
+  let fd
+  for (;;) {
+    try {
+      fd = openSync(lock, "wx")
+      break
+    } catch (error) {
+      if (error.code !== "EEXIST") throw error
+      if (Date.now() > deadline) throw new Error(`manifest lock held for over ${LOCK_TIMEOUT_MS}ms: ${lock}`)
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, LOCK_RETRY_MS)
+    }
+  }
+  try {
+    const manifest = readManifest(repo)
+    const result = update(manifest)
+    writeManifest(repo, manifest)
+    return result
+  } finally {
+    closeSync(fd)
+    rmSync(lock, { force: true })
+  }
 }
 
 function add(repo, { path, branch, base }) {
   if (!path || !branch) throw new Error("add needs --path and --branch")
   const worktree = resolve(path)
   git(repo, ["worktree", "add", "-q", "-b", branch, worktree, ...(base ? [base] : [])])
-  const manifest = readManifest(repo)
-  manifest.created.push({
-    path: worktree,
-    branch,
-    base: base ?? git(repo, ["rev-parse", "HEAD"]),
-    created_at: new Date().toISOString(),
+  const recordedBase = base ?? git(repo, ["rev-parse", "HEAD"])
+  withManifestLock(repo, (manifest) => {
+    manifest.created.push({ path: worktree, branch, base: recordedBase, created_at: new Date().toISOString() })
   })
-  writeManifest(repo, manifest)
   return { path: worktree, branch, ...provision(repo, worktree) }
 }
 
-function isMerged(repo, branch, into) {
-  return git(repo, ["branch", "--merged", into, "--format=%(refname:short)"]).split("\n").includes(branch)
+// Landed = merged as a commit (an ancestor of `into`), or its changes are already in `into` after a squash or rebase
+// merge: merging it into `into` then yields `into`'s own tree. A conflict means it has not landed.
+function isLanded(repo, branch, into) {
+  const ancestor = spawnSync("git", ["merge-base", "--is-ancestor", branch, into], { cwd: repo, stdio: "ignore" })
+  if (ancestor.status === 0) return true
+  const merged = spawnSync("git", ["merge-tree", "--write-tree", into, branch], { cwd: repo, encoding: "utf8" })
+  return merged.status === 0 && merged.stdout.split("\n")[0] === git(repo, ["rev-parse", `${into}^{tree}`])
 }
 
-/** Removes recorded worktrees whose branch is merged into `into` (default: the main checkout's HEAD). */
+/** Removes recorded worktrees whose branch has landed on `into` (default: the main checkout's HEAD). */
 function teardown(repo, { into }) {
   const target = into ?? git(repo, ["rev-parse", "--abbrev-ref", "HEAD"])
-  const manifest = readManifest(repo)
-  const removed = []
-  const kept = []
-  for (const entry of manifest.created) {
-    if (!isMerged(repo, entry.branch, target)) {
-      kept.push({ path: entry.path, branch: entry.branch, reason: `not merged into ${target}` })
-      continue
-    }
-    try {
-      if (existsSync(entry.path)) git(repo, ["worktree", "remove", entry.path])
-      // -D, not -d: `-d` checks against HEAD, while the merge was just verified against `target`.
-      git(repo, ["branch", "-D", entry.branch])
-      removed.push({ path: entry.path, branch: entry.branch })
-    } catch (error) {
-      kept.push({ path: entry.path, branch: entry.branch, reason: String(error.stderr ?? error.message).trim() })
-    }
-  }
+  // Prune first: a recorded worktree whose folder is already gone still holds its branch until pruned.
   git(repo, ["worktree", "prune"])
-  writeManifest(repo, { created: manifest.created.filter((entry) => kept.some((k) => k.branch === entry.branch)) })
-  return { into: target, removed, kept }
+  return withManifestLock(repo, (manifest) => {
+    const removed = []
+    const kept = []
+    for (const entry of manifest.created) {
+      if (!isLanded(repo, entry.branch, target)) {
+        kept.push({ path: entry.path, branch: entry.branch, reason: `not landed on ${target}` })
+        continue
+      }
+      try {
+        if (existsSync(entry.path)) git(repo, ["worktree", "remove", entry.path])
+        // -D, not -d: `-d` checks ancestry against HEAD, while landing was just verified against `target`.
+        git(repo, ["branch", "-D", entry.branch])
+        removed.push({ path: entry.path, branch: entry.branch })
+      } catch (error) {
+        kept.push({ path: entry.path, branch: entry.branch, reason: String(error.stderr ?? error.message).trim() })
+      }
+    }
+    git(repo, ["worktree", "prune"])
+    manifest.created = manifest.created.filter((entry) => kept.some((k) => k.branch === entry.branch))
+    return { into: target, removed, kept }
+  })
 }
 
 function parseFlags(argv) {
@@ -86,11 +120,14 @@ function parseFlags(argv) {
 }
 
 // The main checkout owns the local config and the manifest, wherever the CLI runs from: inside a run worktree,
-// `--show-toplevel` would name that worktree instead. `git worktree list` always lists the main checkout first.
+// `--show-toplevel` would name that worktree instead. `git worktree list` always lists the main checkout first;
+// in a bare repository that entry is the bare directory, which has no checkout to work from, so it is refused.
 function mainCheckout(cwd) {
-  return git(cwd, ["worktree", "list", "--porcelain"])
-    .split("\n")[0]
-    .replace(/^worktree /, "")
+  const [first] = git(cwd, ["worktree", "list", "--porcelain"]).split("\n\n")
+  const lines = first.split("\n")
+  const path = lines[0].replace(/^worktree /, "")
+  if (lines.includes("bare")) throw new Error(`bare repository at ${path}: run from a repository with a main checkout`)
+  return path
 }
 
 export function main(argv) {

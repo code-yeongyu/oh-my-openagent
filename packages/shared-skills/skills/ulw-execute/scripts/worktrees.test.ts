@@ -251,6 +251,89 @@ describe("ulw-execute worktrees helper", () => {
     expect(git(repo, "worktree", "list", "--porcelain")).not.toContain("wt-w")
   })
 
+  test("#given a branch landed by squash merge #when torn down #then it counts as merged and is removed, while a branch with unlanded work is kept", () => {
+    const repo = fixtureRepo()
+    const squashed = join(repo, "..", "wt-squash")
+    const pending = join(repo, "..", "wt-pending")
+    run(repo, "add", "--path", squashed, "--branch", "ulw/squash")
+    run(repo, "add", "--path", pending, "--branch", "ulw/pending")
+    for (const name of ["one.txt", "two.txt"]) {
+      writeFileSync(join(squashed, name), `${name}\n`)
+      git(squashed, "add", name)
+      git(squashed, "commit", "-qm", name)
+    }
+    git(repo, "merge", "-q", "--squash", "ulw/squash")
+    git(repo, "commit", "-qm", "squash")
+    writeFileSync(join(repo, "later.txt"), "later\n")
+    git(repo, "add", "later.txt")
+    git(repo, "commit", "-qm", "later")
+    writeFileSync(join(pending, "wip.txt"), "w\n")
+    git(pending, "add", "wip.txt")
+    git(pending, "commit", "-qm", "wip")
+
+    const result = run(repo, "teardown")
+
+    expect(result.json.removed).toEqual([{ path: squashed, branch: "ulw/squash" }])
+    expect(result.json.kept.map((entry: { branch: string }) => entry.branch)).toEqual(["ulw/pending"])
+  })
+
+  test("#given a recorded worktree whose folder is already gone #when torn down once #then its merged branch is removed in that same run", () => {
+    const repo = fixtureRepo()
+    const wt = join(repo, "..", "wt-gone")
+    run(repo, "add", "--path", wt, "--branch", "ulw/gone")
+    rmSync(wt, { recursive: true, force: true })
+
+    const result = run(repo, "teardown")
+
+    expect(result.json.kept).toEqual([])
+    expect(git(repo, "branch", "--list", "ulw/gone")).toBe("")
+  })
+
+  test("#given parallel lanes adding worktrees at once #when every add finishes #then the manifest records all of them", async () => {
+    const repo = fixtureRepo()
+    const lanes = Array.from({ length: 6 }, (_, i) => i)
+    await Promise.all(
+      lanes.map(
+        (i) =>
+          Bun.spawn(
+            [
+              process.execPath,
+              CLI,
+              "add",
+              "--path",
+              join(repo, "..", `wt-lane${i}`),
+              "--branch",
+              `ulw/lane${i}`,
+              "--repo",
+              repo,
+            ],
+            {
+              stdout: "ignore",
+              stderr: "ignore",
+            },
+          ).exited,
+      ),
+    )
+
+    const manifest = JSON.parse(readFileSync(join(repo, ".omo", "ulw-execute", "worktrees.json"), "utf8"))
+    expect(manifest.created.map((entry: { branch: string }) => entry.branch).sort()).toEqual(
+      lanes.map((i) => `ulw/lane${i}`),
+    )
+  })
+
+  test("#given a bare repository with worktrees #when the CLI runs #then it stops with an error instead of using the bare directory as the checkout", () => {
+    const repo = fixtureRepo()
+    const bare = join(repo, "..", "bare.git")
+    git(repo, "clone", "-q", "--bare", repo, bare)
+    const linked = join(repo, "..", "linked")
+    git(bare, "worktree", "add", "-q", linked, "main")
+
+    const result = runFrom(linked, "provision", "--path", linked)
+
+    expect(result.status).toBe(1)
+    expect(result.json).toBeUndefined()
+  })
+
   test("#given a branch merged into the --into ref but not into the checkout's HEAD #when torn down #then the worktree and its branch are both removed", () => {
     const repo = fixtureRepo()
     const wt = join(repo, "..", "wt-into")
