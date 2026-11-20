@@ -43,11 +43,9 @@ const isEntry = (value: unknown): value is Readonly<Record<string, unknown>> =>
 
 /**
  * The candidates of a typed refusal (an ambiguous device, name or prefix), one per line - the address or device id a
- * person can type back, then its name (#14305 review M4). A refusal with no candidates prints nothing.
- */
-/**
- * A refusal's candidates as lines to choose from. An offline device is one device the person named, not a choice, so a
- * device_offline refusal prints none (its typed details keep them for a caller that reads data).
+ * person can type back, then its name (#14305 review M4). A refusal with no candidates prints nothing, and neither does a
+ * device_offline refusal: an offline device is the one device the person named, not a choice (its typed details keep
+ * the candidates for a caller that reads data).
  */
 export function candidateLines(refusal: {
   readonly code: string

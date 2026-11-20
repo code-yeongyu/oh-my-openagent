@@ -507,7 +507,7 @@ export function createRelayTransport(
         REFUSAL_CODES.turn_conflict.code,
         `${rowKey(row)} on device ${row.device} is not running, so no turn of it can be steered.`,
         REFUSAL_CODES.turn_conflict.next,
-        { device: row.device },
+        { device: row.device, thread: rowKey(row) },
       )
     const expected = delivery.expected_turn_id === undefined ? null : Number(delivery.expected_turn_id)
     // A woken session starts a turn when it opens; a live one takes the lane its probe decides.
