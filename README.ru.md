@@ -7,12 +7,6 @@
 > *Просто добавьте "mass ulw" в свой промпт - и вы мастер графовой инженерии. Мультимодельный ultracode с улучшенной системой памяти. (Правая панель - [omo-herdr-dag](https://github.com/jc01rho/omo-herdr-dag))*
 
 
-> **Sponsors**
-> Ниже представлены наши спонсоры. Они помогают проекту существовать как личному сайд-проекту.
-> | [<img alt="OpenGateway" src="./.github/assets/opengateway-logo.svg" width="156px" />](https://opengateway.ai/) | **[OpenGateway](https://opengateway.ai/)** спонсирует OmO. Это OpenAI-совместимый шлюз, который объединяет множество провайдеров моделей под одним API. Спасибо за поддержку open source. |
-> | :-----| :----- |
-
-
 > [!TIP] Будьте с нами!
 >
 > | [<img alt="Discord link" src="https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square" width="156px" />](https://discord.gg/PUwSMR9XNk) | Вступайте в наш [Discord](https://discord.gg/PUwSMR9XNk), чтобы общаться с контрибьюторами и пользователями OmO. |
