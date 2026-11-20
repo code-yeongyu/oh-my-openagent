@@ -24,9 +24,17 @@ export function retireSyncPinOnDiscard(options: {
       )
       return
     }
-    // A sign-in that names no account never ran `omo sync` here (the usual case): nothing to retire, silently.
     const account = discarded.owner?.accountId ?? discarded.accountId
-    if (account === undefined) return
+    if (account === undefined) {
+      // A sign-in that names no account usually never ran `omo sync` here: no live pin, nothing to say. A live pin left
+      // here (a legacy sign-in whose account the service could not be asked for) is kept, and the user is told how to
+      // clear it, since `omo account show` keeps answering `joined` for it (#13662).
+      if (await hasLiveTrustAnchor(options.pinDir()).catch(() => false))
+        options.log(
+          "memory sync: the account of this sign-in is unknown, so its sync pin was kept; clear it with `omo account retire-sync --account <id>` for the account `omo account show` reports as joined",
+        )
+      return
+    }
     try {
       await retireSyncDevice({ pinDir: options.pinDir(), account })
     } catch (error) {
