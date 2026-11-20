@@ -232,6 +232,26 @@ function createReceipts(now: () => number): RelayTransportOptions["store"] {
       return held.delete(keyOf(request))
     },
     deliveryView: async () => null,
+    reconcileRemoteReceipt: async (request) => {
+      const known = held.get(keyOf({ ...request, operation: "thread_send:remote" }))
+      if (known === undefined || !known.settled || typeof known.result !== "object" || known.result === null)
+        return { kind: "outcome_unavailable" }
+      if (
+        Reflect.get(known.result, "delivery_id") !== request.delivery_id ||
+        Reflect.get(known.result, "device") !== request.device ||
+        Reflect.get(known.result, "thread_id") !== request.target_durable_id
+      )
+        return { kind: "outcome_unavailable" }
+      const old = Reflect.get(known.result, "outcome")
+      if (
+        typeof old === "object" &&
+        old !== null &&
+        (Reflect.get(old, "kind") === "applied" || Reflect.get(old, "kind") === "refused")
+      )
+        return old as import("../thread/gateway/types").ReceiptOutcome
+      known.result = { ...known.result, outcome: request.outcome }
+      return request.outcome
+    },
   }
 }
 

@@ -143,6 +143,8 @@ function resultView(name: ThreadToolName, result: ThreadToolResult, args: Args):
     case "thread_handoff":
       return sendView(r, args)
     case "thread_read":
+      if ("outcome" in r && typeof r.outcome === "object" && r.outcome !== null)
+        return { tone: "muted", headline: `${target}: delivery ${String(Reflect.get(r.outcome, "kind"))}`, details: [] }
       return readView(r, target)
     case "thread_list":
       return listView(r)

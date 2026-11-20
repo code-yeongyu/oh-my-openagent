@@ -4,6 +4,22 @@ export type GatewayDeliveryMode = "auto" | "steer" | "follow_up"
 
 export type DeliveryState = "queued" | "admitting" | "admitted" | "applied" | "refused" | "uncertain"
 
+/** Application evidence, separate from the historical admission lane of a retained receipt. */
+export type ReceiptRefusalReason = "expired" | "not_steerable" | "turn_conflict" | "target_closed" | "binding_closed"
+
+export type ReceiptOutcome =
+  | { readonly kind: "pending" | "admitted" | "applied" | "outcome_unavailable" }
+  | { readonly kind: "refused"; readonly reason: ReceiptRefusalReason }
+
+export type RefusalNotice = {
+  readonly row_id: string
+  readonly delivery_id: string
+  readonly device: string
+  readonly session: string
+  readonly target_durable_id: string
+  readonly reason: ReceiptRefusalReason
+}
+
 /**
  * The lane a delivery took at its receiver: `start` began a turn on an idle session (through the engine's followUp lane),
  * `steer` joined the running turn, `follow_up` waits behind a turn or a hold.
@@ -298,6 +314,7 @@ export type GatewayDeliverySuccess = {
   readonly delivery_id: string
   readonly message_seq: number
   readonly delivery: GatewayDeliveryDelivery
+  readonly outcome?: ReceiptOutcome
   readonly effective_mode: GatewayDeliveryMode | EffectiveLane
   readonly endpoint_kind: "rpc_host" | "tui" | null
   readonly deduplicated: boolean

@@ -11,8 +11,10 @@ import type {
   ReportOpRequest,
   ReportOpResult,
   ToolReceiptBegin,
+  RemoteReceipt,
+  ReconcileRemoteReceiptRequest,
 } from "./store-relay-ops"
-import type { DeliveryReceipt } from "./store-ops"
+import type { DeliveryReceipt, ReceiptOutcomeRequest } from "./store-ops"
 import type { IntakeMarkStore, SessionWaitStore } from "./session-wait-types"
 import type { WokenSessionStore } from "./woken-types"
 import type { ClearEndpointRequest, RegisterIncarnationRequest, SessionOwner } from "./store-ownership"
@@ -32,6 +34,8 @@ import type {
   ReconcileRequest,
   RecordOutcomeRequest,
   RefusalReason,
+  ReceiptOutcome,
+  RefusalNotice,
 } from "./types"
 
 /** The gateway store facade's API (`createGatewayStore` in `store.ts`). */
@@ -93,6 +97,19 @@ export type GatewayStore = ExtensionFacade & {
     readonly error_note: string
   }) => Promise<boolean>
   readonly deliveryView: (deliveryId: string) => Promise<DeliveryView | null>
+  readonly receiptOutcome: (request: ReceiptOutcomeRequest) => Promise<ReceiptOutcome>
+  readonly refusalNotices: (now: number) => Promise<readonly RefusalNotice[]>
+  readonly claimRefusalNotice: (request: {
+    readonly now: number
+    readonly notice: RefusalNotice
+    readonly suppress?: boolean
+  }) => Promise<boolean>
+  readonly remoteReceipt: (request: {
+    readonly now: number
+    readonly principal: string
+    readonly delivery_id: string
+  }) => Promise<RemoteReceipt | null>
+  readonly reconcileRemoteReceipt: (request: ReconcileRemoteReceiptRequest) => Promise<ReceiptOutcome>
   /** A completed delivery receipt's stored result and the row facts its arguments were hashed with; a plain read. */
   readonly deliveryReceipt: (request: {
     readonly now: number

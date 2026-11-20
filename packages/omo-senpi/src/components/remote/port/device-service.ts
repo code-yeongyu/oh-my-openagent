@@ -467,6 +467,14 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       }
     },
     canWake: async () => (await svc().catch(() => undefined))?.carriesWakeMark === true,
+    // wakeCommand names a durable routing key. The new record is negotiated as delivery-outcome:v1
+    // by the sender service and intercepted before any engine/cold-wake path at its receiver.
+    receipt: async (
+      device: string,
+      durableId: string,
+      deliveryId: string,
+    ): Promise<RemoteCommandOutcome | { readonly kind: "unavailable" }> =>
+      await port.wake(device, durableId, { type: "get_delivery_outcome", deliveryId }),
     canLookup: async () => (await svc().catch(() => undefined))?.takesSingleLocate === true,
     wake: async (device, durableId, rpc) => {
       let record: WireRpc

@@ -92,6 +92,7 @@ export function extensionTransaction(
     completeReceipt: (request) => joined(() => ops.completeReceipt(ctx, request)),
     abandonReceipt: (request) => joined(() => ops.abandonReceipt(ctx, request)),
     deliveryView: async (id) => joined(() => ops.deliveryView(ctx, id)),
+    receiptOutcome: (request) => joined(() => ops.receiptOutcome(ctx, request)),
     deliveryReceipt: async (request) => joined(() => ops.deliveryReceipt(ctx, request)),
     recoverDelivery: (request) => joined(() => ops.recoverDelivery(ctx, request)),
     bind: (request) => joined(() => relay.bindThread(ctx, request)),

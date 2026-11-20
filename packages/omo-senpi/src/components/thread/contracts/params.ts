@@ -43,6 +43,14 @@ const THREAD_READ_WAIT_MAX_MS = 600_000
 
 export const ThreadReadParams = Type.Object({
   thread: ThreadAddress,
+  delivery_id: Type.Optional(
+    Type.String({
+      minLength: 1,
+      maxLength: 128,
+      description:
+        "Query only the outcome of your original delivery to this exact thread ID. Reads no conversation, sends no message and wakes no session; after evidence expires answers outcome_unavailable.",
+    }),
+  ),
   cursor: Type.Optional(
     Type.String({
       description:

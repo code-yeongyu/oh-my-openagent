@@ -58,7 +58,10 @@ export type GatewayEngine = {
 export type GatewayEngineOptions = {
   /** Sender-owned context, kept outside every delivery/tool request. */
   readonly senderProvenance?: () => Promise<Provenance>
-  readonly store: Pick<GatewayStore, "now" | "enqueue" | "completeReceipt" | "deliveryView" | "abandonReceipt">
+  readonly store: Pick<
+    GatewayStore,
+    "now" | "enqueue" | "completeReceipt" | "deliveryView" | "abandonReceipt" | "receiptOutcome"
+  >
   readonly endpoints: GatewayEndpointPort
   readonly resolve: GatewayResolve
   readonly now?: () => number
@@ -207,7 +210,17 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
     if (outcome.kind === "refused") return fail(outcome.code, outcome.message, outcome.details)
     if (outcome.kind === "replay") {
       const replayed = outcome.result as GatewayDeliveryResult
-      return replayed.kind === "ok" ? { ...replayed, deduplicated: true } : replayed
+      if (replayed.kind !== "ok") return replayed
+      return {
+        ...replayed,
+        deduplicated: true,
+        outcome: await store.receiptOutcome({
+          now: now(),
+          principal: facts.principal,
+          delivery_id: replayed.delivery_id,
+          target_durable_id: replayed.thread_id,
+        }),
+      }
     }
     const settle = async (result: GatewayDeliveryResult): Promise<GatewayDeliveryResult> => {
       await store.completeReceipt({ now: now(), principal: facts.principal, idempotency_key: idempotencyKey, result })

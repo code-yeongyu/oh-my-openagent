@@ -976,6 +976,16 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
       return await ops.abandonReceipt(ctx, args as Parameters<typeof ops.abandonReceipt>[1])
     case "delivery_view":
       return ops.deliveryView(ctx, args as string)
+    case "receipt_outcome":
+      return await ops.receiptOutcome(ctx, args as ops.ReceiptOutcomeRequest)
+    case "refusal_notices":
+      return ops.refusalNotices(ctx, args as number)
+    case "claim_refusal_notice":
+      return await ops.claimRefusalNotice(ctx, args as Parameters<typeof ops.claimRefusalNotice>[1])
+    case "remote_receipt":
+      return relay.remoteReceipt(ctx, args as Parameters<typeof relay.remoteReceipt>[1])
+    case "reconcile_remote_receipt":
+      return await relay.reconcileRemoteReceipt(ctx, args as relay.ReconcileRemoteReceiptRequest)
     case "delivery_receipt":
       return ops.deliveryReceipt(ctx, args as Parameters<typeof ops.deliveryReceipt>[1])
     case "recover_delivery":

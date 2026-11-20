@@ -4,6 +4,7 @@ import type { IntakeOutcome, IntakeRecord } from "../gateway/types"
 import { findDiskSessions } from "../address-book"
 import { resolveWakeTarget } from "../wake/session-target"
 import { decodeServeAck, refusalCode, type DeliveryInboundEvent, type DeliveryServicePort } from "./port"
+import { receiptOutcomeOf } from "../remote/receipt"
 
 const DELIVERY_PROTOCOL_VERSION = 1
 
@@ -130,6 +131,65 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
   }
 
   const onInbound = async (event: DeliveryInboundEvent): Promise<void> => {
+    if (event.record["type"] === "delivery_outcome_notice") {
+      const pair = { sender_device: event.sender_device, command_id: event.command_id }
+      if (!(await port.peerAdmitted(event.sender_device))) {
+        await answer(pair, { kind: "refused", reason: "sender_not_admitted" })
+        return
+      }
+      const id = event.record["deliveryId"]
+      const outcome = receiptOutcomeOf({ kind: "refused", reason: event.record["reason"] })
+      if (typeof id === "string" && outcome.kind === "refused") {
+        const principal = `session:${event.durable_id}`
+        const held = await store.remoteReceipt({ now: store.now(), principal, delivery_id: id })
+        if (
+          held !== null &&
+          held.result.device === event.sender_device &&
+          held.result.thread_id === event.record["targetSessionId"] &&
+          (await port.peerAdmitted(event.sender_device))
+        )
+          await store.reconcileRemoteReceipt({
+            now: store.now(),
+            principal,
+            idempotency_key: held.idempotency_key,
+            delivery_id: id,
+            device: event.sender_device,
+            target_durable_id: held.result.thread_id,
+            outcome,
+          })
+      }
+      // A missing receipt, a duplicate and a kept notice have the same acknowledgment.
+      await answer(pair, { accepted: true })
+      return
+    }
+    if (event.record["type"] === "get_delivery_outcome") {
+      const pair = { sender_device: event.sender_device, command_id: event.command_id }
+      // The service attests the device principal and checks its grant again after this answer.
+      // Check here too, before touching a transcript or returning any receipt state.
+      if (!(await port.peerAdmitted(event.sender_device))) {
+        await answer(pair, { kind: "refused", reason: "sender_not_admitted" })
+        return
+      }
+      const deliveryId = event.record["deliveryId"]
+      if (typeof deliveryId !== "string") {
+        await answer(pair, { outcome: { kind: "outcome_unavailable" } })
+        return
+      }
+      const target = resolveWakeTarget(options.sessionsDirectory, event.durable_id)
+      const outcome = await store.receiptOutcome({
+        now: store.now(),
+        principal: `device:${event.sender_device}`,
+        delivery_id: deliveryId,
+        target_durable_id: event.durable_id,
+        ...(target.kind === "found" ? { session_path: target.session_path } : {}),
+      })
+      if (!(await port.peerAdmitted(event.sender_device))) {
+        await answer(pair, { kind: "refused", reason: "sender_not_admitted" })
+        return
+      }
+      await answer(pair, { outcome })
+      return
+    }
     const target = resolveWakeTarget(options.sessionsDirectory, event.durable_id)
     const reason =
       target.kind === "gone"
@@ -237,6 +297,17 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
       return "serving"
     },
     reportDrained: async () => {
+      if (port.notice !== undefined) {
+        for (const notice of await store.refusalNotices(store.now())) {
+          if (!(await port.peerAdmitted(notice.device))) {
+            await store.claimRefusalNotice({ now: store.now(), notice, suppress: true })
+            continue
+          }
+          if (!(await store.claimRefusalNotice({ now: store.now(), notice }))) continue
+          if (!(await port.peerAdmitted(notice.device))) continue
+          await port.notice(notice).catch((error: unknown) => options.onError?.(error))
+        }
+      }
       if (!marksKept) return
       for (const pair of await store.intakeMarks.marked()) {
         const result = await store.intakeMarks.drained(pair)

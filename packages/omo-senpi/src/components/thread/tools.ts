@@ -88,6 +88,7 @@ import {
   uncertainFailure,
 } from "./tools/internals"
 import { currentResult, threadRow } from "./tools/thread-row"
+import { reconcileRemoteReceipt } from "./remote/receipt"
 
 /** How many keys a tool surface keeps for recovering receipts whose admission reply was lost. */
 export const RECEIPT_RECOVERY_MAX_KEYS = 4_096
@@ -180,6 +181,39 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     const parsed = parseThreadParams(threadToolParamSchemas[name], args)
     if (parsed.kind === "error") return output(parsed as ThreadToolResult)
     const value = parsed.value as Static<(typeof threadToolParamSchemas)[T]>
+    if (
+      name === "thread_read" &&
+      "delivery_id" in value &&
+      typeof value.delivery_id === "string" &&
+      "thread" in value &&
+      typeof value.thread === "string"
+    ) {
+      // This branch precedes view()/ensureHost and the read tool's own receipt admission.
+      // Only the authenticated caller's existing send may authorize a remote lookup.
+      const id = value.delivery_id
+      const thread = value.thread
+      const request = { now: now(), principal: `session:${callerId}`, delivery_id: id }
+      const retained = await store.remoteReceipt(request)
+      if (retained !== null) {
+        if (retained.result.thread_id !== thread)
+          return output({ kind: "ok", thread, delivery_id: id, outcome: { kind: "outcome_unavailable" } })
+        const reconciled = await reconcileRemoteReceipt(
+          store,
+          options.remote,
+          callerId,
+          retained.idempotency_key,
+          retained.result,
+        )
+        if (reconciled.kind === "error") return output(reconciled)
+        return output({ kind: "ok", thread, delivery_id: id, outcome: reconciled.outcome })
+      }
+      return output({
+        kind: "ok",
+        thread,
+        delivery_id: id,
+        outcome: await store.receiptOutcome({ ...request, target_durable_id: thread }),
+      })
+    }
     const explicitKey =
       "idempotency_key" in value ? (value as { idempotency_key?: string }).idempotency_key?.trim() : undefined
     const scope = {
@@ -681,6 +715,7 @@ async function deliverThrough(
   if ("device" in sent) {
     // The relay leg answers with the same delivery facts as the local one (#13014, #13036); it knows no endpoint on that device.
     const facts = {
+      ...(sent.outcome === undefined ? {} : { outcome: sent.outcome }),
       ...(sent.delivery_id === undefined ? {} : { delivery_id: sent.delivery_id }),
       ...(sent.effective_mode === undefined ? {} : { effective_mode: sent.effective_mode }),
       device: sent.device,
@@ -720,6 +755,7 @@ async function deliverThrough(
   }
   const threadId = sent.thread_id
   const facts = {
+    ...(sent.outcome === undefined ? {} : { outcome: sent.outcome }),
     delivery_id: sent.delivery_id,
     effective_mode: sent.effective_mode,
   }
