@@ -20,6 +20,7 @@ import {
 import { ApiRefusal, type Credentials, serviceOrigin, SignInError } from "../omo-opencode/src/cli/service-auth/protocol"
 import { createSession } from "../omo-opencode/src/cli/service-auth/session"
 import { retireSyncPinOnDiscard } from "../omo-opencode/src/cli/service-auth/sync-pin-retire"
+import { type Listed, liveDevices } from "./account-devices"
 
 export interface SyncContext {
   readonly account: string
@@ -34,6 +35,8 @@ export interface SyncContext {
    * built from: a logout or a different sign-in in another process retires the operation (#12303).
    */
   readonly authority: SyncOperationAuthority
+  /** The account's live devices, through the same read `omo account devices` uses. */
+  readonly listDevices?: () => Promise<readonly Listed[]>
 }
 
 export interface SyncContextOptions {
@@ -80,7 +83,11 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
     if (current !== null && current.device.id === credentials.device.id && current.accountId === undefined)
       await store.write({ ...current, accountId: account })
   })
-  const http = { baseUrl: api, token, ...(options.fetch === undefined ? {} : { fetch: options.fetch }) }
+  const http = {
+    baseUrl: api,
+    token,
+    ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
+  }
   const retired = new AbortController()
   const captured = (current: Credentials | null) =>
     current !== null &&
@@ -114,5 +121,6 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
     chain: createAccountHttp(http),
     pairing: createPairingHttp(http),
     authority,
+    listDevices: () => liveDevices(session),
   }
 }
