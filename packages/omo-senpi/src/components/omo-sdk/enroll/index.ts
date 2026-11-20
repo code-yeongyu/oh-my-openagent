@@ -238,7 +238,7 @@ export async function enrollDevice(request: EnrollRequest, ports: EnrollPorts): 
         "the target has no usable credential store",
         platform === "darwin"
           ? "make a keychain available to the target user, then enroll again"
-          : "run a Secret Service keyring for the target user (credentials are never kept in a file), then enroll again",
+          : "repair or stop the target user's Secret Service keyring (with none running, omo keeps the sign-in in a private file), then enroll again",
       )
     const state = showSchema.safeParse(firstJson(show.lines))
     if (!state.success)
