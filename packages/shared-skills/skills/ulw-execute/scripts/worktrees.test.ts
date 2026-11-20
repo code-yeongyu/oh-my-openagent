@@ -355,7 +355,7 @@ describe("ulw-execute worktrees helper", () => {
     expect(result.status).toBe(0)
     const manifest = JSON.parse(readFileSync(join(repo, ".omo", "ulw-execute", "worktrees.json"), "utf8"))
     expect(manifest.created.map((entry: { branch: string }) => entry.branch)).toEqual(["ulw/stale"])
-  }, 60_000)
+  })
 
   test("#given parallel lanes adding worktrees at once #when every add finishes #then the manifest records all of them", async () => {
     const repo = fixtureRepo()
