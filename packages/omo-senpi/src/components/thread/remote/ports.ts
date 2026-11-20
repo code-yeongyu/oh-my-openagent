@@ -289,6 +289,10 @@ export const rowThreadId = (row: RemoteSessionRow): string => row.durable_id ?? 
 export const rowStatus = (row: RemoteSessionRow): ThreadStatus =>
   row.state === "ended" || row.source === "cache" ? "resumable" : "live"
 
+/** A row's working folder: its `path` (the folder the device lists), else the folder's name when that is unknown (#14429). */
+export const rowFolder = (row: RemoteSessionRow): string =>
+  row.path !== "" && row.path !== "unknown" ? row.path : row.project
+
 /**
  * The one rule for a probe-built `ended` row (#13238 review): a probe may build one only while this device's service
  * can carry the wake, since an ended row goes down the wake path; with the wake off it would go down the live path and
