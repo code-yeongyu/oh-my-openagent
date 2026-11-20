@@ -10,6 +10,8 @@ Revision r3 answers the delta review at 8055949a91 (REQUEST-CHANGES): M4 is sect
 
 Revision r5 answers the CLEAR review at c778cb3ee5 (two LOWs): L1 corrects the section 8 reason for an absent `recovery`; L2 adds `recovery: { blocked }` for a corrupt or conflicting pin (section 1 status field, section 8, tests 4b and 12).
 
+Amendment 1 (after the r5 delta, from the engine review of #14464 at 562c5c2213, L4). Recovery takes a fresh `RejectionCounter` per call (omo `packages/omo-senpi/src/components/memory/sync-rpc-wiring.ts:51`), the same as the CLI `recover` already does (`packages/omo-native/sync-recover-command.ts:57`). It does not share the sync engine's counter. That counter is the `sync.batch.rejected` signal: it counts invalid served records (omo `packages/memory-core/src/sync/crypto/rejection.ts:1-24`) and plays no part in the wrong-phrase lockout. The lockout lives in desktop main (desk `apps/desktop/src/account/recoveryPasskey/recoveryPhraseLockout.ts:14-15`, used at `recoveryPhraseBridge.ts:140`; section 6). Section 1 "Status field" is corrected to match.
+
 Revision r4 answers the CLEAR review at adea555dea (one LOW): L1 is section 1 "Status field naming the recovery method". Status omits `recovery` when membership cannot be read, and a status walk uses its own rejection counter. Test 4b covers both.
 
 ## 0. Correction to the #14122 design note
@@ -100,9 +102,9 @@ readonly recovery?:
 
 When membership cannot be read, status never guesses `member`. A transient failure omits the whole `recovery` field: a walk that answers `unavailable` or `unverified`, or a keyring the method read cannot parse. A pin problem is a lasting state, so status answers `{ blocked }` instead: `pin-corrupt` for a pin that does not load (`recover.ts:104`), and `pin-conflict` for a walk that answers `anchor-mismatch`. In each of these cases the guard would refuse `recover` anyway (`unavailable`, `unverified`, `pin-corrupt`, `pin-conflict`), so no state shows a button the engine would refuse. `{ blocked }` lets Settings show the pin's own next step (section 8) instead of an empty entry. The engine guard stays the decision, and status is only the UX reading of it.
 
-Cost of a status call: with no pin there is no walk, and status reads only `listKeys` as it does today (`phrase-hints.ts:51`, `salt-inputs.ts:60`). With a pin, status adds one verified walk (`listEntries` + `listKeys`, `served-chain.ts:34-51`). That walk uses its own `createRejectionCounter()`, as the read-only walk in `enroll-phrase.ts:281` does, so status calls never bump the `RejectionCounter` that recovery and sync share. The walk runs only when the host lists `recover` in `features`. An older desktop never pays for it.
+Cost of a status call: with no pin there is no walk, and status reads only `listKeys` as it does today (`phrase-hints.ts:51`, `salt-inputs.ts:60`). With a pin, status adds one verified walk (`listEntries` + `listKeys`, `served-chain.ts:34-51`). That walk uses its own `createRejectionCounter()`, as the read-only walk in `enroll-phrase.ts:281` does, so status calls never bump the `RejectionCounter` of a recovery or of sync (each takes its own; Amendment 1). The walk runs only when the host lists `recover` in `features`. An older desktop never pays for it.
 
-Test 4b also asserts both rules: with a pin, a walk that answers `unavailable` makes status omit `recovery`, and the shared counter passed to recovery is not touched by status.
+Test 4b also asserts both rules: with a pin, a walk that answers `unavailable` makes status omit `recovery`, and status takes no counter, so the one a recovery uses is never touched by it (Amendment 1).
 
 It is computed from the served keyring through the same reader recovery uses: `servedPhraseHints` (omo `recovery/phrase-hints.ts`) for phrase keys and `servedSaltInputs` (omo `recovery/salt-inputs.ts`) for passkey keys, after removed keys are subtracted. It never comes from a server claim field. An unreadable keyring omits the field instead of guessing. Older engines omit it, and the desktop then labels the button generically.
 
