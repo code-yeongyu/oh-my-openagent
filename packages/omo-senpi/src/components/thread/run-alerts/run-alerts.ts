@@ -67,7 +67,7 @@ export function createRunAlerts(options: RunAlertsOptions): RunAlerts {
     return state
   }
 
-  async function toThread(address: string, payload: AlertPayload): Promise<void> {
+  async function toThread(address: string, payload: AlertPayload): Promise<boolean> {
     const args = {
       thread: address,
       message: `${payload.text}\n${JSON.stringify(withoutText(payload))}`,
@@ -87,7 +87,7 @@ export function createRunAlerts(options: RunAlertsOptions): RunAlerts {
       }))
       if (result.kind === "ok") {
         options.log.info(`operator alert: ${payload.event} for ${payload.session_id} sent to thread ${address}`)
-        return
+        return true
       }
       if (attempt === 1) await delay(ALERT_THREAD_RETRY_DELAY_MS)
     }
@@ -95,9 +95,10 @@ export function createRunAlerts(options: RunAlertsOptions): RunAlerts {
     options.log.warn(
       `operator alert: ${payload.event} for ${payload.session_id} not sent to thread ${address}: ${code}`,
     )
+    return false
   }
 
-  async function toWebhook(url: string, payload: AlertPayload): Promise<void> {
+  async function toWebhook(url: string, payload: AlertPayload): Promise<boolean> {
     const post = options.fetch ?? fetch
     let failure = "unknown"
     for (let attempt = 1; attempt <= 2; attempt++) {
@@ -110,7 +111,7 @@ export function createRunAlerts(options: RunAlertsOptions): RunAlerts {
         })
         if (response.ok) {
           options.log.info(`operator alert: ${payload.event} for ${payload.session_id} sent to the webhook`)
-          return
+          return true
         }
         failure = `HTTP ${response.status}`
       } catch (error) {
@@ -121,6 +122,7 @@ export function createRunAlerts(options: RunAlertsOptions): RunAlerts {
       if (attempt === 1) await delay(ALERT_WEBHOOK_RETRY_DELAY_MS)
     }
     options.log.warn(`operator alert: ${payload.event} for ${payload.session_id} not sent to the webhook: ${failure}`)
+    return false
   }
 
   async function dispatch(event: ErrorStreakEvent, settings: ResolvedErrorStreakSettings): Promise<void> {
@@ -135,10 +137,13 @@ export function createRunAlerts(options: RunAlertsOptions): RunAlerts {
         `operator alert: operator_alerts.error_streak.webhook_url_env names ${settings.webhookUrlEnv}, which is not set; no webhook is called`,
       )
     }
-    await Promise.all([
+    const reached = await Promise.all([
       ...settings.threads.map((address) => toThread(address, payload)),
       ...(url ? [toWebhook(url, payload)] : []),
     ])
+    options.log.info(
+      `operator alert: ${payload.event} for ${payload.session_id}: ${reached.filter(Boolean).length} of ${reached.length} target(s) reached`,
+    )
   }
 
   return {

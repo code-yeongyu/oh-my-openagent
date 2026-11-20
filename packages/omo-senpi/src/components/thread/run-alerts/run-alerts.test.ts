@@ -1,12 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { Database } from "bun:sqlite"
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { awaitWithinTestBudget } from "../../../../../../test-support/test-deadline"
 import { createThreadComponent } from "../component"
-import { gatewayDatabasePath } from "../gateway/paths"
 import { createGatewayStore } from "../gateway/store"
 import type { ThreadHost, ThreadHostSession } from "../tools"
 
@@ -98,26 +96,30 @@ type Posted = { readonly url: string; readonly body: Record<string, unknown> }
 function seatWithAlerts(options: {
   readonly fetch: (url: string, body: Record<string, unknown>) => Promise<Response>
   readonly peers?: readonly string[]
+  /** Which layer carries `operator_alerts`: the user's `~/.omo/omo.jsonc` or the workspace's `.omo/omo.json`. */
+  readonly configLayer?: "user" | "project"
 }) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "run-alerts-")))
   cleanups.push(() => rmSync(root, { recursive: true, force: true }))
   const agentDir = join(root, "agent")
   const home = join(root, "home")
+  const workspace = join(home, "project")
   mkdirSync(join(home, ".omo"), { recursive: true })
-  writeFileSync(
-    join(home, ".omo", "omo.jsonc"),
-    JSON.stringify({
-      operator_alerts: {
-        error_streak: { threshold: 10, realert_minutes: 60, threads: [DUTY], webhook_url_env: WEBHOOK_ENV },
-      },
-    }),
-  )
+  mkdirSync(join(workspace, ".omo"), { recursive: true })
+  const alerts = {
+    operator_alerts: {
+      error_streak: { threshold: 10, realert_minutes: 60, threads: [DUTY], webhook_url_env: WEBHOOK_ENV },
+    },
+  }
+  const project = options.configLayer === "project"
+  writeFileSync(join(home, ".omo", "omo.jsonc"), JSON.stringify(project ? {} : alerts))
+  writeFileSync(join(workspace, ".omo", "omo.json"), JSON.stringify(project ? alerts : {}))
   const store = createGatewayStore({ agentDir })
   cleanups.push(() => store.dispose())
   const handlers = new Map<string, Handler[]>()
   const tools: { name: string; execute: (...args: unknown[]) => Promise<unknown> }[] = []
   const pi = {
-    cwd: home,
+    cwd: workspace,
     registerTool: (tool: (typeof tools)[number]) => tools.push(tool),
     on: (event: string, handler: Handler) => handlers.set(event, [...(handlers.get(event) ?? []), handler]),
     registerCommand() {},
@@ -136,7 +138,7 @@ function seatWithAlerts(options: {
     agentDir: () => agentDir,
     store,
     env: { HOME: home, [WEBHOOK_ENV]: WEBHOOK_URL },
-    callerWorkspaceRoot: () => home,
+    callerWorkspaceRoot: () => workspace,
     operatorAlerts: {
       now: () => clock,
       device: async () => "device-test",
@@ -174,17 +176,11 @@ function seatWithAlerts(options: {
       content: [],
     })
   const normalRun = () => endRun({ role: "assistant", stopReason: "stop", content: [{ type: "text", text: "done" }] })
-  const deliveriesTo = (target: string) => {
-    const db = new Database(gatewayDatabasePath(agentDir), { readonly: true })
-    try {
-      return db.query("SELECT sender, body FROM deliveries WHERE target_durable_id = ? ORDER BY seq").all(target) as {
-        sender: string
-        body: string
-      }[]
-    } finally {
-      db.close()
-    }
-  }
+  // Read through the component's own store worker, never a second connection to the file it is writing.
+  const deliveriesTo = async (target: string) =>
+    [...(await store.list({ target_durable_id: target }))]
+      .sort((a, b) => a.seq - b.seq)
+      .map((row) => ({ sender: row.sender, body: row.body }))
   const sendAsPeer = async (peer: string, text: string) => {
     const send = tools.find((tool) => tool.name === "thread_send")
     if (send === undefined) throw new Error("thread_send is not registered")
@@ -215,7 +211,7 @@ describe("error-streak alerts through the thread component (#14430)", () => {
     await seat.normalRun()
     await awaitWithinTestBudget(Promise.all([recovered, recoveredThread]), "the recovered notice")
 
-    const toDuty = seat.deliveriesTo(DUTY)
+    const toDuty = await seat.deliveriesTo(DUTY)
     expect(toDuty.map((row) => row.sender)).toEqual([`session:${SEAT}`, `session:${SEAT}`])
     expect(toDuty.map((row) => JSON.parse(row.body.split("\n")[1] ?? "{}"))).toMatchObject([
       { event: "error_streak", count: 10, device: "device-test" },
@@ -239,18 +235,22 @@ describe("error-streak alerts through the thread component (#14430)", () => {
     for (const sentinel of SENTINELS) expect(everything.filter((text) => text.includes(sentinel))).toEqual([])
   })
 
-  test("#given a seat whose own inbox holds 64 undelivered messages #when its 10th error run settles #then the alert still reaches the duty thread", async () => {
-    const peers = Array.from({ length: 8 }, (_, index) => `dur-peer-${index}`)
+  test("#given a seat whose own inbox holds 128 undelivered messages #when its 10th error run settles #then the alert still reaches the duty thread", async () => {
+    // 128 is the per-target backlog the #14428 admission caps a target at: the seat's own inbox is full, its outbound alert is not.
+    const peers = Array.from({ length: 16 }, (_, index) => `dur-peer-${index}`)
     const seat = seatWithAlerts({ fetch: ok, peers })
-    for (const peer of peers)
-      for (let message = 1; message <= 8; message++) await seat.sendAsPeer(peer, `work ${message}`)
-    expect(seat.deliveriesTo(SEAT)).toHaveLength(64)
+    await Promise.all(
+      peers.map(async (peer) => {
+        for (let message = 1; message <= 8; message++) await seat.sendAsPeer(peer, `work ${message}`)
+      }),
+    )
+    expect(await seat.deliveriesTo(SEAT)).toHaveLength(128)
 
     const alerted = seat.log.next(/error_streak for dur-seat sent to thread dur-duty/)
     for (let run = 1; run <= 10; run++) await seat.failedRun()
     await awaitWithinTestBudget(alerted, "the alert to the duty thread")
 
-    expect(seat.deliveriesTo(DUTY)).toHaveLength(1)
+    expect(await seat.deliveriesTo(DUTY)).toHaveLength(1)
   })
 
   test("#given a webhook that answers 500 once and then holds its answer #when the alert fires #then the settle never waits for it, the POST is retried once, and the URL is never logged", async () => {
@@ -281,5 +281,17 @@ describe("error-streak alerts through the thread component (#14430)", () => {
 
     expect(calls).toBe(2)
     expect(seat.log.lines.filter((line) => line.includes("SECRET-PATH"))).toEqual([])
+  })
+
+  test("#given operator_alerts set only in the workspace's .omo/omo.json #when the 10th error settles #then the alert is logged but no thread or webhook receives it", async () => {
+    const seat = seatWithAlerts({ fetch: ok, configLayer: "project" })
+    const detected = seat.log.next(/^omo alert: .*ended 10 runs in a row/)
+    const dispatched = seat.log.next(/error_streak for dur-seat: \d+ of \d+ target\(s\) reached/)
+
+    for (let run = 1; run <= 10; run++) await seat.failedRun()
+    await awaitWithinTestBudget(Promise.all([detected, dispatched]), "the logged and dispatched error-streak alert")
+
+    expect(await seat.deliveriesTo(DUTY)).toEqual([])
+    expect(seat.posted).toEqual([])
   })
 })

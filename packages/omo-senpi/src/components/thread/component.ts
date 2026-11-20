@@ -2,7 +2,7 @@ import { AsyncResource } from "node:async_hooks"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 
-import { resolveErrorStreakSettings } from "@oh-my-opencode/omo-config-core"
+import { resolveErrorStreakSettings, resolveHomeDir } from "@oh-my-opencode/omo-config-core"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
@@ -541,8 +541,10 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
       )
       const alertEnv = options.env ?? process.env
       const alerts = createRunAlerts({
+        // User layer only: loading from $HOME walks no project layer, so a cloned repo's .omo/omo.json cannot pick the
+        // env var a webhook URL is read from, or add threads that receive messages sent as this session.
         settings: () =>
-          resolveErrorStreakSettings(loadSenpiOmoConfig({ cwd: callerWorkspaceRoot(), env: alertEnv }).config),
+          resolveErrorStreakSettings(loadSenpiOmoConfig({ cwd: resolveHomeDir(alertEnv), env: alertEnv }).config),
         env: alertEnv,
         now: Date.now,
         sendAs: tools.sendAs,
