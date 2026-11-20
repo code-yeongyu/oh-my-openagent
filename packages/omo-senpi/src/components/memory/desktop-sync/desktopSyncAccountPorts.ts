@@ -1,7 +1,10 @@
 import { z } from "zod"
 import type { AccountHttp, PairingHttp, RevocationView } from "@oh-my-opencode/memory-core/sync-engine"
-import { parseRevocationView } from "@oh-my-opencode/memory-core/sync-account-ports"
-import { phraseKeyBlockersOf, refusalBlockersOf } from "@oh-my-opencode/memory-core/sync-engine"
+import {
+  parseRevocationView,
+  phraseKeyBlockersOf,
+  refusalBlockersOf,
+} from "@oh-my-opencode/memory-core/sync-account-ports"
 import type { SyncDevice } from "@oh-my-opencode/memory-core/sync-engine"
 import {
   decodeRecoveryWraps,

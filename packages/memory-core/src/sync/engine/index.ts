@@ -37,7 +37,7 @@ export type {
 } from "../account/source-types"
 export type { GenesisBridge, GenesisBridgeResult } from "../genesis/bridge.ts"
 export type { PhraseGate, PhraseGateRefusal, PhraseKeyBlocker, ServiceFloor } from "../genesis/phrase-gate.ts"
-export { phraseKeyBlockersOf, readServiceFloor, refusalBlockersOf } from "../genesis/phrase-gate.ts"
+export { readServiceFloor } from "../genesis/phrase-gate.ts"
 export { SYNC_CAPABILITIES, SYNC_CONTRACT_VERSION } from "../contract-version.ts"
 export type { DeviceKeyMaterial } from "../keyring-port"
 export { GitSpaceConfig, listRemotes, repoHasCommit, resolveSpace } from "../space/space"
