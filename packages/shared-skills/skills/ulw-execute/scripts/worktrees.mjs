@@ -88,7 +88,9 @@ function parseFlags(argv) {
 // The main checkout owns the local config and the manifest, wherever the CLI runs from: inside a run worktree,
 // `--show-toplevel` would name that worktree instead. `git worktree list` always lists the main checkout first.
 function mainCheckout(cwd) {
-  return git(cwd, ["worktree", "list", "--porcelain"]).split("\n")[0].replace(/^worktree /, "")
+  return git(cwd, ["worktree", "list", "--porcelain"])
+    .split("\n")[0]
+    .replace(/^worktree /, "")
 }
 
 export function main(argv) {

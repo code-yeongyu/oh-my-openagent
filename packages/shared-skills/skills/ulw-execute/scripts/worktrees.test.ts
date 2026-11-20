@@ -85,7 +85,8 @@ describe("ulw-execute worktrees helper", () => {
   test("#given a .worktreeinclude #when provisioning #then listed files copy, a missing listed path fails as required, escapes and symlinks are refused", () => {
     const repo = fixtureRepo({
       "secrets/api.key": "k\n",
-      ".worktreeinclude": "# local config\nsecrets/api.key\nconfig/local.json\n../outside\n/etc/passwd\nlinked.env\n.env.*\n",
+      ".worktreeinclude":
+        "# local config\nsecrets/api.key\nconfig/local.json\n../outside\n/etc/passwd\nlinked.env\n.env.*\n",
     })
     symlinkSync("/etc/hostname", join(repo, "linked.env"))
     symlinkSync(join(repo, "nowhere"), join(repo, ".env.dangling"))
