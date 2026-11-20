@@ -134,7 +134,7 @@ export interface SyncDevice {
   readonly kind: "desktop" | "cli"
   readonly platform: "macos" | "linux" | "windows"
   readonly createdAt: string
-  readonly lastSyncAt: string
+  readonly lastSeenAt: string
   readonly approximateLocation?: string
   readonly current: boolean
   readonly syncing: boolean

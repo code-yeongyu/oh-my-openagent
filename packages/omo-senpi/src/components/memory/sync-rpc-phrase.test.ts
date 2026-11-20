@@ -39,6 +39,19 @@ test("#given the service floor for the signed-in account #when features is asked
   expect(await (await setup()).call("features", owner("a").context)).toEqual({ features: without })
 })
 
+test("#given a floor read that never answers #when features is asked #then it answers within the floor timeout without phrase-genesis (review L1)", async () => {
+  const hung: PhraseGate = {
+    enabled: true,
+    serviceFloor: () => new Promise(() => {}),
+    floorTimeoutMs: 5,
+    refused: () => undefined,
+  }
+  const f = await setup({ phraseGate: hung })
+  expect(await f.call("features", owner("a").context)).toEqual({
+    features: ["enable-method", "acknowledge", "disable"],
+  })
+})
+
 test("#given enable with the phrase method #when the ceremony starts #then the method and gate reach enable, the call answers in_progress at once, and status settles to the created outcome", async () => {
   const phraseGate = gate(true)
   const f = await setup({ phraseGate })

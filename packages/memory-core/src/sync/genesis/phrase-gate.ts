@@ -32,12 +32,21 @@ export interface PhraseRefusal {
   readonly devices?: ReadonlyArray<PhraseKeyBlocker>
 }
 
+/** At most this many named devices and this many characters per field, like the service's other reply lists. */
+const MAX_BLOCKERS = 20
+const MAX_FIELD_CHARS = 120
+
+// Service-supplied text reaches a terminal: control characters (escape sequences included) are dropped.
+// biome-ignore lint/suspicious/noControlCharactersInRegex: the class strips exactly the control characters
+const CONTROL = /[\u0000-\u001f\u007f-\u009f]/g
+const clean = (value: string): string => value.replace(CONTROL, "").slice(0, MAX_FIELD_CHARS)
+
 const blockerOf = (value: unknown): PhraseKeyBlocker | null => {
   if (typeof value !== "object" || value === null) return null
   const row = value as Record<string, unknown>
-  const label = row["label"]
-  if (typeof label !== "string" || label.length === 0) return null
-  const text = (key: string) => (typeof row[key] === "string" ? (row[key] as string) : "")
+  const label = typeof row["label"] === "string" ? clean(row["label"]) : ""
+  if (label.trim().length === 0) return null
+  const text = (key: string) => (typeof row[key] === "string" ? clean(row[key] as string) : "")
   return {
     label,
     kind: text("kind"),
@@ -46,9 +55,17 @@ const blockerOf = (value: unknown): PhraseKeyBlocker | null => {
   }
 }
 
-/** An open decoder over the service's blocker list: malformed rows are dropped, anything but an array is none. */
+/**
+ * An open decoder over the service's blocker list: malformed rows are dropped, control characters are stripped,
+ * fields and the list are capped, and anything but an array is none.
+ */
 export const phraseKeyBlockersOf = (value: unknown): ReadonlyArray<PhraseKeyBlocker> =>
-  Array.isArray(value) ? value.map(blockerOf).filter((row): row is PhraseKeyBlocker => row !== null) : []
+  Array.isArray(value)
+    ? value
+        .map(blockerOf)
+        .filter((row): row is PhraseKeyBlocker => row !== null)
+        .slice(0, MAX_BLOCKERS)
+    : []
 
 /**
  * The client-side release gate for creating a recovery-phrase key (contract amendment A1). `enabled` is

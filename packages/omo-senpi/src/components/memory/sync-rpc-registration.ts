@@ -14,6 +14,7 @@ const acknowledgeRequest = z
   .strict()
 const FEATURES = ["enable-method", "phrase-genesis", "acknowledge", "disable"] as const
 const WITHOUT_PHRASE = FEATURES.filter((f) => f !== "phrase-genesis")
+const FLOOR_TIMEOUT_MS = 10_000
 
 /** One fresh floor read through the signed-in account's own chain; anything but "on" withholds the feature. */
 const phraseGenesisOffered = async (
@@ -25,10 +26,18 @@ const phraseGenesisOffered = async (
   const floor = gate?.serviceFloor
   if (gate?.enabled !== true || floor === undefined || context === undefined) return false
   const answer = await coordinator.read(context, async (ports) => {
+    // Review L1 (#14433 @ ea71d92): the same bound memory-core's floor read has, so a hung service cannot hold features.
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const timeout = new Promise<"unknown">((resolve) => {
+      timer = setTimeout(() => resolve("unknown"), gate.floorTimeoutMs ?? FLOOR_TIMEOUT_MS)
+      timer.unref?.()
+    })
     try {
-      return await floor(ports.chain)
+      return await Promise.race([floor(ports.chain), timeout])
     } catch {
       return "unknown" as const
+    } finally {
+      clearTimeout(timer)
     }
   })
   return answer === "on"

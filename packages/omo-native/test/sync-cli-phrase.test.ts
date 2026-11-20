@@ -309,3 +309,15 @@ test("#given the service refuses the phrase append naming a device to update #wh
   )
   expect(r.f.entries).toEqual([])
 })
+
+test("#given a hostile blocker list with escape sequences and far too many rows #when enable is refused #then each printed label is stripped of control characters and the list is capped (review L2)", async () => {
+  const hostile = Array.from({ length: 50 }, (_, i) => ({ label: `\u001b[2J\u001b]8;;x\u0007box ${i}`, kind: "cli" }))
+  const r = await runEnable({ env: {}, terminal: scriptedTerminal().open }, undefined, {
+    server: { acceptsPhraseKeys: false, extraState: { phrase_key_blockers: hostile } },
+    productionFloor: true,
+  })
+  const lines = r.err.filter((line) => line.startsWith("Update OmO"))
+  expect(lines.length).toBe(20)
+  expect(lines.some((line) => /[\u0000-\u001f\u007f-\u009f]/.test(line))).toBe(false)
+  expect(lines[0]).toContain("box 0")
+})
