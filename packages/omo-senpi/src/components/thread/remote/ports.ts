@@ -147,6 +147,12 @@ export type RemoteWatchOutcome =
   { readonly kind: "ok"; readonly watch: RemoteSessionWatch } | { readonly kind: "refused"; readonly reason: string }
 
 export type RemoteSessionsPort = {
+  /** Authenticated query-only device-service request; never an engine command or cold wake. */
+  readonly receipt?: (
+    device: string,
+    durableId: string,
+    deliveryId: string,
+  ) => Promise<RemoteCommandOutcome | { readonly kind: "unavailable" }>
   /** The device service state; `plan_required` means the account's plan has no relay (A5: paid only). */
   readonly status: () => Promise<RemoteServiceState>
   readonly thisDevice: () => Promise<string | null>

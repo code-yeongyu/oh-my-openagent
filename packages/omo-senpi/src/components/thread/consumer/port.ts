@@ -26,6 +26,8 @@ export type DeliveryPendingPair = {
 export type DeliveryServeAck = { readonly wake?: boolean }
 
 export type DeliveryServicePort = {
+  /** Best-effort refusal notice, negotiated by the device service; never a session input. */
+  readonly notice?: (notice: import("../gateway/types").RefusalNotice) => Promise<void>
   readonly serve: (request: { readonly agent_dir: string; readonly v: number }) => Promise<unknown>
   /** Echoes the inbound's own pair: the service keys a waiting hand-off by (sender device, command id) (A5.1). */
   readonly answer: (

@@ -65,6 +65,50 @@ async function stateOf(h: GatewayHarness, id: string): Promise<string | null> {
 }
 
 describe("all_fifteen_delivery_state_cases", () => {
+  test("a sender reads expiry at 24h without waking or draining the target", async () => {
+    const h = open()
+    const sender = h.session("A")
+    h.phantom("B")
+    const retry = () => send(h, "A", "B", "one", { idempotency_key: "one" })
+    const id = okId(await retry())
+    h.clock.now += 86_400_000 - 1
+    expect(await retry()).toMatchObject({ delivery_id: id, outcome: { kind: "pending" } })
+    h.clock.now++
+    expect(await retry()).toMatchObject({ delivery_id: id, outcome: { kind: "refused", reason: "expired" } })
+    h.clock.now++
+    expect(await retry()).toMatchObject({ delivery_id: id, outcome: { kind: "refused", reason: "expired" } })
+    expect(await sender.store.list({ target_durable_id: "B" })).toMatchObject([
+      { delivery_id: id, state: "refused", reason: "expired", attempt: 0 },
+    ])
+    expect(h.wakes).toHaveLength(0)
+  })
+
+  test("a historically queued follow-up replays application only after the engine writes it", async () => {
+    const h = open()
+    h.session("A")
+    const target = h.session("B")
+    target.runtime.phaseValue = "mid_turn"
+    const retry = () => send(h, "A", "B", "one", { mode: "follow_up", idempotency_key: "one" })
+    const id = okId(await retry())
+    h.clock.now += 86_400_000
+    expect(target.runtime.transcriptEntries(id)).toBe(0)
+    expect(await retry()).toMatchObject({
+      delivery_id: id,
+      delivery: { kind: "queued" },
+      outcome: { kind: "admitted" },
+    })
+    target.runtime.endTurn()
+    await h.quiesce()
+    expect(target.runtime.transcriptEntries(id)).toBe(1)
+    expect(await retry()).toMatchObject({
+      delivery_id: id,
+      delivery: { kind: "queued" },
+      outcome: { kind: "applied" },
+    })
+    expect(target.runtime.enqueueCount(id)).toBe(1)
+    expect(h.wakes).toHaveLength(1)
+  })
+
   test("#given a target in each runtime state #when A sends with each mode #then the sender sees the table's outcome and the row lands in the matching state", async () => {
     const h = open()
     h.session("A")
@@ -280,7 +324,12 @@ describe("lost_ack_and_durable_recovery", () => {
     const first = await send(h, "A", "B", "hello", { idempotency_key: "k1" })
     const again = await send(h, "A", "B", "hello", { idempotency_key: "k1" })
     const changed = await send(h, "A", "B", "hello!", { idempotency_key: "k1" })
-    expect(again).toEqual({ ...(first as Extract<GatewayDeliveryResult, { kind: "ok" }>), deduplicated: true })
+    expect(again).toEqual({
+      ...(first as Extract<GatewayDeliveryResult, { kind: "ok" }>),
+      deduplicated: true,
+      outcome: { kind: "applied" },
+    })
+    expect(h.get("B").runtime.transcriptEntries(okId(first))).toBe(1)
     expect(summary(changed)).toBe("error:idempotency_conflict")
     expect(await h.get("B").store.list({ target_durable_id: "B" })).toHaveLength(1)
   })

@@ -29,6 +29,7 @@ import {
   TARGET_MAX_MESSAGES,
 } from "./constants"
 import { pairLoopGuardMessage } from "../errors"
+import { findDiskSessions } from "../address-book"
 import { readLegacyMailbox } from "./legacy-mailbox"
 import { gatewayInboxDirectory } from "./paths"
 import { isClaimantDead, sameProcess } from "./process-identity"
@@ -54,6 +55,8 @@ import type {
   ReconcileOutcome,
   ReconcileRequest,
   RecordOutcomeRequest,
+  ReceiptOutcome,
+  RefusalNotice,
   RefusalReason,
   StoreRefusal,
 } from "./types"
@@ -554,7 +557,10 @@ function placeCausally(ctx: StoreContext, request: EnqueueRequest): CausalPlacem
   return placement
 }
 
-function takePairToken(ctx: StoreContext, request: EnqueueRequest): StoreRefusal | undefined {
+function takePairToken(
+  ctx: StoreContext,
+  request: Pick<EnqueueRequest, "rate_principal" | "sender_principal" | "target_durable_id" | "now">,
+): StoreRefusal | undefined {
   const sender = request.rate_principal ?? request.sender_principal
   const bucket = ctx.sql.one(
     ["tokens", "updated_at"],
@@ -892,6 +898,198 @@ function transition(
       row.target_durable_id,
     ])
   }
+}
+
+/** The caller holds the write lock; unresolved claims never expire by time alone. */
+function currentReceiptOutcome(ctx: StoreContext, row: DeliveryRow | undefined, now: number): ReceiptOutcome {
+  if (row === undefined) return { kind: "outcome_unavailable" }
+  switch (row.state) {
+    case "applied":
+    case "admitted":
+      return { kind: row.state }
+    case "admitting":
+    case "uncertain":
+      return { kind: "outcome_unavailable" }
+    case "refused":
+      switch (row.reason) {
+        case "expired":
+        case "binding_closed":
+        case "target_closed":
+        case "turn_conflict":
+        case "not_steerable":
+          return { kind: "refused", reason: row.reason }
+        default:
+          return { kind: "outcome_unavailable" }
+      }
+    case "queued":
+      if (row.expires_at > now) return { kind: "pending" }
+      // A local message cannot reach an engine without a claim. If a previous claim existed,
+      // only reconciliation with its application evidence can establish non-delivery.
+      if (row.attempt !== 0 || row.admitted_by !== null) return { kind: "outcome_unavailable" }
+      transition(ctx, row, "refused", now, { reason: "expired" })
+      unlinkMarker(ctx, row.target_durable_id, row.delivery_id)
+      return { kind: "refused", reason: "expired" }
+  }
+}
+
+export type ReceiptOutcomeRequest = {
+  readonly now: number
+  /** Authenticated principal, never the session claimed in a relayed message body. */
+  readonly principal: string
+  readonly delivery_id: string
+  readonly target_durable_id: string
+  /** Receiver-owned path resolved by the local consumer; never a wire field. */
+  readonly session_path?: string
+}
+
+/** Bounded refusal-only candidates. A claim below, after authorization, owns each notice once. */
+export function refusalNotices(ctx: StoreContext, now: number): readonly RefusalNotice[] {
+  const rows = ctx.sql
+    .all(
+      DELIVERY_COLUMNS,
+      `SELECT ${DELIVERY_COLUMNS.join(", ")} FROM deliveries WHERE state = 'refused' AND reason IN ('expired', 'not_steerable', 'turn_conflict', 'target_closed', 'binding_closed') AND ledger_id IS NOT NULL AND updated_at > ? AND NOT EXISTS (SELECT 1 FROM receipts r WHERE r.operation = 'outcome_notice' AND r.delivery_id = deliveries.delivery_id) ORDER BY updated_at LIMIT 32`,
+      [now - GATEWAY_RECEIPT_RETENTION_MS],
+    )
+    .map(rowFrom)
+  return rows.flatMap((row) => {
+    const outcome = currentReceiptOutcome(ctx, row, now)
+    if (outcome.kind !== "refused" || !row.sender.startsWith("device:") || !("session" in row.envelope.origin))
+      return []
+    const prefix = `${row.sender}/`
+    if (!row.ledger_id?.startsWith(prefix)) return []
+    return [
+      {
+        row_id: row.delivery_id,
+        delivery_id: row.ledger_id.slice(prefix.length),
+        device: row.sender.slice("device:".length),
+        session: row.envelope.origin.session,
+        target_durable_id: row.target_durable_id,
+        reason: outcome.reason,
+      },
+    ]
+  })
+}
+
+/** Uses the existing durable pair bucket and receipt retention; a lost notice is repaired by query. */
+export async function claimRefusalNotice(
+  ctx: StoreContext,
+  request: { readonly now: number; readonly notice: RefusalNotice; readonly suppress?: boolean },
+): Promise<boolean> {
+  return await transaction(ctx, "claim_outcome_notice", () => {
+    const n = request.notice
+    const row = selectRow(ctx, n.row_id)
+    if (
+      row === undefined ||
+      row.state !== "refused" ||
+      row.reason !== n.reason ||
+      row.sender !== `device:${n.device}` ||
+      row.ledger_id !== `device:${n.device}/${n.delivery_id}` ||
+      row.target_durable_id !== n.target_durable_id ||
+      !("session" in row.envelope.origin) ||
+      row.envelope.origin.session !== n.session
+    )
+      return false
+    const key = `outcome-notice:${n.device}`
+    if (
+      ctx.sql.one(
+        ["delivery_id"],
+        "SELECT delivery_id FROM receipts WHERE principal = ? AND operation = 'outcome_notice' AND idempotency_key = ?",
+        [key, n.row_id],
+      ) !== undefined
+    )
+      return false
+    if (
+      !request.suppress &&
+      takePairToken(ctx, { now: request.now, sender_principal: "outcome-notice", target_durable_id: n.device }) !==
+        undefined
+    )
+      return false
+    write(
+      ctx,
+      "INSERT INTO receipts (principal, operation, idempotency_key, args_hash, status, delivery_id, owner_instance, created_at, updated_at, expires_at) VALUES (?, 'outcome_notice', ?, ?, 'completed', ?, ?, ?, ?, ?)",
+      [
+        key,
+        n.row_id,
+        n.reason,
+        n.row_id,
+        ctx.config.instance_id,
+        request.now,
+        request.now,
+        request.now + GATEWAY_RECEIPT_RETENTION_MS,
+      ],
+    )
+    return true
+  })
+}
+
+/** Query-only. It writes no receipt, admission, marker, or wake, even after retention. */
+export async function receiptOutcome(ctx: StoreContext, request: ReceiptOutcomeRequest): Promise<ReceiptOutcome> {
+  const key = request.principal.startsWith("device:")
+    ? `${request.principal}/${request.delivery_id}`
+    : request.delivery_id
+  const find = () =>
+    selectRows(ctx, "sender = ? AND target_durable_id = ? AND (delivery_id = ? OR ledger_id = ?)", [
+      request.principal,
+      request.target_durable_id,
+      key,
+      key,
+    ])[0]
+  const before = find()
+  if (before === undefined) {
+    // A live RPC admission bypasses intake. Its engine-stamped, device-scoped transcript ID is
+    // still authoritative application evidence; absence proves neither expiry nor admission.
+    if (request.principal.startsWith("device:") && request.session_path !== undefined) {
+      try {
+        if (sessionHasToken(request.session_path, key, new Map())) return { kind: "applied" }
+      } catch {
+        return { kind: "outcome_unavailable" }
+      }
+    }
+    return { kind: "outcome_unavailable" }
+  }
+  const remember = (row: DeliveryRow, outcome: ReceiptOutcome): ReceiptOutcome => {
+    if (!request.principal.startsWith("session:")) return outcome
+    write(
+      ctx,
+      "UPDATE receipts SET result = json_set(result, '$.outcome', json(?)), updated_at = ? WHERE principal = ? AND operation = 'deliver' AND delivery_id = ? AND status = 'completed' AND expires_at > ? AND json_extract(result, '$.kind') = 'ok' AND COALESCE(json_extract(result, '$.outcome'), '') != ?",
+      [JSON.stringify(outcome), request.now, request.principal, row.delivery_id, request.now, JSON.stringify(outcome)],
+    )
+    return outcome
+  }
+  // A terminal fact needs no filesystem observation and is immutable.
+  if (before.state === "applied" || before.state === "refused")
+    return await transaction(ctx, "receipt_outcome", () => {
+      const row = find()
+      return row === undefined
+        ? { kind: "outcome_unavailable" }
+        : remember(row, currentReceiptOutcome(ctx, row, request.now))
+    })
+  const paths =
+    request.session_path === undefined
+      ? findDiskSessions(join(ctx.config.agent_dir, "sessions"), before.target_durable_id, { id_only: true })
+      : [{ session_path: request.session_path }]
+  let written = false
+  if (paths.length === 1) {
+    try {
+      written = sessionHasToken(paths[0]?.session_path ?? null, engineKey(before), new Map())
+    } catch {
+      return { kind: "outcome_unavailable" }
+    }
+  }
+  return await transaction(ctx, "receipt_outcome", () => {
+    const row = find()
+    if (row === undefined) return { kind: "outcome_unavailable" }
+    if (row.state === "applied" || row.state === "refused")
+      return remember(row, currentReceiptOutcome(ctx, row, request.now))
+    if (row.state !== before.state || claimFingerprint(row) !== claimFingerprint(before))
+      return { kind: "outcome_unavailable" }
+    if (written) {
+      transition(ctx, row, "applied", request.now)
+      unlinkMarker(ctx, row.target_durable_id, row.delivery_id)
+      return remember(row, { kind: "applied" })
+    }
+    return remember(row, currentReceiptOutcome(ctx, row, request.now))
+  })
 }
 
 /**

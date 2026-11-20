@@ -1,5 +1,6 @@
 import type { ThreadErrorCode, ThreadToolFailure } from "../errors"
 import type { BindingRecord, OutboxRow } from "../gateway/bindings"
+import type { ReceiptOutcome } from "../gateway/types"
 import type { ThreadWorktree } from "../worktree/thread-worktree"
 import type { ThreadActivity, ThreadModel, ThreadState } from "./state"
 
@@ -130,6 +131,7 @@ export type ThreadDelivery =
  * endpoint internal (#14044): only the SDK's send (`endpoint_kind`, for `omo thread send` and connectors) reports it.
  */
 export type ThreadGatewayDeliveryFacts = {
+  readonly outcome?: ReceiptOutcome
   readonly delivery_id?: string
   readonly effective_mode?: "auto" | "start" | "steer" | "follow_up"
 }
@@ -256,6 +258,14 @@ export type ThreadListResult =
       readonly unanswered_endpoints?: number
     }
   | ThreadDataError
+
+/** A query-only read of the caller's original delivery; the transcript read type stays unchanged. */
+export type ThreadReceiptResult = {
+  readonly kind: "ok"
+  readonly thread: string
+  readonly delivery_id: string
+  readonly outcome: ReceiptOutcome
+}
 
 export type ThreadReadResult =
   | {
@@ -451,6 +461,7 @@ export type ThreadToolResult =
   | ThreadCreateResult
   | ThreadListResult
   | ThreadReadResult
+  | ThreadReceiptResult
   | ThreadSendResult
   | ThreadInterruptResult
   | ThreadCloseResult
