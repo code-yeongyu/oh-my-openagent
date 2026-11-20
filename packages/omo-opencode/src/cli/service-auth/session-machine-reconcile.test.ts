@@ -376,16 +376,28 @@ describe("reconcileDevice settles without a write or a log once its budget abort
 })
 
 describe("a refresh renames a generated device label to the machine name once (#13651, #14044)", () => {
-  test("`omo CLI on <host>` becomes the machine name, and the stored credential follows", async () => {
-    const server = service({ name: "omo CLI on build-box.local", bound: true, bindAnswer: "bound" })
-    const m = await signedIn("omo CLI on build-box.local", server)
+  // #14475: the desktop's pre-#14044 label is generated too; the CLI is the one refresher that renames it.
+  test.each(["omo CLI on build-box.local", "OmO Desktop on build-box"])(
+    "`%s` becomes the machine name, and the stored credential follows",
+    async (label) => {
+      const server = service({ name: label, bound: true, bindAnswer: "bound" })
+      const m = await signedIn(label, server)
+
+      await m.session.accessToken()
+      expect(server.renames).toEqual([{ path: `/v1/devices/${grant.device.id}`, body: { name: "build-box" } }])
+      expect(m.memory.current()?.device.name).toBe("build-box")
+
+      await m.session.accessToken()
+      expect(server.renames).toHaveLength(1)
+    },
+  )
+
+  test("a chosen name that only mentions the desktop is never renamed (#14475)", async () => {
+    const server = service({ name: "My OmO Desktop", bound: true, bindAnswer: "bound" })
+    const m = await signedIn("My OmO Desktop", server)
 
     await m.session.accessToken()
-    expect(server.renames).toEqual([{ path: `/v1/devices/${grant.device.id}`, body: { name: "build-box" } }])
-    expect(m.memory.current()?.device.name).toBe("build-box")
-
-    await m.session.accessToken()
-    expect(server.renames).toHaveLength(1)
+    expect(server.renames).toEqual([])
   })
 
   test("a name the person chose is never renamed", async () => {
