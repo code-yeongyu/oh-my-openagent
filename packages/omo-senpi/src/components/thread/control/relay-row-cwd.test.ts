@@ -28,4 +28,22 @@ describe("a thread on another device reports its working folder, not the folder'
     expect(JSON.stringify(result)).toContain('"cwd":"/srv/runs/hcfree-kakao"')
     expect(JSON.stringify(result)).not.toContain('"cwd":"hcfree-kakao"')
   })
+
+  test("#given b lists the thread #when thread_handoff delivers to it by name #then the receipt's cwd is the row's working folder", async () => {
+    const a = account({ rows: [ROW] })
+    const { run } = surface(a.remote)
+
+    const result = await run("thread_handoff", { thread: ROW.title, message: "hi" })
+
+    expect(result).toMatchObject({ kind: "ok", cwd: "/srv/runs/hcfree-kakao" })
+  })
+
+  test("#given b could not name the thread's folder #when thread_list runs with all_scope #then its cwd falls back to the folder name b listed", async () => {
+    const a = account({ rows: [{ ...ROW, path: "unknown" }] })
+    const { run } = surface(a.remote)
+
+    const result = await run("thread_list", { all_scope: true })
+
+    expect(JSON.stringify(result)).toContain('"cwd":"hcfree-kakao"')
+  })
 })
