@@ -1,10 +1,11 @@
 import { z } from "zod"
-import {
-  RECOVER_REFUSALS,
-  type RecoverBeginResult,
-  type RecoverBridgeResult,
-  type RecoverySessionBridge,
+import type {
+  RecoverBeginResult,
+  RecoverBridgeResult,
+  RecoverySessionBridge,
 } from "@oh-my-opencode/memory-core/sync-engine"
+// The light subpath: a value import from sync-engine pulls the CRDT runtime and its assets into the device-account bundle.
+import { RECOVER_REFUSALS } from "@oh-my-opencode/memory-core/sync-account-ports"
 import type { DesktopSyncOperationHandle } from "./desktopSyncOperation"
 
 const text = z.string().min(1).max(4096)
