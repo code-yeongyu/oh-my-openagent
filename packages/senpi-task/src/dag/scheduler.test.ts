@@ -31,9 +31,9 @@ import type { DagNode, DagNodeId, DagRunEvent, DagRunId } from "./types"
 
 // bunfig preloads test-setup.ts to raise the default timeout, but Bun honours a preload's
 // setDefaultTimeout only for the FIRST test file of a run; every later file silently reverts to
-// the built-in 5000ms. These wave/residency cases drive a fake manager plus a real file store,
-// which overshoots 5s on a windows runner and times out the whole barrier suite. Set the floor
-// here, where Bun does honour it.
+// the built-in 5000ms. The journal is in memory now (#11632), but results.ts still writes result
+// artifacts to disk with fsync (#11629), so a loaded windows runner can still push a multi-node case
+// past 5s. Set the floor here, where Bun does honour it.
 setDefaultTimeout(process.platform === "win32" ? 60_000 : 20_000)
 
 const cleanupRoots: string[] = []

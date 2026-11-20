@@ -164,7 +164,7 @@ export function readDagDirectory(directory: string): readonly fs.Dirent[] {
 
 export function createDagFileStore(config: DagStoreConfig, options: StoreOptions = {}): DagFileStore {
   const stateDir = resolveStateDir(config)
-  const paths = createPaths(stateDir)
+  const paths = createDagStorePaths(stateDir)
   const diagnosticLog: DagStoreDiagnostic[] = []
   const recoveredPaths = new Set<string>()
   const now = options.now ?? Date.now
@@ -327,7 +327,9 @@ export function createDagFileStore(config: DagStoreConfig, options: StoreOptions
   return store
 }
 
-function createPaths(stateDir: string): DagStorePaths {
+// Exported for the in-memory store (#11621): a test double with its own copy of the layout drifted from
+// this one (no result-path containment, raw task-owner lock names), so both build paths here.
+export function createDagStorePaths(stateDir: string): DagStorePaths {
   const root = join(stateDir, "dag")
   const keys = join(root, "keys")
   const runs = join(root, "runs")

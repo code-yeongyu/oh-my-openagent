@@ -7,6 +7,8 @@
 // against Bun's fixed 5 s default. Durability is covered by store.test.ts and the e2e cases.
 //
 // Fidelity, in the order a caller can observe it:
+// - Paths come from the file store's own builder (createDagStorePaths), so result-path containment and
+//   hashed lock names match it exactly.
 // - Refusals come from the file store's OWN validators (assertSupportedSchema, assertSafeSegment), so a
 //   journal regression that drops schemaVersion or names an unsafe run id fails here exactly as on disk.
 // - Seq must be strictly increasing, with the file store's error text; pages carry the same
@@ -38,11 +40,11 @@ import {
 import {
   assertSafeSegment,
   assertSupportedSchema,
+  createDagStorePaths,
   dagKeyHash,
   type DagEventPage,
   type DagFileStore,
   type DagKeyRecord,
-  type DagStorePaths,
 } from "../store"
 import type { DagRunEvent, DagRunId } from "../types"
 
@@ -50,39 +52,11 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
 }
 
-function memoryPaths(stateDir: string): DagStorePaths {
-  const root = join(stateDir, "dag")
-  const keys = join(root, "keys")
-  const runs = join(root, "runs")
-  const events = join(root, "events")
-  const results = join(root, "results")
-  const locks = join(root, "locks")
-  return {
-    root,
-    keys,
-    runs,
-    events,
-    results,
-    locks,
-    key: (parentSessionId, runKey) => join(keys, `${dagKeyHash(parentSessionId, runKey)}.json`),
-    run: (runId) => join(runs, `${runId}.json`),
-    event: (runId) => join(events, `${runId}.jsonl`),
-    result: (runId, nodeId) => {
-      assertSafeSegment(runId, "run id")
-      assertSafeSegment(nodeId, "node id")
-      return join(results, runId, `${nodeId}.txt`)
-    },
-    runLock: (runId) => join(locks, `${runId}.lock`),
-    keyLock: (parentSessionId, runKey) => join(locks, `key-${dagKeyHash(parentSessionId, runKey)}.lock`),
-    taskOwnerLock: (taskOwner) => join(locks, `task-owner-${taskOwner}.lock`),
-  }
-}
-
 export function createInMemoryDagStore(
   stateDir = "/memory/.omo/senpi-task",
   now: () => number = Date.now,
 ): DagFileStore {
-  const paths = memoryPaths(stateDir)
+  const paths = createDagStorePaths(stateDir)
   const eventsByRun = new Map<DagRunId, DagRunEvent[]>()
   const checkpoints = new Map<DagRunId, object>()
   const keys = new Map<string, DagKeyRecord>()
