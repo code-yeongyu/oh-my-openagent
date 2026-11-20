@@ -1277,6 +1277,19 @@ describe("remote == local: the same call answers the same on b as on this device
     },
   )
 
+  // omo#14478: a terminal thread on b refused the unload as a bare `unsupported` and the caller was told to update omo.
+  test("#given a thread held by an interactive terminal on b #when thread_close runs without graceful #then the refusal carries the graceful retry a local terminal close carries", async () => {
+    const a = account({ terminal: true })
+    const { run } = surface(a.remote)
+
+    const result = await run("thread_close", { thread: "dur-on-b" })
+
+    expect(result).toMatchObject({
+      kind: "error",
+      error: { code: "unsupported", details: { device: "b", retry_with: { graceful: true } } },
+    })
+  })
+
   test("#given a truncated read on both #when each follows its next_cursor #then the second pages match too", async () => {
     const a = account()
     const { run } = surface(a.remote)

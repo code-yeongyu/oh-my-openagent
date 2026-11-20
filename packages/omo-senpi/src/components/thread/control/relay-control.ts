@@ -104,9 +104,19 @@ export function createRelayControl(
         if (closed.outcome !== "held_elsewhere") remote.sessions.closed?.(row, unloaded, closedAt)
         return closed
       } catch (error) {
-        throw error instanceof ControlRefusal
-          ? new ControlRefusal({ ...error.failure, details: { device, ...error.failure.details } })
-          : error
+        if (!(error instanceof ControlRefusal)) throw error
+        // omo#14478: a terminal's endpoint takes no unload, and the device service reports that only as `unsupported`,
+        // the same reason an engine that predates the unload gives. Say what this device answers for a terminal thread
+        // (it closes only gracefully) instead of advising an update that cannot help.
+        if (closeOptions?.graceful !== true && error.failure.details?.["reason"] === "unsupported")
+          throw new ControlRefusal({
+            ...error.failure,
+            message: `Device ${device} refused to close thread ${row.title || sessionId} (unsupported): an interactive terminal closes its own session only gracefully, and an older engine takes no close at all.`,
+            next_action:
+              "Close it with graceful: true (the terminal exits once its turn ends), or use thread_interrupt (tool.thread_interrupt() in an eval cell) to stop its turn. If that is refused too, update omo on that device.",
+            details: { device, ...error.failure.details, command: "unload_session", retry_with: { graceful: true } },
+          })
+        throw new ControlRefusal({ ...error.failure, details: { device, ...error.failure.details } })
       }
     },
     setName: async (name) => {
