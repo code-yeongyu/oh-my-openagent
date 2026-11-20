@@ -10,14 +10,13 @@
 // engine runs (review r1 M1). A switch therefore completes or resumes; it never leaves A's files in B's tree.
 
 import { createHash, randomBytes } from "node:crypto"
-import { dirname, join, relative } from "node:path"
+import { basename, dirname, join, relative } from "node:path"
 
 import { existsSync, mkdir, readdir, rename, rm, stat } from "../../fs/resilient"
 import { syncJournalDirectory } from "../../journal/fsync"
 import { readJson, removeAtomic, writeJson } from "./atomic"
 import type { EngineDeps } from "./engine-deps"
 import type { SyncJournal } from "./journal"
-import { CursorBeyondHeadError, type Received, receive } from "./receive"
 import { itemPathsOnDisk } from "./working-tree"
 
 interface SwitchMarker {
@@ -62,8 +61,12 @@ async function finish(deps: EngineDeps, journal: SyncJournal, marker: SwitchMark
   const root = deps.repo.root
   await assertSameFileSystem(root, journal)
   // 1. park `from`'s journal, unless it is already parked (a resumed switch) or the journal already is `to`'s.
-  if (existsSync(journal.dir) && (await journal.state()).account !== marker.to)
+  const hasState = existsSync(join(journal.dir, "state.json"))
+  if (hasState && (await journal.state()).account !== marker.to)
     await moveIfPresent(journal.dir, parkedJournal(journal, marker.from))
+  // A journal dir with no state is the empty one open.ts recreates after a crash (review r2 M2): it gives way.
+  if (!hasState && existsSync(parkedJournal(journal, marker.to)) && (await filesUnder(journal.dir)).length === 0)
+    await rm(journal.dir, { recursive: true, force: true })
   // 2. park `from`'s item files; a path whose parked copy exists was parked before a crash.
   const fromTree = parkedTree(journal, marker.from)
   for (const file of marker.files) await moveIfPresent(join(root, file), join(fromTree, file))
@@ -80,47 +83,100 @@ async function finish(deps: EngineDeps, journal: SyncJournal, marker: SwitchMark
   await syncJournalDirectory(dirname(journal.dir))
 }
 
+const UNKNOWN_ACCOUNT = "unknown"
+
+/** The ownership proof could not reach the service: nothing is decided, captured or uploaded until a later cycle proves it. */
+export class OwnershipUnprovenError extends Error {
+  override readonly name = "OwnershipUnprovenError"
+  constructor(cause: unknown) {
+    super("memory sync is checking which account this device's memory belongs to", { cause })
+  }
+}
+
 /**
- * Finishes a switch a crash interrupted, then switches to the signed-in account when the journal names another.
- * Answers whether the state changed hands, so the caller reloads the item store. A journal an older build wrote
- * names no account: it is taken as the signed-in account's (a wrong one is caught by `cursorBeyondHead`).
+ * Whether a journal that names no account (an older build wrote it) belongs to the signed-in account: the record it
+ * applied at its cursor must be the one the signed-in account's server holds there (review r2 H2). A journal that
+ * never applied or queued anything holds no account's content. The pull runs outside the writer lock (sync-design §5);
+ * a pull that fails proves nothing either way.
+ */
+async function provenOwn(deps: EngineDeps, dir: string, queued: boolean): Promise<boolean> {
+  const { applied } = await readJson<{ readonly applied: number }>(join(dir, "state.json"), { applied: 0 })
+  if (applied === 0) return !queued
+  const index = await readJson<Record<string, { readonly seq: number; readonly digest: string }>>(
+    join(dir, "applied.json"),
+    {},
+  )
+  const [batchId, record] = Object.entries(index)
+    .filter(([, r]) => r.seq <= applied)
+    .sort(([, a], [, b]) => b.seq - a.seq)[0] ?? [null, null]
+  let page: Awaited<ReturnType<EngineDeps["transport"]["pull"]>>
+  try {
+    page = await deps.transport.pull((record?.seq ?? applied) - 1, 1)
+  } catch (error) {
+    throw new OwnershipUnprovenError(error)
+  }
+  if (page.head < applied) return false
+  if (record === null) return true
+  const entry = page.entries[0]
+  return entry?.seq === record.seq && entry.batchId === batchId && entry.digest === record.digest
+}
+
+async function pruneRetired(path: string, keep: string): Promise<void> {
+  const prefix = `${basename(path)}.retired-`
+  for (const name of await readdir(dirname(path)))
+    if (name.startsWith(prefix) && name !== basename(keep))
+      await rm(join(dirname(path), name), { recursive: true, force: true })
+}
+
+async function switchAccount(deps: EngineDeps, journal: SyncJournal, from: string, to: string): Promise<void> {
+  const suffix = `.retired-${Date.now()}-${randomBytes(4).toString("hex")}`
+  for (const stale of [parkedJournal(journal, from), parkedTree(journal, from)])
+    if (existsSync(stale)) {
+      await rename(stale, `${stale}${suffix}`)
+      await pruneRetired(stale, `${stale}${suffix}`)
+    }
+  const files = [...(await itemPathsOnDisk(deps.repo.root)).byKey.values()]
+    .filter((path): path is string => path !== null)
+    .sort()
+  const marker: SwitchMarker = { from, to, files }
+  await writeJson(markerPath(journal), marker)
+  await finish(deps, journal, marker)
+}
+
+/**
+ * Finishes a switch a crash interrupted, then gives the repository to the signed-in account: its own state is kept,
+ * another account's is parked, and an unproven older journal is parked as an unknown account's and never uploaded; it
+ * is restored once an account proves it. The moves run under the writer lock, so no memory write lands between the
+ * snapshot and the renames (review r2 M3). Answers whether the state changed hands, so the caller reloads the store.
  */
 export async function claimAccount(deps: EngineDeps, journal: SyncJournal): Promise<boolean> {
   const pending = await readJson<SwitchMarker | null>(markerPath(journal), null)
-  if (pending !== null) await finish(deps, journal, pending)
+  if (pending !== null) await deps.lock.withLock(() => finish(deps, journal, pending))
   const account = deps.account
   if (account === undefined) return pending !== null
   const owner = (await journal.state()).account
   if (owner === account) return pending !== null
-  if (owner === null) {
+  if (owner === null && (await provenOwn(deps, journal.dir, (await journal.pending()).items.length > 0))) {
     await journal.updateState({ account })
     return pending !== null
   }
-  const stale = parkedJournal(journal, owner)
-  const suffix = `.retired-${Date.now()}-${randomBytes(4).toString("hex")}`
-  if (existsSync(stale)) await rename(stale, `${stale}${suffix}`)
-  if (existsSync(parkedTree(journal, owner)))
-    await rename(parkedTree(journal, owner), `${parkedTree(journal, owner)}${suffix}`)
-  const files = [...(await itemPathsOnDisk(deps.repo.root)).byKey.values()]
-    .filter((path): path is string => path !== null)
-    .sort()
-  const marker: SwitchMarker = { from: owner, to: account, files }
-  await writeJson(markerPath(journal), marker)
-  await finish(deps, journal, marker)
-  deps.log?.(`sync: this repository synced another account; its memories are parked and this account's are restored`)
+  const unknown = parkedJournal(journal, UNKNOWN_ACCOUNT)
+  const reclaim =
+    owner !== null &&
+    !existsSync(parkedJournal(journal, account)) &&
+    existsSync(unknown) &&
+    (await provenOwn(deps, unknown, true))
+  await deps.lock.withLock(async () => {
+    if (reclaim) {
+      await rename(unknown, parkedJournal(journal, account))
+      await moveIfPresent(parkedTree(journal, UNKNOWN_ACCOUNT), parkedTree(journal, account))
+    }
+    await switchAccount(deps, journal, owner ?? UNKNOWN_ACCOUNT, account)
+  })
+  deps.log?.(
+    owner === null
+      ? "sync: local memory from another account was set aside; it is restored when that account signs in here"
+      : "sync: this repository synced another account; its memories are parked and this account's are restored",
+  )
   return true
-}
-
-/**
- * A pull that finds the server head below the applied cursor ran on another chain's journal (review L2): it is retired
- * and this chain starts over. The working files stay, so an edit the retired outbox still held is captured fresh.
- */
-export async function receiveOnFreshChain(deps: EngineDeps, journal: SyncJournal, error: unknown): Promise<Received> {
-  if (!(error instanceof CursorBeyondHeadError)) throw error
-  deps.log?.(`sync: ${error.message}; retiring that journal and starting this account's sync over`)
-  await journal.retire()
-  await journal.claim(deps.store.peer(), deps.space, deps.legacySpace, deps.log)
-  if (deps.account !== undefined) await journal.updateState({ account: deps.account })
-  await deps.store.load()
-  return receive(deps, journal)
 }

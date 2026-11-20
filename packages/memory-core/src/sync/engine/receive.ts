@@ -43,20 +43,6 @@ async function takeSnapshot(
   return null
 }
 
-/**
- * The server's head is below this journal's applied cursor: the cursor was built on another chain (a journal an
- * older build wrote before an account switch, #14481 review L2). Heads never move back on one chain.
- */
-export class CursorBeyondHeadError extends Error {
-  override readonly name = "CursorBeyondHeadError"
-  constructor(
-    readonly head: number,
-    readonly applied: number,
-  ) {
-    super(`memory sync: the server head ${head} is below this journal's applied cursor ${applied}`)
-  }
-}
-
 export async function receive(deps: EngineDeps, journal: SyncJournal): Promise<Received> {
   const state = await journal.state()
   const index = await journal.applied()
@@ -97,7 +83,6 @@ export async function receive(deps: EngineDeps, journal: SyncJournal): Promise<R
   }
   for (;;) {
     const page = await deps.transport.pull(after, PAGE)
-    if (page.head < state.applied) throw new CursorBeyondHeadError(page.head, state.applied)
     if (page.snapshot !== null && page.snapshot.coversSeq >= expected) {
       const s = page.snapshot
       const entry: PulledEntry = {

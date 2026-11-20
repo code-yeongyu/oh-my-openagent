@@ -6,6 +6,7 @@
 // (#13635), and the ones the engine can name honestly get their own kind.
 
 import { StrandedGitLockError } from "../../git/repo-lock-sweep"
+import { OwnershipUnprovenError } from "./account-journal"
 import { SyncAuthError, SyncHttpError, SyncNetworkError } from "./adapters/http-transport"
 import { causeOf, type SyncFailureCause, type SyncStage } from "./failure-cause"
 
@@ -41,6 +42,13 @@ const AUTH_EXPIRED: SyncFailure = {
   kind: "auth_expired",
   reason: "This device's OmO sign-in has expired or was refused, so memory sync cannot reach your account.",
   action: "Sign in to OmO again from the OmO desktop app on this computer.",
+}
+
+/** An older journal waits for its owner to be proven (#14491): nothing is uploaded or set aside meanwhile. */
+const OWNERSHIP_UNPROVEN: SyncFailure = {
+  kind: "offline",
+  reason: "Memory sync is checking which account this device's memory belongs to.",
+  action: "Nothing is uploaded until the OmO sync service answers; sync resumes on its own once it is reachable.",
 }
 
 const OFFLINE: SyncFailure = {
@@ -160,5 +168,6 @@ export function describeSyncFailure(error: unknown, stage: SyncStage): SyncFailu
   }
   if (error instanceof SyncAuthError || (error instanceof SyncHttpError && error.status === 401)) return AUTH_EXPIRED
   if (error instanceof SyncNetworkError || (error instanceof SyncHttpError && error.transient)) return OFFLINE
+  if (error instanceof OwnershipUnprovenError) return OWNERSHIP_UNPROVEN
   return describeCausedFailure(error, stage)
 }

@@ -249,6 +249,8 @@ export async function makeDevice(
     async restart(f, moveTo, switchTo) {
       if (moveTo !== undefined) bound = moveTo
       if (switchTo !== undefined) link = switchTo
+      // Production opens the journal dir before the engine loads (open.ts): a restart does too.
+      await mkdir(join(root, ".git", "omo-sync"), { recursive: true })
       Object.assign(device, build(f))
     },
     async syncCommits() {

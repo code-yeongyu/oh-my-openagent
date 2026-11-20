@@ -4,7 +4,7 @@
 // journaled work, receives outside the lock, captures and applies under it, then pushes outside it;
 // a stale base receives first and retries.
 
-import { claimAccount, receiveOnFreshChain } from "./account-journal"
+import { claimAccount } from "./account-journal"
 import { advance, applyVerified } from "./apply"
 import type { EngineDeps } from "./engine-deps"
 import type { SyncFailure } from "./failure"
@@ -281,7 +281,7 @@ export class SyncEngine {
     let snapshot: number | null = null
     const inbound = async () => {
       this.stage = "receive"
-      const got = await receive(deps, journal).catch((error: unknown) => receiveOnFreshChain(deps, journal, error))
+      const got = await receive(deps, journal)
       refused += got.refused
       snapshot = got.snapshot ?? snapshot
       this.stage = "capture"
