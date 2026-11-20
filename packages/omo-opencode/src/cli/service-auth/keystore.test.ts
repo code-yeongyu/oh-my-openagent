@@ -306,7 +306,8 @@ describe("Linux with no Secret Service keeps the shared sign-in in a private sta
     expect(notices.join("\n")).not.toContain(otherRecord.refreshToken)
   })
 
-  test("#given the same sign-in in both #then only a file at least as fresh as the keyring moves over it", async () => {
+  // #13667 L2: a fresher keyring copy supersedes the file; the stale rotating refresh token must not stay at rest.
+  test("#given the same sign-in in both #then a file at least as fresh moves over the keyring, a staler one is deleted", async () => {
     for (const [keyringExpiry, moves] of [
       ["2098-01-01T00:00:00.000Z", true],
       ["2099-01-01T00:00:00.000Z", true],
@@ -330,7 +331,7 @@ describe("Linux with no Secret Service keeps the shared sign-in in a private sta
       }).toEqual({
         keyringExpiry,
         keyring: moves ? written : inKeyring,
-        fileKept: !moves,
+        fileKept: false,
       })
     }
   })
@@ -351,5 +352,35 @@ describe("Linux with no Secret Service keeps the shared sign-in in a private sta
     await linuxStore(unanswered, kept.api, "unknown").clear()
     expect(await missing(stateFile(unanswered))).toBe(true)
     expect(keyringValue(kept)).toMatchObject({ device: record.device })
+  })
+
+  // #13667 L1: a sign-out that keeps another context's sign-in file never leads to that sign-in here, in this process or
+  // the next; the context that wrote the file keeps using it.
+  test("#given the keyring holds A and the file holds B #when signed out here #then no later command here signs in as B", async () => {
+    const home = await temporaryHome()
+    await linuxStore(home, null, "absent").write(otherRecord)
+    const written = await readFile(stateFile(home), "utf8")
+    const memory = memorySecrets()
+    await linuxStore(await temporaryHome(), memory.api, "unlocked").write(record)
+    const notices: string[] = []
+    await linuxStore(home, memory.api, "unlocked", notices).clear()
+    expect(notices).toHaveLength(1)
+    expect(notices.join("\n")).not.toContain(otherRecord.refreshToken)
+    for (const lock of ["unlocked", "unknown"] as const) {
+      const next = linuxStore(home, memory.api, lock)
+      expect({ lock, read: await next.read(), keyring: memory.values.size }).toEqual({ lock, read: null, keyring: 0 })
+    }
+    expect(await readFile(stateFile(home), "utf8")).toBe(written)
+    expect(await linuxStore(home, null, "absent").read()).toMatchObject(otherRecord)
+
+    const signedInAgain = linuxStore(home, memory.api, "unlocked")
+    await signedInAgain.write(record)
+    expect(await signedInAgain.read()).toMatchObject(record)
+    expect(await readFile(stateFile(home), "utf8")).toBe(written)
+
+    await linuxStore(home, null, "absent").clear()
+    await linuxStore(home, null, "absent").write(otherRecord)
+    await memory.api.delete({ service: "omo-cli", name: credentialId(api) })
+    expect(await linuxStore(home, memory.api, "unlocked").read()).toMatchObject(otherRecord)
   })
 })
