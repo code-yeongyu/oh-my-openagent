@@ -239,4 +239,5 @@ test("#given a recovery that succeeds and a device switch the service refuses to
   expect(r.exit).toBe(1)
   expect(r.out).toEqual([])
   expect(r.err.join("\n")).toContain("`omo sync enable`")
+  expect(r.err.join("\n")).toContain("(service unavailable)")
 })
