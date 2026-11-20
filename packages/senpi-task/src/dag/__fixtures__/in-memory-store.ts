@@ -14,7 +14,7 @@
 //   encoding, so no caller can hold a live reference to stored state.
 // - Locks refuse a nested acquire of the same lock, as the file store does (there a second create of a
 //   live lock file ends in "Timed out acquiring DAG lock"); it is refused at once rather than after the
-//   file store's 1 s stall. Beyond that a lock is a no-op: mutual exclusion between synchronous sections
+//   file store's 30 s stall behind an unchanged holder. Beyond that a lock is a no-op: mutual exclusion between synchronous sections
 //   is what single-threaded JS already provides, and there is no second process to exclude.
 //
 // Deliberately NOT emulated, because no case here depends on it:
@@ -26,6 +26,7 @@
 // - `pruneExpired` returns nothing and `writeCheckpoint` does not enforce max_runs_per_session: both are
 //   file-store retention/capacity concerns, covered by store.test.ts, and a memory store is discarded
 //   with its test.
+import { existsSync, readdirSync } from "node:fs"
 import { basename, join } from "node:path"
 
 import { decodePausedNodes, decodePausedTransition, encodePausedNodes, encodePausedTransition } from "../paused-node-encoding"
@@ -159,4 +160,15 @@ export function createInMemoryDagStore(stateDir = "/memory/.omo/senpi-task", now
       withLock(join(paths.locks, `session-runs-${dagKeyHash(parentSessionId, "session-runs")}.lock`), operation),
     pruneExpired: () => [],
   }
+}
+
+// The journal files a file-backed store WOULD have written under this store's paths. Cases that journal
+// in memory assert this stays empty, so a fixture swapped back to disk fails loudly instead of quietly
+// reintroducing the load-dependent commit cost. results/ and skills/ are excluded: their writers bypass
+// the store (results.ts, skills materialization) until #11629.
+export function journalFilesOnDisk(store: DagFileStore): readonly string[] {
+  const { events, runs, locks, keys } = store.paths
+  return Object.entries({ events, runs, locks, keys }).flatMap(([name, directory]) =>
+    existsSync(directory) ? readdirSync(directory).map((entry) => `${name}/${entry}`) : [],
+  )
 }

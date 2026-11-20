@@ -1,6 +1,5 @@
 import { afterEach, expect, test } from "bun:test"
-import { existsSync, readdirSync } from "node:fs"
-import { join } from "node:path"
+import { journalFilesOnDisk } from "./__fixtures__/in-memory-store"
 import { dagNode, infraFixture, infrastructureFailure, success, RetryClock } from "./infra-retry-fixture"
 import { createDagScheduler } from "./scheduler"
 import { RunnerError } from "../runners/in-process/runner-error"
@@ -12,12 +11,6 @@ const fixtures: ReturnType<typeof infraFixture>[] = []
 // bring the same cost straight back to any file-backed caller (hosted Windows measured ~110-160 ms per
 // commit). The assertion fails before that can happen unnoticed.
 const MAX_JOURNAL_COMMITS_PER_CASE = 150
-function journalFilesOnDisk(fixture: ReturnType<typeof infraFixture>): readonly string[] {
-  return ["events", "runs", "locks", "keys"].flatMap((directory) => {
-    const path = join(fixture.dagDirectory, directory)
-    return existsSync(path) ? readdirSync(path).map((entry) => `${directory}/${entry}`) : []
-  })
-}
 
 afterEach(() => {
   // These cases assert retry semantics, never crash durability, so their journal stays in memory. A
@@ -28,7 +21,7 @@ afterEach(() => {
   // by callers that bypass the store (results.ts, skills materialization), so <dag>/results and
   // <dag>/skills may exist; no case here reads them, and routing those writers through the store is
   // #11629.
-  const journaled = fixtures.map(journalFilesOnDisk)
+  const journaled = fixtures.map((fixture) => journalFilesOnDisk(fixture.store))
   for (const fixture of fixtures.splice(0)) fixture.cleanup()
   for (const files of journaled) expect(files).toEqual([])
 })

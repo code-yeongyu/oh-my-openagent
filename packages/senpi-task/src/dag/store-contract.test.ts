@@ -18,7 +18,11 @@ afterAll(() => {
 function fileStore(): DagFileStore {
   const project = fs.mkdtempSync(join(tmpdir(), "dag-store-contract-"))
   projects.push(project)
-  return createDagFileStore({ project_dir: project }, { fsync: false })
+  // A virtual clock that steps an hour per read: a nested acquire sees its own live holder, and the file
+  // store's stall bound (30 s behind one unchanged holder, #14129) elapses on the next check instead of
+  // in real time.
+  let virtualNow = 0
+  return createDagFileStore({ project_dir: project }, { fsync: false, now: () => (virtualNow += 3_600_000) })
 }
 
 const RUN_ID = "dag_contract" as DagRunId

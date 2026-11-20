@@ -60,9 +60,6 @@ export function infraFixture(
   return {
     starts,
     store,
-    // Where a file-backed journal WOULD write. The cases assert it stays absent, so a store swapped
-    // back to disk fails here instead of quietly reintroducing the load-dependent commit cost.
-    dagDirectory: join(stateDir, "dag"),
     taskStore,
     taskManager,
     async scheduler(nodes: DagDefinition["nodes"]) {
