@@ -1,5 +1,6 @@
-import { afterAll, describe, expect, test } from "bun:test"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { afterAll, describe, expect, spyOn, test } from "bun:test"
+import * as fs from "node:fs"
+import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -145,6 +146,59 @@ describe("readTranscript tail mode", () => {
     }
     expect(pages.length).toBeGreaterThan(2)
     expect(pages.reverse().flat()).toEqual(entries.slice(-20).map(idOf))
+  })
+
+  test("#14418: a tail read of a large session file reads its window from the end, not the whole file", () => {
+    const dir = makeTempDir()
+    const entries = [sessionHeader(), ...Array.from({ length: 3000 }, (_, i) => messageEntry(i, "z".repeat(2000)))]
+    const path = writeJsonl(dir, "large.jsonl", entries)
+    const fileBytes = fs.statSync(path).size
+
+    const reads = spyOn(fs, "readSync")
+    try {
+      const result = expectOk(readTranscript(jsonlSource(path), { mode: "tail", max_bytes: THREAD_READ_MAX_BYTES }))
+      expect(result.items.map(idOf)).toEqual(entries.slice(-THREAD_TAIL_DEFAULT_ITEMS).map(idOf))
+      const bytes = reads.mock.results.reduce(
+        (sum, read) => sum + (read.type === "return" && typeof read.value === "number" ? read.value : 0),
+        0,
+      )
+      // The window's 60 entries of ~2 KB each, plus at most one chunk read past the window's first line.
+      expect(bytes).toBeLessThan(THREAD_TAIL_DEFAULT_ITEMS * 2200 + 65536)
+      expect(bytes).toBeLessThan(fileBytes / 10)
+      // The older entries were never read, so the read cannot count them.
+      expect(result.total_items).toBeNull()
+    } finally {
+      reads.mockRestore()
+    }
+  })
+
+  test("a tail read rebuilds lines longer than a read chunk and multi-byte text split across chunks", () => {
+    const dir = makeTempDir()
+    const long = { ...messageEntry(1), message: { role: "assistant", content: "한글".repeat(70_000) } }
+    const entries = [sessionHeader(), messageEntry(0), long, messageEntry(2), "{ torn", messageEntry(3)]
+    const path = writeJsonl(dir, "long-line.jsonl", entries)
+
+    const result = expectOk(readTranscript(jsonlSource(path), { mode: "tail", max_bytes: THREAD_READ_MAX_BYTES }))
+    expect(result.items).toEqual(entries.filter((entry) => typeof entry !== "string") as Entry[])
+    expect(result.total_items).toBe(5)
+    expect(result.skipped_lines).toBe(1)
+  })
+
+  test("the cursor of a session file's tail window goes stale when the file is appended under it", () => {
+    const dir = makeTempDir()
+    const entries = [sessionHeader(), ...Array.from({ length: 30 }, (_, i) => messageEntry(i, "y".repeat(400)))]
+    const path = writeJsonl(dir, "tail-stale.jsonl", entries)
+
+    const first = expectOk(readTranscript(jsonlSource(path), { mode: "tail", tail_items: 20, max_bytes: 2048 }))
+    const cursor = first.next_cursor as string
+    expect(
+      expectOk(readTranscript(jsonlSource(path), { mode: "page", max_bytes: 2048, cursor })).items.length,
+    ).toBeGreaterThan(0)
+
+    appendFileSync(path, `${JSON.stringify(messageEntry(30))}\n`)
+    const result = readTranscript(jsonlSource(path), { mode: "page", max_bytes: 2048, cursor })
+    expect(expectError(result).error.code).toBe("cursor_stale")
+    expectNextAction(result)
   })
 
   test("a tail shorter than the transcript is not a truncation of the byte budget", () => {
