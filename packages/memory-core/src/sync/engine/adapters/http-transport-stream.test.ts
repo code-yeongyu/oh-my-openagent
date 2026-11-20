@@ -51,7 +51,7 @@ function streamServer(answers: readonly ((signal: AbortSignal | null | undefined
 const advanced = (seq: number, cursor: string) =>
   `id: ${cursor}\ndata: ${JSON.stringify({ type: "sync.advanced", head: { seq, link: "A".repeat(43) } })}\n\n`
 
-// Time is the behavior here: a stream counts as resumable only once it lived the retry wait.
+// Time is the behavior here: a stream counts as resumable only once it lived the resume floor.
 const lived = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
 test("a stream the service closes after its lifetime is resumed at once with Last-Event-ID, and the engine is never told it dropped", async () => {
@@ -59,7 +59,7 @@ test("a stream the service closes after its lifetime is resumed at once with Las
     (signal) =>
       sse(
         ["retry: 2000\nid: p1.d0123456789abcdef\n\n", advanced(3, "p1.d0123456789abcdef.s3.n0.t0")],
-        lived(5_100),
+        lived(1_100),
         signal,
       ),
   ])

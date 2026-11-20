@@ -21,7 +21,9 @@ export const b64urlOfHex = (hex: string): string => Buffer.from(hex, "hex").toSt
 export const hexOfB64url = (b64url: string): string => Buffer.from(b64url, "base64url").toString("hex")
 
 const STREAM_RETRY_MS = 5_000
-const STREAM_CONNECT_MS = 5_000
+const STREAM_CONNECT_MS = 3_000
+/** A stream that lived this long before the service closed it resumes at once; a shorter one waits STREAM_RETRY_MS. */
+const STREAM_RESUME_MIN_MS = 1_000
 
 export class SyncHttpError extends Error {
   override readonly name = "SyncHttpError"
@@ -174,11 +176,11 @@ export function createHttpTransport(options: HttpTransportOptions): Transport {
 }
 
 /**
- * Holds the stream open for as long as the subscription lives. A stream that delivered a cursor and lived the retry
- * wait (the service closes each one after its bounded lifetime) is resumed at once with `Last-Event-ID`, so the service
+ * Holds the stream open for as long as the subscription lives. A stream that delivered a cursor and lived at least
+ * STREAM_RESUME_MIN_MS (the service closes each one after its bounded lifetime) is resumed at once with `Last-Event-ID`, so the service
  * replays what landed in between and the engine never drops to its poll for a routine reconnect. Any other end - a
  * refused, failed or stalled connect (each connect has a deadline), a broken stream, one that ended before its first
- * cursor or before the retry wait - is reported as `onConnected(false, cause)` with the HTTP status and code or the
+ * cursor or sooner than that - is reported as `onConnected(false, cause)` with the HTTP status and code or the
  * failure, and retried after STREAM_RETRY_MS; the engine polls meanwhile (#14476).
  */
 async function streamLoop(
@@ -217,9 +219,9 @@ async function streamLoop(
           if (event?.kind === "advanced") handlers.onAdvanced(event.head)
           else if (event?.kind === "state") handlers.onStateChanged()
         }
-        // A stream that lived its bounded lifetime resumes at once; one that ended sooner is retried after the full
-        // wait like any other failure, so an endpoint that keeps ending streams early never spins the loop.
-        if (resumable && Date.now() - opened >= STREAM_RETRY_MS) continue
+        // A stream that lived past the floor resumes at once; one that ended sooner is retried after the full wait like
+        // any other failure, so an endpoint that keeps ending streams early never spins the loop.
+        if (resumable && Date.now() - opened >= STREAM_RESUME_MIN_MS) continue
         cause = resumable ? "stream ended early" : "stream ended before its first event id"
       }
     } catch (error) {
