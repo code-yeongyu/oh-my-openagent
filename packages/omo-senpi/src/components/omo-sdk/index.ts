@@ -1,17 +1,27 @@
 import { type AccessPorts, createAccountAccess } from "./access"
 import { type AccountApi, createAccountApi } from "./account"
-import { type ConfigApi, createConfigApi } from "./config"
+import { type ConfigApi, type ConfigPorts, createConfigApi } from "./config"
 import { createDeviceServiceApi, type DeviceServiceApi, type DeviceServiceStatusPort } from "./device-service"
 import { createDevicesApi, type DevicesApi } from "./devices"
 
 export type { CredentialStorePort, SessionPort } from "./access"
 export type { WhoAmI } from "./account"
-export type { ConfigStatus } from "./config"
+export type {
+  CheckOptions,
+  ConfigEdit,
+  ConfigExplanation,
+  ConfigPorts,
+  ConfigStatus,
+  ModelSwaps,
+  PolicyCheck,
+  PolicyFinding,
+  StatusOptions,
+} from "./config"
 export type { DeviceServiceStatus, DeviceServiceStatusPort } from "./device-service"
 export type { LiveDevice } from "./devices"
 export type { OmoError, OmoErrorCode, OmoResult } from "./result"
 
-export type OmoSdkPorts = AccessPorts & { readonly deviceServiceStatus?: DeviceServiceStatusPort }
+export type OmoSdkPorts = AccessPorts & ConfigPorts & { readonly deviceServiceStatus?: DeviceServiceStatusPort }
 
 export type OmoSdkOptions = {
   /** The account service origin; else `OMO_SERVICE_API_URL` from `env`, else the production API. */
@@ -45,7 +55,7 @@ export function createOmoSdk(options: OmoSdkOptions = {}): OmoSdk {
       ...(options.home === undefined ? {} : { home: options.home }),
       ...(ports.deviceServiceStatus === undefined ? {} : { status: ports.deviceServiceStatus }),
     }),
-    config: createConfigApi({ cwd, env }),
+    config: createConfigApi({ cwd, env, ports }),
     close: access.close,
   }
 }

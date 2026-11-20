@@ -83,9 +83,7 @@ export const modelChange = (
     timestamp,
     provider,
     modelId,
-    ...(reason === undefined
-      ? {}
-      : { reason, originalProvider, originalModelId, source: reason, duringTurn: true }),
+    ...(reason === undefined ? {} : { reason, originalProvider, originalModelId, source: reason, duringTurn: true }),
   }
 }
 

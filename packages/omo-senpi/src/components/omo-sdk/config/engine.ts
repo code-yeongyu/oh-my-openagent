@@ -1,4 +1,5 @@
 import { existsSync, lstatSync, readFileSync } from "node:fs"
+import { createRequire } from "node:module"
 import { homedir, userInfo } from "node:os"
 import { dirname, join, normalize, resolve } from "node:path"
 
@@ -130,7 +131,10 @@ export function parseEngineSettings(content: string): {
 } {
   const parsed = parseJsoncSafe<unknown>(content)
   if (parsed.errors.length > 0) {
-    return { document: {}, diagnostics: parsed.errors.map((error) => `parse error ${error.message} at ${error.offset}`) }
+    return {
+      document: {},
+      diagnostics: parsed.errors.map((error) => `parse error ${error.message} at ${error.offset}`),
+    }
   }
   const data = parsed.data
   if (data === null || data === undefined) return { document: {}, diagnostics: [] }
@@ -143,6 +147,35 @@ export function readEngineSettings(scope: EngineScope, location: EngineLocation)
   if (!existsSync(path)) return { scope, path, exists: false, loaded: false, diagnostics: [], document: {} }
   const { document, diagnostics } = parseEngineSettings(readFileSync(path, "utf-8"))
   return { scope, path, exists: true, loaded: diagnostics.length === 0, diagnostics, document }
+}
+
+export function readEngineLayers(location: EngineLocation): {
+  readonly global: EngineSettingsFile
+  readonly project: EngineSettingsFile
+} {
+  return { global: readEngineSettings("global", location), project: readEngineSettings("project", location) }
+}
+
+/** The key path of an engine setting; a fallback chain's model id may hold dots, so it stays one segment. */
+export function engineKeySegments(key: string): readonly string[] {
+  const chains = "retry.fallbackChains."
+  return key.startsWith(chains) ? ["retry", "fallbackChains", key.slice(chains.length)] : key.split(".")
+}
+
+/** The version of the engine package this process can resolve, if any. */
+export function installedEngineVersion(): string | undefined {
+  const require = createRequire(import.meta.url)
+  for (const modules of require.resolve.paths("@code-yeongyu/senpi/package.json") ?? []) {
+    const manifest = join(modules, "@code-yeongyu", "senpi", "package.json")
+    if (!existsSync(manifest)) continue
+    try {
+      const version: unknown = JSON.parse(readFileSync(manifest, "utf-8")).version
+      return typeof version === "string" ? version : undefined
+    } catch {
+      return undefined
+    }
+  }
+  return undefined
 }
 
 export function valueAt(document: unknown, path: readonly (string | number)[]): unknown {
@@ -219,8 +252,14 @@ export function engineView(
   const get = (key: EngineDefaultKey): unknown => effectiveEngineValue(key, global, project)
   const compaction = {
     enabled: asBoolean(get("compaction.enabled"), ENGINE_DEFAULTS["compaction.enabled"]),
-    speculativeEnabled: asBoolean(get("compaction.speculativeEnabled"), ENGINE_DEFAULTS["compaction.speculativeEnabled"]),
-    speculativeFraction: asNumber(get("compaction.speculativeFraction"), ENGINE_DEFAULTS["compaction.speculativeFraction"]),
+    speculativeEnabled: asBoolean(
+      get("compaction.speculativeEnabled"),
+      ENGINE_DEFAULTS["compaction.speculativeEnabled"],
+    ),
+    speculativeFraction: asNumber(
+      get("compaction.speculativeFraction"),
+      ENGINE_DEFAULTS["compaction.speculativeFraction"],
+    ),
     speculativeCooldownMs: asNumber(
       get("compaction.speculativeCooldownMs"),
       ENGINE_DEFAULTS["compaction.speculativeCooldownMs"],

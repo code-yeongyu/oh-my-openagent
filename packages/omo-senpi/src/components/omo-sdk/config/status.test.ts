@@ -14,7 +14,14 @@ describe("config.status files", () => {
     const project = sandbox.projectConfig("{ not json")
     const engineGlobal = sandbox.engineGlobal({})
     const status = valueOf(await sandbox.config().status())
-    expect(status.files).toContainEqual({ kind: "omo", scope: "user", path: user, exists: true, loaded: true, diagnostics: [] })
+    expect(status.files).toContainEqual({
+      kind: "omo",
+      scope: "user",
+      path: user,
+      exists: true,
+      loaded: true,
+      diagnostics: [],
+    })
     expect(status.files).toContainEqual(
       expect.objectContaining({ kind: "omo", scope: "project", path: project, exists: true, loaded: false }),
     )
@@ -75,9 +82,7 @@ describe("config.status routing", () => {
   test("#given the machine's available models #when status runs #then each entry names the rung a spawn would pick", async () => {
     sandbox = configSandbox()
     sandbox.userConfig({ categories: { quick: { model: "openai/gpt-5.5" } } })
-    const { routing } = valueOf(
-      await sandbox.config().status({ models: [{ provider: "openai", id: "gpt-5.5" }] }),
-    )
+    const { routing } = valueOf(await sandbox.config().status({ models: [{ provider: "openai", id: "gpt-5.5" }] }))
     expect(routing.categories.find((entry) => entry.name === "quick")?.pick).toBe("openai/gpt-5.5")
     expect(routing.agents.find((entry) => entry.name === "librarian")?.pick).toBeNull()
   })
@@ -147,9 +152,7 @@ describe("config.status engine", () => {
 
   test("#given an installed engine other than the read-at version #when status runs #then it says so", async () => {
     sandbox = configSandbox()
-    const { engine } = valueOf(
-      await sandbox.config({ ports: { engineVersion: () => "2026.12.30-1" } }).status(),
-    )
+    const { engine } = valueOf(await sandbox.config({ ports: { engineVersion: () => "2026.12.30-1" } }).status())
     expect(engine.installedEngineVersion).toBe("2026.12.30-1")
     expect(engine.installedEngineDiffers).toBe(true)
   })

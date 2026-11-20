@@ -1,7 +1,14 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
 import type { ConfigEdit, PolicyFinding } from "."
-import { assistantTurn, configSandbox, type ConfigSandbox, LAUNCH, modelChange, valueOf } from "./config-sandbox.test-support"
+import {
+  assistantTurn,
+  configSandbox,
+  type ConfigSandbox,
+  LAUNCH,
+  modelChange,
+  valueOf,
+} from "./config-sandbox.test-support"
 import { ENGINE_READ_AT_VERSION } from "./engine"
 
 let sandbox: ConfigSandbox
@@ -90,7 +97,10 @@ describe("config.check deep_family", () => {
   test("#given a deep-high entry on a Claude model #when the files are checked #then it warns", async () => {
     sandbox = configSandbox()
     sandbox.userConfig({ categories: { "deep-high": { model: OPUS_55 } } })
-    expect(finding(await findings(), "deep_family")).toMatchObject({ severity: "warn", path: "categories.deep-high.model" })
+    expect(finding(await findings(), "deep_family")).toMatchObject({
+      severity: "warn",
+      path: "categories.deep-high.model",
+    })
   })
 
   test("#given deep entries on GPT and DeepSeek models #when the files are checked #then deep_family stays silent", async () => {

@@ -52,10 +52,12 @@ describe("config.explain engine keys", () => {
 
   test("#given no settings #when a model's fallback chain is explained #then the default chain answers", async () => {
     sandbox = configSandbox()
-    const explained = valueOf(
-      await sandbox.config().explain({ path: "engine:retry.fallbackChains.claude-opus-5-5" }),
-    )
-    expect(explained).toMatchObject({ set: true, source: "default", value: ENGINE_DEFAULT_FALLBACK_CHAINS["claude-opus-5-5"] })
+    const explained = valueOf(await sandbox.config().explain({ path: "engine:retry.fallbackChains.claude-opus-5-5" }))
+    expect(explained).toMatchObject({
+      set: true,
+      source: "default",
+      value: ENGINE_DEFAULT_FALLBACK_CHAINS["claude-opus-5-5"],
+    })
   })
 
   test("#given an engine key the SDK does not know #when it is explained #then it answers unknown_path", async () => {

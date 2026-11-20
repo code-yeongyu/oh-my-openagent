@@ -1,7 +1,14 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { join } from "node:path"
 
-import { assistantTurn, configSandbox, type ConfigSandbox, errorOf, modelChange, valueOf } from "./config-sandbox.test-support"
+import {
+  assistantTurn,
+  configSandbox,
+  type ConfigSandbox,
+  errorOf,
+  modelChange,
+  valueOf,
+} from "./config-sandbox.test-support"
 
 let sandbox: ConfigSandbox
 afterEach(() => sandbox.cleanup())
@@ -30,7 +37,14 @@ describe("config.modelSwaps", () => {
     expect(swaps.launchModel).toBe(OPUS_55)
     expect(swaps.currentModel).toBe(OPUS_5)
     expect(swaps.swaps).toEqual([
-      { time: "2026-11-09T12:11:27.105Z", reason: "fallback", from: OPUS_55, to: OPUS_5, source: "fallback", duringTurn: true },
+      {
+        time: "2026-11-09T12:11:27.105Z",
+        reason: "fallback",
+        from: OPUS_55,
+        to: OPUS_5,
+        source: "fallback",
+        duringTurn: true,
+      },
       {
         time: "2026-11-09T12:12:39.953Z",
         reason: "fallback-revert",
@@ -39,7 +53,14 @@ describe("config.modelSwaps", () => {
         source: "fallback-revert",
         duringTurn: true,
       },
-      { time: "2026-11-09T12:20:00.000Z", reason: "fallback", from: OPUS_55, to: OPUS_5, source: "fallback", duringTurn: true },
+      {
+        time: "2026-11-09T12:20:00.000Z",
+        reason: "fallback",
+        from: OPUS_55,
+        to: OPUS_5,
+        source: "fallback",
+        duringTurn: true,
+      },
     ])
     expect(swaps.fallbackWindowOpen).toBe(true)
     expect(swaps.turnsPerModel).toEqual({ [OPUS_55]: 3, [OPUS_5]: 2 })

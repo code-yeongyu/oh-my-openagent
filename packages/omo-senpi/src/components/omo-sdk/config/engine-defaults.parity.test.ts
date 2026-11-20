@@ -18,8 +18,7 @@ describe("engine defaults parity", () => {
   }
 
   test("#given the SDK's default table #when a fresh in-memory SettingsManager is asked #then every default is the engine's", () => {
-    expect(Object.keys(ENGINE_DEFAULTS).sort()).toEqual(Object.keys(answers).sort())
-    for (const [key, value] of Object.entries(ENGINE_DEFAULTS)) expect([key, value]).toEqual([key, answers[key as EngineDefaultKey]])
+    expect(answers).toEqual({ ...ENGINE_DEFAULTS })
   })
 
   test("#given the SDK's default fallback chains #when the engine resolves chains with no settings #then they are the engine's", () => {
