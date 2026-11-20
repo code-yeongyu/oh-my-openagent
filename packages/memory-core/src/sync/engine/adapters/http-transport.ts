@@ -175,6 +175,12 @@ async function streamLoop(
         headers: { ...syncRequestHeaders(await bearer(options)), accept: "text/event-stream" },
         signal,
       })
+      if (response.status === 426) {
+        // The client floor refuses this build until OmO is updated (#14483): stop reconnecting and let the engine's
+        // paced recheck (polling while the stream is down) notice a lifted floor instead of a 5 s reconnect loop.
+        handlers.onConnected(false)
+        return
+      }
       if (!response.ok || response.body === null) throw new SyncHttpError("stream", response.status, true)
       up = true
       handlers.onConnected(true)

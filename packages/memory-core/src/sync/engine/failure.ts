@@ -20,7 +20,7 @@ export type SyncFailure =
   | { readonly kind: "offline"; readonly reason: string; readonly action: string }
   | {
       /** A full disk, a refused write, a service refusal, else unknown: each says what failed in `cause`. */
-      readonly kind: "disk_full" | "no_write_access" | "service_refused" | "unknown"
+      readonly kind: "disk_full" | "no_write_access" | "service_refused" | "client_update_required" | "unknown"
       readonly reason: string
       readonly action: string
       readonly cause: SyncFailureCause
@@ -85,6 +85,16 @@ const READ_ONLY = {
     "Make the memory folder writable again; with OMO_DEBUG=1 the memory log names the file. Sync retries on its own.",
 } as const
 
+/** The service's client floor refuses this build (HTTP 426 `client_update_required`): it never passes until OmO is updated (#14483). */
+const CLIENT_UPDATE_REQUIRED = {
+  kind: "client_update_required",
+  reason: "This version of OmO is too old for the OmO sync service, so memory sync is paused on this device.",
+  action: "Update OmO on this device to keep syncing; sync is paused until then.",
+} as const
+
+const isClientUpdateRequired = (error: SyncHttpError): boolean =>
+  error.status === 426 || error.code === "client_update_required"
+
 const FULL_CODES: ReadonlySet<string> = new Set(["ENOSPC", "EDQUOT"])
 const DENIED_CODES: ReadonlySet<string> = new Set(["EACCES", "EPERM"])
 
@@ -95,6 +105,7 @@ function describeCausedFailure(error: unknown, stage: SyncStage): SyncFailure {
   if (FULL_CODES.has(code)) return { ...DISK_FULL, cause }
   if (DENIED_CODES.has(code)) return { ...PERMISSION_DENIED, cause }
   if (code === "EROFS") return { ...READ_ONLY, cause }
+  if (error instanceof SyncHttpError && isClientUpdateRequired(error)) return { ...CLIENT_UPDATE_REQUIRED, cause }
   if (error instanceof SyncHttpError)
     return {
       kind: "service_refused",

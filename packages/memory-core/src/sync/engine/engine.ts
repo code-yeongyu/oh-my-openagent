@@ -12,44 +12,19 @@ import { batchBound, heldShown, recordHeld } from "./held"
 import { type EngineState, SyncJournal } from "./journal"
 import { type CaptureHolds, capture } from "./local-capture"
 import { pushCycle } from "./push-cycle"
-import type { FreezeReason, RefusalCode } from "./ports"
 import { receive } from "./receive"
 import { StatusTracker } from "./status-tracker"
+import { EngineTimers } from "./engine-timers"
+import type { CycleReport, EngineStatus } from "./engine-types"
 
 export { CrashInjected, type EngineFault, INBOUND_POINTS, OUTBOUND_POINTS } from "./engine-deps"
 export type { SyncFailure, SyncFailureKind } from "./failure"
+export type { CycleReport, EngineStatus, Failing } from "./engine-types"
 
 export const POLL_MS = 10_000
 export const LOCAL_DEBOUNCE_MS = 2_000
-
-export type EngineStatus =
-  | { readonly kind: "never_synced" }
-  /**
-   * `updatedWhileOffline`: the memories the catch-up after this device's latest offline gap updated (`gap` in
-   * SyncEngine says what a gap is). Absent when the latest entries it received came in with no gap before them.
-   */
-  | { readonly kind: "synced"; readonly at: number; readonly updatedWhileOffline?: number }
-  | { readonly kind: "paused"; readonly seq: number; readonly code: RefusalCode; readonly held?: Failing }
-  /** Pushes are frozen by the service until a key rotation lands (sync-design section 7). */
-  | { readonly kind: "frozen"; readonly reason: FreezeReason; readonly since: number }
-  | { readonly kind: "failing"; readonly failure: SyncFailure; readonly since: number; readonly attempts: number }
-
-export interface Failing {
-  readonly failure: SyncFailure
-  readonly since: number
-  readonly attempts: number
-}
-
-export interface CycleReport {
-  readonly applied: number
-  readonly refused: number
-  /** Received items this cycle dropped because their key may never reach this device's files. */
-  readonly rejectedItems: number
-  readonly pushed: boolean
-  readonly snapshot: number | null
-  /** Keys held out of the push because one change to each exceeds the batch bound (#12284). */
-  readonly held: readonly string[]
-}
+/** While the service's client floor refuses this build, no trigger starts a cycle; one recheck runs after this long (#14483). */
+export const CLIENT_UPDATE_RECHECK_MS = 15 * 60_000
 
 export class SyncEngine {
   readonly journal: SyncJournal
@@ -71,8 +46,7 @@ export class SyncEngine {
   private appliedMirror = 0
   private waiters: { readonly resolve: (report: CycleReport) => void; readonly reject: (error: unknown) => void }[] = []
   private unsubscribe: (() => void) | null = null
-  private cancelPoll: (() => void) | null = null
-  private cancelDebounce: (() => void) | null = null
+  private readonly timers: EngineTimers
   private readonly tracker: StatusTracker
   /** The next cycle settles a service freeze before it pushes: startup, a poll, a state event, or a stream event while frozen. */
   private settleNext = true
@@ -93,6 +67,7 @@ export class SyncEngine {
   constructor(private readonly deps: EngineDeps) {
     this.journal = new SyncJournal(deps.repo.gitDir)
     this.tracker = new StatusTracker(() => deps.clock.now())
+    this.timers = new EngineTimers(deps.clock)
   }
 
   state(): Promise<EngineState> {
@@ -129,7 +104,7 @@ export class SyncEngine {
         if (this.tracker.frozen !== null) this.settleNext = true
         if (head > this.appliedMirror) this.request("event")
       },
-      onConnected: (connected) => (connected ? this.stopPolling() : this.poll()),
+      onConnected: (connected) => (connected ? this.timers.cancel("poll") : this.poll()),
       onStateChanged: () => {
         this.settleNext = true
         this.request()
@@ -141,8 +116,7 @@ export class SyncEngine {
   async stop(): Promise<void> {
     this.unsubscribe?.()
     this.unsubscribe = null
-    this.stopPolling()
-    this.cancelDebounce?.()
+    this.timers.cancelAll()
     this.stopped = true
     this.rerun = false
     this.rerunOnEvent = false
@@ -150,11 +124,7 @@ export class SyncEngine {
   }
 
   notifyLocalCommit(): void {
-    this.cancelDebounce?.()
-    this.cancelDebounce = this.deps.clock.after(LOCAL_DEBOUNCE_MS, () => {
-      this.cancelDebounce = null
-      this.request()
-    })
+    this.timers.arm("debounce", LOCAL_DEBOUNCE_MS, () => this.request())
   }
 
   /** The running cycle's outcome, or the next cycle's when none is running: its report, or its failure. */
@@ -196,7 +166,8 @@ export class SyncEngine {
         const rerun = this.rerun || this.rerunOnEvent
         this.rerun = false
         this.rerunOnEvent = false
-        if (rerun) this.request()
+        if (this.tracker.updateRequired()) this.recheckLater()
+        else if (rerun) this.request()
         // Logged last, once the cycle is settled: nothing the log does can leave it running.
         logCycleFailure(this.deps.log, stage, error, shownChanged)
       },
@@ -221,8 +192,8 @@ export class SyncEngine {
     }
   }
 
-  private request(trigger: "always" | "event" = "always"): void {
-    if (this.stopped) return
+  private request(trigger: "always" | "event" | "recheck" = "always"): void {
+    if (this.stopped || (trigger !== "recheck" && this.tracker.updateRequired())) return
     if (this.running !== null) {
       if (trigger === "event") this.rerunOnEvent = true
       else this.rerun = true
@@ -232,22 +203,19 @@ export class SyncEngine {
     void this.runCycle().catch(() => undefined)
   }
 
-  private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => this.deps.clock.after(ms, resolve))
-  }
-
   private poll(): void {
-    this.stopPolling()
-    this.cancelPoll = this.deps.clock.after(POLL_MS, () => {
+    this.timers.arm("poll", POLL_MS, () => {
       this.settleNext = true
       this.request()
       this.poll()
     })
   }
 
-  private stopPolling(): void {
-    this.cancelPoll?.()
-    this.cancelPoll = null
+  private recheckLater(): void {
+    this.timers.arm("recheck", CLIENT_UPDATE_RECHECK_MS, () => {
+      this.settleNext = true
+      this.request("recheck")
+    })
   }
 
   private async cycle(): Promise<CycleReport> {
@@ -308,7 +276,7 @@ export class SyncEngine {
         await inbound()
         this.stage = "push"
       },
-      sleep: (ms) => this.sleep(ms),
+      sleep: (ms) => new Promise((resolve) => deps.clock.after(ms, resolve)),
       settleFirst,
       frozen: this.tracker.frozen,
       withheld: () => holds.withheld,

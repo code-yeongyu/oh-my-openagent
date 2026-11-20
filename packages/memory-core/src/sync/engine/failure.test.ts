@@ -3,7 +3,7 @@ import { expect, test } from "bun:test"
 import { GitCommandError } from "../../git/errors"
 import { SyncFormatError } from "../crypto/vendor/sync-format/jcs"
 import { SyncCommitError } from "./adapters/git-sync-repo"
-import { SyncHttpError } from "./adapters/http-transport"
+import { createHttpTransport, SyncHttpError } from "./adapters/http-transport"
 import { describeSyncFailure } from "./failure"
 import { logCycleFailure } from "./failure-cause"
 
@@ -47,6 +47,31 @@ test("a non-transient service refusal names the service code and HTTP status", (
     reason: expect.any(String),
     action: expect.any(String),
     cause: { errorClass: "SyncHttpError", code: "payload_too_large", httpStatus: 413, stage: "push" },
+  })
+})
+
+test("#given the service's real 426 client floor refusal #when a request is refused #then the failure is its own client_update_required kind keeping the service code and HTTP status (#14483)", async () => {
+  const floored = createHttpTransport({
+    baseUrl: "http://sync.example",
+    token: () => "tok",
+    fetch: (async () =>
+      Response.json(
+        { error: { code: "client_update_required", message: "update OmO to keep syncing", retryable: false } },
+        { status: 426 },
+      )) as unknown as typeof fetch,
+  })
+  const refusal = await floored.pull(0, 500).then(
+    () => null,
+    (error: unknown) => error,
+  )
+
+  const failure = describeSyncFailure(refusal, "receive")
+
+  expect(failure).toEqual({
+    kind: "client_update_required",
+    reason: expect.any(String),
+    action: expect.any(String),
+    cause: { errorClass: "SyncHttpError", code: "client_update_required", httpStatus: 426, stage: "receive" },
   })
 })
 
