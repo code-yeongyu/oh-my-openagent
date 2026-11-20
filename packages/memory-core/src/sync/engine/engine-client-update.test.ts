@@ -42,3 +42,35 @@ test("#given the service's client floor refuses this build (426) #when local com
     await device.dispose()
   }
 })
+
+test("#given a floored cycle still in flight #when stop() runs #then the failed cycle arms no recheck timer after the stop (#14483 review L1)", async () => {
+  // given
+  const device = await makeDevice(new FakeSyncServer(), "a")
+  const floored = new SyncHttpError("client_update_required", 426, false)
+  let release: () => void = () => undefined
+  const gate = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const load = spyOn(device.store, "load").mockImplementation(async () => {
+    await gate
+    throw floored
+  })
+  const after = spyOn(device.clock, "after")
+  try {
+    const cycle = device.engine.nextCycle()
+    device.engine.start()
+
+    // when
+    const stopped = device.engine.stop()
+    release()
+    await expect(cycle).rejects.toBe(floored)
+    await stopped
+
+    // then
+    expect(after.mock.calls.filter(([ms]) => ms === CLIENT_UPDATE_RECHECK_MS)).toHaveLength(0)
+  } finally {
+    after.mockRestore()
+    load.mockRestore()
+    await device.dispose()
+  }
+})
