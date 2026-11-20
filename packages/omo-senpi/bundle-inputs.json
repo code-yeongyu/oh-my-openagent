@@ -456,6 +456,7 @@
     "packages/memory-core/src/sync/crypto/vendor/sync-format/receive.ts",
     "packages/memory-core/src/sync/crypto/vendor/sync-format/stream.ts",
     "packages/memory-core/src/sync/device-retire.ts",
+    "packages/memory-core/src/sync/engine/account-journal.ts",
     "packages/memory-core/src/sync/engine/adapters/device-item-recovery.ts",
     "packages/memory-core/src/sync/engine/adapters/device-item-store.ts",
     "packages/memory-core/src/sync/engine/adapters/git-sync-repo.ts",
