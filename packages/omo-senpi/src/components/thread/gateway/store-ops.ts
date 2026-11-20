@@ -674,7 +674,7 @@ export async function enqueue(
       return binding
     }
     const expired = refuseExpiredQueued(ctx, request.now, RETENTION_SWEEP_BATCH, request.target_durable_id)
-    const backlog = targetBacklog(ctx, request.target_durable_id, deadClaims)
+    const backlog = targetBacklog(ctx, request.target_durable_id, request.now, deadClaims)
     const bytes = Buffer.byteLength(request.body)
     if (backlog.messages >= TARGET_MAX_MESSAGES || backlog.bytes + bytes > TARGET_MAX_BYTES) {
       rollbackQuietly(ctx)
@@ -888,13 +888,16 @@ async function expiredDeadClaims(ctx: StoreContext, target: string, now: number)
 function targetBacklog(
   ctx: StoreContext,
   target: string,
+  now: number,
   deadClaims: ReadonlyMap<string, string>,
 ): { readonly messages: number; readonly bytes: number; readonly frees_at: number | null } {
+  // An expired intake row stays queued for the target's reconcile (`refuseExpiredQueued` skips it) but no longer counts.
+  const counted = `NOT (state = 'queued' AND ledger_id IS NOT NULL AND expires_at <= ?)`
   const open = ctx.sql.one(
     ["n", "b", "f"],
     `SELECT COUNT(*) AS n, COALESCE(SUM(bytes), 0) AS b, MIN(CASE WHEN state = 'queued' THEN expires_at END) AS f
-     FROM deliveries WHERE target_durable_id = ? AND state IN ${OPEN_STATES}`,
-    [target],
+     FROM deliveries WHERE target_durable_id = ? AND state IN ${OPEN_STATES} AND ${counted}`,
+    [target, now],
   )
   let messages = Number(open?.n ?? 0)
   let bytes = Number(open?.b ?? 0)
@@ -910,8 +913,9 @@ function targetBacklog(
 
 /**
  * Settles queued rows past their TTL as `refused`/`expired` without the target's drain, at most `limit` of them (of
- * `target` only when given). Answers what it refused; the caller unlinks their inbox markers once its transaction
- * commits, so a rolled-back call leaves every marker in place.
+ * `target` only when given). An intake row (`ledger_id` set) is left to the target's `reconcile`, which first checks
+ * whether the same delivery already reached the transcript live and then settles it `applied`. Answers what it refused;
+ * the caller unlinks their inbox markers once its transaction commits, so a rolled-back call leaves every marker in place.
  */
 export function refuseExpiredQueued(
   ctx: StoreContext,
@@ -922,7 +926,7 @@ export function refuseExpiredQueued(
   const rows = ctx.sql
     .all(
       ["delivery_id", "target_durable_id"],
-      `SELECT delivery_id, target_durable_id FROM deliveries WHERE state = 'queued' AND expires_at <= ?${target === undefined ? "" : " AND target_durable_id = ?"} LIMIT ?`,
+      `SELECT delivery_id, target_durable_id FROM deliveries WHERE state = 'queued' AND ledger_id IS NULL AND expires_at <= ?${target === undefined ? "" : " AND target_durable_id = ?"} LIMIT ?`,
       target === undefined ? [now, limit] : [now, target, limit],
     )
     .map((row) => ({ delivery_id: String(row.delivery_id), target_durable_id: String(row.target_durable_id) }))

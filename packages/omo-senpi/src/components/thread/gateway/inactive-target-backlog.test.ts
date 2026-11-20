@@ -66,6 +66,15 @@ function holdAll(h: GatewayHarness, target: string, holder: ProcessIdentity): vo
   }
 }
 
+function markIntake(h: GatewayHarness, deliveryId: string): void {
+  const db = new Database(gatewayDatabasePath(h.agentDir))
+  try {
+    db.run("UPDATE deliveries SET ledger_id = ? WHERE delivery_id = ?", [`ledger-${deliveryId}`, deliveryId])
+  } finally {
+    db.close()
+  }
+}
+
 async function identityOf(pid: number): Promise<ProcessIdentity> {
   return { pid, process_start_time: await processStartTime(pid), instance_id: randomUUID(), runtime_instance: null }
 }
@@ -128,6 +137,22 @@ describe("a target that is not running", () => {
     h.clock.now += QUEUED_TTL_MS
 
     expect(summary(await send(h, "T", "after the TTL"))).toBe("error:queue_full")
+  }, 30_000)
+
+  test("#given a full backlog whose only expired row is an intake row #when a send arrives #then that row stops counting but stays queued, because only the target's reconcile can tell whether it already reached the transcript", async () => {
+    const h = open()
+    const ids = await fill(h, "T", TARGET_MAX_MESSAGES)
+    const intake = ids[0] as string
+    markIntake(h, intake)
+    const first = (await rows(h, "T")).find((row) => row.delivery_id === intake)
+    if (first === undefined) throw new Error("no intake row")
+    h.clock.now = first.expires_at - PAIR_BUCKET_REFILL_MS
+
+    expect(summary(await send(h, "T", "after the intake row expired"))).toBe("queued_offline")
+    expect(summary(await send(h, "T", "while the rest are still live", 0))).toBe("error:queue_full")
+
+    expect((await rows(h, "T")).find((row) => row.delivery_id === intake)).toMatchObject({ state: "queued" })
+    expect(existsSync(join(gatewayInboxDirectory(h.agentDir, "T"), intake))).toBe(true)
   }, 30_000)
 
   test("#given queued rows past their TTL and no further send to that target #when the retention sweep runs on another write #then they are refused expired and their inbox markers are gone", async () => {
