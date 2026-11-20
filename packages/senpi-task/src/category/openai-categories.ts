@@ -186,18 +186,10 @@ const DEEP_LOW_CATEGORY_CALLER_GUIDANCE = `<Selection_Gate>Of the two deep lanes
 
 const DEEP_HIGH_CATEGORY_CALLER_GUIDANCE = `<Selection_Gate>Route here only when you can name the decision evidence cannot settle: a trade-off with no single right answer, a contract change crossing a package or process boundary, a mechanism with no in-repo pattern to copy, or correctness argued from invariants rather than observed in a test. Wide scope with easy decisions is deep-low or unspecified-high; reasoning as the deliverable is ultrabrain.</Selection_Gate>`
 
-// The GPT flagship gate: either id present in the live registry keeps ultrabrain available. Each deep
-// lane is a single rung with no model fallback, so it gates on its own model and disappears without it.
-const GPT_FLAGSHIP_GATE_MODELS = [LATEST_MODEL_BY_FAMILY.gptAstra, "gpt-6-astra", "gpt-5.6-sol"] as const
-const DEEP_LOW_GATE_MODELS = [
-  LATEST_MODEL_BY_FAMILY.gptSol,
-  LATEST_MODEL_BY_FAMILY.gptSolFast,
-  "gpt-6.1-sol",
-  "gpt-6.1-sol-fast",
-  "gpt-5.6-sol-fast",
-  "gpt-5.6-sol",
-] as const
-const DEEP_HIGH_GATE_MODELS = [LATEST_MODEL_BY_FAMILY.gptAstra, "gpt-6-astra"] as const
+// ultrabrain and both deep lanes are a single exact-model rung (#14155), so each gates on that one model
+// and disappears without it; the gate also pins resolution to that exact id (see builtins.ts).
+const GPT_ASTRA_GATE_MODELS = [LATEST_MODEL_BY_FAMILY.gptAstra] as const
+const DEEP_LOW_GATE_MODELS = [LATEST_MODEL_BY_FAMILY.gptSol] as const
 
 export const OPENAI_CATEGORIES = [
   {
@@ -207,7 +199,8 @@ export const OPENAI_CATEGORIES = [
       "Use ONLY for genuinely hard, logic-heavy tasks. Give clear goals only, not step-by-step instructions.",
     promptAppend: ULTRABRAIN_CATEGORY_PROMPT_APPEND,
     resolvePromptAppend: resolveUltrabrainCategoryPromptAppend,
-    requiresModel: GPT_FLAGSHIP_GATE_MODELS,
+    requiresModel: GPT_ASTRA_GATE_MODELS,
+    exactModels: true,
   },
   {
     name: "deep-low",
@@ -218,6 +211,7 @@ export const OPENAI_CATEGORIES = [
     promptAppend: DEEP_LOW_CATEGORY_PROMPT_APPEND,
     resolvePromptAppend: resolveDeepLowCategoryPromptAppend,
     requiresModel: DEEP_LOW_GATE_MODELS,
+    exactModels: true,
   },
   {
     name: "deep-high",
@@ -227,7 +221,8 @@ export const OPENAI_CATEGORIES = [
     callerGuidance: DEEP_HIGH_CATEGORY_CALLER_GUIDANCE,
     promptAppend: DEEP_HIGH_CATEGORY_PROMPT_APPEND,
     resolvePromptAppend: resolveDeepHighCategoryPromptAppend,
-    requiresModel: DEEP_HIGH_GATE_MODELS,
+    requiresModel: GPT_ASTRA_GATE_MODELS,
+    exactModels: true,
   },
   {
     name: "quick",
