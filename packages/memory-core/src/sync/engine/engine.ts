@@ -22,7 +22,7 @@ export { CrashInjected, type EngineFault, INBOUND_POINTS, OUTBOUND_POINTS } from
 export type { SyncFailure, SyncFailureKind } from "./failure"
 export type { CycleReport, EngineStatus, Failing } from "./engine-types"
 
-export { POLL_MS } from "./stream-state"
+export const POLL_MS = 10_000
 export const LOCAL_DEBOUNCE_MS = 300
 /** While the service's client floor refuses this build, no trigger starts a cycle; one recheck runs after this long (#14483). */
 export const CLIENT_UPDATE_RECHECK_MS = 15 * 60_000
@@ -70,10 +70,7 @@ export class SyncEngine {
     this.journal = new SyncJournal(deps.repo.gitDir)
     this.tracker = new StatusTracker(() => deps.clock.now())
     this.timers = new EngineTimers(deps.clock)
-    this.stream = new StreamState(this.timers, deps.log, () => {
-      this.settleNext = true
-      this.request()
-    })
+    this.stream = new StreamState(this.timers, deps.log, () => this.settleAndRequest("always"), POLL_MS)
   }
 
   state(): Promise<EngineState> {
@@ -210,10 +207,13 @@ export class SyncEngine {
   }
 
   private recheckLater(): void {
-    this.timers.arm("recheck", CLIENT_UPDATE_RECHECK_MS, () => {
-      this.settleNext = true
-      this.request("recheck")
-    })
+    this.timers.arm("recheck", CLIENT_UPDATE_RECHECK_MS, () => this.settleAndRequest("recheck"))
+  }
+
+  /** A poll or a recheck: settle any service freeze first, then run a cycle. */
+  private settleAndRequest(trigger: "always" | "recheck"): void {
+    this.settleNext = true
+    this.request(trigger)
   }
 
   private async cycle(): Promise<CycleReport> {
