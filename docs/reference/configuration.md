@@ -506,6 +506,7 @@ Control parallel agent execution and concurrency limits. `background_task` (came
 | `modelConcurrency`          | -         | Per-model limits (key = `provider/model`). Overrides provider limits. |
 | `maxDepth`                  | -         | Maximum nested subagent depth (min: 1)                                |
 | `staleTimeoutMs`            | `2700000` | Interrupt tasks with no activity (min: 60000)                         |
+| `wakeOnStall`               | `true`    | Wake the parent when continuation stops with unfinished todos         |
 | `messageStalenessTimeoutMs` | `3600000` | Timeout when no progress update was ever received (min: 60000)        |
 | `taskTtlMs`                 | `1800000` | Absolute non-terminal task TTL (min: 300000)                          |
 | `sessionGoneTimeoutMs`      | `60000`   | Timeout when a task session disappears (min: 10000)                   |
