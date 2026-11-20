@@ -3,7 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { randomUUID } from "node:crypto"
 import { existsSync } from "node:fs"
 
-import { WAKE_LEASE_MS, WOKEN_SESSION_CAP } from "./constants"
+import { WAKE_LEASE_MS } from "./constants"
 import { gatewayDatabasePath, gatewayWakeMarkerPath } from "./paths"
 import { processStartTime } from "./process-identity"
 import type { GatewayStore } from "./store"
@@ -11,7 +11,8 @@ import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
 import type { ProcessIdentity } from "./types"
 
 // The record of a woken session (#13037, amendment A3.1.1 to A3.1.3): one row per session a wake asked for or opened,
-// with the cap of 4 counted in the transaction that starts a row, a lease and a generation that fences every write.
+// with no count on how many may be past `requested` (the carrier admits on measured host memory), a lease and a
+// generation that fences every write.
 
 let harness: GatewayHarness | undefined
 afterEach(async () => {
@@ -46,40 +47,19 @@ describe("woken session record", () => {
     expect(existsSync(gatewayWakeMarkerPath(h.agentDir))).toBe(true)
   })
 
-  test("#given three rows past requested #when two store handles race to start a fourth and a fifth #then exactly one passes and the other is overloaded and stays requested", async () => {
+  test("#given four rows past requested #when two store handles race to start a fifth and a sixth #then both start: no count caps woken sessions", async () => {
     const h = (harness = createGatewayHarness())
     const seed = h.store()
-    for (const id of ["a", "b", "c"]) await started(seed, id)
+    for (const id of ["a", "b", "c", "d"]) await started(seed, id)
     const left = h.store()
     const right = h.store()
-    await left.woken.request({ durable_id: "d", session_file: "/sessions/d.jsonl" })
-    await right.woken.request({ durable_id: "e", session_file: "/sessions/e.jsonl" })
+    await left.woken.request({ durable_id: "e", session_file: "/sessions/e.jsonl" })
+    await right.woken.request({ durable_id: "f", session_file: "/sessions/f.jsonl" })
 
-    const answers = await Promise.all([left.woken.start({ durable_id: "d" }), right.woken.start({ durable_id: "e" })])
+    const answers = await Promise.all([left.woken.start({ durable_id: "e" }), right.woken.start({ durable_id: "f" })])
 
-    expect(answers.map((answer) => answer.kind).sort()).toEqual(["overloaded", "started"])
-    const rows = await seed.woken.list()
-    expect(rows.filter((row) => row.state !== "requested")).toHaveLength(WOKEN_SESSION_CAP)
-    expect(rows.filter((row) => row.state === "requested")).toHaveLength(1)
-  })
-
-  test("#given four rows past requested #when a fifth asks to start #then it is overloaded, and it starts once one row ends", async () => {
-    const h = (harness = createGatewayHarness())
-    const store = h.store()
-    const generations = new Map<string, number>()
-    for (const id of ["a", "b", "c", "d"]) generations.set(id, await started(store, id))
-    await store.woken.request({ durable_id: "e", session_file: "/sessions/e.jsonl" })
-
-    expect(await store.woken.start({ durable_id: "e" })).toMatchObject({ kind: "overloaded" })
-    expect((await store.woken.list()).find((row) => row.durable_id === "e")?.state).toBe("requested")
-
-    expect(await store.woken.end({ durable_id: "a", generation: generations.get("a") ?? -1 })).toEqual({
-      kind: "ended",
-    })
-    expect(await store.woken.start({ durable_id: "e" })).toMatchObject({
-      kind: "started",
-      row: { durable_id: "e", state: "opening", generation: 1 },
-    })
+    expect(answers.map((answer) => answer.kind)).toEqual(["started", "started"])
+    expect((await seed.woken.list()).filter((row) => row.state === "opening")).toHaveLength(6)
   })
 
   test("#given a started row #when it starts #then the caller holds the lease for the lease time and the generation is raised", async () => {

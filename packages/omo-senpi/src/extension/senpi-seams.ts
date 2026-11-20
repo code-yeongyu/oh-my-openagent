@@ -1,3 +1,5 @@
+import { parseAddress } from "@oh-my-opencode/thread-address-core"
+
 /**
  * The senpi `pi.*` seams omo feature-detects (#12861). Every guard in this package that probes the host
  * (`typeof pi.X`, `pi.X === undefined`, `pi.X?.`, `"X" in pi`, `pi.X ?? fallback`, `if (pi.X)`, `!pi.X`, `pi.X && ...`) degrades a feature silently when the seam is
@@ -28,6 +30,7 @@ export const SENPI_SEAMS = {
   registerMessageRenderer: "function",
   registerReadClassifier: "function",
   registerRemovedToolHint: "function",
+  registerRpcRemoteSource: "function",
   registerTool: "function",
   rpc: "object",
   "rpc.emit": "function",
@@ -70,21 +73,18 @@ export function absentSenpiSeamsNotice(surface: unknown): string | undefined {
 export const REMOTE_WAKE_SEAM = "registerRpcRemoteSource"
 export const REMOTE_WAKE_UNAVAILABLE = "remote_wake_unavailable"
 
-// senpi's remote-target shape (rpc-monitor-targets.ts `parseRpcTarget`, from 2026.11.6-2): one `/`, no leading `/`,
-// not a `.jsonl` path, not a drive letter. A senpi without the seam resolves every such target locally, so the
+// senpi's remote-target shape (rpc-monitor-targets.ts `parseRpcTarget`, from 2026.11.6-2) read by the one address
+// grammar (thread-address-core `parseAddress`). A senpi without the seam resolves every such target locally, so the
 // refusal must never catch a local path: a first segment only a path can have (`.`, `..`, `.hidden`, `~`, `~user`)
 // and a `.jsonl` file in any case stay local even where senpi's own shape would call them remote.
-const REMOTE_TARGET = /^([^/]+)\/[^/]+$/
-const DRIVE_LETTER = /^[A-Za-z]:$/
-const PATH_SEGMENT = /^[.~]/
-
-function isRemoteMonitorTarget(target: string): boolean {
-  const trimmed = target.trim()
-  const device = REMOTE_TARGET.exec(trimmed)?.[1]
-  return device !== undefined && !/\.jsonl$/i.test(trimmed) && !DRIVE_LETTER.test(device) && !PATH_SEGMENT.test(device)
+/** The device and session a `<device>/<session>` monitor target names, by the one address grammar; undefined for a local target. */
+export function remoteMonitorTarget(target: string): { readonly device: string; readonly session: string } | undefined {
+  const parsed = parseAddress(target)
+  return parsed.kind === "device" ? { device: parsed.device, session: parsed.thread } : undefined
 }
+const isRemoteMonitorTarget = (target: string): boolean => remoteMonitorTarget(target) !== undefined
 
-function remoteWakeUnavailable(
+export function remoteWakeUnavailable(
   surface: unknown,
   target: string,
 ): { readonly code: typeof REMOTE_WAKE_UNAVAILABLE; readonly message: string } | undefined {
@@ -105,20 +105,26 @@ export function installRemoteWakeRefusal(pi: {
 }): void {
   if (seamPresent(pi, REMOTE_WAKE_SEAM, "function")) return
   pi.on("tool_call", (payload) => {
-    if (typeof payload !== "object" || payload === null || Reflect.get(payload, "toolName") !== "monitor")
-      return undefined
-    const input: unknown = Reflect.get(payload, "input")
-    if (typeof input !== "object" || input === null) return undefined
-    const action: unknown = Reflect.get(input, "action")
-    const type: unknown = Reflect.get(input, "type")
-    const target: unknown = Reflect.get(input, "target")
-    if (
-      (action !== undefined && action !== "create") ||
-      (type !== undefined && type !== "rpc") ||
-      typeof target !== "string"
-    )
-      return undefined
-    const refusal = remoteWakeUnavailable(pi, target)
+    const call = monitorRpcOpen(payload)
+    const refusal = call === undefined ? undefined : remoteWakeUnavailable(pi, call.target)
     return refusal === undefined ? undefined : { block: true, reason: refusal.message }
   })
+}
+
+/** The input and target of a `tool_call` payload that opens a `monitor` rpc watch; undefined for any other call. */
+export function monitorRpcOpen(payload: unknown): { readonly input: object; readonly target: string } | undefined {
+  if (typeof payload !== "object" || payload === null || Reflect.get(payload, "toolName") !== "monitor")
+    return undefined
+  const input: unknown = Reflect.get(payload, "input")
+  if (typeof input !== "object" || input === null) return undefined
+  const action: unknown = Reflect.get(input, "action")
+  const type: unknown = Reflect.get(input, "type")
+  const target: unknown = Reflect.get(input, "target")
+  if (
+    (action !== undefined && action !== "create") ||
+    (type !== undefined && type !== "rpc") ||
+    typeof target !== "string"
+  )
+    return undefined
+  return { input, target }
 }

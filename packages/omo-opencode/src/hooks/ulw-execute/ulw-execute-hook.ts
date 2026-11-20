@@ -16,7 +16,7 @@ import {
 import { detectWorktreePath } from "./worktree-detector"
 import { parseUserRequest } from "./parse-user-request"
 import { buildUlwExecuteContextInfo } from "./context-info-builder"
-import { createPrDeliveryBlock, createWorktreeActiveBlock } from "./worktree-block"
+import { createLightProfileBlock, createPrDeliveryBlock, createWorktreeActiveBlock } from "./worktree-block"
 import { findRecentSessionPlanPath } from "./session-plan-affinity"
 
 export const HOOK_NAME = "ulw-execute" as const
@@ -184,9 +184,10 @@ export function createUlwExecuteHook(ctx: PluginInput) {
     const sessionId = normalizeSessionId(input.sessionID, "opencode")
     const timestamp = new Date().toISOString()
 
-    const { planName: explicitPlanName, explicitWorktreePath, makePr, ship } = parseUserRequest(promptText)
+    const { planName: explicitPlanName, explicitWorktreePath, makePr, ship, light } = parseUserRequest(promptText)
     const { worktreePath, block } = resolveWorktreeContext(explicitWorktreePath)
-    const worktreeBlock = block + createPrDeliveryBlock({ makePr, ship }, worktreePath)
+    const worktreeBlock =
+      block + createPrDeliveryBlock({ makePr, ship }, worktreePath) + (light ? createLightProfileBlock() : "")
     const preferredPlanPath = explicitPlanName
       ? null
       : await findRecentSessionPlanPath({

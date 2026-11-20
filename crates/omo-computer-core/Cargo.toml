@@ -13,5 +13,8 @@ serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
 [dev-dependencies]
 syn = { version = "=2.0.118", features = ["full", "visit"] }

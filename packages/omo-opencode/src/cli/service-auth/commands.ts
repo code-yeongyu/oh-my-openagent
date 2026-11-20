@@ -4,17 +4,24 @@ import { serviceAccountsOpen } from "./accounts-gate"
 import { isClosedBareLogin, isClosedDeviceLogin, withClosedDeviceLoginOptions } from "./closed-device-login"
 import { openSignInBrowser } from "./browser"
 import { deviceName, devicePlatform } from "./device-name"
-import { loginDevice } from "./device-flow"
 import { advertisesMachineIdentity, readMachineDigest } from "./machine-digest"
 import { refuseSecondMachineDevice } from "./machine-device"
 import { createCredentialStore, INTERACTIVE_READ_WAIT } from "./keystore"
-import { BrowserUnavailable, loginLoopback } from "./loopback"
+import { signInByRoute } from "./login-routes"
 import { type ChooseDevice, type ListedDevice, RequestFailure, serviceOrigin, SignInError } from "./protocol"
+import { decideReplace } from "./replace-device"
 import { resolveMemoryRoot, syncPinDir } from "@oh-my-opencode/memory-core/sync-device-retire"
 
 import { createSession, type DeviceServiceHandoff, type Session } from "./session"
 import { retireSyncPinOnDiscard } from "./sync-pin-retire"
 import { terminalText } from "./terminal-text"
+import { dedicatedStoreState } from "./keychain-helper/dedicated-store"
+
+// #13116 design 7: a sign-in kept in OmO's own keychain says so; the login keychain default adds no line.
+function noteDedicatedStore(): void {
+  if (process.platform === "darwin" && dedicatedStoreState() === "active")
+    console.log("The sign-in is kept in OmO's own keychain on this Mac (omo account store status).")
+}
 
 // Probe the service before anything user-visible (a browser tab, a device code) so an
 // unreachable or unhealthy service fails at once instead of after a dead page and a wait.
@@ -52,6 +59,7 @@ type Options = {
   readonly accounts?: string
   readonly device?: boolean
   readonly browser?: boolean
+  readonly replace?: boolean
   readonly help?: boolean
 }
 
@@ -105,6 +113,7 @@ async function run(
       store,
       signal: controller.signal,
       ...(deviceService === undefined ? {} : { deviceService }),
+      log: (line) => console.error(line),
       beforeKeysDiscarded: retireSyncPinOnDiscard({
         pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())),
         log: (line) => console.error(line),
@@ -129,6 +138,7 @@ async function run(
             : `Signed in to ${api} as ${terminalText(email)} (${terminalText(saved.device.name)}).`
           : "Not signed in.",
       )
+      noteDedicatedStore()
       return
     }
     // Local sign-in and the device service first, so an already-signed-in computer is told to log out
@@ -148,34 +158,41 @@ async function run(
           ? "Signed in to OmO. The account could not be read; run omo whoami to see it."
           : `Signed in to OmO as ${terminalText(email)}.`,
       )
+      noteDedicatedStore()
     }
-    if (!options.device && options.browser !== false) {
-      try {
-        await loginLoopback(session, {
-          accounts: accountsOrigin(options, process.env),
-          name,
-          platform,
-          open: openSignInBrowser,
-          chooseDevice,
-          ...digest,
-        })
-        await signedIn()
-        return
-      } catch (error) {
-        if (!(error instanceof BrowserUnavailable)) throw error
-      }
-    }
-    await loginDevice(session, {
-      name,
-      platform,
-      chooseDevice,
-      ...digest,
-      show: (code) => {
-        console.log(`Open ${code.verificationUri}`)
-        console.log(`User code: ${code.userCode}`)
-        console.log(`Matching code: ${code.matchingCode}`)
+    const { replacedDeviceId } = await signInByRoute(session, {
+      ...(!options.device && options.browser !== false
+        ? {
+            loopback: {
+              accounts: accountsOrigin(options, process.env),
+              name,
+              platform,
+              open: openSignInBrowser,
+              chooseDevice,
+              ...digest,
+            },
+          }
+        : {}),
+      device: {
+        name,
+        platform,
+        chooseDevice,
+        replaceDevice: decideReplace({
+          replace: options.replace === true,
+          interactive: process.stdin.isTTY === true,
+          confirm: async (message) => (await confirm({ message, initialValue: false })) === true,
+          log: (line) => console.log(line),
+        }),
+        ...digest,
+        show: (code) => {
+          console.log(`Open ${code.verificationUri}`)
+          console.log(`User code: ${code.userCode}`)
+          console.log(`Matching code: ${code.matchingCode}`)
+        },
       },
     })
+    if (replacedDeviceId !== undefined)
+      console.log(`This computer's earlier OmO device (id ${terminalText(replacedDeviceId)}) was signed out.`)
     await signedIn()
   } catch (error) {
     console.error(
@@ -207,10 +224,14 @@ and the credential is stored in the OS credential store.
   omo login                 device-code sign-in (a computer without the OmO desktop app's sign-in)
   omo login --device        force the device-code route
   omo login --no-browser    the same, never opening a browser
+  omo login --replace       replace this computer's earlier device without asking
   omo login --api <url>     OmO API origin (or OMO_SERVICE_API_URL)
 
 The service's approval page decides who may sign in. A computer whose OmO desktop app or
-stored sign-in already has its device is refused instead of registering a second one.`
+stored sign-in already has its device is refused instead of registering a second one.
+When the service says this computer already has a device, omo login offers to replace it
+(an interactive terminal asks, default No; a script passes --replace). The replacement is
+approved on the service's page, which then signs the earlier device out.`
 
 const CLOSED_LOGOUT_HELP = `Sign out of OmO: revoke this machine's device and remove the stored credentials and device keys.
 
@@ -225,6 +246,8 @@ const CLOSED_WHOAMI_HELP = `Show the current OmO device sign-in.
 
 This runs while OmO accounts are closed.`
 
+const CLOSED_AUTH_HELP = { login: CLOSED_LOGIN_HELP, logout: CLOSED_LOGOUT_HELP, whoami: CLOSED_WHOAMI_HELP } as const
+
 function refuseClosedServiceAuth(): never {
   console.error(CLOSED_LOGIN_MESSAGE)
   process.exit(1)
@@ -232,7 +255,7 @@ function refuseClosedServiceAuth(): never {
 
 function describeClosedAuthCommand(name: "login" | "logout" | "whoami") {
   return () => {
-    console.log(name === "login" ? CLOSED_LOGIN_HELP : name === "logout" ? CLOSED_LOGOUT_HELP : CLOSED_WHOAMI_HELP)
+    console.log(CLOSED_AUTH_HELP[name])
     process.exit(0)
   }
 }
@@ -246,7 +269,13 @@ function configureClosedServiceAuthCommands(program: Command, hooks: ServiceAuth
       .allowUnknownOption()
       .allowExcessArguments()
       .option("--api <url>")
+      .option("--help")
       .action((options: Options) => {
+        // #13461: `--help` describes the command, as `login --help` does; any other argument still refuses.
+        if (options.help === true) {
+          console.log(CLOSED_AUTH_HELP[name])
+          return
+        }
         if (command.args.length !== 0) refuseClosedServiceAuth()
         return run(name, options, hooks)
       })
@@ -288,6 +317,7 @@ export function configureServiceAuthCommands(
     .description("Sign in to OmO using the OS credential store")
     .option("--device", "Use a device code instead of a browser callback")
     .option("--no-browser", "Sign in by device code without opening a browser")
+    .option("--replace", "Replace this computer's earlier device without asking, when the service reports one")
     .option("--api <url>", "OmO API origin (or OMO_SERVICE_API_URL)")
     .option("--accounts <url>", "OmO sign-in page origin (or OMO_SERVICE_ACCOUNTS_URL)")
     .action((options: Options) => run("login", options, hooks))

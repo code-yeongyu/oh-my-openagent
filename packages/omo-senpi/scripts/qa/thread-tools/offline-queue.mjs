@@ -44,7 +44,7 @@ await runScenario("offline-queue", async ({ report, fake, scratch, install, star
   report.assert(
     "sender-sees-target-live",
     listed?.kind === "ok" &&
-      listed.threads.some((thread) => thread.thread_id === endpoint.durableId && thread.alive === true),
+      listed.threads.some((thread) => thread.thread === endpoint.durableId && thread.alive === true),
     `threads=${listed?.threads?.length}`,
   )
 

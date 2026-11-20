@@ -19,6 +19,7 @@ export {
   ColdWakeUnitError,
   installColdWake,
   readColdWake,
+  refreshColdWake,
   type UnitState,
   SessionHostLaunch,
   uninstallColdWake,
@@ -26,4 +27,5 @@ export {
 export { installDeviceService, runCommand } from "./install.ts"
 export { DEVICE_SERVICE_VERSION } from "./pin.ts"
 export { type AgentDirRegistrant, type RegistrantEvent, startAgentDirRegistrant } from "./registrant.ts"
+export { realTimers, type Timers } from "./timers.ts"
 export { deviceServiceHost } from "./release/acquire.ts"

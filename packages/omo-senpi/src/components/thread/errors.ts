@@ -15,6 +15,7 @@ export const THREAD_ERROR_CODES = [
   "foreign_live_owner",
   "no_active_turn",
   "turn_conflict",
+  "turn_active",
   "not_steerable",
   "message_too_large",
   "queue_full",
@@ -23,6 +24,8 @@ export const THREAD_ERROR_CODES = [
   "idempotency_conflict",
   "idempotency_in_progress",
   "idempotency_uncertain",
+  "delivered_unconfirmed",
+  "prompt_not_started",
   "approval_unavailable",
   "approval_route_locked",
   "partial_commit",
@@ -35,6 +38,8 @@ export const THREAD_ERROR_CODES = [
   "model_ambiguous",
   "thinking_level_unsupported",
   "loop_detected",
+  "pair_loop_guard",
+  "chain_count_limit",
   "binding_conflict",
   "binding_mismatch",
   "binding_inactive",
@@ -45,6 +50,7 @@ export const THREAD_ERROR_CODES = [
   "device_offline",
   "relay_requires_paid_plan",
   "alias_taken",
+  "gateway_schema_too_new",
 ] as const
 
 export type ThreadErrorCode = (typeof THREAD_ERROR_CODES)[number]
@@ -76,3 +82,51 @@ export function threadToolFailure(
   }
   return { code, message, next_action: nextAction, ...(details === undefined ? {} : { details }) }
 }
+
+/**
+ * The gateway store refuses to open because a newer omo build on this machine already migrated it past the schema this
+ * build knows (`gateway/schema.ts` `GatewaySchemaVersionError`, carried across the store worker with its `details`).
+ * The refusal stands, since reading a newer schema could corrupt it; this turns it into the one failure that names
+ * both versions and the remedy. Any other error answers undefined.
+ */
+export function gatewaySchemaRefusal(error: unknown): ThreadToolFailure | undefined {
+  const { code, details } = (error ?? {}) as {
+    code?: unknown
+    details?: { found?: unknown; supported?: unknown; extension?: unknown }
+  }
+  if (
+    code !== "gateway_schema_too_new" ||
+    typeof details?.found !== "number" ||
+    typeof details.supported !== "number" ||
+    details.extension !== undefined
+  )
+    return undefined
+  const command = UPDATE_COMMAND
+  return threadToolFailure(
+    "gateway_schema_too_new",
+    `This omo build reads gateway schema ${details.supported}, but this machine's gateway store is at schema ${details.found}: a newer omo build already upgraded it. Nothing was sent or changed.`,
+    `Update omo with \`${command}\`, restart this session, then retry.`,
+    { gateway_schema: details.found, binary_schema: details.supported, update_command: command },
+  )
+}
+
+/**
+ * The pair loop guard (`gateway/store-ops.ts` `takePairToken`): one sender spent its burst to one target within the
+ * bucket's refill window, which only a send loop between two sessions does. The message names both ends and the burst;
+ * the next action names when the next send to that target is accepted. The relay leg (`remote/relay-transport.ts`)
+ * builds its answer from the same two texts.
+ */
+export function pairLoopGuardMessage(sender: string, target: string, burst: number, windowMs: number): string {
+  return `${burst} sends from ${sender} to ${target} within ${windowMs / 1000} s; this one was not delivered.`
+}
+
+export function pairLoopGuardNextAction(retryAfterMs: number): string {
+  return `This looks like a send loop between these two sessions; the next send to this target is accepted after ${Math.ceil(retryAfterMs / 1000)} s.`
+}
+
+/**
+ * The one command that updates any omo build: a release updates itself, a source build answers with its own rebuild command
+ * (omo-native `compile-entry.ts`). Nothing in the environment can name a better one: the engine strips `SENPI_BRAND` at
+ * startup and the `omo thread` CLI runs in the launcher, which never has it.
+ */
+const UPDATE_COMMAND = "omo update"

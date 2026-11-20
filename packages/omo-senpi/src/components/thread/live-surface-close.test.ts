@@ -17,7 +17,9 @@ function surface(host: ContractHost): LiveThreadSurface {
 async function close(host: ContractHost): Promise<unknown> {
   const client = surface(host)
   if (client.closeSession === undefined) throw new Error("closeSession is missing")
-  return await client.closeSession("rpc-1", "dur-selected")
+  const answer = await client.closeSession("rpc-1", "dur-selected")
+  expect(answer.dropped_deliveries).toEqual([])
+  return answer.outcome
 }
 
 const sentTypes = (host: ContractHost) =>
@@ -33,8 +35,8 @@ describe("thread_close on this device's host: the session ends for every client 
           type: "unload_session",
           sessionId: "rpc-1",
           force: true,
-          interrupt: true,
           children: "detach",
+          deliveries: "refuse",
         }),
       ])
       expect(sentTypes(host).slice(0, 2)).toEqual(["attach_session", "unload_session"])
@@ -73,6 +75,23 @@ describe("thread_close on this device's host: the session ends for every client 
       })
     },
   )
+
+  // #14169: the refusal must say which blocker the engine hit (a turn, a bash command, an unwritten delivery), because
+  // the caller reads the message, not only `details`. The engine's detail is data the ladder passes through.
+  test("#given an engine without unload_refuse_deliveries that refuses the unload work_pending #when it is closed #then the refusal carries the engine's detail, says the ids are unavailable, and nothing was interrupted (#14234)", async () => {
+    await withContractHost({ auth: true, unloadRefusal: "work_pending" }, async (host) => {
+      const refused = await close(host).then(
+        () => undefined,
+        (error: unknown) => controlRefusalOf(error),
+      )
+      expect(refused).toMatchObject({
+        code: "turn_active",
+        details: { reason: "work_pending", detail: "refused: work_pending", pending_deliveries: "unavailable" },
+      })
+      expect(refused?.message).toContain("refused: work_pending")
+      expect(host.mutations.filter((frame) => frame["interrupt"] === true)).toEqual([])
+    })
+  })
 
   test("#given a session that already left the host #when it is closed #then nothing was live and nothing is mutated", async () => {
     await withContractHost({ auth: true, attachRefusal: "unknown_session" }, async (host) => {

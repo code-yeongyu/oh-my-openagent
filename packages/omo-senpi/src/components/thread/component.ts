@@ -4,6 +4,7 @@ import { join } from "node:path"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
+import { returnedAtClose, settleGracefulClose } from "./gateway/graceful-close-returns"
 import { createCompletionTracker, type AgentEndFacts } from "./gateway/completion"
 import { SESSION_CONTROL_DELIVERY_TYPE } from "./gateway/constants"
 import { gatewayDatabasePath } from "./gateway/paths"
@@ -24,6 +25,7 @@ import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { registerThreadTools, UNKNOWN_CALLER, type ThreadToolSurfaceOptions } from "./tools"
 import { createLazyLiveThreadSurface } from "./lazy-live-surface"
 import { createDefaultRemoteSurface } from "./remote/default-remote"
+import { registerRemoteMonitorTargets } from "./remote/lazy-ops"
 import { createOmoNativeProductConfig } from "../telemetry/product-identity"
 import { defaultThreadStateDirectory, isThreadSocket } from "./live-surface-paths"
 import { stampThisDevice } from "./remote/this-device"
@@ -123,7 +125,12 @@ function messageOf(event: unknown): EngineMessage | undefined {
 type DeliveryDetails = {
   readonly delivery_id?: unknown
   readonly chain_count?: unknown
-  readonly sender?: { readonly kind?: unknown; readonly session_id?: unknown; readonly name?: unknown }
+  readonly sender?: {
+    readonly kind?: unknown
+    readonly session_id?: unknown
+    readonly name?: unknown
+    readonly platform?: unknown
+  }
 }
 
 /** senpi `external-admission.js` `deliveryIdOf`: the delivery a `session_control_delivery` message carries. */
@@ -134,12 +141,16 @@ function deliveryOf(message: EngineMessage):
       readonly agentSender: string | undefined
       readonly senderName: string | undefined
       readonly device: string | undefined
+      readonly rpcInput: boolean
     }
+  | "malformed"
   | undefined {
   if (message.role !== "custom" || message.customType !== SESSION_CONTROL_DELIVERY_TYPE) return undefined
   const details = (message.details ?? undefined) as DeliveryDetails | undefined
   const id = details?.delivery_id
-  if (typeof id !== "string") return undefined
+  // A delivery message without a string id is malformed: after an answer it starts a new group with nobody approved,
+  // and it never passes as a turn the engine started, which would keep the earlier group's allowance (#13056).
+  if (typeof id !== "string") return "malformed"
   const count = details?.chain_count
   return {
     id,
@@ -153,12 +164,17 @@ function deliveryOf(message: EngineMessage):
         ? details.sender.name.trim()
         : undefined,
     device: deliveryDevice(id),
+    // senpi admits a `prompt`/`steer`/`follow_up` sent over the session's RPC socket as this same message, under the
+    // client's `clientMessageId` and with this sender it stamps itself (`session-control-input-commands.js`).
+    rpcInput: details?.sender?.kind === "external" && details.sender.platform === "rpc",
   }
 }
 
 /**
  * The device a delivery came from, as the receiving side attested it in the delivery's id: `device:<device>/<id>` names
- * it (URI-encoded); `rpc:local/<id>` and a bare row id mean this device (amendment A4.3.1 of #13037).
+ * it (URI-encoded); `rpc:local/<id>` and a bare row id name no device (amendment A4.3.1 of #13037). Those are this
+ * device's deliveries, or another device's admitted on a connection that declared no remote origin (#14048), so a reply
+ * that finds no such session here resolves account-wide (`tools.ts` `locate`).
  */
 function deliveryDevice(id: string): string | undefined {
   if (!id.startsWith("device:")) return undefined
@@ -180,6 +196,17 @@ function callsTools(message: EngineMessage): boolean {
   )
 }
 
+/** A final answer was given: the next input starts a new group, and nothing of the earlier one survives. */
+function startGroup(run: RunContext): void {
+  run.cause = undefined
+  run.consumed = []
+  run.replyTo = []
+  run.replySenders = []
+  run.chainHop = 0
+  run.local = false
+  run.answered = false
+}
+
 /**
  * Decision 0027 section 6 (#13042): the reply allowance belongs to the consumed delivery and lasts for the work that
  * delivery started - the consuming turn and every later turn the engine starts on its own (a reminder, a goal
@@ -188,26 +215,32 @@ function callsTools(message: EngineMessage): boolean {
  * it too) or any delivery, whose own sender the new group then holds. A delivery that joins running work adds its
  * sender. The run's deliveries (`consumed`, the implicit target of a report) end with the final answer in every
  * order: an engine-started message that arrives after the answer and before the settle keeps the allowance, not them.
+ * The same-account bound is not enforced here: a delivery reaches this component only after the engine's admission
+ * accepted it for this account, so the allowance a consumed delivery grants rests on that admission (#13044, #13056).
  */
 function noteInput(run: RunContext, message: EngineMessage): void {
   if (message.role !== "user" && message.role !== "custom") return
   const delivery = deliveryOf(message)
+  if (delivery === "malformed") {
+    // Like a delivery it ends an answered group (nothing of the earlier group survives) and, unlike a valid one, adds
+    // no sender; while work is running it joins it as a valid delivery would, adding nothing and keeping the hop.
+    if (run.answered) startGroup(run)
+    return
+  }
   if (message.role === "custom" && delivery === undefined) {
     if (run.answered) run.consumed = []
     run.answered = false
     return
   }
-  if (run.answered) {
-    run.cause = undefined
-    run.consumed = []
-    run.replyTo = []
-    run.replySenders = []
-    run.chainHop = 0
-    run.local = false
-    run.answered = false
-  }
+  if (run.answered) startGroup(run)
   if (message.role === "user") run.local = true
   if (delivery === undefined) return
+  // RPC input is typed input, never a delivery this session received: its id is the client's to choose, so it is no
+  // cause, no consumed origin and no reply sender, and a send from its run starts a new causal root (#12317).
+  if (delivery.rpcInput) {
+    run.local = true
+    return
+  }
   // Every consumed delivery is the cause of the run's next send, on either transport (decision 0027 section 3); one no row
   // here holds starts a new root there and its hop count continues the chain (K8).
   run.cause = delivery.id
@@ -272,6 +305,10 @@ function relayedQuestionOf(event: unknown): { readonly call: string; readonly re
     ? { call: toolCallId, request: request_id }
     : undefined
 }
+
+/** senpi's `session_shutdown { closed: true }`: a graceful close ended the session on request (omo#14313). */
+const closedOnRequest = (event: unknown): boolean =>
+  typeof event === "object" && event !== null && (event as { readonly closed?: unknown }).closed === true
 
 function durableIdOf(eventCtx: unknown): string | undefined {
   const manager = (eventCtx as { readonly sessionManager?: { readonly getSessionId?: () => unknown } } | undefined)
@@ -362,9 +399,13 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         options.remote ??
         createDefaultRemoteSurface({
           version: createOmoNativeProductConfig().packageVersion,
+          // One surface serves every session of this engine, so its client acts as the engine's host instance: engine-wide,
+          // never per session. The thread surface calls only service.status and devices.list, which never read it.
+          sender: { kind: "session", id: runtimeInstance ?? UNKNOWN_CALLER },
           log: (line) => ctx.logger.warn(line),
           permissionPreset: () => pi.getPermissionPreset?.(),
         })
+      registerRemoteMonitorTargets(pi, remote)
       const store =
         options.store ??
         createGatewayStore({
@@ -645,7 +686,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
           COMPLETION_SETTLE_WAIT_MS,
         )
       })
-      pi.on("session_shutdown", async () => {
+      pi.on("session_shutdown", async (event, eventCtx) => {
         completions.dispose()
         tools.dispose()
         await registrant
@@ -655,7 +696,17 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
               `thread gateway: control endpoint teardown failed: ${error instanceof Error ? error.message : String(error)}`,
             ),
           )
+        const durableId = durableIdOf(eventCtx)
+        if (closedOnRequest(event) && durableId !== undefined)
+          await settleGracefulClose(store, durableId, returnedAtClose(eventCtx)).catch((error: unknown) =>
+            ctx.logger.warn(
+              `thread gateway: the graceful close's unread messages were not answered: ${error instanceof Error ? error.message : String(error)}`,
+            ),
+          )
         if (options.store === undefined) await store.dispose().catch(() => undefined)
+        // The surface this component built holds the device-service connection a thread tool opened; left open it keeps
+        // the engine alive after its last session ends (#14054: `omo -p` never exited). A later call reconnects lazily.
+        if (options.remote === undefined) await remote.sessions.close?.().catch(() => undefined)
       })
     },
   }

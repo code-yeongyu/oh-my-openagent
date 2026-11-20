@@ -65,6 +65,7 @@ test(
       lastSyncedAt: null,
       updatedWhileOffline: 0,
       peer: null,
+      space: null,
     }
     await writeJsonFile(join(sync, "state.json"), state)
     const incoming1: IncomingRecord = {

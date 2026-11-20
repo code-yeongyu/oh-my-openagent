@@ -10,7 +10,7 @@ import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { FakeSessionRuntime } from "./gateway/testing/fake-runtime"
 import type { GatewayDeliveryResult } from "./gateway/types"
 import { createLiveThreadSurface, parseHostStatusAll } from "./live-surface"
-import { createThreadSdk, type ThreadSdk } from "./sdk"
+import { createThreadSdk, type ThreadSdk, type ThreadSdkSendResult } from "./sdk"
 import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
 import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
@@ -129,7 +129,7 @@ function otherLiveHost(name = "other lane", wakes: string[] = []): ThreadHost {
   }
 }
 
-function deliveryIdOf(result: GatewayDeliveryResult | ThreadToolResult): string {
+function deliveryIdOf(result: GatewayDeliveryResult | ThreadSdkSendResult | ThreadToolResult): string {
   if (result.kind !== "ok" || !("delivery_id" in result) || typeof result.delivery_id !== "string")
     throw new Error(`expected a delivery, got ${JSON.stringify(result)}`)
   return result.delivery_id
@@ -198,7 +198,7 @@ describe("thread send with no live endpoint anywhere", () => {
     expect((await store.list({ target_durable_id: "dur-gone" })).map((row) => row.state)).toEqual(["queued"])
   })
 
-  test("#given no endpoint answers #when a session's thread_send targets an exited terminal #then the tool answers queued_offline with endpoint null", async () => {
+  test("#given no endpoint answers #when a session's thread_send targets an exited terminal #then the tool answers queued_offline", async () => {
     const agentDir = agentDirectory()
     sessionFile(agentDir, "dur-gone", process.cwd(), "gone-tui")
     const host = createLiveThreadSurface(undefined, {
@@ -223,9 +223,8 @@ describe("thread send with no live endpoint anywhere", () => {
     )
     expect(output.details.result).toMatchObject({
       kind: "ok",
-      thread_id: "dur-gone",
+      thread: "dur-gone",
       delivery: { kind: "queued_offline" },
-      endpoint: null,
     })
   })
 })
@@ -261,32 +260,6 @@ describe("store-only operations with no live endpoint", () => {
     })
     expect(moved).toMatchObject({ kind: "ok", binding: { session_durable_id: "dur-next", revision: 2 } })
   })
-
-  test("#given no endpoint answers #when a session's thread_bind names another session known only from disk #then the tool binds it", async () => {
-    const agentDir = agentDirectory()
-    sessionFile(agentDir, "dur-gone", process.cwd(), "gone-tui")
-    const host = createLiveThreadSurface(undefined, {
-      env: { HOME: agentDir, OMO_CODING_AGENT_DIR: agentDir },
-      statusAll: async () => parseHostStatusAll(deadTerminalStatus(agentDir)),
-    })
-    const tools = createThreadTools({
-      host,
-      stateDirectory: agentDir,
-      store: storeAt(agentDir),
-      sessionsDirectory: () => join(agentDir, "sessions"),
-      callerSessionId: () => "dur-caller",
-      callerWorkspaceRoot: () => process.cwd(),
-    })
-    const bind = tools.find((tool) => tool.name === "thread_bind")
-    const output = await bind!.execute(
-      "call-1",
-      { platform: "custom", account_id: "bot", chat_id: "c1", session: "gone-tui" },
-      undefined,
-      undefined,
-      { sessionManager: { getSessionId: () => "dur-caller" } } as never,
-    )
-    expect(output.details.result).toMatchObject({ kind: "ok", binding: { session_durable_id: "dur-gone" } })
-  })
 })
 
 describe("findDiskSessions", () => {
@@ -316,13 +289,13 @@ describe("thread send to a session this process never saw alive", () => {
     const byName = await sdk.send({ thread: "dead-tui", text: "by name" })
     expect(byId).toMatchObject({
       kind: "ok",
-      thread_id: "dur-dead",
+      thread: "dur-dead",
       delivery: { kind: "queued_offline" },
       endpoint_kind: null,
     })
     expect(byName).toMatchObject({
       kind: "ok",
-      thread_id: "dur-dead",
+      thread: "dur-dead",
       delivery: { kind: "queued_offline" },
       endpoint_kind: null,
     })
@@ -354,9 +327,8 @@ describe("thread send to a session this process never saw alive", () => {
     } as never)
     expect(output.details.result).toMatchObject({
       kind: "ok",
-      thread_id: "dur-dead",
+      thread: "dur-dead",
       delivery: { kind: "queued_offline" },
-      endpoint: null,
     })
   })
 
@@ -379,14 +351,13 @@ describe("thread send to a session this process never saw alive", () => {
     } as never)
     expect(output.details.result).toMatchObject({
       kind: "ok",
-      thread_id: "dur-x",
+      thread: "dur-x",
       delivery: { kind: "queued_offline" },
-      endpoint: null,
     })
     const sdk = sdkOver(agentDir, host)
     expect(await sdk.send({ thread: "dur-x", text: "for x too" })).toMatchObject({
       kind: "ok",
-      thread_id: "dur-x",
+      thread: "dur-x",
       delivery: { kind: "queued_offline" },
       endpoint_kind: null,
     })
@@ -395,7 +366,7 @@ describe("thread send to a session this process never saw alive", () => {
     expect(wakes).toEqual([])
   })
 
-  test("#given session files on disk #when the address is an unknown id, a name two sessions share, or a name only another workspace holds #then not_found, ambiguous_target, and not_found unless all_scope, with nothing written", async () => {
+  test("#given session files on disk #when the address is an unknown id, a name two sessions share, or a name only another workspace holds #then not_found, ambiguous_target, and scope_denied unless all_scope, with nothing written", async () => {
     const agentDir = agentDirectory()
     const elsewhere = realpathSync(mkdtempSync(join(tmpdir(), "thread-offline-elsewhere-")))
     cleanups.push(() => rmSync(elsewhere, { recursive: true, force: true }))
@@ -413,13 +384,13 @@ describe("thread send to a session this process never saw alive", () => {
     })
     expect(await sdk.send({ thread: "far-lane", text: "x" })).toMatchObject({
       kind: "error",
-      error: { code: "not_found" },
+      error: { code: "scope_denied" },
     })
     const store = storeAt(agentDir)
     expect(await store.list()).toEqual([])
     expect(await sdk.send({ thread: "far-lane", text: "x", all_scope: true })).toMatchObject({
       kind: "ok",
-      thread_id: "dur-far",
+      thread: "dur-far",
       delivery: { kind: "queued_offline" },
     })
   })

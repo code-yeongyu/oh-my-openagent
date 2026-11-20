@@ -1,10 +1,14 @@
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import type { CommandResult } from "@oh-my-opencode/device-service-core"
-import { outcomeFailure, READ_UNCERTAIN } from "./outcome"
+import type { RemoteClient } from "../../remote"
+import { accountDevices, accountState } from "./account"
+import { notSignedInFailure, outcomeFailure, READ_UNCERTAIN } from "./outcome"
 import {
   endedRow,
+  probeMayBuildEndedRow,
   type AliasError,
   type AliasHolder,
+  type RemoteDevice,
   type JsonObject,
   type RemoteSessionRow,
   type RemoteThreadSurface,
@@ -20,17 +24,24 @@ const fail = (
 
 /** A5: the relay is paid only; on any other plan the remote path answers this, never a silent failure or a queue. */
 export async function remoteAvailable(remote: RemoteThreadSurface): Promise<Failure | undefined> {
-  let state: string
-  try {
-    state = (await remote.sessions.status()).state
-  } catch (error) {
+  const ready = await remoteReady(remote)
+  return "kind" in ready ? ready : undefined
+}
+
+/** remoteAvailable, and on a connected relay this device's account id, read in the same status round. */
+export async function remoteReady(remote: RemoteThreadSurface): Promise<Failure | { readonly here: string | null }> {
+  const status = await accountState(remote.client)
+  if ("kind" in status)
     return fail(
       "host_unavailable",
       "This device's device service is not reachable.",
       "Install or start the device service, then retry.",
-      { reason: error instanceof Error ? error.message : String(error) },
+      // No device service at all is "not set up" (no state); a service that answers with a failure is an outage.
+      status.details?.["reason"] === "service_not_installed"
+        ? { reason: status.message }
+        : { reason: status.message, state: "unreachable" },
     )
-  }
+  const state = status.state
   if (state === "plan_required")
     return fail(
       "relay_requires_paid_plan",
@@ -44,7 +55,12 @@ export async function remoteAvailable(remote: RemoteThreadSurface): Promise<Fail
       "Sign in, turn remote sessions on, or wait for the device service to connect, then retry.",
       { state },
     )
-  return undefined
+  return { here: status.here }
+}
+
+/** An alias holder as a failure names it: the thread to pass back, and its device. */
+export function holderDetails(holder: AliasHolder): { readonly thread: string; readonly device: string } {
+  return { thread: holder.session_id, device: holder.device }
 }
 
 export function aliasFailure(error: AliasError): Failure {
@@ -53,14 +69,18 @@ export function aliasFailure(error: AliasError): Failure {
       "alias_taken",
       error.message,
       "Choose another alias; the holder is named in details.",
-      error.details?.holder === undefined ? undefined : { holder: error.details.holder },
+      error.details?.holder === undefined ? undefined : { holder: holderDetails(error.details.holder) },
     )
   if (error.code === "alias_invalid")
     return fail("invalid_arguments", error.message, "Use 1-64 visible characters that do not look like a session id.", {
       reason: error.details?.reason,
     })
   if (error.code === "alias_not_found")
-    return fail("not_found", error.message, "Call thread_list to see the threads and their aliases.")
+    return fail(
+      "not_found",
+      error.message,
+      "Call thread_list (tool.thread_list() in an eval cell) to see the threads and their aliases.",
+    )
   return fail("host_unavailable", error.message, "Retry when the account service is reachable.", {
     reason: error.details?.reason,
   })
@@ -80,13 +100,15 @@ export type RemoteTarget =
  * listing keys every session (terminal-held or rpc-host alike) by the relay key that device's connector assigned and names
  * only its project, so the row cannot be matched by durable id: the holding device maps it (session.locate, the same
  * lookup a create on another device uses). An offline holder device is device_offline; one that is online but cannot map
- * the holder to a session it lists is not_found.
+ * the holder to a session it lists is not_found. A holder device the account's roster no longer names (removed from the
+ * account, #13505) is not_found without that probe; with no roster (`undefined`) the account's device list is read here.
  */
 export async function holderTarget(
   remote: RemoteThreadSurface,
   holder: AliasHolder,
   here: string | null,
   rows: readonly RemoteSessionRow[],
+  roster: readonly RemoteDevice[] | undefined,
 ): Promise<RemoteTarget | Failure> {
   if (holder.device === here) return { where: "here", session_id: holder.session_id }
   // A holder is recorded by its durable id (claimed on its own device) or by its listing key: match either.
@@ -95,13 +117,22 @@ export async function holderTarget(
       row.device === holder.device && (row.durable_id === holder.session_id || row.session_id === holder.session_id),
   )
   if (listed !== undefined) return { where: "remote", row: listed }
-  const device = (await remote.sessions.devices()).find((candidate) => candidate.device === holder.device)
+  const device = (roster ?? (await accountDevices(remote.client)).devices).find(
+    (candidate) => candidate.device === holder.device,
+  )
+  if (roster !== undefined && device === undefined)
+    return fail(
+      "not_found",
+      `The alias names thread ${holder.session_id} on device ${holder.device}, which is no longer on this account.`,
+      "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to find the live thread, then claim the alias for it again with thread_rename (tool.thread_rename()).",
+      { device: holder.device, thread: holder.session_id },
+    )
   if (device !== undefined && !device.online)
     return fail(
       "device_offline",
       `Device ${holder.device} holding this thread is offline.`,
       "Retry when that device is online; nothing was queued.",
-      { device: holder.device, thread_id: holder.session_id },
+      { device: holder.device, thread: holder.session_id },
     )
   const located = await remote.sessions.locate(holder.device, holder.session_id)
   const row =
@@ -111,15 +142,17 @@ export async function holderTarget(
   if (row !== undefined) return { where: "remote", row }
   // omo#13037 A4.3.2: the holder's device answered the probe for a session no engine lists: an ended row from that answer,
   // only while this device's service can carry the wake (else today's not_found below).
-  if (located.kind === "ok" && (await remote.sessions.canWake?.()) === true)
+  if (located.kind === "ok" && (await probeMayBuildEndedRow(remote.sessions)))
     return { where: "remote", row: endedRow(holder.device, located.sessionId, holder.session_id) }
+  const notSignedIn = located.kind === "refused" ? notSignedInFailure(located.reason, holder.device) : undefined
+  if (notSignedIn !== undefined) return notSignedIn
   return fail(
     "not_found",
     `The alias names thread ${holder.session_id} on device ${holder.device}, which that device does not list.`,
-    "Call thread_list with all_scope to find the live thread, then claim the alias for it again with thread_rename.",
+    "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to find the live thread, then claim the alias for it again with thread_rename (tool.thread_rename() in an eval cell).",
     {
       device: holder.device,
-      thread_id: holder.session_id,
+      thread: holder.session_id,
       ...(located.kind === "refused" ? { reason: located.reason } : {}),
     },
   )
@@ -127,13 +160,35 @@ export async function holderTarget(
 
 /** A typed `device_offline` when the device is known and not online; nothing is ever queued for it (A3). */
 export async function deviceOnline(remote: RemoteThreadSurface, device: string): Promise<Failure | undefined> {
-  const devices = await remote.sessions.devices()
+  const listed = await listedDevices(remote.client, device)
+  return "kind" in listed ? listed : deviceRefusal(listed.devices, device)
+}
+
+/** The account's devices, or a typed host_unavailable naming `device` when this device's service cannot list them. */
+export async function listedDevices(
+  client: RemoteClient,
+  device: string,
+): Promise<{ readonly devices: readonly RemoteDevice[] } | Failure> {
+  try {
+    return { devices: (await accountDevices(client)).devices }
+  } catch (error) {
+    return fail(
+      "host_unavailable",
+      "This device's device service could not list the account's devices.",
+      "Retry when the device service is reachable.",
+      { device, reason: error instanceof Error ? error.message : String(error) },
+    )
+  }
+}
+
+/** deviceOnline over a device list the caller already read: not_found for an unknown id, device_offline for an offline one. */
+export function deviceRefusal(devices: readonly RemoteDevice[], device: string): Failure | undefined {
   const row = devices.find((candidate) => candidate.device === device)
   if (row === undefined)
     return fail(
       "not_found",
       `No device named ${device} is signed in to this account.`,
-      "Call thread_list with all_scope to see the account's devices and threads.",
+      "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to see the account's devices and threads.",
       { device },
     )
   if (!row.online)
@@ -262,6 +317,20 @@ export async function followRemote(
 ): Promise<RemoteFollow | Failure> {
   const offline = await deviceOnline(remote, row.device)
   if (offline !== undefined) return offline
+  // An id-carrying send: the user entries carrying its text before it is sent (read before the watch, so before the
+  // send). On an engine that stamps no id they are all earlier sends, finished or not, and a prompt matched only by
+  // its text is never one of them; undefined when the read failed, and then no text match counts (#13481 delta M1).
+  let storedBeforeSend: ReadonlySet<string> | undefined
+  if (options?.text !== undefined && options.clientMessageId !== undefined) {
+    const page = await remote.sessions.read(row.device, row.session_id, READ_TAIL)
+    const raw = page.kind === "ok" ? page.response["entries"] : undefined
+    if (Array.isArray(raw)) {
+      const entries = raw.filter(isRecord)
+      storedBeforeSend = new Set(
+        textCarryingUserEntries(entries, options.text).map((index) => entryKeyOf(entries[index])),
+      )
+    }
+  }
   let settle!: (end: string) => void
   const settled = new Promise<string>((resolve) => {
     settle = resolve
@@ -378,11 +447,15 @@ export async function followRemote(
   }
   // The stop reason of the run's last assistant message: an interrupted turn ends its run with "aborted" (#13272).
   let lastStopReason: unknown
+  // What the stream printed from the aim on: the probe prints only the part of the stored answer it has not (#13481).
+  let streamed = ""
   const streamRecord = (record: JsonObject): void => {
     if (record["type"] === "agent_settled") {
       if (record["reason"] === "session_closed") return end("session_closed")
       return end(lastStopReason === "aborted" ? "interrupted" : "settled")
     }
+    // Each run starts with no stop reason of its own (#13272 review).
+    if (record["type"] === "agent_start") lastStopReason = undefined
     if (record["type"] === "message_end") {
       const message = record["message"]
       if (isRecord(message) && message["role"] === "assistant") lastStopReason = message["stopReason"]
@@ -398,12 +471,40 @@ export async function followRemote(
     )
       return
     const delta = event["delta"]
-    if (last !== undefined && !last.endsLine && (newMessage || event["contentIndex"] !== last.index)) onText("\n")
+    if (last !== undefined && !last.endsLine && (newMessage || event["contentIndex"] !== last.index)) {
+      streamed += "\n"
+      onText("\n")
+    }
     newMessage = false
     last = { index: event["contentIndex"], endsLine: delta.endsWith("\n") }
+    streamed += delta
     onText(delta)
   }
-  const probe = async (settleSignal: boolean): Promise<void> => {
+  // Whether a buffered stream record is this send's own prompt: senpi streams the prompt's user message as the run
+  // starts, and stores its entry at that message's end. A message carrying this send's client message id is its own
+  // ("id"); one carrying any other id never is, whether this send has an id or not. An unstamped message carrying the
+  // send's text matches by text ("text"): a send with no id stores no id, and an engine that keeps no id stamps none
+  // (#13481 review M1, L1).
+  const promptMatchOf = (record: JsonObject): "id" | "text" | undefined => {
+    const text = options?.text
+    if (text === undefined || record["type"] !== "message_end" || !isUserEntry(record)) return undefined
+    const stamped = entryClientMessageIdOf(record)
+    if (stamped !== undefined) return stamped === options?.clientMessageId ? "id" : undefined
+    return entryTextOf(record)?.includes(text) === true ? "text" : undefined
+  }
+  // Whether a record shows the engine stamps client message ids: then an id-carrying send's own prompt carries its id,
+  // and an unstamped same-text prompt is an earlier send's (a send without --wait, text typed in the TUI) (#13481 review M1).
+  const showsStamping = (record: JsonObject): boolean =>
+    isUserEntry(record) && entryClientMessageIdOf(record) !== undefined
+  /**
+   * Reads the transcript once for a started turn that may have finished, or been superseded, before the aim.
+   * `settleSignal`: this turn's own run settled before the aim. `promptStored`: the stream showed this send's prompt
+   * stored before the read, so the newest entry carrying its text is its own; without that (and without its client
+   * message id on an entry) the newest text match may be an earlier identical send, and nothing prints (#13481 review M1).
+   * `storedByText`: an id-carrying send's prompt was matched only by its text (an engine that keeps no id), which holds
+   * only while the transcript shows no stamped entry either (#13481 review L1).
+   */
+  const probe = async (settleSignal: boolean, promptStored: boolean, storedByText: boolean): Promise<void> => {
     const text = options?.text
     if (done || text === undefined) return
     const page = await remote.sessions.read(row.device, row.session_id, READ_TAIL)
@@ -411,9 +512,27 @@ export async function followRemote(
     const raw = page.response["entries"]
     if (!Array.isArray(raw)) return
     const entries = raw.filter(isRecord)
-    const matches = anchorMatches(entries, text, options?.clientMessageId)
-    if (matches.length === 0) return
-    const anchor = matches[matches.length - 1]
+    const clientMessageId = options?.clientMessageId
+    const own =
+      clientMessageId === undefined
+        ? -1
+        : entries.findIndex((entry) => isUserEntry(entry) && entryClientMessageIdOf(entry) === clientMessageId)
+    let anchor = own
+    if (anchor < 0) {
+      if (!promptStored) return
+      // A prompt matched only by its text is this id-carrying send's only on an engine that stamps no id: a stamped
+      // entry in the transcript says the matched prompt is an earlier send's (#13481 review M1, L1).
+      if (storedByText && entries.some(showsStamping)) return
+      // Nor is it an entry the transcript already held before the send: that is an earlier prompt with its own run,
+      // whatever settle the buffer holds after it (#13481 delta M1). Entries stored between the send starting and its prompt landing are indistinguishable without ids (oh-my-openagent#13580).
+      if (storedByText && storedBeforeSend === undefined) return
+      const before = storedByText ? storedBeforeSend : undefined
+      const matches = anchorMatches(entries, text).filter(
+        (index) => before === undefined || !before.has(entryKeyOf(entries[index])),
+      )
+      if (matches.length === 0) return
+      anchor = matches[matches.length - 1]
+    }
     const answer: string[] = []
     let superseded = false
     let answerAtTail = false
@@ -438,9 +557,22 @@ export async function followRemote(
     const interrupted = stopReason === "aborted"
     if (!(superseded || (settleSignal && (answerAtTail || interrupted)))) return
     if (answer.length === 0 && !interrupted) return
-    for (const [index, entryText] of answer.entries()) {
-      if (index > 0) onText("\n")
-      onText(entryText)
+    const stored = answer.join("\n")
+    if (streamed === "")
+      for (const [index, entryText] of answer.entries()) {
+        if (index > 0) onText("\n")
+        onText(entryText)
+      }
+    else {
+      // The stream printed from the aim on: of this turn's stored answer only what it has not printed yet is written,
+      // so the answer prints once (#13481). Deltas that are not this answer (a later message's turn streaming after
+      // the aim of a superseded send) never drop it: it prints after them (#13481 review L3).
+      if (stored.startsWith(streamed)) {
+        if (stored.length > streamed.length) onText(stored.slice(streamed.length))
+      } else if (!streamed.startsWith(stored)) {
+        if (!streamed.endsWith("\n")) onText("\n")
+        onText(stored)
+      }
     }
     end(interrupted ? "interrupted" : "settled")
   }
@@ -479,19 +611,31 @@ export async function followRemote(
     // The run's own records the buffer already holds (after its agent_start) still say how its last message ended:
     // a turn aborted before the aim and settled after it is interrupted, not settled (#13272 review L2).
     const runStart = buffer.findLastIndex((record) => record["type"] === "agent_start")
-    if (runStart >= 0)
+    // A run the buffer already saw settle is an earlier run, not this send's: its stop reason marks nothing (#13272 review).
+    const runSettled = runStart >= 0 && buffer.slice(runStart + 1).some((record) => record["type"] === "agent_settled")
+    if (runStart >= 0 && !runSettled)
       for (const record of buffer.slice(runStart + 1)) {
         const ended = record["message"]
         if (record["type"] === "message_end" && isRecord(ended) && ended["role"] === "assistant")
           lastStopReason = ended["stopReason"]
       }
     if (lane === "started") {
-      // A run whose settle the buffer already holds ended before this aim: its settle is the probe's signal.
-      const settledAlready = buffer.length > 0 && buffer[buffer.length - 1]?.["type"] === "agent_settled"
-      void probe(settledAlready)
+      // This send's run ended before the aim only when the buffer holds a settle AFTER this send's own prompt: a settle
+      // buffered with no prompt of its own before it is an earlier run's, never this turn's signal (#13481 review M1).
+      // A send with an id takes a prompt matched by its text only while nothing buffered shows the engine stamps ids:
+      // an engine that keeps no id stamps none, so its turn that finished before the aim still prints (#13481 review L1).
+      const byId = buffer.findLastIndex((record) => promptMatchOf(record) === "id")
+      const textAllowed = options?.clientMessageId === undefined || !buffer.some(showsStamping)
+      const byText = byId >= 0 || !textAllowed ? -1 : buffer.findLastIndex((record) => promptMatchOf(record) === "text")
+      const ownPrompt = byId >= 0 ? byId : byText
+      const settledAlready =
+        ownPrompt >= 0 && buffer.slice(ownPrompt + 1).some((record) => record["type"] === "agent_settled")
+      void probe(settledAlready, ownPrompt >= 0, byId < 0 && options?.clientMessageId !== undefined)
     }
   }
-  const watched = await remote.sessions.watch(row.device, row.session_id, receive)
+  // A gap in the attach ends the follow with its reason, as an ended attach always did: the send's own turn may have
+  // settled unseen, and the CLI answers that typed instead of waiting through a resync.
+  const watched = await remote.sessions.watch(row.device, row.session_id, { record: receive, lost: end })
   if (watched.kind !== "ok") return outcomeFailure(watched, row.device)
   void watched.watch.ended.then(end)
   return { settled, stop: watched.watch.stop, aim }

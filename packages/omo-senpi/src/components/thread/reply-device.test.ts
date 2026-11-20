@@ -71,12 +71,105 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
     await fixture.cleanup()
   })
 
-  async function consumed(deliveries: readonly Delivery[], rows: readonly RemoteSessionRow[]) {
+  async function consumed(
+    deliveries: readonly Delivery[],
+    rows: readonly RemoteSessionRow[],
+    {
+      listingReads,
+      selfDevice,
+      service,
+      firstDeviceReadMisses,
+    }: {
+      readonly listingReads?: number
+      readonly selfDevice?: "throws" | "fails_once"
+      /** The device service's own answers (probe, wake, missed devices), as the fixture's account options name them. */
+      readonly service?: Pick<
+        NonNullable<Parameters<typeof fixture.account>[0]>,
+        "incomplete" | "wakeFeature" | "noLookup" | "silent"
+      >
+      /** The first one-device listing lacks every row (a listing that has not caught up), later ones answer as usual. */
+      readonly firstDeviceReadMisses?: boolean
+    } = {},
+  ) {
     const agentDir = mkdtempSync(join(tmpdir(), "thr-reply-device-"))
     directories.push(agentDir)
     const store = createGatewayStore({ agentDir })
     stores.push(store)
-    const account = fixture.account({ rows, live: rows.map((row) => row.session_id) })
+    const account = fixture.account({
+      rows,
+      live: rows.map((row) => row.session_id),
+      ...(selfDevice === "throws" ? { selfDevice } : {}),
+      ...service,
+    })
+    // The first read of one device's rows misses them, through whichever port method reads them.
+    const accountListing = account.remote.sessions.listing
+    const deviceRows = account.remote.sessions.sessions
+    if (accountListing === undefined) throw new Error("the fixture's sessions port has no listing")
+    let missed = firstDeviceReadMisses !== true
+    const missOnce = (device: string | undefined): boolean => {
+      if (device === undefined || missed) return false
+      missed = true
+      return true
+    }
+    const port: typeof account.remote.sessions = {
+      ...account.remote.sessions,
+      sessions: async (filter) => {
+        const rows = await deviceRows(filter)
+        return missOnce(filter?.device) ? [] : rows
+      },
+      listing: async (filter) => {
+        const listed = await accountListing(filter)
+        return missOnce(filter?.device) ? { ...listed, rows: [] } : listed
+      },
+    }
+    // `fails_once`: this device's id read fails once, then answers (a device service that recovers mid-call).
+    let deviceListFailed = false
+    const deviceList = account.remote.client.devices.list
+    const client =
+      selfDevice === "fails_once"
+        ? {
+            ...account.remote.client,
+            devices: {
+              ...account.remote.client.devices,
+              list: async (...args: Parameters<typeof deviceList>) => {
+                if (deviceListFailed) return await deviceList(...args)
+                deviceListFailed = true
+                return {
+                  kind: "error",
+                  code: "host_unavailable",
+                  message: "device.info failed",
+                  next_action: "Retry.",
+                } as const
+              },
+            },
+          }
+        : account.remote.client
+    // `listingReads`: how many reads of the account session listing answer before every later one throws.
+    // The rows (`sessions`) and the round with its missing devices (`listing`) are the same account listing read.
+    let reads = 0
+    const listing = port
+    const read = () => {
+      reads += 1
+      if (listingReads !== undefined && reads > listingReads) throw new Error("account list failed")
+    }
+    const remote =
+      listingReads === undefined
+        ? { ...account.remote, client, sessions: port }
+        : {
+            ...account.remote,
+            client,
+            sessions: {
+              ...listing,
+              sessions: async (...args: Parameters<typeof listing.sessions>) => {
+                read()
+                return await listing.sessions(...args)
+              },
+              listing: async (filter?: { readonly device?: string }) => {
+                read()
+                return { rows: await listing.sessions(filter), incomplete: [] }
+              },
+            },
+          }
     const handlers = new Map<string, Handler[]>()
     const tools: CapturedTool[] = []
     const pi = {
@@ -113,7 +206,7 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
       stateDirectory: join(agentDir, "state"),
       agentDir: () => agentDir,
       store,
-      remote: account.remote,
+      remote,
     }).register(pi as never, { logger, config: { getFlag: () => undefined } } as never)
     const ctx = { sessionManager: { getSessionId: () => "dur-caller" } }
     const dispatch = async (event: string, payload: Record<string, unknown> = {}) => {
@@ -149,7 +242,14 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
       account.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message").map((entry) => entry.device)
     // A delivery to a session on this device leaves a marker in its gateway inbox: none means nothing reached it.
     const reachedLocally = (durableId: string) => existsSync(gatewayInboxDirectory(agentDir, durableId))
-    return { reply, admittedOn, prompts: () => prompts, reachedLocally, listings: () => localListings }
+    return {
+      reply,
+      admittedOn,
+      prompts: () => prompts,
+      reachedLocally,
+      listings: () => localListings,
+      deviceReads: () => account.listings.device,
+    }
   }
 
   test("#given b's delivery states a session id that a third device also lists #when the run replies by that id #then the reply goes to b's row and nothing reaches the third device", async () => {
@@ -157,21 +257,56 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
       [{ id: "device:b/d-1", session_id: "dur-on-b", name: "on b" }],
       [C_SAME_ID, B_ROW],
     )
-    expect(await reply("dur-on-b")).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
+    expect(await reply("dur-on-b")).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b" })
     expect(admittedOn()).toEqual(["b"])
   })
 
-  test("#given b's delivery states a session id that only a third device lists #when the run replies by that id #then it is not_found naming b, and nothing reaches the third device", async () => {
-    const { reply, admittedOn } = await consumed([{ id: "device:b/d-1", session_id: "dur-on-b" }], [C_SAME_ID])
+  test("#given b's delivery states a session id that only a third device lists, and b's probe says it holds none #when the run replies by that id #then b's listing is read again, it is not_found naming b, and nothing reaches the third device", async () => {
+    const { reply, admittedOn, deviceReads } = await consumed(
+      [{ id: "device:b/d-1", session_id: "dur-on-b" }],
+      [C_SAME_ID],
+      { service: { wakeFeature: true } },
+    )
     expect(await reply("dur-on-b")).toMatchObject({
       kind: "error",
       error: { code: "not_found", details: { device: "b" } },
     })
+    expect(deviceReads()).toBe(2)
     expect(admittedOn()).toEqual([])
   })
 
+  // #14280: a live sender whose row this read of b's listing misses is never refused as gone: the miss is read again, and a
+  // refusal names why b could not tell (it missed the round, or this device cannot probe it), never not_found.
+  test("#given b's first listing has not caught up with the sender #when the run replies by its id #then the second read finds it and the reply reaches b", async () => {
+    const { reply, admittedOn } = await consumed([{ id: "device:b/d-1", session_id: "dur-on-b" }], [B_ROW], {
+      firstDeviceReadMisses: true,
+    })
+    expect(await reply("dur-on-b")).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b" })
+    expect(admittedOn()).toEqual(["b"])
+  })
+
+  test.each([
+    ["b missed the listing round", { incomplete: ["b"], wakeFeature: true }, "listing_incomplete"],
+    ["this device's service carries no wake, so it does not probe", {}, "wake_unavailable"],
+    ["this device's service makes no single probe", { wakeFeature: true, noLookup: true }, "lookup_unavailable"],
+  ] as const)(
+    "#given b's listing lacks the sender and %s #when the run replies by its id #then it is host_unavailable naming that reason and b, and nothing is sent",
+    async (_case, service, reason) => {
+      const { reply, admittedOn } = await consumed([{ id: "device:b/d-1", session_id: "dur-on-b" }], [C_SAME_ID], {
+        service,
+      })
+      expect(await reply("dur-on-b")).toMatchObject({
+        kind: "error",
+        error: { code: "host_unavailable", details: { reason, device: "b", thread: "dur-on-b" } },
+      })
+      expect(admittedOn()).toEqual([])
+    },
+  )
+
   test("#given b's delivery states the id of a session on this device #when the run replies by that id #then the reply does not reach the local session", async () => {
-    const { reply, admittedOn } = await consumed([{ id: "device:b/d-1", session_id: "dur-local" }], [B_ROW])
+    const { reply, admittedOn } = await consumed([{ id: "device:b/d-1", session_id: "dur-local" }], [B_ROW], {
+      service: { wakeFeature: true },
+    })
     expect(await reply("dur-local")).toMatchObject({
       kind: "error",
       error: { code: "not_found", details: { device: "b" } },
@@ -184,7 +319,7 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
       [{ id: "device:b/d-1", session_id: "dur-on-b", name: "planner" }],
       [B_ROW, C_PLANNER],
     )
-    expect(await reply("planner")).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
+    expect(await reply("planner")).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b" })
     expect(admittedOn()).toEqual(["b"])
   })
 
@@ -194,11 +329,39 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
       [B_ROW],
     )
     const listedBefore = listings()
-    expect(await reply("local peer")).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
+    expect(await reply("local peer")).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b" })
     expect(admittedOn()).toEqual(["b"])
     expect(prompts()).toBe(0)
     expect(listings() - listedBefore).toBe(0)
     expect(reachedLocally("dur-local")).toBe(false)
+  })
+
+  test("#given a delivery from this device's own id and this device's id cannot be read #when the run replies #then it is host_unavailable naming why, and nothing is sent anywhere", async () => {
+    const { reply, admittedOn, prompts, reachedLocally } = await consumed(
+      [{ id: "device:here/d-1", session_id: "dur-local", name: "local peer" }],
+      [B_ROW],
+      { selfDevice: "throws" },
+    )
+    expect(await reply("dur-local")).toMatchObject({
+      kind: "error",
+      error: { code: "host_unavailable", details: { reason: "device.info failed", devices: ["here"] } },
+    })
+    expect([admittedOn(), prompts(), reachedLocally("dur-local")]).toEqual([[], 0, false])
+  })
+
+  // #13483 review L1: the view a reply takes and its route rest on one read of this device's id, so a read that fails and
+  // then succeeds cannot pick the empty view for another device and then route the reply here into it.
+  test("#given this device's id read fails once and then answers #when the run replies to a sender on this device #then the reply answers that one failed read and nothing is sent", async () => {
+    const { reply, admittedOn, prompts, reachedLocally } = await consumed(
+      [{ id: "device:here/d-1", session_id: "dur-local", name: "local peer" }],
+      [B_ROW],
+      { selfDevice: "fails_once" },
+    )
+    expect(await reply("dur-local")).toMatchObject({
+      kind: "error",
+      error: { code: "host_unavailable", details: { reason: "device.info failed", devices: ["here"] } },
+    })
+    expect([admittedOn(), prompts(), reachedLocally("dur-local")]).toEqual([[], 0, false])
   })
 
   test("#given deliveries from b and from c that state one session id #when the run replies by that id #then it is ambiguous_target and nothing is sent", async () => {
@@ -231,7 +394,7 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
       [{ id: `device:${encodeURIComponent("b c")}/d-1`, session_id: "dur-on-b" }],
       [spaced],
     )
-    expect(await reply("dur-on-b")).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b c" })
+    expect(await reply("dur-on-b")).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b c" })
     expect(admittedOn()).toEqual(["b c"])
   })
 
@@ -241,28 +404,95 @@ describe("#13037 A4.3.1: an approved reply resolves on the device its delivery c
       const { reply, admittedOn } = await consumed([{ id, session_id: "dur-local", name: "local peer" }], [B_ROW])
       for (const address of ["dur-local", "local peer"]) {
         const result = await reply(address)
-        expect(result).toMatchObject({ kind: "ok", thread_id: "dur-local" })
+        expect(result).toMatchObject({ kind: "ok", thread: "dur-local" })
         expect(result).not.toHaveProperty("device")
       }
       expect(admittedOn()).toEqual([])
     },
   )
 
+  // #14048: the receiving device service admitted b's delivery on a connection that declared no remote origin, so the
+  // engine keyed it `rpc:local/<id>` (or a bare id): nothing attests the device, and the sender is listed only on b.
+  test.each(["rpc:local/d-1", "d-1"])(
+    "#given an unattested delivery (id %s) whose sender is listed only on b #when the run replies by its id and by its stated name #then both reach b's row",
+    async (id) => {
+      const { reply, admittedOn, prompts } = await consumed(
+        [{ id, session_id: "dur-on-b", name: "duty" }],
+        [{ ...B_ROW, title: "duty" }],
+      )
+      expect(await reply("dur-on-b")).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b" })
+      expect(await reply("duty")).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b" })
+      expect(admittedOn()).toEqual(["b", "b"])
+      expect(prompts()).toBe(0)
+    },
+  )
+
+  // An unattested sender has no device to pin, so when two devices list its durable id the reply cannot tell which copy
+  // sent the delivery: it is refused whatever order the account listing returns the rows in.
+  test.each([
+    ["c, b", [C_SAME_ID, B_ROW]],
+    ["b, c", [B_ROW, C_SAME_ID]],
+  ] as const)(
+    "#given an unattested delivery whose sender id is listed on b and c (listing order %s) #when the run replies by that id #then it is ambiguous_target and nothing is sent",
+    async (_order, rows) => {
+      const { reply, admittedOn } = await consumed([{ id: "rpc:local/d-1", session_id: "dur-on-b" }], rows)
+      expect(await reply("dur-on-b")).toMatchObject({ kind: "error", error: { code: "ambiguous_target" } })
+      expect(admittedOn()).toEqual([])
+    },
+  )
+
+  test("#given an unattested delivery from a session this device holds whose id b also lists #when the run replies by the name b's row carries #then it is ambiguous_target and nothing reaches either copy", async () => {
+    const { reply, admittedOn, prompts, reachedLocally } = await consumed(
+      [{ id: "rpc:local/d-1", session_id: "dur-local", name: "duty" }],
+      [{ ...B_ROW, durable_id: "dur-local", title: "duty" }],
+    )
+    expect(await reply("duty")).toMatchObject({ kind: "error", error: { code: "ambiguous_target" } })
+    expect(admittedOn()).toEqual([])
+    expect(prompts()).toBe(0)
+    expect(reachedLocally("dur-local")).toBe(false)
+  })
+
+  // #14305: the account-wide lookup and the check that one device holds the sender share ONE listing read.
+  test("#given an unattested delivery whose sender is listed only on b and one account listing read answers #when the run replies by its id #then that one read finds the sender and confirms its device, and the reply reaches b", async () => {
+    const { reply, admittedOn } = await consumed([{ id: "rpc:local/d-1", session_id: "dur-on-b" }], [B_ROW], {
+      listingReads: 1,
+    })
+    expect(await reply("dur-on-b")).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b" })
+    expect(admittedOn()).toEqual(["b"])
+  })
+
+  test("#given an unattested delivery whose sender is listed only on b #when the account listing cannot be read #then it is host_unavailable and nothing is sent", async () => {
+    const { reply, admittedOn } = await consumed([{ id: "rpc:local/d-1", session_id: "dur-on-b" }], [B_ROW], {
+      listingReads: 0,
+    })
+    expect(await reply("dur-on-b")).toMatchObject({ kind: "error", error: { code: "host_unavailable" } })
+    expect(admittedOn()).toEqual([])
+  })
+
+  test("#given an unattested delivery whose stated name another device's session carries #when the run replies by that name #then it is reply_target_mismatch and nothing is sent", async () => {
+    const { reply, admittedOn } = await consumed(
+      [{ id: "rpc:local/d-1", session_id: "dur-gone", name: "c thread" }],
+      [B_ROW, C_OTHER],
+    )
+    expect(await reply("c thread")).toMatchObject({ kind: "error", error: { code: "reply_target_mismatch" } })
+    expect(admittedOn()).toEqual([])
+  })
+
   test("unchanged: #given a delivery relayed from b #when the run replies by the sender's id and by its stated name #then both reach b's listed row", async () => {
     const { reply, admittedOn } = await consumed(
       [{ id: "device:b/d-1", session_id: "dur-on-b", name: "on b" }],
       [B_ROW],
     )
-    expect(await reply("dur-on-b")).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
-    expect(await reply("on b")).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
+    expect(await reply("dur-on-b")).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b" })
+    expect(await reply("on b")).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b" })
     expect(admittedOn()).toEqual(["b", "b"])
   })
 
   test("unchanged: #given a run that consumed no delivery #when it sends by id and by name #then each resolves as before: b's id to b, the local name here", async () => {
     const { reply, admittedOn } = await consumed([], [B_ROW])
-    expect(await reply("dur-on-b")).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
+    expect(await reply("dur-on-b")).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b" })
     const here = await reply("local peer")
-    expect(here).toMatchObject({ kind: "ok", thread_id: "dur-local" })
+    expect(here).toMatchObject({ kind: "ok", thread: "dur-local" })
     expect(here).not.toHaveProperty("device")
     expect(admittedOn()).toEqual(["b"])
   })
