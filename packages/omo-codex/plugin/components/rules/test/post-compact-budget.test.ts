@@ -75,17 +75,20 @@ describe("post-compact context budget", () => {
 		expect(budget.maxRuleChars).toBeLessThanOrEqual(budget.maxResultChars);
 	});
 
-	it.each(["gpt-6.2-astra", "gpt-6.2-astra-fast", "gpt-6-astra", "gpt-6-astra-fast"])("#given %s within its 600k window #when resolving post-compact budget #then keeps configured post-compact cap", (model) => {
-		// given
-		const transcriptPath = writeCompactedTranscript("A".repeat(541_500));
+	it.each(["gpt-6.2-astra", "gpt-6.2-astra-fast", "gpt-6-astra", "gpt-6-astra-fast"])(
+		"#given %s within its 600k window #when resolving post-compact budget #then keeps configured post-compact cap",
+		(model) => {
+			// given
+			const transcriptPath = writeCompactedTranscript("A".repeat(541_500));
 
-		// when
-		const budget = withPostCompactBudget(CONFIG, { model, transcriptPath });
+			// when
+			const budget = withPostCompactBudget(CONFIG, { model, transcriptPath });
 
-		// then
-		expect(budget.maxRuleChars).toBe(CONFIG.postCompactMaxRuleChars);
-		expect(budget.maxResultChars).toBe(CONFIG.postCompactMaxResultChars);
-	});
+			// then
+			expect(budget.maxRuleChars).toBe(CONFIG.postCompactMaxRuleChars);
+			expect(budget.maxResultChars).toBe(CONFIG.postCompactMaxResultChars);
+		},
+	);
 
 	it("#given gpt-5.6-sol within its 650k window #when resolving post-compact budget #then keeps configured post-compact cap", () => {
 		// given
