@@ -1,6 +1,4 @@
-import { syncRequestHeaders } from "../memory-core/src/sync/contract-version"
-import { type LiveDevice, listLiveDevices } from "../omo-opencode/src/cli/service-auth/devices"
-import { ApiRefusal } from "../omo-opencode/src/cli/service-auth/protocol"
+import { type LiveDevice, listLiveDevices, revokeDevice } from "../omo-opencode/src/cli/service-auth/devices"
 import type { Session } from "../omo-opencode/src/cli/service-auth/session"
 import { resolveDevice, type DeviceRow } from "../thread-address-core/src/index"
 import { sessionFailure, type SessionOutcomeDependencies } from "./account-session-outcome"
@@ -55,28 +53,22 @@ async function revoke(dependencies: AccountDevicesDependencies, session: Session
     dependencies.error(`omo account devices revoke: no live device ${id} on this account (run omo account devices)`)
     return reply(dependencies, { revoked: false, error: "not_found" }, ACCOUNT_EXIT.failed)
   }
-  // The stored credential decides too: a service that omits or misreports `current` never gets this device revoked.
-  if (target.current || target.id === stored) {
-    dependencies.error("omo account devices revoke: that is this device; sign it out with omo logout")
-    return reply(dependencies, { revoked: false, error: "this_device", device: target }, ACCOUNT_EXIT.invalid)
+  const outcome = await revokeDevice(session, { id: target.id, thisDeviceId: stored ?? undefined })
+  switch (outcome.kind) {
+    case "not_found":
+      dependencies.error(`omo account devices revoke: no live device ${id} on this account (run omo account devices)`)
+      return reply(dependencies, { revoked: false, error: "not_found" }, ACCOUNT_EXIT.failed)
+    case "this_device":
+      dependencies.error("omo account devices revoke: that is this device; sign it out with omo logout")
+      return reply(dependencies, { revoked: false, error: "this_device", device: outcome.device }, ACCOUNT_EXIT.invalid)
+    case "still_live":
+      dependencies.error(`omo account devices revoke: ${target.id} is still listed as live after the revoke`)
+      return reply(dependencies, { revoked: false, error: "still_live", device: outcome.device }, ACCOUNT_EXIT.failed)
+    case "confirmation_mismatch":
+      return reply(dependencies, { revoked: false, error: outcome.kind, device: outcome.device }, ACCOUNT_EXIT.invalid)
+    case "revoked":
+      return reply(dependencies, { revoked: true, device: outcome.device })
   }
-  const access = await session.accessToken()
-  try {
-    await session.request(`/v1/devices/${encodeURIComponent(target.id)}`, {
-      method: "DELETE",
-      headers: syncRequestHeaders(access),
-    })
-  } catch (error) {
-    // Another caller revoked it between the list and the delete: the account answers 404 for a device it no longer has.
-    if (!(error instanceof ApiRefusal && error.status === 404)) throw error
-  }
-  // Read back: the revoke counts only once the account no longer lists the device as live.
-  const after = await listLiveDevices(session)
-  if (after.some((device) => device.id === target.id)) {
-    dependencies.error(`omo account devices revoke: ${target.id} is still listed as live after the revoke`)
-    return reply(dependencies, { revoked: false, error: "still_live", device: target }, ACCOUNT_EXIT.failed)
-  }
-  return reply(dependencies, { revoked: true, device: target })
 }
 
 export async function runDevicesVerb(
