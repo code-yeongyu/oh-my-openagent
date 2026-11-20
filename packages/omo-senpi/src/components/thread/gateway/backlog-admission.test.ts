@@ -43,20 +43,32 @@ async function send(
 }
 
 /**
- * Sends `count` follow-ups to "lead" with its drain held off, then (when it has one) lets one drain pass take them all:
- * a pass per send would re-reconcile every open row each time.
+ * Writes `count` follow-ups for "lead" the way another device's relay leg does (`store.intake`: one store call each,
+ * the same per-lane cap), then lets one drain pass take them when "lead" has a drain. Only the sends a test asserts on
+ * go through the engine.
  */
 async function fillFollowUps(h: GatewayHarness, sender: HarnessSession, count: number): Promise<void> {
-  const lead = h.get("lead")
-  const registered = lead.drainRegistered
-  lead.drainRegistered = false
   for (let index = 0; index < count; index++) {
-    const result = await send(sender, `alert ${index}`)
-    if (result.kind !== "ok") throw new Error(`follow-up ${index} refused: ${JSON.stringify(result)}`)
+    const taken = await sender.store.intake({
+      now: h.clock.now,
+      attested_device: "dev-remote",
+      record: {
+        sessionId: "lead",
+        deliveryId: `alert-${index}`,
+        text: `OMO_GATEWAY v=1\nsource=peer_agent\n\nalert ${index}`,
+        displayText: `alert ${index}`,
+        sender: { kind: "agent", session_id: sender.id },
+        deliverAs: "followUp",
+        chainCount: 1,
+      },
+      provenance: { workspace: "remote", project: "remote" },
+      target_session_kind: "interactive",
+    })
+    if (taken.kind !== "queued") throw new Error(`follow-up ${index} refused: ${JSON.stringify(taken)}`)
     h.clock.now += 3 * 60_000
   }
-  lead.drainRegistered = registered
-  if (registered) await lead.drain.drain({ reason: "command" })
+  const lead = h.get("lead")
+  if (lead.drainRegistered) await lead.drain.drain({ reason: "command" })
   await h.quiesce()
 }
 
