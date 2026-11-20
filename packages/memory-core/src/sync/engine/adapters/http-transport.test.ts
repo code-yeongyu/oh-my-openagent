@@ -162,40 +162,47 @@ test("the event stream delivers sync.advanced heads and reports the connection",
   expect(await server.untilStreamsClosed()).toBe(0)
 })
 
-test("#given the service's client floor refuses this build #when the event stream opens with a 426 #then it reports the stream down once and stops reconnecting (#14483)", async () => {
+test("#given the service's client floor refuses this build #when the event stream opens with a 426 #then it reports the stream down, waits the floor retry instead of 5 s, and reconnects once the floor is lifted (#14483, review L2)", async () => {
   let opened = 0
   const floored = createHttpTransport({
     baseUrl: "http://sync.example",
     token: () => "tok",
+    floorRetryMs: 5,
     fetch: (async () => {
       opened += 1
-      return Response.json(
-        { error: { code: "client_update_required", message: "update OmO to keep syncing", retryable: false } },
-        { status: 426 },
-      )
+      if (opened === 1)
+        return Response.json(
+          { error: { code: "client_update_required", message: "update OmO to keep syncing", retryable: false } },
+          { status: 426 },
+        )
+      return new Response(`data: ${JSON.stringify({ type: "sync.advanced", head: { seq: 3 } })}\n\n`, {
+        headers: { "content-type": "text/event-stream" },
+      })
     }) as unknown as typeof fetch,
   })
   const connected: boolean[] = []
   let stop: () => void = () => undefined
-  const down = new Promise<void>((resolve, reject) => {
+  const heads: number[] = []
+  const advanced = new Promise<void>((resolve, reject) => {
     const timer = setTimeout(
-      () => reject(new Error("waited 10s for the 426 stream to report down, never fired")),
+      () => reject(new Error("waited 10s for the stream to come back after the 426, never did")),
       10_000,
     )
     stop = floored.subscribe({
-      onAdvanced: () => undefined,
-      onConnected: (up) => {
-        connected.push(up)
+      onAdvanced: (head) => {
+        heads.push(head)
         clearTimeout(timer)
         resolve()
       },
+      onConnected: (up) => connected.push(up),
       onStateChanged: () => undefined,
     })
   })
-  await down
+  await advanced
   stop()
-  expect(connected).toEqual([false])
-  expect(opened).toBe(1)
+  expect(connected.slice(0, 2)).toEqual([false, true])
+  expect(heads).toEqual([3])
+  expect(opened).toBe(2)
 })
 
 // #12280 R-A9 (wire): a revoke through the real route freezes the account; the stream announces it as
