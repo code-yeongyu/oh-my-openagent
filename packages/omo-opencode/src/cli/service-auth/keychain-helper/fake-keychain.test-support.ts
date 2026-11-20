@@ -166,6 +166,12 @@ export function fakeKeychain(
         items.delete(name)
         return { ok: true }
       }
+      // One keychain only: OmO's own keychain (#13116) is modelled by dedicated-fake.test-support.ts.
+      case "store-create":
+      case "store-activate":
+      case "store-deactivate":
+      case "store-erase":
+        return { error: "refused", reason: "unknown-verb" }
     }
   }
   const access: HelperAccess = { kind: "ready", path: "/fake/omo-keychain", call }

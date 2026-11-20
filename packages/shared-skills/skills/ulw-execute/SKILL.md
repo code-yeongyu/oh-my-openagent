@@ -1,7 +1,7 @@
 ---
 name: ulw-execute
 description: "Executes a written ulw-plan work plan with Boulder state, evidence ledger, worktree discipline, and parallel subagents. Use when the user says ulw-execute or asks to run a .omo/plans plan."
-argument-hint: "[plan-name] [--worktree <absolute-path>] [--make-pr] [--ship]"
+argument-hint: "[plan-name] [--worktree <absolute-path>] [--make-pr] [--ship] [--light]"
 ---
 
 ## ABSOLUTE RULE: YOU ARE AN ORCHESTRATOR — NEVER THE IMPLEMENTER
@@ -41,13 +41,23 @@ Execute a work plan until every top-level checkbox is `[x]` or `[~]`. This skill
 ## Usage
 
 ```text
-$ulw-execute [plan-name] [--worktree <absolute-path>] [--make-pr] [--ship]
+$ulw-execute [plan-name] [--worktree <absolute-path>] [--make-pr] [--ship] [--light]
 ```
 
 - `plan-name` (optional): a full or partial file stem under `.omo/plans/`.
 - `--worktree` (optional): reuse an existing task-owned worktree for the first phase instead of creating one; every phase runs in a task-owned worktree regardless.
 - `--make-pr` (optional): deliver each phase's worktree as a pull request — push the branch, open a reviewer-readable PR, hand off with the URL, and merge only if the user asks.
 - `--ship` (optional): full delivery lifecycle; implies `--make-pr`. After the PR opens, stay on the job until it is MERGED: watch CI and review gates, fix failures and address feedback from the worktree (fresh QA evidence for behavior changes), merge per the repository's merge policy, then remove the worktree and sync `.omo/` state back.
+- `--light` (optional): the light profile below. It keeps the plan and drops the per-step ceremony. Without it, every rule in this skill applies as written.
+
+## Light profile (`--light`)
+
+Keep: the plan, Boulder state, the goal, the todos, delegation and its parallelism, and the delivery mode. Change exactly these rules, and nothing else:
+
+- **One worktree for the whole plan.** Create it once before the first dispatch (or use `--worktree`) and run every wave in it. Waves and lanes get no worktrees of their own, and under `--make-pr`/`--ship` the whole plan ships as one PR.
+- **No per-checkbox gates.** A checkbox is `[x]` as soon as its worker reports done with its own tests passing. Skip Phase 4's five gates, the per-checkbox `DoneClaim`/`AdversarialVerify` loop and the adversarial-class probes.
+- **No receipts or evidence files per step.** The ledger holds exactly two kinds of entry: one `run-start` entry with `"profile": "light"` (so a resumed session keeps the profile) and the `final-verification` entry. Workers write no evidence directories.
+- **Verify once, at the end.** After the last checkbox, one worker runs the plan's verification commands and one real-surface QA against the plan's acceptance criteria, captured as one artifact. Final Verification Wave rows collapse into this pass. If it fails, send the failures back to workers and run the pass again. Stop after the same failure twice or after three failed passes, and report the run as unmet.
 
 ## Goal and todo discipline (MANDATORY)
 
@@ -98,16 +108,16 @@ Write `.omo/boulder.json` before implementation starts. Prefix session ids with 
 }
 ```
 
-Every phase (plan wave) runs in its own task-owned worktree with its own goal: before the wave's first dispatch, record the wave's goal — its checkboxes and their acceptance criteria — as a ledger entry, then `git worktree add <repo>-wt/<plan>-<wave> <branch off the integration base>` (or verify a `--worktree` path with `git worktree list --porcelain`), store the absolute path as `worktree_path`, run every edit, command, test, and evidence capture inside it; the wave lands on the integration base once each of its checkboxes is verified or `[~]` (direct merge, or the PR under `--make-pr`/`--ship`; a `[~]` row's unverified changes do not land: a dispatched worker reverts them in the wave worktree before landing, and the `unmet` entry records the revert), and the next wave branches from that landed base. Use the bundled ultrawork directive’s Task resources and todo rules at wave/worktree creation; read those sections if absent from context.
+Every phase (plan wave) runs in its own task-owned worktree with its own goal (under `--light`, one worktree serves every phase): before the wave's first dispatch, record the wave's goal — its checkboxes and their acceptance criteria — as a ledger entry, then `git worktree add <repo>-wt/<plan>-<wave> <branch off the integration base>` (or verify a `--worktree` path with `git worktree list --porcelain`), store the absolute path as `worktree_path`, run every edit, command, test, and evidence capture inside it; the wave lands on the integration base once each of its checkboxes is verified or `[~]` (direct merge, or the PR under `--make-pr`/`--ship`; a `[~]` row's unverified changes do not land: a dispatched worker reverts them in the wave worktree before landing, and the `unmet` entry records the revert), and the next wave branches from that landed base. Use the bundled ultrawork directive’s Task resources and todo rules at wave/worktree creation; read those sections if absent from context.
 
 ## Parallel delivery lanes (teams and worktrees)
 
 Solo orchestration with parallel background workers is the default topology. Decide once, when the wave's lanes are known, and record the verdict in the ledger:
 
 - **Independent lanes -> parallel workers.** Separate files, no shared contract: one parallel spawn burst; no team.
-- **Dependency-ordered lanes -> one `workflow` run per wave.** Sub-tasks with real ordering between them (C needs A and B finished first) and a harness with a native `workflow` tool: dispatch the wave as ONE run (one producer node per lane plus a verification node); recover inside it with `retry`/`amend`/`send`; let the run's settle wake you instead of arming per-lane watchers; the next wave is a NEW run (use `amend` only to re-run the current wave after its definition changed) — never one graph for the whole plan. When the harness lists the `mass-ulw` skill, read its `SKILL.md` and `references/planning.md` IN FULL before defining any graph.
+- **Dependency-ordered lanes -> one `workflow` run per wave.** Sub-tasks with real ordering between them (C needs A and B finished first) and a harness with a native `workflow` tool: dispatch the wave as ONE run (one producer node per lane; add a verification node only when the wave's check is too long to run yourself); recover inside it with `retry`/`amend`/`send`; let the run's settle wake you instead of arming per-lane watchers; the next wave is a NEW run (use `amend` only to re-run the current wave after its definition changed) — never one graph for the whole plan. When the harness lists the `mass-ulw` skill, read its `SKILL.md` and `references/planning.md` IN FULL before defining any graph.
 - **Overlapping lanes -> a team.** The lanes touch the same module or contract AND running them concurrently actually finishes sooner: stand up a team (where the harness has one) so one lane's discoveries relay through you mid-flight.
-- **PR-mode independent lanes -> a worktree per lane.** Under `--make-pr`/`--ship`, when a wave holds independent checkboxes, give each lane its own branch and task-owned worktree, delivered as its own PR.
+- **PR-mode independent lanes -> a worktree per lane.** Under `--make-pr`/`--ship` (never under `--light`), when a wave holds independent checkboxes, give each lane its own branch and task-owned worktree, delivered as its own PR.
 
 Landing rules, regardless of topology:
 
@@ -121,7 +131,7 @@ Landing rules, regardless of topology:
 2. Find the first unchecked column-0 checkbox in `## TODOs` or `## Final Verification Wave`.
 3. Ignore nested checkboxes under acceptance criteria, evidence, and definition-of-done sections.
 4. Classify the checkbox tier and record it in its ledger entry. Default is LIGHT — a narrow change inside existing layers. Take HEAVY only on a fact you can point to: a new module / abstraction / domain model; auth, security, or session; an external integration; a DB schema or migration; concurrency or transaction boundaries; a cross-domain refactor; or the plan or user signals care. When unsure, take HEAVY; upgrade and redo skipped gates the moment a HEAVY fact surfaces; never downgrade.
-5. Decompose that checkbox into atomic sub-tasks sized for ONE worker in ONE run — a sub-task that would need mid-flight steering is two sub-tasks. Collect every other unchecked checkbox in the same plan wave whose dependencies are met — their lanes execute concurrently. A wave that could split further but holds fewer than 3 independent sub-tasks is under-split.
+5. Decompose that checkbox into atomic sub-tasks sized for ONE worker in ONE run — a sub-task that would need mid-flight steering is two sub-tasks. Collect every other unchecked checkbox in the same plan wave whose dependencies are met — their lanes execute concurrently.
 6. **DELEGATE EVERYTHING. YOU NEVER IMPLEMENT.** Route every sub-task through the delegation router below, then dispatch ALL independent sub-tasks across those checkboxes in one parallel worker-spawn burst (a single batched spawn call where the harness supports it); route named dependencies per the lane-topology decision above. Verification and checkbox marking stay per-checkbox.
 7. Give every dispatched sub-task its completion condition and watch for it per the section below. A dispatch whose completion nobody watches is an unfinished dispatch.
 
@@ -176,7 +186,7 @@ The 9 ultraqa classes are trigger-mapped: new input parsing → malformed input;
 
 ## Phase 4: Verify and record evidence
 
-For each checkbox, complete all five gates before marking it done:
+Under `--light`, skip this phase for every checkbox and run the single end-of-plan verification from the light profile instead. Otherwise, for each checkbox, complete all five gates before marking it done:
 
 1. Plan reread: confirm the checkbox and acceptance criteria.
 2. Automated verification: run tests, typecheck, lint, build, or the plan-specific equivalent.

@@ -6,10 +6,10 @@
  *    delivery, sends to C; C's model, running on B's, sends to A. The third send closes
  *    A -> B -> C -> A under one causal root and is DELIVERED (K8: thread chains have no count limit
  *    unless the user sets one, and A->B->A is allowed); A's row carries hop 3.
- * 2. Fan-out: one turn of A sends to 17 distinct live sessions (opened on one Desktop-thread shard
- *    host, `i-*`); 16 are accepted and exactly one is refused `overloaded` (`budget: "fanout"`).
- * 3. Burst: 9 concurrent `omo thread send`s to one target: 8 pass, the 9th is `overloaded`
- *    (`budget: "pair_rate"`, `retry_after_ms`); after 5 s of REAL wall time one more passes.
+ * 2. Fan-out: one turn of A sends to 20 distinct live sessions (opened on one Desktop-thread shard
+ *    host, `i-*`); every send is accepted (one turn has no cap on how many sessions it reaches).
+ * 3. Burst: 9 concurrent `omo thread send`s to one target: 8 pass, the 9th is `pair_loop_guard`
+ *    (`guard: "pair_loop"`, `burst`, `retry_after_ms`); after 5 s of REAL wall time one more passes.
  *    TIME-UNDER-TEST EXCEPTION: the refill is the behavior under test, so this one wait is a
  *    deliberate 5 s wall-clock pause, recorded in the report; nothing else here waits on time.
  *
@@ -32,7 +32,7 @@ import {
 } from "./lib/gateway.mjs"
 
 const MUTANT = hasFlag("--mutant")
-const FANOUT_TARGETS = 17
+const FANOUT_TARGETS = 20
 const BURST = 8
 const REFILL_WAIT_MS = 5_000
 
@@ -106,7 +106,7 @@ await runScenario(
       `rows_to_a_under_root=${JSON.stringify(toA)} a_entries=${deliveryEntries(tuis.a.endpoint.sessionPath).length}`,
     )
 
-    // ------------------------------------------------------------------ 2. fan-out cap
+    // ------------------------------------------------------------------ 2. fan-out, no per-turn cap
     const shard = await startShardHost(scratch, install, `qa-loop-guard-${process.pid}`)
     const targets = []
     for (let index = 0; index < FANOUT_TARGETS; index += 1)
@@ -131,14 +131,11 @@ await runScenario(
       { label: `${targets.length} fan-out results`, timeoutMs: 120_000 },
     )
     const accepted = fanResults.filter((result) => result?.kind === "ok").length
-    const capped = fanResults.filter(
-      (result) =>
-        result?.kind === "error" && result.error?.code === "overloaded" && result.error?.details?.budget === "fanout",
-    )
+    const refusedFan = fanResults.filter((result) => result?.kind !== "ok")
     report.assert(
-      "fanout-cap-16",
-      accepted === 16 && capped.length === 1,
-      `accepted=${accepted} refused_fanout=${capped.length} ${JSON.stringify(capped[0]?.error ?? null).slice(0, 200)}`,
+      "fanout-all-accepted",
+      accepted === FANOUT_TARGETS && refusedFan.length === 0,
+      `accepted=${accepted}/${FANOUT_TARGETS} refused=${refusedFan.length} ${JSON.stringify(refusedFan[0]?.error ?? null).slice(0, 200)}`,
     )
 
     // ------------------------------------------------------------------ 3. per-pair burst + real refill
@@ -154,8 +151,9 @@ await runScenario(
     const refused = burst.filter(
       (result) =>
         result.json?.kind === "error" &&
-        result.json.error?.code === "overloaded" &&
-        result.json.error?.details?.budget === "pair_rate" &&
+        result.json.error?.code === "pair_loop_guard" &&
+        result.json.error?.details?.guard === "pair_loop" &&
+        result.json.error.details.burst === BURST &&
         result.json.error.details.retry_after_ms > 0,
     )
     const stamps = (
@@ -171,7 +169,7 @@ await runScenario(
     report.assert(
       "burst-8-then-refused",
       passed.length === allowed && refused.length === BURST + 1 - allowed && refused.length >= 1,
-      `passed=${passed.length} refused_pair_rate=${refused.length} allowed_by_clock=${allowed} spread_ms=${spreadMs} refusal=${JSON.stringify(refused[0]?.json?.error ?? null).slice(0, 200)}`,
+      `passed=${passed.length} refused_pair_loop_guard=${refused.length} allowed_by_clock=${allowed} spread_ms=${spreadMs} refusal=${JSON.stringify(refused[0]?.json?.error ?? null).slice(0, 200)}`,
     )
     report.log(
       `TIME-UNDER-TEST EXCEPTION: waiting ${REFILL_WAIT_MS} ms of real wall time for one pair-bucket token to refill`,

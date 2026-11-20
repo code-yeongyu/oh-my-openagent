@@ -1,6 +1,12 @@
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
-import { DEFAULT_CATEGORIES, resolveCategory, type SenpiModelPort, type SenpiModelRegistryPort } from "../category"
+import {
+  DEFAULT_CATEGORIES,
+  resolveCategory,
+  type ModelSelectionSource,
+  type SenpiModelPort,
+  type SenpiModelRegistryPort,
+} from "../category"
 import { findExactAgentModel } from "./agent-model-registry"
 import type { ResolvedModelRecord } from "../state"
 
@@ -16,6 +22,7 @@ export type AgentCategorySelection = {
   readonly reasoningEffort?: string
   readonly requested_model?: ResolvedModelRecord
   readonly fallback_models?: readonly ResolvedModelRecord[]
+  readonly source: ModelSelectionSource
 }
 
 export type ResolveAgentCategoryInput<TModel extends SenpiModelPort> = {
@@ -37,13 +44,14 @@ function findOnlyCategoryModel<TModel extends SenpiModelPort>(
   input: ResolveAgentCategoryInput<TModel>,
 ): AgentCategorySelection | undefined {
   if (Array.isArray(input.registry.getAvailable())) return undefined
-  const fallbackModel = firstCategoryDefaultModel(input.categories, input.omoConfig)
-  if (fallbackModel === undefined) return undefined
-  const found = findExactAgentModel(fallbackModel, input.registry)
+  const fallback = firstCategoryModel(input.categories, input.omoConfig)
+  if (fallback === undefined) return undefined
+  const found = findExactAgentModel(fallback.model, input.registry)
   if (found === undefined) return undefined
   return {
     provider: found.provider,
     modelId: found.modelId,
+    source: fallback.source,
     ...(input.configuredTuning.variant !== undefined ? { variant: input.configuredTuning.variant } : {}),
     ...(input.configuredTuning.reasoningEffort !== undefined
       ? { reasoningEffort: input.configuredTuning.reasoningEffort }
@@ -52,22 +60,29 @@ function findOnlyCategoryModel<TModel extends SenpiModelPort>(
 }
 
 // The model the agent would have run on had a category resolved: the first listed category's
-// model. A user `categories.<name>.model` outranks the builtin default so a failure names what the
-// user actually configured instead of a builtin they never chose. Feeds `attemptedModel` on the
-// model_unavailable and no-registry paths.
-export function firstCategoryDefaultModel(
+// model, and who supplied it. A user `categories.<name>.model` outranks the builtin default so a
+// failure names what the user actually configured instead of a builtin they never chose. Feeds
+// `attemptedModel` on the model_unavailable and no-registry paths, and the find-only selection.
+function firstCategoryModel(
   categories: readonly string[] | undefined,
   omoConfig?: OmoConfig,
-): string | undefined {
+): { readonly model: string; readonly source: ModelSelectionSource } | undefined {
   const userCategories = omoConfig?.categories
   for (const name of categories ?? []) {
     const userModel =
       userCategories !== undefined && Object.hasOwn(userCategories, name) ? userCategories[name]?.model : undefined
-    if (userModel !== undefined) return userModel
+    if (userModel !== undefined) return { model: userModel, source: "user" }
     const builtin = Object.hasOwn(DEFAULT_CATEGORIES, name) ? DEFAULT_CATEGORIES[name] : undefined
-    if (builtin?.model !== undefined) return builtin.model
+    if (builtin?.model !== undefined) return { model: builtin.model, source: "builtin" }
   }
   return undefined
+}
+
+export function firstCategoryDefaultModel(
+  categories: readonly string[] | undefined,
+  omoConfig?: OmoConfig,
+): string | undefined {
+  return firstCategoryModel(categories, omoConfig)?.model
 }
 
 // Categories supply the MODEL only: prompt_append, tools, temperature, top_p, maxTokens and
@@ -90,6 +105,7 @@ export function resolveAgentCategoryModel<TModel extends SenpiModelPort>(
   return {
     provider: spec.provider,
     modelId: spec.modelId,
+    source: winner.modelSelection.source,
     ...(input.configuredTuning.variant !== undefined
       ? { variant: input.configuredTuning.variant }
       : categoryReasoning !== undefined

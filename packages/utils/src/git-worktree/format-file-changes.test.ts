@@ -29,6 +29,8 @@ describe("formatFileChanges path display", () => {
   test("#given a path with DEL, U+0085 or U+2028 #when formatting #then escapes each as lowercase \\uXXXX", () => {
     expect(createdLines("a\u007fb.ts")[2]).toBe(String.raw`  "a\u007fb.ts"  (+1)`)
     expect(createdLines("a\u0085b.ts")[2]).toBe(String.raw`  "a\u0085b.ts"  (+1)`)
+    // #13304: a direction override is escaped too, through the shared helper.
+    expect(createdLines("a\u202eb.ts")[2]).toBe(String.raw`  "a\u202eb.ts"  (+1)`)
     expect(createdLines("a b.ts")[2]).toBe(String.raw`  "a b.ts"  (+1)`)
     expect(createdLines("a b.ts")[2]).toBe(String.raw`  "a b.ts"  (+1)`)
   })

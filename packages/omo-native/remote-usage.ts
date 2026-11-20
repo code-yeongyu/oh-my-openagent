@@ -29,7 +29,7 @@ const USAGE_ENTRIES: readonly { readonly verbs: readonly string[]; readonly text
   {
     verbs: ["wake"],
     text: `  wake [on|off|default]                    whether sessions on this device that are not running may be started
-                                           by a message from your other signed-in devices; off unless turned on`,
+                                           by a message from your other signed-in devices; on unless turned off`,
   },
   {
     verbs: ["bootstrap"],
@@ -37,31 +37,35 @@ const USAGE_ENTRIES: readonly { readonly verbs: readonly string[]; readonly text
   },
   {
     verbs: ["attach"],
-    text: "  attach <device>/<session>                open a session on another device in the terminal UI, to watch and type",
+    text: "  attach <session>                         open a session in the terminal UI; also takes <device>/<session>",
   },
   {
     verbs: ["open"],
-    text: `  open <device> [--project P] [--model M] [--permission-preset MODE]
+    text: `  open <device> [--project P] [--model provider/id] [--thinking LEVEL] [--permission-preset MODE]
+       [--worktree [--branch B] [--base REF]] [--prompt TEXT [--steer|--follow-up]]
                                            start a session on another device; prints <device>/<session>; it runs
-                                           in MODE (default: this device's own setting, else full-access)`,
+                                           in MODE (default: this device's own setting, else full-access), on the
+                                           model and thinking level given (a model it cannot run opens nothing),
+                                           in a new git worktree of P with --worktree, and is handed TEXT first`,
   },
   {
     verbs: ["send"],
-    text: `  send <device>/<session> <text> [--steer|--follow-up] [--no-wait]
+    text: `  send <session> <text> [--steer|--follow-up] [--no-wait]
                                            send a message and print the answer as it arrives (--steer: into the
-                                           running turn; --no-wait: return once the session took it)`,
+                                           running turn; --no-wait: return once the session took it).
+                                           Use the thread value from open --json, or <device>/<session>.`,
   },
   {
     verbs: ["model"],
-    text: "  model <device>/<session> <provider/id>   switch the session's model",
+    text: "  model <session> <provider/id>            switch the model; also takes <device>/<session>",
   },
   {
     verbs: ["interrupt"],
-    text: "  interrupt <device>/<session>             stop the session's running turn",
+    text: "  interrupt <session>                      stop the running turn; also takes <device>/<session>",
   },
   {
     verbs: ["close"],
-    text: "  close <device>/<session>                 end the session on its device",
+    text: "  close <session> [--force]                end the session; --force also drops messages it has not read",
   },
 ]
 

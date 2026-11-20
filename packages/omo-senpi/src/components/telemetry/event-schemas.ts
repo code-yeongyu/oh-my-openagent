@@ -47,6 +47,7 @@ export const BUILTIN_SKILL_NAMES = Object.freeze([
   "init-deep",
   "lsp-setup",
   "mass-ulw",
+  "omo-relay",
   "onboarding",
   "programming",
   "refactor",

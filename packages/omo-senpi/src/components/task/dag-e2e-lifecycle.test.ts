@@ -4,7 +4,7 @@ import * as fs from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { loadOmoConfig } from "@oh-my-opencode/omo-config-core"
+import { loadOmoConfig, type OmoConfig } from "@oh-my-opencode/omo-config-core"
 import {
   type ManagedChildHandle,
   type ManagedRunner,
@@ -27,6 +27,13 @@ import { createTeamServiceTestModelRegistry } from "./team-service-test-model-re
 import type { CapturedUi } from "./runtime-context"
 import { createSessionTransitionBridge } from "./session-transition-bridge"
 import { remainingTestTime } from "../../../../../test-support/test-deadline"
+
+// These fixtures route nodes by agent with a mock call-site model. A builtin agent refuses a
+// call-site model (#14367), so they name this custom agent instead.
+function dagTestConfig(cwd: string): OmoConfig {
+  const config = loadOmoConfig({ cwd }).config
+  return { ...config, agents: { ...config.agents, "dag-worker": { description: "dag test worker" } } }
+}
 
 const cleanupRoots: string[] = []
 const sessionId = "session-dag-lifecycle"
@@ -236,7 +243,7 @@ async function runtimeFixture(options: RuntimeFixtureOptions = {}): Promise<Runt
   const pi = Object.assign(new FakeExtensionAPI(), { rpc: bus.api })
   const engine = composeTaskEngine({
     pi,
-    omoConfig: loadOmoConfig({ cwd: project }).config,
+    omoConfig: dagTestConfig(project),
     cwd: project,
     sharedParentTools: () => [],
     runnerFactories,
@@ -290,7 +297,7 @@ async function runtimeFixture(options: RuntimeFixtureOptions = {}): Promise<Runt
           nodes: nodes.map((node) => ({
             id: node.id,
             prompt: `do ${node.id}`,
-            subagent_type: "explore",
+            subagent_type: "dag-worker",
             model: "omo-mock/mock-1",
             ...(node.dependsOn === undefined ? {} : { dependsOn: [...node.dependsOn] }),
           })),
@@ -333,7 +340,7 @@ async function seedPendingRun(project: string, runId: DagRunId): Promise<void> {
     definition: {
       key: "restart-proof",
       name: "restart proof",
-      nodes: [{ id: "resume", prompt: "resume", subagent_type: "explore", model: "omo-mock/mock-1" }],
+      nodes: [{ id: "resume", prompt: "resume", subagent_type: "dag-worker", model: "omo-mock/mock-1" }],
     },
   })
 }
