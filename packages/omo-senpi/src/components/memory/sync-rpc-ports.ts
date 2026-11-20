@@ -11,6 +11,9 @@ import type {
   PhraseGate,
   PhraseNoticeStatus,
   PhraseVoidNotice,
+  RecoverSyncOutcome,
+  RecoverySessionBridge,
+  RecoveryStatus,
   DesktopSyncAccount,
   DesktopSyncDescriptor,
   DesktopSyncOperation,
@@ -95,6 +98,26 @@ export interface SyncRpcRuntime {
       readonly serviceDeviceId: string
     },
   ): Promise<DisableOutcome>
+  /**
+   * Recovery on a fresh device, then sync turned on (D12): absent on a host that has not wired it, so `features`
+   * never lists `recover` there.
+   */
+  recoverAccount?(
+    input: SyncRpcCeremonyInput & {
+      readonly serviceDeviceId: string
+      readonly rpId: string
+      readonly bridge: RecoverySessionBridge
+      readonly method: "passkey" | "phrase"
+      readonly onSwitchFailed: (error: unknown) => void
+    },
+  ): Promise<RecoverSyncOutcome>
+  /** The `status.recovery` reading; absent means status omits it. Null when it cannot be read. */
+  recoveryStatus?(input: {
+    readonly chain: SyncRpcOperation["chain"]
+    readonly account: string
+    readonly pinDir: string
+    readonly deviceId: string
+  }): Promise<RecoveryStatus | null>
   joinAccount(
     input: SyncRpcCeremonyInput & {
       readonly clock: CeremonyClock

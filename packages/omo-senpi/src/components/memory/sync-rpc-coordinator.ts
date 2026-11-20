@@ -7,6 +7,8 @@ import type {
   SyncApproveResponse,
   SyncDisableResponse,
   SyncEnableResponse,
+  SyncRecoverRequest,
+  SyncRecoverResponse,
   SyncRpcProblem,
   SyncUnavailableCode,
   SyncStatusResponse,
@@ -30,6 +32,7 @@ import {
   type CeremonyOperation,
   type Operation,
 } from "./sync-rpc-operation"
+import { recoveryStatusField, runRecover } from "./sync-rpc-recover"
 
 export function createSyncRpcCoordinator(options: SyncRpcOptions) {
   // The desktop polls status and the pending/devices reads, so a cause is logged once when it starts, not on every poll.
@@ -268,8 +271,15 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
           check(owner)
         }
         const ownEnable = visible.find((record) => record.kind === "enable")?.enable ?? null
+        const recovery = await recoveryStatusField(
+          options,
+          account,
+          <T>(use: (ports: SyncRpcOperation, current: SyncRpcAccount) => Promise<T>) => this.read(owner, use),
+        )
+        check(owner)
         return {
           ...(sync === undefined ? {} : { sync }),
+          ...recovery,
           // Another process (the CLI) holding the ceremony shows as in progress, never as a void phrase.
           enable: ownEnable ?? (notice.inProgress === true ? { kind: "in_progress" } : null),
           ...(notice.phraseVoid !== undefined ? { phraseVoid: notice.phraseVoid } : {}),
@@ -308,6 +318,27 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
           ...(request.credentialId !== undefined ? { credentialId: request.credentialId } : {}),
         }),
       )
+    },
+    async recover(owner: SyncRpcContext, request: SyncRecoverRequest): Promise<SyncRecoverResponse> {
+      const task = runRecover(
+        options,
+        {
+          current,
+          authority,
+          subscribe,
+          newRecord: (context) => newRecord(context, "read"),
+          disposeRecord,
+          enableActive: () => enable?.active === true,
+        },
+        owner,
+        request,
+      )
+      reads.add(task)
+      try {
+        return await task
+      } finally {
+        reads.delete(task)
+      }
     },
     /** Turns sync off on this device (#14093): `off`, or a typed problem that never carries the service's words. */
     async disable(owner: SyncRpcContext): Promise<SyncDisableResponse> {

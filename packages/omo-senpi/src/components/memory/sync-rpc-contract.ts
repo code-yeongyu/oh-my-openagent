@@ -10,7 +10,7 @@ export type SyncFeaturesRequest = Readonly<Record<string, never>>
  * The features this engine speaks; an engine older than recovery-phrase genesis answers it as an unknown verb.
  * `disable` (#14093): the engine answers `omo.memory.sync.disable`, so a client offers Turn off only when it is listed.
  */
-export type SyncFeature = "enable-method" | "phrase-genesis" | "acknowledge" | "disable"
+export type SyncFeature = "enable-method" | "phrase-genesis" | "acknowledge" | "disable" | "recover"
 export type SyncFeaturesResponse = { readonly features: readonly SyncFeature[] }
 export type SyncAcknowledgeRequest = {
   readonly notice: "phrase_void"
@@ -24,6 +24,43 @@ export type SyncDisableRequest = Readonly<Record<string, never>>
  * answers it too. Memory on this device is not touched and the account's other devices keep syncing.
  */
 export type SyncDisableResponse = { readonly kind: "off" } | SyncRpcProblem
+export type SyncRecoverMethod = "passkey" | "phrase"
+/** The button the person pressed; the request never carries words (D12 section 1). */
+export type SyncRecoverRequest = { readonly method: SyncRecoverMethod }
+export type SyncRecoverRefusal =
+  | "no-recovery-key"
+  | "history-incomplete"
+  | "not-enrolled"
+  | "key-mismatch"
+  | "countersign-mismatch"
+  | "wrap-refused"
+  | "wrap-unbound"
+  | "rp-mismatch"
+  | "recovery-expired"
+  | "unverified"
+  | "join-refused"
+  | "join-unconfirmed"
+  | "pin-conflict"
+  | "pin-corrupt"
+  | "authenticator-unsupported"
+  | "surface-unavailable"
+  | "unavailable"
+  | "already-member"
+  | "local-only"
+  | "too-many-attempts"
+  | "rate_limited"
+  | "stale_base"
+  | "not_found"
+  | "refused"
+  | "phrase_keys_not_accepted"
+/** `sync: "on"` is the only answer that may say memory sync is on; `off` means recovered, turn sync on next. */
+export type SyncRecoverResponse =
+  | ({ readonly kind: "recovered"; readonly sync: "on" | "off" } & SyncRootNotice)
+  | ({ readonly kind: "recovered_read_only"; readonly sync: "on" | "off" } & SyncRootNotice)
+  | { readonly kind: "cancelled" }
+  | { readonly kind: "in_progress" }
+  | { readonly kind: "recover_refused"; readonly code: SyncRecoverRefusal }
+  | SyncRpcProblem
 export type SyncPendingRequest = Readonly<Record<string, never>>
 export type SyncStatusRequest = Readonly<Record<string, never>>
 export type SyncDevicesRequest = Readonly<Record<string, never>>
@@ -117,6 +154,14 @@ export type SyncStatusResponse =
       /** Read-only: a shown recovery phrase that was not saved; a read never clears it. */
       readonly phraseVoid?: PhraseVoidNotice
       readonly phraseUnresolved?: true
+      /**
+       * The recover entry (D12 section 1): enrolled methods and whether this device is already in the account's chain,
+       * or `blocked` for a pin that needs repair. Absent when it cannot be read now, on an engine without `recover`,
+       * or on a host without the runtime.
+       */
+      readonly recovery?:
+        | { readonly method: "passkey" | "phrase" | "both" | "none"; readonly member: boolean }
+        | { readonly blocked: "pin-corrupt" | "pin-conflict" }
       readonly approvals: readonly ApprovalProgress[]
     }
   | SyncRpcProblem

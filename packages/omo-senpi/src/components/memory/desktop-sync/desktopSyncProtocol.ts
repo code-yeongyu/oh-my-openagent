@@ -10,16 +10,23 @@ export class DesktopSyncRefused extends Error {
 }
 
 const token = z.string().min(1).max(256)
+/** D12: recovery on a fresh device runs in desktop main; only public values cross these ops. */
+export const RECOVER_OPS = ["recoverBeginPhrase", "recoverBegin", "recoverFinish", "recoverAbort"] as const
+export type RecoverOp = (typeof RECOVER_OPS)[number]
 export const DesktopSyncRequest = z.union([
   z.object({ op: z.enum(["descriptor", "operationBegin", "capability"]) }),
   z.object({ op: z.enum(["operationCancel", "operationEnd"]), handle: token }),
-  z.object({ op: z.enum(["service", "keyring", "genesisRun", "phraseGenesisRun"]), handle: token, data: z.unknown() }),
+  z.object({
+    op: z.enum(["service", "keyring", "genesisRun", "phraseGenesisRun", ...RECOVER_OPS]),
+    handle: token,
+    data: z.unknown(),
+  }),
 ])
 export type DesktopSyncRequest =
   | { readonly op: "descriptor" | "operationBegin" | "capability" }
   | { readonly op: "operationCancel" | "operationEnd"; readonly handle: string }
   | {
-      readonly op: "service" | "keyring" | "genesisRun" | "phraseGenesisRun"
+      readonly op: "service" | "keyring" | "genesisRun" | "phraseGenesisRun" | RecoverOp
       readonly handle: string
       readonly data: unknown
     }
