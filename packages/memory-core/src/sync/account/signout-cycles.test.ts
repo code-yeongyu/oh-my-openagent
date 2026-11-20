@@ -8,7 +8,6 @@ import { expect, test } from "bun:test"
 
 import { createRejectionCounter } from "../crypto/rejection.ts"
 import { loadTrustAnchor } from "../crypto/trust-pin.ts"
-import { GIT_TEST_TIMEOUT } from "../engine/engine-harness.test-support.ts"
 import { openAccountChain } from "./account-chain.ts"
 import { createAccountHttp } from "./http.ts"
 import { principalOf } from "./join.ts"
@@ -59,5 +58,4 @@ test(
       await w.close()
     }
   },
-  GIT_TEST_TIMEOUT * 6,
 )
