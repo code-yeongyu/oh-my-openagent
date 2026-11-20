@@ -2,8 +2,11 @@ import { AsyncResource } from "node:async_hooks"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 
+import { resolveErrorStreakSettings } from "@oh-my-opencode/omo-config-core"
+
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
+import { loadSenpiOmoConfig } from "../config-resolution"
 import { returnedAtClose, settleGracefulClose } from "./gateway/graceful-close-returns"
 import { createCompletionTracker, type AgentEndFacts } from "./gateway/completion"
 import { SESSION_CONTROL_DELIVERY_TYPE } from "./gateway/constants"
@@ -28,7 +31,8 @@ import { createDefaultRemoteSurface } from "./remote/default-remote"
 import { registerRemoteMonitorTargets } from "./remote/lazy-ops"
 import { createOmoNativeProductConfig } from "../telemetry/product-identity"
 import { defaultThreadStateDirectory, isThreadSocket } from "./live-surface-paths"
-import { stampThisDevice } from "./remote/this-device"
+import { stampThisDevice, thisDeviceId } from "./remote/this-device"
+import { createRunAlerts, type RunAlertsOptions } from "./run-alerts/run-alerts"
 import type { IntakeAdmission } from "./gateway/intake-admission"
 import type { SameDeviceWake } from "./gateway/same-device-wake"
 import type { ThreadWakeOptions } from "./wake/runtime"
@@ -77,6 +81,8 @@ export type ThreadComponentOptions = Partial<
   readonly controlEndpointTest?: ControlEndpointRegistrantOptions["_test"]
   /** Test seams of the session wake (#13037): the carrier, the consumer and their switches. */
   readonly wake?: ThreadWakeOptions
+  /** Test seams of the error-streak alerts (#14430): the clock, this device's id, the webhook client and the retry pause. */
+  readonly operatorAlerts?: Pick<RunAlertsOptions, "now" | "device" | "fetch" | "delay">
 }
 
 /**
@@ -533,6 +539,21 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         },
         (line) => ctx.logger.warn(line),
       )
+      const alertEnv = options.env ?? process.env
+      const alerts = createRunAlerts({
+        settings: () =>
+          resolveErrorStreakSettings(loadSenpiOmoConfig({ cwd: callerWorkspaceRoot(), env: alertEnv }).config),
+        env: alertEnv,
+        now: Date.now,
+        sendAs: tools.sendAs,
+        sessionName: () => pi.getSessionName?.(),
+        device: async () => {
+          const here = await thisDeviceId(remote)
+          return "device" in here ? here.device : undefined
+        },
+        log: { info: (line) => ctx.logger.info(line), warn: (line) => ctx.logger.warn(line) },
+        ...options.operatorAlerts,
+      })
       // A durable arm this runtime did not make itself - left by an earlier runtime (a restart, or a
       // crash before its write), or made by another process (`omo thread report ... completion`) - is
       // picked up at session_start and on a `wake` command, and written at this session's next settle.
@@ -666,7 +687,9 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
       })
       pi.on("agent_end", (event, eventCtx) => {
         const durableId = durableIdOf(eventCtx)
-        if (durableId !== undefined) completions.agentEnd(durableId, event as AgentEndFacts)
+        if (durableId === undefined) return
+        completions.agentEnd(durableId, event as AgentEndFacts)
+        alerts.agentEnd(durableId, event as AgentEndFacts)
       })
       pi.on("agent_settled", async (_event, eventCtx) => {
         const durableId = durableIdOf(eventCtx)
@@ -677,6 +700,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         run.local = false
         run.answered = true
         if (durableId === undefined) return
+        alerts.settled(durableId)
         // A failed write is reported (and retried) by the tracker's onWriteFailed.
         await waitAtMost(
           completions.settled(durableId).then(
