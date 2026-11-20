@@ -94,7 +94,7 @@ const EXACT_MODEL_CATEGORIES: ReadonlySet<string> = new Set(
   ),
 )
 
-export function isExactModelCategory(categoryName: string): boolean {
+function isExactModelCategory(categoryName: string): boolean {
   return EXACT_MODEL_CATEGORIES.has(categoryName)
 }
 
