@@ -34,8 +34,28 @@ function writeManifest(repo, manifest) {
   renameSync(tmp, path)
 }
 
-// Parallel lanes run `add` at the same time: the manifest's read-edit-write holds an exclusive lock file so no
-// entry is lost (a lost entry is a worktree teardown never removes).
+function isAlive(pid) {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return error.code === "EPERM"
+  }
+}
+
+// A lock whose recorded holder is no longer running was left by a crash: clear it instead of waiting it out.
+function clearStaleLock(lock) {
+  let pid
+  try {
+    pid = Number.parseInt(readFileSync(lock, "utf8"), 10)
+  } catch {
+    return
+  }
+  if (Number.isInteger(pid) && pid > 0 && !isAlive(pid)) rmSync(lock, { force: true })
+}
+
+// Parallel lanes run `add` at the same time: the manifest's read-edit-write holds an exclusive lock file (holding
+// its owner's pid) so no entry is lost; a lost entry is a worktree teardown never removes. Keep the update short.
 function withManifestLock(repo, update) {
   const lock = `${manifestPath(repo)}.lock`
   mkdirSync(dirname(lock), { recursive: true })
@@ -44,9 +64,11 @@ function withManifestLock(repo, update) {
   for (;;) {
     try {
       fd = openSync(lock, "wx")
+      writeFileSync(fd, `${process.pid}\n`)
       break
     } catch (error) {
       if (error.code !== "EEXIST") throw error
+      clearStaleLock(lock)
       if (Date.now() > deadline) throw new Error(`manifest lock held for over ${LOCK_TIMEOUT_MS}ms: ${lock}`)
       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, LOCK_RETRY_MS)
     }
@@ -82,32 +104,52 @@ function isLanded(repo, branch, into) {
   return merged.status === 0 && merged.stdout.split("\n")[0] === git(repo, ["rev-parse", `${into}^{tree}`])
 }
 
+function refExists(repo, ref) {
+  return (
+    spawnSync("git", ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`], { cwd: repo, stdio: "ignore" }).status ===
+    0
+  )
+}
+
+// Why an entry must stay, or undefined when its branch has landed and the worktree can go. A branch with no commit
+// beyond its base has landed nothing yet: its worktree is a lane still starting, unless the folder is already gone.
+function keepReason(repo, entry, target) {
+  if (!refExists(repo, `refs/heads/${entry.branch}`)) return `branch ${entry.branch} no longer exists`
+  const ahead = Number(git(repo, ["rev-list", "--count", `${entry.base}..refs/heads/${entry.branch}`]))
+  if (ahead === 0 && existsSync(entry.path)) return "no commits beyond its base yet"
+  if (ahead > 0 && !isLanded(repo, entry.branch, target)) return `not landed on ${target}`
+  return undefined
+}
+
 /** Removes recorded worktrees whose branch has landed on `into` (default: the main checkout's HEAD). */
 function teardown(repo, { into }) {
   const target = into ?? git(repo, ["rev-parse", "--abbrev-ref", "HEAD"])
+  if (!refExists(repo, target)) throw new Error(`--into ${target}: no such ref`)
   // Prune first: a recorded worktree whose folder is already gone still holds its branch until pruned.
   git(repo, ["worktree", "prune"])
-  return withManifestLock(repo, (manifest) => {
-    const removed = []
-    const kept = []
-    for (const entry of manifest.created) {
-      if (!isLanded(repo, entry.branch, target)) {
-        kept.push({ path: entry.path, branch: entry.branch, reason: `not landed on ${target}` })
-        continue
-      }
-      try {
-        if (existsSync(entry.path)) git(repo, ["worktree", "remove", entry.path])
-        // -D, not -d: `-d` checks ancestry against HEAD, while landing was just verified against `target`.
-        git(repo, ["branch", "-D", entry.branch])
-        removed.push({ path: entry.path, branch: entry.branch })
-      } catch (error) {
-        kept.push({ path: entry.path, branch: entry.branch, reason: String(error.stderr ?? error.message).trim() })
-      }
+  // The slow removals run outside the lock; only the final manifest edit holds it, so a parallel `add` never waits.
+  const removed = []
+  const kept = []
+  for (const entry of readManifest(repo).created) {
+    const reason = keepReason(repo, entry, target)
+    if (reason) {
+      kept.push({ path: entry.path, branch: entry.branch, reason })
+      continue
     }
-    git(repo, ["worktree", "prune"])
-    manifest.created = manifest.created.filter((entry) => kept.some((k) => k.branch === entry.branch))
-    return { into: target, removed, kept }
+    try {
+      if (existsSync(entry.path)) git(repo, ["worktree", "remove", entry.path])
+      // -D, not -d: `-d` checks ancestry against HEAD, while landing was just verified against `target`.
+      git(repo, ["branch", "-D", entry.branch])
+      removed.push({ path: entry.path, branch: entry.branch })
+    } catch (error) {
+      kept.push({ path: entry.path, branch: entry.branch, reason: String(error.stderr ?? error.message).trim() })
+    }
+  }
+  git(repo, ["worktree", "prune"])
+  withManifestLock(repo, (manifest) => {
+    manifest.created = manifest.created.filter((entry) => !removed.some((r) => r.branch === entry.branch))
   })
+  return { into: target, removed, kept }
 }
 
 function parseFlags(argv) {

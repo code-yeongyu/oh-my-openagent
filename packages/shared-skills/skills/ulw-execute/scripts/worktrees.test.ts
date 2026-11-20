@@ -244,7 +244,15 @@ describe("ulw-execute worktrees helper", () => {
     const added = runFrom(wave1, "add", "--path", wave2, "--branch", "ulw/w2")
     expect(added.json.provisioned).toEqual([".env"])
 
-    git(repo, "merge", "-q", "--no-ff", "-m", "merge", "ulw/w2")
+    for (const [wt, branch] of [
+      [wave1, "ulw/w1"],
+      [wave2, "ulw/w2"],
+    ]) {
+      writeFileSync(join(wt, `${branch.slice(4)}.txt`), "w\n")
+      git(wt, "add", "-A")
+      git(wt, "commit", "-qm", branch)
+      git(repo, "merge", "-q", "--no-ff", "-m", "merge", branch)
+    }
     const torn = runFrom(repo, "teardown")
 
     expect(torn.json.removed.map((entry: { branch: string }) => entry.branch).sort()).toEqual(["ulw/w1", "ulw/w2"])
@@ -288,6 +296,42 @@ describe("ulw-execute worktrees helper", () => {
     expect(result.json.kept).toEqual([])
     expect(git(repo, "branch", "--list", "ulw/gone")).toBe("")
   })
+
+  test("#given a run worktree with no commits yet #when torn down #then it is kept, because nothing of it has landed", () => {
+    const repo = fixtureRepo({ ".env": "TOKEN=dummy\n", ".worktreeinclude": ".env\n" })
+    const wt = join(repo, "..", "wt-fresh")
+    run(repo, "add", "--path", wt, "--branch", "ulw/fresh")
+
+    const result = run(repo, "teardown")
+
+    expect(result.json.removed).toEqual([])
+    expect(result.json.kept.map((entry: { branch: string }) => entry.branch)).toEqual(["ulw/fresh"])
+    expect(readFileSync(join(wt, ".env"), "utf8")).toBe("TOKEN=dummy\n")
+  })
+
+  test("#given an --into ref that does not exist #when torn down #then it fails instead of keeping everything as not landed", () => {
+    const repo = fixtureRepo()
+    run(repo, "add", "--path", join(repo, "..", "wt-typo"), "--branch", "ulw/typo")
+
+    const result = run(repo, "teardown", "--into", "mian")
+
+    expect(result.status).toBe(1)
+    expect(result.json).toBeUndefined()
+  })
+
+  test("#given a lock file left by a crashed process #when a worktree is added #then the stale lock is cleared and the add is recorded", () => {
+    const repo = fixtureRepo()
+    const dead = spawnSync(process.execPath, ["-e", ""])
+    expect(dead.status).toBe(0)
+    mkdirSync(join(repo, ".omo", "ulw-execute"), { recursive: true })
+    writeFileSync(join(repo, ".omo", "ulw-execute", "worktrees.json.lock"), `${dead.pid}\n`)
+
+    const result = run(repo, "add", "--path", join(repo, "..", "wt-stale"), "--branch", "ulw/stale")
+
+    expect(result.status).toBe(0)
+    const manifest = JSON.parse(readFileSync(join(repo, ".omo", "ulw-execute", "worktrees.json"), "utf8"))
+    expect(manifest.created.map((entry: { branch: string }) => entry.branch)).toEqual(["ulw/stale"])
+  }, 60_000)
 
   test("#given parallel lanes adding worktrees at once #when every add finishes #then the manifest records all of them", async () => {
     const repo = fixtureRepo()
