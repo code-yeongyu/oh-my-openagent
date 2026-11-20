@@ -8,6 +8,8 @@ Revision r2 answers the review at 2646134d49 (FIX_FIRST): M1 is section 1 "Refus
 
 Revision r3 answers the delta review at 8055949a91 (REQUEST-CHANGES): M4 is section 1 "Membership guard" (the guard reads chain membership, not engine health) with tests 4, 4b and 12 and the section 8 entry rule; L4 is section 5 (the new route scope covers `recover` only, nothing else changes) with test 8.
 
+Revision r4 answers the CLEAR review at adea555dea (one LOW): L1 is section 1 "Status field naming the recovery method". Status omits `recovery` when membership cannot be read, and a status walk uses its own rejection counter. Test 4b covers both.
+
 ## 0. Correction to the #14122 design note
 
 The issue's design note says "Main hands the typed words to the engine over the local channel as bytes" and "the engine derives the key and zeroes its buffer". The current code already does better than that, and this design keeps it that way. **On the desktop the words never leave desktop main.** Main parses the words, derives the keys and holds them behind a one-shot handle. The engine receives only public values: the handle, the credential id and the two public keys.
@@ -91,6 +93,12 @@ readonly recovery?: { readonly method: "passkey" | "phrase" | "both" | "none"; r
 ```
 
 `member` is the membership guard's pre-begin reading (pinned anchor, walk, `authority.members.has(id)`); without a pin it is `false`. It is what the desktop uses to choose between the recover button and the turn-on button (section 8), so the entry never depends on engine health.
+
+When membership cannot be read, status omits the whole `recovery` field rather than guessing `member`. That covers a pin that does not load (`pin-corrupt`, `recover.ts:104`) and a walk that answers `unavailable`, `unverified` or `anchor-mismatch`. In each of those cases the guard would refuse `recover` anyway (`pin-corrupt`, `unavailable`, `unverified`, `pin-conflict`), so hiding the button (section 8) shows nothing the engine would refuse. The engine guard stays the decision, and status is only the UX reading of it.
+
+Cost of a status call: with no pin there is no walk, and status reads only `listKeys` as it does today (`phrase-hints.ts:51`, `salt-inputs.ts:60`). With a pin, status adds one verified walk (`listEntries` + `listKeys`, `served-chain.ts:34-51`). That walk uses its own `createRejectionCounter()`, as the read-only walk in `enroll-phrase.ts:281` does, so status calls never bump the `RejectionCounter` that recovery and sync share. The walk runs only when the host lists `recover` in `features`. An older desktop never pays for it.
+
+Test 4b also asserts both rules: with a pin, a walk that answers `unavailable` makes status omit `recovery`, and the shared counter passed to recovery is not touched by status.
 
 It is computed from the served keyring through the same reader recovery uses: `servedPhraseHints` (omo `recovery/phrase-hints.ts`) for phrase keys and `servedSaltInputs` (omo `recovery/salt-inputs.ts`) for passkey keys, after removed keys are subtracted. It never comes from a server claim field. An unreadable keyring omits the field instead of guessing. Older engines omit it, and the desktop then labels the button generically.
 
