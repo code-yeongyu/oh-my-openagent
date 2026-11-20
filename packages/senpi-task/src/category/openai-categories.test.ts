@@ -171,7 +171,12 @@ describe("resolveCategory on GPT registries", () => {
       const result = resolveCategory(category, {}, astraRegistry)
       expect(result.kind).toBe("resolved")
       if (result.kind !== "resolved") throw new Error("Expected resolved")
-      expect(result.spec).toMatchObject({ provider: "openai", modelId: "gpt-6.2-astra", variant, prompt_append: append })
+      expect(result.spec).toMatchObject({
+        provider: "openai",
+        modelId: "gpt-6.2-astra",
+        variant,
+        prompt_append: append,
+      })
     })
 
     it(`#given only chatgpt-subscription/gpt-6.2-astra #when ${category} resolves #then the subscription default carries the same variant and append`, () => {
