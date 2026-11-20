@@ -29,9 +29,9 @@ export const SCENARIOS = {
   },
   "geeky-heavy-subscription-first": {
     omoConfig: { model_profile: "geeky-heavy" },
-    mockModels: ["mock-1", "gpt-6-astra"],
+    mockModels: ["mock-1", "gpt-6.2-astra"],
     registerProviders: ["openai", "chatgpt-subscription"],
-    expect: { model: "gpt-6-astra", provider: "chatgpt-subscription", notice: APPLIED_TYPE, thinking: "high" },
+    expect: { model: "gpt-6.2-astra", provider: "chatgpt-subscription", notice: APPLIED_TYPE, thinking: "high" },
   },
   "daily-normal-opus": {
     omoConfig: { model_profile: "daily-normal" },
@@ -75,10 +75,10 @@ export const SCENARIOS = {
   },
   "geeky-heavy-astra": {
     omoConfig: { model_profile: "geeky-heavy" },
-    mockModels: ["mock-1", "gpt-6-astra"],
+    mockModels: ["mock-1", "gpt-6.2-astra"],
     cliModel: undefined,
     registerProviders: ["chatgpt-subscription"],
-    expect: { model: "gpt-6-astra", provider: "chatgpt-subscription", notice: APPLIED_TYPE, thinking: "high" },
+    expect: { model: "gpt-6.2-astra", provider: "chatgpt-subscription", notice: APPLIED_TYPE, thinking: "high" },
   },
   "daily-normal-kimi": {
     omoConfig: { model_profile: "daily-normal" },
@@ -97,10 +97,10 @@ export const SCENARIOS = {
 
   "geeky-normal-astra": {
     omoConfig: { model_profile: "geeky-normal" },
-    mockModels: ["mock-1", "gpt-5.6-sol", "gpt-6.1-sol", "gpt-6.1-sol-fast", "gpt-6-astra"],
+    mockModels: ["mock-1", "gpt-5.6-sol", "gpt-6.1-sol", "gpt-6.1-sol-fast", "gpt-6.2-astra"],
     cliModel: undefined,
     registerProviders: ["chatgpt-subscription"],
-    expect: { model: "gpt-6-astra", provider: "chatgpt-subscription", notice: APPLIED_TYPE, thinking: "medium" },
+    expect: { model: "gpt-6.2-astra", provider: "chatgpt-subscription", notice: APPLIED_TYPE, thinking: "medium" },
   },
   "geeky-normal-gpt6-only-unavailable": {
     omoConfig: { model_profile: "geeky-normal" },
@@ -312,17 +312,17 @@ export const SCENARIOS = {
   // A ChatGPT subscription login whose refresh fails transiently at session start (the fixture
   // answers ECONNREFUSED to every exchange until the first turn starts) beside an OpenAI API lane serving the same model (#11432): the
   // subscription keeps the rung, and the first turn's own refresh succeeds on it. Before the fix the
-  // session moved to openai/gpt-6-astra for its lifetime.
+  // session moved to openai/gpt-6.2-astra for its lifetime.
   "geeky-normal-transient-refresh-keeps-subscription": {
     omoConfig: { model_profile: "geeky-normal" },
-    mockModels: ["mock-1", "gpt-6-astra"],
+    mockModels: ["mock-1", "gpt-6.2-astra"],
     registerProviders: ["chatgpt-subscription", "openai"],
     oauthProviders: ["chatgpt-subscription"],
     authJson: {
       "chatgpt-subscription": { type: "oauth", access: "stale-access", refresh: FLAKY_REFRESH_TOKEN, expires: 0 },
     },
     expect: {
-      model: "gpt-6-astra",
+      model: "gpt-6.2-astra",
       provider: "chatgpt-subscription",
       notice: APPLIED_TYPE,
       thinking: "medium",
