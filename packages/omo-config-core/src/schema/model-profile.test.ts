@@ -39,7 +39,7 @@ describe("OmoModelProfileSchema", () => {
 
   test("#given a legacy variant on a chain entry #when parsed #then it normalizes to reasoning like a category chain", () => {
     // given
-    const entry = { models: [{ model: "openai/gpt-6-astra", variant: "high" }] }
+    const entry = { models: [{ model: "openai/gpt-6.2-astra", variant: "high" }] }
 
     // when
     const result = OmoModelProfileSchema.safeParse(entry)
@@ -47,7 +47,7 @@ describe("OmoModelProfileSchema", () => {
     // then
     expect(result.success).toBe(true)
     if (!result.success) throw new Error(result.error.message)
-    expect(result.data.models).toEqual([{ model: "openai/gpt-6-astra", reasoning: "high" }])
+    expect(result.data.models).toEqual([{ model: "openai/gpt-6.2-astra", reasoning: "high" }])
   })
 
   test("#given an unknown sibling key #when parsed #then the strict profile object rejects the entry", () => {
