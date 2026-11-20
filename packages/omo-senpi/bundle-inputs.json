@@ -2245,6 +2245,7 @@
     "packages/senpi-task/src/runners/rpc-host/own-endpoint.ts",
     "packages/senpi-task/src/runners/rpc-host/owner-claim.ts",
     "packages/senpi-task/src/runners/rpc-host/permission-push.ts",
+    "packages/senpi-task/src/runners/rpc-host/read-rpc-diagnostic.ts",
     "packages/senpi-task/src/runners/rpc-host/reattach-port.ts",
     "packages/senpi-task/src/runners/rpc-host/reattach.ts",
     "packages/senpi-task/src/runners/rpc-host/reconcile-turn.ts",
