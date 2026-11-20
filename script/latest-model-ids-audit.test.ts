@@ -22,6 +22,7 @@ const MODEL_IDENTITY_FILES = new Map<string, string>([
     "a frozen copy of the collector pin's model enum",
   ],
   ["packages/omo-codex/src/install/managed-agent-model-defaults.ts", "models LazyCodex once bundled"],
+  ["packages/omo-codex/src/install/codex-model-catalog.ts", "the Astra id the Codex edition ships"],
   ["packages/utils/src/migration/agent-category.ts", "each known id's migration category"],
   ["packages/prompts-core/src/atlas-prompts.ts", "prompts written for one model"],
   ["packages/prompts-core/src/variant-resolver.ts", "prompts written for one model"],
