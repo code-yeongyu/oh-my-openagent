@@ -104,7 +104,7 @@ function engineLine(engine: EngineSyncRead): string {
     case "no_engine":
       return "Engine: no engine is running on this machine."
     case "running":
-      return "Engine: running. Its memory sync state shows inside its sessions (the TUI footer or the desktop app)."
+      return "Engine: running. Its memory sync details are not readable from the CLI yet (see code-yeongyu/senpi#7107); the TUI footer and the desktop app show them."
     case "unreadable":
       return `Engine: could not be checked (${engine.reason}).`
   }
