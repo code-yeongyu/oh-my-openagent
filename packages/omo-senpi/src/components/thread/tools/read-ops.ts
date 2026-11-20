@@ -199,23 +199,15 @@ function readDegraded(
   if (entry === undefined || entry.session_path === null)
     return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live.")
   const durable = readTranscript(
-    { kind: "jsonl", path: entry.session_path, live_host_present: false },
+    { kind: "jsonl", path: entry.session_path, live_host_present: false, view: "messages" },
     readWindow(value),
   )
   if (durable.kind === "error") return { kind: "error", error: durable.error }
-  // A session file interleaves messages with bookkeeping (the session header, model and thinking
-  // changes, names): only message entries are transcript, rendered with the live path's roles.
-  const messages = durable.items.flatMap((item) => {
-    const message = item.message
-    if (item.type !== "message" || typeof message !== "object" || message === null || Array.isArray(message)) return []
-    return message.role === "user" || message.role === "assistant" || message.role === "toolResult" ? [message] : []
-  })
-  const items = messages.map(readItem)
   return {
     kind: "ok",
     thread: threadId,
     link: threadLink(threadId, entry.title),
-    items,
+    items: durable.items.map(readItem),
     truncated: durable.truncated,
     ...(durable.next_cursor === null ? {} : { next_cursor: durable.next_cursor }),
     source: durable.source,
