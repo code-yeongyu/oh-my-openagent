@@ -1,17 +1,7 @@
 import { createInterface } from "node:readline/promises"
 
-import {
-  approveDevice,
-  type CeremonyClock,
-  disableSync,
-  enableSync,
-  joinAccount,
-} from "../memory-core/src/sync/account/index.ts"
+import { approveDevice, disableSync, enableSync, joinAccount } from "../memory-core/src/sync/account/index.ts"
 import { acknowledgePhraseVoid, type PhraseVoidNotice } from "../memory-core/src/sync/account/phrase-notice.ts"
-import { createRejectionCounter } from "../memory-core/src/sync/crypto/rejection.ts"
-import { createRecoveryBridge } from "../memory-core/src/sync/recovery/bridge.ts"
-import type { PasskeyAuthenticator } from "../memory-core/src/sync/recovery/ports.ts"
-import { recoverOnFreshDevice } from "../memory-core/src/sync/recovery/recover.ts"
 import { createPhraseGenesisBridge } from "../memory-core/src/sync/genesis/phrase-bridge.ts"
 import { type PhraseGate, readServiceFloor } from "../memory-core/src/sync/genesis/phrase-gate.ts"
 import {
@@ -19,7 +9,6 @@ import {
   controllingTerminalAvailable,
   lazyTerminalSurface,
   openControllingTerminal,
-  type PhraseTerminal,
 } from "./sync-phrase-tty"
 import type { Command } from "commander"
 
@@ -27,30 +16,10 @@ import { SignInError } from "../omo-opencode/src/cli/service-auth/protocol"
 import { type SyncContext, signedInSyncContext } from "./sync-context"
 import { CREATION_UNAVAILABLE, phraseCreationGuidance, RUN_IT_YOURSELF } from "./sync-creation-guidance"
 
-export const EXIT_UNSUPPORTED_HERE = 2
+import { EXIT_UNSUPPORTED_HERE, type SyncCommandDependencies } from "./sync-command-dependencies"
+import { recover, recoverRefused } from "./sync-recover-command"
 
-export interface SyncCommandDependencies {
-  readonly context: () => Promise<SyncContext>
-  readonly clock: CeremonyClock
-  readonly output: (line: string) => void
-  readonly error: (line: string) => void
-  readonly confirm: (question: string) => Promise<boolean>
-  readonly interactive: boolean
-  /** The environment the refusal markers and the phrase flag are read from. */
-  readonly env?: Readonly<Record<string, string | undefined>>
-  /** Opens the controlling terminal; null when there is none. Words never go anywhere else. */
-  readonly terminal?: () => PhraseTerminal | null
-  readonly terminalAvailable?: () => boolean
-  /**
-   * The service floor reader; tests inject one. Absent, the gate reads the service's own `accepts_phrase_keys`
-   * fresh for every creation through the operation's signed-in chain, and any failure refuses (#13631).
-   */
-  readonly phraseFloor?: PhraseGate["serviceFloor"]
-}
-
-const RECOVER_ELSEWHERE =
-  "Recovering memory with your passkey runs in the OmO desktop app, which can use the passkey on this computer. " +
-  "On a machine without it, approve this device from a device that already syncs: run `omo sync enable` here, then `omo sync approve` there."
+export { EXIT_UNSUPPORTED_HERE, type SyncCommandDependencies }
 
 export const PHRASE_GENESIS_FLAG = "OMO_MEMORY_SYNC_PHRASE_GENESIS"
 const PHRASE_VOID = "The recovery phrase you saw was not saved to your account. Do not keep it."
@@ -231,70 +200,6 @@ async function disable(dependencies: SyncCommandDependencies, context: SyncConte
   )
   dependencies.output("Run `omo sync enable` to turn it on again.")
   return 0
-}
-
-// The CLI has no passkey authenticator: phrase recovery is the only key source it can drive.
-const noPasskeys: PasskeyAuthenticator = {
-  prfSupported: false,
-  create: async () => null,
-  assert: async () => null,
-  discover: async () => null,
-  signalRemoved: async () => "unsupported",
-}
-
-const RECOVER_YOURSELF = "Run `omo sync recover` yourself in a terminal."
-const RECOVERED = "Your memory is recovered on this device and memory sync is on."
-const RECOVERED_READ_ONLY =
-  "This device can read your recovered memory, but another step is still pending before it can write. Run `omo sync recover` again later."
-
-/**
- * Checker LOW (#13337 @ e6ac0bca): recover refuses under an agent harness, CI or without a controlling terminal
- * BEFORE the signed-in context (credentials, session, device keyring) is loaded.
- */
-const recoverRefused = (dependencies: SyncCommandDependencies): boolean => {
-  const env = dependencies.env ?? process.env
-  if (!agentMarkerSet(env) && (dependencies.terminalAvailable ?? controllingTerminalAvailable)()) return false
-  dependencies.error(RECOVER_YOURSELF)
-  dependencies.error(RECOVER_ELSEWHERE)
-  return true
-}
-
-async function recover(dependencies: SyncCommandDependencies, context: SyncContext): Promise<number> {
-  const surface = lazyTerminalSurface(dependencies.terminal ?? openControllingTerminal, context.account)
-  try {
-    const outcome = await recoverOnFreshDevice({
-      account: context.account,
-      rpId: "",
-      keyring: context.keyring,
-      bridge: createRecoveryBridge(noPasskeys, context.keyring, { phraseSurface: surface }),
-      transport: context.chain,
-      rejections: createRejectionCounter(),
-      stateDir: context.pinDir,
-      method: "phrase",
-    })
-    if (outcome.ok) {
-      dependencies.output(outcome.state === "recovered" ? RECOVERED : RECOVERED_READ_ONLY)
-      return 0
-    }
-    switch (outcome.reason) {
-      case "cancelled":
-        dependencies.error("Recovery was cancelled. Nothing changed.")
-        return 1
-      case "no-recovery-key":
-        dependencies.error(`This account has no recovery phrase. ${RECOVER_ELSEWHERE}`)
-        return EXIT_UNSUPPORTED_HERE
-      case "history-incomplete":
-        dependencies.error(
-          "That recovery phrase does not match this account's history. Your account history looks incomplete; check the phrase, or recover from another device.",
-        )
-        return 1
-      default:
-        dependencies.error(`Recovery did not complete (${outcome.reason}). Nothing secret was stored.`)
-        return 1
-    }
-  } finally {
-    surface.done()
-  }
 }
 
 async function approve(

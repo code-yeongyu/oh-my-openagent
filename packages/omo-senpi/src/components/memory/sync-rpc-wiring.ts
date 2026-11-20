@@ -40,6 +40,31 @@ export function wireSyncRpc(options: {
       approveDevice: async (input) => (await import("#omo-memory-sync-runtime")).approveDevice(input),
       phraseNoticeStatus: async (place) => (await import("#omo-memory-sync-runtime")).phraseNoticeStatus(place),
       acknowledgePhraseVoid: async (input) => (await import("#omo-memory-sync-runtime")).acknowledgePhraseVoid(input),
+      recoverAccount: async (input) => {
+        const runtime = await import("#omo-memory-sync-runtime")
+        return runtime.recoverAndTurnOnSync({
+          account: input.account,
+          rpId: input.rpId,
+          keyring: input.keyring,
+          bridge: input.bridge,
+          transport: input.chain,
+          rejections: runtime.createRejectionCounter(),
+          stateDir: input.pinDir,
+          method: input.method,
+          serviceDeviceId: input.serviceDeviceId,
+          pairing: input.pairing,
+          authority: input.authority,
+          signal: input.signal,
+          onSwitchFailed: input.onSwitchFailed,
+        })
+      },
+      recoveryStatus: async (input) =>
+        (await import("#omo-memory-sync-runtime")).readRecoveryStatus({
+          transport: input.chain,
+          account: input.account,
+          stateDir: input.pinDir,
+          deviceId: input.deviceId,
+        }),
     },
     claims: createSyncRpcClaims(join(options.memoryRoot, "runtime", "sync-rpc-claims")),
     pinDir: options.pinDir,

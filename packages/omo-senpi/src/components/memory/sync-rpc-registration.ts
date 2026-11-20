@@ -1,10 +1,12 @@
 import { z } from "zod"
 import { createSyncRpcCoordinator } from "./sync-rpc-coordinator"
 import { syncErrorFields } from "./sync-rpc-operation"
+import { recoverFeature } from "./sync-rpc-recover"
 import type { SyncRpcOptions, SyncRpcRegistration } from "./sync-rpc-ports"
 
 const empty = z.object({}).strict()
 const enableRequest = z.object({ method: z.enum(["passkey", "phrase"]).optional() }).strict()
+const recoverRequest = z.object({ method: z.enum(["passkey", "phrase"]) }).strict()
 const acknowledgeRequest = z
   .object({
     notice: z.literal("phrase_void"),
@@ -45,6 +47,7 @@ export function registerSyncRpc(rpc: SyncRpcRegistration, options: SyncRpcOption
     "features",
     "acknowledge",
     "disable",
+    "recover",
   ] as const) {
     rpc.handle(`omo.memory.sync.${verb}`, async (data, context) => {
       if (!coordinator.check(context)) return { kind: "unavailable", reason: "A live trusted connection is required." }
@@ -60,6 +63,11 @@ export function registerSyncRpc(rpc: SyncRpcRegistration, options: SyncRpcOption
           const { method } = parsed.data
           return await coordinator.enable(context, method === undefined ? {} : { method })
         }
+        if (verb === "recover") {
+          const parsed = recoverRequest.safeParse(data)
+          if (!parsed.success) return { kind: "refused", reason: "Invalid recover request." }
+          return await coordinator.recover(context, parsed.data)
+        }
         if (verb === "acknowledge") {
           const parsed = acknowledgeRequest.safeParse(data)
           if (!parsed.success) return { kind: "refused", reason: "Invalid acknowledge request." }
@@ -68,12 +76,12 @@ export function registerSyncRpc(rpc: SyncRpcRegistration, options: SyncRpcOption
         }
         if (!empty.safeParse(data).success) return { kind: "refused", reason: "This request takes no parameters." }
         switch (verb) {
-          case "features":
+          case "features": {
             // Phrase genesis is listed only while the client flag is on (amendment A1).
-            return {
-              features:
-                options.phraseGate?.enabled === true ? FEATURES : FEATURES.filter((f) => f !== "phrase-genesis"),
-            }
+            const base =
+              options.phraseGate?.enabled === true ? FEATURES : FEATURES.filter((f) => f !== "phrase-genesis")
+            return { features: (await recoverFeature(options)) ? [...base, "recover"] : base }
+          }
           case "status":
             return await coordinator.status(context)
           case "disable":

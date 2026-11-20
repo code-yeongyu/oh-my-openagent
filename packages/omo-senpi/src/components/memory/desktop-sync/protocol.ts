@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { RECOVER_OPS } from "./desktopSyncProtocol"
 
 const token = z.string().min(1).max(256)
 const id = z.number().int().min(1).max(0x7fffffff)
@@ -7,7 +8,11 @@ export const desktopSyncRequest = z.union([
   z.object({ op: z.enum(["descriptor", "operationBegin", "capability"]) }).strict(),
   z.object({ op: z.enum(["operationCancel", "operationEnd"]), handle: token }).strict(),
   z
-    .object({ op: z.enum(["service", "keyring", "genesisRun", "phraseGenesisRun"]), handle: token, data: z.unknown() })
+    .object({
+      op: z.enum(["service", "keyring", "genesisRun", "phraseGenesisRun", ...RECOVER_OPS]),
+      handle: token,
+      data: z.unknown(),
+    })
     .strict(),
 ])
 export type DesktopSyncRequest = z.infer<typeof desktopSyncRequest>

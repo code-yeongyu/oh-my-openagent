@@ -144,17 +144,27 @@ export type RecoverFinishRequest = {
 /** The next step a person sees for an expired, used or unknown recovery handle. */
 export const RECOVER_AGAIN = "start recovery again" as const
 
-export type RecoverRefusal =
-  | "cancelled"
-  | "no-prf"
-  | "no-user-verification"
-  | "not-enrolled"
-  | "history-incomplete"
-  | "key-mismatch"
-  | "countersign-mismatch"
-  | "wrap-refused"
-  | "wrap-unbound"
-  | "recovery-expired"
+/**
+ * Every refusal a recovery bridge (the reference bridge or desktop main) may send for begin or finish. The engine's
+ * channel proxy decodes main's replies against exactly this list; `fixtures/recover-refusals-v1.json` is the copy
+ * both repos assert equality with (D12 section 1).
+ */
+export const RECOVER_REFUSALS = [
+  "cancelled",
+  "no-prf",
+  "no-user-verification",
+  "not-enrolled",
+  "history-incomplete",
+  "key-mismatch",
+  "countersign-mismatch",
+  "wrap-refused",
+  "wrap-unbound",
+  "recovery-expired",
+  "unavailable",
+  "rp-mismatch",
+  "too-many-attempts",
+] as const
+export type RecoverRefusal = (typeof RECOVER_REFUSALS)[number]
 
 export type SignedJoin = {
   readonly body: KeyringBody
@@ -191,6 +201,12 @@ export interface RecoveryBridge {
   /** Phrase enrollment with the engine-drawn credential id (M3); absent where no phrase surface exists. */
   enrollPhrase?(request: PhraseEnrollBridgeRequest): Promise<EnrollBridgeResult>
 }
+
+/** The bridge members recovery on a fresh device drives; a channel proxy to desktop main implements only these. */
+export type RecoverySessionBridge = Pick<
+  RecoveryBridge,
+  "prfSupported" | "recoverBegin" | "recoverFinish" | "recoverAbort" | "recoverBeginWithPhrase"
+>
 
 /** A row of `GET /v1/sync/entries`: ciphertext-free chain metadata. */
 export type ChainRow = {
