@@ -11,6 +11,6 @@ export { executeBackgroundTask } from "./background-task"
 export { executeSyncTask } from "./sync-task"
 
 export { resolveCategoryExecution } from "./category-resolver"
-export type { CategoryResolutionResult } from "./category-resolver"
+export type { CategoryResolutionResult } from "./category-resolution-result"
 
 export { resolveSubagentExecution } from "./subagent-resolver"

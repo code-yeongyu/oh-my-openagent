@@ -78,7 +78,7 @@ export function LedgerShowcase(): JSX.Element {
               icon={<Eye />}
               name="Plan Reviewer"
               role="Plan review gate"
-              chip="GPT 6 Astra xHigh"
+              chip="GPT 6.2 Astra xHigh"
             />
             <BentoCell
               icon={<Anvil />}
@@ -90,7 +90,7 @@ export function LedgerShowcase(): JSX.Element {
               icon={<Hammer />}
               name="Deep"
               role="Deep autonomous problem-solving"
-              chip="GPT 6 Astra High"
+              chip="GPT 6.2 Astra High"
             />
             <BentoCell
               icon={<BookOpen />}

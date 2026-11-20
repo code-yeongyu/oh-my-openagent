@@ -35,26 +35,6 @@ function expectResolved(
 
 const gpt56CategoryCases = [
   {
-    category: "ultrabrain",
-    modelId: "gpt-5.6-sol",
-    nativeVariant: "max",
-    mixedWinner: { provider: "github-copilot", modelId: "gpt-5.6-sol", variant: "max" },
-    copilotVariant: "max",
-    copilotFallbackEntry: { providers: ["github-copilot"] as string[], model: "gpt-5.6-sol", variant: "max" },
-  },
-  {
-    category: "deep",
-    modelId: "gpt-5.6-sol",
-    nativeVariant: "medium",
-    mixedWinner: { provider: "github-copilot", modelId: "gpt-5.6-sol", variant: "medium" },
-    copilotVariant: "medium",
-    copilotFallbackEntry: {
-      providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"] as string[],
-      model: "gpt-5.6-sol",
-      variant: "medium",
-    },
-  },
-  {
     category: "unspecified-low",
     modelId: "gpt-5.6-sol",
     nativeVariant: "medium",
@@ -468,16 +448,16 @@ describe("builtin category defaults", () => {
     // then: availability gating applies only to the model-gated builtins; any listed id opens the gate
     expect(BUILTIN_CATEGORY_REQUIRES_MODEL).toEqual({
       architect: ["claude-fable-5-2", "claude-fable-5-1"],
-      ultrabrain: ["gpt-6.2-astra", "gpt-6-astra", "gpt-5.6-sol"],
-      "deep-low": [
-        "gpt-6.2-sol",
-        "gpt-6.2-sol-fast",
-        "gpt-6.1-sol",
-        "gpt-6.1-sol-fast",
-        "gpt-5.6-sol-fast",
-        "gpt-5.6-sol",
-      ],
-      "deep-high": ["gpt-6.2-astra", "gpt-6-astra"],
+      ultrabrain: ["gpt-6.2-astra"],
+      "deep-low": ["gpt-6.2-sol"],
+      "deep-high": ["gpt-6.2-astra"],
     })
+
+    // then: only the three GPT deep lanes resolve on exact ids; architect keeps its chain matching
+    expect(defaults.filter((definition) => definition.exactModels === true).map(({ name }) => name)).toEqual([
+      "ultrabrain",
+      "deep-low",
+      "deep-high",
+    ])
   })
 })

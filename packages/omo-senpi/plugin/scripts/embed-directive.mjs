@@ -11,7 +11,7 @@ const sourcePath = resolve(repoRoot, "packages/omo-senpi/skills/ultrawork/SKILL.
 const astraVariantPath = resolve(packageRoot, "skills/ultrawork/references/astra-variant.md")
 const targetPath = resolve(packageRoot, "src/components/ultrawork/generated-directive.ts")
 
-// A marker pair names one block of the baseline directive that the GPT-6 Astra variant replaces.
+// A marker pair names one block of the baseline directive that the GPT-6.2 Astra variant replaces.
 // Marker lines sit alone on their line, so stripping them gives the baseline back byte for byte;
 // the Astra variant swaps each block for the `## <name>` section of astra-variant.md, and an
 // empty section cuts the block. Every block needs a section and every section a block: a stale
