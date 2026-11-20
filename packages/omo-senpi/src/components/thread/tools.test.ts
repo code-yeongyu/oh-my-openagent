@@ -53,11 +53,12 @@ function fixture() {
     const index = sessions.findIndex((entry) => entry.sessionId === sessionId)
     sessions[index] = { ...sessions[index], name }
   })
-  const setModel = mock(async (_sessionId: string, provider: string, modelId: string, _durableId?: string) => ({
-    provider,
-    id: modelId,
-    name: "Selected model",
-  }))
+  let model = { provider: "openai", id: "gpt-previous" }
+  const getState = async () => ({ isStreaming: false, model, thinkingLevel: "off" })
+  const setModel = mock(async (_sessionId: string, provider: string, modelId: string, _durableId?: string) => {
+    model = { provider, id: modelId }
+    return { ...model, name: "Selected model" }
+  })
   const getAvailableModels = mock(async (_sessionId: string) => models)
   const setThinkingLevel = mock(
     async (_sessionId: string, _level: string, _scope?: "session" | "turn", _durableId?: string) => {},
@@ -69,7 +70,7 @@ function fixture() {
     listSessions: async () => sessions,
     openSession: async () => session,
     getMessages: async () => [{ role: "user", content: "hello" }],
-    getState: async () => ({ isStreaming: false }),
+    getState,
     prompt,
     interrupt: async () => ({ interrupted: false }),
     setSessionName,
@@ -86,6 +87,7 @@ function fixture() {
     store: tempStore(),
     sessions,
     models,
+    getState,
     setSessionName,
     setModel,
     getAvailableModels,
@@ -452,7 +454,7 @@ describe("thread session controls", () => {
     expect(f.setModel).not.toHaveBeenCalled()
   })
 
-  test("#14445: set_model reports when the selected model rejects the requested thinking level", async () => {
+  test("#14445: set_model leaves the active model unchanged when the requested thinking level is refused", async () => {
     const f = fixture()
     f.models.splice(1, 1)
     f.setThinkingLevel.mockImplementation(async () => {
@@ -463,6 +465,31 @@ describe("thread session controls", () => {
       kind: "error",
       error: { code: "thinking_level_unsupported", details: { supported: ["off", "high"] } },
     })
+    expect((await f.getState()).model).toEqual({ provider: "openai", id: "gpt-previous" })
+  })
+
+  test("#14445: set_model reports a partial commit when the previous model cannot be restored", async () => {
+    const f = fixture()
+    const setModel = f.setModel.getMockImplementation()
+    f.setModel.mockImplementation(async (session, provider, id, durableId) => {
+      if (id === "gpt-previous") throw new Error("Previous model is no longer available")
+      return setModel(session, provider, id, durableId)
+    })
+    f.setThinkingLevel.mockImplementation(async () => {
+      throw new Error("thinking_level_unsupported:Thinking level max is not supported by the active model.")
+    })
+
+    expect(await runner(f)("thread_set_model", { thread: "peer", model: "openai/gpt-x:max" })).toMatchObject({
+      kind: "error",
+      error: {
+        code: "partial_commit",
+        details: {
+          previous_model: { provider: "openai", id: "gpt-previous" },
+          selected_model: { provider: "openai", id: "gpt-x" },
+        },
+      },
+    })
+    expect((await f.getState()).model).toEqual({ provider: "openai", id: "gpt-x" })
   })
 
   test("set_model reports no match with at most twenty available provider/id values", async () => {
