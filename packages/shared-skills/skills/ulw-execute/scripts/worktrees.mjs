@@ -43,15 +43,37 @@ function isAlive(pid) {
   }
 }
 
-// A lock whose recorded holder is no longer running was left by a crash: clear it instead of waiting it out.
-function clearStaleLock(lock) {
-  let pid
+function lockHolder(lock) {
   try {
-    pid = Number.parseInt(readFileSync(lock, "utf8"), 10)
+    return Number.parseInt(readFileSync(lock, "utf8"), 10)
   } catch {
-    return
+    return Number.NaN
   }
-  if (Number.isInteger(pid) && pid > 0 && !isAlive(pid)) rmSync(lock, { force: true })
+}
+
+function isDead(pid) {
+  return Number.isInteger(pid) && pid > 0 && !isAlive(pid)
+}
+
+// A lock whose recorded holder is no longer running was left by a crash: clear it instead of waiting it out. Only
+// one waiter may clear at a time (it holds the `.break` file), and it re-reads the holder first: another waiter may
+// already have cleared the dead lock and taken a fresh one, which must not be deleted.
+function clearStaleLock(lock) {
+  if (!isDead(lockHolder(lock))) return
+  const breaker = `${lock}.break`
+  let fd
+  try {
+    fd = openSync(breaker, "wx")
+  } catch (error) {
+    if (error.code === "EEXIST") return
+    throw error
+  }
+  try {
+    if (isDead(lockHolder(lock))) rmSync(lock, { force: true })
+  } finally {
+    closeSync(fd)
+    rmSync(breaker, { force: true })
+  }
 }
 
 // Parallel lanes run `add` at the same time: the manifest's read-edit-write holds an exclusive lock file (holding
@@ -88,7 +110,8 @@ function add(repo, { path, branch, base }) {
   if (!path || !branch) throw new Error("add needs --path and --branch")
   const worktree = resolve(path)
   git(repo, ["worktree", "add", "-q", "-b", branch, worktree, ...(base ? [base] : [])])
-  const recordedBase = base ?? git(repo, ["rev-parse", "HEAD"])
+  // The commit the branch starts from, not the --base name: that name moves once the work lands on it.
+  const recordedBase = git(repo, ["rev-parse", `refs/heads/${branch}`])
   withManifestLock(repo, (manifest) => {
     manifest.created.push({ path: worktree, branch, base: recordedBase, created_at: new Date().toISOString() })
   })

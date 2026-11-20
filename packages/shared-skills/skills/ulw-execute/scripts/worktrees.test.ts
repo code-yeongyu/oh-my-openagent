@@ -309,6 +309,30 @@ describe("ulw-execute worktrees helper", () => {
     expect(readFileSync(join(wt, ".env"), "utf8")).toBe("TOKEN=dummy\n")
   })
 
+  test("#given a worktree added with --base <branch name> #when its work lands on that branch by merge commit or fast-forward #then teardown removes it", () => {
+    const repo = fixtureRepo()
+    const merged = join(repo, "..", "wt-base-merge")
+    const forwarded = join(repo, "..", "wt-base-ff")
+    run(repo, "add", "--path", merged, "--branch", "ulw/base-merge", "--base", "main")
+    run(repo, "add", "--path", forwarded, "--branch", "ulw/base-ff", "--base", "main")
+    writeFileSync(join(forwarded, "ff.txt"), "ff\n")
+    git(forwarded, "add", "ff.txt")
+    git(forwarded, "commit", "-qm", "ff")
+    git(repo, "merge", "-q", "--ff-only", "ulw/base-ff")
+    writeFileSync(join(merged, "m.txt"), "m\n")
+    git(merged, "add", "m.txt")
+    git(merged, "commit", "-qm", "m")
+    git(repo, "merge", "-q", "--no-ff", "-m", "merge", "ulw/base-merge")
+
+    const result = run(repo, "teardown")
+
+    expect(result.json.kept).toEqual([])
+    expect(result.json.removed.map((entry: { branch: string }) => entry.branch).sort()).toEqual([
+      "ulw/base-ff",
+      "ulw/base-merge",
+    ])
+  })
+
   test("#given an --into ref that does not exist #when torn down #then it fails instead of keeping everything as not landed", () => {
     const repo = fixtureRepo()
     run(repo, "add", "--path", join(repo, "..", "wt-typo"), "--branch", "ulw/typo")
