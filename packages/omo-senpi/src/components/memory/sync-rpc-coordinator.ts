@@ -1,5 +1,4 @@
 import type {
-  ApprovalProgress,
   SyncAcknowledgeRequest,
   SyncAcknowledgeResponse,
   SyncEnableRequest,
@@ -21,7 +20,6 @@ import type {
   SyncRpcOptions,
 } from "./sync-rpc-ports"
 import {
-  identityOf,
   LOGGABLE_CODE,
   refused,
   RetiredSyncOperation,
@@ -32,7 +30,8 @@ import {
   type CeremonyOperation,
   type Operation,
 } from "./sync-rpc-operation"
-import { recoveryStatusField, runRecover } from "./sync-rpc-recover"
+import { runRecover } from "./sync-rpc-recover"
+import { readSyncStatus } from "./sync-rpc-status"
 
 export function createSyncRpcCoordinator(options: SyncRpcOptions) {
   // The desktop polls status and the pending/devices reads, so a cause is logged once when it starts, not on every poll.
@@ -147,21 +146,6 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
       ? (record.problem ?? refused())
       : { pendingId: record.pendingId ?? "", expiresAt: record.expiresAt, code: record.code, outcome: record.approval }
   const readEnable = (record: Operation): SyncEnableResponse => record.enable ?? unavailable()
-  // A notice that cannot be read is reported as unresolved: never as void, never as saved.
-  const phraseNotice = async (account: SyncRpcAccount) => {
-    const read = options.runtime.phraseNoticeStatus
-    if (read === undefined) return {}
-    try {
-      return await read({
-        pinDir: options.pinDir,
-        account: account.descriptor.accountId,
-        principalId: account.descriptor.syncPrincipalId,
-      })
-    } catch {
-      return { phraseUnresolved: true } as const
-    }
-  }
-
   const start = (record: CeremonyOperation): void => {
     operations.add(record)
     record.done = runSyncRpcOperation(record, options, { current, authority, subscribe, cancel }).finally(() =>
@@ -237,68 +221,20 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
       return progress(previous)
     },
     async status(owner: SyncRpcContext): Promise<SyncStatusResponse> {
-      const binding = lifetime.signal
-      let step: "account" | "identity" | "sync_status" | "recheck" = "account"
-      try {
-        const account = await current(owner)
-        step = "identity"
-        const identity = identityOf(account)
-        step = "sync_status"
-        const sync = await options.syncStatus()
-        step = "recheck"
-        check(owner)
-        binding.throwIfAborted()
-        if (account.signal.aborted || !(await account.isCurrent()))
-          return reportUnavailable("status", "account_not_current", { step })
-        check(owner)
-        lastUnavailable.delete("status")
-        const visible = records().filter((record) => ensureOwned(record, owner) && record.identity === identity)
-        let notice = await phraseNotice(account)
-        check(owner)
-        // Review LOW (#13336 @ 9f9734a8): an unresolved local read may be an enroll/rotate void notice; resolve it
-        // against the verified chain so the notice can show over RPC.
-        const verify = options.runtime.verifiedPhraseNoticeStatus
-        if (notice.phraseUnresolved === true && verify !== undefined) {
-          const verified = await this.read(owner, (ports, current) =>
-            verify({
-              pinDir: options.pinDir,
-              account: current.descriptor.accountId,
-              principalId: current.descriptor.syncPrincipalId,
-              chain: ports.chain,
-            }),
-          )
-          if (!("kind" in verified)) notice = verified
-          check(owner)
-        }
-        const ownEnable = visible.find((record) => record.kind === "enable")?.enable ?? null
-        const recovery = await recoveryStatusField(
+      return readSyncStatus(
+        {
           options,
-          account,
-          <T>(use: (ports: SyncRpcOperation, current: SyncRpcAccount) => Promise<T>) => this.read(owner, use),
-        )
-        check(owner)
-        return {
-          ...(sync === undefined ? {} : { sync }),
-          ...recovery,
-          // Another process (the CLI) holding the ceremony shows as in progress, never as a void phrase.
-          enable: ownEnable ?? (notice.inProgress === true ? { kind: "in_progress" } : null),
-          ...(notice.phraseVoid !== undefined ? { phraseVoid: notice.phraseVoid } : {}),
-          ...(notice.phraseUnresolved === true ? { phraseUnresolved: true } : {}),
-          approvals: visible
-            .filter((record) => record.kind === "approve" && record.expiresAt !== undefined)
-            .map((record): ApprovalProgress => ({
-              pendingId: record.pendingId ?? "",
-              expiresAt: record.expiresAt ?? 0,
-              code: record.code,
-              outcome: record.approval,
-            })),
-        }
-      } catch (error) {
-        return reportUnavailable("status", error instanceof RetiredSyncOperation ? error.code : "status_read_failed", {
-          step,
-          ...syncErrorFields(error),
-        })
-      }
+          binding: lifetime.signal,
+          current,
+          check,
+          visible: (context, identity) =>
+            records().filter((record) => ensureOwned(record, context) && record.identity === identity),
+          read: (context, use) => this.read(context, use),
+          reportUnavailable: (code, fields) => reportUnavailable("status", code, fields),
+          recovered: () => lastUnavailable.delete("status"),
+        },
+        owner,
+      )
     },
     async acknowledge(owner: SyncRpcContext, request: SyncAcknowledgeRequest): Promise<SyncAcknowledgeResponse> {
       const acknowledgePhraseVoid = options.runtime.acknowledgePhraseVoid
