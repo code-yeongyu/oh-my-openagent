@@ -31,10 +31,13 @@ async function leftoverSocket(path: string): Promise<void> {
   )
   cleanups.push(() => child.kill("SIGKILL"))
   const reader = child.stdout.getReader()
+  let timer: ReturnType<typeof setTimeout> | undefined
   const ready = await Promise.race([
     reader.read(),
-    new Promise<never>((_, reject) => setTimeout(() => reject(new Error("waited 10s for the listener")), 10_000)),
-  ])
+    new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error("waited 10s for the listener")), 10_000)
+    }),
+  ]).finally(() => clearTimeout(timer))
   expect(new TextDecoder().decode(ready.value)).toContain("ready")
   child.kill("SIGKILL")
   await child.exited
