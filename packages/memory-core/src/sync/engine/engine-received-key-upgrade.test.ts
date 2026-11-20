@@ -67,7 +67,6 @@ test(
       peer: null,
       space: null,
       account: null,
-      foreign: [],
     }
     await writeJsonFile(join(sync, "state.json"), state)
     const incoming1: IncomingRecord = {

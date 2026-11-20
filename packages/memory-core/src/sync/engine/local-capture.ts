@@ -5,7 +5,6 @@
 // captured item's ops go into one outbox segment as they are captured, so a capture holds an index
 // entry per item, never the whole set's ops (#12286).
 
-import { liveForeign } from "./account-journal"
 import { isSyncItemKey } from "../item"
 import { adoptLandedRenders } from "./apply"
 import { planBatches } from "./batches"
@@ -171,15 +170,11 @@ export async function capture(
   const rewoundJoining = await rewindJoining(deps, journal, incoming)
   const known = await acceptedKeys(deps, journal, "capture", deps.store.keys())
   const knownSet = new Set(known)
-  // Another account's files stay out of this account's chain (#14481): neither captured nor adopted on join.
-  const foreign = await liveForeign(deps, journal)
   const joining = new Set([
     ...rewoundJoining,
-    ...[...incoming].filter((key) => !knownSet.has(key) && files.byKey.has(key) && !foreign.has(key)),
+    ...[...incoming].filter((key) => !knownSet.has(key) && files.byKey.has(key)),
   ])
-  const keys = [...new Set([...known, ...files.byKey.keys()])]
-    .filter((key) => !joining.has(key) && !foreign.has(key))
-    .sort()
+  const keys = [...new Set([...known, ...files.byKey.keys()])].filter((key) => !joining.has(key)).sort()
   const prints = (await journal.state()).held?.prints ?? {}
   const captured: PendingItem[] = []
   const held = new Map<string, string>()
