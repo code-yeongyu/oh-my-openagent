@@ -128,3 +128,14 @@ test("#given an unresolved local phrase read and a verified-chain reader #when s
   expect(status).not.toHaveProperty("phraseUnresolved")
   expect(seen.length).toBe(1)
 })
+
+test("#given the engine refuses phrase creation naming devices to update #when enable answers over RPC #then the device labels reach the wire (per-account phrase gate)", async () => {
+  const f = await setup()
+  const devices = [{ label: "Work MacBook", kind: "desktop", platform: "macos", lastSyncAt: "2026-11-19T10:00:00Z" }]
+  f.runtime.enableSync = async () => ({ kind: "phrase_unavailable", reason: "service-floor-off", devices })
+  expect(await f.call("enable", owner("a").context, { method: "phrase" })).toEqual({
+    kind: "phrase_unavailable",
+    reason: "service-floor-off",
+    devices,
+  })
+})

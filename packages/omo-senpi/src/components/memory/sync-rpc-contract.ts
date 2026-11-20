@@ -78,6 +78,13 @@ export type SyncEnableResponse =
   | {
       readonly kind: "phrase_unavailable"
       readonly reason: "no-surface" | "disabled" | "service-floor-off"
+      /** Devices to update OmO on first, by label only (per-account phrase gate). */
+      readonly devices?: ReadonlyArray<{
+        readonly label: string
+        readonly kind: string
+        readonly platform: string
+        readonly lastSyncAt: string
+      }>
       readonly deviceSyncLeftOn?: true
     }
   | { readonly kind: "cancelled" }
@@ -127,7 +134,7 @@ export interface SyncDevice {
   readonly kind: "desktop" | "cli"
   readonly platform: "macos" | "linux" | "windows"
   readonly createdAt: string
-  readonly lastSeenAt: string
+  readonly lastSyncAt: string
   readonly approximateLocation?: string
   readonly current: boolean
   readonly syncing: boolean

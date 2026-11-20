@@ -274,3 +274,38 @@ test("#given a device already in the chain whose earlier shown phrase was never 
   expect(r.err).toContain("The recovery phrase you saw was not saved to your account. Do not keep it.")
   expect(await phraseMarkerExists(r.f.input.pinDir, r.f.keyring.principal().id)).toBe(true)
 })
+
+const BLOCKERS = [
+  { label: "Work MacBook", kind: "desktop", platform: "macos", last_sync_at: "2026-11-19T10:00:00Z" },
+  { kind: "cli" },
+  { label: "build box", kind: "cli", platform: "linux", last_sync_at: "2026-11-18T10:00:00Z" },
+]
+
+test("#given the service names devices that block phrase keys on its state route #when enable must create a phrase #then it names each device to update first, opens no terminal and writes nothing (per-account phrase gate)", async () => {
+  const terminal = scriptedTerminal()
+  const r = await runEnable({ env: {}, terminal: terminal.open }, undefined, {
+    server: { acceptsPhraseKeys: false, extraState: { phrase_key_blockers: BLOCKERS } },
+    productionFloor: true,
+  })
+  expect(r.exit).toBe(EXIT_UNSUPPORTED_HERE)
+  expect(r.err.filter((line) => line.startsWith("Update OmO"))).toEqual([
+    "Update OmO on Work MacBook first (it is older than 5.1.74), then run `omo sync enable` again.",
+    "Update OmO on build box first (it is older than 5.1.74), then run `omo sync enable` again.",
+  ])
+  expect(terminal.opened()).toBe(0)
+  expect(r.f.entries).toEqual([])
+  expect(r.f.server.switches).toEqual([])
+})
+
+test("#given the service refuses the phrase append naming a device to update #when enable runs the ceremony #then the words are void and stderr names that device (per-account phrase gate)", async () => {
+  const terminal = scriptedTerminal()
+  const r = await runEnable({ env: {}, terminal: terminal.open }, async (f) => {
+    f.server.phrase.accept = false
+    f.server.phrase.detail = { reason: "devices_need_update", devices: [{ ...BLOCKERS[0], lastSyncAt: "x" }] }
+  })
+  expect(r.exit).toBe(EXIT_UNSUPPORTED_HERE)
+  expect(r.err).toContain(
+    "Update OmO on Work MacBook first (it is older than 5.1.74), then run `omo sync enable` again.",
+  )
+  expect(r.f.entries).toEqual([])
+})

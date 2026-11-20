@@ -14,7 +14,7 @@ import { completeAccountChain } from "../genesis/complete.ts"
 import { loadGenesisIntent, storeGenesisIntent, withGenesisLock } from "../genesis/intent-store.ts"
 import { verifyGenesisRequest } from "../genesis/intent-verify.ts"
 import { deletePhraseGenesisMarker, genesisPhraseState } from "../genesis/phrase-marker.ts"
-import { phraseCreationRefusal, type PhraseGate } from "../genesis/phrase-gate.ts"
+import { phraseCreationRefusal, type PhraseGate, type PhraseKeyBlocker } from "../genesis/phrase-gate.ts"
 import type { AccountHttp } from "./http.ts"
 import type { PairingHttp } from "./pairing-http.ts"
 import { principalOf } from "./join.ts"
@@ -42,6 +42,8 @@ export type EnableOutcome =
   | {
       readonly kind: "phrase_unavailable"
       readonly reason: "no-surface" | "disabled" | "service-floor-off"
+      /** Devices the service named that must update OmO before a recovery phrase can be created (per-account phrase gate). */
+      readonly devices?: ReadonlyArray<PhraseKeyBlocker>
       /** Set when withdrawing this device's sync switch after a service refusal failed; it is still on. */
       readonly deviceSyncLeftOn?: true
     }
@@ -132,7 +134,7 @@ async function enableLocked(
       if (genesis?.phraseSupported !== true || genesis.createPhraseGenesis === undefined)
         return { kind: "phrase_unavailable", reason: "no-surface" }
       const refusal = await phraseCreationRefusal(input.phraseGate, input.account, captured.chain)
-      if (refusal !== null) return { kind: "phrase_unavailable", reason: refusal }
+      if (refusal !== null) return { kind: "phrase_unavailable", ...refusal }
       if (!serviceOrigin) throw new GenesisEnableError("missing_configuration")
       return createPhraseGenesis(
         captured,

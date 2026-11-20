@@ -1,7 +1,54 @@
 import type { AccountHttp } from "../account/http.ts"
 
-/** The service's account-scoped client floor (sisyphuslabs/omo-service#1069/#1070) as this device reads it. */
-export type ServiceFloor = "on" | "off" | "unknown"
+/**
+ * A device the service names as blocking phrase keys for this account (per-account phrase gate): it synced recently
+ * without declaring the phrase capability, so it must update first. Labels only, never ids.
+ */
+export interface PhraseKeyBlocker {
+  readonly label: string
+  readonly kind: string
+  readonly platform: string
+  readonly lastSyncAt: string
+}
+
+/**
+ * The service's account-scoped client floor (sisyphuslabs/omo-service#1069/#1070) as this device reads it; an object
+ * is an off floor whose cause is named devices that must update first (#1189).
+ */
+export type ServiceFloor = "on" | "off" | "unknown" | { readonly blockedBy: ReadonlyArray<PhraseKeyBlocker> }
+
+/** A `phrase_keys_not_accepted` refusal's `error.detail` (per-account phrase gate): the devices to update first, else none. */
+export const refusalBlockersOf = (code: string, detail: unknown): ReadonlyArray<PhraseKeyBlocker> =>
+  code === "phrase_keys_not_accepted" &&
+  typeof detail === "object" &&
+  detail !== null &&
+  (detail as Record<string, unknown>)["reason"] === "devices_need_update"
+    ? phraseKeyBlockersOf((detail as Record<string, unknown>)["devices"])
+    : []
+
+/** Why phrase creation was refused, with the devices to update when the service named them. */
+export interface PhraseRefusal {
+  readonly reason: PhraseGateRefusal
+  readonly devices?: ReadonlyArray<PhraseKeyBlocker>
+}
+
+const blockerOf = (value: unknown): PhraseKeyBlocker | null => {
+  if (typeof value !== "object" || value === null) return null
+  const row = value as Record<string, unknown>
+  const label = row["label"]
+  if (typeof label !== "string" || label.length === 0) return null
+  const text = (key: string) => (typeof row[key] === "string" ? (row[key] as string) : "")
+  return {
+    label,
+    kind: text("kind"),
+    platform: text("platform"),
+    lastSyncAt: text("lastSyncAt") || text("last_sync_at"),
+  }
+}
+
+/** An open decoder over the service's blocker list: malformed rows are dropped, anything but an array is none. */
+export const phraseKeyBlockersOf = (value: unknown): ReadonlyArray<PhraseKeyBlocker> =>
+  Array.isArray(value) ? value.map(blockerOf).filter((row): row is PhraseKeyBlocker => row !== null) : []
 
 /**
  * The client-side release gate for creating a recovery-phrase key (contract amendment A1). `enabled` is
@@ -27,7 +74,8 @@ export const readServiceFloor = async (chain: AccountHttp): Promise<ServiceFloor
   try {
     const state = await chain.state()
     if (state === null) return "unknown"
-    return state.acceptsPhraseKeys ? "on" : "off"
+    if (state.acceptsPhraseKeys) return "on"
+    return state.phraseKeyBlockers.length > 0 ? { blockedBy: state.phraseKeyBlockers } : "off"
   } catch {
     return "unknown"
   }
@@ -48,7 +96,12 @@ const floorOf = async (gate: PhraseGate, chain: AccountHttp): Promise<ServiceFlo
   })
   try {
     const answer: unknown = await Promise.race([Promise.resolve().then(() => port(chain)), timeout])
-    return answer === "on" || answer === "off" ? answer : "unknown"
+    if (answer === "on" || answer === "off") return answer
+    if (typeof answer === "object" && answer !== null && "blockedBy" in answer) {
+      const devices = phraseKeyBlockersOf(answer.blockedBy)
+      return devices.length > 0 ? { blockedBy: devices } : "off"
+    }
+    return "unknown"
   } catch {
     return "unknown"
   } finally {
@@ -56,14 +109,17 @@ const floorOf = async (gate: PhraseGate, chain: AccountHttp): Promise<ServiceFlo
   }
 }
 
-/** Fail-closed: no gate, the flag off, or a floor that is not positively "on" all refuse creation. */
+/** Fail-closed: no gate, a disabled gate, or a floor that is not positively "on" all refuse creation. */
 export const phraseCreationRefusal = async (
   gate: PhraseGate | undefined,
   account: string,
   chain: AccountHttp,
-): Promise<PhraseGateRefusal | null> => {
-  if (gate?.enabled !== true) return "disabled"
-  if ((await floorOf(gate, chain)) === "on") return null
+): Promise<PhraseRefusal | null> => {
+  if (gate?.enabled !== true) return { reason: "disabled" }
+  const floor = await floorOf(gate, chain)
+  if (floor === "on") return null
   gate.refused("service-floor-off", account)
-  return "service-floor-off"
+  return typeof floor === "object"
+    ? { reason: "service-floor-off", devices: floor.blockedBy }
+    : { reason: "service-floor-off" }
 }

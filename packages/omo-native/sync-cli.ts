@@ -25,7 +25,12 @@ import type { Command } from "commander"
 
 import { SignInError } from "../omo-opencode/src/cli/service-auth/protocol"
 import { type SyncContext, signedInSyncContext } from "./sync-context"
-import { CREATION_UNAVAILABLE, phraseCreationGuidance, RUN_IT_YOURSELF } from "./sync-creation-guidance"
+import {
+  CREATION_UNAVAILABLE,
+  phraseCreationGuidance,
+  RUN_IT_YOURSELF,
+  updateDeviceFirst,
+} from "./sync-creation-guidance"
 
 export const EXIT_UNSUPPORTED_HERE = 2
 
@@ -186,7 +191,9 @@ async function enable(dependencies: SyncCommandDependencies, context: SyncContex
       dependencies.error(CANCELLED)
       return 1
     case "phrase_unavailable":
-      dependencies.error(phraseCreationGuidance[outcome.reason])
+      if (outcome.devices !== undefined && outcome.devices.length > 0)
+        for (const device of outcome.devices) dependencies.error(updateDeviceFirst(device.label))
+      else dependencies.error(phraseCreationGuidance[outcome.reason])
       return EXIT_UNSUPPORTED_HERE
     case "acknowledge_required":
     case "method_required":

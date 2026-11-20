@@ -1,6 +1,7 @@
 import { z } from "zod"
 import type { AccountHttp, PairingHttp, RevocationView } from "@oh-my-opencode/memory-core/sync-engine"
 import { parseRevocationView } from "@oh-my-opencode/memory-core/sync-account-ports"
+import { phraseKeyBlockersOf, refusalBlockersOf } from "@oh-my-opencode/memory-core/sync-engine"
 import type { SyncDevice } from "@oh-my-opencode/memory-core/sync-engine"
 import {
   decodeRecoveryWraps,
@@ -24,6 +25,7 @@ const stateReply = z.object({
   current_epoch: SyncInteger,
   rotation_pending: z.boolean(),
   accepts_phrase_keys: z.boolean().optional(),
+  phrase_key_blockers: z.unknown().optional(),
 })
 
 type AppendRequest = Parameters<AccountHttp["appendKeys"]>[0]
@@ -48,8 +50,10 @@ export function desktopSyncAccountPorts(
         case "stale_base":
         case "rate_limited":
         case "not_found":
-        case "phrase_keys_not_accepted":
-          return { ok: false as const, reason: error.code }
+        case "phrase_keys_not_accepted": {
+          const devices = refusalBlockersOf(error.code, error.detail)
+          return { ok: false as const, reason: error.code, ...(devices.length > 0 ? { devices } : {}) }
+        }
         default:
           return { ok: false as const, reason: "refused" as const }
       }
@@ -69,6 +73,7 @@ export function desktopSyncAccountPorts(
           currentEpoch: state.current_epoch,
           rotationPending: state.rotation_pending,
           acceptsPhraseKeys: state.accepts_phrase_keys === true,
+          phraseKeyBlockers: phraseKeyBlockersOf(state.phrase_key_blockers),
         }
       },
       appendKeys: (request) => append("appendKeys", request),

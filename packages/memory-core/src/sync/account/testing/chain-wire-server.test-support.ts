@@ -38,7 +38,7 @@ export interface ChainWireServer {
   /** How many `PUT /v1/sync/keys` requests reached the server. */
   readonly keyAppendsReceived: number
   /** omo-service #1069 M1: while false, a keys append carrying a phrase key is refused `phrase_keys_not_accepted`. */
-  readonly phrase: { accept: boolean }
+  readonly phrase: { accept: boolean; detail?: unknown }
   /** The `omo-sync-capabilities` and `omo-contract-version` headers of every request, in order. */
   readonly syncHeaders: ReadonlyArray<{
     readonly path: string
@@ -71,8 +71,8 @@ const memberKeys = (chain: ReadonlyArray<SyncEntry>): Set<string> => {
   return members
 }
 
-const refusal = (status: number, code: string): Response =>
-  Response.json({ error: { code, message: code } }, { status })
+const refusal = (status: number, code: string, detail?: unknown): Response =>
+  Response.json({ error: { code, message: code, ...(detail === undefined ? {} : { detail }) } }, { status })
 
 const chainRow = ({
   seq,
@@ -127,7 +127,7 @@ export function startChainWireServer(
   /** Live confirmation tokens, each bound to the device it was issued for and spent by one switch. */
   const confirmations = new Map<string, string>()
   const switches: string[] = []
-  const phrase = { accept: true }
+  const phrase: { accept: boolean; detail?: unknown } = { accept: true }
   const syncHeaders: { path: string; capabilities: string | null; version: string | null }[] = []
   const hooks: { tamperReveal: ((reveal: Record<string, unknown>) => Record<string, unknown>) | null } = {
     tamperReveal: null,
@@ -366,7 +366,7 @@ export function startChainWireServer(
         // Binding D1: only a record that INTRODUCES a phrase key is refused; a fork resolution re-carrying one is not.
         const introduces = request.record["kind"] === "genesis" || request.record["kind"] === "recovery-key"
         if (!phrase.accept && introduces && JSON.stringify(request.record).includes('"survivable":"phrase"'))
-          return refusal(409, "phrase_keys_not_accepted")
+          return refusal(409, "phrase_keys_not_accepted", phrase.detail)
         const digest = await sha256B64(jcsBytes(request.record))
         if (request.base_seq !== chain.length) return refusal(409, "stale_base")
         const kind = request.record["kind"]

@@ -188,6 +188,49 @@ describe("the desktop account ports for phrase keys (A3 part 2a)", () => {
       reason: "phrase_keys_not_accepted",
     })
   })
+
+  test("#given the service names devices to update #when state is read or a phrase append is refused #then the engine receives their labels and drops malformed rows (per-account phrase gate)", async () => {
+    const device = { label: "Work MacBook", kind: "desktop", platform: "macos", last_sync_at: "2026-11-19T10:00:00Z" }
+    const expected = [{ label: "Work MacBook", kind: "desktop", platform: "macos", lastSyncAt: "2026-11-19T10:00:00Z" }]
+    const stateMain = fakeMain("unsupported", {
+      service: () => ({
+        kind: "json",
+        status: 200,
+        body: { ...STATE, phrase_key_blockers: [device, { kind: "cli" }] },
+      }),
+    })
+    const stateOp = await (await openDesktopSyncAccount(stateMain.wire, "/unused")).forOperation(owner())
+    expect((await stateOp.chain.state())?.phraseKeyBlockers).toEqual(expected)
+    const main = fakeMain("unsupported", {
+      service: () => ({
+        kind: "json",
+        status: 409,
+        body: {
+          error: {
+            code: "phrase_keys_not_accepted",
+            detail: {
+              reason: "devices_need_update",
+              devices: [{ ...device, last_sync_at: undefined, lastSyncAt: "2026-11-19T10:00:00Z" }],
+            },
+          },
+        },
+      }),
+    })
+    const operation = await (await openDesktopSyncAccount(main.wire, "/unused")).forOperation(owner())
+    const request: Parameters<typeof operation.chain.appendKeys>[0] = {
+      record: { kind: "recovery-key", account: "account-1", epoch: 1 },
+      base_seq: 0,
+      link: "l",
+      keyring_link: "k",
+      record_sig: "s",
+      wraps: [],
+    }
+    expect(await operation.chain.appendKeys(request)).toEqual({
+      ok: false,
+      reason: "phrase_keys_not_accepted",
+      devices: expected,
+    })
+  })
 })
 
 describe("turning this device's sync off over the desktop channel (omo #14093)", () => {

@@ -143,7 +143,7 @@ const enrollUnderLock = async (
   if (pending === "unresolved") return { ok: false, reason: "unresolved" }
   if (pending !== null) return { ok: false, reason: "acknowledge-required", phraseVoid: pending }
   const refusal = await phraseCreationRefusal(input.phraseGate, input.account, input.chain)
-  if (refusal !== null) return { ok: false, reason: "phrase-unavailable", why: refusal }
+  if (refusal !== null) return { ok: false, reason: "phrase-unavailable", why: refusal.reason }
   const enrollPhrase = input.bridge.enrollPhrase
   if (enrollPhrase === undefined) return { ok: false, reason: "phrase-unavailable", why: "no-surface" }
   const { authority, head } = served.state
