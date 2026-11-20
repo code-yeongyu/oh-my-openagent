@@ -713,6 +713,8 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         )
       })
       pi.on("session_shutdown", async (event, eventCtx) => {
+        const endedId = durableIdOf(eventCtx)
+        if (endedId !== undefined) alerts.ended(endedId)
         completions.dispose()
         tools.dispose()
         await registrant

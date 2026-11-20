@@ -27,6 +27,8 @@ export type RunAlerts = {
   readonly agentEnd: (durableId: string, event: AgentEndFacts) => void
   /** Never waits for an alert: delivery runs in the background with its own bounded retry. */
   readonly settled: (durableId: string) => void
+  /** The session ended: whatever it still holds (an open streak, an unsettled run end) is dropped. */
+  readonly ended: (durableId: string) => void
 }
 
 type AlertPayload = ErrorStreakEvent & {
@@ -49,7 +51,11 @@ const defaultDelay = (ms: number) =>
 export function createRunAlerts(options: RunAlertsOptions): RunAlerts {
   const lastEnd = new Map<string, RunEnd>()
   let state:
-    | { settings: ResolvedErrorStreakSettings; observe: (id: string, end: RunEnd) => ErrorStreakEvent | undefined }
+    | {
+        settings: ResolvedErrorStreakSettings
+        observe: (id: string, end: RunEnd) => ErrorStreakEvent | undefined
+        forget: (id: string) => void
+      }
     | undefined
   let missingWebhookReported = false
   const delay = options.delay ?? defaultDelay
@@ -62,7 +68,7 @@ export function createRunAlerts(options: RunAlertsOptions): RunAlerts {
         realertMs: settings.realertMs,
         now: options.now,
       })
-      state = { settings, observe: (id, end) => detect.observe(id, end) }
+      state = { settings, observe: (id, end) => detect.observe(id, end), forget: (id) => detect.forget(id) }
     }
     return state
   }
@@ -162,6 +168,10 @@ export function createRunAlerts(options: RunAlertsOptions): RunAlerts {
           `operator alert: ${event.event} for ${durableId} failed: ${(error as Error | null)?.name ?? "error"}`,
         ),
       )
+    },
+    ended: (durableId) => {
+      lastEnd.delete(durableId)
+      state?.forget(durableId)
     },
   }
 }

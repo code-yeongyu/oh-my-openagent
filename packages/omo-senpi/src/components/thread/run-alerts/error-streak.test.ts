@@ -113,6 +113,17 @@ describe("error streak detector (#14430)", () => {
     expect(detector.observe(SEAT, rateLimited)).toMatchObject({ count: 10, aborted: 1 })
   })
 
+  test("#given a session forgotten mid-streak #when it fails again #then it starts a new streak and holds nothing before that", () => {
+    const detector = createErrorStreakDetector({ threshold: 10, realertMs: 60 * MINUTE, now: virtualClock().now })
+    for (let run = 1; run <= 9; run++) detector.observe(SEAT, rateLimited)
+    detector.forget(SEAT)
+
+    expect(detector.observe(SEAT, { kind: "completed" })).toBeUndefined()
+    const afterForget = Array.from({ length: 9 }, () => detector.observe(SEAT, rateLimited))
+    expect(afterForget.filter((event) => event !== undefined)).toEqual([])
+    expect(detector.observe(SEAT, rateLimited)).toMatchObject({ count: 10 })
+  })
+
   test("#given two sessions #when only one keeps failing #then only that one alerts", () => {
     const detector = createErrorStreakDetector({ threshold: 10, realertMs: 60 * MINUTE, now: virtualClock().now })
     const events = []

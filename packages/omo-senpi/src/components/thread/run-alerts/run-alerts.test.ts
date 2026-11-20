@@ -192,7 +192,8 @@ function seatWithAlerts(options: {
       ctx(peer),
     )
   }
-  return { log, posted, failedRun, normalRun, deliveriesTo, sendAsPeer }
+  const shutdown = () => dispatch("session_shutdown", SEAT)
+  return { log, posted, failedRun, normalRun, deliveriesTo, sendAsPeer, shutdown }
 }
 
 const ok = async () => new Response("ok", { status: 200 })
@@ -293,5 +294,20 @@ describe("error-streak alerts through the thread component (#14430)", () => {
 
     expect(await seat.deliveriesTo(DUTY)).toEqual([])
     expect(seat.posted).toEqual([])
+  })
+
+  test("#given a seat that ended its session nine errors into a streak #when the same session id fails ten more times #then the alert's streak starts at the first run after the shutdown", async () => {
+    const seat = seatWithAlerts({ fetch: ok })
+    for (let run = 1; run <= 9; run++) await seat.failedRun()
+    await seat.shutdown()
+    const sent = seat.log.next(/error_streak for dur-seat sent to the webhook/)
+
+    for (let run = 1; run <= 10; run++) await seat.failedRun()
+    await awaitWithinTestBudget(sent, "the error-streak alert after the shutdown")
+
+    // Runs end 15 s apart from 22:00:00: the tenth run, the first after the shutdown, ended at 22:02:30.
+    expect(seat.posted.map((post) => [post.body["event"], post.body["count"], post.body["first_at"]])).toEqual([
+      ["error_streak", 10, Date.parse("2026-11-19T22:02:30.000Z")],
+    ])
   })
 })

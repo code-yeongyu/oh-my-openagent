@@ -99,6 +99,9 @@ export function createErrorStreakDetector(options: ErrorStreakDetectorOptions) {
   })
 
   return {
+    forget(sessionId: string): void {
+      streaks.delete(sessionId)
+    },
     observe(sessionId: string, end: RunEnd): ErrorStreakEvent | undefined {
       const streak = streaks.get(sessionId)
       if (end.kind === "aborted") {
