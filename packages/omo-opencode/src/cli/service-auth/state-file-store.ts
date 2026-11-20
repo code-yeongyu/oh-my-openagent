@@ -12,7 +12,7 @@ import type { SealedStore } from "./keystore"
  * credential, so every read proves it is still private before using it, and a write never leaves a partial or briefly
  * readable file behind. The desktop keeps its own sign-in under the same rules.
  */
-export const ACCOUNT_STATE_DIR = "account-state"
+const ACCOUNT_STATE_DIR = "account-state"
 
 const { O_RDONLY, O_WRONLY, O_CREAT, O_EXCL, O_NOFOLLOW, O_NONBLOCK, O_DIRECTORY } = constants
 const GROUP_OR_WORLD = 0o077
@@ -69,7 +69,7 @@ async function checkDir(dir: string, uid: number): Promise<boolean> {
  * The file's text, null when there is none. It is opened without following a symlink and judged on the open
  * descriptor, so it cannot be swapped between the check and the read; O_NONBLOCK keeps a FIFO from hanging the open.
  */
-export async function readStateFile(dir: string, name: string, uid: number): Promise<string | null> {
+async function readStateFile(dir: string, name: string, uid: number): Promise<string | null> {
   if (!(await checkDir(dir, uid))) return null
   const handle = await open(join(dir, name), O_RDONLY | O_NOFOLLOW | O_NONBLOCK).catch((error: unknown) => {
     const code = errnoCode(error)
@@ -130,7 +130,7 @@ export async function writeStateFile(dir: string, name: string, contents: string
 }
 
 /** A symlink in the file's place is unlinked itself, never followed to its target. */
-export async function removeStateFile(dir: string, name: string): Promise<void> {
+async function removeStateFile(dir: string, name: string): Promise<void> {
   await removeTempLeftovers(dir, name)
   await rm(join(dir, name), { force: true })
 }
