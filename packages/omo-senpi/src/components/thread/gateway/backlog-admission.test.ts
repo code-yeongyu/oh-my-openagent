@@ -9,9 +9,6 @@ import type { GatewayDeliveryResult } from "./types"
 // omo#14428: a busy seat's runtime held 128 follow-ups it had taken but not written; the target backlog cap counted them,
 // so every later send (a steer too) answered queue_full with nothing about why. A fake busy session on the virtual clock.
 
-/** Filling the target cap is 128 real store transactions; bun's 5 s default is too tight on a loaded box. */
-const FULL_BACKLOG_TIMEOUT_MS = 60_000
-
 let harness: GatewayHarness | undefined
 afterEach(async () => {
   await harness?.dispose()
@@ -45,12 +42,21 @@ async function send(
   })
 }
 
+/**
+ * Sends `count` follow-ups to "lead" with its drain held off, then (when it has one) lets one drain pass take them all:
+ * a pass per send would re-reconcile every open row each time.
+ */
 async function fillFollowUps(h: GatewayHarness, sender: HarnessSession, count: number): Promise<void> {
+  const lead = h.get("lead")
+  const registered = lead.drainRegistered
+  lead.drainRegistered = false
   for (let index = 0; index < count; index++) {
     const result = await send(sender, `alert ${index}`)
     if (result.kind !== "ok") throw new Error(`follow-up ${index} refused: ${JSON.stringify(result)}`)
     h.clock.now += 3 * 60_000
   }
+  lead.drainRegistered = registered
+  if (registered) await lead.drain.drain({ reason: "command" })
   await h.quiesce()
 }
 
@@ -59,19 +65,25 @@ describe("omo#14428 target backlog admission", () => {
     const { h, lead, sender } = seat()
     await fillFollowUps(h, sender, TARGET_MAX_MESSAGES)
 
-    const steer = await send(sender, "stop and read this", { mode: "steer", expected_turn_id: lead.runtime.epoch })
+    const steer = await send(sender, "stop and read this", {
+      mode: "steer",
+      expected_turn_id: lead.runtime.epoch,
+    })
     expect(steer).toMatchObject({ kind: "ok", delivery: { kind: "steered" } })
     lead.runtime.toolBoundary()
     await h.quiesce()
 
     if (steer.kind !== "ok") throw new Error("unreachable")
     expect(lead.runtime.transcriptEntries(steer.delivery_id)).toBe(1)
-  }, FULL_BACKLOG_TIMEOUT_MS)
+  })
 
   test("#given steers fill their own reserve #when one more steer is sent #then it is refused queue_full while follow-ups are unaffected", async () => {
     const { h, lead, sender } = seat()
     for (let index = 0; index < STEER_RESERVE_MESSAGES; index++) {
-      const steer = await send(sender, `steer ${index}`, { mode: "steer", expected_turn_id: lead.runtime.epoch })
+      const steer = await send(sender, `steer ${index}`, {
+        mode: "steer",
+        expected_turn_id: lead.runtime.epoch,
+      })
       expect(steer.kind).toBe("ok")
       h.clock.now += 60_000
     }
@@ -106,7 +118,7 @@ describe("omo#14428 target backlog admission", () => {
         },
       },
     })
-  }, FULL_BACKLOG_TIMEOUT_MS)
+  })
 
   test("#given a target whose drain never runs #when its backlog fills #then queue_full says the rows wait in the gateway", async () => {
     const h = (harness = createGatewayHarness())
@@ -118,16 +130,24 @@ describe("omo#14428 target backlog admission", () => {
       kind: "error",
       error: {
         code: "queue_full",
-        details: { held_by_session: 0, waiting_in_gateway: TARGET_MAX_MESSAGES, reason: "session_not_draining" },
+        details: {
+          held_by_session: 0,
+          waiting_in_gateway: TARGET_MAX_MESSAGES,
+          reason: "session_not_draining",
+        },
       },
     })
-  }, FULL_BACKLOG_TIMEOUT_MS)
+  })
 
   test("#given one sender repeats an alert under one collapse key 100 times while the session is busy #then at most one of them is undelivered", async () => {
     const { h, lead, sender } = seat()
     const results: GatewayDeliveryResult[] = []
     for (let index = 0; index < 100; index++) {
-      results.push(await send(sender, `Q unanswered for ${index * 3} min`, { collapse_key: "slack:C1:1700000000.1" }))
+      results.push(
+        await send(sender, `Q unanswered for ${index * 3} min`, {
+          collapse_key: "slack:C1:1700000000.1",
+        }),
+      )
       h.clock.now += 3 * 60_000
     }
     await h.quiesce()
