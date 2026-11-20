@@ -49,6 +49,7 @@ import { consumedSendersOf, threadSendPermission } from "./tools/reply-permissio
 import { otherDevice, replyTargetFailure, replyTargetMismatch } from "./tools/reply-target"
 import { accountDevices } from "./remote/account"
 import { listAcross } from "./remote/lazy-ops"
+import { rowFolder } from "./remote/ports"
 import { locateControl } from "./control/locate"
 import { createThread } from "./control/create"
 import { awaitPromptStart, FIRST_PROMPT_START_RESERVE_MS, FIRST_PROMPT_START_WAIT_MS } from "./control/prompt-start"
@@ -107,8 +108,12 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
   return buildThreadTools(options).tools
 }
 
+/** thread_send as `callerId` with no tool call behind it, through the same wrapper a tool call takes (#14430 operator alerts). */
+export type ThreadSendAs = (callerId: string, args: ThreadSendInput) => Promise<ThreadToolResult>
+
 function buildThreadTools(surface: ThreadToolSurfaceOptions): {
   readonly tools: readonly AnyTool[]
+  readonly sendAs: ThreadSendAs
   readonly dispose: () => void
 } {
   // One ledger of the threads these tools closed on other devices, read by every tool through the remote surface (#14170).
@@ -413,6 +418,16 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         deliver(current, value.thread, value, operationId, callerId),
       ),
   }
+  const sendAs: ThreadSendAs = async (callerId, args) => {
+    const sent = await execute(
+      "thread_send",
+      `send-as:${args.idempotency_key ?? callerId}`,
+      args,
+      { sessionManager: { getSessionId: () => callerId } },
+      async (current, value, operationId, id) => deliver(current, value.thread, value, operationId, id),
+    )
+    return sent.details.result
+  }
   const interrupt: AnyTool = {
     ...metadata("thread_interrupt"),
     parameters: threadToolParamSchemas.thread_interrupt,
@@ -509,6 +524,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         permissionParser: tool.permissionParser ?? threadToolPermission(tool.name, options),
       }),
     ),
+    sendAs,
     dispose,
   }
 
@@ -706,7 +722,7 @@ async function deliverThrough(
         status: "live",
         state: rowState(row),
         ...threadModel(row.model),
-        cwd: escapeForDisplay(row.project),
+        cwd: escapeForDisplay(rowFolder(row)),
         created_at: seen,
         updated_at: seen,
         device: row.device,
@@ -765,7 +781,7 @@ export function registerThreadTools(
   pi: ExtensionToolHost,
   options: ThreadToolSurfaceOptions,
   log: (line: string) => void = () => undefined,
-): { readonly dispose: () => void } {
+): { readonly sendAs: ThreadSendAs; readonly dispose: () => void } {
   const built = buildThreadTools(options)
   // Thread tools run on the loop side of a split session (engine `ToolDefinition.runs`).
   for (const tool of built.tools) pi.registerTool({ ...tool, runs: "brain" })
@@ -774,7 +790,7 @@ export function registerThreadTools(
     registerExtensionTools(host, options, log)
     installMonitorTargetResolution(host, createMonitorTargetResolver(options), options.callerSessionId)
   }
-  return { dispose: built.dispose }
+  return { sendAs: built.sendAs, dispose: built.dispose }
 }
 
 type ConsumedSender = { readonly session_id: string; readonly device?: string }
