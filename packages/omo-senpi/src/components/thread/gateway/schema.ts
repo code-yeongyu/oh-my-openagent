@@ -443,13 +443,14 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
   ],
 
   // v16 (#14312): thread bindings are gone, with the outbox, its consumer cursors and the completion arms that only a
-  // binding fed. One-way: their rows are deleted. `bindings` itself is dropped only when it holds no rows (store-ops.ts
-  // migrate): an extension that kept thread routes on core bindings imports their owners through the read-only
-  // `tx.bindingFor` on its next open (dori-extension#122), so the rows stay until a later step removes the table.
-  // Re-runnable, like every step a rewound store runs again, so the
-  // binding-era `deliveries` columns (`binding_id`, `binding_revision`, `actor_user_id`) stay as unused nullable
-  // columns: SQLite has no DROP COLUMN IF EXISTS, and nothing reads or writes them. It runs with foreign_keys OFF
-  // (store-ops.ts migrate), so an extension table referencing `bindings` keeps its rows.
+  // binding fed. One-way: their rows are deleted. `bindings` itself is dropped only when it holds no rows AND no table
+  // declares a foreign key to it (store-ops.ts dropEmptyBindings): an extension that kept thread routes on core
+  // bindings imports their owners through the read-only `tx.bindingFor` on its next open (dori-extension#122), and an
+  // extension table referencing `bindings` would become unwritable once the table is gone. A kept `bindings` stays until
+  // a later step removes it; that step must repeat both checks. Re-runnable, like every step a rewound store runs
+  // again, so the binding-era `deliveries` columns (`binding_id`, `binding_revision`, `actor_user_id`) stay as unused
+  // nullable columns: SQLite has no DROP COLUMN IF EXISTS, and nothing reads or writes them. It runs with foreign_keys
+  // OFF (store-ops.ts migrate), so dropping the other tables fires no foreign-key action from an extension table.
   [
     "DROP TABLE IF EXISTS completion_arms",
     "DROP TABLE IF EXISTS outbox_cursors",
