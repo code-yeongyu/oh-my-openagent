@@ -161,11 +161,11 @@ Every send is checked against fixed budgets, which no setting raises:
 | Guard | Limit | Answer |
 | --- | --- | --- |
 | Message size | 1 MiB for `send` (with or without `--binding`); 32 KiB for `report` and `answer` text | `message_too_large` |
-| Backlog of one target | 128 undelivered messages or 1 MiB | `queue_full` |
+| Backlog of one target | 128 undelivered messages or 1 MiB; an expired message no longer counts, also while the target is not running | `queue_full`, with `target_running` and `frees_at` (when the oldest queued message expires and frees a slot) |
 | One sender to one target (the loop guard) | bursts of 8, then one every 5 s; a binding sender is keyed by binding and author (`binding:<id>#author:<platform user id>`), or by the binding alone when the message names no author | `pair_loop_guard` with `burst`, `window_ms` and `retry_after_ms` |
 | One causal chain (a message and the messages it caused) | no count limit; each delivery records its hop | - |
 | A send to itself | always refused | `loop_detected` |
-| An undelivered message | expires after 24 hours (or when its binding expires) | the row ends `refused` |
+| An undelivered message | expires after 24 hours (or when its binding expires), whether or not the target is running | the row ends `refused` |
 
 A session may message the session that messaged it, so A to B to A is delivered; answers also flow back through `read`, `report` and `answer`.
 

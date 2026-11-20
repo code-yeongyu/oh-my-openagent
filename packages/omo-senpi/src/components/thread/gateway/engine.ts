@@ -93,6 +93,9 @@ const NEXT_ACTION: Partial<Record<ThreadErrorCode, string>> = {
   invalid_arguments: "Fix the arguments and send again.",
 }
 
+const QUEUE_FULL_NOT_RUNNING =
+  "The target is not running, so nothing takes its queue until it resumes. Resume it, or send again after details.frees_at, when its oldest queued message expires and frees a slot."
+
 function fail(
   code: ThreadErrorCode,
   message: string,
@@ -105,7 +108,9 @@ function fail(
       message,
       code === "pair_loop_guard"
         ? pairLoopGuardNextAction(Number(details?.["retry_after_ms"]))
-        : (NEXT_ACTION[code] ??
+        : code === "queue_full" && details?.["target_running"] === false
+          ? QUEUE_FULL_NOT_RUNNING
+          : (NEXT_ACTION[code] ??
             "Call thread_list (tool.thread_list() in an eval cell) and retry after checking the target."),
       details,
     ),
