@@ -247,4 +247,15 @@ describe("the credential write seam retires the sync pin (#12280)", () => {
     expect(await h.pins()).toEqual({ live: 1, retired: 0 })
     expect(h.logs).toHaveLength(1)
   })
+
+  // #13642 review L1: with no live pin there is nothing left in place, so nothing is reported.
+  test("#given an unreadable stored item and no live pin #when it is forgotten #then it is deleted and nothing is logged", async () => {
+    const home = await temporaryHome()
+    const logs: string[] = []
+    const hook = retireSyncPinOnDiscard({ pinDir: () => join(home, "sync-device"), log: (line) => logs.push(line) })
+    const s = memoryStore(stored, true)
+    await createSession({ api: "https://api.omo.dev", store: s.store, home, beforeKeysDiscarded: hook }).forget()
+    expect(s.current()).toBeNull()
+    expect(logs).toEqual([])
+  })
 })
