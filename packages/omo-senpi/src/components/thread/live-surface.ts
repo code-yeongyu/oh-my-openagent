@@ -140,7 +140,7 @@ export async function requestFrame(
 ): Promise<RpcFrame> {
   return await withRpcSocket(
     socketPath,
-    { connect, secret: options.secret, timeoutMs: options.timeoutMs ?? REQUEST_TIMEOUT_MS },
+    { connect, secret: options.secret, timeoutMs: options.timeoutMs ?? REQUEST_TIMEOUT_MS, readCommand: command.type },
     async (request) => {
       if (options.rpcHost !== true) return await request(command)
       const protocolRequest = command.type === "get_protocol_info" ? command : undefined

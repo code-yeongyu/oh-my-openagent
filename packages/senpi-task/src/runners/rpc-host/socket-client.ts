@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises"
 import { createConnection, type Socket } from "node:net"
 import { win32 } from "node:path"
 import { StringDecoder } from "node:string_decoder"
+import { readRpcDiagnostic } from "./read-rpc-diagnostic"
 import type { RpcObject, RpcRequest } from "./socket-auth"
 
 export { authenticateRpcHost, authRequiredError, RpcIdentityError } from "./socket-auth"
@@ -38,13 +39,21 @@ export async function withRpcSocket<T>(
   endpoint: string,
   options: {
     readonly timeoutMs: number
+    readonly readCommand?: unknown
     readonly secret?: Uint8Array
     readonly connect?: (endpoint: string) => Socket
     readonly listen?: { readonly frame: (frame: RpcObject) => void; readonly closed: (error: Error) => void }
   },
   operation: (request: RpcRequest) => Promise<T>,
 ): Promise<T> {
-  const socket = (options.connect ?? createConnection)(endpoint)
+  const diagnostic = readRpcDiagnostic(options.readCommand)
+  let socket: Socket
+  try {
+    socket = (options.connect ?? createConnection)(endpoint)
+  } catch (error) {
+    diagnostic?.failed(error)
+    throw error
+  }
   const decoder = new StringDecoder("utf8")
   let buffer = ""
   let pending: { id: unknown; resolve: (frame: RpcObject) => void; reject: (error: Error) => void } | undefined
@@ -80,8 +89,10 @@ export async function withRpcSocket<T>(
   socket.once("error", fail)
   socket.once("close", () => fail(new Error("thread RPC connection closed before the response arrived")))
   socket.on("data", (chunk: Buffer) => {
+    diagnostic?.at("response-bytes")
     buffer += decoder.write(chunk)
     for (let newline = buffer.indexOf("\n"); newline >= 0; newline = buffer.indexOf("\n")) {
+      diagnostic?.at("response-frame")
       const line = buffer.slice(0, newline)
       buffer = buffer.slice(newline + 1)
       if (line.trim() === "") continue
@@ -109,6 +120,7 @@ export async function withRpcSocket<T>(
       const id = command.id ?? randomUUID()
       pending = { id, resolve, reject }
       arm(timeoutMs)
+      diagnostic?.at(command.type === options.readCommand ? "request" : "handshake")
       socket.write(`${JSON.stringify({ ...command, id })}\n`)
     })
   }
@@ -118,11 +130,15 @@ export async function withRpcSocket<T>(
       arm(options.timeoutMs)
       socket.once("connect", () => {
         clear()
+        diagnostic?.at("handshake")
         if (options.secret !== undefined) socket.write(Buffer.from(options.secret))
         resolve()
       })
     })
     return await operation(request)
+  } catch (error) {
+    diagnostic?.failed(error)
+    throw error
   } finally {
     clear()
     socket.destroy()
