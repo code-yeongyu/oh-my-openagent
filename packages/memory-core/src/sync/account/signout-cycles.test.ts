@@ -26,36 +26,33 @@ async function chainSeenBy(w: World, device: WorldDevice, token: string) {
   })
 }
 
-test(
-  "#given A and B syncing #when B signs out unconfirmed and signs back in twice, each sign-in revoking the device before it #then the keyring holds only A and the current B, and no earlier B opens the newest epoch",
-  async () => {
-    const w = await revokeWorld()
-    try {
-      const A = await w.engine(w.a)
-      let current = await w.join("b0", 20)
-      const retired: WorldDevice[] = []
-      for (const [cycle, seed] of [21, 22].entries()) {
-        const next = await w.join(`b${cycle + 1}`, seed)
-        expect((await w.call(next, "DELETE", `/v1/devices/${current.serviceDeviceId}`)).status).toBe(204)
-        expect(w.f.server.freeze.pending).toBe(true)
-        await A.write(`written after sign-out ${cycle + 1}`)
-        expect((await A.sync.engine.runCycle()).pushed).toBe(true)
-        expect(w.f.server.freeze.pending).toBe(false)
-        retired.push(current)
-        current = next
-      }
-
-      const chain = await chainSeenBy(w, w.a, w.a.token)
-      const members = [...(chain.state().authority?.members.keys() ?? [])].sort()
-      expect(members).toEqual([w.a.keyring.principal().id, current.keyring.principal().id].sort())
-      const newest = w.batchEpochs().at(-1) ?? 0
-      expect(newest).toBe(3)
-      for (const old of retired) {
-        const leaked = w.f.server.tokenFor(principalOf(old.keyring), `${old.serviceDeviceId}-copy`)
-        expect(await (await chainSeenBy(w, old, leaked)).epochKey(newest)).toBeNull()
-      }
-    } finally {
-      await w.close()
+test("#given A and B syncing #when B signs out unconfirmed and signs back in twice, each sign-in revoking the device before it #then the keyring holds only A and the current B, and no earlier B opens the newest epoch", async () => {
+  const w = await revokeWorld()
+  try {
+    const A = await w.engine(w.a)
+    let current = await w.join("b0", 20)
+    const retired: WorldDevice[] = []
+    for (const [cycle, seed] of [21, 22].entries()) {
+      const next = await w.join(`b${cycle + 1}`, seed)
+      expect((await w.call(next, "DELETE", `/v1/devices/${current.serviceDeviceId}`)).status).toBe(204)
+      expect(w.f.server.freeze.pending).toBe(true)
+      await A.write(`written after sign-out ${cycle + 1}`)
+      expect((await A.sync.engine.runCycle()).pushed).toBe(true)
+      expect(w.f.server.freeze.pending).toBe(false)
+      retired.push(current)
+      current = next
     }
-  },
-)
+
+    const chain = await chainSeenBy(w, w.a, w.a.token)
+    const members = [...(chain.state().authority?.members.keys() ?? [])].sort()
+    expect(members).toEqual([w.a.keyring.principal().id, current.keyring.principal().id].sort())
+    const newest = w.batchEpochs().at(-1) ?? 0
+    expect(newest).toBe(3)
+    for (const old of retired) {
+      const leaked = w.f.server.tokenFor(principalOf(old.keyring), `${old.serviceDeviceId}-copy`)
+      expect(await (await chainSeenBy(w, old, leaked)).epochKey(newest)).toBeNull()
+    }
+  } finally {
+    await w.close()
+  }
+})
