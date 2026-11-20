@@ -110,7 +110,8 @@ export class SyncEngine {
         this.request()
       },
     })
-    this.request()
+    // A (re)start always tries once, even on a device a previous run saw floored (#14483 review L3).
+    this.request("recheck")
   }
 
   async stop(): Promise<void> {
