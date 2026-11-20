@@ -4,7 +4,22 @@ import type { ThreadTranscriptEntry } from "../reader"
 import type { InterruptOutcome } from "./interrupt"
 import type { ModelChoice } from "../tools/model-match"
 import type { ThreadCloseAnswer, ThreadCloseOptions } from "../tools/ports"
-import type { ThreadResultSummary, ThreadSummary, ThreadWaitOutcome } from "../contracts"
+import { threadModel } from "../tools/thread-state"
+import type { ThreadModel, ThreadResultSummary, ThreadSummary, ThreadWaitOutcome } from "../contracts"
+
+export type SessionModelState = {
+  readonly model: ThreadModel
+  readonly thinkingLevel: string
+}
+
+export function sessionModelState(state: {
+  readonly model?: unknown
+  readonly thinkingLevel?: unknown
+}): SessionModelState | undefined {
+  const { thinkingLevel } = state
+  const { model } = threadModel(state.model)
+  return model !== undefined && typeof thinkingLevel === "string" ? { model, thinkingLevel } : undefined
+}
 
 /**
  * One live thread's controls, wherever it is held: the session on this device's endpoint, or the session on another
@@ -32,6 +47,8 @@ export type SessionControl = {
   readonly getAvailableModels: (options?: {
     readonly fresh?: boolean
   }) => Promise<{ readonly models: readonly ModelChoice[]; readonly held: boolean }>
+  /** A fresh `get_state` snapshot of the model and level, for restoring a refused compound switch. */
+  readonly getModelState: () => Promise<SessionModelState | undefined>
   readonly setModel: (provider: string, id: string) => Promise<{ readonly provider: string; readonly id: string }>
   readonly getAvailableThinkingLevels: () => Promise<readonly string[]>
   /**

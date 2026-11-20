@@ -306,17 +306,6 @@ try {
       : "fail",
     JSON.stringify(details),
   )
-  const rejectedMax = await call(tools, "thread_set_model", {
-    thread: threadA,
-    model: "mock/mock-model-fast:max",
-    all_scope: true,
-  })
-  record(
-    "14445-b",
-    "unsupported-max",
-    rejectedMax.kind === "error" && rejectedMax.error.code === "thinking_level_unsupported" ? "pass" : "fail",
-    errorCode(rejectedMax),
-  )
   const max = await call(tools, "thread_set_model", {
     thread: threadA,
     model: "mock/mock-model-deep:max",
@@ -333,6 +322,23 @@ try {
       ? "pass"
       : "fail",
     `result=${max.kind} engineModel=${state.model?.id} engineThinking=${state.thinkingLevel}`,
+  )
+  const rejectedMax = await call(tools, "thread_set_model", {
+    thread: threadA,
+    model: "mock/mock-model-fast:max",
+    all_scope: true,
+  })
+  const afterRefusal = await surface.getState(routingA)
+  record(
+    "14445-b",
+    "unsupported-max",
+    rejectedMax.kind === "error" &&
+      rejectedMax.error.code === "thinking_level_unsupported" &&
+      afterRefusal.model?.id === "mock-model-deep" &&
+      afterRefusal.thinkingLevel === "max"
+      ? "pass"
+      : "fail",
+    `${errorCode(rejectedMax)} engineModel=${afterRefusal.model?.id} engineThinking=${afterRefusal.thinkingLevel}`,
   )
   await call(tools, "thread_set_model", { thread: threadA, model: "mock/mock-model-fast", all_scope: true })
 

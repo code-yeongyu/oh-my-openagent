@@ -12,7 +12,7 @@ import type { ModelChoice } from "../tools/model-match"
 import { REMOTE_GRACEFUL_MAX_WAIT_MS } from "../contracts/fields"
 import { closeLadder, SESSION_GONE, type RecordAnswer } from "./close-ladder"
 import { interruptOver } from "./interrupt"
-import { ControlRefusal, refuse, SESSION_ONLY_THINKING_SCOPE, type SessionControl } from "./port"
+import { ControlRefusal, refuse, sessionModelState, SESSION_ONLY_THINKING_SCOPE, type SessionControl } from "./port"
 import { waitForTurnEnd } from "./wait-settled"
 import { displayedThread } from "./relay-session-host"
 import { threadRow } from "../tools/thread-row"
@@ -116,6 +116,7 @@ export function createRelayControl(
       const outcome = await commandOutcome({ type: "get_available_models" }, options)
       return { models: modelsOf(replyData(outcome.response)["models"]), held: outcome.local === true }
     },
+    getModelState: async () => sessionModelState(await command({ type: "get_state" }, { fresh: true })),
     setModel: async (provider, id) => {
       // `scope: "session"` switches only this session; without it the engine persists the device's default model.
       const reply = await command({ type: "set_model", provider, modelId: id, scope: "session" })

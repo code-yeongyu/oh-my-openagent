@@ -119,7 +119,15 @@ export type ThreadHost = {
     readonly durableSessionId?: string
   }) => Promise<ThreadHostSession>
   readonly getMessages: (sessionId: string) => Promise<readonly ThreadTranscriptEntry[]>
-  readonly getState: (sessionId: string) => Promise<{ readonly isStreaming?: boolean; readonly activeTurnId?: string }>
+  readonly getState: (
+    sessionId: string,
+    durable_session_id?: string,
+  ) => Promise<{
+    readonly isStreaming?: boolean
+    readonly activeTurnId?: string
+    readonly model?: unknown
+    readonly thinkingLevel?: unknown
+  }>
   readonly prompt: (
     sessionId: string,
     message: string,

@@ -471,6 +471,7 @@ describe("thread session controls", () => {
   test("#14445: set_model reports a partial commit when the previous model cannot be restored", async () => {
     const f = fixture()
     const setModel = f.setModel.getMockImplementation()
+    if (setModel === undefined) throw new Error("Fixture must implement setModel")
     f.setModel.mockImplementation(async (session, provider, id, durableId) => {
       if (id === "gpt-previous") throw new Error("Previous model is no longer available")
       return setModel(session, provider, id, durableId)
@@ -490,6 +491,17 @@ describe("thread session controls", () => {
       },
     })
     expect((await f.getState()).model).toEqual({ provider: "openai", id: "gpt-x" })
+  })
+
+  test("#14445: set_model does not apply thinking to the old model when the switch is held", async () => {
+    const f = fixture()
+    f.setModel.mockResolvedValueOnce({ provider: "openai", id: "gpt-x", name: "Selected model" })
+
+    expect(await runner(f)("thread_set_model", { thread: "peer", model: "openai/gpt-x:max" })).toMatchObject({
+      kind: "error",
+      error: { code: "partial_commit", details: { reason: "model_switch_unconfirmed" } },
+    })
+    expect(f.setThinkingLevel).not.toHaveBeenCalled()
   })
 
   test("set_model reports no match with at most twenty available provider/id values", async () => {

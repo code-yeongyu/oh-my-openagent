@@ -73,6 +73,7 @@ export const createRelayControl = (remote: RemoteThreadSurface, row: RemoteSessi
     close: async (options) => await (await built).close(options),
     setName: async (name) => await (await built).setName(name),
     getAvailableModels: async (options) => await (await built).getAvailableModels(options),
+    getModelState: async () => await (await built).getModelState(),
     setModel: async (provider, id) => await (await built).setModel(provider, id),
     getAvailableThinkingLevels: async () => await (await built).getAvailableThinkingLevels(),
     setThinkingLevel: async (level) => await (await built).setThinkingLevel(level),
