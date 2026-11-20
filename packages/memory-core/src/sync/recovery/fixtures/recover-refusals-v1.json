@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "refusals": [
+    "cancelled",
+    "no-prf",
+    "no-user-verification",
+    "not-enrolled",
+    "history-incomplete",
+    "key-mismatch",
+    "countersign-mismatch",
+    "wrap-refused",
+    "wrap-unbound",
+    "recovery-expired",
+    "unavailable",
+    "rp-mismatch",
+    "too-many-attempts"
+  ]
+}

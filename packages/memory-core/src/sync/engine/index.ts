@@ -14,6 +14,17 @@ export {
 export { type ApproveOutcome, approveDevice } from "../account/approve"
 export { type EnableMethod, type EnableOutcome, enableSync } from "../account/enable"
 export { type DisableOutcome, disableSync, isDeviceSyncOff } from "../account/device-switch"
+export { type RecoverSyncInput, type RecoverSyncOutcome, recoverAndTurnOnSync } from "../account/recover-sync"
+export { readRecoveryStatus, type RecoveryMethod, type RecoveryStatus } from "../recovery/membership"
+export type { RecoverRefusalReason } from "../recovery/recover"
+export {
+  RECOVER_REFUSALS,
+  type RecoverBeginResult,
+  type RecoverBridgeResult,
+  type RecoverRefusal,
+  type RecoverySessionBridge,
+} from "../recovery/ports"
+export { createRejectionCounter } from "../crypto/rejection"
 export {
   acknowledgePhraseVoid,
   type AcknowledgeInput,

@@ -5,6 +5,7 @@ import type { PairingHttp } from "./pairing-http"
 import type { SyncOperationAuthority } from "../operation-authority"
 import type { GenesisBridge } from "../genesis/bridge.ts"
 import type { RevocationView } from "./revocation-view.ts"
+import type { RecoverySessionBridge } from "../recovery/ports.ts"
 export type { SyncOperationAuthority } from "../operation-authority"
 
 /** Public selected-account identity. Credentials and private key material have no fields here. */
@@ -12,6 +13,8 @@ export interface DesktopSyncDescriptor {
   readonly genesis: "supported" | "unsupported"
   /** Whether this process owns a protected recovery-phrase surface; the only phrase flag the engine trusts. */
   readonly phraseGenesis?: "supported" | "unsupported"
+  /** Whether this process serves recovery on a fresh device through its protected window (D12); absent means no. */
+  readonly phraseRecover?: "supported" | "unsupported"
   readonly rpId: string | null
   readonly userName: string | null
   readonly serviceOrigin: string
@@ -44,11 +47,16 @@ export interface DesktopSyncOperation {
   readonly pairing: PairingHttp
   /** Bound to this operation's main-issued handle; absent for the CLI source, never on background ports. */
   readonly genesis?: GenesisBridge
+  /**
+   * The recovery bridge bound to this operation's main-issued handle (D12); absent where the descriptor does not
+   * advertise `phraseRecover`. `report` receives the closed code of a reply that did not decode, never the reply.
+   */
+  readonly recovery?: (report: (code: "bridge_result_invalid") => void) => RecoverySessionBridge
   devices(): Promise<readonly SyncDevice[]>
   close(): Promise<void>
 }
 
-export interface DesktopSyncAccount extends Omit<DesktopSyncOperation, "close" | "genesis"> {
+export interface DesktopSyncAccount extends Omit<DesktopSyncOperation, "close" | "genesis" | "recovery"> {
   readonly kind: "desktop"
   readonly descriptor: DesktopSyncDescriptor
   readonly signal: AbortSignal
