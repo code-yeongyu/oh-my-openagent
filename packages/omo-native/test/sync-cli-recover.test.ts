@@ -80,6 +80,7 @@ type RecoverSetup = {
   readonly plain?: boolean
   readonly chain?: Record<string, unknown>
   readonly contexts?: { count: number }
+  readonly setDeviceSync?: (id: string, enabled: boolean) => Promise<void>
 }
 
 const runRecover = async (dependencies: Partial<SyncCommandDependencies>, setup: RecoverSetup = {}) => {
@@ -106,7 +107,9 @@ const runRecover = async (dependencies: Partial<SyncCommandDependencies>, setup:
         },
         pairing: {
           setAccountSync: async (enabled: boolean) => void switches.push(`account ${enabled}`),
-          setDeviceSync: async (id: string, enabled: boolean) => void switches.push(`device ${id} ${enabled}`),
+          setDeviceSync:
+            setup.setDeviceSync ??
+            (async (id: string, enabled: boolean) => void switches.push(`device ${id} ${enabled}`)),
           disableDeviceSync: unused,
           listPending: unused,
           openPending: unused,
@@ -219,4 +222,21 @@ test("#given the enrolled phrase and a rotation append the service refuses #when
   )
   expect(r.exit).toBe(0)
   expect(r.out.join("\n")).toContain("another step is still pending")
+  // #14453 review L1: a read-only join can read, so it turns sync on too.
+  expect(r.switches).toEqual(["account true", "device svc-fresh true"])
+})
+
+test("#given a recovery that succeeds and a device switch the service refuses to turn on #when omo sync recover runs #then it says memory was recovered, names omo sync enable to turn sync on, and exits 1 (#14453 review L2)", async () => {
+  const terminal = typing([ENROLLED.join(" ")])
+  const r = await runRecover(
+    { terminal: terminal.open },
+    {
+      setDeviceSync: async () => {
+        throw new Error("service unavailable")
+      },
+    },
+  )
+  expect(r.exit).toBe(1)
+  expect(r.out).toEqual([])
+  expect(r.err.join("\n")).toContain("`omo sync enable`")
 })

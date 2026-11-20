@@ -246,6 +246,8 @@ const noPasskeys: PasskeyAuthenticator = {
 
 const RECOVER_YOURSELF = "Run `omo sync recover` yourself in a terminal."
 const RECOVERED = "Your memory is recovered on this device and memory sync is on."
+const RECOVERED_SYNC_OFF =
+  "Your memory is recovered on this device, but memory sync could not be turned on. Run `omo sync enable` to turn it on."
 const RECOVERED_READ_ONLY =
   "This device can read your recovered memory, but another step is still pending before it can write. Run `omo sync recover` again later."
 
@@ -277,8 +279,14 @@ async function recover(dependencies: SyncCommandDependencies, context: SyncConte
     if (outcome.ok) {
       // #14453: the service gates every sync read on the account's and this device's switches, as enable sets them.
       const pairing = pairingOperation(context.pairing, context)
-      await pairing.setAccountSync(true)
-      await turnDeviceSyncOn({ ...context, pairing })
+      try {
+        await pairing.setAccountSync(true)
+        await turnDeviceSyncOn({ ...context, pairing })
+      } catch {
+        // The recovery itself landed; only the switches failed, and enable sets them again (review L2).
+        dependencies.error(RECOVERED_SYNC_OFF)
+        return 1
+      }
       dependencies.output(outcome.state === "recovered" ? RECOVERED : RECOVERED_READ_ONLY)
       return 0
     }
