@@ -15,6 +15,8 @@ const fileSchema = z.object({ owed: z.array(owedSchema) })
 type OwedRevoke = z.infer<typeof owedSchema>
 /** Each unconfirmed logout adds one; the oldest go first past this, so the file stays bounded. */
 const MAX_OWED = 20
+/** An owe that names no account and that no sign-in here lists is given up after this, and the user is told. */
+const OWED_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000
 
 const listedSchema = z.object({
   devices: z.array(
@@ -51,19 +53,21 @@ async function writeOwed(path: string, owed: readonly OwedRevoke[]): Promise<voi
   if (owed.length === 0) return rm(path, { force: true })
   await mkdir(dirname(path), { recursive: true, mode: 0o700 })
   const staging = `${path}.${process.pid}.tmp`
-  await writeFile(staging, JSON.stringify({ owed: owed.slice(-MAX_OWED) } satisfies z.infer<typeof fileSchema>), {
-    mode: 0o600,
-  })
+  await writeFile(staging, JSON.stringify({ owed: [...owed] } satisfies z.infer<typeof fileSchema>), { mode: 0o600 })
   await rename(staging, path)
 }
 
-/** Records that `device`'s revoke is owed. Called under the credential lock, before its keys are discarded. */
-export async function oweRevoke(path: string, device: string, account: string | undefined): Promise<void> {
-  const owed = (await readOwed(path)).filter((entry) => entry.device !== device)
-  await writeOwed(path, [
-    ...owed,
+/**
+ * Records that `device`'s revoke is owed. Called under the credential lock, before its keys are discarded. Returns how
+ * many of the oldest owes were dropped to keep the file bounded; the caller reports them.
+ */
+export async function oweRevoke(path: string, device: string, account: string | undefined): Promise<number> {
+  const owed = [
+    ...(await readOwed(path)).filter((entry) => entry.device !== device),
     { device, ...(account === undefined ? {} : { account }), at: new Date().toISOString() },
-  ])
+  ]
+  await writeOwed(path, owed.slice(-MAX_OWED))
+  return Math.max(0, owed.length - MAX_OWED)
 }
 
 type Listed = z.infer<typeof listedSchema>["devices"][number]
@@ -73,8 +77,16 @@ type Listed = z.infer<typeof listedSchema>["devices"][number]
 // ever comes from an omo CLI logout, so it can only name a CLI device of this computer's platform; one naming the
 // desktop app's device, the caller itself, or another platform is not this computer's sign-out: dropped unsent.
 // (Browsers are listed apart, in `browsers`, so an owe naming one is never in `devices`.)
-function judge(entry: OwedRevoke, listed: Listed | undefined, account: string | undefined): "send" | "keep" | "drop" {
-  if (listed === undefined) return entry.account !== undefined && entry.account === account ? "drop" : "keep"
+// An owe that names no account and that no sign-in lists can never be judged; past its lifetime it expires (reported).
+function judge(
+  entry: OwedRevoke,
+  listed: Listed | undefined,
+  account: string | undefined,
+): "send" | "keep" | "drop" | "expire" {
+  if (listed === undefined) {
+    if (entry.account !== undefined) return entry.account === account ? "drop" : "keep"
+    return Date.now() - Date.parse(entry.at) > OWED_LIFETIME_MS ? "expire" : "keep"
+  }
   if (listed.current || listed.kind !== "cli" || listed.platform !== devicePlatform()) return "drop"
   return listed.revokedAt === null ? "send" : "drop"
 }
@@ -88,6 +100,8 @@ export type OwedRevokeOutcome = {
   readonly unsent: number
   /** The codes of lasting refusals; those owes are dropped, and only the Devices page can remove the device. */
   readonly refused: readonly string[]
+  /** Owes given up past their lifetime; only the Devices page can remove those devices. */
+  readonly expired: number
 }
 
 /**
@@ -102,12 +116,13 @@ export async function settleOwedRevokes(options: {
 }): Promise<OwedRevokeOutcome> {
   const { path, signedIn } = options
   const owed = await readOwed(path)
-  if (owed.length === 0) return { unsent: 0, refused: [] }
+  if (owed.length === 0) return { unsent: 0, refused: [], expired: 0 }
   const authorization = { authorization: `Bearer ${signedIn.accessToken}` }
   const listed = parseReply(listedSchema, await options.request("/v1/devices", { headers: authorization })).devices
   const account = accountOfCredentials(signedIn)
   const settled = new Set<string>()
   let unsent = 0
+  let expired = 0
   const refused: string[] = []
   for (const entry of owed) {
     const verdict = judge(
@@ -115,7 +130,8 @@ export async function settleOwedRevokes(options: {
       listed.find((device) => device.id === entry.device),
       account,
     )
-    if (verdict === "drop") settled.add(entry.device)
+    if (verdict === "drop" || verdict === "expire") settled.add(entry.device)
+    if (verdict === "expire") expired++
     if (verdict !== "send") continue
     try {
       await options.request(`/v1/devices/${encodeURIComponent(entry.device)}`, {
@@ -143,5 +159,5 @@ export async function settleOwedRevokes(options: {
         current.filter((entry) => !settled.has(entry.device)),
       )
     })
-  return { unsent, refused }
+  return { unsent, refused, expired }
 }

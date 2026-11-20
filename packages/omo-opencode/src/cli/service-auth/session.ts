@@ -341,7 +341,11 @@ export function createSession(options: {
           `A device this computer signed out of earlier is not revoked yet (${reason}). Remove it from the Devices page of your OmO account; the next omo login also tries again.`,
         )
       await settleOwedRevokes({ path: owedPath, signedIn: value, request, locked }).then(
-        ({ unsent, refused }) => {
+        ({ unsent, refused, expired }) => {
+          if (expired > 0)
+            log(
+              `${expired} device(s) this computer signed out of long ago could not be matched to any account signed in here and will no longer be retried. Remove them from the Devices page of your OmO account.`,
+            )
           if (refused.length > 0)
             log(
               `The service refused to revoke a device this computer signed out of earlier (${refused.join(", ")}). Remove it from the Devices page of your OmO account; omo will not try again.`,
@@ -424,8 +428,22 @@ export function createSession(options: {
             await writeSignedOutMarker(markerPath, current?.device.id ?? null)
             // #12281: an unconfirmed revoke is owed to the next sign-in here, before the keys go, so the device's
             // sync principal still leaves the account keyring through the service's rotation on revoke.
-            if (current !== null && !revoked)
-              await oweRevoke(owedPath, current.device.id, accountOfCredentials(current) ?? account)
+            // The owe is advice for the next sign-in: failing to record it never stops the keys from being discarded.
+            if (current !== null && !revoked) {
+              const device = current.device.id
+              await oweRevoke(owedPath, device, accountOfCredentials(current) ?? account).then(
+                (dropped) => {
+                  if (dropped > 0)
+                    log(
+                      `${dropped} older sign-out(s) this computer could not confirm will no longer be retried. Remove those devices from the Devices page of your OmO account.`,
+                    )
+                },
+                (error: unknown) =>
+                  log(
+                    `This sign-out could not be recorded for retry (${error instanceof Error ? error.message : String(error)}). Remove device ${device} from the Devices page of your OmO account.`,
+                  ),
+              )
+            }
             // A refresh refusal inside this logout already cleared the store (and retired the pin).
             const stored = current === null ? null : await store.read().catch(() => current)
             if (stored !== null)
