@@ -92,7 +92,8 @@ const agentDir = process.env.OMO_CODING_AGENT_DIR ?? process.env.SENPI_CODING_AG
   ?? process.env.PI_CODING_AGENT_DIR ?? join(homedir(), ".omo", "agent")
 const env = {
   ...process.env,
-  SENPI_BRAND: JSON.stringify(brand),
+  // The plugin this launcher prepends with --extension is the engine's own, never a user flag (#14465).
+  SENPI_BRAND: JSON.stringify({ ...brand, extensions: [plugin] }),
   OMO_NATIVE: "1",
   OMO_CODING_AGENT_DIR: agentDir,
   SENPI_CODING_AGENT_DIR: agentDir,
