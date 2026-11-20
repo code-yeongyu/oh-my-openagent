@@ -161,12 +161,14 @@ export function createSession(options: {
    * The account of a sign-in that names none, for a pin it earned before `omo sync` stamped the account on it (#12383):
    * asked of the service with `access` only while a live pin exists. Every discard route reads it the same way.
    */
-  const unstampedAccount = async (current: Credentials, access: string): Promise<string | undefined> =>
-    current.accountId === undefined &&
-    current.owner === undefined &&
-    (await beforeKeysDiscarded.wantsAccount?.()) === true
-      ? accountOf(access)
-      : undefined
+  const unstampedAccount = async (current: Credentials, access: string): Promise<string | undefined> => {
+    if (current.accountId !== undefined || current.owner !== undefined) return undefined
+    if ((await beforeKeysDiscarded.wantsAccount?.()) !== true) return undefined
+    // It runs under the credential lock, so it gets the fix-up's short budget, not the 30 s request timeout: a stalled
+    // service keeps the pin (and the hook reports it) instead of holding up the sign-out.
+    const budget = AbortSignal.timeout(options.machine?.budgetMs ?? DEVICE_FIXUP_BUDGET_MS)
+    return accountOf(access, signal === undefined ? budget : AbortSignal.any([signal, budget]))
+  }
   /**
    * Runs the hook for a principal whose keys are about to be discarded, naming its account when the service can. An
    * expired access token is never sent (the service refuses it, and the call would hold the credential lock): its pin stays.
