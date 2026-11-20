@@ -69,7 +69,7 @@ export class SyncEngine {
   constructor(private readonly deps: EngineDeps) {
     this.journal = new SyncJournal(deps.repo.gitDir)
     this.tracker = new StatusTracker(() => deps.clock.now())
-    this.timers = new EngineTimers(deps.clock)
+    this.timers = new EngineTimers(deps.clock, () => this.stopped)
     this.stream = new StreamState(this.timers, deps.log, () => this.settleAndRequest("always"), POLL_MS)
   }
 
@@ -169,6 +169,7 @@ export class SyncEngine {
         const rerun = this.rerun || this.rerunOnEvent
         this.rerun = false
         this.rerunOnEvent = false
+        // A floored device waits for the paced recheck instead of rerunning (#14483).
         if (this.tracker.updateRequired()) this.recheckLater()
         else if (rerun) this.request()
         // Logged last, once the cycle is settled: nothing the log does can leave it running.

@@ -26,6 +26,22 @@ const INLINE_BATCH_MAX_BYTES = 262_144
 const STREAM_CONNECT_MS = 3_000
 /** A stream that lived this long before the service closed it resumes at once; a shorter one waits STREAM_RETRY_MS. */
 const STREAM_RESUME_MIN_MS = 1_000
+/** How long the event stream waits after a 426 client-floor refusal before it asks again (#14483). */
+const STREAM_FLOOR_RETRY_MS = 15 * 60_000
+
+/** Waits `ms`, or less when the stream is closed, so a long floor wait never outlives its subscription. */
+const pause = (ms: number, signal: AbortSignal): Promise<void> =>
+  new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms)
+    signal.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer)
+        resolve()
+      },
+      { once: true },
+    )
+  })
 
 export class SyncHttpError extends Error {
   override readonly name = "SyncHttpError"
@@ -59,6 +75,8 @@ export interface HttpTransportOptions {
   /** The device's bearer token, read per request so a refresh takes effect. */
   readonly token: () => string | Promise<string>
   readonly fetch?: typeof fetch
+  /** How long the event stream waits after a 426 before it reconnects; tests shorten it. */
+  readonly floorRetryMs?: number
 }
 
 interface WireRow {
@@ -212,10 +230,11 @@ async function streamLoop(
       if (lastEventId !== null) headers["last-event-id"] = lastEventId
       const response = await connectWithin(doFetch, `${options.baseUrl}/v1/me/events`, headers, signal)
       if (response.status === 426) {
-        // The client floor refuses this build until OmO is updated (#14483): stop reconnecting and let the engine's
-        // paced recheck (polling while the stream is down) notice a lifted floor instead of a 5 s reconnect loop.
+        // The client floor refuses this build until OmO is updated (#14483): no 5 s reconnect loop, but a slow retry,
+        // so a floor the service lifts without a client update brings the stream (and an end to polling) back.
         handlers.onConnected(false, await refusalOf(response))
-        return
+        await pause(options.floorRetryMs ?? STREAM_FLOOR_RETRY_MS, signal)
+        continue
       }
       if (!response.ok || response.body === null) cause = await refusalOf(response)
       else {
@@ -241,7 +260,7 @@ async function streamLoop(
       cause = error instanceof ConnectTimeout ? "connect timed out" : error.name
     }
     handlers.onConnected(false, cause)
-    await new Promise((resolve) => setTimeout(resolve, STREAM_RETRY_MS))
+    await pause(STREAM_RETRY_MS, signal)
   }
 }
 
