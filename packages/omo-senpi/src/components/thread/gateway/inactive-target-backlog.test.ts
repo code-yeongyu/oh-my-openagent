@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite"
 import { afterEach, describe, expect, test } from "bun:test"
 import { randomUUID } from "node:crypto"
-import { existsSync } from "node:fs"
+import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { PAIR_BUCKET_REFILL_MS, QUEUED_TTL_MS, RETENTION_SWEEP_INTERVAL_MS, TARGET_MAX_MESSAGES } from "./constants"
@@ -40,12 +40,40 @@ function summary(result: GatewayDeliveryResult): string {
   return result.kind === "ok" ? result.delivery.kind : `error:${result.error.code}`
 }
 
+/**
+ * Writes `count` queued follow-ups from A to `to`, one second apart, in one transaction, each with its inbox marker, as
+ * an enqueue leaves them. Only the sends a test asserts on go through the engine.
+ */
 async function fill(h: GatewayHarness, to: string, count: number): Promise<string[]> {
-  const ids: string[] = []
-  for (let index = 0; index < count; index++) {
-    const result = await send(h, to, `line ${index}`)
-    if (result.kind !== "ok") throw new Error(`fill ${index}: ${JSON.stringify(result)}`)
-    ids.push(result.delivery_id)
+  await rows(h, to)
+  const inbox = gatewayInboxDirectory(h.agentDir, to)
+  mkdirSync(inbox, { recursive: true, mode: 0o700 })
+  const ids = Array.from({ length: count }, () => randomUUID())
+  const db = new Database(gatewayDatabasePath(h.agentDir))
+  try {
+    const insert = db.prepare(
+      "INSERT INTO deliveries (delivery_id, target_durable_id, seq, sender, envelope, body, bytes, mode_requested, state, root_id, hop, created_at, updated_at, expires_at) VALUES (?, ?, ?, 'session:A', ?, ?, ?, 'follow_up', 'queued', 'root-seeded', 1, ?, ?, ?)",
+    )
+    db.transaction(() => {
+      ids.forEach((id, index) => {
+        h.clock.now += 1_000
+        const body = `line ${index}`
+        const envelope = {
+          provenance: { workspace: "w", project: "p" },
+          origin: { session: "A" },
+          actor: "A",
+          via: [],
+          root_id: "root-seeded",
+          hop: 1,
+          delivery_id: id,
+        }
+        const at = h.clock.now
+        insert.run(id, to, index + 1, JSON.stringify(envelope), body, body.length, at, at, at + QUEUED_TTL_MS)
+        writeFileSync(join(inbox, id), "", { mode: 0o600 })
+      })
+    })()
+  } finally {
+    db.close()
   }
   return ids
 }
@@ -97,7 +125,7 @@ describe("a target that is not running", () => {
     expect(summary(refused)).toBe("error:queue_full")
     if (refused.kind !== "error") throw new Error("expected a refusal")
     expect(refused.error.details).toMatchObject({ target_running: false, frees_at: first?.expires_at })
-  }, 30_000)
+  })
 
   test("#given a full backlog #when its oldest row passes the queued TTL #then that row is refused expired, one send is accepted, and the next is refused again", async () => {
     const h = open()
@@ -113,7 +141,7 @@ describe("a target that is not running", () => {
     expect(after.find((row) => row.delivery_id === ids[0])).toMatchObject({ state: "refused", reason: "expired" })
     expect(after.filter((row) => row.state === "queued")).toHaveLength(TARGET_MAX_MESSAGES)
     expect(existsSync(join(gatewayInboxDirectory(h.agentDir, "T"), ids[0] as string))).toBe(false)
-  }, 30_000)
+  })
 
   test("#given rows a runtime took and then died holding #when they pass the queued TTL #then they stop counting and stay for the target's own reconcile", async () => {
     const h = open()
@@ -127,7 +155,7 @@ describe("a target that is not running", () => {
     const states = (await rows(h, "T")).map((row) => row.state)
     expect(states.filter((state) => state === "admitted")).toHaveLength(TARGET_MAX_MESSAGES)
     expect(states.filter((state) => state === "queued")).toHaveLength(1)
-  }, 30_000)
+  })
 
   test("#given rows a live runtime still holds #when they pass the queued TTL #then they keep counting, because that runtime can still write them", async () => {
     const h = open()
@@ -137,7 +165,7 @@ describe("a target that is not running", () => {
     h.clock.now += QUEUED_TTL_MS
 
     expect(summary(await send(h, "T", "after the TTL"))).toBe("error:queue_full")
-  }, 30_000)
+  })
 
   test("#given a full backlog whose only expired row is an intake row #when a send arrives #then that row stops counting but stays queued, because only the target's reconcile can tell whether it already reached the transcript", async () => {
     const h = open()
@@ -153,7 +181,7 @@ describe("a target that is not running", () => {
 
     expect((await rows(h, "T")).find((row) => row.delivery_id === intake)).toMatchObject({ state: "queued" })
     expect(existsSync(join(gatewayInboxDirectory(h.agentDir, "T"), intake))).toBe(true)
-  }, 30_000)
+  })
 
   test("#given queued rows past their TTL and no further send to that target #when the retention sweep runs on another write #then they are refused expired and their inbox markers are gone", async () => {
     const h = open()
@@ -166,5 +194,5 @@ describe("a target that is not running", () => {
     for (const row of (await rows(h, "T")).filter((found) => ids.includes(found.delivery_id)))
       expect(row).toMatchObject({ state: "refused", reason: "expired" })
     for (const id of ids) expect(existsSync(join(gatewayInboxDirectory(h.agentDir, "T"), id))).toBe(false)
-  }, 30_000)
+  })
 })
