@@ -1,6 +1,6 @@
 import { lstat } from "node:fs/promises"
-import { createConnection } from "node:net"
 
+import { probeSocket } from "../senpi-task/src/runners/rpc-host/busy-host"
 import { resolveTaskHostSocket } from "../senpi-task/src/runners/rpc-host/daemon-contract"
 import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
 
@@ -20,33 +20,6 @@ export type EngineSyncRead =
   /** The socket could not be checked; `reason` names why. */
   | { readonly kind: "unreadable"; readonly reason: string }
 
-const CONNECT_MS = 2_000
-
-// Only "nobody listens" means no engine; a permission error or a host that does not answer is reported as such.
-const NOBODY_LISTENS = new Set(["ECONNREFUSED", "ENOENT"])
-
-const probe = (socket: string): Promise<EngineSyncRead> =>
-  new Promise((resolve) => {
-    const connection = createConnection({ path: socket })
-    const done = (answer: EngineSyncRead) => {
-      clearTimeout(timer)
-      connection.destroy()
-      resolve(answer)
-    }
-    const timer = setTimeout(
-      () => done({ kind: "unreadable", reason: `the engine host did not answer within ${CONNECT_MS / 1000}s` }),
-      CONNECT_MS,
-    )
-    connection.once("connect", () => done({ kind: "running" }))
-    connection.once("error", (error: NodeJS.ErrnoException) =>
-      done(
-        error.code !== undefined && NOBODY_LISTENS.has(error.code)
-          ? { kind: "no_engine" }
-          : { kind: "unreadable", reason: error.message },
-      ),
-    )
-  })
-
 export async function readEngineSyncStatus(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): Promise<EngineSyncRead> {
@@ -58,5 +31,13 @@ export async function readEngineSyncStatus(
     if (error instanceof Error && "code" in error && error.code === "ENOENT") return { kind: "no_engine" }
     return { kind: "unreadable", reason: error instanceof Error ? error.message : "the socket could not be read" }
   }
-  return probe(socket)
+  const probe = await probeSocket(socket)
+  switch (probe.kind) {
+    case "accepts":
+      return { kind: "running" }
+    case "refused":
+      return { kind: "no_engine" }
+    case "unknown":
+      return { kind: "unreadable", reason: `the engine host could not be checked: ${probe.reason}` }
+  }
 }
