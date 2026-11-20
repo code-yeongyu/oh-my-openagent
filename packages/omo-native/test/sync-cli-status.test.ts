@@ -9,7 +9,7 @@ import { Command } from "commander"
 import { temporaryHome } from "../../omo-opencode/src/cli/service-auth/test-support"
 import { configureSyncCommands } from "../sync-cli"
 import type { SyncContext } from "../sync-context"
-import { type EngineSyncRead, parseEngineAnswer } from "../sync-engine-status"
+import { type EngineSyncRead, parseEngineAnswer, readEngineSyncStatus } from "../sync-engine-status"
 
 const initialExitCode = process.exitCode
 afterEach(() => {
@@ -179,6 +179,22 @@ describe("omo sync status", () => {
     expect(out).toContain("Devices: could not be read (service answered 503).")
     expect(out).toContain("Engine: running, but it has no open session to read sync status from.")
   })
+
+  test.skipIf(process.platform === "win32")(
+    "the operator socket decides no_engine: absent, or a leftover file nobody listens on",
+    async () => {
+      // given an agent dir with no socket, then one with a stale non-socket file at the socket path
+      const home = await temporaryHome()
+      const socket = `${home}/rpc.sock`
+      // when the engine is read through that socket
+      const absent = await readEngineSyncStatus({ OMO_CODING_AGENT_DIR: home, OMO_RPC_SOCKET: socket })
+      await Bun.write(socket, "")
+      const stale = await readEngineSyncStatus({ OMO_CODING_AGENT_DIR: home, OMO_RPC_SOCKET: socket })
+      // then both report that no engine is running
+      expect(absent).toEqual({ kind: "no_engine" })
+      expect(stale).toEqual({ kind: "no_engine" })
+    },
+  )
 
   test("an engine answer of the wrong shape is unreadable, not a crash", () => {
     expect(parseEngineAnswer({ sync: { state: "exploded" } }).kind).toBe("unreadable")
