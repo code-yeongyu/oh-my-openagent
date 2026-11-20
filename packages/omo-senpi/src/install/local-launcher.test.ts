@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -24,6 +24,55 @@ const BASE = {
 }
 
 describe("local omo launcher", () => {
+  describe("#given a umask of 0002 (#12716)", () => {
+    // Runs the generated launcher for real: a stub engine stands in for senpi, so the launcher's
+    // own agent-dir step is the only thing that can create or change the directory.
+    async function launchUnderUmask0002(home: string): Promise<number> {
+      const stub = join(home, "stub-cli.mjs")
+      writeFileSync(stub, "process.exit(0)\n")
+      const launcher = join(home, "omo.mjs")
+      writeFileSync(launcher, renderLocalLauncher({ ...BASE, senpiCliPath: stub }))
+      const previous = process.umask(0o002)
+      let child: ReturnType<typeof Bun.spawn>
+      try {
+        child = Bun.spawn(["node", launcher, "--version"], {
+          env: { PATH: process.env.PATH, HOME: home, USERPROFILE: home },
+          stdin: "ignore", stdout: "ignore", stderr: "ignore",
+        })
+      } finally {
+        process.umask(previous)
+      }
+      return await child.exited
+    }
+
+    describe("#when the launcher starts on a fresh home", () => {
+      test.skipIf(process.platform === "win32")("#then it creates ~/.omo/agent owner-only before the engine runs", async () => {
+        const home = makeHome()
+        try {
+          expect(await launchUnderUmask0002(home)).toBe(0)
+          expect(statSync(join(home, ".omo", "agent")).mode & 0o777).toBe(0o700)
+        } finally {
+          rmSync(home, { recursive: true, force: true })
+        }
+      })
+    })
+
+    describe("#when an earlier run left ~/.omo/agent group-writable", () => {
+      test.skipIf(process.platform === "win32")("#then it removes the group/world write bits", async () => {
+        const home = makeHome()
+        try {
+          const agentDir = join(home, ".omo", "agent")
+          mkdirSync(agentDir, { recursive: true })
+          chmodSync(agentDir, 0o775)
+          expect(await launchUnderUmask0002(home)).toBe(0)
+          expect(statSync(agentDir).mode & 0o777).toBe(0o755)
+        } finally {
+          rmSync(home, { recursive: true, force: true })
+        }
+      })
+    })
+  })
+
   describe("#given a sibling-store install", () => {
     describe("#when the launcher is rendered", () => {
       test("#then it hands the engine the same product identity as the published launcher", () => {
