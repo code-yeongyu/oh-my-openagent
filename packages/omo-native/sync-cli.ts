@@ -6,7 +6,9 @@ import {
   disableSync,
   enableSync,
   joinAccount,
+  turnDeviceSyncOn,
 } from "../memory-core/src/sync/account/index.ts"
+import { pairingOperation } from "../memory-core/src/sync/account/operation-ports.ts"
 import { acknowledgePhraseVoid, type PhraseVoidNotice } from "../memory-core/src/sync/account/phrase-notice.ts"
 import { createRejectionCounter } from "../memory-core/src/sync/crypto/rejection.ts"
 import { createRecoveryBridge } from "../memory-core/src/sync/recovery/bridge.ts"
@@ -273,6 +275,10 @@ async function recover(dependencies: SyncCommandDependencies, context: SyncConte
       method: "phrase",
     })
     if (outcome.ok) {
+      // #14453: the service gates every sync read on the account's and this device's switches, as enable sets them.
+      const pairing = pairingOperation(context.pairing, context)
+      await pairing.setAccountSync(true)
+      await turnDeviceSyncOn({ ...context, pairing })
       dependencies.output(outcome.state === "recovered" ? RECOVERED : RECOVERED_READ_ONLY)
       return 0
     }
