@@ -1,5 +1,7 @@
 import type { CategoryConfig } from "../../config/schema"
 import type { BuiltinCategoryDefinition } from "./builtin-category-definition"
+import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
+import { transformModelForProvider } from "../../shared/provider-model-id-transform"
 import { GOOGLE_CATEGORIES } from "./google-categories"
 import { KIMI_CATEGORIES } from "./kimi-categories"
 import { OPENAI_CATEGORIES } from "./openai-categories"
@@ -34,8 +36,9 @@ export const CATEGORY_PROMPT_APPEND_RESOLVERS: Record<string, (model: string | u
 
 // Gate models mirrored from senpi-task's builtins.ts requiresModel plumbing: CATEGORY_MODEL_REQUIREMENTS
 // (model-core) wins when it carries its own requiresModel; this record covers builtin categories whose
-// gate is declared only on the definition (deep). A gate lists every id that opens the category; one
-// present id is enough, so deep stays available on a registry carrying either GPT flagship.
+// gate is declared only on the definition. A gate lists every id that opens the category; one present
+// id is enough. ultrabrain and deep-high gate on gpt-6.2-astra alone and deep-low on gpt-6.2-sol alone
+// (#14155), so a registry without a lane's exact model never falls through to an older or Fast model.
 export const BUILTIN_CATEGORY_REQUIRES_MODEL: Record<string, readonly string[]> = Object.fromEntries(
   BUILTIN_CATEGORIES.filter((definition) => definition.requiresModel !== undefined).map((definition) => [
     definition.name,
@@ -49,4 +52,27 @@ export function builtinCategoryGateModels(
 ): readonly string[] {
   if (requirementGateModel !== undefined) return [requirementGateModel]
   return BUILTIN_CATEGORY_REQUIRES_MODEL[categoryName] ?? []
+}
+
+// The live registry models (`provider/id`) through which a provider this gated category's chain lists
+// serves a gate model, spelled exactly; undefined for an ungated category. Builtin resolution sees only
+// this set, because delegate-core matches a default or rung id by substring and would otherwise let
+// `gpt-6.2-sol` select `gpt-6.2-sol-fast` (#14155).
+export function categoryGateServedModels(
+  categoryName: string,
+  availableModels: ReadonlySet<string>,
+): Set<string> | undefined {
+  const requirement = CATEGORY_MODEL_REQUIREMENTS[categoryName]
+  const gateModels = builtinCategoryGateModels(categoryName, requirement?.requiresModel)
+  if (gateModels.length === 0) return undefined
+  const chainProviders = requirement?.fallbackChain.flatMap((rung) => rung.providers) ?? []
+  return new Set(
+    gateModels.flatMap((gateModel) =>
+      chainProviders.flatMap((provider) =>
+        [`${provider}/${gateModel}`, `${provider}/${transformModelForProvider(provider, gateModel)}`].filter((id) =>
+          availableModels.has(id),
+        ),
+      ),
+    ),
+  )
 }
