@@ -34,6 +34,8 @@ export interface SyncContext {
    * built from: a logout or a different sign-in in another process retires the operation (#12303).
    */
   readonly authority: SyncOperationAuthority
+  /** The account's `GET /v1/devices` answer, unparsed; `omo sync status` reads it at its own boundary. */
+  readonly listDevices?: () => Promise<unknown>
 }
 
 export interface SyncContextOptions {
@@ -80,7 +82,11 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
     if (current !== null && current.device.id === credentials.device.id && current.accountId === undefined)
       await store.write({ ...current, accountId: account })
   })
-  const http = { baseUrl: api, token, ...(options.fetch === undefined ? {} : { fetch: options.fetch }) }
+  const http = {
+    baseUrl: api,
+    token,
+    ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
+  }
   const retired = new AbortController()
   const captured = (current: Credentials | null) =>
     current !== null &&
@@ -114,5 +120,12 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
     chain: createAccountHttp(http),
     pairing: createPairingHttp(http),
     authority,
+    listDevices: async () => {
+      const response = await doFetch(`${api}/v1/devices`, {
+        headers: syncRequestHeaders(await token()),
+      })
+      if (!response.ok) throw new ApiRefusal("unknown", response.status)
+      return response.json()
+    },
   }
 }
