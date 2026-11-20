@@ -113,9 +113,9 @@ interface LocalAssistantMessageEventStream extends AsyncIterable<LocalStreamEven
   result(): Promise<AssistantMessage>
 }
 
-// A second id that the Astra detectors recognize (`omo-mock/gpt-6-astra`), so a live driver can
-// prove which ultrawork directive a GPT-6 Astra receiver gets without a real OpenAI route.
-const ASTRA_MOCK_MODEL_ID = "gpt-6-astra"
+// A second id that the Astra detectors recognize (`omo-mock/gpt-6.2-astra`), so a live driver can
+// prove which ultrawork directive a GPT-6.2 Astra receiver gets without a real OpenAI route.
+const ASTRA_MOCK_MODEL_ID = "gpt-6.2-astra"
 
 const model = {
   id: "mock-1",
@@ -136,7 +136,7 @@ export default function registerMockProvider(pi: ExtensionAPI): void {
     baseUrl: "file://mock-provider",
     apiKey: "mock",
     api: "openai-completions",
-    models: [model, { ...model, id: ASTRA_MOCK_MODEL_ID, name: "Mock GPT-6 Astra" }],
+    models: [model, { ...model, id: ASTRA_MOCK_MODEL_ID, name: "Mock GPT-6.2 Astra" }],
     streamSimple(streamModel: Model<Api>, context: Context, options?: SimpleStreamOptions) {
       return streamMockResponse(streamModel, context, options)
     },

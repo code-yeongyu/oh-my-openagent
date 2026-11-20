@@ -236,7 +236,7 @@ test("#given test command override #when running check #then records state and l
       toVersion: "1.0.1",
     },
   ])
-  assert.match(await readFile(join(env.CODEX_HOME, "config.toml"), "utf8"), /model = "gpt-6-astra"/)
+  assert.match(await readFile(join(env.CODEX_HOME, "config.toml"), "utf8"), /model = "gpt-6.2-astra"/)
 })
 
 test("#given failed waited update #when retry window passes #then next update is not blocked by success throttle", async () => {
@@ -776,7 +776,7 @@ test("#given throttled updater and stale Codex config #when running check #then 
   const content = await readFile(join(codexHome, "config.toml"), "utf8")
   assert.equal(result.started, false)
   assert.equal(result.reason, "throttled")
-  assert.match(content, /model = "gpt-6-astra"/)
+  assert.match(content, /model = "gpt-6.2-astra"/)
   assert.match(content, /model_context_window = 600000/)
   assert.match(content, /model_reasoning_effort = "high"/)
   assert.match(content, /plan_mode_reasoning_effort = "xhigh"/)

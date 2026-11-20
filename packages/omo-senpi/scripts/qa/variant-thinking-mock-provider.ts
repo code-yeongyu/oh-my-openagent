@@ -25,7 +25,7 @@ type TaskE2EExtensionAPI = Parameters<typeof registerTaskE2eMockProvider>[0]
 type MockProvider = Parameters<TaskE2EExtensionAPI["registerProvider"]>[1]
 type MockModel = MockProvider["models"][number]
 
-// One model per curated chain head (fallback-chains.ts): plan-reviewer lands on its `gpt-6-astra`
+// One model per curated chain head (fallback-chains.ts): plan-reviewer lands on its `gpt-6.2-astra`
 // xhigh rung and plan-consultant on its `gpt-5.6-sol` medium rung through cross-provider chain
 // matching, without impersonating a builtin provider id (senpi merges a builtin's real baseUrl
 // over any such registration).
@@ -48,7 +48,7 @@ function reasoningModel(id: string, name: string): ReasoningMockModel {
 
 const FALLBACK_MODELS: readonly ReasoningMockModel[] = [
   reasoningModel("gpt-5.6-sol", "Mock Sol"),
-  reasoningModel("gpt-6-astra", "Mock Astra"),
+  reasoningModel("gpt-6.2-astra", "Mock Astra"),
 ]
 
 export default async function registerVariantThinkingMockProvider(pi: TaskE2EExtensionAPI): Promise<void> {
