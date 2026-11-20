@@ -217,7 +217,8 @@ describe("the credential write seam retires the sync pin (#12280)", () => {
     expect(await h.pins()).toEqual({ live: 0, retired: 1 })
   })
 
-  test("#given a legacy sign-in with no account, a live pin and an expired access token #when it is forgotten #then no request is made, it is deleted, and its pin is kept", async () => {
+  // #13662: the kept pin is reported with the command that clears it (the token the CLI dispatches on).
+  test("#given a legacy sign-in with no account, a live pin and an expired access token #when it is forgotten #then no request is made, it is deleted, its pin is kept, and the retire-sync command is named", async () => {
     const h = await pinnedHome()
     const calls: string[] = []
     const api = fakeApi((request) => {
@@ -229,6 +230,8 @@ describe("the credential write seam retires the sync pin (#12280)", () => {
     expect(s.current()).toBeNull()
     expect(calls).toEqual([])
     expect(await h.pins()).toEqual({ live: 1, retired: 0 })
+    expect(h.logs).toHaveLength(1)
+    expect(h.logs[0]).toContain("omo account retire-sync --account")
   })
 
   test("#given an unreadable stored item #when it is forgotten #then it is still deleted, its pin is kept, and one line is logged", async () => {
