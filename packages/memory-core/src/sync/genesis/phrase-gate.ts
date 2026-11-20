@@ -36,10 +36,13 @@ export interface PhraseRefusal {
 const MAX_BLOCKERS = 20
 const MAX_FIELD_CHARS = 120
 
-// Service-supplied text reaches a terminal: control characters (escape sequences included) are dropped.
+// Service-supplied text reaches a terminal: control characters (escape sequences included), bidi overrides and
+// isolates, zero-width and other invisible format characters are dropped, and the cap counts code points so a
+// surrogate pair is never cut in half.
 // biome-ignore lint/suspicious/noControlCharactersInRegex: the class strips exactly the control characters
-const CONTROL = /[\u0000-\u001f\u007f-\u009f]/g
-const clean = (value: string): string => value.replace(CONTROL, "").slice(0, MAX_FIELD_CHARS)
+const UNSAFE =
+  /[\u0000-\u001f\u007f-\u009f\u00ad\u061c\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\ufff9-\ufffb]/g
+const clean = (value: string): string => Array.from(value.replace(UNSAFE, "")).slice(0, MAX_FIELD_CHARS).join("")
 
 const blockerOf = (value: unknown): PhraseKeyBlocker | null => {
   if (typeof value !== "object" || value === null) return null
@@ -103,7 +106,7 @@ export const readServiceFloor = async (chain: AccountHttp): Promise<ServiceFloor
  * timeout or answers anything but "on" | "off" | "unknown" reads as unknown. With no port the answer is
  * unknown: production wires `readServiceFloor` only after the A1 delta conditions hold.
  */
-const floorOf = async (gate: PhraseGate, chain: AccountHttp): Promise<ServiceFloor> => {
+export const boundedServiceFloor = async (gate: PhraseGate, chain: AccountHttp): Promise<ServiceFloor> => {
   const port = gate.serviceFloor
   if (port === undefined) return "unknown"
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -133,7 +136,7 @@ export const phraseCreationRefusal = async (
   chain: AccountHttp,
 ): Promise<PhraseRefusal | null> => {
   if (gate?.enabled !== true) return { reason: "disabled" }
-  const floor = await floorOf(gate, chain)
+  const floor = await boundedServiceFloor(gate, chain)
   if (floor === "on") return null
   gate.refused("service-floor-off", account)
   return typeof floor === "object"
