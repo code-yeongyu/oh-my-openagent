@@ -1,8 +1,11 @@
 import { describe, expect, test } from "bun:test"
 import { spawn } from "node:child_process"
 import { fileURLToPath } from "node:url"
-import { Duplex } from "node:stream"
-import { readFrames, writeFrame } from "./desktop-sync/framing"
+import {
+  MEMORY_SYNC_SLOTS,
+  MEMORY_SYNC_TABLE,
+  memorySyncParentChannel,
+} from "./desktop-sync/memory-sync-channel.test-support"
 
 async function registration(scenario: string): Promise<{
   source?: string
@@ -19,7 +22,7 @@ async function registration(scenario: string): Promise<{
   const env = { ...process.env }
   delete env.SENPI_PRIVATE_FDS
   delete env.SENPI_PRIVATE_FDS_FINAL
-  if (scenario === "desktop" || scenario === "worker-desktop") env.SENPI_PRIVATE_FDS = '{"memory-sync":5}'
+  if (scenario === "desktop" || scenario === "worker-desktop") env.SENPI_PRIVATE_FDS = MEMORY_SYNC_TABLE
   else if (scenario !== "cli" && scenario !== "worker-absent" && scenario !== "worker-port-absent")
     env.SENPI_PRIVATE_FDS = '{"memory-sync":null}'
   const fixture = scenario.startsWith("observer-")
@@ -27,7 +30,7 @@ async function registration(scenario: string): Promise<{
     : new URL("./index-selection.fixture.ts", import.meta.url)
   const child = spawn(process.execPath, [fileURLToPath(fixture), scenario], {
     env,
-    stdio: ["ignore", "pipe", "pipe", "ignore", "ignore", "pipe"],
+    stdio: ["ignore", "pipe", "pipe", "ignore", "ignore", ...MEMORY_SYNC_SLOTS],
   })
   let output = ""
   let errors = ""
@@ -40,36 +43,31 @@ async function registration(scenario: string): Promise<{
   child.stderr.on("data", (chunk) => {
     errors += chunk.toString()
   })
-  const stream: unknown = Reflect.get(child.stdio, 5)
-  if (!(stream instanceof Duplex)) throw new Error("missing inherited socket")
-  readFrames(
-    stream,
-    (packet) => {
-      const request = packet as { id: number; op: string; request?: { op: string } }
-      let value: unknown = {}
-      if (request.op === "bootstrap") {
-        claims += 1
-        value = { child: "fixture-child" }
-      } else if (request.request?.op === "descriptor") {
-        value = {
-          genesis: "unsupported",
-          rpId: null,
-          userName: null,
-          serviceOrigin: "https://api.example.test",
-          accountId: "account-1",
-          serviceDeviceId: "device-1",
-          syncPrincipalId: "principal-1",
-          publicKeys: { signing: "signing-1", sealing: "sealing-1" },
-          generation: "generation-1",
-          incarnation: "incarnation-1",
-        }
-      } else if (request.request?.op === "operationBegin") {
-        value = { handle: `handle-${++handles}` }
+  const channel = memorySyncParentChannel(child.stdio)
+  channel.onFrame((packet) => {
+    const request = packet as { id: number; op: string; request?: { op: string } }
+    let value: unknown = {}
+    if (request.op === "bootstrap") {
+      claims += 1
+      value = { child: "fixture-child" }
+    } else if (request.request?.op === "descriptor") {
+      value = {
+        genesis: "unsupported",
+        rpId: null,
+        userName: null,
+        serviceOrigin: "https://api.example.test",
+        accountId: "account-1",
+        serviceDeviceId: "device-1",
+        syncPrincipalId: "principal-1",
+        publicKeys: { signing: "signing-1", sealing: "sealing-1" },
+        generation: "generation-1",
+        incarnation: "incarnation-1",
       }
-      writeFrame(stream, { id: request.id, ok: true, value })
-    },
-    () => {},
-  )
+    } else if (request.request?.op === "operationBegin") {
+      value = { handle: `handle-${++handles}` }
+    }
+    channel.reply({ id: request.id, ok: true, value })
+  })
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
     const code = await new Promise<number | null>((resolve, reject) => {
@@ -81,7 +79,7 @@ async function registration(scenario: string): Promise<{
     return { ...JSON.parse(output), claims }
   } finally {
     clearTimeout(timer)
-    stream.destroy()
+    channel.destroy()
     if (child.exitCode === null) child.kill()
   }
 }
@@ -99,22 +97,16 @@ describe("memory component registration selects the engine account source", () =
     expect(await registration("observer-override")).toMatchObject({ observersBefore: 0, observersAfterFirst: 1 })
   }, 30_000)
 
-  // POSIX only: this case asserts a POSIX inherited-fd socket (fd 5), which has no win32 form. On Windows the channel is
-  // two one-way pipes, covered by desktop-sync/channel-compiled.test.ts's win32 pair case (#11997); win32 versions: #12698.
-  test.skipIf(process.platform === "win32")(
-    "(a) an in-process desktop daemon selects desktop through the real inherited channel",
-    async () => {
-      expect(await registration("desktop")).toEqual({
-        source: "desktop",
-        cliBuilt: 0,
-        declared: true,
-        sharedSource: true,
-        claims: 1,
-        takes: 1,
-      })
-    },
-    30_000,
-  )
+  test("(a) an in-process desktop daemon selects desktop through the real inherited channel", async () => {
+    expect(await registration("desktop")).toEqual({
+      source: "desktop",
+      cliBuilt: 0,
+      declared: true,
+      sharedSource: true,
+      claims: 1,
+      takes: 1,
+    })
+  }, 30_000)
 
   test("(b) a declared null channel is unavailable and never constructs CLI", async () => {
     expect(await registration("declared-null")).toEqual({
@@ -166,22 +158,16 @@ describe("memory component registration selects the engine account source", () =
     expect(result.cliBuilt).toBe(0)
   }, 30_000)
 
-  // POSIX only: this case asserts a POSIX inherited-fd socket (fd 5), which has no win32 form. On Windows the channel is
-  // two one-way pipes, covered by desktop-sync/channel-compiled.test.ts's win32 pair case (#11997); win32 versions: #12698.
-  test.skipIf(process.platform === "win32")(
-    "the real senpi handoff gives a session Worker the host's desktop selection",
-    async () => {
-      expect(await registration("worker-desktop")).toEqual({
-        source: "desktop",
-        cliBuilt: 0,
-        declared: false,
-        sharedSource: true,
-        claims: 1,
-        takes: 0,
-      })
-    },
-    30_000,
-  )
+  test("the real senpi handoff gives a session Worker the host's desktop selection", async () => {
+    expect(await registration("worker-desktop")).toEqual({
+      source: "desktop",
+      cliBuilt: 0,
+      declared: false,
+      sharedSource: true,
+      claims: 1,
+      takes: 0,
+    })
+  }, 30_000)
 
   test("deviceAccount overrides win without constructing the default source", async () => {
     expect(await registration("override")).toEqual({

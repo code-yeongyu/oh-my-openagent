@@ -5,8 +5,11 @@ import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { Duplex } from "node:stream"
-import { readFrames, writeFrame } from "./desktop-sync/framing"
+import {
+  MEMORY_SYNC_SLOTS,
+  MEMORY_SYNC_TABLE,
+  memorySyncParentChannel,
+} from "./desktop-sync/memory-sync-channel.test-support"
 
 const senpiCli = join(
   dirname(createRequire(import.meta.url).resolve("@code-yeongyu/senpi/package.json")),
@@ -34,12 +37,12 @@ async function engineLaunch(declared: boolean) {
     TMPDIR: join(home, "tmp"),
     OMO_MEMORY_HOME: join(home, "memory"),
     SENPI_CODING_AGENT_DIR: join(home, "agent"),
-    ...(declared ? { SENPI_PRIVATE_FDS: '{"memory-sync":5}' } : {}),
+    ...(declared ? { SENPI_PRIVATE_FDS: MEMORY_SYNC_TABLE } : {}),
   }
   const child = spawn(process.execPath, [senpiCli, "--mode", "rpc", "--no-session", "--no-extensions", "-e", fixture], {
     cwd: home,
     env,
-    stdio: ["pipe", "pipe", "pipe", "ignore", "ignore", "pipe"],
+    stdio: ["pipe", "pipe", "pipe", "ignore", "ignore", ...MEMORY_SYNC_SLOTS],
   })
   const frames: Frame[] = []
   const pending = new Map<string, (line: RpcLine) => void>()
@@ -58,23 +61,18 @@ async function engineLaunch(declared: boolean) {
       if (line.type === "response" && line.id !== undefined) pending.get(line.id)?.(line)
     }
   })
-  const channel: unknown = Reflect.get(child.stdio, 5)
-  if (!(channel instanceof Duplex)) throw new Error("missing the memory-sync socket")
+  const channel = memorySyncParentChannel(child.stdio)
   const bootstrapped = Promise.withResolvers<void>()
-  readFrames(
-    channel,
-    (packet) => {
-      const frame = packet as Frame
-      frames.push(frame)
-      if (frame.op === "bootstrap") {
-        writeFrame(channel, { id: frame.id, ok: true, value: { child: "engine-child" } })
-        bootstrapped.resolve()
-      } else {
-        writeFrame(channel, { id: frame.id, ok: false })
-      }
-    },
-    () => {},
-  )
+  channel.onFrame((packet) => {
+    const frame = packet as Frame
+    frames.push(frame)
+    if (frame.op === "bootstrap") {
+      channel.reply({ id: frame.id, ok: true, value: { child: "engine-child" } })
+      bootstrapped.resolve()
+    } else {
+      channel.reply({ id: frame.id, ok: false })
+    }
+  })
   let sequence = 0
   const call = (name: string) => {
     const id = `call-${++sequence}`
@@ -104,27 +102,21 @@ async function selection(launch: Awaited<ReturnType<typeof engineLaunch>>): Prom
 }
 
 describe("the real senpi engine claims the desktop's private memory-sync channel at startup (#11997)", () => {
-  // POSIX only: this case asserts a POSIX inherited-fd socket (fd 5), which has no win32 form. On Windows the channel is
-  // two one-way pipes, covered by desktop-sync/channel-compiled.test.ts's win32 pair case (#11997); win32 versions: #12698.
-  test.skipIf(process.platform === "win32")(
-    "a declared memory-sync socket gets the bootstrap frame and the engine adopts the reply's child",
-    async () => {
-      const launch = await engineLaunch(true)
-      try {
-        await launch.bootstrapped()
-        expect(await selection(launch)).toEqual({ kind: "desktop" })
-        // Resolving the account goes through the desktop source, addressed by the adopted child capability.
-        await launch.call("omo.memory.sync.status")
-        expect(launch.frames).toEqual([
-          { id: 1, op: "bootstrap" },
-          { id: 2, op: "request", capability: "engine-child", request: { op: "descriptor" } },
-        ])
-      } finally {
-        launch.close()
-      }
-    },
-    300_000,
-  )
+  test("a declared memory-sync socket gets the bootstrap frame and the engine adopts the reply's child", async () => {
+    const launch = await engineLaunch(true)
+    try {
+      await launch.bootstrapped()
+      expect(await selection(launch)).toEqual({ kind: "desktop" })
+      // Resolving the account goes through the desktop source, addressed by the adopted child capability.
+      await launch.call("omo.memory.sync.status")
+      expect(launch.frames).toEqual([
+        { id: 1, op: "bootstrap" },
+        { id: 2, op: "request", capability: "engine-child", request: { op: "descriptor" } },
+      ])
+    } finally {
+      launch.close()
+    }
+  }, 300_000)
 
   test("with no memory-sync channel declared the engine still selects the CLI source", async () => {
     const launch = await engineLaunch(false)
