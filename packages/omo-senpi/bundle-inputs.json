@@ -1796,6 +1796,7 @@
     "packages/omo-senpi/src/components/thread/worktree/worktree-rpc.ts",
     "packages/omo-senpi/src/components/todo-fanout-reminder/index.ts",
     "packages/omo-senpi/src/components/todo-fanout-reminder/reminder.ts",
+    "packages/omo-senpi/src/components/ultrawork/directive-variants.ts",
     "packages/omo-senpi/src/components/ultrawork/generated-directive.ts",
     "packages/omo-senpi/src/components/ultrawork/index.ts",
     "packages/omo-senpi/src/components/ulw-execute-continuation/agent-end-eligibility.ts",
