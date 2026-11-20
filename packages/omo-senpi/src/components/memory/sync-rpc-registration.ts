@@ -1,4 +1,4 @@
-import { boundedServiceFloor } from "@oh-my-opencode/memory-core/sync-engine"
+import { boundedServiceFloor } from "@oh-my-opencode/memory-core/sync-account-ports"
 import { z } from "zod"
 import { createSyncRpcCoordinator } from "./sync-rpc-coordinator"
 import { syncErrorFields } from "./sync-rpc-operation"
