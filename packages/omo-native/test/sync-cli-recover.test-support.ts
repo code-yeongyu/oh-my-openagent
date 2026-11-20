@@ -11,6 +11,8 @@ import {
   newDevice,
   transportFor,
 } from "../../memory-core/src/sync/recovery/testing/world.test-support"
+import { accountReads } from "../../memory-core/src/sync/recovery/testing/account-reads.test-support"
+import { pinnedDir } from "../../memory-core/src/sync/recovery/testing/pinned-dir.test-support"
 import { configureSyncCommands, type SyncCommandDependencies } from "../sync-cli"
 import type { PhraseTerminal } from "../sync-phrase-tty"
 
@@ -84,73 +86,85 @@ type RecoverSetup = {
   readonly contexts?: { count: number }
   readonly pairing?: Record<string, unknown>
   readonly pinDir?: string
+  /** Recover as the account's own device, holding its trust pin, instead of a fresh one. */
+  readonly owner?: boolean
+  /** A command run after `sync recover` in the same context, e.g. `["sync", "enable"]`. */
+  readonly next?: ReadonlyArray<string>
 }
 
 /** The service's read gate (svc sync/store/consent.ts): a pull answers 200 only once both switches are on. */
 export const consentService = (failDevice = false) => {
   const state = { account: false, device: false }
+  const control = { failDevice }
   return {
     state,
+    control,
     pull: (): 200 | 403 => (state.account && state.device ? 200 : 403),
     pairing: {
       setAccountSync: async (on: boolean) => {
         state.account = on
       },
       setDeviceSync: async (_device: string, on: boolean) => {
-        if (failDevice) throw new Error("device switch unavailable")
+        if (control.failDevice) throw new Error("device switch unavailable")
         state.device = on
       },
     },
   }
 }
 
+/** The served chain, with the account reads enable needs derived from the same served list. */
+const chainOf = (transport: ReturnType<typeof transportFor>, overrides: Record<string, unknown> = {}) => {
+  const chain = { ...transport, ...overrides }
+  return { ...accountReads(chain), ...chain }
+}
+
 export const runRecover = async (dependencies: Partial<SyncCommandDependencies>, setup: RecoverSetup = {}) => {
   const world = setup.plain === true ? await createWorld() : await enrolledAccount()
-  const fresh = await newDevice()
+  const fresh = setup.owner === true ? world.owner : await newDevice()
   const out: string[] = []
   const err: string[] = []
-  const pinDir = setup.pinDir ?? freshStateDir()
+  const pinDir = setup.owner === true ? await pinnedDir(world) : (setup.pinDir ?? freshStateDir())
   const initial = process.exitCode
-  const program = new Command("omo").exitOverride()
-  configureSyncCommands(program, {
-    context: async () => {
-      if (setup.contexts !== undefined) setup.contexts.count += 1
-      return {
-        account: world.account,
-        serviceDeviceId: "svc-fresh",
-        keyring: fresh.keyring,
-        pinDir,
-        chain: {
-          ...transportFor(world, fresh),
-          listEntriesAfter: async () => null,
-          state: async () => null,
-          ...setup.chain,
-        },
-        pairing: {
-          setAccountSync: async () => undefined,
-          setDeviceSync: async () => undefined,
-          disableDeviceSync: unused,
-          listPending: unused,
-          openPending: unused,
-          readPending: unused,
-          answerPending: unused,
-          revealPending: unused,
-          ...setup.pairing,
-        },
-        authority: { signal: new AbortController().signal, admit: (dispatch) => dispatch() },
-      }
-    },
-    clock: { now: () => 0, sleep: async () => undefined },
-    output: (line) => void out.push(line),
-    error: (line) => void err.push(line),
-    confirm: async () => false,
-    interactive: true,
-    env: {},
-    terminalAvailable: () => true,
-    ...dependencies,
-  })
-  await program.parseAsync(["sync", "recover"], { from: "user" })
-  const exit = process.exitCode
+  const run = async (argv: ReadonlyArray<string>) => {
+    const program = new Command("omo").exitOverride()
+    configureSyncCommands(program, {
+      context: async () => {
+        if (setup.contexts !== undefined) setup.contexts.count += 1
+        return {
+          account: world.account,
+          serviceDeviceId: "svc-fresh",
+          keyring: fresh.keyring,
+          pinDir,
+          chain: chainOf(transportFor(world, fresh), setup.chain),
+          pairing: {
+            setAccountSync: async () => undefined,
+            setDeviceSync: async () => undefined,
+            disableDeviceSync: unused,
+            listPending: unused,
+            openPending: unused,
+            readPending: unused,
+            answerPending: unused,
+            revealPending: unused,
+            ...setup.pairing,
+          },
+          authority: { signal: new AbortController().signal, admit: (dispatch) => dispatch() },
+        }
+      },
+      clock: { now: () => 0, sleep: async () => undefined },
+      output: (line) => void out.push(line),
+      error: (line) => void err.push(line),
+      confirm: async () => false,
+      interactive: true,
+      env: {},
+      terminalAvailable: () => true,
+      ...dependencies,
+    })
+    process.exitCode = 0
+    await program.parseAsync([...argv], { from: "user" })
+    return process.exitCode
+  }
+  const exit = await run(["sync", "recover"])
+  const nextExit = setup.next === undefined ? undefined : await run(setup.next)
   process.exitCode = initial ?? 0
-  return { world, out, err, exit, pinDir }
+  return { world, out, err, exit, nextExit, pinDir }
 }

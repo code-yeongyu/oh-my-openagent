@@ -78,6 +78,17 @@ test("#given the runtime and the phraseRecover descriptor #when features is aske
   expect(Object(await rpc.call("features")).features).toContain("recover")
 })
 
+test("#given an account source that rejects #when features is asked #then the answer still lists the other features and only recover is left out (#14464 L1)", async () => {
+  const rpc = await recoverHarness({
+    world: await enrolledWorld(),
+    sourceFails: true,
+    main: (device) => fakeMain(device, []),
+  })
+  const answer = Object(await rpc.call("features"))
+  expect(answer.features).toEqual(expect.arrayContaining(["enable-method", "acknowledge", "disable"]))
+  expect(answer.features).not.toContain("recover")
+})
+
 test("#given another process holding the enable ceremony claim #when RPC recover runs #then it answers in_progress and no window opens", async () => {
   const world = await enrolledWorld()
   const rpc = await recoverHarness({ world, main: (device) => fakeMain(device, [ENROLLED.join(" ")]) })

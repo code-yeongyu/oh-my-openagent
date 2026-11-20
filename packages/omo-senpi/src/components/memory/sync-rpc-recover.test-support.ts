@@ -17,6 +17,7 @@ import {
   transportFor,
   type World,
 } from "../../../../memory-core/src/sync/recovery/testing/world.test-support"
+import { accountReads } from "../../../../memory-core/src/sync/recovery/testing/account-reads.test-support"
 import { desktopRecoveryBridge } from "./desktop-sync/desktopRecoveryBridge"
 import type { MemoryRpcSync } from "./memory-rpc-sync"
 import type { SyncRpcAccount, SyncRpcContext, SyncRpcRegistration } from "./sync-rpc-ports"
@@ -123,14 +124,16 @@ export type MainServe = (op: string, data: unknown) => Promise<unknown>
 
 export const consent = (failDevice = false) => {
   const state = { account: false, device: false }
+  const control = { failDevice }
   return {
     state,
+    control,
     pull: (): 200 | 403 => (state.account && state.device ? 200 : 403),
     setAccountSync: async (on: boolean) => {
       state.account = on
     },
     setDeviceSync: async (_device: string, on: boolean) => {
-      if (failDevice) throw new Error("device switch unavailable")
+      if (control.failDevice) throw new Error("device switch unavailable")
       state.device = on
     },
   }
@@ -153,6 +156,8 @@ export async function recoverHarness(input: {
   readonly chain?: Record<string, unknown>
   readonly rpId?: string
   readonly prfSupported?: boolean
+  /** The account source rejects, as a sidecar that fails to load does. */
+  readonly sourceFails?: boolean
   readonly syncStatus?: () => Promise<MemoryRpcSync | undefined>
 }) {
   const device = input.device ?? (await newDevice())
@@ -181,7 +186,10 @@ export async function recoverHarness(input: {
     boundary: async (dispatch) => dispatch(),
     forOperation: async () => ({
       keyring: device.keyring,
-      chain: { ...createAccountHttp(OFFLINE), ...transportFor(input.world, device), ...input.chain },
+      chain: (() => {
+        const served = { ...transportFor(input.world, device), ...input.chain }
+        return { ...createAccountHttp(OFFLINE), ...accountReads(served), ...served }
+      })(),
       pairing: {
         ...createPairingHttp(OFFLINE),
         setAccountSync: gate.setAccountSync,
@@ -209,7 +217,10 @@ export async function recoverHarness(input: {
   roots.push(memoryRoot)
   const coordinator = wireSyncRpc({
     rpc: { handle: (name, handler) => void handlers.set(name, handler) },
-    source: async () => account,
+    source: async () => {
+      if (input.sourceFails === true) throw new Error("the sync sidecar did not load")
+      return account
+    },
     memoryRoot,
     pinDir: input.pinDir ?? freshStateDir(),
     signal: new AbortController().signal,

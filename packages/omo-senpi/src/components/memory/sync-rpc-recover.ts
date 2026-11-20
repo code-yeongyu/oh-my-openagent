@@ -87,8 +87,15 @@ export interface RecoverDeps {
 const recoverable = (options: SyncRpcOptions, account: SyncRpcAccount | null): boolean =>
   options.runtime.recoverAccount !== undefined && account?.descriptor.phraseRecover === "supported"
 
-export const recoverFeature = async (options: SyncRpcOptions): Promise<boolean> =>
-  recoverable(options, options.runtime.recoverAccount === undefined ? null : await options.source())
+/**
+ * Whether `features` lists `recover`. An account source that cannot be read leaves `recover` out and
+ * never fails the whole answer, so `disable`, `acknowledge` and `phrase-genesis` stay visible (#14464 L1).
+ */
+export const recoverFeature = async (options: SyncRpcOptions): Promise<boolean> => {
+  if (options.runtime.recoverAccount === undefined) return false
+  const account = await options.source().catch(() => null)
+  return recoverable(options, account)
+}
 
 /**
  * The status reading of the recover entry; absent on a host without it, and absent when it cannot be read now, so

@@ -1,6 +1,8 @@
 import { afterAll, expect, test } from "bun:test"
 import { readdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
+import { disableSync, isDeviceSyncOff } from "../account/device-switch.ts"
+import { createPairingHttp } from "../account/pairing-http.ts"
 import { createRejectionCounter } from "../crypto/rejection.ts"
 import { createRecoveryBridge } from "./bridge.ts"
 import { readRecoveryStatus } from "./membership.ts"
@@ -57,6 +59,25 @@ const spiedRecover = async (world: World, device: Device, stateDir: string) => {
 test("#given a pinned member of the account #when it asks to recover #then it refuses already-member before the bridge is called and appends nothing", async () => {
   const world = await createWorld()
   const { outcome, calls, appended } = await spiedRecover(world, world.owner, await pinnedDir(world))
+  expect(outcome).toEqual({ ok: false, reason: "already-member" })
+  expect(calls).toEqual({ begin: 0, finish: 0, abort: 0 })
+  expect(appended).toBe(0)
+})
+
+test("#given a member turned off by disableSync (pin kept, off mark present) #when it asks to recover #then it still refuses already-member before the bridge (D12 test 4 ii)", async () => {
+  const world = await createWorld()
+  const dir = await pinnedDir(world)
+  await disableSync({
+    account: world.account,
+    serviceDeviceId: "svc-owner",
+    pinDir: dir,
+    pairing: {
+      ...createPairingHttp({ baseUrl: "https://unused.invalid", token: () => "" }),
+      disableDeviceSync: async () => ({ ok: true }),
+    },
+  })
+  expect(await isDeviceSyncOff(dir, world.account)).toBe(true)
+  const { outcome, calls, appended } = await spiedRecover(world, world.owner, dir)
   expect(outcome).toEqual({ ok: false, reason: "already-member" })
   expect(calls).toEqual({ begin: 0, finish: 0, abort: 0 })
   expect(appended).toBe(0)

@@ -46,3 +46,34 @@ test("#given a phrase that does not match #when omo sync recover refuses #then n
   expect(r.exit).toBe(1)
   expect(service.state).toEqual({ account: false, device: false })
 })
+
+test("#given a recovery whose device switch failed #when omo sync enable runs next #then the switch turns on and a pull answers 200 (D12 test 13)", async () => {
+  const service = consentService(true)
+  const pairing = {
+    ...service.pairing,
+    setDeviceSync: async (device: string, on: boolean) => {
+      try {
+        await service.pairing.setDeviceSync(device, on)
+      } finally {
+        service.control.failDevice = false
+      }
+    },
+  }
+  const terminal = typing([ENROLLED.join(" ")])
+  const r = await runRecover({ terminal: terminal.open }, { pairing, next: ["sync", "enable"] })
+  expect(r.exit).toBe(1)
+  expect(r.nextExit).toBe(0)
+  expect(r.out).toEqual(["Memory sync is on for this device."])
+  expect(service.state).toEqual({ account: true, device: true })
+  expect(service.pull()).toBe(200)
+})
+
+test("#given the account's own pinned device #when omo sync recover runs #then it refuses already-member, opens no terminal and touches no switch (D12 test 4)", async () => {
+  const service = consentService()
+  const terminal = typing([ENROLLED.join(" ")])
+  const r = await runRecover({ terminal: terminal.open }, { owner: true, pairing: service.pairing })
+  expect(r.exit).toBe(1)
+  expect(r.err.join("\n")).toContain("already part of your memory sync")
+  expect(terminal.opened()).toBe(0)
+  expect(service.state).toEqual({ account: false, device: false })
+})

@@ -181,3 +181,14 @@ test("#given recovery succeeds but the device switch call fails #when RPC recove
   expect(rpc.resumes()).toBe(0)
   expect(rpc.warnings.some((line) => line.includes("switch_failed"))).toBe(true)
 })
+
+test("#given a recovery whose device switch failed #when enable runs next over RPC #then it answers joined, both switches are on and a pull answers 200 (D12 test 13)", async () => {
+  const world = await enrolledWorld()
+  const gate = consent(true)
+  const rpc = await recoverHarness({ world, gate, main: (device) => fakeMain(device, [ENROLLED.join(" ")]) })
+  expect(await rpc.call("recover", { method: "phrase" })).toEqual({ kind: "recovered", sync: "off" })
+  gate.control.failDevice = false
+  expect(await rpc.call("enable", {})).toMatchObject({ kind: "joined" })
+  expect(gate.state).toEqual({ account: true, device: true })
+  expect(gate.pull()).toBe(200)
+})
