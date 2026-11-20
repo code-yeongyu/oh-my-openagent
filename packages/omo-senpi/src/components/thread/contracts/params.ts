@@ -27,11 +27,17 @@ export const ThreadListParams = Type.Object({
   ),
   state: Type.Optional(
     Type.Array(
-      Type.Union([Type.Literal("running"), Type.Literal("idle"), Type.Literal("inactive"), Type.Literal("archived")]),
+      Type.Union([
+        Type.Literal("opening"),
+        Type.Literal("running"),
+        Type.Literal("idle"),
+        Type.Literal("inactive"),
+        Type.Literal("archived"),
+      ]),
       {
         minItems: 1,
         description:
-          "Thread states to list: running, idle, inactive (no engine holds it) or archived; the default lists every state but archived.",
+          "Thread states to list: opening (not yet ready for controls), running, idle, inactive (no engine holds it) or archived; the default lists every state but archived.",
       },
     ),
   ),

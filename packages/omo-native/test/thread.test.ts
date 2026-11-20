@@ -203,14 +203,23 @@ describe("omo thread: argv to SDK calls", () => {
   })
 
   test("#given list --state repeated and comma-separated #when run #then the SDK lists exactly those states, each once", async () => {
-    const result = await run(["list", "--state", "archived,idle", "--state", "running", "--state", "idle", "--json"])
-    expect(result.calls).toEqual([{ method: "list", request: { state: ["archived", "idle", "running"] } }])
+    const result = await run([
+      "list",
+      "--state",
+      "archived,idle,opening",
+      "--state",
+      "running",
+      "--state",
+      "idle",
+      "--json",
+    ])
+    expect(result.calls).toEqual([{ method: "list", request: { state: ["archived", "idle", "opening", "running"] } }])
   })
 
-  test("#given list --state with a state that is not one of the four #when run #then it is a usage error and the SDK is never loaded", async () => {
+  test("#given list --state with an unknown state #when run #then it is a usage error and the SDK is never loaded", async () => {
     const result = await run(["list", "--state", "idle,live"])
     expect({ exitCode: result.exitCode, loaded: result.loaded }).toEqual({ exitCode: THREAD_EXIT.usage, loaded: 0 })
-    expect(result.stderr).toContain("--state must be one of running, idle, inactive, archived")
+    expect(result.stderr).toContain("--state must be one of opening, running, idle, inactive, archived")
   })
 
   test("#given send text that reads --json after -- #when run #then it is sent as text and the output stays human", async () => {

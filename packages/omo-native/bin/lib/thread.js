@@ -18,7 +18,7 @@ export { THREAD_EXIT } from "./thread-args.js"
 const USAGE = [
   "usage: omo thread <list|send|read|close|bind|unbind|rebind|bindings|report|answer|outbox|ack> [options] [--json]",
   "",
-  "  list      [--all-scope] [--state running|idle|inactive|archived[,...]]  (repeatable; default: all but archived)",
+  "  list      [--all-scope] [--state opening|running|idle|inactive|archived[,...]]  (repeatable; default: all but archived)",
   "  send      <target> <text> [--mode auto|steer|follow_up] [--expected-turn <n>] [--idempotency-key <k>]",
   "  send      --binding <id> [<target>] <text> [--idempotency-key <event-id>] [--mode auto|follow_up]",
   "            [--author-id <platform-user-id> --author-name <display> [--author-user-id <id>]]",

@@ -147,15 +147,17 @@ export function summary(session: ThreadHostSession, entry?: AddressEntry): Threa
   } = session
   const created = entry?.created_at ?? session.created_at ?? session.createdAt ?? new Date().toISOString()
   const held = session.status !== "closed" && entry?.alive !== false
+  const opening = session.status === "opening"
   return {
     ...rest,
     thread_id: id,
     name: entry?.title ?? threadTitle(session.name, null) ?? "",
     status: held ? "live" : "resumable",
-    state: threadState({ archived, held, activity }),
+    state: threadState({ archived, held, activity, opening }),
+    ...(opening ? { controls: [] } : {}),
     ...threadModel(model),
-    ...activityDetail(held && archived !== true, activity, error_code, turn_id),
-    ...retryWait(held && archived !== true && activity === "running", waiting),
+    ...activityDetail(held && !opening && archived !== true, activity, error_code, turn_id),
+    ...retryWait(held && !opening && archived !== true && activity === "running", waiting),
     created_at: created,
     updated_at: entry === undefined ? (session.updated_at ?? session.updatedAt ?? created) : entry.updated_at,
     ...(entry === undefined ? {} : { endpoint: entry.endpoint, surface: entry.surface }),
