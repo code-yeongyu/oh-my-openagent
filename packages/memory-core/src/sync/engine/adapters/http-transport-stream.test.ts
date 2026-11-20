@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 
-import { awaitWithinTestBudget } from "../../../../../../test-support/test-deadline"
+import { awaitWithinTestBudget, useTestTimeout } from "../../../../../../test-support/test-deadline"
 import { createHttpTransport } from "./http-transport"
 
 // The account event stream's lifecycle against the service's wire (omo-service core/src/events/routes.ts): each
@@ -9,12 +9,17 @@ import { createHttpTransport } from "./http-transport"
 
 const encoder = new TextEncoder()
 
-function sse(frames: readonly string[], close: boolean, signal: AbortSignal | null | undefined): Response {
+function sse(
+  frames: readonly string[],
+  close: boolean | Promise<void>,
+  signal: AbortSignal | null | undefined,
+): Response {
   const body = new ReadableStream<Uint8Array>({
     start(controller) {
       for (const frame of frames) controller.enqueue(encoder.encode(frame))
-      if (close) controller.close()
-      else signal?.addEventListener("abort", () => controller.error(signal.reason))
+      if (close === true) controller.close()
+      else if (close !== false) void close.then(() => controller.close())
+      signal?.addEventListener("abort", () => controller.error(signal.reason))
     },
   })
   return new Response(body, { headers: { "content-type": "text/event-stream" } })
@@ -46,10 +51,18 @@ function streamServer(answers: readonly ((signal: AbortSignal | null | undefined
 const advanced = (seq: number, cursor: string) =>
   `id: ${cursor}\ndata: ${JSON.stringify({ type: "sync.advanced", head: { seq, link: "A".repeat(43) } })}\n\n`
 
-test("a stream the service closes after delivering its cursor is resumed at once with Last-Event-ID, and the engine is never told it dropped", async () => {
+// Time is the behavior here: a stream counts as resumable only once it lived the retry wait.
+const lived = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+
+test("a stream the service closes after its lifetime is resumed at once with Last-Event-ID, and the engine is never told it dropped", async () => {
+  useTestTimeout(15_000)
   const server = streamServer([
     (signal) =>
-      sse(["retry: 2000\nid: p1.d0123456789abcdef\n\n", advanced(3, "p1.d0123456789abcdef.s3.n0.t0")], true, signal),
+      sse(
+        ["retry: 2000\nid: p1.d0123456789abcdef\n\n", advanced(3, "p1.d0123456789abcdef.s3.n0.t0")],
+        lived(5_100),
+        signal,
+      ),
   ])
   const transport = createHttpTransport({ baseUrl: "https://service.test", token: () => "tok", fetch: server.fetch })
   const connected: boolean[] = []
@@ -67,7 +80,60 @@ test("a stream the service closes after delivering its cursor is resumed at once
   expect(server.connects.map((c) => c.lastEventId)).toEqual([null, "p1.d0123456789abcdef.s3.n0.t0"])
   expect(heads).toEqual([3])
   expect(connected).toEqual([true, true])
+}, 15_000)
+
+test("a stream that delivers a cursor and ends at once is reported down before any reconnect, so repeated ends never spin", async () => {
+  const server = streamServer([(signal) => sse([advanced(3, "p1.d0123456789abcdef.s3.n0.t0")], true, signal)])
+  const transport = createHttpTransport({ baseUrl: "https://service.test", token: () => "tok", fetch: server.fetch })
+  let stop: () => void = () => undefined
+  const reports: (readonly [boolean, string | undefined, number])[] = []
+  const down = new Promise<void>((resolve) => {
+    stop = transport.subscribe({
+      onAdvanced: () => undefined,
+      onConnected: (up, cause) => {
+        reports.push([up, cause, server.connects.length])
+        if (!up) resolve()
+      },
+      onStateChanged: () => undefined,
+    })
+  })
+  try {
+    await awaitWithinTestBudget(down, "the down report of a stream that ended early")
+  } finally {
+    stop()
+  }
+  expect(reports).toEqual([
+    [true, undefined, 1],
+    [false, "stream ended early", 1],
+  ])
 })
+
+test("a connect that never answers is reported down once its deadline passes, and the stalled request is aborted", async () => {
+  useTestTimeout(15_000)
+  let aborted = false
+  const stalled = (async (_url: string | URL | Request, init?: RequestInit) =>
+    new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => {
+        aborted = true
+        reject(init.signal?.reason)
+      })
+    })) as typeof fetch
+  const transport = createHttpTransport({ baseUrl: "https://service.test", token: () => "tok", fetch: stalled })
+  let stop: () => void = () => undefined
+  const down = new Promise<readonly [boolean, string | undefined]>((resolve) => {
+    stop = transport.subscribe({
+      onAdvanced: () => undefined,
+      onConnected: (up, cause) => resolve([up, cause]),
+      onStateChanged: () => undefined,
+    })
+  })
+  try {
+    expect(await awaitWithinTestBudget(down, "the stalled connect's down report")).toEqual([false, "connect timed out"])
+  } finally {
+    stop()
+  }
+  expect(aborted).toBe(true)
+}, 15_000)
 
 test("a refused stream is reported down on the first attempt with the HTTP status and the service's code", async () => {
   const server = streamServer([

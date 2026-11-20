@@ -21,6 +21,7 @@ export const b64urlOfHex = (hex: string): string => Buffer.from(hex, "hex").toSt
 export const hexOfB64url = (b64url: string): string => Buffer.from(b64url, "base64url").toString("hex")
 
 const STREAM_RETRY_MS = 5_000
+const STREAM_CONNECT_MS = 5_000
 
 export class SyncHttpError extends Error {
   override readonly name = "SyncHttpError"
@@ -173,12 +174,12 @@ export function createHttpTransport(options: HttpTransportOptions): Transport {
 }
 
 /**
- * Holds the stream open for as long as the subscription lives. A stream that delivered a cursor and then ended (the
- * service closes each one after its bounded lifetime) is resumed at once with `Last-Event-ID`, so the service replays
- * what landed in between and the engine never drops to its poll for a routine reconnect. Any other end - a refused or
- * failed connect, a broken stream, one that ended before its first cursor - is
- * reported as `onConnected(false, cause)` with the HTTP status and code or the error name, and retried after
- * STREAM_RETRY_MS; the engine polls meanwhile (#14476).
+ * Holds the stream open for as long as the subscription lives. A stream that delivered a cursor and lived the retry
+ * wait (the service closes each one after its bounded lifetime) is resumed at once with `Last-Event-ID`, so the service
+ * replays what landed in between and the engine never drops to its poll for a routine reconnect. Any other end - a
+ * refused, failed or stalled connect (each connect has a deadline), a broken stream, one that ended before its first
+ * cursor or before the retry wait - is reported as `onConnected(false, cause)` with the HTTP status and code or the
+ * failure, and retried after STREAM_RETRY_MS; the engine polls meanwhile (#14476).
  */
 async function streamLoop(
   options: HttpTransportOptions,
@@ -189,13 +190,14 @@ async function streamLoop(
   let lastEventId: string | null = null
   while (!signal.aborted) {
     let cause: string
+    const opened = Date.now()
     try {
       const headers: Record<string, string> = {
         ...syncRequestHeaders(await bearer(options)),
         accept: "text/event-stream",
       }
       if (lastEventId !== null) headers["last-event-id"] = lastEventId
-      const response = await doFetch(`${options.baseUrl}/v1/me/events`, { headers, signal })
+      const response = await connectWithin(doFetch, `${options.baseUrl}/v1/me/events`, headers, signal)
       if (response.status === 426) {
         // The client floor refuses this build until OmO is updated (#14483): stop reconnecting and let the engine's
         // paced recheck (polling while the stream is down) notice a lifted floor instead of a 5 s reconnect loop.
@@ -215,16 +217,44 @@ async function streamLoop(
           if (event?.kind === "advanced") handlers.onAdvanced(event.head)
           else if (event?.kind === "state") handlers.onStateChanged()
         }
-        if (resumable) continue
-        cause = "stream ended before its first event id"
+        // A stream that lived its bounded lifetime resumes at once; one that ended sooner is retried after the full
+        // wait like any other failure, so an endpoint that keeps ending streams early never spins the loop.
+        if (resumable && Date.now() - opened >= STREAM_RETRY_MS) continue
+        cause = resumable ? "stream ended early" : "stream ended before its first event id"
       }
     } catch (error) {
       if (signal.aborted) return
       if (!(error instanceof Error)) throw error
-      cause = error.name
+      cause = error instanceof ConnectTimeout ? "connect timed out" : error.name
     }
     handlers.onConnected(false, cause)
     await new Promise((resolve) => setTimeout(resolve, STREAM_RETRY_MS))
+  }
+}
+
+class ConnectTimeout extends Error {
+  override readonly name = "ConnectTimeout"
+}
+
+/** Every connect, a resume included, answers within STREAM_CONNECT_MS or fails, so a stalled one is reported down. */
+async function connectWithin(
+  doFetch: typeof fetch,
+  url: string,
+  headers: Record<string, string>,
+  signal: AbortSignal,
+): Promise<Response> {
+  const deadline = new AbortController()
+  const timer = setTimeout(
+    () => deadline.abort(new ConnectTimeout("the event stream did not answer in time")),
+    STREAM_CONNECT_MS,
+  )
+  try {
+    return await doFetch(url, { headers, signal: AbortSignal.any([signal, deadline.signal]) })
+  } catch (error) {
+    if (deadline.signal.aborted && !signal.aborted) throw deadline.signal.reason
+    throw error
+  } finally {
+    clearTimeout(timer)
   }
 }
 
