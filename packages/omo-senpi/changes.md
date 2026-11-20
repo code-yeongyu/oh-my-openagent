@@ -1,3 +1,75 @@
+## 2026-11-20 - DeepSeek V4.1 Flash receives the GPT ultrawork prompt (#14462)
+
+`ultraworkVariantFor` in `src/components/ultrawork/directive-variants.ts` returns `gpt` for a GPT id or a DeepSeek V4.1 Flash id (`isDeepseekV41FlashModel` in `@oh-my-opencode/model-core`). The senpi `deepseek-v4-1-flash` preset became a standalone copy of the gpt-6.2 core (senpi#7100), which owns reading, reporting and todo upkeep, so the default directive contradicted it the way it contradicted gpt-6.2 (#14441). The four bundles that carry `model-core` are regenerated; `omo.js` is 1,560,003 B and the budget is unchanged.
+
+## 2026-11-20 - Ultrawork directive variants are whole prompts chosen by the receiving model (#14460)
+
+The Astra variant was an overlay: eleven marked blocks of `skills/ultrawork/SKILL.md` were swapped from `references/astra-variant.md`, so every unmarked sentence of the default still reached the model, and only ids matching `isGpt6AstraModel` received it. Now `skills/ultrawork/SKILL.md` is the default directive and `skills/ultrawork/references/gpt.md` is the GPT directive, each a complete prompt. `plugin/scripts/embed-directive.mjs` embeds one export per source (`SENPI_ULTRAWORK_DIRECTIVE`, `SENPI_GPT_ULTRAWORK_DIRECTIVE`); the marker syntax, `astra-variant.md` and `SENPI_ASTRA_ULTRAWORK_DIRECTIVE` are gone. `src/components/ultrawork/directive-variants.ts` selects by `isGptModel` of the receiving model, at arming and again at each request. The default directive is byte-identical to its previous rendering (sha256 `90065d4c043e7aefb63a83787fe2ce28a439fb913b07bc00fbb4c030d99e221b`). The GPT directive is 2,723 `o200k_base` tokens against 7,590 for the default. `omo.js` grows by 9,681 bytes (the GPT directive is embedded whole), and `bundle-budget.json` is set to the measurement plus 4 KiB.
+
+## 2026-11-20 - GPT-6.2 Astra profiles (#14427)
+
+The Obsessive profiles use GPT-6.2 Astra instead of the previous Astra model. The Normal profile retains its separate Sol choices.
+
+## 2026-11-19 - The remote client on the shared address module (#14327)
+
+`components/remote` resolves device parts with the core's `resolveDevice` (`resolve.ts` `resolveRemoteDevice`) and judges a silent device with `deviceListing` (`listingIncomplete`). Removed: `sessions.ts` `resolveSessionTarget` and `targetOf`, `aliases.ts` `sessionOf`, `resolve.ts` `deviceNamed`. `attach.ts` resolves its device part before it opens; `follow` and `wait` open through it.
+
+## 2026-11-19 - The thread SDK resolves through the address module (#14322)
+
+`thread/sdk.ts` calls `thread/address` `resolveAddress` for every address instead of its private paths, with or without a remote surface; an id this device's gateway store owns skips the lookup, and a send lists the host once. The store-only operations resolve over this device's book first and consult the account only on a local `not_found`. `tools/internals.ts` `resolveStoredSession` is deleted (its last caller moved).
+
+## 2026-11-19 - One thread address module (#14318)
+
+New core package `packages/thread-address-core` (dependency-free; vendored by the desktop app) holds `parseAddress`, `resolveDevice`, `normalizeName`, `deviceListing`, row identity (`rowKey`, `rowAddress`, `rowName`, `mergeRows`, `listingKey`, `sameSession`) and the refusals as data. `components/thread/address/` holds `readAccount` (one status, roster and listing read) and `resolveAddress`; `control/locate.ts` loads it lazily from the thread client sidecar. `remote/seams.ts`, `remote/device-address.ts`, `remote/unknown-device.ts`, `remote/plan-create.ts`, `extension/senpi-seams.ts` and `addressing.ts` use the core instead of their own copies.
+
+## 2026-11-19 - this device's listing reports an engine that did not answer (#14309)
+
+`tools/read-ops.ts` `listThreads` counts the endpoints that failed without being known dead (a socket that is gone or refuses is `dead`) and reports `listing: "incomplete"` with `unanswered_endpoints`. `remote/cross-device.ts` `deviceRows` reads it for this device's row. `address-book.ts` `assembleAddressBook` no longer lets the workspace disk scan's copy of a session file (no endpoint) replace the record of the endpoint that claimed it, so a timed-out engine's threads keep `live_unresponsive`.
+
+## 2026-11-19 - thread_list partial devices and dropped counts (#14304)
+
+`remote/port/device-service.ts` `listing()` adds every device whose round state is not `answered` to `incomplete`. `disk-list.ts` returns the durable ids of the session files it did not read (`unread`). `tools/read-ops.ts` `listThreads` counts the inactive threads among them that no endpoint lists (`inactive_dropped`, only when the filter shows inactive threads). `remote/cross-device.ts` `deviceRows` puts that count on this device's row as `dropped`.
+
+## 2026-11-19 - thread_read error text and the retry wait on thread_list rows (#14283)
+
+`tools/read-item.ts` is now the one message-to-item builder for both the live path and the session-file path of `read-ops.ts`. It appends `{type: "error", text}` (capped at 500 characters) when `stopReason` is `error`. `tools/thread-state.ts` `retryWait` turns senpi#7025's `waiting` on a running session's list_sessions row into `waiting_on`. It ignores a thread that is not running, a closed or archived one, and any wait whose shape this build does not know. `internals.ts` `summary()` and `thread-row.ts` carry the field.
+
+## 2026-11-17 - Connector next actions on the inbound path (#13994)
+
+- `src/components/thread/gateway/relay.ts` `inbound`: the `binding_inactive` and `unsupported` refusals carry a connector next action instead of the session-facing defaults, as the default table's comment already says a connector-only refusal does. Codes, messages and details are unchanged.
+
+## 2026-11-19 - a refused steer conflict is the same race as reply data (#14326)
+
+`remote/relay-transport.ts` `send` reads a steer conflict in both forms the receiver can answer: reply data (`data.kind: "turn_conflict"`) and a refused command (`reason: "turn_conflict"` or `"not_steerable"`). `auto` on the steer lane re-sends once on the follow-up lane for either form under the same delivery id; a second refusal is answered with its own code. An explicit steer maps the refusal through `REFUSAL_CODES`. `remote/outcome.ts` `outcomeFailure` maps both reasons to their own codes instead of the `unsupported` fallback (#14320).
+
+## 2026-11-19 - the held admission kind (#14287)
+
+senpi 2026.11.19-2 (senpi#7014) answers `admit_external_message` and `wake` with `kind: "held"` and `holds[]` when an idle session sits under a hold a peer cannot release. `gateway/adapter.ts` `ExternalAdmissionKind` and `gateway-replies.ts` `EXTERNAL_ADMISSION_KINDS` gain `held`. `remote/relay-transport.ts` maps it, on the live admit path and on the wake path, to `queued` with `waiting_on: { kind: "hold", device }` instead of `idempotency_uncertain`; `gateway/result.ts` maps a same-device row whose `admission_kind` is `held` the same way. No new `ThreadDelivery` kind.
+
+## 2026-11-19 - host_unavailable names the devices that answered (#14279)
+
+`tools/internals.ts` `lookupAcross`: when some devices answer "not held" and others stay silent, the `host_unavailable` failure lists the answering devices (this device first) in its message and as `details.answered`, beside `details.devices` (the silent ones), and its next action says a file on an answering device is not where that device looks (#14270).
+
+## 2026-11-19 - thread client inlines TypeBox (#14265)
+
+`plugin/scripts/build-extension-core.mjs` builds `extensions/omo-thread-client.js` with the TypeBox loader aliases (`typebox`, `typebox/*`, `@sinclair/typebox`, `@sinclair/typebox/*`) removed from its externals, so the sidecar has no bare package import. The omo CLI (`omo-native/bin/lib/thread.js`, also behind `omo daemon`) imports it with a plain dynamic `import()` outside any engine, where senpi's loader aliases do not exist (#14204). Every other bundle keeps the aliases. In an engine the sidecar now uses its own TypeBox copy; TypeBox 1.x marks schemas with `~kind` string keys, so its schemas and the engine's are interchangeable. `build-extension.test.mjs` loads the built sidecar under Node from a plugin layout with no `node_modules`.
+
+## 2026-11-19 - older entry cursors are stale; CLI hint names older messages (#14264)
+
+`paged-reader.ts` `isEntryCursor` recognizes the retired `t2` entry-cursor version, so `selectEntryPage` answers it `cursor_stale`; `omo-native` `thread-output.js` prints `(truncated; older messages: --cursor <c>)`.
+
+## 2026-11-19 - reply-route device read bounded by the call budget (#14263)
+
+`tools.ts` `thisDeviceOf` reads `accountDevices` through `withinCallBudget`; a read the budget cut is the existing `host_unavailable` refusal with `reason: "request_timeout"`.
+
+## 2026-11-19 - a parked live-listed thread is re-asked and woken (#14262)
+
+`remote/relay-transport.ts`: a `route_unlisted` refusal of the first session command to a live-listed row re-runs the send once with the row addressed as parked: `find_session`, then the existing wake path for a session on disk (no `state === "ended"` requirement), `not_found` when absent, `not_resumable` when the device holds it on disk and this device cannot wake it; when `find_session` itself is refused, unsupported or unanswered, the send answers the first `route_unlisted` refusal as before (#14237's mapping). The retry keeps the first attempt's delivery ids.
+
+## 2026-11-19 - refuse a blank thread_create prompt (#14261)
+
+`control/create.ts` refuses a `prompt` that is blank after trimming (`details.field: "prompt"`) before placement, alone or with a name; the schema's `minLength` counted spaces, so it passed #14063's empty-create refusal.
+
 ## 2026-11-17 - omo.modelRouting.resolve (#14025)
 
 `components/task/model-routing-rpc.ts` registers `omo.modelRouting.resolve` (no request data). It loads the session cwd's config with the task engine's own loader and answers `{ schemaVersion: 1, rows }` from `model-routing-rows.ts`: one row per builtin and configured category, then per task agent, each from `resolveCategory` / `resolveAgent` against the planner's own inputs: the register-time project cwd its live config reads, the agent table the engine composed (so a mid-session `agents` edit shows exactly what a spawn still picks), and the parent fast-tier step (`-fast` sibling unless `exclude_models` keeps it out). Retired agent aliases fold into their canonical row. The round-robin distributor is not consulted, so a read never advances a rotation, with `effective` (`provider/model` or null), `source` (`override` / `provider-fallback` / `unresolved`) and the thinking level as `variant`. A missing cwd, an unreadable config layer and a session without a model registry answer typed errors (`cwd_unavailable`, `config_invalid`, `registry_unavailable`). The consumer is the desktop app's model-routing settings.
