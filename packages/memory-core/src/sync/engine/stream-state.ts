@@ -5,8 +5,6 @@
 import type { EngineTimers } from "./engine-timers"
 import type { SyncLog } from "./ports"
 
-export const POLL_MS = 10_000
-
 export class StreamState {
   up = false
   private shown: string | null = null
@@ -15,11 +13,12 @@ export class StreamState {
     private readonly timers: EngineTimers,
     private readonly log: SyncLog | undefined,
     private readonly onPoll: () => void,
+    private readonly pollMs: number,
   ) {}
 
   changed(connected: boolean, cause: string | undefined): void {
     this.up = connected
-    const shown = connected ? "connected" : `down (${cause ?? "dropped"}), polling every ${POLL_MS / 1000} s`
+    const shown = connected ? "connected" : `down (${cause ?? "dropped"}), polling every ${this.pollMs / 1000} s`
     if (shown !== this.shown) {
       this.shown = shown
       this.log?.(`sync event stream ${shown}`, connected ? "info" : "warn")
@@ -29,7 +28,7 @@ export class StreamState {
   }
 
   private poll(): void {
-    this.timers.arm("poll", POLL_MS, () => {
+    this.timers.arm("poll", this.pollMs, () => {
       this.onPoll()
       this.poll()
     })
