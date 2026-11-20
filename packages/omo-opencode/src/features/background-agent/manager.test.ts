@@ -8974,3 +8974,40 @@ describe("BackgroundManager attempt lifecycle bindings", () => {
     manager.shutdown()
   })
 })
+
+describe("BackgroundManager continuation stalls", () => {
+  test("queues a parent wake without completing or aborting the child", async () => {
+    const abortCalls: string[] = []
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async ({ path }: { path: { id: string } }) => {
+          abortCalls.push(path.id)
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({
+      pluginContext: createPluginInput(client),
+      enableParentSessionNotifications: true,
+    })
+    const task = createMockTask({
+      id: "task-stalled",
+      sessionId: "session-stalled",
+      parentSessionId: "parent-stalled",
+      parentAgent: "parent-agent",
+      parentModel: { providerID: "openai", modelID: "model", variant: "high" },
+    })
+    getTaskMap(manager).set(task.id, task)
+
+    await manager.notifyContinuationStall({ sessionID: "session-stalled", reason: "directive-response" })
+
+    const wake = getPendingParentWakes(manager).get(task.parentSessionId)
+    expect(wake?.notifications.join("\n")).toContain("**Reason:** directive-response")
+    expect(wake?.shouldReply).toBe(true)
+    expect(task.status).toBe("running")
+    expect(abortCalls).toEqual([])
+    manager.shutdown()
+  })
+})

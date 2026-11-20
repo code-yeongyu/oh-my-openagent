@@ -107,7 +107,14 @@ import {
   getRegisteredBackgroundTask,
   rememberBackgroundTask,
 } from "./task-registry"
-import type { BackgroundTask, BackgroundTaskAttempt, BackgroundTaskSnapshot, LaunchInput, ResumeInput } from "./types"
+import type {
+  BackgroundTask,
+  BackgroundTaskAttempt,
+  BackgroundTaskSnapshot,
+  ContinuationStallReason,
+  LaunchInput,
+  ResumeInput,
+} from "./types"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -266,6 +273,7 @@ export class BackgroundManager {
   private parentWakeTextDeltaBuffers: Map<string, string> = new Map()
   private observedOutputSessions: Set<string> = new Set()
   private observedIncompleteTodosBySession: Map<string, boolean> = new Map()
+  private readonly notifiedContinuationStalls = new Set<string>()
   private rootDescendantCounts: Map<string, number>
   private preStartDescendantReservations: Set<string>
   private enableParentSessionNotifications: boolean
@@ -1716,6 +1724,41 @@ The fallback retry session is now created and can be inspected directly.
     }
   }
 
+  rearmContinuationStall(sessionID: string): void {
+    this.notifiedContinuationStalls.delete(sessionID)
+  }
+
+  async notifyContinuationStall(input: { sessionID: string; reason: ContinuationStallReason }): Promise<void> {
+    if (!this.enableParentSessionNotifications || this.config?.wakeOnStall === false) return
+    const resolved = this.resolveTaskAttemptBySession(input.sessionID)
+    const task = resolved?.isCurrent ? resolved.task : undefined
+    if (!task || task.status !== "running" || this.notifiedContinuationStalls.has(input.sessionID)) return
+
+    const parentPromptContext = await this.resolveParentWakePromptContext(task)
+    const notification = `<system-reminder>
+[BACKGROUND TASK STALLED]
+**ID:** \`${task.id}\`
+**Description:** ${task.description}
+**Reason:** ${input.reason}
+
+Automatic continuation stopped with incomplete todos. Inspect the task with background_output(task_id="${task.id}") and resume or redirect it with a new prompt.
+</system-reminder>`
+    this.notifiedContinuationStalls.add(input.sessionID)
+    this.queuePendingParentWake(
+      task.parentSessionId,
+      notification,
+      parentPromptContext,
+      true,
+      PENDING_PARENT_WAKE_DEBOUNCE_MS,
+    )
+    this.updateBackgroundTaskMarker(task.parentSessionId)
+    this.logger("[background-agent] Queued continuation stall notification:", {
+      taskId: task.id,
+      sessionID: input.sessionID,
+      reason: input.reason,
+    })
+  }
+
   private markSessionOutputObserved(sessionID: string): void {
     this.observedOutputSessions.add(sessionID)
   }
@@ -2043,6 +2086,7 @@ The fallback retry session is now created and can be inspected directly.
       if (!sessionID) return
       this.clearSessionOutputObserved(sessionID)
       this.clearSessionTodoObservation(sessionID)
+      this.notifiedContinuationStalls.delete(sessionID)
 
       const tasksToCancel = new Map<string, BackgroundTask>()
       const directTask = this.resolveTaskAttemptBySession(sessionID)
