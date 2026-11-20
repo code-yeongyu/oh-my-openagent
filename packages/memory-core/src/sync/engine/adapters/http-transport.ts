@@ -162,53 +162,92 @@ export function createHttpTransport(options: HttpTransportOptions): Transport {
   }
 }
 
+/**
+ * Holds the stream open for as long as the subscription lives. A stream that delivered a cursor and then ended (the
+ * service closes each one after its bounded lifetime) is resumed at once with `Last-Event-ID`, so the service replays
+ * what landed in between and the engine never drops to its poll for a routine reconnect. Any other end - a refused or
+ * failed connect, a broken stream, one that ended before its first cursor - is
+ * reported as `onConnected(false, cause)` with the HTTP status and code or the error name, and retried after
+ * STREAM_RETRY_MS; the engine polls meanwhile (#14476).
+ */
 async function streamLoop(
   options: HttpTransportOptions,
   doFetch: typeof fetch,
   handlers: StreamHandlers,
   signal: AbortSignal,
 ): Promise<void> {
+  let lastEventId: string | null = null
   while (!signal.aborted) {
-    let up = false
+    let cause: string
     try {
-      const response = await doFetch(`${options.baseUrl}/v1/me/events`, {
-        headers: { ...syncRequestHeaders(await bearer(options)), accept: "text/event-stream" },
-        signal,
-      })
-      if (!response.ok || response.body === null) throw new SyncHttpError("stream", response.status, true)
-      up = true
-      handlers.onConnected(true)
-      let buffer = ""
-      const decoder = new TextDecoder()
-      for await (const chunk of response.body) {
-        buffer += decoder.decode(chunk, { stream: true })
-        let end = buffer.indexOf("\n\n")
-        while (end >= 0) {
-          const event = streamEvent(buffer.slice(0, end))
+      const headers: Record<string, string> = {
+        ...syncRequestHeaders(await bearer(options)),
+        accept: "text/event-stream",
+      }
+      if (lastEventId !== null) headers["last-event-id"] = lastEventId
+      const response = await doFetch(`${options.baseUrl}/v1/me/events`, { headers, signal })
+      if (!response.ok || response.body === null) cause = await refusalOf(response)
+      else {
+        handlers.onConnected(true)
+        let resumable = false
+        for await (const frame of streamFrames(response.body)) {
+          if (frame.id !== null) {
+            lastEventId = frame.id
+            resumable = true
+          }
+          const event = streamEvent(frame.data)
           if (event?.kind === "advanced") handlers.onAdvanced(event.head)
           else if (event?.kind === "state") handlers.onStateChanged()
-          buffer = buffer.slice(end + 2)
-          end = buffer.indexOf("\n\n")
         }
+        if (resumable) continue
+        cause = "stream ended before its first event id"
       }
     } catch (error) {
       if (signal.aborted) return
       if (!(error instanceof Error)) throw error
+      cause = error.name
     }
-    if (up) handlers.onConnected(false)
-    if (signal.aborted) return
+    handlers.onConnected(false, cause)
     await new Promise((resolve) => setTimeout(resolve, STREAM_RETRY_MS))
+  }
+}
+
+async function refusalOf(response: Response): Promise<string> {
+  const code = await response.json().then(
+    (b: unknown) => (b as { error?: { code?: string } }).error?.code ?? "no code",
+    () => "no code",
+  )
+  return `HTTP ${response.status} ${code}`
+}
+
+/** The stream's frames: the `id:` field (the service's resume cursor) and the joined `data:` lines. */
+async function* streamFrames(
+  body: ReadableStream<Uint8Array>,
+): AsyncGenerator<{ readonly id: string | null; readonly data: string }> {
+  let buffer = ""
+  const decoder = new TextDecoder()
+  for await (const chunk of body) {
+    buffer += decoder.decode(chunk, { stream: true })
+    let end = buffer.indexOf("\n\n")
+    while (end >= 0) {
+      const lines = buffer.slice(0, end).split("\n")
+      buffer = buffer.slice(end + 2)
+      end = buffer.indexOf("\n\n")
+      const id = lines.findLast((line) => line.startsWith("id:"))
+      yield {
+        id: id === undefined ? null : id.slice(3).trim(),
+        data: lines
+          .filter((line) => line.startsWith("data:"))
+          .map((line) => line.slice(5).trim())
+          .join("\n"),
+      }
+    }
   }
 }
 
 type StreamEvent = { readonly kind: "advanced"; readonly head: number } | { readonly kind: "state" }
 
-function streamEvent(frame: string): StreamEvent | null {
-  const data = frame
-    .split("\n")
-    .filter((line) => line.startsWith("data:"))
-    .map((line) => line.slice(5).trim())
-    .join("\n")
+function streamEvent(data: string): StreamEvent | null {
   if (data === "") return null
   const event = JSON.parse(data) as { type?: string; head?: { seq?: number } }
   if (event.type === "sync.state.changed") return { kind: "state" }

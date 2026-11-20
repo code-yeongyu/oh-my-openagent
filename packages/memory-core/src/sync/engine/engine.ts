@@ -11,6 +11,7 @@ import { logCycleFailure, type SyncStage } from "./failure-cause"
 import { batchBound, heldShown, recordHeld } from "./held"
 import { type EngineState, SyncJournal } from "./journal"
 import { type CaptureHolds, capture } from "./local-capture"
+import { PollFallback } from "./poll-fallback"
 import { pushCycle } from "./push-cycle"
 import type { FreezeReason, RefusalCode } from "./ports"
 import { receive } from "./receive"
@@ -19,7 +20,7 @@ import { StatusTracker } from "./status-tracker"
 export { CrashInjected, type EngineFault, INBOUND_POINTS, OUTBOUND_POINTS } from "./engine-deps"
 export type { SyncFailure, SyncFailureKind } from "./failure"
 
-export const POLL_MS = 10_000
+export { POLL_MS } from "./poll-fallback"
 export const LOCAL_DEBOUNCE_MS = 2_000
 
 export type EngineStatus =
@@ -71,7 +72,7 @@ export class SyncEngine {
   private appliedMirror = 0
   private waiters: { readonly resolve: (report: CycleReport) => void; readonly reject: (error: unknown) => void }[] = []
   private unsubscribe: (() => void) | null = null
-  private cancelPoll: (() => void) | null = null
+  private readonly polling: PollFallback
   private cancelDebounce: (() => void) | null = null
   private readonly tracker: StatusTracker
   /** The next cycle settles a service freeze before it pushes: startup, a poll, a state event, or a stream event while frozen. */
@@ -93,6 +94,10 @@ export class SyncEngine {
   constructor(private readonly deps: EngineDeps) {
     this.journal = new SyncJournal(deps.repo.gitDir)
     this.tracker = new StatusTracker(() => deps.clock.now())
+    this.polling = new PollFallback(deps.clock, deps.log, () => {
+      this.settleNext = true
+      this.request()
+    })
   }
 
   state(): Promise<EngineState> {
@@ -129,7 +134,7 @@ export class SyncEngine {
         if (this.tracker.frozen !== null) this.settleNext = true
         if (head > this.appliedMirror) this.request("event")
       },
-      onConnected: (connected) => (connected ? this.stopPolling() : this.poll()),
+      onConnected: (connected, cause) => this.polling.streamChanged(connected, cause),
       onStateChanged: () => {
         this.settleNext = true
         this.request()
@@ -141,7 +146,7 @@ export class SyncEngine {
   async stop(): Promise<void> {
     this.unsubscribe?.()
     this.unsubscribe = null
-    this.stopPolling()
+    this.polling.stop()
     this.cancelDebounce?.()
     this.stopped = true
     this.rerun = false
@@ -234,20 +239,6 @@ export class SyncEngine {
 
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => this.deps.clock.after(ms, resolve))
-  }
-
-  private poll(): void {
-    this.stopPolling()
-    this.cancelPoll = this.deps.clock.after(POLL_MS, () => {
-      this.settleNext = true
-      this.request()
-      this.poll()
-    })
-  }
-
-  private stopPolling(): void {
-    this.cancelPoll?.()
-    this.cancelPoll = null
   }
 
   private async cycle(): Promise<CycleReport> {

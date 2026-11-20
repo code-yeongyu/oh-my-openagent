@@ -55,8 +55,11 @@ export interface AppendRequest {
 export interface StreamHandlers {
   /** `sync.advanced` / `sync.keyring.changed`: a trigger carrying the advertised head, never data. */
   readonly onAdvanced: (head: number) => void
-  /** The stream connected (true) or dropped (false); while down the engine polls. */
-  readonly onConnected: (connected: boolean) => void
+  /**
+   * The stream connected (true), or it is down (false): it dropped, or a connect attempt failed, `cause` naming why
+   * (the HTTP status and code, or the error). Sent again on every failed retry; while down the engine polls.
+   */
+  readonly onConnected: (connected: boolean, cause?: string) => void
   /** `sync.state.changed`: the account state moved without an append (a rotation is pending, or sync was toggled). */
   readonly onStateChanged: () => void
 }

@@ -70,10 +70,25 @@ export class FakeSyncServer {
       },
       subscribe: (handlers) => {
         this.listeners.add(handlers)
-        handlers.onConnected(true)
+        if (this.streamRefusal === null) handlers.onConnected(true)
+        else handlers.onConnected(false, this.streamRefusal)
         return () => this.listeners.delete(handlers)
       },
     }
+  }
+
+  /** Set: every subscribe is refused with this cause instead of connecting, the way a refused stream route is. */
+  streamRefusal: string | null = null
+
+  /** One failed reconnect for every subscriber, as the HTTP transport reports each retry of a refused stream. */
+  refuseStreamRetry(): void {
+    for (const l of this.listeners) l.onConnected(false, this.streamRefusal ?? "dropped")
+  }
+
+  /** Every subscriber's stream connects (a refused stream's retry that the service now admits). */
+  connectStreams(): void {
+    this.streamRefusal = null
+    for (const l of this.listeners) l.onConnected(true)
   }
 
   /** Drops the stream for every subscriber (they fall back to polling). */
