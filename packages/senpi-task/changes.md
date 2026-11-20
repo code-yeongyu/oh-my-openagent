@@ -1,3 +1,7 @@
+## 2026-11-20 - Exact GPT models for deep categories (#14427)
+
+The three built-in GPT deep categories use only their named GPT-6.2 model and effort. A provider that offers only Fast or older models no longer makes the category available.
+
 ## 2026-11-17 - resolvers report who chose the model (#14025)
 
 `resolveCategory` now sets `modelSelection.source` and `resolveAgent` sets `modelSource` (`"user" | "builtin"`); an agent's own-model source is read from the definition being resolved (a builtin still on its builtin model is `builtin`), and `firstCategoryDefaultModel` and the find-only selection share one walk that returns the model with its source: `user` when the selected model came from omo.json (`model`, `models`, `fallback_models`, an agent's own model or a user category it runs through, or a call-site pin), `builtin` for a builtin default, chain rung or system default. Selection itself is unchanged.
