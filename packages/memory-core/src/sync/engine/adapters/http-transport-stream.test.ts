@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 
-import { awaitWithinTestBudget, useTestTimeout } from "../../../../../../test-support/test-deadline"
+import { awaitWithinTestBudget } from "../../../../../../test-support/test-deadline"
 import { createHttpTransport } from "./http-transport"
 
 // The account event stream's lifecycle against the service's wire (omo-service core/src/events/routes.ts): each
@@ -55,7 +55,6 @@ const advanced = (seq: number, cursor: string) =>
 const lived = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
 test("a stream the service closes after its lifetime is resumed at once with Last-Event-ID, and the engine is never told it dropped", async () => {
-  useTestTimeout(15_000)
   const server = streamServer([
     (signal) =>
       sse(
@@ -80,7 +79,7 @@ test("a stream the service closes after its lifetime is resumed at once with Las
   expect(server.connects.map((c) => c.lastEventId)).toEqual([null, "p1.d0123456789abcdef.s3.n0.t0"])
   expect(heads).toEqual([3])
   expect(connected).toEqual([true, true])
-}, 15_000)
+})
 
 test("a stream that delivers a cursor and ends at once is reported down before any reconnect, so repeated ends never spin", async () => {
   const server = streamServer([(signal) => sse([advanced(3, "p1.d0123456789abcdef.s3.n0.t0")], true, signal)])
@@ -109,7 +108,6 @@ test("a stream that delivers a cursor and ends at once is reported down before a
 })
 
 test("a connect that never answers is reported down once its deadline passes, and the stalled request is aborted", async () => {
-  useTestTimeout(15_000)
   let aborted = false
   const stalled = (async (_url: string | URL | Request, init?: RequestInit) =>
     new Promise<Response>((_resolve, reject) => {
@@ -133,7 +131,7 @@ test("a connect that never answers is reported down once its deadline passes, an
     stop()
   }
   expect(aborted).toBe(true)
-}, 15_000)
+})
 
 test("a refused stream is reported down on the first attempt with the HTTP status and the service's code", async () => {
   const server = streamServer([
