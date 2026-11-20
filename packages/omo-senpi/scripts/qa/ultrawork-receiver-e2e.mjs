@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Live proof of the receiver-selected ultrawork directive (omo#8168 / omo#9642 follow-up): the REAL
 // senpi binary, an isolated agent dir, the built plugin, and the keyless mock provider under two model
-// ids. The GPT-6 Astra id must receive SENPI_ASTRA_ULTRAWORK_DIRECTIVE and every other id the baseline,
+// ids. The GPT-6.2 Astra id must receive SENPI_ASTRA_ULTRAWORK_DIRECTIVE and every other id the baseline,
 // read back from the session JSONL (the only place the hidden custom message is distinguishable).
 import { spawnSync } from "node:child_process"
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
@@ -16,7 +16,7 @@ const scriptDir = dirname(fileURLToPath(import.meta.url))
 const mockProviderEntry = join(scriptDir, "mock-provider", "index.ts")
 
 const SCENARIOS = [
-  { name: "astra-receiver", model: "gpt-6-astra", expect: "astra" },
+  { name: "astra-receiver", model: "gpt-6.2-astra", expect: "astra" },
   { name: "baseline-receiver", model: "mock-1", expect: "baseline" },
 ]
 
