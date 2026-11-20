@@ -23,7 +23,7 @@ const NOT_HANDED: Readonly<Record<ConnectFailure, string>> = {
   timed_out: "the device service did not answer in time",
   failed: "the device service could not be reached",
 }
-export const notHandedLine = (cause: ConnectFailure, detail: string): string =>
+const notHandedLine = (cause: ConnectFailure, detail: string): string =>
   `OmO device service: this sign-in did not reach it, so remote sessions stay signed out on this device: ${NOT_HANDED[cause]} (${cause}: ${detail}). Run \`omo remote enable\`, then start omo once to hand the sign-in over.`
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null
