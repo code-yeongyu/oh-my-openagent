@@ -420,6 +420,49 @@ describe("thread session controls", () => {
     expect(f.setModel.mock.calls).toEqual([["route-peer", "openai", "gpt-x", "dur-peer"]])
   })
 
+  test.each([
+    ["openai/gpt-x", "gpt-x", []],
+    ["openai/gpt-x:max", "gpt-x", [["route-peer", "max", "turn", "dur-peer"]]],
+    ["openai/gpt-other:max", "gpt-other:max", []],
+  ])("#14445: set_model resolves %s on the one-provider target", async (model, id, thinkingCalls) => {
+    const f = fixture()
+    f.models.splice(1, 1, { provider: "openai", id: "gpt-other:max" })
+
+    expect(await runner(f)("thread_set_model", { thread: "peer", model })).toEqual({
+      kind: "ok",
+      thread: "dur-peer",
+      model: { provider: "openai", id },
+    })
+    expect(f.setThinkingLevel.mock.calls).toEqual(thinkingCalls)
+  })
+
+  test("#14445: set_model identifies a provider missing from the one-provider target", async () => {
+    const f = fixture()
+    f.models.splice(1, 1, { provider: "openai", id: "gpt-y" })
+
+    expect(await runner(f)("thread_set_model", { thread: "peer", model: "apitopia/glm-5.1:max" })).toMatchObject({
+      kind: "error",
+      error: {
+        code: "model_not_found",
+        details: { reason: "provider_not_configured", provider: "apitopia", available_providers: ["openai"] },
+      },
+    })
+    expect(f.setModel).not.toHaveBeenCalled()
+  })
+
+  test("#14445: set_model reports when the selected model rejects the requested thinking level", async () => {
+    const f = fixture()
+    f.models.splice(1, 1)
+    f.setThinkingLevel.mockImplementation(async () => {
+      throw new Error("thinking_level_unsupported:Thinking level max is not supported by the active model.")
+    })
+
+    expect(await runner(f)("thread_set_model", { thread: "peer", model: "openai/gpt-x:max" })).toMatchObject({
+      kind: "error",
+      error: { code: "thinking_level_unsupported", details: { supported: ["off", "high"] } },
+    })
+  })
+
   test("set_model reports no match with at most twenty available provider/id values", async () => {
     const f = fixture()
     f.models.splice(
