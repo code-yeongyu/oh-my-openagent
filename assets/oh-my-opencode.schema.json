@@ -9333,6 +9333,9 @@
           "type": "number",
           "minimum": 60000
         },
+        "wakeOnStall": {
+          "type": "boolean"
+        },
         "messageStalenessTimeoutMs": {
           "type": "number",
           "minimum": 60000

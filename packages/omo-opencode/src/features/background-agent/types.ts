@@ -135,6 +135,8 @@ export interface LaunchInput {
   userPermission?: Record<string, "ask" | "allow" | "deny">
 }
 
+export type ContinuationStallReason = "stagnation" | "failures" | "user-interruption" | "directive-response"
+
 export interface ResumeInput {
   sessionId: string
   prompt: string
