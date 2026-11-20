@@ -1,6 +1,6 @@
 import { syncRequestHeaders } from "@oh-my-opencode/memory-core/sync-capabilities"
 import { z } from "zod"
-import { jsonRequest } from "./protocol"
+import { ApiRefusal, jsonRequest } from "./protocol"
 import type { Session } from "./session"
 
 // The account's devices as `GET /v1/devices` lists them, read with this device's sign-in. One reader for every caller:
@@ -54,6 +54,40 @@ export async function listLiveDevices(session: Pick<Session, "accessToken" | "re
     .parse(body)
     .devices.filter((device) => device.revokedAt === null)
     .map(live)
+}
+
+export type RevokeOutcome =
+  | { readonly kind: "revoked"; readonly device: LiveDevice }
+  | { readonly kind: "not_found" }
+  | { readonly kind: "this_device" | "confirmation_mismatch" | "still_live"; readonly device: LiveDevice }
+
+/**
+ * Signs ANOTHER device of this account out, by id (#13189): the refusals are decided on a fresh list before any request,
+ * and the revoke counts only once the account no longer lists the device. `confirmName`, when given, must equal the
+ * device's current name. `thisDeviceId` is the stored credential's device: a service that omits or misreports `current`
+ * never gets this device revoked.
+ */
+export async function revokeDevice(
+  session: Pick<Session, "accessToken" | "request">,
+  target: { readonly id: string; readonly thisDeviceId: string | undefined; readonly confirmName?: string },
+): Promise<RevokeOutcome> {
+  const device = (await listLiveDevices(session)).find((listed) => listed.id === target.id)
+  if (device === undefined) return { kind: "not_found" }
+  if (device.current || device.id === target.thisDeviceId) return { kind: "this_device", device }
+  if (target.confirmName !== undefined && target.confirmName !== device.name)
+    return { kind: "confirmation_mismatch", device }
+  const access = await session.accessToken()
+  try {
+    await session.request(`/v1/devices/${encodeURIComponent(device.id)}`, {
+      method: "DELETE",
+      headers: syncRequestHeaders(access),
+    })
+  } catch (error) {
+    // Another caller revoked it between the list and the delete: the account answers 404 for a device it no longer has.
+    if (!(error instanceof ApiRefusal && error.status === 404)) throw error
+  }
+  const stillLive = (await listLiveDevices(session)).some((listed) => listed.id === device.id)
+  return stillLive ? { kind: "still_live", device } : { kind: "revoked", device }
 }
 
 /** Renames a device of this account; the service answers 404 `not_found` for an id the account does not have. */
