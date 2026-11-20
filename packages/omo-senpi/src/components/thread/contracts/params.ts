@@ -168,7 +168,7 @@ export const ThreadSetModelParams = Type.Object({
   model: Type.String({
     minLength: 1,
     description:
-      "Model to switch the thread to, as provider/id, an exact model id, or a case-insensitive fragment of the id or display name resolved against the host's model catalog; no match returns model_not_found with the available list, several matches return model_ambiguous with candidates.",
+      "Model to switch the thread to, as provider/id, an exact model id, or a case-insensitive fragment of the id or display name, resolved against the target's catalog. Append a thinking level such as :max to apply it after switching. No match returns model_not_found with the available list; an absent provider adds details.reason = provider_not_configured and lists the target's available providers. Several matches return model_ambiguous with candidates.",
   }),
   provider: Type.Optional(
     Type.String({

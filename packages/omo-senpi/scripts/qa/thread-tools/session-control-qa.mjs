@@ -176,6 +176,7 @@ try {
             api: "openai-completions",
             models: ["mock-model", "mock-model-fast", "mock-model-deep"].map((id) => ({
               id,
+              ...(id === "mock-model-deep" ? { reasoning: true, thinkingLevelMap: { max: "max" } } : {}),
               baseUrl: fake.url,
               api: "openai-completions",
               contextWindow: 128000,
@@ -287,6 +288,53 @@ try {
     (await surface.listSessions()).find((session) => (session.durableSessionId ?? session.sessionId) === threadA)
       ?.sessionId ?? threadA
   const supported = await surface.getAvailableThinkingLevels(routingA).catch(() => undefined)
+  const missingProvider = await call(tools, "thread_set_model", {
+    thread: threadA,
+    model: "absent/fake:max",
+    all_scope: true,
+  })
+  const details = missingProvider.kind === "error" ? missingProvider.error.details : undefined
+  record(
+    "14445-a",
+    "absent-provider",
+    missingProvider.kind === "error" &&
+      missingProvider.error.code === "model_not_found" &&
+      details?.reason === "provider_not_configured" &&
+      details?.provider === "absent" &&
+      JSON.stringify(details?.available_providers) === '["mock"]'
+      ? "pass"
+      : "fail",
+    JSON.stringify(details),
+  )
+  const rejectedMax = await call(tools, "thread_set_model", {
+    thread: threadA,
+    model: "mock/mock-model-fast:max",
+    all_scope: true,
+  })
+  record(
+    "14445-b",
+    "unsupported-max",
+    rejectedMax.kind === "error" && rejectedMax.error.code === "thinking_level_unsupported" ? "pass" : "fail",
+    errorCode(rejectedMax),
+  )
+  const max = await call(tools, "thread_set_model", {
+    thread: threadA,
+    model: "mock/mock-model-deep:max",
+    all_scope: true,
+  })
+  const state = await surface.getState(routingA)
+  record(
+    "14445-c",
+    "max-round-trip",
+    max.kind === "ok" &&
+      max.model.id === "mock-model-deep" &&
+      state.model?.id === "mock-model-deep" &&
+      state.thinkingLevel === "max"
+      ? "pass"
+      : "fail",
+    `result=${max.kind} engineModel=${state.model?.id} engineThinking=${state.thinkingLevel}`,
+  )
+  await call(tools, "thread_set_model", { thread: threadA, model: "mock/mock-model-fast", all_scope: true })
 
   // 8. a level the active model DOES support is accepted and echoed with its scope
   if (supported === undefined || supported.length === 0) {

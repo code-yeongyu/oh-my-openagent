@@ -421,10 +421,10 @@ describe("thread session controls", () => {
   })
 
   test.each([
-    ["openai/gpt-x", "gpt-x", []],
-    ["openai/gpt-x:max", "gpt-x", [["route-peer", "max", "turn", "dur-peer"]]],
-    ["openai/gpt-other:max", "gpt-other:max", []],
-  ])("#14445: set_model resolves %s on the one-provider target", async (model, id, thinkingCalls) => {
+    ["openai/gpt-x", "gpt-x", undefined],
+    ["openai/gpt-x:max", "gpt-x", "max"],
+    ["openai/gpt-other:max", "gpt-other:max", undefined],
+  ])("#14445: set_model resolves %s on the one-provider target", async (model, id, level) => {
     const f = fixture()
     f.models.splice(1, 1, { provider: "openai", id: "gpt-other:max" })
 
@@ -433,7 +433,9 @@ describe("thread session controls", () => {
       thread: "dur-peer",
       model: { provider: "openai", id },
     })
-    expect(f.setThinkingLevel.mock.calls).toEqual(thinkingCalls)
+    expect(f.setThinkingLevel.mock.calls).toEqual(
+      level === undefined ? [] : [["route-peer", level, "turn", "dur-peer"]],
+    )
   })
 
   test("#14445: set_model identifies a provider missing from the one-provider target", async () => {

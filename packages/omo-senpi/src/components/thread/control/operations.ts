@@ -102,7 +102,7 @@ export async function setModelOn(
   const fresh = async () => matchModel((await control.getAvailableModels({ fresh: true })).models, model, provider)
   const first = await control.getAvailableModels()
   const held = first.held ? exactModel(first.models, model, provider) : undefined
-  const matched =
+  let matched: Awaited<ReturnType<typeof fresh>> =
     held !== undefined
       ? { kind: "match" as const, model: held }
       : first.held
@@ -124,6 +124,11 @@ export async function setModelOn(
     if (rematched.kind !== "match") return rematched
     if (rematched.model.provider === matched.model.provider && rematched.model.id === matched.model.id) throw error
     selected = await control.setModel(rematched.model.provider, rematched.model.id)
+    matched = rematched
+  }
+  if (matched.thinkingLevel !== undefined) {
+    const refusal = await applyThinkingLevel(control, matched.thinkingLevel)
+    if (refusal !== undefined) return refusal
   }
   return { kind: "ok", ...controlIdentity(control), model: { provider: selected.provider, id: selected.id } }
 }
@@ -133,6 +138,11 @@ export async function setThinkingLevelOn(
   level: ThreadSetReasoningInput["level"],
   scope: ThreadSetReasoningInput["scope"],
 ): Promise<ThreadToolResult> {
+  const refusal = await applyThinkingLevel(control, level)
+  return refusal ?? { kind: "ok", ...controlIdentity(control), level, scope: scope ?? "session" }
+}
+
+async function applyThinkingLevel(control: SessionControl, level: string): Promise<ThreadToolResult | undefined> {
   try {
     await control.setThinkingLevel(level)
   } catch (error) {
@@ -145,5 +155,4 @@ export async function setThinkingLevelOn(
       { supported },
     )
   }
-  return { kind: "ok", ...controlIdentity(control), level, scope: scope ?? "session" }
 }
