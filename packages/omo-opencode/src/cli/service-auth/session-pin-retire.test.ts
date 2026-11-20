@@ -248,6 +248,27 @@ describe("the credential write seam retires the sync pin (#12280)", () => {
     expect(h.logs).toHaveLength(1)
   })
 
+  // #13642 review (b088286) L1: the account lookup runs under the credential lock, so it gets the fix-up's short budget;
+  // a stalled service keeps the pin (reported) instead of holding the sign-out for the 30 s request timeout.
+  test("#given a legacy sign-in with a live pin and a service that never answers /v1/me #when it is forgotten #then the lookup gives up within its budget, the item is deleted and the kept pin is reported", async () => {
+    const h = await pinnedHome()
+    const api = fakeApi(() => new Promise<Response>(() => undefined))
+    const s = memoryStore({ ...grant, ...privateKeys })
+    const started = performance.now()
+    await createSession({
+      api,
+      store: s.store,
+      home: h.home,
+      beforeKeysDiscarded: h.hook,
+      machine: { digest: async () => undefined, name: () => "test", budgetMs: 50 },
+    }).forget()
+    // The budget under test is 50 ms; the unbounded lookup waits for the request timeout (seconds).
+    expect(performance.now() - started).toBeLessThan(3_000)
+    expect(s.current()).toBeNull()
+    expect(await h.pins()).toEqual({ live: 1, retired: 0 })
+    expect(h.logs).toHaveLength(1)
+  })
+
   // #13642 review L1: with no live pin there is nothing left in place, so nothing is reported.
   test("#given an unreadable stored item and no live pin #when it is forgotten #then it is deleted and nothing is logged", async () => {
     const home = await temporaryHome()
