@@ -52,6 +52,8 @@ export interface EngineDeps {
    * (#13720). A journal an older build wrote names no space; with this set it is that space's.
    */
   readonly legacySpace?: string
+  /** The account the session is signed in to; the journal belongs to it (#14481). */
+  readonly account?: string
   readonly lock: WriterLock
   readonly clock: Clock
   readonly fault?: EngineFault

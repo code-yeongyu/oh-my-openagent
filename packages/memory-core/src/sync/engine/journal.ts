@@ -109,6 +109,10 @@ export interface EngineState {
    * an older build wrote. The account feed carries every space, so a cursor is only valid in its own.
    */
   readonly space: string | null
+  /** The account whose chain this journal synced (#14481); null in a journal an older build wrote. */
+  readonly account: string | null
+  /** Working files present when this account took the repository over from another: never captured into it. */
+  readonly foreign: readonly string[]
 }
 
 const EMPTY_STATE: EngineState = {
@@ -124,6 +128,8 @@ const EMPTY_STATE: EngineState = {
   updatedWhileOffline: null,
   peer: null,
   space: null,
+  account: null,
+  foreign: [],
 }
 
 export class SyncJournal {

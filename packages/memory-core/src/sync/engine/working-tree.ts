@@ -77,3 +77,7 @@ export function landingPath(paths: ItemPaths, key: string): string | null {
   const path = paths.byKey.get(key)
   return path === undefined ? key : path
 }
+
+/** The item paths of the repository's working tree as it stands on disk. */
+export const itemPathsOnDisk = async (root: string): Promise<ItemPaths> =>
+  itemPaths((await scanWorkingTree(diskLister(root))).files)
