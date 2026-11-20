@@ -2,7 +2,7 @@
 // ulw-execute worktree lifecycle (#14391): `add` creates a task-owned worktree, copies the gitignored local
 // config into it and records it; `provision` re-copies into an existing one; `teardown` removes every
 // recorded worktree and its branch once the branch is merged. Prints one JSON line. Exit 3: listed config is missing, or
-// unlisted local config (.env, .env.*) exists: ask the user before going on.
+// with no .worktreeinclude, unlisted local config (.env, .env.*) exists: ask the user before going on.
 import { execFileSync } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
@@ -64,7 +64,8 @@ function teardown(repo, { into }) {
     }
     try {
       if (existsSync(entry.path)) git(repo, ["worktree", "remove", entry.path])
-      git(repo, ["branch", "-d", entry.branch])
+      // -D, not -d: `-d` checks against HEAD, while the merge was just verified against `target`.
+      git(repo, ["branch", "-D", entry.branch])
       removed.push({ path: entry.path, branch: entry.branch })
     } catch (error) {
       kept.push({ path: entry.path, branch: entry.branch, reason: String(error.stderr ?? error.message).trim() })
@@ -84,10 +85,16 @@ function parseFlags(argv) {
   return flags
 }
 
+// The main checkout owns the local config and the manifest, wherever the CLI runs from: inside a run worktree,
+// `--show-toplevel` would name that worktree instead. `git worktree list` always lists the main checkout first.
+function mainCheckout(cwd) {
+  return git(cwd, ["worktree", "list", "--porcelain"]).split("\n")[0].replace(/^worktree /, "")
+}
+
 export function main(argv) {
   const [command, ...rest] = argv
   const flags = parseFlags(rest)
-  const repo = resolve(flags.repo ?? git(process.cwd(), ["rev-parse", "--show-toplevel"]))
+  const repo = mainCheckout(resolve(flags.repo ?? process.cwd()))
   let result
   if (command === "add") result = add(repo, flags)
   else if (command === "provision") result = { path: resolve(flags.path), ...provision(repo, resolve(flags.path)) }

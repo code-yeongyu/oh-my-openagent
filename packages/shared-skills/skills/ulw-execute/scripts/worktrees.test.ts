@@ -52,7 +52,12 @@ function fixtureRepo(files: Record<string, string> = {}): string {
 }
 
 function run(repo: string, ...args: string[]) {
-  const result = spawnSync(process.execPath, [CLI, ...args, "--repo", repo], { encoding: "utf8" })
+  return runFrom(repo, ...args, "--repo", repo)
+}
+
+// The CLI as a run invokes it: from some directory, with no --repo.
+function runFrom(cwd: string, ...args: string[]) {
+  const result = spawnSync(process.execPath, [CLI, ...args], { cwd, encoding: "utf8" })
   const lastLine = result.stdout.trim().split("\n").at(-1) ?? ""
   return {
     status: result.status,
@@ -80,9 +85,10 @@ describe("ulw-execute worktrees helper", () => {
   test("#given a .worktreeinclude #when provisioning #then listed files copy, a missing listed path fails as required, escapes and symlinks are refused", () => {
     const repo = fixtureRepo({
       "secrets/api.key": "k\n",
-      ".worktreeinclude": "# local config\nsecrets/api.key\nconfig/local.json\n../outside\n/etc/passwd\nlinked.env\n",
+      ".worktreeinclude": "# local config\nsecrets/api.key\nconfig/local.json\n../outside\n/etc/passwd\nlinked.env\n.env.*\n",
     })
     symlinkSync("/etc/hostname", join(repo, "linked.env"))
+    symlinkSync(join(repo, "nowhere"), join(repo, ".env.dangling"))
     const wt = join(repo, "..", "wt-b")
 
     const result = run(repo, "add", "--path", wt, "--branch", "ulw/b")
@@ -91,7 +97,7 @@ describe("ulw-execute worktrees helper", () => {
     expect(readFileSync(join(wt, "secrets", "api.key"), "utf8")).toBe("k\n")
     expect(existsSync(join(wt, "linked.env"))).toBe(false)
     expect(result.json.missingRequired).toEqual(["config/local.json"])
-    expect(result.json.refused.sort()).toEqual(["../outside", "/etc/passwd", "linked.env"])
+    expect(result.json.refused.sort()).toEqual(["../outside", ".env.dangling", "/etc/passwd", "linked.env"])
   })
 
   test("#given an include entry git does not ignore #when provisioning #then it is refused so a copied secret can never be staged, and the copy keeps the source mode", () => {
@@ -221,5 +227,42 @@ describe("ulw-execute worktrees helper", () => {
     expect(git(repo, "branch", "--list", "someone/else")).not.toBe("")
     const manifest = JSON.parse(readFileSync(join(repo, ".omo", "ulw-execute", "worktrees.json"), "utf8"))
     expect(manifest.created.map((entry: { branch: string }) => entry.branch)).toEqual(["ulw/unmerged"])
+  })
+
+  test("#given the CLI runs from inside a run worktree #when it provisions and adds the next wave #then it reads and records against the main checkout, so teardown from there removes every wave", () => {
+    const repo = fixtureRepo({ ".env": "TOKEN=dummy\n", ".worktreeinclude": ".env\n" })
+    const wave1 = join(repo, "..", "wt-w1")
+    const wave2 = join(repo, "..", "wt-w2")
+    runFrom(repo, "add", "--path", wave1, "--branch", "ulw/w1")
+    rmSync(join(wave1, ".env"))
+
+    const provisioned = runFrom(wave1, "provision", "--path", wave1)
+    expect(provisioned.status).toBe(0)
+    expect(readFileSync(join(wave1, ".env"), "utf8")).toBe("TOKEN=dummy\n")
+
+    const added = runFrom(wave1, "add", "--path", wave2, "--branch", "ulw/w2")
+    expect(added.json.provisioned).toEqual([".env"])
+
+    git(repo, "merge", "-q", "--no-ff", "-m", "merge", "ulw/w2")
+    const torn = runFrom(repo, "teardown")
+
+    expect(torn.json.removed.map((entry: { branch: string }) => entry.branch).sort()).toEqual(["ulw/w1", "ulw/w2"])
+    expect(git(repo, "worktree", "list", "--porcelain")).not.toContain("wt-w")
+  })
+
+  test("#given a branch merged into the --into ref but not into the checkout's HEAD #when torn down #then the worktree and its branch are both removed", () => {
+    const repo = fixtureRepo()
+    const wt = join(repo, "..", "wt-into")
+    run(repo, "add", "--path", wt, "--branch", "ulw/into")
+    writeFileSync(join(wt, "feature.txt"), "f\n")
+    git(wt, "add", "feature.txt")
+    git(wt, "commit", "-qm", "feature")
+    git(repo, "branch", "landed", "ulw/into")
+
+    const result = run(repo, "teardown", "--into", "landed")
+
+    expect(result.json.kept).toEqual([])
+    expect(result.json.removed).toEqual([{ path: wt, branch: "ulw/into" }])
+    expect(git(repo, "branch", "--list", "ulw/into")).toBe("")
   })
 })

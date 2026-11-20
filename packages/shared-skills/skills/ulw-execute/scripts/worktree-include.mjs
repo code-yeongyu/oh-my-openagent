@@ -120,11 +120,14 @@ function copyOne(repo, worktree, path, result) {
   const source = join(repo, path)
   const stat = lstatSync(source)
   const target = join(worktree, path)
-  const escapes = !within(repo, realpathSync(source)) || !within(worktree, join(resolvedAncestor(dirname(target)), "x"))
+  // Checked before any realpath: a dangling symlink would make realpathSync throw.
+  if (stat.isSymbolicLink() || !stat.isFile()) {
+    result.refused.push(path)
+    return
+  }
   if (
-    stat.isSymbolicLink() ||
-    !stat.isFile() ||
-    escapes ||
+    !within(repo, realpathSync(source)) ||
+    !within(worktree, join(resolvedAncestor(dirname(target)), "x")) ||
     !isGitIgnored(repo, path) ||
     !isGitIgnored(worktree, path)
   ) {
