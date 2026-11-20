@@ -1,12 +1,12 @@
 {
  "repo": {
-  "head": "cdd244eb701e5bc522bdff28570f4a116402ead0",
+  "head": "28c8cc04493785ad4ced8d257c67caacc66d2245",
   "harness": "5ab795e3392325c961596d7944a1740f4d0a9e20"
  },
  "platform": "darwin-arm64",
  "runtimes": {
-  "harness": "node@26.13.1",
-  "child": "bun@1.4.4 @code-yeongyu/senpi@2026.11.19-3 (pinned)"
+  "harness": "node@26.12.0",
+  "child": "bun@1.4.4 @code-yeongyu/senpi@2026.11.19-5 (pinned)"
  },
  "hashes": {
   "driver": "sha256:641a42d1f3de87b4cf64b3486a03b6c39d9049e66f1d5776208b108883fe0428",
@@ -14,5 +14,5 @@
   "fakeModelServer": "sha256:cab5b6866b7854287218de51d1fafcc242a8602b2c83fb85572abe332f9f6560",
   "collectors": "sha256:f084a278fe05fa9e3603e95ab86bd3988e4a2c500a3174a2e72521a0d4038bdd"
  },
- "command": "node packages/omo-senpi/scripts/qa/fused-equivalence-e2e.mjs --record --repeat 2"
+ "command": "node packages/omo-senpi/scripts/qa/fused-equivalence-e2e.mjs --record"
 }

@@ -276,7 +276,10 @@ export type RemoteThreadSurface = {
   readonly permissionPreset?: () => string | undefined
 }
 
-/** The id a listing row has ABOVE the ports (decision 0027 D2): its durable id and nothing else; "" when the device publishes none. */
+/**
+ * A listing row's durable id (decision 0027 D2), "" when its device publishes none. What a row is listed and addressed by
+ * is thread-address-core `rowKey` (the durable id, else `<device id>/<listing key>`); this is the durable id alone.
+ */
 export const rowThreadId = (row: RemoteSessionRow): string => row.durable_id ?? ""
 
 /**
@@ -285,10 +288,6 @@ export const rowThreadId = (row: RemoteSessionRow): string => row.durable_id ?? 
  */
 export const rowStatus = (row: RemoteSessionRow): ThreadStatus =>
   row.state === "ended" || row.source === "cache" ? "resumable" : "live"
-
-/** A listing row's display name: its title, else its folder's name, so no listed thread shows an empty name (#14043). */
-export const rowLabel = (row: RemoteSessionRow): string =>
-  row.title !== "" ? row.title : (row.project.split(/[\\/]/).findLast((part) => part !== "") ?? "")
 
 /**
  * The one rule for a probe-built `ended` row (#13238 review): a probe may build one only while this device's service

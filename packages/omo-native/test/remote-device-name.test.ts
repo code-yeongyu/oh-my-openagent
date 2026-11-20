@@ -5,7 +5,7 @@ import { join } from "node:path"
 
 import { connectDeviceService } from "../../device-service-core/src/index.ts"
 import { startFakeOwner, type FakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
-import { defaultWorld } from "../../device-service-core/test/local-api/conformance/world.ts"
+import { defaultWorld, type World } from "../../device-service-core/test/local-api/conformance/world.ts"
 import { createRemoteThreadFixture } from "../../omo-senpi/src/components/thread/thread-remote-fixture"
 import { REMOTE_EXIT, runRemoteVerb } from "../remote-cli"
 
@@ -26,12 +26,12 @@ afterEach(async () => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
 
-async function run(args: readonly string[]) {
+async function run(args: readonly string[], world: World = defaultWorld()) {
   const a = fixture.account()
   const stateDir = mkdtempSync(join(tmpdir(), "omo-13432-owner-"))
   chmodSync(stateDir, 0o700)
   dirs.push(stateDir)
-  const owner = await startFakeOwner({ stateDir, world: defaultWorld() })
+  const owner = await startFakeOwner({ stateDir, world })
   owners.push(owner)
   const err: string[] = []
   const out: string[] = []
@@ -99,6 +99,38 @@ describe("omo remote session verbs take the device the table prints", () => {
   })
 })
 
-// `sessions --device <name|prefix|here>` resolves inside the client's one sessions.list call, which belongs to the
-// roster lane (U6): the name and ambiguity cases of that resolution moved there with #14305. The CLI's own half -
-// printing the candidates the client answers - is pinned in remote-cli.test.ts over a spy client.
+describe("omo remote sessions takes the device the table prints (#14305)", () => {
+  test("#given the NAME column's value in another case #when sessions --device runs #then it lists that device's rows", async () => {
+    const result = await run(["sessions", "--device", "studio", "--json"])
+    expect(result.code).toBe(REMOTE_EXIT.ok)
+    const listing = JSON.parse(result.out.join("")) as { rows: { device: { id: string } }[] }
+    expect(listing.rows.length).toBeGreaterThan(0)
+    expect(new Set(listing.rows.map((row) => row.device.id))).toEqual(new Set(["dev-peer-1"]))
+  })
+
+  test("#given two online devices sharing a name #when sessions --device names it #then it lists nothing and the refusal names both devices", async () => {
+    const world = defaultWorld()
+    const twin = {
+      device: "dev-peer-3",
+      label: "Studio",
+      kind: "desktop" as const,
+      platform: "linux" as const,
+      last_seen_ms: 1_790_000_000_000,
+      online: true,
+    }
+    const result = await run(["sessions", "--device", "Studio", "--json"], {
+      ...world,
+      devices: [...world.devices, twin],
+    })
+    // The exit the CLI unit pins for a typed ambiguous answer (remote-cli.test.ts): failed, with the answer on stdout.
+    expect(result.code).toBe(REMOTE_EXIT.failed)
+    const answer = JSON.parse(result.out.join("")) as {
+      code: string
+      rows?: unknown
+      details: { candidates: { device: string }[] }
+    }
+    expect(answer.code).toBe("ambiguous_target")
+    expect(answer.rows).toBeUndefined()
+    expect(answer.details.candidates.map((candidate) => candidate.device).sort()).toEqual(["dev-peer-1", "dev-peer-3"])
+  })
+})

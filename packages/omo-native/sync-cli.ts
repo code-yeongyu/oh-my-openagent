@@ -25,6 +25,7 @@ import type { Command } from "commander"
 
 import { SignInError } from "../omo-opencode/src/cli/service-auth/protocol"
 import { type SyncContext, signedInSyncContext } from "./sync-context"
+import { CREATION_UNAVAILABLE, phraseCreationGuidance, RUN_IT_YOURSELF } from "./sync-creation-guidance"
 
 export const EXIT_UNSUPPORTED_HERE = 2
 
@@ -52,10 +53,6 @@ const RECOVER_ELSEWHERE =
   "On a machine without it, approve this device from a device that already syncs: run `omo sync enable` here, then `omo sync approve` there."
 
 export const PHRASE_GENESIS_FLAG = "OMO_MEMORY_SYNC_PHRASE_GENESIS"
-const RUN_IT_YOURSELF = "Run `omo sync enable` yourself in a terminal."
-// A1.1-L2: creation unavailable is never worded as "recovery is optional".
-const CREATION_UNAVAILABLE =
-  "Turning on memory sync isn't available on this device yet. Update OmO later, or turn it on from a Mac with Touch ID."
 const PHRASE_VOID = "The recovery phrase you saw was not saved to your account. Do not keep it."
 const CANCELLED = "Turning on memory sync was cancelled. Nothing was saved."
 
@@ -189,7 +186,7 @@ async function enable(dependencies: SyncCommandDependencies, context: SyncContex
       dependencies.error(CANCELLED)
       return 1
     case "phrase_unavailable":
-      dependencies.error(outcome.reason === "no-surface" ? RUN_IT_YOURSELF : CREATION_UNAVAILABLE)
+      dependencies.error(phraseCreationGuidance[outcome.reason])
       return EXIT_UNSUPPORTED_HERE
     case "acknowledge_required":
     case "method_required":
