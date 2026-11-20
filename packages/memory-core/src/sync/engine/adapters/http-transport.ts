@@ -196,6 +196,12 @@ async function streamLoop(
       }
       if (lastEventId !== null) headers["last-event-id"] = lastEventId
       const response = await doFetch(`${options.baseUrl}/v1/me/events`, { headers, signal })
+      if (response.status === 426) {
+        // The client floor refuses this build until OmO is updated (#14483): stop reconnecting and let the engine's
+        // paced recheck (polling while the stream is down) notice a lifted floor instead of a 5 s reconnect loop.
+        handlers.onConnected(false, await refusalOf(response))
+        return
+      }
       if (!response.ok || response.body === null) cause = await refusalOf(response)
       else {
         handlers.onConnected(true)

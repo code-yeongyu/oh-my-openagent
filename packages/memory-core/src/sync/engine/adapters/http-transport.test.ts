@@ -185,6 +185,42 @@ test("the event stream delivers sync.advanced heads and reports the connection",
   expect(await server.untilStreamsClosed()).toBe(0)
 })
 
+test("#given the service's client floor refuses this build #when the event stream opens with a 426 #then it reports the stream down once and stops reconnecting (#14483)", async () => {
+  let opened = 0
+  const floored = createHttpTransport({
+    baseUrl: "http://sync.example",
+    token: () => "tok",
+    fetch: (async () => {
+      opened += 1
+      return Response.json(
+        { error: { code: "client_update_required", message: "update OmO to keep syncing", retryable: false } },
+        { status: 426 },
+      )
+    }) as unknown as typeof fetch,
+  })
+  const connected: boolean[] = []
+  let stop: () => void = () => undefined
+  const down = new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error("waited 10s for the 426 stream to report down, never fired")),
+      10_000,
+    )
+    stop = floored.subscribe({
+      onAdvanced: () => undefined,
+      onConnected: (up) => {
+        connected.push(up)
+        clearTimeout(timer)
+        resolve()
+      },
+      onStateChanged: () => undefined,
+    })
+  })
+  await down
+  stop()
+  expect(connected).toEqual([false])
+  expect(opened).toBe(1)
+})
+
 // #12280 R-A9 (wire): a revoke through the real route freezes the account; the stream announces it as
 // `sync.state.changed`, the state route shows the flag, and a push is refused `stale_base`.
 test("#given a subscribed device #when another device is signed out through the sign-out route #then the stream delivers a state change and pushes are refused stale_base", async () => {

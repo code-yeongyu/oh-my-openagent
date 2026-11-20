@@ -61,9 +61,9 @@ test(
     const b = await makeDevice(server, "b")
     devices.push(a, b)
     a.engine.start()
+    const aStarted = a.engine.nextCycle()
     b.engine.start()
-    await a.engine.nextCycle()
-    await b.engine.nextCycle()
+    await Promise.all([aStarted, b.engine.nextCycle()])
     const pullsBefore = server.pulls.filter((author) => author === "device:a").length
 
     await a.write("x.md", "x\n")
@@ -99,6 +99,13 @@ test(
     const pushed = a.engine.nextCycle()
     a.engine.notifyLocalCommit()
     a.clock.advance(LOCAL_DEBOUNCE_MS)
+    // The stale_base answer backs off on the engine's clock before it pulls and retries.
+    let settled = false
+    void pushed.finally(() => (settled = true))
+    while (!settled) {
+      await Promise.race([pushed, a.clock.untilPending()])
+      a.clock.advance(1_000)
+    }
     const report = await awaitWithinTestBudget(pushed, "A's push after the stale base")
     await b.engine.runCycle()
 
