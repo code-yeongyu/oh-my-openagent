@@ -216,12 +216,12 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
       const replayed = outcome.result as GatewayDeliveryResult
       return replayed.kind === "ok" ? { ...replayed, deduplicated: true } : replayed
     }
-    if (outcome.kind === "collapsed")
-      return resultFromRow(outcome.row, outcome.queue_position, endpoint?.kind ?? null, true, false)
     const settle = async (result: GatewayDeliveryResult): Promise<GatewayDeliveryResult> => {
       await store.completeReceipt({ now: now(), principal: facts.principal, idempotency_key: idempotencyKey, result })
       return result
     }
+    if (outcome.kind === "collapsed")
+      return await settle(resultFromRow(outcome.row, outcome.queue_position, endpoint?.kind ?? null, true, false))
     try {
       if (endpoint === null) return await settle(resultFromRow(outcome.row, outcome.queue_position, null, false, true))
       let reply: Awaited<ReturnType<GatewayEndpointPort["wake"]>> | undefined

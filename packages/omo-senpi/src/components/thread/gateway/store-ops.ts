@@ -673,12 +673,14 @@ export async function enqueue(
       rollbackQuietly(ctx)
       return binding
     }
-    const absorbing = collapseEarlier(ctx, request)
-    if (absorbing !== undefined) {
+    const collapse = collapseEarlier(ctx, request)
+    if (collapse.absorbing !== undefined) {
+      // The absorbed send keeps its own receipt, which the engine completes: a retry under its key replays this answer.
+      insertReceipt(ctx, request, collapse.absorbing.delivery_id, undefined)
       const outcome: EnqueueOutcome = {
         kind: "collapsed",
-        row: absorbing,
-        queue_position: queuePosition(ctx, absorbing),
+        row: collapse.absorbing,
+        queue_position: queuePosition(ctx, collapse.absorbing),
       }
       ctx.sql.exec(commitSql)
       committed = true
@@ -752,28 +754,15 @@ export async function enqueue(
     }
     insertDelivery(ctx, row)
     const position = queuePosition(ctx, row)
-    const answer = intakeFields?.answer(row, position)
-    write(
-      ctx,
-      "INSERT INTO receipts (principal, operation, idempotency_key, args_hash, status, delivery_id, owner_instance, result, created_at, updated_at, expires_at) VALUES (?, 'deliver', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      [
-        request.sender_principal,
-        request.receipt.idempotency_key,
-        request.receipt.args_hash,
-        answer === undefined ? "prepared" : "completed",
-        row.delivery_id,
-        ctx.config.instance_id,
-        answer === undefined ? null : JSON.stringify(answer),
-        request.now,
-        request.now,
-        request.now + GATEWAY_RECEIPT_RETENTION_MS,
-      ],
-    )
+    insertReceipt(ctx, request, row.delivery_id, intakeFields?.answer(row, position))
     marker = createMarker(ctx, row.target_durable_id, row.delivery_id, false)
     sweepRetentionIfDue(ctx, request.now, cleared)
     if (ctx.afterCommit === undefined) await ctx.hook("beforeDbCommit")
     ctx.sql.exec(commitSql)
     committed = true
+    // A superseded row's marker goes only once its refusal committed: a later refusal in this enqueue rolls the row back
+    // to queued, and a queued row always keeps its wake (a receiver's reconcile removes a marker left behind).
+    for (const id of collapse.superseded) unlinkMarker(ctx, request.target_durable_id, id)
     if (ctx.afterCommit === undefined) await ctx.hook("afterDbCommit")
     return { kind: "inserted", row, queue_position: position }
   } catch (error) {
@@ -791,8 +780,11 @@ export async function enqueue(
  * waiting in the gateway is refused `superseded`; a row the session's runtime already took absorbs the repeat (the
  * runtime cannot give it back), so one key never leaves more than one undelivered message.
  */
-function collapseEarlier(ctx: StoreContext, request: EnqueueRequest): DeliveryRow | undefined {
-  if (request.collapse_key === undefined) return undefined
+function collapseEarlier(
+  ctx: StoreContext,
+  request: EnqueueRequest,
+): { readonly absorbing?: DeliveryRow; readonly superseded: readonly string[] } {
+  if (request.collapse_key === undefined) return { superseded: [] }
   const earlier = selectRows(
     ctx,
     `target_durable_id = ? AND sender = ? AND collapse_key = ? AND state IN ${OPEN_STATES}`,
@@ -800,12 +792,37 @@ function collapseEarlier(ctx: StoreContext, request: EnqueueRequest): DeliveryRo
     "seq",
   )
   const taken = earlier.find((row) => row.state !== "queued")
-  if (taken !== undefined) return taken
+  if (taken !== undefined) return { absorbing: taken, superseded: [] }
   for (const row of earlier) {
     transition(ctx, row, "refused", request.now, { reason: "superseded" })
-    unlinkMarker(ctx, row.target_durable_id, row.delivery_id)
+    // A retry of the superseded send replays its refusal, not the queued answer it got when it was sent.
+    const refusedRow = selectRow(ctx, row.delivery_id) as DeliveryRow
+    write(
+      ctx,
+      "UPDATE receipts SET status = 'completed', result = ?, updated_at = ? WHERE operation = 'deliver' AND delivery_id = ?",
+      [JSON.stringify(resultFromRow(refusedRow, 0, null, true, false)), request.now, row.delivery_id],
+    )
   }
-  return undefined
+  return { superseded: earlier.map((row) => row.delivery_id) }
+}
+
+function insertReceipt(ctx: StoreContext, request: EnqueueRequest, deliveryId: string, answer: unknown): void {
+  write(
+    ctx,
+    "INSERT INTO receipts (principal, operation, idempotency_key, args_hash, status, delivery_id, owner_instance, result, created_at, updated_at, expires_at) VALUES (?, 'deliver', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    [
+      request.sender_principal,
+      request.receipt.idempotency_key,
+      request.receipt.args_hash,
+      answer === undefined ? "prepared" : "completed",
+      deliveryId,
+      ctx.config.instance_id,
+      answer === undefined ? null : JSON.stringify(answer),
+      request.now,
+      request.now,
+      request.now + GATEWAY_RECEIPT_RETENTION_MS,
+    ],
+  )
 }
 
 function transcriptText(sessionPath: string | null, cache: Map<string, string>): string {
