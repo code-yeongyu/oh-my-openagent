@@ -188,6 +188,11 @@ describe("omo sync status", () => {
         expect(stale).toEqual({ kind: "no_engine" })
         expect(running).toEqual({ kind: "running" })
         expect(Buffer.concat(received).length).toBe(0)
+        // and a socket this user may not open is "could not be checked", never "no engine"
+        if (process.getuid?.() !== 0) {
+          await chmod(socket, 0o000)
+          expect((await readEngineSyncStatus(env)).kind).toBe("unreadable")
+        }
       } finally {
         server.close()
       }

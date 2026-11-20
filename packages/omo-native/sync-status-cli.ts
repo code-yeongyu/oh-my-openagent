@@ -6,8 +6,8 @@ import type { SyncContext } from "./sync-context"
 import type { EngineSyncRead } from "./sync-engine-status"
 
 // `omo sync status` (#14435): a read-only report of this device's memory sync. It reads the signed-in context, the
-// local pin and switch, the account's devices and pending joins, and whether an engine runs; it writes nothing, and
-// every field is an id, a flag, a time or a count, never key material. Each section reports its own failure.
+// local pin and switch, the account's devices and pending joins, and whether an engine runs. It writes no sync state
+// (the shared sign-in context may still refresh the credential, as every signed-in command does), and every field is an id, a flag, a time or a count, never key material. Each section reports its own failure.
 
 type Section<T> = ({ readonly ok: true } & T) | { readonly ok: false; readonly reason: string }
 
