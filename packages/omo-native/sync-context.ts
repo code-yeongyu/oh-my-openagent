@@ -20,6 +20,7 @@ import {
 import { ApiRefusal, type Credentials, serviceOrigin, SignInError } from "../omo-opencode/src/cli/service-auth/protocol"
 import { createSession } from "../omo-opencode/src/cli/service-auth/session"
 import { retireSyncPinOnDiscard } from "../omo-opencode/src/cli/service-auth/sync-pin-retire"
+import { type Listed, liveDevices } from "./account-devices"
 
 export interface SyncContext {
   readonly account: string
@@ -34,8 +35,8 @@ export interface SyncContext {
    * built from: a logout or a different sign-in in another process retires the operation (#12303).
    */
   readonly authority: SyncOperationAuthority
-  /** The account's `GET /v1/devices` answer, unparsed; `omo sync status` reads it at its own boundary. */
-  readonly listDevices?: () => Promise<unknown>
+  /** The account's live devices, through the same read `omo account devices` uses. */
+  readonly listDevices?: () => Promise<readonly Listed[]>
 }
 
 export interface SyncContextOptions {
@@ -120,12 +121,6 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
     chain: createAccountHttp(http),
     pairing: createPairingHttp(http),
     authority,
-    listDevices: async () => {
-      const response = await doFetch(`${api}/v1/devices`, {
-        headers: syncRequestHeaders(await token()),
-      })
-      if (!response.ok) throw new ApiRefusal("unknown", response.status)
-      return response.json()
-    },
+    listDevices: () => liveDevices(session),
   }
 }

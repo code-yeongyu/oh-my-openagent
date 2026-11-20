@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdir } from "node:fs/promises"
+import { chmod, mkdir } from "node:fs/promises"
+import { createServer } from "node:net"
 
 import type { AccountHttp, PairingHttp, PendingApproval } from "../../memory-core/src/sync/account/index.ts"
 import { trustAnchorDir } from "../../memory-core/src/sync/device-retire.ts"
@@ -9,7 +10,7 @@ import { Command } from "commander"
 import { temporaryHome } from "../../omo-opencode/src/cli/service-auth/test-support"
 import { configureSyncCommands } from "../sync-cli"
 import type { SyncContext } from "../sync-context"
-import { type EngineSyncRead, parseEngineAnswer, readEngineSyncStatus } from "../sync-engine-status"
+import { type EngineSyncRead, readEngineSyncStatus } from "../sync-engine-status"
 
 const initialExitCode = process.exitCode
 afterEach(() => {
@@ -20,20 +21,18 @@ const unused = (): never => {
   throw new Error("not used by this case")
 }
 
-const DEVICES = {
-  devices: [
-    {
-      id: "dev_svc",
-      name: "laptop",
-      syncing: true,
-      lastSeenAt: "2026-11-20T01:00:00.000Z",
-      current: true,
-      revokedAt: null,
-    },
-    { id: "dev_b", name: "desk", syncing: false, lastSeenAt: "2026-11-19T01:00:00.000Z", revokedAt: null },
-    { id: "dev_gone", name: "old", syncing: true, revokedAt: "2026-11-01T00:00:00.000Z" },
-  ],
-}
+const DEVICES = [
+  {
+    id: "dev_svc",
+    name: "laptop",
+    syncing: true,
+    lastSeenAt: "2026-11-20T01:00:00.000Z",
+    current: true,
+    revokedAt: null,
+  },
+  { id: "dev_b", name: "desk", syncing: false, lastSeenAt: "2026-11-19T01:00:00.000Z", revokedAt: null },
+  { id: "dev_old", name: "old", revokedAt: null },
+]
 
 const PENDING: PendingApproval = {
   id: "pend_1",
@@ -45,7 +44,7 @@ const PENDING: PendingApproval = {
 }
 
 async function context(
-  options: { readonly joined?: boolean; readonly off?: boolean; readonly devices?: () => Promise<unknown> } = {},
+  options: { readonly joined?: boolean; readonly off?: boolean; readonly devices?: SyncContext["listDevices"] } = {},
 ): Promise<SyncContext> {
   const pinDir = await temporaryHome()
   if (options.joined === true) await mkdir(trustAnchorDir(pinDir, "acct"), { recursive: true })
@@ -96,31 +95,30 @@ async function status(args: string[], ctx: SyncContext, engine: EngineSyncRead) 
   return { out, err, exit: process.exitCode }
 }
 
-const SYNCED: EngineSyncRead = {
-  kind: "read",
-  sync: { state: "synced", lastSyncedAtISO: "2026-11-20T01:30:00.000Z", appliedWhileOffline: 3 },
-}
+const RUNNING: EngineSyncRead = { kind: "running" }
 
 describe("omo sync status", () => {
-  test("reports account, join, switch, live devices, pending joins and the engine as JSON", async () => {
-    // given a joined device with sync on, three listed devices (one revoked), one pending join and a synced engine
+  test("reports account, join, switch, the account's devices, pending joins and the engine as JSON", async () => {
+    // given a joined device with sync on, three live devices (one from a service without the newer fields), one pending join
     const ctx = await context({ joined: true })
     // when status runs with --json
-    const { out, exit } = await status(["--json"], ctx, SYNCED)
-    // then one typed object carries every section and drops the revoked device
+    const { out, exit } = await status(["--json"], ctx, RUNNING)
+    // then one typed object carries every section
     expect(exit).toBe(0)
     expect(JSON.parse(out.join(""))).toEqual({
       account: "acct",
-      device: { id: "dev_svc", joined: true, switch: "on" },
+      deviceId: "dev_svc",
+      device: { ok: true, joined: true, switch: "on" },
       devices: {
         ok: true,
         list: [
           { id: "dev_svc", name: "laptop", syncing: true, lastSeenAt: "2026-11-20T01:00:00.000Z", current: true },
           { id: "dev_b", name: "desk", syncing: false, lastSeenAt: "2026-11-19T01:00:00.000Z", current: false },
+          { id: "dev_old", name: "old", current: false },
         ],
       },
       pending: { ok: true, list: [{ id: "pend_1", expiresAt: "2026-11-20T02:00:00.000Z", answered: false }] },
-      engine: SYNCED,
+      engine: RUNNING,
     })
   })
 
@@ -129,75 +127,70 @@ describe("omo sync status", () => {
     const ctx = await context({ off: true })
     // when status runs
     const { out, exit } = await status([], ctx, { kind: "no_engine" })
-    // then the human lines name both facts and the missing engine
+    // then the human lines name both facts, the unknown membership and the missing engine
     expect(exit).toBe(0)
     expect(out).toContain("This device: dev_svc, not joined, sync off")
-    expect(out).toContain("Engine: no engine is running on this machine.")
-    expect(out).toContain("Pending join requests:")
+    expect(out).toContain("    old (dev_old): sync unknown")
     expect(out).toContain("  pend_1: expires 2026-11-20T02:00:00.000Z, waiting")
+    expect(out).toContain("Engine: no engine is running on this machine.")
   })
 
-  test("a failing engine shows its reason, last cycle and held files", async () => {
-    // given an engine holding two files
-    const engine = parseEngineAnswer({
-      sync: {
-        state: "paused",
-        failure: {
-          kind: "unknown",
-          reason: "two files are too large",
-          action: "shrink them",
-          sinceISO: "2026-11-20T00:00:00.000Z",
-          attempts: 4,
-          keys: ["a.md", "b.md"],
-        },
-      },
-    })
-    // when status runs
-    const { out } = await status([], await context({ joined: true }), engine)
-    // then each engine field is printed
-    expect(out).toEqual(
-      expect.arrayContaining([
-        "  state: paused",
-        "  reason: two files are too large",
-        "  since: 2026-11-20T00:00:00.000Z (4 attempts)",
-        "  held files: a.md, b.md",
-      ]),
-    )
-  })
-
-  test("a device list the service refuses is reported without failing the whole status", async () => {
-    // given a device list that throws
+  test("a refused device list and an unreadable pin dir each report their own reason", async () => {
+    // given a device list that throws and a pin dir this user cannot search
     const ctx = await context({
       devices: async () => {
         throw new Error("service answered 503")
       },
     })
-    // when status runs
-    const { out, exit } = await status([], ctx, { kind: "no_session" })
-    // then the other sections still print and the devices line names the reason
-    expect(exit).toBe(0)
-    expect(out).toContain("Devices: could not be read (service answered 503).")
-    expect(out).toContain("Engine: running, but it has no open session to read sync status from.")
+    await chmod(ctx.pinDir, 0o000)
+    try {
+      // when status runs
+      const { out, exit } = await status([], ctx, RUNNING)
+      // then the command still succeeds and each failed section names why
+      expect(exit).toBe(0)
+      expect(out).toContain("Devices: could not be read (service answered 503).")
+      expect(out.some((line) => line.startsWith("This device: dev_svc, local sync state could not be read ("))).toBe(
+        process.getuid?.() !== 0,
+      )
+      expect(out).toContain("  pend_1: expires 2026-11-20T02:00:00.000Z, waiting")
+    } finally {
+      await chmod(ctx.pinDir, 0o700)
+    }
   })
 
   test.skipIf(process.platform === "win32")(
-    "the operator socket decides no_engine: absent, or a leftover file nobody listens on",
+    "the operator socket decides: absent or a leftover file is no engine, a listener is running and receives nothing",
     async () => {
-      // given an agent dir with no socket, then one with a stale non-socket file at the socket path
+      // given an agent dir with no socket, then a stale regular file at the path, then a real listener
       const home = await temporaryHome()
       const socket = `${home}/rpc.sock`
-      // when the engine is read through that socket
-      const absent = await readEngineSyncStatus({ OMO_CODING_AGENT_DIR: home, OMO_RPC_SOCKET: socket })
+      const env = { OMO_CODING_AGENT_DIR: home, OMO_RPC_SOCKET: socket }
+      // when the engine is read through that socket each time
+      const absent = await readEngineSyncStatus(env)
       await Bun.write(socket, "")
-      const stale = await readEngineSyncStatus({ OMO_CODING_AGENT_DIR: home, OMO_RPC_SOCKET: socket })
-      // then both report that no engine is running
-      expect(absent).toEqual({ kind: "no_engine" })
-      expect(stale).toEqual({ kind: "no_engine" })
+      const stale = await readEngineSyncStatus(env)
+      await Bun.file(socket).delete()
+      const received: Buffer[] = []
+      const closed = Promise.withResolvers<void>()
+      const server = createServer((connection) => {
+        connection.on("data", (chunk: Buffer) => received.push(chunk))
+        connection.on("close", () => closed.resolve())
+      })
+      await new Promise<void>((resolve) => server.listen(socket, resolve))
+      try {
+        const running = await readEngineSyncStatus(env)
+        await Promise.race([
+          closed.promise,
+          new Promise((_, reject) => setTimeout(() => reject(new Error("waited 5s for the probe to close")), 5_000)),
+        ])
+        // then only the listener reads as running, and the probe sent no request (no auth, no attach)
+        expect(absent).toEqual({ kind: "no_engine" })
+        expect(stale).toEqual({ kind: "no_engine" })
+        expect(running).toEqual({ kind: "running" })
+        expect(Buffer.concat(received).length).toBe(0)
+      } finally {
+        server.close()
+      }
     },
   )
-
-  test("an engine answer of the wrong shape is unreadable, not a crash", () => {
-    expect(parseEngineAnswer({ sync: { state: "exploded" } }).kind).toBe("unreadable")
-    expect(parseEngineAnswer({})).toEqual({ kind: "read", sync: null })
-  })
 })
