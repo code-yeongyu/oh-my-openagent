@@ -238,6 +238,8 @@ export type ThreadListResult =
       readonly kind: "ok"
       readonly threads: readonly ThreadResultSummary[]
       readonly scope: "workspace" | "all"
+      /** Why the rows carry no `backlog`: the gateway store could not be read (#14428). The threads are still listed. */
+      readonly backlog_error?: string
       /** The account's devices, this one included, when the account's devices could be listed. */
       readonly devices?: readonly ThreadDevice[]
       /**

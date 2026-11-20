@@ -93,10 +93,10 @@ export async function withBacklog(
   let backlogs: Awaited<ReturnType<typeof store.backlogs>>
   try {
     backlogs = await store.backlogs(listed.threads.map((thread) => thread.thread))
-  } catch {
+  } catch (error) {
     // The backlog is an optional detail: a store that cannot be read (a newer schema, a worker that failed to start) never
-    // costs the listing, which is how a stuck gateway is diagnosed.
-    return listed
+    // costs the listing, which is how a stuck gateway is diagnosed, and the listing names why the backlog is missing.
+    return { ...listed, backlog_error: error instanceof Error ? error.message : String(error) }
   }
   return {
     ...listed,

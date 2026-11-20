@@ -254,7 +254,11 @@ describe("omo#14428 target backlog admission", () => {
       backlogs: async () => Promise.reject(new Error("gateway schema 17 is newer than this binary's 16")),
     }
 
-    expect(await withBacklog(broken, listing)).toEqual(listing)
+    const listed = await withBacklog(broken, listing)
+
+    if (listed.kind !== "ok" || !("threads" in listed) || !("threads" in listing)) throw new Error("not a listing")
+    expect(listed.threads).toEqual(listing.threads)
+    expect(listed.backlog_error).toBe("gateway schema 17 is newer than this binary's 16")
   })
 
   test("#given an empty steer lane #when one steer larger than the steer byte reserve is sent #then it is admitted", async () => {
