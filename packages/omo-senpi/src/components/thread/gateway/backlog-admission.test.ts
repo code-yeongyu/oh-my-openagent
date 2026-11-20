@@ -26,7 +26,11 @@ function seat(): { h: GatewayHarness; lead: HarnessSession; sender: HarnessSessi
 async function send(
   sender: HarnessSession,
   text: string,
-  extra: { readonly mode?: "follow_up" | "steer"; readonly expected_turn_id?: number; readonly collapse_key?: string } = {},
+  extra: {
+    readonly mode?: "follow_up" | "steer"
+    readonly expected_turn_id?: number
+    readonly collapse_key?: string
+  } = {},
 ): Promise<GatewayDeliveryResult> {
   return await sender.engine.deliver({
     sender: { kind: "session", durable_id: sender.id },
@@ -137,7 +141,16 @@ describe("omo#14428 target backlog admission", () => {
     h.session("quiet")
     const firstAt = h.clock.now
     await fillFollowUps(h, sender, 3)
-    const row = (thread: string) => ({ thread, name: thread, status: "live", state: "running", cwd: "/", created_at: "", updated_at: null, link: "" })
+    const row = (thread: string) => ({
+      thread,
+      name: thread,
+      status: "live",
+      state: "running",
+      cwd: "/",
+      created_at: "",
+      updated_at: null,
+      link: "",
+    })
 
     const listed = await withBacklog(lead.store, {
       kind: "ok",

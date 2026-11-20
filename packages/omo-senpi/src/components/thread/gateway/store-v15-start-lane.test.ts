@@ -16,6 +16,16 @@ import { settled } from "./testing/settled"
  */
 const V14 = 14
 
+/** What the steps after v15 add to `deliveries`: v16's collapse key column and its index (#14428). */
+const SINCE_V15 = {
+  column: { name: "collapse_key", type: "TEXT", notnull: 0, dflt_value: null, pk: 0 },
+  object: { type: "index", name: "deliveries_collapse" },
+  row: { collapse_key: null },
+}
+
+const byTypeAndName = (left: { type: string; name: string }, right: { type: string; name: string }) =>
+  left.type === right.type ? left.name.localeCompare(right.name) : left.type.localeCompare(right.type)
+
 let harness: GatewayHarness | undefined
 afterEach(async () => {
   await harness?.dispose()
@@ -106,11 +116,12 @@ test("#given a v14 store holding deliveries in every lane #when the current buil
   await openAndMigrate(h)
 
   const after = snapshot(path)
-  expect(after.version).toBe(V14 + 1)
   expect(after.version).toBe(GATEWAY_MIGRATIONS.length)
-  expect(after.rows).toEqual(before.rows)
-  expect(after.columns).toEqual(before.columns)
-  expect(after.objects).toEqual(before.objects)
+  expect(after.rows).toEqual(before.rows.map((row) => ({ ...(row as object), ...SINCE_V15.row })))
+  expect(after.columns).toEqual([...before.columns, SINCE_V15.column])
+  expect(after.objects).toEqual(
+    [...(before.objects as { type: string; name: string }[]), SINCE_V15.object].toSorted(byTypeAndName),
+  )
   expect(after.registry).toEqual(before.registry)
   expect(after.foreignKeyViolations).toBe(0)
   insertStart()
@@ -144,7 +155,9 @@ test("#given an extension table referencing deliveries ON DELETE CASCADE #when m
       { id: 1, delivery_id: "d-follow" },
       { id: 2, delivery_id: "d-queued" },
     ])
-    expect((db.query("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(V14 + 1)
+    expect((db.query("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(
+      GATEWAY_MIGRATIONS.length,
+    )
   } finally {
     db.close()
   }
