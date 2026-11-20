@@ -147,7 +147,11 @@ export interface Device {
    * A fresh engine over the same directories; `fault` crashes it at a journal marker. `moveTo` binds
    * it to another memory space (and names the space it leaves when the journal records none).
    */
-  restart(fault?: EngineFault, moveTo?: { readonly space: string; readonly legacySpace?: string }): Promise<void>
+  restart(
+    fault?: EngineFault,
+    moveTo?: { readonly space: string; readonly legacySpace?: string },
+    switchTo?: AccountLink,
+  ): Promise<void>
   syncCommits(): Promise<string[]>
   workingTempFiles(): Promise<string[]>
   /** Cycle render journals left under .git/omo-sync/renders (none once every cycle ended). */
@@ -156,6 +160,12 @@ export interface Device {
   workingFiles(): Promise<string[]>
   retiredJournals(): Promise<string[]>
   dispose(): Promise<void>
+}
+
+/** The account a device's session is signed in to and that account's server (#14481: a sign-out then a sign-in to another). */
+export interface AccountLink {
+  readonly server: FakeSyncServer
+  readonly account: string
 }
 
 export interface DeviceOptions {
@@ -170,6 +180,8 @@ export interface DeviceOptions {
   readonly freeze?: FreezeSettler
   /** The memory space the device's session is bound to; FAKE_SPACE by default. */
   readonly space?: string
+  /** The account the device's session is signed in to; ACCOUNT by default. */
+  readonly account?: string
 }
 
 export async function makeDevice(
@@ -187,8 +199,9 @@ export async function makeDevice(
   const repo = await gitRepo(root, options.memoryFrom !== undefined)
   const clock = new ManualClock()
   let bound: { readonly space: string; readonly legacySpace?: string } = { space: options.space ?? FAKE_SPACE }
+  let link: AccountLink = { server, account: options.account ?? ACCOUNT }
   const build = (f?: EngineFault) => {
-    const verifier = new FakeVerifier(ACCOUNT, bound.space)
+    const verifier = new FakeVerifier(link.account, bound.space)
     const store: ItemStore =
       options.realStore === true
         ? createDeviceItemStore({
@@ -202,10 +215,11 @@ export async function makeDevice(
     const engine = new SyncEngine({
       repo,
       store,
-      transport: lockGuarded(server.transport(`device:${name}`), lock),
+      transport: lockGuarded(link.server.transport(`device:${name}`), lock),
       verifier,
-      sealer: new FakeSealer(ACCOUNT, bound.space),
+      sealer: new FakeSealer(link.account, bound.space),
       space: bound.space,
+      account: link.account,
       ...(bound.legacySpace === undefined ? {} : { legacySpace: bound.legacySpace }),
       lock,
       clock,
@@ -232,8 +246,9 @@ export async function makeDevice(
     async read(key) {
       return readFile(join(root, key), "utf8").catch(() => null)
     },
-    async restart(f, moveTo) {
+    async restart(f, moveTo, switchTo) {
       if (moveTo !== undefined) bound = moveTo
+      if (switchTo !== undefined) link = switchTo
       Object.assign(device, build(f))
     },
     async syncCommits() {
