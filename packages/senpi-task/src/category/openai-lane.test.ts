@@ -32,10 +32,9 @@ function expectResolved(
 }
 
 const GPT_CATEGORY_CASES = [
-  { category: "ultrabrain", modelId: "gpt-6-astra", variant: "max" },
-  { category: "deep-high", modelId: "gpt-6-astra", variant: "high" },
-  { category: "deep-low", modelId: "gpt-5.6-sol-fast", variant: "medium" },
-  { category: "deep-low", modelId: "gpt-5.6-sol", variant: "medium" },
+  { category: "ultrabrain", modelId: "gpt-6.2-astra", variant: "max" },
+  { category: "deep-high", modelId: "gpt-6.2-astra", variant: "high" },
+  { category: "deep-low", modelId: "gpt-6.2-sol", variant: "medium" },
 ] as const
 
 describe("openai lane policy", () => {
@@ -55,42 +54,31 @@ describe("openai lane policy", () => {
       })
     }
 
-    test("#when the API lane is listed first in the registry #then chatgpt-subscription still wins and its runtime chain stays on the codex lane", () => {
+    test("#when the API lane is listed first beside older GPT models #then chatgpt-subscription still wins and no lane carries a cross-model fallback", () => {
       // given
       const models = registry([
+        model("openai", "gpt-6.2-astra"),
+        model("openai", "gpt-6.2-sol"),
         model("openai", "gpt-6-astra"),
         model("openai", "gpt-5.6-sol"),
         model("chatgpt-subscription", "gpt-5.6-sol"),
         model("chatgpt-subscription", "gpt-6-astra"),
+        model("chatgpt-subscription", "gpt-6.2-sol"),
+        model("chatgpt-subscription", "gpt-6.2-astra"),
       ])
 
       // when
-      const result = expectResolved(resolveCategory("ultrabrain", {}, models))
+      const results = ["ultrabrain", "deep-high", "deep-low"].map((category) =>
+        expectResolved(resolveCategory(category, {}, models)),
+      )
 
       // then
-      expect(result.spec.provider).toBe("chatgpt-subscription")
-      expect(result.spec.modelId).toBe("gpt-6-astra")
-      expect(result.spec.fallback_models?.map((entry) => entry.display)).toEqual(["chatgpt-subscription/gpt-5.6-sol"])
-    })
-
-    test("#when a deep lane resolves #then it carries no cross-model fallback, so the lanes never substitute each other", () => {
-      // given
-      const models = registry([
-        model("openai", "gpt-6-astra"),
-        model("openai", "gpt-5.6-sol"),
-        model("chatgpt-subscription", "gpt-5.6-sol"),
-        model("chatgpt-subscription", "gpt-6-astra"),
+      expect(results.map((result) => `${result.spec.provider}/${result.spec.modelId}`)).toEqual([
+        "chatgpt-subscription/gpt-6.2-astra",
+        "chatgpt-subscription/gpt-6.2-astra",
+        "chatgpt-subscription/gpt-6.2-sol",
       ])
-
-      // when
-      const high = expectResolved(resolveCategory("deep-high", {}, models))
-      const low = expectResolved(resolveCategory("deep-low", {}, models))
-
-      // then
-      expect(high.spec.modelId).toBe("gpt-6-astra")
-      expect(low.spec.modelId).toBe("gpt-5.6-sol")
-      expect(high.spec.fallback_models ?? []).toEqual([])
-      expect(low.spec.fallback_models ?? []).toEqual([])
+      for (const result of results) expect(result.spec.fallback_models ?? []).toEqual([])
     })
   })
 
@@ -115,14 +103,14 @@ describe("openai lane policy", () => {
   describe("#given only chatgpt-subscription", () => {
     test("#when deep-high resolves #then the subscription lane is the requested model", () => {
       // given
-      const models = registry([model("chatgpt-subscription", "gpt-6-astra")])
+      const models = registry([model("chatgpt-subscription", "gpt-6.2-astra")])
 
       // when
       const result = expectResolved(resolveCategory("deep-high", {}, models))
 
       // then
       expect(result.spec.provider).toBe("chatgpt-subscription")
-      expect(result.spec.modelId).toBe("gpt-6-astra")
+      expect(result.spec.modelId).toBe("gpt-6.2-astra")
       expect(result.spec.requested_model?.display).toBe("chatgpt-subscription/gpt-6.2-astra")
     })
   })
