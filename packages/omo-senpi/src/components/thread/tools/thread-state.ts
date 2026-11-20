@@ -77,6 +77,16 @@ export function retryWait(running: boolean, waiting: unknown): { readonly waitin
   }
 }
 
+/** omo-relay-spec #314: a holder version is an opaque, nonempty, well-formed string of at most 128 UTF-16 code units. */
+const ENGINE_VERSION_MAX_CHARS = 128
+
+/** The holder's engine version when it is one (see above); anything else is unknown and shown as nothing. */
+export function holderVersion(value: unknown): { readonly engine_version?: string } {
+  return typeof value === "string" && value !== "" && value.length <= ENGINE_VERSION_MAX_CHARS && value.isWellFormed()
+    ? { engine_version: value }
+    : {}
+}
+
 /** A reported model, when it is exactly a non-empty provider and id. */
 export function threadModel(value: unknown): { readonly model?: ThreadModel } {
   if (typeof value !== "object" || value === null) return {}

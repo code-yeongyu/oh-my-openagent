@@ -14,7 +14,7 @@ import { prepareRemoteWorktree, removeRemoteWorktree } from "../worktree/remote-
 import { openedEngineId, openRefusal } from "./open-reply"
 import { threadLink } from "../thread-link"
 import type { ThreadHostSession } from "../tools/ports"
-import { rowState, threadModel } from "../tools/thread-state"
+import { holderVersion, retryWait, rowState, threadModel } from "../tools/thread-state"
 import {
   openedThread,
   type HostedThread,
@@ -55,6 +55,10 @@ function listedThread(row: RemoteSessionRow): HostedThread {
     status: rowStatus(row),
     state: rowState(row),
     ...threadModel(row.model),
+    // Only a row its device answered this round names a live holder: a cached snapshot shows neither field (#14278).
+    ...(row.source === "cache"
+      ? {}
+      : { ...retryWait(rowState(row) === "running", row.waiting), ...holderVersion(row.engine_version) }),
     cwd: row.project,
     created_at: seen,
     updated_at: seen,

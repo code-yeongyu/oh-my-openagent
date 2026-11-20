@@ -33,6 +33,10 @@ export type RemoteSessionRow = {
   readonly model?: { readonly provider: string; readonly id: string }
   /** Rows 4: the engine archived the session; absent means not archived. */
   readonly archived?: true
+  /** Rows 6: the holder's retry wait as its engine names it (`{kind, attempt, maxAttempts, delayMs, until}`); absent = none or unknown. */
+  readonly waiting?: unknown
+  /** Rows 7: the version of the engine that holds the session live; absent = unknown. */
+  readonly engine_version?: string
 }
 
 export type RemoteDevice = {

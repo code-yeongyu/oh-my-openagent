@@ -27,4 +27,24 @@ describe("device-service port: the listing row fields the thread tools read", ()
       { ...ROW, session_id: "s3", source: "cache", as_of: 1 },
     ])
   })
+
+  test("#given rows 6/7 listing rows #when the account is listed #then the holder's wait and engine version reach the port as sent, and a row without them carries none (#14278)", async () => {
+    const waiting = { kind: "retry", attempt: 1, maxAttempts: 5, delayMs: 3000, until: "2026-11-20T09:00:03.000Z" }
+    const service = {
+      sessions: async () => ({
+        rows: [
+          { ...ROW, session_id: "s1", source: "live", as_of: 2, waiting, engine_version: "2026.11.19-3" },
+          { ...ROW, session_id: "s2", source: "live", as_of: 2 },
+        ],
+        incomplete: [],
+      }),
+      closed: new Promise(() => {}),
+      close: () => undefined,
+    } as unknown as DeviceService
+    const port = sessionsPort({ version: "0.0.0-test", connect: async () => ({ conn: service, owned: true }) })
+    expect(await port.sessions()).toEqual([
+      { ...ROW, session_id: "s1", source: "live", waiting, engine_version: "2026.11.19-3" },
+      { ...ROW, session_id: "s2", source: "live" },
+    ])
+  })
 })
