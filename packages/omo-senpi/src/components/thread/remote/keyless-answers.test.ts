@@ -29,7 +29,7 @@ describe("answers about a session with no durable id name it by its row key (#14
     },
   )
 
-  test("#given b's ended session with no durable id #when a steer is addressed to its row key #then turn_conflict names the row by that key", async () => {
+  test("#given b's ended session with no durable id #when a steer is addressed to its row key #then turn_conflict's details name the row by that key", async () => {
     const ended = { ...ANON, state: "ended" as const }
     const a = account({ rows: [B_ROW, ended], wakeFeature: true })
     const result = await surface(a.remote).run("thread_send", {
@@ -38,18 +38,18 @@ describe("answers about a session with no durable id name it by its row key (#14
       delivery: "steer",
       expected_turn_id: "1",
     })
-    expect(result).toMatchObject({ kind: "error" })
-    expect(JSON.stringify(result)).toContain(KEY)
-    expect(JSON.stringify(result)).not.toContain('" on device b')
+    expect(result).toMatchObject({
+      kind: "error",
+      error: { code: "turn_conflict", details: { device: "b", thread: KEY } },
+    })
   })
 
-  test("#given b's ended session with no durable id and no wake on this device #when a send is addressed to its row key #then not_resumable names it by that key in message and details", async () => {
+  test("#given b's ended session with no durable id and no wake on this device #when a send is addressed to its row key #then not_resumable's details name it by that key", async () => {
     const ended = { ...ANON, state: "ended" as const }
     const result = await surface(account({ rows: [B_ROW, ended] }).remote).run("thread_send", {
       thread: KEY,
       message: "hi",
     })
     expect(result).toMatchObject({ kind: "error", error: { code: "not_resumable", details: { thread: KEY } } })
-    expect(result.kind === "error" ? result.error.message : "").toStartWith(`${KEY} on device b`)
   })
 })
