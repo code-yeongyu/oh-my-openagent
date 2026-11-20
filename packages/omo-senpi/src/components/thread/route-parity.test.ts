@@ -20,7 +20,7 @@ const approved = (address: string) => [
   { permission: "thread_send", patterns: [address], always: [address], autoApproveAsk: true as const },
 ]
 /** Known to exist on one leg only: a gateway row's sequence and endpoint kind here, the device there (contracts/results.ts). */
-const LEG_ONLY_KEYS: ReadonlySet<string> = new Set(["thread_id", "link", "message_seq", "endpoint", "device"])
+const LEG_ONLY_KEYS: ReadonlySet<string> = new Set(["thread", "link", "message_seq", "device"])
 const sharedKeys = (result: object) =>
   Object.keys(result)
     .filter((key) => !LEG_ONLY_KEYS.has(key))
@@ -84,8 +84,9 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
 
   /**
    * A delivered send on either leg: the target it reached, a minted delivery id, and the lane as the contract defines it
-   * (contracts/results.ts): the lane the target took once admitted (`follow_up` for the default mode on an idle or busy
-   * target), or the requested mode while the delivery still waits for a receiver (`queued_offline` has no lane yet).
+   * (contracts/results.ts): the lane the target took once admitted (`start` for a turn begun on an idle target,
+   * `follow_up` behind a busy one), or the requested mode while the delivery still waits for a receiver (`queued_offline`
+   * has no lane yet, and neither has a same-device row its receiver's drain has not taken).
    */
   const delivered = (result: unknown, leg: Leg) => {
     const { delivery, delivery_id, effective_mode } = result as {
@@ -93,10 +94,16 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
       delivery_id?: unknown
       effective_mode?: unknown
     }
-    expect(result).toMatchObject({ kind: "ok", thread_id: TARGET[leg].id, deduplicated: false })
+    expect(result).toMatchObject({ kind: "ok", thread: TARGET[leg].id, deduplicated: false })
     expect(delivery_id).toMatch(UUID)
     expect(["started", "queued", "queued_offline"]).toContain(delivery.kind)
-    expect(effective_mode).toBe(delivery.kind === "queued_offline" ? "auto" : "follow_up")
+    expect(effective_mode).toBe(
+      delivery.kind === "started"
+        ? "start"
+        : delivery.kind === "queued_offline" || leg === "local"
+          ? "auto"
+          : "follow_up",
+    )
     return sharedKeys(result as object)
   }
 
@@ -128,17 +135,18 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
       expect(permission({ thread: TARGET[leg].name, message: "reply" })).toEqual(approved(TARGET[leg].name))
       expect(await run("thread_send", { thread: TARGET[leg].id, message: "reply" })).toMatchObject({
         kind: "ok",
-        thread_id: TARGET[leg].id,
+        thread: TARGET[leg].id,
       })
       expect(await run("thread_send", { thread: TARGET[leg].name, message: "reply" })).toMatchObject({
         kind: "ok",
-        thread_id: TARGET[leg].id,
+        thread: TARGET[leg].id,
       })
     },
   )
 
   // A4.3.1 of #13037: a reply resolves on the device the consumed delivery came from, so a name another thread carries
-  // never redirects it: the sender on b is reached on b, and a sender on this device that stated b's name is not found here.
+  // never redirects it: the sender on b is reached on b. A sender whose delivery names no device and that stated b's name is
+  // looked up account-wide (#14048), and b's thread is not that sender, so it is refused by name.
   test.each(LEGS)(
     "#given a run woken by a sender that stated the %s thread's name but is another session #when it replies by that name #then the ask is approved from the delivery, and the send never reaches the thread carrying that name",
     async (leg) => {
@@ -149,14 +157,17 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
       expect(permission({ thread: TARGET[leg].name, message: "reply" })).toEqual(approved(TARGET[leg].name))
       const result = await run("thread_send", { thread: TARGET[leg].name, message: "reply" })
       if (leg === "local") {
-        expect(result).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
+        expect(result).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b" })
         expect(admits()).toHaveLength(1)
         // The local namesake ("local peer", dur-local) received nothing: no prompt and no gateway delivery.
         expect(prompts()).toBe(0)
         expect(enqueuedFor("dur-local")).toBe(0)
         expect(reachedLocally("dur-local")).toBe(false)
       } else {
-        expect(result).toMatchObject({ kind: "error", error: { code: "not_found" } })
+        expect(result).toMatchObject({
+          kind: "error",
+          error: { code: "reply_target_mismatch", details: { thread: "dur-on-b", device: "b" } },
+        })
         expect(admits()).toHaveLength(0)
       }
     },
@@ -171,9 +182,9 @@ describe("#13006: a send answers the same shape and the same refusals whichever 
       const result = await run("thread_send", { thread: "twin", message: "which one" })
       expect(result).toMatchObject({ kind: "error", error: { code: "ambiguous_target" } })
       const candidates =
-        (result as { error: { details?: { candidates?: readonly { id: string; device?: string }[] } } }).error.details
-          ?.candidates ?? []
-      expect(candidates.map((candidate) => candidate.id).sort()).toEqual([...twins].sort())
+        (result as { error: { details?: { candidates?: readonly { thread: string; device?: string }[] } } }).error
+          .details?.candidates ?? []
+      expect(candidates.map((candidate) => candidate.thread).sort()).toEqual([...twins].sort())
       if (leg === "remote") expect(candidates.map((candidate) => candidate.device)).toEqual(["b", "b"])
       expect(admits()).toHaveLength(0)
     },

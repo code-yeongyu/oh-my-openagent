@@ -13,6 +13,7 @@ import {
 } from "./package-paths.js"
 import { isPrintOnlyUpdate, updateUsageAnswer } from "./update-args.js"
 import { findHolders, heldTarget, isLockFailure, listWindowsProcesses, LOCK_RETRY_DELAYS_MS } from "./update-lock.js"
+import { findVersionedInstall, updateVersionedInstall, versionedUpdateTarget } from "./versioned-install.js"
 
 export { isPrintOnlyUpdate }
 
@@ -44,13 +45,17 @@ export function formatVersionChange(before, after) {
  * prove the install moved (#9198). An unreachable registry falls back to the unpinned channel spec.
  * `run` defaults to `runChild` so tests inject a spawn without touching the child-process helper.
  *
+ * When the running package sits in a side-by-side versions layout (`<versions>/current -> <version>`,
+ * #12022), the update installs the target into a new version dir with bun and switches `current`
+ * (`versioned-install.js`) instead of `npm i -g`, which would install a copy PATH never runs.
+ *
  * On Windows a manager failure whose stderr says a file is held (EPERM/EBUSY, #10090) is retried with
  * backoff. If the file stays held, the report names the file, the processes of this install that hold it
  * and one action, and only an install that can no longer be read is reinstalled at the previous version; any readable version is kept.
  *
  * @typedef {{ omo: string, engine: string }} InstalledVersion
  * @typedef {{ status: number | null, signal: string | null, stderr?: string }} ChildResult
- * @typedef {{ stdio?: "inherit", windowsHide?: boolean, env?: NodeJS.ProcessEnv, captureStderr?: boolean }} RunOptions
+ * @typedef {{ stdio?: "inherit", windowsHide?: boolean, env?: NodeJS.ProcessEnv, captureStderr?: boolean, cwd?: string }} RunOptions
  * @typedef {import("./update-lock.js").ProcessEntry} ProcessEntry
  * @typedef {{ manager: string, command: string, argv: string[], env?: Record<string, string> }} UpdateTarget
  * @typedef {{
@@ -66,6 +71,7 @@ export function formatVersionChange(before, after) {
  *   listProcesses?: () => ProcessEntry[],
  *   installDir?: string,
  *   selfPids?: number[],
+ *   root?: string,
  * }} SelfUpdateOptions
  * @param {string[]} args
  * @param {SelfUpdateOptions} [options]
@@ -93,7 +99,14 @@ export async function runSelfUpdate(args, options = {}) {
   const before = readInstalled()
   const channel = releaseChannel(before.omo)
   const target = channelDistTagVersion(fetchDistTags(), before.omo)
-  const update = resolveUpdate(target)
+  const versioned = findVersionedInstall(options.root ?? packageRoot, platform)
+  if (versioned !== undefined && target === undefined) {
+    error(
+      `omo: could not confirm the ${channel} omo-ai version from the npm registry; ${versioned.versionsDir} installs exact versions only, so retry when the registry answers`,
+    )
+    return 1
+  }
+  const update = versioned === undefined ? resolveUpdate(target) : versionedUpdateTarget(versioned, target)
 
   if (target === undefined) {
     log(
@@ -116,6 +129,9 @@ export async function runSelfUpdate(args, options = {}) {
     return 0
   }
   log(formatUpdateCommand(update))
+  if (versioned !== undefined) {
+    return updateVersionedInstall({ install: versioned, before: before.omo, target, run, env, platform, log, error })
+  }
 
   const install = async (target) => {
     const [command, ...argv] = target.argv

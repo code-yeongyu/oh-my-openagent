@@ -72,6 +72,28 @@ describe("per-request Native model prompt selection", () => {
     expect(output.system).toEqual([previous])
   })
 
+  test("drops the Hephaestus role on a GPT-6.2 request and restores it on the way back, keeping the user append", async () => {
+    const registered = createHephaestusAgent("openai/gpt-5.4").prompt ?? ""
+    const standalone = createHephaestusAgent("openai/gpt-6.2-astra").prompt ?? ""
+    const output = { system: [registered + "\nUSER_APPEND_SENTINEL"] }
+    const transform = createSystemTransformHandler()
+
+    await transform({ model: { providerID: "openai", id: "gpt-6.2-astra" } }, output)
+    expect(output.system).toEqual([standalone + "\nUSER_APPEND_SENTINEL"])
+    expect(standalone.endsWith("\n</omo-model-core>")).toBe(true)
+
+    await transform({ model: { providerID: "openai", id: "gpt-5.4" } }, output)
+    expect(output.system).toEqual([registered + "\nUSER_APPEND_SENTINEL"])
+  })
+
+  test("restores the Hephaestus role when a GPT-6.2 registration serves another model", async () => {
+    const output = { system: [createHephaestusAgent("openai/gpt-6.2-sol").prompt ?? ""] }
+
+    await createSystemTransformHandler()({ model: { providerID: "openai", id: "gpt-5.6-sol" } }, output)
+
+    expect(output.system).toEqual([createHephaestusAgent("openai/gpt-5.6-sol").prompt ?? ""])
+  })
+
   test("does not interpret unframed custom system prompts", async () => {
     const output = { system: ["CUSTOM_PROMPT_SENTINEL"] }
     await createSystemTransformHandler()({ model: { providerID: "openai", id: "gpt-5.4" } }, output)

@@ -7,6 +7,9 @@ import { basename, join } from "node:path"
 import { trustLaunchKind } from "../compile-args"
 import { runTrustStage, type TrustStageOptions } from "../trust-stage"
 import { issueCertificates } from "./trust-certificate-fixtures"
+import { usePrivateTmpdir } from "./trust-private-tmpdir"
+
+usePrivateTmpdir()
 
 let root: string
 let ca: string

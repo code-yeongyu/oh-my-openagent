@@ -9,7 +9,7 @@ export const THREAD_READ_MAX_BYTES = 1048576
 
 export const ThreadAddress = Type.String({
   description:
-    "Recipient thread id or unique name as returned by thread_list; a name shared by several threads returns ambiguous_target with candidates.",
+    "Recipient thread: the thread value of a thread_list row (tool.thread_list() in an eval cell) or of any thread tool result, an alias, a unique name, or the first 8+ characters of a thread value when only one thread starts with them. A name or prefix shared by several threads returns ambiguous_target with candidates. self addresses the caller's own session.",
 })
 
 export const AllScope = Type.Optional(
@@ -45,14 +45,26 @@ export const Message = Type.String({
   description: `Instruction to deliver to the target thread; longer than ${THREAD_MESSAGE_MAX_BYTES} UTF-8 bytes returns message_too_large.`,
 })
 
+export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const
+// Spelled out, not mapped from THINKING_LEVELS: a mapped array loses the literal types, and the level's static type then
+// reads as never wherever a parsed level is passed on (setThinkingLevelOn).
+export const thinkingLevel = (description: string) =>
+  Type.Union(
+    [
+      Type.Literal("off"),
+      Type.Literal("minimal"),
+      Type.Literal("low"),
+      Type.Literal("medium"),
+      Type.Literal("high"),
+      Type.Literal("xhigh"),
+      Type.Literal("max"),
+    ],
+    { description },
+  )
+
 export const BindingId = Type.String({
   minLength: 1,
-  description: "Binding id as returned by thread_bind or thread_bindings.",
-})
-
-export const ExpectedRevision = Type.Integer({
-  minimum: 1,
-  description: "Revision the caller last saw for this binding; a binding that moved since returns stale_revision.",
+  description: "Id of the chat binding the gateway keeps for the thread.",
 })
 
 // No schema maxLength: the cap is in UTF-8 bytes, and the relay enforces it as message_too_large
@@ -61,8 +73,23 @@ export const RelayText = Type.String({
   description: `Text relayed to or from the external thread; longer than ${RELAY_TEXT_MAX_BYTES} UTF-8 bytes returns message_too_large.`,
 })
 
+/**
+ * The delivery mode of every send that names none: the thread tools (thread_send, thread_create's first prompt,
+ * thread_handoff), the thread SDK, `omo thread send` and `omo remote send|open`. `auto` steers a running turn and starts
+ * one on an idle session, so an omitted mode never queues behind the receiver's turn; follow_up is only ever asked for.
+ */
+export const DEFAULT_THREAD_DELIVERY = "auto" as const
+
 // R6: an enum instead of a boolean because delivery has three plausible states.
 export const ThreadDeliveryMode = Type.Union([Type.Literal("auto"), Type.Literal("steer"), Type.Literal("follow_up")], {
+  default: DEFAULT_THREAD_DELIVERY,
   description:
-    "auto steers the running turn when one is active and starts a new turn otherwise; steer requires expected_turn_id and becomes turn_conflict when the active turn changed; follow_up queues the message behind the running turn.",
+    "Omitted: auto. auto steers the running turn when one is active and starts a new turn otherwise; steer requires expected_turn_id and becomes turn_conflict when the active turn changed; follow_up queues the message behind the running turn (pass it only when the message must wait for that turn to end).",
 })
+
+/**
+ * The longest drain a graceful close of a thread on another device can wait for: its record waits 45 s for the holder's
+ * answer (`remote/port/device-service.ts` SEND_WAIT_MS), less the answer's reserve. A longer drain would outlive that
+ * wait and end as an untyped lost reply while the holder still drains (omo#14324 review M1).
+ */
+export const REMOTE_GRACEFUL_MAX_WAIT_MS = 35_000

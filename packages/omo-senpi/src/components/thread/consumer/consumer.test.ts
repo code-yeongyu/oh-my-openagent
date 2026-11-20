@@ -34,7 +34,14 @@ function record(deliveryId: string, sessionId = "t"): Record<string, unknown> {
   }
 }
 
-function setup(options: { readonly admitted?: boolean } = {}) {
+function setup(
+  options: {
+    readonly admitted?: boolean
+    readonly chainCountLimit?: number
+    readonly chainCountLimitFails?: Error
+    readonly errors?: unknown[]
+  } = {},
+) {
   const h = (harness = createGatewayHarness())
   const service: FakeDeliveryService = createFakeDeliveryService({ admitted: options.admitted ?? true })
   const sessions = join(h.agentDir, "sessions")
@@ -45,6 +52,11 @@ function setup(options: { readonly admitted?: boolean } = {}) {
     port: service.port,
     agentDir: h.agentDir,
     sessionsDirectory: sessions,
+    chainCountLimit: async () => {
+      if (options.chainCountLimitFails !== undefined) throw options.chainCountLimitFails
+      return options.chainCountLimit
+    },
+    ...(options.errors === undefined ? {} : { onError: (error: unknown) => options.errors?.push(error) }),
     wake: async (durableId) => {
       woken.push(durableId)
     },
@@ -226,6 +238,103 @@ describe("a handed delivery", () => {
       { state: "refused", reason: "sender_not_admitted" },
     ])
     expect(woken).toEqual([])
+  })
+
+  // The sender maps the receiving store's own reason (`relay-transport.ts` `wakeRefusal`; chain_count_limit included,
+  // #12766 review M1), so the answer carries the store's `details.reason`, and the coarse tool code only when it named none.
+  test.each([
+    ["a sender that is not an agent", { sender: { kind: "cli" } }, "sender_not_allowed"],
+    ["a steer", { deliverAs: "steer" }, "turn_conflict"],
+  ])(
+    "#given %s #when the intake refuses the record #then the answer names the store's reason and nothing is woken",
+    async (_label, change, reason) => {
+      const { sessions, service, woken, consumer } = setup()
+      writeSessionFile(sessions, "t")
+      await consumer.start()
+      const reply = await service.inbound({
+        command_id: "c-1",
+        sender_device: "dev-a",
+        durable_id: "t",
+        record: { ...record("d-1"), ...change },
+      })
+      expect(reply.data).toEqual({ kind: "refused", reason })
+      await consumer.idle()
+      expect(woken).toEqual([])
+    },
+  )
+
+  // #12766 review L1: the device's `threads.chainCountLimit` reaches the store's intake, so the queued route refuses a
+  // chain past it as the running engine does, with the count and the limit the sender maps.
+  test.each([
+    [4, { kind: "refused", reason: "chain_count_limit", chain_count: 4, limit: 3 }],
+    [3, { kind: "queued" }],
+  ])(
+    "#given this device's user set a chain count limit of 3 #when a record at hop %i is handed in #then the answer is %o",
+    async (chainCount, expected) => {
+      const { h, sessions, service, woken, consumer } = setup({ chainCountLimit: 3 })
+      writeSessionFile(sessions, "t")
+      await consumer.start()
+      const reply = await service.inbound({
+        command_id: "c-1",
+        sender_device: "dev-a",
+        durable_id: "t",
+        record: { ...record("d-1"), chainCount },
+      })
+      expect(reply.data).toMatchObject(expected)
+      await consumer.idle()
+      if (expected.kind === "refused") {
+        expect(await h.store().list({ target_durable_id: "t" })).toEqual([])
+        expect(woken).toEqual([])
+      } else expect(woken).toEqual(["t"])
+    },
+  )
+
+  test("#given one device already handed this session 8 records #when a 9th follows at once #then the answer is pair_loop_guard with the burst, the window and the wait the sender maps", async () => {
+    const { sessions, service, consumer } = setup()
+    writeSessionFile(sessions, "t")
+    await consumer.start()
+    for (let index = 0; index < 8; index++) {
+      const reply = await service.inbound({
+        command_id: `c-${index}`,
+        sender_device: "dev-a",
+        durable_id: "t",
+        record: record(`d-${index}`),
+      })
+      expect(reply.data).toMatchObject({ kind: "queued" })
+    }
+    const ninth = await service.inbound({
+      command_id: "c-8",
+      sender_device: "dev-a",
+      durable_id: "t",
+      record: record("d-8"),
+    })
+    expect(ninth.data).toEqual({
+      kind: "refused",
+      reason: "pair_loop_guard",
+      burst: 8,
+      window_ms: 40_000,
+      retry_after_ms: 5_000,
+    })
+    await consumer.idle()
+  })
+
+  // #12766 review L2: a limit that cannot be read fails open, so the delivery is queued as before and the failure is reported.
+  test("#given the chain count limit cannot be read #when a record is handed in #then it is queued, the session woken and the failure reported", async () => {
+    const failure = new Error("settings barrel failed to load")
+    const errors: unknown[] = []
+    const { sessions, service, woken, consumer } = setup({ chainCountLimitFails: failure, errors })
+    writeSessionFile(sessions, "t")
+    await consumer.start()
+    const reply = await service.inbound({
+      command_id: "c-1",
+      sender_device: "dev-a",
+      durable_id: "t",
+      record: { ...record("d-1"), chainCount: 9 },
+    })
+    expect(reply.data).toMatchObject({ kind: "queued", delivery_id: "d-1" })
+    await consumer.idle()
+    expect(woken).toEqual(["t"])
+    expect(errors).toEqual([failure])
   })
 
   test("#given two sender devices that use the same command id #when both hand a record in #then each gets its own answer, keyed by its own sender device", async () => {

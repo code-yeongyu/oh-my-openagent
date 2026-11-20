@@ -32,6 +32,7 @@ test("#given a wake that rejects #when a handed record is taken in #then the fai
       port: service.port,
       agentDir: h.agentDir,
       sessionsDirectory: sessions,
+      chainCountLimit: async () => undefined,
       wake: async () => {
         throw new Error("wake failed")
       },

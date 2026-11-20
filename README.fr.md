@@ -6,12 +6,6 @@
 > [![OmO Herdr DAG - DAG de workflows OmO en direct dans un panneau latéral Herdr](./.github/assets/omo-herdr-dag.png)](https://github.com/jc01rho/omo-herdr-dag)
 > *Tapez simplement "mass ulw" avec votre prompt - vous voilà maître de l'ingénierie de graphes. De l'ultracode multi-modèle, associé à un meilleur système de mémoire. (Le panneau de droite est [omo-herdr-dag](https://github.com/jc01rho/omo-herdr-dag).)*
 
-> **Sponsors**
-> Voici nos sponsors. Ils permettent à OmO de continuer en tant que projet personnel.
-> | [<img alt="OpenGateway" src="./.github/assets/opengateway-logo.svg" width="156px" />](https://opengateway.ai/) | **[OpenGateway](https://opengateway.ai/)** sponsorise OmO. Une passerelle compatible OpenAI qui regroupe de nombreux fournisseurs de modèles derrière une seule API. Merci de soutenir l'open source. |
-> | :-----| :----- |
-
-
 > [!TIP]
 > Rejoignez-nous !
 >

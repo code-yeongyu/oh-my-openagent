@@ -1,10 +1,16 @@
-import type { ThreadToolResult } from "../contracts"
+import { mergeRows, rowKey, type DeviceListing } from "@oh-my-opencode/thread-address-core"
+import type { ThreadDevice, ThreadState, ThreadToolResult } from "../contracts"
 import { threadToolFailure } from "../errors"
-import { listedThread } from "../control/relay-session-host"
-import { rowThreadId, type AliasRegistry, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
+import { displayedThread } from "../control/relay-session-host"
+import { threadRow } from "../tools/thread-row"
+import { listedStates } from "../tools/thread-state"
+import { type AliasRegistry, type RemoteDevice, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
+import { rememberListed, remoteNotSetUp } from "./address-book"
+import { readAccount } from "../address/account"
 import type { WorktreeRequest } from "../worktree/thread-worktree"
 import { placeFolder } from "./create-folder"
-import { aliasFailure, remoteAvailable } from "./remote-ops"
+import { accountDevices } from "./account"
+import { aliasFailure, remoteReady } from "./remote-ops"
 import {
   planCreate as placeCreate,
   signedOut,
@@ -44,10 +50,10 @@ export async function planCreate(
       error: threadToolFailure(
         "unsupported",
         "fork_from cannot fork yet: the engine opens a blank session instead of a fork, so no thread was created.",
-        "Create the thread without fork_from and hand it the source's context with thread_send; thread_read reads the source.",
+        "Create the thread without fork_from and hand it the source's context with thread_send; thread_read reads the source (tool.thread_send() and tool.thread_read() in an eval cell).",
         {
           reason: "fork_unsupported",
-          source: plan.request.forkFrom,
+          thread: plan.request.forkFrom,
           ...(plan.host.device === undefined ? {} : { device: plan.host.device }),
         },
       ),
@@ -93,11 +99,11 @@ export async function claimCreatedAlias(
     return result
   let claimed: Awaited<ReturnType<AliasRegistry["claim"]>>
   try {
-    const holderDevice = device ?? (await remote.sessions.thisDevice()) ?? ""
+    const holderDevice = device ?? (await accountDevices(remote.client)).here ?? ""
     claimed = await remote.aliases.claim({
       alias,
-      holder: { session_id: result.thread.thread_id, device: holderDevice },
-      idempotency_key: `create:${result.thread.thread_id}`,
+      holder: { session_id: result.thread, device: holderDevice },
+      idempotency_key: `create:${result.thread}`,
     })
   } catch (error) {
     claimed = {
@@ -114,10 +120,10 @@ export async function claimCreatedAlias(
     const failed = aliasFailure(claimed.error)
     return {
       kind: "error",
-      error: { ...failed.error, details: { ...(failed.error.details ?? {}), thread_id: result.thread.thread_id } },
+      error: { ...failed.error, details: { ...(failed.error.details ?? {}), thread: result.thread } },
     }
   }
-  return { ...result, thread: { ...result.thread, alias: claimed.value.alias } } as ThreadToolResult
+  return { ...result, alias: claimed.value.alias } as ThreadToolResult
 }
 
 /**
@@ -136,7 +142,7 @@ export async function renameAlias(
   const current = await remote.aliases.aliasesOf([threadId])
   if (current.kind === "error") return signedOut(current.error) ? { local: "sign_in" } : aliasFailure(current.error)
   const from = current.value.get(threadId)
-  const holderDevice = device ?? (await remote.sessions.thisDevice()) ?? ""
+  const holderDevice = device ?? (await accountDevices(remote.client)).here ?? ""
   const changed =
     from === undefined
       ? await remote.aliases.claim({
@@ -150,37 +156,129 @@ export async function renameAlias(
   return signedOut(changed.error) ? { local: "sign_in" } : aliasFailure(changed.error)
 }
 
-/** thread_list with all_scope: this device's threads plus the account's other devices' (each with its device), with aliases. */
+// `threads` counts the threads THIS result lists on the device, so it reads the same for every row: this device's are
+// the caller's scoped local threads, another device's are its rows merged into the result. `listing` is the one
+// per-device state the resolver reads too (design section 6).
+function deviceRows(
+  roster: readonly RemoteDevice[],
+  self: { readonly id: string | null; readonly name: string | null },
+  listingOf: (device: string) => DeviceListing,
+  threads: readonly { readonly device?: string }[],
+  local: { readonly dropped?: number; readonly incomplete: boolean },
+): readonly ThreadDevice[] {
+  // The account roster leaves this device out (relayd lists only peers), so this device's row is made here.
+  const devices: readonly RemoteDevice[] =
+    self.id === null || roster.some((row) => row.device === self.id)
+      ? roster
+      : [
+          {
+            device: self.id,
+            label: self.name ?? self.id,
+            online: true,
+            platform: process.platform,
+            last_seen_ms: null,
+          },
+          ...roster,
+        ]
+  return devices.map((row) => {
+    const thisDevice = row.device === self.id
+    return {
+      device: row.device,
+      name: row.label,
+      ...(row.platform === undefined ? {} : { platform: row.platform }),
+      ...(row.kind === undefined ? {} : { kind: row.kind }),
+      online: thisDevice || row.online,
+      last_seen:
+        row.last_seen_ms === undefined || row.last_seen_ms === null ? null : new Date(row.last_seen_ms).toISOString(),
+      this_device: thisDevice,
+      // This device's threads come from its own endpoints, whose answers say whether it listed them in full.
+      listing: thisDevice ? (local.incomplete ? "incomplete" : "listed") : listingOf(row.device),
+      threads: threads.filter((thread) => (thread.device ?? self.id) === row.device).length,
+      ...(thisDevice && local.dropped !== undefined ? { dropped: local.dropped } : {}),
+    }
+  })
+}
+
+/**
+ * thread_list: this device's threads (scoped by `all_scope` as before) merged with the account's other devices' threads
+ * (each with its device, any workspace), with aliases, and the account's devices with their listing state. A device
+ * whose rows this listing could not include is named `incomplete` in `devices`, never silently left out. `states` filters
+ * the other devices' rows as `listThreads` filters this device's (the default leaves archived threads out), and a device
+ * counts only the threads listed. The order is design section 6's: read (one account read) -> identity (`rowKey`) ->
+ * merge (`mergeRows`) -> name (`rowName`) -> state -> filter; nothing of another device is capped.
+ */
 export async function listAcross(
   remote: RemoteThreadSurface | undefined,
   local: ThreadToolResult,
   allScope: boolean,
+  states?: readonly ThreadState[],
 ): Promise<ThreadToolResult> {
   if (remote === undefined || local.kind !== "ok" || !("threads" in local)) return local
-  const ids = local.threads.map((thread) => thread.thread_id)
-  const unavailable = await remoteAvailable(remote)
-  if (!allScope) return unavailable === undefined ? withAliases(remote, local, ids) : local
-  if (unavailable !== undefined) return { ...local, remote_unavailable: unavailable.error.code }
-  const here = await remote.sessions.thisDevice()
-  const known = new Set(ids)
-  let listed: readonly RemoteSessionRow[]
-  try {
-    listed = await remote.sessions.sessions()
-  } catch {
+  const ids = local.threads.map((thread) => thread.thread)
+  const status = remoteReady(remote)
+  const ready = await status
+  if ("kind" in ready) {
+    const notSetUp = ready.error.code === "host_unavailable" && remoteNotSetUp(ready.error.details?.["state"])
+    const listed = !allScope && notSetUp ? local : { ...local, remote_unavailable: ready.error.code }
+    // The registry is asked only while the account's other devices can be reached (#12833): not while the device service is
+    // not connected, nor on a plan without a relay (plan_required). A row's missing alias is then unknown, never "holds none" (#13923).
+    return remote.aliases === undefined || ids.length === 0 ? listed : { ...listed, aliases_unavailable: "not_asked" }
+  }
+  // The roster is the sessions port's, which lists each device's platform and kind; readAccount judges rows by it.
+  const [hereName, roster] = await Promise.all([
+    remote.sessions.thisDeviceName?.().catch(() => null) ?? Promise.resolve(null),
+    remote.sessions.devices().then(
+      (devices) => ({ ok: true as const, devices }),
+      () => ({ ok: false as const }),
+    ),
+  ])
+  const read = await readAccount(remote, { ready: status, roster: roster.ok ? roster.devices : undefined }).catch(
+    () => undefined,
+  )
+  // Without this device's id its own rows cannot be told apart from another device's, so none are merged.
+  if (read?.kind !== "account" || read.account.here === null)
     return withAliases(remote, { ...local, remote_unavailable: "host_unavailable" }, ids)
-  }
-  const others = listed.filter((row) => row.device !== here && !known.has(rowThreadId(row)))
-  const merged: ThreadToolResult = {
+  const account = read.account
+  const here = read.account.here
+  // relayAddressBook (until the removal unit deletes it with its memory) ties a thread to the device an earlier round
+  // listed it on (#14172): this round is such a round.
+  rememberListed(remote.sessions, account.rows)
+  // A device the account no longer lists contributes no rows (#13505, readAccount); an offline one keeps its rows.
+  const merged = mergeRows<{ readonly key: string; readonly device: string; readonly row?: RemoteSessionRow }>(
+    ids.map((key) => ({ key, device: here })),
+    account.rows.map((row) => ({ key: rowKey(row), device: row.device, row })),
+    here,
+  )
+  const shown = listedStates(states)
+  // Every row names the machine that holds it (#14044 step 4a): this device's name on its own rows, the roster's name on
+  // another device's.
+  const machines = new Map(roster.ok ? roster.devices.map((device) => [device.device, device.label]) : [])
+  const others = merged
+    .flatMap((entry) => (entry.row === undefined ? [] : [entry.row]))
+    .map((row) => ({ row, thread: threadRow(displayedThread(row), machines.get(row.device)) }))
+    .filter(({ thread }) => shown.has(thread.state))
+  const threads = [
+    ...local.threads.map((thread) =>
+      hereName === null || thread.machine !== undefined ? thread : { ...thread, machine: hereName },
+    ),
+    ...others.map(({ thread }) => thread),
+  ]
+  // A roster that fails is said, never silently dropped: the threads stay merged and remote_unavailable names it.
+  const listed: ThreadToolResult = {
     ...local,
-    threads: [
-      ...local.threads,
-      ...others.map((row) => {
-        const { sessionId: _routing, ...thread } = listedThread(row)
-        return thread
-      }),
-    ],
+    threads,
+    ...(roster.ok
+      ? {
+          devices: deviceRows(roster.devices, { id: here, name: hereName }, account.listingOf, threads, {
+            dropped: local.inactive_dropped,
+            incomplete: local.listing === "incomplete",
+          }),
+        }
+      : { remote_unavailable: "devices_unavailable" }),
   }
-  return withAliases(remote, merged, [...ids, ...others.map(rowThreadId).filter((id) => id !== "")])
+  // Aliases are held by thread id: a row whose device publishes none holds no alias.
+  const aliased = others.flatMap(({ row }) => (row.durable_id === undefined ? [] : [row.durable_id]))
+  return withAliases(remote, listed, [...ids, ...aliased])
 }
 
 async function withAliases(
@@ -193,13 +291,15 @@ async function withAliases(
   try {
     aliases = await remote.aliases.aliasesOf(ids)
   } catch {
-    return listed
+    return { ...listed, aliases_unavailable: "host_unavailable" }
   }
-  if (aliases.kind === "error") return listed
+  // Said, never silently dropped (#13923): a row without an alias then means "not read", never "holds none".
+  if (aliases.kind === "error")
+    return { ...listed, aliases_unavailable: signedOut(aliases.error) ? "sign_in" : "host_unavailable" }
   return {
     ...listed,
     threads: listed.threads.map((thread) => {
-      const alias = aliases.value.get(thread.thread_id)
+      const alias = aliases.value.get(thread.thread)
       return alias === undefined ? thread : { ...thread, alias }
     }),
   }

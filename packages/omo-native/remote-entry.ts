@@ -3,9 +3,11 @@ import { createCredentialStore, SESSION_READ_WAIT } from "../omo-opencode/src/cl
 import { accountServiceApi } from "./account-show"
 import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { cliDeviceServiceHandoff } from "./device-service-handoff"
-import { deviceServiceBootstrapSetup, omoBinaryPath } from "./remote-bootstrap"
+import { deviceServiceBootstrapSetup, omoBinaryPath, runLoginSetup } from "./remote-bootstrap"
+import { backgroundRemote } from "./remote-background-enable"
 import { prepareRemoteAttach, type RemoteVerbDependencies, runRemoteVerb } from "./remote-cli"
-import { coldWakeSetup } from "./remote-cold-wake"
+import { coldWakeSetup, refreshColdWakeAtLaunch } from "./remote-cold-wake"
+import { remoteOptOut } from "./remote-opt-out"
 import { localRemoteDependencies } from "./remote-local"
 
 // The launchers' `omo remote` entries: the verbs in remote-cli.ts over this device's real service, sign-in and binary.
@@ -18,18 +20,28 @@ function remoteDependencies(packageRoot?: string): RemoteVerbDependencies {
     ...localRemoteDependencies(packageRoot),
     bootstrap: deviceServiceBootstrapSetup({ stateDir, binaryPath, agentDir }),
     coldWake: coldWakeSetup({ binaryPath, agentDir }),
-    // Reads the stored credential only when `omo remote enable` finds a service that holds no device (omo#13602).
+    optOut: remoteOptOut(),
+    // Reads the stored credential only when enable or the bootstrap finds a service that holds no device (omo#13602).
     linkDevice: async () => {
       const api = accountServiceApi()
       const credentials = await createCredentialStore(api, { wait: SESSION_READ_WAIT }).read()
       if (credentials === null) return "signed_out"
-      await cliDeviceServiceHandoff({ api, stateDir, log: (line) => process.stderr.write(`${line}\n`) }).adopt(
-        credentials,
-      )
+      await cliDeviceServiceHandoff({
+        api,
+        stateDir,
+        log: (line) => process.stderr.write(`${line}\n`),
+      }).adopt(credentials)
       return "linked"
     },
   }
 }
+
+/**
+ * A launch of this runtime brings an installed session host unit an older runtime wrote to it (omo#14191). The runtime is
+ * the running executable itself, never `OMO_BIN` or the caller's agent dir (#14194 review H1).
+ */
+export const refreshSessionHostUnit = (isOlder: (installedRuntimeVersion: string) => boolean): Promise<void> =>
+  refreshColdWakeAtLaunch({ runtime: process.execPath, isOlder }, (line) => process.stderr.write(`${line}\n`))
 
 /** The launchers' entry for `omo remote attach`: the engine argv to run in place of this command, or undefined (exit code set). */
 export async function runRemoteAttachCommand(args: readonly string[]): Promise<readonly string[] | undefined> {
@@ -39,6 +51,20 @@ export async function runRemoteAttachCommand(args: readonly string[]): Promise<r
     return undefined
   }
   return prepared.engineArgs
+}
+
+// The sign-in suites drive the real `omo login` through the launcher; their in-process preload marks the child so a test
+// login never installs or links a device service on the machine running the suite. Nothing a user can set reaches it.
+const testSkipKey = Symbol.for("omo.test.skipRemoteLoginSetup")
+
+/**
+ * Right after a successful `omo login`: remote sessions switch on and the user is told (omo#13602); a device with no
+ * current device service gets it from a detached `omo remote enable` instead of inside the login (omo#13722).
+ */
+export async function setUpRemoteAfterLogin(): Promise<void> {
+  if ((globalThis as Record<symbol, unknown>)[testSkipKey] === true) return
+  const dependencies = remoteDependencies()
+  await runLoginSetup(dependencies, dependencies.bootstrap, dependencies, backgroundRemote(omoBinaryPath()))
 }
 
 /** `packageRoot`: the compiled binary's provisioned runtime directory (its staged `plugin/`); the npm launcher passes nothing. */

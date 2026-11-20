@@ -1,5 +1,5 @@
 import type { RuntimePhase } from "./adapter"
-import type { GatewayDeliveryMode } from "./types"
+import type { EffectiveLane, GatewayDeliveryMode } from "./types"
 
 export type TargetState = RuntimePhase | "offline"
 
@@ -12,6 +12,12 @@ export type DeliveryDecision =
     }
   | { readonly kind: "refuse"; readonly reason: "not_steerable" | "turn_conflict" }
   | { readonly kind: "queued_offline" }
+
+/** The lane an admitted delivery takes: an idle session's followUp admission starts its turn. */
+export function effectiveLaneOf(decision: Extract<DeliveryDecision, { readonly kind: "admit" }>): EffectiveLane {
+  if (decision.deliverAs === "steer") return "steer"
+  return decision.expect === "started" ? "start" : "follow_up"
+}
 
 /**
  * The 15-cell table {idle, mid_turn, waiting_question, compacting, offline} x {auto, steer,

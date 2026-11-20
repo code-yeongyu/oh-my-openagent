@@ -1,7 +1,15 @@
 import type { ThreadSetReasoningInput, ThreadToolResult } from "../contracts"
 import { failure } from "../tools/internals"
 import { exactModel, matchModel, modelPatternFailure } from "../tools/model-match"
+import type { ThreadCloseOptions } from "../tools/ports"
 import { controlIdentity, controlRefusalOf, type SessionControl } from "./port"
+
+/** A control's answer for a thread no engine holds live, on this device or another. */
+export const NOT_LIVE: ThreadToolResult = failure(
+  "not_resumable",
+  "The thread has no live owner.",
+  "Retry when the target is live.",
+)
 
 /** Runs one control body and answers its typed refusal as data; every other throw stays the leg's transport failure. */
 export async function answered(body: () => Promise<ThreadToolResult>): Promise<ThreadToolResult> {
@@ -26,11 +34,40 @@ export async function interruptThread(control: SessionControl, turnId: string | 
     ...controlIdentity(control),
     ...(result.turn_id === undefined ? {} : { turn_id: result.turn_id }),
     interrupted: result.interrupted,
+    background: result.background,
   }
 }
 
-export async function closeThread(control: SessionControl): Promise<ThreadToolResult> {
-  const outcome = await control.close()
+/** The close options a `thread_close` input names, absent ones left out. */
+export function closeOptions(value: {
+  readonly force?: boolean | undefined
+  readonly graceful?: boolean | undefined
+  readonly wait_ms?: number | undefined
+}): ThreadCloseOptions {
+  return {
+    ...(value.force === undefined ? {} : { force: value.force }),
+    ...(value.graceful === undefined ? {} : { graceful: value.graceful }),
+    ...(value.wait_ms === undefined ? {} : { wait_ms: value.wait_ms }),
+  }
+}
+
+export async function closeThread(
+  control: SessionControl,
+  options: ThreadCloseOptions = {},
+): Promise<ThreadToolResult> {
+  if (options.graceful === true && options.force === true)
+    return failure(
+      "invalid_arguments",
+      "graceful and force exclude each other: a graceful close lets the turn end, a forced one stops it.",
+      "Pass one of them.",
+    )
+  if (options.wait_ms !== undefined && options.graceful !== true)
+    return failure(
+      "invalid_arguments",
+      "wait_ms only bounds a graceful close: a close without graceful does not wait for the turn.",
+      "Pass graceful: true with wait_ms, or drop wait_ms.",
+    )
+  const { outcome, dropped_deliveries, graceful } = await control.close(options)
   if (outcome === "held_elsewhere")
     return failure(
       "foreign_live_owner",
@@ -38,7 +75,15 @@ export async function closeThread(control: SessionControl): Promise<ThreadToolRe
       "Close it from the client that holds it, or send it a message first so it can be closed for every holder.",
       control.device === undefined ? undefined : { device: control.device },
     )
-  return { kind: "ok", ...controlIdentity(control), closed: outcome === "closed" }
+  const closed = outcome === "closed"
+  return {
+    kind: "ok",
+    ...controlIdentity(control),
+    closed,
+    reason: closed ? "closed" : "not_live",
+    dropped_deliveries: [...dropped_deliveries],
+    ...(graceful === undefined ? {} : { graceful }),
+  }
 }
 
 /**
@@ -89,7 +134,7 @@ export async function setThinkingLevelOn(
   scope: ThreadSetReasoningInput["scope"],
 ): Promise<ThreadToolResult> {
   try {
-    await control.setThinkingLevel(level, scope === "turn" ? "turn" : undefined)
+    await control.setThinkingLevel(level)
   } catch (error) {
     if (controlRefusalOf(error)?.code !== "thinking_level_unsupported") throw error
     const supported = await control.getAvailableThinkingLevels()

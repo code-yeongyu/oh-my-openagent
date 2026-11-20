@@ -1,6 +1,8 @@
+import { existsSync } from "node:fs"
 import { join } from "node:path"
 
 import { isEngineCommand } from "./bin/lib/engine-commands.js"
+import { LAUNCH_SPEC_FILENAME } from "./bin/lib/launch-spec-mode.js"
 import { isSelfUpdate, updateUsageAnswer } from "./bin/lib/update-args.js"
 import { serviceAccountsOpen } from "../omo-opencode/src/cli/service-auth/accounts-gate"
 import {
@@ -53,13 +55,52 @@ export function trustLaunchKind(
   return "long-lived"
 }
 
+/**
+ * The shared host child the engine's supervisor spawns (`--mode rpc --multi-session --listen` plus its launch spec's
+ * `--session-runtime` and `--extension` paths; a spec listing no extensions gives only the former) already names
+ * everything it loads, and the engine identifies it by exactly that list
+ * (`runtimeBuildId`, `launch_profile`), while `host ensure` predicts the id (`clientRuntimeBuildId`) from the spec
+ * alone. Prepending the plugin here made one binary report two ids whenever the spec's plugin was not this runtime's
+ * own folder (a user-owned copy, a discovered plugin): the desktop judged the host `build_mismatch` and every
+ * handover's successor exited. The desktop's packaged entry applies the same rule.
+ */
+function carriesLaunchProfile(options: readonly string[]): boolean {
+  const mode = options.indexOf("--mode")
+  return (
+    mode !== -1 &&
+    options[mode + 1] === "rpc" &&
+    options.includes("--multi-session") &&
+    options.includes("--listen") &&
+    (options.includes("--extension") || options.includes("--session-runtime"))
+  )
+}
+
+function startsHost(options: readonly string[]): boolean {
+  if (options[0] !== "host") return false
+  return options[1] === "ensure" || options[1] === "handoff" || (options[1] === "session" && options[2] === "open")
+}
+
+/**
+ * A host this runtime starts loads its plugin through this runtime's own launch spec, as `omo daemon` already passes
+ * it. Without one the engine predicts a host with no extensions while the host child, re-entering this wrapper,
+ * would load the plugin, so the two runtime ids could never agree.
+ */
+function withOwnLaunchSpec(args: string[], execDir: string): string[] {
+  const options = launchOptions(args)
+  if (!startsHost(options)) return args
+  if (options.some((arg) => arg === "--launch-spec" || arg.startsWith("--launch-spec="))) return args
+  const spec = join(execDir, "plugin", LAUNCH_SPEC_FILENAME)
+  if (!existsSync(spec)) return args
+  return [...options, "--launch-spec", spec, ...args.slice(options.length)]
+}
+
 export function buildSenpiArgs(args: string[], execDir: string): string[] {
-  const ownsExtensions = launchOptions(args).includes("--no-extensions")
-  if (isEngineCommand(args)) return args
+  const options = launchOptions(args)
+  if (isEngineCommand(args)) return withOwnLaunchSpec(args, execDir)
   // `--no-extensions` is the caller owning the extension list: a memory child lists none and an
   // RPC task child lists this plugin itself, so injecting it here would load the plugin into a
   // bare child or load it twice.
-  if (ownsExtensions) return args
+  if (options.includes("--no-extensions") || carriesLaunchProfile(options)) return args
   return ["--extension", join(execDir, "plugin"), ...args]
 }
 

@@ -1,8 +1,9 @@
 /**
  * The relay SDK: bindings, the outbox, reply tokens and connector inbound, over one gateway store.
- * The agent tools (`thread_bind` ... `thread_answer`) call it with the calling session's principal;
+ * The agent tools (`thread_report` ... `thread_answer`) call it with the calling session's principal;
  * the `omo thread` CLI (todo 14) calls the same functions with `cli:<uid>`, and a connector drives
- * only `outbox`, `ack`, `answer` and `inbound`. Every result is data: `{ kind: "ok", ... }` or
+ * only `outbox`, `ack`, `answer` and `inbound`. Binding is not a session tool: the gateway binds,
+ * rebinds and unbinds chat threads through these functions as its own principal. Every result is data: `{ kind: "ok", ... }` or
  * `{ kind: "error", error }` with a taxonomy code and a `next_action`.
  */
 import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from "../errors"
@@ -154,12 +155,21 @@ export type GatewayRelayOptions = {
   readonly now?: () => number
 }
 
+const SELF =
+  "thread_report (tool.thread_report() in an eval cell) without binding_id uses the chat binding the gateway keeps for this session."
+
+// The default next action per code. The relay does not know its caller here, and a session reaches every code below
+// through its relay tools except binding_conflict and stale_revision (only bind/rebind/unbind return them, and only the
+// gateway or the CLI calls those), so every other text names session tools and never a shell command. A refusal that only
+// the gateway, the CLI or a connector can get, or one whose cause the code alone does not tell, carries its own next
+// action where it is returned (`fromStore`'s overrides, `failure`'s nextAction).
 const NEXT_ACTION: Partial<Record<ThreadErrorCode, string>> = {
   binding_conflict:
-    "Call thread_bindings to find the binding that holds this thread, then thread_rebind it with its revision, or thread_unbind it first.",
+    "Find the binding that holds this thread with `omo thread bindings`, then rebind it with its revision, or unbind it first.",
   binding_mismatch: "Answer through the binding that asked the question; the question stays pending.",
-  binding_inactive: "Bind the thread again with thread_bind.",
-  stale_revision: "Call thread_bindings for the current revision and retry with it.",
+  binding_inactive:
+    "The chat binding is closed: the gateway binds the chat again when its next message arrives, so report through that binding.",
+  stale_revision: "Read the binding's current revision with `omo thread bindings` and retry with it.",
   stale_token:
     "The question was asked under an earlier binding revision or session runtime; wait for the session to ask again.",
   already_answered: "Nothing to do: the question has its answer.",
@@ -167,11 +177,11 @@ const NEXT_ACTION: Partial<Record<ThreadErrorCode, string>> = {
     "Retry after a moment: another answer is still being handed to the session, and the question goes back to pending if that fails.",
   idempotency_conflict: "Retry with a new idempotency_key.",
   idempotency_uncertain:
-    "Call thread_bindings or thread_outbox to see the current state before retrying with a new key.",
-  scope_denied: "Report through a binding attached to this session; thread_bindings lists them.",
+    "Read the binding's outbox with thread_outbox (tool.thread_outbox() in an eval cell) to see whether the earlier call took effect, then retry with a new idempotency_key.",
+  scope_denied: `That binding belongs to another session: ${SELF}`,
   unsupported: "Report only the events the binding subscribes to, through a binding with an outbound direction.",
-  not_found: "Call thread_bindings for the binding ids that exist.",
-  cursor_invalid: "Read thread_outbox again and ack a cursor it returned.",
+  not_found: `No binding has that id: ${SELF}`,
+  cursor_invalid: "Read thread_outbox (tool.thread_outbox() in an eval cell) again and ack a cursor it returned.",
   host_unavailable: "Retry when the session is running; the question stays pending.",
   invalid_arguments: "Fix the arguments and call again.",
 }
@@ -191,18 +201,22 @@ function failure(
 ): { readonly kind: "error"; readonly error: ThreadToolFailure } {
   return {
     kind: "error",
-    error: threadToolFailure(
-      code,
-      message,
-      nextAction ?? NEXT_ACTION[code] ?? "Call thread_bindings and retry after checking the binding.",
-      details,
-    ),
+    error: threadToolFailure(code, message, nextAction ?? NEXT_ACTION[code] ?? `Retry; ${SELF}`, details),
   }
 }
 
-function fromStore<T extends object>(outcome: RelayOutcome<T> | StoreRefusal): RelayResult<T> {
-  if (outcome.kind === "refused") return failure(outcome.code, outcome.message, outcome.details)
+function fromStore<T extends object>(
+  outcome: RelayOutcome<T> | StoreRefusal,
+  nextAction?: Partial<Record<ThreadErrorCode, string>>,
+): RelayResult<T> {
+  if (outcome.kind === "refused")
+    return failure(outcome.code, outcome.message, outcome.details, nextAction?.[outcome.code])
   return outcome as RelayResult<T>
+}
+
+/** unbind and rebind run only as the gateway or the CLI, which can list the bindings. */
+const BINDING_ADMIN_NEXT_ACTION: Partial<Record<ThreadErrorCode, string>> = {
+  not_found: "List the binding ids that exist with `omo thread bindings`.",
 }
 
 function checkedAuthor(
@@ -276,6 +290,7 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
       const args = { binding_id: request.binding_id, expected_revision: request.expected_revision }
       return fromStore(
         await store.unbind({ now: now(), receipt: receipt(request, "thread_unbind", args), ...args }),
+        BINDING_ADMIN_NEXT_ACTION,
       ) as RelayResult<{
         binding: BindingRecord
         already_closed: boolean
@@ -291,6 +306,7 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
       }
       return fromStore(
         await store.rebind({ now: now(), receipt: receipt(request, "thread_rebind", args), ...args }),
+        BINDING_ADMIN_NEXT_ACTION,
       ) as RelayResult<{ binding: BindingRecord; closed: readonly string[]; deduplicated: boolean }>
     },
     bindings: async (request) => fromStore(await store.listBindings({ now: now(), ...request })),
@@ -326,7 +342,12 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
         answer: request.answer,
         answered_by: answeredBy,
       })
-      if (claim.kind !== "ok") return fromStore(claim)
+      // The token named this binding, so not_found here means its question left the outbox, not an unknown binding.
+      if (claim.kind !== "ok")
+        return fromStore(claim, {
+          not_found:
+            "The question this token belongs to is gone from the outbox: read thread_outbox (tool.thread_outbox() in an eval cell) for a newer question and answer that one.",
+        })
       const own: AnswerClaimRef = { reply_token: request.reply_token, claimed_at: claim.claimed_at }
       const respond = options.endpoints.respondUi
       let endpoint: GatewayEndpointRef | null = null
@@ -407,7 +428,7 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
           { session: claim.session_durable_id, reason: reply.error },
           malformed
             ? `The session could not read this answer (${reply.error}); answer again with text it can take. The question stays pending.`
-            : `The session refused the answer (${reply.error}): it no longer waits on this question. Read thread_outbox for a newer question and answer that one.`,
+            : `The session refused the answer (${reply.error}): it no longer waits on this question. Read thread_outbox (tool.thread_outbox() in an eval cell) for a newer question and answer that one.`,
         )
       }
       await confirm({ ...own, answer: request.answer, answered_by: answeredBy })
@@ -431,7 +452,13 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
       const author = checkedAuthor(request.author)
       if (author !== undefined && "kind" in author) return author
       const binding = await store.bindingView({ now: now(), binding_id: request.binding_id })
-      if (binding === null) return failure("not_found", "No binding has this id.", { binding_id: request.binding_id })
+      if (binding === null)
+        return failure(
+          "not_found",
+          "No binding has this id.",
+          { binding_id: request.binding_id },
+          "Deliver the message through the binding the gateway keeps for this chat now; this one no longer exists.",
+        )
       // An event the session already took keeps its stored result whatever the binding did since (a
       // connector that lost the ACK retries it): the receipt is checked against the target and
       // revision it was delivered under BEFORE the binding's current status or revision, so neither an
@@ -463,13 +490,21 @@ export function createGatewayRelay(options: GatewayRelayOptions): GatewayRelay {
         }
         if (recovered?.kind === "refused") return failure(recovered.code, recovered.message, recovered.details)
       }
+      // Only a connector delivers inbound, so these refusals name its next step, not the session-facing defaults.
       if (binding.status !== "active")
-        return failure("binding_inactive", `The binding is ${binding.status}.`, {
-          binding_id: binding.binding_id,
-          status: binding.status,
-        })
+        return failure(
+          "binding_inactive",
+          `The binding is ${binding.status}.`,
+          { binding_id: binding.binding_id, status: binding.status },
+          "The binding is closed: deliver the message through the binding the gateway keeps for this chat now.",
+        )
       if (!binding.direction.inbound)
-        return failure("unsupported", "The binding carries no inbound direction.", { binding_id: binding.binding_id })
+        return failure(
+          "unsupported",
+          "The binding carries no inbound direction.",
+          { binding_id: binding.binding_id },
+          "This binding takes no inbound messages: deliver through a binding with an inbound direction, such as the one the gateway keeps for this chat.",
+        )
       const mode = request.mode ?? binding.inbound_mode
       if (mode === "auto" && binding.inbound_mode === "follow_up") {
         return failure(

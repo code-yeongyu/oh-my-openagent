@@ -18,9 +18,86 @@ const runningChildren = new Set<ChildProcess>()
 // Headroom over any single status spawn, so the observing reads land inside the idle window on a loaded runner.
 const OBSERVED_IDLE_EXIT_MS = 8_000
 const REQUIRED_REACHABLE_READS = 2
+const IDLE_TEST_BUDGET_MS = OBSERVED_IDLE_EXIT_MS * 6
 
-const TEST_BUDGET_MS = 30_000
-setDefaultTimeout(TEST_BUDGET_MS)
+// #11845: a starved-but-working child must not die at a wall-clock deadline. A cold daemon start on a
+// CPU-starved shard container legitimately needs multiples of its quiet-box wall time, and the CLI spends
+// its whole life blocked in spawnSync while the daemon tree does the work — so the only honest progress
+// signal is CPU time of the child's whole descendant tree. Kill on CPU stall, bound the runaway, and let
+// bun's test timeout sit above both.
+const STALL_KILL_MS = 10_000
+const RUNAWAY_CAP_MS = 120_000
+const PROGRESS_SAMPLE_MS = 250
+// Two scheduler quanta: less than this between samples is scheduling noise, not work.
+const PROGRESS_EPSILON_S = 0.02
+setDefaultTimeout(RUNAWAY_CAP_MS + 5_000)
+class SpawnBudgetError extends Error {
+  override name = "SpawnBudgetError"
+}
+
+// Linux: sum utime+stime+cutime+cstime over the /proc subtree rooted at the child. The CLI's own utime
+// stays flat while it blocks on the daemon, so sampling the tree is what separates slow from stalled.
+// macOS: ps gives the same graph once per sample. CLK_TCK is 100 on every host we run on.
+function childTreeCpuSeconds(rootPid: number): number {
+  if (process.platform === "linux") {
+    try {
+      const ppidOf = new Map<number, number>()
+      const cpuOf = new Map<number, number>()
+      for (const entry of readdirSync("/proc")) {
+        if (!/^\d+$/.test(entry)) continue
+        let stat: string
+        try {
+          stat = readFileSync(`/proc/${entry}/stat`, "utf8")
+        } catch {
+          continue
+        }
+        const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ")
+        ppidOf.set(Number(entry), Number(fields[1]))
+        cpuOf.set(
+          Number(entry),
+          (Number(fields[11]) + Number(fields[12]) + Number(fields[13]) + Number(fields[14])) / 100,
+        )
+      }
+      let total = 0
+      const walk = (pid: number): void => {
+        const cpu = cpuOf.get(pid)
+        if (cpu === undefined) return
+        total += cpu
+        for (const [childPid, parentPid] of ppidOf) if (parentPid === pid) walk(childPid)
+      }
+      walk(rootPid)
+      return total
+    } catch {
+      return -1
+    }
+  }
+  const listing = spawnSync("ps", ["-axo", "pid=,ppid=,cputime="], { encoding: "utf8" })
+  if (listing.status !== 0) return -1
+  const ppidOf = new Map<number, number>()
+  const cpuOf = new Map<number, number>()
+  for (const line of listing.stdout.split("\n")) {
+    const match = line.trim().match(/^(\d+)\s+(\d+)\s+(.+)$/)
+    if (!match) continue
+    const parts = match[3].split(":")
+    let seconds = 0
+    for (const part of parts) {
+      const [days, rest] = part.split("-")
+      if (rest !== undefined) seconds += Number.parseInt(days, 10) * 86_400
+      seconds = seconds * 60 + Number.parseFloat(rest ?? days)
+    }
+    ppidOf.set(Number(match[1]), Number(match[2]))
+    cpuOf.set(Number(match[1]), seconds)
+  }
+  let total = 0
+  const walk = (pid: number): void => {
+    const cpu = cpuOf.get(pid)
+    if (cpu === undefined) return
+    total += cpu
+    for (const [childPid, parentPid] of ppidOf) if (parentPid === pid) walk(childPid)
+  }
+  walk(rootPid)
+  return total
+}
 
 afterEach(() => {
   for (const child of runningChildren) child.kill("SIGKILL")
@@ -35,7 +112,9 @@ function sandbox() {
   roots.push(agentDir)
   const socket = join(agentDir, "rpc", "shards", "p-aaaaaaaaaaaaaaaa.sock")
   expect(Buffer.byteLength(`${socket}.next-99`)).toBeLessThanOrEqual(103)
-  mkdirSync(join(agentDir, "rpc", "shards"), { recursive: true })
+  // The engine refuses an agent dir any group or other user can write (unsafe_key_record), as a real ~/.omo/agent never
+  // is; mkdirSync otherwise takes the process umask, so on a host with umask 002 every shard here failed to start.
+  mkdirSync(join(agentDir, "rpc", "shards"), { recursive: true, mode: 0o700 })
   const env = {
     ...process.env,
     TMPDIR: agentDir,
@@ -45,13 +124,22 @@ function sandbox() {
     OMO_CODING_AGENT_DIR: agentDir,
     SENPI_CODING_AGENT_DIR: agentDir,
     PI_CODING_AGENT_DIR: agentDir,
+    // The idle contracts this file observes need a transient shard. A runner whose own host is pinned
+    // (omo daemon run --pinned) leaks SENPI_RPC_HOST_COLD_START=persistent into every child, and a
+    // persistent shard never idle-exits: the observing-reads case then dies at its exit deadline
+    // ("shard pid still alive after N more status reads"). Pin the transient default here; each
+    // case's SENPI_RPC_HOST_IDLE_EXIT_MS override stays where it is observed.
+    SENPI_RPC_HOST_COLD_START: "transient",
   }
   return { agentDir, socket, env }
 }
 
-// A cold `node` start on a loaded host can take longer than any fixed per-spawn budget (#9679), so each child runs
-// until it closes; the only bound is the test's own budget, which names the command it was waiting on.
-function run(command: string, args: readonly string[], env: NodeJS.ProcessEnv, deadlineMs = TEST_BUDGET_MS) {
+// A cold `node` start on a loaded host can take longer than any fixed per-spawn budget (#9679), so each child
+// runs until it closes. The bounds are progress-shaped (#11845): a child whose descendant tree stops making
+// CPU progress for stallMs is killed as stalled; a child that keeps making progress is bounded only by the
+// runaway cap. Both rejections name the command and its output.
+function run(command: string, args: readonly string[], env: NodeJS.ProcessEnv, options: { stallMs?: number } = {}) {
+  const stallMs = options.stallMs ?? STALL_KILL_MS
   return new Promise<{ exitCode: number; stdout: string; stderr: string }>((resolvePromise, reject) => {
     const child = spawn(command, [...args], { env, stdio: ["ignore", "pipe", "pipe"] })
     runningChildren.add(child)
@@ -63,19 +151,58 @@ function run(command: string, args: readonly string[], env: NodeJS.ProcessEnv, d
     child.stderr.setEncoding("utf8").on("data", (chunk: string) => {
       stderr += chunk
     })
-    const deadline = setTimeout(() => {
+    let settled = false
+    const settle = (finish: () => void): void => {
+      if (settled) return
+      settled = true
+      clearInterval(sampler)
+      clearTimeout(capTimer)
+      finish()
+    }
+    const capTimer = setTimeout(() => {
       child.kill("SIGKILL")
-      reject(new Error(`${command} ${args.join(" ")} did not exit within the ${deadlineMs} ms test budget`))
-    }, deadlineMs)
+      settle(() =>
+        reject(
+          new SpawnBudgetError(
+            `${command} ${args.join(" ")} exceeded the ${RUNAWAY_CAP_MS}ms runaway cap while still making CPU progress\nstdout: ${stdout}\nstderr: ${stderr}`,
+          ),
+        ),
+      )
+    }, RUNAWAY_CAP_MS)
+    let lastCpu = -1
+    let lastAdvance = Date.now()
+    const sampler = setInterval(() => {
+      if (child.pid === undefined) return
+      const cpu = childTreeCpuSeconds(child.pid)
+      if (cpu < 0) return
+      if (cpu >= lastCpu + PROGRESS_EPSILON_S) {
+        lastCpu = cpu
+        lastAdvance = Date.now()
+        return
+      }
+      if (Date.now() - lastAdvance >= stallMs) {
+        child.kill("SIGKILL")
+        const stalledFor = Math.round((Date.now() - lastAdvance) / 1000)
+        settle(() =>
+          reject(
+            new SpawnBudgetError(
+              `${command} ${args.join(" ")} made no CPU progress for ${stalledFor}s (tree cpu ${cpu.toFixed(2)}s): stalled, not slow\nstdout: ${stdout}\nstderr: ${stderr}`,
+            ),
+          ),
+        )
+      }
+    }, PROGRESS_SAMPLE_MS)
     child.on("error", (error) => {
-      clearTimeout(deadline)
-      runningChildren.delete(child)
-      reject(error)
+      settle(() => {
+        runningChildren.delete(child)
+        reject(error)
+      })
     })
     child.on("close", (code) => {
-      clearTimeout(deadline)
-      runningChildren.delete(child)
-      resolvePromise({ exitCode: code ?? 1, stdout, stderr })
+      settle(() => {
+        runningChildren.delete(child)
+        resolvePromise({ exitCode: code ?? 1, stdout, stderr })
+      })
     })
   })
 }
@@ -97,7 +224,8 @@ async function ensureShard(socket: string, env: NodeJS.ProcessEnv) {
     ],
     env,
   )
-  expect(result.exitCode).toBe(0)
+  // On a refusal the engine names its reason (e.g. unsafe_key_record) in the ensure output; the assertion carries it.
+  expect(result.exitCode, `host ensure failed: ${result.stdout}${result.stderr}`).toBe(0)
   const payload = JSON.parse(result.stdout) as { pid: number }
   ownedPids.add(payload.pid)
   return payload.pid
@@ -292,8 +420,34 @@ if (process.platform !== "win32") {
         expect(reachableReads).toBe(REQUIRED_REACHABLE_READS)
         ownedPids.delete(supervisorPid)
       },
-      OBSERVED_IDLE_EXIT_MS * 6,
+      IDLE_TEST_BUDGET_MS,
     )
+
+    describe("omo daemon real-engine spawn budget progress semantics", () => {
+      test("#given a child that stalls with no CPU work #when it stops advancing #then it is killed as stalled, not slow", async () => {
+        const started = Date.now()
+        let rejection: unknown
+        try {
+          // Sleeps 60s: alive, but its tree burns no CPU after boot.
+          await run("node", ["-e", "setTimeout(() => {}, 60000)"], process.env, { stallMs: 1_500 })
+        } catch (error) {
+          rejection = error
+        }
+        expect(rejection).toBeInstanceOf(SpawnBudgetError)
+        const elapsed = Date.now() - started
+        expect(elapsed).toBeLessThan(20_000)
+        expect(String(rejection)).toContain("stalled, not slow")
+      })
+
+      test("#given a child that keeps making CPU progress #when the stall window keeps elapsing #then it still exits on its own", async () => {
+        // Solid CPU for 4s: far past the stall window, far under the runaway cap. The old wall-clock
+        // deadline (or a fixed 30s test budget on a starved runner) is what this child used to lose to.
+        const result = await run("node", ["-e", "const t=Date.now()+4000;while(Date.now()<t){}"], process.env, {
+          stallMs: 1_500,
+        })
+        expect(result.exitCode).toBe(0)
+      })
+    })
   })
 }
 

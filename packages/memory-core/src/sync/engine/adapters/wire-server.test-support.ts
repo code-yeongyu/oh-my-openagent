@@ -10,6 +10,7 @@ import { randomBytes } from "node:crypto"
 import { writeFile } from "node:fs/promises"
 
 import { FreezeModel } from "../../account/testing/freeze-model.test-support.ts"
+import { missesSyncContract } from "../../contract-version"
 
 type Row = { seq: number; digest: string; objectId: string; author: string; batchId: string }
 
@@ -20,8 +21,17 @@ export interface WireServerOptions {
   readonly port?: number
 }
 
+/** The contract headers one request carried, as the service floor reads them. */
+export interface WireRequest {
+  readonly method: string
+  readonly path: string
+  readonly version: string | null
+  readonly capabilities: string | null
+}
+
 export interface WireServer {
   readonly url: string
+  readonly requests: readonly WireRequest[]
   pageSize: number
   refuseNext: string | null
   failNext: number | null
@@ -56,6 +66,7 @@ export function startWireServer(options: WireServerOptions): WireServer {
   >()
   const tokens = new Map(Object.entries(options.devices).map(([name, id]) => [`${options.token}.${name}`, id]))
   const streams = new Set<ReadableStreamDefaultController<Uint8Array>>()
+  const requests: WireRequest[] = []
   let snapshot: { covers: number; chunks: readonly string[] } | null = null
   let closedWaiters: (() => void)[] = []
   const broadcast = (event: Record<string, unknown>) => {
@@ -79,8 +90,17 @@ export function startWireServer(options: WireServerOptions): WireServer {
     idleTimeout: 0,
     async fetch(req) {
       const url = new URL(req.url)
+      requests.push({
+        method: req.method,
+        path: url.pathname,
+        version: req.headers.get("omo-contract-version"),
+        capabilities: req.headers.get("omo-sync-capabilities"),
+      })
       const device = tokens.get((req.headers.get("authorization") ?? "").replace(/^Bearer /, ""))
       if (device === undefined) return refusal("unauthorized")
+      // The service's client floor for a phrase account (#13691), on every request: a client that drops the
+      // contract headers fails every test that drives it through this server.
+      if (missesSyncContract(url.pathname, req.headers)) return refusal("client_update_required")
       if (freeze.isRevokedDevice(device)) return freeze.revokedRefusal()
       if (state.failNext !== null) {
         const status = state.failNext
@@ -229,6 +249,7 @@ export function startWireServer(options: WireServerOptions): WireServer {
       state.failNext = status
     },
     tokenOf: (name) => `${options.token}.${name}`,
+    requests,
     freeze,
     compactTo(coversSeq, chunkIds) {
       snapshot = { covers: coversSeq, chunks: chunkIds }
