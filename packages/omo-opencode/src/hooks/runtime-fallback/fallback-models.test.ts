@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { detectAgentFromSession, resolveAgentForSession } from "./agent-resolver"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import { ProviderPinRegistry } from "../../shared/provider-pin-registry"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
 describe("runtime-fallback fallback-models", () => {
@@ -27,6 +28,24 @@ describe("runtime-fallback fallback-models", () => {
 
     //#then
     expect(result).toEqual(["openai/gpt-5.5", "anthropic/claude-opus-4-7"])
+  })
+
+  test("returns no fallback models for a session pinned to a provider", () => {
+    //#given
+    const sessionID = "ses_runtime_fallback_provider_pinned"
+    SessionCategoryRegistry.register(sessionID, "quick")
+    ProviderPinRegistry.register(sessionID, "openai")
+    const pluginConfig = unsafeTestValue({
+      categories: { quick: { fallback_models: ["anthropic/claude-opus-4-7"] } },
+      agents: { "sisyphus-junior": { fallback_models: ["anthropic/claude-opus-4-7"] } },
+    })
+
+    //#when
+    const result = getFallbackModelsForSession(sessionID, "sisyphus-junior", pluginConfig)
+    ProviderPinRegistry.remove(sessionID)
+
+    //#then
+    expect(result).toEqual([])
   })
 
   test("uses agent-specific fallback_models when agent is resolved", () => {

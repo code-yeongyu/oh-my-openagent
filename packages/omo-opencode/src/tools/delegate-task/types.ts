@@ -7,6 +7,7 @@ import type {
   AgentOverrides,
   SisyphusAgentConfig,
 } from "../../config/schema"
+import type { ModelProvider, ProviderModelsConfig } from "../../config/schema/provider-models"
 import type { ModelFallbackControllerAccessor } from "../../hooks/model-fallback"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 import type { SessionPromptAsyncData, SessionPromptData, SessionStatusData } from "@opencode-ai/sdk"
@@ -69,6 +70,8 @@ export interface DelegateTaskArgs {
   task_id?: string
   command?: string
   load_skills: string[]
+  /** Run on this provider's `provider_models` pin instead of default routing. */
+  provider?: ModelProvider
 }
 
 export interface ToolContextWithMetadata {
@@ -116,8 +119,10 @@ export interface DelegateTaskToolOptions {
   availableCategories?: AvailableCategory[]
   availableSkills?: AvailableSkill[]
   agentOverrides?: AgentOverrides
+  /** `provider_models`: present pin sets expose the `provider` argument. */
+  providerModels?: ProviderModelsConfig
   /** Reload model-bearing config at task invocation time so edits are honored without rebuilding tools. */
-  loadCurrentModelConfig?: () => Pick<OhMyOpenCodeConfig, "agents" | "categories">
+  loadCurrentModelConfig?: () => Pick<OhMyOpenCodeConfig, "agents" | "categories" | "provider_models">
   sisyphusAgentConfig?: SisyphusAgentConfig
   /** Mirrors `claude_code.agents`; when false, `.claude/agents` definitions are not read during subagent matching. */
   claudeCodeAgentsEnabled?: boolean

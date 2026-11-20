@@ -13,6 +13,9 @@ import {
   executeBackgroundTask,
   executeSyncTask,
 } from "./executor"
+import { resolvePinnedCategoryExecution } from "./provider-pinned-resolution"
+import { MODEL_PROVIDERS } from "../../config/schema/provider-models"
+import { hasProviderModelPins } from "../../shared/provider-model-pin"
 import { prepareDelegateTaskArgs } from "./tool-argument-preparation"
 import { createDelegateTaskPresentation } from "./tool-description"
 import type { AvailableSkill } from "../../agents/dynamic-agent-prompt-builder"
@@ -91,13 +94,24 @@ const delegateTaskArgsSchema = {
   command: tool.schema.string().optional().describe("The command that triggered this task"),
 }
 
+const providerArgSchema = {
+  provider: tool.schema
+    .enum(MODEL_PROVIDERS)
+    .optional()
+    .describe(
+      "Run the child on this provider's configured pin for the category or subagent_type, bypassing default model routing and fallbacks. Fails when that provider has no pin for it. Omit for default routing. Not with task_id.",
+    ),
+}
+
 export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefinition {
   const { availableCategories, availableSkills, categoryExamples, description } =
     createDelegateTaskPresentation(options)
 
   return tool({
     description,
-    args: delegateTaskArgsSchema,
+    args: hasProviderModelPins(options.providerModels)
+      ? { ...delegateTaskArgsSchema, ...providerArgSchema }
+      : delegateTaskArgsSchema,
     async execute(args, toolContext) {
       const ctx = toolContext as ToolContextWithMetadata
       const delegateTaskArgs = await prepareDelegateTaskArgs(args, ctx)
@@ -131,6 +145,10 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         availableSkills,
         nativeSkillInfos,
       })
+
+      if (delegateTaskArgs.provider && delegateTaskArgs.task_id) {
+        return `Invalid arguments: provider applies to a new category or subagent_type task. A continuation (task_id) keeps the model its session runs on; omit provider.`
+      }
 
       const parentContext = await resolveParentContext(ctx, options.client)
 
@@ -169,7 +187,12 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       const modelOptions =
         currentModelConfig === undefined
           ? options
-          : { ...options, userCategories: currentModelConfig.categories, agentOverrides: currentModelConfig.agents }
+          : {
+              ...options,
+              userCategories: currentModelConfig.categories,
+              agentOverrides: currentModelConfig.agents,
+              providerModels: currentModelConfig.provider_models,
+            }
 
       let agentToUse: string
       let categoryModel: DelegatedModelConfig | undefined
@@ -181,12 +204,9 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       let maxPromptTokens: number | undefined
 
       if (delegateTaskArgs.category) {
-        const resolution = await resolveCategoryExecution(
-          delegateTaskArgs,
-          modelOptions,
-          inheritedModel,
-          systemDefaultModel,
-        )
+        const resolution = delegateTaskArgs.provider
+          ? resolvePinnedCategoryExecution(delegateTaskArgs, modelOptions, delegateTaskArgs.provider)
+          : await resolveCategoryExecution(delegateTaskArgs, modelOptions, inheritedModel, systemDefaultModel)
         if (resolution.error) {
           return resolution.error
         }

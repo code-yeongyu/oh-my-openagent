@@ -130,6 +130,7 @@ export async function executeBackgroundTask(
       skills: args.load_skills.length > 0 ? args.load_skills : undefined,
       skillContent: systemContent,
       category: args.category,
+      ...(args.provider ? { providerPin: args.provider } : {}),
       sessionPermission: QUESTION_DENIED_SESSION_PERMISSION,
       userPermission: categoryModel?.tools ? migrateToolsToPermission(categoryModel.tools) : undefined,
     })

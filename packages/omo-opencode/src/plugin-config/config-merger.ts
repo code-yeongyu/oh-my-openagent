@@ -7,6 +7,7 @@ export function mergeConfigs(base: OhMyOpenCodeConfig, override: Partial<OhMyOpe
     ...override,
     agents: deepMerge(base.agents, override.agents),
     categories: deepMerge(base.categories, override.categories),
+    provider_models: deepMerge(base.provider_models, override.provider_models),
     team_mode: deepMerge(base.team_mode, override.team_mode),
     agent_definitions: mergeUniqueStrings(base.agent_definitions, override.agent_definitions),
     disabled_agents: mergeUniqueStrings(base.disabled_agents, override.disabled_agents),

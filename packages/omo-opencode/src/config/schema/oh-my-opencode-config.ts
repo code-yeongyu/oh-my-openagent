@@ -17,6 +17,7 @@ import { KeywordDetectorConfigSchema } from "./keyword-detector"
 import { NotificationConfigSchema } from "./notification"
 import { OpenClawConfigSchema } from "./openclaw"
 import { ModelCapabilitiesConfigSchema } from "./model-capabilities"
+import { ProviderModelsConfigSchema } from "./provider-models"
 import { GoalConfigSchema } from "./goal"
 import { MonitorConfigSchema } from "./monitor"
 import { RuntimeFallbackConfigSchema } from "./runtime-fallback"
@@ -66,6 +67,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   model_fallback: z.boolean().optional(),
   agents: AgentOverridesSchema.optional(),
   categories: CategoriesConfigSchema.optional(),
+  provider_models: ProviderModelsConfigSchema.optional(),
   claude_code: ClaudeCodeConfigSchema.optional(),
   sisyphus_agent: SisyphusAgentConfigSchema.optional(),
   comment_checker: CommentCheckerConfigSchema.optional(),
