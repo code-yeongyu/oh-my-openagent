@@ -22,10 +22,6 @@ const extension = (name = "alpha"): StoreExtensionRegistration => ({
     [`CREATE TABLE ${name}_items (id INTEGER PRIMARY KEY, value TEXT)`, `INSERT INTO ${name}_items VALUES (0, 'seed')`],
   ],
 })
-const bind = {
-  principal: "connector:test",
-  binding: { platform: "custom", account_id: "bot", chat_id: "chat", session_durable_id: "target", ttl_seconds: null },
-}
 
 describe("store extension migrations", () => {
   test("#given a mixed-case extension table registered on a v6 store #when the store upgrades to the current schema #then the extension registers again and owns its one table row", async () => {
