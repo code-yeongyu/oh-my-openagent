@@ -11,7 +11,9 @@ import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { resumeProcess, suspendProcess } from "./gateway/testing/job-control"
 import { createRemoteThreadFixture } from "./thread-remote-fixture"
 import type { ThreadHost } from "./tools"
-import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
+import { awaitWithinTestBudget, remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
+import { startFakeOwner } from "../../../../device-service-core/test/local-api/conformance/fake-owner.ts"
+import { defaultWorld, PEER } from "../../../../device-service-core/test/local-api/conformance/world.ts"
 
 function host(): ThreadHost {
   return {
@@ -239,7 +241,7 @@ async function holdWriteLock(databasePath: string) {
 }
 
 describe("thread component control endpoint registration", () => {
-  test("#given an engine without pi.session #when the component registers #then no control endpoint is registered and only the run, message, startup-arm and shutdown hooks exist", () => {
+  test("#given an engine without pi.session #when the component registers #then no control endpoint is registered and only the run, message, startup-arm, shutdown and monitor-target (tool_call) hooks exist", () => {
     const f = eventApi()
     createThreadComponent({
       host: host(),
@@ -254,6 +256,7 @@ describe("thread component control endpoint registration", () => {
       "message_start",
       "session_shutdown",
       "session_start",
+      "tool_call",
     ])
   })
 
@@ -1152,7 +1155,7 @@ describe("thread component settle never waits on the gateway store", () => {
   })
 })
 
-const EIGHTEEN = [
+const FIFTEEN = [
   "thread_create",
   "thread_list",
   "thread_read",
@@ -1163,10 +1166,7 @@ const EIGHTEEN = [
   "thread_rename",
   "thread_set_model",
   "thread_set_reasoning",
-  "thread_bind",
-  "thread_unbind",
-  "thread_rebind",
-  "thread_bindings",
+  "thread_archive",
   "thread_report",
   "thread_outbox",
   "thread_outbox_ack",
@@ -1174,13 +1174,13 @@ const EIGHTEEN = [
 ]
 
 describe("thread component production registration", () => {
-  test("registers all eighteen tools when a test host is supplied", () => {
+  test("registers all fifteen tools when a test host is supplied", () => {
     const f = api()
     createThreadComponent({ host: host(), stateDirectory: "/tmp/thread-test-state" }).register(
       f.pi as never,
       context([]) as never,
     )
-    expect(f.tools.map((tool) => tool.name)).toEqual(EIGHTEEN)
+    expect(f.tools.map((tool) => tool.name)).toEqual(FIFTEEN)
   })
 
   // Placement contract (engine `ToolDefinition.runs`): thread tools run on the loop side of a split session.
@@ -1199,15 +1199,72 @@ describe("thread component production registration", () => {
       f.pi as never,
       context([]) as never,
     )
-    expect(f.tools.map((tool) => tool.name)).toEqual(EIGHTEEN)
+    expect(f.tools.map((tool) => tool.name)).toEqual(FIFTEEN)
   })
 
-  test("registers all eighteen tools when a test host is supplied and no host flag exists", () => {
+  // #14054: `omo -p` never exited after any thread tool call, because the default remote surface's device-service
+  // connection (opened by the call, owned by the component) stayed open and referenced after session_shutdown.
+  test("#given thread_list reached this device's device service through the default remote surface #when the session shuts down #then the process exits by itself", async () => {
+    useTestTimeout(30_000)
+    const root = mkdtempSync(join(tmpdir(), "thr-component-exit-"))
+    const stateDir = join(root, "device-service")
+    mkdirSync(stateDir, { recursive: true, mode: 0o700 })
+    // An empty account listing keeps the alias registry (the account sign-in) out of the run: no row asks it.
+    const owner = await startFakeOwner({
+      stateDir,
+      world: { ...defaultWorld(), listing: { revisions: [{ rows: [], incomplete: [] }], devices: {} } },
+    })
+    const script = join(root, "engine.ts")
+    writeFileSync(
+      script,
+      `import { createThreadComponent } from ${JSON.stringify(join(import.meta.dir, "component.ts"))}
+const agentDir = process.env.THREAD_EXIT_AGENT_DIR
+const handlers = new Map()
+const tools = []
+const pi = { cwd: agentDir, registerTool: (tool) => tools.push(tool), on: (event, handler) => handlers.set(event, [...(handlers.get(event) ?? []), handler]), registerCommand() {}, registerFlag() {}, getFlag() {}, sendMessage() {}, sendUserMessage() {} }
+const host = { socket: agentDir + "/none.sock", listSessions: async () => [] }
+createThreadComponent({ host, diskSessions: () => [], stateDirectory: agentDir + "/state", agentDir: () => agentDir, sessionsDirectory: () => agentDir + "/sessions", callerWorkspaceRoot: () => agentDir, callerSessionId: () => "dur-exit" }).register(pi, { logger: { info() {}, warn() {}, error() {} }, config: { getFlag: () => undefined } })
+const listed = await tools.find((tool) => tool.name === "thread_list").execute("c1", { all_scope: true }, undefined, undefined, { sessionManager: { getSessionId: () => "dur-exit" } })
+console.log("LISTED " + JSON.stringify((listed.details.result.devices ?? []).map((device) => device.device)))
+for (const handler of handlers.get("session_shutdown") ?? []) await handler({ type: "session_shutdown" })
+console.log("SHUT DOWN")
+`,
+    )
+    const child = spawn(process.execPath, [script], {
+      env: { ...process.env, OMO_DEVICE_SERVICE_STATE_DIR: stateDir, THREAD_EXIT_AGENT_DIR: root },
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+    })
+    let output = ""
+    child.stdout.on("data", (chunk: Buffer) => (output += chunk.toString()))
+    child.stderr.on("data", (chunk: Buffer) => (output += chunk.toString()))
+    const exited = new Promise<number | null>((resolve) => child.once("exit", (code) => resolve(code)))
+    try {
+      const code = await awaitWithinTestBudget(exited, "the engine process to exit after session_shutdown").catch(
+        (error: unknown) => {
+          throw new Error(`${error instanceof Error ? error.message : String(error)}; output so far:\n${output}`)
+        },
+      )
+      // The roster names the account's other device: the call did go through the device-service connection.
+      expect(output).toMatch(new RegExp(`LISTED \\[.*"${PEER}"`))
+      expect(output).toContain("SHUT DOWN")
+      expect(code, output).toBe(0)
+    } finally {
+      if (child.exitCode === null && child.signalCode === null) {
+        child.kill("SIGKILL")
+        await exited
+      }
+      await owner.stop()
+      rmSync(root, { recursive: true, force: true })
+    }
+  }, 30_000)
+
+  test("registers all fifteen tools when a test host is supplied and no host flag exists", () => {
     const f = api()
     createThreadComponent({ host: host(), stateDirectory: "/tmp/thread-test-state" }).register(
       f.pi as never,
       context([]) as never,
     )
-    expect(f.tools).toHaveLength(18)
+    expect(f.tools).toHaveLength(15)
   })
 })

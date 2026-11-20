@@ -88,7 +88,7 @@ test("#given inbound rules #when called through tx.enqueue #then authors modes d
     expect(await core(store, "enqueue", { ...request, event_id: `message-${i}`, author })).toMatchObject({ kind: "ok" })
   expect(await core(store, "enqueue", { ...request, event_id: "exhausted", author })).toMatchObject({
     kind: "error",
-    error: { code: "overloaded" },
+    error: { code: "pair_loop_guard" },
   })
   expect(await core(store, "enqueue", { ...request, event_id: "unauthored" })).toMatchObject({ kind: "ok" })
   const rows = await store.list()

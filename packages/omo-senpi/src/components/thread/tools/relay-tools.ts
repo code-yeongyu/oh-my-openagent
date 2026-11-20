@@ -4,35 +4,22 @@ import {
   parseThreadParams,
   threadToolParamSchemas,
   type ThreadAnswerInput,
-  type ThreadBindingsInput,
-  type ThreadBindInput,
   type ThreadOutboxAckInput,
   type ThreadOutboxInput,
-  type ThreadRebindInput,
   type ThreadReportInput,
   type ThreadToolName,
   type ThreadToolResult,
-  type ThreadUnbindInput,
 } from "../contracts"
-import type { ThreadErrorCode } from "../errors"
+import { gatewaySchemaRefusal, type ThreadErrorCode } from "../errors"
 import type { GatewayRelay } from "../gateway/relay"
-import { metadata, output, resolveStoredSession, type AnyTool, type ToolOutput } from "./internals"
-import { UNKNOWN_CALLER, type ThreadHostView, type ThreadHostViewRequest, type ThreadToolSurfaceOptions } from "./ports"
+import { metadata, output, type AnyTool, type ToolOutput } from "./internals"
+import { UNKNOWN_CALLER, type ThreadToolSurfaceOptions } from "./ports"
 
-type RelayToolName =
-  | "thread_bind"
-  | "thread_unbind"
-  | "thread_rebind"
-  | "thread_bindings"
-  | "thread_report"
-  | "thread_outbox"
-  | "thread_outbox_ack"
-  | "thread_answer"
+type RelayToolName = "thread_report" | "thread_outbox" | "thread_outbox_ack" | "thread_answer"
 
 export type RelayToolsContext = {
   readonly options: ThreadToolSurfaceOptions
   readonly relay: GatewayRelay
-  readonly view: (request: ThreadHostViewRequest) => Promise<ThreadHostView>
   readonly failure: (
     code: ThreadErrorCode,
     message: string,
@@ -48,10 +35,11 @@ type Call<T extends RelayToolName> = {
 }
 
 /**
- * The eight relay tools. They run over the gateway store alone: no host listing is taken unless a
- * session address other than the caller has to be resolved, so a terminal with no host running
- * can still bind, report and read its outbox. Mutations are idempotent per `(caller, tool, key)`
- * inside the store transaction that performs them.
+ * The four relay tools. They run over the gateway store alone and take no host listing, so a
+ * terminal with no host running can still report and read its outbox. Binding a chat thread is
+ * not a session tool: the gateway writes, moves and expires bindings through the relay SDK as its
+ * own principal. Mutations are idempotent per `(caller, tool, key)` inside the store transaction
+ * that performs them.
  */
 export function createRelayTools(context: RelayToolsContext): AnyTool[] {
   const { options, relay, failure } = context
@@ -81,6 +69,8 @@ export function createRelayTools(context: RelayToolsContext): AnyTool[] {
       )
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
+      const schema = gatewaySchemaRefusal(error)
+      if (schema !== undefined) return output({ kind: "error", error: schema })
       if (message.startsWith("host_unavailable:"))
         return output(
           failure(
@@ -93,29 +83,10 @@ export function createRelayTools(context: RelayToolsContext): AnyTool[] {
         failure(
           "internal_error",
           `Thread relay operation failed: ${message}`,
-          "Call thread_bindings and retry after checking the binding.",
+          "Retry; thread_report (tool.thread_report() in an eval cell) without binding_id uses the chat binding the gateway keeps for this session.",
         ),
       )
     }
-  }
-
-  async function sessionOf(
-    address: string | undefined,
-    callerId: string,
-    allScope: boolean | undefined,
-  ): Promise<{ readonly id: string } | ThreadToolResult> {
-    if (address === undefined || address === "self" || (address === callerId && callerId !== UNKNOWN_CALLER)) {
-      if (callerId === UNKNOWN_CALLER)
-        return failure(
-          "caller_context_missing",
-          "The calling session's durable id is unknown.",
-          "Name the session explicitly, or retry from a session that passes its execution context.",
-        )
-      return { id: callerId }
-    }
-    const resolved = await resolveStoredSession(options, context.view, address, callerId, allScope)
-    if (resolved.kind === "error") return { kind: "error", error: resolved }
-    return { id: resolved.entry.thread_id }
   }
 
   const principal = (callerId: string) => `session:${callerId}`
@@ -128,71 +99,6 @@ export function createRelayTools(context: RelayToolsContext): AnyTool[] {
   })
 
   return [
-    tool("thread_bind", async ({ value, callerId, key }) => {
-      const input = value as ThreadBindInput
-      const session = await sessionOf(input.session, callerId, input.all_scope)
-      if ("kind" in session) return session
-      return (await relay.bind({
-        principal: principal(callerId),
-        idempotency_key: key,
-        binding: {
-          platform: input.platform,
-          account_id: input.account_id,
-          chat_id: input.chat_id,
-          ...(input.thread_id === undefined ? {} : { thread_id: input.thread_id }),
-          ...(input.root_message_id === undefined ? {} : { root_message_id: input.root_message_id }),
-          ...(input.progress_message_id === undefined ? {} : { progress_message_id: input.progress_message_id }),
-          session_durable_id: session.id,
-          ...(input.direction === undefined ? {} : { direction: input.direction }),
-          ...(input.inbound_mode === undefined ? {} : { inbound_mode: input.inbound_mode }),
-          ...(input.outbound_events === undefined ? {} : { outbound_events: input.outbound_events }),
-          ...(input.policy_id === undefined ? {} : { policy_id: input.policy_id }),
-          ...(input.ttl_seconds === undefined ? {} : { ttl_seconds: input.ttl_seconds }),
-        },
-      })) as ThreadToolResult
-    }),
-    tool("thread_unbind", async ({ value, callerId, key }) => {
-      const input = value as ThreadUnbindInput
-      return (await relay.unbind({
-        principal: principal(callerId),
-        idempotency_key: key,
-        binding_id: input.binding_id,
-        expected_revision: input.expected_revision,
-      })) as ThreadToolResult
-    }),
-    tool("thread_rebind", async ({ value, callerId, key }) => {
-      const input = value as ThreadRebindInput
-      const session = await sessionOf(input.session, callerId, input.all_scope)
-      if ("kind" in session) return session
-      return (await relay.rebind({
-        principal: principal(callerId),
-        idempotency_key: key,
-        binding_id: input.binding_id,
-        expected_revision: input.expected_revision,
-        session_durable_id: session.id,
-      })) as ThreadToolResult
-    }),
-    tool("thread_bindings", async ({ value, callerId }) => {
-      const input = value as ThreadBindingsInput
-      let sessionFilter: string | undefined
-      if (input.session !== undefined) {
-        const session = await sessionOf(input.session, callerId, input.all_scope)
-        if ("kind" in session) return session
-        sessionFilter = session.id
-      }
-      return (await relay.bindings({
-        filter: {
-          ...(sessionFilter === undefined ? {} : { session_durable_id: sessionFilter }),
-          ...(input.platform === undefined ? {} : { platform: input.platform }),
-          ...(input.account_id === undefined ? {} : { account_id: input.account_id }),
-          ...(input.chat_id === undefined ? {} : { chat_id: input.chat_id }),
-          ...(input.thread_id === undefined ? {} : { thread_id: input.thread_id }),
-          ...(input.status === undefined ? {} : { status: input.status }),
-        },
-        ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
-        ...(input.limit === undefined ? {} : { limit: input.limit }),
-      })) as ThreadToolResult
-    }),
     tool("thread_report", async ({ value, callerId, key }) => {
       const input = value as ThreadReportInput
       if (callerId === UNKNOWN_CALLER)
@@ -227,7 +133,7 @@ export function createRelayTools(context: RelayToolsContext): AnyTool[] {
           return failure(
             "idempotency_uncertain",
             "An earlier completion report under this key was recorded without its arm sequence, and the session has no completion armed now: its completion was already written, or the arm is gone.",
-            "Read the binding's outbox with thread_outbox to see whether the completion was sent; to arm another, report again under a new idempotency_key.",
+            "Read the binding's outbox with thread_outbox (tool.thread_outbox() in an eval cell) to see whether the completion was sent; to arm another, report again under a new idempotency_key.",
           )
         options.onCompletionArmed?.(callerId, durableArmSeq)
       }

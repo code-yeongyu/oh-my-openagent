@@ -1,7 +1,11 @@
 import type {
   ApprovalProgress,
+  SyncAcknowledgeRequest,
+  SyncAcknowledgeResponse,
+  SyncEnableRequest,
   SyncApproveRequest,
   SyncApproveResponse,
+  SyncDisableResponse,
   SyncEnableResponse,
   SyncRpcProblem,
   SyncUnavailableCode,
@@ -16,6 +20,7 @@ import type {
 } from "./sync-rpc-ports"
 import {
   identityOf,
+  LOGGABLE_CODE,
   refused,
   RetiredSyncOperation,
   runSyncRpcOperation,
@@ -139,6 +144,20 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
       ? (record.problem ?? refused())
       : { pendingId: record.pendingId ?? "", expiresAt: record.expiresAt, code: record.code, outcome: record.approval }
   const readEnable = (record: Operation): SyncEnableResponse => record.enable ?? unavailable()
+  // A notice that cannot be read is reported as unresolved: never as void, never as saved.
+  const phraseNotice = async (account: SyncRpcAccount) => {
+    const read = options.runtime.phraseNoticeStatus
+    if (read === undefined) return {}
+    try {
+      return await read({
+        pinDir: options.pinDir,
+        account: account.descriptor.accountId,
+        principalId: account.descriptor.syncPrincipalId,
+      })
+    } catch {
+      return { phraseUnresolved: true } as const
+    }
+  }
 
   const start = (record: CeremonyOperation): void => {
     operations.add(record)
@@ -172,7 +191,7 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
         return false
       }
     },
-    async enable(owner: SyncRpcContext): Promise<SyncEnableResponse> {
+    async enable(owner: SyncRpcContext, request: SyncEnableRequest = {}): Promise<SyncEnableResponse> {
       if (enable?.active) {
         if (!ensureOwned(enable, owner)) return refused()
         const record = enable
@@ -181,6 +200,7 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
       }
       if (enable !== undefined) disposeRecord(enable)
       const record = newRecord(owner, "enable")
+      if (request.method !== undefined) record.method = request.method
       enable = record
       start(record)
       await record.ready.promise
@@ -230,9 +250,30 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
         check(owner)
         lastUnavailable.delete("status")
         const visible = records().filter((record) => ensureOwned(record, owner) && record.identity === identity)
+        let notice = await phraseNotice(account)
+        check(owner)
+        // Review LOW (#13336 @ 9f9734a8): an unresolved local read may be an enroll/rotate void notice; resolve it
+        // against the verified chain so the notice can show over RPC.
+        const verify = options.runtime.verifiedPhraseNoticeStatus
+        if (notice.phraseUnresolved === true && verify !== undefined) {
+          const verified = await this.read(owner, (ports, current) =>
+            verify({
+              pinDir: options.pinDir,
+              account: current.descriptor.accountId,
+              principalId: current.descriptor.syncPrincipalId,
+              chain: ports.chain,
+            }),
+          )
+          if (!("kind" in verified)) notice = verified
+          check(owner)
+        }
+        const ownEnable = visible.find((record) => record.kind === "enable")?.enable ?? null
         return {
           ...(sync === undefined ? {} : { sync }),
-          enable: visible.find((record) => record.kind === "enable")?.enable ?? null,
+          // Another process (the CLI) holding the ceremony shows as in progress, never as a void phrase.
+          enable: ownEnable ?? (notice.inProgress === true ? { kind: "in_progress" } : null),
+          ...(notice.phraseVoid !== undefined ? { phraseVoid: notice.phraseVoid } : {}),
+          ...(notice.phraseUnresolved === true ? { phraseUnresolved: true } : {}),
           approvals: visible
             .filter((record) => record.kind === "approve" && record.expiresAt !== undefined)
             .map((record): ApprovalProgress => ({
@@ -249,7 +290,55 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
         })
       }
     },
-    async read<T>(owner: SyncRpcContext, use: (ports: SyncRpcOperation) => Promise<T>): Promise<T | SyncRpcProblem> {
+    async acknowledge(owner: SyncRpcContext, request: SyncAcknowledgeRequest): Promise<SyncAcknowledgeResponse> {
+      const acknowledgePhraseVoid = options.runtime.acknowledgePhraseVoid
+      if (acknowledgePhraseVoid === undefined) return unavailable()
+      return this.read(owner, (ports, account, auth) =>
+        acknowledgePhraseVoid({
+          account: account.descriptor.accountId,
+          serviceDeviceId: account.descriptor.serviceDeviceId,
+          serviceOrigin: account.descriptor.serviceOrigin,
+          keyring: ports.keyring,
+          chain: ports.chain,
+          pairing: ports.pairing,
+          pinDir: options.pinDir,
+          authority: auth,
+          signal: auth.signal,
+          purpose: request.purpose,
+          ...(request.credentialId !== undefined ? { credentialId: request.credentialId } : {}),
+        }),
+      )
+    },
+    /** Turns sync off on this device (#14093): `off`, or a typed problem that never carries the service's words. */
+    async disable(owner: SyncRpcContext): Promise<SyncDisableResponse> {
+      const result = await this.read(owner, async (ports, account, auth) => ({
+        outcome: await options.runtime.disableSync({
+          account: account.descriptor.accountId,
+          serviceDeviceId: account.descriptor.serviceDeviceId,
+          pairing: ports.pairing,
+          pinDir: options.pinDir,
+          authority: auth,
+          signal: auth.signal,
+        }),
+      }))
+      if ("kind" in result) return result
+      if (result.outcome.kind === "refused") {
+        const { code } = result.outcome
+        options.warn?.("memory sync disable refused", {
+          path: "disable",
+          ...(LOGGABLE_CODE.test(code) ? { code } : {}),
+        })
+        return { kind: "refused", reason: "The service did not turn memory sync off for this device." }
+      }
+      // The switch is off on the service and locally; an engine this process still runs for the device stops now,
+      // so the next status read already shows a device that does not sync.
+      await options.stopSync?.()
+      return { kind: "off" }
+    },
+    async read<T>(
+      owner: SyncRpcContext,
+      use: (ports: SyncRpcOperation, account: SyncRpcAccount, auth: SyncRpcAuthority) => Promise<T>,
+    ): Promise<T | SyncRpcProblem> {
       const record = newRecord(owner, "read")
       const task = (async () => {
         let ports: SyncRpcOperation | undefined
@@ -260,7 +349,7 @@ export function createSyncRpcCoordinator(options: SyncRpcOptions) {
           auth.admit(() => undefined)
           ports = await record.account.forOperation(auth)
           auth.admit(() => undefined)
-          const result = await use(ports)
+          const result = await use(ports, record.account, auth)
           auth.admit(() => undefined)
           if (!(await record.account.isCurrent())) return reportUnavailable("read", "account_not_current")
           auth.admit(() => undefined)

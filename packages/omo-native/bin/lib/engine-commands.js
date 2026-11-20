@@ -11,6 +11,8 @@ const ENGINE_COMMANDS = new Set([
   "auth",
   "host",
   "schedule",
+  // omo#14253: senpi answers `session-of-pid <pid> --json` itself (one JSON line, its own usage errors).
+  "session-of-pid",
 ])
 
 export function isEngineCommand(args) {

@@ -382,8 +382,8 @@ test.describe("Getting to the download page", () => {
     await useScenario("launched")
     await page.goto("/")
 
-    // then the public beta button is not shown beside this site's own download button
-    await expect(page.getByTestId("hero-desktop-beta-cta")).toHaveCount(0)
+    // then the public stable page's button is not shown beside this site's own download button
+    await expect(page.getByTestId("hero-desktop-stable-cta")).toHaveCount(0)
 
     // when
     await page.getByTestId("hero-desktop-cta").click()
