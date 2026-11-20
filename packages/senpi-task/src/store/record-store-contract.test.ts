@@ -123,5 +123,33 @@ for (const [name, create] of stores) {
       const store = create()
       expect(() => store.load("../escape")).toThrow()
     })
+
+    test("#given two owned starts for one owner key #when both run concurrently #then the second waits for the first to finish", async () => {
+      const store = create()
+      const order: string[] = []
+      let releaseFirst = (): void => undefined
+      const firstHeld = new Promise<void>((resolve) => {
+        releaseFirst = resolve
+      })
+      let markEntered = (): void => undefined
+      const firstEntered = new Promise<void>((resolve) => {
+        markEntered = resolve
+      })
+      const first = store.withOwnerLock("dag\0run\0node", async () => {
+        order.push("first:start")
+        markEntered()
+        await firstHeld
+        order.push("first:end")
+        return "first"
+      })
+      await firstEntered
+      const second = store.withOwnerLock("dag\0run\0node", async () => {
+        order.push("second")
+        return "second"
+      })
+      releaseFirst()
+      expect(await Promise.all([first, second])).toEqual(["first", "second"])
+      expect(order).toEqual(["first:start", "first:end", "second"])
+    })
   })
 }

@@ -1,6 +1,4 @@
 import { createHash } from "node:crypto"
-import * as fs from "node:fs"
-import { dirname, join } from "node:path"
 
 import { buildSkillPrepend, createFsSkillLoader } from "../tools/task/skills"
 import type { LoadedSkill, SkillLoader } from "../tools/task/types"
@@ -44,10 +42,6 @@ export type DagSkillMaterializerOptions = {
   readonly loadSkills?: SkillLoader
   readonly homeDir?: string
   readonly extraDirs?: readonly string[]
-}
-
-function manifestPath(store: DagFileStore, runId: DagRunId): string {
-  return join(store.paths.root, "skills", `${runId}.json`)
 }
 
 function sha256(value: string): string {
@@ -128,9 +122,7 @@ export function createDagSkillMaterializer(options: DagSkillMaterializerOptions)
       }
     }
     const manifest: DagSkillManifest = { schemaVersion: SCHEMA_VERSION, runId, cwd, at, nodes }
-    const path = manifestPath(options.store, runId)
-    fs.mkdirSync(dirname(path), { recursive: true })
-    fs.writeFileSync(path, JSON.stringify(manifest), "utf8")
+    options.store.writeSkillManifest(runId, JSON.stringify(manifest))
     return {
       nodes: nodes.map((node) => ({ nodeId: node.nodeId, effectivePrompt: node.effectivePrompt })),
       diagnostics,
@@ -140,10 +132,6 @@ export function createDagSkillMaterializer(options: DagSkillMaterializerOptions)
 
 // Resume path: read the creation-time materialization, never SKILL.md.
 export function readDagSkillManifest(store: DagFileStore, runId: DagRunId): DagSkillManifest | null {
-  try {
-    return JSON.parse(fs.readFileSync(manifestPath(store, runId), "utf8")) as DagSkillManifest
-  } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return null
-    throw error
-  }
+  const manifest = store.readSkillManifest(runId)
+  return manifest === null ? null : (JSON.parse(manifest) as DagSkillManifest)
 }

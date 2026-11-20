@@ -14,6 +14,9 @@
 //   a missing record and only by their owner, and handed over only from the recorded owner.
 // - appendEvent returns the path the file store's log would have, and payloads are redacted the same way.
 //
+// - withOwnerLock serializes concurrent async callers per owner key, as the file store's cross-process
+//   lock does within one process.
+//
 // Deliberately NOT emulated: the record lock is a no-op (single-threaded JS already serializes these
 // synchronous sections and there is no second process), and remove/completeExpunge still delete the real
 // children/ and completion-results/ paths, because other writers put session transcripts and spill files
@@ -43,6 +46,7 @@ export function createInMemoryTaskRecordStore(stateDir: string): InMemoryTaskRec
   const records = new Map<string, string>()
   const tombstones = new Map<string, Tombstone>()
   const eventLogs = new Map<string, PersistedTaskEvent[]>()
+  const ownerLockTails = new Map<string, Promise<unknown>>()
   const recordPath = (taskId: string): string => join(stateDir, "tasks", `${taskId}.json`)
   const serialize = (record: TaskRecord): string => JSON.stringify(toStorableTaskRecord(record))
   const parse = (taskId: string, serialized: string): TaskRecord =>
@@ -116,6 +120,21 @@ export function createInMemoryTaskRecordStore(stateDir: string): InMemoryTaskRec
       removeArtifacts(id)
       tombstones.delete(id)
       return true
+    },
+    // The file store's owner lock spans an await, so two async starts for one owner can interleave in
+    // one process; a no-op here would let both spawn. Chain them per key instead.
+    withOwnerLock(ownerKey, operation) {
+      const previous = ownerLockTails.get(ownerKey) ?? Promise.resolve()
+      const run = previous.then(operation, operation)
+      const tail = run.then(
+        () => undefined,
+        () => undefined,
+      )
+      ownerLockTails.set(ownerKey, tail)
+      void tail.then(() => {
+        if (ownerLockTails.get(ownerKey) === tail) ownerLockTails.delete(ownerKey)
+      })
+      return run
     },
     listExpunging: () => [...tombstones.keys()].toSorted(),
     loadExpunging(taskId) {

@@ -102,5 +102,33 @@ for (const [name, create] of stores) {
       store.appendEvent(event(1))
       expect(() => store.appendEvent(event(3))).toThrow(/strictly increasing: expected 2, received 3/)
     })
+
+    test("#given a node result and stats sidecar #when written and read #then both round-trip and an unsafe node id is refused", () => {
+      const store = create()
+      expect(store.readResult(RUN_ID, "node")).toBeNull()
+      expect(store.writeResult(RUN_ID, "node", "output")).toBe(store.paths.result(RUN_ID, "node"))
+      expect(store.writeResultStats(RUN_ID, "node", "{}")).toBe(store.paths.resultStats(RUN_ID, "node"))
+      expect(store.readResult(RUN_ID, "node")).toBe("output")
+      expect(store.readResultStats(RUN_ID, "node")).toBe("{}")
+      expect(() => store.writeResult(RUN_ID, "../escape", "output")).toThrow()
+      expect(() => store.writeResultStats(RUN_ID, "../escape", "{}")).toThrow()
+    })
+
+    test("#given a skill manifest #when written and read #then it round-trips and a missing one reads null", () => {
+      const store = create()
+      expect(store.readSkillManifest(RUN_ID)).toBeNull()
+      store.writeSkillManifest(RUN_ID, '{"nodes":[]}')
+      expect(store.readSkillManifest(RUN_ID)).toBe('{"nodes":[]}')
+      expect(() => store.writeSkillManifest("../escape" as DagRunId, "{}")).toThrow(/Invalid run id/)
+    })
+
+    test("#given checkpoints for two runs #when run ids are listed #then both are reported", () => {
+      const store = create()
+      const other = "dag_contract_other" as DagRunId
+      expect(store.listRunIds()).toEqual([])
+      store.writeCheckpoint(RUN_ID, { schemaVersion: 1, checkpointSeq: 0 })
+      store.writeCheckpoint(other, { schemaVersion: 1, checkpointSeq: 0 })
+      expect([...store.listRunIds()].toSorted()).toEqual([RUN_ID, other].toSorted())
+    })
   })
 }

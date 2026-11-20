@@ -597,10 +597,8 @@ describe("DAG scheduler terminal result persistence", () => {
     // then
     expect(result.status).toBe("completed")
     expect(resultPathCallsUnderLock()).toBeGreaterThan(0)
-    expect(fs.readFileSync(store.paths.result(runId, "artifact"), "utf8")).toBe("done artifact")
-    expect(
-      JSON.parse(fs.readFileSync(store.paths.result(runId, "artifact").replace(/\.txt$/, ".stats.json"), "utf8")),
-    ).toEqual({
+    expect(store.readResult(runId, "artifact")).toBe("done artifact")
+    expect(JSON.parse(store.readResultStats(runId, "artifact") ?? "null")).toEqual({
       schemaVersion: 1,
       runId,
       nodeId: "artifact",
@@ -1777,7 +1775,7 @@ describe("DAG scheduler node controls", () => {
     expect(events().filter((event) => event.type === "dag.node.transitioned" && event.to === "completed")).toHaveLength(
       1,
     )
-    expect(fs.readFileSync(store.paths.result(runId, "revivable"), "utf8")).toBe("done revivable")
+    expect(store.readResult(runId, "revivable")).toBe("done revivable")
   })
 
   test("#given the full send outcome vocabulary #when a node child is messaged #then each outcome maps to its exact result or refusal", async () => {

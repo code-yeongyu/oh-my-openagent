@@ -1,6 +1,5 @@
-import { createHash, randomBytes } from "node:crypto"
-import * as fs from "node:fs"
-import { dirname, relative } from "node:path"
+import { createHash } from "node:crypto"
+import { relative } from "node:path"
 
 import type { TaskRecord, TaskRunStats } from "../state"
 import type { DagFileStore, DagStoreDiagnostic } from "./store"
@@ -28,6 +27,7 @@ export type DagNodeResultPersistOutcome =
 export type DagNodeResultRead = {
   readonly output: string
   readonly runStats?: TaskRunStats
+  readonly artifact: DagNodeResultArtifact
 }
 
 export type DagNodeResultPersistInput = {
@@ -69,9 +69,8 @@ export function persistDagNodeResult(input: DagNodeResultPersistInput): DagNodeR
     // terminal-transition mutation.
     outputPath = input.store.paths.result(input.runId, input.nodeId)
     const output = input.record.final_response ?? ""
-    fs.mkdirSync(dirname(outputPath), { recursive: true })
-    writeArtifact(outputPath, output)
-    const stats = writeStatsSidecar(input, statsPath(outputPath))
+    input.store.writeResult(input.runId, input.nodeId, output)
+    const stats = writeStatsSidecar(input)
     return {
       kind: "persisted",
       artifact: {
@@ -111,13 +110,20 @@ export function readDagNodeResult(input: DagNodeResultReadInput): DagNodeResultR
     if (error instanceof Error) return null
     throw error
   }
-  const output = readTextFile(outputPath)
+  const output = input.store.readResult(input.runId, input.nodeId)
   if (output === null) return null
-  const runStats = readStats(statsPath(outputPath))
-  return runStats === undefined ? { output } : { output, runStats }
+  const stats = input.store.readResultStats(input.runId, input.nodeId)
+  const artifact: DagNodeResultArtifact = {
+    ...artifactRef(input.store, outputPath, output),
+    ...(stats === null
+      ? {}
+      : { stats: artifactRef(input.store, input.store.paths.resultStats(input.runId, input.nodeId), stats) }),
+  }
+  if (stats === null) return { output, artifact }
+  return { output, artifact, runStats: (JSON.parse(stats) as StatsSidecar).runStats }
 }
 
-function writeStatsSidecar(input: DagNodeResultPersistInput, path: string): DagResultArtifactRef | undefined {
+function writeStatsSidecar(input: DagNodeResultPersistInput): DagResultArtifactRef | undefined {
   const runStats = input.record.run_stats
   if (runStats === undefined) return undefined
   const sidecar: StatsSidecar = {
@@ -127,48 +133,7 @@ function writeStatsSidecar(input: DagNodeResultPersistInput, path: string): DagR
     runStats,
   }
   const serialized = JSON.stringify(sidecar)
-  writeArtifact(path, serialized)
-  return artifactRef(input.store, path, serialized)
-}
-
-function writeArtifact(path: string, contents: string): void {
-  const tmpPath = `${path}.tmp-${randomSuffix()}`
-  let fd: number | undefined
-  try {
-    fd = fs.openSync(tmpPath, "w")
-    fs.writeSync(fd, contents)
-    fs.fsyncSync(fd)
-    fs.closeSync(fd)
-    fd = undefined
-    fs.renameSync(tmpPath, path)
-  } catch (error) {
-    if (fd !== undefined) {
-      try {
-        fs.closeSync(fd)
-      } catch {
-        // ignore close errors during cleanup
-      }
-      fd = undefined
-    }
-    try {
-      fs.rmSync(tmpPath, { force: true })
-    } catch {
-      // ignore cleanup errors
-    }
-    throw error
-  } finally {
-    if (fd !== undefined) {
-      try {
-        fs.closeSync(fd)
-      } catch {
-        // ignore close errors during cleanup
-      }
-    }
-  }
-}
-
-function randomSuffix(): string {
-  return randomBytes(8).toString("hex")
+  return artifactRef(input.store, input.store.writeResultStats(input.runId, input.nodeId, serialized), serialized)
 }
 
 function artifactRef(store: DagFileStore, path: string, contents: string): DagResultArtifactRef {
@@ -176,26 +141,6 @@ function artifactRef(store: DagFileStore, path: string, contents: string): DagRe
     relativePath: relative(store.stateDir, path),
     sha256: createHash("sha256").update(contents, "utf8").digest("hex"),
     bytes: Buffer.byteLength(contents, "utf8"),
-  }
-}
-
-function statsPath(outputPath: string): string {
-  return `${outputPath.slice(0, -".txt".length)}.stats.json`
-}
-
-function readStats(path: string): TaskRunStats | undefined {
-  const raw = readTextFile(path)
-  if (raw === null) return undefined
-  const value = JSON.parse(raw) as StatsSidecar
-  return value.runStats
-}
-
-function readTextFile(path: string): string | null {
-  try {
-    return fs.readFileSync(path, "utf8")
-  } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return null
-    throw error
   }
 }
 

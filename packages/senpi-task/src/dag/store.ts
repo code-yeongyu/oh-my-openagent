@@ -92,6 +92,8 @@ export type DagStorePaths = {
   readonly run: (runId: DagRunId) => string
   readonly event: (runId: DagRunId) => string
   readonly result: (runId: DagRunId, nodeId: string) => string
+  readonly resultStats: (runId: DagRunId, nodeId: string) => string
+  readonly skillManifest: (runId: DagRunId) => string
   readonly runLock: (runId: DagRunId) => string
   readonly keyLock: (parentSessionId: string, runKey: string) => string
   readonly taskOwnerLock: (taskOwner: string) => string
@@ -109,6 +111,12 @@ export type DagFileStore = {
   readonly readKey: (parentSessionId: string, runKey: string) => DagKeyRecord | null
   readonly writeResult: (runId: DagRunId, nodeId: string, result: string) => string
   readonly readResult: (runId: DagRunId, nodeId: string) => string | null
+  readonly writeResultStats: (runId: DagRunId, nodeId: string, stats: string) => string
+  readonly readResultStats: (runId: DagRunId, nodeId: string) => string | null
+  readonly writeSkillManifest: (runId: DagRunId, manifest: string) => void
+  readonly readSkillManifest: (runId: DagRunId) => string | null
+  /** Ids of every run with a checkpoint, in no particular order. */
+  readonly listRunIds: () => readonly DagRunId[]
   readonly withRunLock: <T>(runId: DagRunId, operation: () => T) => T
   readonly withKeyLock: <T>(parentSessionId: string, runKey: string, operation: () => T) => T
   readonly withTaskOwnerLock: <T>(taskOwner: string, runId: DagRunId, operation: () => T) => T
@@ -274,13 +282,30 @@ export function createDagFileStore(config: DagStoreConfig, options: StoreOptions
     readResult(runId, nodeId) {
       assertSafeSegment(runId, "run id")
       assertSafeSegment(nodeId, "node id")
-      try {
-        return fs.readFileSync(paths.result(runId, nodeId), "utf8")
-      } catch (error) {
-        if (hasCode(error, "ENOENT")) return null
-        throw error
-      }
+      return readOptionalText(paths.result(runId, nodeId))
     },
+    writeResultStats(runId, nodeId, stats) {
+      const path = paths.resultStats(runId, nodeId)
+      writeFileAtomic(path, stats, platform, fsyncWrites)
+      return path
+    },
+    readResultStats(runId, nodeId) {
+      return readOptionalText(paths.resultStats(runId, nodeId))
+    },
+    writeSkillManifest(runId, manifest) {
+      assertSafeSegment(runId, "run id")
+      const path = paths.skillManifest(runId)
+      fs.mkdirSync(dirname(path), { recursive: true })
+      fs.writeFileSync(path, manifest, "utf8")
+    },
+    readSkillManifest(runId) {
+      assertSafeSegment(runId, "run id")
+      return readOptionalText(paths.skillManifest(runId))
+    },
+    listRunIds: () =>
+      readDagDirectory(paths.runs)
+        .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
+        .map((entry) => entry.name.slice(0, -".json".length) as DagRunId),
     withRunLock(runId, operation) {
       assertSafeSegment(runId, "run id")
       return withLock(paths.runLock(runId), runId, operation, isProcessAlive, now, fsyncWrites)
@@ -336,6 +361,24 @@ export function createDagStorePaths(stateDir: string): DagStorePaths {
   const events = join(root, "events")
   const results = join(root, "results")
   const locks = join(root, "locks")
+  // A node id becomes one path segment under the run's results directory. The store's own gate is
+  // the containment check below: it is structural, so a caller that bypasses
+  // writeResult/readResult (results.ts, scheduler.ts) cannot escape even if the shared deny-list is
+  // later weakened. The deny-list still runs after it for the hazards containment does not cover
+  // (a NUL byte, ":" alternate-data-stream), so the two layers are not one rule applied twice.
+  const result = (runId: DagRunId, nodeId: string): string => {
+    assertSafeSegment(runId, "run id")
+    const runDir = join(results, runId)
+    const outputPath = join(runDir, `${nodeId}.txt`)
+    const fromRunDir = relative(runDir, resolve(outputPath))
+    // An escape is ".." itself, or ".." followed by a separator; a plain "..name" is an ordinary
+    // filename (id "..." yields "....txt") and must stay allowed.
+    if (isAbsolute(fromRunDir) || fromRunDir === ".." || fromRunDir.startsWith(`..${sep}`)) {
+      throw new Error(`Unsafe dag result path: node id "${nodeId}" escapes the run results directory`)
+    }
+    assertSafeSegment(nodeId, "node id")
+    return outputPath
+  }
   return {
     root,
     keys,
@@ -346,24 +389,9 @@ export function createDagStorePaths(stateDir: string): DagStorePaths {
     key: (parentSessionId, runKey) => join(keys, `${dagKeyHash(parentSessionId, runKey)}.json`),
     run: (runId) => join(runs, `${runId}.json`),
     event: (runId) => join(events, `${runId}.jsonl`),
-    // A node id becomes one path segment under the run's results directory. The store's own gate is
-    // the containment check below: it is structural, so a caller that bypasses
-    // writeResult/readResult (results.ts, scheduler.ts) cannot escape even if the shared deny-list is
-    // later weakened. The deny-list still runs after it for the hazards containment does not cover
-    // (a NUL byte, ":" alternate-data-stream), so the two layers are not one rule applied twice.
-    result: (runId, nodeId) => {
-      assertSafeSegment(runId, "run id")
-      const runDir = join(results, runId)
-      const outputPath = join(runDir, `${nodeId}.txt`)
-      const fromRunDir = relative(runDir, resolve(outputPath))
-      // An escape is ".." itself, or ".." followed by a separator; a plain "..name" is an ordinary
-      // filename (id "..." yields "....txt") and must stay allowed.
-      if (isAbsolute(fromRunDir) || fromRunDir === ".." || fromRunDir.startsWith(`..${sep}`)) {
-        throw new Error(`Unsafe dag result path: node id "${nodeId}" escapes the run results directory`)
-      }
-      assertSafeSegment(nodeId, "node id")
-      return outputPath
-    },
+    result,
+    skillManifest: (runId) => join(root, "skills", `${runId}.json`),
+    resultStats: (runId, nodeId) => `${result(runId, nodeId).slice(0, -".txt".length)}.stats.json`,
     runLock: (runId) => join(locks, `${runId}.lock`),
     keyLock: (parentSessionId, runKey) => join(locks, `key-${dagKeyHash(parentSessionId, runKey)}.lock`),
     taskOwnerLock: (taskOwner) => join(locks, `task-owner-${sha256(taskOwner)}.lock`),
@@ -397,7 +425,7 @@ function writeCheckpointWithinSessionLimit(
       try {
         assertSessionRunCapacity(paths, parentSessionId, runId, maxRunsPerSession, now)
       } catch (error) {
-        fs.rmSync(join(paths.root, "skills", `${runId}.json`), { force: true })
+        fs.rmSync(paths.skillManifest(runId), { force: true })
         throw error
       }
       writeJsonAtomic(path, checkpoint, platform, fsyncWrites)
@@ -588,6 +616,15 @@ function parseJson(text: string, path: string, runId?: DagRunId, now: () => numb
     return JSON.parse(text) as unknown
   } catch (error) {
     throw corrupt(path, runId, `malformed JSON: ${error instanceof Error ? error.message : String(error)}`, now)
+  }
+}
+
+function readOptionalText(path: string): string | null {
+  try {
+    return fs.readFileSync(path, "utf8")
+  } catch (error) {
+    if (hasCode(error, "ENOENT")) return null
+    throw error
   }
 }
 
@@ -956,7 +993,7 @@ function pruneRunArtifacts(
 ): void {
   fs.rmSync(paths.event(runId), { force: true })
   fs.rmSync(join(paths.results, runId), { recursive: true, force: true })
-  fs.rmSync(join(paths.root, "skills", `${runId}.json`), { force: true })
+  fs.rmSync(paths.skillManifest(runId), { force: true })
   fs.rmSync(paths.runLock(runId), { force: true })
   for (const name of artifacts.keyFilesByRun.get(runId) ?? []) {
     fs.rmSync(join(paths.keys, name), { force: true })

@@ -135,13 +135,25 @@ export function createInMemoryDagStore(
     },
     writeResult(runId, nodeId, result) {
       const path = paths.result(runId, nodeId)
-      results.set(`${runId}\u0000${nodeId}`, result)
+      results.set(path, result)
       return path
     },
-    readResult(runId, nodeId) {
-      paths.result(runId, nodeId)
-      return results.get(`${runId}\u0000${nodeId}`) ?? null
+    readResult: (runId, nodeId) => results.get(paths.result(runId, nodeId)) ?? null,
+    writeResultStats(runId, nodeId, stats) {
+      const path = paths.resultStats(runId, nodeId)
+      results.set(path, stats)
+      return path
     },
+    readResultStats: (runId, nodeId) => results.get(paths.resultStats(runId, nodeId)) ?? null,
+    writeSkillManifest(runId, manifest) {
+      assertSafeSegment(runId, "run id")
+      results.set(paths.skillManifest(runId), manifest)
+    },
+    readSkillManifest(runId) {
+      assertSafeSegment(runId, "run id")
+      return results.get(paths.skillManifest(runId)) ?? null
+    },
+    listRunIds: () => [...checkpoints.keys()],
     withRunLock(runId, operation) {
       assertSafeSegment(runId, "run id")
       return withLock(paths.runLock(runId), operation)
@@ -158,13 +170,13 @@ export function createInMemoryDagStore(
   }
 }
 
-// The journal files a file-backed store WOULD have written under this store's paths. Cases that journal
-// in memory assert this stays empty, so a fixture swapped back to disk fails loudly instead of quietly
-// reintroducing the load-dependent commit cost. results/ and skills/ are excluded: their writers bypass
-// the store (results.ts, skills materialization) until #11629.
+// The files a file-backed store WOULD have written under this store's paths. Cases that journal in memory
+// assert this stays empty, so a fixture swapped back to disk, or a writer that bypasses the store (#11629),
+// fails loudly instead of quietly reintroducing the load-dependent I/O cost.
 export function journalFilesOnDisk(store: DagFileStore): readonly string[] {
-  const { events, runs, locks, keys } = store.paths
-  return Object.entries({ events, runs, locks, keys }).flatMap(([name, directory]) =>
+  const { events, runs, locks, keys, results } = store.paths
+  const skills = join(store.paths.root, "skills")
+  return Object.entries({ events, runs, locks, keys, results, skills }).flatMap(([name, directory]) =>
     existsSync(directory) ? readdirSync(directory).map((entry) => `${name}/${entry}`) : [],
   )
 }

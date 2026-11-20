@@ -72,5 +72,6 @@ export function createMutationNotifyingStore(
     },
     readExpungeOwner: (taskId) => backing.readExpungeOwner(taskId),
     takeOverExpunging: (taskId, from, to) => backing.takeOverExpunging(taskId, from, to),
+    withOwnerLock: (ownerKey, operation) => backing.withOwnerLock(ownerKey, operation),
   }
 }

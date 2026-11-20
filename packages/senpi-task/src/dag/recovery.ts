@@ -23,7 +23,7 @@ import { skipDuplicateTerminalTransition, type DagPersistedNode, type DagRunReco
 import type { DagTaskOwner, OwnedStartResult } from "./owner"
 import { readDagNodeResult } from "./results"
 import { applyDagSchedulerEvent, createDagScheduler, type DagNodeSpawnPolicy } from "./scheduler"
-import { readDagDirectory, type DagFileStore } from "./store"
+import type { DagFileStore } from "./store"
 import type { DagNodeError, DagNodeErrorCode, DagNodeId, DagNodeTransitionReason, DagRunEvent, DagRunId } from "./types"
 
 const LIVE_RUN_STATUSES = new Set(["pending", "running"])
@@ -580,9 +580,9 @@ function releaseLease(context: RecoveryContext, runId: DagRunId): void {
 }
 
 function listRunRecords(store: DagFileStore): readonly RecoverableRecord[] {
-  return readDagDirectory(store.paths.runs)
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
-    .map((entry) => store.readCheckpoint<RecoverableRecord>(entry.name.slice(0, -5) as DagRunId))
+  return store
+    .listRunIds()
+    .map((runId) => store.readCheckpoint<RecoverableRecord>(runId))
     .filter((record): record is RecoverableRecord => record !== null)
 }
 

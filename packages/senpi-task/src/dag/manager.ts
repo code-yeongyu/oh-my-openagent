@@ -1,7 +1,6 @@
 // allow: SIZE_OK - the run lifecycle surface keeps key idempotency, session ownership, and snapshot projection on one contract so callers cannot bypass a step.
 import { randomUUID } from "node:crypto"
 import * as fs from "node:fs"
-import { join } from "node:path"
 import type { Guidance } from "../pause/guidance"
 import { applyDagRunMutation } from "./run-mutation"
 import { liveLeaseHolder, pausedAmendmentUnsafe } from "./amend-safety"
@@ -14,7 +13,7 @@ import { dagDefinitionFingerprint, diffNodeFingerprints, type DagNodeFingerprint
 import { compileDag, type DagCompileError, type DagDefinition, type DagNodeInput } from "./graph"
 import { createDagJournal, type DagJournalCheckpoint } from "./journal"
 import { readDagNodeActivityAt } from "./node-activity"
-import { readDagDirectory, type DagEventPage, type DagFileStore } from "./store"
+import type { DagEventPage, DagFileStore } from "./store"
 import { DAG_SETTINGS_DEFAULTS } from "./types"
 import type {
   AmendRecord,
@@ -327,9 +326,7 @@ export function createDagManager(options: DagManagerOptions): DagManager {
       const limit = resolveLimit(listOptions?.limit, LIST_DEFAULT_LIMIT, LIST_MAX_LIMIT)
       const summaries: DagRunSummary[] = []
       const present = new Set<DagRunId>()
-      for (const entry of readDagDirectory(store.paths.runs)) {
-        if (!entry.isFile() || !entry.name.endsWith(".json")) continue
-        const runId = entry.name.slice(0, -5) as DagRunId
+      for (const runId of store.listRunIds()) {
         present.add(runId)
         const summary = runSummary(runId)
         if (summary === undefined || summary.parentSessionId !== parentSessionId) continue
@@ -696,10 +693,12 @@ function materializeAmendedDefinition(
       diagnostics: oldRecord.diagnostics,
     }
   }
-  const manifestPath = join(context.store.paths.root, "skills", `${oldRecord.runId}.json`)
-  const oldManifest = fs.existsSync(manifestPath)
-    ? (JSON.parse(fs.readFileSync(manifestPath, "utf8")) as { cwd?: string; nodes?: readonly { nodeId: string }[] })
-    : undefined
+  type ManifestNodes = { cwd?: string; nodes?: readonly { nodeId: string }[] }
+  const readManifest = (): ManifestNodes | undefined => {
+    const raw = context.store.readSkillManifest(oldRecord.runId)
+    return raw === null ? undefined : (JSON.parse(raw) as ManifestNodes)
+  }
+  const oldManifest = readManifest()
   const selected = definition.nodes.filter((node) => rematerializedIds.includes(node.id as DagNodeId))
   const materialized = context.materializeSkills({
     runId: oldRecord.runId,
@@ -707,11 +706,11 @@ function materializeAmendedDefinition(
     at,
   })
   const effective = new Map(materialized.nodes.map((node) => [node.nodeId, node.effectivePrompt] as const))
-  if (oldManifest !== undefined && fs.existsSync(manifestPath)) {
-    const freshManifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as { nodes?: readonly { nodeId: string }[] }
+  const freshManifest = oldManifest === undefined ? undefined : readManifest()
+  if (oldManifest !== undefined && freshManifest !== undefined) {
     const replaced = new Set(selected.map((node) => node.id))
-    fs.writeFileSync(
-      manifestPath,
+    context.store.writeSkillManifest(
+      oldRecord.runId,
       JSON.stringify({
         ...freshManifest,
         cwd: oldManifest.cwd,
@@ -720,7 +719,6 @@ function materializeAmendedDefinition(
           ...(freshManifest.nodes ?? []),
         ],
       }),
-      "utf8",
     )
   }
   return {
