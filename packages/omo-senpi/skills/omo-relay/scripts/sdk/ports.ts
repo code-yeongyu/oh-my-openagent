@@ -53,7 +53,7 @@ export type ThreadRow = {
 
 export type ThreadListOptions = {
   readonly all_scope?: boolean
-  readonly state?: readonly ("running" | "idle" | "inactive" | "archived")[]
+  readonly state?: readonly ("opening" | "running" | "idle" | "inactive" | "archived")[]
 }
 
 export type ThreadReadOptions = {
