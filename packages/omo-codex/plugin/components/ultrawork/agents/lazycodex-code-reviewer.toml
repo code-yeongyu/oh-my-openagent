@@ -1,7 +1,7 @@
 name = "lazycodex-code-reviewer"
 description = "Read-only LazyCodex code-quality reviewer. Audits diffs, tests, and risk with strict artifact-backed findings."
 nickname_candidates = ["Code Reviewer"]
-model = "gpt-6-astra"
+model = "gpt-6.2-astra"
 model_reasoning_effort = "medium"
 
 developer_instructions = """

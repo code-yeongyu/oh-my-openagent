@@ -2,7 +2,11 @@ import { NextResponse, type NextRequest } from "next/server"
 import createMiddleware from "next-intl/middleware"
 import { locales, type Locale } from "./i18n/config"
 import { routing } from "./i18n/routing"
-import { desktopDownloadEnabled } from "./lib/desktop-download"
+import {
+  desktopDownloadEnabled,
+  PUBLIC_DESKTOP_BETA_URL,
+  PUBLIC_DESKTOP_STABLE_URL,
+} from "./lib/desktop-download"
 
 const handleI18nRouting = createMiddleware(routing)
 const oldHosts = new Set(["www.omo.dev"])
@@ -24,9 +28,14 @@ const installGuidePaths = new Set([
 const desktopPaths = new Set(["desktop"])
 
 // Shipped desktop builds link https://omo.dev/download (reinstall screen, deb update pill). While this
-// site's own download page is off, that path goes to the public beta download page instead of a 404.
+// site's own download page is off, that path goes to the public stable download page (which links the
+// beta page), or to the beta page when `?channel=beta` asks for it, instead of a 404.
 // Temporary (307), not permanent: a browser must not keep skipping this site's page once it is enabled.
-const PUBLIC_DESKTOP_DOWNLOAD_PAGE = "https://get.omo.dev/desktop/beta/"
+function publicDesktopDownloadPage(request: NextRequest): string {
+  return request.nextUrl.searchParams.get("channel") === "beta"
+    ? PUBLIC_DESKTOP_BETA_URL
+    : PUBLIC_DESKTOP_STABLE_URL
+}
 
 function getLocaleSegment(segment: string | undefined): Locale | null {
   if (!segment) return null
@@ -71,7 +80,7 @@ function isDownloadPath(pathname: string): boolean {
 
 export default function proxy(request: NextRequest): NextResponse {
   if (!desktopDownloadEnabled() && isDownloadPath(request.nextUrl.pathname)) {
-    return NextResponse.redirect(PUBLIC_DESKTOP_DOWNLOAD_PAGE, 307)
+    return NextResponse.redirect(publicDesktopDownloadPage(request), 307)
   }
 
   const forwardedHost = request.headers.get("x-forwarded-host")

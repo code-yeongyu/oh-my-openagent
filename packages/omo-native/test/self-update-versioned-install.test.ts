@@ -6,6 +6,7 @@ import {
   readdirSync,
   readFileSync,
   readlinkSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -43,7 +44,7 @@ function writePackage(versionDir: string, version: string) {
 const MANIFEST = { private: true, dependencies: { "omo-ai": "5.1.77" }, trustedDependencies: ["omo-ai"] }
 
 function fixture(shape: "wrapper" | "bin-link") {
-  const home = mkdtempSync(join(tmpdir(), "omo-12022-"))
+  const home = realpathSync(mkdtempSync(join(tmpdir(), "omo-12022-")))
   homes.push(home)
   const versions = join(home, ".omo", "omo-versions")
   const bunBin = join(home, ".bun", "bin")

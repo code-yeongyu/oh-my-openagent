@@ -102,7 +102,7 @@ export const ThreadCreateParams = Type.Object({
     Type.String({
       minLength: 1,
       maxLength: THREAD_MESSAGE_MAX_BYTES,
-      description: `First message for the new thread, delivered as thread_send (tool.thread_send() in an eval cell) delivers it once the thread exists (delivery picks its mode); the result's prompt field names that delivery, or its failure while the thread stays created. Covered by the same idempotency_key as the create. Longer than ${THREAD_MESSAGE_MAX_BYTES} UTF-8 bytes returns message_too_large. Only for a new thread.`,
+      description: `First message for the new thread, delivered as thread_send (tool.thread_send() in an eval cell) delivers it once the thread exists (delivery picks its mode); the result's prompt field names that delivery, or its failure while the thread stays created. Covered by the same idempotency_key as the create. Also sent when thread opens an existing thread: it goes to that thread (#14335). Longer than ${THREAD_MESSAGE_MAX_BYTES} UTF-8 bytes returns message_too_large.`,
     }),
   ),
   delivery: Type.Optional(ThreadDeliveryMode),
