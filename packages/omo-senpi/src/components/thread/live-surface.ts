@@ -984,6 +984,10 @@ export function createLiveThreadSurface(
       }
     },
     listSessions: async () => (await listView()).sessions,
+    capabilities: async () => {
+      const info = await callOn<Record<string, unknown>>(legacy, "get_protocol_info", { observe: true })
+      return Array.isArray(info.capabilities) ? info.capabilities.filter((name) => typeof name === "string") : []
+    },
     listView,
     endpoint: (socket) =>
       sessionMethods(socket, (type, data, durableId) => callOn(socket, type, data, undefined, durableId)),

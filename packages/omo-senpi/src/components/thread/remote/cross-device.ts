@@ -42,15 +42,17 @@ export async function planCreate(
     }
   const plan = placeFolder(await placeCreate(remote, value, local), value.worktree, local.callerCwd)
   if (plan.kind !== "open" || plan.request.forkFrom === undefined) return plan
-  // The engine's open_session does not read forkFrom (#13031): an open carrying it would start a blank thread.
+  // An engine that forks on open_session advertises it (senpi#7085); one that does not would open a blank thread for an
+  // open carrying forkFrom (#13031), so fork_from is refused there before anything opens.
+  if (await plan.host.forks()) return plan
   return {
     kind: "done",
     result: {
       kind: "error",
       error: threadToolFailure(
         "unsupported",
-        "fork_from cannot fork yet: the engine opens a blank session instead of a fork, so no thread was created.",
-        "Create the thread without fork_from and hand it the source's context with thread_send; thread_read reads the source (tool.thread_send() and tool.thread_read() in an eval cell).",
+        "fork_from cannot fork here: this engine opens a blank session instead of a fork, so no thread was created.",
+        "Update omo on the device that holds the source so its engine forks, or create the thread without fork_from and hand it the source's context with thread_send; thread_read reads the source (tool.thread_send() and tool.thread_read() in an eval cell).",
         {
           reason: "fork_unsupported",
           thread: plan.request.forkFrom,
