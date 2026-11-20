@@ -29,8 +29,21 @@
 import { existsSync, readdirSync } from "node:fs"
 import { basename, join } from "node:path"
 
-import { decodePausedNodes, decodePausedTransition, encodePausedNodes, encodePausedTransition } from "../paused-node-encoding"
-import { assertSafeSegment, assertSupportedSchema, dagKeyHash, type DagEventPage, type DagFileStore, type DagKeyRecord, type DagStorePaths } from "../store"
+import {
+  decodePausedNodes,
+  decodePausedTransition,
+  encodePausedNodes,
+  encodePausedTransition,
+} from "../paused-node-encoding"
+import {
+  assertSafeSegment,
+  assertSupportedSchema,
+  dagKeyHash,
+  type DagEventPage,
+  type DagFileStore,
+  type DagKeyRecord,
+  type DagStorePaths,
+} from "../store"
 import type { DagRunEvent, DagRunId } from "../types"
 
 function clone<T>(value: T): T {
@@ -45,7 +58,12 @@ function memoryPaths(stateDir: string): DagStorePaths {
   const results = join(root, "results")
   const locks = join(root, "locks")
   return {
-    root, keys, runs, events, results, locks,
+    root,
+    keys,
+    runs,
+    events,
+    results,
+    locks,
     key: (parentSessionId, runKey) => join(keys, `${dagKeyHash(parentSessionId, runKey)}.json`),
     run: (runId) => join(runs, `${runId}.json`),
     event: (runId) => join(events, `${runId}.jsonl`),
@@ -60,7 +78,10 @@ function memoryPaths(stateDir: string): DagStorePaths {
   }
 }
 
-export function createInMemoryDagStore(stateDir = "/memory/.omo/senpi-task", now: () => number = Date.now): DagFileStore {
+export function createInMemoryDagStore(
+  stateDir = "/memory/.omo/senpi-task",
+  now: () => number = Date.now,
+): DagFileStore {
   const paths = memoryPaths(stateDir)
   const eventsByRun = new Map<DagRunId, DagRunEvent[]>()
   const checkpoints = new Map<DagRunId, object>()
@@ -152,10 +173,11 @@ export function createInMemoryDagStore(stateDir = "/memory/.omo/senpi-task", now
       return withLock(paths.runLock(runId), operation)
     },
     withKeyLock: (parentSessionId, runKey, operation) => withLock(paths.keyLock(parentSessionId, runKey), operation),
-    withTaskOwnerLock: (taskOwner, runId, operation) => withLock(paths.taskOwnerLock(taskOwner), () => {
-      assertSafeSegment(runId, "run id")
-      return operation()
-    }),
+    withTaskOwnerLock: (taskOwner, runId, operation) =>
+      withLock(paths.taskOwnerLock(taskOwner), () => {
+        assertSafeSegment(runId, "run id")
+        return operation()
+      }),
     withSessionRunCapacity: (parentSessionId, _runId, operation) =>
       withLock(join(paths.locks, `session-runs-${dagKeyHash(parentSessionId, "session-runs")}.lock`), operation),
     pruneExpired: () => [],

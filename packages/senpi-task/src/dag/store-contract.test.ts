@@ -29,8 +29,14 @@ const RUN_ID = "dag_contract" as DagRunId
 
 function event(seq: number, overrides: Partial<DagRunEvent> = {}): DagRunEvent {
   return {
-    schemaVersion: 1, runId: RUN_ID, seq, at: "2026-10-19T00:00:00.000Z", lane: "lifecycle",
-    type: "dag.run.started", generation: 1, ...overrides,
+    schemaVersion: 1,
+    runId: RUN_ID,
+    seq,
+    at: "2026-10-19T00:00:00.000Z",
+    lane: "lifecycle",
+    type: "dag.run.started",
+    generation: 1,
+    ...overrides,
   } as DagRunEvent
 }
 
@@ -45,7 +51,9 @@ for (const [name, create] of stores) {
     test("#given an event without a supported schemaVersion #when appended #then it is refused", () => {
       const store = create()
       expect(() => store.appendEvent(event(1, { schemaVersion: 2 as 1 }))).toThrow(/schemaVersion/)
-      expect(() => store.appendEvent({ ...event(1), schemaVersion: undefined } as unknown as DagRunEvent)).toThrow(/schemaVersion/)
+      expect(() => store.appendEvent({ ...event(1), schemaVersion: undefined } as unknown as DagRunEvent)).toThrow(
+        /schemaVersion/,
+      )
     })
 
     test("#given a checkpoint without a supported schemaVersion #when written #then it is refused", () => {
@@ -83,7 +91,9 @@ for (const [name, create] of stores) {
       expect(last.events.map((entry) => entry.seq)).toEqual([3, 4, 5])
       expect(last.hasMore).toBe(false)
       expect(store.readEvents(RUN_ID, 5, { limit: 10 }).events).toEqual([])
-      expect(store.readEvents(RUN_ID, 0, { limit: 10, throughSeq: 3 }).events.map((entry) => entry.seq)).toEqual([1, 2, 3])
+      expect(store.readEvents(RUN_ID, 0, { limit: 10, throughSeq: 3 }).events.map((entry) => entry.seq)).toEqual([
+        1, 2, 3,
+      ])
       expect(() => store.readEvents(RUN_ID, 0, { limit: 0 })).toThrow(/positive integer/)
     })
 

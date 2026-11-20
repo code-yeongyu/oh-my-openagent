@@ -600,7 +600,12 @@ function readJsonFile(path: string, runId?: DagRunId, now: () => number = Date.n
 
 // Exported for the in-memory store the retry tests journal to (#11621): a test double that skips these
 // refusals would pass journal state the file store rejects, so both stores call the SAME validator.
-export function assertSupportedSchema(value: unknown, path: string, runId: DagRunId | undefined, now: () => number): void {
+export function assertSupportedSchema(
+  value: unknown,
+  path: string,
+  runId: DagRunId | undefined,
+  now: () => number,
+): void {
   if (!isRecord(value) || typeof value.schemaVersion !== "number") {
     throw corrupt(path, runId, "missing schemaVersion", now)
   }
