@@ -1,7 +1,14 @@
 import type { ThreadAddressEntry } from "../addressing"
 import type { ThreadToolFailure } from "../errors"
 import { threadToolFailure } from "../errors"
-import { rowStatus, rowThreadId, type RemoteListing, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
+import {
+  rowFolder,
+  rowStatus,
+  rowThreadId,
+  type RemoteListing,
+  type RemoteSessionRow,
+  type RemoteThreadSurface,
+} from "./ports"
 import { onAccount } from "./account"
 import { holderTarget, remoteReady } from "./remote-ops"
 
@@ -19,7 +26,7 @@ export function relayAddressEntry(row: RemoteSessionRow, aliases?: readonly stri
     // names collide across threads and would turn into ambiguous addresses (#14043).
     name: row.title,
     status: rowStatus(row),
-    cwd: row.project,
+    cwd: rowFolder(row),
     created_at: updated,
     updated_at: updated,
     device: row.device,
