@@ -309,6 +309,8 @@ export type GatewayDeliverySuccess = {
   readonly effective_mode: GatewayDeliveryMode | EffectiveLane
   readonly endpoint_kind: "rpc_host" | "tui" | null
   readonly deduplicated: boolean
+  /** A collapse-key repeat the target already held an earlier message for: this send's text was not delivered (#14428). */
+  readonly collapsed?: true
 }
 
 export type GatewayDeliveryResult =

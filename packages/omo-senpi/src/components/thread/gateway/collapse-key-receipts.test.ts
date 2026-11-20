@@ -65,6 +65,8 @@ describe("collapse key and the store's invariants", () => {
 
     if (first.kind !== "ok" || absorbed.kind !== "ok") throw new Error("send refused")
     expect(absorbed.delivery_id).toBe(first.delivery_id)
+    expect(absorbed.collapsed).toBe(true)
+    expect(first.collapsed).toBeUndefined()
     expect(retried).toMatchObject({ kind: "ok", delivery_id: first.delivery_id, deduplicated: true })
     expect(await sender.store.list({ target_durable_id: "lead" })).toHaveLength(1)
   })

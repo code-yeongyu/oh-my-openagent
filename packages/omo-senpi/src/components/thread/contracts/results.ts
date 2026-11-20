@@ -142,6 +142,8 @@ export type ThreadDelivery =
 export type ThreadGatewayDeliveryFacts = {
   readonly delivery_id?: string
   readonly effective_mode?: "auto" | "start" | "steer" | "follow_up"
+  /** The target already held this sender's earlier message under the same collapse_key: this text was not delivered. */
+  readonly collapsed?: true
 }
 
 export type ThreadAddressResolution = "id" | "exact_name" | "fuzzy"

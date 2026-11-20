@@ -90,7 +90,14 @@ export async function withBacklog(
   listed: ThreadToolResult,
 ): Promise<ThreadToolResult> {
   if (listed.kind !== "ok" || !("threads" in listed) || listed.threads.length === 0) return listed
-  const backlogs = await store.backlogs(listed.threads.map((thread) => thread.thread))
+  let backlogs: Awaited<ReturnType<typeof store.backlogs>>
+  try {
+    backlogs = await store.backlogs(listed.threads.map((thread) => thread.thread))
+  } catch {
+    // The backlog is an optional detail: a store that cannot be read (a newer schema, a worker that failed to start) never
+    // costs the listing, which is how a stuck gateway is diagnosed.
+    return listed
+  }
   return {
     ...listed,
     threads: listed.threads.map((thread) => {

@@ -170,8 +170,8 @@ Every send is checked against fixed budgets, which no setting raises:
 A sender that repeats one message (an alert re-sent every few minutes) passes `--collapse-key <k>`
 (`collapse_key` on `thread_send`): the send replaces the sender's earlier undelivered message under
 the same key, which ends `refused` `superseded`, or, when the session already took that one into its
-queue, is answered deduplicated with its delivery id. One key never holds more than one undelivered
-message. It reaches sessions on this device only; a send to another device with it answers `unsupported`.
+queue, is answered deduplicated with its delivery id and `collapsed: true` (this text is not delivered;
+the earlier message stands). One key never holds more than one undelivered message. It reaches sessions on this device only; a send to another device with it answers `unsupported`.
 
 A session may message the session that messaged it, so A to B to A is delivered; answers also flow back through `read`, `report` and `answer`.
 

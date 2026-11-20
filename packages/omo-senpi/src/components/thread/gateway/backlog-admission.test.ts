@@ -1,8 +1,10 @@
+import { Database } from "bun:sqlite"
 import { afterEach, describe, expect, test } from "bun:test"
 
 import type { ThreadToolResult } from "../contracts"
 import { withBacklog } from "../tools/read-ops"
-import { STEER_RESERVE_MESSAGES, TARGET_MAX_MESSAGES } from "./constants"
+import { QUEUED_TTL_MS, STEER_RESERVE_BYTES, STEER_RESERVE_MESSAGES, TARGET_MAX_MESSAGES } from "./constants"
+import { gatewayDatabasePath } from "./paths"
 import { createGatewayHarness, type GatewayHarness, type HarnessSession } from "./testing/harness"
 import type { GatewayDeliveryResult } from "./types"
 
@@ -43,33 +45,61 @@ async function send(
 }
 
 /**
- * Writes `count` follow-ups for "lead" the way another device's relay leg does (`store.intake`: one store call each,
- * the same per-lane cap), then lets one drain pass take them when "lead" has a drain. Only the sends a test asserts on
- * go through the engine.
+ * Seeds `count` follow-ups from `sender` to "lead" in one transaction, three minutes apart. With a drain, "lead"'s
+ * runtime holds them (claimed by a live process that is not this test's store, so reconcile leaves them as they are);
+ * without one they wait in the gateway. Only the sends a test asserts on go through the engine.
  */
 async function fillFollowUps(h: GatewayHarness, sender: HarnessSession, count: number): Promise<void> {
-  for (let index = 0; index < count; index++) {
-    const taken = await sender.store.intake({
-      now: h.clock.now,
-      attested_device: "dev-remote",
-      record: {
-        sessionId: "lead",
-        deliveryId: `alert-${index}`,
-        text: `OMO_GATEWAY v=1\nsource=peer_agent\n\nalert ${index}`,
-        displayText: `alert ${index}`,
-        sender: { kind: "agent", session_id: sender.id },
-        deliverAs: "followUp",
-        chainCount: 1,
-      },
-      provenance: { workspace: "remote", project: "remote" },
-      target_session_kind: "interactive",
-    })
-    if (taken.kind !== "queued") throw new Error(`follow-up ${index} refused: ${JSON.stringify(taken)}`)
-    h.clock.now += 3 * 60_000
+  const held = h.get("lead").drainRegistered
+  await sender.store.list({ target_durable_id: "lead" })
+  const claimant = JSON.stringify({
+    pid: process.pid,
+    process_start_time: null,
+    instance_id: "seeded-runtime",
+    runtime_instance: null,
+  })
+  const db = new Database(gatewayDatabasePath(h.agentDir))
+  try {
+    const insert = db.prepare(
+      "INSERT INTO deliveries (delivery_id, target_durable_id, seq, sender, envelope, body, bytes, mode_requested, mode_effective, state, admitted_by, claimed_at, attempt, admission_kind, root_id, hop, created_at, updated_at, expires_at) VALUES (?, 'lead', ?, ?, ?, ?, ?, 'follow_up', ?, ?, ?, ?, ?, ?, 'root-seeded', 1, ?, ?, ?)",
+    )
+    db.transaction(() => {
+      for (let index = 0; index < count; index++) {
+        const id = `seeded-${index}`
+        const body = `alert ${index}`
+        const at = h.clock.now
+        const envelope = {
+          provenance: { workspace: "w", project: "p" },
+          origin: { session: sender.id },
+          actor: sender.id,
+          via: [],
+          root_id: "root-seeded",
+          hop: 1,
+          delivery_id: id,
+        }
+        insert.run(
+          id,
+          index + 1,
+          `session:${sender.id}`,
+          JSON.stringify(envelope),
+          body,
+          body.length,
+          held ? "follow_up" : null,
+          held ? "admitted" : "queued",
+          held ? claimant : null,
+          held ? at : null,
+          held ? 1 : 0,
+          held ? "queued" : null,
+          at,
+          at,
+          at + QUEUED_TTL_MS,
+        )
+        h.clock.now += 3 * 60_000
+      }
+    })()
+  } finally {
+    db.close()
   }
-  const lead = h.get("lead")
-  if (lead.drainRegistered) await lead.drain.drain({ reason: "command" })
-  await h.quiesce()
 }
 
 describe("omo#14428 target backlog admission", () => {
@@ -201,6 +231,41 @@ describe("omo#14428 target backlog admission", () => {
       oldest_at: new Date(firstAt).toISOString(),
     })
     expect(listed.threads[1]).not.toHaveProperty("backlog")
+  })
+
+  test("#given a gateway store that cannot be read #when threads are listed #then the listing is returned without backlog details", async () => {
+    const listing = {
+      kind: "ok",
+      scope: "workspace",
+      threads: [
+        {
+          thread: "lead",
+          name: "lead",
+          status: "live",
+          state: "running",
+          cwd: "/",
+          created_at: "",
+          updated_at: null,
+          link: "",
+        },
+      ],
+    } as ThreadToolResult
+    const broken = {
+      backlogs: async () => Promise.reject(new Error("gateway schema 17 is newer than this binary's 16")),
+    }
+
+    expect(await withBacklog(broken, listing)).toEqual(listing)
+  })
+
+  test("#given an empty steer lane #when one steer larger than the steer byte reserve is sent #then it is admitted", async () => {
+    const { lead, sender } = seat()
+
+    const steer = await send(sender, "x".repeat(STEER_RESERVE_BYTES + 1024), {
+      mode: "steer",
+      expected_turn_id: lead.runtime.epoch,
+    })
+
+    expect(steer).toMatchObject({ kind: "ok", delivery: { kind: "steered" } })
   })
 
   test("#given a collapse key whose earlier row still waits in the gateway #when the sender repeats it #then the newer text replaces it and the older is refused superseded", async () => {

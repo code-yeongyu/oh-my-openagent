@@ -80,7 +80,9 @@ export function backlogRefusal(
   const lane: BacklogLane = mode === "steer" ? "steer" : "follow_up"
   const limits = LANE_LIMITS[lane]
   const backlog = readTargetBacklog(ctx, target, lane)
-  if (backlog.held < limits.messages && backlog.held_bytes + bytes <= limits.bytes) return undefined
+  // The byte budget bounds what waits together: a lone delivery the engine accepted always fits an empty lane.
+  if (backlog.held < limits.messages && (backlog.held === 0 || backlog.held_bytes + bytes <= limits.bytes))
+    return undefined
   const stall: BacklogStall =
     backlog.held_by_session >= backlog.waiting_in_gateway ? "session_not_writing" : "session_not_draining"
   return {

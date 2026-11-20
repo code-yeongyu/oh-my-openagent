@@ -220,8 +220,10 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
       await store.completeReceipt({ now: now(), principal: facts.principal, idempotency_key: idempotencyKey, result })
       return result
     }
-    if (outcome.kind === "collapsed")
-      return await settle(resultFromRow(outcome.row, outcome.queue_position, endpoint?.kind ?? null, true, false))
+    if (outcome.kind === "collapsed") {
+      const absorbed = resultFromRow(outcome.row, outcome.queue_position, endpoint?.kind ?? null, true, false)
+      return await settle(absorbed.kind === "ok" ? { ...absorbed, collapsed: true } : absorbed)
+    }
     try {
       if (endpoint === null) return await settle(resultFromRow(outcome.row, outcome.queue_position, null, false, true))
       let reply: Awaited<ReturnType<GatewayEndpointPort["wake"]>> | undefined
