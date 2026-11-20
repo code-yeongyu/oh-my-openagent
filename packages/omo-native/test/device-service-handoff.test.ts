@@ -181,6 +181,26 @@ describe("the omo CLI device service hand-off", () => {
     expect(lines.filter((line) => line.includes("treated as not running"))).toEqual([])
   })
 
+  test("#given a service that left its endpoint and does not answer #when a sign-in hands its keys over #then the line names the cause and the step that clears it", async () => {
+    const stateDir = join(temp(), "ds")
+    mkdirSync(stateDir, { recursive: true, mode: 0o700 })
+    await Bun.write(deviceServiceEndpointPath(stateDir), "")
+    const lines: string[] = []
+    const handoff = cliDeviceServiceHandoff({
+      api: "http://127.0.0.1:9",
+      stateDir,
+      fetch: me,
+      log: (line) => lines.push(line),
+      connect: async () => {
+        throw Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:1"), { code: "ECONNREFUSED" })
+      },
+    })
+    await handoff.adopt(signedIn("acct_42"))
+    expect(lines).toEqual([
+      "OmO device service: this sign-in did not reach it, so remote sessions stay signed out on this device: the device service is not running (dead_endpoint: connect ECONNREFUSED 127.0.0.1:1). Run `omo remote enable`, then start omo once to hand the sign-in over.",
+    ])
+  })
+
   test("a failure is reported on the log and never fails the sign-in or sign-out", async () => {
     const stateDir = join(temp(), "ds")
     mkdirSync(stateDir, { recursive: true, mode: 0o700 })

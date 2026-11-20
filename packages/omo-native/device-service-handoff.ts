@@ -7,12 +7,24 @@ import {
   forgetDeviceService,
   handDeviceKeys,
 } from "../device-service-core/src/index.ts"
-import { connectOrNotRunning } from "../device-service-core/src/hand-device-keys.ts"
+import { type ConnectFailure, connectOrNotRunning } from "../device-service-core/src/hand-device-keys.ts"
 import { refuseIfLocalOnly } from "../device-service-core/src/local-only.ts"
 import { syncRequestHeaders } from "../memory-core/src/sync/contract-version"
 import type { Credentials } from "../omo-opencode/src/cli/service-auth/protocol"
 import type { DeviceServiceHandoff } from "../omo-opencode/src/cli/service-auth/session"
 import packageJson from "./package.json" with { type: "json" }
+
+// omo#14471: a sign-in whose keys did not reach a service that left its endpoint file says so, with the cause and the
+// step that clears it. The keys reach a restarted service from the next omo session (the memory device session).
+const NOT_HANDED: Readonly<Record<ConnectFailure, string>> = {
+  dead_endpoint: "the device service is not running",
+  refused: "the device service refused this client",
+  unreadable: "the device service's state files are missing or not readable as you",
+  timed_out: "the device service did not answer in time",
+  failed: "the device service could not be reached",
+}
+export const notHandedLine = (cause: ConnectFailure, detail: string): string =>
+  `OmO device service: this sign-in did not reach it, so remote sessions stay signed out on this device: ${NOT_HANDED[cause]} (${cause}: ${detail}). Run \`omo remote enable\`, then start omo once to hand the sign-in over.`
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null
 
@@ -60,6 +72,7 @@ export function cliDeviceServiceHandoff(options: {
           connect,
           when: "always",
           log: options.log,
+          onFailure: (cause, detail) => options.log(notHandedLine(cause, detail)),
           credential: {
             device: { id: credentials.device.id, name: credentials.device.name },
             signingPrivateKey: credentials.signingPrivateKey,

@@ -8,7 +8,7 @@ import {
 } from "./device-service.ts"
 
 /** Why a connection to the device service's endpoint failed; the first word of the log line. */
-type ConnectFailure = "dead_endpoint" | "refused" | "unreadable" | "timed_out" | "failed"
+export type ConnectFailure = "dead_endpoint" | "refused" | "unreadable" | "timed_out" | "failed"
 
 const DEAD_ENDPOINT_CODES = new Set(["ENOENT", "ECONNREFUSED", "ECONNRESET", "EPIPE"])
 
@@ -33,6 +33,7 @@ const connectFailure = (error: unknown): { readonly cause: ConnectFailure; reado
 export const connectOrNotRunning = async (
   connect: () => Promise<DeviceService>,
   log: ((line: string) => void) | undefined,
+  onFailure?: (cause: ConnectFailure, detail: string) => void,
 ): Promise<DeviceService | "not_running"> => {
   try {
     return await connect()
@@ -40,7 +41,8 @@ export const connectOrNotRunning = async (
     // dead_endpoint: nothing listens (a dead service left its file); refused: it refused us or failed the mutual proof;
     // unreadable: its state dir or token could not be read safely; timed_out: it did not answer in time.
     const { cause, detail } = connectFailure(error)
-    log?.(`OmO device service: ${cause}, treated as not running (${detail}).`)
+    if (onFailure === undefined) log?.(`OmO device service: ${cause}, treated as not running (${detail}).`)
+    else onFailure(cause, detail)
     return "not_running"
   }
 }
@@ -64,9 +66,11 @@ export const handDeviceKeys = async (options: {
   readonly when: "always" | "not_adopted"
   /** One line when an endpoint file is there but no service answers it. */
   readonly log?: (line: string) => void
+  /** omo#14471: the typed cause instead of the log line, for a caller that reports it to the person. */
+  readonly onFailure?: (cause: ConnectFailure, detail: string) => void
 }): Promise<"adopted" | "already_adopted" | "not_running"> => {
   if (!existsSync(deviceServiceEndpointPath(options.stateDir))) return "not_running"
-  const service = await connectOrNotRunning(options.connect, options.log)
+  const service = await connectOrNotRunning(options.connect, options.log, options.onFailure)
   if (service === "not_running") return "not_running"
   try {
     if (options.when === "not_adopted" && adopted(await service.status())) return "already_adopted"
