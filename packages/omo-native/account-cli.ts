@@ -66,6 +66,7 @@ const sessionOf = (dependencies: AccountCommandDependencies): Session =>
     api: dependencies.api,
     store: dependencies.store,
     beforeKeysDiscarded: retireHook(dependencies),
+    log: dependencies.error,
     ...(dependencies.home === undefined ? {} : { home: dependencies.home }),
     ...(dependencies.deviceService === undefined ? {} : { deviceService: dependencies.deviceService }),
   })

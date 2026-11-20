@@ -817,6 +817,7 @@
     "packages/omo-opencode/src/cli/service-auth/keystore.ts",
     "packages/omo-opencode/src/cli/service-auth/machine-digest.ts",
     "packages/omo-opencode/src/cli/service-auth/machine-reconcile.ts",
+    "packages/omo-opencode/src/cli/service-auth/owed-revoke.ts",
     "packages/omo-opencode/src/cli/service-auth/protocol-request.ts",
     "packages/omo-opencode/src/cli/service-auth/protocol.ts",
     "packages/omo-opencode/src/cli/service-auth/secret-service-lock.ts",
