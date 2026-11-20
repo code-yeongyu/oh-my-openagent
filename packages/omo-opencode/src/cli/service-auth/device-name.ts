@@ -33,16 +33,21 @@ export function deviceName(host: string = machineHost()): string {
   return bounded === "" ? UNNAMED : bounded
 }
 
-/** The label every CLI device was registered under before #14044. */
-const LEGACY_PREFIX = "omo CLI on "
+/**
+ * The labels every CLI and every desktop device was registered under before #14044. The desktop leaves renaming its
+ * own label to this refresh (#14475), so both prefixes are generated here.
+ */
+const LEGACY_PREFIXES = ["omo CLI on ", "OmO Desktop on "]
 
 /**
- * Whether omo generated this device name itself (#13651): the pre-#14044 `omo CLI on <host>` label, the unnamed
- * fallback, or the name built from the kernel hostname a Mac registered under before LocalHostName. Any other name is
- * one the person chose, and omo never replaces it.
+ * Whether omo generated this device name itself (#13651): a pre-#14044 `omo CLI on <host>` or `OmO Desktop on <host>`
+ * label, the unnamed fallback, or the name built from the kernel hostname a Mac registered under before LocalHostName.
+ * Any other name is one the person chose, and omo never replaces it.
  */
 export function isGeneratedDeviceName(name: string): boolean {
-  return name.startsWith(LEGACY_PREFIX) || name === UNNAMED || name === deviceName(hostname())
+  return (
+    LEGACY_PREFIXES.some((prefix) => name.startsWith(prefix)) || name === UNNAMED || name === deviceName(hostname())
+  )
 }
 
 export function devicePlatform(): Platform {
