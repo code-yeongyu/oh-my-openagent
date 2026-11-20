@@ -1,5 +1,6 @@
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
+import { syncRequestHeaders } from "@oh-my-opencode/memory-core/sync-capabilities"
 import { z } from "zod"
 import { devicePlatform } from "./device-name"
 import { ApiRefusal, type Credentials, nonempty, parseReply, SignInError } from "./protocol"
@@ -117,8 +118,8 @@ export async function settleOwedRevokes(options: {
   const { path, signedIn } = options
   const owed = await readOwed(path)
   if (owed.length === 0) return { unsent: 0, refused: [], expired: 0 }
-  const authorization = { authorization: `Bearer ${signedIn.accessToken}` }
-  const listed = parseReply(listedSchema, await options.request("/v1/devices", { headers: authorization })).devices
+  const headers = syncRequestHeaders(signedIn.accessToken)
+  const listed = parseReply(listedSchema, await options.request("/v1/devices", { headers })).devices
   const account = accountOfCredentials(signedIn)
   const settled = new Set<string>()
   let unsent = 0
@@ -136,7 +137,7 @@ export async function settleOwedRevokes(options: {
     try {
       await options.request(`/v1/devices/${encodeURIComponent(entry.device)}`, {
         method: "DELETE",
-        headers: authorization,
+        headers,
       })
       settled.add(entry.device)
     } catch (error) {
