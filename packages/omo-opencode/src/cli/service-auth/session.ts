@@ -70,7 +70,7 @@ export type DiscardedCredential =
   | { readonly kind: "unreadable" }
 
 export type BeforeKeysDiscarded = ((discarded: DiscardedCredential) => Promise<void>) & {
-  /** Whether a sign-in that names no account should have it read before logout revokes the device. */
+  /** Whether a sign-in that names no account should have it read from the service before its keys are discarded. */
   readonly wantsAccount?: () => Promise<boolean>
 }
 
@@ -95,7 +95,7 @@ export type DeviceServiceHandoff = {
   readonly machineDevice?: () => Promise<MachineDeviceState>
 }
 
-export const discardedOf = (
+const discardedOf = (
   credentials: Credentials,
   cause: "refused" | "forget" | "logout" | "replaced",
 ): DiscardedCredential => ({
@@ -163,6 +163,29 @@ export function createSession(options: {
         : undefined
     return typeof id === "string" && id !== "" ? id : undefined
   }
+  /**
+   * The account of a sign-in that names none, for a pin it earned before `omo sync` stamped the account on it (#12383):
+   * asked of the service with `access` only while a live pin exists. Every discard route reads it the same way.
+   */
+  const unstampedAccount = async (current: Credentials, access: string): Promise<string | undefined> => {
+    if (current.accountId !== undefined || current.owner !== undefined) return undefined
+    if ((await beforeKeysDiscarded.wantsAccount?.()) !== true) return undefined
+    // It runs under the credential lock, so it gets the fix-up's short budget, not the 30 s request timeout: a stalled
+    // service keeps the pin (and the hook reports it) instead of holding up the sign-out.
+    const budget = AbortSignal.timeout(options.machine?.budgetMs ?? DEVICE_FIXUP_BUDGET_MS)
+    return accountOf(access, signal === undefined ? budget : AbortSignal.any([signal, budget]))
+  }
+  /**
+   * Runs the hook for a principal whose keys are about to be discarded, naming its account when the service can. An
+   * expired access token is never sent (the service refuses it, and the call would hold the credential lock): its pin stays.
+   */
+  async function discard(current: Credentials, cause: "refused" | "forget" | "replaced"): Promise<void> {
+    const account =
+      Date.parse(current.accessTokenExpiresAt) > now()
+        ? await unstampedAccount(current, current.accessToken)
+        : undefined
+    await beforeKeysDiscarded(discardedOf(account === undefined ? current : { ...current, accountId: account }, cause))
+  }
   async function refreshed(current: Credentials): Promise<Credentials> {
     // Legacy state cannot prove the original key, identity and age. Only protocol-2's owned
     // transaction can recover; neither a draft key nor a new key authorizes a legacy resend.
@@ -194,7 +217,7 @@ export function createSession(options: {
         error.status < 500 &&
         ["unauthorized", "account_deleted", "reauth_required", "invalid_grant", "device_revoked"].includes(error.code)
       ) {
-        await beforeKeysDiscarded(discardedOf(current, "refused"))
+        await discard(current, "refused")
         await store.clear()
         await deviceService?.forget()
         throw new SessionEnded(
@@ -326,8 +349,7 @@ export function createSession(options: {
           await beforeKeysDiscarded({ kind: "unreadable" })
           stored = null
         }
-        if (stored !== null && stored.device.id !== value.device.id)
-          await beforeKeysDiscarded(discardedOf(stored, "replaced"))
+        if (stored !== null && stored.device.id !== value.device.id) await discard(stored, "replaced")
         // An item nobody here can read reads as missing above; row 8b moving it aside is still a discard, reported first.
         await store.write(value, "fresh-sign-in", () => beforeKeysDiscarded({ kind: "unreadable" }))
         await clearSignedOutMarker(markerPath)
@@ -374,13 +396,27 @@ export function createSession(options: {
         return action(current)
       })
     },
+    /** The hook for a principal a caller discards inside `update` (`omo account forget --device`, `adopt --replace`). */
+    discard,
     /**
-     * Deletes the item without reading it (a corrupt or locked item must still be removable, with one
-     * native call), so it cannot name the account whose pin to retire: `omo account forget --device`
-     * and `logout` read first and retire; this one leaves the pin (a stale pin is harmless for keys).
+     * Every sign-out retires the pin of the account it signs out of (#12308): the item is read first to name it. An item
+     * that cannot be read (corrupt, or a store that fails the read) is still deleted, and once it is gone its pin is
+     * reported left with one line; a delete that fails too (a locked store) discarded nothing and reports only its error.
      */
     async forget(): Promise<void> {
-      await locked(() => store.clear())
+      await locked(async () => {
+        let current: Credentials | null
+        try {
+          current = await store.readAuthoritative()
+        } catch (error) {
+          if (!(error instanceof InvalidCredentialState || error instanceof CredentialStoreError)) throw error
+          await store.clear()
+          await beforeKeysDiscarded({ kind: "unreadable" })
+          return
+        }
+        if (current !== null) await discard(current, "forget")
+        await store.clear()
+      })
       await deviceService?.forget()
     },
     accessSnapshot: snapshot,
@@ -401,13 +437,8 @@ export function createSession(options: {
                 Date.parse(current.accessTokenExpiresAt) <= now()
                   ? (await refreshed(current)).accessToken
                   : current.accessToken
-              if (
-                current.accountId === undefined &&
-                current.owner === undefined &&
-                (await beforeKeysDiscarded.wantsAccount?.()) === true
-              ) {
-                account = await accountOf(access)
-              }
+              // Before the revoke, while `access` still works.
+              account = await unstampedAccount(current, access)
               await request(`/v1/devices/${encodeURIComponent(current.device.id)}`, {
                 method: "DELETE",
                 headers: syncRequestHeaders(access),
