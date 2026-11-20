@@ -74,3 +74,31 @@ test("#given a floored cycle still in flight #when stop() runs #then the failed 
     await device.dispose()
   }
 })
+
+test("#given an engine stopped while the service floor refused it #when it is started again #then it runs a cycle at once instead of waiting forever (#14483 review L3)", async () => {
+  // given
+  const device = await makeDevice(new FakeSyncServer(), "a")
+  const floored = new SyncHttpError("client_update_required", 426, false)
+  const load = spyOn(device.store, "load").mockImplementation(async () => {
+    throw floored
+  })
+  try {
+    const first = device.engine.nextCycle()
+    device.engine.start()
+    await expect(first).rejects.toBe(floored)
+    await device.engine.stop()
+    load.mockRestore()
+
+    // when
+    const restarted = device.engine.nextCycle()
+    device.engine.start()
+
+    // then
+    await restarted
+    expect(await device.engine.status()).toMatchObject({ kind: "synced" })
+  } finally {
+    load.mockRestore()
+    await device.engine.stop()
+    await device.dispose()
+  }
+})
