@@ -3,7 +3,7 @@ import { Duplex } from "node:stream"
 import { readFrames, writeFrame } from "./framing"
 
 // The desktop's private memory-sync channel as a test parent spawns it (#12698). POSIX: one socket at fd 5.
-// win32: two one-way pipes, fd 5 desktop->engine and fd 6 engine->desktop (the desktop's pair shape, sisyphuslabs/omo-desktop-app#5278).
+// win32: two one-way pipes, fd 5 desktop->engine and fd 6 engine->desktop (the desktop's pair shape).
 const pair = process.platform === "win32"
 
 export const MEMORY_SYNC_TABLE = pair ? '{"memory-sync":[5,6]}' : '{"memory-sync":5}'
