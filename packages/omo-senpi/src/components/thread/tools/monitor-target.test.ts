@@ -38,6 +38,15 @@ describe("monitor rpc target addressing (#14294): the address thread_send takes"
     expect(refusedCode(await resolve("nowhere/dur-on-b"))).toBe("not_found")
   })
 
+  test("#14477: a timed-out probe keeps its reason when the monitor refuses a bare thread id", async () => {
+    expect(
+      await resolve("0195f0c2-1a2b-7c3d-8e4f-00000000a003", { wakeFeature: true, lookupTimeouts: ["b"] }),
+    ).toMatchObject({
+      kind: "refused",
+      failure: { code: "host_unavailable", details: { device_reasons: { b: "lookup_timeout" } } },
+    })
+  })
+
   test("#given device b offline #when either form names its thread #then the refusal is device_offline", async () => {
     expect(refusedCode(await resolve("studio/dur-on-b", { online: false }))).toBe("device_offline")
     expect(refusedCode(await resolve("dur-on-b", { online: false }))).toBe("device_offline")

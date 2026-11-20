@@ -706,6 +706,25 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
 })
 
 describe("A3: an existing thread is named by id or alias only; a device only to create", () => {
+  test("#14477: reopening distinguishes a slow device from a device that did not answer", async () => {
+    const a = account({ wakeFeature: true, lookupTimeouts: ["b"], silent: ["c"] })
+    const { run } = surface(a.remote)
+    const thread = "0195f0c2-1a2b-7c3d-8e4f-00000000a003"
+
+    expect(await run("thread_create", { thread })).toMatchObject({
+      kind: "error",
+      error: {
+        code: "host_unavailable",
+        message: expect.stringMatching(/studio \(b\)[^.]*slow.*\bc did not answer/),
+        next_action: expect.stringMatching(/^Retry the lookup/),
+        details: {
+          devices: ["b", "c"],
+          device_reasons: { b: "lookup_timeout", c: "host_not_answering" },
+        },
+      },
+    })
+  })
+
   test("#given an id and a device #when thread_create runs #then it is invalid_arguments and nothing is sent", async () => {
     const a = account()
     const { run } = surface(a.remote)
