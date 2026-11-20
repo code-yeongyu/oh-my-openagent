@@ -5,6 +5,7 @@
 
 import { describe, expect, test } from "bun:test"
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises"
+import { dirname } from "node:path"
 
 import { devicePlatform } from "./device-name"
 import { credentialId, type CredentialStore } from "./keystore"
@@ -293,5 +294,51 @@ describe("an unconfirmed sign-out owes its revoke to the next sign-in (#12281)",
     w.calls.length = 0
     await w.session(s.store).save(w.signIn("device-3"))
     expect(w.calls).toEqual([list("access-device-3"), revoke("device-1", "access-device-3")])
+  })
+})
+
+describe("an owe never blocks a sign-out and is never lost silently (#13647 review)", () => {
+  // M1 / delta L1: the owe is advice for the next sign-in; logout still discards the keys when it cannot be written.
+  test("#given the owe file cannot be written #when an unconfirmed logout runs #then the keys are still removed and the gap is reported", async () => {
+    const w = await world()
+    const s = memoryStore(w.signIn("device-1"))
+    await mkdir(`${w.owedPath}.${process.pid}.tmp`, { recursive: true })
+    w.setDown(true)
+    expect(await w.session(s.store).logout()).toBe(false)
+    expect(s.current()).toBeNull()
+    expect(w.logs).toHaveLength(1)
+    await rm(`${w.owedPath}.${process.pid}.tmp`, { recursive: true })
+  })
+
+  // First review L1: the oldest owe past the cap is dropped, and the user is told to use the Devices page for it.
+  test("#given the owe file is full #when another unconfirmed logout runs #then the oldest owe is dropped and that is reported", async () => {
+    const w = await world()
+    const full = Array.from({ length: 20 }, (_, i) => ({
+      device: `old-${i}`,
+      account: ACCOUNT,
+      at: new Date(i).toISOString(),
+    }))
+    await mkdir(dirname(w.owedPath), { recursive: true })
+    await writeFile(w.owedPath, JSON.stringify({ owed: full }))
+    const s = memoryStore(w.signIn("device-1"))
+    w.setDown(true)
+    expect(await w.session(s.store).logout()).toBe(false)
+    expect(w.logs).toHaveLength(1)
+    const kept = (JSON.parse(await readFile(w.owedPath, "utf8")) as { owed: { device: string }[] }).owed
+    expect(kept.map((entry) => entry.device)).not.toContain("old-0")
+    expect(kept.map((entry) => entry.device)).toContain("device-1")
+  })
+
+  // First review L1: an owe that names no account and that no signed-in account lists is not kept forever.
+  test("#given an owe with no account, unlisted and older than the owe lifetime #when this computer signs in #then it is dropped and reported", async () => {
+    const w = await world()
+    await mkdir(dirname(w.owedPath), { recursive: true })
+    await writeFile(w.owedPath, JSON.stringify({ owed: [{ device: "device-gone", at: new Date(0).toISOString() }] }))
+    const s = memoryStore(null)
+    await w.session(s.store).save(w.signIn("device-2"))
+    expect(w.logs).toHaveLength(1)
+    w.calls.length = 0
+    await w.session(s.store).save(w.signIn("device-3"))
+    expect(w.calls).toEqual([])
   })
 })
