@@ -96,7 +96,11 @@ export interface FreezeSettler {
 
 export interface Transport {
   /** Entries with `seq > after`, in sequence order, at most `limit` of them. */
-  pull(after: number, limit: number): Promise<PullPage>
+  /**
+   * `advertised`: the highest head the event stream announced; a transport may answer from the entries alone when
+   * they reach it, instead of reading the head first.
+   */
+  pull(after: number, limit: number, advertised?: number): Promise<PullPage>
   /** Object bytes, fetched through the Worker after the account check. */
   download(objectId: string): Promise<Uint8Array>
   /** Reserve exactly `size` bytes with this SHA-256; returns the upload id. */

@@ -21,6 +21,9 @@ export class FakeSyncServer {
   private readonly uploads = new Map<string, Upload>()
   private readonly byBatch = new Map<string, number>()
   private readonly listeners = new Set<StreamHandlers>()
+  private readonly authors = new Map<StreamHandlers, string>()
+  /** Authors whose stream stays connected but never receives the next advanced heads (a lost delivery). */
+  readonly missAdvanced = new Set<string>()
   private ids = 0
   snapshot: SnapshotRef | null = null
   /** Entries at or below this seq were compacted away (only the snapshot covers them). */
@@ -34,6 +37,8 @@ export class FakeSyncServer {
   beforeNextAppend: (() => Promise<void>) | null = null
   /** Authors whose requests cannot reach the service: every pull fails as the network would. */
   readonly unreachable = new Set<string>()
+  /** Every pull served, by author. */
+  readonly pulls: string[] = []
 
   get head(): number {
     return this.entries.at(-1)?.seq ?? this.trimmedThrough
@@ -43,6 +48,7 @@ export class FakeSyncServer {
     return {
       pull: async (after, limit) => {
         if (this.unreachable.has(author)) throw new SyncNetworkError(new TypeError("fetch failed"))
+        this.pulls.push(author)
         return this.pull(after, limit)
       },
       download: async (objectId) => {
@@ -70,6 +76,7 @@ export class FakeSyncServer {
       },
       subscribe: (handlers) => {
         this.listeners.add(handlers)
+        this.authors.set(handlers, author)
         if (this.streamRefusal === null) handlers.onConnected(true)
         else handlers.onConnected(false, this.streamRefusal)
         return () => this.listeners.delete(handlers)
@@ -171,7 +178,7 @@ export class FakeSyncServer {
     const seq = this.head + 1
     this.entries.push({ seq, kind: "batch", batchId: request.batchId, digest: request.digest, objectId, author })
     this.byBatch.set(request.batchId, seq)
-    for (const l of this.listeners) l.onAdvanced(seq)
+    for (const l of this.listeners) if (!this.missAdvanced.has(this.authors.get(l) ?? "")) l.onAdvanced(seq)
     return { ok: true, seq }
   }
 }

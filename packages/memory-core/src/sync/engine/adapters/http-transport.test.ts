@@ -113,6 +113,29 @@ test("a stale base answers stale_base with the server's head", async () => {
   expect(await pushOne(b, new TextEncoder().encode("two"), 0)).toEqual({ ok: false, error: "stale_base", head: 1 })
 })
 
+test("a pull for a head the stream announced reads only the batches page once a state read placed the cursor inside the retained history (#14476)", async () => {
+  const { server, a, b } = await pair()
+  await pushOne(a, new TextEncoder().encode("one"), 0)
+  await b.pull(0, 500)
+  await pushOne(a, new TextEncoder().encode("two"), 1)
+  const before = server.requests.length
+  const page = await b.pull(1, 500, 2)
+  const routes = server.requests.slice(before).map(({ method, path }) => `${method} ${path}`)
+  expect(routes).toEqual(["GET /v1/sync/batches"])
+  expect([page.entries.map((e) => e.seq), page.head, page.more, page.snapshot]).toEqual([[2], 2, false, null])
+})
+
+test("an announced head the batches page does not reach falls back to the state read", async () => {
+  const { server, a, b } = await pair()
+  await pushOne(a, new TextEncoder().encode("one"), 0)
+  await b.pull(0, 500)
+  const before = server.requests.length
+  const page = await b.pull(1, 500, 5)
+  const routes = server.requests.slice(before).map(({ method, path }) => `${method} ${path}`)
+  expect(routes).toEqual(["GET /v1/sync/batches", "GET /v1/sync/state", "GET /v1/sync/batches"])
+  expect([page.entries.length, page.head, page.more]).toEqual([0, 1, false])
+})
+
 test("a full page asks for more, and the snapshot comes from the state route", async () => {
   const { server, a, b } = await pair()
   server.pageSize = 2

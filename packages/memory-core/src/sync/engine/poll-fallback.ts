@@ -8,6 +8,8 @@ export const POLL_MS = 10_000
 export class PollFallback {
   private cancel: (() => void) | null = null
   private shown: string | null = null
+  /** The stream is up: advanced heads arrive as events, so a head this device has not heard of is not expected. */
+  connected = false
 
   constructor(
     private readonly clock: Clock,
@@ -22,6 +24,7 @@ export class PollFallback {
    */
   streamChanged(connected: boolean, cause: string | undefined): void {
     const shown = connected ? "connected" : `down (${cause ?? "dropped"}), polling every ${POLL_MS / 1000} s`
+    this.connected = connected
     if (shown !== this.shown) {
       this.shown = shown
       this.log?.(`sync event stream ${shown}`, connected ? "info" : "warn")

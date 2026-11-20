@@ -108,19 +108,29 @@ export function createHttpTransport(options: HttpTransportOptions): Transport {
     objectId: row.object_id ?? "",
     author: `${row.author.kind}:${row.author.id}`,
   })
+  let oldestRetained: number | null = null
+  const page = async (from: number): Promise<readonly WireRow[]> =>
+    ((await (await request("GET", `/v1/sync/batches?after=${from}`)).json()) as { entries: readonly WireRow[] }).entries
   return {
-    async pull(after, limit): Promise<PullPage> {
+    async pull(after, limit, advertised): Promise<PullPage> {
+      // An announced head inside the retained history (a state read showed where it starts) is answered by the
+      // batches page alone when its rows start right after the cursor and reach that head: no snapshot is due and
+      // the head is known, so the state read is skipped (#14476). Anything else reads the state as before.
+      if (advertised !== undefined && advertised > after && oldestRetained !== null && after >= oldestRetained - 1) {
+        const rows = (await page(after)).slice(0, limit)
+        const last = rows.at(-1)?.seq
+        if (last !== undefined && rows[0]?.seq === after + 1 && last >= advertised)
+          return { snapshot: null, entries: rows.map(entryOf), head: last, more: false }
+      }
       const state = await readState()
+      oldestRetained = state.oldest_retained_seq
       const s = state.snapshot
       const snapshot: SnapshotRef | null =
         s !== null && after < state.oldest_retained_seq - 1
           ? { coversSeq: s.covers_seq, objectIds: s.chunk_object_ids, digest: null }
           : null
       const from = snapshot === null ? after : Math.max(after, snapshot.coversSeq)
-      const page = (await (await request("GET", `/v1/sync/batches?after=${from}`)).json()) as {
-        entries: readonly WireRow[]
-      }
-      const rows = page.entries.slice(0, limit)
+      const rows = (await page(from)).slice(0, limit)
       const last = rows.at(-1)?.seq ?? from
       return { snapshot, entries: rows.map(entryOf), head: Math.max(state.head.seq, last), more: last < state.head.seq }
     },

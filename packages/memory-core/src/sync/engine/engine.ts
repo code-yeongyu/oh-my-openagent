@@ -21,7 +21,7 @@ export { CrashInjected, type EngineFault, INBOUND_POINTS, OUTBOUND_POINTS } from
 export type { SyncFailure, SyncFailureKind } from "./failure"
 
 export { POLL_MS } from "./poll-fallback"
-export const LOCAL_DEBOUNCE_MS = 2_000
+export const LOCAL_DEBOUNCE_MS = 300
 
 export type EngineStatus =
   | { readonly kind: "never_synced" }
@@ -244,6 +244,7 @@ export class SyncEngine {
   private async cycle(): Promise<CycleReport> {
     const { deps, journal } = this
     this.stage = "load"
+    const wasLoaded = this.loaded
     if (!this.loaded) {
       await deps.store.load()
       if (await journal.claim(deps.store.peer(), deps.space, deps.legacySpace, deps.log)) await deps.store.load()
@@ -267,11 +268,13 @@ export class SyncEngine {
     let memories = 0
     let refused = 0
     let snapshot: number | null = null
-    const inbound = async () => {
+    const inbound = async (pull = true) => {
       this.stage = "receive"
-      const got = await receive(deps, journal)
-      refused += got.refused
-      snapshot = got.snapshot ?? snapshot
+      if (pull) {
+        const got = await receive(deps, journal)
+        refused += got.refused
+        snapshot = got.snapshot ?? snapshot
+      }
       this.stage = "capture"
       const done = await deps.lock.withLock(async () => {
         holds = await capture(deps, journal)
@@ -288,7 +291,9 @@ export class SyncEngine {
       memories += done.memories
       if (this.gap !== null) this.gap.applied += done.memories
     }
-    await inbound()
+    // With the stream up and no head advertised past the applied cursor there is nothing to pull: the push goes out
+    // at once, and a batch that landed unannounced still comes in through the append's stale_base (#14476).
+    await inbound(!(this.polling.connected && this.eventHead <= this.appliedMirror && before.cycle === null && wasLoaded))
     const settleFirst = this.settleNext
     this.settleNext = false
     this.stage = "push"

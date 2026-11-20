@@ -80,17 +80,17 @@ test(
 )
 
 test(
-  "a local commit starts a cycle after a 2 s debounce, once for a burst",
+  "a local commit starts a cycle after the debounce, once for a burst",
   async () => {
     const { a, b } = await started()
     a.engine.start()
     await a.engine.nextCycle()
     await a.write("x.md", "x\n")
     a.engine.notifyLocalCommit()
-    a.clock.advance(1_000)
+    a.clock.advance(LOCAL_DEBOUNCE_MS / 2)
     await a.write("y.md", "y\n")
     a.engine.notifyLocalCommit()
-    a.clock.advance(1_999)
+    a.clock.advance(LOCAL_DEBOUNCE_MS - 1)
     expect(a.engine.cyclesRun).toBe(1)
     const pushed = a.engine.nextCycle()
     a.clock.advance(1)
