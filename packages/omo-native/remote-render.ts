@@ -1,12 +1,11 @@
 import type {
   ControlAttachState,
   ControlSessionWakeState,
-  DeviceRow,
-  ListingResult,
   Status,
   StatusState,
   UnitState,
 } from "../device-service-core/src/index.ts"
+import type { DeviceRow, SessionsList } from "../omo-senpi/src/components/remote/index"
 import type { ThreadDelivery, ThreadToolResult } from "../omo-senpi/src/components/thread/contracts"
 import type { LocalStatus } from "./remote-cold-wake"
 
@@ -25,6 +24,7 @@ const STATE_LABELS: Readonly<Record<StatusState, string>> = {
   service_degraded: "Needs attention",
   update_required: "Update required",
   signed_out: "Signed out",
+  fail_closed: "Needs repair",
 }
 
 function renderTable(header: readonly string[], rows: readonly (readonly string[])[]): string[] {
@@ -36,6 +36,28 @@ function renderTable(header: readonly string[], rows: readonly (readonly string[
       .trimEnd()
   return [line(header), ...rows.map(line)]
 }
+
+const textOf = (value: unknown): string | undefined => (typeof value === "string" && value !== "" ? value : undefined)
+const isEntry = (value: unknown): value is Readonly<Record<string, unknown>> =>
+  typeof value === "object" && value !== null
+
+/**
+ * The candidates of a typed refusal (an ambiguous device, name or prefix), one per line - the address or device id a
+ * person can type back, then its name (#14305 review M4). A refusal with no candidates prints nothing.
+ */
+export function candidateLines(details: Readonly<Record<string, unknown>> | undefined): string[] {
+  const listed: unknown = details?.["candidates"]
+  if (!Array.isArray(listed)) return []
+  return listed.filter(isEntry).flatMap((candidate) => {
+    const id = textOf(candidate["address"]) ?? textOf(candidate["device"]) ?? textOf(candidate["thread"])
+    const name = textOf(candidate["device_name"]) ?? textOf(candidate["name"])
+    return id === undefined ? [] : [`  ${id}${name === undefined ? "" : `  ${name}`}`]
+  })
+}
+
+// A refusal's next action may name the agents' eval-only thread_list tool; a person at a terminal runs the CLI verb.
+export const personNextAction = (text: string): string =>
+  /\bthread_list\b/.test(text) ? "Run omo remote sessions to see the account's sessions." : text
 
 export function ago(ms: number | null, now: number): string {
   if (ms === null) return "never"
@@ -100,42 +122,34 @@ export function deviceLines(devices: readonly DeviceRow[], now: number): string[
   return renderTable(
     ["DEVICE", "NAME", "KIND", "PLATFORM", "SEEN"],
     devices.map((device) => [
-      device.device,
-      device.label,
-      device.kind,
+      device.id,
+      device.name,
+      device.kind ?? "this device",
       device.platform,
       device.online ? "online" : ago(device.last_seen_ms, now),
     ]),
   )
 }
 
-export function sessionLines(result: ListingResult, labels: ReadonlyMap<string, string>, now: number): string[] {
+export function sessionLines(listing: SessionsList, now: number): string[] {
   const lines =
-    result.rows.length === 0
+    listing.rows.length === 0
       ? ["No sessions found."]
       : renderTable(
           ["SESSION", "TITLE", "STATE", "PROJECT", "DEVICE", "UPDATED"],
-          result.rows.map((row) => [
-            `${row.device}/${row.session_id}`,
+          listing.rows.map((row) => [
+            row.thread,
             row.title,
             row.source === "cache" ? `${row.state} (cached)` : row.state,
             row.project,
-            labels.get(row.device) ?? row.device,
+            row.device.name,
             ago(row.updated_ms, now),
           ]),
         )
-  const missing = [
-    ...new Set([
-      ...result.incomplete,
-      ...Object.entries(result.devices)
-        .filter(([, state]) => state !== "answered")
-        .map(([device]) => device),
-    ]),
-  ]
-  if (missing.length > 0)
+  if (listing.unanswered.length > 0)
     lines.push(
       "",
-      `Not answered, rows may be missing or cached: ${missing.map((device) => labels.get(device) ?? device).join(", ")}`,
+      `Not answered, rows may be missing or cached: ${listing.unanswered.map((device) => device.name).join(", ")}`,
     )
   return lines
 }
@@ -158,17 +172,42 @@ export function sessionVerbLines(
   result: ThreadToolResult,
 ): string[] {
   if (result.kind !== "ok") return []
-  if (verb === "open" && "thread" in result) return [`${result.thread.device ?? ""}/${result.thread.thread_id}`]
+  if (verb === "open" && "deduplicated" in result && "name" in result)
+    return [`${result.device ?? ""}/${result.thread}`]
   if (verb === "send" && "delivery" in result) {
     const { delivery } = result
     if (delivery.kind === "queued" || delivery.kind === "queued_offline") return [queuedLine(label, delivery)]
     if (delivery.kind === "steered") return [`Steered turn ${delivery.turn_id} on ${label}.`]
     return [`Sent to ${label}: turn ${delivery.turn_id} started.`]
   }
-  if (verb === "model" && "model" in result) return [`${label} now uses ${result.model.provider}/${result.model.id}.`]
-  if (verb === "interrupt" && "interrupted" in result)
-    return [result.interrupted ? `Interrupted ${label}.` : `Nothing was running on ${label}.`]
-  if (verb === "close" && "closed" in result) return [result.closed ? `Closed ${label}.` : `${label} was not open.`]
+  if (verb === "model" && "model" in result && result.model !== undefined)
+    return [`${label} now uses ${result.model.provider}/${result.model.id}.`]
+  if (verb === "interrupt" && "interrupted" in result) {
+    if (!result.interrupted) return [`Nothing was running on ${label}.`]
+    const { background } = result
+    if (background.status === "not_supported")
+      return [
+        `Interrupted ${label}.`,
+        `Background jobs that turn started were left running: the engine on ${label} cannot stop them.`,
+      ]
+    const jobName = (job: { readonly id: string; readonly description?: string }) => job.description ?? job.id
+    const count = background.stopped.length
+    return [
+      `Interrupted ${label}.`,
+      ...(count === 0
+        ? []
+        : [`Stopped ${count} background job${count === 1 ? "" : "s"}: ${background.stopped.map(jobName).join(", ")}.`]),
+      ...background.failed.map((job) => `Could not stop background job ${jobName(job)}: ${job.reason}.`),
+    ]
+  }
+  if (verb === "close" && "closed" in result) {
+    const dropped =
+      "dropped_deliveries" in result && Array.isArray(result.dropped_deliveries) ? result.dropped_deliveries : []
+    return [
+      result.closed ? `Closed ${label}.` : `${label} was not open.`,
+      ...(dropped.length === 0 ? [] : [`Dropped ${dropped.length} message(s) it had not read: ${dropped.join(", ")}.`]),
+    ]
+  }
   return []
 }
 

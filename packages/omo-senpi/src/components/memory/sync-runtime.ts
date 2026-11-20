@@ -3,14 +3,26 @@ import { caseFold, loadLoroRuntime } from "@oh-my-opencode/memory-core/sync-engi
 export {
   deviceKeyringFromMaterial,
   GitSpaceConfig,
+  isDeviceSyncOff,
   listRemotes,
+  loadTrustAnchor,
   openAccountSession,
   openDeviceSync,
+  repoHasCommit,
   resolveSpace,
 } from "@oh-my-opencode/memory-core/sync-engine"
-export { enableSync, joinAccount, approveDevice } from "@oh-my-opencode/memory-core/sync-engine"
+export {
+  acknowledgePhraseVoid,
+  disableSync,
+  enableSync,
+  joinAccount,
+  approveDevice,
+  phraseNoticeStatus,
+  readServiceFloor,
+  verifiedPhraseNoticeStatus,
+} from "@oh-my-opencode/memory-core/sync-engine"
 // A freeze status exists only while the engine runs, so its words ship with the engine, not the eager bundle.
-export { failureRpcSync, freezeFailure } from "./sync-status-copy"
+export { causeNote, failureRpcSync, freezeFailure } from "./sync-status-copy"
 
 /** Proves the packaged sidecar's file assets load: the Loro wasm and the case-fold table beside it. */
 export async function checkSyncRuntime(): Promise<void> {

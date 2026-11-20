@@ -7,6 +7,7 @@ import {
   CATEGORY_PROMPT_APPEND_RESOLVERS,
   CATEGORY_PROMPT_APPENDS,
   DEFAULT_CATEGORIES,
+  exactServedRungs,
   isCategoryChainRungResolvable,
   isCategoryGateSatisfied,
 } from "./builtins"
@@ -20,6 +21,7 @@ import { categoryModelCandidates, flattenFallbackModels } from "./user-candidate
 import type {
   CategoryModelSelection,
   CategoryResolutionResult,
+  ModelSelectionSource,
   ResolveCategoryOptions,
   ResolvedChildSpec,
   SenpiModelPort,
@@ -35,6 +37,7 @@ type ModelSelectionInput = {
   readonly variant?: string
   readonly fallbackEntry?: DelegateFallbackEntry
   readonly matchedFallback?: boolean
+  readonly source: ModelSelectionSource
 }
 
 function getOwnRecordValue<TValue>(record: Readonly<Record<string, TValue>>, key: string): TValue | undefined {
@@ -62,12 +65,13 @@ function nearestFallback(selection: CategoryModelSelection): string | undefined 
 }
 
 function modelSelection(input: ModelSelectionInput): CategoryModelSelection {
-  const { fallbackEntry, matchedFallback, selectedModel, variant } = input
+  const { fallbackEntry, matchedFallback, selectedModel, source, variant } = input
   return {
     selectedModel,
     ...(variant !== undefined ? { variant } : {}),
     ...(fallbackEntry !== undefined ? { fallbackEntry } : {}),
     matchedFallback: matchedFallback === true,
+    source,
   }
 }
 
@@ -192,13 +196,21 @@ export function resolveCategory<TModel extends SenpiModelPort>(
     canonicalChain !== undefined
       ? canonicalChain.slice(1).map((candidate) => candidate.model)
       : flattenFallbackModels(config.fallback_models)
+  // An exact-model category hands delegate-core its builtin default only when the registry serves it
+  // exactly, and each rung narrowed to its exact-serving providers; user entries keep the whole registry.
+  const exactRungs =
+    fallbackChain === undefined ? undefined : exactServedRungs(categoryName, fallbackChain, availableModelSet)
+  const builtinDefaultModel =
+    exactRungs !== undefined && builtinConfig?.model !== undefined && !availableModelSet.has(builtinConfig.model)
+      ? undefined
+      : builtinConfig?.model
   const resolution = resolveModelForDelegateTask(
     {
       userModel,
       userFallbackModels,
-      categoryDefaultModel: builtinConfig?.model,
+      categoryDefaultModel: builtinDefaultModel,
       isUserConfiguredCategoryModel: false,
-      fallbackChain,
+      fallbackChain: exactRungs?.map(([narrowed]) => narrowed) ?? fallbackChain,
       availableModels: new Set(availableModels),
     },
     {
@@ -221,8 +233,15 @@ export function resolveCategory<TModel extends SenpiModelPort>(
   const selection = modelSelection({
     selectedModel: resolution.model,
     variant: resolution.variant,
-    fallbackEntry: resolution.fallbackEntry,
+    fallbackEntry:
+      exactRungs?.find(([narrowed]) => narrowed === resolution.fallbackEntry)?.[1] ?? resolution.fallbackEntry,
     matchedFallback: resolution.matchedFallback,
+    // A user model always answers from the user branch (as itself or a promoted user fallback); with none, a
+    // fallback match without a chain rung is a user fallback_models entry. Defaults and chain rungs are omo's.
+    source:
+      userModel !== undefined || (resolution.matchedFallback === true && resolution.fallbackEntry === undefined)
+        ? "user"
+        : "builtin",
   })
   const parsedModel = parseModel(selection.selectedModel)
   const foundModel = parsedModel

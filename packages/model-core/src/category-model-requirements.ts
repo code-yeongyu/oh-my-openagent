@@ -31,39 +31,31 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["opencode"], model: LATEST_MODEL_BY_FAMILY.kimiK3, variant: "max" },
     ],
   },
+  // The three GPT deep lanes run one exact model each (#14155): no older GPT, no Fast tier and no other
+  // family behind it. The single rung lists every provider serving that exact id, in preference order;
+  // Copilot does not serve GPT-6.2 and GPT-6.2 Sol is served only on the two OpenAI lanes. A registry
+  // without the model leaves the lane unavailable instead of resolving another model.
   ultrabrain: {
+    requiresAnyModel: true,
     fallbackChain: [
-      { providers: ["openai", "chatgpt-subscription"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "max" },
-      { providers: ["github-copilot"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "max" },
       {
         providers: ["openai", "chatgpt-subscription", "opencode"],
         model: LATEST_MODEL_BY_FAMILY.gptAstra,
         variant: "max",
       },
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-5.6-sol", variant: "max" },
-      { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "max" },
-      { providers: ["openai", "chatgpt-subscription", "opencode"], model: "gpt-5.6-sol", variant: "max" },
     ],
   },
   "deep-low": {
+    requiresAnyModel: true,
     fallbackChain: [
-      // GPT-6.1 Sol leads at the same medium effort: it matches GPT-6 Sol's price with near-Astra
-      // quality, but only the OpenAI lanes serve it (plain, then the Fast tier). GPT-5.6 Sol stays
-      // behind it so Copilot, OpenCode Zen and a registry without 6.1 still resolve the lane.
       { providers: ["openai", "chatgpt-subscription"], model: LATEST_MODEL_BY_FAMILY.gptSol, variant: "medium" },
-      { providers: ["openai", "chatgpt-subscription"], model: LATEST_MODEL_BY_FAMILY.gptSolFast, variant: "medium" },
-      {
-        providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
-        model: "gpt-5.6-sol",
-        variant: "medium",
-      },
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-5.6-sol-fast", variant: "medium" },
     ],
   },
   "deep-high": {
+    requiresAnyModel: true,
     fallbackChain: [
       {
-        providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
+        providers: ["openai", "chatgpt-subscription", "opencode"],
         model: LATEST_MODEL_BY_FAMILY.gptAstra,
         variant: "high",
       },
@@ -127,9 +119,10 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["xai", "github-copilot", "opencode-go"], model: "grok-4.7", variant: "xhigh" },
       // GLM 5.3 sits ahead of the GPT rungs so a Claude + Z.ai user does not fall from Sonnet to GPT (#10306).
       { providers: ["zai-coding-plan", "opencode-go"], model: LATEST_MODEL_BY_FAMILY.glm, variant: "high" },
-      // GPT-6.1 Sol is the current GPT default, served only by the OpenAI lanes; GPT-5.6 Sol stays
-      // behind it so Copilot, OpenCode Zen and a registry without 6.1 still resolve the lane (#9844).
+      // GPT-6.2 Sol is the current GPT default, served only by the OpenAI lanes; GPT-6.1 Sol and then
+      // GPT-5.6 Sol stay behind it so Copilot, OpenCode Zen and an older registry still resolve the lane (#9844).
       { providers: ["openai", "chatgpt-subscription"], model: LATEST_MODEL_BY_FAMILY.gptSol, variant: "medium" },
+      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol", variant: "medium" },
       {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
         model: "gpt-5.6-sol",

@@ -1,7 +1,6 @@
 import { isPlainRecord } from "./codex-cache-fs"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
-import { LATEST_MODEL_BY_FAMILY } from "@oh-my-opencode/model-core/latest-models"
 
 export type CodexReasoningProfile = {
   readonly model: string
@@ -17,9 +16,14 @@ export type CodexModelCatalog = {
   readonly managedProfiles: readonly CodexReasoningProfileMatch[]
 }
 
+// The Astra id the Codex edition ships: its agent TOMLs, plugin/model-catalog.json and
+// migrate-codex-config/catalog.mjs all name it, so it moves with those files, not with
+// model-core's LATEST_MODEL_BY_FAMILY.
+export const CODEX_ASTRA_MODEL = "gpt-6.2-astra"
+
 const FALLBACK_CODEX_MODEL_CATALOG: CodexModelCatalog = {
   current: {
-    model: LATEST_MODEL_BY_FAMILY.gptAstra,
+    model: CODEX_ASTRA_MODEL,
     modelContextWindow: 600_000,
     modelReasoningEffort: "high",
     planModeReasoningEffort: "xhigh",
@@ -41,6 +45,12 @@ const FALLBACK_CODEX_MODEL_CATALOG: CodexModelCatalog = {
     {
       model: "gpt-5.6-sol",
       modelContextWindow: 650_000,
+      modelReasoningEffort: "high",
+      planModeReasoningEffort: "xhigh",
+    },
+    {
+      model: "gpt-6-astra",
+      modelContextWindow: 600_000,
       modelReasoningEffort: "high",
       planModeReasoningEffort: "xhigh",
     },

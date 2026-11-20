@@ -61,7 +61,7 @@ for (const code of ["device_revoked", "unknown_refusal"]) {
         {
           signedIn: true,
           device: grant.device,
-          refreshState: "uncertain",
+          refreshState: "expired",
           storage: "keyring",
         },
       ])

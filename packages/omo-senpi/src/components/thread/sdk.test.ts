@@ -3,11 +3,14 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { B, createTwoDevices, NAMES, ROUTE, T, type TwoDeviceOptions } from "./address/testing/two-devices"
 import type { GatewayEndpointRef, ReleaseSessionRequest } from "./gateway/adapter"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
+import { storeMigratedByNewerBuild } from "./gateway/testing/newer-schema"
 import type { RemoteThreadSurface } from "./remote/ports"
+import { createThreadSdk as createBundledThreadSdk } from "../../extension/thread-sdk"
 import { createThreadSdk, type ThreadSdk } from "./sdk"
-import { createRemoteThreadFixture } from "./thread-remote-fixture"
+import { createRemoteThreadFixture, fakeRemoteClient } from "./thread-remote-fixture"
 import type { ThreadHost, ThreadHostSession } from "./tools"
 import type { ThreadHostViewRequest } from "./tools/ports"
 import { startFakeEngineHost } from "./wake/testing/fake-engine-host"
@@ -32,6 +35,10 @@ function fixture(
     readonly cwd?: string
     readonly noHostAnswering?: boolean
     readonly diskOnly?: readonly string[]
+    /** Replaces the fixture's default sessions (used with the address module's two-device account). */
+    readonly sessions?: readonly ThreadHostSession[]
+    /** The host's session controls a test drives (open, interrupt, close, name, model); every other host method stays unused. */
+    readonly controls?: Partial<ThreadHost>
   } = {},
 ) {
   const agentDir = mkdtempSync(join(tmpdir(), "thread-sdk-"))
@@ -58,7 +65,8 @@ function fixture(
   const sessionsDir = join(agentDir, "sessions", "--fixture--")
   mkdirSync(sessionsDir, { recursive: true })
   const diskOnly = (options.diskOnly ?? []).map((id) => ({ durableSessionId: id, cwd: process.cwd() }))
-  for (const session of [hostSession, tuiSession, ...diskOnly])
+  const sessions = options.sessions ?? [hostSession, tuiSession]
+  for (const session of [...sessions, ...diskOnly])
     writeFileSync(
       join(sessionsDir, `epoch_${session.durableSessionId}.jsonl`),
       JSON.stringify({
@@ -76,7 +84,7 @@ function fixture(
   }
   const host: ThreadHost = {
     socket: "/tmp/thread-sdk-legacy.sock",
-    listSessions: async () => [hostSession, tuiSession],
+    listSessions: async () => [...sessions],
     listView: async (request) => {
       views.push(request)
       // The live surface's contract: when no endpoint answers it throws, unless the caller takes nothing live as the offline case.
@@ -84,14 +92,26 @@ function fixture(
         if (request?.offline !== true) throw new Error("connect ECONNREFUSED")
         return { sessions: [], hosts: [], disk: [] }
       }
-      return {
-        sessions: [hostSession, tuiSession],
-        hosts: [
-          { socket: HOST_SOCKET, list_sessions: { sessions: [hostSession] }, endpoint_kind: "rpc_host", alive: true },
-          { socket: TUI_SOCKET, list_sessions: { sessions: [tuiSession] }, endpoint_kind: "tui", alive: true },
-        ],
-        disk: [],
-      }
+      const hosts = [
+        ...new Map(
+          sessions.flatMap((session) =>
+            session.socket === undefined
+              ? []
+              : [
+                  [
+                    session.socket,
+                    {
+                      socket: session.socket,
+                      list_sessions: { sessions: sessions.filter((listed) => listed.socket === session.socket) },
+                      endpoint_kind: session.endpoint_kind,
+                      alive: true as const,
+                    },
+                  ],
+                ],
+          ),
+        ).values(),
+      ]
+      return { sessions, hosts, disk: [] }
     },
     openSession: unused,
     getMessages: async () => [{ role: "user", content: "hello from the host" }],
@@ -103,6 +123,7 @@ function fixture(
     getAvailableModels: unused,
     setThinkingLevel: unused,
     getAvailableThinkingLevels: unused,
+    ...options.controls,
     gateway: {
       wake: async (endpoint, ids) => {
         wakes.push({ endpoint, ids })
@@ -132,6 +153,8 @@ function fixture(
     host,
     ...(options.sdkOwnsStore === true ? {} : { store }),
     ...(options.remote === undefined ? {} : { remote: options.remote }),
+    // No session this fixture's host opens drains its inbox, so a create's first prompt is not waited for.
+    firstPromptWaitMs: 0,
   })
   sdks.push(sdk)
   return { sdk, store, wakes, releases, views }
@@ -143,13 +166,13 @@ function countingRemote(remote: RemoteThreadSurface): {
   readonly calls: string[]
 } {
   const calls: string[] = []
-  const counted = <T extends object>(port: T): T =>
+  const counted = <T extends object>(port: T, prefix = ""): T =>
     new Proxy(port, {
       get: (target, key, receiver) => {
         const value: unknown = Reflect.get(target, key, receiver)
         if (typeof value !== "function") return value
         return (...args: unknown[]) => {
-          calls.push(String(key))
+          calls.push(`${prefix}${String(key)}`)
           return Reflect.apply(value, target, args)
         }
       },
@@ -158,27 +181,53 @@ function countingRemote(remote: RemoteThreadSurface): {
     remote: {
       ...remote,
       sessions: counted(remote.sessions),
+      client: {
+        ...remote.client,
+        service: counted(remote.client.service, "client.service."),
+        devices: counted(remote.client.devices, "client.devices."),
+        sessions: counted(remote.client.sessions, "client.sessions."),
+      },
       ...(remote.aliases === undefined ? {} : { aliases: counted(remote.aliases) }),
     },
     calls,
   }
 }
 
+describe("thread SDK: options are checked at the boundary", () => {
+  test.each([
+    ["the bundled entry", createBundledThreadSdk],
+    ["the component", createThreadSdk],
+  ] as const)(
+    "#given %s #when created without options or without agentDir #then it throws a TypeError naming the missing fields",
+    (_entry, create) => {
+      const call = create as (options?: unknown) => ThreadSdk
+      expect(() => call()).toThrow(
+        new TypeError(
+          "createThreadSdk needs { agentDir, cwd, uid, user }; missing or invalid: agentDir, cwd, user, uid",
+        ),
+      )
+      expect(() => call({ cwd: process.cwd(), uid: 501, user: "q" })).toThrow(
+        new TypeError("createThreadSdk needs { agentDir, cwd, uid, user }; missing or invalid: agentDir"),
+      )
+    },
+  )
+})
+
 describe("thread SDK: sessions", () => {
-  test("#given a host and a terminal session #when listed and read #then rows carry surface and endpoint and the live transcript comes from the session's endpoint", async () => {
+  test("#given a host and a terminal session #when listed and read #then rows carry surface and the live transcript comes from the session's endpoint", async () => {
     const { sdk } = fixture()
     const listed = await sdk.list({})
     expect(listed).toMatchObject({
       kind: "ok",
       scope: "workspace",
       threads: [
-        { thread_id: "dur-host", surface: "desktop", endpoint: { kind: "rpc_host", socket: HOST_SOCKET } },
-        { thread_id: "dur-tui", surface: "tui", endpoint: { kind: "tui" } },
+        { thread: "dur-host", surface: "desktop" },
+        { thread: "dur-tui", surface: "tui" },
       ],
     })
     expect(await sdk.read({ thread: "host lane" })).toMatchObject({
       kind: "ok",
-      thread_id: "dur-host",
+      thread: "dur-host",
       items: [{ seq: 1, role: "user", content: JSON.stringify("hello from the host") }],
     })
   })
@@ -224,9 +273,101 @@ describe("thread SDK: sessions", () => {
   })
 })
 
+describe("thread SDK: a send with no remote surface resolves through the address module (#14322)", () => {
+  const HEX = "0cc00001-0000-4000-8000-000000000001"
+  const hexSession: ThreadHostSession = {
+    sessionId: "rpc-7",
+    durableSessionId: HEX,
+    cwd: process.cwd(),
+    name: "hex lane",
+    status: "open",
+    socket: HOST_SOCKET,
+    endpoint_kind: "rpc_host",
+  }
+
+  test.each([
+    ["here/<thread id>", `here/${HEX}`],
+    ["a thread name", "hex lane"],
+    ["an 8-hex id prefix", HEX.slice(0, 8)],
+  ])(
+    "#given no remote surface #when the CLI sends to %s #then it is delivered to that local thread",
+    async (_form, thread) => {
+      const { sdk, store } = fixture({ sessions: [hexSession] })
+      expect(await sdk.send({ thread, text: "ping" })).toMatchObject({ kind: "ok" })
+      expect((await store.list({ target_durable_id: HEX })).length).toBe(1)
+    },
+  )
+
+  test("#given no remote surface #when the CLI sends to <other device>/<id> #then the address module's typed refusal answers and nothing is written", async () => {
+    const { sdk, store } = fixture({ sessions: [hexSession] })
+    expect(await sdk.send({ thread: `b7c41e09d2a64f1e/${HEX}`, text: "ping" })).toMatchObject({
+      kind: "error",
+      error: { code: "not_found", details: { kind: "thread" } },
+    })
+    expect(await store.list()).toEqual([])
+  })
+
+  test("#given an id this device's gateway store owns #when the CLI sends to it #then no host listing is read (the published-id shortcut)", async () => {
+    const { sdk, store, views } = fixture({ sessions: [hexSession] })
+    await store.registerIncarnation({ durable_id: HEX, incarnation: "runtime-1" })
+    expect(await sdk.send({ thread: HEX, text: "ping" })).toMatchObject({ kind: "ok" })
+    expect(views).toEqual([])
+  })
+
+  test("#given one SDK object that sent to a session before it started #when the session starts and is then bound and reported to #then the completion wakes the session that is live now (#14322 delta review N1)", async () => {
+    const sessions: ThreadHostSession[] = []
+    const { sdk, wakes } = fixture({ sessions, diskOnly: [HEX] })
+    expect(await sdk.send({ thread: HEX, text: "before it runs" })).toMatchObject({
+      kind: "ok",
+      delivery: { kind: "queued_offline" },
+    })
+    sessions.push(hexSession)
+    const bound = await sdk.bind({ session: HEX, binding: { platform: "custom", account_id: "qa", chat_id: "late" } })
+    expect(bound).toMatchObject({ kind: "ok" })
+    expect(await sdk.report({ session: HEX, kind: "completion", text: "done" })).toMatchObject({
+      kind: "ok",
+      wake: { reached: true },
+    })
+    expect(wakes.map((wake) => wake.endpoint.kind)).toEqual(["rpc_host"])
+  })
+})
+
+describe("thread SDK: a gateway store a newer omo build migrated", () => {
+  test("#given the agent dir's store is at a schema newer than this binary's #when omo thread send runs #then it answers gateway_schema_too_new naming both schemas and the update command", async () => {
+    let versions = { gateway: 0, binary: 0 }
+    const { sdk } = fixture({
+      store: (agentDir) => {
+        versions = storeMigratedByNewerBuild(agentDir)
+        return createGatewayStore({ agentDir })
+      },
+    })
+    const sent = await sdk.send({ thread: "my-tui", text: "ping" })
+    expect(sent).toMatchObject({
+      kind: "error",
+      error: {
+        code: "gateway_schema_too_new",
+        details: {
+          gateway_schema: versions.gateway,
+          binary_schema: versions.binary,
+          update_command: "omo update",
+        },
+      },
+    })
+  })
+})
+
 describe("thread SDK: read reaches the account like the agent tools (#12833)", () => {
   const remoteFixture = createRemoteThreadFixture()
   afterEach(remoteFixture.cleanup)
+
+  test("#given a thread on b #when omo thread list runs #then b's thread is listed with its device beside this device's, as the agent's thread_list lists it", async () => {
+    const account = remoteFixture.account()
+    const { sdk } = fixture({ remote: account.remote })
+    const listed = await sdk.list({})
+    expect(listed.kind === "ok" && "threads" in listed && listed.threads.find((t) => t.device === "b")).toMatchObject({
+      thread: "dur-on-b",
+    })
+  })
 
   test("#given aliases held by a thread here and by one on b #when omo thread read names each alias #then the first reads this device's transcript and the second b's", async () => {
     const account = remoteFixture.account({
@@ -236,11 +377,14 @@ describe("thread SDK: read reaches the account like the agent tools (#12833)", (
       ]),
     })
     const { sdk } = fixture({ remote: account.remote })
-    expect(await sdk.read({ thread: "lane-here" })).toMatchObject({ kind: "ok", thread_id: "dur-host" })
-    expect(await sdk.read({ thread: "lane-b" })).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
+    expect(await sdk.read({ thread: "lane-here" })).toMatchObject({ kind: "ok", thread: "dur-host" })
+    expect(await sdk.read({ thread: "lane-b" })).toMatchObject({ kind: "ok", thread: "dur-on-b", device: "b" })
     expect(
       account.sent.filter((entry) => entry.via === "session").map((entry) => [entry.device, entry.rpc?.["type"]]),
-    ).toEqual([["b", "get_messages"]])
+    ).toEqual([
+      ["b", "get_entries"],
+      ["b", "get_messages"],
+    ])
   })
 
   test("#given an alias held by a thread on this device and omo thread run from another workspace #when read and send name the alias without all_scope #then both reach that thread; the raw id alone stays scope_denied", async () => {
@@ -248,7 +392,7 @@ describe("thread SDK: read reaches the account like the agent tools (#12833)", (
       aliases: new Map([["lane-here", { session_id: "dur-host", device: "here" }]]),
     })
     const { sdk, store } = fixture({ remote: account.remote, cwd: "/thread-sdk-other-workspace" })
-    expect(await sdk.read({ thread: "lane-here" })).toMatchObject({ kind: "ok", thread_id: "dur-host" })
+    expect(await sdk.read({ thread: "lane-here" })).toMatchObject({ kind: "ok", thread: "dur-host" })
     expect(await sdk.read({ thread: "dur-host" })).toMatchObject({ kind: "error", error: { code: "scope_denied" } })
     expect(await sdk.send({ thread: "lane-here", text: "ping" })).toMatchObject({ kind: "ok", deduplicated: false })
     expect((await store.list({ target_durable_id: "dur-host" })).map((row) => row.sender)).toEqual(["cli:501"])
@@ -273,7 +417,7 @@ describe("thread SDK: read reaches the account like the agent tools (#12833)", (
     ])
   })
 
-  test("#given a published thread id and the account surface set #when omo thread send names that id #then it is delivered with no host listing, no alias call and no listing, and its one device-service call is the thisDevice read that stamps its sender device (#12860, #13004)", async () => {
+  test("#given a published thread id and the account surface set #when omo thread send names that id #then it is delivered with no host listing, no alias call and no listing, and its one device-service call is the device read that stamps its sender device (#12860, #13004)", async () => {
     const account = remoteFixture.account({
       aliases: new Map([["lane-here", { session_id: "dur-host", device: "here" }]]),
     })
@@ -288,22 +432,22 @@ describe("thread SDK: read reaches the account like the agent tools (#12833)", (
     expect((await store.list({ target_durable_id: "dur-host" })).map((row) => row.sender)).toEqual(["cli:501"])
     expect(views).toEqual([])
     // Decision 0027 section 3: every delivery names its sender device, read once and kept for the process.
-    expect(counting.calls).toEqual(["thisDevice"])
+    expect(counting.calls).toEqual(["client.devices.list"])
     expect((await store.list({ target_durable_id: "dur-host" }))[0]?.envelope.provenance?.device).toBe("here")
     expect(await sdk.send({ thread: "dur-host", text: "again" })).toMatchObject({ kind: "ok" })
-    expect(counting.calls).toEqual(["thisDevice"])
+    expect(counting.calls).toEqual(["client.devices.list"])
   })
 
   test("#given the device service cannot answer #when omo thread send names a thread here #then the send still goes and its row names why it carries no sender device (#13004)", async () => {
     const account = remoteFixture.account()
     const down = {
       ...account.remote,
-      sessions: {
-        ...account.remote.sessions,
-        thisDevice: async () => {
-          throw new Error("device service down")
-        },
-      },
+      client: fakeRemoteClient({
+        state: () => "connected",
+        here: "here",
+        devices: () => [],
+        fail: { kind: "error", code: "host_unavailable", message: "device service down", next_action: "Retry." },
+      }),
     }
     const { sdk, store } = fixture({ remote: down })
     await store.registerIncarnation({
@@ -333,6 +477,154 @@ describe("thread SDK: read reaches the account like the agent tools (#12833)", (
       deduplicated: false,
     })
     expect((await store.list({ target_durable_id: "dur-tui" })).map((row) => row.sender)).toEqual(["cli:501"])
+  })
+})
+
+describe("thread SDK: every address form through the shared resolver (#14305)", () => {
+  const twos: ReturnType<typeof createTwoDevices>[] = []
+  afterEach(() => {
+    for (const two of twos.splice(0)) two.cleanup()
+  })
+  const twoDevices = (options: TwoDeviceOptions = {}) => {
+    const two = createTwoDevices(options)
+    twos.push(two)
+    return two
+  }
+  // The fixture's own HERE_SESSIONS / HERE_DISK are not exported (the module branch pruned unused
+  // names): rebuilt here from its exported ids, routing ids and names, on one rpc_host socket.
+  const hereDisk: readonly string[] = [T.hereEnded, T.stale]
+  const hereSessions: readonly ThreadHostSession[] = (
+    [
+      [T.hereLive, ROUTE.hereLive, NAMES.hereLive],
+      [T.hereShared, ROUTE.hereShared, NAMES.shared],
+      [T.hereSlash, ROUTE.hereSlash, NAMES.slash],
+    ] as const
+  ).map(([durableSessionId, sessionId, name]) => ({
+    sessionId,
+    durableSessionId,
+    cwd: process.cwd(),
+    name,
+    status: "open" as const,
+    socket: HOST_SOCKET,
+    endpoint_kind: "rpc_host" as const,
+  }))
+  const sdkOn = (two: ReturnType<typeof createTwoDevices>) =>
+    fixture({ remote: two.remote, sessions: hereSessions, diskOnly: [...hereDisk] })
+
+  test("#given a thread on device B #when locate names it by name and by <device>/<id> #then the located row keeps the local shape and adds its device and address", async () => {
+    const { sdk } = sdkOn(twoDevices())
+    expect(await sdk.locate({ thread: NAMES.bLive })).toMatchObject({
+      kind: "ok",
+      thread: {
+        thread_id: T.bLive,
+        title: NAMES.bLive,
+        status: "live",
+        cwd: "/work/b",
+        endpoint: null,
+        alive: true,
+        device: B.id,
+        address: `${B.id}/${T.bLive}`,
+      },
+    })
+    expect(await sdk.locate({ thread: `${B.name}/${T.bLive}` })).toMatchObject({
+      kind: "ok",
+      thread: { thread_id: T.bLive, device: B.id },
+    })
+    // A local thread keeps today's result byte for byte: no device, no address.
+    const local = await sdk.locate({ thread: NAMES.hereLive })
+    expect(local).toMatchObject({
+      kind: "ok",
+      thread: {
+        thread_id: T.hereLive,
+        endpoint: {
+          kind: "rpc_host",
+          socket: HOST_SOCKET,
+          routing_id: ROUTE.hereLive,
+          durable_session_id: T.hereLive,
+        },
+        surface: "desktop",
+        alive: true,
+      },
+    })
+    if (local.kind !== "ok") throw new Error("locate of a local thread failed")
+    expect(local.thread).not.toHaveProperty("device")
+    expect(local.thread).not.toHaveProperty("address")
+  })
+
+  test("#given a thread on device B #when send addresses it by <device name>/<id> and by <device prefix>/<id prefix> #then each resolves there and the engine's refusal of a command-line sender comes back as data", async () => {
+    const two = twoDevices()
+    const { sdk } = sdkOn(two)
+    for (const address of [`${B.name}/${T.bLive}`, `${B.id.slice(0, 6)}/${T.bLive.slice(0, 8)}`]) {
+      expect(await sdk.send({ thread: address, text: "ping" })).toMatchObject({
+        kind: "error",
+        error: { code: "unsupported", details: { device: B.id, reason: "sender_not_allowed" } },
+      })
+    }
+    expect(two.account.sent.filter((entry) => entry.via === "session")).toEqual([])
+  })
+
+  test("#given a thread on this device #when read names it here/<id> #then it reads this device's transcript (surface pin: the control path already resolves it)", async () => {
+    const { sdk } = sdkOn(twoDevices())
+    expect(await sdk.read({ thread: `here/${T.hereLive}` })).toMatchObject({ kind: "ok", thread: T.hereLive })
+  })
+
+  test("#given a session that lives only on device B #when bind, rebind, bindings --session, report and a bound send name it #then each is refused with the device named and nothing is written", async () => {
+    const { sdk, store } = sdkOn(twoDevices())
+    const refused = await sdk.bind({
+      session: NAMES.bLive,
+      binding: { platform: "custom", account_id: "qa", chat_id: "c1" },
+    })
+    expect(refused).toMatchObject({
+      kind: "error",
+      error: {
+        code: "unsupported",
+        details: {
+          thread: T.bLive,
+          device: B.id,
+          device_name: B.name,
+          address: `${B.id}/${T.bLive}`,
+          reason: "session_on_other_device",
+        },
+      },
+    })
+    expect(await sdk.report({ session: NAMES.bLive, kind: "milestone", text: "m" })).toMatchObject({
+      kind: "error",
+      error: { code: "unsupported", details: { device: B.id, reason: "session_on_other_device" } },
+    })
+    expect(await sdk.bindings({ session: NAMES.bLive })).toMatchObject({
+      kind: "error",
+      error: { code: "unsupported", details: { device: B.id } },
+    })
+    const bound = await sdk.bind({
+      session: NAMES.hereLive,
+      binding: { platform: "custom", account_id: "qa", chat_id: "c2" },
+    })
+    if (bound.kind !== "ok") throw new Error("bind of a local session failed")
+    expect(
+      await sdk.rebind({ binding_id: bound.binding.binding_id, expected_revision: 1, session: NAMES.bLive }),
+    ).toMatchObject({ kind: "error", error: { code: "unsupported", details: { device: B.id } } })
+    expect(
+      await sdk.send({ binding_id: bound.binding.binding_id, thread: NAMES.bLive, text: "wrong device" }),
+    ).toMatchObject({ kind: "error", error: { code: "unsupported", details: { device: B.id } } })
+    expect(await store.list()).toEqual([])
+  })
+
+  test("#given a name a local session and a thread on device B share #when bind and report name it #then they resolve to the local session, as before the module (#14322 review H1)", async () => {
+    const { sdk } = sdkOn(twoDevices())
+    const bound = await sdk.bind({
+      session: NAMES.shared,
+      binding: { platform: "custom", account_id: "qa", chat_id: "shared" },
+    })
+    expect(bound).toMatchObject({ kind: "ok", binding: { session_durable_id: T.hereShared } })
+    expect(await sdk.report({ session: NAMES.shared, kind: "milestone", text: "m" })).toMatchObject({ kind: "ok" })
+  })
+
+  test("#given device B missed the listing round #when locate names a thread only B holds #then it answers host_unavailable naming B, never not_found", async () => {
+    const { sdk } = sdkOn(twoDevices({ incomplete: true }))
+    expect(await sdk.locate({ thread: NAMES.bLive })).toMatchObject({
+      kind: "error",
+      error: { code: "host_unavailable", details: { reason: "listing_incomplete", devices: [B.id] } },
+    })
   })
 })
 
@@ -678,6 +970,256 @@ describe("thread SDK: takeover", () => {
   })
 })
 
+// #13413: the session controls a script runs, through the same bodies as the agent tools (locateControl + control/operations.ts,
+// and the shared create body over the SessionHost port), acting as the SDK's own caller (no session identity, like read).
+describe("thread SDK: session controls (#13413)", () => {
+  const remoteFixture = createRemoteThreadFixture()
+  afterEach(remoteFixture.cleanup)
+
+  function controlled() {
+    const calls: unknown[][] = []
+    const opened: ThreadHostSession = {
+      sessionId: "rpc-2",
+      durableSessionId: "dur-new",
+      cwd: process.cwd(),
+      name: "fresh lane",
+      status: "open",
+      socket: HOST_SOCKET,
+      endpoint_kind: "rpc_host",
+    }
+    const openSession: NonNullable<ThreadHost["openSession"]> = async (request) => {
+      calls.push(["openSession", request])
+      return opened
+    }
+    const controls: Partial<ThreadHost> = {
+      openSession,
+      interrupt: async (...args) => {
+        calls.push(["interrupt", ...args])
+        return { interrupted: true, turnId: "turn-7" }
+      },
+      closeSession: async (...args) => {
+        calls.push(["closeSession", ...args])
+        return { outcome: "closed", dropped_deliveries: [] }
+      },
+      setSessionName: async (...args) => {
+        calls.push(["setSessionName", ...args])
+      },
+      getAvailableModels: async () => [
+        { provider: "anthropic", id: "claude-opus", name: "Opus" },
+        { provider: "openai", id: "gpt-6" },
+      ],
+      setModel: async (...args) => {
+        calls.push(["setModel", ...args])
+        return { provider: args[1], id: args[2] }
+      },
+    }
+    return { calls, controls, openSession }
+  }
+
+  test("#given a host session here #when a script interrupts it #then the host's interrupt runs on that session and the result names the stopped turn", async () => {
+    const { calls, controls } = controlled()
+    const { sdk } = fixture({ controls })
+    expect(await sdk.interrupt({ thread: "host lane" })).toEqual({
+      kind: "ok",
+      thread: "dur-host",
+      turn_id: "turn-7",
+      interrupted: true,
+      background: { status: "not_supported" },
+    })
+    expect(calls).toEqual([["interrupt", "rpc-1", { background: "stop" }, "dur-host"]])
+  })
+
+  test("#given a host session and a terminal session here #when a script closes each #then the host closes its session and the terminal's refusal comes back as unsupported data with nothing called", async () => {
+    const { calls, controls } = controlled()
+    const { sdk } = fixture({ controls })
+    expect(await sdk.close({ thread: "host lane" })).toEqual({
+      kind: "ok",
+      thread: "dur-host",
+      closed: true,
+      reason: "closed",
+      dropped_deliveries: [],
+    })
+    expect(await sdk.close({ thread: "my-tui" })).toMatchObject({
+      kind: "error",
+      error: { code: "unsupported", details: { command: "close_session" } },
+    })
+    expect(calls).toEqual([["closeSession", "rpc-1", "dur-host", {}]])
+  })
+
+  test("#given a host session here #when a script renames it, then to a name another thread holds, then with nothing to change #then the first is set on the host and the others are refused as data before anything changes", async () => {
+    const { calls, controls } = controlled()
+    const { sdk } = fixture({ controls })
+    expect(await sdk.rename({ thread: "host lane", name: "  renamed lane " })).toEqual({
+      kind: "ok",
+      thread: "dur-host",
+      name: "renamed lane",
+    })
+    expect(await sdk.rename({ thread: "dur-host", name: "MY-TUI" })).toMatchObject({
+      kind: "error",
+      error: { code: "name_conflict" },
+    })
+    expect(await sdk.rename({ thread: "dur-host" })).toMatchObject({
+      kind: "error",
+      error: { code: "invalid_arguments" },
+    })
+    expect(calls).toEqual([["setSessionName", "rpc-1", "renamed lane", "dur-host"]])
+  })
+
+  test("#given a host session here #when a script sets its model by a fragment and by one no catalog lists #then the fragment resolves on the session's catalog and the miss is model_not_found with nothing set", async () => {
+    const { calls, controls } = controlled()
+    const { sdk } = fixture({ controls })
+    expect(await sdk.set_model({ thread: "host lane", model: "opus" })).toEqual({
+      kind: "ok",
+      thread: "dur-host",
+      model: { provider: "anthropic", id: "claude-opus" },
+    })
+    expect(await sdk.set_model({ thread: "host lane", model: "no-such-model" })).toMatchObject({
+      kind: "error",
+      error: { code: "model_not_found" },
+    })
+    expect(calls).toEqual([["setModel", "rpc-1", "anthropic", "claude-opus", "dur-host"]])
+  })
+
+  test("#given this device's host #when a script creates a named thread, then another under a taken name #then the first opens in the script's cwd and the second is name_conflict with nothing opened", async () => {
+    const { calls, controls } = controlled()
+    const { sdk } = fixture({ controls })
+    expect(await sdk.create({ name: "fresh lane" })).toMatchObject({
+      kind: "ok",
+      thread: "dur-new",
+      name: "fresh lane",
+      deduplicated: false,
+    })
+    expect(await sdk.create({ name: "my-tui" })).toMatchObject({ kind: "error", error: { code: "name_conflict" } })
+    expect(await sdk.create({})).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+    expect(calls).toEqual([
+      [
+        "openSession",
+        expect.objectContaining({ cwd: process.cwd(), name: "fresh lane", durableSessionId: expect.any(String) }),
+      ],
+    ])
+  })
+
+  test("#given this device's host #when a script creates a thread with a first prompt that no drain takes #then the thread opens, the prompt is the script's own row, and the create fails prompt_not_started", async () => {
+    const { calls, controls, openSession } = controlled()
+    // The host lists the session it opened, as a real one does once open_session answers.
+    let listed: ThreadHostSession[] = []
+    const { sdk, store } = fixture({
+      controls: {
+        ...controls,
+        openSession: async (request) => {
+          const session = await openSession(request)
+          listed = [session]
+          return session
+        },
+        listView: async () => ({
+          sessions: listed,
+          hosts: [{ socket: HOST_SOCKET, list_sessions: { sessions: listed }, endpoint_kind: "rpc_host", alive: true }],
+          disk: [],
+        }),
+      },
+    })
+    const created = await sdk.create({ prompt: "start the nightly build", idempotency_key: "nightly-1" })
+    expect(created).toMatchObject({
+      kind: "error",
+      error: { code: "prompt_not_started", details: { thread: "dur-new", delivery_id: expect.any(String) } },
+    })
+    expect(calls.filter(([what]) => what === "openSession")).toHaveLength(1)
+    const rows = await store.list({ target_durable_id: "dur-new" })
+    expect(
+      rows.map((row) => ({
+        sender: row.sender,
+        authority: row.envelope.authority,
+        body: row.body,
+        mode: row.mode_requested,
+      })),
+    ).toEqual([{ sender: "cli:501", authority: "creator", body: "start the nightly build", mode: "auto" }])
+  })
+
+  test("#given a script with no session of its own #when it addresses self #then every control verb answers caller_context_missing and nothing runs", async () => {
+    const { calls, controls } = controlled()
+    const { sdk } = fixture({ controls })
+    for (const result of [
+      await sdk.interrupt({ thread: "self" }),
+      await sdk.close({ thread: "self" }),
+      await sdk.close({}),
+      await sdk.rename({ thread: "self", name: "mine" }),
+      await sdk.rename({ name: "mine" }),
+      await sdk.set_model({ thread: "self", model: "opus" }),
+    ])
+      expect(result).toMatchObject({ kind: "error", error: { code: "caller_context_missing" } })
+    expect(calls).toEqual([])
+  })
+
+  test("#given a thread on device b #when a script interrupts, renames, sets the model of and closes it #then each runs on b's engine through the device service and names device b", async () => {
+    const account = remoteFixture.account({ aliases: new Map([["lane-b", { session_id: "dur-on-b", device: "b" }]]) })
+    const { sdk } = fixture({ remote: account.remote })
+    expect(await sdk.interrupt({ thread: "lane-b" })).toEqual({
+      kind: "ok",
+      thread: "dur-on-b",
+      device: "b",
+      interrupted: false,
+      background: { status: "not_supported" },
+    })
+    expect(await sdk.rename({ thread: "lane-b", name: "renamed on b", alias: "lane-b2" })).toEqual({
+      kind: "ok",
+      thread: "dur-on-b",
+      device: "b",
+      name: "renamed on b",
+      alias: "lane-b2",
+    })
+    expect(account.aliases.get("lane-b2")).toEqual({ session_id: "dur-on-b", device: "b" })
+    expect(await sdk.set_model({ thread: "lane-b2", model: "gpt-6" })).toEqual({
+      kind: "ok",
+      thread: "dur-on-b",
+      device: "b",
+      model: { provider: "openai", id: "gpt-6" },
+    })
+    expect(await sdk.close({ thread: "lane-b2" })).toEqual({
+      kind: "ok",
+      thread: "dur-on-b",
+      device: "b",
+      closed: true,
+      reason: "closed",
+      dropped_deliveries: [],
+    })
+    expect(
+      account.sent
+        .filter((entry) => entry.device === "b" && entry.rpc !== undefined)
+        .map((entry) => entry.rpc?.["type"])
+        .filter((type) => type !== "get_state"),
+    ).toEqual(["interrupt", "set_session_name", "get_available_models", "set_model", "unload_session"])
+  })
+
+  test("#given a thread that ended on device b #when a script closes it #then it answers closed false for device b and nothing reaches b's engine", async () => {
+    const account = remoteFixture.account({
+      rowState: "ended",
+      aliases: new Map([["lane-b", { session_id: "dur-on-b", device: "b" }]]),
+    })
+    const { sdk } = fixture({ remote: account.remote })
+    expect(await sdk.close({ thread: "lane-b" })).toEqual({
+      kind: "ok",
+      thread: "dur-on-b",
+      device: "b",
+      closed: false,
+      reason: "not_live",
+      dropped_deliveries: [],
+    })
+    expect(account.sent.filter((entry) => entry.via === "session")).toEqual([])
+  })
+
+  test("#given device b online #when a script creates a thread on b #then b's engine opens it and the result names device b", async () => {
+    const account = remoteFixture.account()
+    const { sdk } = fixture({ remote: account.remote })
+    expect(await sdk.create({ device: "b", name: "lane on b" })).toMatchObject({
+      kind: "ok",
+      thread: "dur-new-on-b",
+      device: "b",
+      deduplicated: false,
+    })
+    expect(account.sent.some((entry) => entry.device === "b" && entry.rpc?.["type"] === "open_session")).toBe(true)
+  })
+})
+
 // #13037 cold wake: `omo daemon run` has the operator daemon load omo with no session open, so its thread component
 // declares the delivery consumer before any session runs. The SDK asks the host thread_create opens sessions on.
 describe("thread SDK: the operator daemon's warm", () => {
@@ -705,4 +1247,19 @@ describe("thread SDK: the operator daemon's warm", () => {
       }
     },
   )
+})
+
+describe("#14333: the SDK's default delivery mode", () => {
+  test("#given a send that names no mode #when it is stored #then its requested mode is the shared default, auto; an explicit follow_up is kept", async () => {
+    const { sdk, store } = fixture()
+    expect(await sdk.send({ thread: "my-tui", text: "no mode" })).toMatchObject({ kind: "ok" })
+    expect(await sdk.send({ thread: "my-tui", text: "queued on purpose", mode: "follow_up" })).toMatchObject({
+      kind: "ok",
+    })
+    const rows = await store.list({ target_durable_id: "dur-tui" })
+    expect(rows.map((row) => [row.body, row.mode_requested])).toEqual([
+      ["no mode", "auto"],
+      ["queued on purpose", "follow_up"],
+    ])
+  })
 })

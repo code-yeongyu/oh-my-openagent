@@ -9,7 +9,7 @@ import {
   HelperMissingForOwnedItem,
   type KeychainHelperOptions,
 } from "./keychain-helper/darwin-backend"
-import { HelperOldSlotsFull, type WriteIntent } from "./keychain-helper/darwin-store"
+import { HelperItemNotOwned, HelperOldSlotsFull, type WriteIntent } from "./keychain-helper/darwin-store"
 import { bindKeychainHelper, type LockedStore, lockedStoreView } from "./keychain-helper/store-binding"
 import { probeSecretServiceLock, type SecretServiceLockProbe } from "./secret-service-lock"
 import { heldCredentialLease, withCredentialLock } from "./credential-lock"
@@ -48,7 +48,11 @@ export type CredentialStore = SealedStore<Credentials>
 
 export class CredentialStoreError extends SignInError {}
 export class KeychainLockedError extends CredentialStoreError {}
+/** The keychain item's access list belongs to another program: unlocking does not help (#13757). */
+export class KeychainItemNotOwnedError extends CredentialStoreError {}
 export class SecretServiceUnavailableError extends CredentialStoreError {}
+/** OmO's own keychain (#13116) refused or cannot be reached; its message names the fix and is never generalized. */
+export class DedicatedStoreError extends CredentialStoreError {}
 export class InvalidCredentialState extends SignInError {}
 /** The stored credential is no longer the identity and generation a caller captured. */
 export class CredentialIdentityChanged extends Error {
@@ -344,9 +348,15 @@ export function createSealedStore<T>(
       clearTimeout(timer)
     }
   }
+  // #13116: a Mac whose login keychain stays locked (another user at the screen, nobody signed in) can opt in to OmO's
+  // own keychain; the hint is the only place that names it, and nothing switches stores on its own.
+  const lockedHint =
+    platform === "darwin"
+      ? " On an unattended Mac, omo account store enable keeps the sign-in in OmO's own keychain."
+      : ""
   const unavailable = (error: unknown) =>
     isLocked(error)
-      ? new KeychainLockedError(`${platformName} is locked. Unlock it, then try again.${neverInAFile}`)
+      ? new KeychainLockedError(`${platformName} is locked. Unlock it, then try again.${neverInAFile}${lockedHint}`)
       : new CredentialStoreError(
           `Cannot access ${platformName}. Unlock or enable the OS credential store and try again.${neverInAFile}`,
         )
@@ -372,7 +382,7 @@ export function createSealedStore<T>(
       if (backend === null) await helper.guardHelperless()
       return await answered(backend === null ? secrets : helper.reader(backend), fresh)
     } catch (error) {
-      if (error instanceof KeychainApprovalPendingError) throw error
+      if (error instanceof KeychainApprovalPendingError || error instanceof DedicatedStoreError) throw error
       if (error instanceof HelperMissingForOwnedItem) throw new CredentialStoreError(error.message)
       throw unavailable(error)
     }
@@ -384,6 +394,8 @@ export function createSealedStore<T>(
   const lockedFailure = (error: unknown): unknown => {
     const mapped = asKeystoreError(error, (message) => new KeychainApprovalPendingError(message))
     if (error instanceof HelperOldSlotsFull) return new CredentialStoreError(error.message)
+    if (error instanceof HelperItemNotOwned)
+      return isLocked(error.cause) ? unavailable(error.cause) : new KeychainItemNotOwnedError(error.message)
     if (mapped instanceof KeychainApprovalPendingError || mapped instanceof SignInError) return mapped
     if (mapped instanceof Error && mapped.name === "LockLeaseLostError") return mapped
     return unavailable(mapped)

@@ -1,12 +1,33 @@
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 
+import { deviceLabel } from "@oh-my-opencode/thread-address-core"
+
 import { askHost } from "../../../../senpi-task/src/runners/rpc-host/host-request"
 import { classifyWarmReply, type WarmAnswer } from "../../../../senpi-task/src/runners/rpc-host/host-warm-reply"
 
+import { resolveAddress } from "./address"
 import { toThreadAddressEntries, type AddressEntry } from "./address-book"
-import type { ThreadToolResult } from "./contracts"
-import { threadToolFailure, type ThreadToolFailure } from "./errors"
+import type { ThreadAddressEntry } from "./addressing"
+import {
+  DEFAULT_THREAD_DELIVERY,
+  parseThreadParams,
+  threadToolParamSchemas,
+  type ThreadCloseInput,
+  type ThreadCreateInput,
+  type ThreadInterruptInput,
+  type ThreadRenameInput,
+  type ThreadSetModelInput,
+  type ThreadState,
+  type ThreadToolResult,
+} from "./contracts"
+import { createThread } from "./control/create"
+import { awaitPromptStart, FIRST_PROMPT_START_RESERVE_MS, FIRST_PROMPT_START_WAIT_MS } from "./control/prompt-start"
+import { locateControl } from "./control/locate"
+import { answered, closeOptions, closeThread, interruptThread, NOT_LIVE, setModelOn } from "./control/operations"
+import { renameThread } from "./control/rename"
+import { controlIdentity } from "./control/port"
+import { gatewaySchemaRefusal, threadToolFailure, type ThreadToolFailure } from "./errors"
 import type { ReleaseSessionReply, ReleaseSessionRequest } from "./gateway/adapter"
 import { isUiRequestKind, UI_REQUEST_KINDS } from "./gateway/answer-shape"
 import { type BindInput, OUTBOUND_EVENTS, type OutboundEvent } from "./gateway/bindings"
@@ -25,21 +46,21 @@ export type {
   StoreExtensionRefusalCode,
 } from "./gateway/store-extensions"
 import type { DeliveryTarget } from "./gateway/transport"
-import type { ExternalAuthor, GatewayDeliveryMode, GatewayDeliveryResult } from "./gateway/types"
+import type {
+  ExternalAuthor,
+  GatewayDeliveryMode,
+  GatewayDeliveryResult,
+  GatewayDeliverySuccess,
+} from "./gateway/types"
 import { createLiveThreadSurface, parseHostStatusAll } from "./live-surface"
 import { resolveThreadSocket } from "./live-surface-paths"
 import { createGatewayResolver, createGatewayServices } from "./tools/gateway-services"
-import {
-  addressBook,
-  hostView,
-  resolution,
-  resolveEntries,
-  resolveStoredSession,
-  sendAddressBook,
-  resolveAcross,
-} from "./tools/internals"
+import { addressBook, hostView, sendAddressBook } from "./tools/internals"
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "./tools/ports"
 import { listThreads, readThread } from "./tools/read-ops"
+import { sendView } from "./tools/send-view"
+import { listAcross } from "./remote/cross-device"
+import { TOOL_CALL_BUDGET_MS, waitWithinCallBudget, withCallDeadline } from "../call-budget/call-deadline"
 import type { RemoteThreadSurface } from "./remote/ports"
 import { stampThisDevice } from "./remote/this-device"
 
@@ -61,12 +82,30 @@ export type ThreadSdkOptions = {
   readonly workerModuleUrl?: string | URL
   readonly host?: ThreadHost
   readonly store?: GatewayStore
+  /** How long a create waits for its first prompt to start on this device; absent, FIRST_PROMPT_START_WAIT_MS (test seam). */
+  readonly firstPromptWaitMs?: number
   readonly now?: () => number
   /**
    * The account's other devices and its alias registry (the CLI passes the thread client sidecar's `createCliRemoteSurface`):
    * `read` then resolves an address exactly as the agent's `thread_read` does. Absent, it reads this device only.
    */
   readonly remote?: RemoteThreadSurface
+}
+
+/**
+ * The SDK's boundary check: a script that calls `createThreadSdk()` with no options, or without one of the four fields
+ * every operation reads, gets a TypeError naming the missing fields instead of a property read deep inside.
+ */
+export function assertThreadSdkOptions(options: unknown): asserts options is ThreadSdkOptions {
+  const given = typeof options === "object" && options !== null ? (options as Record<string, unknown>) : {}
+  const missing = [
+    ...(["agentDir", "cwd", "user"] as const).filter(
+      (field) => typeof given[field] !== "string" || (given[field] as string).length === 0,
+    ),
+    ...(typeof given["uid"] === "number" ? [] : ["uid"]),
+  ]
+  if (missing.length > 0)
+    throw new TypeError(`createThreadSdk needs { agentDir, cwd, uid, user }; missing or invalid: ${missing.join(", ")}`)
 }
 
 type Failure = { readonly kind: "error"; readonly error: ThreadToolFailure }
@@ -91,16 +130,26 @@ type Reported = Promise<
   RelayResult<Omit<ReportOpResult, "arm_seq"> & { readonly deduplicated: boolean; readonly wake?: ArmWake }> | Failure
 >
 
+/** A send's answer: the gateway's delivery facts, with the session named `thread`, the address `read` and `send` take back. */
+export type ThreadSdkSendResult =
+  | (Omit<GatewayDeliverySuccess, "thread_id"> & { readonly thread: string })
+  | Exclude<GatewayDeliveryResult, GatewayDeliverySuccess>
+
 /** Where a session lives right now, as `omo daemon adopt` needs it. */
 export type LocatedThread = Pick<
   AddressEntry,
   "thread_id" | "title" | "cwd" | "status" | "session_path" | "endpoint" | "surface" | "alive"
->
+> & {
+  /** A thread on another device: its device id and the address every tool accepts (absent on this device). */
+  readonly device?: string
+  readonly address?: string
+}
 
 export type ThreadSdk = StoreExtensionApi & {
   /** `cli:<uid>`: the principal every receipt, budget and bindingless send of this SDK is keyed by. */
   readonly principal: string
-  readonly list: (request: Scoped) => Promise<ThreadToolResult>
+  /** `state`: the thread states to list; the default lists every state but archived. */
+  readonly list: (request: Scoped & { readonly state?: readonly ThreadState[] }) => Promise<ThreadToolResult>
   readonly read: (
     request: Scoped & { readonly thread: string; readonly max_bytes?: number; readonly cursor?: string },
   ) => Promise<ThreadToolResult>
@@ -118,7 +167,7 @@ export type ThreadSdk = StoreExtensionApi & {
         readonly binding_id?: string
         readonly author?: ExternalAuthor
       },
-  ) => Promise<GatewayDeliveryResult>
+  ) => Promise<ThreadSdkSendResult>
   readonly bind: (
     request: Scoped & Keyed & { readonly session: string; readonly binding: Omit<BindInput, "session_durable_id"> },
   ) => Relayed<"bind">
@@ -171,6 +220,16 @@ export type ThreadSdk = StoreExtensionApi & {
   readonly locate: (
     request: Scoped & { readonly thread: string },
   ) => Promise<{ readonly kind: "ok"; readonly thread: LocatedThread } | Failure>
+  /**
+   * The session controls of the agent tools (thread_create, thread_interrupt, thread_close, thread_rename,
+   * thread_set_model): the same arguments, bodies and results, on this device or another of the account. The SDK acts as
+   * itself, never as a session, so `self` is `caller_context_missing` and a created thread records no creator.
+   */
+  readonly create: (request: ThreadCreateInput) => Promise<ThreadToolResult>
+  readonly interrupt: (request: ThreadInterruptInput) => Promise<ThreadToolResult>
+  readonly close: (request: ThreadCloseInput) => Promise<ThreadToolResult>
+  readonly rename: (request: ThreadRenameInput) => Promise<ThreadToolResult>
+  readonly set_model: (request: ThreadSetModelInput) => Promise<ThreadToolResult>
   /** senpi `release_session` on the host that serves `thread`; a thrown transport failure is answered as `host_unavailable`. */
   readonly release: (
     thread: LocatedThread,
@@ -198,6 +257,8 @@ function fail(
 
 /** The same mapping the tools apply to a thrown surface failure, so a script sees data, never a stack. */
 function thrown(error: unknown): Failure {
+  const schema = gatewaySchemaRefusal(error)
+  if (schema !== undefined) return { kind: "error", error: schema }
   const message = error instanceof Error ? error.message : String(error)
   if (message.startsWith("host_unavailable:"))
     return fail(
@@ -219,9 +280,10 @@ function thrown(error: unknown): Failure {
   )
 }
 
+// omo#14130: every SDK operation runs inside one tool-call budget, as an agent's thread tool call does (tools.ts).
 async function guarded<T>(body: () => Promise<T>): Promise<T | Failure> {
   try {
-    return await body()
+    return await withCallDeadline(Date.now() + TOOL_CALL_BUDGET_MS, body)
   } catch (error) {
     return thrown(error)
   }
@@ -233,6 +295,7 @@ async function guarded<T>(body: () => Promise<T>): Promise<T | Failure> {
  * the engine enumerates and the gateway store under `agentDir`.
  */
 export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
+  assertThreadSdkOptions(options)
   const principal = `cli:${options.uid}`
   const env = { ...(options.env ?? process.env), OMO_CODING_AGENT_DIR: options.agentDir }
   const engineStatusAll = options.engineStatusAll
@@ -304,15 +367,75 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     }
   }
 
+  const controls: ThreadToolSurfaceOptions = {
+    ...surface,
+    ...(options.remote === undefined ? {} : { remote: options.remote }),
+  }
+  // One session control as its tool runs it: the tool's parameter schema, then its body, a control's typed refusal as data.
+  function control<I>(
+    schema: (typeof threadToolParamSchemas)[
+      "thread_create" | "thread_interrupt" | "thread_close" | "thread_rename" | "thread_set_model"],
+    request: I,
+    body: (value: I) => Promise<ThreadToolResult>,
+  ): Promise<ThreadToolResult> {
+    return guarded(async () => {
+      const parsed = parseThreadParams(schema, request)
+      if (parsed.kind === "error") return parsed as ThreadToolResult
+      return await answered(() => body(parsed.value as I))
+    })
+  }
+  async function located(address: string, allScope: boolean | undefined) {
+    return await locateControl(controls, await view(), address, allScope, UNKNOWN_CALLER)
+  }
+
+  // The shared resolver's context, as far as it is fixed for this SDK instance (the local book each call builds
+  // is spread in per call). `self` never resolves for the CLI (UNKNOWN_CALLER), exactly as before.
+  const resolveContext = (local: readonly ThreadAddressEntry[]) => ({
+    remote: options.remote,
+    callerWorkspaceRoot: surface.callerWorkspaceRoot(),
+    local,
+    callerId: UNKNOWN_CALLER,
+  })
+
+  /**
+   * A session a store-only operation names (bind, rebind, bindings --session, report, a bound send's target), through
+   * the one address module. These operations write THIS device's gateway store, so the address resolves on this device
+   * first, exactly as before the module (a name a local session shares with another device's thread is the local
+   * session); only a local not_found consults the account, so a thread that lives on another device is refused naming
+   * that device instead of a bare not_found.
+   */
   async function sessionId(address: string, allScope: boolean | undefined): Promise<{ readonly id: string } | Failure> {
-    const resolved = await resolveStoredSession(
-      surface,
-      (request) => hostView(surface, request),
-      address,
-      UNKNOWN_CALLER,
-      allScope,
-    )
-    return resolved.kind === "error" ? { kind: "error", error: resolved } : { id: resolved.entry.thread_id }
+    const offline = await sendView(surface, address, () => hostView(surface, { offline: true }))
+    const context = resolveContext(toThreadAddressEntries(sendAddressBook(surface, offline, bareOf(address), allScope)))
+    const here = await resolveAddress({ ...context, remote: undefined }, address, { all_scope: allScope })
+    const resolved =
+      here.kind === "error" && here.code === "not_found" && options.remote !== undefined
+        ? await resolveAddress(context, address, { all_scope: allScope, probe: true })
+        : here
+    if (resolved.kind === "error") return { kind: "error", error: resolved }
+    if (resolved.where.kind === "device") {
+      const device = resolved.device
+      const id = resolved.where.row.device
+      return fail(
+        "unsupported",
+        `Session ${resolved.thread} is held on ${deviceLabel({ id, name: device?.name ?? id })}, not on this device; this device's gateway holds bindings and reports only for sessions it holds.`,
+        "Run the bind or report on that device, or name a session this device holds.",
+        {
+          thread: resolved.thread,
+          device: id,
+          ...(device === null ? {} : { device_name: device.name }),
+          address: resolved.address,
+          reason: "session_on_other_device",
+        },
+      )
+    }
+    return { id: resolved.thread }
+  }
+
+  function named(sent: GatewayDeliveryResult): ThreadSdkSendResult {
+    if (sent.kind !== "ok") return sent
+    const { thread_id, ...facts } = sent
+    return { ...facts, thread: thread_id }
   }
 
   async function inbound(
@@ -361,7 +484,15 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     registerStoreExtension: store.registerStoreExtension,
     extensionCall: store.extensionCall,
     principal,
-    list: (request) => guarded(async () => listThreads(surface, await view(), request.all_scope)),
+    list: (request) =>
+      guarded(async () =>
+        listAcross(
+          options.remote,
+          listThreads(surface, await view(), request.all_scope, request.state),
+          request.all_scope === true,
+          request.state,
+        ),
+      ),
     read: (request) =>
       guarded(async () =>
         readThread(
@@ -378,7 +509,8 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
       ),
     send: (request) =>
       guarded(async () => {
-        if (request.binding_id !== undefined) return await inbound({ ...request, binding_id: request.binding_id })
+        if (request.binding_id !== undefined)
+          return named(await inbound({ ...request, binding_id: request.binding_id }))
         if (request.thread === undefined)
           return fail(
             "invalid_arguments",
@@ -391,24 +523,21 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
             "An author names a human in a bound external thread; a send without a binding has none.",
             "Pass binding_id with the author, or drop the author.",
           )
-        // The same road as an agent's send: the address resolves across the account, and the target's kind picks the transport.
-        // Like the agent's thread_send, a published id needs no lookup (no host listing, no account call), and any other address
-        // resolves over the offline view and the send address book, so an own alias is account-wide and a thread that is not
-        // running with nothing live answering still queues offline.
+        // The same road as an agent's send: the address resolves through the address module (across the account when this SDK
+        // has one, this device only otherwise), and the target's kind picks the transport. Like the agent's thread_send, an id
+        // this device's gateway owns needs no lookup (no host listing, no account call); any other address resolves over the
+        // offline view and the send address book, so a thread that is not running with nothing live answering still queues offline.
         let target: DeliveryTarget = {
           kind: "local",
           thread_id: request.thread,
           ...(request.all_scope === undefined ? {} : { all_scope: request.all_scope }),
         }
-        const remote = options.remote
-        if (remote !== undefined && (await store.sessionOwner(request.thread)) === null) {
+        if ((await store.sessionOwner(request.thread)) === null) {
           const offline = await hostView(surface, { offline: true })
-          const across = await resolveAcross(
-            { ...surface, remote },
-            toThreadAddressEntries(sendAddressBook(surface, offline, request.thread, true)),
+          const across = await resolveAddress(
+            resolveContext(toThreadAddressEntries(sendAddressBook(surface, offline, bareOf(request.thread), true))),
             request.thread,
-            UNKNOWN_CALLER,
-            request.all_scope,
+            { all_scope: request.all_scope },
           )
           if (across.kind === "error")
             return fail(
@@ -418,11 +547,11 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
               "details" in across ? (across as { details?: Readonly<Record<string, unknown>> }).details : undefined,
             )
           target =
-            across.entry.transport?.kind === "relay"
-              ? { kind: "remote", row: across.entry.transport.row }
+            across.where.kind === "device"
+              ? { kind: "remote", row: across.where.row }
               : {
                   kind: "local",
-                  thread_id: across.entry.thread_id,
+                  thread_id: across.thread,
                   ...(across.all_scope === undefined ? {} : { all_scope: across.all_scope }),
                 }
         }
@@ -431,7 +560,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
           caller_id: principal,
           target,
           text: request.text,
-          mode: request.mode ?? "auto",
+          mode: request.mode ?? DEFAULT_THREAD_DELIVERY,
           ...(request.expected_turn_id === undefined ? {} : { expected_turn_id: String(request.expected_turn_id) }),
           idempotency_key: request.idempotency_key ?? `auto:${randomUUID()}`,
           args: request,
@@ -442,7 +571,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
             `A command-line send reached a session on device ${sent.device}, which the engine does not admit.`,
             "Report this: the relay transport must refuse a command-line sender before sending.",
           )
-        return sent
+        return named(sent)
       }),
     bind: (request) =>
       guarded(async () => {
@@ -533,20 +662,37 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     locate: (request) =>
       guarded(async () => {
         const current = await view()
-        const resolved = resolution(
-          surface,
-          resolveEntries(surface, current),
+        const resolved = await resolveAddress(
+          resolveContext(toThreadAddressEntries(addressBook(surface, current))),
           request.thread,
-          UNKNOWN_CALLER,
-          request.all_scope,
+          { all_scope: request.all_scope, probe: true },
         )
         if (resolved.kind === "error") return { kind: "error", error: resolved } as const
-        const entries = addressBook(surface, current).filter((entry) => entry.thread_id === resolved.entry.thread_id)
+        // A thread on another device: the same located shape, carrying its device and the address every tool takes.
+        if (resolved.where.kind === "device") {
+          const { thread_id, name, cwd, status } = resolved.entry
+          return {
+            kind: "ok",
+            thread: {
+              thread_id,
+              title: name,
+              cwd,
+              status,
+              session_path: null,
+              endpoint: null,
+              surface: null,
+              alive: status === "live",
+              device: resolved.where.row.device,
+              address: resolved.address,
+            },
+          } as const
+        }
+        const entries = addressBook(surface, current).filter((entry) => entry.thread_id === resolved.thread)
         const entry = entries.find((candidate) => candidate.alive) ?? entries[0]
         if (entry === undefined)
           return fail(
             "not_found",
-            `Thread ${resolved.entry.thread_id} is not in the address book.`,
+            `Thread ${resolved.thread} is not in the address book.`,
             "Run omo thread list --all-scope.",
           )
         const { thread_id, title, cwd, status, session_path, endpoint, surface: where, alive } = entry
@@ -554,6 +700,66 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
           kind: "ok",
           thread: { thread_id, title, cwd, status, session_path, endpoint, surface: where, alive },
         } as const
+      }),
+    create: (request) =>
+      control(threadToolParamSchemas.thread_create, request, async (value) =>
+        createThread(controls, await view(), value, {
+          operationId: value.idempotency_key ?? `auto:${randomUUID()}`,
+          callerId: UNKNOWN_CALLER,
+          view,
+          deliverPrompt: async (_current, target, send, key) => {
+            // The script created the thread, so its first prompt carries the creator's authority (#14045), as the tool's does.
+            const sent = await pipeline.deliver({
+              sender: { kind: "cli", uid: options.uid, user: options.user },
+              caller_id: principal,
+              target,
+              text: send.message,
+              mode: send.delivery ?? DEFAULT_THREAD_DELIVERY,
+              idempotency_key: key,
+              args: send,
+              authority: "creator",
+            })
+            if (sent.kind === "error") return { kind: "error", error: sent.error }
+            const { thread_id, ...facts } = sent
+            return { ...facts, thread: thread_id } as ThreadToolResult
+          },
+          awaitPromptStart: (deliveryId) =>
+            awaitPromptStart(
+              store,
+              deliveryId,
+              waitWithinCallBudget(
+                options.firstPromptWaitMs ?? FIRST_PROMPT_START_WAIT_MS,
+                FIRST_PROMPT_START_RESERVE_MS,
+              ),
+            ),
+        }),
+      ),
+    interrupt: (request) =>
+      control(threadToolParamSchemas.thread_interrupt, request, async (value) => {
+        const found = await located(value.thread, value.all_scope)
+        if (found.kind === "error") return found.result
+        if (found.kind === "not_live") return NOT_LIVE
+        return await interruptThread(found.control, value.turn_id)
+      }),
+    close: (request) =>
+      control(threadToolParamSchemas.thread_close, request, async (value) => {
+        const found = await located(value.thread ?? "self", value.all_scope)
+        if (found.kind === "error") return found.result
+        // Nothing live holds it: there is nothing to close, and the thread stays resumable from its session file.
+        if (found.kind === "not_live")
+          return { kind: "ok", ...controlIdentity(found), closed: false, reason: "not_live", dropped_deliveries: [] }
+        return await closeThread(found.control, closeOptions(value))
+      }),
+    rename: (request) =>
+      control(threadToolParamSchemas.thread_rename, request, async (value) =>
+        renameThread(controls, await view(), value, value.idempotency_key ?? `auto:${randomUUID()}`, UNKNOWN_CALLER),
+      ),
+    set_model: (request) =>
+      control(threadToolParamSchemas.thread_set_model, request, async (value) => {
+        const found = await located(value.thread, value.all_scope)
+        if (found.kind === "error") return found.result
+        if (found.kind === "not_live") return NOT_LIVE
+        return await setModelOn(found.control, value.model, value.provider)
       }),
     release: async (thread, request) => {
       const releaseSession = host.gateway?.releaseSession
@@ -586,3 +792,9 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
 function keyed(request: Keyed): Keyed {
   return request.idempotency_key === undefined ? {} : { idempotency_key: request.idempotency_key }
 }
+
+const HERE_PREFIX = "here/"
+
+/** The thread part of a `here/<thread>` address, for building the local book: a session file answers a bare id. */
+const bareOf = (address: string): string =>
+  address.startsWith(HERE_PREFIX) ? address.slice(HERE_PREFIX.length) : address

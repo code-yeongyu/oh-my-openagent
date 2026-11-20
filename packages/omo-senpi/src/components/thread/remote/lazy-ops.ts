@@ -1,4 +1,7 @@
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
+import type { RpcRemoteSource, SenpiExtensionAPI } from "../../../extension/types"
 import type * as CrossDevice from "./cross-device"
+import type * as MonitorSource from "./monitor-source"
 import { rowThreadId } from "./ports"
 import type * as RemoteOps from "./remote-ops"
 import type * as RelayTransport from "./relay-transport"
@@ -13,7 +16,8 @@ type Runtime = Pick<
 > &
   Pick<typeof RemoteOps, "deviceOnline"> &
   Pick<typeof RelayTransport, "createRelayTransport"> &
-  Pick<typeof RelayControl, "createRelayControl">
+  Pick<typeof RelayControl, "createRelayControl"> &
+  Pick<typeof MonitorSource, "createRemoteMonitorSource" | "resolveMonitorTarget">
 
 // The cross-device half ships in the thread client sidecar (`#omo-thread-client-runtime`), which every thread
 // operation already loads for the live host, so `omo.js` carries none of it.
@@ -30,6 +34,8 @@ export const claimCreatedAlias = async (...args: Parameters<Runtime["claimCreate
   await (await runtime()).claimCreatedAlias(...args)
 export const deviceOnline = async (...args: Parameters<Runtime["deviceOnline"]>) =>
   await (await runtime()).deviceOnline(...args)
+export const resolveMonitorTarget = async (...args: Parameters<Runtime["resolveMonitorTarget"]>) =>
+  await (await runtime()).resolveMonitorTarget(...args)
 
 /** The relay transport lives in the sidecar too; it is built once per composition, on the first delivery, and keeps its state. */
 export const createRelayTransport = (
@@ -60,15 +66,38 @@ export const createRelayControl = (remote: RemoteThreadSurface, row: RemoteSessi
   return {
     thread_id: rowThreadId(row),
     device: row.device,
-    title: row.title,
+    // #13304: printed by thread_read; another device's own text.
+    title: escapeForDisplay(row.title),
     visible: async () => await (await built).visible(),
     interrupt: async (turnId) => await (await built).interrupt(turnId),
-    close: async () => await (await built).close(),
+    close: async (options) => await (await built).close(options),
     setName: async (name) => await (await built).setName(name),
     getAvailableModels: async (options) => await (await built).getAvailableModels(options),
     setModel: async (provider, id) => await (await built).setModel(provider, id),
     getAvailableThinkingLevels: async () => await (await built).getAvailableThinkingLevels(),
-    setThinkingLevel: async (level, scope) => await (await built).setThinkingLevel(level, scope),
+    setThinkingLevel: async (level) => await (await built).setThinkingLevel(level),
     getMessages: async () => await (await built).getMessages(),
+    readEntryPage: async (read) => await (await built).readEntryPage(read),
+    waitSettled: async (timeoutMs, signal) => await (await built).waitSettled(timeoutMs, signal),
+    running: async () => await (await built).running(),
+    setArchived: async (archived) => await (await built).setArchived(archived),
+    listed: async (archived) => await (await built).listed(archived),
   }
+}
+
+/**
+ * monitor({type: "rpc", target: "<device>/<session>"}): an engine with senpi's remote-target seam (#12719) gets this
+ * device's sessions on other devices as monitor targets; an older one keeps local targets only (false). The sidecar
+ * loads on the first remote target a monitor arms.
+ */
+export function registerRemoteMonitorTargets(
+  pi: Pick<SenpiExtensionAPI, "registerRpcRemoteSource">,
+  remote: RemoteThreadSurface,
+): boolean {
+  if (typeof pi.registerRpcRemoteSource !== "function") return false
+  const source: RpcRemoteSource = {
+    open: async (...args) => await (await runtime()).createRemoteMonitorSource(remote).open(...args),
+  }
+  pi.registerRpcRemoteSource(source)
+  return true
 }

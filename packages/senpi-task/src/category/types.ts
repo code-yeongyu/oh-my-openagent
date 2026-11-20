@@ -12,6 +12,9 @@ export type BuiltinCategoryDefinition = {
   readonly resolvePromptAppend?: (model: string | undefined) => string
   // One model id, or several ids any one of which satisfies the gate (see builtins.ts).
   readonly requiresModel?: string | readonly string[]
+  // The builtin default and chain resolve on exact registry ids only: no substring match onto a Fast
+  // tier or a longer id of the same family (see exactServedRungs in builtins.ts).
+  readonly exactModels?: true
 }
 
 export type SenpiModelPort = {
@@ -46,11 +49,15 @@ export type ResolveCategoryOptions = {
   readonly distributeModels?: import("@oh-my-opencode/omo-config-core").ModelDistributor
 }
 
+/** Who chose the selected model: the user's omo.json (`model`/`models`/`fallback_models`) or omo's builtin default/chain. */
+export type ModelSelectionSource = "user" | "builtin"
+
 export type CategoryModelSelection = {
   readonly selectedModel: string
   readonly variant?: string
   readonly matchedFallback: boolean
   readonly fallbackEntry?: DelegateFallbackEntry
+  readonly source: ModelSelectionSource
 }
 
 export type CategoryResolutionResult<TModel extends SenpiModelPort> =

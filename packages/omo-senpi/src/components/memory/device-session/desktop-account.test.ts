@@ -1,11 +1,29 @@
-import { describe, expect, test } from "bun:test"
+import { afterAll, describe, expect, test } from "bun:test"
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
 import type { AccountSessionOptions, SyncSession } from "@oh-my-opencode/memory-core/sync-engine"
 import type { DesktopSyncAccount } from "./account-source"
 import * as syncRuntime from "../sync-runtime"
 import { createDeviceSessionResolver, type DeviceSessionRuntime } from "./resolver"
 
+const memoryRoots: string[] = []
+afterAll(() => {
+  for (const root of memoryRoots.splice(0)) rmSync(root, { recursive: true, force: true })
+})
+
+// The resolver binds a space only once the memory repository exists and has its first commit (#13486).
+function existingMemoryRepo() {
+  const root = mkdtempSync(join(tmpdir(), "omo-desktop-account-"))
+  memoryRoots.push(root)
+  const paths = buildIdentityPaths(root, "fixture")
+  mkdirSync(join(paths.repo, ".git"), { recursive: true })
+  return paths
+}
+
 function fixture() {
+  const paths = existingMemoryRepo()
   const lifetime = new AbortController()
   const principal = { kind: "device" as const, id: "main-principal" }
   const publicKeys = { signing: "public-signing", sealing: "public-sealing" }
@@ -58,6 +76,7 @@ function fixture() {
       },
       setAccountSync: async () => undefined,
       setDeviceSync: async () => undefined,
+      disableDeviceSync: async () => ({ ok: true }),
     },
     transport: {
       pull: async () => ({ snapshot: null, entries: [], head: 0, more: false }),
@@ -76,6 +95,7 @@ function fixture() {
   const calls: AccountSessionOptions[] = []
   let factoryCalls = 0
   const session: SyncSession = {
+    space: "desktop-account-space",
     transport: account.transport,
     verifier: {
       verifyEntry: async () => ({ ok: true, payload: { items: [] }, batchId: "batch" }),
@@ -86,6 +106,7 @@ function fixture() {
   const runtime: DeviceSessionRuntime = {
     ...syncRuntime,
     listRemotes: () => [],
+    repoHasCommit: () => true,
     resolveSpace: () => syncRuntime.resolveSpace({ get: () => null, set: () => undefined }, { profile: "personal" }),
     deviceKeyringFromMaterial: async () => {
       factoryCalls++
@@ -103,7 +124,7 @@ function fixture() {
       loadRuntime,
     })({
       identity: "fixture",
-      paths: buildIdentityPaths("/unused-memory", "fixture"),
+      paths,
       space: { profile: "personal", projectDir: "/unused-project" },
     })
   return { account, lifetime, runtime, calls, resolve, factoryCalls: () => factoryCalls }
@@ -127,16 +148,16 @@ describe("desktop account session ports", () => {
 
   test("retirement during runtime loading prevents opening a session", async () => {
     const world = fixture()
-    const started = Promise.withResolvers<void>()
-    const release = Promise.withResolvers<void>()
+    const started = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
     const opening = world.resolve(async () => {
-      started.resolve()
+      started.resolve(undefined)
       await release.promise
       return world.runtime
     })
     await started.promise
     world.lifetime.abort()
-    release.resolve()
+    release.resolve(undefined)
     expect(await opening).toBeNull()
     expect(world.calls).toEqual([])
     expect(world.factoryCalls()).toBe(0)

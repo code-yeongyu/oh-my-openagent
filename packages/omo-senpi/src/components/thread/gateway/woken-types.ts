@@ -32,7 +32,6 @@ export type WakeRequestOutcome = {
 
 export type WakeStartOutcome =
   | { readonly kind: "started"; readonly row: WokenSessionRow }
-  | { readonly kind: "overloaded" }
   | { readonly kind: "not_yet"; readonly next_attempt_at: number }
   /** Another carrier already moved the row past `requested`. */
   | { readonly kind: "in_progress"; readonly row: WokenSessionRow }

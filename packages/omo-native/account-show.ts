@@ -13,6 +13,8 @@ import {
   SecretServiceUnavailableError,
 } from "../omo-opencode/src/cli/service-auth/keystore"
 import { type Credentials, SignInError, serviceOrigin } from "../omo-opencode/src/cli/service-auth/protocol"
+import { readRecoveryClock, type RecoveryClock } from "../omo-opencode/src/cli/service-auth/recovery-clock"
+import { eligibleAttempt } from "../omo-opencode/src/cli/service-auth/refresh-attempt"
 import { readSignedOutMarker, signedOutMarkerPath } from "../omo-opencode/src/cli/service-auth/signed-out-marker"
 
 // `omo account show`, apart from the verbs that sign in, refresh or hand keys over: it reads the stored credential, the
@@ -38,11 +40,29 @@ export interface AccountShowDependencies {
   readonly store: CredentialStore
   readonly home?: string
   readonly pinDir: () => string
+  /** Defaults to the OS recovery clock. An uncertain fence is expired when this clock cannot prove the attempt. */
+  readonly recoveryClock?: RecoveryClock
   readonly output: (line: string) => void
   readonly error: (line: string) => void
 }
 
 const deviceOf = (credentials: Credentials) => ({ id: credentials.device.id, name: credentials.device.name })
+
+const isAttemptRecord = (value: unknown): value is { readonly state?: unknown } =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+
+// `uncertain` is in progress only while a protocol-2 attempt is still eligible on this boot. No attempt, an
+// exhausted attempt, or one the recovery clock rejects (deadline, reboot, clock loss) is terminal: `omo token`
+// already ends that session, and the desktop must not treat it as a renewal still running.
+async function reportedRefreshState(current: Credentials, origin: string, clock: RecoveryClock): Promise<string> {
+  if (current.refreshState !== "uncertain") return current.refreshState ?? "ok"
+  const attempt = current.refreshAttempt
+  if (attempt === undefined || attempt === null) return "expired"
+  if (isAttemptRecord(attempt) && attempt.state === "exhausted") return "expired"
+  if (current.owner === undefined) return "expired"
+  const eligible = eligibleAttempt(attempt, serviceOrigin(origin), current.owner, current.refreshToken, await clock())
+  return eligible === null ? "expired" : "uncertain"
+}
 
 const reply = (dependencies: AccountShowDependencies, value: unknown, code: number = ACCOUNT_EXIT.ok): number => {
   dependencies.output(JSON.stringify(value))
@@ -76,7 +96,17 @@ export async function showAccount(dependencies: AccountShowDependencies, flags: 
     dependencies,
     current === null
       ? { signedIn: false, ...(marker === null ? {} : { signedOut: marker }), ...sync, ...storage }
-      : { signedIn: true, device: deviceOf(current), refreshState: current.refreshState ?? "ok", ...sync, ...storage },
+      : {
+          signedIn: true,
+          device: deviceOf(current),
+          refreshState: await reportedRefreshState(
+            current,
+            dependencies.api,
+            dependencies.recoveryClock ?? readRecoveryClock,
+          ),
+          ...sync,
+          ...storage,
+        },
   )
 }
 
@@ -111,8 +141,15 @@ async function runAccountShow(dependencies: AccountShowDependencies, flags: read
 /** The account service origin this process signs in against: OMO_SERVICE_API_URL, else the production API. */
 export const accountServiceApi = (): string => serviceOrigin(process.env.OMO_SERVICE_API_URL ?? "https://api.omo.dev")
 
-/** `omo account show` run in this process with no arguments, for the remote verbs' first step: exit code and stdout. */
-export async function readAccountInProcess(): Promise<AccountShowResult> {
+/**
+ * `omo account show` run in this process with no arguments, for the remote verbs' first step: exit code and stdout.
+ * The store's own lines (the recovery hint for an invalid stored sign-in, a locked keychain) go to `error`, never into
+ * the stdout the caller parses (#13638). `openStore` replaces the OS credential store in tests.
+ */
+export async function readAccountInProcess(
+  error: (line: string) => void,
+  openStore: (api: string) => CredentialStore = (api) => createCredentialStore(api, { wait: SESSION_READ_WAIT }),
+): Promise<AccountShowResult> {
   const api = accountServiceApi()
   const lines: string[] = []
   let store: CredentialStore | undefined
@@ -120,12 +157,12 @@ export async function readAccountInProcess(): Promise<AccountShowResult> {
     {
       api,
       get store() {
-        store ??= createCredentialStore(api, { wait: SESSION_READ_WAIT })
+        store ??= openStore(api)
         return store
       },
       pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())),
       output: (line) => lines.push(line),
-      error: () => {},
+      error,
     },
     [],
   )

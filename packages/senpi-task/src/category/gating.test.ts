@@ -118,7 +118,7 @@ describe("category activation gating", () => {
     })
   })
 
-  describe("#given a builtin category gated on gpt-6-astra or gpt-5.6-sol", () => {
+  describe("#given ultrabrain gated on gpt-6.2-astra alone", () => {
     test("#when the registry offers only cross-family models #then ultrabrain is unavailable and never falls back", () => {
       // given
       const models = registry(MODELS_THE_PRE_GATING_CHAINS_WOULD_HAVE_ACCEPTED)
@@ -129,13 +129,13 @@ describe("category activation gating", () => {
       // then
       expect(result.kind).toBe("model_unavailable")
       if (result.kind !== "model_unavailable") throw new Error("Expected model_unavailable")
-      expect(result.attemptedModel).toBe("chatgpt-subscription/gpt-6-astra")
+      expect(result.attemptedModel).toBe("chatgpt-subscription/gpt-6.2-astra")
       expect(result.availableCategories).not.toContain("ultrabrain")
     })
 
-    test("#when the registry offers gpt-6-astra alone #then ultrabrain resolves on it at max", () => {
+    test("#when the registry offers gpt-6.2-astra on the API lane #then ultrabrain resolves on it at max", () => {
       // given
-      const models = registry([model("openai", "gpt-6-astra")])
+      const models = registry([model("openai", "gpt-6.2-astra")])
 
       // when
       const result = resolveCategory("ultrabrain", {}, models)
@@ -144,38 +144,28 @@ describe("category activation gating", () => {
       expect(result.kind).toBe("resolved")
       if (result.kind !== "resolved") throw new Error("Expected resolved")
       expect(result.spec.provider).toBe("openai")
-      expect(result.spec.modelId).toBe("gpt-6-astra")
+      expect(result.spec.modelId).toBe("gpt-6.2-astra")
       expect(result.spec.variant).toBe("max")
       expect(result.availableCategories).toContain("ultrabrain")
     })
 
-    test("#when the registry offers gpt-5.6-sol alone #then ultrabrain falls back to the sol rung at max", () => {
+    test.each([
+      ["older Astra", model("openai", "gpt-6-astra")],
+      ["the Fast tier", model("chatgpt-subscription", "gpt-6.2-astra-fast")],
+      ["GPT-5.6 Sol", model("openai", "gpt-5.6-sol")],
+      ["GPT-6.2 Sol", model("chatgpt-subscription", "gpt-6.2-sol")],
+      ["Copilot's GPT-6 Astra", model("github-copilot", "gpt-6-astra")],
+      ["Copilot's GPT-6.2 Astra", model("github-copilot", "gpt-6.2-astra")],
+    ])("#when the registry offers only %s #then ultrabrain is unavailable", (_label, offered) => {
       // given
-      const models = registry([model("openai", "gpt-5.6-sol")])
+      const models = registry([offered])
 
       // when
       const result = resolveCategory("ultrabrain", {}, models)
 
       // then
-      expect(result.kind).toBe("resolved")
-      if (result.kind !== "resolved") throw new Error("Expected resolved")
-      expect(result.spec.provider).toBe("openai")
-      expect(result.spec.modelId).toBe("gpt-5.6-sol")
-      expect(result.spec.variant).toBe("max")
-    })
-
-    test("#when only Copilot carries gpt-5.6-sol #then the gate is satisfied and the copilot rung applies", () => {
-      // given
-      const models = registry([model("github-copilot", "gpt-5.6-sol")])
-
-      // when
-      const result = resolveCategory("ultrabrain", {}, models)
-
-      // then
-      expect(result.kind).toBe("resolved")
-      if (result.kind !== "resolved") throw new Error("Expected resolved")
-      expect(result.spec.provider).toBe("github-copilot")
-      expect(result.spec.variant).toBe("max")
+      expect(result.kind).toBe("model_unavailable")
+      expect(result.availableCategories).not.toContain("ultrabrain")
     })
   })
 
@@ -195,9 +185,9 @@ describe("category activation gating", () => {
       expect(low.availableCategories).not.toContain("deep-high")
     })
 
-    test("#when the registry offers gpt-6-astra alone #then deep-high resolves at high and deep-low stays unavailable", () => {
+    test("#when the registry offers gpt-6.2-astra alone #then deep-high resolves at high and deep-low stays unavailable", () => {
       // given
-      const models = registry([model("openai", "gpt-6-astra")])
+      const models = registry([model("openai", "gpt-6.2-astra")])
 
       // when
       const result = resolveCategory("deep-high", {}, models)
@@ -206,16 +196,16 @@ describe("category activation gating", () => {
       expect(result.kind).toBe("resolved")
       if (result.kind !== "resolved") throw new Error("Expected resolved")
       expect(result.spec.provider).toBe("openai")
-      expect(result.spec.modelId).toBe("gpt-6-astra")
+      expect(result.spec.modelId).toBe("gpt-6.2-astra")
       expect(result.spec.variant).toBe("high")
       expect(result.availableCategories).toContain("deep-high")
       expect(result.availableCategories).not.toContain("deep-low")
       expect(resolveCategory("deep-low", {}, models).kind).toBe("model_unavailable")
     })
 
-    test("#when the registry offers gpt-5.6-sol alone #then deep-low resolves at medium and deep-high stays unavailable", () => {
+    test("#when the registry offers gpt-6.2-sol alone #then deep-low resolves at medium and deep-high stays unavailable", () => {
       // given
-      const models = registry([model("openai", "gpt-5.6-sol")])
+      const models = registry([model("openai", "gpt-6.2-sol")])
 
       // when
       const result = resolveCategory("deep-low", {}, models)
@@ -224,7 +214,7 @@ describe("category activation gating", () => {
       expect(result.kind).toBe("resolved")
       if (result.kind !== "resolved") throw new Error("Expected resolved")
       expect(result.spec.provider).toBe("openai")
-      expect(result.spec.modelId).toBe("gpt-5.6-sol")
+      expect(result.spec.modelId).toBe("gpt-6.2-sol")
       expect(result.spec.variant).toBe("medium")
       expect(result.availableCategories).toContain("deep-low")
       expect(result.availableCategories).not.toContain("deep-high")
@@ -291,21 +281,21 @@ describe("category activation gating", () => {
       expect(result.availableCategories).not.toContain("architect")
     })
 
-    test("#when ultrabrain resolves #then an unrelated vendor model must not open the sol gate", () => {
+    test("#when deep-low resolves #then an unrelated vendor model must not open the sol gate", () => {
       // given
-      const models = registry([model("custom", "unrelated/gpt-5.6-sol")])
+      const models = registry([model("custom", "unrelated/gpt-6.2-sol")])
 
       // when
-      const result = resolveCategory("ultrabrain", {}, models)
+      const result = resolveCategory("deep-low", {}, models)
 
       // then
       expect(result.kind).toBe("model_unavailable")
-      expect(result.availableCategories).not.toContain("ultrabrain")
+      expect(result.availableCategories).not.toContain("deep-low")
     })
 
     test("#when ultrabrain resolves #then an unrelated vendor model must not open the astra gate", () => {
       // given
-      const models = registry([model("custom", "unrelated/gpt-6-astra")])
+      const models = registry([model("custom", "unrelated/gpt-6.2-astra")])
 
       // when
       const result = resolveCategory("ultrabrain", {}, models)
@@ -317,7 +307,7 @@ describe("category activation gating", () => {
 
     test("#when only an unlisted gateway re-publishes the gate model #then the gate stays closed", () => {
       // given
-      const models = registry([model("vercel", "openai/gpt-5.6-sol")])
+      const models = registry([model("vercel", "openai/gpt-6.2-astra")])
 
       // when
       const result = resolveCategory("ultrabrain", {}, models)

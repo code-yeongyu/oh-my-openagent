@@ -48,7 +48,7 @@ test("#given stale root reasoning config #when ensuring config #then replaces st
   assert.equal(result.match(/^model_context_window\s*=/gm)?.length, 1)
   assert.equal(result.match(/^model_reasoning_effort\s*=/gm)?.length, 1)
   assert.equal(result.match(/^plan_mode_reasoning_effort\s*=/gm)?.length, 1)
-  assert.match(result, /model = "gpt-6-astra"/)
+  assert.match(result, /model = "gpt-6.2-astra"/)
   assert.match(result, /model_context_window = 600000/)
   assert.match(result, /model_reasoning_effort = "high"/)
   assert.match(result, /plan_mode_reasoning_effort = "xhigh"/)
@@ -73,7 +73,7 @@ test("#given section settings reuse managed root keys #when ensuring config #the
     ].join("\n"),
   )
 
-  assert.match(result, /^model = "gpt-6-astra"$/m)
+  assert.match(result, /^model = "gpt-6.2-astra"$/m)
   assert.match(result, /^model_context_window = 600000$/m)
   assert.match(result, /\[model_providers\.openai\]\nmodel = "provider-scoped-value"\nmodel_context_window = 123456/)
   assert.match(result, /\[profiles\.review\]\nmodel_reasoning_effort = "medium"\nplan_mode_reasoning_effort = "medium"/)
@@ -155,7 +155,7 @@ test("#given global and project-local stale Codex configs #when migrating #then 
   })
 
   assert.deepEqual(result.changed.sort(), [join(codexHome, "config.toml"), projectConfig].sort())
-  assert.match(await readFile(join(codexHome, "config.toml"), "utf8"), /model = "gpt-6-astra"/)
+  assert.match(await readFile(join(codexHome, "config.toml"), "utf8"), /model = "gpt-6.2-astra"/)
   assert.match(await readFile(projectConfig, "utf8"), /model_context_window = 600000/)
 })
 
@@ -177,7 +177,7 @@ test("#given model catalog is unavailable and stale 272k config #when migrating 
 
   const content = await readFile(join(codexHome, "config.toml"), "utf8")
   assert.deepEqual(result.changed, [join(codexHome, "config.toml")])
-  assert.match(content, /model = "gpt-6-astra"/)
+  assert.match(content, /model = "gpt-6.2-astra"/)
   assert.match(content, /model_context_window = 600000/)
 })
 
@@ -200,9 +200,46 @@ test("#given model catalog is malformed and stale config #when migrating #then f
 
   const content = await readFile(join(codexHome, "config.toml"), "utf8")
   assert.deepEqual(result.changed, [join(codexHome, "config.toml")])
-  assert.match(content, /model = "gpt-6-astra"/)
+  assert.match(content, /model = "gpt-6.2-astra"/)
   assert.match(content, /model_context_window = 600000/)
 })
+
+for (const catalogSource of ["shipped", "fallback"]) {
+  for (const [window, expectedModel] of [
+    [600000, "gpt-6.2-astra"],
+    [400000, "gpt-6-astra"],
+  ]) {
+    test(`#given gpt-6-astra at ${window} without managed state and the ${catalogSource} catalog #when migrating #then root model is ${expectedModel}`, async () => {
+      const root = await mkdtemp(join(tmpdir(), "lazycodex-config-astra-provenance-"))
+      const codexHome = join(root, "codex-home")
+      await mkdir(codexHome, { recursive: true })
+      const configPath = join(codexHome, "config.toml")
+      await writeFile(
+        configPath,
+        [
+          'model = "gpt-6-astra"',
+          `model_context_window = ${window}`,
+          'model_reasoning_effort = "high"',
+          'plan_mode_reasoning_effort = "xhigh"',
+          "",
+        ].join("\n"),
+      )
+
+      await migrateCodexConfig({
+        env: {
+          CODEX_HOME: codexHome,
+          LAZYCODEX_MODEL_CATALOG_STATE_PATH: join(root, "model-state.json"),
+          ...(catalogSource === "fallback" ? { LAZYCODEX_MODEL_CATALOG_PATH: join(root, "missing.json") } : {}),
+        },
+        cwd: root,
+      })
+
+      const parsed = parseTomlWithPython(await readFile(configPath, "utf8"))
+      assert.equal(parsed.model, expectedModel)
+      assert.equal(parsed.model_context_window, window)
+    })
+  }
+}
 
 test("#given user-customized Codex model config #when migrating #then user values are preserved without root multi-agent mode", async () => {
   const root = await mkdtemp(join(tmpdir(), "lazycodex-config-custom-"))
@@ -627,7 +664,7 @@ test("#given global config starts with inline-comment features table #when full 
   const content = await readFile(configPath, "utf8")
   const parsed = parseTomlWithPython(content)
   assert.equal("multi_agent_mode" in parsed, false)
-  assert.equal(parsed.model, "gpt-6-astra")
+  assert.equal(parsed.model, "gpt-6.2-astra")
   assert.equal(parsed.model_context_window, 600000)
   assert.equal(parsed.model_reasoning_effort, "high")
   assert.equal(parsed.plan_mode_reasoning_effort, "xhigh")
@@ -635,7 +672,7 @@ test("#given global config starts with inline-comment features table #when full 
   assert.equal("multi_agent_mode" in parsed.features, false)
   assert.equal("model" in parsed.features, false)
   assert.equal("model_context_window" in parsed.features, false)
-  assert.match(content, /^model = "gpt-6-astra"\nmodel_context_window = 600000/m)
+  assert.match(content, /^model = "gpt-6.2-astra"\nmodel_context_window = 600000/m)
   assert.doesNotMatch(content, /^\s*multi_agent_mode\s*=/m)
   assert.match(content, /\[features\] # keep comment\nplugins = true/)
 })

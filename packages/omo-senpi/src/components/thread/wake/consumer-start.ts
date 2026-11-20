@@ -15,6 +15,8 @@ export type ConsumerStartInput = {
   readonly engineVersion: string | undefined
   readonly minimumEngine: string | null | undefined
   readonly wake: (durableId: string) => Promise<void>
+  /** `threads.chainCountLimit` for a target session's cwd (`consumer.ts` `chainCountLimit`). */
+  readonly chainCountLimit: (cwd: string) => Promise<number | undefined>
   /** `session_wake.same_device`, read per swept session for ITS own cwd (its project's configuration). */
   readonly sameDevice: (cwd?: string) => boolean
   /** The consumer had a port and died (its start failed, or its serving connection ended): it may be started again. */
@@ -54,6 +56,7 @@ export async function startDeliveryConsumer(input: ConsumerStartInput): Promise<
     port,
     agentDir: input.agentDir,
     sessionsDirectory: input.sessionsDirectory,
+    chainCountLimit: input.chainCountLimit,
     wake: input.wake,
   })
   input.onConsumer?.(consumer)
@@ -100,7 +103,20 @@ export async function startDeliveryConsumer(input: ConsumerStartInput): Promise<
         const target = resolveWakeTarget(input.sessionsDirectory, durableId)
         return input.sameDevice(target.kind === "found" ? target.cwd : undefined)
       },
+      closedAt: (durableId) => {
+        const target = resolveWakeTarget(input.sessionsDirectory, durableId)
+        return target.kind === "found" ? target.closed_at : undefined
+      },
     })
+    // The rows the sweep settled (refused, or closed under them) leave their marks drained: the service is told now, so
+    // a settled mark is not handed back at the next start (#14273). A report that fails is retried at the next drain.
+    await consumer
+      .reportDrained()
+      .catch((error: unknown) =>
+        input.log(
+          `thread wake: drained marks not reported after the sweep: ${error instanceof Error ? error.message : String(error)}`,
+        ),
+      )
   } catch (error) {
     // The sweep failed after the consumer was already acknowledged: it is stopped and reported dead here, or its
     // subscriptions would outlive a start its caller sees as failed (#13456's delta review).

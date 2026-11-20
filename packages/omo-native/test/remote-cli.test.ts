@@ -5,6 +5,7 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { connectDeviceService, DEVICE_SERVICE_VERSION } from "../../device-service-core/src/index.ts"
+import type { Status } from "../../device-service-core/src/device-service.ts"
 import { deviceServiceAssetName } from "../../device-service-core/src/release/acquire.ts"
 import { startFakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
 import {
@@ -20,6 +21,7 @@ import {
   SESSION_ID,
 } from "../../device-service-core/test/local-api/conformance/world.ts"
 import { createCredentialStore } from "../../omo-opencode/src/cli/service-auth/keystore"
+import type { RemoteClient } from "../../omo-senpi/src/components/remote/index"
 import type { RemoteSessionsPort, RemoteThreadSurface } from "../../omo-senpi/src/components/thread/remote/ports"
 import { createRemoteThreadFixture, ENGINE } from "../../omo-senpi/src/components/thread/thread-remote-fixture"
 import { runAccountVerb } from "../account-cli"
@@ -42,23 +44,47 @@ import {
 useRemoteCliCleanup()
 
 describe("omo remote", () => {
-  test("status prints the connection state, and --json prints the service's Status", async () => {
+  test("status prints the connection state, and --json prints the person client's service.status value", async () => {
     const human = await run(["status"])
     expect(human.code).toBe(REMOTE_EXIT.ok)
     expect(human.out).toContain("State            Connected")
     expect(human.out).toContain("This device      This Mac")
+    expect(human.out).toContain("Service          1.4.0")
     const json = await run(["status", "--json"])
-    expect(JSON.parse(json.out.join(""))).toEqual(defaultWorld().status)
+    expect(JSON.parse(json.out.join(""))).toEqual({ ...defaultWorld().status, service_version: "1.4.0" })
   })
 
-  test("devices lists each device with its presence", async () => {
+  test("devices lists this device first and then each peer with its presence (the service's roster leaves this device out, #13402)", async () => {
     const { code, out } = await run(["devices"])
     expect(code).toBe(REMOTE_EXIT.ok)
     expect(out[0]).toMatch(/^DEVICE\s+NAME\s+KIND\s+PLATFORM\s+SEEN$/)
-    expect(out[1]).toMatch(new RegExp(`^${PEER}\\s+Studio\\s+desktop\\s+darwin\\s+online$`))
-    expect(out[2]).toMatch(new RegExp(`^${OFFLINE_PEER}\\s+Laptop\\s+cli\\s+linux\\s+12d ago$`))
+    // The person client lists this device first (B1 self row), then the account's other devices.
+    expect(out[1]).toMatch(new RegExp(`^dev-self\\s+This Mac\\s+this device\\s+${process.platform}\\s+online$`))
+    expect(out[2]).toMatch(new RegExp(`^${PEER}\\s+Studio\\s+desktop\\s+darwin\\s+online$`))
+    expect(out[3]).toMatch(new RegExp(`^${OFFLINE_PEER}\\s+Laptop\\s+cli\\s+linux\\s+12d ago$`))
     const json = await run(["devices", "--json"])
-    expect(JSON.parse(json.out.join(""))).toEqual(defaultWorld().devices)
+    const rows = JSON.parse(json.out.join("")) as { id: string; self?: true }[]
+    expect(rows.map((row) => [row.id, row.self ?? false])).toEqual([
+      ["dev-self", true],
+      [PEER, false],
+      [OFFLINE_PEER, false],
+    ])
+  })
+
+  test("devices shows this device offline while its service is not connected, and invents no kind for it", async () => {
+    const world = defaultWorld()
+    const owner = await startFakeOwner({
+      stateDir: privateDir(),
+      world: { ...world, status: { ...world.status, state: "offline" } },
+    })
+    owners.push(owner)
+    const { code, out } = await run(["devices"], owner.stateDir)
+    expect(code).toBe(REMOTE_EXIT.ok)
+    expect(out[1]).toMatch(new RegExp(`^dev-self\\s+This Mac\\s+this device\\s+${process.platform}\\s+never$`))
+    const json = await run(["devices", "--json"], owner.stateDir)
+    const [here] = JSON.parse(json.out.join("")) as Record<string, unknown>[]
+    expect(here).toMatchObject({ id: "dev-self", name: "This Mac", online: false, last_seen_ms: null, self: true })
+    expect(here).not.toHaveProperty("kind")
   })
 
   test("sessions shows attach targets, marks cached rows and names devices that did not answer", async () => {
@@ -72,8 +98,84 @@ describe("omo remote", () => {
 
   test("sessions passes its filter to the service and --json prints the listing result", async () => {
     const { out } = await run(["sessions", "--device", PEER, "--json"])
-    const result = JSON.parse(out.join("")) as { rows: { device: string }[] }
-    expect(result.rows.map((row) => row.device)).toEqual([PEER])
+    const result = JSON.parse(out.join("")) as { rows: { thread: string; device: { id: string } }[] }
+    expect(result.rows.map((row) => row.device.id)).toEqual([PEER])
+    expect(result.rows.map((row) => row.thread)).toEqual([`${PEER}/${SESSION_ID}`])
+  })
+
+  test("sessions --device naming no device of the account is a usage error, not an empty list (#13402)", async () => {
+    const typo = await run(["sessions", "--device", "no-such-device", "--json"])
+    expect(typo.code).toBe(REMOTE_EXIT.usage)
+    expect(typo.out).toEqual([])
+    expect(typo.err).toEqual(["omo remote sessions: no device no-such-device on this account (see omo remote devices)"])
+    const self = await run(["sessions", "--device", "dev-self", "--json"])
+    expect(self.code).toBe(REMOTE_EXIT.ok)
+  })
+
+  const ambiguousDeviceClient = (calls: string[]) => ({
+    devices: { list: async () => ({ kind: "ok", value: [] }) },
+    sessions: {
+      list: async () => {
+        calls.push("sessions.list")
+        return {
+          kind: "error",
+          code: "ambiguous_target",
+          message: "2 online devices are named studio.",
+          next_action: "Pass the device id.",
+          details: {
+            kind: "device",
+            candidates: [
+              { device: "dev-peer-1", name: "Studio", online: true },
+              { device: "dev-peer-3", name: "Studio", online: true },
+            ],
+          },
+        }
+      },
+    },
+    close: () => {},
+  })
+
+  test("sessions --device names the candidates of an ambiguous device one per line, on the one call it makes (#14305)", async () => {
+    const calls: string[] = []
+    const { code, err } = await run(["sessions", "--device", "studio"], privateDir(), undefined, undefined, undefined, {
+      client: () => ambiguousDeviceClient(calls) as unknown as RemoteClient,
+    })
+    expect(code).toBe(REMOTE_EXIT.failed)
+    expect(err.filter((line) => line.includes("dev-peer-1") !== line.includes("dev-peer-3"))).toHaveLength(2)
+    expect(calls).toEqual(["sessions.list"])
+  })
+
+  test("sessions --device --json prints an ambiguous device's typed failure with its candidates on stdout (#14305 review M1)", async () => {
+    const calls: string[] = []
+    const { code, out } = await run(
+      ["sessions", "--device", "studio", "--json"],
+      privateDir(),
+      undefined,
+      undefined,
+      undefined,
+      { client: () => ambiguousDeviceClient(calls) as unknown as RemoteClient },
+    )
+    expect(code).toBe(REMOTE_EXIT.failed)
+    expect(JSON.parse(out.join(""))).toMatchObject({
+      kind: "error",
+      code: "ambiguous_target",
+      details: { candidates: [{ device: "dev-peer-1" }, { device: "dev-peer-3" }] },
+    })
+    expect(calls).toEqual(["sessions.list"])
+  })
+
+  test("sessions --device accepts a device the roster misses when the listing still has its rows", async () => {
+    const world = defaultWorld()
+    const owner = await startFakeOwner({
+      stateDir: privateDir(),
+      world: { ...world, devices: world.devices.filter((device) => device.device !== PEER) },
+    })
+    owners.push(owner)
+    const { code, out, err } = await run(["sessions", "--device", PEER, "--json"], owner.stateDir)
+    expect(err).toEqual([])
+    expect(code).toBe(REMOTE_EXIT.ok)
+    const result = JSON.parse(out.join("")) as { rows: { device: { id: string } }[] }
+    expect(result.rows.map((row) => row.device.id)).toEqual([PEER])
   })
 
   test("disable and enable report the switch the service answers with", async () => {
@@ -375,8 +477,13 @@ describe("omo remote attach", () => {
     running = true,
     account = SIGNED_IN,
     connect?: () => ReturnType<typeof connectDeviceService>,
+    state?: Status["state"],
   ) {
-    const owner = await startFakeOwner({ stateDir: privateDir(), world: defaultWorld() })
+    const world = defaultWorld()
+    const owner = await startFakeOwner({
+      stateDir: privateDir(),
+      world: state === undefined ? world : { ...world, status: { ...world.status, state } },
+    })
     owners.push(owner)
     if (!running) await owner.stop()
     const err: string[] = []
@@ -403,12 +510,37 @@ describe("omo remote attach", () => {
     expect(socket).toMatch(/[\\/]t-[0-9a-f]{16}\.sock$/)
   })
 
-  test.each([[[]], [["no-slash"]], [["/session"]], [["device/"]], [[`${PEER}/${SESSION_ID}`, "extra"]]])(
-    "refuses the target %p as usage",
-    async (target) => {
-      const { prepared, err } = await attach(target)
-      expect(prepared).toBe(REMOTE_EXIT.usage)
-      expect(err[0]).toStartWith("usage: omo remote attach <device>/<session>")
+  test.each([[[]], [[`${PEER}/${SESSION_ID}`, "extra"]]])("refuses the target %p as usage", async (target) => {
+    const { prepared, err } = await attach(target)
+    expect(prepared).toBe(REMOTE_EXIT.usage)
+    expect(err[0]).toStartWith("usage: omo remote attach <device>/<session>")
+  })
+
+  // An address with an empty side is malformed: usage, as before the address module (#14305 review L2).
+  test.each([["/session"], ["device/"]])("refuses the malformed target %p as usage", async (target) => {
+    const { prepared, err } = await attach([target])
+    expect(prepared).toBe(REMOTE_EXIT.usage)
+    expect(err[0]).toStartWith("usage: omo remote attach <device>/<session>")
+  })
+
+  // Every omo remote verb needs its device online (#14305): an offline device named by its name is refused at resolution,
+  // so no attach reaches the service.
+  // (The device_offline code itself is pinned at the resolver seam, remote/device-address.test.ts.)
+  test("#given an offline device named by its name #when attach addresses a session on it #then it fails and nothing is attached", async () => {
+    const { prepared } = await attach([`Laptop/${SESSION_ID}`])
+    expect(prepared).toBe(REMOTE_EXIT.failed)
+    expect(owners.at(-1)?.state.log).not.toContain("session.attach")
+  })
+
+  // #14305 delta review H1: attach needs the relay like every verb: a service that is off, signed out or not set up
+  // names its state, as before the address module, and nothing is attached.
+  test.each(["disabled", "signed_out", "not_configured", "sign_in_required"] as const)(
+    "#given a device service in state %s #when attach runs #then it names that state and nothing is attached",
+    async (state) => {
+      const { prepared, err } = await attach([`${PEER}/${SESSION_ID}`], true, SIGNED_IN, undefined, state)
+      expect(prepared).toBe(REMOTE_EXIT.failed)
+      expect(err[0] ?? "").toContain(`(${state})`)
+      expect(owners.at(-1)?.state.log).not.toContain("session.attach")
     },
   )
 
@@ -560,17 +692,33 @@ describe("omo remote session verbs", () => {
       status: () => note("status", port.status()),
       thisDevice: () => note("thisDevice", port.thisDevice()),
       devices: () => note("devices", port.devices()),
-      sessions: () => note("sessions", port.sessions()),
+      // A filtered read names its device, so a device-qualified address can be told from an account-wide listing (#12709).
+      sessions: (filter) =>
+        note(filter?.device === undefined ? "sessions" : `sessions:${filter.device}`, port.sessions(filter)),
       endpointCommand: (device, rpc, options) =>
         note(`endpoint:${String(rpc["type"])}`, port.endpointCommand(device, rpc, options)),
       locate: (device, engineId, knownKey) => note("locate", port.locate(device, engineId, knownKey)),
       sessionCommand: (device, sessionId, rpc, options) =>
         note(`command:${String(rpc["type"])}`, port.sessionCommand(device, sessionId, rpc, options)),
       read: (device, sessionId, tail) => note("read", port.read(device, sessionId, tail)),
-      watch: (device, sessionId, listener) => note("watch", port.watch(device, sessionId, listener)),
+      watch: (device, sessionId, handlers, options) => note("watch", port.watch(device, sessionId, handlers, options)),
     }
-    return { calls, remote: { ...remote, sessions } }
+    // The relay state and the device list are read through the remote client (#13414 U5): the same two account reads.
+    const client = {
+      ...remote.client,
+      service: { ...remote.client.service, status: () => note("status", remote.client.service.status()) },
+      devices: { ...remote.client.devices, list: () => note("devices", remote.client.devices.list()) },
+    }
+    return { calls, remote: { ...remote, sessions, client } }
   }
+
+  test("#given a session verb #when it returns #then the command has closed its remote client, so no device-service connection outlives it", async () => {
+    const a = fixture.account()
+    let closed = 0
+    const remote = { ...a.remote, client: { ...a.remote.client, close: () => void (closed += 1) } }
+    await run(["interrupt", "b/dur-on-b"], undefined, SIGNED_IN, testBootstrap(), remote)
+    expect(closed).toBe(1)
+  })
 
   test("open creates a session on the device in the project and prints <device>/<session>", async () => {
     const a = fixture.account()
@@ -585,7 +733,8 @@ describe("omo remote session verbs", () => {
     expect(types(a.sent, "open_session").map((entry) => entry.rpc?.["cwd"])).toEqual(["/work/b"])
   })
 
-  test("open --model sets the new session's model, and --json prints the typed result with it", async () => {
+  // #13409: the model is the open's launch profile, never a set_model after it.
+  test("open --model opens the session on that model in the one open_session, and --json prints the typed result", async () => {
     const a = fixture.account()
     const { code, out } = await run(
       ["open", "b", "--model", "openai/gpt-6", "--json"],
@@ -595,14 +744,17 @@ describe("omo remote session verbs", () => {
       a.remote,
     )
     expect(code).toBe(REMOTE_EXIT.ok)
+    // Review LOW at c09a616: --json still names the model the session opened on, as it did before #13409.
     expect(JSON.parse(out.join(""))).toMatchObject({
       kind: "ok",
-      thread: { thread_id: "dur-new-on-b", device: "b" },
+      thread: "dur-new-on-b",
+      device: "b",
       model: { provider: "openai", id: "gpt-6" },
     })
-    expect(types(a.sent, "set_model").map((entry) => [entry.session, entry.rpc?.["modelId"]])).toEqual([
-      ["dur-new-on-b", "gpt-6"],
+    expect(types(a.sent, "open_session").map((entry) => [entry.rpc?.["provider"], entry.rpc?.["modelId"]])).toEqual([
+      ["openai", "gpt-6"],
     ])
+    expect(types(a.sent, "set_model")).toEqual([])
   })
 
   test("send streams the answer's text deltas in order and returns once the turn settles", async () => {
@@ -635,29 +787,31 @@ describe("omo remote session verbs", () => {
     )
   })
 
-  test("open --model that the new session cannot use names the session it opened, which is still open, in human and --json output", async () => {
+  // #13409: b's engine refuses an open whose model it cannot run (senpi model_unavailable), so no session is left behind.
+  test("open --model that b cannot run opens nothing and fails with model_not_found, in human and --json output", async () => {
+    const refusal = "model_unavailable: no model nope/none"
+    const humanAccount = fixture.account({ openRefuse: refusal })
     const human = await run(
       ["open", "b", "--model", "nope/none"],
       undefined,
       SIGNED_IN,
       testBootstrap(),
-      fixture.account().remote,
+      humanAccount.remote,
     )
-    expect([human.code, human.out]).toEqual([REMOTE_EXIT.failed, ["b/dur-new-on-b"]])
-    expect(human.err[0]).toStartWith("omo remote: opened b/dur-new-on-b, but its model was not set: ")
-    expect(human.err[1]).toEndWith("The session is still open; end it with omo remote close b/dur-new-on-b.")
+    expect([human.code, human.out]).toEqual([REMOTE_EXIT.failed, []])
+    expect(human.err[0]).toStartWith("omo remote: No thread was created: device b cannot run nope/none")
+    expect(types(humanAccount.sent, "set_model")).toEqual([])
     const json = await run(
       ["open", "b", "--model", "nope/none", "--json"],
       undefined,
       SIGNED_IN,
       testBootstrap(),
-      fixture.account().remote,
+      fixture.account({ openRefuse: refusal }).remote,
     )
     expect(json.code).toBe(REMOTE_EXIT.failed)
     expect(JSON.parse(json.out.join(""))).toMatchObject({
       kind: "error",
-      error: { code: "model_not_found" },
-      thread: { thread_id: "dur-new-on-b", device: "b" },
+      error: { code: "model_not_found", details: { reason: "model_unavailable", model: "nope/none", device: "b" } },
     })
   })
 
@@ -673,6 +827,56 @@ describe("omo remote session verbs", () => {
       REMOTE_EXIT.failed,
       ["omo remote: the session on b ended before its turn settled (session_closed)."],
     ])
+  })
+
+  // A listing key the person typed names the session in every --json answer, the ended one and its link included, as
+  // before the address module (#14305 delta review 2, M2); only those fields change, never the reply's text.
+  const sentJson = (out: readonly string[]): { thread?: string; link?: string; kind?: string; reply?: string } => {
+    try {
+      return JSON.parse(out.at(-1) ?? "") as { thread?: string; link?: string; kind?: string; reply?: string }
+    } catch {
+      return {}
+    }
+  }
+
+  test("#given send <device>/<listing key> --json #when the session ends before its turn settles #then its thread and link name that key", async () => {
+    const a = fixture.account({ records: [{ type: "agent_settled", reason: "session_closed" }] })
+    const { code, out } = await run(
+      ["send", "b/rk-on-b", "hi", "--json"],
+      undefined,
+      SIGNED_IN,
+      testBootstrap(),
+      a.remote,
+    )
+    const answer = sentJson(out)
+    expect(code).toBe(REMOTE_EXIT.failed)
+    expect(answer.kind).toBe("session_ended")
+    expect(answer.thread).toBe("rk-on-b")
+    expect(answer.link).toEndWith("(omo-thread://v1/rk-on-b)")
+  })
+
+  test("#given send <device>/<listing key> --json #when the reply text names the durable id #then thread and link name the key and the reply text is unchanged", async () => {
+    const a = fixture.account({
+      records: [
+        {
+          type: "message_update",
+          assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "my id is dur-on-b" },
+        },
+        { type: "agent_settled" },
+      ],
+    })
+    const { code, out } = await run(
+      ["send", "b/rk-on-b", "what is your thread id?", "--json"],
+      undefined,
+      SIGNED_IN,
+      testBootstrap(),
+      a.remote,
+    )
+    const answer = sentJson(out)
+    expect(code).toBe(REMOTE_EXIT.ok)
+    expect(answer.thread).toBe("rk-on-b")
+    expect(answer.link).toEndWith("(omo-thread://v1/rk-on-b)")
+    expect(answer.reply).toBe("my id is dur-on-b")
   })
 
   test("send to a session that cannot be followed is refused before the message is sent", async () => {
@@ -754,7 +958,8 @@ describe("omo remote session verbs", () => {
 
   test("a waiting send whose started turn was interrupted and finished before the send caught up fails with a typed line (probe)", async () => {
     const a = fixture.account({
-      records: [{ type: "agent_settled" }],
+      // The run's own prompt precedes its settle, so the settle is this send's turn and not an earlier run's.
+      records: [{ type: "message_end", message: { role: "user", content: "hi" } }, { type: "agent_settled" }],
       recordsBeforeReply: true,
       entriesAfterAnswer: [
         { role: "user", content: "hi" },
@@ -818,7 +1023,7 @@ describe("omo remote session verbs", () => {
     expect([code, out, port.calls]).toEqual([
       REMOTE_EXIT.ok,
       ["Steered turn 3 on b/dur-on-b."],
-      ["status", "devices", "command:get_state", "command:prompt"],
+      ["status", "status", "devices", "sessions:b", "command:get_state", "command:prompt"],
     ])
   })
 
@@ -851,20 +1056,36 @@ describe("omo remote session verbs", () => {
     expect(types(a.sent, "prompt").map((entry) => entry.rpc?.["streamingBehavior"])).toEqual(["followUp"])
   })
 
-  // A verb costs its remote op's round trips and nothing account-wide: the session is addressed directly, never looked
-  // up in the account listing, whose round waits for the account's slowest device (#12709: ~10 s live).
+  // A verb costs two local relay status reads (the CLI's own check, then the address module's), ONE filtered listing of
+  // the device it names (sessions:b) and its remote op's round trips, never the device-less account listing whose round
+  // waits for the account's slowest device (#12709: ~10 s live; #14305).
   test.each([
     [
       ["model", "b/dur-on-b", "anthropic/claude-opus"],
       "b/dur-on-b now uses anthropic/claude-opus.",
-      ["status", "devices", "command:get_available_models", "command:set_model"],
+      ["status", "status", "devices", "sessions:b", "command:get_available_models", "command:set_model"],
     ],
-    [["interrupt", "b/dur-on-b"], "Nothing was running on b/dur-on-b.", ["status", "devices", "command:interrupt"]],
-    [["close", "b/dur-on-b"], "Closed b/dur-on-b.", ["status", "devices", "command:unload_session"]],
+    [
+      ["interrupt", "b/dur-on-b"],
+      "Nothing was running on b/dur-on-b.",
+      ["status", "status", "devices", "sessions:b", "command:interrupt"],
+    ],
+    [
+      ["close", "b/dur-on-b"],
+      "Closed b/dur-on-b.",
+      ["status", "status", "devices", "sessions:b", "command:unload_session"],
+    ],
     [
       ["send", "b/dur-on-b", "hi", "--no-wait"],
       "Sent to b/dur-on-b: turn turn-b started.",
-      ["status", "devices", "command:prompt"],
+      ["status", "status", "devices", "sessions:b", "command:prompt"],
+    ],
+    // A bare address reads the account once (status, listing, roster); the this-device holder check reuses those reads
+    // and asks for nothing more (#14305 delta review 2, M1).
+    [
+      ["send", "dur-on-b", "hi", "--no-wait"],
+      "Sent to b/dur-on-b: turn turn-b started.",
+      ["status", "status", "sessions", "devices", "command:prompt"],
     ],
     [["open", "b"], "b/dur-new-on-b", ["status", "devices", "endpoint:open_session", "locate"]],
   ])("%p makes only its remote op's calls and reports the answer", async (args, line, calls) => {
@@ -873,22 +1094,90 @@ describe("omo remote session verbs", () => {
     expect([code, out, port.calls]).toEqual([REMOTE_EXIT.ok, [line], calls])
   })
 
+  // omo#14234 review M1: the CLI close takes the same force the tool does, names its own option, and lists what it dropped.
+  test.each([
+    ["an engine that names unread messages", {}, "messages it has not read: device:a/second, device:a/third"],
+    [
+      "an engine without unload_refuse_deliveries",
+      { refusesDeliveries: false },
+      "message ids: unavailable on that device's engine",
+    ],
+  ] as const)(
+    "close of a busy session with unread messages on %s is refused naming --force; --force closes it and lists them",
+    async (_label, engine, ids) => {
+      const unread = ["device:a/second", "device:a/third"]
+      const refused = fixture.account({ busy: true, unread, ...engine })
+      const denied = await run(["close", "b/dur-on-b"], undefined, SIGNED_IN, testBootstrap(), refused.remote)
+      expect(denied.code).toBe(REMOTE_EXIT.failed)
+      expect(denied.err.at(-1)).toBe(
+        `${ids}. Run omo remote close b/dur-on-b --force to close it anyway; those messages are dropped.`,
+      )
+      expect(refused.live.has("rk-on-b")).toBe(true)
+      const forced = fixture.account({ busy: true, unread, ...engine })
+      const { code, out } = await run(
+        ["close", "b/dur-on-b", "--force"],
+        undefined,
+        SIGNED_IN,
+        testBootstrap(),
+        forced.remote,
+      )
+      expect([code, out]).toEqual([
+        REMOTE_EXIT.ok,
+        ["Closed b/dur-on-b.", "Dropped 2 message(s) it had not read: device:a/second, device:a/third."],
+      ])
+    },
+  )
+
   test("--json prints the remote op's typed result as is", async () => {
     const a = fixture.account({ engine: { ...ENGINE, interrupt: { turnId: "turn-b", interrupted: true } } })
     const { out } = await run(["interrupt", "b/dur-on-b", "--json"], undefined, SIGNED_IN, testBootstrap(), a.remote)
     expect(JSON.parse(out.join(""))).toEqual({
       kind: "ok",
-      thread_id: "dur-on-b",
+      thread: "dur-on-b",
       turn_id: "turn-b",
       interrupted: true,
+      background: { status: "not_supported" },
       device: "b",
     })
   })
 
   test.each([
     [
-      ["send", "no-slash", "hi"],
-      "omo remote send: name the session as <device>/<session> (the SESSION column of omo remote sessions)",
+      {
+        turnId: "turn-b",
+        interrupted: true,
+        background: {
+          stopped: [{ kind: "bash", id: "bash_3", description: "bun test" }],
+          failed: [{ kind: "bash", id: "bash_4", reason: "permission denied" }],
+        },
+      },
+      [
+        "Interrupted b/dur-on-b.",
+        "Stopped 1 background job: bun test.",
+        "Could not stop background job bash_4: permission denied.",
+      ],
+    ],
+    [
+      { turnId: "turn-b", interrupted: true },
+      [
+        "Interrupted b/dur-on-b.",
+        "Background jobs that turn started were left running: the engine on b/dur-on-b cannot stop them.",
+      ],
+    ],
+  ])("interrupt without --json names the background jobs it stopped or left (%#)", async (interrupt, lines) => {
+    const a = fixture.account({ engine: { ...ENGINE, interrupt } })
+    const { code, out } = await run(["interrupt", "b/dur-on-b"], undefined, SIGNED_IN, testBootstrap(), a.remote)
+    expect([code, out]).toEqual([REMOTE_EXIT.ok, lines])
+  })
+
+  test.each([
+    [
+      ["send", "/session", "hi"],
+      "omo remote send: name the session as <device>/<session> (the SESSION column of omo remote sessions) or by the thread value open printed",
+    ],
+    [
+      ["send"],
+      "omo remote send: name the session as <device>/<session> (the SESSION column of omo remote sessions) or by the thread value open printed",
     ],
     [["send", "b/dur-on-b"], "omo remote send: the message text is required"],
     [["send", "b/dur-on-b", "hi", "--steer", "--follow-up"], "omo remote send: pass --steer or --follow-up, not both"],
@@ -896,22 +1185,24 @@ describe("omo remote session verbs", () => {
     [["open"], "omo remote open: the device is required (the DEVICE column of omo remote devices)"],
     [["open", "b", "--project"], "omo remote open: --project needs a value"],
     [["close", "b/dur-on-b", "--steer"], "omo remote close: unknown argument --steer"],
+    [
+      ["close", "b/dur-on-b", "--graceful", "--wait-ms", "35001"],
+      "omo remote close: --wait-ms takes 1..35000 milliseconds and goes with --graceful",
+    ],
   ])("refuses %p as usage before contacting the service", async (args, message) => {
     const { code, err } = await run(args, join(privateDir(), "absent"))
     expect(code).toBe(REMOTE_EXIT.usage)
     expect(err[0]).toBe(message)
   })
 
-  // A send is one round trip (#12320): the prompt is the first frame, and the device that does not hold the session
-  // refuses it, so the message reaches no session and nothing else is sent.
-  test("a session its device does not hold is named as unknown from the device's refusal of the one prompt, and nothing else is sent to it", async () => {
+  // #14305: the address module resolves the target before anything is sent, so a session its device does not hold is
+  // a typed not_found and nothing reaches the device.
+  test("a session its device does not hold is a typed not_found, and nothing is sent to that device", async () => {
     const a = fixture.account()
     const { code, err } = await run(["send", "b/dur-unknown", "hi"], undefined, SIGNED_IN, testBootstrap(), a.remote)
-    expect([code, err]).toEqual([
-      REMOTE_EXIT.failed,
-      ["omo remote: no session b/dur-unknown on this account.", "Run omo remote sessions to see them."],
-    ])
-    expect(a.sent.flatMap((entry) => (entry.rpc === undefined ? [] : [entry.rpc["type"]]))).toEqual(["prompt"])
+    expect(code).toBe(REMOTE_EXIT.failed)
+    expect(err[0]).toBe("omo remote: No thread dur-unknown on studio (b).")
+    expect(a.sent).toEqual([])
   })
 
   test("a refusal from the remote op is reported with its next step, and nothing is followed", async () => {
