@@ -36,7 +36,7 @@ export interface SyncCommandDependencies {
   readonly error: (line: string) => void
   readonly confirm: (question: string) => Promise<boolean>
   readonly interactive: boolean
-  /** The environment the refusal markers and the phrase flag are read from. */
+  /** The environment the agent, CI and terminal refusal markers are read from. */
   readonly env?: Readonly<Record<string, string | undefined>>
   /** Opens the controlling terminal; null when there is none. Words never go anywhere else. */
   readonly terminal?: () => PhraseTerminal | null
@@ -52,7 +52,6 @@ const RECOVER_ELSEWHERE =
   "Recovering memory with your passkey runs in the OmO desktop app, which can use the passkey on this computer. " +
   "On a machine without it, approve this device from a device that already syncs: run `omo sync enable` here, then `omo sync approve` there."
 
-export const PHRASE_GENESIS_FLAG = "OMO_MEMORY_SYNC_PHRASE_GENESIS"
 const PHRASE_VOID = "The recovery phrase you saw was not saved to your account. Do not keep it."
 const CANCELLED = "Turning on memory sync was cancelled. Nothing was saved."
 
@@ -93,7 +92,8 @@ const phraseSetup = (
   // Checked before any secret exists: an agent harness, CI, or no controlling terminal never sees words (sec 7).
   refused: agentMarkerSet(env) || !(dependencies.terminalAvailable ?? controllingTerminalAvailable)(),
   gate: {
-    enabled: env[PHRASE_GENESIS_FLAG] === "1",
+    // Creation follows the service's own accepts_phrase_keys answer alone; there is no client flag (#14432).
+    enabled: true,
     serviceFloor: dependencies.phraseFloor ?? readServiceFloor,
     refused: (reason, account) =>
       dependencies.error(`memory sync refused to create a recovery phrase (${reason}) for account ${account}.`),

@@ -4,21 +4,39 @@ import { disposeSyncRpcFixtures, owner, setup } from "./sync-rpc-test-support"
 
 afterEach(disposeSyncRpcFixtures)
 
-const gate = (enabled: boolean): PhraseGate => ({ enabled, serviceFloor: async () => "on", refused: () => undefined })
+const gate = (enabled: boolean, floor: PhraseGate["serviceFloor"] = async () => "on"): PhraseGate => ({
+  enabled,
+  ...(floor === undefined ? {} : { serviceFloor: floor }),
+  refused: () => undefined,
+})
 
-test("#given the phrase flag off or on #when features is asked #then phrase-genesis is listed only while the flag is on (amendment A1)", async () => {
-  const off = await setup({ phraseGate: gate(false) })
-  expect(await off.call("features", owner("a").context)).toEqual({
-    features: ["enable-method", "acknowledge", "disable"],
+test("#given the service floor for the signed-in account #when features is asked #then phrase-genesis is listed only while the service answers on (#14432)", async () => {
+  const without = ["enable-method", "acknowledge", "disable"]
+  const seen: unknown[] = []
+  const on = await setup({
+    phraseGate: gate(true, async (chain) => {
+      seen.push(chain)
+      return "on"
+    }),
   })
-  const absent = await setup()
-  expect(await absent.call("features", owner("a").context)).toEqual({
-    features: ["enable-method", "acknowledge", "disable"],
-  })
-  const on = await setup({ phraseGate: gate(true) })
   expect(await on.call("features", owner("a").context)).toEqual({
     features: ["enable-method", "phrase-genesis", "acknowledge", "disable"],
   })
+  expect(seen.length).toBe(1)
+  for (const floor of [
+    async () => "off" as const,
+    async () => "unknown" as const,
+    async () => {
+      throw new Error("unreachable")
+    },
+  ]) {
+    const f = await setup({ phraseGate: gate(true, floor) })
+    expect(await f.call("features", owner("a").context)).toEqual({ features: without })
+  }
+  expect(await (await setup({ phraseGate: gate(false) })).call("features", owner("a").context)).toEqual({
+    features: without,
+  })
+  expect(await (await setup()).call("features", owner("a").context)).toEqual({ features: without })
 })
 
 test("#given enable with the phrase method #when the ceremony starts #then the method and gate reach enable, the call answers in_progress at once, and status settles to the created outcome", async () => {

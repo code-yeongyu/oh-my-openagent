@@ -9,7 +9,7 @@ import {
   phraseGenesis,
   scriptedSurface,
 } from "../../../../memory-core/src/sync/account/testing/phrase-enable.test-support"
-import { PHRASE_GENESIS_FLAG, phraseGateFrom } from "./sync-phrase-gate"
+import { phraseGateFrom } from "./sync-phrase-gate"
 
 const logger = () => {
   const lines: { message: string; fields?: Record<string, unknown> }[] = []
@@ -33,7 +33,6 @@ type Fixture = Awaited<ReturnType<typeof fixture>>
  * only that route's client to model a signed-out session or an unreachable service.
  */
 const phraseEnable = async (
-  env: Readonly<Record<string, string | undefined>>,
   acceptsPhraseKeys: boolean | undefined,
   stateFrom?: (f: Fixture) => AccountHttp["state"],
 ) => {
@@ -54,7 +53,7 @@ const phraseEnable = async (
       },
     },
     method: "phrase",
-    phraseGate: phraseGateFrom(env, log),
+    phraseGate: phraseGateFrom(log),
     genesis: {
       prfSupported: false,
       phraseSupported: true,
@@ -65,10 +64,8 @@ const phraseEnable = async (
   return { result, log, f, shown: person.calls.show, stateReads }
 }
 
-const FLAG_ON = { [PHRASE_GENESIS_FLAG]: "1" }
-
-test("#given the release flag on and the signed-in state route answering accepts_phrase_keys true #when a phrase genesis is asked for through the host gate #then it is created", async () => {
-  const s = await phraseEnable(FLAG_ON, true)
+test("#given no client flag and the signed-in state route answering accepts_phrase_keys true #when a phrase genesis is asked for through the host gate #then it is created", async () => {
+  const s = await phraseEnable(true)
   expect(s.result).toEqual({ kind: "joined", created: true })
   expect(s.log.lines).toEqual([])
   expect(s.stateReads).toBeGreaterThan(0)
@@ -88,13 +85,13 @@ for (const [label, accepts, stateFrom] of [
     (f: Fixture) => createAccountHttp({ baseUrl: "http://127.0.0.1:1", token: f.options.token }).state,
   ],
 ] as const) {
-  test(`#given the release flag on and the state route ${label} #when a phrase genesis is asked for through the host gate #then it is refused as service-floor-off, logged, with no words shown and nothing written`, async () => {
-    const s = await phraseEnable(FLAG_ON, accepts, stateFrom)
+  test(`#given the state route ${label} #when a phrase genesis is asked for through the host gate #then it is refused as service-floor-off, logged, with no words shown and nothing written`, async () => {
+    const s = await phraseEnable(accepts, stateFrom)
     expect(s.result).toEqual({ kind: "phrase_unavailable", reason: "service-floor-off" })
     expect(s.log.lines).toEqual([
       {
         message: "memory sync refused to create a recovery phrase",
-        fields: { reason: "service-floor-off", account: ACCOUNT, flag: PHRASE_GENESIS_FLAG },
+        fields: { reason: "service-floor-off", account: ACCOUNT },
       },
     ])
     expect(s.shown).toBe(0)
@@ -103,23 +100,13 @@ for (const [label, accepts, stateFrom] of [
   })
 }
 
-for (const value of [undefined, "", "0", "true", "yes", " 1"]) {
-  test(`#given the release flag ${value === undefined ? "absent" : JSON.stringify(value)} and a service that accepts phrase keys #when a phrase genesis is asked for through the host gate #then it is refused as disabled without reading the floor`, async () => {
-    const s = await phraseEnable(value === undefined ? {} : { [PHRASE_GENESIS_FLAG]: value }, true)
-    expect(s.result).toEqual({ kind: "phrase_unavailable", reason: "disabled" })
-    expect(s.stateReads).toBe(0)
-    expect(s.log.lines).toEqual([])
-    expect(s.f.entries).toEqual([])
-  })
-}
-
-test("#given a refused phrase creation #when the gate reports it #then one error line names the reason, the account and the flag, and nothing secret", () => {
+test("#given a refused phrase creation #when the gate reports it #then one error line names the reason and the account, and nothing secret", () => {
   const log = logger()
-  phraseGateFrom(FLAG_ON, log).refused("service-floor-off", "account-1")
+  phraseGateFrom(log).refused("service-floor-off", "account-1")
   expect(log.lines).toEqual([
     {
       message: "memory sync refused to create a recovery phrase",
-      fields: { reason: "service-floor-off", account: "account-1", flag: PHRASE_GENESIS_FLAG },
+      fields: { reason: "service-floor-off", account: "account-1" },
     },
   ])
 })

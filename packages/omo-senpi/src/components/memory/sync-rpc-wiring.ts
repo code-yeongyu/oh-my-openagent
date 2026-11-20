@@ -15,7 +15,6 @@ export function wireSyncRpc(options: {
   readonly syncStatus: () => Promise<MemoryRpcSync | undefined>
   readonly stopSync?: () => Promise<void>
   readonly resumeSync?: () => Promise<void>
-  readonly env: Readonly<Record<string, string | undefined>>
   readonly logger: { error(message: string, fields?: Record<string, unknown>): void }
   readonly warn?: (message: string, fields: Record<string, unknown>) => void
 }) {
@@ -47,7 +46,7 @@ export function wireSyncRpc(options: {
     syncStatus: options.syncStatus,
     ...(options.stopSync === undefined ? {} : { stopSync: options.stopSync }),
     ...(options.resumeSync === undefined ? {} : { resumeSync: options.resumeSync }),
-    phraseGate: phraseGateFrom(options.env, options.logger),
+    phraseGate: phraseGateFrom(options.logger),
     ...(options.warn === undefined ? {} : { warn: options.warn }),
   })
 }
