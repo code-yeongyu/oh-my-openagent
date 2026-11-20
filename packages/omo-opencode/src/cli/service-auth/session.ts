@@ -27,6 +27,7 @@ import {
   tokenSchema,
 } from "./protocol"
 import { requestApi } from "./protocol-request"
+import { accountOfCredentials, owedRevokePath, oweRevoke, settleOwedRevokes } from "./owed-revoke"
 import {
   DEVICE_FIXUP_BUDGET_MS,
   type MachineIdentity,
@@ -117,14 +118,19 @@ export function createSession(options: {
   readonly deviceService?: DeviceServiceHandoff
   /** The machine a refreshed device binds to and is named after (#13651); this computer unless a test says otherwise. */
   readonly machine?: MachineIdentity
-  /** Where a post-refresh device fix-up reports a refusal; silent when absent (a TUI host must not write over its screen). */
+  /**
+   * Where a post-refresh device fix-up reports a refusal and a sign-in reports what it left undone after its credential
+   * was stored (#12281); silent when absent (a TUI host must not write over its screen).
+   */
   readonly log?: (line: string) => void
 }) {
   const api = serviceOrigin(options.api)
+  const log = options.log ?? (() => undefined)
   const deviceService = options.deviceService
   const now = options.now ?? Date.now
   const { store, signal, beforeKeysDiscarded } = options
   const markerPath = signedOutMarkerPath(options.home ?? homedir(), credentialId(api))
+  const owedPath = owedRevokePath(options.home ?? homedir(), credentialId(api))
   // Any approval dialog happens in prepare(), before the lock: no access dialog is ever open while it is held. Inside,
   // every section first converges an interrupted migration (#11262 design 3.2, 3.4); a nested section reuses the outer one.
   async function locked<T>(action: (view: LockedStore<Credentials> | null) => Promise<T>): Promise<T> {
@@ -249,7 +255,7 @@ export function createSession(options: {
       accountOf: (access) => accountOf(access, stop),
       signal: stop,
       refusalPath: machineRefusalPath(options.home ?? homedir(), credentialId(api)),
-      log: options.log ?? (() => undefined),
+      log,
       renamed: (name) =>
         locked(async () => {
           const stored = await store.readAuthoritative()
@@ -329,6 +335,25 @@ export function createSession(options: {
       // After the marker is gone, so a stale marker from an earlier sign-out cannot park this sign-in; from the value
       // in memory, never read back from the store.
       await deviceService?.adopt(value)
+      // #12281: the credential is stored, so an owed revoke left unsettled is reported and never fails the sign-in.
+      const unsettled = (reason: string) =>
+        log(
+          `A device this computer signed out of earlier is not revoked yet (${reason}). Remove it from the Devices page of your OmO account; the next omo login also tries again.`,
+        )
+      await settleOwedRevokes({ path: owedPath, signedIn: value, request, locked }).then(
+        ({ unsent, refused, expired }) => {
+          if (expired > 0)
+            log(
+              `${expired} device(s) this computer signed out of long ago could not be matched to any account signed in here and will no longer be retried. Remove them from the Devices page of your OmO account.`,
+            )
+          if (refused.length > 0)
+            log(
+              `The service refused to revoke a device this computer signed out of earlier (${refused.join(", ")}). Remove it from the Devices page of your OmO account; omo will not try again.`,
+            )
+          if (unsent > 0) unsettled("the service could not be reached")
+        },
+        (error: unknown) => unsettled(error instanceof Error ? error.message : String(error)),
+      )
     },
     /** The marker an explicit `omo logout` left, or null; only an empty store makes it meaningful. */
     signedOutMarker: () => readSignedOutMarker(markerPath),
@@ -367,6 +392,7 @@ export function createSession(options: {
         return await locked(async () => {
           let current: Credentials | null = null
           let account: string | undefined
+          let revoked = false
           try {
             current = await store.readAuthoritative()
             if (current !== null) {
@@ -387,15 +413,37 @@ export function createSession(options: {
                 headers: syncRequestHeaders(access),
               })
             }
-            return true
+            revoked = true
+            return revoked
           } catch (error) {
-            if (error instanceof SessionEnded) return error.deviceRevoked
+            if (error instanceof SessionEnded) {
+              revoked = error.deviceRevoked
+              return revoked
+            }
             if (error instanceof SignInError) return false
             throw error
           } finally {
             // Marker first: it only counts once the store is empty, so an unlocked reader never sees an empty store
             // without it, and a failed marker write leaves the credentials in place instead of half-signing-out.
             await writeSignedOutMarker(markerPath, current?.device.id ?? null)
+            // #12281: an unconfirmed revoke is owed to the next sign-in here, before the keys go, so the device's
+            // sync principal still leaves the account keyring through the service's rotation on revoke.
+            // The owe is advice for the next sign-in: failing to record it never stops the keys from being discarded.
+            if (current !== null && !revoked) {
+              const device = current.device.id
+              await oweRevoke(owedPath, device, accountOfCredentials(current) ?? account).then(
+                (dropped) => {
+                  if (dropped > 0)
+                    log(
+                      `${dropped} older sign-out(s) this computer could not confirm will no longer be retried. Remove those devices from the Devices page of your OmO account.`,
+                    )
+                },
+                (error: unknown) =>
+                  log(
+                    `This sign-out could not be recorded for retry (${error instanceof Error ? error.message : String(error)}). Remove device ${device} from the Devices page of your OmO account.`,
+                  ),
+              )
+            }
             // A refresh refusal inside this logout already cleared the store (and retired the pin).
             const stored = current === null ? null : await store.read().catch(() => current)
             if (stored !== null)

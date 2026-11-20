@@ -52,9 +52,15 @@ function memoryStore(initial: Credentials | null) {
 function run(
   store: CredentialStore,
   args: string[],
-  options: { stdin?: string; api?: string; pinDir?: string; beforeKeysDiscarded?: BeforeKeysDiscarded } = {},
+  options: {
+    stdin?: string
+    api?: string
+    home?: string
+    pinDir?: string
+    beforeKeysDiscarded?: BeforeKeysDiscarded
+  } = {},
 ) {
-  const home = mkdtempSync(join(tmpdir(), "omo-account-cli-"))
+  const home = options.home ?? mkdtempSync(join(tmpdir(), "omo-account-cli-"))
   homes.push(home)
   const pinDir = options.pinDir ?? join(home, "sync-device")
   const out: string[] = []
@@ -89,6 +95,26 @@ function fakeService(answer: (body: Record<string, unknown>) => Response) {
 }
 
 describe("omo account", () => {
+  // #13647 review L2: the sessions `omo account` opens report on stderr what a sign-in refresh left undone (here the
+  // device list the post-refresh fix-up reads is not served), instead of dropping it.
+  test("#given a token refresh whose device fix-up cannot read the device list #when token runs #then the gap is reported on stderr", async () => {
+    const service = fakeService(() =>
+      Response.json({
+        accessToken: "at-fresh",
+        accessTokenExpiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+        refreshToken: "rt-next",
+      }),
+    )
+    try {
+      const { store } = memoryStore(credential("dev_a", 1_000, "rt-first"))
+      const result = await run(store, ["token"], { api: service.api })
+      expect(result.code).toBe(ACCOUNT_EXIT.ok)
+      expect(result.err.length).toBeGreaterThan(0)
+    } finally {
+      service.stop()
+    }
+  })
+
   test.each(["{", JSON.stringify({ accessToken: "synthetic-invalid" })])(
     "#given corrupt stored data %s #when forgotten #then deletion needs no credential read",
     async (initial) => {
