@@ -6,6 +6,7 @@ import { rowThreadId } from "./ports"
 import type * as RemoteOps from "./remote-ops"
 import type * as RelayTransport from "./relay-transport"
 import type * as RelayControl from "../control/relay-control"
+import type * as Receipt from "./receipt"
 import type { SessionControl } from "../control/port"
 import type { DeliveryTransport } from "../gateway/transport"
 import type { RemoteSessionRow, RemoteThreadSurface } from "./ports"
@@ -17,6 +18,7 @@ type Runtime = Pick<
   Pick<typeof RemoteOps, "deviceOnline"> &
   Pick<typeof RelayTransport, "createRelayTransport"> &
   Pick<typeof RelayControl, "createRelayControl"> &
+  Pick<typeof Receipt, "readReceipt"> &
   Pick<typeof MonitorSource, "createRemoteMonitorSource" | "resolveMonitorTarget">
 
 // The cross-device half ships in the thread client sidecar (`#omo-thread-client-runtime`), which every thread
@@ -25,6 +27,8 @@ const runtime = (): Promise<Runtime> => import("#omo-thread-client-runtime")
 
 export const listAcross = async (...args: Parameters<Runtime["listAcross"]>) =>
   await (await runtime()).listAcross(...args)
+export const readReceipt = async (...args: Parameters<Runtime["readReceipt"]>) =>
+  await (await runtime()).readReceipt(...args)
 export const planCreate = async (...args: Parameters<Runtime["planCreate"]>) =>
   await (await runtime()).planCreate(...args)
 export const renameAlias = async (...args: Parameters<Runtime["renameAlias"]>) =>

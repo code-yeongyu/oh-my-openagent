@@ -374,9 +374,10 @@ describe("checkExtensionCurrent", () => {
 
   test("#given lazy thread registration #when bundle inputs are inspected #then live RPC implementation is confined to its sidecar", async () => {
     const { mainInputs, threadClientInputs } = await sharedOutputs()
-    const suffix = "/components/thread/live-surface.ts"
-    expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))).toBe(false)
-    expect(threadClientInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))).toBe(true)
+    for (const suffix of ["/components/thread/live-surface.ts", "/components/thread/remote/receipt.ts"]) {
+      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))).toBe(false)
+      expect(threadClientInputs.some((input) => toPortableBuildPath(input).endsWith(suffix))).toBe(true)
+    }
   })
 
   // #14204: `omo thread` and `omo daemon` import the thread client with a plain dynamic import, outside the engine,

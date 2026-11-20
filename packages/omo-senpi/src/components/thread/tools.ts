@@ -48,7 +48,7 @@ import { withThreadRenderers } from "./tools/render"
 import { consumedSendersOf, threadSendPermission } from "./tools/reply-permission"
 import { otherDevice, replyTargetFailure, replyTargetMismatch } from "./tools/reply-target"
 import { accountDevices } from "./remote/account"
-import { listAcross } from "./remote/lazy-ops"
+import { listAcross, readReceipt } from "./remote/lazy-ops"
 import { locateControl } from "./control/locate"
 import { createThread } from "./control/create"
 import { awaitPromptStart, FIRST_PROMPT_START_RESERVE_MS, FIRST_PROMPT_START_WAIT_MS } from "./control/prompt-start"
@@ -88,7 +88,6 @@ import {
   uncertainFailure,
 } from "./tools/internals"
 import { currentResult, threadRow } from "./tools/thread-row"
-import { reconcileRemoteReceipt } from "./remote/receipt"
 
 /** How many keys a tool surface keeps for recovering receipts whose admission reply was lost. */
 export const RECEIPT_RECOVERY_MAX_KEYS = 4_096
@@ -189,30 +188,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
       typeof value.thread === "string"
     ) {
       // This branch precedes view()/ensureHost and the read tool's own receipt admission.
-      // Only the authenticated caller's existing send may authorize a remote lookup.
-      const id = value.delivery_id
-      const thread = value.thread
-      const request = { now: now(), principal: `session:${callerId}`, delivery_id: id }
-      const retained = await store.remoteReceipt(request)
-      if (retained !== null) {
-        if (retained.result.thread_id !== thread)
-          return output({ kind: "ok", thread, delivery_id: id, outcome: { kind: "outcome_unavailable" } })
-        const reconciled = await reconcileRemoteReceipt(
-          store,
-          options.remote,
-          callerId,
-          retained.idempotency_key,
-          retained.result,
-        )
-        if (reconciled.kind === "error") return output(reconciled)
-        return output({ kind: "ok", thread, delivery_id: id, outcome: reconciled.outcome })
-      }
-      return output({
-        kind: "ok",
-        thread,
-        delivery_id: id,
-        outcome: await store.receiptOutcome({ ...request, target_durable_id: thread }),
-      })
+      return output(await readReceipt(store, options.remote, callerId, value.thread, value.delivery_id, now()))
     }
     const explicitKey =
       "idempotency_key" in value ? (value as { idempotency_key?: string }).idempotency_key?.trim() : undefined

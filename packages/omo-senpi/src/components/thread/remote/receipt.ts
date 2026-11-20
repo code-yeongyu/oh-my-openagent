@@ -2,8 +2,35 @@ import type { GatewayStore } from "../gateway/store"
 import type { ReceiptOutcome } from "../gateway/types"
 import type { RelayDeliverySuccess } from "../gateway/transport"
 import type { RemoteThreadSurface } from "./ports"
+import type { ThreadDataError, ThreadReceiptResult } from "../contracts/results"
 import { replyData } from "./remote-ops"
 import { outcomeFailure } from "./outcome"
+
+export async function readReceipt(
+  store: Pick<GatewayStore, "now" | "remoteReceipt" | "receiptOutcome" | "reconcileRemoteReceipt">,
+  remote: RemoteThreadSurface | undefined,
+  caller: string,
+  thread: string,
+  id: string,
+  now: number,
+): Promise<ThreadReceiptResult | ThreadDataError> {
+  // Only the authenticated caller's existing send may authorize a remote lookup.
+  const request = { now, principal: `session:${caller}`, delivery_id: id }
+  const retained = await store.remoteReceipt(request)
+  if (retained !== null) {
+    if (retained.result.thread_id !== thread)
+      return { kind: "ok", thread, delivery_id: id, outcome: { kind: "outcome_unavailable" } }
+    const reconciled = await reconcileRemoteReceipt(store, remote, caller, retained.idempotency_key, retained.result)
+    if (reconciled.kind === "error") return reconciled
+    return { kind: "ok", thread, delivery_id: id, outcome: reconciled.outcome }
+  }
+  return {
+    kind: "ok",
+    thread,
+    delivery_id: id,
+    outcome: await store.receiptOutcome({ ...request, target_durable_id: thread }),
+  }
+}
 
 export function receiptOutcomeOf(value: unknown): ReceiptOutcome {
   if (typeof value !== "object" || value === null) return { kind: "outcome_unavailable" }
