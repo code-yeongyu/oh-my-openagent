@@ -3,6 +3,7 @@ import { type Static, Type } from "typebox"
 import {
   AllScope,
   BindingId,
+  CollapseKey,
   ExpectedTurnId,
   IdempotencyKey,
   Message,
@@ -74,6 +75,7 @@ export const ThreadSendParams = Type.Object({
   expected_turn_id: ExpectedTurnId,
   summary: Summary,
   idempotency_key: IdempotencyKey,
+  collapse_key: CollapseKey,
   all_scope: AllScope,
 })
 

@@ -26,6 +26,15 @@ export const IdempotencyKey = Type.Optional(
   }),
 )
 
+export const CollapseKey = Type.Optional(
+  Type.String({
+    minLength: 1,
+    maxLength: 200,
+    description:
+      "Caller-chosen key for a repeating message (an alert re-sent each minute): a send replaces this sender's earlier message with the same key that the target has not taken yet, and is answered deduplicated with the earlier delivery_id when the target already holds that one, so one key never leaves more than one undelivered message. Reaches sessions on this device only.",
+  }),
+)
+
 export const ExpectedTurnId = Type.Optional(
   Type.String({
     description:

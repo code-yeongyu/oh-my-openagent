@@ -29,10 +29,10 @@ import {
   rfc3339,
 } from "./bindings"
 import { answerShape, isUiRequestKind, type UiRequestKind } from "./answer-shape"
-import { GATEWAY_RECEIPT_RETENTION_MS } from "./constants"
+import { GATEWAY_RECEIPT_RETENTION_MS, OPEN_STATES } from "./constants"
 import type { SqlRow, SqlValue } from "./sql"
 import { gatewayOutboxMarkerPath } from "./paths"
-import { OPEN_STATES, type StoreContext, transaction, unlinkMarker, write } from "./store-ops"
+import { type StoreContext, transaction, unlinkMarker, write } from "./store-ops"
 import { deleteExpiredReceipt, sweepRetentionIfDue } from "./store-retention"
 import type { ExternalAuthor, StoreRefusal } from "./types"
 

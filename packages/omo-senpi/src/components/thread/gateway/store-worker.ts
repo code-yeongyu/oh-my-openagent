@@ -9,12 +9,13 @@ import { dirname, join } from "node:path"
 import { setTimeout as delay } from "node:timers/promises"
 import { parentPort } from "node:worker_threads"
 
-import { WAKE_LEASE_MS } from "./constants"
+import { OPEN_STATES, WAKE_LEASE_MS } from "./constants"
 import { lockWaitExceeded } from "./lock-wait"
 import { gatewayDatabasePath, gatewayRootDirectory, gatewayWakeMarkerPath } from "./paths"
 import { isClaimantDead, processStartTime } from "./process-identity"
 import { GatewaySchemaVersionError } from "./schema"
 import { isBusyError, Sql, type SqliteConnection, type SqlRow } from "./sql"
+import { readTargetBacklogs } from "./backlog"
 import * as ops from "./store-ops"
 import * as relay from "./store-relay-ops"
 import * as ownership from "./store-ownership"
@@ -226,14 +227,14 @@ async function intake(ctx: ops.StoreContext, request: IntakeRequest): Promise<In
     if (view === null) throw error
     return answerFromLedgerRow(view.row, view.queue_position, ledgerId, record)
   }
-  if (outcome.kind === "inserted") {
+  if (outcome.kind === "inserted" || outcome.kind === "collapsed") {
     return {
       kind: "queued",
       delivery_id: record.deliveryId,
       row_id: outcome.row.delivery_id,
       ledger_id: ledgerId,
       queue_position: outcome.queue_position,
-      deduplicated: false,
+      deduplicated: outcome.kind === "collapsed",
     }
   }
   if (outcome.kind === "replay") {
@@ -733,7 +734,7 @@ async function recordIntakeCommand(
 
 function openMarkRows(ctx: ops.StoreContext, pair: IntakePair): number {
   return Number(
-    ctx.sql.one(["n"], `SELECT COUNT(*) AS n FROM deliveries WHERE ${MARK_PAIR_ROWS} AND state IN ${ops.OPEN_STATES}`, [
+    ctx.sql.one(["n"], `SELECT COUNT(*) AS n FROM deliveries WHERE ${MARK_PAIR_ROWS} AND state IN ${OPEN_STATES}`, [
       ...markPairParams(pair),
     ])?.n ?? 0,
   )
@@ -794,7 +795,7 @@ async function openIntakeSessions(ctx: ops.StoreContext): Promise<OpenIntakeSess
   const rows = ctx.sql.all(
     ["target_durable_id", "device", "state", "admitted_by"],
     `SELECT target_durable_id, ${MARK_DEVICE} AS device, state, admitted_by FROM deliveries
-     WHERE ledger_id IS NOT NULL AND state IN ${ops.OPEN_STATES}`,
+     WHERE ledger_id IS NOT NULL AND state IN ${OPEN_STATES}`,
     [],
     "target_durable_id",
   )
@@ -839,7 +840,7 @@ function openForMarkCommand(
       ctx.sql.one(
         ["n"],
         `SELECT COUNT(*) AS n FROM intake_commands c JOIN deliveries d ON d.ledger_id = c.ledger_id
-         WHERE c.command_id = ? AND substr(c.ledger_id, 1, length(?)) = ? AND d.state IN ${ops.OPEN_STATES}`,
+         WHERE c.command_id = ? AND substr(c.ledger_id, 1, length(?)) = ? AND d.state IN ${OPEN_STATES}`,
         [request.command_id, prefix, prefix],
       )?.n ?? 0,
     ) > 0
@@ -984,6 +985,8 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
       return ops.listDeliveries(ctx, args as Parameters<typeof ops.listDeliveries>[1])
     case "is_referenced":
       return ops.isReferenced(ctx, args as string)
+    case "backlogs":
+      return readTargetBacklogs(ctx, args as readonly string[])
     case "journal_mode":
       return ops.journalMode(ctx)
     case "stats":

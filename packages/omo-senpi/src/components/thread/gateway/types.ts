@@ -18,6 +18,8 @@ export type RefusalReason =
   | "sender_not_admitted"
   /** The target was closed on request after the row was queued, before it took the message (#14273). */
   | "target_closed"
+  /** A newer delivery from the same sender under the same collapse key replaced it before the target took it (#14428). */
+  | "superseded"
 
 export type ProcessIdentity = {
   readonly pid: number
@@ -121,6 +123,8 @@ export type DeliveryRow = {
   /** The sender's rendered text and display text of such a delivery, handed to the engine unrendered; null on every other row. */
   readonly verbatim_text?: string | null
   readonly verbatim_display_text?: string | null
+  /** The sender's collapse key (#14428); null on a row sent without one. */
+  readonly collapse_key?: string | null
 }
 
 /** A delivery record another device's service attested, as the sender's relay leg writes it (`remote/relay-transport.ts`). */
@@ -207,6 +211,8 @@ export type EnqueueRequest = {
   readonly binding: { readonly binding_id: string; readonly revision: number } | null
   readonly receipt: { readonly idempotency_key: string; readonly args_hash: string }
   readonly endpoint_kind: "rpc_host" | "tui" | null
+  /** Replaces the sender's earlier undelivered delivery to this target under the same key (#14428). */
+  readonly collapse_key?: string
 }
 
 export type StoreRefusal = {
@@ -218,6 +224,8 @@ export type StoreRefusal = {
 
 export type EnqueueOutcome =
   | { readonly kind: "inserted"; readonly row: DeliveryRow; readonly queue_position: number }
+  /** The sender's earlier delivery under the same collapse key, already in the session's runtime, absorbed this one. */
+  | { readonly kind: "collapsed"; readonly row: DeliveryRow; readonly queue_position: number }
   | { readonly kind: "replay"; readonly result: unknown }
   | StoreRefusal
   | { readonly kind: "busy" }

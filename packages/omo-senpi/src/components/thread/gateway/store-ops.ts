@@ -25,10 +25,10 @@ import {
   ROOT_LIFETIME_MS,
   SESSION_CONTROL_DELIVERY_TYPE,
   SESSION_RELEASED_ENTRY_TYPE,
-  TARGET_MAX_BYTES,
-  TARGET_MAX_MESSAGES,
+  OPEN_STATES,
 } from "./constants"
 import { pairLoopGuardMessage } from "../errors"
+import { backlogRefusal } from "./backlog"
 import { readLegacyMailbox } from "./legacy-mailbox"
 import { gatewayInboxDirectory } from "./paths"
 import { isClaimantDead, sameProcess } from "./process-identity"
@@ -103,9 +103,9 @@ const DELIVERY_COLUMNS = [
   "ledger_id",
   "verbatim_text",
   "verbatim_display_text",
+  "collapse_key",
 ] as const
 
-export const OPEN_STATES = "('queued', 'admitting', 'admitted')"
 const DURABLE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/
 
 function refused(
@@ -150,6 +150,7 @@ function rowFrom(record: SqlRow): DeliveryRow {
     ledger_id: nullableString(record.ledger_id),
     verbatim_text: nullableString(record.verbatim_text),
     verbatim_display_text: nullableString(record.verbatim_display_text),
+    collapse_key: nullableString(record.collapse_key),
   }
 }
 
@@ -341,6 +342,7 @@ function insertDelivery(ctx: StoreContext, row: DeliveryRow): void {
       row.ledger_id ?? null,
       row.verbatim_text ?? null,
       row.verbatim_display_text ?? null,
+      row.collapse_key ?? null,
     ],
   )
 }
@@ -671,18 +673,22 @@ export async function enqueue(
       rollbackQuietly(ctx)
       return binding
     }
-    const backlog = ctx.sql.one(
-      ["n", "b"],
-      `SELECT COUNT(*) AS n, COALESCE(SUM(bytes), 0) AS b FROM deliveries WHERE target_durable_id = ? AND state IN ${OPEN_STATES}`,
-      [request.target_durable_id],
-    )
+    const absorbing = collapseEarlier(ctx, request)
+    if (absorbing !== undefined) {
+      const outcome: EnqueueOutcome = {
+        kind: "collapsed",
+        row: absorbing,
+        queue_position: queuePosition(ctx, absorbing),
+      }
+      ctx.sql.exec(commitSql)
+      committed = true
+      return outcome
+    }
     const bytes = Buffer.byteLength(request.body)
-    if (Number(backlog?.n ?? 0) >= TARGET_MAX_MESSAGES || Number(backlog?.b ?? 0) + bytes > TARGET_MAX_BYTES) {
+    const full = backlogRefusal(ctx, request.target_durable_id, request.mode, bytes, request.now)
+    if (full !== undefined) {
       rollbackQuietly(ctx)
-      return refused("queue_full", "The target's delivery backlog is full.", {
-        max_messages: TARGET_MAX_MESSAGES,
-        max_bytes: TARGET_MAX_BYTES,
-      })
+      return full
     }
     const placement = placeCausally(ctx, request)
     if ("kind" in placement) {
@@ -742,6 +748,7 @@ export async function enqueue(
       ledger_id: intakeFields?.ledger_id ?? null,
       verbatim_text: intakeFields?.verbatim_text ?? null,
       verbatim_display_text: intakeFields?.verbatim_display_text ?? null,
+      collapse_key: request.collapse_key ?? null,
     }
     insertDelivery(ctx, row)
     const position = queuePosition(ctx, row)
@@ -777,6 +784,28 @@ export async function enqueue(
     }
     throw error
   }
+}
+
+/**
+ * A delivery under a collapse key replaces its sender's earlier undelivered one under that key (#14428): a row still
+ * waiting in the gateway is refused `superseded`; a row the session's runtime already took absorbs the repeat (the
+ * runtime cannot give it back), so one key never leaves more than one undelivered message.
+ */
+function collapseEarlier(ctx: StoreContext, request: EnqueueRequest): DeliveryRow | undefined {
+  if (request.collapse_key === undefined) return undefined
+  const earlier = selectRows(
+    ctx,
+    `target_durable_id = ? AND sender = ? AND collapse_key = ? AND state IN ${OPEN_STATES}`,
+    [request.target_durable_id, request.sender_principal, request.collapse_key],
+    "seq",
+  )
+  const taken = earlier.find((row) => row.state !== "queued")
+  if (taken !== undefined) return taken
+  for (const row of earlier) {
+    transition(ctx, row, "refused", request.now, { reason: "superseded" })
+    unlinkMarker(ctx, row.target_durable_id, row.delivery_id)
+  }
+  return undefined
 }
 
 function transcriptText(sessionPath: string | null, cache: Map<string, string>): string {

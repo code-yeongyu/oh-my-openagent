@@ -65,6 +65,14 @@ export type ThreadRetryWait = {
   readonly max_attempts: number
 }
 
+/** A thread's undelivered messages: in its own queue (taken, not yet written) or still in the gateway, and the oldest's age. */
+export type ThreadBacklog = {
+  readonly held: number
+  readonly held_by_session: number
+  readonly waiting_in_gateway: number
+  readonly oldest_at: string
+}
+
 export type ThreadResultSummary = {
   readonly thread: string
   readonly name: string
@@ -96,6 +104,8 @@ export type ThreadResultSummary = {
    * Absent while it works, and on an engine that does not publish the wait (senpi before #7025, another device's row).
    */
   readonly waiting_on?: ThreadRetryWait
+  /** Messages sent to this thread that it has not written yet (#14428); absent when it holds none or is on another device. */
+  readonly backlog?: ThreadBacklog
   /**
    * Set when the row comes from another device's cached listing (it did not answer this round): when that listing was
    * taken. Such a row is the device's last word, so it reads `inactive` (or `archived`), never `running`.

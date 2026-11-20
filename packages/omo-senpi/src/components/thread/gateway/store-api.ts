@@ -12,6 +12,7 @@ import type {
   ReportOpResult,
   ToolReceiptBegin,
 } from "./store-relay-ops"
+import type { TargetBacklog } from "./backlog"
 import type { DeliveryReceipt } from "./store-ops"
 import type { IntakeMarkStore, SessionWaitStore } from "./session-wait-types"
 import type { WokenSessionStore } from "./woken-types"
@@ -110,6 +111,8 @@ export type GatewayStore = ExtensionFacade & {
     readonly root_id?: string
   }) => Promise<readonly DeliveryRow[]>
   readonly isReferenced: (durableId: string) => Promise<boolean>
+  /** Each session's undelivered deliveries (#14428), keyed by durable id; a session holding none is absent. */
+  readonly backlogs: (durableIds: readonly string[]) => Promise<Readonly<Record<string, TargetBacklog>>>
   readonly journalMode: () => Promise<string>
   readonly stats: () => Promise<GatewayStoreStats>
   readonly legacyMigrated: () => Promise<number>

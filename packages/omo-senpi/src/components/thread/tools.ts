@@ -39,7 +39,7 @@ import type { DeliveryPipeline } from "./gateway/pipeline"
 import type { DeliveryTarget } from "./gateway/transport"
 import type { DeliveryAuthority } from "./gateway/types"
 import { createGatewayServices } from "./tools/gateway-services"
-import { listThreads, readThread } from "./tools/read-ops"
+import { listThreads, readThread, withBacklog } from "./tools/read-ops"
 import { archiveThread } from "./tools/archive-ops"
 import { rowState, threadModel } from "./tools/thread-state"
 import { createRelayTools } from "./tools/relay-tools"
@@ -390,7 +390,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         async (current, value) =>
           await listAcross(
             options.remote,
-            listThreads(options, current, value.all_scope, value.state),
+            await withBacklog(options.store, listThreads(options, current, value.all_scope, value.state)),
             value.all_scope === true,
             value.state,
           ),
@@ -673,6 +673,7 @@ async function deliverThrough(
     mode: value.delivery ?? DEFAULT_THREAD_DELIVERY,
     ...(value.expected_turn_id === undefined ? {} : { expected_turn_id: value.expected_turn_id }),
     idempotency_key: idempotencyKey,
+    ...("collapse_key" in value && value.collapse_key !== undefined ? { collapse_key: value.collapse_key } : {}),
     args: value,
     ...(inboundHop === undefined || inboundHop <= 0 ? {} : { inbound_hop: inboundHop }),
     ...(authority === undefined ? {} : { authority }),

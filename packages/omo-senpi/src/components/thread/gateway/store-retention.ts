@@ -10,13 +10,14 @@
 import { OUTBOX_RETENTION_MS, rfc3339 } from "./bindings"
 import {
   DELIVERY_RETENTION_MS,
+  OPEN_STATES,
   PAIR_BUCKET_BURST,
   PAIR_BUCKET_REFILL_MS,
   RETENTION_SWEEP_BATCH,
   RETENTION_SWEEP_INTERVAL_MS,
 } from "./constants"
 import type { Sql } from "./sql"
-import { OPEN_STATES, type StoreContext, write } from "./store-ops"
+import { type StoreContext, write } from "./store-ops"
 
 /** Keyed by the connection: an extension call joins core operations through a derived context. */
 const nextSweepDue = new WeakMap<Sql, number>()

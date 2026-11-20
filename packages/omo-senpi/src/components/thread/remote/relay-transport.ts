@@ -894,6 +894,14 @@ export function createRelayTransport(
           `Turn ${delivery.expected_turn_id} is not a turn of the target session.`,
           "Read the target again and steer with the turn_id a started or steered result returned.",
         )
+      // The relayed delivery record has no collapse key, so the receiving device could not replace earlier repeats (#14428).
+      if (delivery.collapse_key !== undefined)
+        return fail(
+          "unsupported",
+          `collapse_key reaches sessions on this device only; the delivery to device ${row.device} was not sent.`,
+          "Send without collapse_key, or send from the device that holds the thread.",
+          { device: row.device, field: "collapse_key" },
+        )
       if (delivery.sender.kind === "person")
         return await once(delivery.caller_id, delivery.idempotency_key, delivery.args, (_later, sending) =>
           prompt(delivery, row, sending),
