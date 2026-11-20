@@ -1,3 +1,4 @@
+import type { BackgroundManager } from "../../features/background-agent"
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../../shared/event-session-id"
 import type { InternalInitiatorTextPartLike } from "../../shared/internal-initiator-marker"
 import { isSyntheticOrInternalOnlyTextParts } from "../../shared/internal-initiator-marker"
@@ -96,8 +97,9 @@ export function handleNonIdleEvent(args: {
   eventType: string
   properties: Record<string, unknown> | undefined
   sessionStateStore: SessionStateStore
+  backgroundManager?: BackgroundManager
 }): void {
-  const { eventType, properties, sessionStateStore } = args
+  const { eventType, properties, sessionStateStore, backgroundManager } = args
 
   if (eventType === "message.updated") {
     const info = properties?.info as Record<string, unknown> | undefined
@@ -129,6 +131,7 @@ export function handleNonIdleEvent(args: {
         return
       }
       if (state && hasAcceptedContinuationLifecycle(state)) {
+        backgroundManager?.rearmContinuationStall(sessionID)
         pauseForGenuineUserInterruption({ state, sessionID, sessionStateStore })
         return
       }
@@ -178,6 +181,7 @@ export function handleNonIdleEvent(args: {
               messageID: part.messageID,
             })
           } else if (hasAcceptedContinuationLifecycle(state)) {
+            backgroundManager?.rearmContinuationStall(targetSessionID)
             pauseForGenuineUserInterruption({
               state,
               sessionID: targetSessionID,

@@ -151,6 +151,7 @@ export function createTodoContinuationHandler(args: {
       eventType: event.type,
       properties: props,
       sessionStateStore,
+      backgroundManager,
     })
   }
 }

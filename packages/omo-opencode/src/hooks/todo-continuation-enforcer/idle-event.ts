@@ -249,15 +249,20 @@ export async function handleSessionIdle(args: {
   }
 
   const progressUpdate = sessionStateStore.trackContinuationProgress(sessionID, incompleteCount, todos)
+  if (progressUpdate.hasProgressed) {
+    backgroundManager?.rearmContinuationStall(sessionID)
+  }
   if (state.continuationBlockReason) {
     log(`[${HOOK_NAME}] Skipped: continuation paused at turn boundary`, {
       sessionID,
       reason: state.continuationBlockReason,
       hasProgressed: progressUpdate.hasProgressed,
     })
+    await backgroundManager?.notifyContinuationStall({ sessionID, reason: state.continuationBlockReason })
     return
   }
   if (shouldStopForStagnation({ sessionID, incompleteCount, progressUpdate })) {
+    await backgroundManager?.notifyContinuationStall({ sessionID, reason: "stagnation" })
     return
   }
   startCountdown({

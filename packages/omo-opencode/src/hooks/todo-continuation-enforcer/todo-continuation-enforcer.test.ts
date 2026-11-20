@@ -1098,7 +1098,14 @@ describe("todo-continuation-enforcer", () => {
       // given
       const sessionID = "main-directive-response-loop-breaker"
       setMainSession(sessionID)
-      const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+      const stallReasons: string[] = []
+      const backgroundManager = {
+        ...createMockBackgroundManager(),
+        notifyContinuationStall: async ({ reason }: { reason: string }) => {
+          stallReasons.push(reason)
+        },
+      } as BackgroundManager
+      const hook = createTodoContinuationEnforcer(createMockPluginInput(), { backgroundManager })
 
       await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
       await fakeTimers.advanceBy(2500, true)
@@ -1117,6 +1124,7 @@ describe("todo-continuation-enforcer", () => {
 
       // then
       expect(promptCalls).toHaveLength(1)
+      expect(stallReasons).toEqual(["directive-response"])
     },
     { timeout: 30000 },
   )
