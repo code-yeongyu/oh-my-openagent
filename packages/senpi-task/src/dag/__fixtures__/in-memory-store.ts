@@ -29,7 +29,7 @@
 //   file-store retention/capacity concerns, covered by store.test.ts, and a memory store is discarded
 //   with its test.
 import { existsSync, readdirSync } from "node:fs"
-import { basename, join } from "node:path"
+import { basename } from "node:path"
 
 import {
   decodePausedNodes,
@@ -153,7 +153,7 @@ export function createInMemoryDagStore(
         return operation()
       }),
     withSessionRunCapacity: (parentSessionId, _runId, operation) =>
-      withLock(join(paths.locks, `session-runs-${dagKeyHash(parentSessionId, "session-runs")}.lock`), operation),
+      withLock(paths.sessionRunsLock(parentSessionId), operation),
     pruneExpired: () => [],
   }
 }
