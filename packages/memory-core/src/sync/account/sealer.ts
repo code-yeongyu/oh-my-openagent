@@ -21,6 +21,9 @@ export class SealRefusedError extends Error {
   }
 }
 
+/** The engine keeps a batch digest as hex; the chain and its record signatures carry it as base64url. */
+const wireDigest = (hex: string): string => Buffer.from(hex, "hex").toString("base64url")
+
 export function createChainSealer(input: {
   readonly chain: AccountChain
   readonly keyring: DeviceKeyring
@@ -70,11 +73,31 @@ export function createChainSealer(input: {
       })
       return { bytes, epoch, link, recordSig }
     },
+    appended: async (own) => {
+      const keys = keyring.publicKeys()
+      await chain.acceptOwn({
+        seq: own.seq,
+        kind: "batch",
+        account: chain.account,
+        base_seq: own.baseSeq,
+        digest: wireDigest(own.digest),
+        epoch: own.epoch,
+        link: own.link,
+        keyring_link: null,
+        author: {
+          kind: "device",
+          id: keyring.principal().id,
+          sealing_public_key: keys.sealing,
+          signing_public_key: keys.signing,
+        },
+        record_sig: own.recordSig,
+      })
+    },
     sealedBySelf: (sealed) =>
       verifyRecordSig(keyring.publicKeys().signing, {
         account: chain.account,
         base_seq: sealed.baseSeq,
-        digest: Buffer.from(sealed.digest, "hex").toString("base64url"),
+        digest: wireDigest(sealed.digest),
         epoch: sealed.epoch,
         link: sealed.link,
         keyring_link: null,
