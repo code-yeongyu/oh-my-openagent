@@ -2003,7 +2003,7 @@
         "scripts/qa/task-resume-e2e-scenarios.mjs": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) runTaskResumeScenarios
         "scripts/qa/task-resume-e2e.mjs": ["exports"],
-        // pre-existing at origin dev 4686e425b5: unused export(s) CREDENTIAL_FILES, digestCredentialFiles, childSessionJsonlExists, analyzeRpcRouting, analyzeSpawn, eventsMentionSteerAck, statusSnapshots, recordRpcChildPids, liveRecordRpcChildPids
+        // pre-existing at origin dev 4686e425b5: unused export(s) CREDENTIAL_FILES, digestCredentialFiles, childSessionJsonlExists, analyzeRpcRouting, analyzeSpawn, eventsMentionSteerAck, statusSnapshots, recordRpcChildPids
         "scripts/qa/task-rpc-e2e-helpers.mjs": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) runOne
         "scripts/qa/task-rpc-reconcile-batch.mjs": ["exports"],

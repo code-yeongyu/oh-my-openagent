@@ -13,7 +13,26 @@ import {
 } from "./protocol"
 import type { Session } from "./session"
 
-export type DisplayCode = { readonly verificationUri: string; readonly userCode: string; readonly matchingCode: string }
+export type DisplayCode = {
+  readonly verificationUri: string
+  readonly userCode: string
+  readonly matchingCode: string
+  /** When the code stops working (ISO 8601), as the service minted it. */
+  readonly expiresAt: string
+}
+
+/** Why a device sign-in stopped: callers branch on the code, never on the message. */
+export type DeviceSignInRefusalCode =
+  "approval_denied" | "approval_expired" | "device_limit" | "replace_unsupported" | "replace_mismatch"
+
+export class DeviceSignInRefused extends SignInError {
+  constructor(
+    readonly code: DeviceSignInRefusalCode,
+    message: string,
+  ) {
+    super(message)
+  }
+}
 export type DeviceLoginOptions = {
   readonly name: string
   readonly platform: Platform
@@ -67,7 +86,8 @@ async function replaceEarlierDevice(
     })
   } catch (error) {
     // An older service ignores `replace` and refuses the same way again.
-    if (error instanceof ApiRefusal && error.code === "machine_exists") throw new SignInError(REPLACE_UNSUPPORTED)
+    if (error instanceof ApiRefusal && error.code === "machine_exists")
+      throw new DeviceSignInRefused("replace_unsupported", REPLACE_UNSUPPORTED)
     throw error
   }
 }
@@ -96,6 +116,7 @@ async function authorizeDevice(
     verificationUri: minted.verificationUri,
     userCode: minted.userCode,
     matchingCode: minted.matchingCode,
+    expiresAt: minted.expiresAt,
   })
   const now = options.now ?? Date.now
   const sleep = options.sleep ?? ((ms) => setTimeout(ms, undefined, { signal: session.signal }))
@@ -133,14 +154,17 @@ async function authorizeDevice(
       }
       if (error.detail !== undefined) {
         if (await session.removeForLimit(error, options.chooseDevice)) continue
-        throw new SignInError("Sign-in cancelled. No device was removed.")
+        throw new DeviceSignInRefused("device_limit", "Sign-in cancelled. No device was removed.")
       }
-      if (error.replaceMismatch) throw new SignInError(REPLACE_MISMATCH)
+      if (error.replaceMismatch) throw new DeviceSignInRefused("replace_mismatch", REPLACE_MISMATCH)
       if (["access_denied", "expired_token", "invalid_grant"].includes(error.code)) {
-        throw new SignInError("Device sign-in was denied or expired. Run omo login again for a new code.")
+        throw new DeviceSignInRefused(
+          error.code === "access_denied" ? "approval_denied" : "approval_expired",
+          "Device sign-in was denied or expired. Run omo login again for a new code.",
+        )
       }
       throw error
     }
   }
-  throw new SignInError("Device sign-in expired. Run omo login again for a new code.")
+  throw new DeviceSignInRefused("approval_expired", "Device sign-in expired. Run omo login again for a new code.")
 }

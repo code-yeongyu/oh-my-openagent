@@ -162,7 +162,7 @@ describe("#given the same name on this device and on B #when it is resolved #the
 })
 
 describe("characterization of current behaviour: a closed copy of an id here while B lists it live", () => {
-  test("#given the closed copy here and B's live row #when the id is resolved #then this device's id hit answers, as resolveAcross does today", async () => {
+  test("#given the closed copy here and B's live row #when the id is resolved #then this device's id hit answers, as resolveAddress does today", async () => {
     await expectHit(T.stale, hit(T.stale, "here", "id"))
   })
 

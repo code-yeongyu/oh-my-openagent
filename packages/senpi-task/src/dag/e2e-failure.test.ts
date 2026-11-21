@@ -23,7 +23,7 @@ import type {
 import { InProcessRunner, type ChildSession } from "../runners/in-process"
 import { buildChildArgs } from "../runners/rpc/spawn"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
-import { createTaskRecordStore } from "../store"
+import { createTaskRecordStore, resolveStateDir } from "../store"
 import type { TaskRecord } from "../state"
 import { dagFingerprint } from "./fingerprint"
 import type { DagDefinition, DagNodeInput } from "./graph"
@@ -39,6 +39,7 @@ import {
   type DagRunReentry,
   type DagScheduler,
 } from "./scheduler"
+import { createInMemoryDagStore, journalFilesOnDisk } from "./__fixtures__/in-memory-store"
 import { createDagSkillMaterializer } from "./skills"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNodeId, DagRunEvent, DagRunId } from "./types"
@@ -55,7 +56,17 @@ const parentSessionId = "session-e2e-failure-parent"
 const rootSessionId = "session-e2e-failure-root"
 const sampleParameters = createReadToolDefinition(process.cwd()).parameters
 
+const memoryStores: DagFileStore[] = []
+
+function memoryStore(project: string): DagFileStore {
+  const store = createInMemoryDagStore(resolveStateDir({ project_dir: project }))
+  memoryStores.push(store)
+  return store
+}
+
 afterEach(() => {
+  const journaled = memoryStores.splice(0).flatMap(journalFilesOnDisk)
+  expect(journaled).toEqual([])
   for (const root of cleanupRoots.splice(0)) {
     fs.rmSync(root, { recursive: true, force: true })
     expect(fs.existsSync(root)).toBe(false)
@@ -252,6 +263,9 @@ type E2eFixtureOptions = {
   readonly defaultConcurrency?: number
   readonly materializeSkills?: ReturnType<typeof createDagSkillMaterializer>
   readonly maxRunsPerSession?: number
+  // Cases that assert ordering or diagnostics, not durability, journal in memory (#11632); the crash,
+  // torn-tail and retention cases keep the fsync-backed file store, which is what proves durability.
+  readonly store?: DagFileStore
 }
 
 type E2eFixture = {
@@ -274,12 +288,14 @@ type E2eFixture = {
 
 function e2eFixture(options: E2eFixtureOptions = {}): E2eFixture {
   const project = options.project ?? tempProject()
-  const store = createDagFileStore({
-    project_dir: project,
-    ...(options.maxRunsPerSession === undefined
-      ? {}
-      : { task: { dag: { max_runs_per_session: options.maxRunsPerSession } } }),
-  })
+  const store =
+    options.store ??
+    createDagFileStore({
+      project_dir: project,
+      ...(options.maxRunsPerSession === undefined
+        ? {}
+        : { task: { dag: { max_runs_per_session: options.maxRunsPerSession } } }),
+    })
   const taskStore = createTaskRecordStore({ project_dir: project })
   const runner = options.runner ?? new ImmediateRunner()
   const taskManager = resultPersistingManager(
@@ -484,7 +500,8 @@ describe("DAG failure, crash, and policy end to end", () => {
     async () => {
       // given
       const runner = new ControlledRunner()
-      const fixture = e2eFixture({ runner })
+      const project = tempProject()
+      const fixture = e2eFixture({ runner, project, store: memoryStore(project) })
       const input = definition("failure-order", [
         categoryNode("graph-first-failure"),
         categoryNode("wall-clock-first-failure"),
@@ -691,13 +708,13 @@ describe("DAG failure, crash, and policy end to end", () => {
   test("#given a missing requested skill #when the real run starts #then a missing_skill diagnostic is retained and the node still completes", async () => {
     // given
     const project = tempProject()
-    const store = createDagFileStore({ project_dir: project })
+    const store = memoryStore(project)
     const materializeSkills = createDagSkillMaterializer({
       store,
       cwd: project,
       loadSkills: (names) => ({ prepend: "", resolved: [], missing: [...names] }),
     })
-    const fixture = e2eFixture({ project, materializeSkills })
+    const fixture = e2eFixture({ project, materializeSkills, store })
 
     // when
     const started = await fixture.start(
