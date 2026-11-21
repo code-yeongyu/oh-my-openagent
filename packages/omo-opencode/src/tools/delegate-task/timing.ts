@@ -13,6 +13,12 @@ export function getDefaultSyncPollTimeoutMs(): number {
   return MAX_POLL_TIME_MS
 }
 
+/** How long a foreground wait may run before it aborts the child: `0` configured means never. */
+export function resolveSyncPollBudgetMs(configured: number | undefined, fallback = MAX_POLL_TIME_MS): number {
+  if (configured === 0) return Number.POSITIVE_INFINITY
+  return configured ?? fallback
+}
+
 export function getTimingConfig() {
   return {
     POLL_INTERVAL_MS,

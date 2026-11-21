@@ -23,6 +23,7 @@ export interface ExecutorContext {
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
   onSyncSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
   syncPollTimeoutMs?: number
+  syncMaxAssistantTurns?: number
   taskCleanupDelayMs?: number
 }
 

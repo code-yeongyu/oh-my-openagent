@@ -84,6 +84,53 @@ describe("checkAndInterruptStaleTasks", () => {
     expect(task.error).toContain("Stale timeout")
   })
 
+  it("#given staleTimeoutMs 0 #when lastUpdate is hours old #then the task keeps running", async () => {
+    //#given
+    const task = createRunningTask({
+      startedAt: new Date(Date.now() - 4 * 60 * 60 * 1000),
+      progress: {
+        toolCalls: 1,
+        lastUpdate: new Date(Date.now() - 3 * 60 * 60 * 1000),
+      },
+    })
+
+    //#when
+    await checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient as never,
+      config: { staleTimeoutMs: 0 },
+      concurrencyManager: mockConcurrencyManager as never,
+      notifyParentSession: mockNotify,
+      sessionStatuses: { "ses-1": { type: "idle" } },
+    })
+
+    //#then
+    expect(task.status).toBe("running")
+    expect(mockClient.session.abort).not.toHaveBeenCalled()
+  })
+
+  it("#given messageStalenessTimeoutMs 0 #when a task never reported progress for hours #then the task keeps running", async () => {
+    //#given
+    const task = createRunningTask({
+      startedAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
+      progress: undefined,
+    })
+
+    //#when
+    await checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient as never,
+      config: { messageStalenessTimeoutMs: 0 },
+      concurrencyManager: mockConcurrencyManager as never,
+      notifyParentSession: mockNotify,
+      sessionStatuses: { "ses-1": { type: "idle" } },
+    })
+
+    //#then
+    expect(task.status).toBe("running")
+    expect(mockClient.session.abort).not.toHaveBeenCalled()
+  })
+
   it("should NOT interrupt tasks with recent lastUpdate", async () => {
     //#given
     const task = createRunningTask({
@@ -1111,6 +1158,36 @@ describe("pruneStaleTasksAndNotifications", () => {
 
     //#then
     expect(pruned).toContain("custom-ttl-task")
+  })
+
+  it("#given taskTtlMs 0 #when a running task and its notification are hours old #then neither is pruned", () => {
+    //#given
+    const tasks = new Map<string, BackgroundTask>()
+    const task: BackgroundTask = {
+      id: "never-ttl-task",
+      parentSessionId: "parent",
+      parentMessageId: "msg",
+      description: "never",
+      prompt: "never",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(Date.now() - 5 * 60 * 60 * 1000),
+    }
+    tasks.set("never-ttl-task", task)
+    const notifications = new Map<string, BackgroundTask[]>([["parent", [task]]])
+    const pruned: string[] = []
+
+    //#when
+    pruneStaleTasksAndNotifications({
+      tasks,
+      notifications,
+      taskTtlMs: 0,
+      onTaskPruned: (taskId) => pruned.push(taskId),
+    })
+
+    //#then
+    expect(pruned).toHaveLength(0)
+    expect(notifications.get("parent")).toHaveLength(1)
   })
 
   it("#given custom taskTtlMs #when task within custom TTL #then should NOT prune", () => {
