@@ -44,6 +44,8 @@ pub struct FakeState {
     pub ax_reads: BTreeMap<String, usize>,
     pub ax_event_pos: usize,
     pub stop_pressed: bool,
+    /// How many `stop_timeline` presses have fired.
+    pub stop_press_pos: usize,
 }
 
 impl FakeState {
@@ -51,6 +53,7 @@ impl FakeState {
         scenario
             .ax_notification_timeline
             .sort_by_key(|event| event.t_ms);
+        scenario.stop_timeline.sort_by_key(|press| press.t_ms);
         let mut faults = FaultQueue::default();
         for failure in &scenario.fail_next {
             faults.push(
@@ -89,6 +92,7 @@ impl FakeState {
             ax_reads: BTreeMap::new(),
             ax_event_pos: 0,
             stop_pressed: false,
+            stop_press_pos: 0,
             scenario,
         }
     }
