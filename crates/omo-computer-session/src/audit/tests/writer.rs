@@ -82,13 +82,11 @@ fn audit_is_one_file_per_hand_with_per_writer_segments() {
     let mut files = files_under(dir.path());
     files.sort();
     let hand = |name: &str| vec!["computer".to_owned(), "hand-1".to_owned(), name.to_owned()];
-    // One data file per hand; where the writer takes its append lock through a file (every OS
-    // but unix, A-IS-65 L7) that lock file sits beside it.
-    let mut expected = vec![hand("audit.jsonl")];
-    if cfg!(not(unix)) {
-        expected.push(hand(crate::audit::AUDIT_LOCK_FILE));
-    }
-    assert_eq!(files, expected, "one data file per hand");
+    assert_eq!(
+        files,
+        vec![hand("audit.jsonl"), hand(crate::audit::AUDIT_LOCK_FILE)],
+        "one data file per hand, beside the hand's lock on every OS (A-IS-62 R7-3)"
+    );
     let all = lines(first.path());
     let metas: Vec<&Value> = all
         .iter()
