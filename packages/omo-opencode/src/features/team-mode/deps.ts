@@ -11,6 +11,14 @@ type Spawn = typeof spawn
 type TeamModeDependencyDeps = {
   readonly spawn?: Spawn
   readonly tmuxEnv?: string
+  /**
+   * The resolved visualization backend. Callers that already loaded the
+   * runtime tmux config (createRuntimeTmuxConfig) thread it here so a
+   * config-only `tmux.multiplexer: "herdr"` is honored; without it only the
+   * OMO_TMUX_MULTIPLEXER env override applies.
+   */
+  readonly multiplexer?: "tmux" | "herdr"
+  readonly herdrEnv?: string
 }
 
 export async function checkTeamModeDependencies(
@@ -18,11 +26,20 @@ export async function checkTeamModeDependencies(
   deps: TeamModeDependencyDeps = {},
 ): Promise<TeamModeDependencyReport> {
   const spawnImpl = deps.spawn ?? spawn
+  const multiplexer = deps.multiplexer ?? readMultiplexerEnv()
   const tmuxEnv = deps.tmuxEnv ?? process.env["TMUX"]
-  const tmuxAvailable = Boolean(tmuxEnv) || (await probeBinary("tmux", ["-V"], spawnImpl))
+  const herdrEnv = deps.herdrEnv ?? process.env["HERDR_ENV"]
+  const tmuxAvailable =
+    multiplexer === "herdr"
+      ? Boolean(herdrEnv) || (await probeBinary("herdr", ["--version"], spawnImpl))
+      : Boolean(tmuxEnv) || (await probeBinary("tmux", ["-V"], spawnImpl))
   const gitAvailable = await probeBinary("git", ["--version"], spawnImpl)
   if (config.tmux_visualization && !tmuxAvailable) {
-    console.warn("[team-mode] tmux_visualization=true but tmux not available; layout will be skipped at runtime")
+    console.warn(
+      multiplexer === "herdr"
+        ? "[team-mode] tmux_visualization=true with multiplexer=herdr but the herdr binary is not available; layout will be skipped at runtime"
+        : "[team-mode] tmux_visualization=true but tmux not available; layout will be skipped at runtime",
+    )
   }
   return { tmuxAvailable, gitAvailable }
 }
@@ -36,4 +53,9 @@ async function probeBinary(cmd: string, args: string[], spawnImpl: Spawn): Promi
     error instanceof Error
     return false
   }
+}
+
+function readMultiplexerEnv(): "tmux" | "herdr" {
+  const value = (process.env["OMO_TMUX_MULTIPLEXER"] ?? "").trim().toLowerCase()
+  return value === "herdr" ? "herdr" : "tmux"
 }

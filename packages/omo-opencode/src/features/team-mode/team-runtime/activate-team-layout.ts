@@ -21,6 +21,11 @@ export async function activateTeamLayout(
 ): Promise<boolean> {
   if (!config.tmux_visualization || !tmuxMgr) return false
 
+  // The manager is constructed with the fully resolved runtime tmux config
+  // (config chain + OMO_TMUX_MULTIPLEXER override), so activation reuses it
+  // instead of re-parsing the config chain. The comparison (rather than a
+  // passthrough) keeps minimal manager stubs on their tmux default.
+  const multiplexer = tmuxMgr.multiplexer === "herdr" ? "herdr" : "tmux"
   const layout = await createTeamLayout(
     runtimeState.teamRunId,
     runtimeState.members.flatMap((member) =>
@@ -36,6 +41,8 @@ export async function activateTeamLayout(
         : [],
     ),
     tmuxMgr,
+    undefined,
+    { multiplexer },
   )
   if (!layout) return false
   const normalizedLayout = normalizeTeamLayout(runtimeState.teamRunId, layout)
