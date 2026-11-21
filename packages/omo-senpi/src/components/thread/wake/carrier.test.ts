@@ -221,6 +221,35 @@ describe("the carrier lifts, reads finished, and hands back", () => {
     expect(await carrier.wake("s1")).toMatchObject({ kind: "open" })
   })
 
+  test("#given rows queued before a close on request that another path settles first #when it is woken #then the rows it lost are not counted queued and nothing opens (#14273 follow-up)", async () => {
+    // The other path (a sender's admission sweep) refuses each row just before the close settles it, so the close's own
+    // refusal loses the race and answers false: the row is no longer queued and must not open the closed session.
+    const { fake, h, store, carrier, path, intakeRow } = await setup({
+      remoteWake: () => true,
+      admitIntake: async () => "admitted",
+      storeWrap: (inner) => ({
+        ...inner,
+        refuseQueued: async (request) => {
+          if (request.reason === "target_closed")
+            await inner.refuseQueued({ ...request, reason: "sender_not_admitted" })
+          return await inner.refuseQueued(request)
+        },
+      }),
+    })
+    const file = path("s1")
+    await intakeRow("s1", "d-before")
+    h.clock.now += 60_000
+    recordUnloadEffect(file, "s1", h.clock.now, "done")
+    h.clock.now += 60_000
+
+    expect(await carrier.wake("s1")).toEqual({ kind: "nothing_queued" })
+    expect(sent(fake, "open_session")).toEqual([])
+    expect((await store.list({ target_durable_id: "s1" })).map((row) => [row.state, row.reason])).toEqual([
+      ["refused", "sender_not_admitted"],
+      ["refused", "sender_not_admitted"],
+    ])
+  })
+
   test("#given a streaming turn #when the carrier looks #then it sends no release and keeps the row, and releases once the turn settled", async () => {
     const { fake, store, carrier, path } = await setup()
     fake.setSnapshot(path("s1"), FINISHED)
