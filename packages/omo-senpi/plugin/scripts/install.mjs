@@ -92,7 +92,8 @@ const agentDir = process.env.OMO_CODING_AGENT_DIR ?? process.env.SENPI_CODING_AG
   ?? process.env.PI_CODING_AGENT_DIR ?? join(homedir(), ".omo", "agent")
 const env = {
   ...process.env,
-  SENPI_BRAND: JSON.stringify(brand),
+  // The plugin this launcher prepends with --extension is the engine's own, never a user flag (#14465).
+  SENPI_BRAND: JSON.stringify({ ...brand, extensions: [plugin] }),
   OMO_NATIVE: "1",
   OMO_CODING_AGENT_DIR: agentDir,
   SENPI_CODING_AGENT_DIR: agentDir,
@@ -338,6 +339,7 @@ var REQUIRED_PLUGIN_ARTIFACTS = [
   join4("skills-conditional", "x-search", "SKILL.md"),
   join4("runtime", "agent-toolkit-sdk", "sdk.js"),
   join4("runtime", "bunshin-ts", "sdk.js"),
+  join4("runtime", "omo-sdk", "sdk.js"),
   join4("runtime", "thread-sdk", "sdk.js"),
   join4("runtime", "ast-grep-mcp", "cli.js"),
   join4("runtime", "lsp-daemon", "dist", "cli.js"),

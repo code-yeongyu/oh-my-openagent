@@ -15,11 +15,11 @@ export async function settleClosedIntake(
 ): Promise<readonly DeliveryRow[]> {
   const queued = (await store.list({ target_durable_id: durableId })).filter((row) => row.state === "queued")
   if (closedAt === undefined) return queued
+  // A refusal that answers false lost to another path that already took the row out of `queued`: it is not queued.
   const remaining: DeliveryRow[] = []
   for (const row of queued) {
     if (row.created_at > closedAt) remaining.push(row)
-    else if (!(await store.refuseQueued({ now: store.now(), delivery_id: row.delivery_id, reason: "target_closed" })))
-      remaining.push(row)
+    else await store.refuseQueued({ now: store.now(), delivery_id: row.delivery_id, reason: "target_closed" })
   }
   return remaining
 }
