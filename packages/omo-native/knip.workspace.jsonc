@@ -20,6 +20,8 @@
         "test/account-linux-no-gdbus.fixture.ts",
         "test/bun-bin-shim.fixture.ts",
         "test/bun-bin-shim.test-support.ts",
+        "test/daemon-real-engine-support.ts",
+        "test/daemon-test-runner.ts",
         "test/daemon-test-support.ts",
         "test/keychain-helper.test-support.ts",
         "test/fixtures/compiled-setup/entry.ts",
