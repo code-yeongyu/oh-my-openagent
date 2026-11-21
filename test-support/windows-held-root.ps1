@@ -7,14 +7,17 @@ try {
   Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
-using System.Runtime.InteropServices.ComTypes;
 using System.Text;
 
 public static class HeldRootRestartManager {
   [StructLayout(LayoutKind.Sequential)]
   public struct UniqueProcess {
     public uint pid;
-    public FILETIME started;
+    public System.Runtime.InteropServices.ComTypes.FILETIME started;
+
+    public DateTime StartTimeUtc() {
+      return DateTime.FromFileTimeUtc(((long)started.dwHighDateTime << 32) | (uint)started.dwLowDateTime);
+    }
   }
   [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
   public struct ProcessInfo {
@@ -57,7 +60,10 @@ public static class HeldRootRestartManager {
         $status = [HeldRootRestartManager]::RmGetList($session, [ref]$needed, [ref]$count, $rows, [ref]$reasons)
         if ($status -ne 0) { throw "RmGetList returned $status" }
         for ($i = 0; $i -lt $count; $i++) {
-          $holders[[int]$rows[$i].process.pid] = $rows[$i].appName
+          $holders[[int]$rows[$i].process.pid] = @{
+            image = $rows[$i].appName
+            startTime = $rows[$i].process.StartTimeUtc().ToString('o')
+          }
         }
       } elseif ($status -ne 0) { throw "RmGetList returned $status" }
     }
@@ -82,7 +88,10 @@ try {
       $lines = & $handle.Source -nobanner $Root 2>&1
       foreach ($line in $lines) {
         if ("$line" -match '^(.*?)\s+pid:\s+(\d+)\s') {
-          $holders[[int]$Matches[2]] = $Matches[1].Trim()
+          $holderPid = [int]$Matches[2]
+          if (-not $holders.ContainsKey($holderPid)) {
+            $holders[$holderPid] = @{ image = $Matches[1].Trim(); startTime = $null }
+          }
         }
       }
       if ($LASTEXITCODE -gt 1) { $diagnosticErrors.Add("handle.exe exited $LASTEXITCODE") }
@@ -94,18 +103,22 @@ try {
 
 $rows = @(
   foreach ($holderPid in $holders.Keys) {
-    $image = $holders[$holderPid]
+    $image = $holders[$holderPid].image
+    $startTime = $holders[$holderPid].startTime
     $parentPid = $null
     try {
       $process = Get-CimInstance Win32_Process -Filter "ProcessId=$holderPid"
       if ($null -eq $process) { throw "process $holderPid exited before parent lookup" }
       $image = $process.Name
       $parentPid = [int]$process.ParentProcessId
+      if ($null -eq $startTime -and $null -ne $process.CreationDate) {
+        $startTime = $process.CreationDate.ToUniversalTime().ToString('o')
+      }
     } catch {
       $diagnosticErrors.Add("process ${holderPid}: $($_.Exception.Message)")
     }
     if ([string]::IsNullOrWhiteSpace($image)) { $image = 'unknown' }
-    @{ pid = $holderPid; image = $image; parentPid = $parentPid }
+    @{ pid = $holderPid; image = $image; parentPid = $parentPid; startTime = $startTime }
   }
 )
 if ($rows.Count -eq 0) { $diagnosticErrors.Add('No holder identified; the lock may have cleared or be a directory-only handle') }

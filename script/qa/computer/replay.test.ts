@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
+import { diagnoseHeldTestRoot } from "../../../test-support/windows-held-root.mts"
 
 const ROOT = resolve(import.meta.dir, "../../..")
 const DRIVER = join(ROOT, "script/qa/computer/replay.ts")
@@ -214,7 +215,17 @@ beforeAll(async () => {
 }, 600_000)
 
 afterAll(async () => {
-  await rm(dir, { recursive: true, force: true })
+  try {
+    await rm(dir, { recursive: true, force: true })
+  } catch (error) {
+    if (process.platform === "win32" && error instanceof Error && "code" in error && error.code === "EBUSY") {
+      console.warn(
+        "REPLAY_HELD_TEST_ROOT",
+        JSON.stringify({ root: dir, code: error.code, ...diagnoseHeldTestRoot(dir) }),
+      )
+    }
+    throw error
+  }
 })
 
 describe("replay driver", () => {
