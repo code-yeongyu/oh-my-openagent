@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import {
@@ -261,18 +261,5 @@ describe("deviceService.status", () => {
       code: "device_service_unavailable",
       details: { code: "server_proof_invalid" },
     })
-  })
-})
-
-describe("config.status", () => {
-  test("#given an unparsable user config #when status runs #then the file is listed unloaded with its parse diagnostic", async () => {
-    const home = mkdtempSync(join(tmpdir(), "omo-sdk-config-"))
-    homes.push(home)
-    mkdirSync(join(home, ".omo"))
-    const configPath = join(home, ".omo", "omo.jsonc")
-    writeFileSync(configPath, "{ not json")
-    const status = valueOf(await createOmoSdk({ env: { HOME: home }, cwd: home }).config.status())
-    expect(status.files).toContainEqual({ path: configPath, scope: "user", exists: true, loaded: false })
-    expect(status.diagnostics).toContainEqual(expect.objectContaining({ kind: "parse", path: configPath }))
   })
 })

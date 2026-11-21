@@ -7,6 +7,8 @@ export type OmoErrorCode =
   | "service_unreachable"
   | "service_refused"
   | "device_service_unavailable"
+  | "unknown_path"
+  | "session_not_found"
   | "internal_error"
 
 export type OmoError = {
