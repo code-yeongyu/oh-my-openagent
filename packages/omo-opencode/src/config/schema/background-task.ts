@@ -23,6 +23,8 @@ export const BackgroundTaskConfigSchema = z.object({
   /** Delay before removing completed/cancelled/errored tasks from memory and deleting completed sync subagent sessions, in milliseconds (default: 600000 = 10 minutes, minimum: 60000 = 1 minute). */
   taskCleanupDelayMs: z.number().min(60000).optional(),
   syncPollTimeoutMs: z.number().min(60000).optional(),
+  /** How long a notice for a parent session whose turn is still running waits before OMO stores it in that session anyway, in milliseconds: the running turn reads it at its next tool step (default: 60000 = 1 minute, 0 = at once). Covers background task and monitor notices; until then a notice waits for the turn to end. */
+  busyParentWakeDelayMs: z.number().int().min(0).optional(),
   /** Maximum tool calls per subagent task before circuit breaker triggers (default: 200, minimum: 10). Prevents runaway loops from burning unlimited tokens. */
   maxToolCalls: z.number().int().min(10).optional(),
   circuitBreaker: CircuitBreakerConfigSchema.optional(),

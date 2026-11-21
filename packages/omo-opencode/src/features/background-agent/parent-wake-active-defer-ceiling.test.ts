@@ -64,6 +64,7 @@ function createNotifier(args: {
   sessionStatuses: Record<string, { type: string }>
   messagesProvider: () => SessionMessageStub[]
   parentActivityWindowMs?: number
+  busyParentWakeDelayMs?: number
 }): {
   notifier: ParentWakeNotifier
   promptAsyncCalls: PromptAsyncCall[]
@@ -95,6 +96,7 @@ function createNotifier(args: {
       failureRequeueWindowMs: 5_000,
       userMessageInProgressWindowMs: 2_000,
       parentSessionActivityInProgressWindowMs: args.parentActivityWindowMs,
+      ...(args.busyParentWakeDelayMs !== undefined ? { busyParentWakeDelayMs: args.busyParentWakeDelayMs } : {}),
     },
   )
 
@@ -180,7 +182,7 @@ describe("parent wake active defer ceiling", () => {
     }
   })
 
-  test("#given retained noReply wake and fresh activity exceed active ceiling #then it dispatches once safe", async () => {
+  test("#given retained noReply wake and fresh activity exceed active ceiling #then its reply waits for the parent to go idle", async () => {
     // given
     const originalDateNow = Date.now
     let now = 100_000
@@ -202,6 +204,16 @@ describe("parent wake active defer ceiling", () => {
       releaseParentWakeHold("parent-1")
       notifier.clearPendingParentWakeTimer("parent-1")
       notifier.recordParentSessionActivity("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(notifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(true)
+
+      // when
+      now = 500_000
+      sessionStatuses["parent-1"] = { type: "idle" }
+      notifier.clearPendingParentWakeTimer("parent-1")
       await notifier.flushPendingParentWake("parent-1")
 
       // then
@@ -288,6 +300,123 @@ describe("parent wake active defer ceiling", () => {
       // then
       expect(promptAsyncCalls).toHaveLength(0)
       expect(notifier.getPendingParentWakes().has("parent-1")).toBe(true)
+    } finally {
+      notifier.shutdown()
+    }
+  })
+
+  describe("#given busyParentWakeDelayMs 0", () => {
+    test("#when a fresh wake arrives while the parent runs a tool #then it is stored in the running turn at once and its reply is kept", async () => {
+      // given
+      const { notifier, promptAsyncCalls } = createNotifier({
+        sessionStatuses: { "parent-1": { type: "busy" } },
+        messagesProvider: () => BLOCKED_MESSAGES,
+        busyParentWakeDelayMs: 0,
+      })
+      notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+
+      try {
+        // when
+        await notifier.flushPendingParentWake("parent-1")
+
+        // then
+        expect(promptAsyncCalls).toHaveLength(1)
+        expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+        expect(notifier.getPendingParentWakes().get("parent-1")?.noReplyAdmittedAt).toBeDefined()
+      } finally {
+        notifier.shutdown()
+      }
+    })
+
+    test("#when the parent is still busy after its tool finished #then the kept reply is not sent, and the turn reading the deposit drops it", async () => {
+      // given
+      const originalDateNow = Date.now
+      let now = 100_000
+      Date.now = () => now
+      let messages = BLOCKED_MESSAGES
+      const sessionStatuses: Record<string, { type: string }> = { "parent-1": { type: "busy" } }
+      const { notifier, promptAsyncCalls } = createNotifier({
+        sessionStatuses,
+        messagesProvider: () => messages,
+        busyParentWakeDelayMs: 0,
+      })
+      notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+
+      try {
+        await notifier.flushPendingParentWake("parent-1")
+        expect(promptAsyncCalls).toHaveLength(1)
+
+        // when
+        now = 145_000
+        messages = SAFE_MESSAGES
+        releaseParentWakeHold("parent-1")
+        notifier.clearPendingParentWakeTimer("parent-1")
+        await notifier.flushPendingParentWake("parent-1")
+
+        // then
+        expect(promptAsyncCalls).toHaveLength(1)
+        expect(notifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(true)
+
+        // when
+        now = 150_000
+        messages = [
+          ...SAFE_MESSAGES,
+          {
+            info: { role: "assistant", finish: "stop", time: { created: 146_500, completed: 149_000 } },
+            parts: [{ type: "text", text: "read the group notice" }],
+          },
+        ]
+        sessionStatuses["parent-1"] = { type: "idle" }
+        notifier.clearPendingParentWakeTimer("parent-1")
+        await notifier.flushPendingParentWake("parent-1")
+
+        // then
+        expect(promptAsyncCalls).toHaveLength(1)
+        expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
+      } finally {
+        Date.now = originalDateNow
+        notifier.shutdown()
+      }
+    })
+
+    test("#when a fresh wake that starts no turn arrives while the parent is busy #then it is stored at once", async () => {
+      // given
+      const { notifier, promptAsyncCalls } = createNotifier({
+        sessionStatuses: { "parent-1": { type: "busy" } },
+        messagesProvider: () => BLOCKED_MESSAGES,
+        busyParentWakeDelayMs: 0,
+      })
+      notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, false)
+
+      try {
+        // when
+        await notifier.flushPendingParentWake("parent-1")
+
+        // then
+        expect(promptAsyncCalls).toHaveLength(1)
+        expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+        expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
+      } finally {
+        notifier.shutdown()
+      }
+    })
+  })
+
+  test("#given no busyParentWakeDelayMs #when a fresh wake arrives while the parent is busy #then it waits", async () => {
+    // given
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "busy" } },
+      messagesProvider: () => BLOCKED_MESSAGES,
+    })
+    notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+
+    try {
+      // when
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(0)
+      expect(notifier.getPendingParentWakeTimers().has("parent-1")).toBe(true)
     } finally {
       notifier.shutdown()
     }
