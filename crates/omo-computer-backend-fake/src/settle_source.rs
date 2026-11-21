@@ -125,6 +125,9 @@ impl SettleSource for FakeSettleSource {
         fire_stop_presses(&mut state, wake);
         if let Some((_, event)) = next_ax.filter(|(at, _)| *at == wake) {
             state.ax_event_pos = from + 1;
+            if event.closes {
+                state.exited.insert(event.window.clone());
+            }
             return Ok(Some(AxEvent {
                 kind: event.kind,
                 window: event.window,

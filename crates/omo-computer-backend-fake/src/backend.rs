@@ -103,6 +103,25 @@ impl FakeBackend {
         Ok(())
     }
 
+    /// Another handle on this same fake (shared state, sink and clock): what a second thread
+    /// presses the stop chord or reads call counts through.
+    #[must_use]
+    pub fn handle(&self) -> Self {
+        Self {
+            shared: Arc::clone(&self.shared),
+            sink: self.sink.clone(),
+            clock: self.clock.clone(),
+            persona: self.persona,
+            stop_path: self.stop_path,
+        }
+    }
+
+    /// How many times a live stop listener of this fake was polled.
+    #[must_use]
+    pub fn stop_polls(&self) -> u32 {
+        self.lock().stop_polls
+    }
+
     /// How often `method` ran.
     #[must_use]
     pub fn calls(&self, method: FakeMethod) -> u32 {

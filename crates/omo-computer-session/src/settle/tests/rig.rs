@@ -37,6 +37,9 @@ const BASE: &str = r#"{
 struct Counting {
     inner: FakeBackend,
     windows: Arc<AtomicU32>,
+    /// Listings from this one on (1-based) are refused with `fail_with`; 0 never refuses.
+    fail_from: Arc<AtomicU32>,
+    fail_with: Arc<std::sync::Mutex<omo_computer_core::backend::Refusal>>,
 }
 
 impl Backend for Counting {
@@ -45,7 +48,15 @@ impl Backend for Counting {
     }
 
     fn windows(&mut self, filter: &WindowFilter) -> BackendResult<WindowList> {
-        self.windows.fetch_add(1, Ordering::SeqCst);
+        let nth = self.windows.fetch_add(1, Ordering::SeqCst) + 1;
+        let fail_from = self.fail_from.load(Ordering::SeqCst);
+        if fail_from > 0 && nth >= fail_from {
+            return Err(self
+                .fail_with
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clone());
+        }
         Backend::windows(&mut self.inner, filter)
     }
 
@@ -95,6 +106,8 @@ pub struct Rig {
     pub clock: FakeClock,
     pub sink: RecordingSink,
     pub windows: Arc<AtomicU32>,
+    fail_from: Arc<AtomicU32>,
+    fail_with: Arc<std::sync::Mutex<omo_computer_core::backend::Refusal>>,
 }
 
 impl Rig {
@@ -109,9 +122,17 @@ impl Rig {
         let fake = FakeBackend::with_parts(scenario, clock.clone(), sink.clone())
             .with_stop_path(StopPathScript::Live);
         let windows = Arc::new(AtomicU32::new(0));
+        let fail_from = Arc::new(AtomicU32::new(0));
+        let fail_with = Arc::new(std::sync::Mutex::new(
+            omo_computer_core::backend::Refusal::bare(
+                omo_computer_core::error::EngineCode::Internal,
+            ),
+        ));
         let backend = Counting {
             inner: fake,
             windows: windows.clone(),
+            fail_from: fail_from.clone(),
+            fail_with: fail_with.clone(),
         };
         let mut session = Session::new(Box::new(backend));
         session
@@ -123,7 +144,24 @@ impl Rig {
             clock,
             sink,
             windows,
+            fail_from,
+            fail_with,
         }
+    }
+
+    /// Listings from the `nth` one after now on are refused with `refusal`.
+    pub fn refuse_listings_after(&self, nth: u32, refusal: omo_computer_core::backend::Refusal) {
+        *self
+            .fail_with
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = refusal;
+        self.fail_listings_after(nth);
+    }
+
+    /// Listings from the `nth` one after now on are refused `Internal`.
+    pub fn fail_listings_after(&self, nth: u32) {
+        let done = self.windows.load(Ordering::SeqCst);
+        self.fail_from.store(done + nth, Ordering::SeqCst);
     }
 
     /// A frame of 101, then a click on it.
