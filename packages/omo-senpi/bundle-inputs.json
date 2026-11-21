@@ -477,6 +477,7 @@
     "packages/memory-core/src/sync/engine/local-capture.ts",
     "packages/memory-core/src/sync/engine/open.ts",
     "packages/memory-core/src/sync/engine/outbox.ts",
+    "packages/memory-core/src/sync/engine/ownership-apply.ts",
     "packages/memory-core/src/sync/engine/ownership-decision.ts",
     "packages/memory-core/src/sync/engine/push-cycle.ts",
     "packages/memory-core/src/sync/engine/push.ts",
