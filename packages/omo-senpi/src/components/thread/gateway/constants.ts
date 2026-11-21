@@ -33,8 +33,16 @@ export const QUEUED_TTL_MS = 24 * 60 * 60 * 1000
 
 export const ROOT_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000
 
+/** One target's undelivered follow-up and auto deliveries (in the gateway or in the session's own queue). */
 export const TARGET_MAX_MESSAGES = 128
 export const TARGET_MAX_BYTES = 1024 * 1024
+
+/** A target's steers count only against this reserve, so follow-ups the session has not written never shut a steer out (#14428). */
+export const STEER_RESERVE_MESSAGES = 16
+export const STEER_RESERVE_BYTES = 256 * 1024
+
+/** The states of an undelivered delivery: waiting in the gateway, being admitted, or held by the session's runtime. */
+export const OPEN_STATES = "('queued', 'admitting', 'admitted')"
 
 export const GATEWAY_RECEIPT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
 
