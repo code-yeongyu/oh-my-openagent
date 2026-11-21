@@ -83,7 +83,14 @@ const ambiguous = (address: string, rows: readonly SessionRow[]): RemoteFailure 
     `${rows.length} sessions answer to ${address}.`,
     "Pass the thread handle of one of them.",
     {
-      details: { candidates: rows.map((row) => ({ thread: row.thread, name: row.name, device: row.device.name })) },
+      details: {
+        candidates: rows.map((row) => ({
+          thread: row.thread,
+          name: row.name,
+          ...(row.unnamed === true ? { unnamed: true } : {}),
+          device: row.device.name,
+        })),
+      },
     },
   )
 

@@ -284,6 +284,16 @@ describe("compiled omo entry launcher parity", () => {
     expect(brand.update?.command).toBe("omo update")
   })
 
+  test("the brand names exactly the plugin buildSenpiArgs prepends (#14465)", () => {
+    const execDir = temp()
+    const brand = JSON.parse(remapSenpiEnvironment({ PATH: "/bin" }, execDir).SENPI_BRAND ?? "{}") as {
+      extensions?: string[]
+    }
+    const [flag, plugin] = buildSenpiArgs(["chat"], execDir)
+    expect(flag).toBe("--extension")
+    expect(brand.extensions).toEqual([plugin])
+  })
+
   test("package-root environment values point into the provisioned runtime", () => {
     const env = remapSenpiEnvironment({ OMO_BIN: "/old", SENPI_BIN: "/old-senpi", PATH: "/bin" }, "/provisioned")
     expect(env.OMO_AGENT_TOOLKIT_BIN).toBeUndefined()

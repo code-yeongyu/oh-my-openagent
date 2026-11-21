@@ -34,6 +34,7 @@
  * `all_scope: true` widens visibility to every entry the daemon knows.
  */
 
+import { rowKey, rowName } from "@oh-my-opencode/thread-address-core"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import {
   ID_PREFIX_SHAPE,
@@ -77,6 +78,8 @@ export type ThreadCandidate = {
   readonly state: ThreadStatus
   /** The account device that holds it, when the candidates span devices (a name matched across the account). */
   readonly device?: string
+  /** `name` is a fallback (thread-address-core `rowName`): the thread has no name of its own. */
+  readonly unnamed?: true
 }
 
 /** How a resolveTarget hit was found. */
@@ -188,12 +191,18 @@ function addressError(
   return candidates === undefined ? { kind: "error", ...failure } : { kind: "error", ...failure, candidates }
 }
 
+/** What a candidate is passed back as: its thread id, or for a listed row that publishes none, its row key. */
+const candidateThread = (entry: ThreadAddressEntry): string =>
+  entry.thread_id === "" && entry.transport !== undefined ? rowKey(entry.transport.row) : entry.thread_id
+
 function toCandidate(entry: ThreadAddressEntry): ThreadCandidate {
   // #13304: a candidate from another device prints its title and project escaped; the entry itself stays as received.
   const shown = entry.transport?.kind === "relay" ? escapeForDisplay : (text: string) => text
+  const named = rowName({ name: entry.name, first_message: entry.preview, folder: entry.cwd })
   return {
-    thread: entry.thread_id,
-    name: shown(entry.name),
+    thread: candidateThread(entry),
+    name: shown(named.name),
+    ...(named.unnamed ? { unnamed: true } : {}),
     cwd: shown(entry.cwd),
     preview: entry.preview ?? "",
     updatedAt: entry.updated_at,
@@ -393,7 +402,7 @@ export function resolveTarget(
     return hit
   }
   if (sessionHits.length >= 2) {
-    const ids = sessionHits.map((entry) => entry.thread_id).filter((id) => id.length > 0)
+    const ids = sessionHits.map(candidateThread).filter((id) => id.length > 0)
     return addressError(
       "ambiguous_target",
       `${sessionHits.length} visible threads share the session id "${target}". Pass one thread: ${ids.join(", ")}.`,

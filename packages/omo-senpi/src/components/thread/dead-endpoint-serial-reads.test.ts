@@ -104,13 +104,21 @@ describe.skipIf(process.platform === "win32")("a dead endpoint's files are read 
 
     // when
     const listing = surface.listView({ offline: true })
+    // omo#14470: never sample "is the second open yet" at one instant: a FIFO reports size 0, so the reader leaves the
+    // first file at once and can win that race under load. Ask when the second file IS opened instead: its writer's open
+    // resolves only once the reader opened it, and a serial reader closed the first file before that, so nobody holds
+    // it then. A reader that opened both at once is still blocked in the first open at that moment.
+    const secondWriter = open(secondSession, "w").then((writer) => ({
+      writer,
+      firstStillHeld: readerHolds(firstSession),
+    }))
     const firstWriter = await within(open(firstSession, "w"), "the first session file to be opened")
-    const secondOpenEarly = readerHolds(secondSession)
     await firstWriter.close()
-    await feed(secondSession, "", "the second session file to be opened")
+    const second = await within(secondWriter, "the second session file to be opened")
+    await second.writer.close()
     await within(listing, "the dead endpoint's listing")
 
     // then
-    expect(secondOpenEarly).toBe(false)
+    expect(second.firstStillHeld).toBe(false)
   })
 })

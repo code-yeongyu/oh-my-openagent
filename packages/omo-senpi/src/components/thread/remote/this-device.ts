@@ -1,5 +1,5 @@
 import type { DeviceAbsentReason, Provenance } from "../gateway/types"
-import { accountDevices } from "./account"
+import { accountDevices } from "../address/account"
 import type { RemoteThreadSurface } from "./ports"
 
 /** This device's account device id, or why a delivery names none. */
@@ -13,7 +13,7 @@ const known = new WeakMap<RemoteThreadSurface, string>()
  * at most one device-service read in a process and never opens anything else. A failed read is not kept: the send still
  * goes, and its row names why no device is stamped.
  */
-async function thisDeviceId(remote: RemoteThreadSurface | undefined): Promise<ThisDevice> {
+export async function thisDeviceId(remote: RemoteThreadSurface | undefined): Promise<ThisDevice> {
   if (remote === undefined) return { device_absent: "no_device_service" }
   const cached = known.get(remote)
   if (cached !== undefined) return { device: cached }

@@ -5,11 +5,11 @@ import { displayedThread } from "../control/relay-session-host"
 import { threadRow } from "../tools/thread-row"
 import { listedStates } from "../tools/thread-state"
 import { type AliasRegistry, type RemoteDevice, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
-import { rememberListed, remoteNotSetUp } from "./address-book"
+import { remoteNotSetUp } from "./address-book"
 import { readAccount } from "../address/account"
 import type { WorktreeRequest } from "../worktree/thread-worktree"
 import { placeFolder } from "./create-folder"
-import { accountDevices } from "./account"
+import { accountDevices } from "../address/account"
 import { aliasFailure, remoteReady } from "./remote-ops"
 import {
   planCreate as placeCreate,
@@ -240,9 +240,6 @@ export async function listAcross(
     return withAliases(remote, { ...local, remote_unavailable: "host_unavailable" }, ids)
   const account = read.account
   const here = read.account.here
-  // relayAddressBook (until the removal unit deletes it with its memory) ties a thread to the device an earlier round
-  // listed it on (#14172): this round is such a round.
-  rememberListed(remote.sessions, account.rows)
   // A device the account no longer lists contributes no rows (#13505, readAccount); an offline one keeps its rows.
   const merged = mergeRows<{ readonly key: string; readonly device: string; readonly row?: RemoteSessionRow }>(
     ids.map((key) => ({ key, device: here })),

@@ -2,8 +2,11 @@ import { AsyncResource } from "node:async_hooks"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 
+import { resolveErrorStreakSettings, resolveHomeDir } from "@oh-my-opencode/omo-config-core"
+
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
+import { loadSenpiOmoConfig } from "../config-resolution"
 import { returnedAtClose, settleGracefulClose } from "./gateway/graceful-close-returns"
 import { SESSION_CONTROL_DELIVERY_TYPE } from "./gateway/constants"
 import { loadProvenanceWorkspaces } from "./gateway/provenance-config"
@@ -24,6 +27,9 @@ import { createDefaultRemoteSurface } from "./remote/default-remote"
 import { registerRemoteMonitorTargets } from "./remote/lazy-ops"
 import { createOmoNativeProductConfig } from "../telemetry/product-identity"
 import { defaultThreadStateDirectory, isThreadSocket } from "./live-surface-paths"
+import { thisDeviceId } from "./remote/this-device"
+import type { AgentEndFacts } from "./run-alerts/error-streak"
+import { createRunAlerts, type RunAlertsOptions } from "./run-alerts/run-alerts"
 import type { IntakeAdmission } from "./gateway/intake-admission"
 import type { SameDeviceWake } from "./gateway/same-device-wake"
 import type { ThreadWakeOptions } from "./wake/runtime"
@@ -50,6 +56,8 @@ export type ThreadComponentOptions = Partial<
   readonly controlEndpointTest?: ControlEndpointRegistrantOptions["_test"]
   /** Test seams of the session wake (#13037): the carrier, the consumer and their switches. */
   readonly wake?: ThreadWakeOptions
+  /** Test seams of the error-streak alerts (#14430): the clock, this device's id, the webhook client and the retry pause. */
+  readonly operatorAlerts?: Pick<RunAlertsOptions, "now" | "device" | "fetch" | "delay">
 }
 
 /**
@@ -423,6 +431,23 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         },
         (line) => ctx.logger.warn(line),
       )
+      const alertEnv = options.env ?? process.env
+      const alerts = createRunAlerts({
+        // User layer only: loading from $HOME walks no project layer, so a cloned repo's .omo/omo.json cannot pick the
+        // env var a webhook URL is read from, or add threads that receive messages sent as this session.
+        settings: () =>
+          resolveErrorStreakSettings(loadSenpiOmoConfig({ cwd: resolveHomeDir(alertEnv), env: alertEnv }).config),
+        env: alertEnv,
+        now: Date.now,
+        sendAs: tools.sendAs,
+        sessionName: () => pi.getSessionName?.(),
+        device: async () => {
+          const here = await thisDeviceId(remote)
+          return "device" in here ? here.device : undefined
+        },
+        log: { info: (line) => ctx.logger.info(line), warn: (line) => ctx.logger.warn(line) },
+        ...options.operatorAlerts,
+      })
       const registrant = registerControlEndpoint(pi, ctx, options, store, agentDir, wakeAdmission)
       let legacyImportStarted = false
       const importLegacyMailbox = async (): Promise<void> => {
@@ -481,12 +506,20 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         const message = messageOf(event)
         if (message?.role === "assistant") run.answered = !callsTools(message)
       })
-      pi.on("agent_settled", () => {
+      pi.on("agent_end", (event, eventCtx) => {
+        const durableId = durableIdOf(eventCtx)
+        if (durableId !== undefined) alerts.agentEnd(durableId, event as AgentEndFacts)
+      })
+      pi.on("agent_settled", (_event, eventCtx) => {
         // A settle alone keeps the consumed delivery's senders, hop and cause (#13042): the next input decides whether
         // the work continues (noteInput).
         run.answered = true
+        const durableId = durableIdOf(eventCtx)
+        if (durableId !== undefined) alerts.settled(durableId)
       })
       pi.on("session_shutdown", async (event, eventCtx) => {
+        const endedId = durableIdOf(eventCtx)
+        if (endedId !== undefined) alerts.ended(endedId)
         tools.dispose()
         await registrant
           ?.stop()

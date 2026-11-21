@@ -133,6 +133,7 @@ describe("thread component control endpoint registration", () => {
       agentDir: () => "/tmp/thread-test-agent",
     }).register(f.pi as never, context([]) as never)
     expect([...f.handlers.keys()].sort()).toEqual([
+      "agent_end",
       "agent_settled",
       "agent_start",
       "message_end",
