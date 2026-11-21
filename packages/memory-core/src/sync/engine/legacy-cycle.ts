@@ -41,7 +41,7 @@ export async function adoptLegacyRenders(
   deps: EngineDeps,
   cycle: CycleRecord,
   recorded: ReadonlySet<string>,
-  readWorking: (key: string) => Promise<string | null>,
+  readWorking: (key: string) => Promise<string | null | undefined>,
 ): Promise<void> {
   const known = new Set(deps.store.keys())
   for (const [key, render] of legacyRenders(cycle)) {
