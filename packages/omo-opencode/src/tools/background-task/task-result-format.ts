@@ -64,10 +64,9 @@ Session ID: ${task.sessionId}
     return timeA.localeCompare(timeB)
   })
 
-  const sessionError = sortedMessages
-    .filter((message) => message.info?.role === "assistant" && message.info?.error)
-    .map((message) => extractErrorMessage(message.info?.error))
-    .find((message): message is string => typeof message === "string" && message.length > 0)
+  const newMessages = consumeNewMessages(task.sessionId, sortedMessages)
+  const latestAssistant = newMessages.findLast((message) => message.info?.role === "assistant")
+  const sessionError = extractErrorMessage(latestAssistant?.info?.error)
   if (sessionError) {
     return `Task Result
 
@@ -81,7 +80,6 @@ Session ID: ${task.sessionId}
 Session error: ${sessionError}`
   }
 
-  const newMessages = consumeNewMessages(task.sessionId, sortedMessages)
   if (newMessages.length === 0) {
     const duration = formatDuration(task.startedAt ?? new Date(), task.completedAt)
     return `Task Result
