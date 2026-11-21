@@ -1,7 +1,8 @@
+import { boundedServiceFloor } from "@oh-my-opencode/memory-core/sync-account-ports"
 import { z } from "zod"
 import { createSyncRpcCoordinator } from "./sync-rpc-coordinator"
 import { syncErrorFields } from "./sync-rpc-operation"
-import type { SyncRpcOptions, SyncRpcRegistration } from "./sync-rpc-ports"
+import type { SyncRpcContext, SyncRpcOptions, SyncRpcRegistration } from "./sync-rpc-ports"
 
 const empty = z.object({}).strict()
 const enableRequest = z.object({ method: z.enum(["passkey", "phrase"]).optional() }).strict()
@@ -13,6 +14,20 @@ const acknowledgeRequest = z
   })
   .strict()
 const FEATURES = ["enable-method", "phrase-genesis", "acknowledge", "disable"] as const
+const WITHOUT_PHRASE = FEATURES.filter((f) => f !== "phrase-genesis")
+
+/** One fresh floor read through the signed-in account's own chain; anything but "on" withholds the feature. */
+const phraseGenesisOffered = async (
+  coordinator: ReturnType<typeof createSyncRpcCoordinator>,
+  context: SyncRpcContext | undefined,
+  options: SyncRpcOptions,
+): Promise<boolean> => {
+  const gate = options.phraseGate
+  if (gate?.enabled !== true || gate.serviceFloor === undefined || context === undefined) return false
+  // The creation gate's own bounded, shape-checked read, so a hung service cannot hold features and the bounds never drift.
+  const answer = await coordinator.read(context, (ports) => boundedServiceFloor(gate, ports.chain))
+  return answer === "on"
+}
 const approval = z.discriminatedUnion("action", [
   z.object({ action: z.literal("begin"), pendingId: z.string().min(1) }).strict(),
   z
@@ -69,11 +84,8 @@ export function registerSyncRpc(rpc: SyncRpcRegistration, options: SyncRpcOption
         if (!empty.safeParse(data).success) return { kind: "refused", reason: "This request takes no parameters." }
         switch (verb) {
           case "features":
-            // Phrase genesis is listed only while the client flag is on (amendment A1).
-            return {
-              features:
-                options.phraseGate?.enabled === true ? FEATURES : FEATURES.filter((f) => f !== "phrase-genesis"),
-            }
+            // Phrase genesis is listed only while the service accepts phrase keys for this account (#14432).
+            return { features: (await phraseGenesisOffered(coordinator, context, options)) ? FEATURES : WITHOUT_PHRASE }
           case "status":
             return await coordinator.status(context)
           case "disable":
