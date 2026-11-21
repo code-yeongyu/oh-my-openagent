@@ -4,7 +4,7 @@ import { deviceServiceStateDir } from "@oh-my-opencode/device-service-core/state
 import { isDeviceRevoked, listLiveDevices } from "@oh-my-opencode/omo-opencode/service-auth"
 import { createOmoNativeProductConfig } from "../../telemetry/product-identity"
 import type { AccountAccess, SignedIn } from "../access"
-import type { EnrollPorts } from "."
+import type { EnrollPorts, MachineSighting } from "."
 import { StepRefusal } from "./outcome"
 import { openSshPort } from "./ssh-port"
 
@@ -21,6 +21,18 @@ const sleep = (ms: number, signal?: AbortSignal): Promise<void> =>
       { once: true },
     )
   })
+
+/**
+ * This device's device service's answer as read_back sightings. Only a service that is not running is "unavailable"
+ * (no wait can succeed); one that did not answer in time is unknown, never offline, so it is no sighting yet.
+ */
+export function sightingsOf(
+  rows: Awaited<ReturnType<typeof readDeviceServiceDevices>>,
+): readonly MachineSighting[] | "unavailable" {
+  if (rows === "not_running") return "unavailable"
+  if (rows === "no_answer") return []
+  return rows.map((row) => ({ id: row.id, state: row.online ? "online" : "offline" }))
+}
 
 /** The caller's own sign-in and device service, the OpenSSH client and the real clock. */
 export function defaultEnrollPorts(options: {
@@ -42,13 +54,8 @@ export function defaultEnrollPorts(options: {
     ssh: openSshPort,
     liveDeviceIds: () => signedIn(async ({ session }) => (await listLiveDevices(session)).map((device) => device.id)),
     isDeviceRevoked: (id) => signedIn(({ session }) => isDeviceRevoked(session, id)),
-    machines: async () => {
-      const rows = await readDeviceServiceDevices({ stateDir, version: createOmoNativeProductConfig().packageVersion })
-      // A string is the service's own status (not running, no answer): there is no view of the machines at all.
-      return typeof rows === "string"
-        ? "unavailable"
-        : rows.map((row) => ({ id: row.id, state: row.online ? "online" : "offline" }))
-    },
+    machines: async () =>
+      sightingsOf(await readDeviceServiceDevices({ stateDir, version: createOmoNativeProductConfig().packageVersion })),
     clock: { now: Date.now, sleep },
   }
 }

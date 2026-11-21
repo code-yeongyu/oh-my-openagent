@@ -23,7 +23,6 @@ export type EnrollPorts = {
   /** This account's live device ids, read with the caller's own sign-in. */
   readonly liveDeviceIds: () => Promise<readonly string[]>
   readonly isDeviceRevoked: (id: string) => Promise<boolean>
-  /** What the fleet client sees through this device's device service. */
   /** This device's own device service's view of the account's machines; "unavailable" when that service is not running. */
   readonly machines: () => Promise<readonly MachineSighting[] | "unavailable">
   readonly clock: EnrollClock

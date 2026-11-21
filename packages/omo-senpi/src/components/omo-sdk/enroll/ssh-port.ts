@@ -97,27 +97,29 @@ export function openSshPort(target: SshTarget): SshPort {
         `${target.port === undefined || target.port === 22 ? target.host : `[${target.host}]:${target.port}`} ${target.hostKey?.trim()}\n`
       const started = (async () => {
         const dir = known === undefined ? undefined : await known
-        if (dir !== undefined) await writeFile(join(dir, "known_hosts"), knownLine(), { mode: 0o600 })
-        const argv = [
-          "ssh",
-          "-T",
-          "-o",
-          "BatchMode=yes",
-          "-o",
-          "StrictHostKeyChecking=yes",
-          "-o",
-          "ConnectTimeout=20",
-          ...(dir === undefined
-            ? []
-            : ["-o", `UserKnownHostsFile=${join(dir, "known_hosts")}`, "-o", "GlobalKnownHostsFile=/dev/null"]),
-          ...(target.port === undefined ? [] : ["-p", String(target.port)]),
-          ...(target.identityFile === undefined ? [] : ["-i", target.identityFile, "-o", "IdentitiesOnly=yes"]),
-          ...(target.user === undefined ? [] : ["-l", target.user]),
-          "--",
-          target.host,
-          remoteCommand(program),
-        ]
+        // Every step after the dir exists runs in here, so any failure before ssh starts (the known_hosts write, a
+        // refused remote command, no ssh binary) removes it; once ssh runs, the exit chain below removes it.
         try {
+          if (dir !== undefined) await writeFile(join(dir, "known_hosts"), knownLine(), { mode: 0o600 })
+          const argv = [
+            "ssh",
+            "-T",
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            "StrictHostKeyChecking=yes",
+            "-o",
+            "ConnectTimeout=20",
+            ...(dir === undefined
+              ? []
+              : ["-o", `UserKnownHostsFile=${join(dir, "known_hosts")}`, "-o", "GlobalKnownHostsFile=/dev/null"]),
+            ...(target.port === undefined ? [] : ["-p", String(target.port)]),
+            ...(target.identityFile === undefined ? [] : ["-i", target.identityFile, "-o", "IdentitiesOnly=yes"]),
+            ...(target.user === undefined ? [] : ["-l", target.user]),
+            "--",
+            target.host,
+            remoteCommand(program),
+          ]
           const child = Bun.spawn(argv, {
             stdin: "pipe",
             stdout: "pipe",
@@ -126,7 +128,6 @@ export function openSshPort(target: SshTarget): SshPort {
           })
           return { child, dir }
         } catch (error) {
-          // No ssh binary (or a refused spawn): the exit chain below never runs, so the known-hosts dir goes here.
           if (dir !== undefined) await rm(dir, { recursive: true, force: true })
           throw error
         }
