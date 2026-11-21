@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
-import { diagnoseHeldTestRoot } from "../../../test-support/windows-held-root.mjs"
+import { diagnoseHeldTestRoot } from "../../../test-support/windows-held-root.mts"
 
 const ROOT = resolve(import.meta.dir, "../../..")
 const DRIVER = join(ROOT, "script/qa/computer/replay.ts")

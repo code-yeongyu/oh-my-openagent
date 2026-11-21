@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { createInterface } from "node:readline"
 import { Readable } from "node:stream"
-import { diagnoseHeldTestRoot } from "./windows-held-root.mjs"
+import { diagnoseHeldTestRoot } from "./windows-held-root.mts"
 import { removeTestRootBestEffort, skippedTestRoots } from "./held-test-root.mjs"
 
 describe("Windows held-root diagnostic", () => {
