@@ -7,7 +7,7 @@ import { pathToFileURL } from "node:url"
 // the assembled changelog, and the bundles regenerated because they embed the version). The release cut refuses a
 // stamp that touches anything else (`--check`), and ci-fast-path.mjs keeps a release-state pull request on Linux only
 // when its whole diff is inside this list, so the two cannot drift apart.
-export const RELEASE_STATE_PATHS = [
+const RELEASE_STATE_PATHS = [
   /^CHANGELOG\.md$/,
   /^changes\.md$/,
   /^changes\//,
