@@ -25,7 +25,9 @@ pub(crate) use route::{key_event, route_for};
 
 use std::path::{Path, PathBuf};
 
-use omo_computer_core::backend::Refusal;
+use omo_computer_core::backend::{Delivered, Refusal};
+use omo_computer_core::intervention::{Pause, TargetLiveness};
+use omo_computer_core::session_state::SessionState;
 use omo_computer_core::error::{EngineCode, Reason};
 use omo_computer_core::paths::Roots;
 use omo_computer_core::report::Disposition;
@@ -69,9 +71,25 @@ pub struct Refused {
     /// The members a consent or lease refusal carries on the wire (`app`, `identity`,
     /// `window`, `holder`, `retryAfterMs`).
     pub detail: Option<Box<Value>>,
-    pub busy: Option<crate::settle::BusyDetail>,
+    /// What row 22 stamps on a refusal, boxed so the error type stays small.
+    pub stamps: Box<Stamps>,
+    /// Boxed so the error type stays small (R70cg).
+    pub busy: Option<Box<crate::settle::BusyDetail>>,
     /// `write_failed` when the refusal's own audit line could not be written.
     pub warning: Option<String>,
+}
+
+/// The members a refusal carries beside its code.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Stamps {
+    /// Object mode: the units sent before an interrupted send stopped.
+    pub delivered: Option<Delivered>,
+    /// What the admission waited for before it refused or the send stopped.
+    pub paused: Vec<Pause>,
+    /// Object mode: the session state sampled for the call.
+    pub session: Option<SessionState>,
+    /// The target that exited or stopped answering.
+    pub target: Option<TargetLiveness>,
 }
 
 impl From<Refusal> for Refused {
@@ -81,10 +99,19 @@ impl From<Refusal> for Refused {
             call_id: None,
             receipt: None,
             interrupted: None,
+            stamps: Box::default(),
             detail: None,
             busy: None,
             warning: None,
         }
+    }
+}
+
+impl Refused {
+    #[must_use]
+    pub fn with_paused(mut self, paused: Vec<Pause>) -> Self {
+        self.stamps.paused = paused;
+        self
     }
 }
 

@@ -3,12 +3,13 @@
 //! and never reaches the session, so it can send nothing. The one notification the protocol
 //! defines, `$/cancel`, has nothing to cancel on this serial loop.
 
-use omo_computer_core::backend::Refusal;
 use omo_computer_core::methods::Method;
-use omo_computer_session::grant::HostCallError;
-use omo_computer_session::{Refused, Session, Unresolved};
+use omo_computer_session::Session;
 use serde::de::DeserializeOwned;
 use serde_json::{json, Map, Value};
+
+mod refusals;
+use refusals::{host_failure, refused, refused_call, unresolved};
 
 pub const PARSE_ERROR: i64 = -32_700;
 pub const INVALID_REQUEST: i64 = -32_600;
@@ -111,78 +112,6 @@ fn dispatch(session: &mut Session, name: &str, params: Value) -> Result<Value, F
 
 // --- Rows 21-27: the session's host calls (R31); row 28 moves this into the engine router. ---
 
-fn host_failure(error: HostCallError) -> Failure {
-    match error {
-        HostCallError::Params(error) => {
-            failure(INVALID_PARAMS, "Invalid params", Some(json!({ "detail": error.to_string() })))
-        }
-        HostCallError::Refused(refused) => refused_call(&refused),
-    }
-}
-
-/// A refusal on the wire: the closed engine code's number and name, `data.code` as v1 wrote
-/// it, and `data.reason` when the refusal carries one. Every refusal resolves to its row of
-/// the one error table (a bare refusal to its code's bare row); a pair with no row is a
-/// backend defect, reported on stderr, and still answered with the refusal's own code.
-fn refused(refusal: &Refusal) -> Failure {
-    if let Err(unknown) = refusal.row() {
-        eprintln!("omo-computer-engine: {unknown}");
-    }
-    let mut data = json!({ "code": refusal.code.wire(), "hint": null });
-    if let Some(reason) = refusal.reason {
-        data["reason"] = json!(reason.wire());
-    }
-    failure(refusal.code.number(), refusal.code.wire(), Some(data))
-}
-
-/// A funnel refusal: the refusal's members plus the `callId` it concerns, for a replay the
-/// stored `receipt` (`TransactionFailed{reason:"replayed", callId, receipt}`), and for a call
-/// whose send was interrupted its `disposition` (`delivery_uncertain/unsafe`): without it
-/// the code's own row would read `not_delivered/safe` and invite a resend; `warning:"write_failed"`
-/// when the refusal's own audit line could not be written.
-fn refused_call(refused: &Refused) -> Failure {
-    let mut failure = self::refused(&refused.refusal);
-    if let Some(data) = failure.data.as_mut() {
-        if let Some(call_id) = &refused.call_id {
-            data["callId"] = json!(call_id);
-        }
-        if let Some(receipt) = &refused.receipt {
-            data["receipt"] = (**receipt).clone();
-        }
-        if let Some(disposition) = refused.interrupted {
-            data["disposition"] = json!(disposition);
-        }
-        if let (Some(Value::Object(detail)), Some(data)) = (refused.detail.as_deref(), data.as_object_mut()) {
-            for (key, value) in detail {
-                data.entry(key.clone()).or_insert_with(|| value.clone());
-            }
-        }
-        if let Some(warning) = &refused.warning {
-            data["warning"] = json!(warning);
-        }
-    }
-    busy_data(refused, &mut failure);
-    failure
-}
-
-/// `InputBusy{target_busy}`: the busy wait's `indicator`, `waitedMs` and `retryAfterMs`.
-fn busy_data(refused: &Refused, failure: &mut Failure) {
-    if let (Some(busy), Some(data)) = (&refused.busy, failure.data.as_mut()) {
-        data["indicator"] = json!(busy.indicator);
-        data["waitedMs"] = json!(busy.waited_ms);
-        data["retryAfterMs"] = json!(busy.retry_after_ms);
-    }
-}
-
-/// A ref that did not resolve: the refusal, and on `AmbiguousTarget` the `candidates`.
-fn unresolved(unresolved: &Unresolved) -> Failure {
-    let mut failure = refused(&unresolved.refusal);
-    if let Some(data) = failure.data.as_mut().filter(|_| !unresolved.candidates.is_empty()) {
-        data["candidates"] = json!(unresolved.candidates);
-    }
-    failure
-}
-
 fn reply(id: &Value, outcome: Result<Value, Failure>) -> String {
     let message = match outcome {
         Ok(result) => json!({ "jsonrpc": "2.0", "id": id, "result": result }),
@@ -201,7 +130,7 @@ fn reply(id: &Value, outcome: Result<Value, Failure>) -> String {
 mod tests {
     use omo_computer_core::error::Reason;
     use omo_computer_backend_fake::{FakeBackend, FakeClock, FakeScenario, RecordingSink};
-    use omo_computer_core::backend::Backend;
+    use omo_computer_core::backend::{Backend, Refusal};
     use omo_computer_core::error::EngineCode;
     use serde_json::{json, Value};
 
@@ -258,13 +187,12 @@ mod tests {
     #[test]
     fn an_interrupted_call_carries_its_disposition_on_the_wire() {
         let interrupted = omo_computer_session::Refused {
-            refusal: Refusal::new(EngineCode::TransactionFailed, Reason::RecoveryRequired),
             call_id: Some("k-1".to_owned()),
-            receipt: None,
             interrupted: Some(omo_computer_core::report::Disposition::UNCERTAIN_UNSAFE),
             detail: None,
             busy: None,
             warning: Some("write_failed".to_owned()),
+            ..Refusal::new(EngineCode::TransactionFailed, Reason::RecoveryRequired).into()
         };
         let Failure { data, .. } = refused_call(&interrupted);
         let data = data.expect("data");
@@ -273,6 +201,49 @@ mod tests {
         assert_eq!(data["disposition"], json!({ "delivery": "delivery_uncertain", "retry": "unsafe" }));
         let plain = refused_call(&Refusal::new(EngineCode::TransactionFailed, Reason::MarkerUnavailable).into());
         assert!(plain.data.expect("data").get("disposition").is_none(), "a refusal before any send carries none");
+    }
+
+    const NOTES: &str = r#""windows":[{"id":"101","title":"t","app":"Notes","pid":4242,"x":0,"y":0,"width":800,"height":600,"focused":true,"elevated":null}]"#;
+
+    fn opened(extra: &str, open: &str) -> Session {
+        let scenario = FakeScenario::from_json(&format!("{{{NOTES}{extra}}}")).expect("scenario");
+        let backend = FakeBackend::with_parts(scenario, FakeClock::default(), RecordingSink::default())
+            .with_stop_path(omo_computer_backend_fake::StopPathScript::Live);
+        let mut session = Session::new(Box::new(backend));
+        call(&mut session, &format!(r#"{{"jsonrpc":"2.0","id":1,"method":"session.open","params":{open}}}"#));
+        call(&mut session, r#"{"jsonrpc":"2.0","id":2,"method":"stopPath.start","params":{}}"#);
+        session
+    }
+
+    const LOCKED: &str = r#","session_timeline":[{"t_ms":0,"screen_locked":true}]"#;
+    const INTERRUPTED: &str = r#","typing_unit_ms":10,"user_input_timeline":[{"t_ms":25,"pid":4242,"kind":"key"}]"#;
+    const CLICK: &str = r#"{"jsonrpc":"2.0","id":3,"method":"click","params":{"target":"101","x":10,"y":10}}"#;
+    const TYPE: &str = r#"{"jsonrpc":"2.0","id":3,"method":"typeText","params":{"target":"101","text":"abcdefghij"}}"#;
+
+    #[test]
+    fn null_mode_refusals_keep_the_v1_bytes() {
+        let locked = call(&mut opened(LOCKED, "{}"), CLICK);
+        assert_eq!(
+            locked["error"]["data"],
+            json!({ "code": "ScreenLocked", "hint": null, "reason": "screen_locked" })
+        );
+        let interrupted = call(&mut opened(INTERRUPTED, "{}"), TYPE);
+        let mut data = interrupted["error"]["data"].clone();
+        assert!(data["callId"].is_string(), "{data}");
+        data.as_object_mut().expect("data").remove("callId");
+        assert_eq!(data, json!({ "code": "UserIntervened", "hint": null }));
+    }
+
+    #[test]
+    fn object_mode_refusals_carry_delivered_paused_and_session() {
+        let object = r#"{"reportMode":"object"}"#;
+        let locked = call(&mut opened(LOCKED, object), CLICK);
+        let data = &locked["error"]["data"];
+        assert_eq!(data["paused"], json!([{ "reason": "screen_locked", "ms": 120_001 }]));
+        assert_eq!(data["session"]["screenLocked"], json!(true));
+        assert!(data.get("delivered").is_none(), "nothing was sent: {data}");
+        let interrupted = call(&mut opened(INTERRUPTED, object), TYPE);
+        assert_eq!(interrupted["error"]["data"]["delivered"], json!({ "count": 3, "of": 10 }));
     }
 
     #[test]
