@@ -1,7 +1,7 @@
 {
   "description": "No local listener (listener none), the session opened with allowHostRelayOnlyStop true and its host keeping the heartbeat fresh: the click is admitted on the host-relay stop path and its events reach the sink. Opened with the policy off, the same click is refused StopPathUnavailable{reason:host_relay_not_allowed} with nothing more sent.",
   "transport": "stdio",
-  "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/v3-two-displays-one-window-consent.json",
   "env": {},
   "steps": [
     {

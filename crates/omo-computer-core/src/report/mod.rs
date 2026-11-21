@@ -6,11 +6,12 @@ mod derive;
 mod disposition;
 mod effect;
 mod evidence;
+mod frame_text;
 mod rejection;
 mod shape;
 mod verb;
 
-pub use action::{ActionReport, ReportParts};
+pub use action::{ActionReport, RefusalReason, ReportParts};
 pub use derive::{completed_effect, Settle};
 pub use disposition::{Delivery, Disposition, InvalidDisposition, Retry};
 pub use effect::{Delivered, Effect, FocusRestoration, Hit, Route, Timings};
