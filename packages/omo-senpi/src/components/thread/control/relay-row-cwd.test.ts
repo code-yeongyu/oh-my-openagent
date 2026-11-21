@@ -80,8 +80,7 @@ describe("an unnamed row is named after the folder its path names, the same name
 
     const result = await run("thread_list", { all_scope: true })
 
-    expect(result.kind).toBe("ok")
-    const listed = (result.kind === "ok" ? result.threads : [])
+    const listed = (result.kind === "ok" && "threads" in result ? result.threads : [])
       .filter((thread) => thread.device === "b")
       .map((thread) => ({ name: thread.name, unnamed: thread.unnamed === true }))
     expect(listed).toEqual([
@@ -98,9 +97,7 @@ describe("an unnamed row is named after the folder its path names, the same name
 
     expect(result).toMatchObject({ kind: "error", error: { code: "ambiguous_target" } })
     const refusal = result.kind === "error" ? result.error : undefined
-    const candidates = ((refusal?.candidates ?? refusal?.details?.["candidates"] ?? []) as readonly {
-      name: string
-    }[])
+    const candidates = (refusal?.details?.["candidates"] ?? []) as readonly { name: string }[]
     expect(candidates.map((candidate) => candidate.name).sort()).toEqual(["attic-thing", "legacy-tooling"])
   })
 })
