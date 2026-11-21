@@ -41,7 +41,7 @@ describe("removeStaleSelfPackageTests", () => {
     const jobs = (Bun.YAML.parse(workflow) as { jobs: Record<string, { steps: { name?: string }[] }> }).jobs
     const suites: Record<string, string> = {
       test: "Run tests with Windows telemetry",
-      "test-linux": "Run tests",
+      "test-linux": "Run omo-opencode tests",
       "senpi-compatibility": "Run Senpi compatibility tests with Windows telemetry",
       "senpi-tests-linux": "Run Senpi compatibility tests",
     }

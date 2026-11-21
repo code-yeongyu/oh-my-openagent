@@ -408,8 +408,8 @@ jobs:
           JOB_SUMMARY_NEXT: Open the first failing test or package-build step; matrix failures are usually OS-specific.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
-  # The Linux root suite as four parallel parts (#14573), each one serial bun process: `bun test --parallel` is
-  # not used on POSIX (--isolate re-runs the heavy preload per file and OOM-kills the 7 GB runners, --no-isolate leaks
+  # The Linux root suite as four parallel parts (#14573), each test command one serial bun process: `bun test --parallel`
+  # is not used on POSIX (--isolate re-runs the heavy preload per file and OOM-kills the 7 GB runners, --no-isolate leaks
   # module state between files), so job-level parts are the parallelism. omo-opencode is never file-sharded (global zauc
   # mocks); the serial quarantine rides with it; the remainder is split in two by Bun's --shard on measured file times.
   test-linux:
@@ -451,19 +451,49 @@ jobs:
         run: npm test
         working-directory: packages/lsp-daemon
 
-      - name: Run tests
-        env:
-          PART: ${{ matrix.part }}
+      # Each part is plain commands in its own step, so the local-receipt reader can mirror them: omo-opencode, then the
+      # serial quarantine; memory-core in an unprivileged PID namespace (memory-core's stranded-git-lock tests read the host
+      # process table, so the step fails loudly when no namespace can be made instead of falling back to the host table, omo
+      # #10199; inside it the user's own LIVE git processes still return EACCES on /proc/<pid>/fd on this kernel, so the
+      # dead-writer reclaim rows pass through the kernel git-activity lock, omo #10322); the remainder as two --shard halves.
+      - name: Run omo-opencode tests
+        id: root-tests-linux-omo-opencode
+        if: matrix.part == 'omo-opencode'
+        run: bun test --timeout 20000 packages/omo-opencode
+
+      - name: Run the serial quarantine
+        id: root-tests-linux-quarantine
+        if: matrix.part == 'omo-opencode'
+        run: bash .github/scripts/ci-root-shard-2.sh quarantine
+
+      - name: Run memory-core tests in a PID namespace
+        id: root-tests-linux-memory-core
+        if: matrix.part == 'memory-core'
         run: |
           set -euo pipefail
-          case "$PART" in
-            omo-opencode)
-              bash .github/scripts/ci-root-shard-1.sh omo-opencode
-              bash .github/scripts/ci-root-shard-2.sh quarantine
-              ;;
-            memory-core) bash .github/scripts/ci-root-shard-1.sh memory-core ;;
-            *) bash .github/scripts/ci-root-shard-2.sh "$PART" ;;
-          esac
+          if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+          if ! procs="$(unshare -Upf --mount-proc --map-current-user -- sh -c 'ls /proc | grep -c "^[0-9]"')"; then
+            echo "::error::cannot create an unprivileged PID namespace; memory-core's lock tests must not fall back to the host process table (omo #10199)"
+            exit 1
+          fi
+          if [ "$procs" -gt 8 ]; then
+            echo "::error::the PID namespace sees $procs processes, so it is not isolated from the host (omo #10199)"
+            exit 1
+          fi
+          echo "PID namespace ready ($procs processes visible)"
+          unshare -Upf --mount-proc --map-current-user -- env CI=1 bun test --timeout 20000 packages/memory-core
+
+      - name: Run the first remainder half
+        id: root-tests-linux-first
+        if: matrix.part == 'remainder-1'
+        run: bash .github/scripts/ci-root-shard-2.sh first
+
+      - name: Run the second remainder half
+        id: root-tests-linux-second
+        if: matrix.part == 'remainder-2'
+        run: bash .github/scripts/ci-root-shard-2.sh second
 
       - name: Write job summary
         if: always()
@@ -1116,7 +1146,7 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   senpi-tests-linux:
-    name: senpi-tests-linux (${{ matrix.part }}/2)
+    name: senpi-tests-linux (${{ matrix.part }})
     needs: [ci-mode]
     if: needs.ci-mode.outputs.run_heavy == 'true'
     runs-on: ubuntu-26.04
@@ -1124,7 +1154,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        part: ["1", "2"]
+        part: [one, two]
     steps:
       - uses: actions/checkout@v7
 
@@ -1155,11 +1185,11 @@ jobs:
         if: always()
         shell: bash
         env:
-          JOB_SUMMARY_TITLE: Senpi compatibility tests (ubuntu-latest, ${{ matrix.part }}/2)
+          JOB_SUMMARY_TITLE: Senpi compatibility tests (ubuntu-latest, part ${{ matrix.part }})
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
             - Builds the Senpi plugin and runs this part of `bun test packages/omo-senpi`, split by `--shard` on `.github/ci-test-timings.json`.
-            - Part 1 also packs the plugin, runs the LSP daemon round trip, `bun check` and the evidence-dir test.
+            - Part one also packs the plugin, runs the LSP daemon round trip, `bun check` and the evidence-dir test.
           JOB_SUMMARY_NEXT: Open the first failing test; `senpi-compatibility (ubuntu-latest)` reports this job's result.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 

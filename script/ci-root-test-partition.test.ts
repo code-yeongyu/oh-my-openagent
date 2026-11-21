@@ -3,7 +3,6 @@ import { existsSync, readFileSync } from "node:fs"
 import { ROOT_TEST_SERIAL_QUARANTINE_PATHS, serialQuarantineCommand } from "./root-test-serial-quarantine.ts"
 
 const workflow = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8")
-const posixShard1 = readFileSync(new URL("../.github/scripts/ci-root-shard-1.sh", import.meta.url), "utf8")
 const posixShard2 = readFileSync(new URL("../.github/scripts/ci-root-shard-2.sh", import.meta.url), "utf8")
 const windowsTelemetryScript = readFileSync(
   new URL("../.github/scripts/windows-ci-telemetry.ps1", import.meta.url),
@@ -85,7 +84,7 @@ describe("root test CI partition", () => {
     const job = rootTestJob()
 
     expect(job).toContain('-TestArguments @("test", "packages/omo-opencode", "packages/memory-core")')
-    expect(posixShard1).toContain("    bun test --timeout 20000 packages/omo-opencode\n")
+    expect(linuxTestJobs()).toContain("run: bun test --timeout 20000 packages/omo-opencode\n")
     expect(job).toContain('-TestArguments @("--config=bunfig.win2.parallel.windows.toml", "test", "--parallel")')
     expect(existsSync(win2ConfigPath)).toBe(true)
     expect(existsSync(win2ParallelConfigPath)).toBe(true)
@@ -143,11 +142,21 @@ describe("root test CI partition", () => {
     // this suite passed with for years.
     expect(linux).toContain("part: [omo-opencode, memory-core, remainder-1, remainder-2]")
     expect(linux).toContain("bash .github/scripts/ci-root-shard-2.sh quarantine")
-    expect(linux).toContain('*) bash .github/scripts/ci-root-shard-2.sh "$PART" ;;')
-    expect(posixShard2).toContain(serialQuarantineCommand())
-    expect(posixShard2).toContain(
-      'bun --config=bunfig.win2.parallel.toml test --timeout 20000 --shard="${mode#remainder-}/2" --timings=.github/ci-test-timings.json',
+    expect(linux).toContain(
+      "if: matrix.part == 'remainder-1'\n        run: bash .github/scripts/ci-root-shard-2.sh first",
     )
+    expect(linux).toContain(
+      "if: matrix.part == 'remainder-2'\n        run: bash .github/scripts/ci-root-shard-2.sh second",
+    )
+    expect(linux).toContain(
+      "unshare -Upf --mount-proc --map-current-user -- env CI=1 bun test --timeout 20000 packages/memory-core",
+    )
+    expect(posixShard2).toContain(serialQuarantineCommand())
+    for (const shard of ["1/2", "2/2"]) {
+      expect(posixShard2).toContain(
+        `bun --config=bunfig.win2.parallel.toml test --timeout 20000 --shard=${shard} --timings=.github/ci-test-timings.json`,
+      )
+    }
     expect(posixShard2).not.toContain("bun --config=bunfig.win2.parallel.toml test --parallel")
   })
 
@@ -162,8 +171,7 @@ describe("root test CI partition", () => {
 
     expect(job).not.toContain("--shard=")
     expect(linuxTestJobs()).not.toContain("--shard=")
-    expect(posixShard1).not.toContain("--shard")
-    expect(posixShard2.match(/--shard=/g)).toHaveLength(1)
+    expect(posixShard2.match(/--shard=/g)).toHaveLength(2)
     expect(job).not.toContain("--path-ignore-patterns=")
     expect(job).not.toContain("format('-c {0}'")
     expect(job).not.toContain("bun test -c")
