@@ -5,7 +5,7 @@
 use std::os::unix::net::UnixStream;
 use std::time::Duration;
 
-use ashpd::desktop::remote_desktop::{DeviceType, RemoteDesktop};
+use ashpd::desktop::remote_desktop::{DeviceType, RemoteDesktop, SelectDevicesOptions};
 use ashpd::desktop::{PersistMode, Session};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use tokio::runtime::Runtime;
@@ -18,7 +18,7 @@ pub const INPUT_PATH_REQUIRED: &str = "RemoteDesktop portal or LIBEI_SOCKET is r
 /// Bound on the presence probe behind `capabilities().inputPermission`.
 const PROBE_TIMEOUT: Duration = Duration::from_secs(2);
 
-type RemoteDesktopSession = Session<'static, RemoteDesktop<'static>>;
+type RemoteDesktopSession = Session<RemoteDesktop>;
 
 /// Which libei devices the user granted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,7 +53,7 @@ async fn close(session: &RemoteDesktopSession) {
 /// constructor succeeds even when no portal service exists (it reads a
 /// failed `version` lookup as version 1), so the property is read again here
 /// and any failure means the portal is not offered.
-async fn offered_portal() -> Result<RemoteDesktop<'static>, String> {
+async fn offered_portal() -> Result<RemoteDesktop, String> {
     let portal = RemoteDesktop::new().await.map_err(|err| err.to_string())?;
     portal
         .get_property::<u32>("version")
@@ -85,7 +85,7 @@ pub fn connect(runtime: &'static Runtime) -> CoreResult<(UnixStream, PortalSessi
             .await
             .map_err(|err| DesktopError::input_failed(format!("{INPUT_PATH_REQUIRED}: {err}")))?;
         let session = portal
-            .create_session()
+            .create_session(Default::default())
             .await
             .map_err(|err| DesktopError::permission_denied(format!("RemoteDesktop CreateSession: {err}")))?;
         match start(&portal, &session).await {
@@ -101,31 +101,31 @@ pub fn connect(runtime: &'static Runtime) -> CoreResult<(UnixStream, PortalSessi
 }
 
 async fn start(
-    portal: &RemoteDesktop<'static>,
+    portal: &RemoteDesktop,
     session: &RemoteDesktopSession,
 ) -> Result<(std::os::fd::OwnedFd, Granted), String> {
     portal
         .select_devices(
             session,
-            DeviceType::Keyboard | DeviceType::Pointer,
-            None,
-            PersistMode::DoNot,
+            SelectDevicesOptions::default()
+                .set_devices(DeviceType::KEYBOARD | DeviceType::POINTER)
+                .set_persist_mode(PersistMode::DoNot),
         )
         .await
         .map_err(|err| format!("RemoteDesktop SelectDevices: {err}"))?;
     let response = portal
-        .start(session, None)
+        .start(session, None, Default::default())
         .await
         .map_err(|err| format!("RemoteDesktop Start: {err}"))?
         .response()
         .map_err(|err| format!("RemoteDesktop permission: {err}"))?;
     let devices = response.devices();
     let granted = Granted {
-        pointer: devices.contains(DeviceType::Pointer),
-        keyboard: devices.contains(DeviceType::Keyboard),
+        pointer: devices.contains(DeviceType::POINTER),
+        keyboard: devices.contains(DeviceType::KEYBOARD),
     };
     let fd = portal
-        .connect_to_eis(session)
+        .connect_to_eis(session, Default::default())
         .await
         .map_err(|err| format!("RemoteDesktop ConnectToEIS: {err}"))?;
     Ok((fd, granted))

@@ -17,4 +17,4 @@ sha2.workspace = true
 libc.workspace = true
 
 [dev-dependencies]
-syn = { version = "=2.0.118", features = ["full", "visit"] }
+syn = { version = "=3.0.10", features = ["full", "visit"] }

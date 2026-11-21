@@ -13,7 +13,7 @@ use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 
 use tokio::runtime::Runtime;
-use zbus::zvariant::{ObjectPath, OwnedValue, Value};
+use zbus::{ObjectPath, OwnedVariant, Variant};
 
 use super::fake_eis::{EisConfig, FakeEis};
 use super::portal_ifaces::{GlobalShortcutsPortal, RemoteDesktopPortal};
@@ -149,11 +149,11 @@ fn start() -> FakeBus {
         .expect("fake portal runtime");
     let connection = runtime
         .block_on(async {
-            zbus::connection::Builder::address(address.as_str())?
-                .name("org.freedesktop.portal.Desktop")?
-                .serve_at(DESKTOP_PATH, RemoteDesktopPortal::new(Arc::clone(&state)))?
-                .serve_at(DESKTOP_PATH, GlobalShortcutsPortal::new(Arc::clone(&state)))?
-                .serve_at(DESKTOP_PATH, ScreenshotPortal::new(Arc::clone(&state)))?
+            zbus::connection::Builder::address(address.as_str())
+                .name("org.freedesktop.portal.Desktop")
+                .serve_at(DESKTOP_PATH, RemoteDesktopPortal::new(Arc::clone(&state)))
+                .serve_at(DESKTOP_PATH, GlobalShortcutsPortal::new(Arc::clone(&state)))
+                .serve_at(DESKTOP_PATH, ScreenshotPortal::new(Arc::clone(&state)))
                 .build()
                 .await
         })
@@ -194,7 +194,7 @@ impl FakeBus {
             .clone()
             .expect("a bound session");
         let session = ObjectPath::try_from(session.as_str()).expect("session path");
-        let options: HashMap<&str, Value<'_>> = HashMap::new();
+        let options: HashMap<&str, Variant<'_>> = HashMap::new();
         self.runtime
             .block_on(self.connection.emit_signal(
                 None::<&str>,
@@ -220,7 +220,7 @@ impl FakeBus {
                 session.as_str(),
                 "org.freedesktop.portal.Session",
                 "Closed",
-                &HashMap::<&str, OwnedValue>::new(),
+                &HashMap::<&str, OwnedVariant>::new(),
             ))
             .expect("emit Closed");
     }

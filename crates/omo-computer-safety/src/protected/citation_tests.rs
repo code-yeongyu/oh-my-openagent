@@ -46,7 +46,7 @@ fn parse(excerpt: &str) -> Result<BTreeMap<u32, String>, String> {
     if numbers != EXCERPT_LINES.collect::<Vec<u32>>() {
         return Err(format!("line numbers must run {EXCERPT_LINES:?} in order"));
     }
-    let digest = format!("{:x}", Sha256::digest(body.as_bytes()));
+    let digest: String = Sha256::digest(body.as_bytes()).iter().map(|byte| format!("{byte:02x}")).collect();
     if digest != header.trim() {
         return Err("the excerpt was edited".to_owned());
     }

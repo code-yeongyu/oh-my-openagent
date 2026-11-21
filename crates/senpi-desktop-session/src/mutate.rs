@@ -38,7 +38,7 @@ use crate::worker::Worker;
 
 /// Serializes input transactions across every session of the process
 /// (gajae `INPUT_TRANSACTION`): capture through restore is never interleaved.
-static INPUT_TRANSACTION: Mutex<()> = parking_lot::const_mutex(());
+static INPUT_TRANSACTION: Mutex<()> = Mutex::new(());
 
 /// How long admission waits on a held transaction lock between cancellation
 /// checks.

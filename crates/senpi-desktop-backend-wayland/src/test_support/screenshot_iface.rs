@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use image::{Rgba, RgbaImage};
 use zbus::message::Header;
-use zbus::zvariant::{OwnedObjectPath, Value};
+use zbus::{OwnedObjectPath, Variant};
 use zbus::{fdo, interface, Connection};
 
 use super::fake_portal::{Shot, State};
@@ -68,7 +68,7 @@ impl ScreenshotPortal {
         let answer = match self.shot()? {
             Shot::Png { width, height } => {
                 let uri = self.write_png(width, height)?;
-                (0, HashMap::from([("uri", Value::from(uri))]))
+                (0, HashMap::from([("uri", Variant::from(uri))]))
             }
             Shot::Deny | Shot::Absent => (1, HashMap::new()),
         };

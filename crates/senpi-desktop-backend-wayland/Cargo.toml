@@ -9,7 +9,7 @@ crate-type = ["rlib"]
 
 [target.'cfg(target_os = "linux")'.dependencies]
 ashpd.workspace = true
-futures = "=0.3.32"
+futures = "=0.3.34"
 image.workspace = true
 libloading.workspace = true
 parking_lot.workspace = true
@@ -20,6 +20,8 @@ senpi-desktop-safety = { path = "../senpi-desktop-safety" }
 serde.workspace = true
 serde_json.workspace = true
 tokio = { workspace = true, features = ["macros", "sync", "time"] }
+# ashpd 0.14 hands the Screenshot portal's URI back as a string; url decodes it to a file path.
+url = "=2.5.9"
 xkeysym.workspace = true
 zbus.workspace = true
 
