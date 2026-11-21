@@ -17,7 +17,7 @@
     }
   },
   "preExistingExports": {
-    // computer-use v3 (row 5): the vitest config default export, same shape as packages/senpi-desktop-sdk
+    // computer-use v3 (row 5): the vitest config default export, the same shape as the desktop SDK package uses
     "packages/omo-computer-protocol/vitest.config.ts": ["default"]
   }
 }
