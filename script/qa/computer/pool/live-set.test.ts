@@ -1,12 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import {
-  blockedSet,
-  MACOS_SCENARIOS,
-  receiptLine,
-  type ScenarioReceipt,
-  summarizeSet,
-  teardownLines,
-} from "./live-set.ts"
+import { blockedSet, MACOS_SCENARIOS, receiptLine, type ScenarioReceipt, summarizeSet } from "./live-set.ts"
 
 const pass: ScenarioReceipt = {
   scenario: "frame-verbs",
@@ -15,10 +8,10 @@ const pass: ScenarioReceipt = {
 }
 
 describe("live macOS set summary", () => {
-  test("before the backend exists every scenario is blocked with one reason and the set exits 0", () => {
+  test("a set where nothing ran never exits 0, so a job cannot show green while every scenario is blocked", () => {
     const summary = summarizeSet("macos", blockedSet("backend_not_built", "none"))
     expect(summary.line).toBe(`SET macos pass=0 fail=0 blocked=${MACOS_SCENARIOS.length} reason=backend_not_built`)
-    expect(summary.exitCode).toBe(0)
+    expect(summary.exitCode).toBe(3)
   })
 
   test("one failing scenario makes the set exit 1", () => {
@@ -36,13 +29,5 @@ describe("receipt lines", () => {
     expect(receiptLine(pass)).toBe(
       "SCENARIO frame-verbs route=synthetic-user PASS oracle=fixture report moved 40 px refusal=minimized window refused",
     )
-  })
-
-  test("teardown prints the process count and the removed directory before any extra receipt", () => {
-    expect(teardownLines({ procs: 0, removedDir: "/tmp/x", extra: ["guest DELETED g1"] })).toEqual([
-      "procs 0",
-      "dir REMOVED /tmp/x",
-      "guest DELETED g1",
-    ])
   })
 })

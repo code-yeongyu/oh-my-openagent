@@ -8,6 +8,8 @@ import type {
   SyncOperationAuthority,
 } from "@oh-my-opencode/memory-core/sync-engine"
 import type { DeviceKeyring } from "@oh-my-opencode/memory-core/keyring"
+// The light subpath: a value import from sync-engine would pull the whole engine (and its wasm asset) into this bundle.
+import { SYNC_CAPABILITIES } from "@oh-my-opencode/memory-core/sync-capabilities"
 import { desktopSyncAccountPorts } from "./desktopSyncAccountPorts"
 import { desktopSyncBoundary } from "./desktopSyncBoundary"
 import { openDesktopSyncOperation } from "./desktopSyncOperation"
@@ -77,7 +79,7 @@ export async function openDesktopSyncAccount(wire: DesktopSyncEngineWire, home?:
   const signal = AbortSignal.any([wire.signal, retired.signal])
   signal.addEventListener("abort", stopListening, { once: true })
   try {
-    return await openAccount(wire, signal, home)
+    return await openAccount(wire, signal, home, () => retired.abort())
   } catch (error) {
     retired.abort()
     throw error
@@ -88,6 +90,7 @@ async function openAccount(
   wire: DesktopSyncEngineWire,
   signal: AbortSignal,
   home: string | undefined,
+  end: () => void,
 ): Promise<DesktopSyncAccount> {
   const descriptor: DesktopSyncDescriptor = SyncDescriptor.parse(await wire.request({ op: "descriptor" }))
   const boundary = desktopSyncBoundary(descriptor, signal, home)
@@ -104,7 +107,9 @@ async function openAccount(
       signal: AbortSignal.any([signal, authority.signal]),
       admit: (effect) => accountAuthority.admit(() => authority.admit(effect)),
     })
-    const call = (data: Readonly<Record<string, unknown>>) => operation.request({ op: "service", data })
+    // A1.1-M3: desktop main copies syncCapabilities verbatim into the `omo-sync-capabilities` header of this request.
+    const call = (data: Readonly<Record<string, unknown>>) =>
+      operation.request({ op: "service", data: { ...data, syncCapabilities: SYNC_CAPABILITIES } })
     const keyring: DeviceKeyring = {
       principal: () => ({ kind: "device", id: descriptor.syncPrincipalId }),
       publicKeys: () => descriptor.publicKeys,
@@ -178,9 +183,13 @@ async function openAccount(
       devices: operation.devices,
       close: operation.close,
     }
-    if (descriptor.genesis !== "supported") return ports
+    const phrase = descriptor.phraseGenesis === "supported"
+    if (descriptor.genesis !== "supported" && !phrase) return ports
     try {
-      const offered = capability.parse(await authority.admit(() => wire.request({ op: "capability" })))
+      const offered =
+        descriptor.genesis === "supported"
+          ? capability.parse(await authority.admit(() => wire.request({ op: "capability" })))
+          : { prfSupported: false, genesisSupported: false }
       // Bound to this operation's main-issued handle; never the background account ports.
       const genesis: GenesisBridge = {
         prfSupported: offered.prfSupported && offered.genesisSupported,
@@ -188,6 +197,16 @@ async function openAccount(
           const reply = await options.operation.admit(() => operation.request({ op: "genesisRun", data: request }))
           return genesisResult.parse(reply) as GenesisBridgeResult
         },
+        ...(phrase && {
+          phraseSupported: true,
+          // The words stay in desktop main's protected window; only the public prepared genesis comes back.
+          async createPhraseGenesis(request, options) {
+            const reply = await options.operation.admit(() =>
+              operation.request({ op: "phraseGenesisRun", data: request }),
+            )
+            return genesisResult.parse(reply) as GenesisBridgeResult
+          },
+        }),
       }
       return { ...ports, genesis }
     } catch (error) {
@@ -210,11 +229,17 @@ async function openAccount(
     async isCurrent() {
       if (signal.aborted) return false
       const current = SyncDescriptor.parse(await wire.request({ op: "descriptor" }))
-      if (signal.aborted || !sameDescriptor(current, descriptor)) return false
-      return boundary(() => true).then(
-        () => true,
-        () => false,
-      )
+      const live =
+        !signal.aborted &&
+        sameDescriptor(current, descriptor) &&
+        (await boundary(() => true).then(
+          () => true,
+          () => false,
+        ))
+      // Callers replace an account that is not current (the account source opens main's next one), so it ends here:
+      // its `retired` listener leaves the channel and sessions on it end, with or without a `retired` event.
+      if (!live) end()
+      return live
     },
   }
 }

@@ -49,7 +49,7 @@ FORBIDDEN:
 - Reordering `describe` / `it` blocks to mask cross-test contamination
 - Relying on test A running before test B
 
-Cross-test contamination = **state leak**. Find the leak. Reset in `beforeEach`, add the reset to `test-setup.ts` if it is shared, or mock at the module boundary (`mock.module`) instead of mutating globals other tests will read.
+Cross-test contamination = **state leak**. Find the leak. Reset in `beforeEach`, add the reset to `test-setup.ts` if it is shared, or inject the dependency (or use a real fake at a boundary) instead of mutating globals other tests will read. New `mock.module` calls are refused by the lint ratchet (`omo-testing/no-module-mock`).
 
 ## AUTHORING GATE
 

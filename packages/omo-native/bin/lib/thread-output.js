@@ -28,7 +28,7 @@ const RENDER = {
         ? [`no threads in ${result.scope === "all" ? "any workspace" : "this workspace"} (try --all-scope)`]
         : result.threads.map(
             (thread) =>
-              `${thread.thread_id}  ${thread.surface ?? "?"}  ${thread.status}  ${thread.name || "(unnamed)"}  ${thread.cwd}${
+              `${thread.thread}  ${thread.surface ?? "?"}  ${thread.state ?? thread.status}  ${thread.name || "(unnamed)"}  ${thread.cwd}${
                 thread.device === undefined ? "" : `  on ${nameOf.get(thread.device) ?? thread.device}`
               }`,
           )),
@@ -37,11 +37,19 @@ const RENDER = {
     ]
   },
   send: (result) => [
-    `${result.delivery?.kind ?? "sent"}: delivery ${result.delivery_id} to ${result.thread_id}${result.deduplicated ? " (already sent)" : ""}`,
+    `${result.delivery?.kind ?? "sent"}: delivery ${result.delivery_id} to ${result.thread}${result.deduplicated ? " (already sent)" : ""}`,
   ],
   read: (result) => [
     ...result.items.map((item) => `[${item.role}] ${item.content}`),
-    ...(result.truncated ? [`(truncated; continue with --cursor ${result.next_cursor})`] : []),
+    ...(result.truncated ? [`(truncated; older messages: --cursor ${result.next_cursor})`] : []),
+  ],
+  close: (result) => [
+    result.closed
+      ? `closed ${result.thread}${result.graceful === undefined ? "" : ` after turn ${result.graceful.turn} (${result.graceful.waited_ms} ms)`}`
+      : `${result.thread} was not running`,
+    ...(result.dropped_deliveries.length === 0
+      ? []
+      : [`returned to their senders: ${result.dropped_deliveries.join(", ")}`]),
   ],
   bind: (result) => [`bound ${bindingLine(result.binding)}${result.deduplicated ? " (already bound)" : ""}`],
   unbind: (result) => [`unbound ${bindingLine(result.binding)}${result.already_closed ? " (already closed)" : ""}`],

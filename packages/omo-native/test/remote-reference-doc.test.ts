@@ -28,6 +28,7 @@ async function printedUsage(): Promise<string> {
       bootstrap: {} as BootstrapSetup,
       coldWake: { install: untouched, uninstall: untouched, status: untouched },
       linkDevice: untouched,
+      optOut: { read: untouched, record: untouched, clear: untouched },
     },
     [],
   )

@@ -131,6 +131,16 @@ const NAMED_RULES: Readonly<Record<string, Rule>> = {
     "host_unavailable",
     () => "check the hub config (or the device service with BUNSHIN_TS_TRANSPORT=relay), then retry",
   ),
+  FanoutOptionsError: rule("invalid_arguments", fixArguments),
+  FanoutDuplicateTargetError: rule(
+    "invalid_arguments",
+    () => 'list each device once, or call fanout with { dedup: "first" } to skip the repeats',
+  ),
+  FanoutTimeoutError: rule(
+    "timeout",
+    ({ device }) =>
+      `the callback on ${device} ran past timeoutMs and may have run part of its work; check its effect, then retry with a larger timeoutMs`,
+  ),
 }
 
 const field = (error: unknown, key: string): unknown =>
@@ -158,11 +168,16 @@ const ruleFor = (error: unknown, name: string | undefined, wireCode: string | un
   return name === undefined ? undefined : NAMED_RULES[name]
 }
 
-export function deviceOperationError(error: unknown, operation: string, device: string): BunshinSessionError {
+/** `requestId` defaults to the error's own request id; a caller that passes one (`resultOf`, whose argument is that id) overrides it. */
+export function deviceOperationError(
+  error: unknown,
+  operation: string,
+  device: string,
+  requestId = text(field(error, "requestId")) ?? "",
+): BunshinSessionError {
   if (error instanceof BunshinSessionError) return error
   const name = text(field(error, "name"))
   const wireCode = text(field(error, "code"))
-  const requestId = text(field(error, "requestId")) ?? ""
   const reason = (error instanceof Error ? error.message : String(error)).replace(TRANSPORT_PREFIX, "")
   const target = { operation, device }
   const matched = ruleFor(error, name, wireCode)

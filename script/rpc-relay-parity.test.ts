@@ -54,6 +54,15 @@ describe("engine RPC local-versus-relay parity table (#13478)", () => {
     expect(namesRecordType('{ type: "prompt_template" }', "prompt")).toBe(false)
   })
 
+  test("a record-type shape inside a comment, a string or a $type property does not count as a pair test", () => {
+    expect(namesRecordType('// sends { type: "prompt" }\n', "prompt")).toBe(false)
+    expect(namesRecordType('/* expects record.type === "prompt" */', "prompt")).toBe(false)
+    expect(namesRecordType(`test('type: "prompt" relays', () => {})`, "prompt")).toBe(false)
+    expect(namesRecordType('const title = `type: "prompt"`', "prompt")).toBe(false)
+    expect(namesRecordType('if (frame.$type === "prompt") relay()', "prompt")).toBe(false)
+    expect(namesRecordType('// comment first\nsend({ type: "prompt" })', "prompt")).toBe(true)
+  })
+
   test("--check reports a broken pair-test row even when the committed table is current", async () => {
     const rows = { prompt: { test: "no/such/pair.test.ts (fakes)" } }
     const rendered = renderTable(await engineMethodClasses(), rows)
@@ -65,6 +74,17 @@ describe("engine RPC local-versus-relay parity table (#13478)", () => {
     expect(checkProblems(`${rendered}stale`, rendered, {})).toEqual([
       `${TABLE_PATH} is stale; run: bun script/rpc-relay-parity.ts`,
     ])
+  })
+
+  test("regex literals, ternaries, type declarations and template expressions are read as code (#13826 review L1-L3)", () => {
+    expect(namesRecordType(`/'/.test(x)\ntest('type: "prompt" relays', () => {})`, "prompt")).toBe(false)
+    expect(namesRecordType(`const q = /["']/g\nsend({ type: "prompt" })`, "prompt")).toBe(true)
+    expect(namesRecordType('const u = /https?:\\/\\//\nsend({ type: "prompt" })', "prompt")).toBe(true)
+    expect(namesRecordType('const k = flag ? "type" : "prompt"', "prompt")).toBe(false)
+    expect(namesRecordType('expect(s).toMatch(/type: "prompt"/)', "prompt")).toBe(false)
+    expect(namesRecordType('type Frame = { type: "prompt" }', "prompt")).toBe(false)
+    expect(namesRecordType('const t = `${send({ type: "prompt" })}`', "prompt")).toBe(true)
+    expect(namesRecordType('if (frame?.type === "prompt") relay()', "prompt")).toBe(true)
   })
 
   test("a rows file with a misspelled key is refused", () => {

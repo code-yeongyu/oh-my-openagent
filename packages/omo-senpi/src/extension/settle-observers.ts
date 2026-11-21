@@ -9,10 +9,17 @@ const SETTLE_OBSERVER_BUDGET_MS = 2_000
  * admitted before cancellation finish under their existing locks and remain identity-owned.
  * Their promises stay observed even after the host is released. The next settle retries
  * incomplete bookkeeping from durable state instead of reusing a retired event context.
+ *
+ * Repeated settles of one session coalesce by supersession (omo#14351): a newer settle of the
+ * same session replaces its still-running predecessor for the same hook, aborting it at its next
+ * phase boundary and logging the skip. Every settle handler is idempotent against durable state,
+ * so the newest settle's run subsumes the superseded ones; a mass wake then costs one in-flight
+ * run per (session, hook) instead of a stack of them holding the host's awaited settle path.
  */
 export function createSettleObservers(pi: SenpiExtensionAPI, logger: ComponentLogger) {
   const pending = new Map<AbortController, string | undefined>()
   const cancellations = new WeakSet<DOMException>()
+  const inFlight = new Map<string, AbortController>()
   const retire: Handler = (_event, ctx) => {
     const sessionId = readSessionId(ctx)
     for (const [controller, owner] of pending) {
@@ -43,6 +50,23 @@ export function createSettleObservers(pi: SenpiExtensionAPI, logger: ComponentLo
           },
         }
         pending.set(controller, sessionId)
+        const inFlightKey = `${sessionId ?? "*"}\u0000${hookLabel}`
+        const superseded = inFlight.get(inFlightKey)
+        if (superseded !== undefined && !superseded.signal.aborted) {
+          const reason = new DOMException("Settle hook superseded by a newer settle", "AbortError")
+          cancellations.add(reason)
+          superseded.abort(reason)
+          logger.warn("extension_handler_superseded", {
+            event: "extension_handler_superseded",
+            extension: "omo.js",
+            component,
+            hook,
+            handlerEvent: "agent_settled",
+            stage: "superseded",
+            sessionId,
+          })
+        }
+        inFlight.set(inFlightKey, controller)
         const released = Promise.withResolvers<undefined>()
         const onAbort = () => released.resolve(undefined)
         signal.addEventListener("abort", onAbort, { once: true })
@@ -74,6 +98,7 @@ export function createSettleObservers(pi: SenpiExtensionAPI, logger: ComponentLo
           clearTimeout(timer)
           signal.removeEventListener("abort", onAbort)
           pending.delete(controller)
+          if (inFlight.get(inFlightKey) === controller) inFlight.delete(inFlightKey)
         }
       }
     },

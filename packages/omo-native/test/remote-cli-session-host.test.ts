@@ -1,7 +1,5 @@
 import { describe, expect, test } from "bun:test"
 
-import { generateKeyPairSync } from "node:crypto"
-
 import { connectDeviceService } from "../../device-service-core/src/index.ts"
 import { startFakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
 import { defaultWorld } from "../../device-service-core/test/local-api/conformance/world.ts"
@@ -16,6 +14,7 @@ import {
   privateDir,
   run,
   SIGNED_IN,
+  signedInCredential,
   testBootstrap,
   useRemoteCliCleanup,
 } from "./remote-cli-harness"
@@ -112,7 +111,7 @@ describe("omo remote enable: the one command after sign-in", () => {
       status: async () => local,
     }
     const json = await run(["status", "--json"], undefined, SIGNED_IN, testBootstrap(), undefined, { coldWake })
-    expect(JSON.parse(json.out.join(""))).toEqual({ ...defaultWorld().status, local })
+    expect(JSON.parse(json.out.join(""))).toEqual({ ...defaultWorld().status, service_version: "1.4.0", local })
     const human = await run(["status"], undefined, SIGNED_IN, testBootstrap(), undefined, { coldWake })
     expect(human.out.some((line) => line.startsWith("Session host") && line.includes("pinned"))).toBe(true)
   })
@@ -122,19 +121,7 @@ describe("omo remote enable: the one command after sign-in", () => {
 // was installed never reached it, so the explicit enable verb (never the background bootstrap) hands the signed-in
 // session's device keys to the service through the same handoff a fresh login uses, and only while it holds no device.
 describe("omo remote enable links a sign-in the service has not seen", () => {
-  const signedIn: Credentials = {
-    accessToken: "access-1",
-    accessTokenExpiresAt: new Date(Date.now() + 3_600_000).toISOString(),
-    refreshToken: "refresh-1",
-    device: { id: "dev-self", name: "This Mac" },
-    accountId: "acct-1",
-    signingPrivateKey: generateKeyPairSync("ed25519")
-      .privateKey.export({ format: "der", type: "pkcs8" })
-      .toString("base64"),
-    sealingPrivateKey: generateKeyPairSync("x25519")
-      .privateKey.export({ format: "der", type: "pkcs8" })
-      .toString("base64"),
-  }
+  const signedIn: Credentials = signedInCredential()
 
   async function serviceWithoutDevice(hasDevice: boolean) {
     const world = defaultWorld()
