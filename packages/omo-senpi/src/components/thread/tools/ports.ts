@@ -53,6 +53,8 @@ export type ThreadHostSession = {
   readonly endpoint_kind?: EndpointKind
   /** The controls that endpoint accepts (`endpoint-controls.ts`). */
   readonly controls?: readonly ThreadControl[]
+  /** The version of the engine that endpoint runs, as its get_protocol_info names it (#14278). */
+  readonly engine_version?: string
   /**
    * The endpoint that listed this session. Routing ids are per-host counters (`rpc-1` on every
    * host), so a session is only addressable as the pair (socket, sessionId); absent for a host

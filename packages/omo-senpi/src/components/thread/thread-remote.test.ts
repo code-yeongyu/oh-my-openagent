@@ -255,6 +255,16 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     expect(a.sent).toEqual([])
   })
 
+  test("#given b is offline and its thread's row is ended #when thread_create reopens it by id #then device_offline names b by id and by name, through the module's device resolution (#14305)", async () => {
+    const a = account({ online: false, rowState: "ended" })
+    const { run } = surface(a.remote)
+    expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({
+      kind: "error",
+      error: { code: "device_offline", details: { device: "b", device_name: "studio" } },
+    })
+    expect(a.sent).toEqual([])
+  })
+
   test("#given b answered again but its row still came from the cache #when thread_create names it by id #then b is asked which file carries its id and opens that file, as for an ended thread (#14043, #14170)", async () => {
     const a = account({ rows: [{ ...B_ROW, source: "cache" }] })
     const { run } = surface(a.remote)
