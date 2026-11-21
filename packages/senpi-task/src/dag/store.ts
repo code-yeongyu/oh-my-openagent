@@ -162,7 +162,7 @@ export function dagKeyHash(parentSessionId: string, runKey: string): string {
 // The state directory can vanish under a live session (git clean, rm -rf .omo, worktree teardown).
 // Every listing reads a missing directory as empty: it holds no runs, and the next write recreates it.
 // Only a present-but-unreadable directory is an error worth raising.
-export function readDagDirectory(directory: string): readonly fs.Dirent[] {
+function readDagDirectory(directory: string): readonly fs.Dirent[] {
   try {
     return fs.readdirSync(directory, { withFileTypes: true })
   } catch (error) {

@@ -24,11 +24,15 @@ export type DagNodeResultPersistOutcome =
   | { readonly kind: "persisted"; readonly artifact: DagNodeResultArtifact }
   | { readonly kind: "failed"; readonly diagnostic: DagStoreDiagnostic }
 
+// The public resume-reuse shape: the node's output and its run stats, nothing about where they live.
 export type DagNodeResultRead = {
   readonly output: string
   readonly runStats?: TaskRunStats
-  readonly artifact: DagNodeResultArtifact
 }
+
+// The scheduler projection also needs the artifact refs (path, bytes, sha256) to rebuild a node's
+// result metadata on replay; that stays inside the package.
+export type DagNodeResultReplay = DagNodeResultRead & { readonly artifact: DagNodeResultArtifact }
 
 export type DagNodeResultPersistInput = {
   readonly store: DagFileStore
@@ -100,6 +104,14 @@ export function persistDagNodeResult(input: DagNodeResultPersistInput): DagNodeR
  * never TaskRecord.final_response / run_stats, so reuse survives the task TTL sweep.
  */
 export function readDagNodeResult(input: DagNodeResultReadInput): DagNodeResultRead | null {
+  const replay = readDagNodeResultReplay(input)
+  if (replay === null) return null
+  return replay.runStats === undefined
+    ? { output: replay.output }
+    : { output: replay.output, runStats: replay.runStats }
+}
+
+export function readDagNodeResultReplay(input: DagNodeResultReadInput): DagNodeResultReplay | null {
   let outputPath: string
   try {
     // Same backstop as persist: an unsafe node id reads nothing rather than escaping the state dir.

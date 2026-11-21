@@ -1,7 +1,7 @@
 import { applyDagRunMutation } from "./manager"
 import { applyRunPause } from "./run-pause"
 import { applyPausedDagEvent, isPausedDagEvent } from "./paused-events"
-import { persistDagNodeResult, readDagNodeResult, type DagNodeResultRead } from "./results"
+import { persistDagNodeResult, readDagNodeResultReplay, type DagNodeResultReplay } from "./results"
 import type { DagFileStore } from "./store"
 import { DAG_NODE_OUTPUT_PREVIEW_CHARS, type DagRunEvent } from "./types"
 import { TERMINAL_NODE_STATES, type PendingTerminalResult, type DagNodeWithResult } from "./scheduler-context"
@@ -147,8 +147,8 @@ function assertNever(value: never): never {
   throw new Error(`unexpected DAG event ${JSON.stringify(value)}`)
 }
 
-function replayDagNodeResult(store: DagFileStore, runId: DagRunId, nodeId: DagNodeId): DagNodeResultRead | undefined {
-  return readDagNodeResult({ store, runId, nodeId }) ?? undefined
+function replayDagNodeResult(store: DagFileStore, runId: DagRunId, nodeId: DagNodeId): DagNodeResultReplay | undefined {
+  return readDagNodeResultReplay({ store, runId, nodeId }) ?? undefined
 }
 
 function transitionedNode(node: DagNode, state: DagNodeState, at: string, error?: DagNodeError): DagNode {
