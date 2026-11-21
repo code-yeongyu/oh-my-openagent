@@ -189,7 +189,7 @@ export async function followRemote(
     readonly clientMessageId?: string
   },
 ): Promise<RemoteFollow | Failure> {
-  const online = await resolveTypedDevice(remote.client, row.device)
+  const online = await resolveTypedDevice(remote.client, row.device, { exactId: true })
   if (online.kind === "error") return online
   // An id-carrying send: the user entries carrying its text before it is sent (read before the watch, so before the
   // send). On an engine that stamps no id they are all earlier sends, finished or not, and a prompt matched only by

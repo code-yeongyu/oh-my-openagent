@@ -26,12 +26,14 @@ export type DeviceResolution =
  * The one device resolver (design section 3): exact id > `here` > name (of the devices sharing it the online ones win,
  * so an offline twin a re-registered machine left behind never shadows the live device; several winners are
  * ambiguous_target) > a unique id prefix of 6+ characters. Whether an offline device resolves depends only on
- * `online`, never on the form: with it, a device found offline by any form is device_offline.
+ * `online`, never on the form: with it, a device found offline by any form is device_offline. A caller that holds a
+ * listing row's device id passes `exactId`: the id resolves or the refusal is the unknown-device one, so a row whose
+ * device left the roster never lands on a device that shares its prefix or carries its text as a name.
  */
 export function resolveDevice(
   roster: DeviceRoster,
   text: string,
-  opts: { readonly online: boolean },
+  opts: { readonly online: boolean; readonly exactId?: boolean },
 ): DeviceResolution {
   const refused = (refusal: AddressRefusal): DeviceResolution => ({ kind: "refusal", refusal })
   const found = (row: DeviceRow): DeviceResolution =>
@@ -49,6 +51,7 @@ export function resolveDevice(
         }
   const byId = roster.devices.find((row) => row.id === text)
   if (byId !== undefined) return found(byId)
+  if (opts.exactId === true) return refused(noDevice(text, roster.devices))
   if (text === HERE) {
     const self = roster.devices.find((row) => row.id === roster.here)
     if (self !== undefined) return found(self)
