@@ -1,3 +1,18 @@
+## 2026-11-21 - `omo account sign-in` (#14513)
+
+`account-cli.ts` / `account-sign-in.ts`: the machine-interface verb `sign-in [--stdin|--check]` prints one JSON object per line (`code`, then `signed_in` or `refused`) and nothing else on stdout; the interface's description says this verb alone widens one line to lines. The origin comes from `OMO_SERVICE_API_URL`; there is no origin flag.
+
+## 2026-11-20 - the brand profile names the plugin the launcher prepends (#14467)
+
+`bin/lib/engine-environment.js` `brandProfile()` and `compiled-environment.ts` add `extensions: [<plugin dir>]` to `SENPI_BRAND`: the exact path `spawnSenpi` / `buildSenpiArgs` pass with `--extension`. senpi's attach plan (senpi#6914) refuses every `--extension` on a start that attaches to a host-held session, and the brand field is how it tells the distribution's own plugin from a user flag (#14465). Older engines ignore the key.
+
+## 2026-11-19 - omo update for the side-by-side versions layout (#14256)
+
+- `versioned-install.js`: `findVersionedInstall` recognises `<versions>/<ver>/node_modules/omo-ai` with `<versions>/current` linking into `<versions>`; `updateVersionedInstall` bun-installs the same package.json shape into `.stage-<ver>-<pid>`, rewrites the `omo` wrapper to the new dir, renames it to `<ver>`, runs it, writes `.complete`, then renames a fresh symlink over `current`. A failed install or a dir reporting another version never becomes `current` (`.failed-<ver>-<ts>`).
+- A target dir another writer already installed is adopted when it runs the target (no reinstall, `.complete` added); a live `.stage-<target>-<pid>` of another installer stops the update; `versioned-leftovers.js` keeps the 2 newest `.failed-*` and removes stages whose pid is gone. The `omo` wrapper is generated from its template for the new dir.
+- `path-omo.js`: the first executable `omo` on PATH and its `--version` line; a mismatch after the switch exits 1 naming both paths (#12022).
+- `self-update.js` chooses the versioned layout before the npm/bun target; `RunOptions` gains `cwd`.
+
 ## 2026-11-17 - omo sync disable (#14093)
 
 - `sync-cli.ts`: `omo sync disable` turns memory sync off for this device through `disableSync`; exit 0 with the off line, exit 1 when the service refuses or the device is signed out. `bin/lib/service-auth.generated.js` is rebuilt.
