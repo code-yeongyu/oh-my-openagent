@@ -98,6 +98,7 @@ Synthetic host skill.
       sessionID: "synthetic",
       directory: project,
       ask: async () => {},
+      abort: new AbortController().signal,
     })
     const tool = createSkillMcpTool({ manager, getLoadedSkills: () => context.mergedSkills })
     const first = await tool.execute({ mcp_name: "synthetic", tool_name: "test" }, toolContext)
