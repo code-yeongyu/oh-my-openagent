@@ -94,31 +94,65 @@ export class OwnershipUnprovenError extends Error {
 }
 
 /**
- * Whether a journal that names no account (an older build wrote it) belongs to the signed-in account: the record it
- * applied at its cursor must be the one the signed-in account's server holds there (review r2 H2). A journal that
- * never applied or queued anything holds no account's content. The pull runs outside the writer lock (sync-design §5);
- * a pull that fails proves nothing either way.
+ * An older journal whose owner no record the service still keeps can show (#14491 review r3 M1): it is neither
+ * adopted nor set aside, and nothing is captured or uploaded until the person chooses.
  */
-async function provenOwn(deps: EngineDeps, dir: string, queued: boolean): Promise<boolean> {
+export class OwnershipUndecidedError extends Error {
+  override readonly name = "OwnershipUndecidedError"
+  constructor() {
+    super("memory sync cannot tell which account this device's memory belongs to")
+  }
+}
+
+type Ownership = "own" | "other" | "undecided"
+
+/** How many of the journal's newest applied records the proof asks the service about before it stays undecided. */
+const PROOF_RECORDS = 3
+
+/**
+ * Whether a journal that names no account (an older build wrote it) belongs to the signed-in account (review r2 H2):
+ * one of its newest applied records must be what that account's server holds at the same seq, a retained row by batch
+ * id and digest, or the snapshot the journal applied by its covered seq and a stated digest (review r3 M1). Only a
+ * retained row that differs, or a head below the journal's cursor, proves another owner; a record the service no
+ * longer keeps proves nothing. A journal that never applied or queued anything holds no account's content. The pulls
+ * run outside the writer lock (sync-design §5); a pull that fails proves nothing either way.
+ */
+async function ownership(deps: EngineDeps, dir: string, queued: boolean): Promise<Ownership> {
   const { applied } = await readJson<{ readonly applied: number }>(join(dir, "state.json"), { applied: 0 })
-  if (applied === 0) return !queued
+  if (applied === 0) return queued ? "undecided" : "own"
   const index = await readJson<Record<string, { readonly seq: number; readonly digest: string }>>(
     join(dir, "applied.json"),
     {},
   )
-  const [batchId, record] = Object.entries(index)
+  const records = Object.entries(index)
     .filter(([, r]) => r.seq <= applied)
-    .sort(([, a], [, b]) => b.seq - a.seq)[0] ?? [null, null]
-  let page: Awaited<ReturnType<EngineDeps["transport"]["pull"]>>
-  try {
-    page = await deps.transport.pull((record?.seq ?? applied) - 1, 1)
-  } catch (error) {
-    throw new OwnershipUnprovenError(error)
+    .sort(([, a], [, b]) => b.seq - a.seq)
+    .slice(0, PROOF_RECORDS)
+  for (const [batchId, record] of records) {
+    let page: Awaited<ReturnType<EngineDeps["transport"]["pull"]>>
+    try {
+      page = await deps.transport.pull(record.seq - 1, 1)
+    } catch (error) {
+      throw new OwnershipUnprovenError(error)
+    }
+    if (page.head < applied) return "other"
+    const snapshot = page.snapshot
+    if (snapshot !== null) {
+      const stated = record.digest !== "" && snapshot.digest !== null
+      if (
+        batchId.startsWith("snapshot:") &&
+        snapshot.coversSeq === record.seq &&
+        stated &&
+        snapshot.digest === record.digest
+      )
+        return "own"
+      continue
+    }
+    const entry = page.entries[0]
+    if (entry?.seq !== record.seq || batchId.startsWith("snapshot:")) continue
+    return entry.batchId === batchId && entry.digest === record.digest ? "own" : "other"
   }
-  if (page.head < applied) return false
-  if (record === null) return true
-  const entry = page.entries[0]
-  return entry?.seq === record.seq && entry.batchId === batchId && entry.digest === record.digest
+  return "undecided"
 }
 
 async function pruneRetired(path: string, keep: string): Promise<void> {
@@ -156,16 +190,20 @@ export async function claimAccount(deps: EngineDeps, journal: SyncJournal): Prom
   if (account === undefined) return pending !== null
   const owner = (await journal.state()).account
   if (owner === account) return pending !== null
-  if (owner === null && (await provenOwn(deps, journal.dir, (await journal.pending()).items.length > 0))) {
-    await journal.updateState({ account })
-    return pending !== null
+  if (owner === null) {
+    const verdict = await ownership(deps, journal.dir, (await journal.pending()).items.length > 0)
+    if (verdict === "undecided") throw new OwnershipUndecidedError()
+    if (verdict === "own") {
+      await journal.updateState({ account })
+      return pending !== null
+    }
   }
   const unknown = parkedJournal(journal, UNKNOWN_ACCOUNT)
   const reclaim =
     owner !== null &&
     !existsSync(parkedJournal(journal, account)) &&
     existsSync(unknown) &&
-    (await provenOwn(deps, unknown, true))
+    (await ownership(deps, unknown, true)) === "own"
   await deps.lock.withLock(async () => {
     if (reclaim) {
       await rename(unknown, parkedJournal(journal, account))

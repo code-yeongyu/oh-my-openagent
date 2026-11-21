@@ -92,3 +92,53 @@ test("#given A's legacy memory was set aside under B #when A signs in again and 
   expect(await d.read("two.md")).toBe(note("two on a\n"))
   expect(serverB.head).toBe(0)
 })
+
+async function legacyJournal(
+  d: Device,
+): Promise<{ applied: Record<string, { seq: number; digest: string }>; state: string }> {
+  const dir = join(d.repo.root, ".git", "omo-sync")
+  return {
+    applied: JSON.parse(await readFile(join(dir, "applied.json"), "utf8")) as Record<
+      string,
+      { seq: number; digest: string }
+    >,
+    state: join(dir, "state.json"),
+  }
+}
+
+test("#given the owner's legacy journal last applied a snapshot the server still states #when it signs in #then it is adopted and its unsent edit reaches the owner", async () => {
+  const serverA = new FakeSyncServer()
+  const d = await legacyDeviceOnA(serverA)
+  const head = serverA.head
+  serverA.compact(head, new TextEncoder().encode(`snapshot through ${head}`))
+  const digest = serverA.snapshot?.digest ?? ""
+  const dir = join(d.repo.root, ".git", "omo-sync")
+  await writeFile(join(dir, "applied.json"), JSON.stringify({ [`snapshot:${head}`]: { seq: head, digest } }))
+  await d.write("unsent.md", note("edited before the upgrade, never pushed\n"))
+
+  await d.restart(undefined, undefined, { server: serverA, account: "acc_a" })
+  await settle(d)
+
+  expect(await d.read("one.md")).toBe(note("one on a\n"))
+  expect(serverA.head).toBe(head + 1)
+  expect((await readdir(join(d.repo.root, ".git"))).filter((name) => name.startsWith("omo-sync.account-"))).toEqual([])
+})
+
+test("#given a legacy journal whose records the server compacted away #when the device signs in #then it stays undecided: nothing adopted, set aside or uploaded", async () => {
+  const serverA = new FakeSyncServer()
+  const d = await legacyDeviceOnA(serverA)
+  const head = serverA.head
+  expect(Object.values((await legacyJournal(d)).applied).some((r) => r.seq === head)).toBe(true)
+  serverA.compact(head, new TextEncoder().encode(`snapshot through ${head}`))
+  await d.write("unsent.md", note("edited before the upgrade, never pushed\n"))
+
+  await d.restart(undefined, undefined, { server: serverA, account: "acc_a" })
+  await expect(d.engine.runCycle()).rejects.toMatchObject({ name: "OwnershipUndecidedError" })
+  await d.engine.runCycle().catch(() => undefined)
+
+  expect(await d.engine.status()).toMatchObject({ kind: "failing", failure: { kind: "ownership_undecided" } })
+  expect(serverA.head).toBe(head)
+  expect(await d.read("one.md")).toBe(note("one on a\n"))
+  expect((await readdir(join(d.repo.root, ".git"))).filter((name) => name.startsWith("omo-sync.account-"))).toEqual([])
+  expect(JSON.parse(await readFile((await legacyJournal(d)).state, "utf8"))).not.toHaveProperty("account")
+})

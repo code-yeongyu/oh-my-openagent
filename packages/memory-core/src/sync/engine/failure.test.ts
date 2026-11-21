@@ -3,7 +3,8 @@ import { expect, test } from "bun:test"
 import { GitCommandError } from "../../git/errors"
 import { SyncFormatError } from "../crypto/vendor/sync-format/jcs"
 import { SyncCommitError } from "./adapters/git-sync-repo"
-import { SyncHttpError } from "./adapters/http-transport"
+import { OwnershipUnprovenError } from "./account-journal"
+import { SyncAuthError, SyncHttpError, SyncNetworkError } from "./adapters/http-transport"
 import { describeSyncFailure } from "./failure"
 import { logCycleFailure } from "./failure-cause"
 
@@ -120,4 +121,19 @@ test("a failed sync-repo commit on the warning names its class only; its git out
   expect(lines.filter(({ level }) => level === "info").map(({ line }) => line)).toEqual([
     expect.stringContaining("secret-value"),
   ])
+})
+
+test("#given the ownership proof failed #when its cause is an expired sign-in #then the status asks for a sign-in, not a wait (#14491 review r3 L1)", () => {
+  expect(
+    describeSyncFailure(new OwnershipUnprovenError(new SyncAuthError(new Error("refresh failed"))), "load").kind,
+  ).toBe("auth_expired")
+  expect(
+    describeSyncFailure(new OwnershipUnprovenError(new SyncHttpError("unauthorized", 401, false)), "load").kind,
+  ).toBe("auth_expired")
+  expect(
+    describeSyncFailure(new OwnershipUnprovenError(new SyncNetworkError(new TypeError("fetch failed"))), "load"),
+  ).toMatchObject({
+    kind: "offline",
+    reason: expect.stringContaining("which account"),
+  })
 })
