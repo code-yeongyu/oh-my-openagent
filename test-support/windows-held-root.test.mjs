@@ -91,7 +91,7 @@ describe("Windows held-root diagnostic", () => {
       } finally {
         await rm(root, { recursive: true, force: true })
       }
-    }, 50_000)
+    })
   }
 
   for (const [name, run] of [
