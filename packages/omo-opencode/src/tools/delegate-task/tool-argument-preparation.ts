@@ -46,6 +46,7 @@ export async function prepareDelegateTaskArgs(
       subagent_type: originalSubagentType,
     })
   }
+  const wake = args.wake === "none" ? "none" : "each"
 
   let loadSkills = args.load_skills
   if (typeof loadSkills === "string") {
@@ -95,6 +96,7 @@ export async function prepareDelegateTaskArgs(
     descriptionSource,
     prompt,
     run_in_background: runInBackground === true,
+    wake,
     task_id: taskID,
     command,
     load_skills: normalizedLoadSkills,
