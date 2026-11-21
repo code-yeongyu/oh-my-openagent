@@ -74,8 +74,6 @@
     "packages/omo-native/bin/lib/model-chains.js": ["formatModelChainLines"],
     // pre-existing at origin dev 4686e425b5: unused export(s) readInstalledVersion
     "packages/omo-native/bin/lib/self-update.js": ["readInstalledVersion"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) default
-    "packages/omo-native/bin/lib/service-auth.generated.js": ["default"],
     // pre-existing at origin dev 4686e425b5: unused export(s) API_KEY_TYPE_ACCEPTLIST
     "packages/omo-native/bin/lib/setup-credentials.js": ["API_KEY_TYPE_ACCEPTLIST"],
     // pre-existing at origin dev 4686e425b5: unused export(s) KNOWN_AUTH_SCHEMA_VERSIONS

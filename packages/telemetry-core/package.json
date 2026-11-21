@@ -49,7 +49,7 @@
     "@opentelemetry/api-logs": "0.223.0",
     "@opentelemetry/context-async-hooks": "2.12.0",
     "@opentelemetry/core": "2.12.0",
-    "posthog-node": "^6.0.5"
+    "posthog-node": "^5.74.0"
   },
   "sideEffects": false
 }

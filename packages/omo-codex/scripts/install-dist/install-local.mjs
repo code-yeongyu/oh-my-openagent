@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:f1f8290845a6a756f36c8a7f4c858a0b9e6e36b5194273701d960472b25edf60:cbc64ec2be1c37d35ba532181c5e198ecaf01f99a39ffed81aff54d40f1692bc
+// omo-codex-install:f1f8290845a6a756f36c8a7f4c858a0b9e6e36b5194273701d960472b25edf60:f00efa83c66f79127d6ae07cc9fb925e3cfbc61a5554f948569fe8bf0ad18426
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -636,7 +636,7 @@ var init_injected_client = __esm(() => {
   };
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/module.node.mjs
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/module.node.mjs
 import { dirname as dirname11, posix as posix3, sep as sep8 } from "node:path";
 function createModulerModifier() {
   const getModuleFromFileName = createGetModuleFromFilename();
@@ -2660,15 +2660,7 @@ var init_cookie = __esm(() => {
 });
 
 // node_modules/.bun/@posthog+core@1.69.2/node_modules/@posthog/core/dist/event-options.mjs
-var EVENT_OPTION_LEGACY_PROPERTIES;
-var init_event_options = __esm(() => {
-  EVENT_OPTION_LEGACY_PROPERTIES = {
-    process_person_profile: "$process_person_profile",
-    cookieless_mode: "$cookieless_mode",
-    disable_skew_correction: "$ignore_sent_at",
-    product_tour_id: "$product_tour_id"
-  };
-});
+var init_event_options = () => {};
 
 // node_modules/.bun/@posthog+core@1.69.2/node_modules/@posthog/core/dist/featureFlagUtils.mjs
 function getFlagDetailFromFlagAndPayload(key, value, payload) {
@@ -7491,7 +7483,7 @@ var init_dist = __esm(() => {
   init_types();
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/context-lines.node.mjs
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/context-lines.node.mjs
 import { constants as constants2 } from "node:fs";
 import { open as promises_open } from "node:fs/promises";
 import { isAbsolute as isAbsolute7 } from "node:path";
@@ -7778,7 +7770,7 @@ var init_context_lines_node = __esm(() => {
   LRU_FILE_CONTENTS_FS_READ_FAILED = new ReduceableCache(20);
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/relative-path.node.mjs
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/error-tracking/modifiers/relative-path.node.mjs
 import { isAbsolute as isAbsolute8, relative as relative5, sep as sep9 } from "node:path";
 function createRelativePathModifier(basePath = process.cwd()) {
   const isWindows = sep9 === "\\";
@@ -7795,11 +7787,11 @@ function createRelativePathModifier(basePath = process.cwd()) {
 }
 var init_relative_path_node = () => {};
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/version.mjs
-var version2 = "6.0.5";
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/version.mjs
+var version2 = "5.74.0";
 var init_version = () => {};
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/types.mjs
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/types.mjs
 var FeatureFlagError2;
 var init_types3 = __esm(() => {
   FeatureFlagError2 = {
@@ -7812,7 +7804,7 @@ var init_types3 = __esm(() => {
   };
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/flags-response.mjs
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/flags-response.mjs
 function readFlagRecords(body) {
   if (!isPlainObject3(body))
     return {
@@ -8041,7 +8033,7 @@ var init_flags_response = __esm(() => {
   };
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/feature-flag-evaluations.mjs
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/feature-flag-evaluations.mjs
 class FeatureFlagEvaluations {
   constructor(init) {
     this._host = init.host;
@@ -8198,7 +8190,7 @@ var init_feature_flag_evaluations = __esm(() => {
   init_types3();
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/flag-events.mjs
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/flag-events.mjs
 function ruleAttribution(record) {
   if (record === undefined || record.unreadableField !== undefined || record.metadata.configVersion !== 2)
     return;
@@ -8237,8 +8229,8 @@ function applyFlagEventCapture(properties, capture) {
     ...capture.pinned
   };
 }
-function minimizeConfigVersion2FlagCalledProperties(properties, transportKeys = []) {
-  const minimal = minimizeFlagCalledEventProperties(properties, transportKeys);
+function minimizeConfigVersion2FlagCalledProperties(properties) {
+  const minimal = minimizeFlagCalledEventProperties(properties);
   for (const name of CONFIG_VERSION_2_ATTRIBUTION_PROPERTIES)
     if (properties[name] !== undefined)
       minimal[name] = properties[name];
@@ -8385,7 +8377,7 @@ var init_flag_events = __esm(() => {
   UUID_PATTERN = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/feature-flags/feature-flags.mjs
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/feature-flags/feature-flags.mjs
 function normalizeEvaluationRuntime(value) {
   return value === "client" || value === "server" ? value : "all";
 }
@@ -8512,7 +8504,7 @@ class FeatureFlagsPoller {
           skipLoadCheck: true
         });
         response[flag.key] = matchValue;
-        if (matchPayload != null)
+        if (matchPayload)
           payloads[flag.key] = matchPayload;
       } catch (e) {
         if (e instanceof RequiresServerEvaluation || e instanceof InconclusiveMatchError) {
@@ -9219,7 +9211,7 @@ var init_feature_flags = __esm(() => {
   ];
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/error-tracking/autocapture.mjs
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/error-tracking/autocapture.mjs
 function splitNodeOptions(nodeOptions) {
   const args = [];
   let current = "";
@@ -9648,15 +9640,12 @@ var init_autocapture = __esm(() => {
   posthogGlobal = globalThis;
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/context/event-context.mjs
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/context/event-context.mjs
 function snapshotEventContext(context) {
   const snapshot = context ? {
     ...context,
     properties: {
       ...context.properties
-    },
-    options: {
-      ...context.options
     }
   } : null;
   return (event) => Object.assign(event, {
@@ -9671,63 +9660,8 @@ var init_event_context = __esm(() => {
   capturedContext = Symbol("capturedContext");
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/error-tracking/index.mjs
-function withoutNullObjectProperties(value) {
-  const copies = new WeakMap;
-  const pending = [];
-  const copyValue = (source, inArray = false) => {
-    if (!Array.isArray(source) && (source === null || typeof source != "object" || Object.getPrototypeOf(source) !== Object.prototype && Object.getPrototypeOf(source) !== null))
-      return source;
-    if (copies.has(source))
-      return copies.get(source);
-    const toJSON = source.toJSON;
-    if (typeof toJSON == "function")
-      return {
-        toJSON(key) {
-          const representation = JSON.parse(safeJsonStringify({
-            [key]: {
-              toJSON: toJSON.bind(source)
-            }
-          }))[key];
-          if (representation === null && !inArray)
-            return;
-          return withoutNullObjectProperties(representation);
-        }
-      };
-    const array = Array.isArray(source);
-    const target = array ? new Array(source.length) : {};
-    copies.set(source, target);
-    pending.push({
-      source,
-      target,
-      array
-    });
-    return target;
-  };
-  const root = copyValue(value);
-  while (pending.length) {
-    const { source, target, array } = pending.pop();
-    const keys = array ? Array.prototype.keys.call(target) : Object.keys(source);
-    for (const key of keys) {
-      if (array && !(key in source))
-        continue;
-      const entry = source[key];
-      if (entry !== null || array)
-        Object.defineProperty(target, key, {
-          value: copyValue(entry, array),
-          enumerable: true,
-          configurable: true,
-          writable: true
-        });
-    }
-  }
-  return root;
-}
-function isReservedExceptionProperty(key) {
-  return key.startsWith("$exception_") && key !== "$exception_fingerprint" || key === "$debug_images" || key === "$cymbal_errors";
-}
-
-class ErrorTracking {
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/error-tracking/index.mjs
+class error_tracking_ErrorTracking {
   constructor(client, options, _logger) {
     this.client = client;
     this._exceptionAutocaptureEnabled = options.enableExceptionAutocapture || false;
@@ -9742,24 +9676,16 @@ class ErrorTracking {
   static isPreviouslyCapturedError(x) {
     return isObject2(x) && "__posthog_previously_captured_error" in x && x.__posthog_previously_captured_error === true;
   }
-  static prepareEventProperties(properties) {
-    const entries = Object.entries(properties);
-    return {
-      ...Object.fromEntries(entries.filter(([key]) => isReservedExceptionProperty(key))),
-      ...withoutNullObjectProperties(Object.fromEntries(entries.filter(([key]) => !isReservedExceptionProperty(key))))
-    };
-  }
-  static async buildEventMessage(builder, error, hint, distinctId, additionalProperties, level, context) {
+  static async buildEventMessage(builder, error, hint, distinctId, additionalProperties, context) {
     const applyContextSnapshot = snapshotEventContext(context);
-    const properties = Object.fromEntries(Object.keys(additionalProperties ?? {}).filter((key) => !isReservedExceptionProperty(key)).map((key) => [
-      key,
-      additionalProperties[key]
-    ]));
+    const properties = {
+      ...additionalProperties
+    };
     const exceptionProperties = builder.buildFromUnknown(error, hint);
     exceptionProperties.$exception_list = await builder.modifyFrames(exceptionProperties.$exception_list);
-    const exceptionLevel = typeof level == "string" ? EXCEPTION_LEVELS.get(level.toLowerCase()) : undefined;
-    if (exceptionLevel !== undefined)
-      exceptionProperties.$exception_level = exceptionLevel;
+    const injectedReleaseId = getInjectedReleaseId();
+    if (injectedReleaseId)
+      properties.$release_id = injectedReleaseId;
     return applyContextSnapshot({
       event: "$exception",
       distinctId,
@@ -9797,8 +9723,8 @@ class ErrorTracking {
   }
   onException(exception, hint) {
     this.client.addPendingPromise((async () => {
-      if (!ErrorTracking.isPreviouslyCapturedError(exception)) {
-        const eventMessage = await ErrorTracking.buildEventMessage(this.client.getErrorPropertiesBuilder(), exception, hint, undefined, undefined, undefined, this.client.getContext());
+      if (!error_tracking_ErrorTracking.isPreviouslyCapturedError(exception)) {
+        const eventMessage = await error_tracking_ErrorTracking.buildEventMessage(this.client.getErrorPropertiesBuilder(), exception, hint, undefined, undefined, this.client.getContext());
         const exceptionProperties = eventMessage.properties;
         const exceptionType = exceptionProperties?.$exception_list[0]?.type ?? "Exception";
         const isRateLimited = this._rateLimiter.consumeRateLimit(exceptionType);
@@ -9822,65 +9748,15 @@ class ErrorTracking {
     this._stopAutocapture = undefined;
   }
 }
-var SHUTDOWN_TIMEOUT = 2000, EXCEPTION_LEVELS, error_tracking_default;
+var SHUTDOWN_TIMEOUT = 2000, error_tracking_default;
 var init_error_tracking2 = __esm(() => {
   init_autocapture();
   init_event_context();
   init_dist();
-  EXCEPTION_LEVELS = new Map([
-    [
-      "fatal",
-      "fatal"
-    ],
-    [
-      "critical",
-      "fatal"
-    ],
-    [
-      "alert",
-      "fatal"
-    ],
-    [
-      "emergency",
-      "fatal"
-    ],
-    [
-      "error",
-      "error"
-    ],
-    [
-      "warning",
-      "warning"
-    ],
-    [
-      "warn",
-      "warning"
-    ],
-    [
-      "log",
-      "log"
-    ],
-    [
-      "notice",
-      "info"
-    ],
-    [
-      "info",
-      "info"
-    ],
-    [
-      "trace",
-      "debug"
-    ],
-    [
-      "debug",
-      "debug"
-    ]
-  ]);
-  error_tracking_default = ErrorTracking;
+  error_tracking_default = error_tracking_ErrorTracking;
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/error-tracking/trace-context.mjs
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/error-tracking/trace-context.mjs
 async function getActiveTraceProperties() {
   try {
     const otelApi = globalThis[OTEL_API_GLOBAL_KEY];
@@ -9904,7 +9780,7 @@ var init_trace_context = __esm(() => {
   SPAN_CONTEXT_KEY = Symbol.for("OpenTelemetry Context Key SPAN");
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/storage-memory.mjs
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/storage-memory.mjs
 class PostHogMemoryStorage {
   getProperty(key) {
     return this._memoryStorage[key];
@@ -9918,77 +9794,50 @@ class PostHogMemoryStorage {
 }
 var init_storage_memory = () => {};
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/capture-v1/compression.mjs
-function resolveCaptureCodec(requested, compressor, onZstdUnavailable) {
-  if (requested === "none" || compressor.supports(requested))
-    return requested;
-  const fallback = compressor.supports("gzip") ? "gzip" : "none";
-  if (requested === "zstd")
-    onZstdUnavailable(fallback);
-  return fallback;
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/context/listeners.mjs
+function notifyContextListeners(client, requestEntry = false) {
+  for (const listener of listeners.get(client) ?? [])
+    try {
+      listener(requestEntry);
+    } catch {}
 }
-var CAPTURE_COMPRESSIONS, webCompressor;
-var init_compression = __esm(() => {
-  init_dist();
-  CAPTURE_COMPRESSIONS = [
-    "none",
-    "gzip",
-    "deflate",
-    "zstd"
-  ];
-  webCompressor = {
-    supports: (codec) => codec !== "zstd" && isGzipSupported(),
-    async compress(payload, codec) {
-      if (codec === "gzip") {
-        const compressed = await gzipCompress(payload, false);
-        return compressed && new Uint8Array(await compressed.arrayBuffer());
-      }
-      if (codec !== "deflate")
-        return null;
-      const stream = new Response(payload).body.pipeThrough(new globalThis.CompressionStream("deflate"));
-      return new Uint8Array(await new Response(stream).arrayBuffer());
-    }
-  };
+var REGISTRY_KEY, registryHolder, listeners;
+var init_listeners = __esm(() => {
+  REGISTRY_KEY = Symbol.for("posthog-node.context-listeners");
+  registryHolder = globalThis;
+  listeners = registryHolder[REGISTRY_KEY] ??= new WeakMap;
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/capture-v1/errors.mjs
-class CaptureLossTally {
-  add(cause, count) {
-    if (count > 0)
-      this.counts.set(cause, (this.counts.get(cause) ?? 0) + count);
-  }
-  get total() {
-    let total = 0;
-    for (const count of this.counts.values())
-      total += count;
-    return total;
-  }
-  entries() {
-    return [
-      ...this.counts
-    ];
-  }
-  constructor() {
-    this.counts = new Map;
-  }
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/capture-v1/config.mjs
+function isCaptureMode(value) {
+  return value === "v0" || value === "v1";
 }
-function describeCaptureLoss(endpoint, loss) {
-  const causes = loss.entries().map(([cause, count]) => `${count} ${cause}`);
-  return `${loss.total} event(s) were not delivered to ${endpoint}: ${causes.join(", ")}`;
+function resolveCaptureMode() {
+  const envMode = "u" > typeof process ? process.env?.POSTHOG_CAPTURE_MODE : undefined;
+  return isCaptureMode(envMode) ? envMode : "v0";
 }
-var CaptureError;
+var init_config3 = () => {};
+
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/capture-v1/routing.mjs
+function isLegacyOnlyEvent(message) {
+  return typeof message.event == "string" && message.event.startsWith(AI_EVENT_PREFIX);
+}
+var AI_EVENT_PREFIX = "$ai_", ANALYTICS_ROUTE = "analytics", AI_ROUTE = "ai";
+var init_routing = () => {};
+
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/capture-v1/errors.mjs
+var CaptureV1Error;
 var init_errors = __esm(() => {
-  CaptureError = class CaptureError extends Error {
-    constructor({ endpoint, requestId, drops, retryExhausted, cause }) {
-      super(CaptureError.buildMessage(endpoint, requestId, drops, retryExhausted, cause)), this.name = "CaptureError";
-      this.endpoint = endpoint;
+  CaptureV1Error = class CaptureV1Error extends Error {
+    constructor({ requestId, drops, retryExhausted, cause }) {
+      super(CaptureV1Error.buildMessage(requestId, drops, retryExhausted, cause)), this.name = "CaptureV1Error";
       this.requestId = requestId;
       this.drops = drops;
       this.retryExhausted = retryExhausted;
       this.cause = cause;
     }
-    static buildMessage(endpoint, requestId, drops, retryExhausted, cause) {
-      let message = `Capture batch ${requestId} to ${endpoint} did not fully deliver: ${drops.length} dropped, ${retryExhausted.length} undelivered`;
+    static buildMessage(requestId, drops, retryExhausted, cause) {
+      let message = `Capture V1 batch ${requestId} did not fully deliver: ${drops.length} dropped, ${retryExhausted.length} undelivered`;
       if (cause instanceof Error)
         message += ` (${cause.message})`;
       return message;
@@ -9996,37 +9845,37 @@ var init_errors = __esm(() => {
   };
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/capture-v1/transform.mjs
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/capture-v1/transform.mjs
+function coerceBool(value) {
+  if (typeof value == "boolean")
+    return value;
+  if (typeof value == "number")
+    return value !== 0;
+  if (typeof value == "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true" || normalized === "1")
+      return true;
+    if (normalized === "false" || normalized === "0")
+      return false;
+  }
+}
+function coerceString(value) {
+  return typeof value == "string" ? value : undefined;
+}
 function isRecord11(value) {
   return typeof value == "object" && value !== null && !Array.isArray(value);
-}
-function jsonTypeName(value) {
-  return Array.isArray(value) ? "array" : typeof value;
-}
-function readEventOptions(value) {
-  if (value == null)
-    return;
-  if (isRecord11(value))
-    return {
-      ...value
-    };
-  console.error(`[PostHog] options must be an object, got ${jsonTypeName(value)}; sending the event without its options`);
-}
-function replaceUnparseableTimestamp() {
-  console.warn("[PostHog] replacing an unparseable event timestamp with the current time");
-  return new Date().toISOString();
 }
 function toRfc3339(timestamp) {
   if (typeof timestamp == "string") {
     const asDate = new Date(timestamp);
     if (Number.isNaN(asDate.getTime()))
-      return replaceUnparseableTimestamp();
+      return new Date().toISOString();
     const normalized = asDate.toISOString();
     const fractionalSeconds = timestamp.match(/\.(\d+)(?:Z|[+-]\d{2}:?\d{2})?$/i)?.[1];
     return fractionalSeconds && fractionalSeconds.length > 3 ? normalized.replace(/\.\d{3}Z$/, `.${fractionalSeconds}Z`) : normalized;
   }
   if (timestamp instanceof Date)
-    return Number.isNaN(timestamp.getTime()) ? replaceUnparseableTimestamp() : timestamp.toISOString();
+    return Number.isNaN(timestamp.getTime()) ? new Date().toISOString() : timestamp.toISOString();
   const asDate = timestamp == null ? new Date : new Date(timestamp);
   return Number.isNaN(asDate.getTime()) ? new Date().toISOString() : asDate.toISOString();
 }
@@ -10039,27 +9888,24 @@ function buildV1Event(message) {
   const properties = {
     ...sourceProperties
   };
-  const options = readEventOptions(message.options) ?? {};
-  for (const [optionKey, property] of Object.entries(EVENT_OPTION_LEGACY_PROPERTIES)) {
-    if (!(property in properties))
-      continue;
-    const legacyValue = properties[property];
-    delete properties[property];
-    const option = options[optionKey];
-    if (option == null && legacyValue !== undefined)
-      options[optionKey] = legacyValue;
-  }
+  const options = {};
+  for (const { property, optionKey, coerce } of OPTION_SENTINELS)
+    if (property in properties) {
+      const coerced = coerce(properties[property]);
+      if (coerced !== undefined)
+        options[optionKey] = coerced;
+      delete properties[property];
+    }
   const topLevel = {};
-  for (const { property, field } of TOPLEVEL_SENTINELS) {
-    if (!(property in properties))
-      continue;
-    const value = properties[property];
-    delete properties[property];
-    if (typeof value == "string")
-      topLevel[field] = value;
-    else if (value != null)
-      console.warn(`[PostHog] dropping ${property}: a ${jsonTypeName(value)} value is not a string`);
-  }
+  for (const { property, field } of TOPLEVEL_SENTINELS)
+    if (property in properties) {
+      const value = properties[property];
+      if (typeof value == "string")
+        topLevel[field] = value;
+      delete properties[property];
+    }
+  delete properties.$lib;
+  delete properties.$lib_version;
   relocateInto(properties, "$set", message.$set);
   relocateInto(properties, "$set_once", message.$set_once);
   return {
@@ -10072,9 +9918,39 @@ function buildV1Event(message) {
     properties
   };
 }
-var TOPLEVEL_SENTINELS;
+function buildV1Batch(messages, { createdAt, historicalMigration }) {
+  const batch = {
+    created_at: createdAt,
+    batch: messages.map(buildV1Event)
+  };
+  if (historicalMigration)
+    batch.historical_migration = true;
+  return batch;
+}
+var OPTION_SENTINELS, TOPLEVEL_SENTINELS;
 var init_transform = __esm(() => {
-  init_dist();
+  OPTION_SENTINELS = [
+    {
+      property: "$cookieless_mode",
+      optionKey: "cookieless_mode",
+      coerce: coerceBool
+    },
+    {
+      property: "$ignore_sent_at",
+      optionKey: "disable_skew_correction",
+      coerce: coerceBool
+    },
+    {
+      property: "$process_person_profile",
+      optionKey: "process_person_profile",
+      coerce: coerceBool
+    },
+    {
+      property: "$product_tour_id",
+      optionKey: "product_tour_id",
+      coerce: coerceString
+    }
+  ];
   TOPLEVEL_SENTINELS = [
     {
       property: "$session_id",
@@ -10087,187 +9963,46 @@ var init_transform = __esm(() => {
   ];
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/capture-v1/serialize.mjs
-function wireProblem(message) {
-  const { event, distinct_id: distinctId, properties } = message;
-  if (typeof event != "string" || event === "")
-    return "event name is missing, empty or not a string";
-  if (typeof distinctId != "string")
-    return "distinct id is missing or not a string";
-  const props = properties ?? {};
-  const ids = [
-    event,
-    distinctId,
-    props.$session_id,
-    props.$window_id
-  ];
-  if (ids.some((value) => typeof value == "string" && LONE_SURROGATE.test(value)))
-    return "event name or id is not well-formed Unicode";
-}
-function serializeV1Event(message) {
-  const { properties, ...rest } = buildV1Event(message);
-  const restJson = safeJsonStringify(rest);
-  const rawPropertiesJson = safeJsonStringify(properties);
-  const propertiesJson = rawPropertiesJson.includes("\\ud") || rawPropertiesJson.includes("\\uD") ? rawPropertiesJson.replace(LONE_SURROGATE_ESCAPE, "$1\\ufffd") : rawPropertiesJson;
-  const propertiesBytes = encoder.encode(propertiesJson).length;
-  return {
-    uuid: rest.uuid,
-    json: `${restJson.slice(0, -1)}${PROPERTIES_KEY}${propertiesJson}}`,
-    bytes: encoder.encode(restJson).length + PROPERTIES_KEY_BYTES + propertiesBytes,
-    propertiesBytes
-  };
-}
-function buildV1Body(events, { createdAt, historicalMigration }) {
-  const migration = historicalMigration ? ',"historical_migration":true' : "";
-  return `{"created_at":${JSON.stringify(createdAt)}${migration},"batch":[${events.map((event) => event.json).join(",")}]}`;
-}
-var encoder, PROPERTIES_KEY = ',"properties":', PROPERTIES_KEY_BYTES, LONE_SURROGATE, LONE_SURROGATE_ESCAPE;
-var init_serialize = __esm(() => {
-  init_dist();
-  init_transform();
-  encoder = new TextEncoder;
-  PROPERTIES_KEY_BYTES = encoder.encode(PROPERTIES_KEY).length;
-  LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
-  LONE_SURROGATE_ESCAPE = /(?<!\\)((?:\\\\)*)\\u[dD][89a-fA-F][0-9a-fA-F]{2}/g;
-});
-
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/capture-v1/uuid.mjs
-function canonicalizeUuid(value) {
-  let hyphenated = value;
-  if (value.length === 38 && value.startsWith("{") && value.endsWith("}"))
-    hyphenated = value.slice(1, -1);
-  else if (value.length === 45 && value.slice(0, URN_PREFIX.length).toLowerCase() === URN_PREFIX)
-    hyphenated = value.slice(URN_PREFIX.length);
-  else if (HEX_32.test(value))
-    hyphenated = `${value.slice(0, 8)}-${value.slice(8, 12)}-${value.slice(12, 16)}-${value.slice(16, 20)}-${value.slice(20)}`;
-  return HYPHENATED.test(hyphenated) ? hyphenated.toLowerCase() : undefined;
-}
-
-class CryptoRandom {
-  constructor(crypto) {
-    this.crypto = crypto;
-    this.words = new Uint32Array(8);
-    this.cursor = this.words.length;
-  }
-  nextUint32() {
-    if (this.cursor >= this.words.length) {
-      this.crypto.getRandomValues(this.words);
-      this.cursor = 0;
-    }
-    return this.words[this.cursor++];
-  }
-}
-function cryptoRandom() {
-  const crypto = globalThis.crypto;
-  return typeof crypto?.getRandomValues == "function" ? new CryptoRandom(crypto) : undefined;
-}
-function eventUuidv7() {
-  return generator.generate().toString();
-}
-var HYPHENATED, HEX_32, URN_PREFIX = "urn:uuid:", generator;
-var init_uuid = __esm(() => {
-  init_dist();
-  HYPHENATED = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  HEX_32 = /^[0-9a-f]{32}$/i;
-  generator = new V7Generator(cryptoRandom());
-});
-
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/capture-v1/sender.mjs
-async function raceAbort(work, signal) {
-  if (!signal)
-    return work;
-  let onAbort;
-  const aborted = new Promise((_resolve, reject) => {
-    onAbort = () => {
-      const abortError = new Error("Capture V1 request aborted while compressing the body");
-      abortError.name = "AbortError";
-      abortError.cause = signal.reason;
-      reject(abortError);
-    };
-    if (signal.aborted)
-      onAbort();
-    else
-      signal.addEventListener("abort", onAbort, {
-        once: true
-      });
-  });
-  try {
-    return await Promise.race([
-      work,
-      aborted
-    ]);
-  } finally {
-    signal.removeEventListener("abort", onAbort);
-  }
-}
-function abortableSleep(ms, signal) {
-  return new Promise((resolve) => {
-    const onAbort = () => {
-      clearTimeout(timer);
-      resolve();
-    };
-    const timer = setTimeout(() => {
-      signal?.removeEventListener("abort", onAbort);
-      resolve();
-    }, ms);
-    signal?.addEventListener("abort", onAbort, {
-      once: true
-    });
-  });
-}
-
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/capture-v1/sender.mjs
 class V1CaptureSender {
   constructor(config, hooks) {
     this.config = config;
-    this.hostOrigin = originOf(config.host);
+    this.maxBackoffMs = config.maxBackoffMs ?? DEFAULT_MAX_BACKOFF_MS;
     this.fetchFn = hooks.fetch;
     this.onError = hooks.onError;
     this.now = hooks.now ?? Date.now;
-    this.sleep = hooks.sleep ?? abortableSleep;
+    this.sleep = hooks.sleep ?? ((ms) => new Promise((resolve) => safeSetTimeout(resolve, ms)));
     this.generateRequestId = hooks.generateRequestId ?? uuidv7;
-    this.random = hooks.random ?? Math.random;
-    this.compress = hooks.compress ?? webCompressor.compress;
+    this.compress = hooks.compress ?? gzipCompress;
   }
-  async send(events, options = {}) {
-    if (events.length === 0)
-      return [];
-    const { signal, keepUnsent = false } = options;
+  async sendV1Batch(messages) {
+    if (messages.length === 0)
+      return;
     const requestId = this.generateRequestId();
     const createdAt = new Date(this.now()).toISOString();
-    const url = `${this.config.host}${this.config.path}`;
+    const { batch } = buildV1Batch(messages, {
+      createdAt,
+      historicalMigration: this.config.historicalMigration
+    });
+    const url = `${this.config.host}${V1_ANALYTICS_PATH}`;
     const drops = [];
-    const loss = new CaptureLossTally;
-    let pending = events;
-    const unsent = (cause, failure) => {
-      if (keepUnsent) {
-        this.surfacePartialDrops(requestId, drops, loss);
-        return pending;
-      }
-      this.surfaceBatchFailure(requestId, drops, pending, cause, loss, failure);
-      return [];
-    };
-    const { maxRetries } = this.config;
-    const maxAttempts = (Number.isInteger(maxRetries) && maxRetries > 0 ? maxRetries : 0) + 1;
+    let pending = batch;
+    const maxAttempts = Math.max(1, this.config.maxAttempts);
     for (let attempt = 1;attempt <= maxAttempts; attempt++) {
-      if (signal?.aborted)
-        return unsent(signal.reason, "not sent: aborted");
       const isLastAttempt = attempt === maxAttempts;
-      const payload = buildV1Body(pending, {
-        createdAt,
-        historicalMigration: this.config.historicalMigration
+      const payload = safeJsonStringify({
+        created_at: createdAt,
+        ...this.config.historicalMigration ? {
+          historical_migration: true
+        } : {},
+        batch: pending
       });
       let captureAttempt;
       let retryDelayMs;
       try {
-        captureAttempt = await this.sendOnce(url, payload, attempt, requestId, signal);
-        const { response, signal: attemptSignal, redirectFailure } = captureAttempt;
+        captureAttempt = await this.sendOnce(url, payload, attempt, requestId);
+        const { response, signal } = captureAttempt;
         const { status } = response;
-        if (redirectFailure !== undefined) {
-          await captureAttempt.waitFor(captureAttempt.cancelBody()).catch(() => {});
-          const failure = `failed on a redirect it does not follow (HTTP ${status})`;
-          this.surfaceBatchFailure(requestId, drops, pending, new Error(redirectFailure), loss, failure);
-          return [];
-        }
         if (status < 200 || status >= 300)
           if (!isLastAttempt && RETRYABLE_STATUSES.has(status)) {
             const retryAfterMs = this.parseRetryAfter(response);
@@ -10275,38 +10010,26 @@ class V1CaptureSender {
             retryDelayMs = this.backoffDelay(attempt, retryAfterMs);
           } else {
             const httpError = await this.buildHttpError(response, status, captureAttempt.waitFor);
-            this.surfaceBatchFailure(requestId, drops, pending, httpError, loss, `failed with HTTP ${status}`);
-            return [];
+            return this.surfaceBatchFailure(requestId, drops, pending, httpError);
           }
         else {
           let parsed;
           try {
             parsed = await captureAttempt.waitFor(this.parseResponse(response));
           } catch (error) {
-            if (attemptSignal.aborted)
+            if (signal.aborted)
               throw error;
-            this.surfaceBatchFailure(requestId, drops, pending, new Error(`Capture V1 returned an unparseable ${status} response body`), loss, `failed with an unreadable response (HTTP ${status})`);
-            return [];
+            return this.surfaceBatchFailure(requestId, drops, pending, new Error(`Capture V1 returned an unparseable ${status} response body`));
           }
-          const dropsBefore = drops.length;
           const retryable = this.classify(pending, parsed, drops);
-          for (const drop of drops.slice(dropsBefore)) {
-            const cause = drop.details === DUPLICATE_EVENT_UUID ? "dropped as duplicate uuids" : "dropped by the server";
-            loss.add(`${cause} (HTTP ${status})`, 1);
-          }
-          if (retryable.length === 0) {
-            this.surfacePartialDrops(requestId, drops, loss);
-            return [];
-          }
-          if (isLastAttempt) {
-            loss.add(`still marked for retry after ${maxAttempts} attempt(s) (HTTP ${status})`, retryable.length);
-            this.report(this.captureError({
+          if (retryable.length === 0)
+            return this.surfacePartialDrops(requestId, drops);
+          if (isLastAttempt)
+            return void this.onError(new CaptureV1Error({
               requestId,
               drops,
               retryExhausted: retryable.map((event) => event.uuid)
-            }), loss);
-            return [];
-          }
+            }));
           pending = retryable;
           const retryAfterMs = this.parseRetryAfter(response);
           retryDelayMs = this.backoffDelay(attempt, retryAfterMs);
@@ -10314,84 +10037,50 @@ class V1CaptureSender {
       } catch (transportError) {
         if (captureAttempt && !captureAttempt.signal.aborted)
           throw transportError;
-        if (isLastAttempt || signal?.aborted)
-          return unsent(transportError, this.describeTransportFailure(transportError, signal));
+        if (isLastAttempt)
+          return this.surfaceBatchFailure(requestId, drops, pending, transportError);
         retryDelayMs = this.backoffDelay(attempt);
       } finally {
         captureAttempt?.cleanup();
       }
       if (retryDelayMs !== undefined)
-        await this.sleepUnlessAborted(retryDelayMs, signal);
-    }
-    return [];
-  }
-  async sleepUnlessAborted(ms, signal) {
-    if (!signal)
-      return this.sleep(ms);
-    if (signal.aborted)
-      return;
-    let onAbort;
-    const aborted = new Promise((resolve) => {
-      onAbort = resolve;
-      signal.addEventListener("abort", onAbort, {
-        once: true
-      });
-    });
-    try {
-      await Promise.race([
-        this.sleep(ms, signal),
-        aborted
-      ]);
-    } finally {
-      signal.removeEventListener("abort", onAbort);
+        await this.sleep(retryDelayMs);
     }
   }
-  async sendOnce(url, payload, attempt, requestId, externalSignal) {
+  async sendOnce(url, payload, attempt, requestId) {
     const headers = this.buildHeaders(attempt, requestId);
-    const body = await raceAbort(this.encodeBody(payload, headers), externalSignal);
+    let body = payload;
+    if (this.config.compressionEnabled) {
+      const compressed = await this.compress(payload, this.config.isDebug);
+      if (compressed !== null) {
+        body = compressed;
+        headers["Content-Encoding"] = "gzip";
+      }
+    }
     const controller = new AbortController;
     let timeoutPhase = "waiting for response headers";
     let timer;
-    let onExternalAbort;
-    const stopListening = () => {
-      if (onExternalAbort)
-        externalSignal?.removeEventListener("abort", onExternalAbort);
-    };
     const deadline = new Promise((_resolve, reject) => {
-      const abortWith = (error) => {
-        reject(error);
-        controller.abort(error);
-      };
-      timer = setTimeout(() => {
+      timer = safeSetTimeout(() => {
         const timeoutError = new Error(`Capture V1 request timed out ${timeoutPhase} after ${this.config.requestTimeoutMs}ms`);
         timeoutError.name = "AbortError";
-        timeoutErrors.add(timeoutError);
-        abortWith(timeoutError);
+        reject(timeoutError);
+        controller.abort(timeoutError);
       }, this.config.requestTimeoutMs);
-      if (externalSignal) {
-        onExternalAbort = () => {
-          const abortError = new Error(`Capture V1 request aborted ${timeoutPhase}`);
-          abortError.name = "AbortError";
-          abortError.cause = externalSignal.reason;
-          abortWith(abortError);
-        };
-        if (externalSignal.aborted)
-          onExternalAbort();
-        else
-          externalSignal.addEventListener("abort", onExternalAbort, {
-            once: true
-          });
-      }
     });
-    deadline.catch(() => {});
     try {
-      const fetchPromise = this.fetchFollowingRedirects(url, headers, body, controller.signal);
+      const fetchPromise = this.fetchFn(url, {
+        method: "POST",
+        headers,
+        body,
+        signal: controller.signal
+      });
       let responseAccepted = false;
-      fetchPromise.then((late) => {
+      fetchPromise.then((lateResponse) => {
         if (controller.signal.aborted && !responseAccepted)
-          this.cancelBody(late.response);
+          this.cancelBody(lateResponse);
       }).catch(() => {});
-      const { response, redirectFailure } = await Promise.race([
+      const response = await Promise.race([
         fetchPromise,
         deadline
       ]);
@@ -10402,7 +10091,6 @@ class V1CaptureSender {
       const cancelBody = () => cancellation ??= this.cancelBody(response);
       return {
         response,
-        redirectFailure,
         signal: controller.signal,
         waitFor: (operation) => Promise.race([
           operation,
@@ -10414,69 +10102,14 @@ class V1CaptureSender {
             return;
           cleanedUp = true;
           clearTimeout(timer);
-          stopListening();
           if (controller.signal.aborted)
             cancelBody();
         }
       };
     } catch (error) {
       clearTimeout(timer);
-      stopListening();
       throw error;
     }
-  }
-  async fetchFollowingRedirects(url, headers, body, signal) {
-    let target = url;
-    for (let redirects = 0;; redirects++) {
-      const response = await this.fetchFn(target, {
-        method: "POST",
-        headers,
-        body: typeof body == "string" ? body : body.slice(),
-        signal,
-        redirect: "manual"
-      });
-      const { status } = response;
-      if (status < 300 || status >= 400)
-        return {
-          response
-        };
-      if (!FOLLOWED_REDIRECT_STATUSES.has(status))
-        return {
-          response,
-          redirectFailure: `Capture V1 request got an HTTP ${status} redirect, which it does not follow`
-        };
-      if (redirects === MAX_REDIRECTS)
-        return {
-          response,
-          redirectFailure: `Capture V1 request was redirected more than ${MAX_REDIRECTS} times`
-        };
-      const next = resolveLocation(response.headers?.get("Location"), target);
-      if (next === undefined || originOf(next) !== this.hostOrigin)
-        return {
-          response,
-          redirectFailure: `Capture V1 request got an HTTP ${status} redirect away from the configured host`
-        };
-      this.cancelBody(response);
-      if (signal.aborted)
-        throw signal.reason;
-      target = next;
-    }
-  }
-  async encodeBody(payload, headers) {
-    const codec = this.config.compression;
-    if (codec === "none")
-      return payload;
-    try {
-      const compressed = await this.compress(payload, codec);
-      if (compressed !== null) {
-        headers["Content-Encoding"] = codec;
-        return compressed;
-      }
-    } catch (error) {
-      if (this.config.isDebug)
-        console.error(`Failed to ${codec} compress the capture request body`, error);
-    }
-    return payload;
   }
   buildHeaders(attempt, requestId) {
     const sdkInfo = `${this.config.libraryId}/${this.config.libraryVersion}`;
@@ -10493,44 +10126,27 @@ class V1CaptureSender {
     return headers;
   }
   classify(pending, parsed, drops) {
-    const results = new Map;
-    for (const [uuid, result] of Object.entries(parsed.results))
-      results.set(canonicalizeUuid(uuid) ?? uuid, result);
+    const results = parsed.results ?? {};
     const retryable = [];
-    let copiesSeen;
     for (const event of pending) {
-      const result = results.get(event.uuid);
-      if (!result)
-        continue;
-      const duplicates = result.duplicates_dropped;
-      if (typeof duplicates == "number" && Number.isSafeInteger(duplicates) && duplicates > 0) {
-        copiesSeen ??= new Map;
-        const copy = copiesSeen.get(event.uuid) ?? 0;
-        copiesSeen.set(event.uuid, copy + 1);
-        if (copy >= 1 && copy <= duplicates) {
+      const result = results[event.uuid];
+      if (result) {
+        if (result.result === "drop")
           drops.push({
             uuid: event.uuid,
-            details: DUPLICATE_EVENT_UUID
+            details: result.details ?? undefined
           });
-          continue;
-        }
+        else if (result.result === "retry")
+          retryable.push(event);
       }
-      if (result.result === "drop")
-        drops.push({
-          uuid: event.uuid,
-          details: result.details ?? undefined
-        });
-      else if (result.result === "retry")
-        retryable.push(event);
     }
     return retryable;
   }
   backoffDelay(attempt, retryAfterMs) {
-    const jitter = 0.75 + 0.5 * this.random();
-    const backoff = Math.min(RETRY_BASE_DELAY_MS * 2 ** (attempt - 1) * jitter, MAX_RETRY_DELAY_MS);
+    const exponential = Math.min(this.config.initialRetryDelayMs * 2 ** (attempt - 1), this.maxBackoffMs);
     if (retryAfterMs === undefined)
-      return backoff;
-    return Math.max(backoff, Math.min(retryAfterMs, MAX_RETRY_DELAY_MS));
+      return exponential;
+    return Math.max(exponential, Math.min(retryAfterMs, this.maxBackoffMs));
   }
   parseRetryAfter(response) {
     const raw = response.headers?.get("Retry-After");
@@ -10553,10 +10169,10 @@ class V1CaptureSender {
     if (typeof parsed != "object" || parsed === null || Array.isArray(parsed))
       throw new Error("unexpected response shape");
     const results = parsed.results;
-    if (typeof results != "object" || results === null || Array.isArray(results))
+    if (results !== undefined && (typeof results != "object" || results === null || Array.isArray(results)))
       throw new Error("unexpected results shape");
     return {
-      results
+      results: results ?? {}
     };
   }
   async buildHttpError(response, status, waitFor) {
@@ -10567,39 +10183,21 @@ class V1CaptureSender {
     const suffix = bodyText ? `: ${bodyText}` : "";
     return new Error(`Capture V1 request failed with HTTP ${status}${suffix}`);
   }
-  surfaceBatchFailure(requestId, drops, pending, cause, loss, failure) {
-    loss.add(failure, pending.length);
-    this.report(this.captureError({
+  surfaceBatchFailure(requestId, drops, pending, cause) {
+    this.onError(new CaptureV1Error({
       requestId,
       drops,
       retryExhausted: pending.map((event) => event.uuid),
       cause
-    }), loss);
+    }));
   }
-  surfacePartialDrops(requestId, drops, loss) {
+  surfacePartialDrops(requestId, drops) {
     if (drops.length > 0)
-      this.report(this.captureError({
+      this.onError(new CaptureV1Error({
         requestId,
         drops,
         retryExhausted: []
-      }), loss);
-  }
-  report(error, loss) {
-    this.onError(error, describeCaptureLoss(this.config.path, loss));
-  }
-  describeTransportFailure(error, signal) {
-    if (error instanceof Error && timeoutErrors.has(error))
-      return "failed: request timed out";
-    if (signal?.aborted)
-      return "failed: request aborted";
-    const name = error instanceof Error && /^\w{1,64}$/.test(error.name) ? error.name : "unknown";
-    return `failed with a network error (${name})`;
-  }
-  captureError(params) {
-    return new CaptureError({
-      endpoint: this.config.path,
-      ...params
-    });
+      }));
   }
   async cancelBody(response) {
     try {
@@ -10607,29 +10205,11 @@ class V1CaptureSender {
     } catch {}
   }
 }
-function originOf(url) {
-  try {
-    return new URL(url).origin;
-  } catch {
-    return;
-  }
-}
-function resolveLocation(location, base) {
-  if (!location)
-    return;
-  try {
-    return new URL(location, base).href;
-  } catch {
-    return;
-  }
-}
-var RETRY_BASE_DELAY_MS = 100, MAX_RETRY_DELAY_MS = 30000, RETRYABLE_STATUSES, FOLLOWED_REDIRECT_STATUSES, MAX_REDIRECTS = 5, timeoutErrors, DUPLICATE_EVENT_UUID = "duplicate_event_uuid";
+var V1_ANALYTICS_PATH = "/i/v1/analytics/events", DEFAULT_MAX_BACKOFF_MS = 30000, RETRYABLE_STATUSES;
 var init_sender = __esm(() => {
   init_dist();
-  init_compression();
   init_errors();
-  init_serialize();
-  init_uuid();
+  init_transform();
   RETRYABLE_STATUSES = new Set([
     404,
     408,
@@ -10639,483 +10219,55 @@ var init_sender = __esm(() => {
     503,
     504
   ]);
-  FOLLOWED_REDIRECT_STATUSES = new Set([
-    307,
-    308
-  ]);
-  timeoutErrors = new WeakSet;
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/capture-v1/types.mjs
-var ANALYTICS_CAPTURE_ENDPOINT = "/i/v1/analytics/events", AI_CAPTURE_ENDPOINT = "/i/v1/ai/events";
-var init_types4 = () => {};
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/ai-capture/routing.mjs
+var AI_CAPTURE_ROUTE = "ai-capture", AI_CAPTURE_ENDPOINT_PATH = "/i/v0/ai/batch/", AI_MAX_EVENT_BYTES = 8388608, AI_BATCH_TARGET_BYTES = 5242880;
+var init_routing2 = () => {};
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/capture-lane/lane.mjs
-class CaptureLane {
-  constructor(config, hooks) {
-    this.queue = [];
-    this.activeFlush = null;
-    this.queuedFlush = null;
-    this.abortController = new AbortController;
-    this.localDrops = emptyTally();
-    this.settledCount = 0;
-    this.config = config;
-    this.hooks = hooks;
-    this.now = hooks.now ?? Date.now;
-  }
-  get length() {
-    return this.queue.length;
-  }
-  enqueue(message) {
-    const checked = this.check(message);
-    if ("drop" in checked) {
-      this.recordLocalDrop(checked.uuid, checked.drop);
-      this.armFlushTimer();
-      return;
-    }
-    if (this.queue.length >= this.config.maxQueueSize)
-      this.recordLocalDrop(this.queue.shift().uuid, "queueFull");
-    this.queue.push({
-      ...checked.event,
-      message
-    });
-    if (this.queue.length >= this.config.flushAt)
-      this.flushInBackground();
-    else
-      this.armFlushTimer();
-  }
-  async sendImmediate(message) {
-    const checked = this.check(message);
-    if ("drop" in checked) {
-      const tally = emptyTally();
-      this.addToTally(tally, checked.uuid, checked.drop);
-      this.reportTally(tally);
-      return;
-    }
-    await this.hooks.sender.send([
-      checked.event
-    ], {
-      signal: this.abortController.signal
-    });
-  }
-  dropUnserializable(uuid, immediate) {
-    if (immediate) {
-      const tally = emptyTally();
-      this.addToTally(tally, uuid, "unserializable");
-      this.reportTally(tally);
-      return;
-    }
-    this.recordLocalDrop(uuid, "unserializable");
-    this.armFlushTimer();
-  }
-  check(message) {
-    let event;
-    try {
-      event = serializeV1Event(message);
-      if (wireProblem(message))
-        return {
-          uuid: event.uuid,
-          drop: "invalid"
-        };
-    } catch {
-      return {
-        uuid: String(message.uuid),
-        drop: "unserializable"
-      };
-    }
-    return this.isTooLarge(event) ? {
-      uuid: event.uuid,
-      drop: "tooLarge"
-    } : {
-      event
-    };
-  }
-  flush() {
-    if (this.queuedFlush)
-      return this.queuedFlush;
-    if (!this.activeFlush)
-      return this.startFlush();
-    const queued = this.activeFlush.then(() => {
-      this.queuedFlush = null;
-      return this.startFlush();
-    });
-    this.queuedFlush = queued;
-    return queued;
-  }
-  async drain(deadlineMs) {
-    this.abortAt(deadlineMs);
-    let settledBefore;
-    do {
-      settledBefore = this.settledCount;
-      await this.flush();
-    } while (this.queue.length > 0 && this.settledCount !== settledBefore && !this.abortController.signal.aborted);
-  }
-  finishShutdown() {
-    clearTimeout(this.abortTimer);
-    this.abortTimer = undefined;
-    this.clearFlushTimer();
-    this.reportLocalDrops(this.queue.splice(0));
-    if (this.abortController.signal.aborted)
-      this.abortController = new AbortController;
-  }
-  startFlush() {
-    const flush = this.runFlushCycle().finally(() => {
-      if (this.activeFlush === flush)
-        this.activeFlush = null;
-    });
-    this.activeFlush = flush;
-    return flush;
-  }
-  flushInBackground() {
-    if (this.queuedFlush)
-      return;
-    const flush = this.flush();
-    this.safely(() => this.hooks.onBackgroundFlush?.(flush));
-  }
-  async runFlushCycle() {
-    this.clearFlushTimer();
-    await Promise.resolve();
-    const budget = this.queue.length;
-    const sent = [];
-    let taken = 0;
-    try {
-      while (taken < budget && this.queue.length > 0) {
-        const batch = this.takeBatch();
-        taken += batch.length;
-        let unsent;
-        try {
-          unsent = await this.hooks.sender.send(batch, {
-            signal: this.abortController.signal,
-            keepUnsent: true
-          });
-        } catch (error) {
-          this.settledCount += batch.length;
-          this.safely(() => this.hooks.onError(error));
-          continue;
-        }
-        this.settledCount += batch.length - unsent.length;
-        const requeued = new Set(unsent);
-        for (const event of batch)
-          if (!requeued.has(event))
-            sent.push(event.message);
-        if (unsent.length > 0) {
-          this.requeue(unsent);
-          break;
-        }
-      }
-    } catch (error) {
-      this.safely(() => this.hooks.onError(error));
-    } finally {
-      if (sent.length > 0)
-        this.safely(() => this.hooks.onFlush(sent));
-      this.reportLocalDrops();
-      if (this.queue.length > 0)
-        this.armFlushTimer();
-    }
-  }
-  takeBatch() {
-    let count = 0;
-    let bytes = 0;
-    while (count < this.queue.length && count < this.config.maxBatchSize) {
-      const next = this.queue[count];
-      if (count > 0 && bytes + next.bytes > this.config.targetBatchBytes)
-        break;
-      bytes += next.bytes;
-      count++;
-    }
-    return this.queue.splice(0, count);
-  }
-  requeue(events) {
-    this.queue.unshift(...events);
-    while (this.queue.length > this.config.maxQueueSize)
-      this.recordLocalDrop(this.queue.shift().uuid, "queueFull");
-    this.hooks.logger.debug(`Kept ${events.length} event(s) for ${this.config.endpoint} after a network failure; the next flush sends them`);
-  }
-  isTooLarge(event) {
-    const bytes = this.config.maxEventBytesOf === "properties" ? event.propertiesBytes : event.bytes;
-    return bytes > this.config.maxEventBytes;
-  }
-  recordLocalDrop(uuid, reason) {
-    this.addToTally(this.localDrops, uuid, reason);
-  }
-  addToTally(tally, uuid, reason) {
-    tally[reason]++;
-    if (uuid !== undefined && tally.sample.length < MAX_REPORTED_LOCAL_DROPS)
-      tally.sample.push({
-        uuid,
-        details: LOCAL_DROP_DETAILS[reason]
-      });
-  }
-  reportLocalDrops(leftovers = []) {
-    const tally = this.localDrops;
-    this.localDrops = emptyTally();
-    this.reportTally(tally, leftovers);
-  }
-  reportTally(tally, leftovers = []) {
-    const errors = [];
-    const loss = new CaptureLossTally;
-    const { endpoint } = this.config;
-    if (leftovers.length > 0) {
-      const error = new CaptureError({
-        endpoint,
-        requestId: "",
-        drops: [],
-        retryExhausted: leftovers.map((event) => event.uuid)
-      });
-      error.message = `${leftovers.length} event(s) for ${endpoint} were still queued when shutdown ended and were not sent`;
-      errors.push(error);
-      loss.add("still queued when shutdown ended", leftovers.length);
-    }
-    const total = tally.queueFull + tally.tooLarge + tally.invalid + tally.unserializable;
-    if (total > 0) {
-      const { maxQueueSize, maxEventBytes, maxEventBytesOf } = this.config;
-      const reasons = [];
-      if (tally.queueFull > 0)
-        reasons.push(`${tally.queueFull} because the queue was full (${maxQueueSize} events)`);
-      if (tally.tooLarge > 0) {
-        const measured = maxEventBytesOf === "properties" ? "properties larger" : "larger";
-        reasons.push(`${tally.tooLarge} with ${measured} than ${maxEventBytes} bytes`);
-      }
-      if (tally.invalid > 0)
-        reasons.push(`${tally.invalid} with a missing, empty or malformed event name or id`);
-      if (tally.unserializable > 0)
-        reasons.push(`${tally.unserializable} with a value that could not be serialized`);
-      const error = new CaptureError({
-        endpoint,
-        requestId: "",
-        drops: tally.sample,
-        retryExhausted: []
-      });
-      error.message = `Dropped ${total} event(s) for ${endpoint} before sending: ${reasons.join(", ")}`;
-      errors.push(error);
-      loss.add(`dropped because the queue was full (${maxQueueSize} events)`, tally.queueFull);
-      const measured = maxEventBytesOf === "properties" ? "their properties were" : "they were";
-      loss.add(`dropped because ${measured} larger than ${maxEventBytes} bytes`, tally.tooLarge);
-      loss.add("dropped because the event name or an id was missing, empty or malformed", tally.invalid);
-      loss.add("dropped because a value could not be serialized", tally.unserializable);
-    }
-    if (errors.length > 0)
-      this.safely(() => this.hooks.onLocalDrops(errors, describeCaptureLoss(endpoint, loss)));
-  }
-  armFlushTimer() {
-    if (this.flushTimer || !this.config.flushIntervalMs)
-      return;
-    this.flushTimer = safeSetTimeout(() => {
-      this.flushTimer = undefined;
-      this.flushInBackground();
-    }, this.config.flushIntervalMs);
-  }
-  clearFlushTimer() {
-    clearTimeout(this.flushTimer);
-    this.flushTimer = undefined;
-  }
-  abortAt(deadlineMs) {
-    clearTimeout(this.abortTimer);
-    const abort = () => this.abortController.abort(new Error("PostHog shutdown deadline reached"));
-    const delayMs = deadlineMs - this.now();
-    if (delayMs <= 0)
-      return void abort();
-    this.abortTimer = safeSetTimeout(abort, delayMs);
-  }
-  safely(fn) {
-    try {
-      fn();
-    } catch (error) {
-      this.hooks.logger.error("Capture lane hook failed:", error);
-    }
-  }
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/ai-capture/batching.mjs
+function eventByteSize(message) {
+  return encoder.encode(safeJsonStringify(message)).length;
 }
-var MAX_REPORTED_LOCAL_DROPS = 100, emptyTally = () => ({
-  queueFull: 0,
-  tooLarge: 0,
-  invalid: 0,
-  unserializable: 0,
-  sample: []
-}), LOCAL_DROP_DETAILS;
-var init_lane = __esm(() => {
-  init_dist();
-  init_errors();
-  init_serialize();
-  LOCAL_DROP_DETAILS = {
-    queueFull: "queue full",
-    tooLarge: "event too large",
-    invalid: "invalid event",
-    unserializable: "unserializable event"
-  };
-});
-
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/capture-lane/limits.mjs
-var CAPTURE_BATCH_TARGET_BYTES = 5242880, ANALYTICS_MAX_EVENT_BYTES = 10485760, AI_MAX_PROPERTIES_BYTES = 8388608;
-var init_limits = () => {};
-
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/capture-lane/settings.mjs
-function resolveCaptureSettings(options, logInvalid) {
+function partitionAiBatch(messages, maxEventBytes = AI_MAX_EVENT_BYTES, targetBatchBytes = AI_BATCH_TARGET_BYTES) {
+  const batches = [];
+  const dropped = [];
+  let current = [];
+  let currentBytes = 0;
+  for (const message of messages) {
+    if (message === undefined)
+      continue;
+    const bytes = eventByteSize(message);
+    if (bytes > maxEventBytes) {
+      dropped.push({
+        event: typeof message.event == "string" ? message.event : "unknown",
+        bytes
+      });
+      continue;
+    }
+    if (current.length > 0 && currentBytes + bytes > targetBatchBytes) {
+      batches.push(current);
+      current = [];
+      currentBytes = 0;
+    }
+    current.push(message);
+    currentBytes += bytes;
+  }
+  if (current.length > 0)
+    batches.push(current);
   return {
-    maxRetries: resolveMaxRetries(options, logInvalid),
-    analytics: {
-      compression: resolveCompression("captureCompression", options.captureCompression, logInvalid) ?? (options.disableCompression ? "none" : "gzip"),
-      requestTimeoutMs: options.requestTimeout ?? DEFAULT_REQUEST_TIMEOUT_MS
-    },
-    ai: {
-      compression: resolveCompression("captureAiCompression", options.captureAiCompression, logInvalid) ?? "gzip",
-      requestTimeoutMs: resolvePositive("captureAiRequestTimeoutMs", options.captureAiRequestTimeoutMs, DEFAULT_AI_REQUEST_TIMEOUT_MS, logInvalid, {
-        integer: false
-      }),
-      maxQueueSize: resolvePositive("captureAiMaxQueueSize", options.captureAiMaxQueueSize, DEFAULT_AI_MAX_QUEUE_SIZE, logInvalid, {
-        integer: true
-      })
-    }
+    batches,
+    dropped
   };
 }
-function resolveCompression(name, value, logInvalid) {
-  if (value == null)
-    return;
-  if (CAPTURE_COMPRESSIONS.includes(value))
-    return value;
-  logInvalid(`${name} must be one of ${CAPTURE_COMPRESSIONS.map((codec) => `'${codec}'`).join(", ")}; using the default.`);
-}
-function resolvePositive(name, value, fallback, logInvalid, { integer }) {
-  if (value == null)
-    return fallback;
-  if (typeof value == "number" && value > 0 && value <= MAX_SETTING_VALUE && (integer ? Number.isSafeInteger(value) : Number.isFinite(value)))
-    return value;
-  logInvalid(`${name} must be a positive ${integer ? "integer" : "number"} up to ${MAX_SETTING_VALUE}; using the default.`);
-  return fallback;
-}
-function resolveMaxRetries(options, logInvalid) {
-  const { captureMaxRetries, fetchRetryCount } = options;
-  if (captureMaxRetries != null) {
-    if (isIntegerInRange(captureMaxRetries, 0, MAX_CAPTURE_MAX_RETRIES))
-      return captureMaxRetries;
-    logInvalid(`captureMaxRetries must be an integer from 0 to ${MAX_CAPTURE_MAX_RETRIES}; using the default.`);
-  }
-  if (typeof fetchRetryCount == "number" && Number.isFinite(fetchRetryCount))
-    return Math.min(Math.max(Math.trunc(fetchRetryCount), 0), MAX_CAPTURE_MAX_RETRIES);
-  return DEFAULT_CAPTURE_MAX_RETRIES;
-}
-var DEFAULT_CAPTURE_MAX_RETRIES = 3, MAX_CAPTURE_MAX_RETRIES = 9, DEFAULT_REQUEST_TIMEOUT_MS = 1e4, DEFAULT_AI_REQUEST_TIMEOUT_MS = 30000, DEFAULT_AI_MAX_QUEUE_SIZE = 1000, isIntegerInRange = (value, min, max) => typeof value == "number" && Number.isInteger(value) && value >= min && value <= max, MAX_SETTING_VALUE = 2147483647;
-var init_settings = __esm(() => {
-  init_compression();
-});
-
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/event-defaults.mjs
-function isPresentString(value) {
-  return typeof value == "string" && value.length > 0;
-}
-function isUnsetValue(key, value) {
-  return LIBRARY_PROPERTIES.has(key) ? !isPresentString(value) : value === undefined;
-}
-function isUnsetProperty(properties, key) {
-  return isUnsetValue(key, properties[key]);
-}
-function fillLibraryProperties(properties, libraryId, libraryVersion) {
-  if (isUnsetProperty(properties, "$lib")) {
-    properties.$lib = libraryId;
-    properties.$lib_version = libraryVersion;
-  } else if (properties.$lib === libraryId && isUnsetProperty(properties, "$lib_version"))
-    properties.$lib_version = libraryVersion;
-}
-function isUnsetOption(options, key) {
-  return options[key] === undefined || options[key] === null;
-}
-function fillProperties(properties, layers, skipKeys = []) {
-  for (const layer of layers)
-    if (layer)
-      for (const [key, value] of Object.entries(layer)) {
-        if (isUnsetValue(key, value) || skipKeys.includes(key))
-          continue;
-        const existing = properties[key];
-        if (isUnsetValue(key, existing))
-          properties[key] = value;
-        else if (NESTED_FILL_PROPERTIES.has(key) && isMergeableObject(existing) && isMergeableObject(value))
-          properties[key] = fillNested(existing, value);
-      }
-}
-function fillOptions(options, layers) {
-  for (const layer of layers)
-    if (layer) {
-      for (const [key, value] of Object.entries(layer))
-        if (value !== undefined && isUnsetOption(options, key))
-          options[key] = value;
-    }
-}
-function fillIdentifyStylePersonProfile(event, options, callerLegacyValue, hasDistinctId) {
-  if (!IDENTIFY_STYLE_EVENTS.has(event) || !isUnsetOption(options, "process_person_profile"))
-    return;
-  if (callerLegacyValue != null)
-    options.process_person_profile = callerLegacyValue;
-  else if (hasDistinctId)
-    options.process_person_profile = true;
-}
-function dropIdentifyStyleLegacyPersonProfile(event, options, properties) {
-  if (IDENTIFY_STYLE_EVENTS.has(event) && !isUnsetOption(options, "process_person_profile"))
-    delete properties[EVENT_OPTION_LEGACY_PROPERTIES.process_person_profile];
-}
-function isMergeableObject(value) {
-  if (!isPlainObject3(value))
-    return false;
-  try {
-    return typeof value.toJSON != "function";
-  } catch {
-    return false;
-  }
-}
-function fillNested(existing, defaults) {
-  const filled = {
-    ...existing
-  };
-  for (const [key, value] of Object.entries(defaults))
-    if (filled[key] === undefined && value !== undefined)
-      filled[key] = value;
-  return filled;
-}
-function snapshotLayer(layer) {
-  return isPlainObject3(layer) ? {
-    ...layer
-  } : undefined;
-}
-var NESTED_FILL_PROPERTIES, LIBRARY_PROPERTIES, IDENTIFY_STYLE_EVENTS;
-var init_event_defaults = __esm(() => {
+var encoder;
+var init_batching = __esm(() => {
   init_dist();
-  NESTED_FILL_PROPERTIES = new Set([
-    "$set",
-    "$set_once",
-    "$groups",
-    "$group_set"
-  ]);
-  LIBRARY_PROPERTIES = new Set([
-    "$lib",
-    "$lib_version"
-  ]);
-  IDENTIFY_STYLE_EVENTS = new Set([
-    "$identify",
-    "$create_alias",
-    "$merge_dangerously",
-    "$groupidentify",
-    "$set",
-    "$set_once"
-  ]);
+  init_routing2();
+  encoder = new TextEncoder;
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/ai-capture/routing.mjs
-var AI_CAPTURE_ROUTE = "ai-capture";
-var init_routing = () => {};
-
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/context/listeners.mjs
-function notifyContextListeners(client, requestEntry = false) {
-  for (const listener of listeners.get(client) ?? [])
-    try {
-      listener(requestEntry);
-    } catch {}
-}
-var REGISTRY_KEY, registryHolder, listeners;
-var init_listeners = __esm(() => {
-  REGISTRY_KEY = Symbol.for("posthog-node.context-listeners");
-  registryHolder = globalThis;
-  listeners = registryHolder[REGISTRY_KEY] ??= new WeakMap;
-});
-
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/emails/errors.mjs
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/emails/errors.mjs
 function emailErrorName(status, code) {
   if (code === "missing_secret_key" || status === 401)
     return "missing_api_key";
@@ -11168,7 +10320,7 @@ var init_errors2 = __esm(() => {
   ]);
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/emails/attachments.mjs
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/emails/attachments.mjs
 function attachmentFiles(attachments, { html, text, subject }) {
   if (!Array.isArray(attachments))
     throw invalid("attachments must be a list of files.", "attachments");
@@ -11304,7 +10456,7 @@ var init_attachments = __esm(() => {
   BASE64_PATTERN = /^[A-Za-z0-9+/]*={0,2}$/;
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/emails/emails.mjs
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/emails/emails.mjs
 class EmailSender {
   constructor(config, hooks) {
     this.inFlight = new Set;
@@ -12012,12 +11164,12 @@ function isRetryable(error) {
 function retryDelayMs(error, attempt, maxRetries) {
   if (attempt >= maxRetries || !isRetryable(error))
     return;
-  if (error.retryAfterMs !== undefined && error.retryAfterMs > MAX_RETRY_DELAY_MS2)
+  if (error.retryAfterMs !== undefined && error.retryAfterMs > MAX_RETRY_DELAY_MS)
     return;
-  const backoffMs = Math.min(MAX_RETRY_DELAY_MS2, 1000 * 2 ** attempt * (0.8 + 0.4 * Math.random()));
+  const backoffMs = Math.min(MAX_RETRY_DELAY_MS, 1000 * 2 ** attempt * (0.8 + 0.4 * Math.random()));
   return Math.max(backoffMs, error.retryAfterMs ?? 0);
 }
-var SEND_PATH = "/api/messaging/send/email/", UPLOADS_PATH = "/api/messaging/attachments/uploads/", STATUS_PATH = "/api/messaging/emails/{messageId}/", PREFERENCES_PATH = "/api/messaging/preferences/", US_APP_HOST = "https://us.posthog.com", EU_APP_HOST = "https://eu.posthog.com", CLOUD_APP_HOSTS, MAX_RETRY_DELAY_MS2 = 30000, UUID_PATTERN2, IDEMPOTENCY_KEY_PATTERN, TEMPLATE_KEY_PATTERN, SHARED_FIELDS, TEMPLATE_FIELDS, CODE_FIELDS, TEMPLATE_FORM, CODE_FORM, DEFAULT_EMAIL_REQUEST_TIMEOUT_MS = 15000, DEFAULT_EMAIL_REQUEST_MAX_RETRIES = 2, REACT_18_AND_19_ELEMENT_MARKERS;
+var SEND_PATH = "/api/projects/@current/messaging/send/email/", UPLOADS_PATH = "/api/projects/@current/messaging/attachments/uploads/", STATUS_PATH = "/api/projects/@current/messaging/emails/{messageId}/", PREFERENCES_PATH = "/api/projects/@current/messaging/preferences/", US_APP_HOST = "https://us.posthog.com", EU_APP_HOST = "https://eu.posthog.com", CLOUD_APP_HOSTS, MAX_RETRY_DELAY_MS = 30000, UUID_PATTERN2, IDEMPOTENCY_KEY_PATTERN, TEMPLATE_KEY_PATTERN, SHARED_FIELDS, TEMPLATE_FIELDS, CODE_FIELDS, TEMPLATE_FORM, CODE_FORM, DEFAULT_EMAIL_REQUEST_TIMEOUT_MS = 15000, DEFAULT_EMAIL_REQUEST_MAX_RETRIES = 2, REACT_18_AND_19_ELEMENT_MARKERS;
 var init_emails = __esm(() => {
   init_dist();
   init_attachments();
@@ -12075,7 +11227,7 @@ var init_emails = __esm(() => {
   ];
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/logs-config.mjs
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/logs-config.mjs
 function resolveNodeLogsConfig(config, inherited = {}) {
   const { rateCap: _rateCap, ...rest } = config ?? {};
   const rateCapWindowMs = config?.rateCap?.windowMs ?? DEFAULT_RATE_CAP_WINDOW_MS;
@@ -12102,133 +11254,23 @@ function resolveNodeLogsConfig(config, inherited = {}) {
 var DEFAULT_FLUSH_INTERVAL_MS3 = 3000, DEFAULT_MAX_BUFFER_SIZE = 100, DEFAULT_MAX_BATCH_RECORDS_PER_POST = 100, DEFAULT_RATE_CAP_WINDOW_MS = 1e4, DEFAULT_MAX_LOGS_PER_INTERVAL = 1e4, DEFAULT_BACKGROUND_FLUSH_BUDGET_MS = 25000, DEFAULT_TERMINATION_FLUSH_BUDGET_MS = 2000;
 var init_logs_config = () => {};
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/client.mjs
-function emitDeprecationWarningOnce(id, message, log = console.warn) {
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/client.mjs
+function emitDeprecationWarningOnce(id, message) {
   if (_emittedDeprecations.has(id))
     return;
   _emittedDeprecations.add(id);
-  log(`[PostHog] ${message}`);
-}
-function resolveRenamedOptions(options) {
-  const resolved = {
-    ...options
-  };
-  for (const [oldName, newName] of RENAMED_OPTIONS)
-    if (resolved[oldName] !== undefined && resolved[newName] === undefined) {
-      resolved[newName] = resolved[oldName];
-      emitDeprecationWarningOnce(`option ${oldName}`, `\`${oldName}\` is deprecated: use \`${newName}\` instead. The old name will be removed in the next major version.`, console.error);
-    }
-  return resolved;
+  console.warn(`[PostHog] ${message}`);
 }
 function normalizeApiKey(value) {
   return typeof value == "string" ? value.trim() : "";
-}
-function apiKeyProblem(apiKey) {
-  if (!apiKey)
-    return "No project API key was passed";
-  if (apiKey.startsWith("phx_"))
-    return 'A personal API key ("phx_...") was passed where the project API key ("phc_...") belongs';
-}
-function summarizeForDebugLog(payload) {
-  if (Array.isArray(payload))
-    return `${payload.length} item(s)`;
-  if (payload instanceof Error)
-    return `${payload.name}: ${payload.message}`;
-  if (payload && typeof payload == "object" && typeof payload.event == "string") {
-    const { event, uuid } = payload;
-    return uuid === undefined ? {
-      event
-    } : {
-      event,
-      uuid
-    };
-  }
 }
 function normalizePersonalApiKey(value) {
   const normalizedValue = typeof value == "string" ? value.trim() : "";
   return normalizedValue || undefined;
 }
-function isUnsetUuid(uuid) {
-  return uuid == null || uuid === "";
-}
-function isInvalidUuid(uuid) {
-  return !isUnsetUuid(uuid) && (typeof uuid != "string" || canonicalizeUuid(uuid) === undefined);
-}
 function normalizeHost(value) {
   const normalizedValue = typeof value == "string" ? value.trim() : "";
   return normalizedValue || DEFAULT_NODE_HOST;
-}
-function readCaptureExceptionArgs(method, second, rest, legacyHasUuid) {
-  if (typeof second != "string" && (rest.length === 0 || isPlainObject3(second))) {
-    if (rest.length > 0)
-      emitDeprecationWarningOnce(`${method} extra arguments`, `${method}(error, options) ignores the arguments after the options object.`);
-    return isPlainObject3(second) ? second : {};
-  }
-  emitDeprecationWarningOnce(`${method} positional arguments`, `${method}(error, distinctId, properties) is deprecated: pass an object instead, e.g. ${method}(error, { distinctId, properties }). The old form will be removed in the next major version.`, console.error);
-  const [properties, ...tail] = rest;
-  const [uuid, flags] = legacyHasUuid ? tail : [
-    undefined,
-    tail[0]
-  ];
-  return {
-    distinctId: second ?? undefined,
-    properties,
-    uuid,
-    flags
-  };
-}
-function readCallerValues(read) {
-  try {
-    return read();
-  } catch (error) {
-    throw new UnreadableEventError(error);
-  }
-}
-function isolateForBeforeSend(eventMessage) {
-  const isolated = copyPlainValues(eventMessage, new WeakMap);
-  isolated.options ??= {};
-  return isolated;
-}
-function isPlainRecord2(value) {
-  if (value === null || typeof value != "object")
-    return false;
-  const prototype = Object.getPrototypeOf(value);
-  return prototype === Object.prototype || prototype === null;
-}
-function copyPlainValues(value, seen) {
-  if (!Array.isArray(value) && !isPlainRecord2(value))
-    return value;
-  const known = seen.get(value);
-  if (known !== undefined)
-    return known;
-  if (Array.isArray(value)) {
-    const copy = new Array(value.length);
-    seen.set(value, copy);
-    value.forEach((item, index) => {
-      copy[index] = copyPlainValues(item, seen);
-    });
-    return copy;
-  }
-  const copy = Object.getPrototypeOf(value) === null ? Object.create(null) : {};
-  seen.set(value, copy);
-  for (const key of Object.keys(value))
-    copy[key] = copyPlainValues(value[key], seen);
-  return copy;
-}
-function identifyEventProperties(properties) {
-  const { $set, $set_once, $anon_distinct_id, ...rest } = properties;
-  return {
-    $set: $set || rest,
-    ...$set_once != null ? {
-      $set_once
-    } : {},
-    $anon_distinct_id: $anon_distinct_id ?? undefined
-  };
-}
-function presentDistinctId(value) {
-  if (value == null || typeof value == "string" && value.trim() === "")
-    return;
-  return typeof value == "string" ? value : String(value);
 }
 function positiveNumberOr(value, fallback) {
   return typeof value == "number" && Number.isFinite(value) && value > 0 ? value : fallback;
@@ -12253,7 +11295,7 @@ function buildFlagEventProperties(flagValues) {
     additionalProperties["$active_feature_flags"] = activeFlags;
   return additionalProperties;
 }
-var MINIMUM_POLLING_INTERVAL = 100, THIRTY_SECONDS = 30000, MAX_CACHE_SIZE = 50000, WAITUNTIL_DEBOUNCE_MS = 50, WAITUNTIL_MAX_WAIT_MS = 500, DEFAULT_NODE_HOST = "https://us.i.posthog.com", _emittedDeprecations, RENAMED_OPTIONS, FLAG_CALLED_OPTION_SOURCE_PROPERTIES, UnreadableEventError, ALIAS_PREPARE_OPTIONS, PostHogBackendClient;
+var MINIMUM_POLLING_INTERVAL = 100, THIRTY_SECONDS = 30000, MAX_CACHE_SIZE = 50000, WAITUNTIL_DEBOUNCE_MS = 50, WAITUNTIL_MAX_WAIT_MS = 500, DEFAULT_NODE_HOST = "https://us.i.posthog.com", _emittedDeprecations, PostHogBackendClient;
 var init_client = __esm(() => {
   init_version();
   init_dist();
@@ -12265,58 +11307,16 @@ var init_client = __esm(() => {
   init_error_tracking2();
   init_trace_context();
   init_storage_memory();
-  init_sender();
-  init_types4();
-  init_lane();
-  init_limits();
-  init_settings();
-  init_compression();
-  init_uuid();
-  init_transform();
-  init_event_defaults();
-  init_routing();
   init_listeners();
   init_event_context();
+  init_config3();
+  init_routing();
+  init_sender();
+  init_batching();
+  init_routing2();
   init_emails();
   init_logs_config();
   _emittedDeprecations = new Set;
-  RENAMED_OPTIONS = [
-    [
-      "before_send",
-      "beforeSend"
-    ],
-    [
-      "custom_blocked_useragents",
-      "customBlockedUserAgents"
-    ],
-    [
-      "disable_capture_url_hashes",
-      "disableCaptureUrlHashes"
-    ],
-    [
-      "__preview_capture_bot_pageviews",
-      "__previewCaptureBotPageviews"
-    ]
-  ];
-  FLAG_CALLED_OPTION_SOURCE_PROPERTIES = [
-    "$cookieless_mode",
-    "$ignore_sent_at",
-    "$product_tour_id",
-    "$process_person_profile",
-    "$session_id",
-    "$window_id"
-  ];
-  UnreadableEventError = class UnreadableEventError extends Error {
-    constructor(original) {
-      super("A value in the event threw while it was read"), this.original = original;
-    }
-  };
-  ALIAS_PREPARE_OPTIONS = {
-    callOnlyProperties: [
-      "alias"
-    ],
-    distinctIdProperty: true
-  };
   PostHogBackendClient = class PostHogBackendClient extends PostHogCoreStateless {
     get distinctIdHasSentFlagCalls() {
       return Object.fromEntries(this._distinctIdHasSentFlagCalls);
@@ -12325,23 +11325,17 @@ var init_client = __esm(() => {
       this._distinctIdHasSentFlagCalls = new Map(Object.entries(value ?? {}));
     }
     constructor(apiKey, options = {}) {
-      options = resolveRenamedOptions(options);
       const normalizedApiKey = normalizeApiKey(apiKey);
-      const keyProblem = apiKeyProblem(normalizedApiKey);
       const normalizedOptions = {
         ...options,
-        disabled: options.disabled || keyProblem !== undefined,
         maxQueueSize: options.maxQueueSize ?? 1e4,
         flushInterval: options.flushInterval ?? 5000,
         host: normalizeHost(options.host),
         personalApiKey: normalizePersonalApiKey(options.secretKey ?? options.personalApiKey)
       };
-      super(normalizedApiKey, normalizedOptions), this._memoryStorage = new PostHogMemoryStorage, this._captureLanes = new Map, this._isShutdown = false, this._globalOptions = {}, this._minimalFlagCalledEvents = false, this._loggedFlagsResponseWithoutTypedValues = false, this._experimentExposuresReported = new Map;
+      super(normalizedApiKey, normalizedOptions), this._memoryStorage = new PostHogMemoryStorage, this._isShutdown = false, this._aiCaptureRouteActive = false, this._minimalFlagCalledEvents = false, this._loggedFlagsResponseWithoutTypedValues = false, this._experimentExposuresReported = new Map;
       this.options = normalizedOptions;
-      if (keyProblem)
-        console.error(`[PostHog] ${keyProblem}, so the client is disabled.`);
-      this.warnIfCaptureModeSet();
-      this._captureSettings = resolveCaptureSettings(normalizedOptions, (message) => console.error(`[PostHog] ${message}`));
+      this.captureMode = resolveCaptureMode();
       this.enableFullAiCapture = normalizedOptions.enableFullAiCapture === true;
       this.privacyMode = normalizedOptions.privacyMode === true;
       this.context = this.initializeContext();
@@ -12382,54 +11376,11 @@ var init_client = __esm(() => {
       this.maxCacheSize = normalizedOptions.maxCacheSize || MAX_CACHE_SIZE;
     }
     enqueue(type, message, options, explicitRoute) {
-      this.wrap(() => {
-        if (this.optedOut)
-          return void this._events.emit(type, "Library is disabled. Not sending event. To re-enable, call posthog.optIn()");
-        const prepared = this._prepareLaneMessage(message, options);
-        if (prepared === null)
-          return;
-        this._captureLane(explicitRoute).enqueue(prepared);
-        this._events.emit(type, prepared);
-      });
+      super.enqueue(type, message, options, explicitRoute);
       this.scheduleDebouncedFlush();
     }
-    async sendImmediate(type, message, options, explicitRoute) {
-      if (this.disabled)
-        return void this._logger.warn("The client is disabled");
-      if (!this._isInitialized)
-        await this._initPromise;
-      if (this.optedOut)
-        return void this._events.emit(type, "Library is disabled. Not sending event. To re-enable, call posthog.optIn()");
-      const prepared = this._prepareLaneMessage(message, options);
-      if (prepared === null)
-        return;
-      try {
-        await this._captureLane(explicitRoute).sendImmediate(prepared);
-      } catch (err) {
-        this._events.emit("error", err);
-      }
-    }
-    _prepareLaneMessage(message, options) {
-      const { _invalidUuidWarned, ...captureOptions } = options ?? {};
-      const uuid = this._canonicalEventUuid(captureOptions.uuid, !_invalidUuidWarned) ?? eventUuidv7();
-      const prepared = this.processBeforeEnqueue(this.prepareMessage(message, {
-        ...captureOptions,
-        uuid
-      }));
-      return prepared === null ? null : this.normalizeMessage(prepared);
-    }
-    _canonicalEventUuid(uuid, warnIfInvalid = true) {
-      if (isUnsetUuid(uuid))
-        return;
-      const canonical = typeof uuid == "string" ? canonicalizeUuid(uuid) : undefined;
-      if (canonical !== undefined)
-        return canonical;
-      if (warnIfInvalid)
-        console.warn("[PostHog] Replaced an invalid event uuid with a generated one; uuids must be RFC 4122 strings");
-      return eventUuidv7();
-    }
     _flushEventsAndSpans(skipThrottledSpans = false) {
-      const events = this.flushWithPendingPromises().then(() => this._flushCaptureLanes());
+      const events = this.flushWithPendingPromises();
       const others = [];
       if (this._traces && !(skipThrottledSpans && this._traces.throttled))
         others.push(this._traces.flush().catch(() => {}));
@@ -12445,24 +11396,15 @@ var init_client = __esm(() => {
           throw eventsResult.reason;
       });
     }
+    flushAutomatic() {
+      return this._flushKeepingRuntimeAlive(true);
+    }
     async flush() {
       this.errorTracking.capturePendingExceptions();
-      return this._keepRuntimeAlive(this._flushEventsAndSpans());
+      return this._flushKeepingRuntimeAlive(false);
     }
-    _flushCaptureLanes() {
-      return Promise.all([
-        ...this._captureLanes.values()
-      ].map((lane) => lane.flush())).then(() => {});
-    }
-    _onLaneBackgroundFlush(laneFlush) {
-      const traces = this._traces;
-      const flush = traces && !traces.throttled ? allSettled([
-        laneFlush,
-        traces.flush().catch(() => {})
-      ]).then(() => {}) : laneFlush;
-      this._keepRuntimeAlive(flush);
-    }
-    _keepRuntimeAlive(flushPromise) {
+    _flushKeepingRuntimeAlive(skipThrottledSpans) {
+      const flushPromise = this._flushEventsAndSpans(skipThrottledSpans);
       const waitUntil = this.options.waitUntil;
       if (waitUntil && !this._waitUntilCycle)
         try {
@@ -12537,74 +11479,85 @@ var init_client = __esm(() => {
     fetch(url, options) {
       return this.options.fetch ? this.options.fetch(url, options) : fetch(url, options);
     }
-    _captureLane(route) {
-      const endpoint = route === AI_CAPTURE_ROUTE ? AI_CAPTURE_ENDPOINT : ANALYTICS_CAPTURE_ENDPOINT;
-      let lane = this._captureLanes.get(endpoint);
-      if (!lane) {
-        const compressor = this.captureCompressor();
-        lane = new CaptureLane(this._captureLaneConfig(endpoint), {
-          sender: new V1CaptureSender(this.captureSenderConfig(endpoint, compressor), {
-            fetch: (url, fetchOptions) => this.fetch(url, fetchOptions),
-            onError: (error, summary) => this._reportCaptureLoss([
-              error
-            ], summary),
-            compress: (payload, codec) => compressor.compress(payload, codec)
-          }),
-          onLocalDrops: (errors, summary) => this._reportCaptureLoss(errors, summary),
-          onError: (error) => this._events.emit("error", error),
-          onFlush: (messages) => this._events.emit("flush", messages),
-          onBackgroundFlush: (flush) => this._onLaneBackgroundFlush(flush),
-          logger: this._logger
-        });
-        this._captureLanes.set(endpoint, lane);
+    getQueueRouteKey(message) {
+      return this.captureMode === "v1" && isLegacyOnlyEvent(message) ? AI_ROUTE : ANALYTICS_ROUTE;
+    }
+    persistedQueueKeyForRoute(route) {
+      if (route === AI_CAPTURE_ROUTE)
+        return types_PostHogPersistedProperty.AiCaptureQueue;
+      return route === AI_ROUTE ? types_PostHogPersistedProperty.AiQueue : types_PostHogPersistedProperty.Queue;
+    }
+    getActiveQueueRoutes() {
+      const routes = this.captureMode === "v1" ? [
+        ANALYTICS_ROUTE,
+        AI_ROUTE
+      ] : [
+        ANALYTICS_ROUTE
+      ];
+      if (this._aiCaptureRouteActive)
+        routes.push(AI_CAPTURE_ROUTE);
+      return routes;
+    }
+    getBatchEndpointPath(route) {
+      return route === AI_CAPTURE_ROUTE ? AI_CAPTURE_ENDPOINT_PATH : super.getBatchEndpointPath(route);
+    }
+    async sendBatch(batchMessages, retryOptions, route = ANALYTICS_ROUTE) {
+      if (route === AI_CAPTURE_ROUTE)
+        return this.sendAiCaptureBatch(batchMessages, retryOptions);
+      if (this.captureMode !== "v1" || route === AI_ROUTE)
+        return super.sendBatch(batchMessages, retryOptions, route);
+      const v1Events = batchMessages.filter((message) => message !== undefined);
+      await this.getV1Sender().sendV1Batch(v1Events);
+    }
+    async sendAiCaptureBatch(batchMessages, retryOptions) {
+      const { batches, dropped } = partitionAiBatch(batchMessages);
+      for (const { event, bytes } of dropped) {
+        const message = `Event ${event} (${bytes} bytes) exceeds the ${AI_MAX_EVENT_BYTES / 1048576}MiB limit for ${AI_CAPTURE_ENDPOINT_PATH}, dropping.`;
+        this._logger.error(message);
+        this._events.emit("error", new Error(message));
       }
-      return lane;
+      for (const batch of batches)
+        await this.sendAiSubBatch(batch, retryOptions);
     }
-    _captureLaneConfig(endpoint) {
-      const isAi = endpoint === AI_CAPTURE_ENDPOINT;
-      const flushAt = isAi ? Math.min(this.flushAt, this._captureSettings.ai.maxQueueSize) : this.flushAt;
-      return {
-        endpoint,
-        flushAt,
-        flushIntervalMs: this.options.flushInterval ?? 5000,
-        maxBatchSize: Math.max(flushAt, this.options.maxBatchSize ?? 100),
-        maxQueueSize: isAi ? this._captureSettings.ai.maxQueueSize : Math.max(this.flushAt, this.options.maxQueueSize ?? 1e4),
-        targetBatchBytes: CAPTURE_BATCH_TARGET_BYTES,
-        maxEventBytes: isAi ? AI_MAX_PROPERTIES_BYTES : ANALYTICS_MAX_EVENT_BYTES,
-        maxEventBytesOf: isAi ? "properties" : "event"
-      };
+    async sendAiSubBatch(batch, retryOptions) {
+      try {
+        await super.sendBatch(batch, retryOptions, AI_CAPTURE_ROUTE);
+      } catch (err) {
+        if (!isPostHogFetchContentTooLargeError(err))
+          throw err;
+        if (batch.length === 1) {
+          const [event] = batch;
+          const eventName = typeof event.event == "string" ? event.event : "unknown";
+          const message = `Event ${eventName} (${eventByteSize(event)} bytes) was rejected with 413 by ${AI_CAPTURE_ENDPOINT_PATH} on its own, dropping.`;
+          this._logger.error(message);
+          this._events.emit("error", new Error(message));
+          return;
+        }
+        const mid = Math.ceil(batch.length / 2);
+        await this.sendAiSubBatch(batch.slice(0, mid), retryOptions);
+        await this.sendAiSubBatch(batch.slice(mid), retryOptions);
+      }
     }
-    _reportCaptureLoss(errors, summary) {
-      const errorListeners = this._events.events["error"]?.length ?? 0;
-      for (const error of errors)
-        this._events.emit("error", error);
-      if (errorListeners === 0)
-        console.warn(`[PostHog] ${summary}`);
-    }
-    captureCompressor() {
-      return webCompressor;
-    }
-    captureSenderConfig(path, compressor) {
-      const laneSettings = path === AI_CAPTURE_ENDPOINT ? this._captureSettings.ai : this._captureSettings.analytics;
-      const compression = resolveCaptureCodec(laneSettings.compression, compressor, (fallback) => this._logger.debug(`zstd compression is not available in this runtime; ${path} uses ${fallback} instead`));
-      return {
-        host: this.host,
-        path,
-        apiKey: this.apiKey,
-        libraryId: this.getLibraryId(),
-        libraryVersion: this.getLibraryVersion(),
-        userAgent: this.getCustomUserAgent() || undefined,
-        historicalMigration: this.historicalMigration,
-        compression,
-        requestTimeoutMs: laneSettings.requestTimeoutMs,
-        maxRetries: this._captureSettings.maxRetries,
-        isDebug: this.isDebug
-      };
-    }
-    warnIfCaptureModeSet() {
-      const captureMode = "u" > typeof process ? process.env?.POSTHOG_CAPTURE_MODE : undefined;
-      if (captureMode !== undefined)
-        console.warn("[PostHog] POSTHOG_CAPTURE_MODE is no longer read. Capture always uses capture v1.");
+    getV1Sender() {
+      if (!this._v1Sender)
+        this._v1Sender = new V1CaptureSender({
+          host: this.host,
+          apiKey: this.apiKey,
+          libraryId: this.getLibraryId(),
+          libraryVersion: this.getLibraryVersion(),
+          userAgent: this.getCustomUserAgent() || undefined,
+          historicalMigration: this.historicalMigration,
+          compressionEnabled: !this.disableCompression,
+          requestTimeoutMs: this.requestTimeout,
+          maxAttempts: (this.options.fetchRetryCount ?? 3) + 1,
+          initialRetryDelayMs: this.options.fetchRetryDelay ?? 3000,
+          isDebug: this.isDebug
+        }, {
+          fetch: (url, fetchOptions) => this.fetch(url, fetchOptions),
+          onError: (error) => this._events.emit("error", error),
+          compress: (payload) => this.compressPayload(payload)
+        });
+      return this._v1Sender;
     }
     getLibraryVersion() {
       return version2;
@@ -12753,39 +11706,11 @@ var init_client = __esm(() => {
         }
       };
     }
-    async _sdkEventProperties(event, properties, distinctId, flagInputs) {
-      const sdkProperties = {
-        ...this._serviceNameProperties(),
-        ...await this._flagEventProperties(distinctId, flagInputs)
-      };
+    getCommonEventProperties() {
+      const commonProperties = super.getCommonEventProperties();
       if (this.options.isServer ?? true)
-        sdkProperties.$is_server = true;
-      if (this.options.disableGeoip ?? true)
-        sdkProperties.$geoip_disable = true;
-      if (event === "$exception") {
-        if (isUnsetProperty(properties, "$trace_id") && isUnsetProperty(properties, "$span_id"))
-          Object.assign(sdkProperties, await getActiveTraceProperties());
-        const releaseId = getInjectedReleaseId();
-        if (releaseId)
-          sdkProperties.$release_id = releaseId;
-      }
-      return sdkProperties;
-    }
-    async _flagEventProperties(distinctId, { groups, flags, sendFeatureFlags, disableGeoip }) {
-      try {
-        if (flags) {
-          if (sendFeatureFlags)
-            console.warn("[PostHog] Both `flags` and `sendFeatureFlags` were passed to capture(); using `flags` and ignoring `sendFeatureFlags`.");
-          return flags._getEventProperties();
-        }
-        if (sendFeatureFlags) {
-          emitDeprecationWarningOnce("sendFeatureFlags", "`sendFeatureFlags` is deprecated and will be removed in a future major version. Pass a `flags` snapshot from `posthog.evaluateFlags(...)` instead — it avoids a second `/flags` request per capture and guarantees the event carries the exact flag values your code branched on.");
-          const sendFeatureFlagsOptions = typeof sendFeatureFlags == "object" ? sendFeatureFlags : undefined;
-          const flagValues = await this.getFeatureFlagsForEvent(distinctId, groups, disableGeoip, sendFeatureFlagsOptions);
-          return buildFlagEventProperties(flagValues);
-        }
-      } catch {}
-      return {};
+        commonProperties.$is_server = true;
+      return commonProperties;
     }
     enable() {
       return super.optIn();
@@ -12797,9 +11722,6 @@ var init_client = __esm(() => {
       super.debug(enabled);
       this.featureFlagsPoller?.debug(enabled);
     }
-    describeDebugPayload(payload) {
-      return summarizeForDebugLog(payload);
-    }
     _warnIfInvalidCapture(props, stringArgumentWarning, exceptionCaptureWarning) {
       if (typeof props == "string")
         this._logger.warn(stringArgumentWarning);
@@ -12807,47 +11729,29 @@ var init_client = __esm(() => {
         this._logger.warn(exceptionCaptureWarning);
     }
     _sendPreparedEvent(type, props, immediate, prepareOptions, explicitRoute) {
-      const invalidUuidWarned = isInvalidUuid(props.uuid);
-      const uuid = this._canonicalEventUuid(props.uuid);
-      if (uuid !== props.uuid)
-        props = {
-          ...props,
-          uuid
-        };
-      return this.addPendingPromise(this._prepareEventMessage(props, prepareOptions).then(({ distinctId, event, properties, options, uuid, timestamp }) => {
+      return this.addPendingPromise(this._prepareEventMessage(props, prepareOptions).then(({ distinctId, event, properties, options }) => {
         if (this.disabled || this.optedOut)
           prepareOptions?.onCaptureFailed?.();
         const captureOptions = {
-          timestamp,
-          disableGeoip: false,
-          uuid,
-          _invalidUuidWarned: invalidUuidWarned
+          timestamp: options.timestamp,
+          disableGeoip: options.disableGeoip,
+          uuid: options.uuid
         };
         const message = {
-          distinct_id: distinctId,
+          distinctId,
           event,
-          properties,
-          ...options !== undefined ? {
-            options
-          } : {}
+          properties: {
+            ...properties,
+            ...this.getCommonEventProperties()
+          }
         };
         return immediate ? this.sendImmediate(type, message, captureOptions, explicitRoute) : this.enqueue(type, message, captureOptions, explicitRoute);
       }).catch((err) => {
-        if (err instanceof UnreadableEventError) {
-          this._dropUnreadableEvent(uuid, immediate, explicitRoute);
-          prepareOptions?.onCaptureFailed?.();
-        } else if (err) {
+        if (err) {
           console.error(err);
           prepareOptions?.onCaptureFailed?.();
         }
       }));
-    }
-    _dropUnreadableEvent(uuid, immediate, explicitRoute) {
-      if (this.disabled || this.optedOut)
-        return;
-      this._captureLane(explicitRoute).dropUnserializable(uuid, immediate);
-      if (!immediate)
-        this.scheduleDebouncedFlush();
     }
     _capturePreparedEvent(props, immediate) {
       return this._sendPreparedEvent("capture", props, immediate);
@@ -12863,7 +11767,7 @@ var init_client = __esm(() => {
     captureAi(props) {
       if (this.disabled)
         return;
-      const uuid = this._canonicalEventUuid(props.uuid) ?? eventUuidv7();
+      const uuid = getEventUuid(props.uuid, uuidv7);
       this._sendPreparedAiEvent({
         ...props,
         uuid
@@ -12873,7 +11777,7 @@ var init_client = __esm(() => {
     async captureAiImmediate(props) {
       if (this.disabled)
         return;
-      const uuid = this._canonicalEventUuid(props.uuid) ?? eventUuidv7();
+      const uuid = getEventUuid(props.uuid, uuidv7);
       await this._sendPreparedAiEvent({
         ...props,
         uuid
@@ -12883,29 +11787,46 @@ var init_client = __esm(() => {
     _sendPreparedAiEvent(props, immediate) {
       if (typeof props?.event == "string" && !props.event.startsWith("$ai_"))
         this._logger.debug(`captureAi called with non-AI event ${props.event}; routing it to the AI endpoint anyway.`);
+      this._aiCaptureRouteActive = true;
       return this._sendPreparedEvent("capture", props, immediate, undefined, AI_CAPTURE_ROUTE);
     }
-    identify({ distinctId, properties = {}, disableGeoip, options }) {
-      const eventProperties = identifyEventProperties(properties);
+    identify({ distinctId, properties = {}, disableGeoip }) {
+      const { $set, $set_once, $anon_distinct_id, ...rest } = properties;
+      const setProps = $set || rest;
+      const setOnceProps = $set_once || {};
+      const eventProperties = {
+        $set: setProps,
+        $set_once: setOnceProps,
+        $anon_distinct_id: $anon_distinct_id ?? undefined
+      };
       this._sendPreparedEvent("identify", {
         distinctId,
         event: "$identify",
         properties: eventProperties,
-        disableGeoip,
-        options
-      }, false);
+        disableGeoip
+      }, false, {
+        includeContextProperties: false
+      });
     }
-    async identifyImmediate({ distinctId, properties = {}, disableGeoip, options }) {
-      const eventProperties = identifyEventProperties(properties);
+    async identifyImmediate({ distinctId, properties = {}, disableGeoip }) {
+      const { $set, $set_once, $anon_distinct_id, ...rest } = properties;
+      const setProps = $set || rest;
+      const setOnceProps = $set_once || {};
+      const eventProperties = {
+        $set: setProps,
+        $set_once: setOnceProps,
+        $anon_distinct_id: $anon_distinct_id ?? undefined
+      };
       await this._sendPreparedEvent("identify", {
         distinctId,
         event: "$identify",
         properties: eventProperties,
-        disableGeoip,
-        options
-      }, true);
+        disableGeoip
+      }, true, {
+        includeContextProperties: false
+      });
     }
-    setPersonProperties({ distinctId, properties = {}, propertiesOnce = {}, options }) {
+    setPersonProperties({ distinctId, properties = {}, propertiesOnce = {} }) {
       if (Object.keys(properties).length === 0 && Object.keys(propertiesOnce).length === 0)
         return;
       const eventProperties = {};
@@ -12916,11 +11837,10 @@ var init_client = __esm(() => {
       this.capture({
         distinctId,
         event: "$set",
-        properties: eventProperties,
-        options
+        properties: eventProperties
       });
     }
-    unsetPersonProperties({ distinctId, properties, options }) {
+    unsetPersonProperties({ distinctId, properties }) {
       const propertyNames = normalizeUnsetPersonProperties(properties);
       if (propertyNames.length === 0)
         return;
@@ -12929,8 +11849,7 @@ var init_client = __esm(() => {
         event: "$set",
         properties: {
           $unset: propertyNames
-        },
-        options
+        }
       });
     }
     alias(data) {
@@ -12938,22 +11857,26 @@ var init_client = __esm(() => {
         distinctId: data.distinctId,
         event: "$create_alias",
         properties: {
+          distinct_id: data.distinctId,
           alias: data.alias
         },
-        disableGeoip: data.disableGeoip,
-        options: data.options
-      }, false, ALIAS_PREPARE_OPTIONS);
+        disableGeoip: data.disableGeoip
+      }, false, {
+        includeContextProperties: false
+      });
     }
     async aliasImmediate(data) {
       await this._sendPreparedEvent("alias", {
         distinctId: data.distinctId,
         event: "$create_alias",
         properties: {
+          distinct_id: data.distinctId,
           alias: data.alias
         },
-        disableGeoip: data.disableGeoip,
-        options: data.options
-      }, true, ALIAS_PREPARE_OPTIONS);
+        disableGeoip: data.disableGeoip
+      }, true, {
+        includeContextProperties: false
+      });
     }
     isLocalEvaluationReady() {
       return this.featureFlagsPoller?.isLocalEvaluationReady() ?? false;
@@ -13524,36 +12447,32 @@ var init_client = __esm(() => {
         };
       return this._featureFlagEvaluationsHost;
     }
-    groupIdentify({ groupType, groupKey, properties, distinctId, disableGeoip, options }) {
+    groupIdentify({ groupType, groupKey, properties, distinctId, disableGeoip }) {
       this._sendPreparedEvent("capture", {
-        distinctId,
+        distinctId: distinctId || `$${groupType}_${groupKey}`,
         event: "$groupidentify",
         properties: {
           $group_type: groupType,
           $group_key: groupKey,
           $group_set: properties || {}
         },
-        disableGeoip,
-        options
+        disableGeoip
       }, false, {
-        fallbackDistinctId: `$${groupType}_${groupKey}`,
-        contextSession: false
+        includeContextProperties: false
       });
     }
-    async groupIdentifyImmediate({ groupType, groupKey, properties, distinctId, disableGeoip, options }) {
+    async groupIdentifyImmediate({ groupType, groupKey, properties, distinctId, disableGeoip }) {
       await this._sendPreparedEvent("capture", {
-        distinctId,
+        distinctId: distinctId || `$${groupType}_${groupKey}`,
         event: "$groupidentify",
         properties: {
           $group_type: groupType,
           $group_key: groupKey,
           $group_set: properties || {}
         },
-        disableGeoip,
-        options
+        disableGeoip
       }, true, {
-        fallbackDistinctId: `$${groupType}_${groupKey}`,
-        contextSession: false
+        includeContextProperties: false
       });
     }
     async reloadFeatureFlags() {
@@ -13614,27 +12533,6 @@ var init_client = __esm(() => {
       }
       return false;
     }
-    register(properties) {
-      return super.register(properties);
-    }
-    unregister(property) {
-      return super.unregister(property);
-    }
-    async registerOptions(options) {
-      if (!isPlainObject3(options))
-        return void console.error("[PostHog] registerOptions takes an object; ignoring the value");
-      this._globalOptions = {
-        ...this._globalOptions,
-        ...options
-      };
-    }
-    async unregisterOptions(key) {
-      const remaining = {
-        ...this._globalOptions
-      };
-      delete remaining[key];
-      this._globalOptions = remaining;
-    }
     withContext(data, fn, options) {
       if (!this.context)
         return fn();
@@ -13645,6 +12543,10 @@ var init_client = __esm(() => {
     }
     getContext() {
       return this.context?.get();
+    }
+    enterContext(data, options) {
+      this.context?.enter(data, options);
+      notifyContextListeners(this);
     }
     async _shutdown(shutdownTimeoutMs) {
       const shutdownDeadlineMs = Date.now() + (shutdownTimeoutMs ?? 30000);
@@ -13682,25 +12584,14 @@ var init_client = __esm(() => {
       const remainingMs = Math.max(0, shutdownDeadlineMs - Date.now());
       const emailsSettled = emailsDrained ? raceWithTimeout(emailsDrained, remainingMs) : undefined;
       try {
-        await Promise.all([
-          super._shutdown(remainingMs),
-          this._drainCaptureLanes(shutdownDeadlineMs)
-        ]);
-        await this._drainCaptureLanes(shutdownDeadlineMs);
+        return await super._shutdown(remainingMs);
       } finally {
-        for (const lane of this._captureLanes.values())
-          lane.finishShutdown();
         await emailsSettled;
         await logsDrained;
         this._distinctIdHasSentFlagCalls.clear();
         this._experimentExposuresReported.clear();
         resolve?.();
       }
-    }
-    _drainCaptureLanes(deadlineMs) {
-      return Promise.all([
-        ...this._captureLanes.values()
-      ].map((lane) => lane.drain(deadlineMs))).then(() => {});
     }
     async _requestRemoteConfigPayload(flagKey) {
       if (this.disabled || !this.apiKey || !this.options.personalApiKey)
@@ -13822,30 +12713,31 @@ var init_client = __esm(() => {
         evaluationCache: {}
       };
     }
-    captureException(error, options, ...legacyArgs) {
-      const exceptionOptions = readCaptureExceptionArgs("captureException", options, legacyArgs, true);
+    captureException(error, distinctId, additionalProperties, uuid, flags) {
       if (!error_tracking_default.isPreviouslyCapturedError(error) && this.errorTracking.claimExplicitCapture(error)) {
         const syntheticException = new Error("PostHog syntheticException");
-        this.addPendingPromise(this._buildExceptionEvent(error, syntheticException, exceptionOptions).then((msg) => this._capturePreparedEvent(msg, false)));
+        this.addPendingPromise(error_tracking_default.buildEventMessage(this.getErrorPropertiesBuilder(), error, {
+          syntheticException
+        }, distinctId, additionalProperties, this.getContext()).then((msg) => this._capturePreparedEvent({
+          ...msg,
+          uuid,
+          flags
+        }, false)));
       }
     }
-    async captureExceptionImmediate(error, options, ...legacyArgs) {
-      const exceptionOptions = readCaptureExceptionArgs("captureExceptionImmediate", options, legacyArgs, false);
+    async captureExceptionImmediate(error, distinctId, additionalProperties, flags) {
       if (!error_tracking_default.isPreviouslyCapturedError(error) && this.errorTracking.claimExplicitCapture(error)) {
         const syntheticException = new Error("PostHog syntheticException");
-        return this.addPendingPromise(this._buildExceptionEvent(error, syntheticException, exceptionOptions).then((msg) => this.captureImmediate(msg)));
+        return this.addPendingPromise(error_tracking_default.buildEventMessage(this.getErrorPropertiesBuilder(), error, {
+          syntheticException
+        }, distinctId, additionalProperties, this.getContext()).then((msg) => this.captureImmediate({
+          ...msg,
+          flags
+        })));
       }
     }
-    async _buildExceptionEvent(error, syntheticException, { distinctId, properties, options, uuid, flags, level }) {
-      const msg = await error_tracking_default.buildEventMessage(this.getErrorPropertiesBuilder(), error, {
-        syntheticException
-      }, distinctId, properties, level, this.getContext());
-      return {
-        ...msg,
-        options,
-        uuid,
-        flags
-      };
+    async prepareEventMessage(props) {
+      return this._prepareEventMessage(props);
     }
     _serviceNameProperties() {
       const serviceName = this._resolveServiceName();
@@ -13858,116 +12750,92 @@ var init_client = __esm(() => {
         this._serviceName = (this.options.traces ? resolveTracesConfig(this.options.traces, this.hostResourceAttributes()).serviceName : undefined) || resolveMetricsConfig(this.options.metrics).serviceName || null;
       return this._serviceName;
     }
-    async prepareEventMessage(props) {
-      try {
-        return await this._prepareEventMessage(props);
-      } catch (error) {
-        throw error instanceof UnreadableEventError ? error.original : error;
-      }
-    }
-    async _prepareEventMessage(props, prepareOptions = {}) {
+    async _prepareEventMessage(props, options = {}) {
       const { distinctId, event, properties, groups, flags, sendFeatureFlags, timestamp, disableGeoip, uuid } = props;
-      const callOptions = readEventOptions(props.options);
       const contextData = getEventContext(props, this.context?.get());
-      const contextProperties = snapshotLayer(contextData?.properties);
-      const contextOptions = snapshotLayer(contextData?.options);
-      const globalProperties = snapshotLayer(this.props);
-      const globalOptions = this._globalOptions;
-      const libraryId = this.getLibraryId();
-      const libraryVersion = this.getLibraryVersion();
-      const resolvedDistinctId = presentDistinctId(distinctId) ?? presentDistinctId(contextData?.distinctId) ?? prepareOptions.fallbackDistinctId;
-      const eventDistinctId = resolvedDistinctId ?? eventUuidv7();
-      const eventProperties = readCallerValues(() => ({
+      const includeContextProperties = options.includeContextProperties ?? true;
+      let mergedDistinctId = distinctId || contextData?.distinctId;
+      const mergedProperties = includeContextProperties ? {
+        ...this._serviceNameProperties(),
+        ...this.props,
+        ...contextData?.properties || {},
         ...properties || {}
-      }));
-      const callerPersonProfile = eventProperties[EVENT_OPTION_LEGACY_PROPERTIES.process_person_profile];
-      if (prepareOptions.distinctIdProperty)
-        eventProperties.distinct_id = eventDistinctId;
-      if ((prepareOptions.contextSession ?? true) && contextData?.sessionId && isUnsetProperty(eventProperties, "$session_id"))
-        eventProperties.$session_id = contextData.sessionId;
-      if (isPlainObject3(groups) && Object.keys(groups).length > 0) {
-        const existingGroups = eventProperties.$groups;
-        eventProperties.$groups = isMergeableObject(existingGroups) ? {
-          ...existingGroups,
-          ...groups
-        } : {
-          ...groups
-        };
-      }
-      if (disableGeoip != null)
-        fillProperties(eventProperties, [
-          {
-            $geoip_disable: disableGeoip
-          }
-        ]);
-      fillProperties(eventProperties, [
-        contextProperties,
-        globalProperties
-      ], prepareOptions.callOnlyProperties);
-      fillProperties(eventProperties, [
-        await this._sdkEventProperties(event, eventProperties, eventDistinctId, {
-          groups,
-          flags,
-          sendFeatureFlags,
-          disableGeoip
-        })
-      ]);
-      fillLibraryProperties(eventProperties, libraryId, libraryVersion);
-      const filledOptions = {
-        ...callOptions
+      } : {
+        ...this._serviceNameProperties(),
+        ...properties || {}
       };
-      fillIdentifyStylePersonProfile(event, filledOptions, callerPersonProfile, resolvedDistinctId !== undefined);
-      fillOptions(filledOptions, [
-        contextOptions,
-        globalOptions,
-        resolvedDistinctId !== undefined ? undefined : {
-          process_person_profile: false
-        }
-      ]);
-      dropIdentifyStyleLegacyPersonProfile(event, filledOptions, eventProperties);
-      const eventOptions = callOptions !== undefined || Object.keys(filledOptions).length > 0 ? filledOptions : undefined;
-      const flagEvent = prepareOptions.flagEvent;
-      const enrichedProperties = flagEvent ? applyFlagEventCapture(eventProperties, flagEvent) : eventProperties;
-      const finalProperties = this._shouldSendMinimalFlagCalledEvent(event, enrichedProperties) ? flagEvent ? minimizeConfigVersion2FlagCalledProperties(enrichedProperties, FLAG_CALLED_OPTION_SOURCE_PROPERTIES) : minimizeFlagCalledEventProperties(enrichedProperties, FLAG_CALLED_OPTION_SOURCE_PROPERTIES) : enrichedProperties;
-      let finalEvent = event;
-      if (event === "$pageview" && this.options.__previewCaptureBotPageviews && typeof finalProperties.$raw_user_agent == "string" && isBlockedUA(finalProperties.$raw_user_agent, this.options.customBlockedUserAgents || [])) {
-        finalEvent = "$bot_pageview";
-        finalProperties.$browser_type = "bot";
+      if (event === "$exception" && !(("$trace_id" in mergedProperties) || ("$span_id" in mergedProperties)))
+        Object.assign(mergedProperties, await getActiveTraceProperties());
+      if (!mergedDistinctId) {
+        mergedDistinctId = uuidv7();
+        mergedProperties.$process_person_profile = false;
       }
+      if (includeContextProperties && contextData?.sessionId && !mergedProperties.$session_id)
+        mergedProperties.$session_id = contextData.sessionId;
+      const flagEvent = options.flagEvent;
+      const enrichedProperties = flagEvent ? applyFlagEventCapture(mergedProperties, flagEvent) : mergedProperties;
+      const finalProperties = this._shouldSendMinimalFlagCalledEvent(event, enrichedProperties) ? flagEvent ? minimizeConfigVersion2FlagCalledProperties(enrichedProperties) : minimizeFlagCalledEventProperties(enrichedProperties) : enrichedProperties;
       const eventMessage = this._runBeforeSend({
-        distinctId: eventDistinctId,
-        event: finalEvent,
+        distinctId: mergedDistinctId,
+        event,
         properties: finalProperties,
         groups,
         flags,
         sendFeatureFlags,
         timestamp,
         disableGeoip,
-        uuid,
-        options: eventOptions
-      }, prepareOptions.onCaptureFailed);
+        uuid
+      }, options.onCaptureFailed);
       if (!eventMessage)
         return Promise.reject(null);
-      const hookProperties = eventMessage.properties;
-      const preparedProperties = props._originatedFromCaptureException && hookProperties ? readCallerValues(() => error_tracking_default.prepareEventProperties(hookProperties)) : hookProperties;
+      const eventProperties = await Promise.resolve().then(async () => {
+        if (flags) {
+          if (sendFeatureFlags)
+            console.warn("[PostHog] Both `flags` and `sendFeatureFlags` were passed to capture(); using `flags` and ignoring `sendFeatureFlags`.");
+          return flags._getEventProperties();
+        }
+        if (sendFeatureFlags) {
+          emitDeprecationWarningOnce("sendFeatureFlags", "`sendFeatureFlags` is deprecated and will be removed in a future major version. Pass a `flags` snapshot from `posthog.evaluateFlags(...)` instead — it avoids a second `/flags` request per capture and guarantees the event carries the exact flag values your code branched on.");
+          const sendFeatureFlagsOptions = typeof sendFeatureFlags == "object" ? sendFeatureFlags : undefined;
+          const flagValues = await this.getFeatureFlagsForEvent(eventMessage.distinctId, groups, disableGeoip, sendFeatureFlagsOptions);
+          return buildFlagEventProperties(flagValues);
+        }
+        return {};
+      }).catch(() => ({})).then((additionalProperties) => {
+        const resolvedGroups = eventMessage.groups || groups;
+        return {
+          ...additionalProperties,
+          ...eventMessage.properties || {},
+          ...resolvedGroups !== undefined && Object.keys(resolvedGroups).length > 0 ? {
+            $groups: resolvedGroups
+          } : {}
+        };
+      });
+      if (eventMessage.event === "$pageview" && this.options.__preview_capture_bot_pageviews && typeof eventProperties.$raw_user_agent == "string") {
+        if (isBlockedUA(eventProperties.$raw_user_agent, this.options.custom_blocked_useragents || [])) {
+          eventMessage.event = "$bot_pageview";
+          eventProperties.$browser_type = "bot";
+        }
+      }
       return {
         distinctId: eventMessage.distinctId,
         event: eventMessage.event,
-        properties: preparedProperties || {},
-        options: eventMessage.options,
-        uuid: eventMessage.uuid,
-        timestamp: eventMessage.timestamp,
-        disableGeoip: eventMessage.disableGeoip
+        properties: eventProperties,
+        options: {
+          timestamp: eventMessage.timestamp,
+          disableGeoip: eventMessage.disableGeoip,
+          uuid: eventMessage.uuid
+        }
       };
     }
     _runBeforeSend(eventMessage, onError) {
-      const beforeSend = this.options.beforeSend;
+      const beforeSend = this.options.before_send;
       if (!beforeSend)
         return eventMessage;
       const fns = Array.isArray(beforeSend) ? beforeSend : [
         beforeSend
       ];
-      let result = readCallerValues(() => isolateForBeforeSend(eventMessage));
+      let result = eventMessage;
       for (const fn of fns)
         try {
           result = fn(result);
@@ -13980,8 +12848,7 @@ var init_client = __esm(() => {
             this._logger.warn(message);
           }
         } catch (error) {
-          const errorType = error instanceof Error ? error.name : typeof error;
-          console.error(`[PostHog] Error in beforeSend function for event '${eventMessage.event}' (${errorType})`);
+          this._logger.error(`Error in before_send function for event '${eventMessage.event}':`, error);
           onError?.();
           return null;
         }
@@ -13990,7 +12857,7 @@ var init_client = __esm(() => {
   };
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/context/lifetime.mjs
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/context/lifetime.mjs
 function inheritContextLifetime(parent, child, signal) {
   const lifetime = parent && lifetimes.get(parent);
   if (signal)
@@ -14018,7 +12885,7 @@ var init_lifetime = __esm(() => {
   lifetimes = registryHolder2[REGISTRY_KEY2] ??= new WeakMap;
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/context/context.mjs
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/context/context.mjs
 import { AsyncLocalStorage } from "node:async_hooks";
 
 class PostHogContext {
@@ -14032,6 +12899,9 @@ class PostHogContext {
   run(context, fn, options) {
     return this.storage.run(this.resolve(context, options), fn);
   }
+  enter(context, options) {
+    this.storage.enterWith(this.resolve(context, options));
+  }
   resolve(context, options) {
     const current = this.get();
     if (options?.fresh === true)
@@ -14044,10 +12914,6 @@ class PostHogContext {
       properties: {
         ...current?.properties || {},
         ...context.properties || {}
-      },
-      options: {
-        ...current?.options || {},
-        ...context.options || {}
       }
     }, options?.signal);
   }
@@ -14056,7 +12922,7 @@ var init_context2 = __esm(() => {
   init_lifetime();
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/context/span-context.node.mjs
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/context/span-context.node.mjs
 import { AsyncLocalStorage as AsyncLocalStorage2 } from "node:async_hooks";
 
 class AsyncLocalStorageSpanContextManager {
@@ -14072,31 +12938,9 @@ class AsyncLocalStorageSpanContextManager {
 }
 var init_span_context_node = () => {};
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/compression.node.mjs
-import * as __rspack_external_node_zlib_95aae9d4 from "node:zlib";
-import { promisify } from "node:util";
-function createZlibCompressor(codecs = __rspack_external_node_zlib_95aae9d4) {
-  const compressors = {
-    gzip: promisify(codecs.gzip),
-    deflate: promisify(codecs.deflate),
-    zstd: typeof codecs.zstdCompress == "function" ? promisify(codecs.zstdCompress) : undefined
-  };
-  return {
-    supports: (codec) => compressors[codec] !== undefined,
-    async compress(payload, codec) {
-      const compress = compressors[codec];
-      return compress ? new Uint8Array(await compress(payload)) : null;
-    }
-  };
-}
-var zlibCompressor;
-var init_compression_node = __esm(() => {
-  zlibCompressor = createZlibCompressor();
-});
-
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/gzip.node.mjs
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/gzip.node.mjs
 import { gzip } from "node:zlib";
-import { promisify as promisify2 } from "node:util";
+import { promisify } from "node:util";
 async function gzipCompress2(input, isDebug = true) {
   try {
     const compressed = await gzipAsync(input);
@@ -14109,10 +12953,10 @@ async function gzipCompress2(input, isDebug = true) {
 }
 var gzipAsync;
 var init_gzip_node = __esm(() => {
-  gzipAsync = promisify2(gzip);
+  gzipAsync = promisify(gzip);
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/host-os.node.mjs
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/host-os.node.mjs
 import { platform, release as release2 } from "node:os";
 function hostOsResourceAttributes() {
   let osName;
@@ -14127,7 +12971,7 @@ var init_host_os_node = __esm(() => {
   init_dist();
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/sentry-integration.mjs
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/sentry-integration.mjs
 function createEventProcessor(_posthog, { organization, projectId, prefix, severityAllowList = [
   "error"
 ], sendExceptionsToPostHog = true } = {}) {
@@ -14204,17 +13048,17 @@ var init_sentry_integration = __esm(() => {
   };
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/tracing-headers.mjs
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/tracing-headers.mjs
 var init_tracing_headers2 = __esm(() => {
   init_dist();
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/url-utils.mjs
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/url-utils.mjs
 var init_url_utils = __esm(() => {
   init_dist();
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/express.mjs
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/express.mjs
 var init_express = __esm(() => {
   init_error_tracking2();
   init_tracing_headers2();
@@ -14222,7 +13066,7 @@ var init_express = __esm(() => {
   init_listeners();
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/fetch-request.mjs
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/extensions/fetch-request.mjs
 var KNOWN_HTTP_METHODS;
 var init_fetch_request = __esm(() => {
   init_listeners();
@@ -14242,11 +13086,10 @@ var init_fetch_request = __esm(() => {
   ]);
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/exports.mjs
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/exports.mjs
 var init_exports = __esm(() => {
   init_listeners();
   init_feature_flag_evaluations();
-  init_errors();
   init_errors2();
   init_dist();
   init_sentry_integration();
@@ -14255,7 +13098,7 @@ var init_exports = __esm(() => {
   init_types3();
 });
 
-// node_modules/.bun/posthog-node@6.0.5+e40b0dfdd726a224/node_modules/posthog-node/dist/entrypoints/index.node.mjs
+// node_modules/.bun/posthog-node@5.74.0+e40b0dfdd726a224/node_modules/posthog-node/dist/entrypoints/index.node.mjs
 var PostHog;
 var init_index_node = __esm(() => {
   init_module_node();
@@ -14265,7 +13108,6 @@ var init_index_node = __esm(() => {
   init_dist();
   init_context2();
   init_span_context_node();
-  init_compression_node();
   init_gzip_node();
   init_host_os_node();
   init_exports();
@@ -14275,9 +13117,6 @@ var init_index_node = __esm(() => {
     }
     compressPayload(payload) {
       return gzipCompress2(payload, this.isDebug);
-    }
-    captureCompressor() {
-      return zlibCompressor;
     }
     initializeContext() {
       return new PostHogContext;
