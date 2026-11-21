@@ -13,17 +13,23 @@ mod poison;
 mod record;
 mod recovery;
 mod report;
+mod route;
+mod url;
 
 #[cfg(test)]
 mod tests;
 
 pub use binding::{Binding, SecureInputProbe, SecureProbe};
 pub use call::Mutation;
+pub(crate) use report::{refused_reply, released_reply};
 pub use memory_markers::MemoryMarkers;
+pub(crate) use route::{key_event, route_for};
 
 use std::path::{Path, PathBuf};
 
-use omo_computer_core::backend::Refusal;
+use omo_computer_core::backend::{Delivered, Refusal};
+use omo_computer_core::intervention::{Pause, TargetLiveness};
+use omo_computer_core::session_state::SessionState;
 use omo_computer_core::error::{EngineCode, Reason};
 use omo_computer_core::paths::Roots;
 use omo_computer_core::report::Disposition;
@@ -56,15 +62,39 @@ pub const TRANSACTION_FAILED: Refusal = Refusal::bare(EngineCode::TransactionFai
 pub const LOCAL_HAND: &str = "local";
 
 /// A refusal and what the funnel adds to it on the wire: the `callId` it concerns, the
-/// stored receipt of a replay, and the disposition of an interrupted earlier send.
+/// stored receipt of a replay, the disposition of an interrupted earlier send, and the busy
+/// wait of an `InputBusy{target_busy}` refusal.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Refused {
     pub refusal: Refusal,
     pub call_id: Option<String>,
     pub receipt: Option<Box<Value>>,
     pub interrupted: Option<Disposition>,
+    /// The members a consent or lease refusal carries on the wire (`app`, `identity`,
+    /// `window`, `holder`, `retryAfterMs`).
+    pub detail: Option<Box<Value>>,
+    /// What row 22 stamps on a refusal, boxed so the error type stays small.
+    pub stamps: Box<Stamps>,
+    /// Boxed so the error type stays small (R70cg).
+    pub busy: Option<Box<crate::settle::BusyDetail>>,
     /// `write_failed` when the refusal's own audit line could not be written.
     pub warning: Option<String>,
+}
+
+/// The members a refusal carries beside its code.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Stamps {
+    /// Object mode: the units sent before an interrupted send stopped.
+    pub delivered: Option<Delivered>,
+    /// What the admission waited for before it refused or the send stopped.
+    pub paused: Vec<Pause>,
+    /// Object mode: the session state sampled for the call.
+    pub session: Option<SessionState>,
+    /// The target that exited or stopped answering.
+    pub target: Option<TargetLiveness>,
+    /// In either report mode, the units an interrupted send got out before it stopped; 0 for
+    /// a refusal before any send. Never on the wire: the hold ledger reads it.
+    pub sent: u32,
 }
 
 impl From<Refusal> for Refused {
@@ -74,8 +104,19 @@ impl From<Refusal> for Refused {
             call_id: None,
             receipt: None,
             interrupted: None,
+            stamps: Box::default(),
+            detail: None,
+            busy: None,
             warning: None,
         }
+    }
+}
+
+impl Refused {
+    #[must_use]
+    pub fn with_paused(mut self, paused: Vec<Pause>) -> Self {
+        self.stamps.paused = paused;
+        self
     }
 }
 
@@ -97,6 +138,12 @@ pub(crate) struct Funnel {
     permits: Permits,
     artifacts: Option<ArtifactStore>,
     secure: Box<dyn SecureProbe>,
+    pub(crate) control: crate::grant::Control,
+    // Row 25: the hand's `computer.url_policy` and the last call's unknown-URL stamp.
+    pub(crate) url_policy: omo_computer_core::url_policy::UrlPolicy,
+    pub(crate) url_unknown: bool,
+    /// Row 26: the hand's `computer.send_on_enter` composer table (acceptance 80).
+    pub(crate) send_on_enter: omo_computer_core::settings::ExactKeyTable<omo_computer_core::settings::SendOnEnterRule>,
     #[cfg(test)]
     warned: Vec<String>,
 }
@@ -115,7 +162,7 @@ impl Funnel {
     /// STATE root.
     pub(crate) fn for_roots(roots: &Roots) -> Self {
         let artifacts = ArtifactStore::new(roots.state.join("artifacts"), GcLimits::default());
-        Self::with(
+        let mut funnel = Self::with(
             (
                 Box::new(MarkerDir::under(&roots.runtime)),
                 Poisoned::under(&roots.runtime),
@@ -123,7 +170,9 @@ impl Funnel {
             AuditSpec::Dir(roots.state.join("audit")),
             Some(InteractionLock::under(&roots.runtime)),
             Some(artifacts),
-        )
+        );
+        funnel.control.runtime = Some(roots.runtime.clone());
+        funnel
     }
 
     fn with(
@@ -144,13 +193,17 @@ impl Funnel {
             permits: Permits::default(),
             artifacts,
             secure: Box::new(SecureInputProbe),
+            control: crate::grant::Control::default(),
+            url_policy: omo_computer_core::url_policy::UrlPolicy::default(),
+            url_unknown: false,
+            send_on_enter: std::collections::BTreeMap::new(),
             #[cfg(test)]
             warned: Vec::new(),
         }
     }
 
     /// The audit sink, opened at first use; a file that cannot be opened refuses every exec.
-    fn audit(&mut self) -> &mut dyn AuditSink {
+    pub(crate) fn audit(&mut self) -> &mut dyn AuditSink {
         let sink = match self.audit.take() {
             Some(sink) => sink,
             None => self.open_audit(),
@@ -184,6 +237,15 @@ impl Funnel {
         }
     }
 
+    /// The Consequential stage's tables from the session's settings (absent is the empty table):
+    /// row 25's `computer.url_policy` and row 26's `computer.send_on_enter`.
+    pub(crate) fn set_url_policy(&mut self, request: &omo_computer_core::requests::SessionOpenRequest) {
+        let consent = request.config.as_ref().map(|config| &config.consent);
+        let hosts = consent.and_then(|consent| consent.url_policy.clone());
+        self.url_policy = omo_computer_core::url_policy::UrlPolicy::new(hosts.unwrap_or_default());
+        self.send_on_enter = consent.and_then(|consent| consent.send_on_enter.clone()).unwrap_or_default();
+    }
+
     pub(crate) fn set_session_id(&mut self, id: String) {
         self.session_id = id;
     }
@@ -214,6 +276,10 @@ impl Session {
     pub fn with_binding(mut self, binding: Binding) -> Self {
         self.funnel.binding = binding;
         self
+    }
+
+    pub(crate) fn funnel_issuer(&self) -> String {
+        self.funnel.binding.issuer.clone()
     }
 
     /// The per-hand audit file, once the first exec opened it.
