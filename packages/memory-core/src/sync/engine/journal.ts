@@ -172,7 +172,10 @@ export class SyncJournal {
       log?.("sync: journal belongs to another memory space; retiring it and adopting the working tree")
       await this.retire()
     }
-    if (owner !== peer || state.space !== space || otherSpace) await this.updateState({ peer, space })
+    // The account stamp is the device's sign-in, not the retired journal's content: a fresh journal keeps it, or an
+    // offline restart would ask whose memory this is (#14491 review r9 Opus L1).
+    if (owner !== peer || state.space !== space || otherSpace)
+      await this.updateState({ peer, space, account: state.account })
     return otherSpace && !otherPeer
   }
 
