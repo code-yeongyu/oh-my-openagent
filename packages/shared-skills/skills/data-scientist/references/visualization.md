@@ -1,7 +1,7 @@
 # Visualization
 
 A chart exists to answer a question at a glance. A chart shown inline beside a reply
-(`show_html_page`, `html_preview`, `html_render`) is drawn in HTML, never as a matplotlib PNG:
+(the host's inline-page or HTML-preview tool, such as `show_html_page`) is drawn in HTML, never as a matplotlib PNG:
 an image ignores the reader's theme and width. When the `visualize` skill is available, it builds
 that page. There this file's chart-type table, Figures and Quality bar apply, and the matplotlib
 calls do not. Everywhere else (a kernel, a file, a document) render it with matplotlib (resident

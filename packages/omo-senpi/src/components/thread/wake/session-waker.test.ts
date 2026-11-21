@@ -114,17 +114,16 @@ describe("ensureSessionRunning", () => {
     },
   )
 
-  test("#given four woken sessions past requested #when a fifth is woken #then it is overloaded, nothing is opened and its row stays requested", async () => {
-    const { fake, store, sessions, ensured, waker } = await setup(() => OPENED)
+  test("#given four woken sessions past requested #when a fifth is woken #then it is opened: no count caps woken sessions", async () => {
+    const { store, sessions, ensured, waker } = await setup(() => OPENED)
     for (const id of ["a", "b", "c", "d"]) {
       await store.woken.request({ durable_id: id, session_file: `/sessions/${id}.jsonl` })
       await store.woken.start({ durable_id: id })
     }
     writeSessionFile(sessions, "s1")
-    expect(await waker.ensureSessionRunning("s1")).toEqual({ kind: "overloaded" })
-    expect(fake.frames).toEqual([])
-    expect(ensured).toEqual([])
-    expect((await store.woken.list()).find((row) => row.durable_id === "s1")?.state).toBe("requested")
+    expect(await waker.ensureSessionRunning("s1")).toMatchObject({ kind: "live" })
+    expect(ensured).toHaveLength(1)
+    expect((await store.woken.list()).find((row) => row.durable_id === "s1")?.state).toBe("opening")
   })
 
   test.each<[string, WakeHostReply, WakeOutcome]>([

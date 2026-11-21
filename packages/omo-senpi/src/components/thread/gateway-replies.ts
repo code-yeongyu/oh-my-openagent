@@ -36,6 +36,7 @@ const EXTERNAL_ADMISSION_KINDS: ReadonlySet<string> = new Set<ExternalAdmissionK
   "steered",
   "turn_conflict",
   "held_draft",
+  "held",
   "already_admitted",
 ])
 

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 import type { ThreadDataError, ThreadSummary } from "../contracts"
 import type { ThreadToolFailure } from "../errors"
 import { summary, type ThreadToolSummary } from "../tools/internals"
@@ -23,12 +24,29 @@ export type SessionOpenRequest = {
   readonly thinkingLevel?: string
   /** A new git worktree to create from the repository at `cwd` on the opening device; the session starts in it. */
   readonly worktree?: WorktreeRequest
+  /** The id a new session is created under (`createdThreadId`); a host without `durable_session_id` ignores it. */
+  readonly durableSessionId?: string
+}
+
+/**
+ * The id thread_create creates a thread on this device under (#14060): derived from the caller and the call's
+ * idempotency key, UUID-shaped (version 8), so a create whose reply was lost, and a retry under the same key, find the
+ * thread it made instead of making another.
+ */
+export function createdThreadId(callerId: string, idempotencyKey: string): string {
+  const hex = createHash("sha256").update(`thread_create\0${callerId}\0${idempotencyKey}`).digest("hex")
+  const variant = ((Number.parseInt(hex.charAt(16), 16) & 0x3) | 0x8).toString(16)
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-8${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`
 }
 
 /** A thread as the tools report it, with `device` when it is on another of the account's devices. */
 /** `warnings`: steps after the session was created that failed; the thread exists and is answered anyway. */
 export type HostedThread = ThreadToolSummary & {
   readonly device?: string
+  /** Set when `name` is a fallback: the thread has no name of its own. */
+  readonly unnamed?: true
+  /** A row from another device's cached listing: when that listing was taken. */
+  readonly as_of?: string
   readonly worktree?: ThreadWorktree
   readonly warnings?: readonly ThreadToolFailure[]
 }
@@ -66,5 +84,13 @@ export type SessionHost = {
   readonly device?: string
   /** The threads visible on that device: this device's address book, or the account listing's live rows of that device. */
   readonly visible: () => Promise<readonly ThreadSummary[]>
-  readonly open: (request: SessionOpenRequest) => Promise<SessionOpenOutcome>
+  /**
+   * `confirmReach`: thread_create goes on to use the new session, so another device's host first checks that its route
+   * reaches the session it opened (#14394), with the name it applies or one state read. It is a hint to the host,
+   * never a field of the engine's open.
+   */
+  readonly open: (
+    request: SessionOpenRequest,
+    options?: { readonly confirmReach?: boolean },
+  ) => Promise<SessionOpenOutcome>
 }

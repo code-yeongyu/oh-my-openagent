@@ -44,10 +44,7 @@ export async function recordThreadCreator(
   runtimeId: string,
   created: ThreadToolResult,
 ): Promise<ThreadToolResult> {
-  const createdId =
-    created.kind === "ok"
-      ? (created as { readonly thread?: { readonly thread_id?: unknown } }).thread?.thread_id
-      : undefined
+  const createdId = created.kind === "ok" ? (created as { readonly thread?: unknown }).thread : undefined
   if (typeof createdId !== "string") return created
   const creator = resolveCallerDurableId(options, view, runtimeId)
   if (creator !== undefined && creator !== createdId)
@@ -94,7 +91,7 @@ export async function buildExtensionTools(options: ThreadToolSurfaceOptions): Pr
 
 export type ExtensionToolHost = {
   registerTool(tool: Record<string, unknown>): void
-  on?(event: string, handler: () => void): void
+  on?(event: string, handler: (event: unknown, ctx?: unknown) => unknown): void
   /** senpi's tool registry for the session (builtins and every extension's tools). */
   getAllTools?(): readonly { readonly name: string }[]
 }

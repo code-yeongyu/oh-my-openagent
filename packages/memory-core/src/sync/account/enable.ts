@@ -1,4 +1,4 @@
-import { loadTrustAnchor, TrustPinError } from "../crypto/trust-pin.ts"
+import { loadTrustAnchor, type RootChangeNotice, TrustPinError } from "../crypto/trust-pin.ts"
 import { creatorAnchor } from "../crypto/anchor.ts"
 import { LockContentionError } from "../../locks/acquire.ts"
 import type { DeviceKeyring } from "../keyring-port.ts"
@@ -18,6 +18,7 @@ import { phraseCreationRefusal, type PhraseGate } from "../genesis/phrase-gate.t
 import type { AccountHttp } from "./http.ts"
 import type { PairingHttp } from "./pairing-http.ts"
 import { principalOf } from "./join.ts"
+import { turnDeviceSyncOn } from "./device-switch.ts"
 import { accountOperation, pairingOperation } from "./operation-ports.ts"
 import { commitIntent, createPhraseGenesis, placeOf } from "./enable-phrase.ts"
 import type { PhraseVoidNotice } from "./phrase-notice.ts"
@@ -25,12 +26,11 @@ import type { PhraseVoidNotice } from "./phrase-notice.ts"
 export type EnableMethod = "passkey" | "phrase"
 
 export type EnableOutcome =
-  | {
+  | ({
       readonly kind: "joined"
       readonly created?: true
-      readonly rootChanged?: true
       readonly phraseVoid?: PhraseVoidNotice
-    }
+    } & RootChangeNotice)
   | { readonly kind: "join_required"; readonly phraseVoid?: PhraseVoidNotice }
   | {
       readonly kind: "method_required"
@@ -147,7 +147,7 @@ async function enableLocked(
   // Bootstrap readability is not consent. Joining, resuming and passkey creation turn both switches on here,
   // before any key or root is written; every refusal above returns with both switches untouched.
   await pairing.setAccountSync(true)
-  await pairing.setDeviceSync(input.serviceDeviceId, true)
+  await turnDeviceSyncOn(captured)
   checkSyncOperation(input)
   if (intent === null && (pin.ok || keys.length > 0)) return { kind: member ? "joined" : "join_required", ...notice }
   if (intent === null) {

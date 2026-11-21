@@ -57,7 +57,7 @@ export const DagToolParams = Type.Object({
             model: Type.Optional(
               Type.String({
                 description:
-                  "Explicit model override. Only valid with subagent_type; rejected alongside category, which takes its model from omo.json.",
+                  "Explicit model override for a custom omo.json agent named by subagent_type; rejected alongside category or a builtin agent, which take their model from omo.json.",
               }),
             ),
             dependsOn: Type.Optional(

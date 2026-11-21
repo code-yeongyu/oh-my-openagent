@@ -34,6 +34,9 @@
         "script/keychain-helper-release.ts",
         "script/lint-ratchet.ts",
         "script/oxlint/biome-ports.ts",
+        // loaded by oxlint as a jsPlugin from script/lint-ratchet.oxlintrc.json by path, not imported; its two
+        // rule modules are its static imports and stay reachable (and flaggable) through this entry (#14208)
+        "script/oxlint/testing.ts",
         "script/patch-node-require-shim.ts",
         "script/preflight-trust.mjs",
         "script/print-release-notes.ts",
@@ -254,6 +257,8 @@
     "script/oxlint/biome-parity.ts": ["parityDir"],
     // pre-existing at origin dev 4686e425b5: unused export(s) default
     "script/oxlint/biome-ports.ts": ["default"],
+    // jsPlugin entry: the oxlint loader reads its default export (the plugin object) by path (#14208)
+    "script/oxlint/testing.ts": ["default"],
     // pre-existing at origin dev 4686e425b5: unused export(s) combineFragments
     "script/package-log-blocks.ts": ["combineFragments"],
     // pre-existing at origin dev 4686e425b5: unused export(s) main

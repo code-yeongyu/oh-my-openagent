@@ -24,4 +24,5 @@ export const pairingOperation = (http: PairingHttp, operation: SyncOperationOpti
     admitSyncOperation(operation, () => http.revealPending(id, principal, nonce, operation)),
   setAccountSync: (enabled) => admitSyncOperation(operation, () => http.setAccountSync(enabled, operation)),
   setDeviceSync: (id, enabled) => admitSyncOperation(operation, () => http.setDeviceSync(id, enabled, operation)),
+  disableDeviceSync: (id) => admitSyncOperation(operation, () => http.disableDeviceSync(id, operation)),
 })

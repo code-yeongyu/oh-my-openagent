@@ -15,7 +15,7 @@ curl -fsSL https://get.omo.dev/install.sh | bash -s -- beta # beta channel, or p
 irm https://get.omo.dev/install.ps1 | iex
 ```
 
-The script picks the asset for your OS, CPU, libc and AVX2 support (Rosetta shells get the Apple Silicon build), verifies it against the release `SHA256SUMS`, and installs it as `~/.local/bin/omo` (`%USERPROFILE%\.local\bin\omo.exe` on Windows). If that directory is not on `PATH` it adds a marked block to your shell profile (or your Windows user `PATH`). It writes a receipt to `~/.omo/install.json` and reports any npm `omo-ai` install it finds without removing it. It refuses to run as root.
+The script picks the asset for your OS, CPU, libc and AVX2 support (Rosetta shells get the Apple Silicon build), verifies it against the release `SHA256SUMS`, and installs it as `~/.local/bin/omo` (`%USERPROFILE%\.local\bin\omo.exe` on Windows). If that directory is not on `PATH` it adds a marked block to your shell profile (or your Windows user `PATH`). It writes a receipt to `~/.omo/install.json` and reports any npm `omo-ai` install it finds without removing it. It refuses to run under `sudo`/`doas` from another user (override: `curl -fsSL https://get.omo.dev/install.sh | OMO_INSTALL_ALLOW_SUDO=1 bash`); a root-only shell such as proot-distro or a container installs normally.
 
 Binaries come from the get.omo.dev mirror, a Cloudflare R2 copy of each release behind the CDN. When the mirror does not have a version, or is unreachable, the script downloads the same file from GitHub Releases and verifies it the same way. Settings: `OMO_INSTALL_DIR` (install directory), `OMO_NO_MODIFY_PATH=1` (never edit profiles).
 
