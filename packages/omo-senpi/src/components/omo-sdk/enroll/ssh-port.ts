@@ -64,7 +64,8 @@ export function remoteCommand(program: RemoteProgram): string {
       return [
         BUN_PATH,
         "umask 077",
-        'f="$(mktemp "${TMPDIR:-/tmp}/doriterm-join.XXXXXX")" || exit 4',
+        'd="$TMPDIR"; [ -n "$d" ] || d=/tmp',
+        'f="$(mktemp "$d/doriterm-join.XXXXXX")" || exit 4',
         "trap 'rm -f \"$f\"' EXIT",
         'cat > "$f"',
         `${DORITERM_SETUP} join --from "$f"`,
