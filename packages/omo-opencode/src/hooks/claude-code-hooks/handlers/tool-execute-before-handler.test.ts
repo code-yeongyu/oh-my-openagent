@@ -1,7 +1,7 @@
-import { afterAll, afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
+import { afterAll, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import { restoreModuleMocksForTestFile } from "../../../testing/module-mock-lifecycle"
-import * as config from "../config"
 import type { PreToolUseContext } from "../pre-tool-use"
+import { useEmptyHookConfig } from "./empty-hook-config.fixture"
 
 type PreToolUseMockResult = {
   readonly decision?: "deny" | "allow"
@@ -16,10 +16,6 @@ type PreToolUseMockResult = {
 let preToolUseResult: PreToolUseMockResult = { decision: "allow" }
 let preToolUseContexts: PreToolUseContext[] = []
 const mockGetWorkForSession = mock(() => null)
-
-mock.module("../config-loader", () => ({
-  loadPluginExtendedConfig: async () => ({}),
-}))
 
 mock.module("../pre-tool-use", () => ({
   executePreToolUseHooks: async (context: PreToolUseContext) => {
@@ -40,18 +36,14 @@ afterAll(() => {
 const { createToolExecuteBeforeHandler } = await import("./tool-execute-before-handler")
 
 describe("createToolExecuteBeforeHandler", () => {
-  let restoreConfig: () => void
+  useEmptyHookConfig()
 
   beforeEach(() => {
-    const configSpy = spyOn(config, "loadClaudeHooksConfig").mockResolvedValue({})
-    restoreConfig = () => configSpy.mockRestore()
     preToolUseResult = { decision: "allow" }
     preToolUseContexts = []
     mockGetWorkForSession.mockReset()
     mockGetWorkForSession.mockReturnValue(null)
   })
-
-  afterEach(() => restoreConfig())
 
   it("#given Bash has an active tool cwd #when handler runs #then PreToolUse receives that cwd", async () => {
     // given

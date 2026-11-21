@@ -1,15 +1,10 @@
-import { afterAll, afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
+import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
 import { restoreModuleMocksForTestFile } from "../../../testing/module-mock-lifecycle"
-import * as config from "../config"
+import { useEmptyHookConfig } from "./empty-hook-config.fixture"
 
 const executeStopHooks = mock(async (context: { parentSessionId?: string; transcriptPath?: string }) => ({
   block: false,
   observedParentSessionId: context.parentSessionId,
-}))
-
-mock.module("../config-loader", () => ({
-  clearPluginExtendedConfigCache: () => {},
-  loadPluginExtendedConfig: async () => ({}),
 }))
 
 mock.module("../stop", () => ({
@@ -24,18 +19,10 @@ afterAll(() => {
 const { createSessionEventHandler } = await import("./session-event-handler")
 
 describe("createSessionEventHandler retry behavior", () => {
-  const configSpies: Array<{ mockRestore(): void }> = []
+  useEmptyHookConfig()
 
   beforeEach(() => {
     executeStopHooks.mockClear()
-    configSpies.push(
-      spyOn(config, "clearClaudeHooksConfigCache").mockImplementation(() => {}),
-      spyOn(config, "loadClaudeHooksConfig").mockResolvedValue(null),
-    )
-  })
-
-  afterEach(() => {
-    for (const spy of configSpies.splice(0)) spy.mockRestore()
   })
 
   test("#given transient parent lookup failure #when the next idle succeeds #then stop hooks receive the later parent session id", async () => {
@@ -71,7 +58,7 @@ describe("createSessionEventHandler retry behavior", () => {
         parentSessionId: "ses_parent",
       }),
       null,
-      {},
+      { disabledHooks: {} },
     )
   })
 
@@ -109,7 +96,7 @@ describe("createSessionEventHandler retry behavior", () => {
         parentSessionId: "ses_parent",
       }),
       null,
-      {},
+      { disabledHooks: {} },
     )
   })
 
