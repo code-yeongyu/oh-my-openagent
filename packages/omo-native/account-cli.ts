@@ -106,7 +106,11 @@ async function adopt(dependencies: AccountCommandDependencies, replace: boolean)
       if (!keepCurrent) await dependencies.store.write(incoming)
       await session.clearSignedOutMarker()
       adopted = keepCurrent ? current : incoming
-      return reply(dependencies, { adopted: true, device: deviceOf(incoming) })
+      return reply(dependencies, {
+        adopted: true,
+        device: deviceOf(incoming),
+        ...(dependencies.store.storage === undefined ? {} : { storage: dependencies.store.storage() }),
+      })
     },
     { replaceInvalid: replace },
   )
