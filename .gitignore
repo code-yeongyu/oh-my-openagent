@@ -1,3 +1,5 @@
+# A cache path built from an unset environment variable can create this directory.
+undefined/
 # Dependencies
 .omo/*
 !.omo/rules/
