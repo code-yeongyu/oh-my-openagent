@@ -66,6 +66,14 @@ export interface DelegateTaskArgs {
   subagent_type?: string
   requested_subagent_type?: string
   run_in_background: boolean
+  /** Omitted: each, or one report for a whole fan-out group. */
+  wake?: "each" | "none"
+  /** Fan-out: one child per contiguous slice of these, all given `prompt`. */
+  items?: string[]
+  /** Fan-out: how many children the items are split across (default: one per item). */
+  split?: number
+  /** Set on each child of a fan-out call: the group its notices are held for. */
+  groupId?: string
   task_id?: string
   command?: string
   load_skills: string[]

@@ -13,6 +13,7 @@ import { stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
 import { resolveMetadataModel } from "./resolve-metadata-model"
 import { getPersistedBackgroundTaskDescription } from "./background-task-description"
+import { backgroundLaunchFollowUp } from "./background-launch-follow-up"
 
 function registerBackgroundSessionContext(args: {
   sessionId: string
@@ -132,6 +133,8 @@ export async function executeBackgroundTask(
       category: args.category,
       sessionPermission: QUESTION_DENIED_SESSION_PERMISSION,
       userPermission: categoryModel?.tools ? migrateToolsToPermission(categoryModel.tools) : undefined,
+      wake: args.wake,
+      groupId: args.groupId,
     })
 
     // OpenCode TUI's `Task` tool UI calculates toolcalls by looking up
@@ -219,7 +222,7 @@ Description: ${task.description}
 Agent: ${task.agent}${args.category ? ` (category: ${args.category})` : ""}
 Status: ${task.status}
 
-Do NOT call background_output now. Wait for <system-reminder> notification first. The system will deliver the result when the task completes; you do not need to poll for it.${taskMetadataBlock}`
+${backgroundLaunchFollowUp(args.wake)}${taskMetadataBlock}`
   } catch (error) {
     return formatDetailedError(error, {
       operation: "Launch background task",
