@@ -10,7 +10,7 @@
 import type { ChainAnchor } from "../crypto/anchor.ts"
 import { type AcceptedBatch, appendEntries, type ChainRejection, type ChainState, emptyChain } from "../crypto/chain.ts"
 import type { BatchEntry, KeyringEntry, SyncEntry } from "../crypto/entry.ts"
-import type { RejectionCounter } from "../crypto/rejection.ts"
+import { createRejectionCounter, type RejectionCounter } from "../crypto/rejection.ts"
 import type { DeviceKeyring } from "../keyring-port.ts"
 import type { ChainRow } from "../recovery/ports.ts"
 import { ownMaterial } from "../recovery/keyring-append.ts"
@@ -35,6 +35,12 @@ export interface AccountChain {
   /** The epoch key this device holds for `epoch`, opened from its own committed wrap. */
   epochKey(epoch: number): Promise<Uint8Array<ArrayBuffer> | null>
   isMember(): boolean
+  /**
+   * Walks this device's own batch, which the service just appended at `entry.seq`, onto the verified chain without
+   * reading it back: the next seal on that base needs its link (#14476). It goes through the same checks as a served
+   * row and is taken only when it extends the verified head and verifies; otherwise the next reach reads as before.
+   */
+  acceptOwn(entry: BatchEntry): Promise<void>
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -92,8 +98,7 @@ export async function openAccountChain(input: {
     return rows.length
   }
 
-  const walk = async (entries: SyncEntry[]): Promise<void> => {
-    const walked = await appendEntries(state, entries, rejections)
+  const adopt = (entries: readonly SyncEntry[], walked: Awaited<ReturnType<typeof appendEntries>>): void => {
     for (const step of walked.steps) {
       if (step.kind === "batch") positions.set(step.batch.seq, { kind: "batch", batch: step.batch })
       else positions.set(step.seq, step.kind === "keyring" ? { kind: "keyring" } : { kind: "vetoed" })
@@ -106,6 +111,16 @@ export async function openAccountChain(input: {
       positions.set(walked.seq, { kind: "refused", reason: walked.reason })
       refusedAt = walked.seq
     }
+  }
+
+  const walk = async (entries: SyncEntry[]): Promise<void> =>
+    adopt(entries, await appendEntries(state, entries, rejections))
+
+  const acceptOwn = async (entry: BatchEntry): Promise<void> => {
+    if (refusedAt !== null || heldFrom !== null || (state.head?.seq ?? 0) !== entry.seq - 1) return
+    // A trial walk with its own counter: an own entry that does not verify is left to the served read.
+    const walked = await appendEntries(state, [entry], createRejectionCounter())
+    if (walked.ok) adopt([entry], walked)
   }
 
   // Pages until `target` is verified, the server has no more rows, or a row stops the walk. The
@@ -153,5 +168,6 @@ export async function openAccountChain(input: {
     linkAt: (seq) => links.get(seq) ?? null,
     epochKey,
     isMember: () => state.authority?.members.has(keyring.principal().id) === true,
+    acceptOwn,
   }
 }
