@@ -35,6 +35,8 @@ export async function takeDecision(gitDir: string, root: string, account: string
   return record.decision
 }
 
-export function clearUndecided(gitDir: string): Promise<void> {
-  return removeAtomic(join(gitDir, UNDECIDED_FILE))
+/** The journal is no longer waiting for the person: its notice and any decision recorded against it go (review r7 L1). */
+export async function settleOwnership(gitDir: string): Promise<void> {
+  await removeAtomic(join(gitDir, UNDECIDED_FILE))
+  await removeAtomic(join(gitDir, DECISION_FILE))
 }

@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test"
-import { readdir, readFile, writeFile } from "node:fs/promises"
+import { readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import { type Device, makeDevice } from "./engine-harness.test-support"
@@ -165,4 +165,26 @@ test("#given a legacy journal that applied nothing but queued an edit #when the 
   await settle(peer)
   expect(await peer.read("after.md")).toBe(note("written after setting it aside\n"))
   expect(await peer.read("queued.md")).toBeNull()
+})
+
+test("#given a journal that was waiting for a choice #when nothing of it is left to leak and it is adopted #then its notice and any recorded decision are gone", async () => {
+  const server = new FakeSyncServer()
+  const d = await makeDevice(server, "d", undefined, { realStore: true, account: "acc_a" })
+  devices.push(d)
+  await d.engine.runCycle()
+  const gitDir = join(d.repo.root, ".git")
+  const statePath = join(gitDir, "omo-sync", "state.json")
+  const { account: _owner, ...olderBuild } = JSON.parse(await readFile(statePath, "utf8")) as Record<string, unknown>
+  await writeFile(statePath, JSON.stringify(olderBuild))
+  await d.restart(undefined, undefined, { server, account: "acc_a" })
+  await expect(d.engine.runCycle()).rejects.toMatchObject({ name: "OwnershipUndecidedError" })
+  expect(await decideOwnership(gitDir, "acc_a", "set_aside", 0)).toEqual({ kind: "recorded" })
+  await writeFile(join(gitDir, DECISION_FILE), JSON.stringify({ account: "acc_b", decision: "use", files: 1 }))
+  await rm(join(d.repo.root, ".gitkeep"), { force: true })
+
+  await d.restart(undefined, undefined, { server, account: "acc_a" })
+  await d.engine.runCycle()
+
+  expect(await readUndecided(gitDir)).toBeNull()
+  expect((await readdir(gitDir)).includes(DECISION_FILE)).toBe(false)
 })

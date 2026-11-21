@@ -17,7 +17,7 @@ import { syncJournalDirectory } from "../../journal/fsync"
 import { readJson, removeAtomic, writeJson } from "./atomic"
 import type { EngineDeps } from "./engine-deps"
 import type { SyncJournal } from "./journal"
-import { clearUndecided, ownedFileCount, takeDecision, writeUndecided } from "./ownership-apply"
+import { ownedFileCount, settleOwnership, takeDecision, writeUndecided } from "./ownership-apply"
 import { itemPathsOnDisk } from "./working-tree"
 
 interface SwitchMarker {
@@ -200,13 +200,14 @@ export async function claimAccount(deps: EngineDeps, journal: SyncJournal): Prom
         await writeUndecided(gitDir, deps.repo.root, account, deps.clock.now())
         throw new OwnershipUndecidedError()
       }
-      await clearUndecided(gitDir)
+      await settleOwnership(gitDir)
       if (decision === "use") {
         await deps.lock.withLock(() => useHere(deps, journal, account))
         deps.log?.("sync: as chosen, this device's memory now syncs to this account and is uploaded to it")
         return true
       }
     }
+    if (verdict !== "undecided") await settleOwnership(dirname(journal.dir))
     if (verdict === "own") {
       await journal.updateState({ account })
       return pending !== null
