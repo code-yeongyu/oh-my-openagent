@@ -159,6 +159,64 @@ test.each<[string, boolean, { name: string }[]]>([
   },
 )
 
+/** Schema v16: dev's store after the collapse key (#14428), the one a host running dev leaves before v17. */
+const V16 = 16
+
+const BINDING_ERA = "SELECT name FROM sqlite_schema WHERE name IN ('bindings', 'outbox', 'outbox_cursors', 'completion_arms') ORDER BY name"
+
+// The binding drop (v17) must leave the collapse-key data and the target's backlog alone, whether the store arrives at
+// it already at v16 or runs v16 and v17 in one open from v15.
+test.each([
+  [V16, "holding a binding", true],
+  [V16, "with no binding rows", false],
+  [V15, "holding a binding", true],
+  [V15, "with no binding rows", false],
+] as const)(
+  "#given a v%i store %s and a queued backlog #when the current store opens it #then only the binding-era tables go and every delivery, its collapse key and the collapse index stay",
+  async (version, _label, bound) => {
+    const h = (harness = createGatewayHarness())
+    const path = gatewayDatabasePath(h.agentDir)
+    const collapse = version === V16 ? ", collapse_key" : ""
+    const keyed = version === V16 ? ", 'alert-1'" : ""
+    v14Fixture(
+      path,
+      [
+        `INSERT INTO deliveries (delivery_id, target_durable_id, seq, sender, envelope, body, bytes, mode_requested, state,
+         root_id, hop, created_at, updated_at, expires_at${collapse}) VALUES ('d-backlog', 'target', 2, 'session:A',
+         '{"provenance":{"workspace":"w","project":"p"}}', 'alert', 5, 'auto', 'queued', 'root-2', 1, 2, 2, 9999999999999${keyed})`,
+      ],
+      { bound, version },
+    )
+    const store = h.store()
+    try {
+      await store.identity()
+    } finally {
+      await store.dispose()
+    }
+    const db = new Database(path)
+    try {
+      expect({
+        version: (db.query("PRAGMA user_version").get() as { user_version: number }).user_version,
+        tables: db.query(BINDING_ERA).all(),
+        deliveries: db
+          .query("SELECT delivery_id, state, body, collapse_key FROM deliveries ORDER BY delivery_id")
+          .all(),
+        collapseIndex: db.query("SELECT name FROM sqlite_schema WHERE type = 'index' AND name = 'deliveries_collapse'").all(),
+      }).toEqual({
+        version: GATEWAY_MIGRATIONS.length,
+        tables: bound ? [{ name: "bindings" }] : [],
+        deliveries: [
+          { delivery_id: "d-backlog", state: "queued", body: "alert", collapse_key: version === V16 ? "alert-1" : null },
+          ...(bound ? [{ delivery_id: "d-bound", state: "queued", body: "from chat", collapse_key: null }] : []),
+        ],
+        collapseIndex: [{ name: "deliveries_collapse" }],
+      })
+    } finally {
+      db.close()
+    }
+  },
+)
+
 // dori-extension imports each thread route's owner from the binding rows through tx.bindingFor on its next open; a
 // store that dropped them first would lose every route.
 test.each([
