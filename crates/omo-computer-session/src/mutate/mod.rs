@@ -13,6 +13,7 @@ mod poison;
 mod record;
 mod recovery;
 mod report;
+mod route;
 
 #[cfg(test)]
 mod tests;
@@ -20,6 +21,7 @@ mod tests;
 pub use binding::{Binding, SecureInputProbe, SecureProbe};
 pub use call::Mutation;
 pub use memory_markers::MemoryMarkers;
+pub(crate) use route::{key_event, route_for};
 
 use std::path::{Path, PathBuf};
 
@@ -56,13 +58,15 @@ pub const TRANSACTION_FAILED: Refusal = Refusal::bare(EngineCode::TransactionFai
 pub const LOCAL_HAND: &str = "local";
 
 /// A refusal and what the funnel adds to it on the wire: the `callId` it concerns, the
-/// stored receipt of a replay, and the disposition of an interrupted earlier send.
+/// stored receipt of a replay, the disposition of an interrupted earlier send, and the busy
+/// wait of an `InputBusy{target_busy}` refusal.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Refused {
     pub refusal: Refusal,
     pub call_id: Option<String>,
     pub receipt: Option<Box<Value>>,
     pub interrupted: Option<Disposition>,
+    pub busy: Option<crate::settle::BusyDetail>,
     /// `write_failed` when the refusal's own audit line could not be written.
     pub warning: Option<String>,
 }
@@ -74,6 +78,7 @@ impl From<Refusal> for Refused {
             call_id: None,
             receipt: None,
             interrupted: None,
+            busy: None,
             warning: None,
         }
     }
