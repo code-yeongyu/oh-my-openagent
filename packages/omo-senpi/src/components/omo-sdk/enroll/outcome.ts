@@ -28,6 +28,7 @@ export type EnrollCode =
   | "accounts_unreachable"
   | "device_service_off"
   | "not_online_before_deadline"
+  | "caller_device_service_unavailable"
   | "aborted"
   | "caller_signed_out"
   | "internal_error"

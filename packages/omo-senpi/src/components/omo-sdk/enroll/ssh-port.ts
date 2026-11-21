@@ -117,13 +117,19 @@ export function openSshPort(target: SshTarget): SshPort {
           target.host,
           remoteCommand(program),
         ]
-        const child = Bun.spawn(argv, {
-          stdin: "pipe",
-          stdout: "pipe",
-          stderr: "pipe",
-          ...(signal === undefined ? {} : { signal }),
-        })
-        return { child, dir }
+        try {
+          const child = Bun.spawn(argv, {
+            stdin: "pipe",
+            stdout: "pipe",
+            stderr: "pipe",
+            ...(signal === undefined ? {} : { signal }),
+          })
+          return { child, dir }
+        } catch (error) {
+          // No ssh binary (or a refused spawn): the exit chain below never runs, so the known-hosts dir goes here.
+          if (dir !== undefined) await rm(dir, { recursive: true, force: true })
+          throw error
+        }
       })()
       const stdoutLines = (async function* () {
         const { child } = await started

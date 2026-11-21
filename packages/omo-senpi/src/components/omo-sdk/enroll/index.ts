@@ -24,7 +24,8 @@ export type EnrollPorts = {
   readonly liveDeviceIds: () => Promise<readonly string[]>
   readonly isDeviceRevoked: (id: string) => Promise<boolean>
   /** What the fleet client sees through this device's device service. */
-  readonly machines: () => Promise<readonly MachineSighting[]>
+  /** This device's own device service's view of the account's machines; "unavailable" when that service is not running. */
+  readonly machines: () => Promise<readonly MachineSighting[] | "unavailable">
   readonly clock: EnrollClock
 }
 
@@ -291,7 +292,8 @@ export async function enrollDevice(request: EnrollRequest, ports: EnrollPorts): 
       if (outcome === undefined)
         throw new StepRefusal("internal_error", "the target's sign-in ended without an answer", "enroll again")
       if (outcome.event === "refused") {
-        const mapped = SIGN_IN_REFUSALS[outcome.code]
+        // The code comes from the target: only the table's own entries count, never an inherited object member.
+        const mapped = Object.hasOwn(SIGN_IN_REFUSALS, outcome.code) ? SIGN_IN_REFUSALS[outcome.code] : undefined
         const devices = outcome.code === "device_limit" ? outcome.details?.["devices"] : undefined
         if (mapped === undefined) throw new StepRefusal("internal_error", "the target's sign-in failed", "enroll again")
         throw new StepRefusal(mapped[0], mapped[1], mapped[2], devices === undefined ? undefined : { devices })
@@ -321,6 +323,15 @@ export async function enrollDevice(request: EnrollRequest, ports: EnrollPorts): 
     let seen: { listed: boolean; machine: MachineSighting["state"] | "absent" } = { listed: false, machine: "absent" }
     for (;;) {
       const [ids, machines] = await Promise.all([ports.liveDeviceIds(), ports.machines()])
+      // Online-ness is read through this device's own device service: without it no wait can ever succeed, and the
+      // fault is on this side, not the target's.
+      if (machines === "unavailable")
+        throw new StepRefusal(
+          "caller_device_service_unavailable",
+          "this device's own device service is not running, so it cannot see the new machine come online",
+          "start this device's device service, then enroll again",
+          { deviceId: device.id, listed: ids.includes(device.id) },
+        )
       const machine = machines.find((row) => row.id === device.id)
       seen = { listed: ids.includes(device.id), machine: machine?.state ?? "absent" }
       if (seen.listed && seen.machine === "online") break

@@ -44,8 +44,9 @@ export function defaultEnrollPorts(options: {
     isDeviceRevoked: (id) => signedIn(({ session }) => isDeviceRevoked(session, id)),
     machines: async () => {
       const rows = await readDeviceServiceDevices({ stateDir, version: createOmoNativeProductConfig().packageVersion })
+      // A string is the service's own status (not running, no answer): there is no view of the machines at all.
       return typeof rows === "string"
-        ? []
+        ? "unavailable"
         : rows.map((row) => ({ id: row.id, state: row.online ? "online" : "offline" }))
     },
     clock: { now: Date.now, sleep },
