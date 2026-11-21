@@ -1290,6 +1290,18 @@ describe("remote == local: the same call answers the same on b as on this device
     })
   })
 
+  // omo#14490 review M1: the title is text from another device's listing (#13304).
+  test("#given a terminal thread on b whose title carries control characters #when thread_close is refused #then the message shows them escaped", async () => {
+    const a = account({ terminal: true, rows: [{ ...B_ROW, title: "evil\n\u001b[31mred" }] })
+    const { run } = surface(a.remote)
+
+    const result = await run("thread_close", { thread: "dur-on-b" })
+
+    const message = (result as { error: { message: string } }).error.message
+    expect(message).toContain("evil\\u000a\\u001b[31mred")
+    expect(message).not.toMatch(/[\n\u001b]/)
+  })
+
   test("#given a truncated read on both #when each follows its next_cursor #then the second pages match too", async () => {
     const a = account()
     const { run } = surface(a.remote)

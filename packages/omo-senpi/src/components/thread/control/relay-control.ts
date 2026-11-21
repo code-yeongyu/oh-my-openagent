@@ -111,7 +111,7 @@ export function createRelayControl(
         if (closeOptions?.graceful !== true && error.failure.details?.["reason"] === "unsupported")
           throw new ControlRefusal({
             ...error.failure,
-            message: `Device ${device} refused to close thread ${row.title || sessionId} (unsupported): an interactive terminal closes its own session only gracefully, and an older engine takes no close at all.`,
+            message: `Device ${device} refused to close thread ${escapeForDisplay(row.title) || sessionId} (unsupported): an interactive terminal closes its own session only gracefully, and an older engine takes no close at all.`,
             next_action:
               "Close it with graceful: true (the terminal exits once its turn ends), or use thread_interrupt (tool.thread_interrupt() in an eval cell) to stop its turn. If that is refused too, update omo on that device.",
             details: { device, ...error.failure.details, command: "unload_session", retry_with: { graceful: true } },

@@ -185,7 +185,8 @@ describe("thread_close: close a thread on this device or on another one", () => 
     const { run, closed } = surface(undefined, { sessions: [terminal] })
     expect(await run("thread_close", { thread: "dur-tui" })).toMatchObject({
       kind: "error",
-      error: { code: "unsupported" },
+      // omo#14478: a terminal thread on another device answers this same retry (thread-remote.test.ts).
+      error: { code: "unsupported", details: { retry_with: { graceful: true } } },
     })
     expect(closed).toEqual([])
   })
