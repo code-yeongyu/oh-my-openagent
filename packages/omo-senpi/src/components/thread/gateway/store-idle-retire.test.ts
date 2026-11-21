@@ -3,6 +3,7 @@ import type { Worker } from "node:worker_threads"
 
 import type { GatewayStore } from "./store"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
+import { settled } from "./testing/settled"
 import { remainingTestTime } from "../../../../../../test-support/test-deadline"
 
 let harness: GatewayHarness | undefined
@@ -172,7 +173,7 @@ test("#given a call whose worker is still opening #when the store is disposed #t
 
   expect(await within(call, remainingTestTime(), "the call to settle")).toMatchObject({ writes: 0 })
   await within(done, remainingTestTime(), "dispose to resolve")
-  await expect(store.stats()).rejects.toThrow("the gateway store is disposed")
+  expect((await settled(store.stats())).error?.message).toBe("the gateway store is disposed")
 })
 
 // Reachability: a terminal whose store worker retired while it sat idle still takes a message at once.
