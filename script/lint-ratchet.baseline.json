@@ -454,7 +454,7 @@
   "packages/memory-core/src/sync/space/adopt-deletion-gate.test.ts": {
     "omo-testing/no-flake-masking": 1
   },
-  "packages/memory-core/src/sync/space/adopt-preservation.test.ts": {
+  "packages/memory-core/src/sync/space/adopt-preservation.test-support.ts": {
     "omo-testing/no-flake-masking": 1
   },
   "packages/memory-core/src/sync/space/adopt-readback.test.ts": {
