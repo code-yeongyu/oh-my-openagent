@@ -7,6 +7,7 @@ import { trustAnchorDir } from "../../memory-core/src/sync/device-retire.ts"
 import { createInMemoryDeviceKeyring } from "../../memory-core/src/sync/keyring-port"
 import { Command } from "commander"
 
+import type { LiveDevice } from "../../omo-opencode/src/cli/service-auth/devices"
 import { temporaryHome } from "../../omo-opencode/src/cli/service-auth/test-support"
 import { configureSyncCommands } from "../sync-cli"
 import type { SyncContext } from "../sync-context"
@@ -21,17 +22,10 @@ const unused = (): never => {
   throw new Error("not used by this case")
 }
 
-const DEVICES = [
-  {
-    id: "dev_svc",
-    name: "laptop",
-    syncing: true,
-    lastSeenAt: "2026-11-20T01:00:00.000Z",
-    current: true,
-    revokedAt: null,
-  },
-  { id: "dev_b", name: "desk", syncing: false, lastSeenAt: "2026-11-19T01:00:00.000Z", revokedAt: null },
-  { id: "dev_old", name: "old", revokedAt: null },
+const DEVICES: LiveDevice[] = [
+  { id: "dev_svc", name: "laptop", syncing: true, lastSeenAt: "2026-11-20T01:00:00.000Z", current: true },
+  { id: "dev_b", name: "desk", syncing: false, lastSeenAt: "2026-11-19T01:00:00.000Z", current: false },
+  { id: "dev_old", name: "old", current: false },
 ]
 
 const PENDING: PendingApproval = {

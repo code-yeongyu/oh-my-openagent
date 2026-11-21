@@ -6,7 +6,7 @@ import { join } from "node:path"
 import { createFakeDeliveryService } from "../consumer/testing/fake-delivery-service"
 import { createGatewayStore } from "../gateway/store"
 import { startThreadWakeAtSession, wakeHostIdleExitMs, type ThreadWakeLatch, type ThreadWakeOptions } from "./runtime"
-import { writeSessionFile } from "./testing/fake-wake-host"
+import { recordUnloadEffect, writeSessionFile } from "./testing/fake-wake-host"
 
 // A carrier that carries nothing arms no sweep timer (design A3.1.4; #13455's MEDIUM and its delta review), the
 // delivery consumer beside it is started again after it dies (#13457's MEDIUM), and the ensured host's idle-exit
@@ -299,6 +299,49 @@ describe("the consumer's stop against an in-flight retry", () => {
         record: { type: "admit_external_message" },
       }),
     ).rejects.toThrow("no consumer is declared")
+  })
+})
+
+// #14273 follow-up: a wake that settles a closed session's rows answers `nothing_queued`; the drained marks those
+// rows leave are reported then, not only at the next carry that ends.
+describe("a wake that settles a closed session's intake", () => {
+  test("#given a delivery from another device queued before a close on request #when the session is woken #then the wake answers nothing_queued and its drained mark is reported", async () => {
+    const agentDir = mkdtempSync("/tmp/omo-wake-runtime-")
+    const file = writeSessionFile(join(agentDir, "sessions"), "dur-closed", { cwd: mkdtempSync("/tmp/omo-wake-cwd-") })
+    const service = createFakeDeliveryService({ admitted: true })
+    service.ackServe({ wake: true })
+    const outcomes: string[] = []
+    const running = start(agentDir, {
+      store: createGatewayStore({ agentDir }),
+      deliveries: async () => service.port,
+      onWake: (_durableId, outcome) => outcomes.push(outcome.kind),
+    })
+    await running?.ready
+    await service.inbound({
+      command_id: "c-1",
+      sender_device: "device-b",
+      durable_id: "dur-closed",
+      record: {
+        type: "admit_external_message",
+        sessionId: "dur-closed",
+        deliveryId: "d-1",
+        text: "OMO_GATEWAY v=1\nsource=peer_agent\n\nd-1",
+        displayText: "d-1",
+        sender: { kind: "agent", session_id: "sender-on-b" },
+        deliverAs: "followUp",
+        chainCount: 1,
+      },
+    })
+    recordUnloadEffect(file, "dur-closed", Date.now() + 1_000, "done")
+    const drainedBefore = service.calls.filter((call) => call.type === "delivery.drained").length
+
+    await running?.wake("dur-closed")
+
+    expect(outcomes.at(-1)).toBe("nothing_queued")
+    expect(service.calls.filter((call) => call.type === "delivery.drained").slice(drainedBefore)).toEqual([
+      { type: "delivery.drained", sender_device: "device-b", session_id: "dur-closed", last_command_id: "c-1" },
+    ])
+    await running?.stop()
   })
 })
 

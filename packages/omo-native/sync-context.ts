@@ -17,10 +17,10 @@ import {
   createCredentialStore,
   INTERACTIVE_READ_WAIT,
 } from "../omo-opencode/src/cli/service-auth/keystore"
+import { type LiveDevice, listLiveDevices } from "../omo-opencode/src/cli/service-auth/devices"
 import { ApiRefusal, type Credentials, serviceOrigin, SignInError } from "../omo-opencode/src/cli/service-auth/protocol"
 import { createSession } from "../omo-opencode/src/cli/service-auth/session"
 import { retireSyncPinOnDiscard } from "../omo-opencode/src/cli/service-auth/sync-pin-retire"
-import { type Listed, liveDevices } from "./account-devices"
 
 export interface SyncContext {
   readonly account: string
@@ -36,7 +36,7 @@ export interface SyncContext {
    */
   readonly authority: SyncOperationAuthority
   /** The account's live devices, through the same read `omo account devices` uses. */
-  readonly listDevices?: () => Promise<readonly Listed[]>
+  readonly listDevices?: () => Promise<readonly LiveDevice[]>
 }
 
 export interface SyncContextOptions {
@@ -121,6 +121,6 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
     chain: createAccountHttp(http),
     pairing: createPairingHttp(http),
     authority,
-    listDevices: () => liveDevices(session),
+    listDevices: () => listLiveDevices(session),
   }
 }

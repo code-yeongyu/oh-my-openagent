@@ -50,6 +50,82 @@ describe("monitor rpc remote targets (#12719): omo's RpcRemoteSource", () => {
     expect(lines).toEqual([])
   })
 
+  test("#given a target armed raw (a restored monitor) #when its device is named and its thread part is a name #then the module resolves both and the watch is b's listing key, under the label given (#14305)", async () => {
+    const a = account()
+    for (const [device, session] of [
+      ["studio", "dur-on-b"],
+      ["b", "on b"],
+    ] as const) {
+      const opened = await registered(a.remote).open({ device, session }, {}, capture().handlers)
+      opened.stop()
+      expect(opened.initial.rows.map((row) => row.sessionId)).toEqual([session])
+    }
+    expect(a.sent.filter((entry) => entry.via === "watch").map((entry) => [entry.device, entry.session])).toEqual([
+      ["b", "rk-on-b"],
+      ["b", "rk-on-b"],
+    ])
+  })
+
+  test.each([
+    ["offline", { online: false }],
+    ["missing from this listing round", { incomplete: ["b"] }],
+  ] as const)(
+    "#given a persistent monitor restored on <device id>/<thread id> while b is %s #when it re-opens #then it watches b's listing key, leaving reachability to the watch, never a lost monitor",
+    async (_case, options) => {
+      const a = account(options)
+      const opened = await registered(a.remote).open({ device: "b", session: "dur-on-b" }, {}, capture().handlers)
+      opened.stop()
+      expect(a.sent.filter((entry) => entry.via === "watch").map((entry) => [entry.device, entry.session])).toEqual([
+        ["b", "rk-on-b"],
+      ])
+    },
+  )
+
+  test("#given a persistent monitor stored with b's NAME (studio/dur-on-b) restored while b is offline #when it re-opens #then it watches b's id and listing key, not the raw name", async () => {
+    const a = account({ online: false })
+    const opened = await registered(a.remote).open({ device: "studio", session: "dur-on-b" }, {}, capture().handlers)
+    opened.stop()
+    expect(a.sent.filter((entry) => entry.via === "watch").map((entry) => [entry.device, entry.session])).toEqual([
+      ["b", "rk-on-b"],
+    ])
+  })
+
+  test("#given a persistent monitor stored by thread NAME (b/on b) restored while b is offline #when it re-opens #then it refuses device_offline: a name never reaches a device unlisted", async () => {
+    const a = account({ online: false })
+    await expect(registered(a.remote).open({ device: "b", session: "on b" }, {}, capture().handlers)).rejects.toThrow(
+      /^device_offline:/,
+    )
+    expect(a.sent.filter((entry) => entry.via === "watch")).toEqual([])
+  })
+
+  test.each([
+    ["by id, offline", "b", { online: false }],
+    ["by name, offline", "studio", { online: false }],
+    ["by id, missing from this listing round", "b", { incomplete: ["b"] }],
+  ] as const)(
+    "#given a persistent device-wide monitor restored on <device>/* (%s) #when it re-opens #then it keeps following b's listing rows, never lost on the device check",
+    async (_case, device, options) => {
+      const opened = await registered(account(options).remote).open({ device, session: "*" }, {}, capture().handlers)
+      opened.stop()
+      expect(opened.initial.rows.map((row) => row.sessionId)).toEqual(["rk-on-b"])
+    },
+  )
+
+  test("#given a persistent monitor stored as <this device's id>/<thread id> before the tool hook armed targets #when it is restored #then it watches that session on this device, as before (review L1 of #14406)", async () => {
+    const a = account()
+    const opened = await registered(a.remote).open({ device: "here", session: "dur-local" }, {}, capture().handlers)
+    opened.stop()
+    expect(a.sent.filter((entry) => entry.via === "watch").map((entry) => [entry.device, entry.session])).toEqual([
+      ["here", "dur-local"],
+    ])
+  })
+
+  test("#given device b by its name #when the monitor opens <device name>/* #then it follows b's listing rows", async () => {
+    const opened = await registered(account().remote).open({ device: "studio", session: "*" }, {}, capture().handlers)
+    opened.stop()
+    expect(opened.initial.rows.map((row) => row.sessionId)).toEqual(["rk-on-b"])
+  })
+
   test("#given b's engine names its session by its routing id #when its records reach senpi #then each carries the target label, so senpi keys them with the rows it armed", async () => {
     const a = account()
     const { lines, handlers } = capture()
