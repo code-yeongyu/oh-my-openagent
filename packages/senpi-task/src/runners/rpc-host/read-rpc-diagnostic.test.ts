@@ -21,6 +21,8 @@ test("only explicitly traced read RPC failures log fixed fields and preserve the
   try {
     delete process.env.OMO_THREAD_READ_TRACE
     await expect(run("list_sessions")).rejects.toBe(error)
+    process.env.OMO_THREAD_READ_TRACE = "true"
+    await expect(run("list_sessions")).rejects.toBe(error)
     process.env.OMO_THREAD_READ_TRACE = "1"
     await expect(run("private command")).rejects.toBe(error)
     expect(log).not.toHaveBeenCalled()
@@ -31,6 +33,71 @@ test("only explicitly traced read RPC failures log fixed fields and preserve the
     )
   } finally {
     log.mockRestore()
+    if (old === undefined) delete process.env.OMO_THREAD_READ_TRACE
+    else process.env.OMO_THREAD_READ_TRACE = old
+  }
+})
+
+test("a connected socket without an auth exchange never reports a handshake", async () => {
+  const old = process.env.OMO_THREAD_READ_TRACE
+  const log = spyOn(console, "error").mockImplementation(() => {})
+  const socket = new Socket()
+  const error = Object.assign(new Error("private detail"), { code: "ECONNRESET" })
+  try {
+    process.env.OMO_THREAD_READ_TRACE = "1"
+    const call = withRpcSocket(
+      "private endpoint",
+      {
+        timeoutMs: 100,
+        readCommand: "get_messages",
+        connect: () => {
+          queueMicrotask(() => {
+            socket.emit("connect")
+            socket.emit("error", error)
+          })
+          return socket
+        },
+      },
+      (request) => request({ type: "get_messages" }),
+    )
+    await expect(call).rejects.toBe(error)
+    expect(log.mock.calls[0]?.[0]).toMatch(
+      /^\[thread-read-rpc\] command=get_messages phase=connected elapsed_ms=\d+ code=ECONNRESET$/,
+    )
+  } finally {
+    log.mockRestore()
+    socket.destroy()
+    if (old === undefined) delete process.env.OMO_THREAD_READ_TRACE
+    else process.env.OMO_THREAD_READ_TRACE = old
+  }
+})
+
+test("an error thrown by the caller's own operation is not logged as a socket failure", async () => {
+  const old = process.env.OMO_THREAD_READ_TRACE
+  const log = spyOn(console, "error").mockImplementation(() => {})
+  const socket = new Socket()
+  const own = new Error("caller logic")
+  try {
+    process.env.OMO_THREAD_READ_TRACE = "1"
+    const call = withRpcSocket(
+      "private endpoint",
+      {
+        timeoutMs: 1000,
+        readCommand: "get_messages",
+        connect: () => {
+          queueMicrotask(() => socket.emit("connect"))
+          return socket
+        },
+      },
+      async () => {
+        throw own
+      },
+    )
+    await expect(call).rejects.toBe(own)
+    expect(log).not.toHaveBeenCalled()
+  } finally {
+    log.mockRestore()
+    socket.destroy()
     if (old === undefined) delete process.env.OMO_THREAD_READ_TRACE
     else process.env.OMO_THREAD_READ_TRACE = old
   }
