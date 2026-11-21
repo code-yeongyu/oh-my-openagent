@@ -33,7 +33,7 @@ export type DecideResult =
   | { readonly kind: "other_account"; readonly account: string }
   | { readonly kind: "changed"; readonly files: number }
 
-async function ownedFileCount(root: string): Promise<number> {
+export async function ownedFileCount(root: string): Promise<number> {
   return [...(await itemPathsOnDisk(root)).byKey.values()].filter((path) => path !== null).length
 }
 

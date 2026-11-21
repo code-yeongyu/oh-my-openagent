@@ -17,7 +17,7 @@ import { syncJournalDirectory } from "../../journal/fsync"
 import { readJson, removeAtomic, writeJson } from "./atomic"
 import type { EngineDeps } from "./engine-deps"
 import type { SyncJournal } from "./journal"
-import { clearUndecided, takeDecision, writeUndecided } from "./ownership-decision"
+import { clearUndecided, ownedFileCount, takeDecision, writeUndecided } from "./ownership-decision"
 import { itemPathsOnDisk } from "./working-tree"
 
 interface SwitchMarker {
@@ -116,13 +116,16 @@ const PROOF_RECORDS = 3
  * digest. A retained row that differs, or a head below the journal's cursor, proves another owner; so does a retained
  * row at a seq the journal only knows as a snapshot, because an account's history is never un-trimmed (review r4 L3).
  * A snapshot record proves nothing else: the service states no snapshot digest and older builds recorded none (review
- * r4 L2), and a record the service no longer keeps proves nothing either. A journal that never applied or queued
- * anything holds no account's content. The pulls run outside the writer lock (sync-design §5); a pull that fails
- * proves nothing either way.
+ * r4 L2), and a record the service no longer keeps proves nothing either. Content the journal never synced cannot be
+ * proven by the service at all (review r6 M1): a journal that applied nothing is the signed-in account's only while
+ * nothing of it could leak, no queued edit and no owned file on disk; otherwise the person chooses. A repository with
+ * no journal yet (this device never ran sync) is a normal enable. The pulls run outside the writer lock (sync-design
+ * §5); a pull that fails proves nothing either way.
  */
 async function ownership(deps: EngineDeps, dir: string, queued: boolean): Promise<Ownership> {
+  if (!existsSync(join(dir, "state.json"))) return "own"
   const { applied } = await readJson<{ readonly applied: number }>(join(dir, "state.json"), { applied: 0 })
-  if (applied === 0) return queued ? "undecided" : "own"
+  if (applied === 0) return queued || (await ownedFileCount(deps.repo.root)) > 0 ? "undecided" : "own"
   const index = await readJson<Record<string, { readonly seq: number; readonly digest: string }>>(
     join(dir, "applied.json"),
     {},

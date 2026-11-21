@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test"
-import { readdir, readFile, writeFile } from "node:fs/promises"
+import { readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import { type Device, makeDevice } from "./engine-harness.test-support"
@@ -170,4 +170,51 @@ test("#given a legacy journal whose records the server compacted away #when the 
   expect(await d.read("one.md")).toBe(note("one on a\n"))
   expect((await readdir(join(d.repo.root, ".git"))).filter((name) => name.startsWith("omo-sync.account-"))).toEqual([])
   expect(JSON.parse(await readFile((await legacyJournal(d)).state, "utf8"))).not.toHaveProperty("account")
+})
+
+async function stripAccount(d: Device): Promise<string> {
+  const dir = join(d.repo.root, ".git", "omo-sync")
+  const statePath = join(dir, "state.json")
+  const { account: _owner, ...olderBuild } = JSON.parse(await readFile(statePath, "utf8")) as Record<string, unknown>
+  expect(olderBuild).toMatchObject({ applied: 0 })
+  await writeFile(statePath, JSON.stringify(olderBuild))
+  return dir
+}
+
+test("#given a legacy journal that applied and queued nothing #when owned memory files are on disk #then it stays undecided and nothing is uploaded", async () => {
+  const server = new FakeSyncServer()
+  const d = await makeDevice(server, "d", undefined, { realStore: true, account: "acc_a" })
+  devices.push(d)
+  server.beforeNextAppend = async () => {
+    throw new Error("the push never reached the service")
+  }
+  await d.write("local.md", note("written while another account was signed in\n"))
+  await expect(d.engine.runCycle()).rejects.toThrow("never reached")
+  const dir = await stripAccount(d)
+  await rm(join(dir, "pending.json"), { force: true })
+  await rm(join(dir, "pending"), { recursive: true, force: true })
+
+  await d.restart(undefined, undefined, { server, account: "acc_a" })
+  await expect(d.engine.runCycle()).rejects.toMatchObject({ name: "OwnershipUndecidedError" })
+
+  expect(server.head).toBe(0)
+  expect(await d.engine.status()).toMatchObject({ kind: "failing", failure: { kind: "ownership_undecided" } })
+  expect(await d.read("local.md")).toBe(note("written while another account was signed in\n"))
+})
+
+test("#given a legacy journal that applied nothing #when no owned memory file is on disk #then it is this account's and sync turns on as usual", async () => {
+  const server = new FakeSyncServer()
+  const d = await makeDevice(server, "d", undefined, { realStore: true, account: "acc_a" })
+  devices.push(d)
+  await rm(join(d.repo.root, ".gitkeep"), { force: true })
+  await d.engine.runCycle()
+  const dir = await stripAccount(d)
+
+  await d.restart(undefined, undefined, { server, account: "acc_a" })
+  await settle(d)
+  await d.write("after.md", note("written after enabling\n"))
+  await settle(d)
+
+  expect(JSON.parse(await readFile(join(dir, "state.json"), "utf8"))).toMatchObject({ account: "acc_a" })
+  expect(server.head).toBeGreaterThan(0)
 })
