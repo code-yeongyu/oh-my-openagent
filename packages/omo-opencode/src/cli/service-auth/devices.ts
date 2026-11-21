@@ -19,6 +19,7 @@ const listedSchema = z.object({
       current: z.boolean().optional(),
       revokedAt: timestamp.nullable(),
       machineBound: z.boolean().optional(),
+      syncing: z.boolean().optional(),
     }),
   ),
 })
@@ -33,6 +34,8 @@ export type LiveDevice = {
   readonly createdAt?: string
   readonly lastSeenAt?: string
   readonly machineBound?: boolean
+  /** Whether the device takes part in the account's memory sync; absent when the service is older than the field. */
+  readonly syncing?: boolean
   readonly current: boolean
 }
 
@@ -44,6 +47,7 @@ const live = (device: Listed): LiveDevice => ({
   ...(device.createdAt === undefined ? {} : { createdAt: device.createdAt }),
   ...(device.lastSeenAt === undefined ? {} : { lastSeenAt: device.lastSeenAt }),
   ...(device.machineBound === undefined ? {} : { machineBound: device.machineBound }),
+  ...(device.syncing === undefined ? {} : { syncing: device.syncing }),
   current: device.current === true,
 })
 
