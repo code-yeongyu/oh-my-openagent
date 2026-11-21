@@ -221,6 +221,69 @@ describe("handleMessagePartUpdated", () => {
 })
 
 describe("handleMessageUpdated", () => {
+  it("captures structured output only from the root assistant message", () => {
+    //#given
+    const ctx = createMockContext("ses_main")
+    const state = createEventState()
+    const stdoutSpy = spyOn(process.stdout, "write").mockImplementation(() => true)
+
+    //#when
+    handleMessageUpdated(ctx, unsafeTestValue({
+      type: "message.updated",
+      properties: {
+        info: {
+          id: "msg_child",
+          sessionID: "ses_child",
+          role: "assistant",
+          structured: { status: "child" },
+        },
+      },
+    }), state)
+    handleMessageUpdated(ctx, unsafeTestValue({
+      type: "message.updated",
+      properties: {
+        info: {
+          id: "msg_root",
+          sessionID: "ses_main",
+          role: "assistant",
+          structured: { status: "completed" },
+        },
+      },
+    }), state)
+
+    //#then
+    expect(state.hasStructuredOutput).toBe(true)
+    expect(state.structuredOutput).toEqual({ status: "completed" })
+    stdoutSpy.mockRestore()
+  })
+
+  it("does not reuse structured output from an older assistant message", () => {
+    //#given
+    const ctx = createMockContext("ses_main")
+    const state = createEventState()
+    state.currentMessageId = "msg_old"
+    state.hasStructuredOutput = true
+    state.structuredOutput = { status: "stale" }
+    const stdoutSpy = spyOn(process.stdout, "write").mockImplementation(() => true)
+
+    //#when
+    handleMessageUpdated(ctx, unsafeTestValue({
+      type: "message.updated",
+      properties: {
+        info: {
+          id: "msg_new",
+          sessionID: "ses_main",
+          role: "assistant",
+        },
+      },
+    }), state)
+
+    //#then
+    expect(state.hasStructuredOutput).toBe(false)
+    expect(state.structuredOutput).toBeUndefined()
+    stdoutSpy.mockRestore()
+  })
+
   it("resets streamed text and reasoning state for a new assistant message", () => {
     //#given
     const nowSpy = spyOn(Date, "now").mockReturnValue(9000)
