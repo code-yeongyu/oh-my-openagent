@@ -8,7 +8,7 @@ import {
 } from "@oh-my-opencode/thread-address-core"
 import { threadToolFailure } from "../errors"
 import { relayAddressEntry } from "../remote/address-book"
-import { rowThreadId, type RemoteDevice, type RemoteThreadSurface } from "../remote/ports"
+import type { RemoteDevice, RemoteThreadSurface } from "../remote/ports"
 import { remoteReady } from "../remote/remote-ops"
 import { accountDevices, readAccount, readRoster, rosterAccount, type Account, type Ready } from "./account"
 import { deviceNameOf, resolveBare, type AccountAttempt } from "./bare"
@@ -150,7 +150,7 @@ async function otherHolder(
     [
       ...ctx.local.filter((entry) => entry.thread_id === thread),
       ...account.rows
-        .filter((row) => row.device !== account.here && rowThreadId(row) === thread)
+        .filter((row) => row.device !== account.here && (row.durable_id ?? "") === thread)
         .map((row) => relayAddressEntry(row)),
     ].map((entry) => [entry.transport?.row.device ?? "here", entry] as const),
   )
