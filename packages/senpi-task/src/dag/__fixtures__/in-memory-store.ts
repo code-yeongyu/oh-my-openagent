@@ -29,7 +29,7 @@
 //   file-store retention/capacity concerns, covered by store.test.ts, and a memory store is discarded
 //   with its test.
 import { existsSync, readdirSync } from "node:fs"
-import { basename } from "node:path"
+import { basename, dirname } from "node:path"
 
 import {
   decodePausedNodes,
@@ -175,7 +175,7 @@ export function createInMemoryDagStore(
 // fails loudly instead of quietly reintroducing the load-dependent I/O cost.
 export function journalFilesOnDisk(store: DagFileStore): readonly string[] {
   const { events, runs, locks, keys, results } = store.paths
-  const skills = join(store.paths.root, "skills")
+  const skills = dirname(store.paths.skillManifest("dag_probe" as DagRunId))
   return Object.entries({ events, runs, locks, keys, results, skills }).flatMap(([name, directory]) =>
     existsSync(directory) ? readdirSync(directory).map((entry) => `${name}/${entry}`) : [],
   )
