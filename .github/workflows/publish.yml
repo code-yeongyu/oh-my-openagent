@@ -278,6 +278,26 @@ jobs:
             ' <<< "$RUNS")"
             if [ -n "$SUCCESS_ID" ]; then
               echo "CI workflow run ${SUCCESS_ID} succeeded for ${PREPARED_RELEASE_SHA}."
+              # A green run proves macOS/Windows only when those legs ran (platform-jobs.jq). A release-state run kept on
+              # Linux, or a release merge push that skipped them, is accepted only on a base that proved them with a
+              # delta inside RELEASE_STATE_PATHS, the same rule ci-fast-path.mjs applied (#14438).
+              LEGS="$(retry_gh "Read CI run jobs" gh api "repos/${REPOSITORY}/actions/runs/${SUCCESS_ID}/jobs?filter=latest&per_page=100" \
+                --jq "$(cat .github/scripts/platform-jobs.jq)" | cut -f2)"
+              if [ -n "$LEGS" ] && ! grep -qvx success <<< "$LEGS"; then
+                echo "Its macOS/Windows legs ran and passed."
+                exit 0
+              fi
+              git fetch --no-tags --depth=2 origin "$PREPARED_RELEASE_SHA"
+              PLATFORM_BASE="$(git rev-parse "${PREPARED_RELEASE_SHA}^")"
+              if ! git diff --name-only -z "$PLATFORM_BASE" "$PREPARED_RELEASE_SHA" | node script/release-state-paths.mjs --check; then
+                echo "::error::CI run ${SUCCESS_ID} did not run macOS/Windows, and ${PREPARED_RELEASE_SHA} changes more than the release stamp over ${PLATFORM_BASE}; run the full matrix on it."
+                exit 1
+              fi
+              if [ "$(GH_REPO="$REPOSITORY" BASE_SHA="$PLATFORM_BASE" bash .github/scripts/base-platform-green.sh)" != "true" ]; then
+                echo "::error::CI run ${SUCCESS_ID} did not run macOS/Windows, and the base ${PLATFORM_BASE} has no dev push run whose macOS/Windows legs ran green."
+                exit 1
+              fi
+              echo "Its macOS/Windows legs did not run; base ${PLATFORM_BASE} proved them and the delta is the release stamp only."
               exit 0
             fi
 
@@ -315,7 +335,7 @@ jobs:
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
             - Skips release validation on the preparation dispatch, which cannot publish.
-            - Waits for a successful CI push workflow run on the exact prepared SHA.
+            - Waits for a successful CI workflow run on the exact prepared SHA; when its macOS/Windows legs did not run, requires a release-stamp-only delta over a base whose dev push run proved them.
             - A repository admin or maintainer may waive that wait with a ci_basis_receipt whose head differs from the prepared SHA only under .github/workflows/; the waiver and delta are logged.
             - Fails closed when CI fails, is cancelled, times out, or cannot be read.
           JOB_SUMMARY_NEXT: Rerun CI on the prepared SHA or fix its failed workflow before publishing.

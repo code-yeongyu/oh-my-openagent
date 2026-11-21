@@ -12,6 +12,7 @@ function file(path: string, body: string): string {
 /**
  * A: base. B: workflow-only on A. C: source change on B. D: workflow-only sibling of B.
  * E: a non-workflow .github/ change on B. R: A with a source file renamed into .github/workflows/.
+ * P: a release stamp on A (manifest + changelog). Q: a release stamp on A that also changes source.
  * Built by one fast-import stream: two git processes, so the fixture stays cheap on a loaded runner.
  */
 const COMMITS = [
@@ -21,6 +22,8 @@ const COMMITS = [
   ["D", "sibling", "A", file(".github/workflows/ci.yml", "on: push\n")],
   ["E", "scripts", "B", file(".github/scripts/summary.sh", "echo\n")],
   ["R", "rename", "A", `D src/a.ts\n${file(".github/workflows/a.yml", "a\n")}`],
+  ["P", "stamp", "A", file("package.json", '{"version":"1.0.1"}\n') + file("CHANGELOG.md", "## 1.0.1\n")],
+  ["Q", "stamp-and-source", "A", file("package.json", '{"version":"1.0.1"}\n') + file("src/a.ts", "q\n")],
 ] as const
 
 export type CommitName = (typeof COMMITS)[number][0]
@@ -56,7 +59,7 @@ export function createGitOrigin(root: string): GitOrigin {
   const marks = join(root, "marks")
   git(origin, ["fast-import", "--quiet", `--export-marks=${marks}`], stream)
 
-  const sha: Record<CommitName, string> = { A: "", B: "", C: "", D: "", E: "", R: "" }
+  const sha: Record<CommitName, string> = { A: "", B: "", C: "", D: "", E: "", R: "", P: "", Q: "" }
   for (const line of readFileSync(marks, "utf8").trim().split("\n")) {
     const [mark, id] = line.split(" ")
     const entry = COMMITS[Number(mark?.slice(1)) - 1]
