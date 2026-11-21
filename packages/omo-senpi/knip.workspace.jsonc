@@ -580,8 +580,8 @@
     "packages/omo-senpi/scripts/qa/task-resume-e2e-scenarios.mjs": ["FINISHED_CHILD_TOKEN", "RESUME_OMO_CONFIG"],
     // pre-existing at origin dev 4686e425b5: unused export(s) runTaskResumeScenarios
     "packages/omo-senpi/scripts/qa/task-resume-e2e.mjs": ["runTaskResumeScenarios"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) CREDENTIAL_FILES, digestCredentialFiles, childSessionJsonlExists, analyzeRpcRouting, analyzeSpawn, eventsMentionSteerAck, statusSnapshots, recordRpcChildPids, liveRecordRpcChildPids
-    "packages/omo-senpi/scripts/qa/task-rpc-e2e-helpers.mjs": ["CREDENTIAL_FILES", "digestCredentialFiles", "childSessionJsonlExists", "analyzeRpcRouting", "analyzeSpawn", "eventsMentionSteerAck", "statusSnapshots", "recordRpcChildPids", "liveRecordRpcChildPids"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) CREDENTIAL_FILES, digestCredentialFiles, childSessionJsonlExists, analyzeRpcRouting, analyzeSpawn, eventsMentionSteerAck, statusSnapshots, recordRpcChildPids
+    "packages/omo-senpi/scripts/qa/task-rpc-e2e-helpers.mjs": ["CREDENTIAL_FILES", "digestCredentialFiles", "childSessionJsonlExists", "analyzeRpcRouting", "analyzeSpawn", "eventsMentionSteerAck", "statusSnapshots", "recordRpcChildPids"],
     // pre-existing at origin dev 4686e425b5: unused export(s) runOne
     "packages/omo-senpi/scripts/qa/task-rpc-reconcile-batch.mjs": ["runOne"],
     // pre-existing at origin dev 4686e425b5: unused export(s) toolResults, runtimeRootDir, taskEventText, buildMessage
