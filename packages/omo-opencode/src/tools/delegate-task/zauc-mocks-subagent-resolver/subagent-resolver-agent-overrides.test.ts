@@ -4,7 +4,6 @@ import type { DelegateTaskArgs } from "../types"
 
 type SubagentResolverModule = typeof import("../subagent-resolver")
 
-const logMock = mock((..._args: unknown[]) => {})
 const readConnectedProvidersCacheMock = mock(() => null as string[] | null)
 const readProviderModelsCacheMock = mock(
   () =>
@@ -53,14 +52,10 @@ describe("resolveSubagentExecution agent overrides", () => {
 
   beforeEach(async () => {
     mock.restore()
-    logMock.mockClear()
     readConnectedProvidersCacheMock.mockReset()
     readProviderModelsCacheMock.mockReset()
     readConnectedProvidersCacheMock.mockReturnValue(null)
     readProviderModelsCacheMock.mockReturnValue(null)
-    mock.module("../../../shared/logger", () => ({
-      log: logMock,
-    }))
     mock.module("../../../shared/connected-providers-cache", () => ({
       readConnectedProvidersCache: readConnectedProvidersCacheMock,
       readProviderModelsCache: readProviderModelsCacheMock,
