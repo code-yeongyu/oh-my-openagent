@@ -19,6 +19,7 @@ type RowSource = Pick<ThreadSummary, "thread_id" | "name" | "status" | "cwd" | "
       | "alias"
       | "surface"
       | "controls"
+      | "engine_version"
       | "error_note"
       | "skills"
     >
@@ -44,6 +45,7 @@ export function threadRow(thread: RowSource, machine?: string): ThreadResultSumm
     alias,
     surface,
     controls,
+    engine_version,
     error_note,
     skills,
   } = thread
@@ -68,6 +70,7 @@ export function threadRow(thread: RowSource, machine?: string): ThreadResultSumm
     ...(alias === undefined ? {} : { alias }),
     ...(surface === undefined || surface === null ? {} : { surface }),
     ...(controls === undefined ? {} : { controls }),
+    ...(engine_version === undefined ? {} : { engine_version }),
     ...(error_note === undefined ? {} : { error_note }),
     ...(skills === undefined ? {} : { skills }),
   }
