@@ -25,10 +25,15 @@ const RELEASE_STATE_PATHS = [
   /^packages\/omo-codex\/plugin\/components\/[^/]+\/package\.json$/,
   /^packages\/omo-codex\/plugin\/hooks\/[^/]+\.json$/,
   /^packages\/omo-codex\/plugin\/components\/[^/]+\/hooks\/hooks\.json$/,
-  /^packages\/omo-senpi\/plugin\/extensions\//,
-  /^packages\/omo-senpi\/plugin\/runtime\//,
+  // Generated code that runs on macOS and Windows: only the outputs a required Linux job rebuilds and compares, so a
+  // stale or hand-edited copy fails there. extensions/*.js|mjs and these runtime files: senpi-compatibility (ubuntu-latest)
+  // "Verify committed Senpi plugin bundle is current" (build-extension.mjs --check). runtime/dag/ is not compared there.
+  /^packages\/omo-senpi\/plugin\/extensions\/[^/]+\.m?js$/,
+  /^packages\/omo-senpi\/plugin\/runtime\/(?:agent-toolkit-sdk|bunshin-ts|omo-sdk|thread-sdk)\/sdk\.js$/,
+  /^packages\/omo-senpi\/plugin\/runtime\/rollback-migrate\.js$/,
   /^packages\/omo-codex\/scripts\/install-dist\/install-local\.mjs$/,
-  /^packages\/omo-native\/bin\/lib\//,
+  // test (ubuntu-latest): script/build-service-auth.test.ts "the native auth bundle matches its source".
+  /^packages\/omo-native\/bin\/lib\/service-auth\.generated\.js$/,
 ]
 
 export function isReleaseStatePath(path) {
