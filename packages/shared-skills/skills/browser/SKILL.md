@@ -77,7 +77,7 @@ you hit and ask.
 const session = await omowright.connectBrowserSkill({ name: "<task>", focused: false })
 const sync = async () => (await session.cooperate("sync")).context_id                      // one context per page action
 try {
-  await session.navigate("https://example.com/", { waitUntil: "load", context: await sync() })
+  await session.navigate("https://example.com/", { waitUntil: "load" })                      // first navigation: no sync (it throws on the blank tab)
   const { tree, refs, css } = await omowright.bskSnapshot(session, { interactive: true, context: await sync() })  // OmOWright tree + refs, no trace in the page
   await session.click({ selector: css.e3 }, { context: await sync() })                      // css[ref] is null inside shadow roots:
   const vom = await session.observe({ maxTokens: 4000 })                                    //   then read the daemon's own tree ...
@@ -101,7 +101,9 @@ try {
 6. **Sync before every page action.** The person at the keyboard can work in the same tab, so
    BrowserSkill 0.4 refuses an action (`permission_denied`, `data.reason: "cooperation_sync_required"`)
    unless it carries `{ context }` from the latest `session.cooperate("sync")`. A context is good
-   for one action: sync, act with `{ context }`, sync again. Navigation, every input method,
+   for one action: sync, act with `{ context }`, sync again. The first `navigate` of a new session is
+   the exception: send it without a context, because `sync` on the untouched about:blank tab throws
+   `Page frames cannot be observed` and the tab stays blank. Navigation, every input method,
    `evaluate` (and so `bskSnapshot`), `tabClose`, `resize`, `emulate`, `observe({ probeHover })` and
    `screenshot({ fullPage: true })` need it; plain reads (`observe`, `snapshot`, `getHtml`,
    `screenshot()`, `console`, `network`, `waitForNavigation`) do not.
