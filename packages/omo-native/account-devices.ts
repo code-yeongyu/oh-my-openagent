@@ -65,6 +65,7 @@ async function revoke(dependencies: AccountDevicesDependencies, session: Session
       dependencies.error(`omo account devices revoke: ${target.id} is still listed as live after the revoke`)
       return reply(dependencies, { revoked: false, error: "still_live", device: outcome.device }, ACCOUNT_EXIT.failed)
     case "confirmation_mismatch":
+      dependencies.error(`omo account devices revoke: ${target.id} is not named as confirmed`)
       return reply(dependencies, { revoked: false, error: outcome.kind, device: outcome.device }, ACCOUNT_EXIT.invalid)
     case "revoked":
       return reply(dependencies, { revoked: true, device: outcome.device })

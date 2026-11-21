@@ -24,6 +24,13 @@ export type DevicesApi = {
   }) => Promise<OmoResult<{ readonly revoked: LiveDevice }>>
 }
 
+const mismatch = () =>
+  refused(
+    "confirmation_mismatch",
+    "the name does not match the device's current name",
+    "list the devices, then pass the device's current name",
+  )
+
 export function createDevicesApi(access: AccountAccess): DevicesApi {
   return {
     list: () => access.signedIn(({ session }) => listLiveDevices(session)),
@@ -36,6 +43,8 @@ export function createDevicesApi(access: AccountAccess): DevicesApi {
         return renamed
       }),
     revoke: async ({ id, confirmName }) => {
+      // The name is the confirmation, and an eval cell calls this untyped: no name never means "skip the check".
+      if (typeof confirmName !== "string" || confirmName === "") return mismatch()
       const outcome = await access.signedIn(({ device, session }) =>
         revokeDevice(session, { id, thisDeviceId: device.id, confirmName }),
       )
@@ -49,11 +58,7 @@ export function createDevicesApi(access: AccountAccess): DevicesApi {
         case "this_device":
           return refused("this_device", "that is this device", "sign this device out by hand with omo logout")
         case "confirmation_mismatch":
-          return refused(
-            "confirmation_mismatch",
-            "the name does not match the device's current name",
-            "list the devices, then pass the device's current name",
-          )
+          return mismatch()
         case "still_live":
           return refused(
             "still_live",
