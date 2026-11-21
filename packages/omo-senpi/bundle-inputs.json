@@ -2308,6 +2308,7 @@
     "packages/senpi-task/src/runners/rpc/ui-auto-answer.ts",
     "packages/senpi-task/src/runners/task-parent-control.ts",
     "packages/senpi-task/src/senpi/explicit-pin.ts",
+    "packages/senpi-task/src/senpi/model-decorators.ts",
     "packages/senpi-task/src/senpi/thinking-level.ts",
     "packages/senpi-task/src/state/host-liveness.ts",
     "packages/senpi-task/src/state/id.ts",
