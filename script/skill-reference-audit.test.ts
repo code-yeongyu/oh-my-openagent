@@ -129,6 +129,25 @@ describe("skill reference audit", () => {
     ).toEqual([[1, "work-with-pr"]])
   })
 
+  test("#given a local skill and a missing skill in one optional sentence #when audited #then only the local name is exempt", () => {
+    for (const content of [
+      "If the environment provides a `project-check` skill (some repositories define one project-locally), use it alongside the `git_master` skill.",
+      "When the project-local `project-check` skill is available, use the `git_master` skill.",
+      "When the project-local skill `project-check` is available, use the `git_master` skill.",
+      "If the `project-check` skill is project-local and is available, use the `git_master` skill.",
+      "When the session lists the `git_master` skill, use project-local configuration.",
+    ]) {
+      expect(audit("skills/main/local-name.md", content, ["senpi", "opencode"])).toEqual([
+        {
+          referenceClass: "skill-name",
+          reference: "git_master",
+          missingIn: ["senpi", "opencode"],
+          suggestion: "git-master",
+        },
+      ])
+    }
+  })
+
   test("#given a conditional about the project rather than the skill #when audited #then the mention is still required in every edition", () => {
     expect(
       audit("skills/main/three-b.md", "If the project has a React app, load the `teammode` skill.\n", [
