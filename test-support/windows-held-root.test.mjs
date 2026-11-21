@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
+import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { createInterface } from "node:readline"
+import { Readable } from "node:stream"
 import { diagnoseHeldTestRoot } from "./windows-held-root.mjs"
 import { removeTestRootBestEffort, skippedTestRoots } from "./held-test-root.mjs"
 
@@ -14,9 +19,12 @@ describe("Windows held-root diagnostic", () => {
     expect(result).toEqual({ holders: [], diagnosticErrors: [] })
   })
 
-  test("#given Windows holders #when queried #then pid image and parent pid are retained", () => {
+  test("#given Windows holders #when queried #then pid image parent pid and start time are retained", () => {
     const root = "C:\\temp\\held root"
-    const expected = { holders: [{ pid: 31, image: "node.exe", parentPid: 30 }], diagnosticErrors: [] }
+    const expected = {
+      holders: [{ pid: 31, image: "node.exe", parentPid: 30, startTime: "2026-11-21T10:00:00.0000000Z" }],
+      diagnosticErrors: [],
+    }
     const calls = []
     const result = diagnoseHeldTestRoot(root, {
       platform: "win32",
@@ -33,6 +41,58 @@ describe("Windows held-root diagnostic", () => {
     expect(calls[0].args).toContain("-File")
     expect(calls[0].options).toEqual({ encoding: "utf8", windowsHide: true, timeout: 30_000 })
   })
+
+  if (process.platform === "win32") {
+    test("#given an exclusively held file #when diagnosed #then Restart Manager identifies the live process", async () => {
+      // given
+      const root = await mkdtemp(join(tmpdir(), "omo-held-root-probe-"))
+      const file = join(root, "held.txt")
+      try {
+        await writeFile(file, "fixture")
+        const holder = Bun.spawn(
+          [
+            "powershell.exe",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "$ErrorActionPreference = 'Stop'; " +
+              "$lock = [IO.File]::Open($env:OMO_HELD_ROOT_TEST_FILE, 'Open', 'ReadWrite', 'None'); " +
+              "try { " +
+              "[Console]::WriteLine([Diagnostics.Process]::GetCurrentProcess().StartTime.ToUniversalTime().ToString('o')); " +
+              "[Console]::Out.Flush(); [void][Console]::Read() } finally { $lock.Dispose() }",
+          ],
+          {
+            env: { ...process.env, OMO_HELD_ROOT_TEST_FILE: file },
+            stdin: "pipe",
+            stdout: "pipe",
+            stderr: "inherit",
+            timeout: 45_000,
+          },
+        )
+        const lines = createInterface({ input: Readable.fromWeb(holder.stdout) })
+        try {
+          const ready = await lines[Symbol.asyncIterator]().next()
+          const started = Date.parse(ready.value ?? "")
+          expect(Number.isFinite(started)).toBe(true)
+
+          // when
+          const result = diagnoseHeldTestRoot(root)
+
+          // then
+          expect(result.diagnosticErrors.filter((error) => error.startsWith("Restart Manager:"))).toEqual([])
+          const found = result.holders.find((process) => process.pid === holder.pid)
+          expect(found?.image.toLowerCase()).toBe("powershell.exe")
+          expect(Date.parse(found?.startTime ?? "")).toBe(started)
+        } finally {
+          lines.close()
+          holder.stdin.end()
+          await holder.exited
+        }
+      } finally {
+        await rm(root, { recursive: true, force: true })
+      }
+    }, 50_000)
+  }
 
   for (const [name, run] of [
     ["spawn error", () => ({ error: new Error("not available") })],
@@ -58,7 +118,7 @@ describe("Windows held-root diagnostic", () => {
 
   test("#given a partial diagnostic #when a holder is found but parent lookup fails #then both results are recorded", () => {
     const expected = {
-      holders: [{ pid: 31, image: "node.exe", parentPid: null }],
+      holders: [{ pid: 31, image: "node.exe", parentPid: null, startTime: "2026-11-21T10:00:00.0000000Z" }],
       diagnosticErrors: ["process exited before parent lookup"],
     }
     expect(
@@ -123,13 +183,13 @@ describe("Windows held-root diagnostic", () => {
         run: () => ({
           status: 0,
           stdout: JSON.stringify({
-            holders: [{ pid: 31, image: null, parentPid: null }],
+            holders: [{ pid: 31, image: null, parentPid: null, startTime: null }],
             diagnosticErrors,
           }),
         }),
       }),
     ).toEqual({
-      holders: [{ pid: 31, image: "unknown", parentPid: null }],
+      holders: [{ pid: 31, image: "unknown", parentPid: null, startTime: null }],
       diagnosticErrors,
     })
   })

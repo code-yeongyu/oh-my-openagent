@@ -34,6 +34,7 @@ export function diagnoseHeldTestRoot(root, { platform = process.platform, run = 
           Number.isInteger(holder.pid) &&
           holder.pid > 0 &&
           (typeof holder.image === "string" || holder.image === null) &&
+          (typeof holder.startTime === "string" || holder.startTime === null) &&
           (holder.parentPid === null || Number.isInteger(holder.parentPid)),
       ) ||
       !Array.isArray(record.diagnosticErrors) ||
