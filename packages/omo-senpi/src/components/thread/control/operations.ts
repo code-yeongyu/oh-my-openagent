@@ -124,11 +124,13 @@ export async function setModelOn(
     }
     if (rematched.kind !== "match") return rematched
     if (rematched.model.provider === matched.model.provider && rematched.model.id === matched.model.id) throw error
-    // The engine's refusal is the more specific answer when the target also cannot report its model state now.
+    // The engine's refusal is the more specific answer when the target also cannot report its model state now; any other
+    // failure (a transport error reading that state) is its own answer.
     try {
       previous = await modelBeforeSwitch(control, rematched.thinkingLevel)
-    } catch {
-      throw error
+    } catch (stateError) {
+      if (controlRefusalOf(stateError)?.details?.reason === "model_state_unavailable") throw error
+      throw stateError
     }
     selected = await control.setModel(rematched.model.provider, rematched.model.id)
     matched = rematched
