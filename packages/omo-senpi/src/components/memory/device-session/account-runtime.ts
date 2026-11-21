@@ -6,52 +6,20 @@
 // order every entry (the desktop's included) follows.
 
 import { sessionWorkerData } from "@code-yeongyu/senpi/session-worker-data"
-import {
-  connectDeviceService,
-  type DeviceService,
-  deviceServiceStateDir,
-  forgetDeviceService,
-  handDeviceKeys,
-} from "@oh-my-opencode/device-service-core"
-import { resolveMemoryRoot, syncPinDir } from "@oh-my-opencode/memory-core"
-import {
-  createCredentialStore,
-  createSession,
-  quietNotice,
-  retireSyncPinOnDiscard,
-  serviceOrigin,
-} from "@oh-my-opencode/omo-opencode/service-auth"
-import { createOmoNativeProductConfig } from "../../telemetry/product-identity"
+import { serviceOrigin } from "@oh-my-opencode/omo-opencode/service-auth"
 import { MEMORY_SYNC_WORKER_DATA, type MemorySyncSelection } from "../desktop-sync/hostSelection"
 import { launchCarriedPrivateTable } from "../desktop-sync/launchClassification"
 import { workerMemorySyncSource } from "../desktop-sync/workerPort"
 import { createCliAccountSource, DEFAULT_SERVICE_API } from "./account-source"
-import type { DeviceAccountSource, HeldCredentialRelay } from "./account-source"
+import type { DeviceAccountSource } from "./account-source"
+import { cliCredentialStore, engineDeviceService, openCliSession } from "./cli-session"
 import { accountSourceFromSelection } from "./selected-account-source"
 
 export { claimMemorySyncAtBoot } from "../desktop-sync/bootClaim"
 export { claimsMemorySyncAtBoot } from "../desktop-sync/bootGate"
 export { claimInheritedDesktopSync } from "../desktop-sync/desktopClaim"
 export { serveWorkerPort } from "../desktop-sync/workerPort"
-
-/**
- * This machine's running device service (never installed or started from here): the re-adopt from the memory device
- * session's held credential, and forget when the service ends the sign-in (design D r9 section 3).
- */
-export function engineDeviceService(
-  stateDir: string = deviceServiceStateDir(),
-  connect: () => Promise<DeviceService> = () =>
-    connectDeviceService({ version: createOmoNativeProductConfig().packageVersion, stateDir, background: true }),
-  log?: (line: string) => void,
-): HeldCredentialRelay {
-  return {
-    readopt: async (credential) =>
-      (await handDeviceKeys({ stateDir, connect, credential, when: "not_adopted", log })) !== "not_running",
-    forget: async () => {
-      await forgetDeviceService({ stateDir, connect, log })
-    },
-  }
-}
+export { engineDeviceService } from "./cli-session"
 
 /** The thread's one account source over its selection; only a CLI selection constructs the CLI credential source. */
 export function selectedAccountSource(
@@ -85,31 +53,18 @@ export function cliServiceAccess(options: {
 }): { readonly origin: string; readonly accessToken: () => Promise<string> } {
   const warn = (line: string): void => options.log?.(line)
   const origin = serviceOrigin(options.env["OMO_SERVICE_API_URL"] ?? DEFAULT_SERVICE_API)
-  let session: ReturnType<typeof createSession> | undefined
+  let session: ReturnType<typeof openCliSession> | undefined
   return {
     origin,
     accessToken: async () => {
       if (launchCarriedPrivateTable())
         throw new Error("a desktop launch uses the desktop's own sign-in, not the CLI credential store")
-      session ??= createSession({
-        api: origin,
-        store: createCredentialStore(origin, { notice: quietNotice }),
-        log: warn,
-        beforeKeysDiscarded: retireSyncPinOnDiscard({
-          pinDir: () => syncPinDir(resolveMemoryRoot({ ...options.env }, options.cwd)),
-          log: warn,
-        }),
-        deviceService: {
-          adopt: async () => undefined,
-          forget: () =>
-            engineDeviceService(undefined, undefined, warn)
-              .forget()
-              .catch((error: unknown) =>
-                warn(
-                  `thread aliases: the device service forget failed (${error instanceof Error ? error.message : String(error)})`,
-                ),
-              ),
-        },
+      session ??= openCliSession({
+        origin,
+        store: cliCredentialStore(origin),
+        env: options.env,
+        cwd: options.cwd,
+        log: (line) => warn(`thread aliases: ${line}`),
       })
       return await session.accessToken()
     },
