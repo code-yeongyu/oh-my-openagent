@@ -137,14 +137,32 @@ export function statusSnapshots(events) {
   return snaps
 }
 
+const isRpcChildRecord = (record) => record.execution_mode === "process" && typeof record.pid === "number"
+
 export function recordRpcChildPids(records) {
-  return records
-    .filter((record) => record.execution_mode === "process" && typeof record.pid === "number")
-    .map((record) => record.pid)
+  return records.filter(isRpcChildRecord).map((record) => record.pid)
 }
 
-export function liveRecordRpcChildPids(records) {
-  return recordRpcChildPids(records).filter(pidAlive)
+/**
+ * Splits the live recorded RPC child pids into `survivors` (still our child: a leak) and `reused` (#14529). A record's
+ * `updated_at` is the last moment its owner wrote it while holding the child (the park after teardown), so a process
+ * created AFTER it cannot be that child: the pid was freed and handed to an unrelated process, which is neither a
+ * leak nor ours to kill. A live pid whose start time cannot be read counts as a survivor, so a real leak is never
+ * explained away.
+ */
+export async function survivingRecordedChildren(records, { isAlive = pidAlive, startMs } = {}) {
+  const readStartMs = startMs ?? (await import("./task-rpc-process-start.mjs")).readProcessStartMs
+  const survivors = []
+  const reused = []
+  for (const record of records.filter(isRpcChildRecord)) {
+    if (!isAlive(record.pid)) continue
+    const parkedAtMs = Date.parse(record.updated_at)
+    const startedAtMs = await readStartMs(record.pid)
+    const fact = { pid: record.pid, task_id: record.task_id, startedAtMs, parkedAtMs }
+    if (startedAtMs !== null && startedAtMs > parkedAtMs) reused.push(fact)
+    else survivors.push(fact)
+  }
+  return { survivors, reused }
 }
 
 export function pidAlive(pid) {

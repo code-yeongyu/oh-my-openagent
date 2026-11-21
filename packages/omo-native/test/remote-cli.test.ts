@@ -28,7 +28,7 @@ import { runAccountVerb } from "../account-cli"
 import { deviceServiceBootstrapSetup } from "../remote-bootstrap"
 import { prepareRemoteAttach, REMOTE_EXIT } from "../remote-cli"
 import { gatewayWorkerAnchor } from "../remote-session-verbs"
-import { ago } from "../remote-render"
+import { ago, candidateLines } from "../remote-render"
 import {
   AGENT_DIR,
   NOW,
@@ -530,6 +530,29 @@ describe("omo remote attach", () => {
     const { prepared } = await attach([`Laptop/${SESSION_ID}`])
     expect(prepared).toBe(REMOTE_EXIT.failed)
     expect(owners.at(-1)?.state.log).not.toContain("session.attach")
+  })
+
+  // The refusal's candidate lines, by return value: an offline device is the one device the person named, so no
+  // choices print (#14440); an ambiguous refusal lists what a person can type back.
+  test("#given a device_offline refusal with candidates in its details #when candidateLines reads it #then it answers no lines, and the ambiguous refusal's candidates", () => {
+    expect(
+      candidateLines({
+        code: "device_offline",
+        details: { device: "dev-cccccc", candidates: [{ device: "dev-cccccc", name: "Attic", online: false }] },
+      }),
+    ).toEqual([])
+    expect(
+      candidateLines({
+        code: "ambiguous_target",
+        details: {
+          candidates: [
+            { address: "dev-aaaaaa/0aa1", device: "dev-aaaaaa", device_name: "Studio" },
+            { address: "dev-bbbbbb/0aa2", device: "dev-bbbbbb", device_name: "Lab" },
+            { device: "dev-noaddr" },
+          ],
+        },
+      }),
+    ).toEqual(["  dev-aaaaaa/0aa1  Studio", "  dev-bbbbbb/0aa2  Lab", "  dev-noaddr"])
   })
 
   // #14305 delta review H1: attach needs the relay like every verb: a service that is off, signed out or not set up

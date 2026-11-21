@@ -5,14 +5,14 @@ import { isClosedBareLogin, isClosedDeviceLogin, withClosedDeviceLoginOptions } 
 import { openSignInBrowser } from "./browser"
 import { deviceName, devicePlatform } from "./device-name"
 import { advertisesMachineIdentity, readMachineDigest } from "./machine-digest"
-import { refuseSecondMachineDevice } from "./machine-device"
 import { createCredentialStore, INTERACTIVE_READ_WAIT } from "./keystore"
+import { beginLogin } from "./login-prelude"
 import { signInByRoute } from "./login-routes"
-import { type ChooseDevice, type ListedDevice, RequestFailure, serviceOrigin, SignInError } from "./protocol"
+import { type ChooseDevice, type ListedDevice, serviceOrigin, SignInError } from "./protocol"
 import { decideReplace } from "./replace-device"
 import { resolveMemoryRoot, syncPinDir } from "@oh-my-opencode/memory-core/sync-device-retire"
 
-import { createSession, type DeviceServiceHandoff, type Session } from "./session"
+import { createSession, type DeviceServiceHandoff } from "./session"
 import { retireSyncPinOnDiscard } from "./sync-pin-retire"
 import { terminalText } from "./terminal-text"
 import { dedicatedStoreState } from "./keychain-helper/dedicated-store"
@@ -21,37 +21,6 @@ import { dedicatedStoreState } from "./keychain-helper/dedicated-store"
 function noteDedicatedStore(): void {
   if (process.platform === "darwin" && dedicatedStoreState() === "active")
     console.log("The sign-in is kept in OmO's own keychain on this Mac (omo account store status).")
-}
-
-// Probe the service before anything user-visible (a browser tab, a device code) so an
-// unreachable or unhealthy service fails at once instead of after a dead page and a wait.
-async function ensureServiceAvailable(session: Pick<Session, "request">, api: string): Promise<unknown> {
-  try {
-    return await session.request("/v1/health", { method: "GET" })
-  } catch (error) {
-    if (!(error instanceof SignInError)) throw error
-    // No usable HTTP answer (DNS, refused, TLS, timeout, non-JSON body): the client can't tell a
-    // service that hasn't launched from an offline network, so it names both.
-    if (error instanceof RequestFailure) {
-      throw new SignInError(
-        `Can't reach OmO accounts at ${api}. The service may not be available yet, or your network, proxy or certificate settings are blocking it.`,
-      )
-    }
-    throw new SignInError(`OmO accounts at ${api} aren't available right now. Try again later.`)
-  }
-}
-
-/**
- * Login order (#6503): refuse a second device from the stored sign-in and the machine's device service before
- * `/v1/health`. A logged-out computer is the one that waits on accounts being reachable.
- */
-export async function beginLogin(
-  session: Pick<Session, "accessSnapshot" | "request">,
-  deviceService: DeviceServiceHandoff | undefined,
-  api: string,
-): Promise<unknown> {
-  await refuseSecondMachineDevice(session, deviceService)
-  return ensureServiceAvailable(session, api)
 }
 
 type Options = {
@@ -65,6 +34,8 @@ type Options = {
 
 /** What the host adds to the account commands: its device service for an API origin (design D r9 sections 4-5). */
 export type ServiceAuthHooks = { readonly deviceService?: (api: string) => DeviceServiceHandoff }
+
+export { beginLogin }
 
 export function deviceChoices(devices: readonly ListedDevice[]) {
   return devices.map((device) => ({ value: device.id, label: terminalText(device.name) }))

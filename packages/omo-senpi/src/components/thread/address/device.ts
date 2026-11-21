@@ -22,7 +22,7 @@ export function resolveAccountDevice(
     readonly listingOf?: (device: string) => DeviceListing
   },
   text: string,
-  opts: { readonly online: boolean },
+  opts: { readonly online: boolean; readonly exactId?: boolean },
 ): { readonly kind: "ok"; readonly device: DeviceRef } | ThreadRefusal {
   const resolved = resolveDevice(
     {
@@ -48,14 +48,16 @@ export async function targetDevice(
 }
 
 /**
- * The device a person typed or a listing row names - its id, `here`, the name the device table prints, or a unique id
- * prefix - through the one device resolver, with the account's device list it read. Every omo remote verb and a
- * thread_create that reopens a thread on another device need the device online (work would otherwise start on an
- * offline device), so an offline device is device_offline here by every form.
+ * The device a person typed or a listing row names - a typed text by its id, `here`, the name the device table prints,
+ * or a unique id prefix, while a listing row's device id (exactId) resolves as that id alone - through the one device
+ * resolver, with the account's device list it read. Every omo remote verb and a thread_create that reopens a thread
+ * on another device need the device online (work would otherwise start on an offline device), so an offline device is
+ * device_offline here by every form.
  */
 export async function resolveTypedDevice(
   client: RemoteClient,
   typed: string,
+  opts?: { readonly exactId?: boolean },
 ): Promise<
   | { readonly kind: "ok"; readonly device: string; readonly devices: readonly RemoteDevice[] }
   | { readonly kind: "error"; readonly error: ThreadToolFailure }
@@ -74,7 +76,7 @@ export async function resolveTypedDevice(
       ),
     }
   }
-  const resolved = resolveAccountDevice(listed, typed, { online: true })
+  const resolved = resolveAccountDevice(listed, typed, { online: true, ...opts })
   return resolved.kind === "ok"
     ? { kind: "ok", device: resolved.device.id, devices: listed.devices }
     : { kind: "error", error: asFailure(resolved) }
