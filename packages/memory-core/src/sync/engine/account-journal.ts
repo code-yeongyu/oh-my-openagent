@@ -17,6 +17,7 @@ import { syncJournalDirectory } from "../../journal/fsync"
 import { readJson, removeAtomic, writeJson } from "./atomic"
 import type { EngineDeps } from "./engine-deps"
 import type { SyncJournal } from "./journal"
+import { clearUndecided, takeDecision, writeUndecided } from "./ownership-decision"
 import { itemPathsOnDisk } from "./working-tree"
 
 interface SwitchMarker {
@@ -174,6 +175,12 @@ async function switchAccount(deps: EngineDeps, journal: SyncJournal, from: strin
  * is restored once an account proves it. The moves run under the writer lock, so no memory write lands between the
  * snapshot and the renames (review r2 M3). Answers whether the state changed hands, so the caller reloads the store.
  */
+/** The person chose to use this memory with `account`: the old journal is retired and every owned file is captured fresh. */
+async function useHere(deps: EngineDeps, journal: SyncJournal, account: string): Promise<void> {
+  await journal.retire()
+  await journal.updateState({ account })
+}
+
 export async function claimAccount(deps: EngineDeps, journal: SyncJournal): Promise<boolean> {
   const pending = await readJson<SwitchMarker | null>(markerPath(journal), null)
   if (pending !== null) await deps.lock.withLock(() => finish(deps, journal, pending))
@@ -183,7 +190,20 @@ export async function claimAccount(deps: EngineDeps, journal: SyncJournal): Prom
   if (owner === account) return pending !== null
   if (owner === null) {
     const verdict = await ownership(deps, journal.dir, (await journal.pending()).items.length > 0)
-    if (verdict === "undecided") throw new OwnershipUndecidedError()
+    if (verdict === "undecided") {
+      const gitDir = dirname(journal.dir)
+      const decision = await takeDecision(gitDir, deps.repo.root, account)
+      if (decision === null) {
+        await writeUndecided(gitDir, deps.repo.root, account, deps.clock.now())
+        throw new OwnershipUndecidedError()
+      }
+      await clearUndecided(gitDir)
+      if (decision === "use") {
+        await deps.lock.withLock(() => useHere(deps, journal, account))
+        deps.log?.("sync: as chosen, this device's memory now syncs to this account and is uploaded to it")
+        return true
+      }
+    }
     if (verdict === "own") {
       await journal.updateState({ account })
       return pending !== null

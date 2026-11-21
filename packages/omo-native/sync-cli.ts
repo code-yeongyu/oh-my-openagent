@@ -25,6 +25,7 @@ import type { Command } from "commander"
 
 import { SignInError } from "../omo-opencode/src/cli/service-auth/protocol"
 import { type SyncContext, signedInSyncContext } from "./sync-context"
+import { ownership, ownershipUseRefused } from "./sync-ownership-cli"
 import { CREATION_UNAVAILABLE, phraseCreationGuidance, RUN_IT_YOURSELF } from "./sync-creation-guidance"
 
 export const EXIT_UNSUPPORTED_HERE = 2
@@ -389,6 +390,28 @@ export function configureSyncCommands(
       }
       await run(dependencies, (context) => recover(dependencies, context))
     })
+  const owner = sync
+    .command("ownership")
+    .description("Choose what happens to memory sync cannot place in an account")
+    .action(() => run(dependencies, (context) => ownership(dependencies, context.account, null)))
+  owner
+    .command("use")
+    .description("Upload that memory to the signed-in account (asks first)")
+    .option("--repo <path>", "the memory repository, when more than one waits")
+    .action(async (options: { readonly repo?: string }) => {
+      if (ownershipUseRefused(dependencies)) {
+        process.exitCode = EXIT_UNSUPPORTED_HERE
+        return
+      }
+      await run(dependencies, (context) => ownership(dependencies, context.account, "use", options.repo))
+    })
+  owner
+    .command("set-aside")
+    .description("Set that memory aside on this device; nothing is uploaded")
+    .option("--repo <path>", "the memory repository, when more than one waits")
+    .action((options: { readonly repo?: string }) =>
+      run(dependencies, (context) => ownership(dependencies, context.account, "set_aside", options.repo)),
+    )
 }
 
 export async function runSyncCommand(args: readonly string[]): Promise<void> {
