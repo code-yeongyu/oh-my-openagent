@@ -1,20 +1,12 @@
 import { resolveMemoryRoot } from "../memory-core/src/identity/layout"
-import { loadTrustAnchor } from "../memory-core/src/sync/crypto/trust-pin.ts"
 import { syncPinDir } from "../memory-core/src/sync/pin-dir"
 import {
   createCredentialStore,
   type CredentialStore,
   INTERACTIVE_READ_WAIT,
   InvalidCredentialState,
-  KeychainLockedError,
-  SecretServiceUnavailableError,
 } from "../omo-opencode/src/cli/service-auth/keystore"
-import {
-  type Credentials,
-  credentialSchema,
-  serviceOrigin,
-  SignInError,
-} from "../omo-opencode/src/cli/service-auth/protocol"
+import { type Credentials, credentialSchema, serviceOrigin } from "../omo-opencode/src/cli/service-auth/protocol"
 import { registerHelperCandidates } from "../omo-opencode/src/cli/service-auth/keychain-helper/darwin-backend"
 import {
   type BeforeKeysDiscarded,
