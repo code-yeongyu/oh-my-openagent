@@ -264,7 +264,7 @@ function createMarker(ctx: StoreContext, targetDurableId: string, deliveryId: st
   return path
 }
 
-function unlinkMarker(ctx: StoreContext, targetDurableId: string, deliveryId: string): void {
+export function unlinkMarker(ctx: StoreContext, targetDurableId: string, deliveryId: string): void {
   if (ctx.afterCommit !== undefined) {
     ctx.afterCommit.push(() => unlinkMarker({ ...ctx, afterCommit: undefined }, targetDurableId, deliveryId))
     return
