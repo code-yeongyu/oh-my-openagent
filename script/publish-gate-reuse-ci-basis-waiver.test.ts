@@ -318,6 +318,12 @@ describe("publish.yml gate-reuse ci_basis_receipt waiver", () => {
       1,
       "changes more than the release stamp",
     ],
+    [
+      "its legs were skipped on a stamp that renames a source file into the changelog fragments",
+      { runLegs: "skipped", prepared: "S", baseLegs: "success" },
+      1,
+      "changes more than the release stamp",
+    ],
   ] as const)(
     "#given an empty receipt and a successful hosted run #when %s #then gate-reuse decides on the platform proof",
     (_label, input, status, line) => {

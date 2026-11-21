@@ -289,7 +289,7 @@ jobs:
               fi
               git fetch --no-tags --depth=2 origin "$PREPARED_RELEASE_SHA"
               PLATFORM_BASE="$(git rev-parse "${PREPARED_RELEASE_SHA}^")"
-              if ! git diff --name-only -z "$PLATFORM_BASE" "$PREPARED_RELEASE_SHA" | node script/release-state-paths.mjs --check; then
+              if ! node script/release-state-paths.mjs --check-stamp "$PLATFORM_BASE" "$PREPARED_RELEASE_SHA"; then
                 echo "::error::CI run ${SUCCESS_ID} did not run macOS/Windows, and ${PREPARED_RELEASE_SHA} changes more than the release stamp over ${PLATFORM_BASE}; run the full matrix on it."
                 exit 1
               fi
