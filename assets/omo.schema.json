@@ -2748,6 +2748,36 @@
         "type": "string"
       }
     },
+    "keyword_detector": {
+      "type": "object",
+      "properties": {
+        "enabled_expansions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "ultrawork",
+              "team",
+              "hyperplan",
+              "hyperplan-ultrawork"
+            ]
+          }
+        },
+        "disabled_keywords": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "ultrawork",
+              "team",
+              "hyperplan",
+              "hyperplan-ultrawork"
+            ]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "exclude_models": {
       "type": "array",
       "items": {
@@ -5266,6 +5296,36 @@
           "items": {
             "type": "string"
           }
+        },
+        "keyword_detector": {
+          "type": "object",
+          "properties": {
+            "enabled_expansions": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ultrawork",
+                  "team",
+                  "hyperplan",
+                  "hyperplan-ultrawork"
+                ]
+              }
+            },
+            "disabled_keywords": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ultrawork",
+                  "team",
+                  "hyperplan",
+                  "hyperplan-ultrawork"
+                ]
+              }
+            }
+          },
+          "additionalProperties": false
         },
         "exclude_models": {
           "type": "array",
@@ -7786,6 +7846,36 @@
             "type": "string"
           }
         },
+        "keyword_detector": {
+          "type": "object",
+          "properties": {
+            "enabled_expansions": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ultrawork",
+                  "team",
+                  "hyperplan",
+                  "hyperplan-ultrawork"
+                ]
+              }
+            },
+            "disabled_keywords": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ultrawork",
+                  "team",
+                  "hyperplan",
+                  "hyperplan-ultrawork"
+                ]
+              }
+            }
+          },
+          "additionalProperties": false
+        },
         "exclude_models": {
           "type": "array",
           "items": {
@@ -10304,6 +10394,36 @@
           "items": {
             "type": "string"
           }
+        },
+        "keyword_detector": {
+          "type": "object",
+          "properties": {
+            "enabled_expansions": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ultrawork",
+                  "team",
+                  "hyperplan",
+                  "hyperplan-ultrawork"
+                ]
+              }
+            },
+            "disabled_keywords": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ultrawork",
+                  "team",
+                  "hyperplan",
+                  "hyperplan-ultrawork"
+                ]
+              }
+            }
+          },
+          "additionalProperties": false
         },
         "exclude_models": {
           "type": "array",
@@ -12830,6 +12950,36 @@
               "type": "string"
             }
           },
+          "keyword_detector": {
+            "type": "object",
+            "properties": {
+              "enabled_expansions": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "ultrawork",
+                    "team",
+                    "hyperplan",
+                    "hyperplan-ultrawork"
+                  ]
+                }
+              },
+              "disabled_keywords": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "ultrawork",
+                    "team",
+                    "hyperplan",
+                    "hyperplan-ultrawork"
+                  ]
+                }
+              }
+            },
+            "additionalProperties": false
+          },
           "exclude_models": {
             "type": "array",
             "items": {
@@ -15348,6 +15498,36 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "keyword_detector": {
+                "type": "object",
+                "properties": {
+                  "enabled_expansions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "ultrawork",
+                        "team",
+                        "hyperplan",
+                        "hyperplan-ultrawork"
+                      ]
+                    }
+                  },
+                  "disabled_keywords": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "ultrawork",
+                        "team",
+                        "hyperplan",
+                        "hyperplan-ultrawork"
+                      ]
+                    }
+                  }
+                },
+                "additionalProperties": false
               },
               "exclude_models": {
                 "type": "array",
@@ -17868,6 +18048,36 @@
                   "type": "string"
                 }
               },
+              "keyword_detector": {
+                "type": "object",
+                "properties": {
+                  "enabled_expansions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "ultrawork",
+                        "team",
+                        "hyperplan",
+                        "hyperplan-ultrawork"
+                      ]
+                    }
+                  },
+                  "disabled_keywords": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "ultrawork",
+                        "team",
+                        "hyperplan",
+                        "hyperplan-ultrawork"
+                      ]
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
               "exclude_models": {
                 "type": "array",
                 "items": {
@@ -20386,6 +20596,36 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "keyword_detector": {
+                "type": "object",
+                "properties": {
+                  "enabled_expansions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "ultrawork",
+                        "team",
+                        "hyperplan",
+                        "hyperplan-ultrawork"
+                      ]
+                    }
+                  },
+                  "disabled_keywords": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "ultrawork",
+                        "team",
+                        "hyperplan",
+                        "hyperplan-ultrawork"
+                      ]
+                    }
+                  }
+                },
+                "additionalProperties": false
               },
               "exclude_models": {
                 "type": "array",
