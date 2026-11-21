@@ -95,6 +95,10 @@ pub struct FakeScenario {
     pub window_reservation: BTreeMap<String, String>,
     /// Signed code identity per pid.
     pub code_identity: BTreeMap<u32, CodeIdentity>,
+    // --- Row 21 (review M3): the executable path per pid a path-only consent binds to. ---
+    pub executable_path: BTreeMap<u32, String>,
+    // --- Row 21 (R70av): chords the fake's set_stop_chord refuses (default: none). ---
+    pub unarmable_stop_chords: Vec<String>,
     /// The hand identity the fleet harness reads.
     pub hand: Option<HandIdentity>,
     // --- Row 21: the fake host's consent view handed to the engine at `session.open`. ---

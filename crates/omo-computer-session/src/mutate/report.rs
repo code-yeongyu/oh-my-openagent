@@ -40,6 +40,8 @@ pub(super) struct Sent {
     pub(super) settle: Option<ObservationSettle>,
     pub(super) audit_id: Option<String>,
     pub(super) warning: Option<String>,
+    /// The foreground lease ended under the user since the last report.
+    pub(super) user_moved_on: bool,
 }
 
 /// # Errors
@@ -62,7 +64,9 @@ pub(super) fn reply(
         effect: sent.effect,
         route: sent.route.into(),
         hit: None,
-        focus_restoration: None,
+        focus_restoration: sent
+            .user_moved_on
+            .then_some(omo_computer_core::report::FocusRestoration::UserMovedOn),
         opened_surfaces: Vec::new(),
         next_call: None,
         note: None,

@@ -16,7 +16,7 @@ use omo_computer_core::results::{
     CapabilitiesReply, ExecReply, PermissionState, SessionOpened, StopPathStatus,
 };
 use omo_computer_core::session_state::Tristate;
-use omo_computer_safety::{Call, Guard, HostAdditions, NoHolds, StopPolicy, TargetRef, Transport, VerbKind};
+use omo_computer_safety::{Call, Guard, HostAdditions, StopPolicy, TargetRef, Transport, VerbKind};
 
 use crate::audit::gc::SweepTrigger;
 use crate::frames::random_u64;
@@ -93,7 +93,9 @@ impl Session {
             tag: random_u64(),
         });
         let resume_token = format!("{:016x}{:016x}", random_u64(), random_u64());
-        self.funnel.set_session_id(resume_token[..16].to_owned());
+        // Row 21 (A-IS-62, R70ai): the open request's stop_hotkey is compared with the consent file's.
+        let stop_hotkey = request.config.as_ref().and_then(|config| config.stop.stop_hotkey.as_deref());
+        self.open_control(&resume_token[..16], stop_hotkey)?;
         self.funnel.sweep(SweepTrigger::Open);
         self.open_trace(request.trace, &resume_token[..16]);
         Ok(SessionOpened {
@@ -104,13 +106,30 @@ impl Session {
 
     /// `stopPath.start`: arms (or re-arms a parked) stop listener.
     pub fn stop_path_start(&mut self, params: StopPathStartParams) -> StopPathStatus {
-        let StopPathStartParams { chord: _ } = params;
-        self.guard.start_on(self.backend.as_mut())
+        // Row 21 (A-IS-62 rev 5, R70aq): the wire entry is `stop_path_start_checked`; this form
+        // keeps its callers' shape and answers the status either way.
+        self.stop_path_start_checked(params)
+            .unwrap_or_else(|_| self.stop_path_status())
+    }
+
+    /// `stopPath.start{chord?}` as the engine answers it: the configured chord is armed FIRST, as
+    /// before, then a carried chord is compared through the one parser.
+    ///
+    /// # Errors
+    /// Row 21 (A-IS-62 rev 5, R70aq): a carried chord that differs from the consent file's or does
+    /// not parse: the call is refused, nothing is disarmed, and the hand reads tampered.
+    pub fn stop_path_start_checked(&mut self, params: StopPathStartParams) -> Result<StopPathStatus, Refusal> {
+        let StopPathStartParams { chord } = params;
+        // R70as(3): an unreadable configured chord arms NOTHING and refuses.
+        self.refuse_unreadable_chord()?;
+        let status = self.arm_configured_chord();
+        self.refuse_carried_chord(chord.as_deref(), "stopPath.start")?;
+        Ok(status)
     }
 
     /// `stopPath.stop{source}`: latches and commits the stop.
     pub fn stop_path_stop(&mut self, params: StopPathStopParams) -> StopPathStatus {
-        self.guard.stop(params.source.as_deref(), &mut NoHolds).1
+        self.stop_control(params.source.as_deref())
     }
 
     /// `stopPath.heartbeat` from the session's host.
@@ -138,6 +157,7 @@ impl Session {
     }
 
     pub fn close(&mut self) {
+        self.close_control();
         if self.opened.take().is_some() {
             self.funnel.sweep(SweepTrigger::IdleExit);
             self.close_trace();
