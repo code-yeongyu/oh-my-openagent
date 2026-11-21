@@ -42,6 +42,25 @@ impl Session {
                 refused.refusal.into(),
             ));
         }
+        if let Some(frame) = mutation.frame_refusal {
+            return Err(self.refuse(record, Some("Frame".to_owned()), frame.refusal().into()));
+        }
+        let waited_ms = match self.busy_before_send(target) {
+            Ok(waited_ms) => waited_ms,
+            Err(busy) => return Err(self.refuse(record, Some("Busy".to_owned()), busy)),
+        };
+        // The busy wait let time pass after the gate: a stop, a lock or a lost permission
+        // during it must still refuse, so a wait that took time is admitted again before
+        // anything is taken or sent. A target that was not busy keeps the single gate pass.
+        if waited_ms > 0 {
+            if let Err(refused) = self.guard.admit_on(self.backend.as_mut(), &mutation.call) {
+                return Err(self.refuse(
+                    record,
+                    Some(format!("{:?}", refused.gate)),
+                    refused.refusal.into(),
+                ));
+            }
+        }
         // `&mut Session` serialises a session's calls, so no exec permit free means one leaked:
         // refused with nothing sent, never sent without one.
         let Some(_permit) = self.funnel.permits.try_take(PermitKind::Exec) else {
@@ -78,7 +97,13 @@ impl Session {
         let of = u32::try_from(mutation.events.len()).unwrap_or(u32::MAX);
         let (count, failure) = self.send(mutation.events, mutation.route, tag);
         drop(lock);
-        let read_back = report::read_back(report::settle());
+        if let Some((target, frame_id)) = mutation.consume.as_ref().filter(|_| count > 0) {
+            self.frames.consume(target, frame_id);
+        }
+        let settled = (failure.is_none() && count > 0)
+            .then(|| self.settle_after_send(target))
+            .flatten();
+        let read_back = report::read_back(report::settle(settled.as_ref()));
         match failure {
             Some(refusal) if count == 0 => {
                 let issuer = record.marker.binding.issuer.clone();
@@ -106,6 +131,7 @@ impl Session {
                     call_id: Some(call_id),
                     receipt: None,
                     interrupted: Some(Disposition::UNCERTAIN_UNSAFE),
+                    busy: None,
                     warning,
                 })
             }
@@ -126,6 +152,7 @@ impl Session {
                     count,
                     of,
                     effect: read_back.effect,
+                    settle: settled.as_ref().map(crate::settle::Settled::wire),
                     warning: appended.is_err().then(|| "write_failed".to_owned()),
                     audit_id: appended.ok(),
                 };
