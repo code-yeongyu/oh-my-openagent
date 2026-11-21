@@ -4,8 +4,10 @@
 // OMO_GATEWAY relay header). A later `thread_send` from the same session to the same thread keeps the relay header.
 import { join } from "node:path"
 import { mkdirSync } from "node:fs"
+import { parseDeliveryText } from "./lib/delivery-text.mjs"
 import {
   HostClient,
+  threadComponent,
   makeScratch,
   startRealHost,
   startFakeModelServer,
@@ -36,7 +38,7 @@ const textOf = (message) =>
       : ""
 const CREATE = evalCall(
   "QA: create a thread with a first prompt",
-  `const v = JSON.parse((await tool.thread_create({ name: "qa-14045-child", prompt: ${JSON.stringify(BRIEF)} })).text); globalThis.child = v.thread?.thread_id; print(JSON.stringify({ kind: v.kind, child: v.thread?.thread_id, prompt: v.prompt?.delivery?.kind ?? v.prompt?.error?.code }))`,
+  `const v = JSON.parse((await tool.thread_create({ name: "qa-14045-child", prompt: ${JSON.stringify(BRIEF)} })).text); globalThis.child = v.thread; print(v.kind === "ok" ? v.thread : v.error)`,
 )
 const SEND = evalCall(
   "QA: send the created thread a later message",
@@ -49,8 +51,8 @@ const laterSeen = new Promise((resolve) => {
 })
 const choose = () => {
   const messages = fake?.requests.at(-1)?.messages ?? []
-  if (messages.some((message) => textOf(message).includes("QA-14045-LATER"))) laterArrived()
   const last = messages.at(-1)
+  if (last?.role === "user" && textOf(last).includes(LATER)) laterArrived()
   const lastUser = textOf([...messages].reverse().find((message) => message.role === "user"))
   if (last?.role !== "user") return { text: "done" }
   if (lastUser.includes("Create the child thread")) return { toolCalls: [CREATE] }
@@ -82,6 +84,10 @@ const caller = await client.openSession({ cwd: scratch.cwd })
 await client.promptAndSettle(caller.routingId, "Create the child thread with its brief.", {
   streamingBehavior: "followUp",
 })
+const createResult = (await client.messages(caller.routingId)).findLast(
+  (message) => message.role === "toolResult" || message.role === "tool",
+)
+const child = textOf(createResult).trim()
 await client.promptAndSettle(caller.routingId, "Now send the child a later message.", {
   streamingBehavior: "followUp",
 })
@@ -120,6 +126,18 @@ report.assert(
   "later-send-keeps-the-relay-header",
   later !== undefined && later.includes("OMO_GATEWAY") && later.includes("source=peer_agent"),
   `header=${later?.includes("OMO_GATEWAY") ?? "absent-message"}`,
+)
+// The model recorder is shared. Check the two admissions in the returned child's own durable transcript as well.
+const { scanDiskSessions } = await threadComponent("address-book")
+const { parseSessionLines } = await threadComponent("session-facts")
+const receiver = scanDiskSessions(join(scratch.agentDir, "sessions")).find((row) => row.durable_id === child)
+const entries = receiver ? parseSessionLines(await Bun.file(receiver.session_path).text()) : []
+const deliveries = entries.filter((entry) => entry.customType === "session_control_delivery")
+const [first, second] = deliveries
+report.assert(
+  "created-thread-admitted-brief-then-peer-message",
+  deliveries.length === 2 && first.details?.display_text === BRIEF && parseDeliveryText(second.content)?.body === LATER,
+  `thread=${child} receiver=${receiver?.durable_id} deliveries=${deliveries.length} first=${JSON.stringify(first?.details?.display_text)} second=${JSON.stringify(second && parseDeliveryText(second.content)?.body)}`,
 )
 const shardSockets = stopOwnedShardHosts(scratch.dir)
 await cleanupAllAndWait()
