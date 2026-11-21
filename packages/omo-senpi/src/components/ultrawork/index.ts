@@ -1,4 +1,3 @@
-import { isGpt6AstraModel } from "@oh-my-opencode/model-core"
 import { readSessionRole, type SessionRole } from "@oh-my-opencode/senpi-task"
 
 import { transformContextText } from "../../extension/context-text-transform"
@@ -11,7 +10,7 @@ import {
   stripQuotedRegions,
   stripQuotedSpans,
 } from "../skill-pointers/strip-quoted-regions"
-import { SENPI_ASTRA_ULTRAWORK_DIRECTIVE, SENPI_ULTRAWORK_DIRECTIVE } from "./generated-directive"
+import { ULTRAWORK_DIRECTIVES, ultraworkDirectiveFor } from "./directive-variants"
 
 // The keyword arms only as a word of its own: "ulw", "ulw loop", a leading "ulw-loop" or "ulw-plan." do;
 // "ulwfoo", "ulw_helper", "mass-ulw-refactor", "ulw-plan.md" and ".omo/ulw/" do not (#9738). Quoted,
@@ -107,8 +106,7 @@ export interface SessionArming {
 const ARMING_LEDGER_KEY = Symbol.for("omo.ultrawork.arming")
 
 interface SharedArmingSlot {
-  readonly directive: string
-  readonly astraDirective: string
+  readonly directives: readonly string[]
   readonly arming: SessionArming
 }
 
@@ -117,15 +115,17 @@ function isCurrentArmingSlot(value: unknown): value is SharedArmingSlot {
     return false
   }
   const slot = value as SharedArmingSlot
-  // The slot stores the directive TEXT itself, not a hash: string `===` compares
-  // by value, so a re-evaluated bundle's fresh constant still matches, while any
-  // edit to the directive (or a hash collision between distinct directives, which
+  // The slot stores every variant's directive TEXT itself, not a hash: string `===` compares
+  // by value, so a re-evaluated bundle's fresh constants still match, while any
+  // edit to a directive (or a hash collision between distinct directives, which
   // a 32-bit FNV-1a revision demonstrably allowed) can never reuse stale arming.
-  // A bare ledger from a pre-slot bundle has no directive to match, so it is
-  // discarded here exactly like a mismatched one.
+  // A bare ledger from a pre-slot bundle, or a slot from a bundle with another set
+  // of variants, has no matching texts, so it is discarded exactly like an edited one.
+  const current = Object.values(ULTRAWORK_DIRECTIVES)
   return (
-    slot.directive === SENPI_ULTRAWORK_DIRECTIVE &&
-    slot.astraDirective === SENPI_ASTRA_ULTRAWORK_DIRECTIVE &&
+    Array.isArray(slot.directives) &&
+    slot.directives.length === current.length &&
+    current.every((directive, index) => slot.directives[index] === directive) &&
     typeof slot.arming === "object" &&
     slot.arming !== null
   )
@@ -138,11 +138,7 @@ export function sharedSessionArming(): SessionArming {
     return existing.arming
   }
   const created = createSessionArming()
-  const slot: SharedArmingSlot = {
-    directive: SENPI_ULTRAWORK_DIRECTIVE,
-    astraDirective: SENPI_ASTRA_ULTRAWORK_DIRECTIVE,
-    arming: created,
-  }
+  const slot: SharedArmingSlot = { directives: Object.values(ULTRAWORK_DIRECTIVES), arming: created }
   registry[ARMING_LEDGER_KEY] = slot
   return created
 }
@@ -165,7 +161,7 @@ export function createUltraworkComponent(arming: SessionArming = sharedSessionAr
           !Array.isArray(payload.messages)
         )
           return
-        const directive = directiveForModel(modelIdFromContext(eventCtx))
+        const directive = ultraworkDirectiveFor(modelIdFromContext(eventCtx))
         let selected = false
         const messages = payload.messages.map((message: unknown) => {
           if (typeof message !== "object" || message === null || !("content" in message)) return message
@@ -394,7 +390,7 @@ function handleInput(
   // The input event's own ctx names the live session; the lifecycle tracker covers
   // hosts that only expose the id on session events.
   const sessionId = sessionIdFromEventCtx(eventCtx) ?? arming.currentSessionId()
-  const directive = directiveForModel(modelIdFromContext(eventCtx))
+  const directive = ultraworkDirectiveFor(modelIdFromContext(eventCtx))
   const classification = classifyUltraworkInput(
     { ...payload, sessionRole: readSessionRole(pi) },
     snapshotSessionArming(arming, sessionId),
@@ -485,18 +481,13 @@ function modelIdFromContext(value: unknown): string | undefined {
   return typeof value.model?.id === "string" ? value.model.id : undefined
 }
 
-function directiveForModel(modelId: string | undefined): string {
-  return isGpt6AstraModel(modelId) ? SENPI_ASTRA_ULTRAWORK_DIRECTIVE : SENPI_ULTRAWORK_DIRECTIVE
-}
-
 function selectDirectiveText(text: string, directive: string): string | undefined {
-  // Native skill expansion retains the variant markers; generated directives
-  // omit them. Match only the canonical full body, preserving arbitrary prose.
-  const unmarked = text.replace(/<!-- omo-ultrawork-astra:[a-z0-9-]+:(?:start|end) -->\r?\n/g, "")
+  // Match only the canonical full body of a variant (native skill expansion inlines the
+  // default one), preserving arbitrary prose around it.
   const selected = directive.trimEnd()
-  let result = unmarked
+  let result = text
   let matched = false
-  for (const candidate of [SENPI_ULTRAWORK_DIRECTIVE, SENPI_ASTRA_ULTRAWORK_DIRECTIVE]) {
+  for (const candidate of Object.values(ULTRAWORK_DIRECTIVES)) {
     if (result.includes(candidate.trimEnd())) {
       matched = true
       result = result.replaceAll(candidate.trimEnd(), () => selected)

@@ -1,15 +1,23 @@
 import { createHash, randomUUID } from "node:crypto"
 
 import { resolveTarget, type ThreadAddressEntry } from "../addressing"
-import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from "../errors"
+import { pairLoopGuardNextAction, threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from "../errors"
 import type { EndpointLiveness, GatewayEndpointPort, GatewayEndpointRef } from "./adapter"
+import { DEFAULT_THREAD_DELIVERY } from "../contracts/fields"
 import { TARGET_MAX_BYTES } from "./constants"
 import { decideDelivery } from "./decision"
 import { senderFacts } from "./envelope"
 import { resultFromRow } from "./result"
 import { resolveProvenance } from "./provenance-resolver"
 import type { GatewayStore } from "./store"
-import type { ExternalAuthor, GatewayDeliveryMode, GatewayDeliveryResult, GatewaySender, Provenance } from "./types"
+import type {
+  DeliveryAuthority,
+  ExternalAuthor,
+  GatewayDeliveryMode,
+  GatewayDeliveryResult,
+  GatewaySender,
+  Provenance,
+} from "./types"
 
 export type GatewayTarget = {
   readonly durable_id: string
@@ -39,6 +47,8 @@ export type GatewayDeliverRequest = {
   readonly root_id?: string
   /** The highest chain hop an input of the caller's current run arrived with from another device (K8): the row continues it. */
   readonly inbound_hop?: number
+  /** Set only by thread_create's first prompt to the thread it made (#14045). */
+  readonly authority?: DeliveryAuthority
 }
 
 export type GatewayEngine = {
@@ -93,7 +103,10 @@ function fail(
     error: threadToolFailure(
       code,
       message,
-      NEXT_ACTION[code] ?? "Call thread_list and retry after checking the target.",
+      code === "pair_loop_guard"
+        ? pairLoopGuardNextAction(Number(details?.["retry_after_ms"]))
+        : (NEXT_ACTION[code] ??
+            "Call thread_list (tool.thread_list() in an eval cell) and retry after checking the target."),
       details,
     ),
   }
@@ -133,7 +146,7 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
   const now = options.now ?? store.now
 
   async function deliver(request: GatewayDeliverRequest): Promise<GatewayDeliveryResult> {
-    const mode = request.mode ?? "auto"
+    const mode = request.mode ?? DEFAULT_THREAD_DELIVERY
     if (mode === "steer" && request.expected_turn_id === undefined)
       return fail("invalid_arguments", "A steer needs expected_turn_id (the target's current turn_epoch).")
     const bytes = Buffer.byteLength(request.text)
@@ -147,7 +160,7 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
       endpoint === null &&
       decideDelivery("offline", mode, request.expected_turn_id ?? null, null).kind === "refuse"
     ) {
-      return fail("turn_conflict", "The target has no live turn to steer.", { target: target.durable_id })
+      return fail("turn_conflict", "The target has no live turn to steer.", { thread: target.durable_id })
     }
     const facts = senderFacts(
       request.sender,
@@ -166,6 +179,7 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
       sender_turn: facts.turn,
       cause_delivery_id: facts.cause,
       ...(request.inbound_hop === undefined ? {} : { inbound_hop: request.inbound_hop }),
+      ...(request.authority === undefined ? {} : { authority: request.authority }),
       claimed_root_id: request.root_id ?? null,
       origin: facts.origin(deliveryId),
       actor: facts.actor,

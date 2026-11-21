@@ -15,6 +15,7 @@ export function outputPathsIn(root) {
     onboardingScanRuntimeOutputPath: join(root, "omo-onboarding-scan.js"),
     toolkitSdkOutputPath: join(root, "runtime", "agent-toolkit-sdk", "sdk.js"),
     bunshinTsOutputPath: join(root, "runtime", "bunshin-ts", "sdk.js"),
+    omoSdkOutputPath: join(root, "runtime", "omo-sdk", "sdk.js"),
     rollbackRuntimeOutputPath: join(root, "runtime", "rollback-migrate.js"),
     memoryDoctorOutputPath: join(root, "omo-memory-doctor.js"),
     memoryMemfsOutputPath: join(root, "omo-memory-memfs.js"),

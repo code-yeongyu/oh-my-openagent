@@ -43,10 +43,11 @@ export const REMOTE_IMPORT_RULES: GuardRules = {
   s2AllowedImporters: [
     DEVICE_SERVICE_CORE,
     REMOTE,
-    // The three infrastructure callers of section 1: endpoint registration, sign-in hand-off, memory re-adopt/forget.
+    // The three infrastructure callers of section 1: endpoint registration, sign-in hand-off, memory re-adopt/forget
+    // (the memory device session's CLI session file, cli-session.ts, moved out of account-runtime.ts in omo#14374).
     "packages/device-service-core/src/registrant.ts",
     "packages/omo-native/device-service-handoff.ts",
-    "packages/omo-senpi/src/components/memory/device-session/account-runtime.ts",
+    "packages/omo-senpi/src/components/memory/device-session/cli-session.ts",
   ],
   s3: { surface: isRemoteSurface, layers: [DEVICE_SERVICE_CORE, REMOTE, BUNSHIN_TS_RELAY], entry: `${REMOTE}index.ts` },
 }
@@ -200,6 +201,8 @@ export const NON_LITERAL_IMPORT_OFFENDERS: Readonly<Record<string, number>> = {
   "packages/omo-senpi/src/components/onboarding/scan-component.ts": 1,
   "packages/omo-senpi/src/components/side-panel/index.ts": 1,
   "packages/omo-senpi/src/components/thread/gateway/extension-registrations.ts": 1,
+  // A test fixture for the paged thread_read tests (#14053); it loads senpi's projector by a computed specifier.
+  "packages/omo-senpi/src/components/thread/thread-remote-entries-fixture.ts": 1,
   // A child-process test fixture for hand-browser-placement.test.ts; it imports the engine entry by path like permission-registry.test-fixture.ts.
   "packages/omo-senpi/src/extension/hand-browser-placement.test-fixture.ts": 1,
   "packages/omo-senpi/src/senpi-test-runtime.ts": 12,

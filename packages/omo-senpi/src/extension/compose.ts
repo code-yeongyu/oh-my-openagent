@@ -6,7 +6,12 @@ import { defaultCommentCheckerCacheDir } from "../components/comment-checker/res
 
 import { createDagSdkRootProvisioning } from "./dag-sdk-root-provisioning"
 import { isOmoSenpiDisabledByEnv } from "./disable-env"
-import { AGENT_TOOLKIT_SDK_ROOT_ENV, BUNSHIN_TS_SDK_ROOT_ENV, createSdkRootProvisioning } from "./sdk-root-provisioning"
+import {
+  AGENT_TOOLKIT_SDK_ROOT_ENV,
+  BUNSHIN_TS_SDK_ROOT_ENV,
+  createSdkRootProvisioning,
+  OMO_SDK_ROOT_ENV,
+} from "./sdk-root-provisioning"
 import { IdleInjectionCoordinator } from "./idle-injection-coordinator"
 import { deliverItems } from "./deliver-items"
 import { publishWakeQueueBaselineOnSessionStart, publishWakeQueueChildWork } from "./wake-queue-source"
@@ -99,6 +104,7 @@ export function composeOmoSenpiExtension(
     })
   const provisionAgentToolkitSdkRoot = runtimeSdkRoot(AGENT_TOOLKIT_SDK_ROOT_ENV, "agent-toolkit-sdk")
   const provisionBunshinTsSdkRoot = runtimeSdkRoot(BUNSHIN_TS_SDK_ROOT_ENV, "bunshin-ts", "bunshin-ts")
+  const provisionOmoSdkRoot = runtimeSdkRoot(OMO_SDK_ROOT_ENV, "omo-sdk", "omo")
 
   return async (pi: unknown): Promise<void> => {
     releaseHerdrAgentHint()
@@ -115,6 +121,7 @@ export function composeOmoSenpiExtension(
     provisionDagSdkRoot()
     provisionAgentToolkitSdkRoot()
     provisionBunshinTsSdkRoot()
+    provisionOmoSdkRoot()
 
     const missing = getMissingCapabilities(pi)
     if (missing.length > 0 || !isSenpiExtensionAPI(pi)) {

@@ -459,11 +459,14 @@ jobs:
     runs-on: macos-latest
     # Each part has its own step timeout so one hung part fails only its own
     # context; the job budget covers install plus the sum of the part budgets.
-    timeout-minutes: 90
+    # Shard 2 is two parts (heavy, light). Their budgets replaced the single
+    # 20-minute step that run 43943966867 hit while tests were still passing.
+    timeout-minutes: 110
     outputs:
       lsp: ${{ steps.lsp-daemon-tests.outcome }}
       shard1: ${{ steps.root-tests-posix-1.outcome }}
-      shard2: ${{ steps.root-tests-posix-2.outcome }}
+      shard2a: ${{ steps.root-tests-posix-2a.outcome }}
+      shard2b: ${{ steps.root-tests-posix-2b.outcome }}
       codex: ${{ steps.codex-platform-tests.outcome }}
       senpi: ${{ steps.senpi-tests-posix.outcome }}
     steps:
@@ -498,13 +501,20 @@ jobs:
         run: |
           mkdir -p "$CI_JUNIT_DIR"
           bun test --timeout 20000 packages/omo-opencode packages/memory-core --reporter=junit --reporter-outfile="$CI_JUNIT_DIR/root-1.xml"
-      - name: Run root test shard 2
-        id: root-tests-posix-2
+      - name: Run root test shard 2 heavy
+        id: root-tests-posix-2a
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         timeout-minutes: 20
         env:
           CI_JUNIT_DIR: ${{ runner.temp }}/junit
-        run: bash .github/scripts/ci-root-shard-2.sh
+        run: bash .github/scripts/ci-root-shard-2.sh heavy
+      - name: Run root test shard 2 light
+        id: root-tests-posix-2b
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        timeout-minutes: 20
+        env:
+          CI_JUNIT_DIR: ${{ runner.temp }}/junit
+        run: bash .github/scripts/ci-root-shard-2.sh light
       - name: Run Codex platform smoke
         id: codex-platform-tests
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
@@ -540,7 +550,8 @@ jobs:
           JOB_SUMMARY_DETAILS: |
             - LSP daemon: `${{ steps.lsp-daemon-tests.outcome }}`.
             - Root shard 1: `${{ steps.root-tests-posix-1.outcome }}`.
-            - Root shard 2: `${{ steps.root-tests-posix-2.outcome }}`.
+            - Root shard 2 heavy: `${{ steps.root-tests-posix-2a.outcome }}`.
+            - Root shard 2 light: `${{ steps.root-tests-posix-2b.outcome }}`.
             - Codex platform: `${{ steps.codex-platform-tests.outcome }}`.
             - Senpi: `${{ steps.senpi-tests-posix.outcome }}`.
           JOB_SUMMARY_NEXT: Inspect the failed part; independent parts continue after an earlier failure.
@@ -592,7 +603,7 @@ jobs:
         env:
           LEG_OS: ${{ matrix.os }}
           LEG_JOB_STATUS: ${{ needs.macos-combined.result }}
-          TEST_OUTCOMES: ${{ needs.macos-combined.outputs.lsp }} ${{ needs.macos-combined.outputs.shard2 }}
+          TEST_OUTCOMES: ${{ needs.macos-combined.outputs.lsp }} ${{ needs.macos-combined.outputs.shard2a }} ${{ needs.macos-combined.outputs.shard2b }}
           RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
           FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
           RUNTIME_TOUCHING: ${{ needs.ci-mode.outputs.runtime_touching }}

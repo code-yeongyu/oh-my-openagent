@@ -1,36 +1,37 @@
-import { threadToolFailure, type ThreadToolFailure } from "../errors"
+import { failed as fail, type Failed as Failure } from "../address/refusals"
 import type { CommandResult } from "@oh-my-opencode/device-service-core"
+import type { RemoteClient } from "../../remote"
+import { accountDevices, accountState } from "../address/account"
 import { outcomeFailure, READ_UNCERTAIN } from "./outcome"
 import {
-  endedRow,
   type AliasError,
   type AliasHolder,
+  type RemoteDevice,
   type JsonObject,
   type RemoteSessionRow,
   type RemoteThreadSurface,
 } from "./ports"
 
-type Failure = { readonly kind: "error"; readonly error: ThreadToolFailure }
-const fail = (
-  code: ThreadToolFailure["code"],
-  message: string,
-  next: string,
-  details?: Readonly<Record<string, unknown>>,
-): Failure => ({ kind: "error", error: threadToolFailure(code, message, next, details) })
-
 /** A5: the relay is paid only; on any other plan the remote path answers this, never a silent failure or a queue. */
 export async function remoteAvailable(remote: RemoteThreadSurface): Promise<Failure | undefined> {
-  let state: string
-  try {
-    state = (await remote.sessions.status()).state
-  } catch (error) {
+  const ready = await remoteReady(remote)
+  return "kind" in ready ? ready : undefined
+}
+
+/** remoteAvailable, and on a connected relay this device's account id, read in the same status round. */
+export async function remoteReady(remote: RemoteThreadSurface): Promise<Failure | { readonly here: string | null }> {
+  const status = await accountState(remote.client)
+  if ("kind" in status)
     return fail(
       "host_unavailable",
       "This device's device service is not reachable.",
       "Install or start the device service, then retry.",
-      { reason: error instanceof Error ? error.message : String(error) },
+      // No device service at all is "not set up" (no state); a service that answers with a failure is an outage.
+      status.details?.["reason"] === "service_not_installed"
+        ? { reason: status.message }
+        : { reason: status.message, state: "unreachable" },
     )
-  }
+  const state = status.state
   if (state === "plan_required")
     return fail(
       "relay_requires_paid_plan",
@@ -44,7 +45,12 @@ export async function remoteAvailable(remote: RemoteThreadSurface): Promise<Fail
       "Sign in, turn remote sessions on, or wait for the device service to connect, then retry.",
       { state },
     )
-  return undefined
+  return { here: status.here }
+}
+
+/** An alias holder as a failure names it: the thread to pass back, and its device. */
+export function holderDetails(holder: AliasHolder): { readonly thread: string; readonly device: string } {
+  return { thread: holder.session_id, device: holder.device }
 }
 
 export function aliasFailure(error: AliasError): Failure {
@@ -53,87 +59,54 @@ export function aliasFailure(error: AliasError): Failure {
       "alias_taken",
       error.message,
       "Choose another alias; the holder is named in details.",
-      error.details?.holder === undefined ? undefined : { holder: error.details.holder },
+      error.details?.holder === undefined ? undefined : { holder: holderDetails(error.details.holder) },
     )
   if (error.code === "alias_invalid")
     return fail("invalid_arguments", error.message, "Use 1-64 visible characters that do not look like a session id.", {
       reason: error.details?.reason,
     })
   if (error.code === "alias_not_found")
-    return fail("not_found", error.message, "Call thread_list to see the threads and their aliases.")
+    return fail(
+      "not_found",
+      error.message,
+      "Call thread_list (tool.thread_list() in an eval cell) to see the threads and their aliases.",
+    )
   return fail("host_unavailable", error.message, "Retry when the account service is reachable.", {
     reason: error.details?.reason,
   })
 }
 
-/**
- * Where a session address points once the account is consulted (A3): another device's session, or this device. With
- * no id or alias match, `none` hands back the account list it read, so step 3 matches titles without a second read.
- */
-export type RemoteTarget =
-  | { readonly where: "remote"; readonly row: RemoteSessionRow }
-  | { readonly where: "here"; readonly session_id: string }
-  | { readonly where: "none"; readonly rows: readonly RemoteSessionRow[]; readonly here: string | null }
-
-/**
- * The listing row an alias holder names. A thread claimed on its own device is held by its durable id, while the account
- * listing keys every session (terminal-held or rpc-host alike) by the relay key that device's connector assigned and names
- * only its project, so the row cannot be matched by durable id: the holding device maps it (session.locate, the same
- * lookup a create on another device uses). An offline holder device is device_offline; one that is online but cannot map
- * the holder to a session it lists is not_found.
- */
-export async function holderTarget(
-  remote: RemoteThreadSurface,
-  holder: AliasHolder,
-  here: string | null,
-  rows: readonly RemoteSessionRow[],
-): Promise<RemoteTarget | Failure> {
-  if (holder.device === here) return { where: "here", session_id: holder.session_id }
-  // A holder is recorded by its durable id (claimed on its own device) or by its listing key: match either.
-  const listed = rows.find(
-    (row) =>
-      row.device === holder.device && (row.durable_id === holder.session_id || row.session_id === holder.session_id),
-  )
-  if (listed !== undefined) return { where: "remote", row: listed }
-  const device = (await remote.sessions.devices()).find((candidate) => candidate.device === holder.device)
-  if (device !== undefined && !device.online)
-    return fail(
-      "device_offline",
-      `Device ${holder.device} holding this thread is offline.`,
-      "Retry when that device is online; nothing was queued.",
-      { device: holder.device, thread_id: holder.session_id },
-    )
-  const located = await remote.sessions.locate(holder.device, holder.session_id)
-  const row =
-    located.kind === "ok"
-      ? rows.find((candidate) => candidate.device === holder.device && candidate.session_id === located.sessionId)
-      : undefined
-  if (row !== undefined) return { where: "remote", row }
-  // omo#13037 A4.3.2: the holder's device answered the probe for a session no engine lists: an ended row from that answer,
-  // only while this device's service can carry the wake (else today's not_found below).
-  if (located.kind === "ok" && (await remote.sessions.canWake?.()) === true)
-    return { where: "remote", row: endedRow(holder.device, located.sessionId, holder.session_id) }
-  return fail(
-    "not_found",
-    `The alias names thread ${holder.session_id} on device ${holder.device}, which that device does not list.`,
-    "Call thread_list with all_scope to find the live thread, then claim the alias for it again with thread_rename.",
-    {
-      device: holder.device,
-      thread_id: holder.session_id,
-      ...(located.kind === "refused" ? { reason: located.reason } : {}),
-    },
-  )
-}
-
 /** A typed `device_offline` when the device is known and not online; nothing is ever queued for it (A3). */
 export async function deviceOnline(remote: RemoteThreadSurface, device: string): Promise<Failure | undefined> {
-  const devices = await remote.sessions.devices()
+  const listed = await listedDevices(remote.client, device)
+  return "kind" in listed ? listed : deviceRefusal(listed.devices, device)
+}
+
+/** The account's devices, or a typed host_unavailable naming `device` when this device's service cannot list them. */
+async function listedDevices(
+  client: RemoteClient,
+  device: string,
+): Promise<{ readonly devices: readonly RemoteDevice[] } | Failure> {
+  try {
+    return { devices: (await accountDevices(client)).devices }
+  } catch (error) {
+    return fail(
+      "host_unavailable",
+      "This device's device service could not list the account's devices.",
+      "Retry when the device service is reachable.",
+      { device, reason: error instanceof Error ? error.message : String(error) },
+    )
+  }
+}
+
+/** deviceOnline over a device list the caller already read: not_found for an unknown id, device_offline for an offline one. */
+function deviceRefusal(devices: readonly RemoteDevice[], device: string): Failure | undefined {
   const row = devices.find((candidate) => candidate.device === device)
   if (row === undefined)
     return fail(
       "not_found",
       `No device named ${device} is signed in to this account.`,
-      "Call thread_list with all_scope to see the account's devices and threads.",
+      "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to see the account's devices and threads.",
       { device },
     )
   if (!row.online)

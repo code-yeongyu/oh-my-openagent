@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs"
 import { delimiter, join } from "node:path"
 import { buildLabel, parseBuildInfo } from "./build-info"
-import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
+import { canonicalAgentDir, ensureAgentDir } from "./bin/lib/agent-dir.js"
 import { OMO_BRAND_LOGO } from "./bin/lib/brand-logo.generated.js"
 import { nearestNodeBin, readJson } from "./bin/lib/package-paths.js"
 
@@ -10,6 +10,7 @@ export function remapSenpiEnvironment(source: NodeJS.ProcessEnv = process.env, e
   delete env.OMO_BIN
   delete env.SENPI_BIN
   const agentDir = canonicalAgentDir(env)
+  ensureAgentDir(agentDir)
   env.OMO_CODING_AGENT_DIR = agentDir
   env.SENPI_CODING_AGENT_DIR = agentDir
   // The engine resolves its package dir from PACKAGE_DIR before falling back to
@@ -50,6 +51,8 @@ export function remapSenpiEnvironment(source: NodeJS.ProcessEnv = process.env, e
     envPrefix: "OMO",
     userAgent: "omo",
     originator: "omo",
+    // The plugin buildSenpiArgs prepends with --extension, so an attaching start never counts it as a user flag (#14465).
+    extensions: [join(execDir, "plugin")],
     changelog: {
       path: join(execDir, "plugin", "CHANGELOG.md"),
       ...(changelogVersion === undefined ? {} : { version: changelogVersion }),
