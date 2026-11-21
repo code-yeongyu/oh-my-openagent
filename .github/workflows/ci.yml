@@ -1045,6 +1045,17 @@ jobs:
           # Every launcher's SENPI_BRAND logo comes from this generated module; it must match the icon asset.
           bun run brand-logo:check
 
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Senpi committed bundle check (ubuntu-latest)
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Checks the committed Senpi extension bundle, installer, bundle-input map and brand logo against their sources.
+          JOB_SUMMARY_NEXT: Rebuild the stale artifact the first failing check names and commit it; `senpi-compatibility (ubuntu-latest)` reports this job's result.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
   senpi-eq:
     needs: [ci-mode]
     if: needs.ci-mode.outputs.run_heavy == 'true'
@@ -1093,6 +1104,17 @@ jobs:
           node packages/omo-senpi/scripts/qa/fused-equivalence-e2e.mjs --compare --placement fused --senpi-repo "$RUNNER_TEMP/senpi-eq" \
             --lsp-dir "$RUNNER_TEMP/eq-lsp/node_modules/.bin" --evidence-dir "$RUNNER_TEMP/eq-omo"
 
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: omo fused-path equivalence (EQ.omo E21-E24)
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds the Senpi plugin and the desktop engine, then runs E21-E24 through the real senpi CLI against the linux-x64 goldens.
+          JOB_SUMMARY_NEXT: Read the first case diff in the step log; `senpi-compatibility (ubuntu-latest)` reports this job's result.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
   senpi-tests-linux:
     name: senpi-tests-linux (${{ matrix.part }}/2)
     needs: [ci-mode]
@@ -1128,6 +1150,18 @@ jobs:
       - name: Run Senpi compatibility tests
         shell: bash
         run: bash .github/scripts/ci-senpi-posix.sh "${{ matrix.part }}"
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Senpi compatibility tests (ubuntu-latest, ${{ matrix.part }}/2)
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds the Senpi plugin and runs this part of `bun test packages/omo-senpi`, split by `--shard` on `.github/ci-test-timings.json`.
+            - Part 1 also packs the plugin, runs the LSP daemon round trip, `bun check` and the evidence-dir test.
+          JOB_SUMMARY_NEXT: Open the first failing test; `senpi-compatibility (ubuntu-latest)` reports this job's result.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   # The required senpi-compatibility (ubuntu-latest) context: passes only when the bundle check, EQ.omo and both
   # test parts passed, and fails closed when they did not run although the classifier asked for heavy validation.
