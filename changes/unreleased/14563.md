@@ -1,0 +1,3 @@
+### Fixed
+
+- A task child no longer fails at once when the task host ends the connection before answering (at connect or during `open_session`) while its socket still accepts, or refuses the open because it is draining. The start waits with the existing bounded backoff and retries; a cut during `open_session` reopens the same session path. When the start still fails, the message names the host socket and the step it stopped at, for example `The task host could not open the child session (host ~/.omo/agent/rpc/rpc.sock, step connect).` (fixes [#14538](https://github.com/code-yeongyu/oh-my-openagent/issues/14538))

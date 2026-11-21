@@ -12,6 +12,7 @@ import {
   type HostSessionOpenInput,
 } from "./session-transport"
 import { toOpenFailure } from "./session-wire"
+import type { HostOpenStep } from "../in-process/child-handle"
 
 interface SessionOpeningPorts {
   readonly socketPath: string
@@ -21,10 +22,13 @@ interface SessionOpeningPorts {
   readonly onDisconnect: (error: RpcTransportGoneError) => void
   readonly onEvent: (record: unknown) => void
   readonly bindClient: (client: HostRpcClient | undefined) => void
+  /** Told each step as the open enters it, so a failure can name the step it stopped at. */
+  readonly onStep?: (step: HostOpenStep) => void
 }
 
 /** Probe and open one child connection; preserve the host's refusal and profile contracts. */
 export async function openHostSessionConnection(input: HostSessionOpenInput, ports: SessionOpeningPorts) {
+  ports.onStep?.("probe")
   const probed = await ports.probeProtocolInfo(ports.socketPath)
   if (probed === undefined && (await ports.socketAccepts(ports.socketPath))) {
     throw new HostUnavailableError("host_busy", {
@@ -33,6 +37,7 @@ export async function openHostSessionConnection(input: HostSessionOpenInput, por
     })
   }
   const identity = assertHostUsable(probed, input.retryFallback)
+  ports.onStep?.("connect")
   const client = await ports.createClient({ socketPath: ports.socketPath, onDisconnect: ports.onDisconnect })
   client.onEvent(ports.onEvent)
   await client.start()
@@ -46,6 +51,7 @@ export async function openHostSessionConnection(input: HostSessionOpenInput, por
     })
   }
   const wire = toWireOpen(spawnedByHonored ? input : withoutSpawnedBy(input))
+  ports.onStep?.("open_session")
   const opened = await client.openSession(wire).catch(async (error: unknown) => {
     ports.bindClient(undefined)
     await client.stop()

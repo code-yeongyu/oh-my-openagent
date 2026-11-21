@@ -4,7 +4,8 @@ import { RunnerError } from "./in-process/runner-error"
 import type { FakeHost } from "./rpc-host/__fixtures__/fake-host"
 import { HostUnavailableError } from "./rpc-host/daemon"
 import { HostSessionClient } from "./rpc-host/session-client"
-import type { HostSessionOpenInput } from "./rpc-host/session-transport"
+import type { HostRpcClient, HostSessionOpenInput } from "./rpc-host/session-transport"
+import { describeStartFailure } from "../manager/start-failure"
 import { isHostSessionHandle, type HostSessionChannel } from "./rpc-host"
 import { childSpec, ensuredDaemon, fakeFallbackRunner, hostRunnerHarness, stubChannel } from "./rpc-host.test-support"
 
@@ -242,6 +243,131 @@ describe("RpcHostRunner busy host (omo#9067)", () => {
     expect(waits.reduce((sum, ms) => sum + ms, 0)).toBeLessThanOrEqual(60_000)
     expect(waits.length).toBeGreaterThan(3)
     expect(fallback.starts).toEqual([])
+  })
+})
+
+describe("RpcHostRunner transient open failures (omo#14538)", () => {
+  // A host whose loop stalls past its supervisor hop's auth budget destroys connections made meanwhile:
+  // the client sees the connection end before any coded answer, while the host socket still accepts.
+  const CUT = "the connection ended before the host answered"
+
+  function cutAt(step: "connect" | "open_session", host: FakeHost, socketPath: string, paths: string[] = []): HostSessionClient {
+    const cut = {
+      start: () => (step === "connect" ? Promise.reject(new Error(CUT)) : Promise.resolve()),
+      stop: () => Promise.resolve(),
+      onEvent: () => () => undefined,
+      openSession: (wire: { sessionPath?: string }) => {
+        if (wire.sessionPath !== undefined) paths.push(wire.sessionPath)
+        return Promise.reject(new Error(CUT))
+      },
+    } as unknown as HostRpcClient
+    const client = new HostSessionClient({
+      socketPath,
+      ports: {
+        probeProtocolInfo: () => host.probeProtocolInfo(),
+        createClient: () => Promise.resolve(cut),
+      },
+    })
+    opened.push(client)
+    return client
+  }
+
+  test("#given the host drops the connection at connect while its socket still accepts #when a child starts #then the runner waits and starts it on the same host", async () => {
+    // given
+    const host = await fakeHost()
+    const waits: number[] = []
+    let clients = 0
+    const runner = runnerOver(host, {
+      createClient: (socketPath) => {
+        clients += 1
+        return clients === 1 ? cutAt("connect", host, socketPath) : realClient(host)
+      },
+      sleep: (ms) => {
+        waits.push(ms)
+        return Promise.resolve()
+      },
+    })
+
+    // when
+    const handle = await runner.start(childSpec())
+
+    // then
+    expect(clients).toBe(2)
+    expect(waits).toEqual([1_000])
+    expect(host.sessions()).toHaveLength(1)
+    await handle.terminate()
+  })
+
+  test("#given the host drops the connection during open_session #when the start retries #then it reopens the SAME session path and the host holds one session", async () => {
+    // given
+    const host = await fakeHost()
+    const cutPaths: string[] = []
+    let clients = 0
+    const runner = runnerOver(host, {
+      createClient: (socketPath) => {
+        clients += 1
+        return clients === 1 ? cutAt("open_session", host, socketPath, cutPaths) : realClient(host)
+      },
+      sleep: () => Promise.resolve(),
+    })
+
+    // when
+    const handle = await runner.start(childSpec())
+
+    // then
+    expect(cutPaths).toHaveLength(1)
+    expect(host.sessions()).toHaveLength(1)
+    expect(host.sessions()[0]?.sessionPath).toBe(cutPaths[0])
+    await handle.terminate()
+  })
+
+  test("#given a draining host refuses the open once #when a child starts #then the runner waits and opens it", async () => {
+    // given
+    const host = await fakeHost()
+    let clients = 0
+    const runner = runnerOver(host, {
+      createClient: () => {
+        clients += 1
+        host.failOpen(clients === 1 ? { code: "host_draining" } : undefined)
+        return realClient(host)
+      },
+      sleep: () => Promise.resolve(),
+    })
+
+    // when
+    const handle = await runner.start(childSpec())
+
+    // then
+    expect(clients).toBe(2)
+    expect(host.sessions()).toHaveLength(1)
+    await handle.terminate()
+  })
+
+  test("#given the connection is dropped and the host socket refuses #when a child starts #then it fails at once and names the host and the failed step", async () => {
+    // given
+    const host = await fakeHost()
+    const deadSocket = "/tmp/omo-14538-dead.sock"
+    const waits: number[] = []
+    const runner = runnerOver(host, {
+      createClient: () => cutAt("connect", host, deadSocket),
+      sleep: (ms) => {
+        waits.push(ms)
+        return Promise.resolve()
+      },
+    })
+
+    // when
+    const failure = await runner.start(childSpec()).catch((error: unknown) => error)
+
+    // then
+    expect(waits).toEqual([])
+    expect(RunnerError.is(failure) ? failure.failure.kind : undefined).toBe("session_unavailable")
+    const described = describeStartFailure(failure)
+    expect(described.errorMessage).toBe(
+      `The task host could not open the child session (host ${deadSocket}, step connect).`,
+    )
+    expect(described.eventFacts).toMatchObject({ open_step: "connect", host_socket: deadSocket })
+    expect(described.errorMessage).not.toContain(CUT)
   })
 })
 

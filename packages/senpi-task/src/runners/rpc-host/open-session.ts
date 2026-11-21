@@ -5,6 +5,7 @@ import { splitModelDecorators } from "../../senpi/explicit-pin"
 import type { HostSessionLiveness } from "./handle-port"
 import { SESSION_START_FAILURE_REASONS, isTaskStartFailureReason, type TaskStartFailureReason } from "../../state"
 import { RunnerError } from "../in-process/runner-error"
+import type { HostOpenStep } from "../in-process/child-handle"
 import { rpcChildAncestry } from "../child-ancestry"
 import { differsOnlyByPriorityAlias, reportedEffectiveModel, startedOnPinnedModel } from "../pinned-model-equivalence"
 import type { RpcRunnerSpec } from "../types"
@@ -22,6 +23,8 @@ export async function openTaskHostSession(input: {
     getState?(): Promise<HostSessionLiveness>
     getAvailableModels?(): Promise<readonly unknown[]>
     close?(): Promise<unknown>
+    readonly socketPath?: string
+    readonly openStep?: HostOpenStep
   }
   readonly spec: RpcRunnerSpec
   readonly sessionPath: string
@@ -50,6 +53,8 @@ export async function openTaskHostSession(input: {
       kind: "session_unavailable",
       message: error instanceof Error ? error.message : String(error),
       ...(reason === undefined ? {} : { reason }),
+      ...(input.client.openStep === undefined ? {} : { open_step: input.client.openStep }),
+      ...(input.client.socketPath === undefined ? {} : { host_socket: input.client.socketPath }),
       cause: error,
     })
   }
