@@ -673,15 +673,18 @@ describe("omo account on Linux, where a locked Secret Service read looks empty (
     expect(await loginShowLogout(linuxStore("absent", memorySecretApi()))).toEqual(signedInThenOut("file"))
   })
 
-  stateFileTest("adopt with no Secret Service answers ok and says the sign-in is kept in the file (#7185b)", async () => {
-    const result = await run(linuxStore("absent", memorySecretApi()), ["adopt"], {
-      stdin: JSON.stringify(credential("dev_s", 60_000)),
-    })
-    expect({ code: result.code, out: result.out }).toEqual({
-      code: ACCOUNT_EXIT.ok,
-      out: [{ adopted: true, device: { id: "dev_s", name: "device dev_s" }, storage: "file" }],
-    })
-  })
+  stateFileTest(
+    "adopt with no Secret Service answers ok and says the sign-in is kept in the file (#7185b)",
+    async () => {
+      const result = await run(linuxStore("absent", memorySecretApi()), ["adopt"], {
+        stdin: JSON.stringify(credential("dev_s", 60_000)),
+      })
+      expect({ code: result.code, out: result.out }).toEqual({
+        code: ACCOUNT_EXIT.ok,
+        out: [{ adopted: true, device: { id: "dev_s", name: "device dev_s" }, storage: "file" }],
+      })
+    },
+  )
 
   test("login and logout on Linux with no gdbus on PATH still succeed through the real probe", async () => {
     const path = process.env.PATH

@@ -146,23 +146,26 @@ describe("Linux with no Secret Service keeps the shared sign-in in a private sta
       },
     })
 
-  stateFileTest("#given no Secret Service on the bus #then the sign-in round-trips through a 0600 file and libsecret is never called", async () => {
-    const home = await temporaryHome()
-    const secrets = watched()
-    const notices: string[] = []
-    const store = linuxStore(home, secrets.api, "absent", notices)
-    await store.write(record)
-    expect(await store.read()).toMatchObject(record)
-    expect(await store.readAuthoritative()).toMatchObject(record)
-    expect(store.storage?.()).toBe("file")
-    expect((await stat(stateFile(home))).mode & 0o777).toBe(0o600)
-    expect(secrets.calls).toEqual([])
-    expect(notices).toHaveLength(1)
-    expect(notices.join("\n")).not.toContain(grant.refreshToken)
-    await store.clear()
-    expect(await missing(stateFile(home))).toBe(true)
-    expect(await store.read()).toBeNull()
-  })
+  stateFileTest(
+    "#given no Secret Service on the bus #then the sign-in round-trips through a 0600 file and libsecret is never called",
+    async () => {
+      const home = await temporaryHome()
+      const secrets = watched()
+      const notices: string[] = []
+      const store = linuxStore(home, secrets.api, "absent", notices)
+      await store.write(record)
+      expect(await store.read()).toMatchObject(record)
+      expect(await store.readAuthoritative()).toMatchObject(record)
+      expect(store.storage?.()).toBe("file")
+      expect((await stat(stateFile(home))).mode & 0o777).toBe(0o600)
+      expect(secrets.calls).toEqual([])
+      expect(notices).toHaveLength(1)
+      expect(notices.join("\n")).not.toContain(grant.refreshToken)
+      await store.clear()
+      expect(await missing(stateFile(home))).toBe(true)
+      expect(await store.read()).toBeNull()
+    },
+  )
 
   stateFileTest("#given no Bun.secrets on Linux #then the state file is the store", async () => {
     const home = await temporaryHome()
@@ -212,17 +215,20 @@ describe("Linux with no Secret Service keeps the shared sign-in in a private sta
     expect(await missing(join(home, ".omo", "account-state"))).toBe(true)
   })
 
-  stateFileTest("#given a state file and now an unlocked keyring #then the sign-in moves to libsecret, is read back, then the file goes", async () => {
-    const home = await temporaryHome()
-    await linuxStore(home, null, "absent").write(record)
-    const written = await readFile(stateFile(home), "utf8")
-    const memory = memorySecrets()
-    const store = linuxStore(home, memory.api, "unlocked")
-    expect(await store.read()).toMatchObject(record)
-    expect(store.storage?.()).toBe("keyring")
-    expect([...memory.values.values()]).toEqual([written])
-    expect(await missing(stateFile(home))).toBe(true)
-  })
+  stateFileTest(
+    "#given a state file and now an unlocked keyring #then the sign-in moves to libsecret, is read back, then the file goes",
+    async () => {
+      const home = await temporaryHome()
+      await linuxStore(home, null, "absent").write(record)
+      const written = await readFile(stateFile(home), "utf8")
+      const memory = memorySecrets()
+      const store = linuxStore(home, memory.api, "unlocked")
+      expect(await store.read()).toMatchObject(record)
+      expect(store.storage?.()).toBe("keyring")
+      expect([...memory.values.values()]).toEqual([written])
+      expect(await missing(stateFile(home))).toBe(true)
+    },
+  )
 
   stateFileTest("#given a state file and a keyring write that fails #then the file is kept", async () => {
     const home = await temporaryHome()
@@ -255,21 +261,24 @@ describe("Linux with no Secret Service keeps the shared sign-in in a private sta
     expect(await readFile(stateFile(home), "utf8")).toBe(written)
   })
 
-  stateFileTest("#given a probe that cannot answer #then an existing state file stays in use, and with none libsecret is used", async () => {
-    const home = await temporaryHome()
-    await linuxStore(home, null, "absent").write(record)
-    const secrets = watched()
-    const kept = linuxStore(home, secrets.api, "unknown")
-    expect(await kept.read()).toMatchObject(record)
-    expect(kept.storage?.()).toBe("file")
-    expect(secrets.calls).toEqual([])
-    await kept.clear()
-    const fresh = linuxStore(home, secrets.api, "unknown")
-    await fresh.write(record)
-    expect(fresh.storage?.()).toBe("keyring")
-    expect(secrets.calls).toContain("set")
-    expect(await missing(stateFile(home))).toBe(true)
-  })
+  stateFileTest(
+    "#given a probe that cannot answer #then an existing state file stays in use, and with none libsecret is used",
+    async () => {
+      const home = await temporaryHome()
+      await linuxStore(home, null, "absent").write(record)
+      const secrets = watched()
+      const kept = linuxStore(home, secrets.api, "unknown")
+      expect(await kept.read()).toMatchObject(record)
+      expect(kept.storage?.()).toBe("file")
+      expect(secrets.calls).toEqual([])
+      await kept.clear()
+      const fresh = linuxStore(home, secrets.api, "unknown")
+      await fresh.write(record)
+      expect(fresh.storage?.()).toBe("keyring")
+      expect(secrets.calls).toContain("set")
+      expect(await missing(stateFile(home))).toBe(true)
+    },
+  )
 
   stateFileTest("#when forgotten with both a state file and a keyring item #then both are removed", async () => {
     const home = await temporaryHome()
@@ -293,67 +302,76 @@ describe("Linux with no Secret Service keeps the shared sign-in in a private sta
   const keyringValue = (memory: ReturnType<typeof memorySecrets>) =>
     JSON.parse([...memory.values.values()][0] ?? "null")
 
-  stateFileTest("#given the keyring holds sign-in A and the file holds B #when the keyring answers #then A stays, the file is kept, one line says so", async () => {
-    const home = await temporaryHome()
-    await linuxStore(home, null, "absent").write(otherRecord)
-    const written = await readFile(stateFile(home), "utf8")
-    const memory = memorySecrets()
-    await linuxStore(await temporaryHome(), memory.api, "unlocked").write(record)
-    const notices: string[] = []
-    const store = linuxStore(home, memory.api, "unlocked", notices)
-    expect(await store.read()).toMatchObject(record)
-    expect(await store.read()).toMatchObject(record)
-    expect(store.storage?.()).toBe("keyring")
-    expect(keyringValue(memory)).toMatchObject({ device: record.device })
-    expect(await readFile(stateFile(home), "utf8")).toBe(written)
-    expect(notices).toHaveLength(1)
-    expect(notices.join("\n")).not.toContain(otherRecord.refreshToken)
-  })
-
-  stateFileTest("#given the same sign-in in both #then only a file at least as fresh as the keyring moves over it", async () => {
-    for (const [keyringExpiry, moves] of [
-      ["2098-01-01T00:00:00.000Z", true],
-      ["2099-01-01T00:00:00.000Z", true],
-      ["2100-01-01T00:00:00.000Z", false],
-    ] as const) {
+  stateFileTest(
+    "#given the keyring holds sign-in A and the file holds B #when the keyring answers #then A stays, the file is kept, one line says so",
+    async () => {
       const home = await temporaryHome()
-      await linuxStore(home, null, "absent").write(record)
+      await linuxStore(home, null, "absent").write(otherRecord)
       const written = await readFile(stateFile(home), "utf8")
       const memory = memorySecrets()
-      const inKeyring = JSON.stringify({
-        ...JSON.parse(written),
-        accessTokenExpiresAt: keyringExpiry,
-        accessToken: "older",
-      })
-      await memory.api.set({ service: "omo-cli", name: credentialId(api), value: inKeyring })
-      await linuxStore(home, memory.api, "unlocked").read()
-      expect({
-        keyringExpiry,
-        keyring: [...memory.values.values()][0],
-        fileKept: !(await missing(stateFile(home))),
-      }).toEqual({
-        keyringExpiry,
-        keyring: moves ? written : inKeyring,
-        fileKept: !moves,
-      })
-    }
-  })
+      await linuxStore(await temporaryHome(), memory.api, "unlocked").write(record)
+      const notices: string[] = []
+      const store = linuxStore(home, memory.api, "unlocked", notices)
+      expect(await store.read()).toMatchObject(record)
+      expect(await store.read()).toMatchObject(record)
+      expect(store.storage?.()).toBe("keyring")
+      expect(keyringValue(memory)).toMatchObject({ device: record.device })
+      expect(await readFile(stateFile(home), "utf8")).toBe(written)
+      expect(notices).toHaveLength(1)
+      expect(notices.join("\n")).not.toContain(otherRecord.refreshToken)
+    },
+  )
 
-  stateFileTest("#given the keyring holds A and the file holds B #when signed out #then only the sign-in in use goes", async () => {
-    const home = await temporaryHome()
-    await linuxStore(home, null, "absent").write(otherRecord)
-    const memory = memorySecrets()
-    await linuxStore(await temporaryHome(), memory.api, "unlocked").write(record)
-    await linuxStore(home, memory.api, "unlocked").clear()
-    expect(memory.values.size).toBe(0)
-    expect(await missing(stateFile(home))).toBe(false)
+  stateFileTest(
+    "#given the same sign-in in both #then only a file at least as fresh as the keyring moves over it",
+    async () => {
+      for (const [keyringExpiry, moves] of [
+        ["2098-01-01T00:00:00.000Z", true],
+        ["2099-01-01T00:00:00.000Z", true],
+        ["2100-01-01T00:00:00.000Z", false],
+      ] as const) {
+        const home = await temporaryHome()
+        await linuxStore(home, null, "absent").write(record)
+        const written = await readFile(stateFile(home), "utf8")
+        const memory = memorySecrets()
+        const inKeyring = JSON.stringify({
+          ...JSON.parse(written),
+          accessTokenExpiresAt: keyringExpiry,
+          accessToken: "older",
+        })
+        await memory.api.set({ service: "omo-cli", name: credentialId(api), value: inKeyring })
+        await linuxStore(home, memory.api, "unlocked").read()
+        expect({
+          keyringExpiry,
+          keyring: [...memory.values.values()][0],
+          fileKept: !(await missing(stateFile(home))),
+        }).toEqual({
+          keyringExpiry,
+          keyring: moves ? written : inKeyring,
+          fileKept: !moves,
+        })
+      }
+    },
+  )
 
-    const unanswered = await temporaryHome()
-    await linuxStore(unanswered, null, "absent").write(otherRecord)
-    const kept = memorySecrets()
-    await linuxStore(await temporaryHome(), kept.api, "unlocked").write(record)
-    await linuxStore(unanswered, kept.api, "unknown").clear()
-    expect(await missing(stateFile(unanswered))).toBe(true)
-    expect(keyringValue(kept)).toMatchObject({ device: record.device })
-  })
+  stateFileTest(
+    "#given the keyring holds A and the file holds B #when signed out #then only the sign-in in use goes",
+    async () => {
+      const home = await temporaryHome()
+      await linuxStore(home, null, "absent").write(otherRecord)
+      const memory = memorySecrets()
+      await linuxStore(await temporaryHome(), memory.api, "unlocked").write(record)
+      await linuxStore(home, memory.api, "unlocked").clear()
+      expect(memory.values.size).toBe(0)
+      expect(await missing(stateFile(home))).toBe(false)
+
+      const unanswered = await temporaryHome()
+      await linuxStore(unanswered, null, "absent").write(otherRecord)
+      const kept = memorySecrets()
+      await linuxStore(await temporaryHome(), kept.api, "unlocked").write(record)
+      await linuxStore(unanswered, kept.api, "unknown").clear()
+      expect(await missing(stateFile(unanswered))).toBe(true)
+      expect(keyringValue(kept)).toMatchObject({ device: record.device })
+    },
+  )
 })
