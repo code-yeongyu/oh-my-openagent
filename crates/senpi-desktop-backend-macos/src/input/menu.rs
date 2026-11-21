@@ -205,9 +205,7 @@ impl MacInput {
         check_stop: &dyn Fn() -> CoreResult<()>,
     ) -> CoreResult<Option<()>> {
         let (pid, _) = window_identity(window)?;
-        let Some(press) = hold.menu_press() else {
-            return Ok(None);
-        };
+        let press = hold.menu_press();
         let background = front_app::current_front_pid() != Some(pid);
         if menu_watch(&press, background, false, || on_menu_control(&press, pid)).is_none() {
             return Ok(None);

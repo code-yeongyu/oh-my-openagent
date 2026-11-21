@@ -18,7 +18,7 @@ fn hold(frame_id: &str, x: f64, y: f64, button: &str, keys: &[&str]) -> Op {
         target: "101".to_owned(),
         x,
         y,
-        duration: 0.01,
+        duration: 0.0,
         button: Some(button.to_owned()),
         keys: Some(keys.iter().map(|key| (*key).to_owned()).collect()),
         frame_id: Some(frame_id.to_owned()),
@@ -48,67 +48,106 @@ fn held_buttons(harness: &Harness) -> usize {
 }
 
 #[test]
-fn a_background_hold_that_would_open_a_menu_is_one_press_that_lists_and_closes_it() {
-    // Pixel (300, 300) is over the window body (a context menu); pixel
-    // (20, 50) is global (120, 170): inside the Kind popup button.
-    let kinds: [(&str, f64, f64, &str, &[&str], MouseButton, Modifiers); 3] = [
+fn background_hold_menu_routing_covers_buttons_modifiers_and_extra_keys() {
+    let modifiers: [(&str, &[&str], Modifiers); 4] = [
+        ("none", &[], Modifiers::default()),
         (
-            "right hold",
-            300.0,
-            300.0,
-            "right",
-            &[],
-            MouseButton::Right,
-            Modifiers::default(),
-        ),
-        (
-            "ctrl-left hold",
-            300.0,
-            300.0,
-            "left",
+            "ctrl",
             &["ctrl"],
-            MouseButton::Left,
             Modifiers {
                 ctrl: true,
                 ..Modifiers::default()
             },
         ),
         (
-            "left hold on a popup button",
-            20.0,
-            50.0,
-            "left",
-            &[],
-            MouseButton::Left,
-            Modifiers::default(),
+            "cmd",
+            &["cmd"],
+            Modifiers {
+                meta: true,
+                ..Modifiers::default()
+            },
+        ),
+        (
+            "shift",
+            &["shift"],
+            Modifiers {
+                shift: true,
+                ..Modifiers::default()
+            },
         ),
     ];
-    for (kind, x, y, button, keys, expected_button, expected_modifiers) in kinds {
-        let mut harness = harness(&fixture(false));
-        let frame = harness.capture("101");
-        assert_eq!(
-            harness.process(hold(&frame, x, y, button, keys)),
-            Ok(Response::Unit),
-            "{kind}"
-        );
-        assert_eq!(
-            menu_ops(&harness),
-            [SinkOp::MenuClosed {
-                window: "101".to_owned()
-            }],
-            "{kind}"
-        );
-        assert_eq!(held_buttons(&harness), 0, "{kind}: nothing stays held");
-        let pressed = pointer_ops(&harness);
-        assert!(
-            matches!(
-                pressed.as_slice(),
-                [RecordedPointer::Click { count: 1, button, modifiers, .. }]
-                    if *button == expected_button && *modifiers == expected_modifiers
-            ),
-            "{kind}: one press with the hold's button and modifiers, got {pressed:?}"
-        );
+    let extra_keys: [(&str, &[&str]); 3] = [
+        ("no key", &[]),
+        ("ordinary key", &["space"]),
+        ("modifier-only key", &["alt"]),
+    ];
+    let mut failures = Vec::new();
+    for (button_name, button) in [("left", MouseButton::Left), ("right", MouseButton::Right)] {
+        for (modifier_name, base_keys, base_modifiers) in modifiers {
+            for (extra_name, extra) in extra_keys {
+                let keys: Vec<_> = base_keys.iter().chain(extra).copied().collect();
+                let expected_modifiers = Modifiers {
+                    alt: !extra.is_empty() && extra[0] == "alt",
+                    ..base_modifiers
+                };
+                // Context menus depend on button/Control, never on extra keys.
+                let expects_menu = button == MouseButton::Right || base_modifiers.ctrl;
+                let kind = format!("{button_name} / {modifier_name} / {extra_name}");
+                let mut harness = harness(&fixture(false));
+                let frame = harness.capture("101");
+                assert_eq!(
+                    harness.process(hold(&frame, 300.0, 300.0, button_name, &keys)),
+                    Ok(Response::Unit),
+                    "{kind}"
+                );
+                let closed = menu_ops(&harness);
+                let pressed = pointer_ops(&harness);
+                let held_keys = harness
+                    .sink
+                    .ops()
+                    .iter()
+                    .filter(|op| matches!(op, SinkOp::HeldKey { .. }))
+                    .count();
+                let correct = if expects_menu {
+                    closed
+                        == [SinkOp::MenuClosed {
+                            window: "101".to_owned(),
+                        }]
+                        && held_buttons(&harness) == 0
+                        && held_keys == 0
+                        && matches!(pressed.as_slice(), [RecordedPointer::Click { count: 1, button: actual, modifiers, .. }]
+                            if *actual == button && *modifiers == expected_modifiers)
+                } else {
+                    closed.is_empty()
+                        && pressed.is_empty()
+                        && held_buttons(&harness) == 2
+                        && held_keys == keys.len() * 2
+                };
+                if !correct {
+                    failures.push(format!("{kind}: expected {}, closed={closed:?}, pressed={pressed:?}, held_buttons={}, held_keys={held_keys}",
+                        if expects_menu { "one menu press and close" } else { "ordinary hold" }, held_buttons(&harness)));
+                }
+            }
+        }
     }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+#[test]
+fn a_popup_button_hold_with_an_ordinary_key_still_closes_its_menu() {
+    let mut harness = harness(&fixture(false));
+    let frame = harness.capture("101");
+    assert_eq!(
+        harness.process(hold(&frame, 20.0, 50.0, "left", &["space"])),
+        Ok(Response::Unit)
+    );
+    assert_eq!(
+        menu_ops(&harness),
+        [SinkOp::MenuClosed {
+            window: "101".to_owned()
+        }]
+    );
+    assert_eq!(held_buttons(&harness), 0);
 }
 
 #[test]

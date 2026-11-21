@@ -16,10 +16,10 @@ pub struct MouseHold<'a> {
 
 impl MouseHold<'_> {
     /// The one press this hold opens a menu with, when it would (D1): its
-    /// button with its modifier keys down. `None` when a held key is not a
-    /// modifier, since such a hold types while the button is down.
+    /// button with its modifier keys down. Ordinary keys do not prevent the
+    /// press from opening a menu; a menu-opening hold collapses to this press.
     #[must_use]
-    pub fn menu_press(&self) -> Option<PointerEvent> {
+    pub fn menu_press(&self) -> PointerEvent {
         let mut modifiers = Modifiers::default();
         for &key in self.keys {
             match key {
@@ -27,16 +27,16 @@ impl MouseHold<'_> {
                 KeyName::Alt => modifiers.alt = true,
                 KeyName::Shift => modifiers.shift = true,
                 KeyName::Meta => modifiers.meta = true,
-                _ => return None,
+                _ => {}
             }
         }
-        Some(PointerEvent::Click {
+        PointerEvent::Click {
             x: self.x,
             y: self.y,
             button: self.button,
             count: 1,
             modifiers,
-        })
+        }
     }
 }
 
@@ -159,7 +159,7 @@ mod menu_press_tests {
             button,
             keys,
         };
-        match hold.menu_press()? {
+        match hold.menu_press() {
             PointerEvent::Click {
                 x,
                 y,
@@ -174,7 +174,7 @@ mod menu_press_tests {
     }
 
     #[test]
-    fn a_hold_becomes_the_press_that_opens_its_menu_unless_a_held_key_types() {
+    fn a_hold_becomes_the_press_that_opens_its_menu_even_with_ordinary_keys() {
         let plain = Modifiers::default();
         let ctrl = Modifiers {
             ctrl: true,
@@ -203,7 +203,16 @@ mod menu_press_tests {
         );
         assert_eq!(
             press(MouseButton::Left, &[KeyName::Shift, KeyName::Space]),
-            None
+            Some((
+                3.0,
+                4.0,
+                MouseButton::Left,
+                1,
+                Modifiers {
+                    shift: true,
+                    ..Modifiers::default()
+                }
+            ))
         );
     }
 }
