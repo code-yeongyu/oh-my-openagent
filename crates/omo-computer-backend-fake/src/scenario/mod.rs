@@ -17,8 +17,8 @@ use serde::Deserialize;
 use serde_json::Value;
 
 pub use additions::{
-    AxNotification, BusyMark, ClipboardScript, FrameAxis, FramePolicy, HandIdentity, SecureFocus,
-    TargetExit,
+    AxNotification, BusyMark, ClipboardScript, FrameAxis, FramePolicy, HandIdentity,
+    NotificationPost, SecureFocus, StopPress, TargetExit,
 };
 pub use events::{DisplaysChange, EpochEvent, EpochReason, IdentityChange};
 pub use invalid::{field_names, InvalidKind, ScenarioInvalid};
@@ -73,6 +73,10 @@ pub struct FakeScenario {
     pub ax_notification_timeline: Vec<AxNotification>,
     /// Loading indicators by fake-clock time.
     pub busy_timeline: Vec<BusyMark>,
+    /// Stop-chord presses by fake-clock time.
+    pub stop_timeline: Vec<StopPress>,
+    /// Notifications by fake-clock time; absent scripts a host with no notification surface.
+    pub notification_timeline: Option<Vec<NotificationPost>>,
     pub secure_focus: Option<SecureFocus>,
     pub secure_input_on: bool,
     pub clipboard: Option<ClipboardScript>,
@@ -93,6 +97,8 @@ pub struct FakeScenario {
     pub code_identity: BTreeMap<u32, CodeIdentity>,
     /// The hand identity the fleet harness reads.
     pub hand: Option<HandIdentity>,
+    // --- Row 21: the fake host's consent view handed to the engine at `session.open`. ---
+    pub consent: Option<serde_json::Value>,
 }
 
 impl FakeScenario {
