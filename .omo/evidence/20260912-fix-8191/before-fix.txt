@@ -1,0 +1,42 @@
+# bun run driver.ts on origin/dev (unpatched)
+
+--- ~/.omo/omo.jsonc before ---
+{
+  "categories": {
+    "quick": {
+      "models": [
+        "primary/model",
+        "second/model"
+      ],
+      "fallback_models": [
+        "legacy/fallback"
+      ]
+    }
+  }
+}
+--- oh-my-openagent config migrate ---
+status: migrated
+target: /private/var/folders/7_/jgfykr3d5b12qrh10lvz_l000000gn/T/omo-e2e-LVO6Dx/.omo/omo.jsonc
+transform: {
+  "categories": {
+    "quick": {
+      "models": [
+        "legacy/fallback"
+      ]
+    }
+  }
+}
+--- exit code 0 ---
+--- ~/.omo/omo.jsonc after ---
+{
+  "categories": {
+    "quick": {
+      "models": [
+        "legacy/fallback"
+      ]
+    }
+  },
+  "_migrations": [
+    "2026-08-reasoning-unification"
+  ]
+}
