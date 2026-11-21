@@ -64,7 +64,9 @@ export async function withRpcSocket<T>(
     timer = undefined
   }
   let rejectConnect: (error: Error) => void = () => undefined
+  const transportErrors = new WeakSet<Error>()
   const fail = (error: Error) => {
+    transportErrors.add(error)
     if (failure === undefined) options.listen?.closed(error)
     failure = error
     clear()
@@ -130,14 +132,15 @@ export async function withRpcSocket<T>(
       arm(options.timeoutMs)
       socket.once("connect", () => {
         clear()
-        diagnostic?.at("handshake")
+        diagnostic?.at(options.secret === undefined ? "connected" : "handshake")
         if (options.secret !== undefined) socket.write(Buffer.from(options.secret))
         resolve()
       })
     })
     return await operation(request)
   } catch (error) {
-    diagnostic?.failed(error)
+    // Only failures this socket recorded (connect, close, timeout) are transport failures; the operation's own throws are not.
+    if (error instanceof Error && transportErrors.has(error)) diagnostic?.failed(error)
     throw error
   } finally {
     clear()

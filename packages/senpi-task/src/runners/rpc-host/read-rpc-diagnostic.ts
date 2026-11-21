@@ -1,7 +1,7 @@
 const readCommands = new Set(["list_sessions", "get_protocol_info", "get_messages", "get_entries"])
 const socketCodes = new Set(["EPIPE", "ECONNRESET", "ECONNREFUSED", "ENOENT", "ETIMEDOUT"])
 
-type Phase = "connect" | "handshake" | "request" | "response-bytes" | "response-frame"
+type Phase = "connect" | "connected" | "handshake" | "request" | "response-bytes" | "response-frame"
 
 /** Never accept the endpoint, frame, auth bytes, or raw error message as output fields. */
 export function readRpcDiagnostic(command: unknown) {
