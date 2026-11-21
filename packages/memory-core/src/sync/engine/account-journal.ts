@@ -17,7 +17,7 @@ import { syncJournalDirectory } from "../../journal/fsync"
 import { readJson, removeAtomic, writeJson } from "./atomic"
 import type { EngineDeps } from "./engine-deps"
 import type { SyncJournal } from "./journal"
-import { clearUndecided, ownedFileCount, takeDecision, writeUndecided } from "./ownership-decision"
+import { clearUndecided, ownedFileCount, takeDecision, writeUndecided } from "./ownership-apply"
 import { itemPathsOnDisk } from "./working-tree"
 
 interface SwitchMarker {

@@ -3,12 +3,12 @@
 // many memory files a "use" would upload; the person answers outside the engine (the CLI, the desktop) with a
 // decision for that same account, and the engine applies it at its next cycle. "use" uploads memory across an
 // account boundary, so it carries the file count the person was shown and is applied only while that count still
-// holds; "set_aside" moves nothing off the device. A decision naming another account is never applied.
+// holds; "set_aside" moves nothing off the device. A decision naming another account is never applied. This module is
+// only the notice and decision files (the CLI reads it); applying a decision lives in ownership-apply.ts.
 
 import { join } from "node:path"
 
-import { readJson, removeAtomic, writeJson } from "./atomic"
-import { itemPathsOnDisk } from "./working-tree"
+import { readJson, writeJson } from "./atomic"
 
 export const UNDECIDED_FILE = "omo-sync-undecided.json"
 export const DECISION_FILE = "omo-sync-ownership.json"
@@ -33,17 +33,8 @@ export type DecideResult =
   | { readonly kind: "other_account"; readonly account: string }
   | { readonly kind: "changed"; readonly files: number }
 
-export async function ownedFileCount(root: string): Promise<number> {
-  return [...(await itemPathsOnDisk(root)).byKey.values()].filter((path) => path !== null).length
-}
-
 export function readUndecided(gitDir: string): Promise<UndecidedNotice | null> {
   return readJson<UndecidedNotice | null>(join(gitDir, UNDECIDED_FILE), null)
-}
-
-export async function writeUndecided(gitDir: string, root: string, account: string, now: number): Promise<void> {
-  const notice: UndecidedNotice = { account, files: await ownedFileCount(root), at: now }
-  await writeJson(join(gitDir, UNDECIDED_FILE), notice)
 }
 
 /**
@@ -63,21 +54,4 @@ export async function decideOwnership(
   const record: OwnershipDecision = { account, decision, files: confirmedFiles }
   await writeJson(join(gitDir, DECISION_FILE), record)
   return { kind: "recorded" }
-}
-
-/**
- * The decision the engine may apply now for `account`, consumed: a decision naming another account is dropped, and a
- * "use" whose confirmed count no longer matches the files on disk is dropped (the person must see the new count).
- */
-export async function takeDecision(gitDir: string, root: string, account: string): Promise<OwnershipChoice | null> {
-  const record = await readJson<OwnershipDecision | null>(join(gitDir, DECISION_FILE), null)
-  if (record === null) return null
-  await removeAtomic(join(gitDir, DECISION_FILE))
-  if (record.account !== account) return null
-  if (record.decision === "use" && record.files !== (await ownedFileCount(root))) return null
-  return record.decision
-}
-
-export function clearUndecided(gitDir: string): Promise<void> {
-  return removeAtomic(join(gitDir, UNDECIDED_FILE))
 }
