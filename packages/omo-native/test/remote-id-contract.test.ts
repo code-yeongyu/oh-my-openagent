@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test"
-import { existsSync, watch } from "node:fs"
-import { basename, dirname } from "node:path"
-import { connectDeviceService } from "../../device-service-core/src/index.ts"
+import { existsSync } from "node:fs"
+import { dirname } from "node:path"
+import { awaitWithinTestBudget } from "../../../test-support/test-deadline"
+import { connectDeviceService, type DeviceService } from "../../device-service-core/src/index.ts"
 import { startFakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
 import {
   defaultWorld,
@@ -77,6 +78,29 @@ async function owner(duplicate: false | "other" | "self" = false) {
   return fake
 }
 
+// The CLI closes the attach endpoint in a continuation it chains on the service's `closed` and keeps no handle to
+// (remote-cli.ts). The service the test hands it records every continuation chained there, so the test awaits the
+// endpoint's own server.close and removal instead of watching the filesystem against a clock (#14528).
+function observeClosed(service: DeviceService) {
+  const continuations: Promise<unknown>[] = []
+  const closed = service.closed.then(() => {})
+  const then = closed.then.bind(closed)
+  Object.defineProperty(closed, "then", {
+    value: (...args: Parameters<typeof then>) => {
+      const continuation = then(...args)
+      continuations.push(continuation)
+      return continuation
+    },
+  })
+  return {
+    service: { ...service, closed },
+    settled: async () => {
+      await closed
+      await Promise.all(continuations)
+    },
+  }
+}
+
 describe("#13010 remote CLI session identity", () => {
   // #13409: the model rides on the one open_session (the engine's launch profile), so no later model step can miss the
   // session whose durable id differs from its attach key.
@@ -145,11 +169,12 @@ describe("#13010 remote CLI session identity", () => {
     const fake = await owner()
     for (const target of [DURABLE, `${PEER}/${DURABLE}`, `${PEER}/${SESSION_ID}`]) {
       const service = await connectDeviceService({ version: "5.1.72", stateDir: fake.stateDir })
+      const observed = observeClosed(service)
       const prepared = await prepareRemoteAttach(
         {
           accountShow: async () => SIGNED_IN,
           stateDir: fake.stateDir,
-          connect: async () => service,
+          connect: async () => observed.service,
           now: () => 0,
           output: () => {},
           write: () => {},
@@ -165,20 +190,11 @@ describe("#13010 remote CLI session identity", () => {
         const socket = prepared.engineArgs[1]
         if (socket === undefined) throw new Error("attach did not name its endpoint")
         const endpoint = dirname(socket)
-        // Closing the service schedules the endpoint's asynchronous server.close; wait for that endpoint's removal.
-        await new Promise<void>((resolve, reject) => {
-          const timer = setTimeout(() => {
-            watcher.close()
-            reject(new Error("attach endpoint was not removed"))
-          }, 2_000)
-          const watcher = watch(dirname(endpoint), (_event, name) => {
-            if (name !== basename(endpoint) || existsSync(endpoint)) return
-            watcher.close()
-            clearTimeout(timer)
-            resolve()
-          })
-          service.close()
-        })
+        expect(existsSync(endpoint)).toBe(true)
+        // Closing the service closes the endpoint: its server.close settles, then its directory is gone.
+        service.close()
+        await awaitWithinTestBudget(observed.settled(), "the attach endpoint's close")
+        expect(existsSync(endpoint)).toBe(false)
       } finally {
         service.close()
       }
