@@ -11,6 +11,7 @@ import { serviceAccountsOpen } from "./service-auth/accounts-gate"
 import { openCodeServiceAuthHooks } from "./service-auth/cli-service-auth-state"
 import { configureServiceAuthCommands } from "./service-auth/commands"
 import { resolveInstallArgs, type InstallCommandOptions } from "./install-command-options"
+import { createProfileCommand } from "./profile"
 import { configureRuntimeCommands } from "./runtime-commands"
 import { runConfigMigrate } from "./config-migrate"
 import { availableInstallPlatforms } from "./native-dev-platform-flag"
@@ -236,6 +237,7 @@ configureRuntimeCommands(program)
 program.addCommand(createMcpOAuthCommand())
 configureServiceAuthCommands(program, serviceAccountsOpen(), openCodeServiceAuthHooks())
 configureAccountKeysCommands(program)
+program.addCommand(createProfileCommand())
 
 export function runCli(): void {
   program.parse()

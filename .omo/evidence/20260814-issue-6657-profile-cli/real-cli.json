@@ -1,0 +1,223 @@
+{
+    "surface":  "freshly built dist/cli/index.js via npx --yes bun",
+    "isolation":  {
+                      "HOME":  "%QA_ROOT%/home",
+                      "USERPROFILE":  "%QA_ROOT%/home",
+                      "XDG_DATA_HOME":  "%QA_ROOT%/xdg-data",
+                      "XDG_CONFIG_HOME":  "%QA_ROOT%/xdg-config",
+                      "XDG_STATE_HOME":  "%QA_ROOT%/xdg-state",
+                      "XDG_CACHE_HOME":  "%QA_ROOT%/xdg-cache",
+                      "project":  "%QA_ROOT%/project"
+                  },
+    "commands":  {
+                     "list_before":  {
+                                         "command":  "npx --yes bun dist/cli/index.js profile list",
+                                         "override":  "none",
+                                         "exit_code":  0,
+                                         "stdout":  "Profiles:\n  gpt\n  kimi",
+                                         "stderr":  "npm notice\nnpm notice New minor version of npm available! 11.11.0 -\u003e 11.19.0\nnpm notice Changelog: https://github.com/npm/cli/releases/tag/v11.19.0\nnpm notice To update run: npm install -g npm@11.19.0\nnpm notice",
+                                         "process_exited":  true
+                                     },
+                     "use_gpt":  {
+                                     "command":  "npx --yes bun dist/cli/index.js profile use gpt",
+                                     "override":  "none",
+                                     "exit_code":  0,
+                                     "stdout":  "Activated profile \"gpt\" (persisted in %QA_ROOT%\\home\\.omo\\omo.jsonc).",
+                                     "stderr":  "",
+                                     "process_exited":  true
+                                 },
+                     "list_after_use":  {
+                                            "command":  "npx --yes bun dist/cli/index.js profile list",
+                                            "override":  "none",
+                                            "exit_code":  0,
+                                            "stdout":  "Profiles:\n* gpt\n  kimi\nActive: gpt (persisted in your omo config)",
+                                            "stderr":  "",
+                                            "process_exited":  true
+                                        },
+                     "current_persisted":  {
+                                               "command":  "npx --yes bun dist/cli/index.js profile current",
+                                               "override":  "none",
+                                               "exit_code":  0,
+                                               "stdout":  "gpt (persisted in your omo config)",
+                                               "stderr":  "",
+                                               "process_exited":  true
+                                           },
+                     "current_override":  {
+                                              "command":  "npx --yes bun dist/cli/index.js profile current",
+                                              "override":  "OMO_PROFILE=kimi",
+                                              "exit_code":  0,
+                                              "stdout":  "kimi (from OMO_PROFILE)",
+                                              "stderr":  "",
+                                              "process_exited":  true
+                                          },
+                     "clear_with_override":  {
+                                                 "command":  "npx --yes bun dist/cli/index.js profile clear",
+                                                 "override":  "OMO_PROFILE=kimi",
+                                                 "exit_code":  0,
+                                                 "stdout":  "Cleared the persisted profile \"gpt\" in %QA_ROOT%\\home\\.omo\\omo.jsonc.\nActive profile remains \"kimi\" (from OMO_PROFILE).",
+                                                 "stderr":  "",
+                                                 "process_exited":  true
+                                             },
+                     "current_after_clear_override":  {
+                                                          "command":  "npx --yes bun dist/cli/index.js profile current",
+                                                          "override":  "OMO_PROFILE=kimi",
+                                                          "exit_code":  0,
+                                                          "stdout":  "kimi (from OMO_PROFILE)",
+                                                          "stderr":  "",
+                                                          "process_exited":  true
+                                                      },
+                     "current_after_clear_base":  {
+                                                      "command":  "npx --yes bun dist/cli/index.js profile current",
+                                                      "override":  "none",
+                                                      "exit_code":  0,
+                                                      "stdout":  "No active profile (using the base config).",
+                                                      "stderr":  "",
+                                                      "process_exited":  true
+                                                  },
+                     "current_missing_override":  {
+                                                      "command":  "npx --yes bun dist/cli/index.js profile current",
+                                                      "override":  "OMO_PROFILE=missing",
+                                                      "exit_code":  0,
+                                                      "stdout":  "No active profile (using the base config).",
+                                                      "stderr":  "Activated omo profile \"missing\" does not exist; using the base configuration",
+                                                      "process_exited":  true
+                                                  },
+                     "list_with_project_profile":  {
+                                                       "command":  "npx --yes bun dist/cli/index.js profile list",
+                                                       "override":  "none",
+                                                       "exit_code":  0,
+                                                       "stdout":  "Profiles:\n  gpt\n  kimi\n  local (project only)",
+                                                       "stderr":  "",
+                                                       "process_exited":  true
+                                                   },
+                     "use_project_only":  {
+                                              "command":  "npx --yes bun dist/cli/index.js profile use local",
+                                              "override":  "none",
+                                              "exit_code":  1,
+                                              "stdout":  "",
+                                              "stderr":  "Profile \"local\" is defined only in project config and cannot be persisted globally.",
+                                              "process_exited":  true
+                                          },
+                     "use_blank":  {
+                                       "command":  "npx --yes bun dist/cli/index.js profile use ",
+                                       "override":  "none",
+                                       "exit_code":  1,
+                                       "stdout":  "",
+                                       "stderr":  "Profile name must not be empty.",
+                                       "process_exited":  true
+                                   },
+                     "use_whitespace":  {
+                                            "command":  "npx --yes bun dist/cli/index.js profile use    ",
+                                            "override":  "none",
+                                            "exit_code":  1,
+                                            "stdout":  "",
+                                            "stderr":  "Profile name must not be empty.",
+                                            "process_exited":  true
+                                        },
+                     "current_whitespace_config":  {
+                                                       "command":  "npx --yes bun dist/cli/index.js profile current",
+                                                       "override":  "none",
+                                                       "exit_code":  1,
+                                                       "stdout":  "",
+                                                       "stderr":  "Invalid omo config at %QA_ROOT%\\home\\.omo\\omo.jsonc: active_profile",
+                                                       "process_exited":  true
+                                                   },
+                     "current_malformed":  {
+                                               "command":  "npx --yes bun dist/cli/index.js profile current",
+                                               "override":  "none",
+                                               "exit_code":  1,
+                                               "stdout":  "",
+                                               "stderr":  "JSONC parse error in %QA_ROOT%\\home\\.omo\\omo.jsonc: CloseBraceExpected, CloseBraceExpected",
+                                               "process_exited":  true
+                                           }
+                 },
+    "configs":  {
+                    "before":  "{\r\n  // QA comment must survive profile writes\r\n  \"profiles\": {\r\n    \"kimi\": { \"categories\": { \"quick\": { \"model\": \"kimi-for-qa\" } } },\r\n    \"gpt\": { \"categories\": { \"quick\": { \"model\": \"gpt-for-qa\" } } }\r\n  }\r\n}",
+                    "after_use":  "{\r\n  // QA comment must survive profile writes\r\n  \"profiles\": {\r\n    \"kimi\": { \"categories\": { \"quick\": { \"model\": \"kimi-for-qa\" } } },\r\n    \"gpt\": { \"categories\": { \"quick\": { \"model\": \"gpt-for-qa\" } } }\r\n  },\r\n  \"active_profile\": \"gpt\"\r\n}",
+                    "after_clear":  "{\r\n  // QA comment must survive profile writes\r\n  \"profiles\": {\r\n    \"kimi\": { \"categories\": { \"quick\": { \"model\": \"kimi-for-qa\" } } },\r\n    \"gpt\": { \"categories\": { \"quick\": { \"model\": \"gpt-for-qa\" } } }\r\n  }\r\n}",
+                    "before_negative_cases":  "{\r\n  // QA comment must survive profile writes\r\n  \"profiles\": {\r\n    \"kimi\": { \"categories\": { \"quick\": { \"model\": \"kimi-for-qa\" } } },\r\n    \"gpt\": { \"categories\": { \"quick\": { \"model\": \"gpt-for-qa\" } } }\r\n  }\r\n}",
+                    "whitespace_fixture":  "{ \"active_profile\": \"   \", \"profiles\": { \"gpt\": {} } }",
+                    "malformed_fixture":  "{ \"profiles\": {"
+                },
+    "assertions":  {
+                       "happy_commands_exit_zero":  true,
+                       "negative_commands_exit_one":  true,
+                       "list_sorted":  true,
+                       "active_marker_after_use":  true,
+                       "comment_preserved_after_use":  true,
+                       "active_profile_written":  true,
+                       "persisted_current":  true,
+                       "override_wins":  true,
+                       "active_profile_removed_after_clear":  true,
+                       "override_survives_clear":  true,
+                       "base_after_clear_without_override":  true,
+                       "comment_preserved_after_clear":  true,
+                       "missing_selected_profile_reports_base":  true,
+                       "missing_selected_profile_diagnostic":  true,
+                       "project_only_profile_labeled":  true,
+                       "project_only_use_rejected":  true,
+                       "project_only_use_did_not_change_user_config":  true,
+                       "blank_use_rejected":  true,
+                       "blank_use_did_not_change_user_config":  true,
+                       "whitespace_use_rejected":  true,
+                       "whitespace_use_did_not_change_user_config":  true,
+                       "whitespace_config_nonzero":  true,
+                       "whitespace_config_no_stdout":  true,
+                       "whitespace_config_reports_validation_error":  true,
+                       "malformed_config_nonzero":  true,
+                       "malformed_config_no_stdout":  true,
+                       "malformed_config_reports_parse_error":  true
+                   },
+    "sandbox_files_before_cleanup":  [
+                                         {
+                                             "relative_path":  "home/.omo/omo.jsonc",
+                                             "length":  15,
+                                             "sha256":  "572e69958d0c11c4416af88f49c23f06fb0d39ae788f637b3d80eda0ae525a0e"
+                                         },
+                                         {
+                                             "relative_path":  "home/.omo/omo.jsonc.bak.2026-08-14T11-46-30-780Z",
+                                             "length":  212,
+                                             "sha256":  "1077ce8120d92a2af524f0d09eb1f77f50bf7dbaddb5445cdb180ac532ea3a72"
+                                         },
+                                         {
+                                             "relative_path":  "home/.omo/omo.jsonc.bak.2026-08-14T11-46-34-630Z",
+                                             "length":  240,
+                                             "sha256":  "38e261afb754430fa2b4a20195a90d0138c4ddb4271ad03c78da910d2f155be0"
+                                         },
+                                         {
+                                             "relative_path":  "project/.omo/omo.jsonc",
+                                             "length":  106,
+                                             "sha256":  "7bfce70c8463bc766dc2c2f80724ac472652cc74575105f0e16c9b71526d800e"
+                                         }
+                                     ],
+    "host_config":  {
+                        "path_label":  "~/.omo/omo.jsonc",
+                        "contents_copied":  false,
+                        "before":  {
+                                       "exists":  false,
+                                       "sha256":  null,
+                                       "length":  null,
+                                       "last_write_utc":  null
+                                   },
+                        "after":  {
+                                      "exists":  false,
+                                      "sha256":  null,
+                                      "length":  null,
+                                      "last_write_utc":  null
+                                  },
+                        "unchanged":  true
+                    },
+    "opencode_db":  {
+                        "applicable":  false,
+                        "reason":  "opencode executable absent; no DB path/query surface available",
+                        "opencode_absent_before":  true,
+                        "opencode_absent_after":  true
+                    },
+    "cleanup":  {
+                    "temp_root_pattern":  "%TEMP%/omo-qa-6657-*",
+                    "stale_roots_removed_before_run":  0,
+                    "resolved_under_system_temp":  true,
+                    "removed":  true,
+                    "spawned_processes_all_exited":  true
+                }
+}
