@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { createGatewayStore, type GatewayStore } from "../gateway/store"
 import type { OutboundDelivery } from "../gateway/transport"
 import { B_ROW, createRemoteThreadFixture, ENGINE } from "../thread-remote-fixture"
+import type { RemoteSessionRow } from "../remote/ports"
 import { createRelayTransport } from "./relay-transport"
 import { commandWaitMs, withCallDeadline } from "../../call-budget/call-deadline"
 
@@ -587,4 +588,49 @@ describe("a receiver whose engine holds the delivery answers the hold, never an 
     expect(admits(a.sent)).toHaveLength(1)
     relay.dispose()
   })
+})
+
+describe("a listing row whose device left the roster is refused, never resolved onto another device", () => {
+  // #14305 follow-up: the send paths hold the row's exact device id, and that id alone decides: without exact-id
+  // resolution the id falls through to name and prefix matching, so a different device that shares its prefix or
+  // carries its text as a name passes the online check for a device the row never named.
+  const rowOf = (device: string): RemoteSessionRow => ({
+    device,
+    session_id: "rk-stale",
+    durable_id: "dur-stale",
+    title: "stale row",
+    project: "/work/stale",
+    path: "/work/stale",
+    state: "idle",
+    updated_ms: 1_700_000_000_000,
+  })
+  const staleDelivery = (row: RemoteSessionRow, key: string): OutboundDelivery => ({
+    ...delivery("stale row send", key),
+    target: { kind: "remote", row },
+  })
+
+  test.each([
+    ["another device's id starts with the row's device id", "b7c41e09", "b7c41e09d2a64f1e", "other lab"],
+    ["another device's name is the row's device id", "b7c41e09d2a64f1e", "c1a50e0000000001", "b7c41e09d2a64f1e"],
+  ])(
+    "#given %s #when the row's thread is delivered to #then not_found as for an unknown device and nothing is sent",
+    async (_case, gone, otherId, otherName) => {
+      const a = account({
+        rows: [rowOf(gone)],
+        removed: [gone],
+        devices: [{ device: otherId, label: otherName, online: true }],
+      })
+      const { relay } = transport(a.remote)
+      const sent = await relay.deliver(staleDelivery(rowOf(gone), "k-stale"))
+      expect(sent).toMatchObject({
+        kind: "error",
+        error: { code: "not_found", details: { kind: "device", device: gone } },
+      })
+      // The refusal carries the account's devices as candidates, exactly as an unknown device does.
+      const candidates =
+        sent.kind === "error" ? ((sent.error.details?.["candidates"] ?? []) as readonly { device: string }[]) : []
+      expect(candidates.map((candidate) => candidate.device)).toEqual(["here", "b", otherId])
+      expect(a.sent).toEqual([])
+    },
+  )
 })

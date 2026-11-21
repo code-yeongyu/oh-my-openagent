@@ -111,3 +111,30 @@ describe("#given the account's devices #when resolveDevice reads a device part #
     },
   )
 })
+
+describe("#given a caller that holds a listing row's exact device id (exactId) #when the roster no longer carries it #then no name or prefix match answers for another device", () => {
+  // The send paths resolve a listing row's device id, not text a person typed: a device that left the roster must read
+  // as gone, or another device sharing the id's prefix or carrying it as a name passes the online check for a device
+  // the row never named (#14305 follow-up).
+  test.each([
+    ["a unique 6+ character id prefix of another device", "b7c41e"],
+    ["another device's name", "Studio Laptop"],
+    ["this device's name", "this mac"],
+  ])("#given %s #when it is resolved with exactId #then not_found with the unknown-device details", (_label, text) => {
+    expect(resolveDevice(account, text, { online: true, exactId: true })).toMatchObject({
+      kind: "refusal",
+      refusal: { code: "not_found", reason: "no_device", details: { kind: "device", device: text } },
+    })
+  })
+
+  test("#given the exact id is in the roster #when it is resolved with exactId #then it answers as without the option", () => {
+    expect(resolveDevice(account, "b7c41e09d2a64f1e", { online: true, exactId: true })).toMatchObject({
+      kind: "ok",
+      device: { id: "b7c41e09d2a64f1e" },
+    })
+    expect(resolveDevice(account, "c0ffee5a1d2b3c4d", { online: true, exactId: true })).toMatchObject({
+      kind: "refusal",
+      refusal: { code: "device_offline", details: { device: "c0ffee5a1d2b3c4d" } },
+    })
+  })
+})
