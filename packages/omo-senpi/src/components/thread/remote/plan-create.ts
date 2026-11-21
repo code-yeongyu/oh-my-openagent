@@ -247,7 +247,7 @@ export async function planCreate(
     // cached snapshot of a device that did not answer (#14043), is opened again from its session file, which no listing
     // row names (#14170: its path is the session's folder); an offline device refuses before anything is asked.
     if (rowStatus(target.row) === "live") return alreadyLive(displayedThread(target.row), target.row.device)
-    const online = await resolveTypedDevice(remote.client, target.row.device)
+    const online = await resolveTypedDevice(remote.client, target.row.device, { exactId: true })
     if (online.kind === "error") return { kind: "done", result: online }
     const file = await sessionFileOf(remote, target.row)
     if ("result" in file) return { kind: "done", result: file.result, device: target.row.device }
