@@ -23,7 +23,8 @@ import type {
 import { InProcessRunner, type ChildSession } from "../runners/in-process"
 import { buildChildArgs } from "../runners/rpc/spawn"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
-import { createTaskRecordStore, resolveStateDir } from "../store"
+import { createTaskRecordStore, resolveStateDir, type TaskRecordStore } from "../store"
+import { createInMemoryTaskRecordStore } from "../store/__fixtures__/in-memory-record-store"
 import type { TaskRecord } from "../state"
 import { dagFingerprint } from "./fingerprint"
 import type { DagDefinition, DagNodeInput } from "./graph"
@@ -266,12 +267,15 @@ type E2eFixtureOptions = {
   // Cases that assert ordering or diagnostics, not durability, journal in memory (#11632); the crash,
   // torn-tail and retention cases keep the fsync-backed file store, which is what proves durability.
   readonly store?: DagFileStore
+  // The ordering case also runs the real task manager on the in-memory record store (#11632); the
+  // record store's own durability stays owned by record-store.test.ts on the file store.
+  readonly taskStore?: TaskRecordStore
 }
 
 type E2eFixture = {
   readonly project: string
   readonly store: DagFileStore
-  readonly taskStore: ReturnType<typeof createTaskRecordStore>
+  readonly taskStore: TaskRecordStore
   readonly taskManager: TaskManager
   readonly manager: DagManager
   readonly runner: ManagedRunner
@@ -296,7 +300,7 @@ function e2eFixture(options: E2eFixtureOptions = {}): E2eFixture {
         ? {}
         : { task: { dag: { max_runs_per_session: options.maxRunsPerSession } } }),
     })
-  const taskStore = createTaskRecordStore({ project_dir: project })
+  const taskStore = options.taskStore ?? createTaskRecordStore({ project_dir: project })
   const runner = options.runner ?? new ImmediateRunner()
   const taskManager = resultPersistingManager(
     createTaskManager({
@@ -501,7 +505,12 @@ describe("DAG failure, crash, and policy end to end", () => {
       // given
       const runner = new ControlledRunner()
       const project = tempProject()
-      const fixture = e2eFixture({ runner, project, store: memoryStore(project) })
+      const fixture = e2eFixture({
+        runner,
+        project,
+        store: memoryStore(project),
+        taskStore: createInMemoryTaskRecordStore(resolveStateDir({ project_dir: project })),
+      })
       const input = definition("failure-order", [
         categoryNode("graph-first-failure"),
         categoryNode("wall-clock-first-failure"),
