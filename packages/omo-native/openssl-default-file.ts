@@ -180,10 +180,12 @@ export function readDefaultFileCandidates(
   let headerEnd = -1
   for (let line = 0; line < lines.length; line++) {
     const current = lines[line] ?? ""
-    // latin1 makes characters equal bytes, so the cap prevents BIO_gets' 253-byte splitting. PEM_read_bio skips
-    // text outside blocks, so bytes 0x80-0xff are allowed there (Fedora's bundle has UTF-8 comments); a block
-    // line, and control bytes anywhere, still drop the file.
-    if (current.length > 200 || (label === undefined ? /[\x00-\x1f\x7f]/ : /[^\x20-\x7e]/).test(current)) {
+    // PEM_read_bio skips descriptive text outside blocks. Keep the byte cap on block and delimiter lines
+    // so BIO_gets' 253-byte splitting cannot hide a boundary. Control bytes still drop the whole file.
+    if (
+      (current.length > 200 && (label !== undefined || current.includes("-----"))) ||
+      (label === undefined ? /[\x00-\x1f\x7f]/ : /[^\x20-\x7e]/).test(current)
+    ) {
       return drop("pem-noncanonical")
     }
     const boundary = /^-----(BEGIN|END) ([A-Z0-9][A-Z0-9 ]*)-----$/.exec(current)
