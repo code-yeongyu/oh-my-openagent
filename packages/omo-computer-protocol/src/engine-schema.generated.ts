@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "b3b3d676b5c6bc93259885c279007402715c4a6eb57e68de457e1f9034c24f81" as const
+export const SCHEMA_SHA256 = "b1e294f921009a741e7503e5ed45e5056d0025a3c8f82eac712c3fca02a68fd2" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const
@@ -398,8 +398,12 @@ export type ActionReport = {
 	warning?: string | null
 	auditIds?: string[]
 	timings?: Timings | null
+	settle?: ObservationSettle | null
 	evidence: Evidence[]
 	observation: UntrustedText
+	paused?: Pause[]
+	session?: SessionState | null
+	target?: TargetLiveness | null
 }
 
 export type AdvanceClockParams = {
@@ -861,6 +865,8 @@ export type Frame = {
 	cursor: CursorMode
 	path?: string | null
 	artifact?: FrameArtifact | null
+	occludersVisible?: boolean | null
+	nextCall?: string | null
 	session: SessionState
 	observation: UntrustedText
 }
@@ -1103,6 +1109,14 @@ export type MoveParams = {
 	observeAfter?: ObserveOptions | null
 }
 
+export type NotificationMatch = {
+	app: string
+	title: string
+	bodyHash: string
+	arrivedAt: number
+	observation: UntrustedText
+}
+
 export type NotificationPredicate = {
 	app?: string | null
 	title?: string | null
@@ -1132,6 +1146,7 @@ export type ObservationSettle = {
 	indicator?: BusyIndicator | null
 	quietMs: number
 	waitedMs: number
+	regime?: SettleRegime | null
 }
 
 export type ObserveAx = boolean | {
@@ -1201,6 +1216,13 @@ export type PasteParams = {
 	runGeneration?: number | null
 	observeAfter?: ObserveOptions | null
 }
+
+export type Pause = {
+	reason: PauseReason
+	ms: number
+}
+
+export type PauseReason = "screen_locked" | "user_active" | "system_suspended"
 
 export type PermissionReport = {
 	state: PermissionState
@@ -1422,6 +1444,8 @@ export type SettleOptions = {
 
 export type SettleOutcome = "settled" | "pending" | "unsupported" | "timeout"
 
+export type SettleRegime = "changed" | "unchanged" | "navigation"
+
 export type SpawnPath = "open_a" | "disclaim"
 
 export type SshHost = {
@@ -1486,6 +1510,15 @@ export type SurfacePredicate = {
 
 export type SurfaceState = "appeared" | "gone"
 
+export type TargetLiveness = {
+	state: TargetState
+	pid: number
+	exitCode?: number | null
+	signal?: number | null
+}
+
+export type TargetState = "exited" | "unresponsive"
+
 export type TextRange = {
 	start: number
 	end: number
@@ -1502,6 +1535,7 @@ export type Timings = {
 	dispatch?: number | null
 	verify?: number | null
 	restore?: number | null
+	settleMs?: number | null
 }
 
 export type ToolkitClass = "canvas_gl" | "chromium_electron" | "pointer_hw" | "qt_xcb"
@@ -1576,6 +1610,7 @@ export type WaitPredicate = {
 export type WaitResult = {
 	outcome: WaitOutcome
 	observation: Observation
+	notification?: NotificationMatch | null
 }
 
 export type WindowFrameParams = {
