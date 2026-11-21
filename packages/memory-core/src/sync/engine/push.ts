@@ -96,7 +96,10 @@ async function pushOne(
     out = await seal(deps, journal, first, randomBytes(16).toString("base64url"))
   }
   const bytes = await journal.outbox.readBatch(out)
-  if (out.stage === "sealed") {
+  // A batch the service takes inline skips the reservation and the upload (#14476): one request, and a crash before
+  // its answer leaves the batch sealed, so the repost is the service's replay of the same batch id.
+  const inline = out.stage === "sealed" && bytes.length <= (deps.transport.inlineBytes?.() ?? 0)
+  if (out.stage === "sealed" && !inline) {
     out = { ...out, uploadId: await deps.transport.reserve(bytes.length, out.digest), stage: "reserved" }
     await journal.setPending({ ...pending, outgoing: out })
     deps.fault?.("reserved")
@@ -108,6 +111,7 @@ async function pushOne(
     deps.fault?.("uploaded")
   }
   const result = await deps.transport.append({
+    ...(inline ? { inline: bytes } : {}),
     uploadId: out.uploadId ?? "",
     digest: out.digest,
     baseSeq: out.baseSeq,
