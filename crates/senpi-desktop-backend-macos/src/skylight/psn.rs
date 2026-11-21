@@ -9,6 +9,13 @@ const EVENT_RECORD_LENGTH_BYTE: u8 = 0xf8;
 const EVENT_RECORD_KIND: u8 = 0x0d;
 const WINDOW_ID_OFFSET: usize = 0x3c;
 const FOCUS_MARKER_OFFSET: usize = 0x8a;
+/// The key-window record pair: kinds `0x01` then `0x02` at offset `0x08`,
+/// flag `0x10` at `0x3a`, and an unset (all `0xff`) location at `0x20..0x30`
+/// (yabai's `window_manager_make_key_window` encoding).
+const KEY_WINDOW_KINDS: [u8; 2] = [0x01, 0x02];
+const KEY_WINDOW_FLAG_OFFSET: usize = 0x3a;
+const KEY_WINDOW_FLAG: u8 = 0x10;
+const KEY_WINDOW_LOCATION: std::ops::Range<usize> = 0x20..0x30;
 
 /// `kCPSNoWindows`: set front without raising or gathering windows.
 pub(super) const SET_FRONT_NO_WINDOWS: u32 = 0x400;
@@ -45,6 +52,31 @@ pub(super) fn focus_record(wid: u32, marker: FocusMarker) -> [u8; EVENT_RECORD_L
     record[WINDOW_ID_OFFSET..WINDOW_ID_OFFSET + 4].copy_from_slice(&wid.to_le_bytes());
     record[FOCUS_MARKER_OFFSET] = marker.byte();
     record
+}
+
+/// Builds the key-window record of `kind` for `wid`. Pure: only the byte assembly.
+pub(super) fn key_window_record(wid: u32, kind: u8) -> [u8; EVENT_RECORD_LENGTH] {
+    let mut record = [0u8; EVENT_RECORD_LENGTH];
+    record[0x04] = EVENT_RECORD_LENGTH_BYTE;
+    record[0x08] = kind;
+    record[KEY_WINDOW_LOCATION].fill(0xff);
+    record[KEY_WINDOW_FLAG_OFFSET] = KEY_WINDOW_FLAG;
+    record[WINDOW_ID_OFFSET..WINDOW_ID_OFFSET + 4].copy_from_slice(&wid.to_le_bytes());
+    record
+}
+
+/// Posts the key-window record pair to `psn`, making `wid` its key window;
+/// `false` when either post was refused.
+pub(super) fn post_key_window_records(psn: &ProcessSerialNumber, wid: u32) -> bool {
+    let Ok(spi) = spi::required() else {
+        return false;
+    };
+    KEY_WINDOW_KINDS.iter().all(|&kind| {
+        let record = key_window_record(wid, kind);
+        // SAFETY: Both the PSN and the complete 248-byte record live through
+        // the synchronous SPI call.
+        unsafe { (spi.post_record)(psn, record.as_ptr()) == 0 }
+    })
 }
 
 /// The frontmost process's PSN, or `None` when the SPI refused.

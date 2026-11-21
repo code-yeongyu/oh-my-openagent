@@ -1,4 +1,4 @@
-use super::{first_front_window, hand_back, HandBack, WindowInfo};
+use super::{first_front_window, hand_back, should_rekey, HandBack, WindowInfo};
 use crate::front_app::{restore_step, user_front_pid, RestoreStep};
 
 #[test]
@@ -176,4 +176,19 @@ fn window_list_keeps_off_screen_windows_whose_onscreen_key_is_absent() {
     // Then: they are listed as off-screen instead of dropped; a dropped helper window was
     // reported as "cannot identify a cursor-helper window" and broke every capture.
     assert!(windows.iter().any(|window| !window.on_screen), "{} windows, none off-screen", windows.len());
+}
+
+#[test]
+fn rekeys_only_a_still_front_app_left_without_focus_by_another_activation() {
+    // Given: Discord (10) was front; the engine made Calculator (20) key.
+    // Then: Discord, still front and without a focused element, is re-keyed.
+    assert!(should_rekey(10, Some(20), false, Some(10)));
+    // An app that kept its focused element is left untouched.
+    assert!(!should_rekey(10, Some(20), true, Some(10)));
+    // The user switched to another app (30) during the AX read: leave it.
+    assert!(!should_rekey(10, Some(20), false, Some(30)));
+    assert!(!should_rekey(10, Some(20), false, None));
+    // The engine activated nothing, or the front app itself: nothing was taken.
+    assert!(!should_rekey(10, None, false, Some(10)));
+    assert!(!should_rekey(10, Some(10), false, Some(10)));
 }
