@@ -97,10 +97,15 @@ export function toolRefusal(core: AddressRefusal, thread?: string, answered?: re
           : [`${slow.join(", ")} ${slow.length === 1 ? "was" : "were"} too slow for the lookup`]),
         ...(unanswered.length === 0 ? [] : [`${unanswered.join(", ")} did not answer`]),
       ]
-      const next =
+      const retry =
         slow.length === 0
           ? `Retry when ${unanswered.length === 1 ? "that device answers" : "those devices answer"}.`
           : "Retry the lookup; a slow device may answer in time on another attempt."
+      // omo#14270: a miss on the device that really keeps the file reads as "wait for the silent one" without this.
+      const next =
+        answered === undefined || answered.length === 0
+          ? retry
+          : `${retry} If the session should be on a device that answered, its file is not where that device looks for sessions.`
       return refusal(
         "host_unavailable",
         `No device that answered${answered === undefined || answered.length === 0 ? "" : ` (${answered.join(", ")})`} holds ${thread === undefined ? "it" : `session ${thread}`}; ${outcomes.join(", and ")}.`,
