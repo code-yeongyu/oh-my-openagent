@@ -15,7 +15,6 @@ type ClaudeCodeAgentRecord = Record<
   }
 >
 
-const logMock = mock((..._args: unknown[]) => {})
 const readConnectedProvidersCacheMock = mock(() => null as string[] | null)
 const readProviderModelsCacheMock = mock(
   () =>
@@ -63,7 +62,6 @@ describe("resolveSubagentExecution claude_code.agents toggle", () => {
 
   beforeEach(async () => {
     mock.restore()
-    logMock.mockClear()
     readConnectedProvidersCacheMock.mockReset()
     readProviderModelsCacheMock.mockReset()
     readConnectedProvidersCacheMock.mockReturnValue(null)
@@ -75,9 +73,6 @@ describe("resolveSubagentExecution claude_code.agents toggle", () => {
     }))
     loadProjectAgentsMock.mockImplementation(() => ({
       "claude-reviewer": { description: "Project Claude Code agent", mode: "subagent" },
-    }))
-    mock.module("../../../shared/logger", () => ({
-      log: logMock,
     }))
     mock.module("../../../shared/connected-providers-cache", () => ({
       readConnectedProvidersCache: readConnectedProvidersCacheMock,
