@@ -37,6 +37,9 @@ export function classifyStartCause(cause: unknown): StartCause | undefined {
       const refusal = cause as { readonly errorCode?: unknown; readonly errorData?: unknown }
       return hostRefusal(refusal.errorCode, refusal.errorData)
     }
+    // The host-session opener re-types every coded open_session refusal (session-wire `toOpenFailure`);
+    // a code outside the closed session reasons must still reach the record, shape-checked.
+    if (cause.name === "HostSessionOpenError") return hostRefusal(code, undefined)
     if (cause.message.startsWith(TIMEOUT_PREFIX)) return requestTimeout(cause.message.slice(TIMEOUT_PREFIX.length))
     return undefined
   } catch {
