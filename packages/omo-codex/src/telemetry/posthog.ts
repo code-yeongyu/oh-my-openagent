@@ -111,8 +111,8 @@ export function createCliPostHog(): PostHogClient {
   return createPostHogClient("cli")
 }
 
-export function createInstallPostHog(): PostHogClient {
-  return createPostHogClient("install")
+export function createInstallPostHog(options: CreatePostHogClientOptions = {}): PostHogClient {
+  return createPostHogClient("install", options)
 }
 
 export function createPluginPostHog(): PostHogClient {

@@ -1,16 +1,25 @@
 import assert from "node:assert/strict"
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import test from "node:test"
+import test, { afterEach } from "node:test"
 
 import { installMarketplaceLocally } from "./install-local.mjs"
-import { makeTempDir, writeJson, writePluginAt } from "./install-test-fixtures.mjs"
+import {
+  createCodexInstallSandbox,
+  disposeCodexInstallSandboxes,
+  makeTempDir,
+  writeJson,
+  writePluginAt,
+} from "./install-test-fixtures.mjs"
+
+afterEach(disposeCodexInstallSandboxes)
 
 test("#given packaged lazycodex adapter #when installing locally #then uses bundled artifacts without source builds", async () => {
   // given
   const repoRoot = await makeTempDir()
-  const codexHome = await makeTempDir()
-  const binDir = await makeTempDir()
+  const sandbox = createCodexInstallSandbox("packaged-local")
+  const codexHome = sandbox.codexHome
+  const binDir = sandbox.binDir
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
   const pluginRoot = join(codexPackageRoot, "plugin")
   const lspRuntimeRoot = join(repoRoot, "packages", "lsp-tools-mcp")
@@ -40,16 +49,17 @@ test("#given packaged lazycodex adapter #when installing locally #then uses bund
   const commands = []
 
   // when
-  const result = await installMarketplaceLocally({
-    repoRoot,
-    codexHome,
-    binDir,
-    platform: "linux",
-    runCommand: async (command, args, options) => {
-      commands.push([command, args.join(" "), options.cwd])
-    },
-    log: () => {},
-  })
+  const result = await installMarketplaceLocally(
+    sandbox.options({
+      repoRoot,
+
+      platform: "linux",
+      runCommand: async (command, args, options) => {
+        commands.push([command, args.join(" "), options.cwd])
+      },
+      log: () => {},
+    }),
+  )
 
   // then
   const pluginCacheRoot = result.installed[0].path

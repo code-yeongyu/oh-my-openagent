@@ -2,11 +2,19 @@ import assert from "node:assert/strict"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
-import test from "node:test"
+import test, { afterEach } from "node:test"
 import { fileURLToPath } from "node:url"
 
 import { installMarketplaceLocally, resolveCodexInstallerBinDir } from "./install-local.mjs"
-import { makeTempDir, writeJson, writePluginAt } from "./install-test-fixtures.mjs"
+import {
+  createCodexInstallSandbox,
+  disposeCodexInstallSandboxes,
+  makeTempDir,
+  writeJson,
+  writePluginAt,
+} from "./install-test-fixtures.mjs"
+
+afterEach(disposeCodexInstallSandboxes)
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 
@@ -38,8 +46,9 @@ test("#given custom CODEX_HOME #when resolving local installer bin dir without o
 
 test("#given custom CODEX_HOME and PATH without omo #when installing locally without bin override #then bootstraps via local CLI when omo is absent", async () => {
   const repoRoot = await makeTempDir()
-  const codexHome = await makeTempDir()
-  const homeDir = await makeTempDir()
+  const sandbox = createCodexInstallSandbox("install-local")
+  const codexHome = sandbox.codexHome
+  const homeDir = sandbox.home
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
   const pluginRoot = join(codexPackageRoot, "plugin")
 
@@ -51,15 +60,17 @@ test("#given custom CODEX_HOME and PATH without omo #when installing locally wit
   await mkdir(join(repoRoot, "dist", "cli"), { recursive: true })
   await writeFile(join(repoRoot, "dist", "cli", "index.js"), "#!/usr/bin/env bun\n")
 
-  const result = await installMarketplaceLocally({
-    repoRoot,
-    codexHome,
-    env: { PATH: "/usr/bin:/bin" },
-    homeDir,
-    platform: "linux",
-    runCommand: async () => {},
-    log: () => {},
-  })
+  const result = await installMarketplaceLocally(
+    sandbox.options({
+      repoRoot,
+      withoutBinDir: true,
+      env: { PATH: "/usr/bin:/bin" },
+      homeDir,
+      platform: "linux",
+      runCommand: async () => {},
+      log: () => {},
+    }),
+  )
 
   assert.equal(result.installed.length, 1)
   const wrapper = await readFile(join(codexHome, "bin", "omo-agent-toolkit"), "utf8")
@@ -76,8 +87,9 @@ test("#given custom CODEX_HOME and PATH without omo #when installing locally wit
 
 test("#given repoRoot without root CLI dist #when installing locally #then warns about the skipped omo runtime wrapper", async () => {
   const repoRoot = await makeTempDir()
-  const codexHome = await makeTempDir()
-  const homeDir = await makeTempDir()
+  const sandbox = createCodexInstallSandbox("install-local")
+  const codexHome = sandbox.codexHome
+  const homeDir = sandbox.home
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
   const pluginRoot = join(codexPackageRoot, "plugin")
 
@@ -88,15 +100,17 @@ test("#given repoRoot without root CLI dist #when installing locally #then warns
   await writePluginAt(pluginRoot, "omo", "0.1.0")
 
   const logs = []
-  await installMarketplaceLocally({
-    repoRoot,
-    codexHome,
-    env: {},
-    homeDir,
-    platform: "linux",
-    runCommand: async () => {},
-    log: (line) => logs.push(String(line)),
-  })
+  await installMarketplaceLocally(
+    sandbox.options({
+      repoRoot,
+      withoutBinDir: true,
+      env: {},
+      homeDir,
+      platform: "linux",
+      runCommand: async () => {},
+      log: (line) => logs.push(String(line)),
+    }),
+  )
 
   const cliPath = join(repoRoot, "dist", "cli", "index.js")
   assert.ok(
@@ -153,7 +167,8 @@ test("#given omo plugin source #when inspecting identity #then uses sisyphuslabs
 
 test("#given plugin hooks #when installing #then records trusted hook hashes", async () => {
   const repoRoot = await makeTempDir()
-  const codexHome = await makeTempDir()
+  const sandbox = createCodexInstallSandbox("install-local")
+  const codexHome = sandbox.codexHome
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
 
   await writeJson(join(codexPackageRoot, "marketplace.json"), {
@@ -182,14 +197,15 @@ test("#given plugin hooks #when installing #then records trusted hook hashes", a
     },
   })
 
-  await installMarketplaceLocally({
-    repoRoot,
-    codexHome,
-    platform: "win32",
-    gitBashResolver: () => ({ found: true, path: "C:\\Program Files\\Git\\bin\\bash.exe", source: "program-files" }),
-    runCommand: async () => {},
-    log: () => {},
-  })
+  await installMarketplaceLocally(
+    sandbox.options({
+      repoRoot,
+      platform: "win32",
+      gitBashResolver: () => ({ found: true, path: "C:\\Program Files\\Git\\bin\\bash.exe", source: "program-files" }),
+      runCommand: async () => {},
+      log: () => {},
+    }),
+  )
 
   const config = await readFile(join(codexHome, "config.toml"), "utf8")
   assert.match(config, /\[hooks\.state\."alpha@debug-marketplace:hooks\/hooks\.json:user_prompt_submit:0:0"\]/)
@@ -198,7 +214,8 @@ test("#given plugin hooks #when installing #then records trusted hook hashes", a
 
 test("#given bad plugin source path #when installing #then rejects traversal", async () => {
   const repoRoot = await makeTempDir()
-  const codexHome = await makeTempDir()
+  const sandbox = createCodexInstallSandbox("install-local")
+  const codexHome = sandbox.codexHome
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
 
   await writeJson(join(codexPackageRoot, "marketplace.json"), {
@@ -212,7 +229,7 @@ test("#given bad plugin source path #when installing #then rejects traversal", a
   })
 
   await assert.rejects(
-    installMarketplaceLocally({ repoRoot, codexHome, log: () => {} }),
+    installMarketplaceLocally(sandbox.options({ repoRoot, log: () => {} })),
     /local plugin source path must start with \.\//,
   )
 })
