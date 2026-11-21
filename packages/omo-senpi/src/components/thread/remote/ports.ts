@@ -277,12 +277,6 @@ export type RemoteThreadSurface = {
 }
 
 /**
- * A listing row's durable id (decision 0027 D2), "" when its device publishes none. What a row is listed and addressed by
- * is thread-address-core `rowKey` (the durable id, else `<device id>/<listing key>`); this is the durable id alone.
- */
-export const rowThreadId = (row: RemoteSessionRow): string => row.durable_id ?? ""
-
-/**
  * A listing row's thread status. Live only when its device answered this round with a non-ended state: a cached row of a
  * device that did not answer is a snapshot (often days old, of sessions long gone), never proof the session runs (#14043).
  */

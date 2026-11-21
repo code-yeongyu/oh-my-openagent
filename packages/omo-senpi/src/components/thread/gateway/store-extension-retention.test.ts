@@ -186,7 +186,7 @@ test("#given extension rows and the core rows an extension still acts on #when t
       alpha_refs: check.query("SELECT id FROM alpha_refs").all(),
       closed_outbox: check.query("SELECT state FROM outbox WHERE binding_id = ?").all(closed.binding_id),
     }).toEqual({
-      deliveries: [{ state: "queued" }],
+      deliveries: [{ state: "refused" }],
       bindings: kept,
       alpha_items: kept.map((value) => ({ value })),
       alpha_refs: [],

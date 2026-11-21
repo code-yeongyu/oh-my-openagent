@@ -90,7 +90,8 @@ function fakeService(answer: (body: Record<string, unknown>) => Response) {
 
 describe("omo account", () => {
   test.each(["{", JSON.stringify({ accessToken: "synthetic-invalid" })])(
-    "#given corrupt stored data %s #when forgotten #then deletion needs no credential read",
+    // #12308: forget reads the item once to name the pin it retires; an item that does not parse is still deleted.
+    "#given corrupt stored data %s #when forgotten #then one read, then the delete",
     async (initial) => {
       let value: string | null = initial
       const calls: string[] = []
@@ -116,7 +117,7 @@ describe("omo account", () => {
       expect({ code: result.code, out: result.out, calls }).toEqual({
         code: ACCOUNT_EXIT.ok,
         out: [{ forgotten: true }],
-        calls: ["delete"],
+        calls: ["get", "delete"],
       })
       expect(value).toBeNull()
     },
@@ -414,6 +415,27 @@ describe("omo account on a locked OS credential store (desktop#3509)", () => {
     }
   })
 
+  // #13642 review: a forget the lock refuses discards nothing, so no line may claim the keys were discarded.
+  test("#given a locked keychain #when forget fails on it #then only the locked outcome is reported, never a discarded-keys line", async () => {
+    const locked = () =>
+      Promise.reject(
+        Object.assign(new Error("SecKeychain write failed (-25308)"), { code: "ERR_SECRETS_PLATFORM_ERROR" }),
+      )
+    const store = createCredentialStore("http://127.0.0.1:1", {
+      secrets: { get: locked, set: locked, delete: locked },
+      platform: "darwin",
+    })
+    const pinLog: string[] = []
+    const result = await run(store, ["forget"], {
+      beforeKeysDiscarded: retireSyncPinOnDiscard({ pinDir: () => "unused", log: (line) => pinLog.push(line) }),
+    })
+    expect({ code: result.code, out: result.out, pinLog }).toEqual({
+      code: ACCOUNT_EXIT.keychainLocked,
+      out: [{ keychain: "locked" }],
+      pinLog: [],
+    })
+  })
+
   test("an immediate native store failure returns store-unavailable", async () => {
     const broken = () => Promise.reject(new Error("boom"))
     const store = createCredentialStore("http://127.0.0.1:1", {
@@ -427,7 +449,7 @@ describe("omo account on a locked OS credential store (desktop#3509)", () => {
 })
 
 describe("omo account storage failures do not trigger another store call", () => {
-  test("#given a native delete failure #when forgetting #then it reports the store failure without a read", async () => {
+  test("#given a native delete failure #when forgetting #then it reports the store failure with no read after it", async () => {
     const calls: string[] = []
     const store = createCredentialStore("http://127.0.0.1:1", {
       platform: "darwin",
@@ -449,7 +471,7 @@ describe("omo account storage failures do not trigger another store call", () =>
     expect({ code: result.code, out: result.out, calls }).toEqual({
       code: ACCOUNT_EXIT.storeUnavailable,
       out: [{ error: "store-unavailable" }],
-      calls: ["delete"],
+      calls: ["get", "delete"],
     })
   })
 
@@ -574,6 +596,11 @@ describe("omo account storage failures do not trigger another store call", () =>
 
 describe("omo account on Linux, where a locked Secret Service read looks empty (desktop#3509)", () => {
   const empty = { get: async () => null, set: async () => {}, delete: async () => true }
+  const storeHome = () => {
+    const home = mkdtempSync(join(tmpdir(), "omo-account-store-"))
+    homes.push(home)
+    return home
+  }
   const linuxStore = (
     lock: "locked" | "unlocked" | "absent" | "unknown",
     secrets: SecretApi = empty,
@@ -583,6 +610,7 @@ describe("omo account on Linux, where a locked Secret Service read looks empty (
       secrets,
       platform: "linux",
       lockProbe: async () => lock,
+      home: storeHome(),
       notice: (message) => {
         notices.push(message)
       },
@@ -646,17 +674,34 @@ describe("omo account on Linux, where a locked Secret Service read looks empty (
   })
 
   // #10658 review: only a LOCKED answer may stop the store. A probe that cannot answer (no gdbus on a minimal
-  // install, no Secret Service name, a slow bus) falls back to libsecret as before, with one notice.
+  // install, a slow bus) falls back to libsecret as before, with one notice; #7185b: no Secret Service at all keeps the
+  // sign-in in the private state file, and show says which one holds it.
   // The notice itself is once per process; account-cli-entry.test.ts counts it through the real `omo account`.
-  test("a probe that cannot answer never blocks login, show or logout: libsecret is used", async () => {
-    for (const lock of ["absent", "unknown"] as const) {
-      expect(await loginShowLogout(linuxStore(lock, memorySecretApi()))).toEqual([
-        ACCOUNT_EXIT.ok,
-        { signedIn: true, device: { id: "dev_f", name: "device dev_f" }, refreshState: "ok" },
-        ACCOUNT_EXIT.ok,
-        { signedIn: false },
-      ])
+  test("a probe that cannot answer or finds no Secret Service never blocks login, show or logout", async () => {
+    for (const [lock, storage] of [
+      ["absent", "file"],
+      ["unknown", "keyring"],
+    ] as const) {
+      expect({ lock, steps: await loginShowLogout(linuxStore(lock, memorySecretApi())) }).toEqual({
+        lock,
+        steps: [
+          ACCOUNT_EXIT.ok,
+          { signedIn: true, device: { id: "dev_f", name: "device dev_f" }, refreshState: "ok", storage },
+          ACCOUNT_EXIT.ok,
+          { signedIn: false, storage },
+        ],
+      })
     }
+  })
+
+  test("adopt with no Secret Service answers ok and says the sign-in is kept in the file (#7185b)", async () => {
+    const result = await run(linuxStore("absent", memorySecretApi()), ["adopt"], {
+      stdin: JSON.stringify(credential("dev_s", 60_000)),
+    })
+    expect({ code: result.code, out: result.out }).toEqual({
+      code: ACCOUNT_EXIT.ok,
+      out: [{ adopted: true, device: { id: "dev_s", name: "device dev_s" }, storage: "file" }],
+    })
   })
 
   test("login and logout on Linux with no gdbus on PATH still succeed through the real probe", async () => {
@@ -668,13 +713,14 @@ describe("omo account on Linux, where a locked Secret Service read looks empty (
       const store = createCredentialStore("http://127.0.0.1:1", {
         secrets: memorySecretApi(),
         platform: "linux",
+        home: storeHome(),
         notice: () => {},
       })
       expect(await loginShowLogout(store)).toEqual([
         ACCOUNT_EXIT.ok,
-        { signedIn: true, device: { id: "dev_f", name: "device dev_f" }, refreshState: "ok" },
+        { signedIn: true, device: { id: "dev_f", name: "device dev_f" }, refreshState: "ok", storage: "keyring" },
         ACCOUNT_EXIT.ok,
-        { signedIn: false },
+        { signedIn: false, storage: "keyring" },
       ])
     } finally {
       process.env.PATH = path
@@ -726,7 +772,10 @@ describe("omo account on Linux, where a locked Secret Service read looks empty (
 
   test("an unlocked collection with no item is still signed out", async () => {
     const result = await run(linuxStore("unlocked"), ["show"])
-    expect({ code: result.code, out: result.out }).toEqual({ code: ACCOUNT_EXIT.ok, out: [{ signedIn: false }] })
+    expect({ code: result.code, out: result.out }).toEqual({
+      code: ACCOUNT_EXIT.ok,
+      out: [{ signedIn: false, storage: "keyring" }],
+    })
   })
 
   test("libsecret's own locked-collection write error (measured on a real keyring) is keychain_locked", async () => {
@@ -777,6 +826,8 @@ describe("discarding keys retires the account's sync pin (#12280)", () => {
 
   for (const [name, args, stdin] of [
     ["forget --device", ["forget", "--device", "dev-1"], undefined],
+    // #12308: the desktop signs a CLI-item session out with plain forget.
+    ["plain forget", ["forget"], undefined],
     ["adopt --replace with another device", ["adopt", "--replace"], JSON.stringify(credential("dev-2", 3_600_000))],
   ] as const) {
     test(`#given a joined device #when ${name} discards its keys #then its account's pin is retired, another account's is kept, and show reports not_joined`, async () => {
@@ -797,6 +848,19 @@ describe("discarding keys retires the account's sync pin (#12280)", () => {
       expect(await shown(s.store, pinDir, "acct-other")).toBe("joined")
     })
   }
+
+  // #12384: after a sign-out without --device, status agrees with the sign-out instead of still answering joined.
+  test("#given a joined device #when it signs out without --device #then show --account reports it signed out and not joined", async () => {
+    const home = mkdtempSync(join(tmpdir(), "omo-account-retire-"))
+    homes.push(home)
+    const pinDir = join(home, "sync-device")
+    await writePin(pinDir, "acct-1")
+    const s = memoryStore(withAccount("dev-1", "acct-1"))
+    expect((await run(s.store, ["forget"], { pinDir, ...retiring(pinDir) })).out).toEqual([{ forgotten: true }])
+    expect((await run(s.store, ["show", "--account", "acct-1"], { pinDir })).out).toEqual([
+      { signedIn: false, sync: "not_joined" },
+    ])
+  })
 
   test("#given a desktop-owned session's account #when retire-sync runs #then that pin is retired, idempotently", async () => {
     const home = mkdtempSync(join(tmpdir(), "omo-account-retire-"))
