@@ -4,15 +4,16 @@
 # Tests:
 #   1. helper --version
 #   2. helper langs                              (lists 25 languages)
-#   3. helper validate '\w+' --lang ts           (must exit 2 with hint)
-#   4. helper validate 'console.log($MSG)'       (must exit 0 plausible)
-#   5. helper validate 'def $F($$$):' --lang py  (must exit 2 - trailing colon)
-#   6. helper validate 'function $N' --lang ts   (must exit 2 - incomplete)
-#   7. helper validate 'foo|bar' --lang ts       (must exit 2 - alternation)
-#   8. helper doctor                             (informational; tolerates no-binary)
-#   9. helper search w/o binary => exit 3 with install hint
-#  10. install.sh --help                         (parses)
-#  11. SKILL.md frontmatter shape                (canonical)
+#   3. custom languages via env + sgconfig.yml   (validate accepts --lang)
+#   4. helper validate '\w+' --lang ts           (must exit 2 with hint)
+#   5. helper validate 'console.log($MSG)'       (must exit 0 plausible)
+#   6. helper validate 'def $F($$$):' --lang py  (must exit 2 - trailing colon)
+#   7. helper validate 'function $N' --lang ts   (must exit 2 - incomplete)
+#   8. helper validate 'foo|bar' --lang ts       (must exit 2 - alternation)
+#   9. helper doctor                             (informational; tolerates no-binary)
+#  10. helper search w/o binary => exit 3 with install hint
+#  11. install.sh --help                         (parses)
+#  12. SKILL.md frontmatter shape                (canonical)
 #
 # Runs against the helper using ONLY stdlib python3 - no ast-grep needed.
 
@@ -65,6 +66,30 @@ pass "--version"
 LANG_LINES=$($HELPER langs | grep -E '^  [a-z]' | wc -l | tr -d ' ')
 [ "$LANG_LINES" -ge 25 ] || fail "langs listed only $LANG_LINES (expected >=25)"
 pass "langs lists at least 25 languages"
+
+# 2a. custom languages via env and sgconfig.yml
+set +e
+OMO_AST_GREP_EXTRA_LANGUAGES=systemverilog $HELPER validate 'module $M; endmodule' --lang systemverilog > "$OUTPUT_DIR/custom-env.out" 2>&1
+RC=$?
+set -e
+[ $RC -eq 0 ] || fail "env custom language should validate, got $RC (output: $(cat $OUTPUT_DIR/custom-env.out))"
+pass "validate accepts env custom language"
+
+CUSTOM_CONFIG_DIR="$OUTPUT_DIR/custom-config"
+mkdir -p "$CUSTOM_CONFIG_DIR"
+cat > "$CUSTOM_CONFIG_DIR/sgconfig.yml" <<'YAML'
+customLanguages:
+  mojo:
+    libraryPath: tree-sitter-mojo.so
+    extensions: [mojo]
+    languageSymbol: tree_sitter_mojo
+YAML
+set +e
+(cd "$CUSTOM_CONFIG_DIR" && $HELPER validate 'fn $F()' --lang mojo > "$OUTPUT_DIR/custom-sgconfig.out" 2>&1)
+RC=$?
+set -e
+[ $RC -eq 0 ] || fail "sgconfig custom language should validate, got $RC (output: $(cat $OUTPUT_DIR/custom-sgconfig.out))"
+pass "validate accepts sgconfig custom language"
 
 # 3. regex misuse: \w+
 set +e
