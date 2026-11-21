@@ -1,0 +1,17 @@
+{
+  "extends": "./skills/mobius-loop/scripts/tsconfig.json",
+  "compilerOptions": {
+    "verbatimModuleSyntax": true,
+    "exactOptionalPropertyTypes": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "files": [],
+  "include": [
+    "skills/mobius-loop/scripts/**/*.mjs",
+    "skills/mobius-loop/scripts/**/*.mts",
+    "skills/mobius-loop/scripts/**/*.ts",
+    "script/**/*.ts",
+    "test/**/*.ts",
+    "test/**/*.mjs"
+  ]
+}

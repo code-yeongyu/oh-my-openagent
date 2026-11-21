@@ -51,6 +51,8 @@
     "docs/reference/omo-json.md: omo doctor x2",
     "packages/get-worker/scripts/install.sh: command -v omo",
     "packages/get-worker/scripts/install.sh: omo install x3",
+    "packages/mobius-loop/README.md: omo install x3",
+    "packages/mobius-loop/docs/releasing.md: omo install",
     "packages/omo-codex/README.md: omo get-local-version",
     "packages/omo-native/AGENTS.md: /bin/omo x2",
     "packages/omo-native/AGENTS.md: omo doctor x5",
