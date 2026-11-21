@@ -218,3 +218,22 @@ test("#given a legacy journal that applied nothing #when no owned memory file is
   expect(JSON.parse(await readFile(join(dir, "state.json"), "utf8"))).toMatchObject({ account: "acc_a" })
   expect(server.head).toBeGreaterThan(0)
 })
+
+test("#given a journal stamped with this account #when a move to another memory space retires it #then the fresh journal keeps the stamp and an offline restart asks nothing", async () => {
+  const server = new FakeSyncServer()
+  const d = await makeDevice(server, "d", undefined, { realStore: true, account: "acc_a" })
+  devices.push(d)
+  await d.write("one.md", note("one on a\n"))
+  await d.engine.runCycle()
+  const statePath = join(d.repo.root, ".git", "omo-sync", "state.json")
+
+  await d.restart(undefined, { space: "space-after-move" })
+  server.unreachable.add("device:d")
+  await d.engine.runCycle().catch(() => undefined)
+  expect(JSON.parse(await readFile(statePath, "utf8"))).toMatchObject({ account: "acc_a", space: "space-after-move" })
+
+  await d.write("offline.md", note("written offline after the move\n"))
+  await d.restart()
+  await expect(d.engine.runCycle()).rejects.not.toMatchObject({ name: "OwnershipUndecidedError" })
+  expect(await d.engine.status()).not.toMatchObject({ failure: { kind: "ownership_undecided" } })
+})
