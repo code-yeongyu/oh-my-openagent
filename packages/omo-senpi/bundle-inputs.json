@@ -1374,6 +1374,7 @@
     "packages/omo-senpi/src/components/omo-sdk/device-service/index.ts",
     "packages/omo-senpi/src/components/omo-sdk/devices/index.ts",
     "packages/omo-senpi/src/components/omo-sdk/enroll/default-ports.ts",
+    "packages/omo-senpi/src/components/omo-sdk/enroll/doriterm-attach.ts",
     "packages/omo-senpi/src/components/omo-sdk/enroll/index.ts",
     "packages/omo-senpi/src/components/omo-sdk/enroll/outcome.ts",
     "packages/omo-senpi/src/components/omo-sdk/enroll/request.ts",
