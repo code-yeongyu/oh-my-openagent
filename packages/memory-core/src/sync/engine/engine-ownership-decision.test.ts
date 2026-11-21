@@ -114,3 +114,55 @@ test("#given memory sync is not waiting on a decision #when one is recorded #the
 
   expect(await decideOwnership(join(d.repo.root, ".git"), "acc_a", "use", 1)).toEqual({ kind: "not_undecided" })
 })
+
+/** D wrote a note on A with an older build, but every push was refused, so its journal applied nothing and queued it. */
+async function queuedOnlyDevice(): Promise<{ d: Device; server: FakeSyncServer; gitDir: string }> {
+  const server = new FakeSyncServer()
+  const d = await makeDevice(server, "d", undefined, { realStore: true, account: "acc_a" })
+  devices.push(d)
+  server.beforeNextAppend = async () => {
+    throw new Error("the push never reached the service")
+  }
+  await d.write("queued.md", note("captured, never pushed\n"))
+  await expect(d.engine.runCycle()).rejects.toThrow("never reached")
+  const gitDir = join(d.repo.root, ".git")
+  const statePath = join(gitDir, "omo-sync", "state.json")
+  const { account: _owner, ...olderBuild } = JSON.parse(await readFile(statePath, "utf8")) as Record<string, unknown>
+  expect(olderBuild).toMatchObject({ applied: 0 })
+  await writeFile(statePath, JSON.stringify(olderBuild))
+  await d.restart(undefined, undefined, { server, account: "acc_a" })
+  await expect(d.engine.runCycle()).rejects.toMatchObject({ name: "OwnershipUndecidedError" })
+  return { d, server, gitDir }
+}
+
+test("#given a legacy journal that applied nothing but queued an edit #when the person confirms using it with this account #then the edit is uploaded to this account", async () => {
+  const { d, server, gitDir } = await queuedOnlyDevice()
+  const files = (await readUndecided(gitDir))?.files ?? 0
+
+  expect(server.head).toBe(0)
+  expect(await decideOwnership(gitDir, "acc_a", "use", files)).toEqual({ kind: "recorded" })
+  await settle(d)
+
+  expect(server.head).toBeGreaterThan(0)
+  const peer = await makeDevice(server, "p", undefined, { realStore: true, account: "acc_a" })
+  devices.push(peer)
+  await settle(peer)
+  expect(await peer.read("queued.md")).toBe(note("captured, never pushed\n"))
+})
+
+test("#given a legacy journal that applied nothing but queued an edit #when the person sets it aside #then nothing is uploaded and its queue no longer blocks sync", async () => {
+  const { d, server, gitDir } = await queuedOnlyDevice()
+
+  expect(await decideOwnership(gitDir, "acc_a", "set_aside", 0)).toEqual({ kind: "recorded" })
+  await settle(d)
+  await d.write("after.md", note("written after setting it aside\n"))
+  await settle(d)
+
+  expect((await d.engine.status()).kind).not.toBe("failing")
+  expect(await d.read("queued.md")).toBeNull()
+  const peer = await makeDevice(server, "p", undefined, { realStore: true, account: "acc_a" })
+  devices.push(peer)
+  await settle(peer)
+  expect(await peer.read("after.md")).toBe(note("written after setting it aside\n"))
+  expect(await peer.read("queued.md")).toBeNull()
+})
