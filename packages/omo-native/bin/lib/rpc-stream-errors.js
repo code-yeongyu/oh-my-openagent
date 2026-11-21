@@ -1,5 +1,6 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
+import { replaceFile } from "./replace-file.js"
 
 export const serialization = 'return JSON.stringify(value.type === "message_update" ? toJsonEvent(value) : value);'
 export const guardedSerialization = `try {
@@ -35,5 +36,5 @@ export function prepareRpcStreamErrors(senpiRoot) {
   }
   if (source.includes(guardedSerialization)) return
   if (!source.includes(serialization)) throw new Error("omo-ai: unsupported Senpi RPC stream serializer")
-  writeFileSync(path, source.replace(serialization, guardedSerialization))
+  replaceFile(path, source.replace(serialization, guardedSerialization))
 }

@@ -1,7 +1,8 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { prepareCompileSafeEngine } from "./compile-safe-engine.js"
 import { LAUNCH_SPEC_FILENAME, normalizeLaunchSpecMode } from "./launch-spec-mode.js"
+import { replaceFile } from "./replace-file.js"
 import { prepareRpcStreamErrors } from "./rpc-stream-errors.js"
 
 // Written inside the engine tree, so reinstalling or upgrading the engine drops it with the tree.
@@ -13,7 +14,7 @@ export function prepareInstalledEngine(senpiRoot) {
 }
 
 export function writeEnginePreparedStamp(senpiRoot, omoVersion) {
-  writeFileSync(join(senpiRoot, ENGINE_PREPARED_STAMP), `${omoVersion}\n`)
+  replaceFile(join(senpiRoot, ENGINE_PREPARED_STAMP), `${omoVersion}\n`)
 }
 
 function isPreparedFor(senpiRoot, omoVersion) {
