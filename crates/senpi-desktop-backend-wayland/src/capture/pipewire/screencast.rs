@@ -4,7 +4,7 @@
 
 use std::os::fd::{AsFd, OwnedFd};
 
-use ashpd::desktop::screencast::{CursorMode, Screencast, SourceType};
+use ashpd::desktop::screencast::{CursorMode, Screencast, SelectSourcesOptions, SourceType};
 use ashpd::desktop::{PersistMode, ResponseError};
 use ashpd::Error as PortalError;
 use tokio::runtime::Runtime;
@@ -43,23 +43,23 @@ async fn open() -> Result<Cast, Failure> {
         .await
         .map_err(|error| failed(format!("ScreenCast portal: {error}")))?;
     let session = portal
-        .create_session()
+        .create_session(Default::default())
         .await
         .map_err(|error| failed(format!("ScreenCast CreateSession: {error}")))?;
     let outcome = async {
         portal
             .select_sources(
                 &session,
-                CursorMode::Embedded,
-                SourceType::Monitor.into(),
-                true,
-                None,
-                PersistMode::DoNot,
+                SelectSourcesOptions::default()
+                    .set_cursor_mode(CursorMode::EMBEDDED)
+                    .set_sources(SourceType::MONITOR)
+                    .set_multiple(true)
+                    .set_persist_mode(PersistMode::DoNot),
             )
             .await
             .map_err(|error| failed(format!("ScreenCast SelectSources: {error}")))?;
         let streams = portal
-            .start(&session, None)
+            .start(&session, None, Default::default())
             .await
             .map_err(|error| failed(format!("ScreenCast Start: {error}")))?
             .response()
@@ -80,7 +80,7 @@ async fn open() -> Result<Cast, Failure> {
             return Err(failed("ScreenCast returned no monitor stream".to_owned()));
         }
         let remote = portal
-            .open_pipe_wire_remote(&session)
+            .open_pipe_wire_remote(&session, Default::default())
             .await
             .map_err(|error| failed(format!("ScreenCast OpenPipeWireRemote: {error}")))?;
         Ok(Cast { monitors, remote })

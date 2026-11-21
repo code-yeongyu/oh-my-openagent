@@ -97,8 +97,8 @@ impl FakeGnome {
         let shell = match shell {
             Shell::Absent => None,
             Shell::WithoutExtension => Some(runtime.block_on(async {
-                zbus::connection::Builder::address(address.as_str())?
-                    .name(SHELL_SERVICE)?
+                zbus::connection::Builder::address(address.as_str())
+                    .name(SHELL_SERVICE)
                     .build()
                     .await
             })),
@@ -108,9 +108,9 @@ impl FakeGnome {
                     calls: Arc::clone(&calls),
                 };
                 Some(runtime.block_on(async {
-                    zbus::connection::Builder::address(address.as_str())?
-                        .name(SHELL_SERVICE)?
-                        .serve_at(RECTS_PATH, rects)?
+                    zbus::connection::Builder::address(address.as_str())
+                        .name(SHELL_SERVICE)
+                        .serve_at(RECTS_PATH, rects)
                         .build()
                         .await
                 }))
@@ -129,7 +129,7 @@ impl FakeGnome {
     pub fn connect(&self) -> impl Future<Output = zbus::Result<zbus::Connection>> {
         let address = self.address.clone();
         async move {
-            zbus::connection::Builder::address(address.as_str())?
+            zbus::connection::Builder::address(address.as_str())
                 .build()
                 .await
         }

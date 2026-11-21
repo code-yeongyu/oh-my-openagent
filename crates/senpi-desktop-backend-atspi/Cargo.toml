@@ -11,4 +11,7 @@ crate-type = ["rlib"]
 atspi.workspace = true
 senpi-desktop-core = { path = "../senpi-desktop-core" }
 tokio = { workspace = true, features = ["time"] }
-zbus.workspace = true
+# atspi 0.30.0 (latest; upstream main still on zbus ^5.5) builds its proxies on zbus 5, and this
+# crate hands zbus::Connection/Proxy values to atspi, so it stays on zbus 5 while the workspace
+# (ashpd 0.14) is on zbus 6.
+zbus = { version = "=5.19.0", default-features = false, features = ["async-io", "blocking-api"] }

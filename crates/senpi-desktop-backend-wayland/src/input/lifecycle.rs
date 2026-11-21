@@ -88,13 +88,13 @@ impl Libei {
     fn handle_event(&mut self, event: EiEvent) -> CoreResult<()> {
         match event {
             EiEvent::SeatAdded(event) => {
-                event.seat.bind_capabilities(&[
-                    DeviceCapability::PointerAbsolute,
-                    DeviceCapability::Pointer,
-                    DeviceCapability::Button,
-                    DeviceCapability::Scroll,
-                    DeviceCapability::Keyboard,
-                ]);
+                event.seat.bind_capabilities(
+                    DeviceCapability::PointerAbsolute
+                        | DeviceCapability::Pointer
+                        | DeviceCapability::Button
+                        | DeviceCapability::Scroll
+                        | DeviceCapability::Keyboard,
+                );
                 self.context.flush().map_err(|error| {
                     DesktopError::input_failed(format!("libei bind seat: {error}"))
                 })?;
@@ -152,7 +152,7 @@ impl Libei {
                 self.devices.clear();
                 return Err(DesktopError::input_failed(format!(
                     "libei disconnected: {}",
-                    event.explanation
+                    event.explanation.as_deref().unwrap_or_default()
                 )));
             }
             _ => {}

@@ -7,13 +7,13 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use zbus::message::Header;
-use zbus::zvariant::{ObjectPath, OwnedFd, OwnedObjectPath, OwnedValue, Value};
+use zbus::{ObjectPath, OwnedFd, OwnedObjectPath, OwnedVariant, Variant};
 use zbus::{fdo, interface, Connection};
 
 use super::fake_portal::{Reply, State};
 
-pub type Options = HashMap<String, OwnedValue>;
-type Results<'a> = HashMap<&'static str, Value<'a>>;
+pub type Options = HashMap<String, OwnedVariant>;
+type Results<'a> = HashMap<&'static str, Variant<'a>>;
 
 pub fn absent(interface: &str) -> fdo::Error {
     fdo::Error::InvalidArgs(format!("No such interface \u{201c}{interface}\u{201d}"))
@@ -123,7 +123,7 @@ impl RemoteDesktopPortal {
     ) -> fdo::Result<OwnedObjectPath> {
         self.present()?;
         let session = create_session(connection, &header, &options).await?;
-        let results = HashMap::from([("session_handle", Value::from(session))]);
+        let results = HashMap::from([("session_handle", Variant::from(session))]);
         respond(connection, &header, &options, (0, results)).await
     }
 
@@ -148,7 +148,7 @@ impl RemoteDesktopPortal {
     ) -> fdo::Result<OwnedObjectPath> {
         self.present()?;
         let answer = match self.reply() {
-            Reply::Grant => (0, HashMap::from([("devices", Value::from(3_u32))])),
+            Reply::Grant => (0, HashMap::from([("devices", Variant::from(3_u32))])),
             Reply::Deny | Reply::Absent => (1, HashMap::new()),
         };
         respond(connection, &header, &options, answer).await
@@ -184,7 +184,7 @@ impl GlobalShortcutsPortal {
     }
 }
 
-type NewShortcut = (String, HashMap<String, OwnedValue>);
+type NewShortcut = (String, HashMap<String, OwnedVariant>);
 
 #[interface(name = "org.freedesktop.portal.GlobalShortcuts")]
 impl GlobalShortcutsPortal {
@@ -202,7 +202,7 @@ impl GlobalShortcutsPortal {
         self.present()?;
         let session = create_session(connection, &header, &options).await?;
         self.0.recorded().shortcuts_session = Some(session.clone());
-        let results = HashMap::from([("session_handle", Value::from(session))]);
+        let results = HashMap::from([("session_handle", Variant::from(session))]);
         respond(connection, &header, &options, (0, results)).await
     }
 
@@ -224,13 +224,13 @@ impl GlobalShortcutsPortal {
                 .map(str::to_owned);
             self.0.recorded().bound.push((id.clone(), trigger.clone()));
             let info = HashMap::from([
-                ("description", Value::from("stop")),
-                ("trigger_description", Value::from(trigger.unwrap_or_default())),
+                ("description", Variant::from("stop")),
+                ("trigger_description", Variant::from(trigger.unwrap_or_default())),
             ]);
             bound.push((id.clone(), info));
         }
         let answer = match self.reply() {
-            Reply::Grant => (0, HashMap::from([("shortcuts", Value::from(bound))])),
+            Reply::Grant => (0, HashMap::from([("shortcuts", Variant::from(bound))])),
             Reply::Deny | Reply::Absent => (1, HashMap::new()),
         };
         respond(connection, &header, &options, answer).await
