@@ -66,6 +66,7 @@
         "script/release-announce.ts",
         "script/release-desktop-engine-target.ts",
         "script/release-latest-flag.ts",
+        "script/release-state-paths.mjs",
         "script/release-version.mjs",
         "script/remove-stale-self-package-tests.ts",
         "script/senpi-worker-compile.ts",
