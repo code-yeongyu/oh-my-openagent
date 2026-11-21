@@ -4,6 +4,7 @@
 // journaled work, receives outside the lock, captures and applies under it, then pushes outside it;
 // a stale base receives first and retries.
 
+import { claimAccount } from "./account-journal"
 import { advance, applyVerified } from "./apply"
 import type { EngineDeps } from "./engine-deps"
 import type { SyncFailure } from "./failure"
@@ -255,7 +256,9 @@ export class SyncEngine {
     this.stage = "load"
     if (!this.loaded) {
       await deps.store.load()
-      if (await journal.claim(deps.store.peer(), deps.space, deps.legacySpace, deps.log)) await deps.store.load()
+      const switched = await claimAccount(deps, journal)
+      const reload = await journal.claim(deps.store.peer(), deps.space, deps.legacySpace, deps.log)
+      if (switched || reload) await deps.store.load()
       if ((await journal.state()).lastSyncedAt !== null) this.gap = { applied: 0 }
       this.loaded = true
     }
