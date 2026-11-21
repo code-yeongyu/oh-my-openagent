@@ -1,5 +1,6 @@
 import { isAbsolute } from "node:path"
 
+import { toThreadAddressEntries } from "../address-book"
 import { checkNameConflict } from "../addressing"
 import type {
   ThreadCreateInput,
@@ -19,8 +20,8 @@ import { threadLink } from "../thread-link"
 import { recordThreadCreator } from "../tools/extension-tools"
 import { resolveAddress } from "../address/lazy"
 import {
+  addressBook,
   failure,
-  resolveEntries,
   sendAddressBook,
   sendBookFor,
   summary,
@@ -119,7 +120,7 @@ export async function createThread(
         { invalid: skills.names },
       )
     const loaded = skills?.kind === "ok" ? skills.names : undefined
-    const entries = resolveEntries(options, current)
+    const entries = toThreadAddressEntries(addressBook(options, current))
     const callerCwd = options.callerWorkspaceRoot()
     const plan = await planCreate(options.remote, value, {
       host: createLocalSessionHost(options.host, entries),
@@ -185,14 +186,18 @@ export async function createThread(
     else if (earlier?.kind === "file") outcome = await plan.host.open(fileOpen(earlier))
     else
       try {
-        outcome = await plan.host.open({
-          ...plan.request,
-          ...(openName === undefined ? {} : { name: openName }),
-          ...(plan.creates && loaded !== undefined ? { initialSkills: loaded } : {}),
-          ...(preset === undefined ? {} : { permissionPreset: preset }),
-          ...(plan.creates ? launch.profile : {}),
-          ...(createdId === undefined ? {} : { durableSessionId: createdId }),
-        })
+        outcome = await plan.host.open(
+          {
+            ...plan.request,
+            ...(openName === undefined ? {} : { name: openName }),
+            ...(plan.creates && loaded !== undefined ? { initialSkills: loaded } : {}),
+            ...(preset === undefined ? {} : { permissionPreset: preset }),
+            ...(plan.creates ? launch.profile : {}),
+            ...(createdId === undefined ? {} : { durableSessionId: createdId }),
+          },
+          // #14397 review L1: every create, a prompt-only and an alias-only one included, is checked for reach.
+          { confirmReach: plan.creates },
+        )
       } catch (error) {
         const found = await reopened()
         if (found === undefined) throw error

@@ -3,7 +3,7 @@ import type { RemoteClient, RemoteFailure } from "../../remote"
 import type { ThreadToolFailure } from "../errors"
 import { remoteReady } from "../remote/remote-ops"
 import { deviceListing as oneDeviceListing } from "../remote/address-book"
-import { rowThreadId, type RemoteDevice, type RemoteSessionRow, type RemoteThreadSurface } from "../remote/ports"
+import type { RemoteDevice, RemoteSessionRow, RemoteThreadSurface } from "../remote/ports"
 
 const LOCAL_ONLY = "local"
 
@@ -50,7 +50,7 @@ async function rosterOf(client: RemoteClient): Promise<readonly RemoteDevice[]> 
  * device out). A removed device's cached rows go (#13505); an offline one keeps its rows. With no roster (`undefined`)
  * nothing can be judged, so every row stays.
  */
-export function onAccount(
+function onAccount(
   rows: readonly RemoteSessionRow[],
   roster: readonly RemoteDevice[] | undefined,
   here: string | null,
@@ -112,7 +112,7 @@ function remember(port: object, rows: readonly RemoteSessionRow[]): (id: string)
     if (!before.has(id)) before.set(id, ids.get(id))
   }
   for (const row of rows)
-    for (const id of new Set([rowThreadId(row), row.session_id])) {
+    for (const id of new Set([row.durable_id ?? "", row.session_id])) {
       if (id.length === 0) continue
       keep(id)
       ids.delete(id)

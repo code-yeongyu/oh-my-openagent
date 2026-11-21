@@ -1,5 +1,7 @@
 import { resolveDevice, type DeviceListing, type DeviceRef, type DeviceRow } from "@oh-my-opencode/thread-address-core"
+import type { RemoteClient } from "../../remote"
 import type { ThreadToolResult } from "../contracts"
+import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import type { RemoteDevice, RemoteThreadSurface } from "../remote/ports"
 import { accountDevices } from "./account"
 import { asFailure, toolRefusal, type ThreadRefusal } from "./refusals"
@@ -43,4 +45,37 @@ export async function targetDevice(
   const resolved = resolveAccountDevice({ here, devices }, text, { online: true })
   if (resolved.kind === "error") return { result: { kind: "error", error: asFailure(resolved) } }
   return resolved.device.id === here ? {} : { id: resolved.device.id }
+}
+
+/**
+ * The device a person typed or a listing row names - its id, `here`, the name the device table prints, or a unique id
+ * prefix - through the one device resolver, with the account's device list it read. Every omo remote verb and a
+ * thread_create that reopens a thread on another device need the device online (work would otherwise start on an
+ * offline device), so an offline device is device_offline here by every form.
+ */
+export async function resolveTypedDevice(
+  client: RemoteClient,
+  typed: string,
+): Promise<
+  | { readonly kind: "ok"; readonly device: string; readonly devices: readonly RemoteDevice[] }
+  | { readonly kind: "error"; readonly error: ThreadToolFailure }
+> {
+  let listed: Awaited<ReturnType<typeof accountDevices>>
+  try {
+    listed = await accountDevices(client)
+  } catch (error) {
+    return {
+      kind: "error",
+      error: threadToolFailure(
+        "host_unavailable",
+        "This device's device service could not list the account's devices.",
+        "Retry when the device service is reachable.",
+        { device: typed, reason: error instanceof Error ? error.message : String(error) },
+      ),
+    }
+  }
+  const resolved = resolveAccountDevice(listed, typed, { online: true })
+  return resolved.kind === "ok"
+    ? { kind: "ok", device: resolved.device.id, devices: listed.devices }
+    : { kind: "error", error: asFailure(resolved) }
 }
