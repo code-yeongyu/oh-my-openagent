@@ -94,7 +94,7 @@ export function collectPendingBuiltinAgents(input: {
         })
         resolution = { model: override.model, provenance: "override" as const }
       } else {
-        resolution = getFirstFallbackModel(requirement)
+        resolution = getFirstFallbackModel(requirement, availableModels)
       }
     }
     if (!resolution) {
