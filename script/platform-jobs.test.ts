@@ -50,13 +50,21 @@ describe("#given platform-jobs.jq", () => {
     },
   )
 
-  posixBashTest("#when macos-combined ran green or red #then the macOS status job takes its result", () => {
-    expect(classify([statusJob("test (macos-latest, 2/2)"), combined("success")])["test (macos-latest, 2/2)"]).toBe(
-      "success",
-    )
-    expect(classify([statusJob("test (macos-latest, 2/2)"), combined("failure")])["test (macos-latest, 2/2)"]).toBe(
-      "failure",
-    )
+  posixBashTest(
+    "#when macos-combined ran #then a passing status job is success, even if another macOS part failed",
+    () => {
+      expect(classify([statusJob("test (macos-latest, 2/2)"), combined("success")])["test (macos-latest, 2/2)"]).toBe(
+        "success",
+      )
+      expect(classify([statusJob("test (macos-latest, 2/2)"), combined("failure")])["test (macos-latest, 2/2)"]).toBe(
+        "success",
+      )
+    },
+  )
+
+  posixBashTest("#when a status job's own part failed #then it is failure", () => {
+    const failed = { ...statusJob("codex-compatibility (macos-latest, platform)"), conclusion: "failure" }
+    expect(classify([failed, combined("failure")])["codex-compatibility (macos-latest, platform)"]).toBe("failure")
   })
 
   posixBashTest("#when a Windows leg ran only setup steps #then it is no-tests whatever macos-combined did", () => {
