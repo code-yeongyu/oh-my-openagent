@@ -100,6 +100,8 @@ On first run the binary writes its runtime to `~/.omo/binary-runtime/<version>/`
 
 Re-run the one-line installer: it replaces the binary when the channel has a newer version and does nothing otherwise. For a manual install, download the new release's asset the same way and replace the binary; the `update` subcommand prints the exact `curl` command for your platform.
 
+The compiled `omo update` trims `GH_TOKEN` and `GITHUB_TOKEN`, then uses `GH_TOKEN`, falling back to `GITHUB_TOKEN` when the primary variable is unset, empty, or whitespace-only. Without a token it queries anonymously, sharing GitHub's limit of 60 requests per hour per IP. If GitHub rejects a supplied token with HTTP 401, the updater retries once anonymously. If that retry also fails, the error names the token variables so you can replace or unset stale credentials. If the anonymous quota is exhausted, set either variable to a valid GitHub token and run `omo update` again. The public asset download command does not include the token.
+
 ## Notes and limits
 
 - **Windows ARM64 is a true ARM64 binary.** This differs from the npm `oh-my-opencode-windows-arm64` package, which ships an x64 binary under emulation. The release asset runs natively on ARM64 Windows.
