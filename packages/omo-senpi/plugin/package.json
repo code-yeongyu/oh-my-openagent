@@ -28,7 +28,8 @@
     "#omo-feedback-runtime": "./extensions/omo-feedback.js",
     "#omo-claim-receipt-runtime": "./extensions/omo-claim-receipt.js",
     "#omo-agent-toolkit-sdk": "./runtime/agent-toolkit-sdk/sdk.js",
-    "#bunshin-ts": "./runtime/bunshin-ts/sdk.js"
+    "#bunshin-ts": "./runtime/bunshin-ts/sdk.js",
+    "#omo-sdk": "./runtime/omo-sdk/sdk.js"
   },
   "keywords": [
     "pi-package",

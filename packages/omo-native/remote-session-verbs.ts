@@ -35,11 +35,7 @@ import { threadLink } from "../omo-senpi/src/components/thread/thread-link"
 import { openedResult } from "../omo-senpi/src/components/thread/tools/thread-row"
 import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { packageRoot } from "./bin/lib/package-paths.js"
-import {
-  rowThreadId,
-  type RemoteSessionRow,
-  type RemoteThreadSurface,
-} from "../omo-senpi/src/components/thread/remote/ports"
+import type { RemoteSessionRow, RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
 import { followRemote, remoteAvailable } from "../omo-senpi/src/components/thread/remote/remote-ops"
 import type { RemoteCommandDependencies } from "./remote-local"
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
@@ -351,8 +347,8 @@ function personDelivery(remote: RemoteThreadSurface, dependencies: RemoteCommand
       }
     return {
       kind: "ok",
-      thread: rowThreadId(row),
-      link: threadLink(rowThreadId(row), row.title),
+      thread: row.durable_id ?? "",
+      link: threadLink(row.durable_id ?? "", row.title),
       delivery: sent.delivery,
       deduplicated: sent.deduplicated,
       device: row.device,
