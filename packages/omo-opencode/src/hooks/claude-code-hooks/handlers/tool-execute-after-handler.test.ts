@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it, mock, afterAll } from "bun:test"
+import { beforeEach, describe, expect, it, mock, afterAll, afterEach, spyOn } from "bun:test"
 import { restoreModuleMocksForTestFile } from "../../../testing/module-mock-lifecycle"
+import * as config from "../config"
 
 type PostToolUseMockResult = {
   block?: boolean
@@ -18,10 +19,6 @@ const appendTranscriptEntry = mock((sessionId: string, entry: unknown) => {
   transcriptCalls.push([sessionId, entry])
 })
 let postToolUseResult: PostToolUseMockResult = { warnings: [] }
-
-mock.module("../config", () => ({
-  loadClaudeHooksConfig: async () => ({}),
-}))
 
 mock.module("../config-loader", () => ({
   loadPluginExtendedConfig: async () => ({}),
@@ -44,11 +41,17 @@ afterAll(() => {
 const { createToolExecuteAfterHandler } = await import("./tool-execute-after-handler")
 
 describe("createToolExecuteAfterHandler", () => {
+  let restoreConfig: () => void
+
   beforeEach(() => {
+    const configSpy = spyOn(config, "loadClaudeHooksConfig").mockResolvedValue({})
+    restoreConfig = () => configSpy.mockRestore()
     appendTranscriptEntry.mockClear()
     transcriptCalls.length = 0
     postToolUseResult = { warnings: [] }
   })
+
+  afterEach(() => restoreConfig())
 
   it("#given diff-heavy metadata #when transcript entry is appended #then it keeps concise output with compact metadata", async () => {
     const handler = createToolExecuteAfterHandler(
