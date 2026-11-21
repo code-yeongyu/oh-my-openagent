@@ -19,6 +19,16 @@ export const refusal = (
   details?: Readonly<Record<string, unknown>>,
 ): ThreadRefusal => ({ kind: "error", ...threadToolFailure(code, message, next, details) })
 
+/** A failure as a tool result carries it (`{ kind: "error", error }`): remote-ops.ts and holder.ts answer this shape. */
+export type Failed = { readonly kind: "error"; readonly error: ThreadToolFailure }
+
+export const failed = (
+  code: ThreadErrorCode,
+  message: string,
+  next: string,
+  details?: Readonly<Record<string, unknown>>,
+): Failed => ({ kind: "error", error: threadToolFailure(code, message, next, details) })
+
 export const asRefusal = (failure: ThreadToolFailure): ThreadRefusal => ({ kind: "error", ...failure })
 
 /** A refusal as the failure a tool result carries (`{ kind: "error", error }`). */
@@ -123,7 +133,14 @@ export function withAddresses(
     return {
       ...candidate,
       ...(device === undefined ? {} : { device }),
-      ...(device === undefined ? {} : { address: formatAddress(device, candidate.thread) }),
+      // A row with no thread id is passed back by its row key, `<device id>/<listing key>`: already an address.
+      ...(device === undefined
+        ? {}
+        : {
+            address: candidate.thread.startsWith(`${device}/`)
+              ? candidate.thread
+              : formatAddress(device, candidate.thread),
+          }),
       ...(name === undefined ? {} : { device_name: name }),
     }
   })
