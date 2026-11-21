@@ -46,6 +46,9 @@ function brandProfile() {
     userAgent: "omo",
     originator: "omo",
     ...(changelog ? { changelog } : {}),
+    // The plugin spawnSenpi prepends with --extension: the engine's own, never a user flag an attaching start
+    // could not apply to a host-held session (#14465).
+    extensions: [join(packageRoot, "plugin")],
     update: {
       packageName: "omo-ai",
       distTag: releaseChannel(),
