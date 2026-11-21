@@ -138,14 +138,41 @@ describe("pruneProvisionedRuntimes", () => {
     expect(listed).toBe(0)
   })
 
-  test("#given beta runtimes #when the stable release prunes #then prerelease versions order below their release", () => {
-    // given
-    provision("5.0.0-0.beta.89", "5.0.0-0.beta.90", "5.0.0")
+  test("#given idle source-built runtimes beside older releases #when a release or a source build prunes #then no 0.0.0 runtime is removed", () => {
+    // given: omob versions are 0.0.0-omob.<omo7>.<senpi7>; all-digit hashes share every non-numeric
+    // identifier, so only the 0.0.0 rule keeps them apart. No process runs any of them.
+    const sources = ["0.0.0-omob.0a1b2c3.9f8e7d6", "0.0.0-omob.1111111.2222222", "0.0.0-omob.3333333.4444444"]
+    const current = "0.0.0-omob.5555555.6666666"
+    provision(...sources, current, "9.2.0", "9.2.1", "9.2.2")
     // when
-    const result = pruneProvisionedRuntimes({ root, current: "5.0.0", platform: "linux", listRunning: () => [] })
+    const release = pruneProvisionedRuntimes({ root, current: "9.2.2", platform: "linux", listRunning: () => [] })
+    const source = pruneProvisionedRuntimes({ root, current, platform: "linux", listRunning: () => [] })
+    // then: the release still retires an older release of its own line
+    expect(release).toEqual({ removed: ["9.2.0"], kept: ["9.2.1"], failed: [] })
+    expect(source).toEqual({ removed: [], kept: [], failed: [] })
+    for (const version of [...sources, current, "9.2.1", "9.2.2"]) expect(present(version)).toBe(true)
+  })
+
+  test("#given stable, beta and other prerelease runtimes #when each channel prunes #then it removes only older runtimes of its own channel", () => {
+    // given
+    provision(
+      "4.9.9",
+      "5.0.0-0.beta.89",
+      "5.0.0-0.beta.90",
+      "5.0.0",
+      "5.0.1",
+      "5.1.0-0.alpha.1",
+      "5.1.0-0.beta.2",
+      "5.1.0-0.beta.3",
+    )
+    // when
+    const stable = pruneProvisionedRuntimes({ root, current: "5.0.1", platform: "linux", listRunning: () => [] })
+    const beta = pruneProvisionedRuntimes({ root, current: "5.1.0-0.beta.3", platform: "linux", listRunning: () => [] })
     // then
-    expect(result.removed).toEqual(["5.0.0-0.beta.89"])
-    expect(result.kept).toEqual(["5.0.0-0.beta.90"])
+    expect(stable).toEqual({ removed: ["4.9.9"], kept: ["5.0.0"], failed: [] })
+    expect(beta.removed.toSorted()).toEqual(["5.0.0-0.beta.89", "5.0.0-0.beta.90"])
+    expect(beta.kept).toEqual(["5.1.0-0.beta.2"])
+    for (const version of ["5.0.0", "5.0.1", "5.1.0-0.alpha.1", "5.1.0-0.beta.2"]) expect(present(version)).toBe(true)
   })
 
   test("#given Windows #when a fresh runtime prunes #then it lists no processes and leaves an open runtime to the rename lock", () => {
