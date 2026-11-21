@@ -26,6 +26,10 @@ export class EngineTimers {
     )
   }
 
+  armed(name: TimerName): boolean {
+    return this.pending.has(name)
+  }
+
   cancel(name: TimerName): void {
     this.pending.get(name)?.()
     this.pending.delete(name)

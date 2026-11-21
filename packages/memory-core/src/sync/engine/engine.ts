@@ -1,6 +1,6 @@
 // The sync engine: one cycle for both directions (sync-design §5). Triggers - startup, an
 // advertised head beyond the applied cursor, a 10 s poll while the event stream is down, a local
-// commit after a 2 s debounce - only request a cycle; cycles run one at a time. A cycle resumes any
+// commit after a 300 ms debounce - only request a cycle; cycles run one at a time. A cycle resumes any
 // journaled work, receives outside the lock, captures and applies under it, then pushes outside it;
 // a stale base receives first and retries.
 
@@ -14,6 +14,7 @@ import { type CaptureHolds, capture } from "./local-capture"
 import { pushCycle } from "./push-cycle"
 import { receive } from "./receive"
 import { StatusTracker } from "./status-tracker"
+import { StreamState } from "./stream-state"
 import { EngineTimers } from "./engine-timers"
 import type { CycleReport, EngineStatus } from "./engine-types"
 
@@ -22,7 +23,7 @@ export type { SyncFailure, SyncFailureKind } from "./failure"
 export type { CycleReport, EngineStatus, Failing } from "./engine-types"
 
 export const POLL_MS = 10_000
-export const LOCAL_DEBOUNCE_MS = 2_000
+export const LOCAL_DEBOUNCE_MS = 300
 /** While the service's client floor refuses this build, no trigger starts a cycle; one recheck runs after this long (#14483). */
 export const CLIENT_UPDATE_RECHECK_MS = 15 * 60_000
 
@@ -47,6 +48,7 @@ export class SyncEngine {
   private waiters: { readonly resolve: (report: CycleReport) => void; readonly reject: (error: unknown) => void }[] = []
   private unsubscribe: (() => void) | null = null
   private readonly timers: EngineTimers
+  private readonly stream: StreamState
   private readonly tracker: StatusTracker
   /** The next cycle settles a service freeze before it pushes: startup, a poll, a state event, or a stream event while frozen. */
   private settleNext = true
@@ -68,6 +70,7 @@ export class SyncEngine {
     this.journal = new SyncJournal(deps.repo.gitDir)
     this.tracker = new StatusTracker(() => deps.clock.now())
     this.timers = new EngineTimers(deps.clock, () => this.stopped)
+    this.stream = new StreamState(this.timers, deps.log, () => this.settleAndRequest("always"), POLL_MS)
   }
 
   state(): Promise<EngineState> {
@@ -104,7 +107,7 @@ export class SyncEngine {
         if (this.tracker.frozen !== null) this.settleNext = true
         if (head > this.appliedMirror) this.request("event")
       },
-      onConnected: (connected) => (connected ? this.timers.cancel("poll") : this.poll()),
+      onConnected: (connected, cause) => this.stream.changed(connected, cause),
       onStateChanged: () => {
         this.settleNext = true
         this.request()
@@ -205,24 +208,20 @@ export class SyncEngine {
     void this.runCycle().catch(() => undefined)
   }
 
-  private poll(): void {
-    this.timers.arm("poll", POLL_MS, () => {
-      this.settleNext = true
-      this.request()
-      this.poll()
-    })
+  private recheckLater(): void {
+    this.timers.arm("recheck", CLIENT_UPDATE_RECHECK_MS, () => this.settleAndRequest("recheck"))
   }
 
-  private recheckLater(): void {
-    this.timers.arm("recheck", CLIENT_UPDATE_RECHECK_MS, () => {
-      this.settleNext = true
-      this.request("recheck")
-    })
+  /** A poll or a recheck: settle any service freeze first, then run a cycle. */
+  private settleAndRequest(trigger: "always" | "recheck"): void {
+    this.settleNext = true
+    this.request(trigger)
   }
 
   private async cycle(): Promise<CycleReport> {
     const { deps, journal } = this
     this.stage = "load"
+    const wasLoaded = this.loaded
     if (!this.loaded) {
       await deps.store.load()
       if (await journal.claim(deps.store.peer(), deps.space, deps.legacySpace, deps.log)) await deps.store.load()
@@ -246,9 +245,9 @@ export class SyncEngine {
     let memories = 0
     let refused = 0
     let snapshot: number | null = null
-    const inbound = async () => {
+    const inbound = async (pull = true) => {
       this.stage = "receive"
-      const got = await receive(deps, journal)
+      const got = pull ? await receive(deps, journal) : { refused: 0, snapshot: null }
       refused += got.refused
       snapshot = got.snapshot ?? snapshot
       this.stage = "capture"
@@ -267,7 +266,9 @@ export class SyncEngine {
       memories += done.memories
       if (this.gap !== null) this.gap.applied += done.memories
     }
-    await inbound()
+    // With the stream up and no head announced past the applied cursor there is nothing to pull: the push goes out at
+    // once, and a batch that landed unannounced still comes in through the append's stale_base (#14476).
+    await inbound(!(this.stream.up && wasLoaded && before.cycle === null && this.eventHead <= this.appliedMirror))
     const settleFirst = this.settleNext
     this.settleNext = false
     this.stage = "push"
