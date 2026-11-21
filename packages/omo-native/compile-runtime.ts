@@ -1,3 +1,4 @@
+import { Database } from "bun:sqlite"
 import { createHash, randomUUID } from "node:crypto"
 import {
   chmodSync,
@@ -5,6 +6,7 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   realpathSync,
   renameSync,
@@ -12,7 +14,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs"
-import { dirname, join, posix, resolve, win32 } from "node:path"
+import { basename, dirname, join, posix, resolve, win32 } from "node:path"
 
 export type EmbeddedFile = Blob & {
   name: string
@@ -80,22 +82,61 @@ export function materializeProvisionedExecutable(
     chmodSync(destinationPath, 0o755)
     return
   }
-  if (provisionedExecutableMatches(sourcePath, destinationPath)) return
-  if (existsSync(destinationPath)) {
+  const matches = provisionedExecutableMatches(sourcePath, destinationPath)
+  if (!matches && existsSync(destinationPath)) {
     try {
       statSync(sourcePath)
     } catch {
       return
     }
   }
-  // Workers and separate PID namespaces can share a PID and runtime directory.
-  const temporaryPath = `${destinationPath}.tmp-${process.pid}-${randomUUID()}`
+  const directory = dirname(destinationPath)
+  const prefix = `${basename(destinationPath)}.tmp-`
+  const temporaryPaths = () =>
+    readdirSync(directory)
+      .filter(
+        (name) =>
+          name.startsWith(prefix) &&
+          /^\d+(?:-[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12})?$/.test(name.slice(prefix.length)),
+      )
+      .map((name) => join(directory, name))
+  const abandoned = temporaryPaths()
+  if (matches && abandoned.length === 0) return
+
+  // A dedicated rollback-journal SQLite file gives every Bun target the same
+  // kernel-backed shared/exclusive lock, including across PID namespaces.
+  // Never unlink it: replacing its inode would let two lock domains coexist.
+  const lock = new Database(`${destinationPath}.provisioning-lock`)
   try {
-    copyFileSync(sourcePath, temporaryPath, constants.COPYFILE_EXCL)
-    chmodSync(temporaryPath, 0o755)
-    renameSync(temporaryPath, destinationPath)
+    if (abandoned.length > 0) {
+      lock.exec("PRAGMA busy_timeout=0")
+      try {
+        lock
+          .transaction(() => {
+            for (const temporaryPath of temporaryPaths()) rmSync(temporaryPath, { force: true })
+          })
+          .exclusive()
+      } catch (error) {
+        // A live provisioner owns a shared lock; its temp must remain untouched.
+        if (!(error instanceof Error) || !("code" in error) || error.code !== "SQLITE_BUSY") throw error
+      }
+    }
+    lock.exec("PRAGMA busy_timeout=5000")
+    lock.transaction(() => {
+      // BEGIN alone is deferred: reading a database page acquires the shared lock.
+      lock.query("SELECT name FROM sqlite_master").all()
+      if (provisionedExecutableMatches(sourcePath, destinationPath)) return
+      const temporaryPath = `${destinationPath}.tmp-${process.pid}-${randomUUID()}`
+      try {
+        copyFileSync(sourcePath, temporaryPath, constants.COPYFILE_EXCL)
+        chmodSync(temporaryPath, 0o755)
+        renameSync(temporaryPath, destinationPath)
+      } finally {
+        rmSync(temporaryPath, { force: true })
+      }
+    })()
   } finally {
-    rmSync(temporaryPath, { force: true })
+    lock.close()
   }
 }
 
