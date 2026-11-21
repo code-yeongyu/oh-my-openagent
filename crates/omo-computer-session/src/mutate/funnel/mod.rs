@@ -1,11 +1,10 @@
 //! `Session::mutate`: the stages in order. No OS call precedes the marker write, and no stage
 //! retries.
 
-use omo_computer_core::error::Reason;
 use std::hash::{BuildHasher, Hasher};
 
-use omo_computer_core::backend::{Delivered, Refusal};
-use omo_computer_core::error::EngineCode;
+use omo_computer_core::backend::Delivered;
+use omo_computer_core::error::Reason;
 use omo_computer_core::intervention::BackendClock;
 use omo_computer_core::params::ReportMode;
 use omo_computer_core::results::ExecReply;
@@ -13,6 +12,7 @@ use serde_json::json;
 
 mod binding;
 mod delivered;
+mod last_pass;
 mod lock;
 mod readmit;
 mod refusal;
@@ -35,6 +35,9 @@ struct Held {
     hold_limits: crate::intervention::HoldLimits,
     target: Option<String>,
     binding: Option<(bool, Option<Vec<u8>>)>,
+    /// The call's pause ceiling in object mode; the takeover hold is checked again under it
+    /// right before delivery (review M2 of #13355).
+    pausing: Option<u64>,
 }
 
 impl Session {
@@ -65,7 +68,8 @@ impl Session {
         let call = (mutation.method, &mutation.call.target, mutation.route);
         let mut plan = self.funnel.control.plan(self.backend.as_mut(), call, epoch);
         let pausing = object.then_some(ceiling);
-        let admission = match self.admit_call(&mutation.call, mutation.route, plan.stages, pausing) {
+        let admission = match self.admit_call(&mutation.call, mutation.route, plan.stages, pausing)
+        {
             Ok(admission) => admission,
             Err(blocked) => {
                 let detail = match blocked.stage.as_str() {
@@ -81,7 +85,13 @@ impl Session {
         if let Some(frame) = mutation.frame_refusal {
             return Err(self.refuse(record, Some("Frame".to_owned()), frame.refusal().into()));
         }
-        let waited_ms = match self.busy_before_send(target) {
+        // Review L5 of #13355: a null-mode call behaves as v1 and never waits on a busy target.
+        let busy = if object {
+            self.busy_before_send(target)
+        } else {
+            Ok(0)
+        };
+        let waited_ms = match busy {
             Ok(waited_ms) => waited_ms,
             Err(busy) => {
                 let busy = self.stamp(busy, object);
@@ -104,7 +114,11 @@ impl Session {
                 }
             }
         }
-        if let Err(out) = self.funnel.control.commit(self.backend.as_mut(), &plan, epoch) {
+        if let Err(out) = self
+            .funnel
+            .control
+            .commit(self.backend.as_mut(), &plan, epoch)
+        {
             return Err(self.refuse(record, Some("Lease".to_owned()), out));
         }
         let held = Held {
@@ -114,6 +128,7 @@ impl Session {
             hold_limits,
             target: target.map(str::to_owned),
             binding: plan.audit_binding.clone(),
+            pausing,
         };
         let result = self.admitted(mutation, record, (call_id, report_mode, tag), held);
         self.funnel.control.reported(&plan);
@@ -129,12 +144,13 @@ impl Session {
         held: Held,
     ) -> Result<ExecReply, Refused> {
         let Held {
-            admission,
+            mut admission,
             policy,
             object,
             hold_limits,
             target,
             binding,
+            pausing,
         } = held;
         let target = target.as_deref();
         let identity_unavailable = binding::bind_audit(&mut record, binding.as_ref());
@@ -155,36 +171,17 @@ impl Session {
             }
             Ok(Verdict::Proceed) => {}
         }
-        let lock = match self.interaction_lock() {
+        // Time passes between the first gate and here (the busy wait, another holder of the
+        // interaction lock, a takeover wait): the last pass runs the gate again under the lock,
+        // after every wait, and nothing is SENT before it. (The exec permit and the marker
+        // recovery come earlier; they send nothing.)
+        let lock = match self.last_pass(&mutation, &mut admission, pausing, object) {
             Ok(lock) => lock,
-            Err(error) => {
-                self.funnel
-                    .warn(format!("interaction lock not taken: {error}"));
-                return Err(self.refuse(
-                    record,
-                    Some("Lock".to_owned()),
-                    TRANSACTION_FAILED.into(),
-                ));
+            Err(refused) => {
+                let (stage, out) = *refused;
+                return Err(self.refuse(record, Some(stage), out));
             }
         };
-        // Time passes between the first gate and here (the busy wait, another holder of the
-        // interaction lock): on every path the gate runs again once the lock is held, and
-        // nothing is SENT before it. (The exec permit and the marker recovery come earlier;
-        // they send nothing.) A refusal drops the lock with nothing sent.
-        // Row 21 on #13391's re-admit (R70bg(2)): the stop is reconciled through the funnel, the
-        // epoch is read fresh and the gate runs on a fresh plan's stages, so a stop or a consent
-        // change while another holder kept the lock refuses here too.
-        if let Err(refused) = self.readmit(&mutation) {
-            let (stage, out) = *refused;
-            drop(lock);
-            let out = self.stamp(out, object);
-            return Err(self.refuse(record, Some(stage), out));
-        }
-        if object && crate::intervention::foreign_input_holds(self.backend.as_ref(), admission.pid) {
-            drop(lock);
-            let out = self.stamp(Refusal::bare(EngineCode::UserIntervened).into(), object);
-            return Err(self.refuse(record, Some("Attribution".to_owned()), out));
-        }
         if let Err(error) = self.funnel.markers.create(&record.marker) {
             self.funnel.warn(format!("marker not written: {error}"));
             return Err(self.refuse(record, Some("Marker".to_owned()), MARKER_UNAVAILABLE.into()));
@@ -197,7 +194,7 @@ impl Session {
         let (count, of) = (outcome.count, outcome.of);
         if count > 0 {
             if let Some(now) = self.backend.clock().map(BackendClock::now_ms) {
-                self.display_awake.update(|hold| hold.tick(now, hold_limits).on_exec(now, hold_limits));
+                self.display_awake.exec(now, hold_limits);
             }
         }
         if let Some((target, frame_id)) = mutation.consume.as_ref().filter(|_| count > 0) {
@@ -224,8 +221,16 @@ impl Session {
             }
             Some(stop) => {
                 let ended = Ended::of(stop, count);
-                record.sent(count, of, ended.disposition, "unverifiable", Some(&ended.refusal));
-                let stored = json!({ "error": { "code": ended.refusal.code.wire(), "reason": ended.refusal.reason.map(Reason::wire) } });
+                record.sent(
+                    count,
+                    of,
+                    ended.disposition,
+                    "unverifiable",
+                    Some(&ended.refusal),
+                );
+                let code = ended.refusal.code.wire();
+                let reason = ended.refusal.reason.map(Reason::wire);
+                let stored = json!({ "error": { "code": code, "reason": reason } });
                 self.store_receipt(&mut record, stored);
                 let warning = self.append_or_warn(record.event);
                 Err(Refused {

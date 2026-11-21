@@ -147,7 +147,12 @@ test.each([
   const github = {
     rest: {
       actions: { listWorkflowRuns: async () => ({ data: { workflow_runs: [{ id: 10, run_number: 1 }] } }) },
-      pulls: { list: async () => ({ data: [{ number: 7, head: { sha: liveHead } }] }) },
+      pulls: {
+        list: async (args) => {
+          expect(args).toMatchObject({ owner: "owner", repo: "project", state: "open", head: "owner:feature" })
+          return { data: [{ number: 7, head: { sha: liveHead } }] }
+        },
+      },
     },
   }
   const context = {
@@ -167,4 +172,26 @@ test.each([
   const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor
   await new AsyncFunction("github", "context", "core", script)(github, context, core)
   expect(warned).toHaveLength(warnings)
+})
+
+test("#given a signal from a deleted fork #then the notice warns instead of failing", async () => {
+  const notice = workflow("pr-automation").jobs["notice-skipped-signal"]
+  const script = notice.steps.find((step) => step.uses?.startsWith("actions/github-script")).with.script
+  const warned = []
+  const github = {
+    rest: {
+      actions: { listWorkflowRuns: async () => ({ data: { workflow_runs: [{ id: 10, run_number: 1 }] } }) },
+      pulls: { list: async () => ({ data: [] }) },
+    },
+  }
+  const context = {
+    repo: { owner: "owner", repo: "project" },
+    workflow: "PR Automation",
+    payload: { workflow_run: { id: 10, head_sha: "old-head", head_branch: "feature", head_repository: null } },
+  }
+  const summary = { addHeading: () => summary, addRaw: () => summary, write: async () => {} }
+  const core = { info() {}, warning: (message) => warned.push(message), summary }
+  const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor
+  await new AsyncFunction("github", "context", "core", script)(github, context, core)
+  expect(warned).toHaveLength(1)
 })

@@ -241,14 +241,45 @@ void verb_promote(const char *base) {
 
 void verb_remove(const char *account) {
   item_state probe = {0};
-  OSStatus status = read_data(account, &probe);
+  OSStatus looked = lookup_attributes(account, &probe);
+  bool marked = looked == errSecSuccess && probe.marker;
   item_state_release(&probe);
-  if (status == errSecItemNotFound) reply_ok("missing");
-  else if (status == errSecAuthFailed && item_keychain_locked(account)) reply_error("locked", NULL, status);
-  else if (status == errSecAuthFailed) reply_error("not-owned", NULL, status);
-  else {
-    if (status == errSecSuccess) status = delete_item(account);
-    if (status == errSecSuccess) reply_ok(NULL);
-    else reply_error(failure_code_for(account, status), NULL, status);
+  if (looked == errSecItemNotFound) {
+    reply_ok("missing");
+    return;
   }
+  if (looked != errSecSuccess) {
+    reply_error(failure_code_for(account, looked), NULL, looked);
+    return;
+  }
+  item_state data = {0};
+  OSStatus status = read_data(account, &data);
+  item_state_release(&data);
+  // A locked keychain is today's locked class. An unlocked ACL miss on someone else's item is not-owned.
+  // Our own marker on an unlocked keychain is deleted without decrypt rights: the trusted-app path can be a
+  // helper copy that no longer exists, and that refusal is not a locked keychain (delete_item, store.c).
+  if (status == errSecAuthFailed && item_keychain_locked(account)) {
+    reply_error("locked", NULL, status);
+    return;
+  }
+  if (status == errSecAuthFailed && !marked) {
+    reply_error("not-owned", NULL, status);
+    return;
+  }
+  if (status != errSecSuccess && status != errSecAuthFailed) {
+    reply_error(failure_code_for(account, status), NULL, status);
+    return;
+  }
+  OSStatus deleted = delete_item(account);
+  if (deleted == errSecSuccess) {
+    reply_ok(NULL);
+    return;
+  }
+  if (deleted == errSecItemNotFound) {
+    reply_ok("missing");
+    return;
+  }
+  if ((deleted == errSecAuthFailed || status == errSecAuthFailed) && !item_keychain_locked(account))
+    reply_error("acl", NULL, deleted);
+  else reply_error(failure_code_for(account, deleted), NULL, deleted);
 }

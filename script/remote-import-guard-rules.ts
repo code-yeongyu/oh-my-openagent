@@ -36,17 +36,18 @@ export const REMOTE_IMPORT_RULES: GuardRules = {
     { names: ["connectDeviceService", "connectLocalApi", "openAttach"], modules: [DEVICE_SERVICE_CORE] },
     {
       names: ["createDeviceServiceSessions"],
-      modules: ["packages/omo-senpi/src/components/thread/remote/device-service.ts", REMOTE],
+      modules: [REMOTE],
     },
     { names: ["createRelayTransport"], modules: [BUNSHIN_TS_RELAY] },
   ],
   s2AllowedImporters: [
     DEVICE_SERVICE_CORE,
     REMOTE,
-    // The three infrastructure callers of section 1: endpoint registration, sign-in hand-off, memory re-adopt/forget.
+    // The three infrastructure callers of section 1: endpoint registration, sign-in hand-off, memory re-adopt/forget
+    // (the memory device session's CLI session file, cli-session.ts, moved out of account-runtime.ts in omo#14374).
     "packages/device-service-core/src/registrant.ts",
     "packages/omo-native/device-service-handoff.ts",
-    "packages/omo-senpi/src/components/memory/device-session/account-runtime.ts",
+    "packages/omo-senpi/src/components/memory/device-session/cli-session.ts",
   ],
   s3: { surface: isRemoteSurface, layers: [DEVICE_SERVICE_CORE, REMOTE, BUNSHIN_TS_RELAY], entry: `${REMOTE}index.ts` },
 }
@@ -67,18 +68,6 @@ export const S2_OFFENDERS: Readonly<Record<string, Offender>> = {
   "packages/omo-native/remote-cli.ts": { uses: ["createDeviceServiceSessions"], removedBy: "omo PR 4c-2" },
   "packages/omo-native/remote-local.ts": { uses: ["connectDeviceService"], removedBy: "omo PR 4c-1" },
   "packages/omo-native/remote-session-verbs.ts": { uses: ["createDeviceServiceSessions"], removedBy: "omo PR 4c-2" },
-  "packages/omo-senpi/src/components/thread/index.ts": {
-    uses: ["createDeviceServiceSessions"],
-    removedBy: "omo PR 4a-1/4b (the barrel re-exports live-surface.ts)",
-  },
-  "packages/omo-senpi/src/components/thread/live-surface.ts": {
-    uses: ["createDeviceServiceSessions"],
-    removedBy: "omo PR 4a-1/4b",
-  },
-  "packages/omo-senpi/src/components/thread/remote/device-service.ts": {
-    uses: ["connectDeviceService"],
-    removedBy: "omo PR 4a-1/4b (moves into components/remote)",
-  },
   "packages/omo-senpi/src/extension/bunshin-ts-pick-transport.ts": {
     uses: ["createRelayTransport"],
     removedBy: "omo PR 4c-3",
@@ -105,7 +94,7 @@ export const S3_OFFENDERS: Readonly<Record<string, Offender>> = {
     removedBy: "omo#13414 U6 (CLI + attach onto the module)",
   },
   "packages/omo-native/remote-cli.ts": {
-    uses: [DEVICE_SERVICE_CORE],
+    uses: [DEVICE_SERVICE_CORE, REMOTE],
     removedBy: "omo#13414 U6 (CLI + attach onto the module)",
   },
   "packages/omo-native/remote-cold-wake.ts": {
@@ -125,7 +114,7 @@ export const S3_OFFENDERS: Readonly<Record<string, Offender>> = {
     removedBy: "omo#13414 U6 (CLI + attach onto the module)",
   },
   "packages/omo-native/remote-session-verbs.ts": {
-    uses: [DEVICE_SERVICE_CORE],
+    uses: [DEVICE_SERVICE_CORE, REMOTE],
     removedBy: "omo#13414 U6 (CLI + attach onto the module)",
   },
   "packages/omo-senpi/src/components/thread/consumer/device-service-port.ts": {
@@ -136,8 +125,13 @@ export const S3_OFFENDERS: Readonly<Record<string, Offender>> = {
     uses: [DEVICE_SERVICE_CORE],
     removedBy: "omo#13414 U5 (thread tools onto the module)",
   },
-  "packages/omo-senpi/src/components/thread/remote/device-service.ts": {
-    uses: [DEVICE_SERVICE_CORE],
+  // Part 4a-1 moved the thread tools' device-service port into the remote module (remote/port/): these two reach it there.
+  "packages/omo-senpi/src/components/thread/live-surface.ts": {
+    uses: [REMOTE],
+    removedBy: "omo#13414 U5 (thread tools onto the module)",
+  },
+  "packages/omo-senpi/src/components/thread/remote/default-remote.ts": {
+    uses: [REMOTE],
     removedBy: "omo#13414 U5 (thread tools onto the module)",
   },
   "packages/omo-senpi/src/components/thread/remote/outcome.ts": {
@@ -207,6 +201,8 @@ export const NON_LITERAL_IMPORT_OFFENDERS: Readonly<Record<string, number>> = {
   "packages/omo-senpi/src/components/onboarding/scan-component.ts": 1,
   "packages/omo-senpi/src/components/side-panel/index.ts": 1,
   "packages/omo-senpi/src/components/thread/gateway/extension-registrations.ts": 1,
+  // A test fixture for the paged thread_read tests (#14053); it loads senpi's projector by a computed specifier.
+  "packages/omo-senpi/src/components/thread/thread-remote-entries-fixture.ts": 1,
   // A child-process test fixture for hand-browser-placement.test.ts; it imports the engine entry by path like permission-registry.test-fixture.ts.
   "packages/omo-senpi/src/extension/hand-browser-placement.test-fixture.ts": 1,
   "packages/omo-senpi/src/senpi-test-runtime.ts": 12,

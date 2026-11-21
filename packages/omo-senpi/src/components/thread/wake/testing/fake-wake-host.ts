@@ -1,5 +1,5 @@
 import { once } from "node:events"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { createServer, type Socket } from "node:net"
 import { join } from "node:path"
 
@@ -80,4 +80,32 @@ export function writeSessionFile(
   }
   writeFileSync(path, `${JSON.stringify({ ...line, ...header })}\n`)
   return path
+}
+
+/**
+ * The two transcript entries senpi's effect ledger writes for an `unload_session` carrying an `effectId`
+ * (`effect-ledger.ts`, `rpcEffectRecordSchema`): `accepted` before it is applied, then `done` (or `failed` for a refused
+ * unload) as the session is torn down.
+ */
+export function recordUnloadEffect(path: string, durableId: string, at: number, state: "done" | "failed"): void {
+  const effect = (entryState: string, iso: string) => ({
+    type: "custom",
+    customType: "rpc_effect",
+    id: `e-${entryState}-${at}`,
+    parentId: null,
+    timestamp: iso,
+    data: {
+      effectId: `omo-thread-close:${at}`,
+      kind: "unload",
+      state: entryState,
+      ...(entryState === "done" ? { disposition: "unloaded" } : {}),
+      by: { connectionId: "c-1" },
+      acceptedAt: new Date(at - 5).toISOString(),
+      updatedAt: iso,
+      durableSessionId: durableId,
+      fingerprint: "f",
+    },
+  })
+  appendFileSync(path, `${JSON.stringify(effect("accepted", new Date(at - 5).toISOString()))}\n`)
+  appendFileSync(path, `${JSON.stringify(effect(state, new Date(at).toISOString()))}\n`)
 }

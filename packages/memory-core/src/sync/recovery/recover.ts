@@ -1,7 +1,7 @@
 import { ANCHOR_NEXT_STEP, recoveryAnchor } from "../crypto/anchor.ts"
 import type { RejectionCounter } from "../crypto/rejection.ts"
 import { deviceIdOf } from "../crypto/signatures.ts"
-import { loadTrustAnchor } from "../crypto/trust-pin.ts"
+import { loadTrustAnchor, type RootChangeNotice } from "../crypto/trust-pin.ts"
 import type { DeviceKeyring } from "../keyring-port.ts"
 import { openBridgeSealedWrap } from "./key-material.ts"
 import { rotationAppend } from "./keyring-append.ts"
@@ -33,19 +33,17 @@ export type RecoverRefusalReason =
   | TransportRefusal
 
 export type RecoverOutcome =
-  | {
+  | ({
       readonly ok: true
       readonly state: "recovered"
       readonly epoch: number
       readonly credentialId: string
-      readonly rootChanged?: true
-    }
-  | {
+    } & RootChangeNotice)
+  | ({
       readonly ok: true
       readonly state: "joined-read-only"
       readonly credentialId: string
-      readonly rootChanged?: true
-    }
+    } & RootChangeNotice)
   | { readonly ok: false; readonly reason: RecoverRefusalReason }
   | {
       readonly ok: false

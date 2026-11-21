@@ -12,7 +12,14 @@ use crate::presence::LeaseEnd;
 pub(crate) struct DisplayAwakeLeaseHook(pub(crate) SharedHold);
 
 impl LeaseHook for DisplayAwakeLeaseHook {
-    fn lease_ended(&mut self, _backend: &mut dyn Backend, why: LeaseEnd) {
+    fn lease_ended(&mut self, backend: &mut dyn Backend, why: LeaseEnd) {
+        // Review L4 of #13355: a hold that lapsed before the lease end reads idle here.
+        if let Some(now) = backend
+            .clock()
+            .map(omo_computer_core::intervention::BackendClock::now_ms)
+        {
+            self.0.tick(now);
+        }
         self.0.update(|hold| {
             if matches!(why, LeaseEnd::DisplayRelease) || hold.holds_display_awake() {
                 hold.release()

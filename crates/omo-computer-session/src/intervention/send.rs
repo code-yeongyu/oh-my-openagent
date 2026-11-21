@@ -101,8 +101,13 @@ impl Session {
     /// the stroke there with the latch's own `Suspended{reason}`.
     fn latched(&mut self) -> Option<Stop> {
         let backend = &mut self.backend;
-        self.guard.observe(&mut || backend.stop_listener(), &mut omo_computer_safety::NoHolds);
-        self.guard.latch().map(|reason| Stop::Refused(reason.refusal()))
+        self.guard.observe(
+            &mut || backend.stop_listener(),
+            &mut omo_computer_safety::NoHolds,
+        );
+        self.guard
+            .latch()
+            .map(|reason| Stop::Refused(reason.refusal()))
     }
 
     pub(crate) fn send_watched(
@@ -117,38 +122,64 @@ impl Session {
         let mut count: u32 = 0;
         for (index, event) in events.into_iter().enumerate() {
             if index > 0 {
-                if let Some(stop) = self.latched().or_else(|| boundary_stop(self.backend.as_ref(), watch, window)) {
-                    return Outcome { count, of, stop: Some(stop) };
+                if let Some(stop) = self
+                    .latched()
+                    .or_else(|| boundary_stop(self.backend.as_ref(), watch, window))
+                {
+                    return Outcome {
+                        count,
+                        of,
+                        stop: Some(stop),
+                    };
                 }
             }
             if let InputEvent::Text(text) = event {
                 // Between scalars as between events (R53): the stop latch first, then the watch.
                 let guard = &mut self.guard;
                 let mut interrupt = |backend: &mut dyn Backend| {
-                    guard.observe(&mut || backend.stop_listener(), &mut omo_computer_safety::NoHolds);
+                    guard.observe(
+                        &mut || backend.stop_listener(),
+                        &mut omo_computer_safety::NoHolds,
+                    );
                     guard.latch().is_some() || boundary_stop(backend, watch, window).is_some()
                 };
                 let delivery = self.backend.post_text(&text, route, tag, &mut interrupt);
                 count = count.saturating_add(delivery.sent);
                 if let Some(refusal) = delivery.refusal {
-                    return Outcome { count, of, stop: Some(Stop::Refused(refusal)) };
+                    return Outcome {
+                        count,
+                        of,
+                        stop: Some(Stop::Refused(refusal)),
+                    };
                 }
                 if delivery.interrupted {
                     let stop = self
                         .latched()
                         .or_else(|| boundary_stop(self.backend.as_ref(), watch, window))
                         .unwrap_or(Stop::Intervened);
-                    return Outcome { count, of, stop: Some(stop) };
+                    return Outcome {
+                        count,
+                        of,
+                        stop: Some(stop),
+                    };
                 }
                 continue;
             }
             match self.backend.post_input(&TaggedInput { event, tag }, route) {
                 Ok(_) => count = count.saturating_add(1),
                 Err(refusal) => {
-                    return Outcome { count, of, stop: Some(Stop::Refused(refusal)) }
+                    return Outcome {
+                        count,
+                        of,
+                        stop: Some(Stop::Refused(refusal)),
+                    }
                 }
             }
         }
-        Outcome { count, of, stop: None }
+        Outcome {
+            count,
+            of,
+            stop: None,
+        }
     }
 }

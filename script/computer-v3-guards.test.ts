@@ -13,6 +13,14 @@ import nameMap from "./computer-v3-name-map.json"
 
 const guardScript = join(import.meta.dir, "computer-v3-guards.ts")
 
+// A self-referencing directory symlink. On Windows the default symlink type is a file, and a file
+// parent is absence (ENOTDIR), which is a different case. The loop has to be a directory symlink.
+const symlinkLoop = (root: string): void => {
+  const path = join(root, "crates")
+  if (process.platform === "win32") symlinkSync("crates", path, "dir")
+  else symlinkSync("crates", path)
+}
+
 // The guard and the fixture git calls see no inherited GIT_* variable and no system git config. Their global config
 // is the repository's hermetic test git config (test-hermetic-home.ts: HOME and GIT_CONFIG_GLOBAL name it), never the
 // user's: it turns off the detached `git maintenance run --auto` that could outlive a fixture's removal.
@@ -118,7 +126,7 @@ describe("computer-v3-guards --residue", () => {
     withRepo((repo) => {
       // given a removal path's parent that is a self-referencing symlink: lstat cannot check what is under it
       repo.write({ "README.md": "the computer module\n" })
-      symlinkSync("crates", join(repo.root, "crates"))
+      symlinkLoop(repo.root)
       repo.commit("symlink loop")
 
       // then each removal path under it is reported once as unreadable, by the guard's own classification (the
@@ -135,7 +143,7 @@ describe("computer-v3-guards --residue", () => {
       // given an unreadable parent over several removal paths, one removal path that still exists, and a file whose
       // text names the old family
       repo.write({ "README.md": "the senpi-desktop module\n", "script/qa/desktop/run.ts": "export {}\n" })
-      symlinkSync("crates", join(repo.root, "crates"))
+      symlinkLoop(repo.root)
       repo.commit("several problems")
 
       // then one run reports all of them: every unreadable path, the remaining path and the text finding

@@ -10,6 +10,7 @@ use omo_computer_safety::{Call, Gate, TargetRef};
 
 use crate::liveness::{exited, unresponsive, WINDOW_NOT_FOUND};
 use crate::mutate::Refused;
+use crate::pause::Pauses;
 use crate::session_state::{route_refusal, sample};
 use crate::Session;
 
@@ -46,6 +47,34 @@ impl Session {
             .map(|info| info.identity.pid)
     }
 
+    /// The takeover hold checked again right before delivery (review M2 of #13355): in object
+    /// mode a user working in the target pauses the send again, under what is left of the call's
+    /// ceiling after its earlier pauses (review L1 at b3227b53b2), and the pauses join the
+    /// admission's, consecutive waits for one reason merged (review L2). Answers whether it
+    /// waited at all.
+    ///
+    /// # Errors
+    /// The hold outlasted the ceiling, with nothing sent.
+    pub(crate) fn recheck_takeover(
+        &mut self,
+        admission: &mut Admission,
+        ceiling_ms: u64,
+    ) -> Result<bool, Refused> {
+        let spent: u64 = admission.paused.iter().map(|pause| pause.ms).sum();
+        match self.pause_admission(admission.pid, ceiling_ms.saturating_sub(spent)) {
+            Ok(waited) => {
+                let any = !waited.is_empty();
+                Pauses::join(&mut admission.paused, waited);
+                Ok(any)
+            }
+            Err(ended) => {
+                let mut paused = std::mem::take(&mut admission.paused);
+                Pauses::join(&mut paused, ended.paused);
+                Err(Refused::from(ended.refusal).with_paused(paused))
+            }
+        }
+    }
+
     /// Admits `call` on `route`, pausing up to `ceiling_ms`.
     ///
     /// # Errors
@@ -58,16 +87,22 @@ impl Session {
         ceiling_ms: Option<u64>,
     ) -> Result<Admission, Blocked> {
         let window = window_of(&call.target);
-        let mut admitted = self.guard.admit_on_with(self.backend.as_mut(), call, stages);
+        let mut admitted = self
+            .guard
+            .admit_on_with(self.backend.as_mut(), call, stages);
         let mut paused = Vec::new();
         let mut pid = None;
-        let may_pause = admitted.as_ref().map_or_else(|r| r.gate == Gate::Lock, |_| true);
+        let may_pause = admitted
+            .as_ref()
+            .map_or_else(|r| r.gate == Gate::Lock, |_| true);
         if let Some(ceiling_ms) = ceiling_ms.filter(|_| may_pause) {
             pid = self.window_pid(window);
             match self.pause_admission(pid, ceiling_ms) {
                 Ok(waited) => {
                     if !waited.is_empty() || admitted.is_err() {
-                        admitted = self.guard.admit_on_with(self.backend.as_mut(), call, stages);
+                        admitted = self
+                            .guard
+                            .admit_on_with(self.backend.as_mut(), call, stages);
                     }
                     paused = waited;
                 }
@@ -80,9 +115,13 @@ impl Session {
             }
         }
         if let Err(refused) = admitted {
-            let crashed = refused.gate == Gate::Target
-                && exited(self.backend.as_ref(), window).is_some();
-            let refusal = if crashed { WINDOW_NOT_FOUND } else { refused.refusal };
+            let crashed =
+                refused.gate == Gate::Target && exited(self.backend.as_ref(), window).is_some();
+            let refusal = if crashed {
+                WINDOW_NOT_FOUND
+            } else {
+                refused.refusal
+            };
             return Err(Blocked {
                 stage: format!("{:?}", refused.gate),
                 refused: Box::new(Refused::from(refusal).with_paused(paused)),

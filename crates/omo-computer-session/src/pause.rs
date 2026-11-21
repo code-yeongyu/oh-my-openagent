@@ -28,6 +28,16 @@ impl Pauses {
         }
     }
 
+    /// Appends `more` to `paused` by the same rule: a first wait for the reason `paused` ends
+    /// on adds to that last pause.
+    pub fn join(paused: &mut Vec<Pause>, more: Vec<Pause>) {
+        let mut joined = Self(std::mem::take(paused));
+        for pause in more {
+            joined.add(pause.reason, pause.ms);
+        }
+        *paused = joined.into_vec();
+    }
+
     #[must_use]
     pub fn into_vec(self) -> Vec<Pause> {
         self.0
@@ -52,6 +62,14 @@ const USER_ACTIVE_IN_TARGET: Refusal = Refusal::new(
 );
 
 impl Session {
+    /// The hold that applies to a call aimed at `pid` now, if any.
+    pub(crate) fn hold_reason(&self, pid: Option<u32>) -> Option<PauseReason> {
+        hold(&sample(self.backend.as_ref())).or_else(|| {
+            pid.filter(|pid| user_active_in_target(self.backend.as_ref(), *pid))
+                .map(|_| PauseReason::UserActive)
+        })
+    }
+
     /// Waits while a hold applies to a call aimed at `pid`.
     ///
     /// # Errors
@@ -64,11 +82,7 @@ impl Session {
         let mut pauses = Pauses::default();
         let mut waited: u64 = 0;
         loop {
-            let reason = hold(&sample(self.backend.as_ref())).or_else(|| {
-                pid.filter(|pid| user_active_in_target(self.backend.as_ref(), *pid))
-                    .map(|_| PauseReason::UserActive)
-            });
-            let Some(reason) = reason else {
+            let Some(reason) = self.hold_reason(pid) else {
                 return Ok(pauses.into_vec());
             };
             if self.guard.supervisor().latch().is_some() {

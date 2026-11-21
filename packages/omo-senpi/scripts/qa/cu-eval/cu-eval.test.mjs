@@ -247,6 +247,8 @@ describe("cu-eval bench", () => {
       { op: "click", reason: "p50", baselineP50: 1, currentP50: 2, limit: 1.3 },
     ])
     expect(compareBench({ ops: {} }, at(1)).regressions).toEqual([{ op: "click", reason: "missing" }])
+    // desktop-bench.yml prints its thresholds from these two fields of the result.
+    expect(compareBench(at(1), at(1))).toMatchObject({ ratio: 1.3, floorMs: 0.5 })
   })
 
   test("#given the committed Linux fake baseline #when read #then every bench op has 30 warm samples and the host load", () => {

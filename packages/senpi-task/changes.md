@@ -1,3 +1,7 @@
+## 2026-11-17 - resolvers report who chose the model (#14025)
+
+`resolveCategory` now sets `modelSelection.source` and `resolveAgent` sets `modelSource` (`"user" | "builtin"`); an agent's own-model source is read from the definition being resolved (a builtin still on its builtin model is `builtin`), and `firstCategoryDefaultModel` and the find-only selection share one walk that returns the model with its source: `user` when the selected model came from omo.json (`model`, `models`, `fallback_models`, an agent's own model or a user category it runs through, or a call-site pin), `builtin` for a builtin default, chain rung or system default. Selection itself is unchanged.
+
 ## 2026-11-15 - architect category defaults to Fable 5.2 at xhigh (#13543)
 
 `task(category: "architect")` with no user configuration now resolves `anthropic/claude-fable-5-2` at `xhigh` (was `max`). The Fable 5.1 rung stays the fallback, at the same effort. Pinning tests and docs updated; the catalog accepts `xhigh` for both Fable generations on every provider lane the chain lists.
