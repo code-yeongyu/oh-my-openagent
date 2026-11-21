@@ -15,11 +15,11 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
-		"@vitest/coverage-v8": "5.0.1",
-		"@types/node": "^26.6.2",
-		"bun-types": "1.4.4",
+		"@vitest/coverage-v8": "5.1.1",
+		"@types/node": "^26.6.6",
+		"bun-types": "1.4.5",
 		"typescript": "^7.0.2",
-		"vitest": "5.0.1"
+		"vitest": "5.1.1"
 	},
 	"engines": {
 		"node": ">=20.0.0"

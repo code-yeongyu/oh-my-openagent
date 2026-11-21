@@ -107,7 +107,11 @@ export function authenticateMessage(raw: unknown, expectedToken: string): Authen
 	if (typeof token !== "string" || !tokenMatches(token, expectedToken)) return authError(id);
 	const cleanParams: Record<string, unknown> = { ...params };
 	delete cleanParams["_omo"];
-	return { input: { ...raw, params: cleanParams }, id, method: typeof raw["method"] === "string" ? raw["method"] : undefined };
+	return {
+		input: { ...raw, params: cleanParams },
+		id,
+		method: typeof raw["method"] === "string" ? raw["method"] : undefined,
+	};
 }
 
 export function isAuthErrorResponse(message: unknown): boolean {
@@ -216,7 +220,11 @@ function authError(id: string | number | null): JsonRpcErrorResponse {
 	return {
 		jsonrpc: "2.0",
 		id,
-		error: { code: AUTH_ERROR_CODE, message: "daemon authentication failed", data: { code: "daemon_authentication_failed" } },
+		error: {
+			code: AUTH_ERROR_CODE,
+			message: "daemon authentication failed",
+			data: { code: "daemon_authentication_failed" },
+		},
 	};
 }
 
@@ -224,6 +232,10 @@ function protocolError(id: string | number | null): JsonRpcErrorResponse {
 	return {
 		jsonrpc: "2.0",
 		id,
-		error: { code: PROTOCOL_ERROR_CODE, message: "daemon protocol mismatch", data: { code: "daemon_protocol_mismatch" } },
+		error: {
+			code: PROTOCOL_ERROR_CODE,
+			message: "daemon protocol mismatch",
+			data: { code: "daemon_protocol_mismatch" },
+		},
 	};
 }

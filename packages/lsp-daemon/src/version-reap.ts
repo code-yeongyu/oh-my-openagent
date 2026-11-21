@@ -214,13 +214,18 @@ function defaultReadProcFile(path: string): Promise<Buffer> {
 
 function defaultExecuteForStdout(file: string, args: readonly string[]): Promise<string | null> {
 	return new Promise<string | null>((resolve) => {
-		execFile(file, [...args], { encoding: "utf8", maxBuffer: 1024 * 1024, timeout: 1_000, windowsHide: true }, (error, stdout) => {
-			if (error !== null) {
-				resolve(null);
-				return;
-			}
-			resolve(stdout);
-		});
+		execFile(
+			file,
+			[...args],
+			{ encoding: "utf8", maxBuffer: 1024 * 1024, timeout: 1_000, windowsHide: true },
+			(error, stdout) => {
+				if (error !== null) {
+					resolve(null);
+					return;
+				}
+				resolve(stdout);
+			},
+		);
 	});
 }
 

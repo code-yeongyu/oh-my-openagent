@@ -60,7 +60,7 @@
     "test": "bun test src/"
   },
   "dependencies": {
-    "loro-crdt": "1.16.4",
+    "loro-crdt": "1.18.0",
     "yaml": "2.9.1",
     "zod": "^4.6.6"
   }

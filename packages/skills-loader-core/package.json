@@ -68,7 +68,7 @@
     "@oh-my-opencode/model-core": "workspace:*",
     "@oh-my-opencode/shared-skills": "workspace:*",
     "@oh-my-opencode/utils": "workspace:*",
-    "js-yaml": "^5.4.2",
+    "js-yaml": "^5.5.0",
     "picomatch": "^4.0.7",
     "zod": "^4.6.6"
   }

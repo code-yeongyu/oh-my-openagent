@@ -72,7 +72,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.4"
+          bun-version: "1.4.5"
 
       - name: Mirror and verify
         id: mirror
@@ -132,7 +132,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.4"
+          bun-version: "1.4.5"
 
       - name: Channel ${{ inputs.op }} channels/${{ inputs.channel }}
         env:

@@ -76,27 +76,19 @@ describe("OMO daemon environment contract", () => {
 });
 
 describe("daemon version grammar", () => {
-	it.each([
-		"0",
-		"1.2.3",
-		"release_2026-07+build.5",
-		"A",
-	])("#given valid version %s #when validating #then it is preserved", (version) => {
-		expect(validateDaemonVersion(version)).toBe(version);
-	});
+	it.each(["0", "1.2.3", "release_2026-07+build.5", "A"])(
+		"#given valid version %s #when validating #then it is preserved",
+		(version) => {
+			expect(validateDaemonVersion(version)).toBe(version);
+		},
+	);
 
-	it.each([
-		"",
-		" 1.2.3",
-		"1.2.3 ",
-		"../1",
-		".hidden",
-		"a/b",
-		"a\\b",
-		"a".repeat(129),
-	])("#given invalid version %s #when validating #then it is rejected", (version) => {
-		expect(() => validateDaemonVersion(version)).toThrow(InvalidDaemonVersionError);
-	});
+	it.each(["", " 1.2.3", "1.2.3 ", "../1", ".hidden", "a/b", "a\\b", "a".repeat(129)])(
+		"#given invalid version %s #when validating #then it is rejected",
+		(version) => {
+			expect(() => validateDaemonVersion(version)).toThrow(InvalidDaemonVersionError);
+		},
+	);
 });
 
 describe("daemon path derivation", () => {
@@ -108,12 +100,12 @@ describe("daemon path derivation", () => {
 		expect(paths.cliPath).toBe(DEFAULT_RUNTIME.cliPath);
 	});
 
-		it("#given a long Unix version directory #when deriving the socket #then the historical short hash fallback remains", () => {
-			const base = `/${"x".repeat(140)}`;
-			const paths = daemonPaths({ [OMO_LSP_DAEMON_DIR]: base }, DEFAULT_RUNTIME, unixPlatform());
-			expect(paths.socket).toBe("/tmp/omo-lsp-1.2.3-b174cf2e082d87e3/daemon.sock");
-			expect(paths.socket.length).toBeLessThan(100);
-		});
+	it("#given a long Unix version directory #when deriving the socket #then the historical short hash fallback remains", () => {
+		const base = `/${"x".repeat(140)}`;
+		const paths = daemonPaths({ [OMO_LSP_DAEMON_DIR]: base }, DEFAULT_RUNTIME, unixPlatform());
+		expect(paths.socket).toBe("/tmp/omo-lsp-1.2.3-b174cf2e082d87e3/daemon.sock");
+		expect(paths.socket.length).toBeLessThan(100);
+	});
 
 	it("#given deterministic Windows identity helpers #when deriving the pipe #then the digest binds version directory and user", () => {
 		const env = { [OMO_LSP_DAEMON_DIR]: "C:\\omo\\daemon" };

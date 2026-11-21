@@ -139,7 +139,11 @@ function resolveSocketPath(dir: string, version: string, platform: DaemonPlatfor
 
 	const natural = platform.path.join(canonicalVersionDir, "daemon.sock");
 	if (natural.length < MAX_SOCKET_PATH_LENGTH) return natural;
-	return platform.path.join(platform.tmpdir(), `omo-lsp-${version}-${shortDigest(canonicalVersionDir)}`, "daemon.sock");
+	return platform.path.join(
+		platform.tmpdir(),
+		`omo-lsp-${version}-${shortDigest(canonicalVersionDir)}`,
+		"daemon.sock",
+	);
 }
 
 function shortDigest(value: string): string {

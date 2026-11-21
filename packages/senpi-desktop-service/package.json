@@ -23,10 +23,10 @@
 		"@oh-my-opencode/senpi-desktop-engine": "workspace:*",
 		"@oh-my-opencode/senpi-desktop-protocol": "workspace:*",
 		"@oh-my-opencode/senpi-desktop-sdk": "workspace:*",
-		"quickjs-wasi": "3.6.2"
+		"quickjs-wasi": "3.7.0"
 	},
 	"devDependencies": {
-		"@types/node": "26.6.2",
-		"vitest": "5.0.1"
+		"@types/node": "26.6.6",
+		"vitest": "5.1.1"
 	}
 }

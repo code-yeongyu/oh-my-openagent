@@ -3,7 +3,12 @@ import { basename, delimiter, dirname, isAbsolute } from "node:path";
 import type { Readable, Writable } from "node:stream";
 import { handleLspMcpRequest, type JsonRpcId, type JsonRpcResponse } from "@oh-my-opencode/lsp-core/mcp";
 import { createStandaloneMcpRequestContext, runWithRequestContext } from "@oh-my-opencode/lsp-core/request-context";
-import { jsonRpcId, type ParentWatchdogConfig, runJsonRpcStdioServer, successResponse } from "@oh-my-opencode/mcp-stdio-core";
+import {
+	jsonRpcId,
+	type ParentWatchdogConfig,
+	runJsonRpcStdioServer,
+	successResponse,
+} from "@oh-my-opencode/mcp-stdio-core";
 import { isPlainRecord } from "@oh-my-opencode/mcp-stdio-core/record";
 
 import { type CallToolOptions, callToolViaDaemon, type DaemonToolContext } from "./daemon-client.js";

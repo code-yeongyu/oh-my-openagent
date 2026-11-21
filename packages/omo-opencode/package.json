@@ -22,10 +22,10 @@
     "typecheck": "tsgo --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@clack/prompts": "^1.8.1",
+    "@clack/prompts": "^1.9.0",
     "@code-yeongyu/senpi": "2026.11.19-5",
     "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.19-5",
-    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@oh-my-opencode/agents-md-core": "workspace:*",
     "@oh-my-opencode/boulder-state": "workspace:*",
     "@oh-my-opencode/claude-code-compat-core": "workspace:*",
@@ -46,10 +46,10 @@
     "@oh-my-opencode/tmux-core": "workspace:*",
     "@oh-my-opencode/team-core": "workspace:*",
     "@oh-my-opencode/utils": "workspace:*",
-    "@opencode-ai/plugin": "1.18.31",
-    "@opencode-ai/sdk": "1.18.31",
-    "@opencode/plugin": "2.0.32",
-    "commander": "^15.0.0",
+    "@opencode-ai/plugin": "1.19.6",
+    "@opencode-ai/sdk": "1.19.6",
+    "@opencode/plugin": "2.3.2",
+    "commander": "^15.1.0",
     "jsonc-parser": "^3.3.1",
     "picocolors": "^1.1.1",
     "zod": "^4.6.6"

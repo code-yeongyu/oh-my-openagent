@@ -118,7 +118,11 @@ function rawRequest(paths: DaemonPaths, token: string): Promise<Record<string, u
 					jsonrpc: "2.0",
 					id: 1,
 					method: "tools/call",
-					params: { _omo: { protocolVersion: 1, token }, name: "status", arguments: { _context: existingContext(paths.dir) } },
+					params: {
+						_omo: { protocolVersion: 1, token },
+						name: "status",
+						arguments: { _context: existingContext(paths.dir) },
+					},
 				}),
 			);
 		});
@@ -177,8 +181,16 @@ describe("daemon IPC authentication and ownership", () => {
 		const secondRoot = realpathSync(mkdtempSync(join(tmpdir(), "lsp-context-b-")));
 		tempDirectories.push(firstRoot, secondRoot);
 
-		const first = await callToolViaDaemon("status", {}, { paths, ensure: async () => {}, context: existingContext(firstRoot) });
-		const second = await callToolViaDaemon("status", {}, { paths, ensure: async () => {}, context: existingContext(secondRoot) });
+		const first = await callToolViaDaemon(
+			"status",
+			{},
+			{ paths, ensure: async () => {}, context: existingContext(firstRoot) },
+		);
+		const second = await callToolViaDaemon(
+			"status",
+			{},
+			{ paths, ensure: async () => {}, context: existingContext(secondRoot) },
+		);
 
 		expect(first.content[0]?.text).toContain("Configured LSP servers");
 		expect(second.content[0]?.text).toContain("Configured LSP servers");
@@ -280,9 +292,13 @@ describe("daemon IPC authentication and ownership", () => {
 		const paths = tempPaths();
 		mkdirSync(paths.dir, { recursive: true });
 		writeFileSync(paths.auth, "x".repeat(43), { mode: 0o600 });
-		writeFileSync(paths.owner, JSON.stringify({ pid: process.pid, nonce: "live", startedAt: "now", endpoint: { path: paths.socket } }), {
-			mode: 0o600,
-		});
+		writeFileSync(
+			paths.owner,
+			JSON.stringify({ pid: process.pid, nonce: "live", startedAt: "now", endpoint: { path: paths.socket } }),
+			{
+				mode: 0o600,
+			},
+		);
 		writeFileSync(paths.endpoint, paths.socket, { mode: 0o600 });
 
 		await expect(startDaemonServer(paths, { onIdleShutdown: () => {} })).rejects.toBeInstanceOf(
@@ -295,9 +311,13 @@ describe("daemon IPC authentication and ownership", () => {
 		const paths = tempPaths();
 		mkdirSync(paths.dir, { recursive: true });
 		writeFileSync(paths.auth, "old-token", { mode: 0o600 });
-		writeFileSync(paths.owner, JSON.stringify({ pid: 9_999_999, nonce: "dead", startedAt: "old", endpoint: { path: paths.socket } }), {
-			mode: 0o600,
-		});
+		writeFileSync(
+			paths.owner,
+			JSON.stringify({ pid: 9_999_999, nonce: "dead", startedAt: "old", endpoint: { path: paths.socket } }),
+			{
+				mode: 0o600,
+			},
+		);
 		writeFileSync(paths.endpoint, paths.socket, { mode: 0o600 });
 		const server = await startDaemonServer(paths, { onIdleShutdown: () => {} });
 		openServers.push(server);

@@ -3,6 +3,9 @@
   "workspaces": {
     "packages/omo-senpi/plugin": {
       "includeEntryExports": true,
+      // posthog-node 6's optional peer: its sendEmail path imports it lazily and we never send email, so the bundled
+      // posthog code in extensions/omo-telemetry-posthog.js names it without needing it.
+      "ignoreDependencies": ["@react-email/render"],
       // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
       // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
       // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).

@@ -42,7 +42,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.4"
+          bun-version: "1.4.5"
       - run: bun install --frozen-lockfile
       - name: Type check
         run: bun run type-check

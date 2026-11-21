@@ -535,7 +535,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.4"
+          bun-version: "1.4.5"
 
       # build-extension.mjs derives its --external list from the runner's builtinModules;
       # the senpi-compatibility freshness check runs it on node 24, so this job must too, or
@@ -1002,7 +1002,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.4"
+          bun-version: "1.4.5"
 
       - uses: actions/setup-node@v7
         with:
@@ -1368,7 +1368,7 @@ jobs:
           ref: ${{ needs.prepare-release-state.outputs.release_sha }}
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.4"
+          bun-version: "1.4.5"
       # Fail before the platform builds rather than after them: the release body is extracted
       # from this commit's CHANGELOG section, so a source prepared without one can never publish.
       - name: Verify the release notes exist on the prepared source
@@ -1438,7 +1438,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.4"
+          bun-version: "1.4.5"
 
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts

@@ -106,7 +106,9 @@ describe("config loader", () => {
 
 		try {
 			// when
-			const servers = runWithRequestContext(createStandaloneMcpRequestContext({ cwd: root }), () => getMergedServers());
+			const servers = runWithRequestContext(createStandaloneMcpRequestContext({ cwd: root }), () =>
+				getMergedServers(),
+			);
 
 			// then
 			expect(servers).toContainEqual(

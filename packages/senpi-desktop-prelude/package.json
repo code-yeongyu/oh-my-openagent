@@ -17,7 +17,7 @@
 		"test": "vitest --run test"
 	},
 	"devDependencies": {
-		"@types/node": "26.6.2",
-		"vitest": "5.0.1"
+		"@types/node": "26.6.6",
+		"vitest": "5.1.1"
 	}
 }

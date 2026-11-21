@@ -72,7 +72,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.4"
+          bun-version: "1.4.5"
 
       - name: Install pinned Rust toolchain and target
         run: |
@@ -282,7 +282,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.4"
+          bun-version: "1.4.5"
 
       - name: Build universal keychain helper
         run: |
@@ -373,7 +373,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.4"
+          bun-version: "1.4.5"
 
       # The checkout is the dispatched ref (#13943, #13964). This step refuses a ref whose operator-darwin-*.ts or
       # bunfig.toml differ from the default branch's, and copies the DEFAULT BRANCH's verifier bytes outside the
@@ -611,7 +611,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.4"
+          bun-version: "1.4.5"
 
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
@@ -1396,7 +1396,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.4"
+          bun-version: "1.4.5"
 
       - uses: actions/setup-python@v6
         with:

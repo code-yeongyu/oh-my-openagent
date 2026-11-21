@@ -132,23 +132,24 @@ describe("extractRequestContext", () => {
 		{ name: "scalar", context: "not-an-object" },
 		{ name: "array", context: [] },
 		{ name: "null", context: null },
-	])("#given authenticated tools/call with $name _context #when routed #then invalid request returns before Core dispatch", async ({
-		context,
-	}) => {
-		const token = "secret-token";
-		const response = await handleDaemonMessage(authenticatedToolCall(20, token, { _context: context }), {
-			token,
-			owner: {
-				pid: process.pid,
-				nonce: "test-owner",
-				startedAt: "now",
-				endpoint: { kind: "missing", path: "memory" },
-			},
-		});
+	])(
+		"#given authenticated tools/call with $name _context #when routed #then invalid request returns before Core dispatch",
+		async ({ context }) => {
+			const token = "secret-token";
+			const response = await handleDaemonMessage(authenticatedToolCall(20, token, { _context: context }), {
+				token,
+				owner: {
+					pid: process.pid,
+					nonce: "test-owner",
+					startedAt: "now",
+					endpoint: { kind: "missing", path: "memory" },
+				},
+			});
 
-		expect(responseCode(response)).toBe("invalid_daemon_request");
-		expect(dispatchMock).not.toHaveBeenCalled();
-	});
+			expect(responseCode(response)).toBe("invalid_daemon_request");
+			expect(dispatchMock).not.toHaveBeenCalled();
+		},
+	);
 
 	it("#given authenticated tools/call with omitted _context #when routed #then invalid request returns before Core dispatch", async () => {
 		const token = "secret-token";

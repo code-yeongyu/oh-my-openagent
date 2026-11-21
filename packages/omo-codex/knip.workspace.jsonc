@@ -37,6 +37,9 @@
       "ignoreDependencies": [
         // pre-existing at origin dev 4686e425b5: a declared dependency nothing imports
         "@oh-my-opencode/shared-skills",
+        // posthog-node 6's optional peer: its sendEmail path imports it lazily and we never send email, so the
+        // bundled posthog code names it without the bundle needing it.
+        "@react-email/render",
       ],
       // pre-existing at origin dev 4686e425b5: executables this package runs that it does not declare
       "ignoreBinaries": ["where"],

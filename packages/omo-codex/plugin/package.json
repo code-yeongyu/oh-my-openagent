@@ -21,8 +21,8 @@
 		"@oh-my-opencode/shared-skills": "file:../../shared-skills"
 	},
 	"devDependencies": {
-		"@vitest/coverage-v8": "5.0.1",
-		"vitest": "5.0.1"
+		"@vitest/coverage-v8": "5.1.1",
+		"vitest": "5.1.1"
 	},
 	"scripts": {
 		"build": "node scripts/sync-version.mjs && node scripts/sync-hook-status-messages.mjs && node scripts/build-bundled-mcp-runtimes.mjs && node scripts/materialize-shared-upstreams.mjs --strict && node scripts/sync-skills.mjs && node scripts/build-components.mjs",

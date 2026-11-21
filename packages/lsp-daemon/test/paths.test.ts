@@ -36,14 +36,12 @@ describe("resolveDaemonVersion injection", () => {
 		expect(resolveDaemonVersion(fake)).toBe("0");
 	});
 
-	it.each([
-		"",
-		"../bad",
-		"bad version",
-		"a".repeat(129),
-	])("#given invalid stamped package version %s #when resolving version #then it is rejected instead of downgraded to zero", (version) => {
-		expect(() => resolveDaemonVersion(() => ({ version }))).toThrow();
-	});
+	it.each(["", "../bad", "bad version", "a".repeat(129)])(
+		"#given invalid stamped package version %s #when resolving version #then it is rejected instead of downgraded to zero",
+		(version) => {
+			expect(() => resolveDaemonVersion(() => ({ version }))).toThrow();
+		},
+	);
 
 	it("#given the default require #when resolving version #then returns the real package version", () => {
 		expect(resolveDaemonVersion()).toBe(packageManifest.version);

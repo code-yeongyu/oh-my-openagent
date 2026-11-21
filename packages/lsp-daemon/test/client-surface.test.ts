@@ -68,16 +68,16 @@ describe("public client package surface", () => {
 		{ name: "array", context: [] },
 		{ name: "scalar", context: "not-a-context" },
 		{ name: "unknown field", context: { cwd: process.cwd(), env: {} } },
-	])("#given malformed public client context $name #when calling the public client #then rejection happens before daemon dispatch", async ({
-		name,
-		context,
-	}) => {
-		const ensure = vi.fn(async () => {});
-		const paths = daemonTestPaths(fileURLToPath(new URL(`client-surface-malformed-${name}`, import.meta.url)));
+	])(
+		"#given malformed public client context $name #when calling the public client #then rejection happens before daemon dispatch",
+		async ({ name, context }) => {
+			const ensure = vi.fn(async () => {});
+			const paths = daemonTestPaths(fileURLToPath(new URL(`client-surface-malformed-${name}`, import.meta.url)));
 
-		await expect(
-			Reflect.apply(callToolViaDaemon, undefined, ["status", {}, { paths, ensure, context }]),
-		).rejects.toThrow(/context|field|capabilities/i);
-		expect(ensure).not.toHaveBeenCalled();
-	});
+			await expect(
+				Reflect.apply(callToolViaDaemon, undefined, ["status", {}, { paths, ensure, context }]),
+			).rejects.toThrow(/context|field|capabilities/i);
+			expect(ensure).not.toHaveBeenCalled();
+		},
+	);
 });

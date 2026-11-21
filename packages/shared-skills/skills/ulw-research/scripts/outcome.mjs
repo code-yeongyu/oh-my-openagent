@@ -46,7 +46,7 @@ function stamp(now) {
   return (now ?? new Date()).toISOString()
 }
 /** The run clock outcome init records (outcome-start.mjs owns the contract). */
-export function parseSessionStart(sessionDir, { startedAt, now } = {}) {
+function parseSessionStart(sessionDir, { startedAt, now } = {}) {
   const fail = (message) => {
     throw new OutcomeError("invalid_session_dir", message)
   }

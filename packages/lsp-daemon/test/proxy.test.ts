@@ -88,7 +88,10 @@ describe("mcp stdio proxy", () => {
 		writeFileSync(opencodeConfig, JSON.stringify({ lsp: { typescript: { disabled: true } } }));
 		writeFileSync(omoConfig, JSON.stringify({ lsp: { typescript: { priority: 99 } } }));
 		writeFileSync(omoClientConfig, JSON.stringify({ lsp: { deno: { disabled: true } } }));
-		writeFileSync(userConfig, JSON.stringify({ lsp: { "user-context-proof": { command: ["user-ls"], extensions: [".user"] } } }));
+		writeFileSync(
+			userConfig,
+			JSON.stringify({ lsp: { "user-context-proof": { command: ["user-ls"], extensions: [".user"] } } }),
+		);
 		const previousProject = process.env["LSP_TOOLS_MCP_PROJECT_CONFIG"];
 		const previousUser = process.env["LSP_TOOLS_MCP_USER_CONFIG"];
 		const previousDecisions = process.env["LSP_TOOLS_MCP_INSTALL_DECISIONS"];
