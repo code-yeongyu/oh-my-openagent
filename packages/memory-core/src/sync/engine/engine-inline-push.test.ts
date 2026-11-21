@@ -63,3 +63,33 @@ for (const { inline, expected } of [
     await b.sync.engine.runCycle()
     expect(await Bun.file(join(b.repo, "note.md")).text()).toBe(NOTE)
   })
+
+// #14496 review M1: a service that stops taking inline batches (a rollback) refuses an inline append invalid_request.
+// The same batch then goes through the upload form once, and later pushes use the upload form - no failure loop.
+test("a service that stops taking inline batches between two pushes gets the next batch through the upload form, and the other device converges", async () => {
+  const server = startWireServer({ token: "t", devices: { a: "dev-a", b: "dev-b" }, inline: true })
+  cleanup.push(() => server.stop())
+  const [a, b] = [await device(server, "a"), await device(server, "b")]
+  await a.sync.engine.runCycle()
+  await Bun.write(join(a.repo, "note.md"), NOTE)
+  expect((await a.sync.engine.runCycle()).pushed).toBe(true)
+
+  server.inline = false
+  const second = `${NOTE}second\n`
+  const from = server.requests.length
+  await Bun.write(join(a.repo, "note.md"), second)
+  const pushed = (await a.sync.engine.runCycle()).pushed
+  const retried = pushRoutes(server, from)
+  const third = `${second}third\n`
+  const later = server.requests.length
+  await Bun.write(join(a.repo, "note.md"), third)
+  expect([pushed, (await a.sync.engine.runCycle()).pushed]).toEqual([true, true])
+  // The second batch lands through the upload form - after one refused inline attempt, or at once when a stream
+  // connect re-read the state first; the third goes straight to the upload form.
+  expect([retried.slice(-3), pushRoutes(server, later)]).toEqual([
+    ["POST /v1/sync/uploads", "PUT /v1/sync/uploads/:id", "POST /v1/sync/batches"],
+    ["POST /v1/sync/uploads", "PUT /v1/sync/uploads/:id", "POST /v1/sync/batches"],
+  ])
+  await b.sync.engine.runCycle()
+  expect(await Bun.file(join(b.repo, "note.md")).text()).toBe(third)
+})
