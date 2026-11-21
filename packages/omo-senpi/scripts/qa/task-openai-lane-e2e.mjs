@@ -20,7 +20,7 @@ import { isolatedChildEnv, sandboxStateDir } from "./sandbox-child-env.mjs"
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const providerEntry = join(scriptDir, "task-openai-lane-mock-provider.ts")
 const finalText = "omo e2e openai lane child final text"
-const laneModelId = "gpt-6-astra"
+const laneModelId = "gpt-6.2-astra"
 const realAgentDir = join(homedir(), ".senpi", "agent")
 const category = process.env.OMO_OPENAI_LANE_CATEGORY?.trim() || "deep-high"
 

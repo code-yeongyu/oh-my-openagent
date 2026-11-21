@@ -4,9 +4,20 @@ export type GatewayDeliveryMode = "auto" | "steer" | "follow_up"
 
 export type DeliveryState = "queued" | "admitting" | "admitted" | "applied" | "refused" | "uncertain"
 
-export type EffectiveLane = "steer" | "follow_up"
+/**
+ * The lane a delivery took at its receiver: `start` began a turn on an idle session (through the engine's followUp lane),
+ * `steer` joined the running turn, `follow_up` waits behind a turn or a hold.
+ */
+export type EffectiveLane = "start" | "steer" | "follow_up"
 
-export type RefusalReason = "not_steerable" | "turn_conflict" | "expired" | "binding_closed" | "sender_not_admitted"
+export type RefusalReason =
+  | "not_steerable"
+  | "turn_conflict"
+  | "expired"
+  | "binding_closed"
+  | "sender_not_admitted"
+  /** The target was closed on request after the row was queued, before it took the message (#14273). */
+  | "target_closed"
 
 export type ProcessIdentity = {
   readonly pid: number
@@ -56,6 +67,12 @@ export type Provenance = {
 /** No device service is set up here, it did not answer, or it answered without a device id. */
 export type DeviceAbsentReason = "no_device_service" | "device_service_unavailable" | "no_device_id"
 
+/**
+ * `creator`: the first prompt of a thread_create, sent by the session that created the target (#14045). The target
+ * receives it as its own first user message, with the creator's authority, instead of a relayed peer message.
+ */
+export type DeliveryAuthority = "creator"
+
 export type DeliveryEnvelope = {
   readonly provenance: Provenance
   readonly origin: EnvelopeOrigin
@@ -64,6 +81,7 @@ export type DeliveryEnvelope = {
   readonly root_id: string
   readonly hop: number
   readonly delivery_id: string
+  readonly authority?: DeliveryAuthority
 }
 
 /** JSON written before provenance was recorded remains readable, never attributed to the receiver. */
@@ -179,6 +197,7 @@ export type EnqueueRequest = {
   readonly cause_delivery_id: string | null
   /** The highest hop an input of the sender's run arrived with from another device (no row here); the chain continues from it (K8). */
   readonly inbound_hop?: number
+  readonly authority?: DeliveryAuthority
   readonly claimed_root_id: string | null
   readonly origin: EnvelopeOrigin
   readonly actor: string

@@ -31,12 +31,8 @@ export async function afterServiceAuth(
   args: readonly string[],
   exitCode: number | string,
   setUpRemote: () => Promise<void>,
-  platform: NodeJS.Platform = process.platform,
 ): Promise<void> {
   if (args[0] !== "login" || Number(exitCode) !== 0) return
-  // 5.1.73: on Windows the post-login device setup blocks login (hosted Windows: every login test hit its 60 s timeout
-  // after the grant). Until it is bounded there, Windows keeps remote sessions behind `omo remote enable`.
-  if (platform === "win32") return
   const api = loginApi(args)
   if (api !== undefined) process.env.OMO_SERVICE_API_URL = api
   await setUpRemote()

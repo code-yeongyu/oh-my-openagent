@@ -11,6 +11,7 @@
         "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
+        "test/cold-wake/cold-wake-fakes.ts",
         "test/local-api/event-examples.ts",
         "test/local-api/sent-request-types.ts",
         "test/local-api/support.ts",

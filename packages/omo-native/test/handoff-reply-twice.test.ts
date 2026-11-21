@@ -156,7 +156,7 @@ async function send(script: Script) {
   const done = deferred<number>()
   void runSession(
     {} as never,
-    { verb: "send", target: { device: "b", session: "dur-on-b" }, text: TEXT, delivery: "auto", wait: true } as never,
+    { verb: "send", target: "b/dur-on-b", text: TEXT, delivery: "auto", wait: true } as never,
     false,
     dependencies,
   ).then(done.resolve)

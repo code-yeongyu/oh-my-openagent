@@ -22,6 +22,9 @@ const ALLOWED = new Set([
   // The alias port (AliasRegistry and its result types): a leaf that imports nothing; ports.ts re-exports it.
   "packages/omo-senpi/src/components/thread/remote/alias-port.ts",
   "packages/omo-senpi/src/components/thread/remote/ports.ts",
+  // The address grammar seams.ts parses with (#14305): a leaf that imports nothing, held by thread-address-core's own
+  // self-contained.test.ts.
+  "packages/thread-address-core/src/parse.ts",
   `${DSC}/src/account-state.ts`,
   // The local API wire vocabulary outside local-api/ (guard G1 S1): re-exports of the leaf files below, nothing else.
   `${DSC}/src/wire.ts`,

@@ -37,11 +37,13 @@
 | `omo remote`: sessions on your other devices (verbs, states, command outcomes, device service install) | [docs/reference/remote-sessions.md](reference/remote-sessions.md) |
 | Engine trust under a user namespace (bwrap sandbox, inode attestation) | [docs/reference/engine-trust-user-namespaces.md](reference/engine-trust-user-namespaces.md) |
 | Desktop engine attach and `--serve` multi-connection threat model | [docs/reference/desktop-attach-threat-model.md](reference/desktop-attach-threat-model.md) |
+| macOS keychain helper custody threat model (where the helper runs, what the item's ACL trusts) | [docs/reference/keychain-helper-custody-threat-model.md](reference/keychain-helper-custody-threat-model.md) |
 | Known issues & workarounds | [docs/reference/known-issues.md](reference/known-issues.md) |
 | `prompt_async_gate` deep-dive | [docs/reference/prompt-async-gate-rfc.md](reference/prompt-async-gate-rfc.md) |
 | Shared core multi-PR extraction QA | [docs/reference/shared-core-multi-pr.md](reference/shared-core-multi-pr.md) |
 | Re-export shim inventory | [docs/reference/re-export-shim-inventory.md](reference/re-export-shim-inventory.md) |
 | Release process | [docs/reference/release-process.md](reference/release-process.md) |
+| Operator-built darwin release artifacts (replacing the hosted macOS legs, verification, provenance) | [docs/reference/operator-built-darwin-release.md](reference/operator-built-darwin-release.md) |
 | Changelog fragments (per-PR `changes/unreleased/<n>.md`, migration, batches) | [docs/reference/changelog-fragments.md](reference/changelog-fragments.md) |
 | GitHub PR evidence attachments | [docs/reference/github-attachment-upload.md](reference/github-attachment-upload.md) |
 | Claiming the lazycodex npm name | [docs/reference/lazycodex-npm-reservation.md](reference/lazycodex-npm-reservation.md) |
