@@ -696,7 +696,7 @@ jobs:
           git add -u packages/omo-native/bin/lib
           # The stamp may change only RELEASE_STATE_PATHS: ci-fast-path.mjs keeps a release-state pull request on Linux
           # when its base is platform-green and its diff is inside that list, so a stamp outside it must stop here.
-          git diff --cached --name-only -z | node script/release-state-paths.mjs --check
+          git diff --cached --no-renames --name-only -z | node script/release-state-paths.mjs --check
           git diff --cached --quiet || git commit -m "release: v${VERSION}"
 
           echo "needs_push=true" >> "$GITHUB_OUTPUT"

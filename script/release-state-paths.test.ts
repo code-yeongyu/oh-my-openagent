@@ -53,9 +53,84 @@ describe("#given the release stamp's path check", () => {
       jobs: { "prepare-release-state": { steps: { id?: string; run?: string }[] } }
     }
     const run = workflow.jobs["prepare-release-state"].steps.find((step) => step.id === "prepare")?.run ?? ""
-    const checkAt = run.indexOf("git diff --cached --name-only -z | node script/release-state-paths.mjs --check")
+    const checkAt = run.indexOf(
+      "git diff --cached --no-renames --name-only -z | node script/release-state-paths.mjs --check",
+    )
     expect(checkAt).toBeGreaterThan(-1)
     expect(checkAt).toBeLessThan(run.indexOf('git commit -m "release: v${VERSION}"'))
+  })
+})
+
+// A real git history: base at 1.0.0, then one candidate commit per case. --check-stamp reads it with git, as CI does.
+describe("#given the release stamp's content check", () => {
+  const repo = join(root, "stamp-repo")
+  const git = (...args: string[]) => {
+    const run = spawnSync("git", args, {
+      cwd: repo,
+      encoding: "utf8",
+      env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1" },
+    })
+    if (run.status !== 0) throw new Error(`git ${args.join(" ")}: ${run.stderr}`)
+    return run.stdout.trim()
+  }
+  const write = (path: string, body: string) => {
+    mkdirSync(join(repo, path, ".."), { recursive: true })
+    writeFileSync(join(repo, path), body)
+  }
+  const hooks = (version: string, windows: string) =>
+    JSON.stringify({ command: `omo ${version}`, commandWindows: windows }, null, 2)
+  mkdirSync(repo, { recursive: true })
+  git("init", "-q")
+  git("config", "user.email", "t@example.invalid")
+  git("config", "user.name", "t")
+  write("package.json", '{ "version": "1.0.0" }\n')
+  write("packages/omo-native/package.json", '{ "version": "1.0.0-0" }\n')
+  write("packages/omo-codex/plugin/hooks/hooks.json", hooks("1.0.0", "cmd /c omo"))
+  write("src/a.ts", "export {}\n")
+  git("add", "-A")
+  git("commit", "-qm", "base")
+  const base = git("rev-parse", "HEAD")
+  function candidate(change: () => void): string {
+    git("checkout", "-q", "--detach", base)
+    write("package.json", '{ "version": "1.0.1" }\n')
+    write("packages/omo-native/package.json", '{ "version": "1.0.1-0" }\n')
+    write("CHANGELOG.md", "## 1.0.1\n")
+    change()
+    git("add", "-A")
+    git("commit", "-qm", "candidate")
+    return git("rev-parse", "HEAD")
+  }
+  const checkStamp = (head: string) =>
+    spawnSync("node", [checker, "--check-stamp", base, head], { cwd: repo, encoding: "utf8" })
+
+  test("#then a version-only edit of a stamped file, a changelog and the manifests pass", () => {
+    const head = candidate(() => write("packages/omo-codex/plugin/hooks/hooks.json", hooks("1.0.1", "cmd /c omo")))
+    expect(checkStamp(head).status).toBe(0)
+  })
+
+  test.each([
+    [
+      "a stamped hooks file whose Windows launch line also changes",
+      () => write("packages/omo-codex/plugin/hooks/hooks.json", hooks("1.0.1", "powershell omo")),
+      "hooks.json: changes more than the version",
+    ],
+    [
+      "a source file renamed into a listed path",
+      () => {
+        mkdirSync(join(repo, "changes"), { recursive: true })
+        git("mv", "src/a.ts", "changes/a.md")
+      },
+      "src/a.ts: outside",
+    ],
+    [
+      "a new file at a stamped path",
+      () => write("packages/omo-codex/plugin/hooks/extra.json", "{}"),
+      "extra.json: added",
+    ],
+  ])("#then %s is refused and named", (_name, change, reason) => {
+    const run = checkStamp(candidate(change))
+    expect(run.status).toBe(1)
+    expect(run.stderr).toContain(reason)
   })
 })
 
