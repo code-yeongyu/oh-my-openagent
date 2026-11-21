@@ -6,8 +6,15 @@ const path = process.argv[2]
 const mode = process.argv[3]
 if (path === undefined || mode === undefined) throw new Error("missing writer fixture arguments")
 const release = Promise.withResolvers<void>()
-process.on("message", (message) => {
-  if (message === "write") release.resolve()
+// "hang" is the stalled writer of #12036: it takes the lock and never acts on "write".
+if (mode !== "hang")
+  process.on("message", (message) => {
+    if (message === "write") release.resolve()
+  })
+// The wait for "write" is bounded by the parent: once its IPC channel closes, nobody can release it.
+let finished = false
+process.on("disconnect", () => {
+  if (!finished) process.exit(1)
 })
 process.send?.("trying")
 await withLock(
@@ -42,5 +49,6 @@ await withLock(
   },
   { waitTimeoutMs: 10_000 },
 )
+finished = true
 process.send?.("written")
 process.disconnect?.()
