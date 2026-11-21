@@ -41,7 +41,10 @@ function rematchControl(states: (SessionModelState | undefined | Error)[]): Sess
 describe("#14482 review L2: set_model rematch after a refused switch", () => {
   test("#given the engine refuses the switch and the target then reports no model state #when the suffix rematches #then the engine's refusal is answered", async () => {
     // given
-    const control = rematchControl([{ model: { provider: "openai", id: "gpt-previous" }, thinkingLevel: "off" }, undefined])
+    const control = rematchControl([
+      { model: { provider: "openai", id: "gpt-previous" }, thinkingLevel: "off" },
+      undefined,
+    ])
 
     // when
     const result = await answered(() => setModelOn(control, "gpt-x:max", undefined))
@@ -53,7 +56,10 @@ describe("#14482 review L2: set_model rematch after a refused switch", () => {
   test("#given the engine refuses the switch and reading the target's model state then fails in transport #when the suffix rematches #then that transport failure is answered", async () => {
     // given
     const transport = new Error("host_unavailable: the target endpoint closed the connection")
-    const control = rematchControl([{ model: { provider: "openai", id: "gpt-previous" }, thinkingLevel: "off" }, transport])
+    const control = rematchControl([
+      { model: { provider: "openai", id: "gpt-previous" }, thinkingLevel: "off" },
+      transport,
+    ])
 
     // when
     const result = answered(() => setModelOn(control, "gpt-x:max", undefined))
