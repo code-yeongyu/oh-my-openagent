@@ -2,6 +2,7 @@
 
 import { describe, expect, test } from "bun:test"
 import { fileURLToPath } from "node:url"
+import { parseSync, Visitor } from "oxc-parser"
 
 const REPO_ROOT = fileURLToPath(new URL("../../../../", import.meta.url))
 
@@ -84,9 +85,10 @@ const ENGINE_NAME_ALLOWLIST: readonly { readonly why: string; readonly pattern: 
 
 // The repo's committed bundles are named *.generated.js (service-auth.generated.js and friends). The
 // bundler names each lazily initialized module init_<module>, so init_senpi_launcher is senpi-launcher.ts
-// and not wording. Only that whole-identifier shape is excused, and only inside a generated bundle.
+// and not wording. Only that identifier is excused, only inside a generated bundle, and only where the
+// bundle's parser sees an identifier: the same token in a string, template, or comment is text and is reported.
 const GENERATED_BUNDLE = /\.generated\.js$/
-const BUNDLER_INIT_IDENTIFIER = /(?<![\w$])init_[\w$]+(?![\w$])/g
+const BUNDLER_INIT_IDENTIFIER = /^init_[\w$]+$/
 
 interface Violation {
   readonly file: string
@@ -104,9 +106,27 @@ function stripEngineNames(line: string): string {
   return rest
 }
 
-function hasUnallowlistedEngineMention(line: string, file: string): boolean {
-  const scanned = GENERATED_BUNDLE.test(file) ? line.replace(BUNDLER_INIT_IDENTIFIER, "") : line
-  return /senpi/i.test(stripEngineNames(scanned))
+function hasUnallowlistedEngineMention(line: string): boolean {
+  return /senpi/i.test(stripEngineNames(line))
+}
+
+function withoutBundlerInitIdentifiers(contents: string, file: string): string {
+  if (!GENERATED_BUNDLE.test(file)) return contents
+  const parsed = parseSync(file, contents)
+  if (parsed.errors.length > 0) throw new Error(`${file} does not parse: ${parsed.errors[0]?.message}`)
+  const spans: { readonly start: number; readonly end: number }[] = []
+  new Visitor({
+    Identifier(node) {
+      if (BUNDLER_INIT_IDENTIFIER.test(node.name)) spans.push(node)
+    },
+  }).visit(parsed.program)
+  let kept = ""
+  let cursor = 0
+  for (const span of spans.toSorted((a, b) => a.start - b.start)) {
+    kept += contents.slice(cursor, span.start)
+    cursor = Math.max(cursor, span.end)
+  }
+  return kept + contents.slice(cursor)
 }
 
 async function userFacingSources(): Promise<readonly string[]> {
@@ -120,13 +140,18 @@ async function userFacingSources(): Promise<readonly string[]> {
   return [...sources].sort()
 }
 
-async function collectViolations(detect: (line: string, file: string) => boolean): Promise<readonly Violation[]> {
+async function collectViolations(
+  detect: (line: string) => boolean,
+  scannedText: (contents: string, file: string) => string = (contents) => contents,
+): Promise<readonly Violation[]> {
   const violations: Violation[] = []
   for (const file of await userFacingSources()) {
     const contents = await Bun.file(`${REPO_ROOT}${file}`).text()
-    contents.split("\n").forEach((text, index) => {
-      if (detect(text, file)) violations.push({ file, line: index + 1, text: text.trim().slice(0, 140) })
-    })
+    scannedText(contents, file)
+      .split("\n")
+      .forEach((text, index) => {
+        if (detect(text)) violations.push({ file, line: index + 1, text: text.trim().slice(0, 140) })
+      })
   }
   return violations
 }
@@ -146,7 +171,7 @@ describe("user-facing surfaces call the standalone edition OmO Native", () => {
 
   test("#given every installer, postinstall, docs, native bin, runtime notice and README surface #when scanned #then each remaining senpi mention is an allowlisted engine name", async () => {
     // given / when
-    const violations = await collectViolations(hasUnallowlistedEngineMention)
+    const violations = await collectViolations(hasUnallowlistedEngineMention, withoutBundlerInitIdentifiers)
 
     // then
     expect(report(violations)).toEqual([])
@@ -178,7 +203,7 @@ describe("the guard itself can fail", () => {
   ])("#given the engine-name line %p #when checked #then it is accepted", (line) => {
     // given / when / then
     expect(namesEditionAfterEngine(line)).toBe(false)
-    expect(hasUnallowlistedEngineMention(line, "README.md")).toBe(false)
+    expect(hasUnallowlistedEngineMention(line)).toBe(false)
   })
 
   test.each([
@@ -187,7 +212,7 @@ describe("the guard itself can fail", () => {
     "Install Senpi to get the standalone command.",
   ])("#given the engine offered as a product %p #when checked #then the allowlist does not excuse it", (line) => {
     // given / when / then
-    expect(hasUnallowlistedEngineMention(line, "README.md")).toBe(true)
+    expect(hasUnallowlistedEngineMention(line)).toBe(true)
   })
 
   test("#given a bare edition mention dressed as prose #when checked #then the allowlist does not excuse it", () => {
@@ -195,7 +220,7 @@ describe("the guard itself can fail", () => {
     const line = "Want one command without a host? Choose senpi (beta)."
 
     // when / then
-    expect(hasUnallowlistedEngineMention(line, "README.md")).toBe(true)
+    expect(hasUnallowlistedEngineMention(line)).toBe(true)
   })
 
   test.each([
@@ -205,21 +230,30 @@ describe("the guard itself can fail", () => {
       false,
     ],
     ["service-auth.generated.js", "init_senpi_command();init_address_book2()", false],
+    ["service-auth.generated.js", "let banner=`${init_senpi_launcher()}`;", false],
+    ["service-auth.generated.js", "let tail=`\n`;init_senpi_launcher();", false],
     [
       "service-auth.generated.js",
       'init_senpi_command();console.log("Install Senpi to get the standalone command.")',
       true,
     ],
+    ["service-auth.generated.js", 'console.log("init_senpi_launcher");', true],
+    ["service-auth.generated.js", "throw new Error('init_senpi_command failed');", true],
+    ["service-auth.generated.js", "let notice=`run init_senpi_launcher first`;", true],
+    ["service-auth.generated.js", "// init_senpi_launcher\ninit_spawn();", true],
     ["service-auth.generated.js", "xinit_senpi_launcher();", true],
     ["service-auth.js", "var init_spawn=__esm(()=>{init_senpi_launcher()})", true],
   ] as const)(
-    "#given %p line %p #when checked #then only a generated bundle's bundler init_ identifiers are excused (reported: %p)",
-    (file, line, reported) => {
+    "#given %p source %p #when checked #then only init_ identifiers in a generated bundle's code are excused (reported: %p)",
+    (file, source, reported) => {
       // given
       const path = `packages/omo-native/bin/lib/${file}`
 
-      // when / then
-      expect(hasUnallowlistedEngineMention(line, path)).toBe(reported)
+      // when
+      const lines = withoutBundlerInitIdentifiers(source, path).split("\n")
+
+      // then
+      expect(lines.some((line) => hasUnallowlistedEngineMention(line))).toBe(reported)
     },
   )
 })
