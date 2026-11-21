@@ -26,10 +26,10 @@ import {
   ROOT_LIFETIME_MS,
   SESSION_CONTROL_DELIVERY_TYPE,
   SESSION_RELEASED_ENTRY_TYPE,
-  TARGET_MAX_BYTES,
-  TARGET_MAX_MESSAGES,
+  OPEN_STATES,
 } from "./constants"
 import { pairLoopGuardMessage } from "../errors"
+import { backlogRefusal } from "./backlog"
 import { readLegacyMailbox } from "./legacy-mailbox"
 import { gatewayInboxDirectory } from "./paths"
 import { isClaimantDead, sameProcess } from "./process-identity"
@@ -104,9 +104,9 @@ const DELIVERY_COLUMNS = [
   "ledger_id",
   "verbatim_text",
   "verbatim_display_text",
+  "collapse_key",
 ] as const
 
-export const OPEN_STATES = "('queued', 'admitting', 'admitted')"
 const DURABLE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/
 
 function refused(
@@ -151,6 +151,7 @@ function rowFrom(record: SqlRow): DeliveryRow {
     ledger_id: nullableString(record.ledger_id),
     verbatim_text: nullableString(record.verbatim_text),
     verbatim_display_text: nullableString(record.verbatim_display_text),
+    collapse_key: nullableString(record.collapse_key),
   }
 }
 
@@ -163,7 +164,12 @@ function engineKey(row: DeliveryRow): string {
   return row.ledger_id ?? row.delivery_id
 }
 
-function selectRows(ctx: StoreContext, where: string, params: readonly SqlValue[], orderBy?: string): DeliveryRow[] {
+export function selectRows(
+  ctx: StoreContext,
+  where: string,
+  params: readonly SqlValue[],
+  orderBy?: string,
+): DeliveryRow[] {
   return ctx.sql
     .all(DELIVERY_COLUMNS, `SELECT ${DELIVERY_COLUMNS.join(", ")} FROM deliveries WHERE ${where}`, params, orderBy)
     .map(rowFrom)
@@ -342,6 +348,7 @@ function insertDelivery(ctx: StoreContext, row: DeliveryRow): void {
       row.ledger_id ?? null,
       row.verbatim_text ?? null,
       row.verbatim_display_text ?? null,
+      row.collapse_key ?? null,
     ],
   )
 }
@@ -673,17 +680,34 @@ export async function enqueue(
       rollbackQuietly(ctx)
       return binding
     }
+    // Expired queued rows of this target are refused first, so neither a collapse nor the cap counts them (#14466).
     const expired = refuseExpiredQueued(ctx, request.now, RETENTION_SWEEP_BATCH, request.target_durable_id)
-    const backlog = targetBacklog(ctx, request.target_durable_id, request.now, deadClaims)
+    const collapse = collapseEarlier(ctx, request)
+    if (collapse.absorbing !== undefined) {
+      // The absorbed send keeps its own receipt, which the engine completes: a retry under its key replays this answer.
+      insertReceipt(ctx, request, collapse.absorbing.delivery_id, undefined)
+      const outcome: EnqueueOutcome = {
+        kind: "collapsed",
+        row: collapse.absorbing,
+        queue_position: queuePosition(ctx, collapse.absorbing),
+      }
+      ctx.sql.exec(commitSql)
+      committed = true
+      for (const gone of expired) unlinkMarker(ctx, gone.target_durable_id, gone.delivery_id)
+      return outcome
+    }
     const bytes = Buffer.byteLength(request.body)
-    if (backlog.messages >= TARGET_MAX_MESSAGES || backlog.bytes + bytes > TARGET_MAX_BYTES) {
+    const full = backlogRefusal(ctx, {
+      target: request.target_durable_id,
+      mode: request.mode,
+      bytes,
+      now: request.now,
+      deadClaims,
+      targetRunning: request.endpoint_kind !== null,
+    })
+    if (full !== undefined) {
       rollbackQuietly(ctx)
-      return refused("queue_full", "The target's delivery backlog is full.", {
-        max_messages: TARGET_MAX_MESSAGES,
-        max_bytes: TARGET_MAX_BYTES,
-        target_running: request.endpoint_kind !== null,
-        frees_at: backlog.frees_at,
-      })
+      return full
     }
     const placement = placeCausally(ctx, request)
     if ("kind" in placement) {
@@ -743,32 +767,21 @@ export async function enqueue(
       ledger_id: intakeFields?.ledger_id ?? null,
       verbatim_text: intakeFields?.verbatim_text ?? null,
       verbatim_display_text: intakeFields?.verbatim_display_text ?? null,
+      collapse_key: request.collapse_key ?? null,
     }
     insertDelivery(ctx, row)
     const position = queuePosition(ctx, row)
-    const answer = intakeFields?.answer(row, position)
-    write(
-      ctx,
-      "INSERT INTO receipts (principal, operation, idempotency_key, args_hash, status, delivery_id, owner_instance, result, created_at, updated_at, expires_at) VALUES (?, 'deliver', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      [
-        request.sender_principal,
-        request.receipt.idempotency_key,
-        request.receipt.args_hash,
-        answer === undefined ? "prepared" : "completed",
-        row.delivery_id,
-        ctx.config.instance_id,
-        answer === undefined ? null : JSON.stringify(answer),
-        request.now,
-        request.now,
-        request.now + GATEWAY_RECEIPT_RETENTION_MS,
-      ],
-    )
+    insertReceipt(ctx, request, row.delivery_id, intakeFields?.answer(row, position))
     marker = createMarker(ctx, row.target_durable_id, row.delivery_id, false)
     sweepRetentionIfDue(ctx, request.now, cleared)
     if (ctx.afterCommit === undefined) await ctx.hook("beforeDbCommit")
     ctx.sql.exec(commitSql)
     committed = true
+    // Markers of rows this enqueue refused (expired, superseded) go only once those refusals committed: a later refusal
+    // in this enqueue rolls them back to queued, and a queued row always keeps its wake (a receiver's reconcile removes a
+    // marker left behind).
     for (const gone of expired) unlinkMarker(ctx, gone.target_durable_id, gone.delivery_id)
+    for (const id of collapse.superseded) unlinkMarker(ctx, request.target_durable_id, id)
     if (ctx.afterCommit === undefined) await ctx.hook("afterDbCommit")
     return { kind: "inserted", row, queue_position: position }
   } catch (error) {
@@ -779,6 +792,56 @@ export async function enqueue(
     }
     throw error
   }
+}
+
+/**
+ * A delivery under a collapse key replaces its sender's earlier undelivered one under that key (#14428): a row still
+ * waiting in the gateway is refused `superseded`; a row the session's runtime already took absorbs the repeat (the
+ * runtime cannot give it back), so one key never leaves more than one undelivered message.
+ */
+function collapseEarlier(
+  ctx: StoreContext,
+  request: EnqueueRequest,
+): { readonly absorbing?: DeliveryRow; readonly superseded: readonly string[] } {
+  if (request.collapse_key === undefined) return { superseded: [] }
+  const earlier = selectRows(
+    ctx,
+    `target_durable_id = ? AND sender = ? AND collapse_key = ? AND state IN ${OPEN_STATES}`,
+    [request.target_durable_id, request.sender_principal, request.collapse_key],
+    "seq",
+  )
+  const taken = earlier.find((row) => row.state !== "queued")
+  if (taken !== undefined) return { absorbing: taken, superseded: [] }
+  for (const row of earlier) {
+    transition(ctx, row, "refused", request.now, { reason: "superseded" })
+    // A retry of the superseded send replays its refusal, not the queued answer it got when it was sent.
+    const refusedRow = selectRow(ctx, row.delivery_id) as DeliveryRow
+    write(
+      ctx,
+      "UPDATE receipts SET status = 'completed', result = ?, updated_at = ? WHERE operation = 'deliver' AND delivery_id = ?",
+      [JSON.stringify(resultFromRow(refusedRow, 0, null, true, false)), request.now, row.delivery_id],
+    )
+  }
+  return { superseded: earlier.map((row) => row.delivery_id) }
+}
+
+function insertReceipt(ctx: StoreContext, request: EnqueueRequest, deliveryId: string, answer: unknown): void {
+  write(
+    ctx,
+    "INSERT INTO receipts (principal, operation, idempotency_key, args_hash, status, delivery_id, owner_instance, result, created_at, updated_at, expires_at) VALUES (?, 'deliver', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    [
+      request.sender_principal,
+      request.receipt.idempotency_key,
+      request.receipt.args_hash,
+      answer === undefined ? "prepared" : "completed",
+      deliveryId,
+      ctx.config.instance_id,
+      answer === undefined ? null : JSON.stringify(answer),
+      request.now,
+      request.now,
+      request.now + GATEWAY_RECEIPT_RETENTION_MS,
+    ],
+  )
 }
 
 function transcriptText(sessionPath: string | null, cache: Map<string, string>): string {
@@ -885,31 +948,6 @@ async function expiredDeadClaims(ctx: StoreContext, target: string, now: number)
 }
 
 /** What still counts against a target's cap, and when its oldest queued row expires and frees a slot without the target. */
-function targetBacklog(
-  ctx: StoreContext,
-  target: string,
-  now: number,
-  deadClaims: ReadonlyMap<string, string>,
-): { readonly messages: number; readonly bytes: number; readonly frees_at: number | null } {
-  // An expired intake row stays queued for the target's reconcile (`refuseExpiredQueued` skips it) but no longer counts.
-  const counted = `NOT (state = 'queued' AND ledger_id IS NOT NULL AND expires_at <= ?)`
-  const open = ctx.sql.one(
-    ["n", "b", "f"],
-    `SELECT COUNT(*) AS n, COALESCE(SUM(bytes), 0) AS b, MIN(CASE WHEN state = 'queued' THEN expires_at END) AS f
-     FROM deliveries WHERE target_durable_id = ? AND state IN ${OPEN_STATES} AND ${counted}`,
-    [target, now],
-  )
-  let messages = Number(open?.n ?? 0)
-  let bytes = Number(open?.b ?? 0)
-  if (deadClaims.size > 0) {
-    for (const row of selectRows(ctx, "target_durable_id = ? AND state IN ('admitting', 'admitted')", [target])) {
-      if (deadClaims.get(row.delivery_id) !== claimFingerprint(row)) continue
-      messages--
-      bytes -= row.bytes
-    }
-  }
-  return { messages, bytes, frees_at: open?.f === null || open?.f === undefined ? null : Number(open.f) }
-}
 
 /**
  * Settles queued rows past their TTL as `refused`/`expired` without the target's drain, at most `limit` of them (of
@@ -939,7 +977,7 @@ export function refuseExpiredQueued(
   return rows
 }
 
-function claimFingerprint(row: DeliveryRow): string {
+export function claimFingerprint(row: DeliveryRow): string {
   return `${JSON.stringify(row.admitted_by)}#${row.attempt}`
 }
 

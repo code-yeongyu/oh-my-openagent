@@ -441,6 +441,12 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
     "CREATE UNIQUE INDEX deliveries_ledger ON deliveries (ledger_id) WHERE ledger_id IS NOT NULL",
     ...PROVENANCE_MIGRATION,
   ],
+
+  // v16 (#14428): a sender's collapse key, so a repeat replaces its earlier undelivered delivery to the same target.
+  [
+    "ALTER TABLE deliveries ADD COLUMN collapse_key TEXT",
+    "CREATE INDEX deliveries_collapse ON deliveries (target_durable_id, sender, collapse_key) WHERE collapse_key IS NOT NULL",
+  ],
 ]
 
 /**

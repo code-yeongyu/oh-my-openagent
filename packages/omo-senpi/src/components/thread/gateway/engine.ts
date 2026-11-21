@@ -44,6 +44,8 @@ export type GatewayDeliverRequest = {
   readonly expected_turn_id?: number
   readonly all_scope?: boolean
   readonly idempotency_key?: string
+  /** Replaces the sender's earlier undelivered delivery to this target under the same key (#14428). */
+  readonly collapse_key?: string
   readonly root_id?: string
   /** The highest chain hop an input of the caller's current run arrived with from another device (K8): the row continues it. */
   readonly inbound_hop?: number
@@ -86,7 +88,8 @@ export function resolveFromEntries(
 const NEXT_ACTION: Partial<Record<ThreadErrorCode, string>> = {
   loop_detected: "A session cannot message itself through the gateway; address another thread.",
   overloaded: "Wait before sending to this session again.",
-  queue_full: "Wait for the target to take its queued messages, then send again.",
+  queue_full:
+    "Read details.reason: the target is not taking its queue. A steer has its own reserve; send repeats with one collapse_key so each replaces the last.",
   idempotency_conflict: "Retry with a new idempotency_key.",
   idempotency_in_progress: "Wait for the earlier call to settle, then retry.",
   idempotency_uncertain: "Read the target transcript before deciding whether to send again; the gateway never resends.",
@@ -129,6 +132,7 @@ export function deliveryArgsHash(fields: {
   readonly expected_turn_id: number | null
   readonly binding: { readonly binding_id: string; readonly revision: number } | null
   readonly author: ExternalAuthor | undefined
+  readonly collapse_key?: string
 }): string {
   return argsHash({
     target: fields.target,
@@ -137,6 +141,7 @@ export function deliveryArgsHash(fields: {
     expected_turn_id: fields.expected_turn_id,
     binding: fields.binding,
     author: fields.author,
+    ...(fields.collapse_key === undefined ? {} : { collapse_key: fields.collapse_key }),
   })
 }
 
@@ -201,9 +206,11 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
           expected_turn_id: request.expected_turn_id ?? null,
           binding: facts.binding,
           author: request.sender.kind === "external" ? request.sender.origin.author : undefined,
+          ...(request.collapse_key === undefined ? {} : { collapse_key: request.collapse_key }),
         }),
       },
       endpoint_kind: endpoint?.kind ?? null,
+      ...(request.collapse_key === undefined ? {} : { collapse_key: request.collapse_key }),
     })
     if (outcome.kind === "busy")
       return fail("overloaded", "The gateway store is locked by a suspended writer; nothing was sent.", {
@@ -217,6 +224,10 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
     const settle = async (result: GatewayDeliveryResult): Promise<GatewayDeliveryResult> => {
       await store.completeReceipt({ now: now(), principal: facts.principal, idempotency_key: idempotencyKey, result })
       return result
+    }
+    if (outcome.kind === "collapsed") {
+      const absorbed = resultFromRow(outcome.row, outcome.queue_position, endpoint?.kind ?? null, true, false)
+      return await settle(absorbed.kind === "ok" ? { ...absorbed, collapsed: true } : absorbed)
     }
     try {
       if (endpoint === null) return await settle(resultFromRow(outcome.row, outcome.queue_position, null, false, true))

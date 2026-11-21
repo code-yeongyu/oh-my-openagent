@@ -84,6 +84,38 @@ export function listThreads(
   }
 }
 
+/** Names each listed thread's undelivered messages from this device's gateway store (#14428): how many, where, since when. */
+export async function withBacklog(
+  store: Pick<ThreadToolSurfaceOptions["store"], "backlogs">,
+  listed: ThreadToolResult,
+): Promise<ThreadToolResult> {
+  if (listed.kind !== "ok" || !("threads" in listed) || listed.threads.length === 0) return listed
+  let backlogs: Awaited<ReturnType<typeof store.backlogs>>
+  try {
+    backlogs = await store.backlogs(listed.threads.map((thread) => thread.thread))
+  } catch (error) {
+    // The backlog is an optional detail: a store that cannot be read (a newer schema, a worker that failed to start) never
+    // costs the listing, which is how a stuck gateway is diagnosed, and the listing names why the backlog is missing.
+    return { ...listed, backlog_error: error instanceof Error ? error.message : String(error) }
+  }
+  return {
+    ...listed,
+    threads: listed.threads.map((thread) => {
+      const found = backlogs[thread.thread]
+      if (found === undefined || found.oldest_at === null) return thread
+      return {
+        ...thread,
+        backlog: {
+          held: found.held,
+          held_by_session: found.held_by_session,
+          waiting_in_gateway: found.waiting_in_gateway,
+          oldest_at: new Date(found.oldest_at).toISOString(),
+        },
+      }
+    }),
+  }
+}
+
 /**
  * A first read takes the newest entries of the trailing window that fit the budget; a read that carries a cursor
  * pages from it (a first read's cursor names the older part of that window). Tail mode ignores the cursor, so following

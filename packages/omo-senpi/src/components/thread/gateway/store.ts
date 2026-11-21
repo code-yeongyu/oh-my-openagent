@@ -370,6 +370,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     recoverDelivery: (request) => call("recover_delivery", request),
     list: (filter = {}) => call("list", filter),
     isReferenced: (durableId) => call("is_referenced", durableId),
+    backlogs: (durableIds) => call("backlogs", { targets: durableIds, now: now() }),
     journalMode: () => call("journal_mode"),
     stats: () => call("stats"),
     legacyMigrated: () => track(async () => (await start()).legacy_migrated),
