@@ -65,13 +65,19 @@ export type RevokeOutcome =
  * Signs ANOTHER device of this account out, by id (#13189): the refusals are decided on a fresh list before any request,
  * and the revoke counts only once the account no longer lists the device. `confirmName`, when given, must equal the
  * device's current name. `thisDeviceId` is the stored credential's device: a service that omits or misreports `current`
- * never gets this device revoked.
+ * never gets this device revoked. `listed` is a list the caller has just read (the CLI's name resolver), so the refusals
+ * are decided on it instead of a second read.
  */
 export async function revokeDevice(
   session: Pick<Session, "accessToken" | "request">,
-  target: { readonly id: string; readonly thisDeviceId: string | undefined; readonly confirmName?: string },
+  target: {
+    readonly id: string
+    readonly thisDeviceId: string | undefined
+    readonly confirmName?: string
+    readonly listed?: readonly LiveDevice[]
+  },
 ): Promise<RevokeOutcome> {
-  const device = (await listLiveDevices(session)).find((listed) => listed.id === target.id)
+  const device = (target.listed ?? (await listLiveDevices(session))).find((listed) => listed.id === target.id)
   if (device === undefined) return { kind: "not_found" }
   if (device.current || device.id === target.thisDeviceId) return { kind: "this_device", device }
   if (target.confirmName !== undefined && target.confirmName !== device.name)

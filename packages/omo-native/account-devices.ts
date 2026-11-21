@@ -53,7 +53,7 @@ async function revoke(dependencies: AccountDevicesDependencies, session: Session
     dependencies.error(`omo account devices revoke: no live device ${id} on this account (run omo account devices)`)
     return reply(dependencies, { revoked: false, error: "not_found" }, ACCOUNT_EXIT.failed)
   }
-  const outcome = await revokeDevice(session, { id: target.id, thisDeviceId: stored ?? undefined })
+  const outcome = await revokeDevice(session, { id: target.id, thisDeviceId: stored ?? undefined, listed: before })
   switch (outcome.kind) {
     case "not_found":
       dependencies.error(`omo account devices revoke: no live device ${id} on this account (run omo account devices)`)
