@@ -93,11 +93,11 @@ export function openSshPort(target: SshTarget): SshPort {
   return {
     open(program, { signal }) {
       const known = target.hostKey === undefined ? undefined : mkdtemp(join(tmpdir(), "omo-enroll-known-"))
-      const knownLine = (dir: string) =>
+      const knownLine = () =>
         `${target.port === undefined || target.port === 22 ? target.host : `[${target.host}]:${target.port}`} ${target.hostKey?.trim()}\n`
       const started = (async () => {
         const dir = known === undefined ? undefined : await known
-        if (dir !== undefined) await writeFile(join(dir, "known_hosts"), knownLine(dir), { mode: 0o600 })
+        if (dir !== undefined) await writeFile(join(dir, "known_hosts"), knownLine(), { mode: 0o600 })
         const argv = [
           "ssh",
           "-T",

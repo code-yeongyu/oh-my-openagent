@@ -57,10 +57,7 @@ export async function listLiveDevices(session: Pick<Session, "accessToken" | "re
 }
 
 /** Whether the account lists this device id as revoked (the live list drops such rows). */
-export async function isDeviceRevoked(
-  session: Pick<Session, "accessToken" | "request">,
-  id: string,
-): Promise<boolean> {
+export async function isDeviceRevoked(session: Pick<Session, "accessToken" | "request">, id: string): Promise<boolean> {
   const access = await session.accessToken()
   const body = await session.request("/v1/devices", { headers: syncRequestHeaders(access) })
   return listedSchema.parse(body).devices.some((device) => device.id === id && device.revokedAt !== null)

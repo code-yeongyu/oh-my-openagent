@@ -52,8 +52,8 @@ test("#given a connection that opens after the caller aborts #when the status is
   await withStateDir(true, async (stateDir) => {
     const controller = new AbortController()
     const late = Promise.withResolvers<DeviceService>()
-    const closed = Promise.withResolvers<void>()
-    const service = { close: () => closed.resolve() } as unknown as DeviceService
+    const closed = Promise.withResolvers<undefined>()
+    const service = { close: () => closed.resolve(undefined) } as unknown as DeviceService
     const answer = readDeviceServiceStatus({
       stateDir,
       version: "0.0.0-test",
