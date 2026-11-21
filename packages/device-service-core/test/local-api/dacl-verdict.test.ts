@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { exactDaclVerdict, parseSddl } from "../../src/local-api/dacl.ts"
-import { aliasedDaclVerdict, applyExactDacl } from "../../src/release/windows-dacl.ts"
+import { applyExactDacl, exactDaclVerdict, parseSddl } from "../../src/local-api/dacl.ts"
+import { aliasedDaclVerdict } from "../../src/release/windows-dacl.ts"
 import { rejectionOf } from "./conformance/rejection.ts"
 
 const U = "S-1-5-21-1111111111-2222222222-3333333333-1001"
