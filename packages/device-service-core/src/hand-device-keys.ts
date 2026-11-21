@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs"
 import {
+  connectDeviceService,
   type DeviceCredential,
   type DeviceService,
   deviceServiceEndpointPath,
@@ -42,6 +43,53 @@ export const connectOrNotRunning = async (
     const { cause, detail } = connectFailure(error)
     log?.(`OmO device service: ${cause}, treated as not running (${detail}).`)
     return "not_running"
+  }
+}
+
+/**
+ * One read of this machine's device service status for a caller that only reports it (the omo SDK): it connects, reads
+ * and closes, and never installs, starts or changes the service. No endpoint file, or one a dead service left behind, is
+ * "not_running"; a service that does not answer in time is "no_answer" (unknown, never offline); a service that refuses
+ * the connection, fails the mutual proof or sits in an unsafe state dir throws. A signed-out service answers its status.
+ */
+export const readDeviceServiceStatus = async (options: {
+  readonly stateDir: string
+  readonly version: string
+  /** The caller stops waiting: the read answers "no_answer" and a connection that opens afterwards is closed. */
+  readonly signal?: AbortSignal
+  /** Test seam: the connection (connectDeviceService by default). */
+  readonly connect?: () => Promise<DeviceService>
+}): Promise<Status | "not_running" | "no_answer"> => {
+  const { signal } = options
+  if (signal?.aborted === true) return "no_answer"
+  if (!existsSync(deviceServiceEndpointPath(options.stateDir))) return "not_running"
+  const aborted = new Promise<"no_answer">((resolve) =>
+    signal?.addEventListener("abort", () => resolve("no_answer"), { once: true }),
+  )
+  const connecting = (
+    options.connect ??
+    (() => connectDeviceService({ version: options.version, stateDir: options.stateDir, background: true }))
+  )()
+  let service: DeviceService | "no_answer"
+  try {
+    service = await Promise.race([connecting, aborted])
+  } catch (error) {
+    const { cause } = connectFailure(error)
+    if (cause === "dead_endpoint") return "not_running"
+    if (cause === "timed_out") return "no_answer"
+    throw error
+  }
+  if (service === "no_answer") {
+    void connecting.then((late) => late.close()).catch(() => undefined)
+    return "no_answer"
+  }
+  try {
+    return await Promise.race([service.status(), aborted])
+  } catch (error) {
+    if (connectFailure(error).cause === "timed_out") return "no_answer"
+    throw error
+  } finally {
+    service.close()
   }
 }
 

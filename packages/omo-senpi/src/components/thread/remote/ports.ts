@@ -277,22 +277,21 @@ export type RemoteThreadSurface = {
 }
 
 /**
- * A listing row's durable id (decision 0027 D2), "" when its device publishes none. What a row is listed and addressed by
- * is thread-address-core `rowKey` (the durable id, else `<device id>/<listing key>`); this is the durable id alone.
- */
-export const rowThreadId = (row: RemoteSessionRow): string => row.durable_id ?? ""
-
-/**
  * A listing row's thread status. Live only when its device answered this round with a non-ended state: a cached row of a
  * device that did not answer is a snapshot (often days old, of sessions long gone), never proof the session runs (#14043).
  */
 export const rowStatus = (row: RemoteSessionRow): ThreadStatus =>
   row.state === "ended" || row.source === "cache" ? "resumable" : "live"
 
+/** A row's working folder: its `path` (the folder the device lists), else the folder's name when that is unknown (#14429). */
+export const rowFolder = (row: RemoteSessionRow): string =>
+  row.path !== "" && row.path !== "unknown" ? row.path : row.project
+
 /**
  * The one rule for a probe-built `ended` row (#13238 review): a probe may build one only while this device's service
  * can carry the wake, since an ended row goes down the wake path; with the wake off it would go down the live path and
- * attach to a key no engine runs. Every probe site (holderTarget, replyOnDevice, lookupAcross) asks this first.
+ * attach to a key no engine runs. Every probe site (address/holder.ts holderTarget, address/probe.ts probeAcross and
+ * pinned) asks this first.
  */
 export async function probeMayBuildEndedRow(sessions: Pick<RemoteSessionsPort, "canWake">): Promise<boolean> {
   return (await sessions.canWake?.().catch(() => false)) === true

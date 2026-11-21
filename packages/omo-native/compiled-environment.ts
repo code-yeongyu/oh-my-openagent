@@ -51,6 +51,8 @@ export function remapSenpiEnvironment(source: NodeJS.ProcessEnv = process.env, e
     envPrefix: "OMO",
     userAgent: "omo",
     originator: "omo",
+    // The plugin buildSenpiArgs prepends with --extension, so an attaching start never counts it as a user flag (#14465).
+    extensions: [join(execDir, "plugin")],
     changelog: {
       path: join(execDir, "plugin", "CHANGELOG.md"),
       ...(changelogVersion === undefined ? {} : { version: changelogVersion }),

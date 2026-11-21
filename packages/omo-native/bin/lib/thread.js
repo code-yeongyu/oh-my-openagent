@@ -19,7 +19,7 @@ const USAGE = [
   "usage: omo thread <list|send|read|close|bind|unbind|rebind|bindings|report|answer|outbox|ack> [options] [--json]",
   "",
   "  list      [--all-scope] [--state running|idle|inactive|archived[,...]]  (repeatable; default: all but archived)",
-  "  send      <target> <text> [--mode auto|steer|follow_up] [--expected-turn <n>] [--idempotency-key <k>]",
+  "  send      <target> <text> [--mode auto|steer|follow_up] [--expected-turn <n>] [--idempotency-key <k>] [--collapse-key <k>]",
   "  send      --binding <id> [<target>] <text> [--idempotency-key <event-id>] [--mode auto|follow_up]",
   "            [--author-id <platform-user-id> --author-name <display> [--author-user-id <id>]]",
   "  read      <target> [--limit <items>] [--max-bytes <n>] [--cursor <c>]",
@@ -58,7 +58,7 @@ const COMMANDS = {
     },
   },
   send: {
-    values: ["--mode", "--expected-turn", "--binding", "--idempotency-key", ...AUTHOR_FLAGS],
+    values: ["--mode", "--expected-turn", "--binding", "--idempotency-key", "--collapse-key", ...AUTHOR_FLAGS],
     booleans: [],
     arity: [1, 2],
     call: (sdk, p, o, scope) =>
@@ -69,6 +69,7 @@ const COMMANDS = {
         expected_turn_id: integerOption(o, "--expected-turn"),
         binding_id: o["--binding"],
         idempotency_key: o["--idempotency-key"],
+        collapse_key: o["--collapse-key"],
         author: authorInput(o),
       }),
   },

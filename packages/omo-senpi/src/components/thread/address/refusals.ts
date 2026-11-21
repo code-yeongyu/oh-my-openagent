@@ -19,6 +19,16 @@ export const refusal = (
   details?: Readonly<Record<string, unknown>>,
 ): ThreadRefusal => ({ kind: "error", ...threadToolFailure(code, message, next, details) })
 
+/** A failure as a tool result carries it (`{ kind: "error", error }`): remote-ops.ts and holder.ts answer this shape. */
+export type Failed = { readonly kind: "error"; readonly error: ThreadToolFailure }
+
+export const failed = (
+  code: ThreadErrorCode,
+  message: string,
+  next: string,
+  details?: Readonly<Record<string, unknown>>,
+): Failed => ({ kind: "error", error: threadToolFailure(code, message, next, details) })
+
 export const asRefusal = (failure: ThreadToolFailure): ThreadRefusal => ({ kind: "error", ...failure })
 
 /** A refusal as the failure a tool result carries (`{ kind: "error", error }`). */
@@ -73,13 +83,36 @@ export function toolRefusal(core: AddressRefusal, thread?: string, answered?: re
         RETRY_LIST,
         details,
       )
-    case "device_unanswered":
+    case "device_unanswered": {
+      const slow: string[] = []
+      const unanswered: string[] = []
+      core.details.devices.forEach((id, index) => {
+        const label = deviceLabel({ id, name: core.details.device_names[index] ?? "" })
+        if (core.details.device_reasons?.[id] === "lookup_timeout") slow.push(label)
+        else unanswered.push(label)
+      })
+      const outcomes = [
+        ...(slow.length === 0
+          ? []
+          : [`${slow.join(", ")} ${slow.length === 1 ? "was" : "were"} too slow for the lookup`]),
+        ...(unanswered.length === 0 ? [] : [`${unanswered.join(", ")} did not answer`]),
+      ]
+      const retry =
+        slow.length === 0
+          ? `Retry when ${unanswered.length === 1 ? "that device answers" : "those devices answer"}.`
+          : "Retry the lookup; a slow device may answer in time on another attempt."
+      // omo#14270: a miss on the device that really keeps the file reads as "wait for the silent one" without this.
+      const next =
+        answered === undefined || answered.length === 0
+          ? retry
+          : `${retry} If the session should be on a device that answered, its file is not where that device looks for sessions.`
       return refusal(
         "host_unavailable",
-        `No device that answered${answered === undefined || answered.length === 0 ? "" : ` (${answered.join(", ")})`} holds ${thread === undefined ? "it" : `session ${thread}`}, and ${labels(core.details.devices, core.details.device_names)} did not answer.`,
-        "Retry when that device answers.",
+        `No device that answered${answered === undefined || answered.length === 0 ? "" : ` (${answered.join(", ")})`} holds ${thread === undefined ? "it" : `session ${thread}`}; ${outcomes.join(", and ")}.`,
+        next,
         { ...details, ...(thread === undefined ? {} : { thread }), ...(answered === undefined ? {} : { answered }) },
       )
+    }
     case "remote_unavailable":
       return refusal(
         "host_unavailable",
@@ -123,7 +156,14 @@ export function withAddresses(
     return {
       ...candidate,
       ...(device === undefined ? {} : { device }),
-      ...(device === undefined ? {} : { address: formatAddress(device, candidate.thread) }),
+      // A row with no thread id is passed back by its row key, `<device id>/<listing key>`: already an address.
+      ...(device === undefined
+        ? {}
+        : {
+            address: candidate.thread.startsWith(`${device}/`)
+              ? candidate.thread
+              : formatAddress(device, candidate.thread),
+          }),
       ...(name === undefined ? {} : { device_name: name }),
     }
   })
