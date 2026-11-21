@@ -29,6 +29,10 @@
       "types": "./src/model-chains/index.ts",
       "import": "./src/model-chains/index.ts"
     },
+    "./model-decorators": {
+      "types": "./src/senpi/model-decorators.ts",
+      "import": "./src/senpi/model-decorators.ts"
+    },
     "./category-shadow": {
       "types": "./src/agents/category-shadow.ts",
       "import": "./src/agents/category-shadow.ts"

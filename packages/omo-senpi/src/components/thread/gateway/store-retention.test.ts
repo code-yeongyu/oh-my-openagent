@@ -21,7 +21,13 @@ function insertDelivery(
   id: string,
   state: string,
   updatedAt: number,
-  extra: { readonly target?: string; readonly seq: number; readonly root?: string; readonly binding?: string },
+  extra: {
+    readonly target?: string
+    readonly seq: number
+    readonly root?: string
+    readonly binding?: string
+    readonly expiresAt?: number
+  },
 ): void {
   db.run(
     'INSERT INTO deliveries (delivery_id, target_durable_id, seq, sender, envelope, body, bytes, mode_requested, state, root_id, hop, created_at, updated_at, expires_at, binding_id) VALUES (?, ?, ?, \'session:A\', \'{"provenance":{"workspace":"Example","project":"project"}}\', \'body\', 4, \'auto\', ?, ?, 1, ?, ?, ?, ?)',
@@ -33,7 +39,7 @@ function insertDelivery(
       extra.root ?? "root-x",
       updatedAt,
       updatedAt,
-      updatedAt + DAY,
+      extra.expiresAt ?? updatedAt + DAY,
       extra.binding ?? null,
     ],
   )
@@ -98,11 +104,11 @@ describe("gateway store retention", () => {
       )
       insertDelivery(db, "d-applied", "applied", t0, { seq: 1, root: "root-old" })
       insertDelivery(db, "d-refused", "refused", t0, { seq: 2 })
-      insertDelivery(db, "d-queued", "queued", t0, { seq: 3 })
-      insertDelivery(db, "d-admitted", "admitted", t0, { seq: 4 })
+      insertDelivery(db, "d-queued", "queued", t0, { seq: 3, expiresAt: t0 + 40 * DAY })
+      insertDelivery(db, "d-admitted", "admitted", t0, { seq: 4, expiresAt: t0 + 40 * DAY })
       insertDelivery(db, "d-receipt", "applied", t0, { seq: 5 })
       insertDelivery(db, "d-recent", "applied", t0 + 30 * DAY, { seq: 6, root: "root-live" })
-      insertDelivery(db, "d-open-binding", "queued", t0, { seq: 7, binding: "bnd-in-flight" })
+      insertDelivery(db, "d-open-binding", "queued", t0, { seq: 7, binding: "bnd-in-flight", expiresAt: t0 + 40 * DAY })
       db.run(
         "INSERT INTO receipts (principal, operation, idempotency_key, args_hash, status, delivery_id, owner_instance, created_at, updated_at, expires_at) VALUES ('session:A', 'deliver', 'k', 'h', 'completed', 'd-receipt', 'i', ?, ?, ?)",
         [t0, t0, t0 + 60 * DAY],
