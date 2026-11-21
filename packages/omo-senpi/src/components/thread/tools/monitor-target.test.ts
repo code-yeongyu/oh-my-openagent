@@ -47,6 +47,11 @@ describe("monitor rpc target addressing (#14294): the address thread_send takes"
     const twins = { devices: [{ device: "c", label: "studio", online: true }] }
     expect(refusedCode(await resolve("studio/dur-on-b", twins))).toBe("ambiguous_target")
   })
+
+  test("#given this device as here and b's thread by its name #when the target is <device>/<thread name> #then the thread part resolves among that device's threads, as thread_send's does (#14305)", async () => {
+    expect(await resolve("here/local peer")).toEqual({ kind: "target", target: "dur-local" })
+    expect(await resolve("studio/on b")).toEqual({ kind: "target", target: "b/dur-on-b" })
+  })
 })
 
 describe("monitor rpc target addressing (#14294): the tool_call hook", () => {
