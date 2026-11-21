@@ -86,6 +86,12 @@ function dependencyManifestPath(packageDir: string, dependencyName: string): str
 
 const EXTENSION_LOADER = join("dist", "core", "extensions", "loader.js")
 const EXTENSION_IMPORTER = "createBunExtensionImporter"
+const JITI_FACTORY = "createJiti"
+/** The modules each factory the loader hands its table to must come from, as the installed loader imports them. */
+const FACTORY_MODULES: ReadonlyMap<string, ReadonlySet<string>> = new Map([
+  [EXTENSION_IMPORTER, new Set(["./bun-extension-importer.js"])],
+  [JITI_FACTORY, new Set(["jiti", "jiti/static"])],
+])
 
 interface AstNode {
   readonly type: string
@@ -109,6 +115,178 @@ function collectNodes(node: unknown, match: (candidate: AstNode) => boolean, fou
   return found
 }
 
+function visitWithParent(
+  node: unknown,
+  parent: AstNode | undefined,
+  visit: (candidate: AstNode, parent: AstNode | undefined) => void,
+): void {
+  if (Array.isArray(node)) {
+    for (const child of node) visitWithParent(child, parent, visit)
+    return
+  }
+  if (!isAstNode(node)) return
+  visit(node, parent)
+  for (const [field, child] of Object.entries(node)) {
+    if (field !== "type" && typeof child === "object") visitWithParent(child, node, visit)
+  }
+}
+
+/** Whether an identifier named like the table is a name in a non-reference position (a key or a member name). */
+function isNameOnly(node: AstNode, parent: AstNode | undefined): boolean {
+  if (parent === undefined) return false
+  if (parent.type === "MemberExpression") return parent["property"] === node && parent["computed"] !== true
+  if (parent.type === "Property" || parent.type === "PropertyDefinition" || parent.type === "MethodDefinition") {
+    return parent["key"] === node && parent["computed"] !== true && parent["shorthand"] !== true
+  }
+  return false
+}
+
+/** Expressions an option object may pass through on its way into a call without being bound to a name. */
+const OPTION_CARRIERS = new Set([
+  "ObjectExpression",
+  "ConditionalExpression",
+  "ParenthesizedExpression",
+  "SpreadElement",
+])
+
+/**
+ * Whether an object literal goes straight into createJiti's arguments, through only object literals, conditionals,
+ * parentheses and spreads: the shape the installed loader passes its jiti options in. An object bound to a name, handed
+ * to any other call (a wrapper, an identity call, Object.assign) or returned from a function could be written through
+ * (o.virtualModules.ws = ...), so its table read is not accepted.
+ */
+function flowsDirectlyIntoCall(objectNode: AstNode, parents: ReadonlyMap<AstNode, AstNode | undefined>): boolean {
+  let child = objectNode
+  for (let parent = parents.get(child); parent !== undefined; child = parent, parent = parents.get(child)) {
+    if (parent.type === "CallExpression") {
+      const callee = parent["callee"]
+      return (
+        isAstNode(callee) &&
+        callee.type === "Identifier" &&
+        callee["name"] === JITI_FACTORY &&
+        Array.isArray(parent["arguments"]) &&
+        parent["arguments"].includes(child)
+      )
+    }
+    if (parent.type === "ConditionalExpression" && parent["test"] === child) return false
+    if (parent.type === "Property") {
+      if (parent["value"] !== child || parent["computed"] === true) return false
+      continue
+    }
+    if (!OPTION_CARRIERS.has(parent.type)) return false
+  }
+  return false
+}
+
+/**
+ * The table is read only where the installed loader hands it on: as createBunExtensionImporter's argument, or as the
+ * `virtualModules` value of an option object that flows straight into createJiti (flowsDirectlyIntoCall). Any other
+ * reference could write to it after its declaration (a member assignment, Object.assign, a reassignment, a delete, a
+ * write through an option object), so its keys would no longer be the served set.
+ */
+function isKnownTableRead(
+  node: AstNode,
+  parent: AstNode | undefined,
+  declarator: AstNode,
+  parents: ReadonlyMap<AstNode, AstNode | undefined>,
+): boolean {
+  if (parent === declarator && declarator["id"] === node) return true
+  if (parent?.type === "CallExpression" && Array.isArray(parent["arguments"]) && parent["arguments"].includes(node)) {
+    const callee = parent["callee"]
+    return isAstNode(callee) && callee.type === "Identifier" && callee["name"] === EXTENSION_IMPORTER
+  }
+  if (parent?.type === "Property" && parent["value"] === node && parent["computed"] !== true) {
+    const key = parent["key"]
+    const options = parents.get(parent)
+    return (
+      isAstNode(key) &&
+      key.type === "Identifier" &&
+      key["name"] === "virtualModules" &&
+      options?.type === "ObjectExpression" &&
+      flowsDirectlyIntoCall(options, parents)
+    )
+  }
+  return false
+}
+
+/** The module an `await import("m")` or `await loadModule("m")` initializer names, else undefined. */
+function awaitedModuleSpecifier(init: unknown): string | undefined {
+  if (!isAstNode(init) || init.type !== "AwaitExpression") return undefined
+  const awaited = init["argument"]
+  if (!isAstNode(awaited)) return undefined
+  const source =
+    awaited.type === "ImportExpression"
+      ? awaited["source"]
+      : awaited.type === "CallExpression" && Array.isArray(awaited["arguments"])
+        ? awaited["arguments"][0]
+        : undefined
+  return isAstNode(source) && source.type === "Literal" && typeof source["value"] === "string"
+    ? source["value"]
+    : undefined
+}
+
+/**
+ * When the loader calls a factory it hands the table to, every binding of that name must be the factory itself: a
+ * non-renamed destructure of an awaited import of its module (as the installed loader binds both), or a named import
+ * from that module. A local function, a plain variable, a parameter or a renamed import of the same name could be a
+ * wrapper that writes to the table. A static reader cannot see what the factory module, or the loader's own import
+ * helper, does with the table once it has it; those are the engine's own code, not a write in the loader.
+ */
+function assertFactoryBindings(program: unknown, fail: (reason: string) => never): void {
+  for (const [name, modules] of FACTORY_MODULES) {
+    const called = collectNodes(program, (node) => {
+      const callee = node["callee"]
+      return (
+        node.type === "CallExpression" && isAstNode(callee) && callee.type === "Identifier" && callee["name"] === name
+      )
+    })
+    if (called.length === 0) continue
+    let factoryBindings = 0
+    visitWithParent(program, undefined, (node, parent) => {
+      const isBindingOf = (candidate: unknown) =>
+        isAstNode(candidate) && candidate.type === "Identifier" && candidate["name"] === name
+      if (node.type === "VariableDeclarator" && isAstNode(node["id"]) && node["id"].type === "ObjectPattern") {
+        const properties = Array.isArray(node["id"]["properties"]) ? node["id"]["properties"] : []
+        for (const property of properties) {
+          if (!isAstNode(property) || !isBindingOf(property["value"])) continue
+          const key = property["key"]
+          const sameName =
+            property["computed"] !== true && isAstNode(key) && key.type === "Identifier" && key["name"] === name
+          const module = awaitedModuleSpecifier(node["init"])
+          if (!sameName || module === undefined || !modules.has(module))
+            fail(`${name} is bound other than from ${[...modules].join(" or ")}`)
+          factoryBindings += 1
+        }
+      } else if (node.type === "VariableDeclarator" && isBindingOf(node["id"])) {
+        fail(`${name} is bound to a value of its own`)
+      } else if (
+        (node.type === "FunctionDeclaration" ||
+          node.type === "FunctionExpression" ||
+          node.type === "ClassDeclaration") &&
+        isBindingOf(node["id"])
+      ) {
+        fail(`${name} is declared locally`)
+      } else if (Array.isArray(node["params"]) && node["params"].some(isBindingOf)) {
+        fail(`${name} is a parameter`)
+      } else if (node.type === "ImportSpecifier" && isBindingOf(node["local"])) {
+        const imported = node["imported"]
+        const importedName = isAstNode(imported) ? (imported["name"] ?? imported["value"]) : undefined
+        const source = isAstNode(parent) ? parent["source"] : undefined
+        const module = isAstNode(source) && typeof source["value"] === "string" ? source["value"] : undefined
+        if (importedName !== name || module === undefined || !modules.has(module))
+          fail(`${name} is imported other than from ${[...modules].join(" or ")}`)
+        factoryBindings += 1
+      } else if (
+        (node.type === "ImportDefaultSpecifier" || node.type === "ImportNamespaceSpecifier") &&
+        isBindingOf(node["local"])
+      ) {
+        fail(`${name} is imported as a default or namespace`)
+      }
+    })
+    if (factoryBindings === 0) fail(`${name} is called but never bound from ${[...modules].join(" or ")}`)
+  }
+}
+
 function propertyKey(property: AstNode, fail: (reason: string) => never): string {
   if (property.type !== "Property" || property["computed"] === true || property["kind"] !== "init") {
     return fail(`its table has a ${property.type === "SpreadElement" ? "spread" : "computed or non-plain"} entry`)
@@ -130,7 +308,8 @@ export function engineServedSpecifiers(hostPackageDir = senpiPackageDir): Readon
     throw new Error(`cannot read the engine's extension module table from ${loaderPath}: ${reason}`)
   }
   if (!existsSync(loaderPath)) return fail("the loader module does not exist")
-  const parsed = parseSync(loaderPath, readFileSync(loaderPath, "utf8"))
+  const source = readFileSync(loaderPath, "utf8")
+  const parsed = parseSync(loaderPath, source)
   if (parsed.errors.length > 0) return fail(`it does not parse (${parsed.errors[0]?.message ?? "unknown error"})`)
   const calls = collectNodes(parsed.program, (node) => {
     const callee = node["callee"]
@@ -154,10 +333,38 @@ export function engineServedSpecifiers(hostPackageDir = senpiPackageDir): Readon
     const id = node["id"]
     return node.type === "VariableDeclarator" && isAstNode(id) && id.type === "Identifier" && id["name"] === tableName
   })
-  const table = declarations.length === 1 ? declarations[0]?.["init"] : undefined
-  if (!isAstNode(table) || table.type !== "ObjectExpression" || !Array.isArray(table["properties"])) {
+  const declarator = declarations.length === 1 ? declarations[0] : undefined
+  const table = declarator?.["init"]
+  if (
+    declarator === undefined ||
+    !isAstNode(table) ||
+    table.type !== "ObjectExpression" ||
+    !Array.isArray(table["properties"])
+  ) {
     return fail(`${tableName} is not declared once as an object literal`)
   }
+  const kind = collectNodes(
+    parsed.program["body"],
+    (node) =>
+      node.type === "VariableDeclaration" &&
+      Array.isArray(node["declarations"]) &&
+      node["declarations"].includes(declarator),
+  )[0]?.["kind"]
+  if (kind !== "const") return fail(`${tableName} is not declared with const`)
+  assertFactoryBindings(parsed.program, fail)
+  const parents = new Map<AstNode, AstNode | undefined>()
+  visitWithParent(parsed.program, undefined, (node, parent) => {
+    parents.set(node, parent)
+  })
+  visitWithParent(parsed.program, undefined, (node, parent) => {
+    if (node.type !== "Identifier" || node["name"] !== tableName || isNameOnly(node, parent)) return
+    if (isKnownTableRead(node, parent, declarator, parents)) return
+    const start = typeof node["start"] === "number" ? node["start"] : 0
+    const line = source.slice(0, start).split("\n").length
+    fail(
+      `${tableName} is used at line ${line} other than as ${EXTENSION_IMPORTER}'s argument or a virtualModules option`,
+    )
+  })
   const specifiers = table["properties"].map((property: unknown) =>
     isAstNode(property) ? propertyKey(property, fail) : fail("its table has an unreadable entry"),
   )
