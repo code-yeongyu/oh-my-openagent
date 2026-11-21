@@ -124,7 +124,12 @@ export async function setModelOn(
     }
     if (rematched.kind !== "match") return rematched
     if (rematched.model.provider === matched.model.provider && rematched.model.id === matched.model.id) throw error
-    previous = await modelBeforeSwitch(control, rematched.thinkingLevel)
+    // The engine's refusal is the more specific answer when the target also cannot report its model state now.
+    try {
+      previous = await modelBeforeSwitch(control, rematched.thinkingLevel)
+    } catch {
+      throw error
+    }
     selected = await control.setModel(rematched.model.provider, rematched.model.id)
     matched = rematched
   }
