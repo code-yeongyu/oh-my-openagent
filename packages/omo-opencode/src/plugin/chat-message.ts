@@ -4,6 +4,8 @@ import { updateSessionAgent } from "../features/claude-code-session-state"
 import { detectSlashCommand, extractPromptText } from "../hooks/auto-slash-command/detector"
 import { isRuntimeFallbackRetryTextParts, isSyntheticOrInternalOnlyTextParts, log } from "../shared"
 import { applyUltraworkModelOverrideOnMessage } from "./ultrawork-model-override"
+import { applyMainSessionFallbackOverride } from "./chat-message/main-session-fallback"
+import { getAvailableModelsForDelegateTask } from "../tools/delegate-task/available-models"
 import type { PluginContext } from "./types"
 import { handleGoalMessage } from "./chat-message/loop-commands"
 import { extractPromptText as extractGoalPromptText } from "./chat-message/prompt-text"
@@ -114,6 +116,22 @@ export function createChatMessageHandler(args: {
     if (storedMainSessionModel) {
       output.message.model = storedMainSessionModel
     }
+
+    await applyMainSessionFallbackOverride({
+      input,
+      output,
+      pluginConfig,
+      getAvailableModels: () => getAvailableModelsForDelegateTask(ctx.client),
+      notify: (title, message) => {
+        const tui = pluginContext.client.tui
+        if (typeof tui?.showToast !== "function") return
+        tui
+          .showToast({
+            body: { title, message, variant: "warning", duration: 5000 },
+          })
+          .catch(() => {})
+      },
+    })
 
     await runChatMessageHooks({
       input,
