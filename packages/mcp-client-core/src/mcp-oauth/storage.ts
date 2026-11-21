@@ -14,12 +14,10 @@ import { getOpenCodeCliConfigDir } from "../config-dir"
 import { deleteTokenIndexEntry, readTokenIndex, saveTokenIndexEntry } from "./storage-index"
 
 export interface OAuthTokenData {
-  issuer?: string
   accessToken: string
   refreshToken?: string
   expiresAt?: number
   clientInfo?: {
-    issuer?: string
     clientId: string
     clientSecret?: string
   }
@@ -89,7 +87,6 @@ function buildKey(serverHost: string, resource: string): string {
 function isOAuthTokenData(value: unknown): value is OAuthTokenData {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return false
   const record = value as Record<string, unknown>
-  if (record["issuer"] !== undefined && typeof record["issuer"] !== "string") return false
   if (typeof record["accessToken"] !== "string") return false
 
   const refreshToken = record["refreshToken"]
@@ -102,7 +99,6 @@ function isOAuthTokenData(value: unknown): value is OAuthTokenData {
   if (clientInfo === undefined) return true
   if (typeof clientInfo !== "object" || clientInfo === null || Array.isArray(clientInfo)) return false
   const clientRecord = clientInfo as Record<string, unknown>
-  if (clientRecord["issuer"] !== undefined && typeof clientRecord["issuer"] !== "string") return false
   if (typeof clientRecord["clientId"] !== "string") return false
   const clientSecret = clientRecord["clientSecret"]
   return clientSecret === undefined || typeof clientSecret === "string"
@@ -173,9 +169,7 @@ export function deleteToken(serverHost: string, resource: string): boolean {
 
   try {
     unlinkSync(filePath)
-    const indexDeleted = deleteTokenIndexEntry(getMcpOauthStorageDir(), getMcpOauthServerHash(serverHost, resource))
-    const legacyDeleted = deleteLegacyToken(serverHost, resource)
-    return indexDeleted && legacyDeleted
+    return deleteTokenIndexEntry(getMcpOauthStorageDir(), getMcpOauthServerHash(serverHost, resource))
   } catch (deleteError) {
     if (!(deleteError instanceof Error)) throw deleteError
     return false

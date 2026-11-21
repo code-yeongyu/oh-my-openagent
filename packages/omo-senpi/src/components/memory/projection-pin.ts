@@ -15,7 +15,6 @@ import {
   type ProjectedChanges,
 } from "@oh-my-opencode/memory-core"
 
-export { MEMORY_EXPIRED_METADATA_TOKEN } from "./projection-expiry"
 export const PROJECTION_PIN_ENTRY_TYPE = "omo-memory:projection-pin"
 export const MEMORY_CHANGES_METADATA_TOKEN = "Memory changed after this session's prompt was pinned to"
 const MAX_LISTED_PATHS = 20
@@ -30,19 +29,12 @@ export interface ProjectionPinRecord {
   readonly noticedThrough: string | null
   readonly compactionId: string | null
   readonly pinnedAtMs: number
-  /** Expiry instants up to this one were announced; absent means none since the pin (#11450). */
-  readonly expiryNoticedThroughMs?: number
 }
 
 export type ProjectionRepinReason = "first-turn" | "compaction" | "refresh" | "missing-revision"
 
 export interface ProjectionTurn {
   readonly revision: string | null
-  /** The instant `expires` is evaluated at for this turn's block: the pin instant. */
-  readonly asOfMs: number
-  /** Expiry instants after the pin and up to this one were already announced. */
-  readonly expiryNoticedThroughMs: number
-  readonly nowMs: number
   readonly changes?: ProjectedChanges
   /** Devices whose synced commits brought these changes, by name; absent when none were synced. */
   readonly sources?: readonly string[]
@@ -63,9 +55,7 @@ export interface ProjectionPins {
    * The revision the next `advance` compiles at, without recording, caching or announcing anything:
    * a before_agent_start preview must compose the real turn's bytes and leave the session untouched.
    */
-  peek(input: Omit<ProjectionAdvanceInput, "record">): Promise<{ readonly revision: string | null; readonly asOfMs: number }>
-  /** Records that expiry instants up to `throughMs` were announced to the session. */
-  noticeExpiries(input: { readonly sessionId: string; readonly throughMs: number; readonly record: (record: ProjectionPinRecord) => void }): void
+  peek(input: Omit<ProjectionAdvanceInput, "record">): Promise<string | null>
   /** /recompile: every session repins to HEAD on its next turn, including ones resumed later in this process. */
   requestRefresh(): void
 }
@@ -99,22 +89,12 @@ export function createProjectionPins(options: ProjectionPinsOptions = {}): Proje
       refreshEpoch += 1
       refreshRequestedAtMs = now()
     },
-    async peek({ repo, sessionId, branch, head }) {
+    async peek({ repo, sessionId, branch, head }): Promise<string | null> {
       const { state, reason } = await resolve(repo, sessionId, branch, head)
-      return state === undefined || reason !== undefined
-        ? { revision: head, asOfMs: now() }
-        : { revision: state.revision, asOfMs: state.pinnedAtMs }
-    },
-    noticeExpiries({ sessionId, throughMs, record }): void {
-      const cached = live.get(sessionId)
-      if (cached === undefined) return
-      const noticed: ProjectionPinRecord = { ...cached.record, expiryNoticedThroughMs: throughMs }
-      live.set(sessionId, { record: noticed, epoch: cached.epoch })
-      record(noticed)
+      return state === undefined || reason !== undefined ? head : state.revision
     },
     async advance({ repo, sessionId, branch, head, record }): Promise<ProjectionTurn> {
       const { compactionId, state, reason } = await resolve(repo, sessionId, branch, head)
-      const nowMs = now()
       if (state === undefined || reason !== undefined) {
         const fresh: ProjectionPinRecord = {
           version: 1,
@@ -122,21 +102,15 @@ export function createProjectionPins(options: ProjectionPinsOptions = {}): Proje
           revision: head,
           noticedThrough: head,
           compactionId,
-          pinnedAtMs: nowMs,
+          pinnedAtMs: now(),
         }
         live.set(sessionId, { record: fresh, epoch: refreshEpoch })
         record(fresh)
-        return { revision: head, asOfMs: nowMs, expiryNoticedThroughMs: nowMs, nowMs, repinned: reason ?? "first-turn" }
+        return { revision: head, repinned: reason ?? "first-turn" }
       }
 
       live.set(sessionId, { record: state, epoch: refreshEpoch })
-      const pinned = {
-        revision: state.revision,
-        asOfMs: state.pinnedAtMs,
-        expiryNoticedThroughMs: state.expiryNoticedThroughMs ?? state.pinnedAtMs,
-        nowMs,
-      }
-      if (state.noticedThrough === head) return pinned
+      if (state.noticedThrough === head) return { revision: state.revision }
       let rangeCommits: readonly MemoryCommit[] = []
       const changes = await projectedChangesBetween(repo, state.noticedThrough, head, {
         excludeSessionId: sessionId,
@@ -147,9 +121,9 @@ export function createProjectionPins(options: ProjectionPinsOptions = {}): Proje
       const advanced: ProjectionPinRecord = { ...state, noticedThrough: head }
       live.set(sessionId, { record: advanced, epoch: refreshEpoch })
       record(advanced)
-      if (isEmptyProjectedChanges(changes)) return pinned
+      if (isEmptyProjectedChanges(changes)) return { revision: state.revision }
       const sources = syncedSources(rangeCommits, changes, deviceName)
-      return sources.length === 0 ? { ...pinned, changes } : { ...pinned, changes, sources }
+      return sources.length === 0 ? { revision: state.revision, changes } : { revision: state.revision, changes, sources }
     },
   }
 }
@@ -217,9 +191,7 @@ function parsePinRecord(value: unknown): ProjectionPinRecord | undefined {
   const { revision, noticedThrough, compactionId, pinnedAtMs } = value
   if (!isNullableString(revision) || !isNullableString(noticedThrough) || !isNullableString(compactionId)) return undefined
   if (typeof pinnedAtMs !== "number" || !Number.isFinite(pinnedAtMs)) return undefined
-  const record = { version: 1 as const, sessionId: value.sessionId, revision, noticedThrough, compactionId, pinnedAtMs }
-  const noticed = value.expiryNoticedThroughMs
-  return typeof noticed === "number" && Number.isFinite(noticed) ? { ...record, expiryNoticedThroughMs: noticed } : record
+  return { version: 1, sessionId: value.sessionId, revision, noticedThrough, compactionId, pinnedAtMs }
 }
 
 function latestCompactionId(branch: readonly unknown[]): string | null {

@@ -68,9 +68,8 @@ const SECRET_SCAN_LINES = HOOK_SECRET_PATTERNS.map(({ class: patternClass, ere, 
  * - `description` is required and must be a non-empty single line.
  * - Every value must be a quoted scalar or a plain scalar that strict YAML
  *   reads verbatim: no `: `, no ` #`, no trailing `:`, no leading indicator.
- * - Known keys are `description`, `read_only`, the legacy `limit`, the
- *   people-record keys `kind` and `aliases`, the claim receipt `provenance`,
- *   and `expires` (#11450); any other key fails the commit.
+ * - Known keys are `description`, `read_only`, the legacy `limit`, and the
+ *   people-record keys `kind` and `aliases`; any other key fails the commit.
  *   SKILL.md may carry any additional key (`name`, `version`, `deprecated`).
  * - `read_only` is protected: it cannot be added, changed or removed by the
  *   agent, and a file that is `read_only: true` in HEAD cannot be modified.
@@ -82,8 +81,7 @@ export const PRE_COMMIT_HOOK_SCRIPT = `#!/bin/sh
 # Installed by omo memory-core. Do not edit by hand - regenerated on startup.
 
 # provenance is the claim receipt the memory tool stamps (#10488); its value is always a quoted JSON string.
-# expires is the instant a file stops being projected (#11450); an unreadable value means no expiry, never a rejection.
-ALL_KNOWN_KEYS="description read_only limit kind aliases provenance expires"
+ALL_KNOWN_KEYS="description read_only limit kind aliases provenance"
 TAB=$(printf '\\t')
 
 fm_value() {

@@ -9,7 +9,6 @@ import {
   type TaskStartFailureReason,
 } from "../../state"
 import { RunnerError } from "../in-process/runner-error"
-import { rpcChildAncestry } from "../child-ancestry"
 import { differsOnlyByPriorityAlias, reportedEffectiveModel, startedOnPinnedModel } from "../pinned-model-equivalence"
 import type { RpcRunnerSpec } from "../types"
 import { HostUnavailableError } from "./daemon"
@@ -36,13 +35,11 @@ export async function openTaskHostSession(input: {
 }): Promise<OpenedHostSession> {
   const model = splitModelRef(input.spec.model)
   const thinkingLevel = asSenpiThinkingLevel(input.spec.reasoning ?? input.spec.variant) ?? asSenpiThinkingLevel(model?.thinkingLevel)
-  const spawnedBy = rpcChildAncestry(input.spec)
   let opened: OpenedHostSession
   try {
     opened = await input.client.open({
       sessionPath: input.sessionPath,
       cwd: input.spec.cwd,
-      ...(spawnedBy === undefined ? {} : { spawnedBy }),
       ...(model === undefined ? {} : { provider: model.provider, modelId: model.modelId }),
       ...(thinkingLevel === undefined ? {} : { thinkingLevel }),
       ...buildChildContext(input.spec),

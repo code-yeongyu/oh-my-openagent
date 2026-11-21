@@ -13,13 +13,7 @@ type SenpiLauncher = {
   readonly prefixArgs: readonly string[]
 }
 
-/** The launcher to spawn and the engine version it will run; undefined when that version is unreadable. */
-type SenpiLaunchTarget = {
-  readonly launcher: SenpiLauncher | null
-  readonly engineVersion: string | undefined
-}
-
-export type { SenpiLauncher, SenpiLaunchTarget }
+export type { SenpiLauncher }
 
 /**
  * Detect whether the current process is a Bun compiled binary, mirroring
@@ -186,32 +180,18 @@ function isRunningCompiledEngine(executable: string, runtime: RpcSpawnRuntime): 
 }
 
 export function resolveSenpiLauncher(runtime: RpcSpawnRuntime): SenpiLauncher | null {
-  return resolveSenpiLaunchTarget(runtime).launcher
-}
-
-/**
- * The launcher plus the version of the engine it actually starts: the running engine for the compiled
- * engine and the `execPath + rpc-entry` fallback (null launcher), otherwise the launched package's own
- * manifest, read the same way for SENPI_BIN, sibling, PATH and Windows shim targets.
- */
-export function resolveSenpiLaunchTarget(runtime: RpcSpawnRuntime): SenpiLaunchTarget {
-  const fromManifest = (launcher: SenpiLauncher): SenpiLaunchTarget =>
-    ({ launcher, engineVersion: readCandidateSenpiVersion(launcher.prefixArgs[0] ?? launcher.command) })
   const executable = (runtime.resolveSenpiExecutable ?? resolveSenpiExecutable)(runtime)
   if (executable !== null) {
-    if (isRunningCompiledEngine(executable, runtime)) {
-      return { launcher: { command: executable, prefixArgs: [] }, engineVersion: runtime.engineVersion }
-    }
+    if (isRunningCompiledEngine(executable, runtime)) return { command: executable, prefixArgs: [] }
     const normalized = normalizeSenpiLauncher(executable, runtime)
-    if (normalized !== null) return fromManifest(normalized)
+    if (normalized !== null) return normalized
   }
-  if (runtime.platform === "win32") {
-    for (const name of ["senpi.cmd", "senpi"]) {
-      const npmShim = scanPathForExecutable(name, runtime.parentEnv.PATH)
-      if (npmShim === null) continue
-      const normalized = normalizeSenpiLauncher(npmShim, runtime)
-      if (normalized !== null) return fromManifest(normalized)
-    }
+  if (runtime.platform !== "win32") return null
+  for (const name of ["senpi.cmd", "senpi"]) {
+    const npmShim = scanPathForExecutable(name, runtime.parentEnv.PATH)
+    if (npmShim === null) continue
+    const normalized = normalizeSenpiLauncher(npmShim, runtime)
+    if (normalized !== null) return normalized
   }
-  return { launcher: null, engineVersion: runtime.engineVersion }
+  return null
 }

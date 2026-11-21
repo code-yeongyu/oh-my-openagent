@@ -69,7 +69,6 @@ describe("getOrRegisterClient", () => {
       }
       const payload = JSON.parse(init.body)
       expect(payload).toEqual({
-        application_type: "web",
         redirect_uris: ["https://app.example.com/callback"],
         client_name: "Test Client",
         grant_types: ["authorization_code", "refresh_token"],

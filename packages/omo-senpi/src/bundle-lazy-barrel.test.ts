@@ -31,7 +31,6 @@ const BUNDLE_FILES = [
   "omo-thread-client.js",
   "omo-telemetry-recovery.js",
   "omo-feedback.js",
-  "omo-desktop-toolkit.js",
   "omo-claim-receipt.js",
 ] as const
 

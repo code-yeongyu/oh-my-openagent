@@ -5,7 +5,6 @@
   "description": "OMO Senpi adapter packaged as one local-path Pi package.",
   "type": "module",
   "imports": {
-    "#omo-desktop-toolkit-runtime": "./extensions/omo-desktop-toolkit.js",
     "#omo-telemetry-posthog-runtime": "./extensions/omo-telemetry-posthog.js",
     "#omo-telemetry-otlp-runtime": "./extensions/omo-telemetry-otlp.js",
     "#omo-task-runtime": "./extensions/omo-task.js",

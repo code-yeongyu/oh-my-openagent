@@ -1,4 +1,4 @@
-import type { NewSessionOptions, RpcClient, RpcExtensionUIResponse, RpcSessionState, RpcTransportGoneError } from "@code-yeongyu/senpi"
+import type { RpcClient, RpcExtensionUIResponse, RpcSessionState, RpcTransportGoneError } from "@code-yeongyu/senpi"
 
 import { loadSenpiBarrel, senpiProbeHost, senpiRpcClient, type SenpiHostProtocolInfo } from "../../lazy/senpi-barrel"
 import type { SenpiThinkingLevel } from "../../senpi/thinking-level"
@@ -51,7 +51,6 @@ export const RETRY_FALLBACK_PROFILE_CAPABILITY = "retry_fallback_profile"
 
 /** The wire shape of `open_session`, in the engine's names. */
 export interface HostOpenSessionWire {
-  readonly spawnedBy?: NewSessionOptions["spawnedBy"]
   readonly sessionPath: string
   readonly cwd: string
   readonly provider?: string
@@ -66,7 +65,6 @@ export interface HostOpenSessionWire {
 
 /** The immutable launch profile of one child session, in omo's names. */
 export interface HostSessionOpenInput {
-  readonly spawnedBy?: NewSessionOptions["spawnedBy"]
   readonly sessionPath: string
   readonly cwd: string
   readonly provider?: string
@@ -104,7 +102,6 @@ export function toWireOpen(input: HostSessionOpenInput): HostOpenSessionWire {
   return {
     sessionPath: input.sessionPath,
     cwd: input.cwd,
-    ...(input.spawnedBy === undefined ? {} : { spawnedBy: input.spawnedBy }),
     ...(input.provider === undefined ? {} : { provider: input.provider }),
     ...(input.modelId === undefined ? {} : { modelId: input.modelId }),
     ...(input.thinkingLevel === undefined ? {} : { thinkingLevel: input.thinkingLevel }),

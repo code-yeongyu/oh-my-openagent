@@ -25,11 +25,10 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "max",
       },
       {
-        providers: ["kimi-for-coding", "moonshotai", "opencode-go"],
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
         model: LATEST_MODEL_BY_FAMILY.kimi,
         variant: "max",
-      },
-      { providers: ["opencode"], model: LATEST_MODEL_BY_FAMILY.kimiK3, variant: "max" }
+      }
     ]),
   },
   ultrabrain: {
@@ -84,11 +83,10 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "max",
       },
       {
-        providers: ["kimi-for-coding", "moonshotai", "opencode-go"],
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
         model: LATEST_MODEL_BY_FAMILY.kimi,
         variant: "max",
-      },
-      { providers: ["opencode"], model: LATEST_MODEL_BY_FAMILY.kimiK3, variant: "max" }
+      }
     ]),
   },
   quick: {
@@ -155,11 +153,10 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       { providers: ["zai-coding-plan", "opencode-go"], model: LATEST_MODEL_BY_FAMILY.glm, variant: "max" },
       {
-        providers: ["kimi-for-coding", "moonshotai", "opencode-go"],
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
         model: LATEST_MODEL_BY_FAMILY.kimi,
         variant: "max",
-      },
-      { providers: ["opencode"], model: LATEST_MODEL_BY_FAMILY.kimiK3, variant: "max" }
+      }
     ],
   },
   writing: {

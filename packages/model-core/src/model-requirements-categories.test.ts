@@ -112,12 +112,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         variant: "max",
       },
       {
-        providers: ["kimi-for-coding", "moonshotai", "opencode-go"],
-        model: "kimi-k3.1-pro",
-        variant: "max",
-      },
-      {
-        providers: ["opencode"],
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
         model: "kimi-k3",
         variant: "max",
       }
@@ -254,12 +249,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         variant: "max",
       },
       {
-        providers: ["kimi-for-coding", "moonshotai", "opencode-go"],
-        model: "kimi-k3.1-pro",
-        variant: "max",
-      },
-      {
-        providers: ["opencode"],
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
         model: "kimi-k3",
         variant: "max",
       }
@@ -291,12 +281,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         variant: "max",
       },
       {
-        providers: ["kimi-for-coding", "moonshotai", "opencode-go"],
-        model: "kimi-k3.1-pro",
-        variant: "max",
-      },
-      {
-        providers: ["opencode"],
+        providers: ["kimi-for-coding", "moonshotai", "opencode-go", "opencode"],
         model: "kimi-k3",
         variant: "max",
       }

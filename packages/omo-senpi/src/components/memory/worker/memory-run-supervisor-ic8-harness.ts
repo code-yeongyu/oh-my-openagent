@@ -39,7 +39,7 @@ export function createMemoryRunSupervisorIc8Harness() {
     )
   }
 
-  const makeRun = async (mode: "graceful" | "stubborn" | "with-grandchild") => {
+  const makeRun = async (mode: "graceful" | "stubborn") => {
     const runDir = realpathSync.native(
       await mkdtemp(join(tmpdir(), "memory-run-supervisor-ic8-")),
     )

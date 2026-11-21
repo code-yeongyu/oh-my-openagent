@@ -4,8 +4,6 @@ import { basename, dirname, join, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import type { RpcRunnerSpec } from "../types"
-import { rpcChildAncestry } from "../child-ancestry"
-import { engineAcceptsSpawnedBy } from "../engine-spawned-by"
 import { asSenpiThinkingLevel } from "../../senpi/thinking-level"
 import { MEMBER_EXTENSION_BUNDLE_NAME, MEMBER_PROCESS_ENV_NAMES, WORKPOOL_PROCESS_ENV_NAMES } from "../../team/member-extension/identity"
 import {
@@ -13,7 +11,6 @@ import {
   detectCompiledEngine,
   readRunningEngineVersion,
   resolveSenpiLauncher,
-  resolveSenpiLaunchTarget,
 } from "./senpi-launcher"
 
 export {
@@ -57,8 +54,7 @@ export type RpcSpawnRuntime = {
   // Injectable so tests can pin the executable-vs-fallback branch; defaults to resolveSenpiExecutable.
   readonly resolveSenpiExecutable?: (runtime: RpcSpawnRuntime) => string | null
   // Running @code-yeongyu/senpi version used to reject PATH/sibling candidates of a different version.
-  // When omitted or unreadable, the parity check is skipped (candidates are accepted). It is also the
-  // launched engine's version when the child runs the compiled engine or the rpc-entry fallback.
+  // When omitted or unreadable, the parity check is skipped (candidates are accepted).
   readonly engineVersion?: string
   // Optional diagnostics for rejected PATH/sibling candidates. Defaults to a no-op.
   readonly onWarning?: (message: string) => void
@@ -190,20 +186,16 @@ export function buildRpcSpawn(spec: RpcSpawnSpec, runtime?: Partial<RpcSpawnRunt
   const profile = buildChildProfile(spec, resolved)
   const env = profile.env
   const childArgs = buildChildArgs(profile.spec)
-  const spawnedBy = rpcChildAncestry(spec)
-  // Only an engine that proves it accepts the flag receives it; an older one may refuse to boot on it.
-  const { launcher, engineVersion } = resolveSenpiLaunchTarget(resolved)
-  const ancestryArgs = engineAcceptsSpawnedBy(engineVersion) && spawnedBy !== undefined
-    ? ["--spawned-by", JSON.stringify(spawnedBy)] : []
+  const launcher = resolveSenpiLauncher(resolved)
   if (launcher !== null) {
     return {
       command: launcher.command,
-      args: [...launcher.prefixArgs, "--mode", "rpc", ...childArgs, ...ancestryArgs],
+      args: [...launcher.prefixArgs, "--mode", "rpc", ...childArgs],
       cwd: spec.cwd,
       env,
     }
   }
-  return { command: resolved.execPath, args: [resolved.resolveRpcEntry(), ...childArgs, ...ancestryArgs], cwd: spec.cwd, env }
+  return { command: resolved.execPath, args: [resolved.resolveRpcEntry(), ...childArgs], cwd: spec.cwd, env }
 }
 
 export function buildRpcModelCatalogSpawn(

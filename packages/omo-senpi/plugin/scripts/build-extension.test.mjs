@@ -3,7 +3,6 @@ import { appendFile, cp, mkdir, mkdtemp, readdir, readFile, rm, utimes, writeFil
 import { tmpdir } from "node:os"
 import { dirname, join, parse } from "node:path"
 import { fileURLToPath } from "node:url"
-import bundleBudget from "../../bundle-budget.json" with { type: "json" }
 
 import { PERSONA_ASSET_FILES } from "@oh-my-opencode/memory-core/personas"
 
@@ -24,7 +23,7 @@ const scriptDir = dirname(fileURLToPath(import.meta.url))
 const pluginRoot = join(scriptDir, "..")
 const repoRoot = join(scriptDir, "..", "..", "..", "..")
 const fixture = createBuildFixture()
-const { sharedOutputs, mutableOutputs, reproductionRoot } = fixture
+const { sharedOutputs, mutableOutputs } = fixture
 
 // A focused run builds the six artifacts twice in ~14s, while the package suite shares CPU and disk
 // with other build/staging files. Keep the test bounded, but give the real two-build workload enough
@@ -89,7 +88,6 @@ describe("checkExtensionCurrent", () => {
       outputPath: outputs.outputPath,
       memberOutputPath: outputs.memberOutputPath,
       supervisorOutputPath: outputs.supervisorOutputPath,
-      expectedRoot: await reproductionRoot(),
     })
     // Compare the whole result so a failure names the stale artifact instead of printing "false".
     expect(check).toMatchObject({ ok: true })
@@ -139,7 +137,7 @@ describe("checkExtensionCurrent", () => {
     ])
 
     // when
-    const result = await checkExtensionCurrent({ ...outputs, expectedRoot: await reproductionRoot() })
+    const result = await checkExtensionCurrent(outputs)
 
     // then
     expect(result).toMatchObject({ ok: true })
@@ -163,7 +161,7 @@ describe("checkExtensionCurrent", () => {
     await appendFile(outputs.supervisorOutputPath, "\nchanged\n")
 
     // when
-    const result = await checkExtensionCurrent({ ...outputs, expectedRoot: await reproductionRoot() })
+    const result = await checkExtensionCurrent(outputs)
 
     // then
     expect(result).toMatchObject({ ok: false, reason: "stale-output", output: outputs.supervisorOutputPath })
@@ -177,7 +175,7 @@ describe("checkExtensionCurrent", () => {
     await utimes(outputs.outputPath, future, future)
 
     // when
-    const result = await checkExtensionCurrent({ ...outputs, expectedRoot: await reproductionRoot() })
+    const result = await checkExtensionCurrent(outputs)
 
     // then
     expect(result).toMatchObject({ ok: false, reason: "stale-output", output: outputs.outputPath })
@@ -192,7 +190,7 @@ describe("checkExtensionCurrent", () => {
     await writeFile(outputs.outputPath, `${prefix}:${"0".repeat(43)}:${bodyDigest}\n${artifact.slice(newline + 1)}`)
 
     // when
-    const result = await checkExtensionCurrent({ ...outputs, expectedRoot: await reproductionRoot() })
+    const result = await checkExtensionCurrent(outputs)
 
     // then
     expect(result).toMatchObject({ ok: false, reason: "stale-output", output: outputs.outputPath })
@@ -281,15 +279,6 @@ describe("checkExtensionCurrent", () => {
       expect(feedbackInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
     }
     expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith("packages/omo-senpi/src/components/feedback/index.ts"))).toBe(true)
-  })
-
-  test("#given offered desktop toolkits #when bundle inputs are inspected #then the runtime is lazy and carries no third-party dependencies", async () => {
-    const { mainInputs, desktopToolkitInputs } = await sharedOutputs()
-    for (const suffix of ["/desktop-toolkit/runtime.ts", "/desktop-toolkit/thread-tools.ts"]) {
-      expect(mainInputs.some(input => toPortableBuildPath(input).endsWith(suffix))).toBe(false)
-      expect(desktopToolkitInputs.some(input => toPortableBuildPath(input).endsWith(suffix))).toBe(true)
-    }
-    expect(desktopToolkitInputs.filter(input => toPortableBuildPath(input).includes("node_modules/"))).toEqual([])
   })
 
   test("#given lazy thread registration #when bundle inputs are inspected #then live RPC implementation is confined to its sidecar", async () => {
@@ -440,7 +429,7 @@ describe("checkExtensionCurrent", () => {
     // old 1_419_425 + 4_096 cap); this branch 1,423,766 B after the persisted-opt-out spool purge (node 24, bun 1.4.4,
     // linux x64). Base reset to the measurement with the standing 4,096 B headroom; bundle-size.test.ts's 1,425,000 B
     // budget stays the binding package ceiling.
-    expect(Buffer.byteLength(main)).toBeLessThanOrEqual(bundleBudget.omoJsBytes)
+    expect(Buffer.byteLength(main)).toBeLessThanOrEqual(1_423_766 + 4_096)
     expect(await readFile(telemetryOtlpOutputPath, "utf8")).not.toContain("#omo-telemetry-otlp-runtime")
   })
 
@@ -528,7 +517,6 @@ describe("checkExtensionCurrent", () => {
     expect(posthog).toContain('import("#telemetry-immediate-send")')
     expect(main).toContain('import("#omo-memory-sync-runtime")')
     expect(main).toContain('import("#omo-feedback-runtime")')
-    expect(main).toContain('import("#omo-desktop-toolkit-runtime")')
     expect(main).toContain('import("#omo-claim-receipt-runtime")')
     expect(task).toMatch(/^\/\/ omo:[A-Za-z0-9_-]{43}:[A-Za-z0-9_-]{43}/)
     expect(main).not.toContain('import("#omo-agent-toolkit-runtime")')
@@ -547,7 +535,6 @@ describe("checkExtensionCurrent", () => {
       "#omo-telemetry-otlp-runtime": "./extensions/omo-telemetry-otlp.js",
       "#omo-memory-sync-runtime": "./extensions/omo-memory-sync.js",
       "#omo-feedback-runtime": "./extensions/omo-feedback.js",
-      "#omo-desktop-toolkit-runtime": "./extensions/omo-desktop-toolkit.js",
       "#omo-claim-receipt-runtime": "./extensions/omo-claim-receipt.js",
       "#omo-thread-client-runtime": "./extensions/omo-thread-client.js",
       "#omo-telemetry-recovery-runtime": "./extensions/omo-telemetry-recovery.js",

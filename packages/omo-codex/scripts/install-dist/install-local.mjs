@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:bace46016a7ebeaca065fecb8e81bad70b0ba7a8abebc3727bde60f6406363f5:a034af89025c3a97ca822d26cdce9161cec7d567f9f2ba5b9ec3ca5302203587
+// omo-codex-install:2d0c1659412332e67b4b2e1662a73437c4b77f7217d62af30e1939f0285042b7:bbeadf337f1e764673db2b0767bd717135d6961cb1d14095b4cc12f695b21755
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -459,37 +459,6 @@ function getDefaultTelemetryOsProvider() {
 }
 var init_machine_id = () => {};
 
-// packages/telemetry-core/src/terminal-program.ts
-function isKnownTerminalProgram(value) {
-  return KNOWN_TERMINAL_PROGRAMS.some((known) => known === value);
-}
-function toTelemetryTerminalProgram(termProgram) {
-  if (termProgram === undefined || termProgram === "")
-    return;
-  return isKnownTerminalProgram(termProgram) ? termProgram : "other";
-}
-var KNOWN_TERMINAL_PROGRAMS;
-var init_terminal_program = __esm(() => {
-  KNOWN_TERMINAL_PROGRAMS = [
-    "Apple_Terminal",
-    "iTerm.app",
-    "vscode",
-    "cursor",
-    "windsurf",
-    "zed",
-    "WezTerm",
-    "ghostty",
-    "tmux",
-    "Hyper",
-    "WarpTerminal",
-    "kitty",
-    "alacritty",
-    "Tabby",
-    "rio",
-    "mintty"
-  ];
-});
-
 // packages/telemetry-core/src/injected-client.ts
 function isTelemetryClientEnabled(input) {
   const env = input.env ?? process.env;
@@ -592,15 +561,11 @@ function getSharedProperties(input) {
     total_memory_gb: Math.round(osProvider.totalmem() / 1024 / 1024 / 1024),
     locale: Intl.DateTimeFormat().resolvedOptions().locale,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    shell: getShellName(process.env.SHELL),
+    shell: process.env.SHELL,
     ci: Boolean(process.env.CI),
-    terminal: toTelemetryTerminalProgram(process.env.TERM_PROGRAM),
+    terminal: process.env.TERM_PROGRAM,
     ...input.product.additionalProperties
   };
-}
-function getShellName(shellPath) {
-  const name = shellPath?.split(/[\\/]/).pop()?.replace(/\.exe$/i, "");
-  return name ? name : undefined;
 }
 function getSafeCpuInfo(osProvider, input) {
   try {
@@ -626,7 +591,6 @@ var NO_OP_CLIENT;
 var init_injected_client = __esm(() => {
   init_env();
   init_machine_id();
-  init_terminal_program();
   NO_OP_CLIENT = {
     enabled: false,
     trackActive: () => {
@@ -10398,15 +10362,6 @@ import { readFile as readFile26 } from "node:fs/promises";
 import { dirname as dirname14, join as join43, resolve as resolve11 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
-// packages/telemetry-core/src/install-disclosure.ts
-var TELEMETRY_PRIVACY_POLICY_URL = "https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/legal/privacy-policy.md";
-var TELEMETRY_INSTALL_DISCLOSURE_LINES = [
-  "OmO sends anonymous usage telemetry (no prompts, code, file paths, or account data) to improve the product.",
-  "The data goes to PostHog in the United States.",
-  "Turn it off with DO_NOT_TRACK=1 (or OMO_DISABLE_TELEMETRY=1).",
-  `Details: ${TELEMETRY_PRIVACY_POLICY_URL}`
-];
-
 // packages/utils/src/runtime/spawn.ts
 import {
   spawn as nodeSpawn,
@@ -13161,8 +13116,7 @@ var LATEST_MODEL_BY_FAMILY = {
   gptLunaFast: "gpt-6-luna-fast",
   glm: "glm-5.3",
   glmFlash: "glm-5.3-flash",
-  kimi: "kimi-k3.1-pro",
-  kimiK3: "kimi-k3",
+  kimi: "kimi-k3",
   geminiPro: "gemini-4-argon"
 };
 
@@ -19889,8 +19843,8 @@ var OmoMemoryWriteNoticeLayerSchema = object({
   enabled: boolean2().optional()
 }).strict();
 var OmoMemoryProjectionSchema = object({
-  max_entries_per_directory: number2().int().min(0).default(0),
-  max_bytes: number2().int().min(0).default(40960)
+  max_entries_per_directory: number2().int().min(0).default(40),
+  max_bytes: number2().int().min(0).default(24576)
 }).strict();
 var OmoMemoryProjectionLayerSchema = object({
   max_entries_per_directory: number2().int().min(0).optional(),
@@ -19954,7 +19908,7 @@ var OmoMemorySettingsSchema = object({
     query_expansion: false
   }),
   project_scope: OmoMemoryProjectScopeSchema.default({ nudge: true, recall: true }),
-  projection: OmoMemoryProjectionSchema.default({ max_entries_per_directory: 0, max_bytes: 40960 }),
+  projection: OmoMemoryProjectionSchema.default({ max_entries_per_directory: 40, max_bytes: 24576 }),
   compile_warn_tokens: number2().int().positive().default(30000),
   agents: record(string2(), OmoMemoryAgentOverridesSchema).default({})
 }).strict();
@@ -19994,17 +19948,6 @@ var OmoModelCatalogSchema = record(string2(), OmoModelCatalogEntrySchema);
 var OmoModelCatalogEntryLayerInputSchema = OmoModelCatalogEntryInputSchema.partial();
 var OmoModelCatalogEntryLayerSchema = preprocess((value) => isRecord5(value) ? normalizeLegacyModelFields(value) : value, OmoModelCatalogEntryLayerInputSchema);
 var OmoModelCatalogLayerSchema = record(string2(), OmoModelCatalogEntryLayerSchema);
-
-// packages/omo-config-core/src/schema/model-pad.ts
-var OmoModelPadLabelsSchema = object({
-  daily: string2().optional(),
-  geeky: string2().optional(),
-  normal: string2().optional(),
-  heavy: string2().optional()
-}).strict();
-var OmoModelPadSchema = object({
-  labels: OmoModelPadLabelsSchema.optional()
-}).strict();
 
 // packages/omo-config-core/src/schema/model-profile.ts
 function isRecord6(value) {
@@ -20303,7 +20246,6 @@ var OmoTypedHarnessConfigSchema = object({
   models: OmoModelCatalogLayerSchema.optional(),
   model_profiles: OmoModelProfilesLayerSchema.optional(),
   model_profile: string2().optional(),
-  model_pad: OmoModelPadSchema.optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
@@ -20322,7 +20264,6 @@ var OmoConfigProfileSchema = object({
   models: OmoModelCatalogLayerSchema.optional(),
   model_profiles: OmoModelProfilesLayerSchema.optional(),
   model_profile: string2().optional(),
-  model_pad: OmoModelPadSchema.optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
@@ -20346,7 +20287,6 @@ var OmoConfigSchema = object({
   models: OmoModelCatalogSchema.optional(),
   model_profiles: OmoModelProfilesSchema.optional(),
   model_profile: string2().optional(),
-  model_pad: OmoModelPadSchema.optional(),
   memory: OmoMemorySettingsSchema.optional(),
   telemetry: OmoTelemetrySettingsSchema.optional(),
   side_panel: OmoSidePanelSettingsSchema.optional(),
@@ -20373,7 +20313,6 @@ var OmoConfigLayerSchema = object({
   models: OmoModelCatalogLayerSchema.optional(),
   model_profiles: OmoModelProfilesLayerSchema.optional(),
   model_profile: string2().optional(),
-  model_pad: OmoModelPadSchema.optional(),
   memory: OmoMemorySettingsLayerSchema.optional(),
   telemetry: OmoTelemetrySettingsLayerSchema.optional(),
   side_panel: OmoSidePanelSettingsLayerSchema.optional(),
@@ -24664,7 +24603,7 @@ async function runLazyCodexInstallLocalCli(input) {
         env: input.env,
         log: logWarning
       });
-      logInstalled(input.log, result);
+      input.log(`Installed ${result.installed.length} plugin(s) from ${result.marketplaceName}.`);
       return 0;
     }
     return runLazyCodexManualUpdate({ env: input.env, dryRun: parsed.dryRun, log: input.log, invokedPath: input.invokedPath });
@@ -24676,14 +24615,8 @@ async function runLazyCodexInstallLocalCli(input) {
     env: input.env,
     log: logWarning
   });
-  logInstalled(input.log, result);
+  input.log(`Installed ${result.installed.length} plugin(s) from ${result.marketplaceName}.`);
   return 0;
-}
-function logInstalled(log, result) {
-  log(`Installed ${result.installed.length} plugin(s) from ${result.marketplaceName}.`);
-  log("");
-  for (const line of TELEMETRY_INSTALL_DISCLOSURE_LINES)
-    log(line);
 }
 export {
   PASSTHROUGH_COMMANDS,

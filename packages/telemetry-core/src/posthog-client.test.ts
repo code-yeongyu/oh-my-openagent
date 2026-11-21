@@ -111,25 +111,14 @@ describe("posthog telemetry client", () => {
 
   test("#given codex product parameters #when daily active is captured #then payload shape matches current contract", async () => {
     // given
-    const savedTermProgram = process.env.TERM_PROGRAM
-    process.env.TERM_PROGRAM = "WezTerm"
-    const previousShell = process.env.SHELL
-    process.env.SHELL = "/home/contract-user/.nix-profile/bin/zsh"
     const capturedMessages: TelemetryCaptureMessage[] = []
-    const client = (() => {
-      try {
-        return createTelemetryClient({
-          env: { POSTHOG_API_KEY: "test-key", POSTHOG_HOST: "https://posthog.test" },
-          osProvider: OS_PROVIDER,
-          product: PRODUCT,
-          source: "cli",
-          transportFactory: createCapturingFactory(capturedMessages),
-        })
-      } finally {
-        if (savedTermProgram === undefined) delete process.env.TERM_PROGRAM
-        else process.env.TERM_PROGRAM = savedTermProgram
-      }
-    })()
+    const client = createTelemetryClient({
+      env: { POSTHOG_API_KEY: "test-key", POSTHOG_HOST: "https://posthog.test" },
+      osProvider: OS_PROVIDER,
+      product: PRODUCT,
+      source: "cli",
+      transportFactory: createCapturingFactory(capturedMessages),
+    })
 
     // when
     client.trackActive({
@@ -139,8 +128,6 @@ describe("posthog telemetry client", () => {
     })
     await client.flush()
     await client.shutdown()
-    if (previousShell === undefined) delete process.env.SHELL
-    else process.env.SHELL = previousShell
 
     // then
     expect(capturedMessages).toHaveLength(1)
@@ -164,9 +151,9 @@ describe("posthog telemetry client", () => {
         total_memory_gb: 16,
         locale: Intl.DateTimeFormat().resolvedOptions().locale,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        shell: "zsh",
+        shell: process.env.SHELL,
         ci: Boolean(process.env.CI),
-        terminal: "WezTerm",
+        terminal: process.env.TERM_PROGRAM,
         $process_person_profile: false,
         day_utc: "2026-05-25",
         reason: "cli_run",

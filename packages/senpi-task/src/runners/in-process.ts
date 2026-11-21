@@ -191,9 +191,7 @@ export class InProcessRunner {
       const { SessionManager } = await loadSenpiBarrel()
       const options = buildChildSessionOptions({
         spec,
-        sessionManager: SessionManager.create(spec.cwd, requireChildSessionDir(spec), {
-          spawnedBy: { parentSessionId: spec.parentSessionId, rootSessionId: spec.rootSessionId, taskId: spec.taskId },
-        }),
+        sessionManager: SessionManager.create(spec.cwd, requireChildSessionDir(spec)),
         sharedParentTools: this.#sharedParentTools,
         uiOnlyToolNames: this.#uiOnlyToolNames,
         ...(this.#kernelToolBindings === undefined ? {} : { kernelToolBindings: this.#kernelToolBindings }),

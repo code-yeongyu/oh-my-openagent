@@ -132,11 +132,7 @@ describe("config loader security", () => {
 					extensions: [".cts"],
 					priority: 42,
 					source: "project",
-					initialization: {
-						tsserver: { useSyntaxServer: "never" },
-						disableAutomaticTypingAcquisition: true,
-						preferences: { quoteStyle: "single" },
-					},
+					initialization: { preferences: { quoteStyle: "single" } },
 				}),
 			);
 			expect(servers.find((server) => server.id === "typescript")).not.toHaveProperty("env");

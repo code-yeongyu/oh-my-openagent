@@ -20,7 +20,6 @@ export async function moveParkedEntries(
   const suffixes = new Set(records.filter((record) => record.state === "parked")
     .map((record) => queueEntrySuffix(record.conversationId, record.end_message_id)))
   if (suffixes.size === 0) return 0
-  const wasMigrated = !restore && migrated.delete(layout.queueDir)
   const source = restore ? layout.parkedDir : layout.queueDir
   const target = restore ? layout.queueDir : layout.parkedDir
   const names = await readdir(source).catch((error: unknown) => {
@@ -36,7 +35,6 @@ export async function moveParkedEntries(
     await rename(join(source, name), join(target, name))
     moved += 1
   }
-  if (wasMigrated) migrated.add(layout.queueDir)
   return moved
 }
 
@@ -48,7 +46,7 @@ export async function migrateParkedEntries(layout: FactsQueueLayout): Promise<vo
     throw error
   })
   if (raw !== undefined) {
-    let records: readonly FactsFailureRecord[]
+    let records
     try {
       records = parseFailuresFile(raw).entries
     } catch (error) {
