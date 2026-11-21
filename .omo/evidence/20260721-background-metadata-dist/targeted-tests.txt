@@ -1,0 +1,39 @@
+bun test v1.3.14 (0d9b296a)
+
+packages/omo-opencode/src/tools/delegate-task/background-task.test.ts:
+(pass) executeBackgroundTask output/session metadata compatibility > does not emit synthetic pending session metadata when session id is unresolved [53.49ms]
+(pass) executeBackgroundTask output/session metadata compatibility > emits task metadata session_id when real session id is available [0.48ms]
+(pass) executeBackgroundTask output/session metadata compatibility > keeps continuation taskId out of visible background metadata [0.34ms]
+(pass) executeBackgroundTask output/session metadata compatibility > captures late-resolved session id and emits synced metadata [1.49ms]
+(pass) executeBackgroundTask output/session metadata compatibility > passes question-deny session permission when launching delegate task [0.38ms]
+(pass) executeBackgroundTask output/session metadata compatibility > strips leading zwsp from agent name before launching background task [0.43ms]
+(pass) executeBackgroundTask output/session metadata compatibility > keeps launched background task alive when parent aborts before session id resolves [0.44ms]
+(pass) executeBackgroundTask output/session metadata compatibility > registers late session category even when parent aborts before session id resolves [5.64ms]
+(pass) executeBackgroundTask output/session metadata compatibility > prefers child terminal status over parent abort while waiting for session id [0.44ms]
+(pass) executeBackgroundTask output/session metadata compatibility > reports failure when manager marks task as error during session startup [1.50ms]
+(pass) executeBackgroundTask output/session metadata compatibility > keeps sibling background launch alive when two tasks start concurrently [1.81ms]
+(pass) executeBackgroundTask output/session metadata compatibility > strips legacy ZWSP-prefixed agent names from persisted background task launch input (GH-3259) [1.18ms]
+(pass) executeBackgroundTask output/session metadata compatibility > does not advertise background_output CTA in launch return (issue #5221) [0.33ms]
+
+packages/omo-opencode/src/tools/delegate-task/metadata-task-id-consistency.test.ts:
+(pass) taskId and backgroundTaskId metadata consistency > #given sync-task runs > #when publishing metadata #then taskId equals sessionId [8.10ms]
+(pass) taskId and backgroundTaskId metadata consistency > #given background-task runs > #when publishing metadata #then taskId is sessionID and backgroundTaskId is task.id [0.35ms]
+(pass) taskId and backgroundTaskId metadata consistency > #given unstable-agent-task runs > #when publishing metadata #then taskId and backgroundTaskId are both included [1.94ms]
+(pass) taskId and backgroundTaskId metadata consistency > #given background-continuation runs > #when publishing metadata #then taskId is sessionID and backgroundTaskId is bg.id [1.24ms]
+(pass) taskId and backgroundTaskId metadata consistency > #given background-continuation runs > #when resumed task has category #then metadata.category equals task.category [0.89ms]
+(pass) taskId and backgroundTaskId metadata consistency > #given background-continuation runs > #when publishing metadata with requested_subagent_type #then metadata.requested_subagent_type preserves original [0.30ms]
+(pass) taskId and backgroundTaskId metadata consistency > #given sync-continuation runs > #when publishing metadata #then taskId is sessionID [5.86ms]
+(pass) taskId and backgroundTaskId metadata consistency > #given sync-continuation runs > #when resumeAgent is resolved #then metadata.agent equals resumeAgent [0.88ms]
+(pass) taskId and backgroundTaskId metadata consistency > #given sync-continuation runs > #when called with category arg #then metadata.category equals args.category [0.56ms]
+(pass) taskId and backgroundTaskId metadata consistency > #given sync-continuation runs > #when publishing metadata with requested_subagent_type #then metadata.requested_subagent_type preserves original [0.50ms]
+(pass) taskId and backgroundTaskId metadata consistency > #given user calls with requested_subagent_type plus category > #when sync-task publishes metadata #then metadata.requested_subagent_type preserves original [0.45ms]
+(pass) taskId and backgroundTaskId metadata consistency > #given user calls with requested_subagent_type plus category > #when background-task publishes metadata #then metadata.requested_subagent_type preserves original [0.30ms]
+(pass) taskId and backgroundTaskId metadata consistency > #given user calls with requested_subagent_type plus category > #when unstable-agent-task publishes metadata #then metadata.requested_subagent_type preserves original [0.54ms]
+(pass) taskId and backgroundTaskId metadata consistency > #given stock task title metadata contract > #when background continuation publishes metadata #then title equals description without resume prefix [0.36ms]
+(pass) taskId and backgroundTaskId metadata consistency > #given stock task title metadata contract > #when sync continuation publishes metadata #then title equals description without resume prefix [0.90ms]
+(pass) taskId and backgroundTaskId metadata consistency > #given background_output runs > #when publishing metadata #then backgroundTaskId is task.id not task_id [56.29ms]
+
+ 29 pass
+ 0 fail
+ 100 expect() calls
+Ran 29 tests across 2 files. [470.00ms]

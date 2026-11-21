@@ -112,6 +112,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
       expect(meta.metadata.taskId).toBe("ses_xyz789")
       expect(meta.metadata.sessionId).toBe("ses_xyz789")
       expect(meta.metadata.backgroundTaskId).toBe("bg_abc123")
+      expect(meta.metadata.background).toBe(true)
     })
   })
 
@@ -208,6 +209,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
       expect(meta.metadata.taskId).toBe("ses_resumed_x")
       expect(meta.metadata.sessionId).toBe("ses_resumed_x")
       expect(meta.metadata.backgroundTaskId).toBe("bg_resumed_y")
+      expect(meta.metadata.background).toBe(true)
     })
 
     test("#when resumed task has category #then metadata.category equals task.category", async () => {
