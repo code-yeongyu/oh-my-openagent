@@ -9,26 +9,16 @@
 set -euo pipefail
 
 lookback="${PLATFORM_RED_LOOKBACK:-30}"
+platform_jobs_filter="$(cat "$(dirname "$0")/platform-jobs.jq")"
 cache="$OUT_DIR/runs"
 mkdir -p "$cache"
 : > "$OUT_DIR/failed.md"
 echo false > "$OUT_DIR/introduced"
 
-# One TSV row per macOS/Windows job of a run: name, conclusion, url, labels. Read once per run.
-# A job that succeeded with only bookkeeping steps run (a dev push that skipped the heavy legs) proved nothing, so it
-# is "no-tests", never green.
+# One TSV row per macOS/Windows job of a run (see platform-jobs.jq). Read once per run.
 platform_jobs() {
   [ -f "$cache/$1" ] && return
-  # shellcheck disable=SC2016 # $ran is a jq variable, not a shell one.
-  gh api "repos/$GH_REPO/actions/runs/$1/jobs?filter=latest&per_page=100" --jq '
-    .jobs[]
-    | select(((.labels | join(" ")) + " " + .name) | test("macos|windows"; "i"))
-    | ([.steps[]?
-        | select(.conclusion == "success")
-        | select(.name | test("^(Set up job|Complete job|Post |Run actions/checkout|Write job summary|Check that this leg ran its tests)") | not)
-      ] | length) as $ran
-    | [.name, (if .conclusion == "success" and $ran == 0 then "no-tests" else (.conclusion // "none") end),
-       .html_url, (.labels | join(", "))] | @tsv' > "$cache/$1.part"
+  gh api "repos/$GH_REPO/actions/runs/$1/jobs?filter=latest&per_page=100" --jq "$platform_jobs_filter" > "$cache/$1.part"
   mv "$cache/$1.part" "$cache/$1"
 }
 
