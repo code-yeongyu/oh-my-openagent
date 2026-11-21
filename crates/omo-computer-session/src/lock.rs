@@ -22,6 +22,7 @@ mod dacl_tests;
 #[cfg(windows)]
 mod dir;
 pub(crate) mod file;
+pub mod wait;
 #[cfg(test)]
 mod process;
 

@@ -3,15 +3,25 @@
 
 use std::fmt;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 /// The seam that sets the clock's start.
 pub const CLOCK_SEAM: &str = "OMO_COMPUTER_FAKE_CLOCK";
 
+/// A test's hook, run with the new time after every advance (clones share it).
+type OnAdvance = Arc<Mutex<Option<Box<dyn Fn(u64) + Send>>>>;
+
 /// Clones share one counter.
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Default)]
 pub struct FakeClock {
     millis: Arc<AtomicU64>,
+    on_advance: OnAdvance,
+}
+
+impl fmt::Debug for FakeClock {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("FakeClock").field("millis", &self.now_ms()).finish_non_exhaustive()
+    }
 }
 
 /// The seam's value is not a millisecond count.
@@ -46,6 +56,7 @@ impl FakeClock {
         };
         Ok(Self {
             millis: Arc::new(AtomicU64::new(start)),
+            on_advance: OnAdvance::default(),
         })
     }
 
@@ -69,9 +80,26 @@ impl FakeClock {
                 Ordering::SeqCst,
                 Ordering::SeqCst,
             ) {
-                Ok(_) => return next,
+                Ok(_) => {
+                    if let Ok(hook) = self.on_advance.lock() {
+                        if let Some(hook) = hook.as_ref() {
+                            hook(next);
+                        }
+                    }
+                    return next;
+                }
                 Err(actual) => previous = actual,
             }
+        }
+    }
+}
+
+impl FakeClock {
+    /// Runs `hook` with the new time after every advance: a test acts at a point of fake time
+    /// (another engine lets go of a lock, commits a stop) without sleeping.
+    pub fn on_advance(&self, hook: Box<dyn Fn(u64) + Send>) {
+        if let Ok(mut slot) = self.on_advance.lock() {
+            *slot = Some(hook);
         }
     }
 }

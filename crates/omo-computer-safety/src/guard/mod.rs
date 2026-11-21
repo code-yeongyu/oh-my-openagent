@@ -10,8 +10,10 @@ use omo_computer_core::results::{PermissionState, StopPathStatus};
 use omo_computer_core::session_state::Tristate;
 
 mod sources;
+mod stages;
 
 pub use sources::{Clock, MonotonicClock, OwnProcess, ProcessSource};
+pub use stages::StageVerdicts;
 
 use crate::gate::{gate, Admitted, GateFacts, GateRefusal, Tables, Tier, VerbKind};
 use crate::latch::SuspendReason;
@@ -168,6 +170,11 @@ impl Guard {
         let now = self.now_ms();
         self.supervisor.arm(listener, deaf_reason, now);
         self.supervisor.status(now)
+    }
+
+    /// Latches a stop marker another engine committed since this engine started.
+    pub fn latch_committed_marker(&mut self) -> Option<SuspendReason> {
+        self.supervisor.latch_committed_marker()
     }
 
     /// `stopPath.stop{source}`.

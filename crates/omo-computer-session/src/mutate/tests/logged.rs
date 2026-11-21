@@ -160,3 +160,46 @@ fn the_grep_zero_walk_fails_on_a_file_it_cannot_read() {
         "an unreadable file must fail the walk, not be skipped"
     );
 }
+
+/// Review L3 of #13370 (at c72fac7d86, ruling R70bg): the admission runs again after the
+/// interaction lock is held. A second holder keeps the lock while a stop is pressed after the
+/// session's admission ran; when the lock comes free the waiting exec is refused `Suspended`,
+/// nothing sent, and the lock is released.
+#[test]
+fn a_stop_pressed_while_another_holder_keeps_the_lock_refuses_the_waiting_exec() {
+    let run = Run::new();
+    let fake = run.fake();
+    let remote = fake.handle();
+    let clock = fake.clock();
+    let mut session = run.session(Box::new(fake));
+    let other = InteractionLock::under(run.dir.path());
+    let held = other.acquire().expect("the other holder takes the lock");
+    let before = remote.stop_polls();
+    // Driven on the fake clock (review M1 of #13767): the exec's wait advances it, and on the
+    // first advance after the session's admission polled the listener, the stop is pressed and
+    // only then the lock released. No thread, no timing.
+    // The hook acts only when time moved: the fake's own zero-length advances run under its
+    // state lock, where reading the remote would deadlock; the exec's wait moves time unlocked.
+    let release = std::sync::Mutex::new(Some(held));
+    let last = std::sync::atomic::AtomicU64::new(clock.now_ms());
+    clock.on_advance(Box::new(move |now| {
+        if last.swap(now, std::sync::atomic::Ordering::SeqCst) == now {
+            return;
+        }
+        if remote.stop_polls() > before {
+            if let Some(held) = release.lock().expect("hook").take() {
+                remote.press_stop_chord();
+                drop(held);
+            }
+        }
+    }));
+    let refused = session
+        .click(click("c-locked"))
+        .expect_err("the stop pressed while waiting refuses");
+    assert_eq!(wire(&refused).0, "Suspended");
+    assert!(run.sink.is_empty(), "nothing sent: {:?}", run.sink.lines());
+    assert!(
+        other.try_acquire().expect("try").is_some(),
+        "the refused exec released the lock"
+    );
+}
