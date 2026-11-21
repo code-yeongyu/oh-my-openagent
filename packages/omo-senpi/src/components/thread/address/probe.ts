@@ -4,7 +4,6 @@ import { deviceListing, relayAddressEntry } from "../remote/address-book"
 import {
   endedRow,
   probeMayBuildEndedRow,
-  rowThreadId,
   type RemoteDevice,
   type RemoteListing,
   type RemoteThreadSurface,
@@ -147,7 +146,7 @@ export async function pinned(
     const row = listing.rows.find((candidate) =>
       sameSession(
         { device: pin.device, thread: pin.thread },
-        { device: candidate.device, thread: rowThreadId(candidate), key: candidate.session_id },
+        { device: candidate.device, thread: candidate.durable_id ?? "", key: candidate.session_id },
       ),
     )
     if (row !== undefined) return { kind: "ok", entry: relayAddressEntry(row), resolution: "id", all_scope: true }

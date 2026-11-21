@@ -1,5 +1,5 @@
 import type { DeviceAbsentReason, Provenance } from "../gateway/types"
-import { accountDevices } from "./account"
+import { accountDevices } from "../address/account"
 import type { RemoteThreadSurface } from "./ports"
 
 /** This device's account device id, or why a delivery names none. */

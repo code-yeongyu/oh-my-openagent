@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test"
 import { B, createTwoDevices, NAMES, T } from "../thread/address/testing/two-devices"
 import type { RemoteClient } from "./client"
-import { resolveTypedAddress, resolveTypedDevice } from "./device-address"
+import { resolveTypedDevice } from "../thread/address"
+import { resolveTypedAddress } from "./device-address"
 import type { DeviceRow, RemoteFailure } from "./types"
 
-// resolveTypedDevice reads the account's devices once through the shared remote-ops listing (the same host_unavailable
-// deviceOnline answers) and hands thread_create's resolver failures through by their own type (#13432).
+// resolveTypedDevice (thread/address/device.ts) reads the account's devices once (host_unavailable when it cannot) and
+// hands thread_create's resolver failures through by their own type (#13432).
 
 const device = (id: string, name: string, online: boolean): DeviceRow => ({
   id,
