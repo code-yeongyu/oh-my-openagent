@@ -79,25 +79,24 @@ async function owner(duplicate: false | "other" | "self" = false) {
 }
 
 // The CLI closes the attach endpoint in a continuation it chains on the service's `closed` and keeps no handle to
-// (remote-cli.ts). The service the test hands it records every continuation chained there, so the test awaits the
-// endpoint's own server.close and removal instead of watching the filesystem against a clock (#14528).
+// (remote-cli.ts). The service the test hands it gives `closed` a Promise subclass, so every promise chained on it
+// (its continuations, built through the subclass's species) is recorded: the test awaits the endpoint's own
+// server.close and removal instead of watching the filesystem against a clock (#14528).
 function observeClosed(service: DeviceService) {
-  const continuations: Promise<unknown>[] = []
-  const closed = service.closed.then(() => {})
-  const then = closed.then.bind(closed)
-  Object.defineProperty(closed, "then", {
-    value: (...args: Parameters<typeof then>) => {
-      const continuation = then(...args)
-      continuations.push(continuation)
-      return continuation
-    },
+  const chained: Promise<unknown>[] = []
+  class Recorded<T> extends Promise<T> {
+    constructor(executor: ConstructorParameters<typeof Promise<T>>[0]) {
+      super(executor)
+      chained.push(this)
+    }
+  }
+  const closed = new Recorded<void>((resolve) => {
+    void service.closed.then(resolve)
   })
   return {
     service: { ...service, closed },
-    settled: async () => {
-      await closed
-      await Promise.all(continuations)
-    },
+    // A snapshot: awaiting a recorded promise chains another one on it.
+    settled: () => Promise.all([...chained]),
   }
 }
 
