@@ -1,16 +1,13 @@
+import { formatAddress, THREAD_ID_SHAPE } from "@oh-my-opencode/thread-address-core"
 import { remoteMonitorTarget } from "../../../extension/senpi-seams"
 import type { RpcRemoteHandlers, RpcRemoteRow, RpcRemoteSource, RpcRemoteState } from "../../../extension/types"
-import type { ThreadResolveResult } from "../addressing"
+import { asFailure, resolveAddress, resolveTypedDevice, type Resolved, type ThreadRefusal } from "../address"
+import { accountDevices } from "../address/account"
+import { resolveAccountDevice } from "../address/device"
 import type { MonitorTargetResolution } from "../tools/monitor-target"
-import {
-  rowThreadId,
-  type JsonObject,
-  type RemoteSessionRow,
-  type RemoteSessionState,
-  type RemoteThreadSurface,
-} from "./ports"
-import { threadToolFailure } from "../errors"
-import { deviceRefusal, listedDevices, remoteAvailable } from "./remote-ops"
+import { UNKNOWN_CALLER } from "../tools/ports"
+import type { JsonObject, RemoteSessionRow, RemoteSessionState, RemoteThreadSurface } from "./ports"
+import { remoteAvailable } from "./remote-ops"
 
 // A device-wide target reads the account listing (running | idle | ended rows), round by round at senpi's own rescan
 // cadence (RPC_RESCAN_MS): coarse, and enough to wake. A session's content needs a session target.
@@ -33,38 +30,21 @@ export function createRemoteMonitorSource(remote: RemoteThreadSurface): RpcRemot
     open: async (target, options, handlers) => {
       const unavailable = await remoteAvailable(remote)
       if (unavailable !== undefined) throw new Error(`${unavailable.error.code}: ${unavailable.error.message}`)
-      if (target.session === "*") return await openDevice(remote, target.device, handlers)
-      return await openSession(remote, target.device, target.session, options.resumeFrom, handlers)
+      if (target.session === "*") {
+        const device = await resolveTypedDevice(remote.client, target.device)
+        if (device.kind === "ok") return await openDevice(remote, device.device, handlers)
+        // A device that is offline or did not answer keeps its device-wide watch on restore: the listing rounds report it
+        // lost and resynced. not_found and ambiguous_target refuse.
+        if (!TRANSIENT.has(device.error.code)) throw new Error(`${device.error.code}: ${device.error.message}`)
+        return await openDevice(remote, await storedDevice(remote, target.device), handlers)
+      }
+      const { device, session } = await sessionOn(remote, target.device, target.session)
+      return await openSession(remote, device, session, target.session, options.resumeFrom, handlers)
     },
   }
 }
 
 const KEEP: MonitorTargetResolution = { kind: "keep" }
-
-/**
- * The online account device a `<device>/<thread>` target names (#14294): by id, else by the name the account lists it
- * under, where two devices of that name are ambiguous_target. Unknown and offline devices answer as deviceOnline does.
- */
-async function deviceNamed(remote: RemoteThreadSurface, name: string): Promise<MonitorTargetResolution | string> {
-  const listed = await listedDevices(remote.client, name)
-  if ("kind" in listed) return { kind: "refused", failure: listed.error }
-  const named = listed.devices.some((candidate) => candidate.device === name)
-    ? [name]
-    : listed.devices.filter((candidate) => candidate.label === name).map((candidate) => candidate.device)
-  if (named.length > 1)
-    return {
-      kind: "refused",
-      failure: threadToolFailure(
-        "ambiguous_target",
-        `${named.length} devices on this account are named ${name}.`,
-        "Name the device by its id (<device id>/<thread>); thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) shows each device's id.",
-        { device: name, candidates: named },
-      ),
-    }
-  const device = named[0] ?? name
-  const refusal = deviceRefusal(listed.devices, device)
-  return refusal === undefined ? device : { kind: "refused", failure: refusal.error }
-}
 
 // senpi's own local targets (rpc-monitor-targets.ts `parseRpcTarget`): the lineage and account keywords, a task id, and a
 // session file path, which no thread address can spell.
@@ -72,49 +52,98 @@ const SENPI_LOCAL_TARGET = /^(?:children|all|st_.*)$/
 const PATH_LIKE = /[/\\]|\.jsonl$/i
 
 /**
- * What `monitor({type: "rpc", target})` arms (#14294). A bare address is resolved by `resolve`, the resolver every thread
- * tool uses (`resolveAcross`, decision 0027): a thread id, alias, unique name or 8+ character id prefix on any device. The
- * device part of `<device>/<session>` is a device id or the name the account lists it under (`deviceNamed`).
+ * What `monitor({type: "rpc", target})` arms (#14294): the target read by `resolve`, the module's resolver as every thread
+ * tool asks it (`resolveAddress` with the device needed online): a bare thread id, alias, unique name or 8+ character id
+ * prefix on any device, or `<device>/<thread>` with the device by id, `here`, name or id prefix and the thread among that
+ * device's threads. `<device>/*` names a device only. A thread on another device is armed as `<device id>/<thread>`.
  */
 export async function resolveMonitorTarget(
   remote: RemoteThreadSurface | undefined,
   target: string,
-  resolve: (address: string) => Promise<ThreadResolveResult>,
+  resolve: (address: string) => Promise<Resolved | ThreadRefusal>,
 ): Promise<MonitorTargetResolution> {
   const text = target.trim()
-  const armed = async (device: string | undefined, session: string): Promise<MonitorTargetResolution> => {
-    let armedTarget = session
-    if (device !== undefined) {
-      if (remote === undefined) return KEEP
-      const named = await deviceNamed(remote, device)
-      if (typeof named !== "string") return named
-      armedTarget = `${named}/${session}`
-    }
-    return armedTarget === text ? KEEP : { kind: "target", target: armedTarget }
-  }
   if (text === "" || SENPI_LOCAL_TARGET.test(text)) return KEEP
   const onDevice = remoteMonitorTarget(text)
-  if (onDevice !== undefined) return await armed(onDevice.device, onDevice.session)
-  if (PATH_LIKE.test(text)) return KEEP
-  const resolved = await resolve(text)
-  if (resolved.kind === "error") {
-    const { kind: _kind, ...failure } = resolved
-    return { kind: "refused", failure }
+  if (onDevice === undefined && PATH_LIKE.test(text)) return KEEP
+  // With no account a device-qualified target is senpi's own to read.
+  if (onDevice !== undefined && remote === undefined) return KEEP
+  let armed: string
+  if (onDevice?.session === "*" && remote !== undefined) {
+    const device = await resolveTypedDevice(remote.client, onDevice.device)
+    if (device.kind === "error") return { kind: "refused", failure: device.error }
+    armed = `${device.device}/*`
+  } else {
+    const resolved = await resolve(text)
+    if (resolved.kind === "error") return { kind: "refused", failure: asFailure(resolved) }
+    armed = resolved.where.kind === "device" ? resolved.address : resolved.thread
   }
-  const row = resolved.entry.transport?.kind === "relay" ? resolved.entry.transport.row : undefined
-  return row === undefined
-    ? await armed(undefined, resolved.entry.thread_id)
-    : await armed(row.device, rowThreadId(row))
+  return armed === text ? KEEP : { kind: "target", target: armed }
+}
+
+/**
+ * The session a raw `<device>/<thread>` open names (a restored monitor, or a target armed before it was read): the
+ * module resolves the device by id, name or prefix, online, and the thread among that device's threads by id, listing
+ * key, alias, name or prefix; only an id-shaped thread part reaches the device unlisted. A device that is offline or did
+ * not answer is no reason to drop a restored monitor for good: the open then watches, on the device resolved by id, name
+ * or prefix online or not, the key its rows give for the thread, or a thread id as stored, and the watch's own reattach
+ * waits for the device. A stored name that no row lists keeps the refusal; not_found and ambiguous_target refuse.
+ */
+/** The refusals a restore outlives: the device is offline or did not answer now, and the watch's reattach waits for it. */
+const TRANSIENT: ReadonlySet<string> = new Set(["device_offline", "host_unavailable"])
+
+/** A stored device part as an id, by id, name or prefix whether or not it is online; the stored text only when that fails. */
+async function storedDevice(remote: RemoteThreadSurface, device: string): Promise<string> {
+  const roster = await accountDevices(remote.client).catch(() => undefined)
+  const named = roster === undefined ? undefined : resolveAccountDevice(roster, device, { online: false })
+  return named?.kind === "ok" ? named.device.id : device
+}
+
+/** The key a device's rows give a stored thread (by listing key or thread id), else the thread as stored. */
+async function storedSession(remote: RemoteThreadSurface, device: string, thread: string) {
+  const rows = await remote.sessions.sessions({ device }).catch(() => [])
+  const listed = rows.find((row) => row.device === device && (row.session_id === thread || row.durable_id === thread))
+  return { device, session: listed?.session_id ?? thread, listed: listed !== undefined }
+}
+
+async function sessionOn(
+  remote: RemoteThreadSurface,
+  device: string,
+  thread: string,
+): Promise<{ readonly device: string; readonly session: string }> {
+  // <this device>/<thread>, stored before the tool hook armed targets: watched on this device's id, as it was (the module
+  // reads no local book here).
+  const here = await accountDevices(remote.client).then(
+    (roster) => roster.here,
+    () => null,
+  )
+  if (here !== null && (await storedDevice(remote, device)) === here) return await storedSession(remote, here, thread)
+  const resolved = await resolveAddress(
+    { remote, callerWorkspaceRoot: "", local: [], callerId: UNKNOWN_CALLER },
+    formatAddress(device, thread),
+    { all_scope: true, need: "online" },
+  )
+  if (resolved.kind === "error") {
+    if (!TRANSIENT.has(resolved.code)) throw new Error(`${resolved.code}: ${resolved.message}`)
+    const stored = await storedSession(remote, await storedDevice(remote, device), thread)
+    // Only an id-shaped thread part reaches a device that does not list it (the module's rule): a name cannot be resolved
+    // without that device's listing, so it keeps the refusal.
+    if (!stored.listed && !THREAD_ID_SHAPE.test(thread)) throw new Error(`${resolved.code}: ${resolved.message}`)
+    return stored
+  }
+  if (resolved.where.kind !== "device")
+    throw new Error(`not_found: ${thread} is a session on this device, which a remote watch does not follow.`)
+  return { device: resolved.where.row.device, session: resolved.where.row.session_id }
 }
 
 async function openSession(
   remote: RemoteThreadSurface,
   device: string,
+  sessionId: string,
   label: string,
   resumeFrom: string | undefined,
   handlers: RpcRemoteHandlers,
 ) {
-  const sessionId = await resolveSession(remote, device, label)
   let durable: string | undefined
   let sawStatusRecord = false
   const watched = await remote.sessions.watch(
@@ -176,19 +205,6 @@ async function openSession(
     cursor: initial.currentTurnId ?? "",
   }
   return { initial: state, stop: watched.watch.stop }
-}
-
-// `<device>/<alias>`: an alias the registry holds for a session on that device. `<device>/<thread id>`: the durable id
-// thread_list and thread_read name it by, mapped to its listing key through the device's rows. Anything else is the
-// session's key.
-async function resolveSession(remote: RemoteThreadSurface, device: string, address: string): Promise<string> {
-  if (remote.aliases !== undefined) {
-    const held = await remote.aliases.resolve(address)
-    if (held.kind === "ok" && held.value.device === device) return held.value.session_id
-  }
-  const rows = await remote.sessions.sessions({ device })
-  const listed = rows.find((row) => row.device === device && (row.session_id === address || row.durable_id === address))
-  return listed?.session_id ?? address
 }
 
 async function openDevice(remote: RemoteThreadSurface, device: string, handlers: RpcRemoteHandlers) {

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:ff863c9fe89c6e8d8d15e4ff3528e2c126a656deeffa6c728ab0b25127829710:71f433e6abcc85da56d157766eb6595b5e1943e61747251d1f85de44bf32354c
+// omo-codex-install:a6870f30b41bdf788a9220da555559b1b52acc149765d24cc6055dd0bacf9ad6:d51784ae76d57120dd009c69520536aa859771df7ec0e247faa22684ac1fc88e
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -20362,6 +20362,16 @@ var OmoSessionWakeSettingsSchema = object({
   wake_limit: number2().int().min(0).optional()
 }).strict();
 
+// packages/omo-config-core/src/schema/operator-alerts.ts
+var OmoOperatorAlertsSettingsSchema = object({
+  error_streak: object({
+    threshold: number2().int().min(1).optional(),
+    realert_minutes: number2().min(0).optional(),
+    threads: array(string2().trim().min(1)).optional(),
+    webhook_url_env: string2().regex(/^[A-Za-z_][A-Za-z0-9_]*$/).optional()
+  }).strict().optional()
+}).strict();
+
 // packages/omo-config-core/src/schema/config.ts
 var OmoOpenCodeHarnessConfigSchema = record(string2(), unknown());
 var OmoDisabledSkillsSchema = array(string2());
@@ -20369,6 +20379,7 @@ var OmoExcludedModelsSchema = array(string2());
 var OmoTypedHarnessConfigSchema = object({
   provenance: OmoProvenanceSettingsSchema.optional(),
   session_wake: OmoSessionWakeSettingsSchema.optional(),
+  operator_alerts: OmoOperatorAlertsSettingsSchema.optional(),
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
@@ -20390,6 +20401,7 @@ var OmoTypedHarnessConfigSchema = object({
 var OmoConfigProfileSchema = object({
   provenance: OmoProvenanceSettingsSchema.optional(),
   session_wake: OmoSessionWakeSettingsSchema.optional(),
+  operator_alerts: OmoOperatorAlertsSettingsSchema.optional(),
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
@@ -20415,6 +20427,7 @@ var OmoConfigProfileSchema = object({
 var OmoConfigSchema = object({
   provenance: OmoProvenanceSettingsSchema.optional(),
   session_wake: OmoSessionWakeSettingsSchema.optional(),
+  operator_alerts: OmoOperatorAlertsSettingsSchema.optional(),
   formatOnMutation: OmoFormatOnMutationSchema.optional(),
   $schema: string2().optional(),
   categories: OmoCategoriesConfigSchema.optional(),
@@ -20444,6 +20457,7 @@ var OmoConfigSchema = object({
 var OmoConfigLayerSchema = object({
   provenance: OmoProvenanceSettingsSchema.optional(),
   session_wake: OmoSessionWakeSettingsSchema.optional(),
+  operator_alerts: OmoOperatorAlertsSettingsSchema.optional(),
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
   $schema: string2().optional(),
   categories: OmoCategoriesConfigSchema.optional(),
