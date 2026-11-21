@@ -75,7 +75,6 @@ export function createGatewayHarness(
     const created = storeFactory({
       agentDir,
       now,
-      resolveTarget: resolveFromEntries(entries, () => agentDir),
       ...extra,
     })
     stores.push(created)

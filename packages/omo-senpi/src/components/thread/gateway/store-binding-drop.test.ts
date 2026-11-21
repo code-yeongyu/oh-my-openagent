@@ -1,0 +1,232 @@
+import { Database } from "bun:sqlite"
+import { mkdirSync } from "node:fs"
+import { dirname } from "node:path"
+import { afterEach, expect, test } from "bun:test"
+
+import { gatewayDatabasePath } from "./paths"
+import { GATEWAY_MIGRATIONS } from "./schema"
+import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
+
+let harness: GatewayHarness | undefined
+afterEach(async () => {
+  await harness?.dispose()
+  harness = undefined
+})
+
+/** Schema v14: a store from before the v15 deliveries rebuild and the v16 binding drop. Pinned, not `length - 1`, because later migrations append. */
+const V14 = 14
+
+const moduleUrl = new URL("./testing/store-extension.mjs", import.meta.url).href
+
+function v14Fixture(
+  path: string,
+  extra: readonly string[] = [],
+  options: { readonly bound: boolean; readonly version?: number } = { bound: true },
+): void {
+  const version = options.version ?? V14
+  mkdirSync(dirname(path), { recursive: true })
+  const db = new Database(path)
+  db.exec("PRAGMA foreign_keys = ON")
+  db.exec("BEGIN")
+  for (const step of GATEWAY_MIGRATIONS.slice(0, version)) for (const statement of step) db.exec(statement)
+  db.exec(`PRAGMA user_version = ${version}`)
+  db.exec("COMMIT")
+  if (!options.bound) {
+    for (const statement of extra) db.exec(statement)
+    db.close()
+    return
+  }
+  db.exec(`INSERT INTO bindings (binding_id, revision, status, platform, account_id, chat_id, thread_id, session_realm_id,
+    session_durable_id, direction_inbound, direction_outbound, inbound_mode, outbound_events, policy_id, created_at,
+    updated_at, lease_started_at) VALUES ('bnd-1', 1, 'active', 'slack', 'acct', 'c1', 't1', 'realm', 'target', 1, 1,
+    'auto', '["report"]', 'dori:v1:route-1', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`)
+  db.exec(`INSERT INTO outbox (binding_id, revision, event_kind, payload, state, created_at)
+    VALUES ('bnd-1', 1, 'report', '{}', 'pending', 1)`)
+  db.exec("INSERT INTO outbox_cursors (binding_id, acked_cursor, updated_at) VALUES ('bnd-1', 0, 1)")
+  db.exec(`INSERT INTO completion_arms (session_durable_id, binding_id, revision, text, armed_at)
+    VALUES ('target', 'bnd-1', 1, 'done', 1)`)
+  db.exec(`INSERT INTO deliveries (delivery_id, target_durable_id, seq, sender, envelope, body, bytes, mode_requested,
+    state, root_id, hop, created_at, updated_at, expires_at, binding_id, binding_revision, actor_user_id)
+    VALUES ('d-bound', 'target', 1, 'binding:bnd-1', '{"provenance":{"workspace":"w","project":"p"}}', 'from chat', 9,
+    'auto', 'queued', 'root', 1, 1, 1, 9999999999999, 'bnd-1', 1, 'u1')`)
+  for (const statement of extra) db.exec(statement)
+  db.close()
+}
+
+test("#given a v14 store holding a binding, its outbox, cursor, completion arm and a bound delivery #when the current store opens it #then the outbox tables are gone, the binding rows stay for an extension's import, a second run of the step changes nothing, and the delivery stays", async () => {
+  const h = (harness = createGatewayHarness())
+  const path = gatewayDatabasePath(h.agentDir)
+  v14Fixture(path)
+  const store = h.store()
+  try {
+    await store.identity()
+  } finally {
+    await store.dispose()
+  }
+  const rewind = new Database(path)
+  rewind.exec(`PRAGMA user_version = ${GATEWAY_MIGRATIONS.length - 1}`)
+  rewind.close()
+  const reopened = h.store()
+  try {
+    await reopened.identity()
+  } finally {
+    await reopened.dispose()
+  }
+  const db = new Database(path)
+  try {
+    expect({
+      version: (db.query("PRAGMA user_version").get() as { user_version: number }).user_version,
+      tables: db
+        .query(
+          "SELECT name FROM sqlite_schema WHERE name IN ('bindings', 'outbox', 'outbox_cursors', 'completion_arms') ORDER BY name",
+        )
+        .all(),
+      deliveries: db.query("SELECT delivery_id, body FROM deliveries").all(),
+      staleCoreObjects: db
+        .query(
+          "SELECT name FROM extension_objects e WHERE owner IS NULL AND NOT EXISTS (SELECT 1 FROM sqlite_schema s WHERE s.type = e.type AND s.name = e.name COLLATE NOCASE)",
+        )
+        .all(),
+    }).toEqual({
+      version: GATEWAY_MIGRATIONS.length,
+      tables: [{ name: "bindings" }],
+      deliveries: [{ delivery_id: "d-bound", body: "from chat" }],
+      staleCoreObjects: [],
+    })
+    expect(db.query("SELECT binding_id, session_durable_id FROM bindings").all()).toEqual([
+      { binding_id: "bnd-1", session_durable_id: "target" },
+    ])
+  } finally {
+    db.close()
+  }
+})
+
+test("#given a v14 store with no binding rows #when the current store opens it #then the bindings table is dropped too", async () => {
+  const h = (harness = createGatewayHarness())
+  const path = gatewayDatabasePath(h.agentDir)
+  v14Fixture(path, [], { bound: false })
+  const store = h.store()
+  try {
+    await store.identity()
+  } finally {
+    await store.dispose()
+  }
+  const db = new Database(path)
+  try {
+    expect(
+      db
+        .query(
+          "SELECT name FROM sqlite_schema WHERE name IN ('bindings', 'outbox', 'outbox_cursors', 'completion_arms') ORDER BY name",
+        )
+        .all(),
+    ).toEqual([])
+  } finally {
+    db.close()
+  }
+})
+
+/** Schema v15: train 6's store (the `deliveries` rebuild for the start lane), the one a released omo leaves before v16. */
+const V15 = 15
+
+test.each<[string, boolean, { name: string }[]]>([
+  ["holding a binding", true, [{ name: "bindings" }]],
+  ["with no binding rows", false, []],
+])(
+  "#given a v15 store %s #when the current store opens it #then it migrates to the current version and keeps the binding table only while it has rows",
+  async (_label, bound, tables) => {
+    const h = (harness = createGatewayHarness())
+    const path = gatewayDatabasePath(h.agentDir)
+    v14Fixture(path, [], { bound, version: V15 })
+    const store = h.store()
+    try {
+      await store.identity()
+    } finally {
+      await store.dispose()
+    }
+    const db = new Database(path)
+    try {
+      expect({
+        version: (db.query("PRAGMA user_version").get() as { user_version: number }).user_version,
+        tables: db
+          .query(
+            "SELECT name FROM sqlite_schema WHERE name IN ('bindings', 'outbox', 'outbox_cursors', 'completion_arms') ORDER BY name",
+          )
+          .all(),
+      }).toEqual({ version: GATEWAY_MIGRATIONS.length, tables })
+    } finally {
+      db.close()
+    }
+  },
+)
+
+// dori-extension imports each thread route's owner from the binding rows through tx.bindingFor on its next open; a
+// store that dropped them first would lose every route.
+test.each([
+  ["holding the binding", true, { binding_id: "bnd-1", policy_id: "dori:v1:route-1", session_durable_id: "target" }],
+  ["with no binding rows", false, null],
+] as const)(
+  "#given a v14 store %s #when an extension reads the thread's legacy binding after v16 #then it gets the owner while the rows exist, else null",
+  async (_label, bound, expected) => {
+    const h = (harness = createGatewayHarness())
+    v14Fixture(gatewayDatabasePath(h.agentDir), [], { bound })
+    const store = h.store()
+    expect(
+      (
+        await store.registerStoreExtension({
+          name: "alpha",
+          moduleUrl,
+          migrations: [["CREATE TABLE alpha_items (id INTEGER PRIMARY KEY, value TEXT)"]],
+        })
+      ).kind,
+    ).toBe("ok")
+    expect(
+      await store.extensionCall("alpha", "legacyBinding", {
+        where: { platform: "slack", account_id: "acct", chat_id: "c1", thread_id: "t1" },
+      }),
+    ).toEqual({ kind: "ok", value: expected })
+  },
+)
+
+// An extension table that still declares a foreign key to `bindings` keeps it usable: v16 leaves an empty `bindings` in
+// place while any table references it, because dropping it would make every later insert into that table fail with
+// "no such table: main.bindings" once foreign keys are back on.
+test.each([
+  ["ON DELETE CASCADE", "REFERENCES bindings ON DELETE CASCADE"],
+  ["a plain REFERENCES", "REFERENCES bindings"],
+])(
+  "#given an empty bindings table and an extension table referencing it with %s #when the store migrates to v16 #then bindings stays, the extension rows stay, and the extension table still takes writes",
+  async (_label, reference) => {
+    const h = (harness = createGatewayHarness())
+    const path = gatewayDatabasePath(h.agentDir)
+    v14Fixture(
+      path,
+      [
+        `CREATE TABLE alpha_refs (id INTEGER PRIMARY KEY, binding_seq INTEGER ${reference})`,
+        "INSERT INTO alpha_refs (id, binding_seq) VALUES (1, NULL), (2, NULL)",
+      ],
+      { bound: false },
+    )
+    const store = h.store()
+    try {
+      await store.identity()
+    } finally {
+      await store.dispose()
+    }
+    const db = new Database(path)
+    try {
+      db.exec("PRAGMA foreign_keys = ON")
+      db.exec("INSERT INTO alpha_refs (id, binding_seq) VALUES (3, NULL)")
+      expect({
+        version: (db.query("PRAGMA user_version").get() as { user_version: number }).user_version,
+        bindings: db.query("SELECT name FROM sqlite_schema WHERE type = 'table' AND name = 'bindings'").all(),
+        rows: db.query("SELECT id FROM alpha_refs ORDER BY id").all(),
+      }).toEqual({
+        version: GATEWAY_MIGRATIONS.length,
+        bindings: [{ name: "bindings" }],
+        rows: [{ id: 1 }, { id: 2 }, { id: 3 }],
+      })
+    } finally {
+      db.close()
+    }
+  },
+)

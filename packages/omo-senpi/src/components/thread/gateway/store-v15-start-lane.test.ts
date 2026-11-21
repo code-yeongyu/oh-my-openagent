@@ -33,6 +33,9 @@ const ENVELOPE = (id: string) =>
     delivery_id: id,
   })
 
+/** The binding-era objects the v16 step drops from an empty-bindings store, with their registry rows. */
+const V16_DROPPED = /^(sqlite_autoindex_)?(bindings|outbox|outbox_cursors|completion_arms)(_|$)/
+
 /** A v14 row with every column set, the later-added ones included, so a dropped or reordered column shows. */
 const DELIVERY_ROW = (id: string, seq: number, effective: string | null, extra: Partial<Record<string, string>> = {}) =>
   `INSERT INTO deliveries (delivery_id, target_durable_id, seq, sender, sender_turn, envelope, body, bytes, mode_requested,
@@ -106,12 +109,14 @@ test("#given a v14 store holding deliveries in every lane #when the current buil
   await openAndMigrate(h)
 
   const after = snapshot(path)
-  expect(after.version).toBe(V14 + 1)
   expect(after.version).toBe(GATEWAY_MIGRATIONS.length)
   expect(after.rows).toEqual(before.rows)
   expect(after.columns).toEqual(before.columns)
   expect(after.objects).toEqual(before.objects)
-  expect(after.registry).toEqual(before.registry)
+  // v16 then drops the binding-era tables (this store holds no binding rows) and their registry rows; nothing else goes.
+  expect(after.registry).toEqual(
+    (before.registry as { readonly name: string }[]).filter((row) => !V16_DROPPED.test(row.name)),
+  )
   expect(after.foreignKeyViolations).toBe(0)
   insertStart()
   const db = new Database(path)
@@ -144,7 +149,9 @@ test("#given an extension table referencing deliveries ON DELETE CASCADE #when m
       { id: 1, delivery_id: "d-follow" },
       { id: 2, delivery_id: "d-queued" },
     ])
-    expect((db.query("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(V14 + 1)
+    expect((db.query("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(
+      GATEWAY_MIGRATIONS.length,
+    )
   } finally {
     db.close()
   }

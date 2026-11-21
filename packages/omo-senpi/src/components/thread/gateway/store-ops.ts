@@ -97,9 +97,6 @@ const DELIVERY_COLUMNS = [
   "created_at",
   "updated_at",
   "expires_at",
-  "binding_id",
-  "binding_revision",
-  "actor_user_id",
   "ledger_id",
   "verbatim_text",
   "verbatim_display_text",
@@ -144,9 +141,6 @@ function rowFrom(record: SqlRow): DeliveryRow {
     created_at: Number(record.created_at),
     updated_at: Number(record.updated_at),
     expires_at: Number(record.expires_at),
-    binding_id: record.binding_id === null ? null : String(record.binding_id),
-    binding_revision: nullableNumber(record.binding_revision),
-    actor_user_id: record.actor_user_id === null ? null : String(record.actor_user_id),
     ledger_id: nullableString(record.ledger_id),
     verbatim_text: nullableString(record.verbatim_text),
     verbatim_display_text: nullableString(record.verbatim_display_text),
@@ -263,7 +257,7 @@ function createMarker(ctx: StoreContext, targetDurableId: string, deliveryId: st
   return path
 }
 
-export function unlinkMarker(ctx: StoreContext, targetDurableId: string, deliveryId: string): void {
+function unlinkMarker(ctx: StoreContext, targetDurableId: string, deliveryId: string): void {
   if (ctx.afterCommit !== undefined) {
     ctx.afterCommit.push(() => unlinkMarker({ ...ctx, afterCommit: undefined }, targetDurableId, deliveryId))
     return
@@ -335,9 +329,6 @@ function insertDelivery(ctx: StoreContext, row: DeliveryRow): void {
       row.created_at,
       row.updated_at,
       row.expires_at,
-      row.binding_id,
-      row.binding_revision,
-      row.actor_user_id,
       row.ledger_id ?? null,
       row.verbatim_text ?? null,
       row.verbatim_display_text ?? null,
@@ -378,12 +369,14 @@ export async function migrate(ctx: StoreContext): Promise<void> {
   for (;;) {
     const version = schemaVersion(ctx)
     if (version >= GATEWAY_MIGRATIONS.length) return
-    // A CHECK-widening rebuild (v7 `bindings`, v15 `deliveries`) must run with foreign_keys OFF, which SQLite only
-    // honors when the pragma is set OUTSIDE the transaction (a table drop would otherwise fire foreign-key actions from
-    // extension tables referencing the rebuilt table). The pragma is restored to its prior value afterwards, and
-    // foreign_key_check is verified from TypeScript before the bump commits.
+    // A CHECK-widening rebuild (v7 `bindings`, v15 `deliveries`) and the v16 binding-table drop must run with
+    // foreign_keys OFF, which SQLite only honors when the pragma is set OUTSIDE the transaction (a table drop would
+    // otherwise fire foreign-key actions from extension tables referencing that table: ON DELETE CASCADE empties them, a
+    // plain REFERENCES fails the step on every open). The pragma is restored to its prior value afterwards. A rebuild
+    // verifies foreign_key_check from TypeScript before its bump commits; v16 keeps `bindings` while any table still
+    // declares a foreign key to it (dropEmptyBindings), so such an extension table keeps both its rows and its writes.
     const rebuilt = GATEWAY_TABLE_REBUILDS.get(version)
-    const needsForeignKeysOff = rebuilt !== undefined
+    const needsForeignKeysOff = rebuilt !== undefined || version === GATEWAY_V16_BINDING_DROP
     const priorForeignKeys = needsForeignKeysOff
       ? Number(ctx.sql.one(["foreign_keys"], "SELECT foreign_keys FROM pragma_foreign_keys")?.foreign_keys ?? 1)
       : 1
@@ -392,6 +385,7 @@ export async function migrate(ctx: StoreContext): Promise<void> {
       await transaction(ctx, "migrate", () => {
         const current = schemaVersion(ctx)
         if (current !== version) return
+        if (version === GATEWAY_V16_BINDING_DROP) dropEmptyBindings(ctx)
         for (const statement of GATEWAY_MIGRATIONS[current]) ctx.sql.exec(statement)
         if (rebuilt !== undefined) {
           const violations = ctx.sql.all(["parent"], "SELECT parent FROM pragma_foreign_key_check")
@@ -410,6 +404,26 @@ export async function migrate(ctx: StoreContext): Promise<void> {
     }
   }
 }
+
+/**
+ * v16 drops `bindings` only once no row is left for an extension to import through `tx.bindingFor` (schema.ts v16), and
+ * only while no table declares a foreign key to it: with the table gone, every later insert into such a table would
+ * fail with "no such table: main.bindings" once foreign keys are back on.
+ */
+function dropEmptyBindings(ctx: StoreContext): void {
+  if (ctx.sql.one(["name"], "SELECT name FROM sqlite_schema WHERE type = 'table' AND name = 'bindings'") === undefined)
+    return
+  if (ctx.sql.one(["seq"], "SELECT seq FROM bindings LIMIT 1") !== undefined) return
+  const referenced = ctx.sql.one(
+    ["name"],
+    `SELECT m.name AS name FROM sqlite_schema m, pragma_foreign_key_list(m.name) f
+     WHERE m.type = 'table' AND f."table" = 'bindings' COLLATE NOCASE LIMIT 1`,
+  )
+  if (referenced === undefined) ctx.sql.exec("DROP TABLE bindings")
+}
+
+/** Migration index (0-based) of the v16 binding-table drop. */
+const GATEWAY_V16_BINDING_DROP = 15
 
 type ReceiptRecord = {
   readonly args_hash: string
@@ -441,7 +455,7 @@ type ReceiptRetry = Pick<EnqueueRequest, "now" | "sender_principal" | "endpoint_
   readonly receipt: Pick<EnqueueRequest["receipt"], "idempotency_key" | "args_hash">
 }
 
-/** How a retry under an existing delivery receipt is answered: a send's retry and a closed binding's replayed event both come here. */
+/** How a retry under an existing delivery receipt is answered. */
 function classifyReceipt(ctx: StoreContext, request: ReceiptRetry, receipt: ReceiptRecord): EnqueueOutcome {
   if (receipt.args_hash !== request.receipt.args_hash) {
     return refused("idempotency_conflict", "The idempotency key was already used with different arguments.")
@@ -591,33 +605,6 @@ function takePairToken(ctx: StoreContext, request: EnqueueRequest): StoreRefusal
   return undefined
 }
 
-function checkBinding(
-  ctx: StoreContext,
-  request: EnqueueRequest,
-): { readonly expires_at: number | null } | StoreRefusal {
-  if (request.binding === null) return { expires_at: null }
-  const binding = ctx.sql.one(
-    ["revision", "status", "session_durable_id", "direction_inbound", "expires_at"],
-    "SELECT revision, status, session_durable_id, direction_inbound, expires_at FROM bindings WHERE binding_id = ?",
-    [request.binding.binding_id],
-  )
-  const expiresAt =
-    binding?.expires_at === null || binding?.expires_at === undefined ? null : Date.parse(String(binding.expires_at))
-  if (
-    binding === undefined ||
-    binding.status !== "active" ||
-    Number(binding.revision) !== request.binding.revision ||
-    String(binding.session_durable_id) !== request.target_durable_id ||
-    Number(binding.direction_inbound) !== 1 ||
-    (expiresAt !== null && expiresAt <= request.now)
-  ) {
-    return refused("invalid_arguments", "The binding is not active for this session at this revision.", {
-      binding: request.binding.binding_id,
-    })
-  }
-  return { expires_at: expiresAt }
-}
-
 /** What only the intake adds to an enqueue: the row's ledger fields, and the answer its receipt completes with in the same commit. */
 export type IntakeFields = {
   readonly ledger_id: string
@@ -665,11 +652,6 @@ export async function enqueue(
       ctx.sql.exec(commitSql)
       committed = true
       return outcome
-    }
-    const binding = checkBinding(ctx, request)
-    if ("kind" in binding) {
-      rollbackQuietly(ctx)
-      return binding
     }
     const backlog = ctx.sql.one(
       ["n", "b"],
@@ -735,10 +717,7 @@ export async function enqueue(
       hop: placement.hop,
       created_at: request.now,
       updated_at: request.now,
-      expires_at: Math.min(request.now + QUEUED_TTL_MS, binding.expires_at ?? Number.POSITIVE_INFINITY),
-      binding_id: request.binding?.binding_id ?? null,
-      binding_revision: request.binding?.revision ?? null,
-      actor_user_id: "external" in request.origin ? (request.origin.external.author?.user_id ?? null) : null,
+      expires_at: request.now + QUEUED_TTL_MS,
       ledger_id: intakeFields?.ledger_id ?? null,
       verbatim_text: intakeFields?.verbatim_text ?? null,
       verbatim_display_text: intakeFields?.verbatim_display_text ?? null,
@@ -1100,69 +1079,6 @@ export async function abandonReceipt(
   )
 }
 
-/** `result` is the stored result of a completed receipt, null for one that has not recorded it. */
-export type DeliveryReceipt = {
-  readonly args_hash: string
-  readonly completed: boolean
-  readonly result: unknown
-  readonly target_durable_id: string
-  readonly binding_revision: number | null
-}
-
-/**
- * An unexpired delivery receipt with the facts of its row the receipt's arguments hash was taken
- * over; null otherwise. A plain read (no write lock): it lets a binding that has since closed still
- * answer a retry of an event it delivered. A receipt that has not recorded its result goes through
- * `recoverDelivery`.
- */
-export function deliveryReceipt(
-  ctx: StoreContext,
-  request: { readonly now: number; readonly principal: string; readonly idempotency_key: string },
-): DeliveryReceipt | null {
-  const receipt = selectReceipt(ctx, request.principal, request.idempotency_key)
-  if (receipt === undefined || receipt.expires_at <= request.now || receipt.delivery_id === null) return null
-  const row = selectRow(ctx, receipt.delivery_id)
-  if (row === undefined) return null
-  const completed = receipt.status === "completed" && receipt.result !== null
-  return {
-    args_hash: receipt.args_hash,
-    completed,
-    result: completed ? JSON.parse(receipt.result as string) : null,
-    target_durable_id: row.target_durable_id,
-    binding_revision: row.binding_revision,
-  }
-}
-
-/**
- * A retry under an existing delivery receipt, answered exactly as a retried send is
- * (`classifyReceipt`): a decided row replays its outcome and completes the receipt, an undecided one
- * stays in progress or uncertain. Admits nothing; null when no unexpired receipt exists.
- */
-export async function recoverDelivery(
-  ctx: StoreContext,
-  request: {
-    readonly now: number
-    readonly principal: string
-    readonly idempotency_key: string
-    readonly args_hash: string
-  },
-): Promise<EnqueueOutcome | null> {
-  return await transaction(ctx, "recover_delivery", () => {
-    const receipt = selectReceipt(ctx, request.principal, request.idempotency_key)
-    if (receipt === undefined || receipt.expires_at <= request.now) return null
-    return classifyReceipt(
-      ctx,
-      {
-        now: request.now,
-        sender_principal: request.principal,
-        endpoint_kind: null,
-        receipt: { idempotency_key: request.idempotency_key, args_hash: request.args_hash },
-      },
-      receipt,
-    )
-  })
-}
-
 export function deliveryView(
   ctx: StoreContext,
   deliveryId: string,
@@ -1188,12 +1104,7 @@ export function isReferenced(ctx: StoreContext, durableId: string): boolean {
     ])?.n ?? 0,
   )
   if (open > 0) return true
-  const bindings = Number(
-    ctx.sql.one(["n"], "SELECT COUNT(*) AS n FROM bindings WHERE session_durable_id = ? AND status = 'active'", [
-      durableId,
-    ])?.n ?? 0,
-  )
-  return bindings > 0 || markerNames(ctx, durableId).length > 0
+  return markerNames(ctx, durableId).length > 0
 }
 
 export function journalMode(ctx: StoreContext): string {
@@ -1284,9 +1195,6 @@ export async function migrateLegacyMailboxes(ctx: StoreContext, now: number): Pr
           created_at: Number.isFinite(accepted) ? accepted : now,
           updated_at: now,
           expires_at: now + QUEUED_TTL_MS,
-          binding_id: null,
-          binding_revision: null,
-          actor_user_id: null,
         })
         createMarker(ctx, item.target, deliveryId, true)
         count++

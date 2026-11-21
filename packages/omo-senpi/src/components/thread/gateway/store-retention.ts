@@ -1,13 +1,11 @@
 /**
  * Retention for the tables nothing else prunes. Runs inside a write transaction the store already
- * takes (an enqueue, a relay mutation, an outbox read), never at open, so opening a current store
+ * takes (an enqueue, a tool receipt admission), never at open, so opening a current store
  * still takes no write lock. Each statement deletes at most `RETENTION_SWEEP_BATCH` rows, and the
  * receipts one call deletes - the expired receipt under its own key included - stay within one batch
  * in total; a sweep that hit a batch bound makes the next sweep due at once, any other sweep waits
- * `RETENTION_SWEEP_INTERVAL_MS`. Nothing an open claim, a live receipt or an active binding still
- * reads is deleted.
+ * `RETENTION_SWEEP_INTERVAL_MS`. Nothing an open claim or a live receipt still reads is deleted.
  */
-import { OUTBOX_RETENTION_MS, rfc3339 } from "./bindings"
 import {
   DELIVERY_RETENTION_MS,
   PAIR_BUCKET_BURST,
@@ -16,7 +14,7 @@ import {
   RETENTION_SWEEP_INTERVAL_MS,
 } from "./constants"
 import type { Sql } from "./sql"
-import { OPEN_STATES, type StoreContext, write } from "./store-ops"
+import { type StoreContext, write } from "./store-ops"
 
 /** Keyed by the connection: an extension call joins core operations through a derived context. */
 const nextSweepDue = new WeakMap<Sql, number>()
@@ -27,8 +25,6 @@ export type RetentionSweep = {
   readonly causal_edges: number
   readonly causal_roots: number
   readonly rate_buckets: number
-  readonly bindings: number
-  readonly outbox_cursors: number
   readonly session_meta: number
 }
 
@@ -96,30 +92,13 @@ export function sweepRetention(ctx: StoreContext, now: number, receiptBatch = RE
     "DELETE FROM rate_buckets WHERE rowid IN (SELECT rowid FROM rate_buckets WHERE updated_at <= ? LIMIT ?)",
     [now - PAIR_BUCKET_BURST * PAIR_BUCKET_REFILL_MS, batch],
   )
-  const bindings = write(
-    ctx,
-    `DELETE FROM bindings WHERE binding_id IN (SELECT b.binding_id FROM bindings b WHERE b.status != 'active' AND b.updated_at <= ?
-      AND NOT EXISTS (SELECT 1 FROM outbox o WHERE o.binding_id = b.binding_id)
-      AND NOT EXISTS (SELECT 1 FROM completion_arms a WHERE a.binding_id = b.binding_id)
-      AND NOT EXISTS (SELECT 1 FROM deliveries d WHERE d.binding_id = b.binding_id AND d.state IN ${OPEN_STATES}) LIMIT ?)`,
-    [rfc3339(now - OUTBOX_RETENTION_MS), batch],
-  )
-  const outboxCursors = write(
-    ctx,
-    "DELETE FROM outbox_cursors WHERE binding_id IN (SELECT c.binding_id FROM outbox_cursors c WHERE NOT EXISTS (SELECT 1 FROM bindings b WHERE b.binding_id = c.binding_id) LIMIT ?)",
-    [batch],
-  )
-  // A session's meta row (sequence counter, incarnation) is only read for its deliveries and the
-  // reply tokens of its bindings; once nothing references the session it is rebuilt on demand
+  // A session's meta row (sequence counter, incarnation) is only read for its deliveries; once nothing references the session it is rebuilt on demand
   // (`allocateSeq` from MAX(seq), the incarnation at the session's next start).
   const sessionMeta = write(
     ctx,
     `DELETE FROM session_meta WHERE durable_id IN (SELECT m.durable_id FROM session_meta m WHERE
       m.incarnation IS NULL
-      AND NOT EXISTS (SELECT 1 FROM deliveries d WHERE d.target_durable_id = m.durable_id)
-      AND NOT EXISTS (SELECT 1 FROM bindings b WHERE b.session_durable_id = m.durable_id)
-      AND NOT EXISTS (SELECT 1 FROM outbox o WHERE o.session_durable_id = m.durable_id)
-      AND NOT EXISTS (SELECT 1 FROM completion_arms a WHERE a.session_durable_id = m.durable_id) LIMIT ?)`,
+      AND NOT EXISTS (SELECT 1 FROM deliveries d WHERE d.target_durable_id = m.durable_id) LIMIT ?)`,
     [batch],
   )
   return {
@@ -128,8 +107,6 @@ export function sweepRetention(ctx: StoreContext, now: number, receiptBatch = RE
     causal_edges: causalEdges,
     causal_roots: causalRoots,
     rate_buckets: rateBuckets,
-    bindings,
-    outbox_cursors: outboxCursors,
     session_meta: sessionMeta,
   }
 }

@@ -134,9 +134,9 @@ describe("one field names a session (#14044 4a)", () => {
       thread_create: await run("thread_create", { name: "fresh" }),
     }
 
-    // then: every verb is either scanned here or a relay tool, addressed by binding, never by session
+    // then: every verb is scanned here
     const unscanned = (Object.keys(threadToolParamSchemas) as ThreadToolName[]).filter(
-      (name) => answers[name] === undefined && !inputNames(name).includes("binding_id"),
+      (name) => answers[name] === undefined,
     )
     expect(unscanned).toEqual([])
     expect(typeof thread).toBe("string")

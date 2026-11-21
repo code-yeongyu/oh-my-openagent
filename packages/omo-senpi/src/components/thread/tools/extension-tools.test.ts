@@ -25,7 +25,7 @@ const migrations = [
   [
     "CREATE TABLE gw_opens (id INTEGER PRIMARY KEY, args TEXT NOT NULL)",
     "CREATE TABLE gw_requests (id TEXT PRIMARY KEY, status TEXT NOT NULL)",
-    "CREATE TABLE gw_items (binding_id TEXT PRIMARY KEY, status TEXT NOT NULL)",
+    "CREATE TABLE gw_items (item_id TEXT PRIMARY KEY, status TEXT NOT NULL)",
   ],
 ]
 const openDeclaration: SessionCallableOp = {
@@ -431,8 +431,8 @@ test("#given a store at the previous schema version with data #when it opens #th
   const agentDir = tempDir("extension-tools-migrate-")
   const path = gatewayDatabasePath(agentDir)
   // Back to the store before v10 (toolkit_replay_receipts), v11 (deliveries.wait_kind), v12 (the intake columns), v13
-  // (woken_sessions), v14 (the wake state tables; v13 and v14 are idempotent so their tables can stay) and v15 (the
-  // deliveries rebuild): all re-run. Pinned, not counted from the end, because later migrations append.
+  // (woken_sessions), v14 (the wake state tables; v13 and v14 are idempotent so their tables can stay), v15 (the
+  // deliveries rebuild) and v16 (the binding-table drop; idempotent, so its tables can stay): all re-run. Pinned, not counted from the end, because later migrations append.
   const previous = 9
   {
     const seed = storeAt(agentDir)
