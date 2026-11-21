@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach, mock } from "bun:test"
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import {
   runFormattersForFile,
   clearFormatterCache,
@@ -6,6 +9,13 @@ import {
   buildFormatterCommand,
   type FormatterClient,
 } from "./formatter-trigger"
+
+const WRITE_MARKER_COMMAND = [
+  process.execPath,
+  "-e",
+  "require('node:fs').writeFileSync(process.argv.at(-1), 'formatted')",
+  "$FILE",
+]
 
 function createMockClient(config: Record<string, unknown> = {}): FormatterClient {
   return {
@@ -364,37 +374,51 @@ describe("runFormattersForFile", () => {
   })
 
   it("skips when no matching formatters for extension", async () => {
-    //#given
+    //#given a .ts-only formatter that would write the file it formats
+    const directory = mkdtempSync(join(tmpdir(), "formatter-trigger-skip-"))
+    const target = join(directory, "main.go")
     const client = createMockClient({
       formatter: {
-        prettier: {
-          command: ["prettier", "--write", "$FILE"],
+        marker: {
+          command: WRITE_MARKER_COMMAND,
           extensions: [".ts"],
         },
       },
     })
 
-    //#when, run for a .go file, but only .ts formatters registered
-    await runFormattersForFile(client, "/project", "/src/main.go")
+    try {
+      //#when, run for a .go file
+      await runFormattersForFile(client, directory, target)
 
-    //#then, no error thrown
+      //#then the formatter never ran
+      expect(existsSync(target)).toBe(false)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
   })
 
   it("runs formatter for matching extension", async () => {
-    //#given
+    //#given a .ts formatter that writes the file it formats
+    const directory = mkdtempSync(join(tmpdir(), "formatter-trigger-run-"))
+    const target = join(directory, "test.ts")
     const client = createMockClient({
       formatter: {
-        echo: {
-          command: ["echo", "$FILE"],
+        marker: {
+          command: WRITE_MARKER_COMMAND,
           extensions: [".ts"],
         },
       },
     })
 
-    //#when, echo is a safe no-op command
-    await runFormattersForFile(client, "/tmp", "/tmp/test.ts")
+    try {
+      //#when
+      await runFormattersForFile(client, directory, target)
 
-    //#then, should complete without error
-    expect(client.config.get).toHaveBeenCalledTimes(1)
+      //#then the formatter ran on that file
+      expect(readFileSync(target, "utf8")).toBe("formatted")
+      expect(client.config.get).toHaveBeenCalledTimes(1)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
   })
 })

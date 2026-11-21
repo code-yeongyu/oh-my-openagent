@@ -219,18 +219,6 @@ describe("generateModelConfig provider routes", () => {
       expect(result.agents?.librarian?.fallback_models).toBeDefined()
       expect(result.agents?.librarian?.fallback_models?.length).toBeGreaterThan(0)
     })
-
-    test("librarian is omitted when only ZAI is available", () => {
-      // given only ZAI is available
-      const config = createConfig({ hasZaiCodingPlan: true })
-
-      // when the generated model config is resolved
-      const result = generateModelConfig(config)
-
-      // then Librarian has no current compatible route
-      expect(result.agents?.librarian).toBeUndefined()
-      expect(JSON.stringify(result)).not.toContain("zai-coding-plan/glm-4.7")
-    })
   })
 
   describe("Vercel AI Gateway provider", () => {

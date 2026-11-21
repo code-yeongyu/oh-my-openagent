@@ -270,13 +270,16 @@ describe("AgentOverrideConfigSchema", () => {
 
     test("accepts config without skills", () => {
       // given
-      const config = { temperature: 0.5 }
+      const config = { category: "visual-engineering" }
 
       // when
       const result = AgentOverrideConfigSchema.safeParse(config)
 
       // then
       expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.skills).toBeUndefined()
+      }
     })
 
     test("rejects non-array skills", () => {

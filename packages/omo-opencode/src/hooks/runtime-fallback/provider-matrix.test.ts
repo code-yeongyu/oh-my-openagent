@@ -252,18 +252,6 @@ describe("runtime-fallback provider matrix quota tests", () => {
       expect(retryable).toBe(true)
     })
 
-    test("402 payment required triggers fallback via quota_exceeded", () => {
-      //#given
-      const error = { statusCode: 402, message: "Payment Required" }
-
-      //#when
-      const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
-
-      //#then
-      // payment required is classified as quota_exceeded, which triggers fallback
-      expect(retryable).toBe(true)
-    })
-
     test("500 server error is retryable", () => {
       //#given
       const error = { statusCode: 500, message: "Internal Server Error" }

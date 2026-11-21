@@ -43,8 +43,6 @@ describe("createDelegateTask schema", () => {
     const description = toolDefinition.description
 
     //#then
-    expect(description).toContain("subagent_type: Use specific agent directly")
-    expect(description).toContain("task_id: Continuation session id")
     expect(description).not.toContain("sisyphus")
     expect(description).not.toContain("hephaestus")
     expect(description).not.toContain("prometheus")

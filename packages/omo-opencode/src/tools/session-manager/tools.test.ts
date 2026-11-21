@@ -122,14 +122,22 @@ describe("session-manager tools", () => {
   })
 
   test("session_list uses ctx.directory as default project_path", async () => {
-    const { session_list } = createTestTools()
-    //#given - no project_path provided
+    //#given - no project_path provided, and a plugin directory that differs from the tool context
+    const requestedDirectories: string[] = []
+    const { session_list } = createSessionManagerTools({ directory: "/plugin/ctx/dir" } as PluginInput, {
+      setStorageClient: () => {},
+      getMainSessions: async ({ directory }): Promise<SessionMetadata[]> => {
+        requestedDirectories.push(directory)
+        return []
+      },
+      formatSessionList: async (sessionIDs) => `sessions:${sessionIDs.join(",")}`,
+    })
 
     //#when
-    const result = await session_list.execute({}, mockContext)
+    await session_list.execute({}, mockContext)
 
     //#then
-    expect(typeof result).toBe("string")
+    expect(requestedDirectories).toEqual(["/plugin/ctx/dir"])
   })
 
   test("#given newer sessions outside the to_date window #when session_list runs with to_date and limit #then the limit applies after the date filter", async () => {

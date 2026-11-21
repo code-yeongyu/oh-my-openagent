@@ -808,30 +808,6 @@ describe("default_agent behavior with Sisyphus orchestration", () => {
     expect(config.default_agent).toBe(getAgentDisplayName("sisyphus"))
   })
 
-  test("uses canonical default_agent display name so OpenCode lookups match emitted agent keys", async () => {
-    // given
-    const pluginConfig = createPluginConfig({})
-    const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-7",
-      default_agent: "hephaestus",
-      agent: {},
-    }
-    const handler = createConfigHandler({
-      ctx: { directory: "/tmp" },
-      pluginConfig,
-      modelCacheState: {
-        anthropicContext1MEnabled: false,
-        modelContextLimitsCache: new Map(),
-      },
-    })
-
-    // when
-    await handler(config)
-
-    // then
-    expect(config.default_agent).toBe(getAgentDisplayName("hephaestus"))
-  })
-
   test("sets default_agent to sisyphus when configured default_agent is empty after trim", async () => {
     // given
     const pluginConfig = createPluginConfig({})

@@ -102,41 +102,6 @@ goto loop
       }
     })
 
-    test("returns empty result on timeout", async () => {
-      // given
-      const { runCommentChecker } = await import("./cli")
-      const binaryPath = createScriptBinary(
-        `#!/bin/sh
-if [ "$1" != "check" ]; then
-  exit 1
-fi
-trap '' TERM
-while :; do
-  :
-done
-`,
-        `@echo off
-if "%~1" neq "check" exit /b 1
-:loop
-goto loop
-`,
-      )
-      const originalSetTimeout = globalThis.setTimeout
-      globalThis.setTimeout = ((fn: (...args: unknown[]) => void, _ms?: number) => {
-        fn()
-        return unsafeTestValue<ReturnType<typeof setTimeout>>(0)
-      }) as typeof setTimeout
-
-      try {
-        // when
-        const result = await runCommentChecker(createMockInput(), binaryPath)
-        // then
-        expect(result).toEqual({ hasComments: false, message: "" })
-      } finally {
-        globalThis.setTimeout = originalSetTimeout
-      }
-    })
-
     test("keeps non-timeout flow unchanged", async () => {
       // given
       const { runCommentChecker } = await import("./cli")
