@@ -201,7 +201,7 @@ describe.skipIf(process.platform === "win32")(
 )
 
 describe.skipIf(process.platform === "win32")("omo remote attach: a raiser-only frame in the snapshot", () => {
-  test("#given a secret input pending in the snapshot #when the attach TUI watches #then it is not shown", async () => {
+  test("#given a secret input dialog, a grantSelect dialog and a secret question pending in the snapshot #when the attach TUI watches #then none of them is shown", async () => {
     const base = defaultWorld()
     const [session] = base.sessions
     if (session === undefined) throw new Error("the default world has a session")
