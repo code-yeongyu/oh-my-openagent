@@ -11,7 +11,7 @@ import { parseJsoncSafe } from "@oh-my-opencode/utils"
  * inline everything except Node builtins, so the SDK keeps this table instead of importing the engine;
  * `engine-defaults.parity.test.ts` holds it equal to the pinned engine's own `SettingsManager`.
  */
-export const ENGINE_READ_AT_VERSION = "2026.11.19-3"
+export const ENGINE_READ_AT_VERSION = "2026.11.19-5"
 
 /**
  * The engine's project settings directory name under the omo brand: omo launches the engine with
