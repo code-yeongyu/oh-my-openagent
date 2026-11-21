@@ -160,8 +160,17 @@ describe("host scope against the user manager", () => {
     }
   })
 
-  test("reports a failing busctl instead of throwing", async () => {
-    const plan = { busctl: "/bin/false", argv: [], unit: "omo-host-1-x.scope", pid: process.pid }
-    expect(await moveIntoHostScope(plan, process.env)).toContain("exit 1")
+  test.skipIf(process.platform === "win32")("reports a failing busctl instead of throwing", async () => {
+    // given a busctl stub that exits 1 (/bin/false is /usr/bin/false on macOS; a #! stub cannot run on Windows)
+    const dir = mkdtempSync(join(tmpdir(), "omo-host-scope-"))
+    const stub = join(dir, "busctl")
+    writeFileSync(stub, "#!/bin/sh\nexit 1\n")
+    chmodSync(stub, 0o755)
+    try {
+      const plan = { busctl: stub, argv: [], unit: "omo-host-1-x.scope", pid: process.pid }
+      expect(await moveIntoHostScope(plan, process.env)).toContain("exit 1")
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })

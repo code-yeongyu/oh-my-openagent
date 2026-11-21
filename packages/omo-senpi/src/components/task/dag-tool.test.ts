@@ -215,11 +215,11 @@ describe("dag tool definition validation", () => {
     expect(runFileCount()).toBe(0)
   })
 
-  test("#given a node with subagent_type and model #when start runs #then the explicit-model spawn is accepted", async () => {
+  test("#given a node with a custom subagent_type and model #when start runs #then the explicit-model spawn is accepted", async () => {
     // given
     const { manager } = fixture()
     const explicit = definition({
-      nodes: [{ id: "plan", prompt: "draft", subagent_type: "plan-reviewer", model: "anthropic/claude-opus-4" }],
+      nodes: [{ id: "plan", prompt: "draft", subagent_type: "my-reviewer", model: "anthropic/claude-opus-4" }],
     })
 
     // when
@@ -229,7 +229,25 @@ describe("dag tool definition validation", () => {
     expect(result.details.kind).toBe("started")
     if (result.details.kind !== "started") throw new Error("Expected subagent_type+model to be accepted")
     const node = result.details.snapshot.nodes[0]
-    expect(node?.route).toEqual({ kind: "agent", agent: "plan-reviewer", model: "anthropic/claude-opus-4" })
+    expect(node?.route).toEqual({ kind: "agent", agent: "my-reviewer", model: "anthropic/claude-opus-4" })
+  })
+
+  test("#given a node naming a builtin agent with a model #when start runs #then it is rejected with agent_with_model", async () => {
+    // given
+    const { manager, runFileCount } = fixture()
+    const conflicted = definition({
+      nodes: [{ id: "plan", prompt: "draft", subagent_type: "explore", model: "anthropic/claude-opus-4" }],
+    })
+
+    // when
+    const result = await runDagTool(deps(manager), { action: "start", definition: conflicted })
+
+    // then
+    expect(result.details.kind).toBe("error")
+    if (result.details.kind !== "error") throw new Error("Expected builtin agent+model to fail")
+    expect(result.details.error.code).toBe("invalid_definition")
+    expect(result.details.error.nodes.map((node) => node.code)).toEqual(["agent_with_model"])
+    expect(runFileCount()).toBe(0)
   })
 })
 

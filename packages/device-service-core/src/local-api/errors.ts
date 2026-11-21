@@ -1,7 +1,20 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6 packages/local-api/src/errors.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@88e58154bb592d781446a62a3d8d912769675079 packages/local-api/src/errors.ts
 import type { IncompleteDevice, PathRefusal, SessionCandidate } from "./protocol.ts";
 import type { SignInReason } from "./protocol-status.ts";
 import type { ClientErrorCode, ErrorCode } from "./vocabulary.ts";
+
+// #1371: why a state entry was refused as insecure_state_dir, as a closed cause. An owner is told apart as the
+// BUILTIN\Administrators group (an elevated run's default owner) or any other account; `reparse` is a link or junction
+// refused unfollowed; `unreadable` an owner or SID that could not be read; `dacl_not_exact` an exact DACL that could not
+// be applied or verified; `entry_owner` and `token_owner_unset` are #1371's install-guard causes.
+export type InsecureStateCause =
+  | "owner_administrators"
+  | "owner_other"
+  | "reparse"
+  | "dacl_not_exact"
+  | "unreadable"
+  | "entry_owner"
+  | "token_owner_unset";
 
 // Every failure the local API reports: an owner's error response (code, reason, action) or one the client raises
 // itself (a refused handshake, an unproven owner, an insecure state dir, a protocol violation).
@@ -18,6 +31,8 @@ export class LocalApiError extends Error {
   readonly incomplete?: readonly IncompleteDevice[];
   // #1031: on a device.adopt sign_in_required that asked for it, why sign-in is needed.
   readonly sign_in_reason?: SignInReason;
+  // On a client-raised insecure_state_dir: its typed cause.
+  readonly insecure_cause?: InsecureStateCause;
 
   constructor(
     code: ErrorCode | ClientErrorCode,
@@ -30,6 +45,7 @@ export class LocalApiError extends Error {
       readonly candidates?: readonly SessionCandidate[];
       readonly incomplete?: readonly IncompleteDevice[];
       readonly sign_in_reason?: SignInReason;
+      readonly insecure_cause?: InsecureStateCause;
     } = {},
   ) {
     super(`${code}: ${reason}`);
@@ -43,6 +59,7 @@ export class LocalApiError extends Error {
     if (extra.candidates !== undefined) this.candidates = extra.candidates;
     if (extra.incomplete !== undefined) this.incomplete = extra.incomplete;
     if (extra.sign_in_reason !== undefined) this.sign_in_reason = extra.sign_in_reason;
+    if (extra.insecure_cause !== undefined) this.insecure_cause = extra.insecure_cause;
   }
 }
 

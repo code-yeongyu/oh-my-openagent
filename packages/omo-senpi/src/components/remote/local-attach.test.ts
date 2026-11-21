@@ -289,6 +289,8 @@ describe("a session on this device (local watch)", () => {
         )
         return socket
       }
+      // win32 resolves the endpoint through its secret file first; without one it answers not_running before connecting.
+      if (process.platform === "win32") await writeFile(join(dir, "rpc.sock.secret"), randomBytes(32))
       await expectEngineFailure(
         createLocalAttach({ socket: join(dir, "rpc.sock"), keyRoot: dir, connect }),
         "unreachable",

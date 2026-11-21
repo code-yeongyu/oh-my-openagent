@@ -113,9 +113,16 @@ interface LocalAssistantMessageEventStream extends AsyncIterable<LocalStreamEven
   result(): Promise<AssistantMessage>
 }
 
-// A second id that the Astra detectors recognize (`omo-mock/gpt-6-astra`), so a live driver can
-// prove which ultrawork directive a GPT-6 Astra receiver gets without a real OpenAI route.
-const ASTRA_MOCK_MODEL_ID = "gpt-6-astra"
+// Ids the receiver detectors recognize (`omo-mock/gpt-6.2-astra`, ...), so a live driver can prove
+// which ultrawork directive each kind of receiver gets without a real provider route.
+const RECEIVER_MOCK_MODEL_IDS = [
+  "gpt-6.2-astra",
+  "gpt-6.2-astra-ultrafast",
+  "gpt-6.2-sol",
+  "gpt-6-astra",
+  "gpt-5.6-sol",
+  "claude-fable-5-2",
+]
 
 const model = {
   id: "mock-1",
@@ -136,7 +143,7 @@ export default function registerMockProvider(pi: ExtensionAPI): void {
     baseUrl: "file://mock-provider",
     apiKey: "mock",
     api: "openai-completions",
-    models: [model, { ...model, id: ASTRA_MOCK_MODEL_ID, name: "Mock GPT-6 Astra" }],
+    models: [model, ...RECEIVER_MOCK_MODEL_IDS.map((id) => ({ ...model, id, name: `Mock ${id}` }))],
     streamSimple(streamModel: Model<Api>, context: Context, options?: SimpleStreamOptions) {
       return streamMockResponse(streamModel, context, options)
     },
@@ -209,9 +216,19 @@ function recordDeclaredTools(cwd: string, context: Context): void {
   appendFileSync(join(cwd, "mock-tools.jsonl"), `${JSON.stringify(declaredToolNames(context))}\n`)
 }
 
+/** A driver that drops `mock-record-context` in the cwd gets one line per request: the receiving model and the messages it was sent. */
+function recordContext(cwd: string, modelId: string, context: Context): void {
+  if (!existsSync(join(cwd, "mock-record-context"))) return
+  appendFileSync(
+    join(cwd, "mock-context.jsonl"),
+    `${JSON.stringify({ model: modelId, messages: context.messages ?? null })}\n`,
+  )
+}
+
 function streamMockResponse(streamModel: Model<Api>, context: Context, options?: SimpleStreamOptions) {
   const cwd = context.cwd ?? process.cwd()
   recordDeclaredTools(cwd, context)
+  recordContext(cwd, streamModel.id, context)
   const script = loadMockScript(cwd)
   const step = script.steps[Math.min(callCount, script.steps.length - 1)]
   callCount += 1

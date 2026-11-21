@@ -25,7 +25,7 @@ import { connectDeliveryServicePort } from "../consumer/device-service-port"
 import { startDeliveryConsumer, type ServingConsumer } from "./consumer-start"
 import { engineDropsRetainedRecord } from "./engine-minimum"
 import { engineHostEnsure, type EngineLauncher } from "./host-ensure"
-import { readHostMemoryHeadroom } from "./memory-headroom"
+import { readHostMemoryHeadroom, readWakeMemoryFloor } from "./memory-headroom"
 
 /** How long a dead delivery consumer waits before it is started again (#13457's MEDIUM: never restarting left remote
  * wake off for the engine's life whenever the service was late or restarted). */
@@ -266,6 +266,7 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart, scope:
     remoteWake: () => consumer?.serving() ?? false,
     admitIntake: carrierAdmission,
     memoryHeadroom: options.memoryHeadroom ?? (() => readHostMemoryHeadroom()),
+    memoryFloor: () => readWakeMemoryFloor(),
     schedule: options.schedule ?? unrefSchedule,
     onEvent: (event) => {
       if (ENDED.has(event.outcome.kind))

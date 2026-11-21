@@ -72,7 +72,7 @@ Timestamp: $TIMESTAMP
 <user-request>
 $ARGUMENTS
 </user-request>`,
-      argumentHint: "[plan-name] [--worktree <path>] [--make-pr] [--ship]",
+      argumentHint: "[plan-name] [--worktree <path>] [--make-pr] [--ship] [--light]",
     },
     "stop-continuation": {
       description:

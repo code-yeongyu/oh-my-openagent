@@ -190,7 +190,7 @@ export const halfOpenServer = async (stateDir: string, script: (peer: RawPeer) =
   if (typeof address === "object" && address !== null) {
     endpoint = tcpEndpoint(address.port)
     await writeSecretFile(join(stateDir, ENDPOINT_FILE), JSON.stringify({ port: address.port }), testSecure)
-  } else await testSecure(join(stateDir, SOCKET_FILE), "socket")
+  } else await testSecure(join(stateDir, SOCKET_FILE), "socket", "created")
   closers.push(() => {
     for (const socket of sockets) socket.destroy()
     server.close()

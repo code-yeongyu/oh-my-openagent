@@ -30,6 +30,8 @@ const ALLOWED = new Set([
   `${DSC}/src/wire.ts`,
   `${DSC}/src/local-api/errors.ts`,
   `${DSC}/src/local-api/vocabulary.ts`,
+  // The policy vocabulary vocabulary.ts re-exports since relay-daemon 88e58154: a leaf that imports nothing.
+  `${DSC}/src/local-api/policy.ts`,
 ])
 const LEAF_PROTOCOL = new RegExp(`^${DSC}/src/local-api/protocol(?:-[a-z]+)?\\.ts$`)
 const allowed = (file: string) => ALLOWED.has(file) || LEAF_PROTOCOL.test(file)

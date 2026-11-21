@@ -95,7 +95,7 @@ function withReasoning(
   }
 }
 
-// senpi keeps a gpt-6-astra request at its cached reasoning baseline and carries a later effort
+// senpi keeps a gpt-6.2-astra request at its cached reasoning baseline and carries a later effort
 // change as a Responses `configuration_update` item built from this context message.
 function lastConfigurationUpdateEffort(context: unknown): string | null {
   if (typeof context !== "object" || context === null) return null

@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6 packages/local-api/src/validate-requests.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@88e58154bb592d781446a62a3d8d912769675079 packages/local-api/src/validate-requests.ts
 import { toHex } from "./bytes-encoding.ts";
 import { SESSION_PROJECT_MAX_CHARS, SESSION_READ_TAIL_MAX } from "./spec-proto.ts";
 import type {
@@ -39,6 +39,8 @@ import { updateCommittedOf } from "./validate-update.ts";
 import { FILTER_KEYS, SESSION_ROW_STATES } from "./vocabulary.ts";
 
 const ENVIRONMENTS_MAX = 1024;
+// The row versions a sessions.list may ask (protocol.ts SessionsList).
+const LISTING_ROWS = [2, 3, 4, 5, 6, 7] as const;
 const PKCS8_KEY_BYTES = 48;
 // PKCS#8 v1 DER of a raw 32-byte private key: SEQUENCE { version 0, AlgorithmIdentifier { OID }, OCTET STRING {
 // OCTET STRING (32) } }; the OID is 1.3.101.112 for Ed25519 and 1.3.101.110 for X25519.
@@ -191,13 +193,11 @@ const VALIDATORS: RequestValidators<RequestType> = {
   },
   "sessions.list": (v, id) => {
     const { filter, rows } = requestFields(v, [], ["filter", "rows"]);
-    if (rows !== undefined && rows !== 2 && rows !== 3 && rows !== 4 && rows !== 5)
-      return fail("rows");
     return {
       id,
       type: "sessions.list",
       ...(filter === undefined ? {} : { filter: filterOf(filter) }),
-      ...(rows === undefined ? {} : { rows }),
+      ...(rows === undefined ? {} : { rows: LISTING_ROWS.find((r) => r === rows) ?? fail("rows") }),
     };
   },
   // #1349: the session_id is the bare stream session key (decision 0008, what session.locate answers as `key`); a durable
