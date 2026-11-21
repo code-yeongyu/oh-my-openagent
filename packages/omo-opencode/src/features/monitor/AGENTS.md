@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Backend for the `monitor_*` tools: spawn long-running watcher processes, decode their stdout/stderr into lines, filter by regex, keep a per-monitor ring buffer, and inject batched output into the parent session as internal prompts. **OFF by default** — gated on `monitor.enabled` (schema in [`src/config/schema/monitor.ts`](../../config/schema/monitor.ts)). Tool wrappers live in [`src/tools/monitor/`](../../tools/monitor); this directory owns the manager, pipeline, and delivery logic.
+Backend for the `monitor` tool: spawn long-running watcher processes, decode their stdout/stderr into lines (stdout lines are events), keep a per-monitor ring buffer and output file, rate-limit event batches, and inject each batch into the parent session as a waking internal prompt. **OFF by default** — gated on `monitor.enabled` (schema in [`src/config/schema/monitor.ts`](../../config/schema/monitor.ts)). Tool wrappers live in [`src/tools/monitor/`](../../tools/monitor); this directory owns the manager, pipeline, and delivery logic.
 
 ## STRUCTURE
 
@@ -24,20 +24,20 @@ Backend for the `monitor_*` tools: spawn long-running watcher processes, decode 
 | `output-injector.ts` | `MonitorOutputInjector` — queues batches, dispatches via `prompt-async-gate`, defers around active user turns |
 | `output-injector-session-inspect.ts` | Session-message inspection: accepted-message detection, user-message-in-progress, blocking assistant turns |
 | `output-injector-types.ts` | Injector deps and session-message shapes |
-| `permission.ts` | `monitor_start` gate: bash-equivalent permission ask when available, else fail closed to `monitor.allowed_commands` |
+| `permission.ts` | `monitor` start gate: bash-equivalent permission ask when available, else fail closed to `monitor.allowed_commands` |
 | `types.ts` | Public contracts: `MonitorRecord`, `MonitorManager`, counters, tool arg shapes |
 
 ## KEY EXPORTS
 
 - `createMonitorManager(options)` / `MonitorManager` — the only stateful entry point; everything else is composed behind it.
 - `types.ts` — `MonitorRecord`, `MonitorStartOpts`, `MonitorOutputQuery`, `MonitorManagerEvent` (`session.idle` / `session.deleted`).
-- Defaults in `manager-internals.ts`: 3 monitors per session, 30min max runtime, 1000-line ring, 50-line/16KB/1s batches.
+- Defaults in `manager-internals.ts`: 3 monitors per session, 30min max runtime (`0` = no cap), 1000-line ring, 50-line/16KB/200ms batches. `rate-limiter.ts`: burst 10 batches, then one per 2s. `output-file.ts`: `<tmpdir>/omo-monitor/<session>/<id>.output`, removed with the record.
 
 ## HOW IT WIRES
 
 | Where | What |
 |-------|------|
-| [`src/plugin/tool-registry-gated-tools.ts`](../../plugin/tool-registry-gated-tools.ts) | Registers `monitor_start` / `monitor_stop` / `monitor_list` / `monitor_output` (from `src/tools/monitor/create-monitor-tools.ts`) only when `monitor.enabled` and a manager exists |
+| [`src/plugin/tool-registry-gated-tools.ts`](../../plugin/tool-registry-gated-tools.ts) | Registers `monitor` (from `src/tools/monitor/create-monitor-tools.ts`) only when `monitor.enabled` and a manager exists; `background_cancel` stops monitors |
 | [`src/plugin/event.ts`](../../plugin/event.ts) | Forwards session events to `monitorManager.handleEvent` |
 | [`src/plugin/event-session-lifecycle.ts`](../../plugin/event-session-lifecycle.ts) | `stopSessionMonitors(sessionID)` on session teardown |
 | [`create-transform-hooks.ts`](../../plugin/hooks/create-transform-hooks.ts) | `monitor-status-injector` Transform hook when enabled |
@@ -47,7 +47,7 @@ Backend for the `monitor_*` tools: spawn long-running watcher processes, decode 
 
 - Dependency injection everywhere: scheduler, spawn, injector, and cleanup hooks are all overridable through `MonitorManagerDeps`; tests use fake schedulers, never real timers.
 - Monitor output is labeled untrusted in the envelope; the injected prompt tells the model not to follow instructions from process output.
-- `monitor_start` is rejected for background sessions (`isBackgroundSession` check in `manager.ts`).
+- Monitors run in subagent sessions too; `create-managers.ts` stops a finished background child's monitors.
 - Output delivery defers while a user message is in progress or a dispatch is settling; timing windows are named constants in `manager-internals.ts`.
 
 ## ANTI-PATTERNS
@@ -55,4 +55,4 @@ Backend for the `monitor_*` tools: spawn long-running watcher processes, decode 
 - Never spawn watcher processes directly — go through `spawnMonitoredProcess` (process-group kill, grace period, max-runtime enforcement).
 - Never inject monitor output as a raw session message — always through `MonitorOutputInjector` + `prompt-async-gate`, or it races user turns.
 - Never accept a match pattern without `createMonitorFilter` validation; unvetted regexes risk catastrophic backtracking on hot output paths.
-- Never bypass the ring buffer counters when dropping lines; `monitor_output` consumers rely on drop accounting.
+- Never bypass the ring buffer counters when dropping lines; the notice's dropped-lines line relies on drop accounting.

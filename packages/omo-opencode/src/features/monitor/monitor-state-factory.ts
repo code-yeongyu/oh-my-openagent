@@ -21,6 +21,8 @@ import { MonitorOutputInjector } from "./output-injector"
 import { createMonitorPipeline } from "./pipeline"
 import { spawnMonitoredProcess, type MonitoredProcess } from "./process"
 import { MonitorRingBuffer } from "./ring-buffer"
+import { MonitorRateLimiter } from "./rate-limiter"
+import type { MonitorOutputFile } from "./output-file"
 import type { MonitorRecord, OutputBatch } from "./types"
 
 interface MonitorStateFactoryInput {
@@ -32,10 +34,12 @@ interface MonitorStateFactoryInput {
   injector: MonitorInjector
   config: typeof DEFAULT_MONITOR_CONFIG
   logger: typeof log
+  now: () => number
+  outputFile?: MonitorOutputFile
 }
 
 export function createMonitorState(input: MonitorStateFactoryInput): InternalMonitorState {
-  const { record, monitoredProcess, filter, ring, batcher, injector, config, logger } = input
+  const { record, monitoredProcess, filter, ring, batcher, injector, config, logger, now, outputFile } = input
 
   const pipeline = createMonitorPipeline(
     {
@@ -46,6 +50,7 @@ export function createMonitorState(input: MonitorStateFactoryInput): InternalMon
       filter,
       ring,
       batcher,
+      ...(outputFile ? { sink: outputFile } : {}),
     },
     {
       stdout: monitoredProcess.stdout,
@@ -61,6 +66,8 @@ export function createMonitorState(input: MonitorStateFactoryInput): InternalMon
     batcher,
     pipeline,
     injector,
+    rateLimiter: new MonitorRateLimiter(now),
+    suppressedEvents: 0,
     stopped: false,
   }
 
@@ -69,11 +76,20 @@ export function createMonitorState(input: MonitorStateFactoryInput): InternalMon
       return
     }
 
+    const stillRunning = state.record.status === "running" || state.record.status === "starting"
+    // The end of a watch is always reported; a running monitor that prints too fast loses batches to the rate limit.
+    if (stillRunning && !state.rateLimiter.tryTake()) {
+      state.suppressedEvents += batch.lines.length
+      return
+    }
     const outputBatch: OutputBatch = {
       ...batch,
       monitorId: state.record.id,
-      stillRunning: state.record.status === "running" || state.record.status === "starting",
+      stillRunning,
+      ...(state.suppressedEvents > 0 ? { suppressedEvents: state.suppressedEvents } : {}),
     }
+    state.suppressedEvents = 0
+    state.record.eventsDelivered += batch.lines.length
     state.record.counters = state.ring.getCounters()
     state.injector.queueBatch(state.record, outputBatch)
   })

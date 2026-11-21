@@ -14,7 +14,7 @@ const fakeTool = tool({
   },
 })
 
-const MONITOR_TOOL_NAMES = ["monitor_start", "monitor_stop", "monitor_list", "monitor_output"] as const
+const MONITOR_TOOL_NAMES = ["monitor"] as const
 
 type PluginConfigOverrides = Omit<Partial<OhMyOpenCodeConfig>, "monitor"> & {
   monitor?: Partial<NonNullable<OhMyOpenCodeConfig["monitor"]>>
@@ -119,17 +119,22 @@ describe("monitor tool registry wiring", () => {
     }
   })
 
-  test("#given monitor_start is disabled by name #when registry is created #then only monitor_start is removed", () => {
+  test("#given monitor is disabled by name #when registry is created #then the monitor tool is removed", () => {
     const result = createRegistry(
       createPluginConfig({
         monitor: { enabled: true },
-        disabled_tools: ["monitor_start"],
+        disabled_tools: ["monitor"],
       }),
     )
 
-    expect(result.filteredTools).not.toHaveProperty("monitor_start")
-    expect(result.filteredTools).toHaveProperty("monitor_stop")
-    expect(result.filteredTools).toHaveProperty("monitor_list")
-    expect(result.filteredTools).toHaveProperty("monitor_output")
+    expect(result.filteredTools).not.toHaveProperty("monitor")
+  })
+
+  test("#given monitor is enabled #when registry is created #then the old monitor_* tools are gone", () => {
+    const result = createRegistry(createPluginConfig({ monitor: { enabled: true } }))
+
+    for (const legacy of ["monitor_start", "monitor_stop", "monitor_list", "monitor_output"]) {
+      expect(result.filteredTools).not.toHaveProperty(legacy)
+    }
   })
 })

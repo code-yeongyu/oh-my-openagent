@@ -1,6 +1,9 @@
 /// <reference types="bun-types" />
 
 import { afterEach, describe, expect, mock, test } from "bun:test"
+import { existsSync, mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import { subagentSessions } from "../claude-code-session-state"
@@ -86,9 +89,11 @@ function createFakeInjector(): FakeInjector {
   }
 }
 
-function createManagerHarness(
-  opts: { maxMonitorsPerSession?: number; isBackgroundSession?: (sessionId: string) => boolean } = {},
-) {
+const outputRoots: string[] = []
+
+function createManagerHarness(opts: { maxMonitorsPerSession?: number } = {}) {
+  const outputRoot = mkdtempSync(join(tmpdir(), "monitor-manager-test-"))
+  outputRoots.push(outputRoot)
   const killCallsByCommand = new Map<string, string[]>()
   const injectorsByMonitorId = new Map<string, FakeInjector>()
   const scheduler = createFakeScheduler()
@@ -111,7 +116,7 @@ function createManagerHarness(
         let nextId = 1
         return () => `mon_test${nextId++}`
       })(),
-      isBackgroundSession: opts.isBackgroundSession,
+      outputRoot,
       spawnMonitoredProcess(input) {
         spawnCalls.push(input.command)
         const killCalls: string[] = []
@@ -135,7 +140,7 @@ function createManagerHarness(
     },
   })
 
-  return { manager, killCallsByCommand, injectorsByMonitorId, scheduler, spawnCalls }
+  return { manager, killCallsByCommand, injectorsByMonitorId, scheduler, spawnCalls, outputRoot }
 }
 
 async function startMonitor(manager: MonitorManager, command: string, sessionId: string): Promise<MonitorRecord> {
@@ -180,6 +185,7 @@ async function drainMicrotasks(): Promise<void> {
 afterEach(() => {
   subagentSessions.clear()
   resetProcessCleanupForTesting()
+  for (const root of outputRoots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
 describe("MonitorManager", () => {
@@ -306,32 +312,49 @@ describe("MonitorManager", () => {
     })
   })
 
-  describe("#given a background session id", () => {
-    test("#when start is requested #then it rejects before spawning", async () => {
-      // given
-      const { manager, spawnCalls } = createManagerHarness({
-        isBackgroundSession: (sessionId) => sessionId === "bg-session",
-      })
-
-      // when
-      const rejectedStart = manager.start({ command: "should-not-run", parentSessionId: "bg-session" })
-
-      // then
-      await expectRejectsWithMessage(rejectedStart, "primary session")
-      expect(spawnCalls).toEqual([])
-    })
-
-    test("#when a session is tracked as a subagent #then start rejects by default", async () => {
+  describe("#given a subagent session", () => {
+    test("#when start is requested #then the monitor runs there too", async () => {
       // given
       const { manager, spawnCalls } = createManagerHarness()
       subagentSessions.add("subagent-session")
 
       // when
-      const rejectedStart = manager.start({ command: "should-not-run", parentSessionId: "subagent-session" })
+      const record = await manager.start({ command: "watch-in-child", parentSessionId: "subagent-session" })
 
       // then
-      await expectRejectsWithMessage(rejectedStart, "primary session")
-      expect(spawnCalls).toEqual([])
+      expect(record.status).toBe("running")
+      expect(spawnCalls).toEqual(["watch-in-child"])
+    })
+  })
+
+  describe("#given a started monitor", () => {
+    test("#when it is started #then its output file exists under the session, and shutdown removes it", async () => {
+      // given
+      const { manager, outputRoot } = createManagerHarness()
+
+      // when
+      const record = await manager.start({ command: "tail-log", parentSessionId: "s-out" })
+
+      // then
+      expect(record.outputFile).toBe(join(outputRoot, "omo-monitor", "s-out", `${record.id}.output`))
+      expect(existsSync(record.outputFile!)).toBe(true)
+      await manager.shutdown()
+      expect(existsSync(join(outputRoot, "omo-monitor"))).toBe(false)
+    })
+
+    test("#when a timeout above the configured cap is asked for #then the cap applies, and 0 means until the source ends", async () => {
+      // given
+      const { manager } = createManagerHarness()
+
+      // when
+      const capped = await manager.start({ command: "a", parentSessionId: "s-t", timeoutMs: 99_999_999 })
+      const open = await manager.start({ command: "b", parentSessionId: "s-t", timeoutMs: 0 })
+      const asked = await manager.start({ command: "c", parentSessionId: "s-t", timeoutMs: 5_000 })
+
+      // then
+      expect(capped.timeoutMs).toBe(60_000)
+      expect(open.timeoutMs).toBe(60_000)
+      expect(asked.timeoutMs).toBe(5_000)
     })
   })
 
@@ -381,6 +404,11 @@ describe("MonitorManager", () => {
         },
         deps: {
           randomId: () => "mon_exit",
+          outputRoot: (() => {
+            const root = mkdtempSync(join(tmpdir(), "monitor-manager-test-"))
+            outputRoots.push(root)
+            return root
+          })(),
           spawnMonitoredProcess() {
             return {
               kill() {},

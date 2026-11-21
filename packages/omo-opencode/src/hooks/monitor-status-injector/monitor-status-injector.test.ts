@@ -140,7 +140,7 @@ describe("createMonitorStatusInjectorHook", () => {
     expect(injectedText).toContain("tail -f")
     expect(injectedText).toContain("starting")
     expect(injectedText).toContain("0 matched")
-    expect(injectedText).toContain("monitor_stop")
+    expect(injectedText).toContain("background_cancel")
     expect(injectedText).not.toContain("mon_done")
   })
 

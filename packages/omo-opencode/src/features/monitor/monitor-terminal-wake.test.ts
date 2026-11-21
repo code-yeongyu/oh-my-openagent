@@ -121,15 +121,15 @@ describe("monitor terminal batch parent wake", () => {
     expect(hasInternalNoReplyMarker(firstPartText(harness.calls[0] as DispatchCall))).toBe(false)
   })
 
-  test("streaming batch stays a no-reply observation", async () => {
+  test("streaming batch also wakes the parent", async () => {
     const harness = createHarness()
 
     harness.injector.queueBatch(createRecord({ status: "running", exitCode: undefined }), createBatch(1, true))
     await harness.injector.flushMonitor("mon_1")
 
     expect(harness.calls).toHaveLength(1)
-    expect(harness.calls[0]?.input.body.noReply).toBe(true)
-    expect(hasInternalNoReplyMarker(firstPartText(harness.calls[0] as DispatchCall))).toBe(true)
+    expect(harness.calls[0]?.input.body.noReply).toBe(false)
+    expect(hasInternalNoReplyMarker(firstPartText(harness.calls[0] as DispatchCall))).toBe(false)
   })
 
   test("terminal batch over the active defer ceiling dispatches while the parent is busy", async () => {
@@ -147,17 +147,21 @@ describe("monitor terminal batch parent wake", () => {
     expect(harness.calls[0]?.checkStatus).toBe(false)
   })
 
-  test("streaming batch is never force dispatched while the parent is busy", async () => {
+  test("streaming batch over the active defer ceiling is dispatched while the parent is busy", async () => {
     const harness = createHarness({ active: true, maxActiveDeferMs: 60_000 })
 
     harness.injector.queueBatch(createRecord({ status: "running", exitCode: undefined }), createBatch(1, true))
-    harness.advance(600_000)
+    await harness.injector.flushMonitor("mon_1")
+    expect(harness.calls).toHaveLength(0)
+
+    harness.advance(60_000)
     await harness.injector.flushMonitor("mon_1")
 
-    expect(harness.calls).toHaveLength(0)
+    expect(harness.calls).toHaveLength(1)
+    expect(harness.calls[0]?.checkStatus).toBe(false)
   })
 
-  test("over-ceiling terminal batch dispatches ahead of queued streaming batches while the parent is busy", async () => {
+  test("batches over the ceiling while the parent is busy dispatch in order", async () => {
     const harness = createHarness({ active: true, maxActiveDeferMs: 60_000 })
     const runningRecord = createRecord({ status: "running", exitCode: undefined })
 
@@ -168,11 +172,13 @@ describe("monitor terminal batch parent wake", () => {
 
     await harness.injector.flushMonitor("mon_1")
 
-    expect(harness.calls).toHaveLength(1)
-    expect(harness.calls[0]?.source).toBe("monitor-output:mon_1:batch-3")
-    expect(harness.calls[0]?.input.body.noReply).toBe(false)
-    expect(harness.calls[0]?.checkStatus).toBe(false)
-    expect(harness.injector.getPendingBatches("mon_1").map((batch) => batch.batchSeq)).toEqual([1, 2])
+    expect(harness.calls.map((call) => call.source)).toEqual([
+      "monitor-output:mon_1:batch-1",
+      "monitor-output:mon_1:batch-2",
+      "monitor-output:mon_1:batch-3",
+    ])
+    expect(harness.calls.every((call) => call.checkStatus === false)).toBe(true)
+    expect(harness.injector.getPendingBatches("mon_1")).toEqual([])
   })
 
   test("ceiling is opt-in: an omitted maxActiveDeferMs keeps the unbounded legacy deferral", async () => {

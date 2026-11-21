@@ -1,4 +1,3 @@
-import { subagentSessions } from "../claude-code-session-state"
 import { registerManagerForCleanup, unregisterManagerForCleanup } from "../background-agent/process-cleanup"
 import { log } from "../../shared"
 import type { SchedulerDeps, TimerHandle } from "./batcher"
@@ -9,6 +8,7 @@ import {
   createEmptyCounters,
   createMonitorId,
   createRealScheduler,
+  resolveMonitorTimeoutMs,
   type InternalMonitorState,
   type MonitorManagerDeps,
   type MonitorManagerOptions,
@@ -20,6 +20,7 @@ import {
   spawnMonitorProcess,
 } from "./monitor-state-factory"
 import { MonitorRingBuffer } from "./ring-buffer"
+import { MonitorOutputFile, monitorOutputPath, removeMonitorOutputFile } from "./output-file"
 import type {
   MonitorId,
   MonitorManager as MonitorManagerContract,
@@ -54,10 +55,6 @@ export class MonitorManager implements MonitorManagerContract {
   }
 
   async start(opts: MonitorStartOpts): Promise<MonitorRecord> {
-    if (this.isBackgroundSession(opts.parentSessionId)) {
-      throw new Error("monitor_start is only available from a primary session")
-    }
-
     this.assertSessionCapacity(opts.parentSessionId)
 
     const id = this.createId()
@@ -65,10 +62,12 @@ export class MonitorManager implements MonitorManagerContract {
       patternMaxLength: this.config.pattern_max_length,
     })
     if (!filterResult.filter) {
-      throw new Error(`monitor_start match_pattern rejected: ${filterResult.error ?? "invalid pattern"}`)
+      throw new Error(`monitor match pattern rejected: ${filterResult.error ?? "invalid pattern"}`)
     }
 
-    const monitoredProcess = spawnMonitorProcess(this.options.deps, opts.command, this.config.max_runtime_ms)
+    const timeoutMs = resolveMonitorTimeoutMs(opts.timeoutMs, this.config.max_runtime_ms)
+    const monitoredProcess = spawnMonitorProcess(this.options.deps, opts.command, timeoutMs ?? Number.POSITIVE_INFINITY)
+    const outputFile = new MonitorOutputFile(monitorOutputPath(opts.parentSessionId, id, this.options.deps?.outputRoot))
     const ring = new MonitorRingBuffer({ ringMaxLines: this.config.ring_max_lines })
     const batcher = new MonitorBatcher({
       batchMaxLines: this.config.batch_max_lines,
@@ -86,6 +85,9 @@ export class MonitorManager implements MonitorManagerContract {
       startedAt: new Date(this.scheduler.now()),
       status: "running",
       counters: ring.getCounters(),
+      ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+      outputFile: outputFile.path,
+      eventsDelivered: 0,
     }
 
     const injector = createMonitorInjector(
@@ -103,6 +105,8 @@ export class MonitorManager implements MonitorManagerContract {
       injector,
       config: this.config,
       logger: this.logger,
+      now: () => this.scheduler.now(),
+      outputFile,
     })
 
     this.addMonitor(state)
@@ -189,6 +193,9 @@ export class MonitorManager implements MonitorManagerContract {
 
     const states = [...this.monitors.values()]
     await Promise.all(states.map((state) => this.stop(state.record.id)))
+    for (const state of states) {
+      if (state.record.outputFile) removeMonitorOutputFile(state.record.outputFile)
+    }
     this.monitors.clear()
     this.monitorsByParentSession.clear()
     this.unregisterCleanup(this)
@@ -236,14 +243,6 @@ export class MonitorManager implements MonitorManagerContract {
     }
   }
 
-  private isBackgroundSession(sessionId: string): boolean {
-    if (this.options.deps?.isBackgroundSession?.(sessionId)) {
-      return true
-    }
-
-    return subagentSessions.has(sessionId)
-  }
-
   private isTerminalStatus(status: MonitorStatus): boolean {
     return status === "stopped" || status === "exited" || status === "failed"
   }
@@ -255,6 +254,7 @@ export class MonitorManager implements MonitorManagerContract {
     if (!state) {
       return
     }
+    if (state.record.outputFile) removeMonitorOutputFile(state.record.outputFile)
     const ids = this.monitorsByParentSession.get(state.record.parentSessionId)
     if (!ids) {
       return

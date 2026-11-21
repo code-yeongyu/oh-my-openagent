@@ -23,6 +23,17 @@ export type MonitorOutputInjectorDeps = {
   readonly now?: () => number
   readonly settleAfterSessionIdle?: () => Promise<void>
   readonly scheduleFlush?: (monitorId: string, delayMs: number, operation: () => Promise<void>) => void
+  /** The parent's agent, model and tools for a notice prompt (default: read from the parent's messages). */
+  readonly resolvePromptContext?: (
+    client: MonitorPromptClient,
+    directory: string,
+    sessionID: string,
+  ) => Promise<{
+    agent?: string
+    model?: { providerID: string; modelID: string }
+    variant?: string
+    tools?: Record<string, boolean>
+  }>
 }
 
 export type MonitorSessionMessage = {
