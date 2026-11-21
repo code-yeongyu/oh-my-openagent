@@ -89,6 +89,9 @@ export type TaskRecordStore = {
   // Take a tombstone over from `from` (an abandoned attempt; undefined for a tombstone written without
   // an owner). Under the record lock; false when another attempt owns it now.
   readonly takeOverExpunging: (taskId: string, from: ExpungeOwner | undefined, to: ExpungeOwner) => boolean
+  // Serializes owned starts for one owner key (a DAG node's kind/runId/nodeId) across processes, so a
+  // retried or resumed node never spawns a second child for the same owner.
+  readonly withOwnerLock: <T>(ownerKey: string, operation: () => Promise<T>) => Promise<T>
 }
 
 // The TTL sweep attempt that tombstoned a record: its process and a token unique to the attempt.

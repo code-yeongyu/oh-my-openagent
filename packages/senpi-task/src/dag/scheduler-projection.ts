@@ -1,12 +1,8 @@
-import { createHash } from "node:crypto"
-import * as fs from "node:fs"
-import { relative } from "node:path"
 import { applyDagRunMutation } from "./manager"
 import { applyRunPause } from "./run-pause"
 import { applyPausedDagEvent, isPausedDagEvent } from "./paused-events"
-import { persistDagNodeResult, readDagNodeResult, type DagNodeResultArtifact } from "./results"
+import { persistDagNodeResult, readDagNodeResult, type DagNodeResultRead } from "./results"
 import type { DagFileStore } from "./store"
-import type { TaskRecord } from "../state"
 import { DAG_NODE_OUTPUT_PREVIEW_CHARS, type DagRunEvent } from "./types"
 import { TERMINAL_NODE_STATES, type PendingTerminalResult, type DagNodeWithResult } from "./scheduler-context"
 import type { DagNode, DagNodeId, DagNodeState, DagNodeError, DagRunId } from "./types"
@@ -151,56 +147,8 @@ function assertNever(value: never): never {
   throw new Error(`unexpected DAG event ${JSON.stringify(value)}`)
 }
 
-function replayDagNodeResult(
-  store: DagFileStore,
-  runId: DagRunId,
-  nodeId: DagNodeId,
-):
-  | {
-      readonly artifact: DagNodeResultArtifact
-      readonly output: string
-      readonly runStats?: TaskRecord["run_stats"]
-    }
-  | undefined {
-  const result = readDagNodeResult({ store, runId, nodeId })
-  if (result === null) return undefined
-  const outputPath = store.paths.result(runId, nodeId)
-  const output = fs.readFileSync(outputPath, "utf8")
-  const statsPath = outputPath.replace(/\.txt$/, ".stats.json")
-  const stats = readOptionalArtifact(store, statsPath)
-  return {
-    output,
-    artifact: {
-      ...artifactRef(store, outputPath, output),
-      ...(stats === undefined ? {} : { stats }),
-    },
-    ...(result.runStats === undefined ? {} : { runStats: result.runStats }),
-  }
-}
-
-function readOptionalArtifact(store: DagFileStore, path: string): DagNodeResultArtifact["stats"] | undefined {
-  try {
-    return artifactRef(store, path, fs.readFileSync(path, "utf8"))
-  } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined
-    throw error
-  }
-}
-
-function artifactRef(
-  store: DagFileStore,
-  path: string,
-  contents: string,
-): {
-  readonly relativePath: string
-  readonly sha256: string
-  readonly bytes: number
-} {
-  return {
-    relativePath: relative(store.stateDir, path),
-    sha256: createHash("sha256").update(contents, "utf8").digest("hex"),
-    bytes: Buffer.byteLength(contents, "utf8"),
-  }
+function replayDagNodeResult(store: DagFileStore, runId: DagRunId, nodeId: DagNodeId): DagNodeResultRead | undefined {
+  return readDagNodeResult({ store, runId, nodeId }) ?? undefined
 }
 
 function transitionedNode(node: DagNode, state: DagNodeState, at: string, error?: DagNodeError): DagNode {

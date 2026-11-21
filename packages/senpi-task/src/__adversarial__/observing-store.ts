@@ -74,6 +74,7 @@ export function createObservingStore(backing: TaskRecordStore, shared?: StoreObs
     load: (taskId) => backing.load(taskId),
     list: () => backing.list(),
     appendEvent: (taskId, event) => backing.appendEvent(taskId, event),
+    withOwnerLock: (ownerKey, operation) => backing.withOwnerLock(ownerKey, operation),
     remove: async (taskId) => {
       await backing.remove(taskId)
       observeResidentCounts(backing, observations)
