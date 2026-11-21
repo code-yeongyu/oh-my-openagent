@@ -17,7 +17,12 @@
 // - withOwnerLock serializes concurrent async callers per owner key, as the file store's cross-process
 //   lock does within one process.
 //
-// Deliberately NOT emulated: the record lock is a no-op (single-threaded JS already serializes these
+// Deliberately NOT emulated, beyond the lock below: the event log never reaches <stateDir>/logs, so
+// readDagNodeActivityAt (dag/node-activity.ts), which dates a child by that file's mtime, reads "no
+// activity" for every child of a run on this double. No case using it asserts activity clocks; one that
+// does must keep the file store.
+//
+// Also NOT emulated: the record lock is a no-op (single-threaded JS already serializes these
 // synchronous sections and there is no second process), and remove/completeExpunge still delete the real
 // children/ and completion-results/ paths, because other writers put session transcripts and spill files
 // there directly.
