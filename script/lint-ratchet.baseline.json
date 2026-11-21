@@ -1128,9 +1128,6 @@
   "packages/omo-opencode/src/tools/session-manager/sdk-storage.ts": {
     "typescript/no-non-null-assertion": 7
   },
-  "packages/omo-opencode/src/tools/session-manager/session-paging.test.ts": {
-    "omo-testing/no-module-mock": 3
-  },
   "packages/omo-opencode/src/tools/session-manager/storage-fallback.test.ts": {
     "omo-testing/no-module-mock": 3
   },
