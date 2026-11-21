@@ -8,3 +8,4 @@ export {
 } from "./manager"
 export { waitForTaskSessionID } from "./wait-for-task-session"
 export type { WaitForTaskSessionIDOptions } from "./wait-for-task-session"
+export { isEmptyNoProgressAssistantTurnInfo } from "./empty-assistant-turn"

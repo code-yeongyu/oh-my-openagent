@@ -114,7 +114,9 @@ export function createAutoRetryDispatcher(
               // can acknowledge it without treating other synthetic prompts as fallback generations.
               return [createRuntimeFallbackRetryTextPart(RUNTIME_FALLBACK_RETRY_CONTINUATION_TEXT)]
             })()
-      const retryMessageID = usingFetchedUserParts ? originalRetryMetadata.messageID : undefined
+      const retryMessageID = usingFetchedUserParts && source !== "session.idle.silent-clean-stop"
+        ? originalRetryMetadata.messageID
+        : undefined
       log(`[${HOOK_NAME}] Auto-retrying with fallback model (${source})`, {
         sessionID,
         model: newModel,
@@ -142,6 +144,8 @@ export function createAutoRetryDispatcher(
       // Our own abort leaves a dangling assistant turn with no terminal error, which
       // the gate's assistant-active check would treat as blocking forever. Skip it.
       const wasInternallyAborted = internallyAbortedSessions.has(sessionID)
+      // The idle classifier already proved this exact persisted turn has no output.
+      const isConfirmedIdleSilentCleanStop = source === "session.idle.silent-clean-stop"
       const dispatchRetryPrompt = (retrySource: string, queueBehavior?: "defer") =>
         dispatchInternalPrompt({
           mode: "async",
@@ -150,7 +154,7 @@ export function createAutoRetryDispatcher(
           source: retrySource,
           settleMs: 0,
           ...(queueBehavior ? { queueBehavior } : {}),
-          ...(wasInternallyAborted ? { checkToolState: false } : {}),
+          ...(wasInternallyAborted || isConfirmedIdleSilentCleanStop ? { checkToolState: false } : {}),
           shouldDispatch: isCurrentFallbackGeneration,
           input: retryPromptInput,
         })
@@ -159,6 +163,12 @@ export function createAutoRetryDispatcher(
       let promptResult = await dispatchRetryPrompt(`runtime-fallback:${source}`, "defer")
       if (!isCurrentFallbackGeneration()) return staleGenerationOutcome()
       if (promptResult.status === "active") {
+        if (isConfirmedIdleSilentCleanStop) {
+          log(`[${HOOK_NAME}] Confirmed idle fallback blocked because session became active`, {
+            sessionID,
+          })
+          return { accepted: false, status: "blocked", reason: "prompt gate returned active" }
+        }
         log(`[${HOOK_NAME}] Session active, queueing fallback dispatch (${source})`, {
           sessionID,
         })
