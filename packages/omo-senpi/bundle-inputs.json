@@ -459,6 +459,7 @@
     "packages/memory-core/src/sync/engine/adapters/device-item-recovery.ts",
     "packages/memory-core/src/sync/engine/adapters/device-item-store.ts",
     "packages/memory-core/src/sync/engine/adapters/git-sync-repo.ts",
+    "packages/memory-core/src/sync/engine/adapters/http-event-stream.ts",
     "packages/memory-core/src/sync/engine/adapters/http-transport.ts",
     "packages/memory-core/src/sync/engine/apply.ts",
     "packages/memory-core/src/sync/engine/atomic.ts",
