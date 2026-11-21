@@ -270,7 +270,9 @@ describe("Senpi compatibility test script", () => {
 
     // #then
     expect(senpiJob).toContain("os: [windows-latest]")
-    expect(senpiJob).toContain("name: senpi-compatibility\n    needs: [ci-mode, senpi-bundle-check, senpi-eq, senpi-tests-linux]")
+    expect(senpiJob).toContain(
+      "name: senpi-compatibility\n    needs: [ci-mode, senpi-bundle-check, senpi-eq, senpi-tests-linux]",
+    )
     expect(senpiJob).toContain("os: [ubuntu-latest]")
     expect(senpiJob).toContain('bash .github/scripts/ci-senpi-posix.sh "${{ matrix.part }}"')
     expect(senpiJob).toContain('node-version: "24"')
