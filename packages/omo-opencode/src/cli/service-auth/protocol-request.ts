@@ -1,6 +1,14 @@
 import { refuseIfLocalOnly } from "@oh-my-opencode/device-service-core/local-only"
 import { z } from "zod"
-import { ApiRefusal, limitSchema, nonempty, RequestFailure, SignInError } from "./protocol"
+import {
+  ApiRefusal,
+  limitSchema,
+  machineDeviceSchema,
+  nonempty,
+  replaceMismatchSchema,
+  RequestFailure,
+  SignInError,
+} from "./protocol"
 
 // The service's one HTTP entry point (fetch), kept apart from the credential schemas in protocol.ts so a module that
 // only reads or validates credentials never reaches the network.
@@ -75,10 +83,15 @@ export async function requestApi(api: string, path: string, init: RequestInit, s
   if (!envelope.success) throw new InvalidApiResponse(response.status)
   const error = envelope.data.error
   const detail = limitSchema.safeParse(error.detail)
+  const machineDevice = error.code === "machine_exists" ? machineDeviceSchema.safeParse(error.detail) : undefined
   throw new ApiRefusal(
     error.code,
     response.status,
     error.code === "entitlement_required" && detail.success ? detail.data : undefined,
     response.headers.get("retry-after"),
+    {
+      ...(machineDevice?.success === true ? { machineDevice: machineDevice.data } : {}),
+      replaceMismatch: error.code === "invalid_grant" && replaceMismatchSchema.safeParse(error.detail).success,
+    },
   )
 }

@@ -169,9 +169,10 @@ export async function capture(
   const incoming = await verifiedIncomingKeys(journal)
   const rewoundJoining = await rewindJoining(deps, journal, incoming)
   const known = await acceptedKeys(deps, journal, "capture", deps.store.keys())
+  const knownSet = new Set(known)
   const joining = new Set([
     ...rewoundJoining,
-    ...[...incoming].filter((key) => !known.includes(key) && files.byKey.has(key)),
+    ...[...incoming].filter((key) => !knownSet.has(key) && files.byKey.has(key)),
   ])
   const keys = [...new Set([...known, ...files.byKey.keys()])].filter((key) => !joining.has(key)).sort()
   const prints = (await journal.state()).held?.prints ?? {}

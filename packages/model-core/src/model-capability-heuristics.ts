@@ -62,6 +62,16 @@ export const HEURISTIC_MODEL_FAMILY_REGISTRY: ReadonlyArray<HeuristicModelFamily
     supportsTemperature: false,
   },
   {
+    // GPT-6.2 Astra and Sol (2026-11-17): the API rejects `none` on both, so they share the low..max
+    // ladder with the downgrade. Matched on the normalized id (`gpt-6.2-sol` -> `gpt-6-2-sol`).
+    family: "gpt-6.2",
+    pattern: /gpt-6-2-(?:astra|sol)/,
+    variants: ["low", "medium", "high", "xhigh", "max"],
+    reasoningEfforts: ["low", "medium", "high", "xhigh", "max"],
+    reasoningEffortAliases: { none: "low", minimal: "low" },
+    supportsTemperature: false,
+  },
+  {
     family: "gpt-6",
     includes: ["gpt-6"],
     variants: ["low", "medium", "high", "xhigh", "max"],

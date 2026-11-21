@@ -1,5 +1,6 @@
 import { homedir } from "node:os"
 import { refuseIfLocalOnly } from "@oh-my-opencode/device-service-core/local-only"
+import { syncRequestHeaders } from "@oh-my-opencode/memory-core/sync-capabilities"
 import { heldCredentialLease, withCredentialLock } from "./credential-lock"
 import { signInHint } from "./accounts-gate"
 import type { CredentialOwner } from "./credential-owner"
@@ -26,6 +27,13 @@ import {
   tokenSchema,
 } from "./protocol"
 import { requestApi } from "./protocol-request"
+import {
+  DEVICE_FIXUP_BUDGET_MS,
+  type MachineIdentity,
+  machineRefusalPath,
+  reconcileDevice,
+  thisMachine,
+} from "./machine-reconcile"
 import {
   clearSignedOutMarker,
   readSignedOutMarker,
@@ -107,6 +115,10 @@ export function createSession(options: {
   readonly beforeKeysDiscarded: BeforeKeysDiscarded
   /** This machine's device service; absent, no device service is told anything. */
   readonly deviceService?: DeviceServiceHandoff
+  /** The machine a refreshed device binds to and is named after (#13651); this computer unless a test says otherwise. */
+  readonly machine?: MachineIdentity
+  /** Where a post-refresh device fix-up reports a refusal; silent when absent (a TUI host must not write over its screen). */
+  readonly log?: (line: string) => void
 }) {
   const api = serviceOrigin(options.api)
   const deviceService = options.deviceService
@@ -128,9 +140,12 @@ export function createSession(options: {
     )
   }
   const request = (path: string, init: RequestInit) => requestApi(api, path, init, signal)
-  /** The account a token's sign-in belongs to; undefined when the service does not say (never blocks logout). */
-  const accountOf = async (access: string): Promise<string | undefined> => {
-    const body = await request("/v1/me", { headers: { authorization: `Bearer ${access}` } }).catch(() => null)
+  /**
+   * The account a token's sign-in belongs to; undefined when the service does not say (never blocks logout). `stop`
+   * aborts the read: the session's signal unless a caller with a tighter bound (the post-refresh fix-up) names its own.
+   */
+  const accountOf = async (access: string, stop = signal): Promise<string | undefined> => {
+    const body = await requestApi(api, "/v1/me", { headers: syncRequestHeaders(access) }, stop).catch(() => null)
     const id =
       typeof body === "object" &&
       body !== null &&
@@ -154,6 +169,9 @@ export function createSession(options: {
     }
     if (Date.parse(current.accessTokenExpiresAt) > now() + 30_000) return current
     refuseIfLocalOnly("service-auth/session.ts refresh")
+    // A legacy credential has no owner, so this fence cannot carry a refreshAttempt. That absence is terminal:
+    // the next token call ends the session, and `omo account show` reports refreshState "expired". An in-progress
+    // protocol-2 journal always includes refreshAttempt; this write is not one.
     await store.write({ ...current, refreshState: "uncertain" })
     try {
       const tokens = parseReply(
@@ -195,17 +213,64 @@ export function createSession(options: {
       )
     }
   }
+  /**
+   * One refresh point for every caller (login, whoami, token, memory sync): after a rotation, outside the lock, the
+   * device is bound to this machine and a generated label renamed (#13651). Neither ever fails the token.
+   */
+  async function renewed(
+    read: (view: LockedStore<Credentials> | null) => Promise<Credentials | null>,
+  ): Promise<Credentials | null> {
+    const outcome = await locked(async (view) => {
+      const current = await read(view)
+      if (current === null) return null
+      const next = await refreshed(current)
+      return { next, rotated: next !== current }
+    })
+    if (outcome === null) return null
+    if (outcome.rotated) await reconcile(outcome.next)
+    return outcome.next
+  }
+  // The fix-up has one overall budget: its requests abort when it runs out, and the caller gets its token then
+  // whatever is still pending, so a stalled service never holds a refreshed token back.
+  async function reconcile(credentials: Credentials): Promise<void> {
+    const machine = options.machine ?? thisMachine
+    const budget = AbortSignal.timeout(machine.budgetMs ?? DEVICE_FIXUP_BUDGET_MS)
+    const stop = signal === undefined ? budget : AbortSignal.any([signal, budget])
+    const stopped = new Promise<void>((resolve) => {
+      if (stop.aborted) resolve()
+      else stop.addEventListener("abort", () => resolve(), { once: true })
+    })
+    const fixup = reconcileDevice({
+      api,
+      credentials,
+      machine,
+      nowMs: now(),
+      request: (path, init) => requestApi(api, path, init, stop),
+      accountOf: (access) => accountOf(access, stop),
+      signal: stop,
+      refusalPath: machineRefusalPath(options.home ?? homedir(), credentialId(api)),
+      log: options.log ?? (() => undefined),
+      renamed: (name) =>
+        locked(async () => {
+          const stored = await store.readAuthoritative()
+          // The lock may come free only after the budget ran out; the caller has its token by then, so nothing is written.
+          if (!stop.aborted && stored !== null && stored.device.id === credentials.device.id)
+            await store.write({ ...stored, device: { ...stored.device, name } })
+        }),
+    })
+    await Promise.race([fixup, stopped])
+  }
   async function snapshot(): Promise<Credentials | null> {
-    return locked(async (view) => {
+    return renewed(async (view) => {
       const current = await store.read()
       if (current === null) return null
       await view?.settle()
-      return refreshed(current)
+      return current
     })
   }
   // #13265: the signed-in account's email through the session's own token; undefined when the service does not say.
   async function emailOf(access: string): Promise<string | undefined> {
-    const body = await request("/v1/me", { headers: { authorization: `Bearer ${access}` } }).catch(() => null)
+    const body = await request("/v1/me", { headers: syncRequestHeaders(access) }).catch(() => null)
     const user =
       typeof body === "object" && body !== null && "user" in body ? (body as { user?: unknown }).user : undefined
     const email =
@@ -228,13 +293,15 @@ export function createSession(options: {
       !(await store.migrationPending?.())
     )
       return snapshot.accessToken
-    return locked(async (view) => {
+    const renewedCredentials = await renewed(async (view) => {
       const current = await store.readAuthoritative()
       if (current === null) throw new SignInError(`Not signed in. ${signInHint("first")}`)
       if (expect !== undefined && !expect(current)) throw new CredentialIdentityChanged()
       await view?.settle()
-      return (await refreshed(current)).accessToken
+      return current
     })
+    if (renewedCredentials === null) throw new SignInError(`Not signed in. ${signInHint("first")}`)
+    return renewedCredentials.accessToken
   }
   return {
     request,
@@ -317,7 +384,7 @@ export function createSession(options: {
               }
               await request(`/v1/devices/${encodeURIComponent(current.device.id)}`, {
                 method: "DELETE",
-                headers: { authorization: `Bearer ${access}` },
+                headers: syncRequestHeaders(access),
               })
             }
             return true
@@ -349,7 +416,7 @@ export function createSession(options: {
     accessToken: (expect?: (current: Credentials) => boolean) => accessTokenImpl(expect),
     async removeForLimit(error: unknown, choose: ChooseDevice): Promise<boolean> {
       if (!(error instanceof ApiRefusal) || error.detail === undefined) throw error
-      const headers = { authorization: `Bearer ${error.detail.managementToken}` }
+      const headers = syncRequestHeaders(error.detail.managementToken)
       const listed = parseReply(deviceListSchema, await request("/v1/devices", { headers }))
       const devices = listed.devices.filter((device) => device.revokedAt === null)
       const chosen = await choose(devices)

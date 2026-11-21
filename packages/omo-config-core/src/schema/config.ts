@@ -17,6 +17,7 @@ import { OmoDeviceServiceSettingsLayerSchema, OmoDeviceServiceSettingsSchema } f
 import { OmoFormatOnMutationLayerSchema, OmoFormatOnMutationSchema } from "./format-on-mutation"
 import { OmoProvenanceSettingsSchema } from "./provenance"
 import { OmoSessionWakeSettingsSchema } from "./session-wake"
+import { OmoOperatorAlertsSettingsSchema } from "./operator-alerts"
 
 export type { OmoHarnessId }
 export { OmoHarnessIdSchema }
@@ -40,6 +41,7 @@ export const OmoTypedHarnessConfigSchema = z
   .object({
     provenance: OmoProvenanceSettingsSchema.optional(),
     session_wake: OmoSessionWakeSettingsSchema.optional(),
+    operator_alerts: OmoOperatorAlertsSettingsSchema.optional(),
     formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
     categories: OmoCategoriesConfigSchema.optional(),
     agents: OmoAgentsConfigSchema.optional(),
@@ -64,6 +66,7 @@ export const OmoConfigProfileSchema = z
   .object({
     provenance: OmoProvenanceSettingsSchema.optional(),
     session_wake: OmoSessionWakeSettingsSchema.optional(),
+    operator_alerts: OmoOperatorAlertsSettingsSchema.optional(),
     formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
     categories: OmoCategoriesConfigSchema.optional(),
     agents: OmoAgentsConfigSchema.optional(),
@@ -92,6 +95,7 @@ export const OmoConfigSchema = z
   .object({
     provenance: OmoProvenanceSettingsSchema.optional(),
     session_wake: OmoSessionWakeSettingsSchema.optional(),
+    operator_alerts: OmoOperatorAlertsSettingsSchema.optional(),
     formatOnMutation: OmoFormatOnMutationSchema.optional(),
     $schema: z.string().optional(),
     categories: OmoCategoriesConfigSchema.optional(),
@@ -124,6 +128,7 @@ export const OmoConfigLayerSchema = z
   .object({
     provenance: OmoProvenanceSettingsSchema.optional(),
     session_wake: OmoSessionWakeSettingsSchema.optional(),
+    operator_alerts: OmoOperatorAlertsSettingsSchema.optional(),
     formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
     $schema: z.string().optional(),
     categories: OmoCategoriesConfigSchema.optional(),

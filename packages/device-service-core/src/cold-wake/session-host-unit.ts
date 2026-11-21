@@ -5,10 +5,10 @@ import { isAbsolute } from "node:path"
 // exactly `<omo> daemon run --pinned` for the agent dir the bootstrap registered, so neither the name nor the command is
 // something a caller can configure. `--pinned`: the host it starts never idle-exits.
 //
-// `omo daemon run` ensures the host, which detaches, and exits. The service manager runs it again after every exit, at
-// most once per RERUN_SECONDS, so a host that died is ensured again; one that runs is reused and never killed (systemd
-// KillMode=process, launchd AbandonProcessGroup), so a restart or stop of the unit never ends a session.
-const RERUN_SECONDS = 30
+// `omo daemon run` ensures the host, which detaches, and exits. The service manager runs it once per start: at login and
+// on every cold wake (the device service starts the unit), so a host that died is ensured again then; one that runs is
+// reused and never killed (systemd KillMode=process, launchd AbandonProcessGroup), so a stop never ends a session.
+const ENSURE_TIMEOUT_SECONDS = 300
 export const SESSION_HOST_SYSTEMD_UNIT = "omo-session-host.service"
 export const SESSION_HOST_LAUNCHD_LABEL = "ai.omo.session-host"
 
@@ -67,7 +67,14 @@ export const systemdQuote = (value: string, dollars: boolean): string => {
   return `"${dollars ? escaped.replaceAll("$", () => "$$") : escaped}"`
 }
 
-/** Started with the user's manager (`default.target`); `StartLimitIntervalSec=0` lets the reruns go on forever. */
+/**
+ * `omo daemon run` ensures the host and exits, the host detached; so each start of the unit is one ensure (oneshot),
+ * run with the user's manager (`default.target`) and again on every cold wake (the device service's `systemctl start`).
+ * Nothing re-runs it on a timer: a rerun of an ensure that exits 0 was a restart loop. `StartLimitIntervalSec=0` keeps
+ * cold-wake starts from being rate-limited; `KillMode=process` leaves the host running when the ensure ends.
+ * A oneshot has no start timeout by default, so a hung ensure would hold every later start (and the bootstrap's blocking
+ * one) forever: ENSURE_TIMEOUT_SECONDS ends it as failed, above a handoff's drain of the old host plus the new boot.
+ */
 export const systemdSessionHostUnit = (launch: SessionHostLaunch): string =>
   [
     "[Unit]",
@@ -75,11 +82,10 @@ export const systemdSessionHostUnit = (launch: SessionHostLaunch): string =>
     "StartLimitIntervalSec=0",
     "",
     "[Service]",
-    "Type=simple",
+    "Type=oneshot",
+    `TimeoutStartSec=${ENSURE_TIMEOUT_SECONDS}`,
     `ExecStart=${launch.argv.map((arg) => systemdQuote(arg, true)).join(" ")}`,
     ...launch.env.map(([key, value]) => `Environment=${systemdQuote(`${key}=${value}`, false)}`),
-    "Restart=always",
-    `RestartSec=${RERUN_SECONDS}`,
     "KillMode=process",
     "",
     "[Install]",
@@ -90,7 +96,7 @@ export const systemdSessionHostUnit = (launch: SessionHostLaunch): string =>
 const xml = (value: string): string =>
   value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;")
 
-/** Runs at load and is kept alive; `ThrottleInterval` spaces the reruns. */
+/** Runs its ensure once at load and again on every cold wake (`launchctl kickstart`); never kept alive. */
 export const launchdSessionHostPlist = (launch: SessionHostLaunch): string => {
   const argv = launch.argv.map((arg) => `    <string>${xml(arg)}</string>`).join("\n")
   const env = launch.env
@@ -112,10 +118,6 @@ ${env}
   </dict>
   <key>RunAtLoad</key>
   <true/>
-  <key>KeepAlive</key>
-  <true/>
-  <key>ThrottleInterval</key>
-  <integer>${RERUN_SECONDS}</integer>
   <key>AbandonProcessGroup</key>
   <true/>
   <key>ProcessType</key>

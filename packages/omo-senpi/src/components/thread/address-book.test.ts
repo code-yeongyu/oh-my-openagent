@@ -441,6 +441,23 @@ describe("address book names, timestamps, endpoints (real JSONL header fixture)"
       liveness: "live_unresponsive",
       endpoint: { kind: "tui" },
     })
+    // The workspace scan reads the same file with no endpoint, in either order: the endpoint's record and its note stay (#14308).
+    const scanned = readDiskSession(path, null)
+    if (scanned === null) throw new Error("fixture did not parse")
+    const host = {
+      socket,
+      endpoint_kind: "tui" as const,
+      alive: false,
+      reason: "live_unresponsive" as const,
+      error: "x",
+    }
+    for (const order of [
+      [disk, scanned],
+      [scanned, disk],
+    ])
+      expect(assembleAddressBook([host], order)).toEqual([
+        expect.objectContaining({ durable_id: "dur-stopped", error_note: "live_unresponsive", source_host: socket }),
+      ])
   })
 
   test("#given an endpoint that refused the connection #when handed to the gateway #then the thread is dead, and a listed thread is routable", () => {

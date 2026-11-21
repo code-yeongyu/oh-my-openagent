@@ -24,7 +24,7 @@ powershell -ExecutionPolicy Bypass -c "irm https://get.omo.dev/install.ps1 | iex
 
 <!-- install-tabs:end -->
 
-The script picks the build for your OS, CPU and C library, checks it against the release `SHA256SUMS`, and installs it at `~/.local/bin/omo` (`%USERPROFILE%\.local\bin\omo.exe` on Windows). On WSL, run the macOS/Linux command inside your Linux distribution; it installs the Linux build there. The script refuses to run as root or as Administrator, so run it as your own user.
+The script picks the build for your OS, CPU and C library, checks it against the release `SHA256SUMS`, and installs it at `~/.local/bin/omo` (`%USERPROFILE%\.local\bin\omo.exe` on Windows). On WSL, run the macOS/Linux command inside your Linux distribution; it installs the Linux build there. The script refuses to run under `sudo` or as Administrator, so run it as your own user. A shell whose only user is root (proot-distro on Android, a container) installs into root's home without any override.
 
 Binaries come from get.omo.dev, a CDN copy of each GitHub release. When get.omo.dev can't serve a file, the script downloads the same file from GitHub Releases and checks it the same way.
 

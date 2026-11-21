@@ -74,6 +74,12 @@ export type GatewayStore = ExtensionFacade & {
     readonly delivery_id: string
     readonly reason: RefusalReason
   }) => Promise<boolean>
+  /** A delivery its session took in and handed back unread at a graceful close (omo#14313); never an applied row. */
+  readonly refuseReturned: (request: {
+    readonly now: number
+    readonly delivery_id: string
+    readonly reason: RefusalReason
+  }) => Promise<boolean>
   readonly completeReceipt: (request: {
     readonly now: number
     readonly principal: string
@@ -117,6 +123,8 @@ export type GatewayStore = ExtensionFacade & {
   readonly toolReceiptRevise: (
     request: ReceiptScope & { readonly now: number; readonly result: unknown },
   ) => Promise<boolean>
+  /** Drops this instance's `prepared` receipt for a call that wrote nothing, so the same key runs again; true when one was dropped. */
+  readonly toolReceiptRelease: (request: ReceiptScope) => Promise<boolean>
   readonly bind: (request: BindOpRequest) => Promise<RelayOutcome<{ readonly binding: BindingRecord } & Deduplicated>>
   readonly unbind: (request: CasRequest) => Promise<
     RelayOutcome<

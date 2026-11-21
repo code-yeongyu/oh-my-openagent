@@ -1,7 +1,7 @@
 {
   "description": "A click naming a frame a newer capture of the same window replaced answers InvalidCoordinateFrame{superseded} and sends nothing; the latest frame takes the click.",
   "transport": "stdio",
-  "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/v3-two-displays-one-window-consent.json",
   "env": {
     "OMO_COMPUTER_FAKE_STOP_PATH": "live"
   },

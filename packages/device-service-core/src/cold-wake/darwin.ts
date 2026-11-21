@@ -16,10 +16,11 @@ const TABLE_KEY = `EnvironmentVariables.${SERVICE_TABLE_ENV}`
 const BOOTSTRAP_ATTEMPTS = 5
 const BOOTSTRAP_RETRY_MS = 1_000
 
-const plistPath = (home: string, label: string): string => join(home, "Library", "LaunchAgents", `${label}.plist`)
+export const plistPath = (home: string, label: string): string =>
+  join(home, "Library", "LaunchAgents", `${label}.plist`)
 
 /** `launchctl bootstrap` right after a bootout can fail while launchd still tears the job down: retried, as the installer does. */
-async function bootstrapJob(host: ColdWakeHost, plist: string) {
+export async function bootstrapJob(host: ColdWakeHost, plist: string) {
   let result = await host.run(["launchctl", "bootstrap", `gui/${host.uid}`, plist])
   for (let attempt = 1; attempt < BOOTSTRAP_ATTEMPTS && result.exitCode !== 0; attempt++) {
     await host.pause(BOOTSTRAP_RETRY_MS)
@@ -70,6 +71,10 @@ export async function installDarwin(host: ColdWakeHost, launch: SessionHostLaunc
     await host.run(["launchctl", "enable", job])
     const loaded = await bootstrapJob(host, plist)
     if (loaded.exitCode !== 0) return failed("unit_load", loaded.output)
+  } else {
+    // Loaded and unchanged: run its ensure again (it reuses a running host), as Linux starts its oneshot unit.
+    const kicked = await host.run(["launchctl", "kickstart", job])
+    if (kicked.exitCode !== 0) return failed("unit_start", kicked.output)
   }
   return applyTable(host, (raw) => withColdWake(raw, "darwin"), "installed")
 }

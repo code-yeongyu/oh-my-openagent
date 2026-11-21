@@ -1,9 +1,10 @@
 import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from "../errors"
+import type { EntryPageRead } from "../paged-reader"
 import type { ThreadTranscriptEntry } from "../reader"
 import type { InterruptOutcome } from "./interrupt"
 import type { ModelChoice } from "../tools/model-match"
-import type { ThreadCloseOutcome } from "../tools/ports"
-import type { ThreadSummary, ThreadWaitOutcome } from "../contracts"
+import type { ThreadCloseAnswer, ThreadCloseOptions } from "../tools/ports"
+import type { ThreadResultSummary, ThreadSummary, ThreadWaitOutcome } from "../contracts"
 
 /**
  * One live thread's controls, wherever it is held: the session on this device's endpoint, or the session on another
@@ -22,7 +23,7 @@ export type SessionControl = {
   /** `interruptOver` on this leg's transport: an idle session answers `interrupted: false`. */
   readonly interrupt: (turnId?: string) => Promise<InterruptOutcome>
   /** The one close ladder (`close-ladder.ts`) on the thread's engine. */
-  readonly close: () => Promise<ThreadCloseOutcome>
+  readonly close: (options?: ThreadCloseOptions) => Promise<ThreadCloseAnswer>
   readonly setName: (name: string) => Promise<void>
   /**
    * The session's model catalog. `held`: answered from a copy the leg keeps (bounded in age), on which only an exact
@@ -34,16 +35,33 @@ export type SessionControl = {
   readonly setModel: (provider: string, id: string) => Promise<{ readonly provider: string; readonly id: string }>
   readonly getAvailableThinkingLevels: () => Promise<readonly string[]>
   /**
-   * Changes only this session's level (`SESSION_ONLY_THINKING_SCOPE`) whatever `scope` says, never the device's
-   * remembered level for the model. Refuses `thinking_level_unsupported` for a level the active model cannot run.
+   * Changes only this session's level (`SESSION_ONLY_THINKING_SCOPE`), never the device's remembered level for the
+   * model. Refuses `thinking_level_unsupported` for a level the active model cannot run.
    */
-  readonly setThinkingLevel: (level: string, scope?: "turn") => Promise<void>
+  readonly setThinkingLevel: (level: string) => Promise<void>
   readonly getMessages: () => Promise<readonly ThreadTranscriptEntry[]>
   /**
-   * Waits, bounded, until the thread stops running, on the leg's own status events (never a polling loop). Absent: the
-   * leg has no such event source here, and a waiting read answers `unsupported`.
+   * One page of the session's newest entries, sent by its holder (`paged-reader.ts`, #14047). `unsupported`: the holder
+   * pages nothing, and the read takes the whole transcript (`getMessages`). Absent: this leg always reads it whole.
    */
-  readonly waitSettled?: (timeoutMs: number, signal?: AbortSignal) => Promise<ThreadWaitOutcome>
+  readonly readEntryPage?: (read: {
+    readonly max_bytes?: number
+    readonly cursor?: string
+  }) => Promise<EntryPageRead | { readonly kind: "unsupported" }>
+  /**
+   * Waits, bounded, until the thread's turn is observed to end, on the leg's own status events (never a polling loop):
+   * `wait-settled.ts` over the remote watch on another device, over the endpoint's session subscription on this one.
+   */
+  readonly waitSettled: (timeoutMs: number, signal?: AbortSignal) => Promise<ThreadWaitOutcome>
+  /** Whether a turn is in flight: the listing's activity, else the engine's own `get_state`. */
+  readonly running: () => Promise<boolean>
+  /**
+   * senpi `set_session_archived`: the archived flag in the session file, nothing else (the desktop's `thread_organize`
+   * archive also unloads the session). Refuses `unsupported` when the engine does not know the command.
+   */
+  readonly setArchived: (archived: boolean) => Promise<void>
+  /** The thread as `thread_list` lists it, with the archived flag set to `archived`. */
+  readonly listed: (archived: boolean) => Promise<ThreadResultSummary>
 }
 
 /**
@@ -80,10 +98,10 @@ export function controlRefusalOf(error: unknown): ThreadToolFailure | undefined 
     : undefined
 }
 
-/** The thread a result names: its id, and its device when it is on another one. */
+/** The thread a result names: `thread`, the address to pass back, and its device when it is on another one. */
 export function controlIdentity(control: Pick<SessionControl, "thread_id" | "device">): {
-  readonly thread_id: string
+  readonly thread: string
   readonly device?: string
 } {
-  return { thread_id: control.thread_id, ...(control.device === undefined ? {} : { device: control.device }) }
+  return { thread: control.thread_id, ...(control.device === undefined ? {} : { device: control.device }) }
 }
