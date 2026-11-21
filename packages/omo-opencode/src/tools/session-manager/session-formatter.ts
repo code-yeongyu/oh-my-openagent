@@ -1,4 +1,4 @@
-import type { SessionInfo, SessionMessage, SearchResult } from "./types"
+import type { SessionInfo, SessionMessage, SearchResult, SessionMetadata } from "./types"
 import { forEachSessionMessagePage, getSessionInfo } from "./storage"
 import { describeSessionError, formatSkippedSessions, type SkippedSession } from "./session-error"
 
@@ -132,30 +132,21 @@ export function formatSearchResults(results: SearchResult[]): string {
   return lines.join("\n")
 }
 
-export async function filterSessionsByDate(
-  sessionIDs: string[],
+export function filterSessionsByUpdatedDate(
+  sessions: SessionMetadata[],
   fromDate?: string,
   toDate?: string,
-  signal?: AbortSignal,
-): Promise<string[]> {
-  if (!fromDate && !toDate) return sessionIDs
+): SessionMetadata[] {
+  if (!fromDate && !toDate) return sessions
 
-  const from = fromDate ? new Date(fromDate) : null
-  const to = toDate ? new Date(toDate) : null
+  const from = fromDate ? new Date(fromDate).getTime() : null
+  const to = toDate ? new Date(toDate).getTime() : null
 
-  const results: string[] = []
-  for (const id of sessionIDs) {
-    signal?.throwIfAborted()
-    const info = await getSessionInfo(id, signal)
-    if (!info || !info.last_message) continue
-
-    if (from && info.last_message < from) continue
-    if (to && info.last_message > to) continue
-
-    results.push(id)
-  }
-
-  return results
+  return sessions.filter((session) => {
+    if (from !== null && session.time.updated < from) return false
+    if (to !== null && session.time.updated > to) return false
+    return true
+  })
 }
 
 // Scans newest messages first, one page at a time, and stops at maxResults or when the signal aborts.
