@@ -264,17 +264,19 @@ describe("Senpi compatibility test script", () => {
     const workflow = readFileSync(ciWorkflowPath, "utf8")
 
     // #when
-    const senpiJob = sliceWorkflowSection(workflow, "  senpi-compatibility:", "  lazycodex-published-smoke:")
+    const senpiJob = sliceWorkflowSection(workflow, "  senpi-compatibility:", "  senpi-bundle-check:")
+    const linuxTests = sliceWorkflowSection(workflow, "  senpi-tests-linux:", "  linux-senpi-status:")
+    const linuxStatus = sliceWorkflowSection(workflow, "  linux-senpi-status:", "  lazycodex-published-smoke:")
     const posixScript = readFileSync(new URL("../.github/scripts/ci-senpi-posix.sh", import.meta.url), "utf8")
     const needsReferences = workflow.match(/needs: \[[^\]]*senpi-compatibility[^\]]*\]/g) ?? []
 
     // #then
     expect(senpiJob).toContain("os: [windows-latest]")
-    expect(senpiJob).toContain(
+    expect(linuxStatus).toContain(
       "name: senpi-compatibility\n    needs: [ci-mode, senpi-bundle-check, senpi-eq, senpi-tests-linux]",
     )
-    expect(senpiJob).toContain("os: [ubuntu-latest]")
-    expect(senpiJob).toContain('bash .github/scripts/ci-senpi-posix.sh "${{ matrix.part }}"')
+    expect(linuxStatus).toContain("os: [ubuntu-latest]")
+    expect(linuxTests).toContain('bash .github/scripts/ci-senpi-posix.sh "${{ matrix.part }}"')
     expect(senpiJob).toContain('node-version: "24"')
     expect(senpiJob).toContain('bun-version: "1.4.4"')
     expect(senpiJob).toContain("bun run build:senpi-plugin")
