@@ -5,7 +5,7 @@ import { threadState } from "../tools/thread-state"
 import type { ThreadHostSession, ThreadToolSurfaceOptions } from "../tools/ports"
 import type { ThreadSummary } from "../contracts"
 import { interruptOver } from "./interrupt"
-import { refuse, SESSION_ONLY_THINKING_SCOPE, type SessionControl } from "./port"
+import { refuse, sessionModelState, SESSION_ONLY_THINKING_SCOPE, type SessionControl } from "./port"
 import { waitForTurnEnd } from "./wait-settled"
 
 const THINKING_LEVEL_UNSUPPORTED = "thinking_level_unsupported:"
@@ -47,6 +47,7 @@ export function createLocalControl(
     },
     setName: (name) => port.setSessionName(routing, name, threadId),
     getAvailableModels: async () => ({ models: await port.getAvailableModels(routing), held: false }),
+    getModelState: async () => sessionModelState(await port.getState(routing, threadId)),
     setModel: async (provider, id) => {
       const selected = await port.setModel(routing, provider, id, threadId)
       return { provider: selected.provider, id: selected.id }

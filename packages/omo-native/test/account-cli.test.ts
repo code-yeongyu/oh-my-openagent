@@ -574,6 +574,11 @@ describe("omo account storage failures do not trigger another store call", () =>
 
 describe("omo account on Linux, where a locked Secret Service read looks empty (desktop#3509)", () => {
   const empty = { get: async () => null, set: async () => {}, delete: async () => true }
+  const storeHome = () => {
+    const home = mkdtempSync(join(tmpdir(), "omo-account-store-"))
+    homes.push(home)
+    return home
+  }
   const linuxStore = (
     lock: "locked" | "unlocked" | "absent" | "unknown",
     secrets: SecretApi = empty,
@@ -583,6 +588,7 @@ describe("omo account on Linux, where a locked Secret Service read looks empty (
       secrets,
       platform: "linux",
       lockProbe: async () => lock,
+      home: storeHome(),
       notice: (message) => {
         notices.push(message)
       },
@@ -646,17 +652,34 @@ describe("omo account on Linux, where a locked Secret Service read looks empty (
   })
 
   // #10658 review: only a LOCKED answer may stop the store. A probe that cannot answer (no gdbus on a minimal
-  // install, no Secret Service name, a slow bus) falls back to libsecret as before, with one notice.
+  // install, a slow bus) falls back to libsecret as before, with one notice; #7185b: no Secret Service at all keeps the
+  // sign-in in the private state file, and show says which one holds it.
   // The notice itself is once per process; account-cli-entry.test.ts counts it through the real `omo account`.
-  test("a probe that cannot answer never blocks login, show or logout: libsecret is used", async () => {
-    for (const lock of ["absent", "unknown"] as const) {
-      expect(await loginShowLogout(linuxStore(lock, memorySecretApi()))).toEqual([
-        ACCOUNT_EXIT.ok,
-        { signedIn: true, device: { id: "dev_f", name: "device dev_f" }, refreshState: "ok" },
-        ACCOUNT_EXIT.ok,
-        { signedIn: false },
-      ])
+  test("a probe that cannot answer or finds no Secret Service never blocks login, show or logout", async () => {
+    for (const [lock, storage] of [
+      ["absent", "file"],
+      ["unknown", "keyring"],
+    ] as const) {
+      expect({ lock, steps: await loginShowLogout(linuxStore(lock, memorySecretApi())) }).toEqual({
+        lock,
+        steps: [
+          ACCOUNT_EXIT.ok,
+          { signedIn: true, device: { id: "dev_f", name: "device dev_f" }, refreshState: "ok", storage },
+          ACCOUNT_EXIT.ok,
+          { signedIn: false, storage },
+        ],
+      })
     }
+  })
+
+  test("adopt with no Secret Service answers ok and says the sign-in is kept in the file (#7185b)", async () => {
+    const result = await run(linuxStore("absent", memorySecretApi()), ["adopt"], {
+      stdin: JSON.stringify(credential("dev_s", 60_000)),
+    })
+    expect({ code: result.code, out: result.out }).toEqual({
+      code: ACCOUNT_EXIT.ok,
+      out: [{ adopted: true, device: { id: "dev_s", name: "device dev_s" }, storage: "file" }],
+    })
   })
 
   test("login and logout on Linux with no gdbus on PATH still succeed through the real probe", async () => {
@@ -668,13 +691,14 @@ describe("omo account on Linux, where a locked Secret Service read looks empty (
       const store = createCredentialStore("http://127.0.0.1:1", {
         secrets: memorySecretApi(),
         platform: "linux",
+        home: storeHome(),
         notice: () => {},
       })
       expect(await loginShowLogout(store)).toEqual([
         ACCOUNT_EXIT.ok,
-        { signedIn: true, device: { id: "dev_f", name: "device dev_f" }, refreshState: "ok" },
+        { signedIn: true, device: { id: "dev_f", name: "device dev_f" }, refreshState: "ok", storage: "keyring" },
         ACCOUNT_EXIT.ok,
-        { signedIn: false },
+        { signedIn: false, storage: "keyring" },
       ])
     } finally {
       process.env.PATH = path
@@ -726,7 +750,10 @@ describe("omo account on Linux, where a locked Secret Service read looks empty (
 
   test("an unlocked collection with no item is still signed out", async () => {
     const result = await run(linuxStore("unlocked"), ["show"])
-    expect({ code: result.code, out: result.out }).toEqual({ code: ACCOUNT_EXIT.ok, out: [{ signedIn: false }] })
+    expect({ code: result.code, out: result.out }).toEqual({
+      code: ACCOUNT_EXIT.ok,
+      out: [{ signedIn: false, storage: "keyring" }],
+    })
   })
 
   test("libsecret's own locked-collection write error (measured on a real keyring) is keychain_locked", async () => {

@@ -276,12 +276,6 @@ export type RemoteThreadSurface = {
   readonly permissionPreset?: () => string | undefined
 }
 
-/**
- * A listing row's durable id (decision 0027 D2), "" when its device publishes none. What a row is listed and addressed by
- * is thread-address-core `rowKey` (the durable id, else `<device id>/<listing key>`); this is the durable id alone.
- */
-export const rowThreadId = (row: RemoteSessionRow): string => row.durable_id ?? ""
-
 // A UUIDv7 carries its creation time in its first 48 bits (RFC 9562 section 5.7); engine durable ids are UUIDv7.
 const UUID_V7 = /^([0-9a-f]{8})-([0-9a-f]{4})-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -290,7 +284,7 @@ const UUID_V7 = /^([0-9a-f]{8})-([0-9a-f]{4})-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
  * UUIDv7 durable id encodes; a row without such an id keeps `updated_ms`.
  */
 export function rowCreatedAt(row: RemoteSessionRow): string {
-  const match = UUID_V7.exec(rowThreadId(row))
+  const match = UUID_V7.exec(row.durable_id ?? "")
   return new Date(match === null ? row.updated_ms : Number.parseInt(`${match[1]}${match[2]}`, 16)).toISOString()
 }
 

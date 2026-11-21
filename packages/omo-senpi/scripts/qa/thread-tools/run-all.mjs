@@ -55,6 +55,7 @@ const gateway = [
   ["report-origin-steer", "report-origin-steer.mjs"],
   ["report-origin-auto-steer", "report-origin-auto-steer.mjs"],
   ["default-delivery", "default-delivery.mjs"],
+  ["busy-backlog", "busy-backlog.mjs"],
 ]
 
 const legacy = [
