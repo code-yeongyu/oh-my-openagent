@@ -4,6 +4,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import { RunnerError } from "../runners/in-process"
 import type { RunnerFailure } from "../runners/in-process/child-handle"
+import { HostSessionOpenError } from "../runners/rpc-host/session-wire"
 import { cleanupProjects, FakeRunner, makeManager } from "./__fixtures__/manager-fakes"
 
 const PRIVATE_DETAIL = "Timeout waiting for response to open_session. Stderr: api_key=sk-private"
@@ -140,6 +141,34 @@ describe("TaskManager host start failures", () => {
     const eventLog = readFileSync(join(store.stateDir, "logs", `${result.task_id}.jsonl`), "utf8")
     expect(eventLog).toContain('"failure_reason":"host_memory_pressure"')
     expect(eventLog).not.toContain(PRIVATE_DETAIL)
+  })
+
+  test("#given the host refuses open_session with a code outside the closed reasons #when start fails #then the result and event log name that code instead of the generic sentence", async () => {
+    // given
+    const runner = new FakeRunner()
+    const refusal = new HostSessionOpenError("predecessor_request_timeout", "/sessions/child.jsonl", PRIVATE_DETAIL)
+    runner.startError = new RunnerError({ kind: "session_unavailable", message: refusal.message, cause: refusal })
+    const { manager, store } = makeManager({ process: runner })
+
+    // when
+    const result = await manager.start({
+      prompt: "work",
+      parent_session_id: "parent-1",
+      depth: 1,
+      category: "quick",
+      execution_mode: "process",
+    })
+
+    // then
+    if (result.kind !== "start_failed") throw new Error("expected start_failed")
+    expect(result.error_message).toBe(
+      "The child session could not be opened: the session open was refused (host_refused: predecessor_request_timeout).",
+    )
+    expect(result.failure_kind).toBe("session_unavailable")
+    const record = store.load(result.task_id)
+    const eventLog = readFileSync(join(store.stateDir, "logs", `${result.task_id}.jsonl`), "utf8")
+    expect(eventLog).toContain('"cause_code":"predecessor_request_timeout"')
+    expect(JSON.stringify({ result, record, eventLog })).not.toContain(PRIVATE_DETAIL)
   })
 
   test("#given an off-enum host reason #when start fails #then no untrusted value reaches any public or durable surface", async () => {
