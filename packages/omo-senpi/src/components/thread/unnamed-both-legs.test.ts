@@ -32,7 +32,9 @@ describe("this device's unnamed thread is named as another device's is", () => {
 
 describe("refusal candidates for rows that publish no thread id", () => {
   test("#given b and c each list a nameless session under the same listing key #when that key is addressed #then each candidate is passed back by its row key and named by rowName", async () => {
-    const anon = { ...B_ROW, session_id: "rk-anon", durable_id: undefined, title: "", project: "/work/anon-folder" }
+    // A row's folder is its path (rowFolder, #14458); project repeats it, as a device publishes both.
+    const folder = "/work/anon-folder"
+    const anon = { ...B_ROW, session_id: "rk-anon", durable_id: undefined, title: "", project: folder, path: folder }
     const a = account({
       devices: [{ device: "c", label: "c-mac", online: true }],
       rows: [anon, { ...anon, device: "c" }],

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:8d153f80d15877b20532f1d5cee15f58917ac8e9f904ece79f21a1e7ce7b49a7:9d2be30d05e5d0a06215ddbe5c85698c7e207d3c3af848d13e575e97aeacc7d8
+// omo-codex-install:a6870f30b41bdf788a9220da555559b1b52acc149765d24cc6055dd0bacf9ad6:d51784ae76d57120dd009c69520536aa859771df7ec0e247faa22684ac1fc88e
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -13148,7 +13148,7 @@ function isRootSetting(line, key) {
 // packages/omo-codex/src/install/codex-model-catalog.ts
 import { readFile as readFile10 } from "node:fs/promises";
 import { join as join16 } from "node:path";
-var CODEX_ASTRA_MODEL = "gpt-6-astra";
+var CODEX_ASTRA_MODEL = "gpt-6.2-astra";
 var FALLBACK_CODEX_MODEL_CATALOG = {
   current: {
     model: CODEX_ASTRA_MODEL,
@@ -13173,6 +13173,12 @@ var FALLBACK_CODEX_MODEL_CATALOG = {
     {
       model: "gpt-5.6-sol",
       modelContextWindow: 650000,
+      modelReasoningEffort: "high",
+      planModeReasoningEffort: "xhigh"
+    },
+    {
+      model: "gpt-6-astra",
+      modelContextWindow: 600000,
       modelReasoningEffort: "high",
       planModeReasoningEffort: "xhigh"
     }
@@ -20356,6 +20362,16 @@ var OmoSessionWakeSettingsSchema = object({
   wake_limit: number2().int().min(0).optional()
 }).strict();
 
+// packages/omo-config-core/src/schema/operator-alerts.ts
+var OmoOperatorAlertsSettingsSchema = object({
+  error_streak: object({
+    threshold: number2().int().min(1).optional(),
+    realert_minutes: number2().min(0).optional(),
+    threads: array(string2().trim().min(1)).optional(),
+    webhook_url_env: string2().regex(/^[A-Za-z_][A-Za-z0-9_]*$/).optional()
+  }).strict().optional()
+}).strict();
+
 // packages/omo-config-core/src/schema/config.ts
 var OmoOpenCodeHarnessConfigSchema = record(string2(), unknown());
 var OmoDisabledSkillsSchema = array(string2());
@@ -20363,6 +20379,7 @@ var OmoExcludedModelsSchema = array(string2());
 var OmoTypedHarnessConfigSchema = object({
   provenance: OmoProvenanceSettingsSchema.optional(),
   session_wake: OmoSessionWakeSettingsSchema.optional(),
+  operator_alerts: OmoOperatorAlertsSettingsSchema.optional(),
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
@@ -20384,6 +20401,7 @@ var OmoTypedHarnessConfigSchema = object({
 var OmoConfigProfileSchema = object({
   provenance: OmoProvenanceSettingsSchema.optional(),
   session_wake: OmoSessionWakeSettingsSchema.optional(),
+  operator_alerts: OmoOperatorAlertsSettingsSchema.optional(),
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
@@ -20409,6 +20427,7 @@ var OmoConfigProfileSchema = object({
 var OmoConfigSchema = object({
   provenance: OmoProvenanceSettingsSchema.optional(),
   session_wake: OmoSessionWakeSettingsSchema.optional(),
+  operator_alerts: OmoOperatorAlertsSettingsSchema.optional(),
   formatOnMutation: OmoFormatOnMutationSchema.optional(),
   $schema: string2().optional(),
   categories: OmoCategoriesConfigSchema.optional(),
@@ -20438,6 +20457,7 @@ var OmoConfigSchema = object({
 var OmoConfigLayerSchema = object({
   provenance: OmoProvenanceSettingsSchema.optional(),
   session_wake: OmoSessionWakeSettingsSchema.optional(),
+  operator_alerts: OmoOperatorAlertsSettingsSchema.optional(),
   formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
   $schema: string2().optional(),
   categories: OmoCategoriesConfigSchema.optional(),
@@ -22217,6 +22237,7 @@ import { lstat as lstat8, readFile as readFile13, readdir as readdir7, writeFile
 import { join as join21 } from "node:path";
 
 // packages/omo-codex/src/install/managed-agent-reasoning-defaults.ts
+var PREVIOUS_CODEX_ASTRA_MODEL = "gpt-6-astra";
 var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
   [
     "explorer",
@@ -22231,7 +22252,11 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
       },
       {
         previous: { model: "gpt-5.6-luna", effort: "low" },
-        current: { model: CODEX_ASTRA_MODEL, effort: "low" }
+        current: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "low" }
+      },
+      {
+        previous: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "low" },
+        current: { model: "gpt-6-luna", effort: "low" }
       }
     ]
   ],
@@ -22248,7 +22273,11 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
       },
       {
         previous: { model: "gpt-5.6-luna", effort: "low" },
-        current: { model: CODEX_ASTRA_MODEL, effort: "low" }
+        current: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "low" }
+      },
+      {
+        previous: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "low" },
+        current: { model: "gpt-6-luna", effort: "low" }
       }
     ]
   ],
@@ -22257,6 +22286,10 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
     [
       {
         previous: { model: "gpt-5.6-sol", effort: "high" },
+        current: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "high" }
+      },
+      {
+        previous: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "high" },
         current: { model: CODEX_ASTRA_MODEL, effort: "high" }
       }
     ]
@@ -22266,6 +22299,10 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
     [
       {
         previous: { model: "gpt-5.6-luna", effort: "high" },
+        current: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "high" }
+      },
+      {
+        previous: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "high" },
         current: { model: CODEX_ASTRA_MODEL, effort: "high" }
       }
     ]
@@ -22283,6 +22320,10 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
       },
       {
         previous: { model: "gpt-5.6-terra", effort: "high" },
+        current: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "high" }
+      },
+      {
+        previous: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "high" },
         current: { model: CODEX_ASTRA_MODEL, effort: "high" }
       }
     ]
@@ -22300,6 +22341,10 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
       },
       {
         previous: { model: "gpt-5.6-sol", effort: "high" },
+        current: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "high" }
+      },
+      {
+        previous: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "high" },
         current: { model: CODEX_ASTRA_MODEL, effort: "high" }
       }
     ]
@@ -22317,6 +22362,10 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
       },
       {
         previous: { model: "gpt-5.6-terra", effort: "high" },
+        current: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "high" }
+      },
+      {
+        previous: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "high" },
         current: { model: CODEX_ASTRA_MODEL, effort: "high" }
       }
     ]
@@ -22330,6 +22379,10 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
       },
       {
         previous: { model: "gpt-5.6-sol", effort: "medium" },
+        current: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "medium" }
+      },
+      {
+        previous: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "medium" },
         current: { model: CODEX_ASTRA_MODEL, effort: "medium" }
       }
     ]
@@ -22343,6 +22396,10 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
       },
       {
         previous: { model: "gpt-5.6-terra", effort: "medium" },
+        current: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "medium" }
+      },
+      {
+        previous: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "medium" },
         current: { model: CODEX_ASTRA_MODEL, effort: "medium" }
       }
     ]
@@ -22356,6 +22413,10 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
       },
       {
         previous: { model: "gpt-5.6-terra", effort: "high" },
+        current: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "high" }
+      },
+      {
+        previous: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "high" },
         current: { model: CODEX_ASTRA_MODEL, effort: "high" }
       }
     ]
@@ -22369,6 +22430,10 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
       },
       {
         previous: { model: "gpt-5.6-luna", effort: "high" },
+        current: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "high" }
+      },
+      {
+        previous: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "high" },
         current: { model: CODEX_ASTRA_MODEL, effort: "high" }
       }
     ]
@@ -22386,6 +22451,10 @@ var MANAGED_REASONING_DEFAULT_UPGRADES = new Map([
       },
       {
         previous: { model: "gpt-5.6-sol", effort: "low" },
+        current: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "low" }
+      },
+      {
+        previous: { model: PREVIOUS_CODEX_ASTRA_MODEL, effort: "low" },
         current: { model: CODEX_ASTRA_MODEL, effort: "low" }
       }
     ]

@@ -186,14 +186,18 @@ export async function createThread(
     else if (earlier?.kind === "file") outcome = await plan.host.open(fileOpen(earlier))
     else
       try {
-        outcome = await plan.host.open({
-          ...plan.request,
-          ...(openName === undefined ? {} : { name: openName }),
-          ...(plan.creates && loaded !== undefined ? { initialSkills: loaded } : {}),
-          ...(preset === undefined ? {} : { permissionPreset: preset }),
-          ...(plan.creates ? launch.profile : {}),
-          ...(createdId === undefined ? {} : { durableSessionId: createdId }),
-        })
+        outcome = await plan.host.open(
+          {
+            ...plan.request,
+            ...(openName === undefined ? {} : { name: openName }),
+            ...(plan.creates && loaded !== undefined ? { initialSkills: loaded } : {}),
+            ...(preset === undefined ? {} : { permissionPreset: preset }),
+            ...(plan.creates ? launch.profile : {}),
+            ...(createdId === undefined ? {} : { durableSessionId: createdId }),
+          },
+          // #14397 review L1: every create, a prompt-only and an alias-only one included, is checked for reach.
+          { confirmReach: plan.creates },
+        )
       } catch (error) {
         const found = await reopened()
         if (found === undefined) throw error
