@@ -278,6 +278,26 @@ describe("enrollDevice", () => {
     expect([code.userCode, code.matchingCode].filter((value) => seen.includes(value))).toEqual([])
     expect(shown).toEqual([code])
   })
+
+  test("#given the caller's own device service is not running #when read back #then refused at once on the caller's side", async () => {
+    const w = world(
+      { preflight: preflightLinux, sign_in_check: ready, account_show: signedOut, sign_in: signedIn() },
+      { machines: async () => "unavailable" as const },
+    )
+    const outcome = await enrollDevice(request(), w.ports)
+    expect(outcome).toMatchObject({ kind: "refused", step: "read_back", code: "caller_device_service_unavailable" })
+    expect(w.sleeps).toEqual([])
+  })
+
+  test("#given the target refuses with a code named like an object member #when signed in #then internal_error", async () => {
+    const refused = ok([
+      json({ event: "code", ...code }),
+      json({ event: "refused", code: "constructor", message: "x" }),
+    ])
+    const w = world({ preflight: preflightLinux, sign_in_check: ready, account_show: signedOut, sign_in: refused })
+    const outcome = await enrollDevice(request(), w.ports)
+    expect(outcome).toMatchObject({ kind: "refused", step: "sign_in", code: "internal_error" })
+  })
 })
 
 describe("remoteCommand", () => {
