@@ -78,6 +78,10 @@ const toolkitSdkOutputPath = join(
 )
 const bunshinTsEntryPath = join(packageRoot, "src", "extension", "bunshin-ts-sdk.ts")
 const bunshinTsOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "runtime", "bunshin-ts", "sdk.js")
+// The account, device, device-service and configuration SDK eval cells import from OMO_SDK_ROOT.
+export const OMO_SDK_RELATIVE_PATH = join("runtime", "omo-sdk", "sdk.js")
+const omoSdkEntryPath = join(packageRoot, "src", "extension", "omo-sdk.ts")
+const omoSdkOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, OMO_SDK_RELATIVE_PATH)
 // The `omo thread` CLI and connector scripts import this SDK without an agent session; it points
 // the gateway store at the worker sidecar in `extensions/` (two levels up from its own file).
 export const THREAD_SDK_RELATIVE_PATH = join("runtime", "thread-sdk", "sdk.js")
@@ -318,6 +322,7 @@ export const extensionBuildPaths = {
   supervisorOutputPath,
   toolkitSdkOutputPath,
   bunshinTsOutputPath,
+  omoSdkOutputPath,
   threadSdkOutputPath,
   advisorRuntimeOutputPath,
   sidePanelRuntimeOutputPath,
@@ -375,6 +380,7 @@ export function resolveOutputs(options) {
       join("runtime", "agent-toolkit-sdk", "sdk.js"),
     ),
     bunshinTsOutput: sibling(options.bunshinTsOutputPath, bunshinTsOutputPath, join("runtime", "bunshin-ts", "sdk.js")),
+    omoSdkOutput: sibling(options.omoSdkOutputPath, omoSdkOutputPath, OMO_SDK_RELATIVE_PATH),
     threadSdkOutput: sibling(options.threadSdkOutputPath, threadSdkOutputPath, THREAD_SDK_RELATIVE_PATH),
     rollbackRuntimeOutput: sibling(
       options.rollbackRuntimeOutputPath,
@@ -434,6 +440,7 @@ export async function buildExtension(options = {}) {
     onboardingScanRuntimeOutput,
     toolkitSdkOutput,
     bunshinTsOutput,
+    omoSdkOutput,
     threadSdkOutput,
     rollbackRuntimeOutput,
     computerUseOutput,
@@ -458,6 +465,7 @@ export async function buildExtension(options = {}) {
   } = resolveOutputs(options)
   const toolkitSdkInputs = await buildEntry(toolkitSdkEntryPath, toolkitSdkOutput, buildDefines, sdkExternalSpecifiers)
   const bunshinTsInputs = await buildEntry(bunshinTsEntryPath, bunshinTsOutput, buildDefines, sdkExternalSpecifiers)
+  const omoSdkInputs = await buildEntry(omoSdkEntryPath, omoSdkOutput, buildDefines, sdkExternalSpecifiers)
   const mainInputs = await buildEntry(entryPath, output, buildDefines)
   const taskInputs = await buildEntry(taskEntryPath, taskOutput, buildDefines)
   const memberInputs = await buildEntry(memberEntryPath, memberOutput, buildDefines)
@@ -530,6 +538,7 @@ export async function buildExtension(options = {}) {
     onboardingScanRuntimeInputs,
     toolkitSdkInputs,
     bunshinTsInputs,
+    omoSdkInputs,
     rollbackRuntimeInputs,
     computerUseInputs,
     computerRunWorkerInputs,
