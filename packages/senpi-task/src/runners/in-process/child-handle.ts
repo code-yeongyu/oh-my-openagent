@@ -55,6 +55,9 @@ export type ChildSession = RunHoldSession & {
  */
 export type RunnerFailureReason = TaskStartFailureReason
 
+/** How far a host-session open got before it failed: the protocol probe, the connection, or `open_session`. */
+export type HostOpenStep = "probe" | "connect" | "open_session"
+
 export type RunnerFailure = {
   // The snake_case kinds map 1:1 onto the manager's respawn disposition codes (todo 12): a resume
   // rebuild failure is TYPED and retryable, never a silently weakened tool set or transcript.
@@ -65,6 +68,10 @@ export type RunnerFailure = {
   // Set only with `launch_spec_insecure`: the refused spec path omo resolved itself, never child
   // output, so the public start failure may name the file and its fix (#9208).
   readonly launch_spec_path?: string
+  // Set only by the host-session opener: the step its open reached and the socket it opened on. Both
+  // are omo's own values, never host output, so a final start failure may name them (#14538).
+  readonly open_step?: HostOpenStep
+  readonly host_socket?: string
   /**
    * Structured exit facts for the internal event log, when the child actually reached a process exit.
    *

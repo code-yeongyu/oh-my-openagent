@@ -36,6 +36,7 @@ import type { TaskParentWire } from "../task-parent-control"
 import { confirmHostSessionAbsent } from "./session-close-proof"
 import { openHostSessionConnection } from "./session-client-opening"
 import { reapplyPermissionPreset, type PermissionPushPorts } from "./permission-push"
+import type { HostOpenStep } from "../in-process/child-handle"
 
 /**
  * ONE senpi `RpcClient` per child, over the machine-wide daemon's public socket. The client probes
@@ -65,6 +66,7 @@ export class HostSessionClient {
   private reattached = false
   private confirmingClose = false
   private openInput: HostSessionOpenInput | undefined
+  private step: HostOpenStep | undefined
   private readonly parent: ChildParentLink
 
   constructor(options: HostSessionClientOptions) {
@@ -97,6 +99,11 @@ export class HostSessionClient {
     return this.identity?.engineVersion
   }
 
+  /** The step the last open reached; after a failed open, the step it stopped at. */
+  get openStep(): HostOpenStep | undefined {
+    return this.step
+  }
+
   async open(input: HostSessionOpenInput): Promise<OpenedHostSession> {
     this.openInput = this.parent.named(input)
     const { opened, identity } = await openHostSessionConnection(this.openInput, {
@@ -105,6 +112,9 @@ export class HostSessionClient {
       onEvent: (record) => this.ingest(record),
       bindClient: (client) => {
         this.client = client
+      },
+      onStep: (step) => {
+        this.step = step
       },
     })
     this.identity = identity

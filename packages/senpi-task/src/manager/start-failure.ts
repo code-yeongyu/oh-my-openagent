@@ -64,8 +64,13 @@ export function describeStartFailure(error: unknown): StartFailureDescription {
           : exited !== undefined && failureKind === "child-prompt-failed"
             ? `Child prompt failed to start: ${describeChildExit(exited)}.`
             : publicMessage(failureKind, reason)
+  // The opener's own step and socket are trusted values; an off-enum reason still names neither.
+  const located =
+    failureKind === "session_unavailable" && (error.failure.reason === undefined || reason !== undefined)
+      ? openLocation(error.failure)
+      : undefined
   return {
-    errorMessage,
+    errorMessage: located === undefined ? errorMessage : `${errorMessage.replace(/\.$/, "")} (host ${located.host_socket}, step ${located.open_step}).`,
     failureKind,
     ...(reason === undefined ? {} : { failureReason: reason }),
     eventFacts: {
@@ -75,8 +80,14 @@ export function describeStartFailure(error: unknown): StartFailureDescription {
       ...(rejectedWhile === undefined ? {} : { rejected_while: rejectedWhile }),
       ...(exit === undefined ? {} : { exit_kind: exit.kind, exit_code: exit.code, exit_signal: exit.signal }),
       ...(cause ?? {}),
+      ...(located ?? {}),
     },
   }
+}
+
+function openLocation(failure: RunnerError["failure"]): { open_step: string; host_socket: string } | undefined {
+  const { open_step: step, host_socket: socket } = failure
+  return step === undefined || socket === undefined ? undefined : { open_step: step, host_socket: homeRelative(socket) }
 }
 
 function causeOf(kind: TaskStartFailureKind, cause: unknown): StartCause | undefined {
