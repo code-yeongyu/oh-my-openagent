@@ -3,6 +3,7 @@ import { existsSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { Worker } from "node:worker_threads"
 
+import { isConnectionLost } from "./connection-lost"
 import { GATEWAY_BUSY_TIMEOUT_MS, GATEWAY_LOCK_WAIT_MAX_MS, GATEWAY_STORE_IDLE_RETIRE_MS } from "./constants"
 import type { GatewayResolve } from "./engine"
 import { resolveProvenance } from "./provenance-resolver"
@@ -339,10 +340,45 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     }
   }
 
+  /**
+   * Detaches a worker whose connection was lost and closes it. The close must finish before a fresh worker
+   * opens: SQLite shares one wal-index mapping per database file across a process's connections, so a
+   * connection opened beside the lost one would inherit its stale `-shm` mapping.
+   */
+  function discardLostWorker(lost: Worker): void {
+    if (worker !== lost) return
+    cancelIdleRetire()
+    worker = undefined
+    opened = undefined
+    const closed = post("close", null, lost)
+      .catch(() => undefined)
+      .then(() => lost.terminate())
+      .then(
+        () => undefined,
+        () => undefined,
+      )
+    const settled: Promise<void> = Promise.all([retiring, closed])
+      .then(() => undefined)
+      .finally(() => {
+        if (retiring === settled) retiring = undefined
+      })
+    retiring = settled
+  }
+
+  /** One retry on a fresh connection when the worker's connection was lost (`CONNECTION_LOST_CODE`). */
   function call<T>(op: string, args?: unknown): Promise<T> {
     return track(async () => {
       await start()
-      return (await post(op, args)) as T
+      const served = worker
+      try {
+        return (await post(op, args)) as T
+      } catch (error) {
+        if (served === undefined || !isConnectionLost(error)) throw error
+        discardLostWorker(served)
+        await retiring
+        await start()
+        return (await post(op, args)) as T
+      }
     })
   }
 

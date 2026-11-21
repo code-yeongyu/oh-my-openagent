@@ -46,6 +46,8 @@
         "src/components/telemetry/posthog-runtime.ts",
         "src/components/telemetry/session-summary-recovery.ts",
         "src/components/thread/live-surface.ts",
+        // the gateway store's Worker entry: started by URL (store.ts gatewayStoreWorkerUrl), never imported
+        "src/components/thread/gateway/store-worker.ts",
         // spawned by path from host-ensure.test.ts as the engine CLI `host ensure` runs
         "src/components/thread/wake/testing/fake-engine-cli.ts",
         // spawned by path as a child process from hand-browser-placement.test.ts
