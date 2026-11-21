@@ -55,6 +55,11 @@ pub enum InputEvent {
     Key { key: String, down: bool },
     Scroll { dx: f64, dy: f64 },
     Text(String),
+    // --- Row 25: the menu, app and system-surface side effects, through the one sink. ---
+    MenuSelect { path: Vec<String> },
+    AppLaunch { app_key: String, activate: bool },
+    AppQuit { app_key: String, force: bool },
+    OpenSurface { kind: crate::listing::SurfaceKind },
 }
 
 /// An input event carrying the engine's tag, so listeners can tell it from the user's.
