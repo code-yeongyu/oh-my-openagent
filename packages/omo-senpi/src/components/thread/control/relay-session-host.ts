@@ -48,7 +48,7 @@ function listedThread(row: RemoteSessionRow): HostedThread {
   // `<device id>/<listing key>` for a session whose device publishes none; the listing key stays inside sessionId for the
   // relay transport. Its name is the one naming function's: a session with none shows its folder's name, marked unnamed.
   const thread = rowKey(row)
-  const { name, unnamed } = rowName({ name: row.title, folder: row.project })
+  const { name, unnamed } = rowName({ name: row.title, folder: rowFolder(row) })
   return {
     sessionId: row.session_id,
     thread_id: thread,
