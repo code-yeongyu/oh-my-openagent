@@ -54,7 +54,7 @@ const versionAt = (commit, manifest) => JSON.parse(git(["show", `${commit}:${man
 
 // Every reason base..head is not a release stamp; empty when it is one. Renames are listed as a delete plus an add, so a
 // source file moved into a listed path still shows its deletion.
-export function stampRefusals(base, head) {
+function stampRefusals(base, head) {
   const fields = git(["diff", "--no-renames", "--name-status", "-z", base, head]).split("\0").filter(Boolean)
   const versions = ["package.json", "packages/omo-native/package.json"]
     .map((manifest) => [versionAt(base, manifest), versionAt(head, manifest)])
