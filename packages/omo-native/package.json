@@ -6,6 +6,13 @@
   "bin": {
     "omo": "bin/omo.js"
   },
+  "exports": {
+    "./remote": {
+      "types": "./bin/lib/remote-sdk.generated.d.ts",
+      "default": "./bin/lib/remote-sdk.generated.js"
+    },
+    "./package.json": "./package.json"
+  },
   "files": [
     "bin",
     "plugin"
