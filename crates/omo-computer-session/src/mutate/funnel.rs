@@ -42,6 +42,9 @@ impl Session {
                 refused.refusal.into(),
             ));
         }
+        if let Some(frame) = mutation.frame_refusal {
+            return Err(self.refuse(record, Some("Frame".to_owned()), frame.refusal().into()));
+        }
         // `&mut Session` serialises a session's calls, so no exec permit free means one leaked:
         // refused with nothing sent, never sent without one.
         let Some(_permit) = self.funnel.permits.try_take(PermitKind::Exec) else {
@@ -78,6 +81,9 @@ impl Session {
         let of = u32::try_from(mutation.events.len()).unwrap_or(u32::MAX);
         let (count, failure) = self.send(mutation.events, mutation.route, tag);
         drop(lock);
+        if let Some((target, frame_id)) = mutation.consume.as_ref().filter(|_| count > 0) {
+            self.frames.consume(target, frame_id);
+        }
         let read_back = report::read_back(report::settle());
         match failure {
             Some(refusal) if count == 0 => {

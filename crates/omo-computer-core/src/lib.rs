@@ -6,6 +6,7 @@ pub mod capabilities;
 pub mod doc;
 pub mod env;
 pub mod error;
+pub mod frame;
 pub mod hello;
 pub mod listing;
 pub mod methods;
