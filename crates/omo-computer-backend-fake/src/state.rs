@@ -28,6 +28,8 @@ pub struct FakeState {
     pub displays: Vec<FakeDisplay>,
     pub process_start: BTreeMap<String, u64>,
     pub exited: BTreeSet<String>,
+    /// The window the last background input was addressed to (row 21a).
+    pub last_input_window: Option<String>,
     pub calls: CallCounter,
     pub faults: FaultQueue,
     pub pending_presses: Vec<UserPress>,
@@ -44,6 +46,13 @@ pub struct FakeState {
     pub ax_reads: BTreeMap<String, usize>,
     pub ax_event_pos: usize,
     pub stop_pressed: bool,
+    /// How many `stop_timeline` presses have fired.
+    pub stop_press_pos: usize,
+    /// How many times a live stop listener was polled.
+    pub stop_polls: u32,
+    // --- Row 21 (review L5, R70cl): each stop listener's own press queue. A press is handed to
+    // the listeners alive when it is delivered; a listener replaced before it is polled drops it. ---
+    pub stop_queues: Vec<std::sync::Weak<std::sync::atomic::AtomicBool>>,
 }
 
 impl FakeState {
@@ -51,6 +60,7 @@ impl FakeState {
         scenario
             .ax_notification_timeline
             .sort_by_key(|event| event.t_ms);
+        scenario.stop_timeline.sort_by_key(|press| press.t_ms);
         let mut faults = FaultQueue::default();
         for failure in &scenario.fail_next {
             faults.push(
@@ -75,6 +85,7 @@ impl FakeState {
             displays: scenario.displays.clone(),
             process_start,
             exited: BTreeSet::new(),
+            last_input_window: None,
             calls: CallCounter::default(),
             faults,
             pending_presses: scenario.user_presses.clone(),
@@ -89,6 +100,9 @@ impl FakeState {
             ax_reads: BTreeMap::new(),
             ax_event_pos: 0,
             stop_pressed: false,
+            stop_press_pos: 0,
+            stop_polls: 0,
+            stop_queues: Vec::new(),
             scenario,
         }
     }
