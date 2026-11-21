@@ -130,6 +130,15 @@ async function pushOne(
   }
   deps.fault?.("append-landed")
   const sent = out
+  // The next seal on this base needs its link; the chain takes the own batch instead of reading it back (#14476).
+  await deps.sealer.appended?.({
+    seq: result.seq,
+    baseSeq: sent.baseSeq,
+    digest: sent.digest,
+    epoch: sent.epoch,
+    link: sent.link,
+    recordSig: sent.recordSig,
+  })
   await journal.recordApplied([
     { seq: result.seq, kind: "batch", batchId: sent.batchId, digest: sent.digest, objectId: "", author: "self" },
   ])
