@@ -1,4 +1,4 @@
-import { splitReasoningSuffix } from "./reasoning-level"
+import { isReasoningLevel, splitReasoningSuffix } from "./reasoning-level"
 
 export function parseVariantFromModelID(
   rawModelID: string,
@@ -28,7 +28,7 @@ export function parseVariantFromModelID(
   if (spaceVariant) {
     const modelID = spaceVariant[1]?.trim() ?? ""
     const variant = spaceVariant[2]?.trim().toLowerCase()
-    if (variant) {
+    if (variant && isReasoningLevel(variant)) {
       return { modelID, variant }
     }
   }

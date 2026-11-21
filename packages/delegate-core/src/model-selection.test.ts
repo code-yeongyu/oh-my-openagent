@@ -227,4 +227,21 @@ describe("resolveModelForDelegateTask", () => {
       matchedFallback: true,
     })
   })
+
+  test("#given user-configured category and fallback models with space-separated model names #when resolved #then trailing non-level words stay part of the model id", () => {
+    const result = resolveModelForDelegateTask(
+      {
+        userModel: "cpa/Gemini 4 Argon",
+        userFallbackModels: ["cpa/Kimi K3.1 Pro"],
+        availableModels: new Set(["cpa/Kimi K3.1 Pro"]),
+      },
+      noCacheDeps,
+    )
+
+    expect(result).toEqual({
+      model: "cpa/Kimi K3.1 Pro",
+      variant: undefined,
+      matchedFallback: true,
+    })
+  })
 })

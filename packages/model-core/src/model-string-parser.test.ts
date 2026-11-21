@@ -37,4 +37,20 @@ describe("parseModelString reasoning suffixes", () => {
       variant: "high",
     })
   })
+
+  test("given space-separated model names with non-level trailing words when parsed then the full model id is preserved", () => {
+    expect(parseModelString("cpa/Gemini 4 Argon")).toEqual({
+      providerID: "cpa",
+      modelID: "Gemini 4 Argon",
+    })
+    expect(parseModelString("cpa/DeepSeek V4.1 Flash")).toEqual({
+      providerID: "cpa",
+      modelID: "DeepSeek V4.1 Flash",
+    })
+    expect(parseModelString("cpa/Kimi K3.1 Pro:high")).toEqual({
+      providerID: "cpa",
+      modelID: "Kimi K3.1 Pro",
+      variant: "high",
+    })
+  })
 })
