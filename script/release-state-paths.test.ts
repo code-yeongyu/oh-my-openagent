@@ -40,6 +40,14 @@ describe("#given the release stamp's path check", () => {
     expect(run.stderr).toContain("packages/omo-native/sync-status-cli.ts")
   })
 
+  test.each([
+    ["hand-written launcher code beside the generated auth bundle", "packages/omo-native/bin/lib/launcher.js"],
+    ["a plugin file the bundle check does not rebuild", "packages/omo-senpi/plugin/extensions/dream-persona.md"],
+    ["a runtime bundle the bundle check does not compare", "packages/omo-senpi/plugin/runtime/dag/sdk.js"],
+  ])("#then %s is outside the stamp", (_name, path) => {
+    expect(check(["package.json", path]).status).toBe(1)
+  })
+
   test("#then prepare-release-state pipes its staged stamp through the check before committing", () => {
     const workflow = load(readFileSync(new URL("../.github/workflows/publish.yml", import.meta.url), "utf8")) as {
       jobs: { "prepare-release-state": { steps: { id?: string; run?: string }[] } }
