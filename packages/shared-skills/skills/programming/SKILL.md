@@ -25,6 +25,7 @@ This skill is an index. The hard per-language rules live under `references/`. Lo
    | `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`, `.cjs`, "TypeScript" / "JavaScript" | `references/typescript/README.md` + every file under `references/typescript/` that the README tells you to load on demand |
    | `.go`, `go.mod`, `go.sum`, `.golangci.yml`, `*.proto` next to a Go module, "Go" / "Golang" | `references/go/README.md` + every file under `references/go/` that the README tells you to load on demand |
    | any test file (`*.test.*`, `*.spec.*`, `*_test.go`, `test_*.py`, `*_test.py`, under `test/`, `tests/` or `__tests__/`), or a change that adds, reshapes, or deletes a test | the language row above PLUS `references/testing/README.md` (the authoring gate) and `references/testing/junk-classes.md` (the table the gate reviewer applies) |
+   | a rendered web surface: `.html`, `.css`, `.jsx`, `.tsx`, `.vue`, `.svelte`, `.astro`, or any task that ships a UI | the language row above PLUS the `frontend` skill, before the first line of UI code. No named brand, reference image or site, or `DESIGN.md`: take the look from its references, never improvise one. The UI is done only after the `visual-qa` skill passes on the real rendered surface. |
 
 3. Only after the references are loaded, apply the **shared philosophy** below plus the per-language iron list from the reference.
 
