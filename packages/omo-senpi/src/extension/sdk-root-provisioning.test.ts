@@ -7,7 +7,7 @@ import { composeOmoSenpiExtension } from "./compose"
 import { FakeExtensionAPI } from "../../test-support/fake-extension-api"
 
 test("#given extension activation #when a component registers #then every SDK root is already published", async () => {
-  const keys = ["OMO_DAG_SDK_ROOT", "OMO_AGENT_TOOLKIT_SDK_ROOT", "OMO_BUNSHIN_TS_SDK_ROOT"]
+  const keys = ["OMO_DAG_SDK_ROOT", "OMO_AGENT_TOOLKIT_SDK_ROOT", "OMO_BUNSHIN_TS_SDK_ROOT", "OMO_SDK_ROOT"]
   const saved = keys.map((key) => process.env[key])
   try {
     for (const key of keys) delete process.env[key]
