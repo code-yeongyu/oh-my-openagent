@@ -17,7 +17,7 @@ import { withinMs } from "./kibitzer/sidecar.test-support"
 import { MEMORY_NOTICE_CUSTOM_TYPE, MEMORY_PRESSURE_METADATA_TOKEN } from "./prompt"
 import { RECALL_CUSTOM_TYPE } from "./recall-wiring"
 import { SESSION_SHUTDOWN_DRAIN_BUDGET_MS } from "./shutdown-drain"
-import { createMemoryWiring } from "./wiring"
+import { createMemoryWiring, type MemorySessionStateLike } from "./wiring"
 import { composeOmoSenpiExtension } from "../../extension/compose"
 import type { SenpiModelPort } from "@oh-my-opencode/senpi-task"
 import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
@@ -271,6 +271,71 @@ describe("memory footer wiring", () => {
     expect(statusCalls).toHaveLength(1)
     expectRelativeStatus(statusCalls[0], fixture.identity)
     await pi.dispatch("session_shutdown", { type: "session_shutdown" }, toolContext)
+  })
+
+  // #13695: a host that exits once the bounded shutdown handler returns must still have received the clear,
+  // so it is sent before the drain, which can spend its whole budget on work that never settles. Work that
+  // settles during the drain must not repaint the footer after that clear.
+  test("#given a memory write whose footer refresh is still running #when the session shuts down #then the footer is cleared before the drain, nothing repaints it, and the drain still runs to its deadline", async () => {
+    // given: the write's footer refresh publishes only once released, then keeps the write pending.
+    const fixture = await createFixture()
+    const pi = new MemoryFakeExtensionAPI()
+    const ctx = componentContext()
+    const refreshEntered = Promise.withResolvers<void>()
+    const publishGate = Promise.withResolvers<void>()
+    const published = Promise.withResolvers<boolean>()
+    const holdGate = Promise.withResolvers<MemoryStatusResult>()
+    let shutdownSettled = false
+    createMemoryComponent({
+      env: fixture.env,
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      refreshStatus: async (input) => {
+        refreshEntered.resolve()
+        await publishGate.promise
+        input.ui.setStatus(MEMORY_STATUS_KEY, `mem:${input.context.identity} 1m ago`)
+        published.resolve(shutdownSettled)
+        return await holdGate.promise
+      },
+      resolveCwd: () => fixture.cwd,
+    }).register(pi, ctx)
+    const drainBudgetSteps = (): unknown[] =>
+      ctx.logs
+        .filter((log) => log.message === "memory shutdown drain hit its budget")
+        .map((log) => (log.details as { step?: string } | undefined)?.step)
+    const statusCalls: Array<{ key: string; text: string | undefined }> = []
+    const cleared = Promise.withResolvers<unknown[]>()
+    const eventCtx = {
+      ...(sessionContext(fixture.sessionId) as Record<string, unknown>),
+      ui: {
+        notify: () => {},
+        setStatus: (key: string, text: string | undefined) => {
+          statusCalls.push({ key, text })
+          if (key !== MEMORY_STATUS_KEY || text !== undefined) return
+          cleared.resolve(drainBudgetSteps())
+          publishGate.resolve()
+        },
+      },
+    }
+    await pi.dispatch("session_start", { type: "session_start" }, sessionContext(fixture.sessionId))
+    const toolResult = pi.dispatch("tool_result", memoryResult("memory"), eventCtx)
+    await withinMs(refreshEntered.promise, "the footer refresh", remainingTestTime())
+
+    // when
+    const shutdown = pi.dispatch("session_shutdown", { type: "session_shutdown" }, eventCtx).then(() => {
+      shutdownSettled = true
+    })
+    const budgetSpentAtClear = await withinMs(cleared.promise, "the footer clear", remainingTestTime())
+    const shutdownSettledAtPublish = await withinMs(published.promise, "the late footer refresh", remainingTestTime())
+    await withinMs(shutdown, "the bounded session shutdown", remainingTestTime())
+
+    // then
+    expect(budgetSpentAtClear).toEqual([])
+    expect(shutdownSettledAtPublish).toBe(false)
+    expect(statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: undefined }])
+    // The drain still waited on the in-flight write and gave up only at the deadline it was handed.
+    expect(drainBudgetSteps()).toContain("memory-work-settle")
+    holdGate.resolve({ notified: false, footerShown: false })
+    await withinMs(toolResult, "the released memory write", remainingTestTime())
   })
 })
 
@@ -988,4 +1053,62 @@ describe("memory footer live wiring", () => {
     harness.advanceFrames(10)
     expect(harness.statusCalls).toHaveLength(afterShutdown)
   })
+
+  // #13695: the open-session case proves the settle refresh does repaint after a clear, so the closing case's
+  // silence comes from the shutting-down flag, not from a refresh that had nothing to publish.
+  for (const shuttingDown of [false, true] as const) {
+    test(`#given a settle refresh still running when the footer is cleared #when the session ${shuttingDown ? "is marked shutting down" : "stays open"} #then the refresh ${shuttingDown ? "repaints nothing" : "repaints the footer"}`, async () => {
+      // given: a committed memory repo, and a sync status read the test holds, so the refresh is running at the clear.
+      const fixture = await createFixture()
+      await new GitMemoryRepo({ dir: fixture.context.identityPaths.repo, agentId: fixture.identity }).init({
+        seedFiles: [{ relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\npersona\n" }],
+      })
+      const readEntered = Promise.withResolvers<void>()
+      const readGate = Promise.withResolvers<void>()
+      let held = false
+      const state: MemorySessionStateLike = { context: fixture.context }
+      const wiring = createMemoryWiring({
+        sessions: new Map([[fixture.sessionId, state]]),
+        loadConfig: () => loadedMemoryConfig(memorySettings()),
+        cwd: () => fixture.cwd,
+        env: fixture.env,
+        createRuntime: () => ({ reconcile: async () => {} }) as unknown as MemoryIdentityRuntime,
+        syncStatus: async () => {
+          if (!held) {
+            held = true
+            readEntered.resolve()
+            await readGate.promise
+          }
+          return null
+        },
+      })
+      const pi = new MemoryFakeExtensionAPI()
+      wiring.registerStatic(pi, componentContext())
+      const statusCalls: Array<{ key: string; text: string | undefined }> = []
+      const eventCtx = sessionContext(fixture.sessionId, statusCalls)
+      await pi.dispatch("agent_settled", {}, eventCtx)
+      await withinMs(readEntered.promise, "the settle refresh", remainingTestTime())
+
+      // when
+      if (shuttingDown) state.shuttingDown = true
+      wiring.clearStatus(eventCtx)
+      readGate.resolve()
+      // The drain waits for the refresh (status-settle) before it disposes the footer.
+      await wiring.onSessionShutdown({
+        reason: "quit",
+        sessionId: fixture.sessionId,
+        deadlineAt: Date.now() + remainingTestTime(),
+        now: () => Date.now(),
+      })
+
+      // then
+      expect(statusCalls[0]).toEqual({ key: MEMORY_STATUS_KEY, text: undefined })
+      if (shuttingDown) {
+        expect(statusCalls).toHaveLength(1)
+      } else {
+        expect(statusCalls).toHaveLength(2)
+        expectRelativeStatus(statusCalls[1], fixture.identity)
+      }
+    })
+  }
 })
