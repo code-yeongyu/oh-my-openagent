@@ -3,7 +3,13 @@ import type { ResolvedErrorStreakSettings } from "@oh-my-opencode/omo-config-cor
 import { PAIR_BUCKET_REFILL_MS } from "../gateway/constants"
 import type { ThreadToolResult } from "../contracts"
 import type { ThreadSendAs } from "../tools"
-import { createErrorStreakDetector, runEndOf, type AgentEndFacts, type ErrorStreakEvent, type RunEnd } from "./error-streak"
+import {
+  createErrorStreakDetector,
+  runEndOf,
+  type AgentEndFacts,
+  type ErrorStreakEvent,
+  type RunEnd,
+} from "./error-streak"
 
 const ALERT_REQUEST_TIMEOUT_MS = 10_000
 const ALERT_WEBHOOK_RETRY_DELAY_MS = 2_000
