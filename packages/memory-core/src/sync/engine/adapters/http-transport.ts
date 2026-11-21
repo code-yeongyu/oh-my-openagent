@@ -22,6 +22,9 @@ import type {
 export const b64urlOfHex = (hex: string): string => Buffer.from(hex, "hex").toString("base64url")
 export const hexOfB64url = (b64url: string): string => Buffer.from(b64url, "base64url").toString("hex")
 
+/** omo-service contract SYNC_INLINE_BATCH_MAX_BYTES (#1315). */
+const INLINE_BATCH_MAX_BYTES = 262_144
+
 export class SyncHttpError extends Error {
   override readonly name = "SyncHttpError"
   constructor(
@@ -69,6 +72,7 @@ interface WireRow {
 
 interface WireState {
   readonly head: { readonly seq: number }
+  readonly accepts_inline_batches?: boolean
   readonly oldest_retained_seq: number
   readonly snapshot: { readonly covers_seq: number; readonly chunk_object_ids: readonly string[] } | null
 }
@@ -100,8 +104,13 @@ export function createHttpTransport(options: HttpTransportOptions): Transport {
     )
     throw new SyncHttpError(response.status >= 500 ? "unavailable" : code, response.status, response.status >= 500)
   }
-  const readState = async (): Promise<WireState> =>
-    (await request("GET", "/v1/sync/state")).json() as Promise<WireState>
+  // The service's answer on the latest state read: whether an append may carry its object inline (omo-service #1315).
+  let inlineAccepted = false
+  const readState = async (): Promise<WireState> => {
+    const state = (await (await request("GET", "/v1/sync/state")).json()) as WireState
+    inlineAccepted = state.accepts_inline_batches === true
+    return state
+  }
   const entryOf = (row: WireRow): PulledEntry => ({
     seq: row.seq,
     kind: row.kind,
@@ -111,6 +120,35 @@ export function createHttpTransport(options: HttpTransportOptions): Transport {
     author: `${row.author.kind}:${row.author.id}`,
   })
   let oldestRetained: number | null = null
+  const reserve = async (size: number, digest: string): Promise<string> => {
+    const body = JSON.stringify({ kind: "batch", bytes: size, sha256: b64urlOfHex(digest) })
+    return ((await (await request("POST", "/v1/sync/uploads", body)).json()) as { upload_id: string }).upload_id
+  }
+  const upload = async (uploadId: string, bytes: Uint8Array): Promise<void> => {
+    await request("PUT", `/v1/sync/uploads/${uploadId}`, bytes, false)
+  }
+  const post = async (req: AppendRequest): Promise<AppendResult> => {
+    const body = JSON.stringify({
+      ...(req.inline === undefined
+        ? { upload_id: req.uploadId }
+        : { inline: Buffer.from(req.inline).toString("base64url") }),
+      digest: b64urlOfHex(req.digest),
+      base_seq: req.baseSeq,
+      idempotency_key: req.batchId,
+      epoch: req.epoch,
+      link: req.link,
+      record_sig: req.recordSig,
+    })
+    try {
+      return {
+        ok: true,
+        seq: ((await (await request("POST", "/v1/sync/batches", body)).json()) as { seq: number }).seq,
+      }
+    } catch (error) {
+      if (!(error instanceof SyncHttpError && error.code === "stale_base")) throw error
+      return { ok: false, error: "stale_base", head: (await readState()).head.seq }
+    }
+  }
   const page = async (from: number): Promise<readonly WireRow[]> =>
     ((await (await request("GET", `/v1/sync/batches?after=${from}`)).json()) as { entries: readonly WireRow[] }).entries
   return {
@@ -139,31 +177,23 @@ export function createHttpTransport(options: HttpTransportOptions): Transport {
     async download(objectId) {
       return new Uint8Array(await (await request("GET", `/v1/sync/objects/${objectId}`)).arrayBuffer())
     },
-    async reserve(size, digest) {
-      const body = JSON.stringify({ kind: "batch", bytes: size, sha256: b64urlOfHex(digest) })
-      return ((await (await request("POST", "/v1/sync/uploads", body)).json()) as { upload_id: string }).upload_id
-    },
-    async upload(uploadId, bytes) {
-      await request("PUT", `/v1/sync/uploads/${uploadId}`, bytes, false)
-    },
+    reserve,
+    upload,
+    inlineBytes: () => (inlineAccepted ? INLINE_BATCH_MAX_BYTES : 0),
     async append(req: AppendRequest): Promise<AppendResult> {
-      const body = JSON.stringify({
-        upload_id: req.uploadId,
-        digest: b64urlOfHex(req.digest),
-        base_seq: req.baseSeq,
-        idempotency_key: req.batchId,
-        epoch: req.epoch,
-        link: req.link,
-        record_sig: req.recordSig,
-      })
+      if (req.inline === undefined) return post(req)
       try {
-        return {
-          ok: true,
-          seq: ((await (await request("POST", "/v1/sync/batches", body)).json()) as { seq: number }).seq,
-        }
+        return await post(req)
       } catch (error) {
-        if (!(error instanceof SyncHttpError && error.code === "stale_base")) throw error
-        return { ok: false, error: "stale_base", head: (await readState()).head.seq }
+        // A service that stopped taking inline batches (a rollback) refuses the inline body invalid_request: the same
+        // batch goes through the upload form once, and later pushes use it until a state read says otherwise
+        // (#14496 review M1). Any other refusal of the upload form stands as before.
+        if (!(error instanceof SyncHttpError && error.code === "invalid_request")) throw error
+        inlineAccepted = false
+        const { inline, ...rest } = req
+        const uploadId = await reserve(inline.byteLength, req.digest)
+        await upload(uploadId, inline)
+        return post({ ...rest, uploadId })
       }
     },
     subscribe(handlers: StreamHandlers) {
@@ -175,7 +205,16 @@ export function createHttpTransport(options: HttpTransportOptions): Transport {
           fetch: doFetch,
           ...(options.floorRetryMs === undefined ? {} : { floorRetryMs: options.floorRetryMs }),
         },
-        handlers,
+        {
+          ...handlers,
+          // The announced-head pull skips the state read, so a service that began - or stopped - taking inline batches
+          // after this client's last state read is noticed on the next stream connect instead of never (#14476,
+          // #14496 review M1). A failed re-read keeps the previous answer; the next connect or full pull reads again.
+          onConnected: (up, cause) => {
+            if (up) void readState().catch(() => undefined)
+            handlers.onConnected(up, cause)
+          },
+        },
         abort.signal,
       )
       return () => abort.abort()
