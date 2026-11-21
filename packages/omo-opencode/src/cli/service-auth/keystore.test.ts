@@ -112,6 +112,10 @@ describe("Linux with no Secret Service keeps the shared sign-in in a private sta
   const api = "https://api.omo.dev"
   const record = { ...grant, ...privateKeys }
   const stateFile = (home: string) => join(home, ".omo", "account-state", `omo-cli-${credentialId(api)}.json`)
+  // `platform: "linux"` picks the store family, but the state file itself is real: it proves it is private with the
+  // host's POSIX owner uid and mode bits, which a Windows host does not have (its own suite in state-file-store.test.ts
+  // is gated the same way). Cases that never touch the file still run on every host.
+  const stateFileTest = test.skipIf(process.platform === "win32")
   const missing = async (path: string) => (await lstat(path).catch(() => null)) === null
   const watched = (secrets: SecretApi = memorySecrets().api) => {
     const calls: string[] = []
@@ -142,7 +146,7 @@ describe("Linux with no Secret Service keeps the shared sign-in in a private sta
       },
     })
 
-  test("#given no Secret Service on the bus #then the sign-in round-trips through a 0600 file and libsecret is never called", async () => {
+  stateFileTest("#given no Secret Service on the bus #then the sign-in round-trips through a 0600 file and libsecret is never called", async () => {
     const home = await temporaryHome()
     const secrets = watched()
     const notices: string[] = []
@@ -160,7 +164,7 @@ describe("Linux with no Secret Service keeps the shared sign-in in a private sta
     expect(await store.read()).toBeNull()
   })
 
-  test("#given no Bun.secrets on Linux #then the state file is the store", async () => {
+  stateFileTest("#given no Bun.secrets on Linux #then the state file is the store", async () => {
     const home = await temporaryHome()
     const store = linuxStore(home, null, "unknown")
     await store.write(record)
@@ -208,7 +212,7 @@ describe("Linux with no Secret Service keeps the shared sign-in in a private sta
     expect(await missing(join(home, ".omo", "account-state"))).toBe(true)
   })
 
-  test("#given a state file and now an unlocked keyring #then the sign-in moves to libsecret, is read back, then the file goes", async () => {
+  stateFileTest("#given a state file and now an unlocked keyring #then the sign-in moves to libsecret, is read back, then the file goes", async () => {
     const home = await temporaryHome()
     await linuxStore(home, null, "absent").write(record)
     const written = await readFile(stateFile(home), "utf8")
@@ -220,7 +224,7 @@ describe("Linux with no Secret Service keeps the shared sign-in in a private sta
     expect(await missing(stateFile(home))).toBe(true)
   })
 
-  test("#given a state file and a keyring write that fails #then the file is kept", async () => {
+  stateFileTest("#given a state file and a keyring write that fails #then the file is kept", async () => {
     const home = await temporaryHome()
     await linuxStore(home, null, "absent").write(record)
     const written = await readFile(stateFile(home), "utf8")
@@ -235,7 +239,7 @@ describe("Linux with no Secret Service keeps the shared sign-in in a private sta
     expect(await readFile(stateFile(home), "utf8")).toBe(written)
   })
 
-  test("#given a state file and a keyring read-back that differs #then the file is kept", async () => {
+  stateFileTest("#given a state file and a keyring read-back that differs #then the file is kept", async () => {
     const home = await temporaryHome()
     await linuxStore(home, null, "absent").write(record)
     const written = await readFile(stateFile(home), "utf8")
@@ -251,7 +255,7 @@ describe("Linux with no Secret Service keeps the shared sign-in in a private sta
     expect(await readFile(stateFile(home), "utf8")).toBe(written)
   })
 
-  test("#given a probe that cannot answer #then an existing state file stays in use, and with none libsecret is used", async () => {
+  stateFileTest("#given a probe that cannot answer #then an existing state file stays in use, and with none libsecret is used", async () => {
     const home = await temporaryHome()
     await linuxStore(home, null, "absent").write(record)
     const secrets = watched()
@@ -267,7 +271,7 @@ describe("Linux with no Secret Service keeps the shared sign-in in a private sta
     expect(await missing(stateFile(home))).toBe(true)
   })
 
-  test("#when forgotten with both a state file and a keyring item #then both are removed", async () => {
+  stateFileTest("#when forgotten with both a state file and a keyring item #then both are removed", async () => {
     const home = await temporaryHome()
     await linuxStore(home, null, "absent").write(record)
     const memory = memorySecrets()
@@ -289,7 +293,7 @@ describe("Linux with no Secret Service keeps the shared sign-in in a private sta
   const keyringValue = (memory: ReturnType<typeof memorySecrets>) =>
     JSON.parse([...memory.values.values()][0] ?? "null")
 
-  test("#given the keyring holds sign-in A and the file holds B #when the keyring answers #then A stays, the file is kept, one line says so", async () => {
+  stateFileTest("#given the keyring holds sign-in A and the file holds B #when the keyring answers #then A stays, the file is kept, one line says so", async () => {
     const home = await temporaryHome()
     await linuxStore(home, null, "absent").write(otherRecord)
     const written = await readFile(stateFile(home), "utf8")
@@ -306,7 +310,7 @@ describe("Linux with no Secret Service keeps the shared sign-in in a private sta
     expect(notices.join("\n")).not.toContain(otherRecord.refreshToken)
   })
 
-  test("#given the same sign-in in both #then only a file at least as fresh as the keyring moves over it", async () => {
+  stateFileTest("#given the same sign-in in both #then only a file at least as fresh as the keyring moves over it", async () => {
     for (const [keyringExpiry, moves] of [
       ["2098-01-01T00:00:00.000Z", true],
       ["2099-01-01T00:00:00.000Z", true],
@@ -335,7 +339,7 @@ describe("Linux with no Secret Service keeps the shared sign-in in a private sta
     }
   })
 
-  test("#given the keyring holds A and the file holds B #when signed out #then only the sign-in in use goes", async () => {
+  stateFileTest("#given the keyring holds A and the file holds B #when signed out #then only the sign-in in use goes", async () => {
     const home = await temporaryHome()
     await linuxStore(home, null, "absent").write(otherRecord)
     const memory = memorySecrets()
