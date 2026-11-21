@@ -5,8 +5,8 @@ A chart exists to answer a question at a glance. A chart shown inline beside a r
 an image ignores the reader's theme and width. When the `visualize` skill is available, it builds
 that page. There this file's chart-type table, Figures and Quality bar apply, and the matplotlib
 calls do not. Everywhere else (a kernel, a file, a document) render it with matplotlib (resident
-in most Python kernels; `uv run --with matplotlib` otherwise). Either way, look at it before delivering —
-a chart nobody inspected is not evidence.
+in most Python kernels; `uv run --with matplotlib` otherwise). Either way, look at it before
+delivering — a chart nobody inspected is not evidence.
 
 ## When to chart
 
@@ -34,6 +34,8 @@ question — decoration dilutes the answer.
 - **Cross-check one figure.** Recompute a headline number from a second source (another
   table, the system's own dashboard, a raw count) and say beside the chart whether it
   matched, and by how much it differed if not.
+- **Totals add up.** A total equals the sum of the parts shown with it, and a ratio states its
+  numerator and denominator in the same unit. Check both before showing the chart.
 
 ## Quality bar — every chart
 
@@ -48,6 +50,8 @@ question — decoration dilutes the answer.
   series: gray the context, color only the series that answers the question.
 - The default color cycle is fine; avoid rainbow palettes and 3D. Sort categorical bars by
   value, never alphabetically.
+- A component under about 5% of the whole is not readable as a band of a stacked bar. Show it
+  as its own ratio line, or use a 100% bar with that component labelled.
 
 ## CJK and other non-Latin text
 
@@ -68,7 +72,7 @@ matplotlib.rcParams["axes.unicode_minus"] = False   # keeps the minus sign rende
    both themes, following the `visualize` skill when it is available.
 2. Otherwise save a PNG next to the work: `plt.savefig(path, dpi=150, bbox_inches="tight")`,
    and also render it inline when the surface displays rich output (kernels usually do).
-3. Report the file path together with the answer.
+3. With a PNG (case 2), report its file path together with the answer.
 
 ## Visual QA — mandatory
 
