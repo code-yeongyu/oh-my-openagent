@@ -838,13 +838,13 @@
     "typescript/no-non-null-assertion": 1
   },
   "packages/omo-opencode/src/hooks/claude-code-hooks/handlers/session-event-handler-retry.test.ts": {
-    "omo-testing/no-module-mock": 3
+    "omo-testing/no-module-mock": 2
   },
   "packages/omo-opencode/src/hooks/claude-code-hooks/handlers/tool-execute-after-handler.test.ts": {
-    "omo-testing/no-module-mock": 4
+    "omo-testing/no-module-mock": 3
   },
   "packages/omo-opencode/src/hooks/claude-code-hooks/handlers/tool-execute-before-handler.test.ts": {
-    "omo-testing/no-module-mock": 4
+    "omo-testing/no-module-mock": 3
   },
   "packages/omo-opencode/src/hooks/comment-checker/__fixtures__/download-probe.fixture.ts": {
     "omo-testing/no-module-mock": 1
