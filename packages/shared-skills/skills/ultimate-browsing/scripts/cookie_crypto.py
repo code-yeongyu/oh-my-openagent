@@ -23,7 +23,14 @@ def derive_key(platform: str, secret: bytes) -> bytes:
     raise UnsupportedPlatform(f"unsupported platform for key derivation: {platform!r}")
 
 
-def decrypt_chromium_value(platform: str, key: bytes, encrypted: bytes) -> str:
+def _decode_value(raw: bytes) -> str | bytes:
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return raw
+
+
+def decrypt_chromium_value(platform: str, key: bytes, encrypted: bytes) -> str | bytes:
     if not encrypted:
         return ""
     prefix = encrypted[:3]
@@ -32,7 +39,8 @@ def decrypt_chromium_value(platform: str, key: bytes, encrypted: bytes) -> str:
 
         nonce, ciphertext, tag = encrypted[3:15], encrypted[15:-16], encrypted[-16:]
         decryptor = Cipher(algorithms.AES(key), modes.GCM(nonce, tag)).decryptor()
-        return (decryptor.update(ciphertext) + decryptor.finalize()).decode("utf-8", errors="replace")
+        raw = decryptor.update(ciphertext) + decryptor.finalize()
+        return _decode_value(raw)
     if prefix in (b"v10", b"v11"):
         from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
@@ -41,8 +49,8 @@ def decrypt_chromium_value(platform: str, key: bytes, encrypted: bytes) -> str:
         pad = decrypted[-1]
         if isinstance(pad, int) and 1 <= pad <= 16:
             decrypted = decrypted[:-pad]
-        return decrypted.decode("utf-8", errors="replace")
-    return encrypted.decode("utf-8", errors="replace")
+        return _decode_value(decrypted)
+    return _decode_value(encrypted)
 
 
 def macos_keyring_secret(safe_storage: str) -> bytes:
@@ -70,6 +78,12 @@ def linux_keyring_secret(safe_storage: str) -> bytes:
 def windows_oscrypt_key(local_state_path: Path) -> bytes:
     state = json.loads(local_state_path.read_text())
     blob = base64.b64decode(state["os_crypt"]["encrypted_key"])[5:]
-    import win32crypt
+    try:
+        import win32crypt
+    except ImportError as e:
+        raise ImportError(
+            "win32crypt (pywin32) is required to decrypt Windows Chromium cookies: "
+            "install it with 'pip install pywin32'"
+        ) from e
 
     return win32crypt.CryptUnprotectData(blob, None, None, None, 0)[1]
