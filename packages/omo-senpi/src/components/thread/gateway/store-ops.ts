@@ -22,6 +22,7 @@ import {
   PAIR_BUCKET_BURST,
   PAIR_BUCKET_REFILL_MS,
   QUEUED_TTL_MS,
+  RETENTION_SWEEP_BATCH,
   ROOT_LIFETIME_MS,
   SESSION_CONTROL_DELIVERY_TYPE,
   SESSION_RELEASED_ENTRY_TYPE,
@@ -640,6 +641,7 @@ export async function enqueue(
   if (!DURABLE_ID_PATTERN.test(request.target_durable_id) || !DURABLE_ID_PATTERN.test(request.delivery_id)) {
     return refused("invalid_arguments", "The target session id is not a durable session id.")
   }
+  const deadClaims = await expiredDeadClaims(ctx, request.target_durable_id, request.now)
   if (!(await beginImmediate(ctx, "enqueue", false))) return { kind: "busy" }
   let marker: string | null = null
   let committed = false
@@ -671,17 +673,16 @@ export async function enqueue(
       rollbackQuietly(ctx)
       return binding
     }
-    const backlog = ctx.sql.one(
-      ["n", "b"],
-      `SELECT COUNT(*) AS n, COALESCE(SUM(bytes), 0) AS b FROM deliveries WHERE target_durable_id = ? AND state IN ${OPEN_STATES}`,
-      [request.target_durable_id],
-    )
+    const expired = refuseExpiredQueued(ctx, request.now, RETENTION_SWEEP_BATCH, request.target_durable_id)
+    const backlog = targetBacklog(ctx, request.target_durable_id, request.now, deadClaims)
     const bytes = Buffer.byteLength(request.body)
-    if (Number(backlog?.n ?? 0) >= TARGET_MAX_MESSAGES || Number(backlog?.b ?? 0) + bytes > TARGET_MAX_BYTES) {
+    if (backlog.messages >= TARGET_MAX_MESSAGES || backlog.bytes + bytes > TARGET_MAX_BYTES) {
       rollbackQuietly(ctx)
       return refused("queue_full", "The target's delivery backlog is full.", {
         max_messages: TARGET_MAX_MESSAGES,
         max_bytes: TARGET_MAX_BYTES,
+        target_running: request.endpoint_kind !== null,
+        frees_at: backlog.frees_at,
       })
     }
     const placement = placeCausally(ctx, request)
@@ -767,6 +768,7 @@ export async function enqueue(
     if (ctx.afterCommit === undefined) await ctx.hook("beforeDbCommit")
     ctx.sql.exec(commitSql)
     committed = true
+    for (const gone of expired) unlinkMarker(ctx, gone.target_durable_id, gone.delivery_id)
     if (ctx.afterCommit === undefined) await ctx.hook("afterDbCommit")
     return { kind: "inserted", row, queue_position: position }
   } catch (error) {
@@ -854,6 +856,87 @@ function sessionHasToken(sessionPath: string | null, deliveryId: string, cache: 
       return true
   }
   return false
+}
+
+/**
+ * Rows of `target` past their TTL that a runtime took and then died holding. No process can still write them, so they
+ * do not count against the target's backlog; the target's own `reconcile` settles each one (applied or expired) when it
+ * runs again. Read before the write lock because judging a claimant may run `ps`; the claim fingerprint lets the
+ * count notice a row reclaimed in between.
+ */
+async function expiredDeadClaims(ctx: StoreContext, target: string, now: number): Promise<ReadonlyMap<string, string>> {
+  const found = new Map<string, string>()
+  const dead = new Map<string, boolean>()
+  for (const row of selectRows(
+    ctx,
+    "target_durable_id = ? AND state IN ('admitting', 'admitted') AND admitted_by IS NOT NULL AND expires_at <= ?",
+    [target, now],
+  )) {
+    if (row.admitted_by === null) continue
+    const key = JSON.stringify(row.admitted_by)
+    let verdict = dead.get(key)
+    if (verdict === undefined) {
+      verdict = await isClaimantDead(row.admitted_by)
+      dead.set(key, verdict)
+    }
+    if (verdict) found.set(row.delivery_id, claimFingerprint(row))
+  }
+  return found
+}
+
+/** What still counts against a target's cap, and when its oldest queued row expires and frees a slot without the target. */
+function targetBacklog(
+  ctx: StoreContext,
+  target: string,
+  now: number,
+  deadClaims: ReadonlyMap<string, string>,
+): { readonly messages: number; readonly bytes: number; readonly frees_at: number | null } {
+  // An expired intake row stays queued for the target's reconcile (`refuseExpiredQueued` skips it) but no longer counts.
+  const counted = `NOT (state = 'queued' AND ledger_id IS NOT NULL AND expires_at <= ?)`
+  const open = ctx.sql.one(
+    ["n", "b", "f"],
+    `SELECT COUNT(*) AS n, COALESCE(SUM(bytes), 0) AS b, MIN(CASE WHEN state = 'queued' THEN expires_at END) AS f
+     FROM deliveries WHERE target_durable_id = ? AND state IN ${OPEN_STATES} AND ${counted}`,
+    [target, now],
+  )
+  let messages = Number(open?.n ?? 0)
+  let bytes = Number(open?.b ?? 0)
+  if (deadClaims.size > 0) {
+    for (const row of selectRows(ctx, "target_durable_id = ? AND state IN ('admitting', 'admitted')", [target])) {
+      if (deadClaims.get(row.delivery_id) !== claimFingerprint(row)) continue
+      messages--
+      bytes -= row.bytes
+    }
+  }
+  return { messages, bytes, frees_at: open?.f === null || open?.f === undefined ? null : Number(open.f) }
+}
+
+/**
+ * Settles queued rows past their TTL as `refused`/`expired` without the target's drain, at most `limit` of them (of
+ * `target` only when given). An intake row (`ledger_id` set) is left to the target's `reconcile`, which first checks
+ * whether the same delivery already reached the transcript live and then settles it `applied`. Answers what it refused;
+ * the caller unlinks their inbox markers once its transaction commits, so a rolled-back call leaves every marker in place.
+ */
+export function refuseExpiredQueued(
+  ctx: StoreContext,
+  now: number,
+  limit: number,
+  target?: string,
+): { readonly delivery_id: string; readonly target_durable_id: string }[] {
+  const rows = ctx.sql
+    .all(
+      ["delivery_id", "target_durable_id"],
+      `SELECT delivery_id, target_durable_id FROM deliveries WHERE state = 'queued' AND ledger_id IS NULL AND expires_at <= ?${target === undefined ? "" : " AND target_durable_id = ?"} LIMIT ?`,
+      target === undefined ? [now, limit] : [now, target, limit],
+    )
+    .map((row) => ({ delivery_id: String(row.delivery_id), target_durable_id: String(row.target_durable_id) }))
+  for (const row of rows)
+    write(
+      ctx,
+      "UPDATE deliveries SET state = 'refused', reason = 'expired', updated_at = ? WHERE delivery_id = ? AND state = 'queued'",
+      [now, row.delivery_id],
+    )
+  return rows
 }
 
 function claimFingerprint(row: DeliveryRow): string {
