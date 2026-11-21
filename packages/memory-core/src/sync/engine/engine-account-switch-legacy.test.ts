@@ -106,22 +106,51 @@ async function legacyJournal(
   }
 }
 
-test("#given the owner's legacy journal last applied a snapshot the server still states #when it signs in #then it is adopted and its unsent edit reaches the owner", async () => {
+test("#given a legacy journal that last applied a snapshot #when the device signs in with the service reachable #then it stays undecided: nothing adopted, set aside or uploaded", async () => {
   const serverA = new FakeSyncServer()
   const d = await legacyDeviceOnA(serverA)
   const head = serverA.head
   serverA.compact(head, new TextEncoder().encode(`snapshot through ${head}`))
-  const digest = serverA.snapshot?.digest ?? ""
   const dir = join(d.repo.root, ".git", "omo-sync")
-  await writeFile(join(dir, "applied.json"), JSON.stringify({ [`snapshot:${head}`]: { seq: head, digest } }))
+  await writeFile(
+    join(dir, "applied.json"),
+    JSON.stringify({ [`snapshot:${head}`]: { seq: head, digest: serverA.snapshot?.digest ?? "" } }),
+  )
   await d.write("unsent.md", note("edited before the upgrade, never pushed\n"))
 
   await d.restart(undefined, undefined, { server: serverA, account: "acc_a" })
+  await expect(d.engine.runCycle()).rejects.toMatchObject({ name: "OwnershipUndecidedError" })
+
+  expect(await d.engine.status()).toMatchObject({ kind: "failing", failure: { kind: "ownership_undecided" } })
+  expect(serverA.head).toBe(head)
+  expect(await d.read("one.md")).toBe(note("one on a\n"))
+  expect(await d.read("unsent.md")).toBe(note("edited before the upgrade, never pushed\n"))
+  expect((await readdir(join(d.repo.root, ".git"))).filter((name) => name.startsWith("omo-sync.account-"))).toEqual([])
+  expect(JSON.parse(await readFile(join(dir, "state.json"), "utf8"))).not.toHaveProperty("account")
+})
+
+test("#given a legacy journal that knows a seq only as a snapshot #when the signed-in account's server still keeps that row #then the journal is another account's: set aside, nothing uploaded", async () => {
+  const serverA = new FakeSyncServer()
+  const serverB = new FakeSyncServer()
+  const d = await legacyDeviceOnA(serverA)
+  const other = await makeDevice(serverB, "e", undefined, { realStore: true, account: "acc_b" })
+  devices.push(other)
+  for (const name of ["b1", "b2"]) {
+    await other.write(`${name}.md`, note(`${name} on b\n`))
+    await other.engine.runCycle()
+  }
+  const headB = serverB.head
+  const dir = join(d.repo.root, ".git", "omo-sync")
+  const { applied } = JSON.parse(await readFile(join(dir, "state.json"), "utf8")) as { applied: number }
+  expect(headB).toBeGreaterThanOrEqual(applied)
+  await writeFile(join(dir, "applied.json"), JSON.stringify({ [`snapshot:${applied}`]: { seq: applied, digest: "" } }))
+
+  await d.restart(undefined, undefined, { server: serverB, account: "acc_b" })
   await settle(d)
 
-  expect(await d.read("one.md")).toBe(note("one on a\n"))
-  expect(serverA.head).toBe(head + 1)
-  expect((await readdir(join(d.repo.root, ".git"))).filter((name) => name.startsWith("omo-sync.account-"))).toEqual([])
+  expect(serverB.head).toBe(headB)
+  expect(await d.read("one.md")).toBeNull()
+  expect((await readdir(join(d.repo.root, ".git"))).some((name) => name.startsWith("omo-sync.account-"))).toBe(true)
 })
 
 test("#given a legacy journal whose records the server compacted away #when the device signs in #then it stays undecided: nothing adopted, set aside or uploaded", async () => {

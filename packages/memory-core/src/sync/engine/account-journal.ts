@@ -111,11 +111,13 @@ const PROOF_RECORDS = 3
 
 /**
  * Whether a journal that names no account (an older build wrote it) belongs to the signed-in account (review r2 H2):
- * one of its newest applied records must be what that account's server holds at the same seq, a retained row by batch
- * id and digest, or the snapshot the journal applied by its covered seq and a stated digest (review r3 M1). Only a
- * retained row that differs, or a head below the journal's cursor, proves another owner; a record the service no
- * longer keeps proves nothing. A journal that never applied or queued anything holds no account's content. The pulls
- * run outside the writer lock (sync-design §5); a pull that fails proves nothing either way.
+ * one of its newest applied records must be the row that account's server still keeps at the same seq, by batch id and
+ * digest. A retained row that differs, or a head below the journal's cursor, proves another owner; so does a retained
+ * row at a seq the journal only knows as a snapshot, because an account's history is never un-trimmed (review r4 L3).
+ * A snapshot record proves nothing else: the service states no snapshot digest and older builds recorded none (review
+ * r4 L2), and a record the service no longer keeps proves nothing either. A journal that never applied or queued
+ * anything holds no account's content. The pulls run outside the writer lock (sync-design §5); a pull that fails
+ * proves nothing either way.
  */
 async function ownership(deps: EngineDeps, dir: string, queued: boolean): Promise<Ownership> {
   const { applied } = await readJson<{ readonly applied: number }>(join(dir, "state.json"), { applied: 0 })
@@ -136,20 +138,9 @@ async function ownership(deps: EngineDeps, dir: string, queued: boolean): Promis
       throw new OwnershipUnprovenError(error)
     }
     if (page.head < applied) return "other"
-    const snapshot = page.snapshot
-    if (snapshot !== null) {
-      const stated = record.digest !== "" && snapshot.digest !== null
-      if (
-        batchId.startsWith("snapshot:") &&
-        snapshot.coversSeq === record.seq &&
-        stated &&
-        snapshot.digest === record.digest
-      )
-        return "own"
-      continue
-    }
     const entry = page.entries[0]
-    if (entry?.seq !== record.seq || batchId.startsWith("snapshot:")) continue
+    if (page.snapshot !== null || entry?.seq !== record.seq) continue
+    if (batchId.startsWith("snapshot:")) return "other"
     return entry.batchId === batchId && entry.digest === record.digest ? "own" : "other"
   }
   return "undecided"
