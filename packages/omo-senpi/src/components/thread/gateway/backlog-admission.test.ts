@@ -97,6 +97,8 @@ async function fillFollowUps(h: GatewayHarness, sender: HarnessSession, count: n
         h.clock.now += 3 * 60_000
       }
     })()
+    // close() leaves the database open while a prepared statement is unfinalized; Windows then cannot delete it.
+    insert.finalize()
   } finally {
     db.close()
   }
