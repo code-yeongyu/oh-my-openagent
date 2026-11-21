@@ -158,6 +158,23 @@ test("#given a worker that is retiring #when the store is disposed #then dispose
   expect(exited).toBe(true)
 })
 
+// Regression (a test timed out on a loaded machine, and its afterEach disposed the store under the call): a dispose that
+// does not wait for the call posts its close between the worker's open and the call's own request, and the call fails
+// with "the gateway store is not open".
+test("#given a call whose worker is still opening #when the store is disposed #then the call answers from the open store, dispose resolves after it, and a later call is refused as disposed", async () => {
+  const h = (harness = createGatewayHarness())
+  const disposal = signal<{ readonly done: Promise<void> }>()
+  let store!: GatewayStore
+  store = h.store({ _test: { onWorkerStarted: () => disposal.fire({ done: store.dispose() }) } })
+
+  const call = store.stats()
+  const { done } = await within(disposal.promise, remainingTestTime(), "the call to start the worker")
+
+  expect(await within(call, remainingTestTime(), "the call to settle")).toMatchObject({ writes: 0 })
+  await within(done, remainingTestTime(), "dispose to resolve")
+  await expect(store.stats()).rejects.toThrow("the gateway store is disposed")
+})
+
 // Reachability: a terminal whose store worker retired while it sat idle still takes a message at once.
 test("#given a target session whose store worker retired #when a peer sends to it #then the message is started and applied", async () => {
   const h = (harness = createGatewayHarness())
