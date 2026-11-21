@@ -1,4 +1,5 @@
-import { afterAll, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
+import * as boulderStateModule from "../../../features/boulder-state"
 import { restoreModuleMocksForTestFile } from "../../../testing/module-mock-lifecycle"
 import type { PreToolUseContext } from "../pre-tool-use"
 
@@ -31,10 +32,6 @@ mock.module("../pre-tool-use", () => ({
   },
 }))
 
-mock.module("../../../features/boulder-state", () => ({
-  getWorkForSession: mockGetWorkForSession,
-}))
-
 afterAll(() => {
   mock.restore()
   restoreModuleMocksForTestFile(import.meta.url)
@@ -43,11 +40,21 @@ afterAll(() => {
 const { createToolExecuteBeforeHandler } = await import("./tool-execute-before-handler")
 
 describe("createToolExecuteBeforeHandler", () => {
+  // A module mock of the re-exporting boulder-state barrel rebinds getWorkForSession for every later importer in the
+  // same process (#13465); a spy restored after each test keeps the stub inside this file.
+  let getWorkForSessionSpy: ReturnType<typeof spyOn> | undefined
+
   beforeEach(() => {
     preToolUseResult = { decision: "allow" }
     preToolUseContexts = []
     mockGetWorkForSession.mockReset()
     mockGetWorkForSession.mockReturnValue(null)
+    getWorkForSessionSpy = spyOn(boulderStateModule, "getWorkForSession").mockImplementation(mockGetWorkForSession)
+  })
+
+  afterEach(() => {
+    getWorkForSessionSpy?.mockRestore()
+    getWorkForSessionSpy = undefined
   })
 
   it("#given Bash has an active tool cwd #when handler runs #then PreToolUse receives that cwd", async () => {
