@@ -43,8 +43,8 @@ await runScenario("tui-to-tui", async ({ report, fake, scratch, install, startTu
     async () => {
       const result = await omo(scratch, install, ["thread", "list", "--json"])
       const rows = Array.isArray(result.json?.threads) ? result.json.threads : []
-      const a = rows.find((row) => row.thread_id === alphaEndpoint.durableId)
-      const b = rows.find((row) => row.thread_id === betaEndpoint.durableId)
+      const a = rows.find((row) => row.thread === alphaEndpoint.durableId)
+      const b = rows.find((row) => row.thread === betaEndpoint.durableId)
       return a?.name === "tui-alpha" && b?.name === "tui-beta" ? rows : undefined
     },
     { label: "omo thread list shows both names", timeoutMs: 30_000 },
@@ -53,15 +53,13 @@ await runScenario("tui-to-tui", async ({ report, fake, scratch, install, startTu
     [row.created_at, row.updated_at].every(
       (stamp) => typeof stamp === "string" && new Date(stamp).getUTCFullYear() > EPOCH_YEAR,
     )
-  const rows = listed.filter(
-    (row) => row.thread_id === alphaEndpoint.durableId || row.thread_id === betaEndpoint.durableId,
-  )
+  const rows = listed.filter((row) => row.thread === alphaEndpoint.durableId || row.thread === betaEndpoint.durableId)
   report.assert(
     "list-both-terminals-named",
     rows.length === 2 && rows.every((row) => row.surface === "tui" && row.endpoint?.kind === "tui" && realTimes(row)),
     JSON.stringify(
       rows.map((row) => ({
-        id: row.thread_id,
+        id: row.thread,
         name: row.name,
         surface: row.surface,
         endpoint: row.endpoint?.kind,

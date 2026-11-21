@@ -15,6 +15,7 @@ import type {
   SnapshotBody,
 } from "./local-api/protocol.ts"
 import { realTimers, type Timers } from "./timers.ts"
+import { UnsettledCommandError } from "./unsettled-command.ts"
 
 /** How an attach ended: a service-reported reason, the connection closing, or this client's own detach. */
 export type AttachEnd = DetachReason | "closed" | "detached" | "listener_failed"
@@ -59,11 +60,11 @@ export type RemoteAttach = {
    * Sends one engine RPC record, unchanged, to the attached session's host on this connection's delegated channel
    * (`session.command {attach, rpc, delegated: true}`) and settles with the first command state that is not a progress
    * state, plus the engine's reply when the host sent one (a host without delegated commands sends none). Rejects with
-   * the local API's refusal, when the connection closes first, or when the attach ended and no final state followed
-   * within ENDED_COMMAND_WAIT_MS: a command that ends its own session (close_session, unload_session) settles with its
-   * state after the attach ends.
+   * the local API's refusal, when the connection closes first, with request_timeout (its command_id kept) when no final
+   * state arrives within `waitMs`, or when the attach ended and no final state followed within ENDED_COMMAND_WAIT_MS: a
+   * command that ends its own session (close_session, unload_session) settles with its state after the attach ends.
    */
-  readonly command: (rpc: CommandRpc, options?: CommandMark) => Promise<CommandResult>
+  readonly command: (rpc: CommandRpc, options?: CommandMark & { readonly waitMs?: number }) => Promise<CommandResult>
   /** The frames the host's engine writes unasked on the delegated channel (dialog requests, session events). */
   readonly onFrame: (listener: (frame: JsonObject) => void) => () => void
   /** A delegated reply or frame that was lost, or the channel closing, with the reason. */
@@ -97,6 +98,10 @@ const attachEvent = (event: LocalEvent): AttachEvent | undefined => {
 // the session stream, the reply rides the channel), and a channel that closes ends the command uncertain itself
 // (docs/local-api.md "Delegated commands"). The bound is the local API's own request timeout.
 const ENDED_COMMAND_WAIT_MS = 30_000
+
+// How long a command on a live attach waits for its final state: the same bound an endpoint command has, since a host
+// sends no state at all for a command it lost. A caller with a shorter budget (a read) passes its own `waitMs`.
+const ATTACH_COMMAND_WAIT_MS = 120_000
 
 // The sender ledger's progress states (local API command_state): every other state ends the command.
 export const PROGRESS_STATES: ReadonlySet<CommandStateEvent["state"]> = new Set([
@@ -225,13 +230,16 @@ export function openAttach(
         failure: () => failure,
         onFrame: (listener) => delegated.onFrame(listener),
         onChannelLoss: (listener) => delegated.onLoss(listener),
-        command: (rpc, options) =>
+        command: (rpc, options = {}) =>
           new Promise<CommandResult>((resolve, reject) => {
             if (ended) return reject(new Error("the attach has ended"))
+            const { waitMs = ATTACH_COMMAND_WAIT_MS, accepts } = options
             // Minted here, before sending, so a state that arrives ahead of the answer is not missed.
             const commandId = randomBytes(16).toString("base64url")
+            let progress: CommandStateEvent["state"] | undefined
             const settle = (): void => {
               stopState()
+              cancelWait()
               commands.delete(end)
               if (ended && commands.size === 0) release()
             }
@@ -241,17 +249,35 @@ export function openAttach(
             }
             const stopState = client.onEvent((event) => {
               if (event.kind !== "session.command_state" || event.command_id !== commandId) return
-              if (PROGRESS_STATES.has(event.state)) return
+              if (PROGRESS_STATES.has(event.state)) {
+                progress = event.state
+                return
+              }
               // Taken before settling: the last command of an ended attach releases the channel that holds the reply.
               const response = delegated.takeReply(commandId)
               settle()
               resolve(response === undefined ? { outcome: event } : { outcome: event, response })
             })
-            commands.add(end)
-            client.commandTo({ attach }, rpc, commandId, { delegated: true }, options).catch((error: unknown) => {
+            // A host that never sends the final state (a relay that dropped it) would hold the caller forever: the
+            // command fails as a session.command that timed out, its id kept because its outcome may still arrive.
+            const cancelWait = timers.after(waitMs, () => {
               settle()
-              reject(error)
+              delegated.forget(commandId)
+              reject(new UnsettledCommandError(commandId, waitMs, progress))
             })
+            commands.add(end)
+            client
+              .commandTo(
+                { attach },
+                rpc,
+                commandId,
+                { delegated: true },
+                accepts === undefined ? undefined : { accepts },
+              )
+              .catch((error: unknown) => {
+                settle()
+                reject(error)
+              })
           }),
         read: (options = {}) =>
           client.read(attach, {

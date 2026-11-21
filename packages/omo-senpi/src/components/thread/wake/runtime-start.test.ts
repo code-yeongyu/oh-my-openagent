@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { AsyncLocalStorage, AsyncResource } from "node:async_hooks"
-import { mkdtempSync } from "node:fs"
+import { mkdtempSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { createFakeDeliveryService } from "../consumer/testing/fake-delivery-service"
 import { createGatewayStore } from "../gateway/store"
 import { startThreadWakeAtSession, wakeHostIdleExitMs, type ThreadWakeLatch, type ThreadWakeOptions } from "./runtime"
+import { recordUnloadEffect, writeSessionFile } from "./testing/fake-wake-host"
 
 // A carrier that carries nothing arms no sweep timer (design A3.1.4; #13455's MEDIUM and its delta review), the
 // delivery consumer beside it is started again after it dies (#13457's MEDIUM), and the ensured host's idle-exit
@@ -298,6 +299,80 @@ describe("the consumer's stop against an in-flight retry", () => {
         record: { type: "admit_external_message" },
       }),
     ).rejects.toThrow("no consumer is declared")
+  })
+})
+
+// #14273 follow-up: a wake that settles a closed session's rows answers `nothing_queued`; the drained marks those
+// rows leave are reported then, not only at the next carry that ends.
+describe("a wake that settles a closed session's intake", () => {
+  test("#given a delivery from another device queued before a close on request #when the session is woken #then the wake answers nothing_queued and its drained mark is reported", async () => {
+    const agentDir = mkdtempSync("/tmp/omo-wake-runtime-")
+    const file = writeSessionFile(join(agentDir, "sessions"), "dur-closed", { cwd: mkdtempSync("/tmp/omo-wake-cwd-") })
+    const service = createFakeDeliveryService({ admitted: true })
+    service.ackServe({ wake: true })
+    const outcomes: string[] = []
+    const running = start(agentDir, {
+      store: createGatewayStore({ agentDir }),
+      deliveries: async () => service.port,
+      onWake: (_durableId, outcome) => outcomes.push(outcome.kind),
+    })
+    await running?.ready
+    await service.inbound({
+      command_id: "c-1",
+      sender_device: "device-b",
+      durable_id: "dur-closed",
+      record: {
+        type: "admit_external_message",
+        sessionId: "dur-closed",
+        deliveryId: "d-1",
+        text: "OMO_GATEWAY v=1\nsource=peer_agent\n\nd-1",
+        displayText: "d-1",
+        sender: { kind: "agent", session_id: "sender-on-b" },
+        deliverAs: "followUp",
+        chainCount: 1,
+      },
+    })
+    recordUnloadEffect(file, "dur-closed", Date.now() + 1_000, "done")
+    const drainedBefore = service.calls.filter((call) => call.type === "delivery.drained").length
+
+    await running?.wake("dur-closed")
+
+    expect(outcomes.at(-1)).toBe("nothing_queued")
+    expect(service.calls.filter((call) => call.type === "delivery.drained").slice(drainedBefore)).toEqual([
+      { type: "delivery.drained", sender_device: "device-b", session_id: "dur-closed", last_command_id: "c-1" },
+    ])
+    await running?.stop()
+  })
+})
+
+// #12766 review L1: the production consumer reads the engine's own `threads.chainCountLimit` (senpi SettingsManager, the
+// setting a running session admits a live thread call against), so a queued delivery past it is refused with the counts.
+describe("the device's thread chain limit on the queued route", () => {
+  test("#given this device's user set threads.chainCountLimit to 3 #when a record at hop 4 is handed to the production consumer #then it is refused chain_count_limit with the count and the limit", async () => {
+    const agentDir = mkdtempSync("/tmp/omo-wake-runtime-")
+    writeFileSync(join(agentDir, "settings.json"), JSON.stringify({ threads: { chainCountLimit: 3 } }))
+    writeSessionFile(join(agentDir, "sessions"), "dur-target", { cwd: mkdtempSync("/tmp/omo-wake-cwd-") })
+    const service = createFakeDeliveryService({ admitted: true })
+    service.ackServe({ wake: true })
+    const running = start(agentDir, { store: createGatewayStore({ agentDir }), deliveries: async () => service.port })
+    await running?.ready
+    const reply = await service.inbound({
+      command_id: "c-1",
+      sender_device: "device-b",
+      durable_id: "dur-target",
+      record: {
+        type: "admit_external_message",
+        sessionId: "dur-target",
+        deliveryId: "d-1",
+        text: "OMO_GATEWAY v=1\nsource=peer_agent\n\nd-1",
+        displayText: "d-1",
+        sender: { kind: "agent", session_id: "sender-on-b" },
+        deliverAs: "followUp",
+        chainCount: 4,
+      },
+    })
+    expect(reply.data).toEqual({ kind: "refused", reason: "chain_count_limit", chain_count: 4, limit: 3 })
+    await running?.stop()
   })
 })
 

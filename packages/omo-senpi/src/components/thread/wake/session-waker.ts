@@ -9,7 +9,6 @@ export type WakeOutcome =
   | { readonly kind: "gone" }
   | { readonly kind: "ambiguous"; readonly session_paths: readonly string[] }
   | { readonly kind: "not_wakeable"; readonly session_kind: Exclude<WakeSessionKind, "interactive"> }
-  | { readonly kind: "overloaded" }
   | { readonly kind: "not_yet"; readonly next_attempt_at: number }
   | { readonly kind: "busy"; readonly code: string; readonly retry_after_ms?: number }
   | { readonly kind: "deferred"; readonly attempts: number; readonly next_attempt_at: number }
@@ -65,7 +64,6 @@ async function wake(options: SessionWakerOptions, durableId: string): Promise<Wa
 
   await options.store.woken.request({ durable_id: durableId, session_file: target.session_path })
   const started = await options.store.woken.start({ durable_id: durableId })
-  if (started.kind === "overloaded") return { kind: "overloaded" }
   if (started.kind === "not_yet") return started
   if (started.kind !== "started") return { kind: "busy", code: "wake_in_progress" }
 

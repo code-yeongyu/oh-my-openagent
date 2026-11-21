@@ -15,6 +15,10 @@ import { spawnTimeout } from "../../../test-support/spawn-timeout"
 const bwrap = process.platform === "linux" ? Bun.which("bwrap") : null
 const bwrapUsable = bwrap !== null && (await probeBwrapUsability(bwrap)).usable
 const trustGeneration = join(import.meta.dir, "..", "..", "..", "..", "omo-native", "trust-generation.ts")
+// The probe loads this checkout's module graph, so the checkout itself must be visible inside the
+// sandbox: under bwrap a checkout placed under /tmp is hidden by the sandbox's own /tmp tmpfs.
+// The repo root is always ro-bound (a no-op when it is already visible through another mount).
+const repoRoot = realpathSync(join(import.meta.dir, "..", "..", "..", "..", ".."))
 const probeSource = `import { prepareTrustDirectory, trustDirectory, TrustStorageError, verifyTrustGeneration } from ${JSON.stringify(trustGeneration)}
 try {
   if (process.argv[2] === "unattested") delete process.env.${USERNS_ROOTS_ENV}
@@ -108,6 +112,9 @@ async function runInSandbox(
   const separator = sandboxed.args.indexOf("--")
   const args = [
     ...sandboxed.args.slice(0, separator),
+    "--ro-bind",
+    repoRoot,
+    repoRoot,
     ...(options.extraMounts?.(setup.root) ?? []),
     ...sandboxed.args.slice(separator),
   ]
@@ -123,7 +130,22 @@ async function runInSandbox(
     new Response(child.stdout).text(),
     new Response(child.stderr).text(),
   ])
-  return { code, stderr, outcome: JSON.parse(stdout) as Outcome }
+  let outcome: Outcome
+  try {
+    outcome = JSON.parse(stdout) as Outcome
+  } catch {
+    // A child whose module graph the sandbox hid never runs its probe: fail with what it actually
+    // said (or that it said nothing), never with a bare parse error on empty output.
+    throw new Error(
+      "sandbox child produced no JSON (code " +
+        code +
+        "); stderr: " +
+        stderr.slice(0, 2_000) +
+        "; stdout: " +
+        stdout.slice(0, 2_000),
+    )
+  }
+  return { code, stderr, outcome }
 }
 
 test.skipIf(!bwrapUsable)(

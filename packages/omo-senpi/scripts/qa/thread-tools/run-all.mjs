@@ -44,6 +44,7 @@ const gateway = [
   ["stopped-target", "stopped-target.mjs"],
   ["sender-death", "sender-death.mjs"],
   ["held-then-exit", "held-then-exit.mjs"],
+  ["graceful-close", "graceful-close.mjs"],
   ["receiver-crash", "receiver-crash.mjs"],
   ["loop-guard", "loop-guard.mjs"],
   ["lost-ack", "lost-ack.mjs"],
@@ -53,6 +54,7 @@ const gateway = [
   ["report-origin", "report-origin.mjs"],
   ["report-origin-steer", "report-origin-steer.mjs"],
   ["report-origin-auto-steer", "report-origin-auto-steer.mjs"],
+  ["default-delivery", "default-delivery.mjs"],
 ]
 
 const legacy = [
@@ -61,7 +63,12 @@ const legacy = [
   ["terminal-to-ui", "terminal-to-ui.mjs"],
   ["desktop-to-cli", "desktop-to-cli.mjs"],
   ["plugin-surface", "plugin-surface.mjs"],
+  ["local-approvals", "local-approvals.mjs"],
   ["session-control", "session-control-qa.mjs"],
+  ["create-prompt-authority", "create-prompt-authority.mjs"],
+  ["reopen-exited", "reopen-exited.mjs"],
+  ["create-atomic", "create-atomic.mjs"],
+  ["free-plan-cross-workspace", "free-plan-cross-workspace.mjs"],
 ]
 
 function option(name) {

@@ -110,7 +110,12 @@ describe("M1: a worktree made for a thread whose open fails is removed", () => {
       },
     }
     const { run } = surface(far)
-    const result = await run("thread_create", { device: "studio", cwd: repo, worktree: { branch: "far-lost" } })
+    const result = await run("thread_create", {
+      name: "worktree-cleanup-113",
+      device: "studio",
+      cwd: repo,
+      worktree: { branch: "far-lost" },
+    })
     expect(errorOf(result)).toMatchObject({ code: "scope_denied", details: { device: "b" } })
     expect([branchExists(repo, "far-lost"), worktreeCount(repo)]).toEqual([false, 1])
     expect(existsSync(join(farRoot, "x"))).toBe(false)
@@ -140,6 +145,7 @@ describe("M1: a worktree made for a thread whose open fails is removed", () => {
       },
     }
     const result = await surface(far).run("thread_create", {
+      name: "worktree-cleanup-142",
       device: "studio",
       cwd: repo,
       worktree: { branch: "far-kept" },
