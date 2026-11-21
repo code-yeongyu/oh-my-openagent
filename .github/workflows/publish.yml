@@ -37,7 +37,7 @@ on:
         required: false
         type: string
       ci_basis_receipt:
-        description: "Maintainer-only: id of an exact-head CI basis receipt that waives the hosted ci.yml wait in gate-reuse. Requires prepared_release_sha and ci_basis_head. Leave empty to wait for hosted CI."
+        description: "Maintainer-only: a logged maintainer waiver of the hosted ci.yml wait in gate-reuse; the receipt is recorded, not looked up. Only the receipt shape, the admin/maintain actor and the ci_basis_head binding to prepared_release_sha are enforced. Leave empty to wait for hosted CI."
         required: false
         type: string
         default: ""
