@@ -6,10 +6,18 @@ import { attachDoriterm, type DoritermPorts } from "./doriterm-attach"
 import { remoteCommand, type RemoteProgram } from "./ssh-port"
 
 const LINK = "https://app.doriterm.example/join#secret-join-fixture-7f3a"
-const meshLine = (members: number) =>
-  `doriterm-setup: mesh ok mesh heihjzwj sync=ok ${members} members: a=self b=connected`
 // doriterm's own result line, as its setup CLI prints it.
 const OK = "doriterm-setup: result ok exit 0"
+
+// doriterm's `verify` as its setup CLI behaves (setup.ts verify): it lists every member as name=state, and with
+// --min-members N it fails unless there are N members AND every one of them is connected.
+const verifyAnswer = (entries: readonly string[], args: readonly string[]) => {
+  const min = args[1] === "--min-members" ? Number(args[2]) : 0
+  const allConnected = entries.every((entry) => /=(self|connected)$/.test(entry))
+  const fail = min > 0 && !(entries.length >= min && allConnected)
+  const mesh = `doriterm-setup: mesh ${fail ? "fail" : "ok"} mesh heihjzwj sync=ok ${entries.length} members: ${entries.join(" ")}`
+  return { code: fail ? 1 : 0, lines: [mesh, fail ? "doriterm-setup: result fail exit 1" : OK] }
+}
 
 type Remote = { lines: readonly string[]; code: number }
 
@@ -20,6 +28,8 @@ function fakes(options: {
   inviteWrites?: boolean
   join?: Remote
   afterJoin?: number
+  /** One of the caller's existing members is offline (a sleeping laptop), as doriterm reports `absent`. */
+  absentMember?: boolean
 }) {
   const calls: string[] = []
   const stdins: string[] = []
@@ -31,8 +41,13 @@ function fakes(options: {
       if (args[0] === "verify") {
         if (options.members === undefined)
           return { code: 0, lines: ["doriterm-setup: mesh ok this host is in no mesh yet", OK] }
-        const count = joined ? (options.afterJoin ?? options.members + 1) : options.members
-        return { code: 0, lines: [meshLine(count), OK] }
+        const existing = Array.from({ length: options.members }, (_, index) =>
+          index === 0
+            ? "m0=self"
+            : `m${index}=${options.absentMember && index === options.members - 1 ? "absent" : "connected"}`,
+        )
+        const grows = joined && (options.afterJoin ?? options.members + 1) > options.members
+        return verifyAnswer(grows ? [...existing, "target=connected"] : existing, args)
       }
       if (args[0] === "invite") {
         const out = args[2]
@@ -86,6 +101,11 @@ describe("attachDoriterm", () => {
       "local:verify",
     ])
     expect(f.stdins).toEqual([LINK])
+  })
+
+  test("#given an offline member in the caller's mesh #when the new machine joins and connects #then attached", async () => {
+    const f = fakes({ members: 2, absentMember: true })
+    expect(await attachDoriterm(f.ports)).toEqual({ kind: "attached", members: 3 })
   })
 
   test("#given a target without a recent bun #when attached #then skipped with the missing prerequisite and no invite", async () => {

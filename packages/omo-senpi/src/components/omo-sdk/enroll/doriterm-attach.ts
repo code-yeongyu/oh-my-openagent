@@ -54,11 +54,17 @@ const bunRecentEnough = (version: string): boolean => {
   return true
 }
 
-// "doriterm-setup: mesh ok mesh heihjzwj sync=ok 3 members: a=self b=connected c=connected" (the mesh id is lowercase base32)
-const membersOf = (lines: readonly string[]): number | undefined => {
+// "doriterm-setup: mesh ok mesh heihjzwj sync=ok 3 members: a=self b=absent c=connected" (the mesh id is lowercase
+// base32): every member as name=state.
+const membersOf = (lines: readonly string[]): ReadonlyMap<string, string> | undefined => {
   for (const line of lines) {
-    const match = /^doriterm-setup: mesh \w+ mesh [0-9a-z]+ \S+ (\d+) members:/.exec(line)
-    if (match?.[1] !== undefined) return Number(match[1])
+    const match = /^doriterm-setup: mesh \w+ mesh [0-9a-z]+ \S+ \d+ members: (.*)$/.exec(line)
+    if (match?.[1] === undefined) continue
+    const entries = match[1].split(" ").flatMap((entry) => {
+      const at = entry.lastIndexOf("=")
+      return at > 0 ? [[entry.slice(0, at), entry.slice(at + 1)] as const] : []
+    })
+    return new Map(entries)
   }
   return undefined
 }
@@ -123,11 +129,14 @@ async function attach(ports: DoritermPorts, enter: (stage: DoritermFailureCode) 
     await rm(dir, { recursive: true, force: true })
   }
 
+  // The new machine counts once a member the mesh did not have before is connected. doriterm's own
+  // `--min-members` needs EVERY member connected, so one offline laptop in the mesh would fail every attach.
   enter("verify_failed")
   for (let attempt = 1; ; attempt++) {
-    const after = await ports.local(["verify", "--min-members", String(members + 1)])
-    const now = membersOf(after.lines)
-    if (after.code === 0 && now !== undefined && now >= members + 1) return { kind: "attached", members: now }
+    const now = membersOf((await ports.local(["verify"])).lines)
+    const added =
+      now === undefined ? [] : [...now].filter(([name, state]) => !members.has(name) && state === "connected")
+    if (now !== undefined && added.length > 0) return { kind: "attached", members: now.size }
     if (attempt >= VERIFY_ATTEMPTS) return failed("verify_failed")
     await ports.sleep(VERIFY_INTERVAL_MS)
   }
