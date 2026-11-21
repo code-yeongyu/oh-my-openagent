@@ -327,7 +327,6 @@ describe("publish.yml gate-reuse ci_basis_receipt waiver", () => {
       expect(outcome.status === 0 ? 0 : 1).toBe(status)
       expect(outcome.output).toContain(line)
     },
-    TEST_TIMEOUT_MS,
   )
 
   test(
