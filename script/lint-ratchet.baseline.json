@@ -891,12 +891,6 @@
   "packages/omo-opencode/src/hooks/preemptive-compaction.context-limit-cache.test.ts": {
     "omo-testing/no-module-mock": 1
   },
-  "packages/omo-opencode/src/hooks/preemptive-compaction.degradation-monitor.test.ts": {
-    "omo-testing/no-module-mock": 1
-  },
-  "packages/omo-opencode/src/hooks/preemptive-compaction.test.ts": {
-    "omo-testing/no-module-mock": 1
-  },
   "packages/omo-opencode/src/hooks/prometheus-md-only/index.test.ts": {
     "omo-testing/no-module-mock": 1
   },
