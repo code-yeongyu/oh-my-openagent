@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
+import { removeTree } from "../../../test-support/remove-tree"
 
 const ROOT = resolve(import.meta.dir, "../../..")
 const DRIVER = join(ROOT, "script/qa/computer/replay.ts")
@@ -214,8 +215,9 @@ beforeAll(async () => {
 }, 600_000)
 
 afterAll(async () => {
-  await rm(dir, { recursive: true, force: true })
-})
+  // Windows can keep a stand-in image busy after the driver has joined the engine.
+  await removeTree(dir)
+}, 15_000)
 
 describe("replay driver", () => {
   test("v1 corpus case 01-stdio-session-open-no-options replays", async () => {
