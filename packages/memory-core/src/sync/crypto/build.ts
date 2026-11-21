@@ -29,6 +29,13 @@ const SEGMENT = 65536
 const SPACE_ID_BYTES = 16
 const MAX_ITEM_KEY_BYTES = 0xffff
 const MAX_BODY_BYTES = 0xffffffff
+/** A record's framing: type (1), space id and key length (2) ahead of the key, body length (4) ahead of the body. */
+const RECORD_HEAD_BYTES = 1 + SPACE_ID_BYTES + 2
+const BODY_LENGTH_BYTES = 4
+
+/** The bytes one record adds to the payload the receiver inflates and bounds: its framing, key and body (#12306). */
+export const framedRecordBytes = (itemKey: string, bodyBytes: number): number =>
+  RECORD_HEAD_BYTES + new TextEncoder().encode(itemKey).length + BODY_LENGTH_BYTES + bodyBytes
 
 export type BatchInputProblem = "space_id_length" | "item_key_too_long" | "body_too_long"
 
@@ -47,11 +54,11 @@ const encodePayload = (records: ReadonlyArray<SyncPayloadRecord>): Uint8Array<Ar
       if (record.spaceId.length !== SPACE_ID_BYTES) throw new BatchInputError("space_id_length")
       if (key.length > MAX_ITEM_KEY_BYTES) throw new BatchInputError("item_key_too_long")
       if (record.body.length > MAX_BODY_BYTES) throw new BatchInputError("body_too_long")
-      const head = new Uint8Array(1 + SPACE_ID_BYTES + 2)
+      const head = new Uint8Array(RECORD_HEAD_BYTES)
       head[0] = record.type
       head.set(record.spaceId, 1)
-      new DataView(head.buffer).setUint16(17, key.length, false)
-      const length = new Uint8Array(4)
+      new DataView(head.buffer).setUint16(1 + SPACE_ID_BYTES, key.length, false)
+      const length = new Uint8Array(BODY_LENGTH_BYTES)
       new DataView(length.buffer).setUint32(0, record.body.length, false)
       return [head, key, length, record.body]
     }),

@@ -11,6 +11,8 @@ afterEach(async () => {
 })
 
 const item = (key: string, bytes: number) => ({ key, bytes })
+// Each record carries type (1), space id (16), key length (2), key and body length (4) around its ops.
+const framed = (key: string, bytes: number) => 1 + 16 + 2 + key.length + 4 + bytes
 
 test("pending ops split between items so no batch exceeds the plaintext bound, in capture order", () => {
   const limit = 1_000
@@ -28,8 +30,8 @@ test("an item alone over the bound is held back whole with every later op of its
     item("b", 400),
     item("huge", 10),
     item("c", 400),
-    item("at-bound", 1_000),
-    item("past-bound", 1_001),
+    item("at-bound", 1_000 - framed("at-bound", 0)),
+    item("past-bound", 1_001 - framed("past-bound", 0)),
   ]
   const { batches, held } = planBatches(items, 1_000)
   expect(batches.map((b) => b.map((i) => i.key))).toEqual([["a", "b"], ["c"], ["at-bound"]])
@@ -40,7 +42,7 @@ test(
   "a backlog larger than one batch is pushed as consecutive batches the other device applies in order",
   async () => {
     const server = new FakeSyncServer()
-    const a = await makeDevice(server, "a", undefined, { batchBytes: 64 })
+    const a = await makeDevice(server, "a", undefined, { batchBytes: 64 + framed("n1.md", 0) })
     const b = await makeDevice(server, "b")
     devices.push(a, b)
     for (const n of [1, 2, 3]) await a.write(`n${n}.md`, `line ${n}\n`)
