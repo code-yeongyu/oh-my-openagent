@@ -86,9 +86,7 @@ impl FakeBackend {
         let (Target::Window(id), DeliveryMode::Background) = (target, mode) else {
             return Ok(None);
         };
-        let Some(press) = hold.menu_press() else {
-            return Ok(None);
-        };
+        let press = hold.menu_press();
         let background = !self.window(id)?.focused;
         if menu_watch(&press, background, false, || {
             self.presses_menu_control(&press)
