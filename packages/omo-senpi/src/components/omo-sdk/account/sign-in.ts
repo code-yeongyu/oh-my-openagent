@@ -101,7 +101,11 @@ export async function runSignIn(
     await run({ args, stdin, env: { ...input.env, OMO_SERVICE_API_URL: input.origin }, onLine, signal })
     await callback
   } catch {
-    return refused("internal_error", "the omo sign-in process could not run", "check the omo install, then retry")
+    return refused(
+      "internal_error",
+      "the omo sign-in process could not run",
+      "check that omo is installed on this machine, then retry",
+    )
   }
   if (signal.aborted) return refused("internal_error", "the sign-in was cancelled", "start a new sign-in")
   return outcome ?? refused("internal_error", "the sign-in ended without an answer", "retry; report it if it repeats")
