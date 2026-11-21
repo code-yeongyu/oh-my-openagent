@@ -21,6 +21,25 @@ import * as senpiTask from "./index"
 import { createMinimalSenpiResourceLoader } from "./index"
 import type { AgentResolutionResult, ResolveAgentOptions } from "./index"
 
+// The marker test boots two real stages (loader reload, then session boot).
+// On Windows either stage can hang until the runner-wide 30 s ceil, and the
+// timeout names no stage (#12957). Bound each stage below the ceil so a hang
+// fails fast with the stage that did not complete.
+const STAGE_TIMEOUT_MS = 15_000
+
+function withStageTimeout<T>(promise: Promise<T>, stage: string, timeoutMs = STAGE_TIMEOUT_MS): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`senpi-api-tripwire: timed out waiting for ${stage} after ${timeoutMs}ms`))
+    }, timeoutMs)
+  })
+  // Clear the timer once the race settles, whichever side won.
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer)
+  })
+}
+
 function acceptRpcTypes(command: RpcCommand, response: RpcResponse, event: AgentSessionEvent): readonly string[] {
   return [typeof command, typeof response, event.type]
 }
@@ -96,7 +115,7 @@ describe("pinned Senpi API surface", () => {
       "utf8",
     )
     const defaultLoader = new DefaultResourceLoader({ cwd, agentDir })
-    await defaultLoader.reload()
+    await withStageTimeout(defaultLoader.reload(), "loader reload")
     expect(existsSync(markerInvokedPath)).toBe(true)
     rmSync(markerInvokedPath, { force: true })
     const loader: ResourceLoader = createMinimalSenpiResourceLoader({
@@ -105,17 +124,20 @@ describe("pinned Senpi API surface", () => {
 
     // when
     try {
-      const result = await createAgentSession({
-        agentDir,
-        cwd,
-        customTools: [],
-        sessionManager: SessionManager.inMemory(),
-        tools: [],
-        model: undefined,
-        resourceLoader: loader,
-        scopedModels: [],
-        favoriteModels: [],
-      })
+      const result = await withStageTimeout(
+        createAgentSession({
+          agentDir,
+          cwd,
+          customTools: [],
+          sessionManager: SessionManager.inMemory(),
+          tools: [],
+          model: undefined,
+          resourceLoader: loader,
+          scopedModels: [],
+          favoriteModels: [],
+        }),
+        "session boot",
+      )
 
       // then
       expect(existsSync(markerInvokedPath)).toBe(false)
@@ -124,6 +146,30 @@ describe("pinned Senpi API surface", () => {
     } finally {
       rmSync(rootDir, { recursive: true, force: true })
     }
+  })
+
+  test("#given a promise that never settles #when raced with a stage timeout #then it rejects naming the stage", async () => {
+    // given
+    const hung = new Promise<never>(() => {})
+
+    // when
+    const failure = await withStageTimeout(hung, "loader reload", 50).then(
+      () => null,
+      (error: unknown) => error,
+    )
+
+    // then
+    expect(failure).toBeInstanceOf(Error)
+    expect((failure as Error).message).toContain("loader reload")
+    expect((failure as Error).message).toContain("50ms")
+  })
+
+  test("#given a promise that settles fast #when raced with a stage timeout #then it resolves with its value", async () => {
+    // given / when
+    const value = await withStageTimeout(Promise.resolve("ok"), "session boot", 1000)
+
+    // then
+    expect(value).toBe("ok")
   })
 
   test("#given pinned artifact #when package metadata and rpc entry are checked #then expected public contract exists", async () => {
