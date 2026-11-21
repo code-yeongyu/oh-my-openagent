@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { SettingsManager } from "@code-yeongyu/senpi"
 
+import { SettingsManager } from "../../../senpi-test-runtime"
 import { ENGINE_DEFAULTS, type EngineDefaultKey } from "./engine"
 import { ENGINE_DEFAULT_FALLBACK_CHAINS } from "./engine-fallback-chains"
 
