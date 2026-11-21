@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs"
 import { ROOT_TEST_SERIAL_QUARANTINE_PATHS, serialQuarantineCommand } from "./root-test-serial-quarantine.ts"
 
 const workflow = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8")
+const posixShard1 = readFileSync(new URL("../.github/scripts/ci-root-shard-1.sh", import.meta.url), "utf8")
 const posixShard2 = readFileSync(new URL("../.github/scripts/ci-root-shard-2.sh", import.meta.url), "utf8")
 const windowsTelemetryScript = readFileSync(
   new URL("../.github/scripts/windows-ci-telemetry.ps1", import.meta.url),
@@ -24,8 +25,15 @@ function escapeForRegExp(literal: string): string {
 
 function rootTestJob(): string {
   const start = workflow.indexOf("  test:\n")
-  const end = workflow.indexOf("\n  macos-combined:", start)
+  const end = workflow.indexOf("\n  test-linux:", start)
   if (start < 0 || end < 0) throw new Error("root test job not found")
+  return workflow.slice(start, end)
+}
+
+function linuxTestJobs(): string {
+  const start = workflow.indexOf("  test-linux:\n")
+  const end = workflow.indexOf("\n  macos-combined:", start)
+  if (start < 0 || end < 0) throw new Error("Linux root test jobs not found")
   return workflow.slice(start, end)
 }
 
@@ -57,20 +65,27 @@ describe("root test CI partition", () => {
     const end = job.indexOf("steps:", start)
     const matrix = job.slice(start, end)
 
-    expect(matrix).toContain("- os: ubuntu-latest")
     expect(matrix).toContain("- os: windows-latest")
+    expect(matrix).not.toContain("- os: ubuntu-latest")
     expect(matrix).not.toContain("- os: macos-latest")
     expect(matrix).toContain('shard: "1/2"')
     expect(matrix).toContain('shard: "2/2"')
     expect(matrix).not.toContain("config:")
     expect(matrix).not.toContain("test_args:")
     expect(matrix).not.toContain("parallel_args:")
+
+    const linux = linuxTestJobs()
+    expect(linux).toContain("name: test\n    needs: [ci-mode, test-linux]")
+    expect(linux).toContain('- os: ubuntu-latest\n            shard: "1/2"')
+    expect(linux).toContain('- os: ubuntu-latest\n            shard: "2/2"')
+    expect(linux).toContain("LEG_JOB_STATUS: ${{ needs.test-linux.result }}")
   })
 
   test("#given global zauc mocks #when Windows root tests are partitioned #then omo-opencode stays in one process", () => {
     const job = rootTestJob()
 
-    expect(job).toContain("bun test --timeout 20000 packages/omo-opencode packages/memory-core")
+    expect(job).toContain('-TestArguments @("test", "packages/omo-opencode", "packages/memory-core")')
+    expect(posixShard1).toContain("    bun test --timeout 20000 packages/omo-opencode\n")
     expect(job).toContain('-TestArguments @("--config=bunfig.win2.parallel.windows.toml", "test", "--parallel")')
     expect(existsSync(win2ConfigPath)).toBe(true)
     expect(existsSync(win2ParallelConfigPath)).toBe(true)
@@ -116,12 +131,8 @@ describe("root test CI partition", () => {
     }
   })
 
-  test("#given the POSIX shard-2 legs #when root tests run #then the quarantine precedes the serial remainder", () => {
-    const job = rootTestJob()
-    const posixStep = job.slice(
-      job.indexOf("runner.os != 'Windows' && matrix.shard == '2/2'"),
-      job.indexOf("runner.os == 'Windows' && matrix.shard == '2/2'"),
-    )
+  test("#given the Linux root parts #when root tests run #then the quarantine and both remainder halves run serially", () => {
+    const linux = linuxTestJobs()
 
     // POSIX shard 2 runs the remainder serially. `bun test --parallel` is not
     // used on POSIX: --isolate re-ran the heavy preload per file across ~1,550
@@ -130,15 +141,14 @@ describe("root test CI partition", () => {
     // (category-routing, coordinator guard, boulder-state failures). Job-level
     // sharding is the parallelism; each shard is one serial process, the shape
     // this suite passed with for years.
-    expect(posixStep).toContain("bash .github/scripts/ci-root-shard-2.sh")
+    expect(linux).toContain("part: [omo-opencode, memory-core, remainder-1, remainder-2]")
+    expect(linux).toContain("bash .github/scripts/ci-root-shard-2.sh quarantine")
+    expect(linux).toContain('*) bash .github/scripts/ci-root-shard-2.sh "$PART" ;;')
     expect(posixShard2).toContain(serialQuarantineCommand())
     expect(posixShard2).toContain(
-      "bun --config=bunfig.win2.parallel.toml test --timeout 20000 $(junit root-2-remainder)\n",
+      'bun --config=bunfig.win2.parallel.toml test --timeout 20000 --shard="${mode#remainder-}/2" --timings=.github/ci-test-timings.json',
     )
     expect(posixShard2).not.toContain("bun --config=bunfig.win2.parallel.toml test --parallel")
-    expect(posixShard2.indexOf(serialQuarantineCommand())).toBeLessThan(
-      posixShard2.indexOf("bun --config=bunfig.win2.parallel.toml test --timeout 20000"),
-    )
   })
 
   test("#given the dedicated Senpi compatibility job #when root tests run #then omo-senpi is excluded on every OS", () => {
@@ -147,10 +157,13 @@ describe("root test CI partition", () => {
     expect(quotedPatterns(readFileSync(win2ConfigPath, "utf8"))).toContain("packages/omo-senpi/**")
   })
 
-  test("#given measured package groups #when the matrix command is rendered #then native file sharding is not used", () => {
+  test("#given global zauc mocks #when Linux parts are sharded #then only the remainder uses native file sharding", () => {
     const job = rootTestJob()
 
     expect(job).not.toContain("--shard=")
+    expect(linuxTestJobs()).not.toContain("--shard=")
+    expect(posixShard1).not.toContain("--shard")
+    expect(posixShard2.match(/--shard=/g)).toHaveLength(1)
     expect(job).not.toContain("--path-ignore-patterns=")
     expect(job).not.toContain("format('-c {0}'")
     expect(job).not.toContain("bun test -c")
@@ -161,13 +174,7 @@ describe("root test CI partition", () => {
     const runBlock = job.slice(job.indexOf("      - name: Run tests"))
 
     expect(runBlock).toContain(
-      "if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && matrix.shard == '1/2'",
-    )
-    expect(runBlock).toContain(
       "if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '1/2'",
-    )
-    expect(runBlock).toContain(
-      "if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && matrix.shard == '2/2'",
     )
     expect(runBlock).toContain(
       "if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '2/2'",
