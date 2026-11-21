@@ -34,6 +34,8 @@ export interface WireRequest {
 export interface WireServer {
   readonly url: string
   readonly requests: readonly WireRequest[]
+  /** Whether the inline append is served now; a test turns it off to model a service rollback (#14496 review M1). */
+  inline: boolean
   pageSize: number
   refuseNext: string | null
   failNext: number | null
@@ -80,6 +82,7 @@ export function startWireServer(options: WireServerOptions): WireServer {
   for (const id of Object.values(options.devices)) freeze.addDevice({ id, kind: "cli", principal: id, signingKey: id })
   freeze.onStateChanged(() => broadcast({ type: "sync.state.changed" }))
   const state = {
+    inline: options.inline === true,
     pageSize: 500,
     refuseNext: null as string | null,
     failNext: null as number | null,
@@ -146,7 +149,7 @@ export function startWireServer(options: WireServerOptions): WireServer {
                   record_sig: "S",
                 },
           min_client_format: 1,
-          ...(options.inline === true ? { accepts_inline_batches: true } : {}),
+          ...(state.inline ? { accepts_inline_batches: true } : {}),
         })
       }
       if (req.method === "GET" && path === "/v1/sync/batches") {
@@ -213,7 +216,7 @@ export function startWireServer(options: WireServerOptions): WireServer {
         }
         const replay = rows.find((r) => r.batchId === body.idempotency_key)
         if (body.inline !== undefined) {
-          if (options.inline !== true || body.upload_id !== undefined) return refusal("invalid_request")
+          if (!state.inline || body.upload_id !== undefined) return refusal("invalid_request")
           const data = new Uint8Array(Buffer.from(body.inline, "base64url"))
           if (new Bun.CryptoHasher("sha256").update(data).digest("hex") !== hex(body.digest))
             return refusal("invalid_request")
@@ -244,6 +247,12 @@ export function startWireServer(options: WireServerOptions): WireServer {
   })
   return {
     url: `http://127.0.0.1:${server.port}`,
+    get inline() {
+      return state.inline
+    },
+    set inline(on) {
+      state.inline = on
+    },
     get pageSize() {
       return state.pageSize
     },
