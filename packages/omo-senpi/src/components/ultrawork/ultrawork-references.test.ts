@@ -50,6 +50,25 @@ describe("omo-senpi ultrawork references do not arm", () => {
     }
   })
 
+  // #14389: pasted advice that forbids the mode armed it. A prohibition word right before the keyword
+  // ("avoid ulw", "no ultrawork", a bulleted rule list) is advice, not a request.
+  it("#given advice that forbids the mode without a 'do not use' verb #when classified #then it does not arm", () => {
+    for (const text of [
+      "avoid ulw for small fixes",
+      "No ultrawork here, a quick answer is enough.",
+      "skip ulw this time",
+      "answer without ultrawork",
+      "don't ulw this one",
+      "never ultrawork a one-line change",
+      "avoid using ulw or mass-ulw on this repo",
+      "skip ulw, ulw-loop and ultrawork here",
+      "Rules from the guide:\n- avoid ulw on tiny tasks\n- no ultrawork for docs\n- skip ulw-loop when unsure",
+    ]) {
+      expect({ text, effective: classify(text).effective }).toEqual({ text, effective: false })
+      expect(classify(text).suppressionReason).toBe("negated_mention")
+    }
+  })
+
   it("#given a URL or a code span carrying the bare keyword #when classified #then it does not arm", () => {
     for (const text of ["see https://example.com/search?q=ulw&page=2", "the flag is `ulw` in the config"]) {
       expect({ text, effective: classify(text).effective }).toEqual({ text, effective: false })
@@ -76,6 +95,13 @@ describe("omo-senpi ultrawork references do not arm", () => {
       "ulw fix src/foo.ts",
       "ulw-loop.",
       "ulw-plan.",
+      "avoid regressions, ulw the fix",
+      "no worries, ulw this",
+      "skip the docs. ulw the fix",
+      // The prohibition covers only the keyword list it names; a comma then a request still arms (#14392 review M1).
+      "No ulw-loop, just ulw this",
+      "skip ulw-plan, ulw the fix",
+      "without ultrawork the answer was bad, so ulw this",
     ]) {
       expect({ text, effective: classify(text).effective }).toEqual({ text, effective: true })
     }

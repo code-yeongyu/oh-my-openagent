@@ -111,6 +111,7 @@ No default profiles ship. A profile exists only when you write one under `profil
   "operator_alerts": {}, // alerts when a session keeps ending its runs with an error (Native harness)
   "disabled_skills": [], // skill names hidden on every harness, unioned across layers
   "exclude_models": [], // models no category, agent, profile or task pin may run, unioned across layers (Native harness)
+  "keyword_detector": {}, // which prompt keywords switch on a mode (OpenCode and Native harnesses)
   "[opencode]": {},     // OpenCode plugin config, freeform (see configuration.md)
   "[native]": {},       // OmO Native-only overrides, typed base keys
   "[codex]": {},        // Codex-only overrides, typed base keys
@@ -124,7 +125,7 @@ Source: `packages/omo-config-core/src/schema/config.ts`.
 
 ### Harness blocks
 
-`[opencode]` is a freeform record: it carries the full OpenCode plugin configuration documented in [`docs/reference/configuration.md`](./configuration.md) (background tasks, tmux, hooks, skills, and every other plugin key), and the strict schema does not validate its contents. `[native]` and `[codex]` are typed blocks accepting the shared base keys (`categories`, `agents`, `git_master`, `task`, `teams`, `models`, `model_profiles`, `model_profile`, `memory`, `telemetry`, `disabled_skills`, `exclude_models`), so a harness-specific override stays schema-checked.
+`[opencode]` is a freeform record: it carries the full OpenCode plugin configuration documented in [`docs/reference/configuration.md`](./configuration.md) (background tasks, tmux, hooks, skills, and every other plugin key), and the strict schema does not validate its contents. `[native]` and `[codex]` are typed blocks accepting the shared base keys (`categories`, `agents`, `git_master`, `task`, `teams`, `models`, `model_profiles`, `model_profile`, `memory`, `telemetry`, `disabled_skills`, `exclude_models`, `keyword_detector`), so a harness-specific override stays schema-checked.
 
 `[senpi]` is the legacy spelling of `[native]`, kept working for one release line. It is canonicalized to `[native]` when the config is read, so a config that cannot be rewritten still applies every value it sets, and the startup migration rewrites the key in the file once, naming it in a notice. When a file carries both blocks, `[native]` wins and the ignored `[senpi]` block is reported as a deprecation diagnostic.
 
@@ -159,6 +160,17 @@ Like `disabled_skills`, layers are unioned: a project file cannot let back in a 
 To see the effect, run `omo doctor --models`. It prints, for every category and task agent, the model a spawn runs first, the runtime retry chain in order, and each declared rung with its source (`built-in`, `omo.json`, or `category:<name>` for an agent that borrows a category) and its state (`runs first`, `fallback N`, `excluded by exclude_models "..."`, `no login`, `not reached`), then the main session's `model_profile` lane. Add `--json` for tooling. The answer comes from the same resolvers spawns use, so it cannot drift from what runs. Logins are read offline and credentials are not probed.
 
 Security invariant: the OpenCode plugin honors `mcp_env_allowlist` and `browser_automation_engine.playwright_mcp_args` only from the user layer, including the user layer's own active profile block. Project layers cannot extend them.
+
+### `keyword_detector` (OpenCode and Native harnesses)
+
+Turns prompt keywords off. `disabled_keywords` lists the keyword types that must not fire; `enabled_expansions`, when set, lets only the listed types fire. The types are `ultrawork`, `team`, `hyperplan` and `hyperplan-ultrawork`. OmO Native arms only `ultrawork`, so it reads the `ultrawork` entries (the Codex edition does not read this key): either key can switch the `ulw` / `ultrawork` keyword off. A project file (`<project>/.omo/omo.jsonc`) turns it off for that project on every launch; the `--omo-senpi-ultrawork-disabled` launch flag still turns it off for one launch.
+
+```jsonc
+// <project>/.omo/omo.jsonc
+{
+  "keyword_detector": { "disabled_keywords": ["ultrawork"] }
+}
+```
 
 ### `telemetry` (Native harness)
 
