@@ -1,5 +1,6 @@
 // The browser doctor's report: one bskDoctor run turned into the `state` the browser skill routes on, its remedy, and a
 // summary. browser-doctor.mjs is the CLI over it; `doctorOptions` reach bskDoctor unchanged (the CLI passes none).
+import { resolveConnectedBrowser } from "./browser-identity.mjs"
 
 // BrowserSkill extension 0.4.0 put every task tab into a native "BrowserSkill" tab group that the browser saves and
 // syncs, so each task left a group in the user's own browser (upstream removed the grouping in 0.4.1).
@@ -84,9 +85,7 @@ export async function runBrowserDoctor({ omowright, entry, browser, doctorOption
       extensionRegistered: detected.extensionRegistered,
     })),
     browsersConnected: report.browsersConnected.map((connected) => ({
-      instanceId: connected.instance_id,
-      name: connected.browser_name,
-      version: connected.browser_version,
+      ...resolveConnectedBrowser(connected, report),
       extensionVersion: connected.extension_version ?? null,
     })),
     nextStep: report.nextStep,

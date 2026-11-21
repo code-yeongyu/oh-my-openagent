@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { loadOmowright } from "./omowright.mjs"
+import { resolveConnectedBrowser } from "./browser-identity.mjs"
 
 const json = process.argv.includes("--json")
 const waitArg = process.argv.find((arg) => arg.startsWith("--wait-ms="))
@@ -44,11 +45,7 @@ const summary = {
     needsRestart: r.needsRestart ?? null,
     humanStep: r.humanStep ?? null,
   })),
-  browsersConnected: result.browsersConnected.map((b) => ({
-    instanceId: b.instance_id,
-    name: b.browser_name,
-    version: b.browser_version,
-  })),
+  browsersConnected: result.browsersConnected.map((b) => resolveConnectedBrowser(b, result)),
   humanStep: result.humanStep,
 }
 
