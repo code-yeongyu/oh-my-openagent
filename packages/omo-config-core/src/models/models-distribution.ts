@@ -1,4 +1,4 @@
-import { splitReasoningSuffix } from "../schema/reasoning-vocabulary"
+import { normalizeReasoning, splitReasoningSuffix } from "../schema/reasoning-vocabulary"
 
 type ModelEntry = string | { readonly model: string }
 type ModelsDistribution = "sequential" | "round_robin"
@@ -19,7 +19,9 @@ export function createModelDistributor(): ModelDistributor {
       const model = typeof entry === "string" ? entry : entry.model
       const key = splitReasoningSuffix(model, { allowMaxSuffix: true })
         .base.replace(/\([^()]+\)\s*$/, "")
-        .replace(/\s+[a-z][a-z0-9_-]*$/i, "")
+        .replace(/\s+([a-z][a-z0-9_-]*)$/i, (match, suffix: string) =>
+          normalizeReasoning(suffix).level !== undefined ? "" : match,
+        )
         .trim()
       if (seen.has(key)) return false
       seen.add(key)

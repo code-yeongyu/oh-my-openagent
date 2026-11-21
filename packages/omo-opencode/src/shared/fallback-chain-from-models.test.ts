@@ -106,6 +106,19 @@ describe("parseFallbackModelEntry (extended)", () => {
     })
   })
 
+  it("preserves trailing non-variant space words in model id", () => {
+    expect(parseFallbackModelEntry("cpa/Gemini 4 Argon", undefined)).toEqual({
+      providers: ["cpa"],
+      model: "Gemini 4 Argon",
+      variant: undefined,
+    })
+    expect(parseFallbackModelEntry("cpa/DeepSeek V4.1 Flash", undefined)).toEqual({
+      providers: ["cpa"],
+      model: "DeepSeek V4.1 Flash",
+      variant: undefined,
+    })
+  })
+
   it("uses context provider when no provider prefix", () => {
     const result = parseFallbackModelEntry("claude-sonnet-4-6", "anthropic")
     expect(result).toEqual({

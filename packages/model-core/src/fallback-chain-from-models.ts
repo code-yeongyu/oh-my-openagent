@@ -1,7 +1,7 @@
 import type { FallbackEntry } from "./model-requirements"
 import type { FallbackModelObject } from "./fallback-model-object"
 import { normalizeFallbackModels } from "./model-resolver"
-import { splitReasoningSuffix } from "./reasoning-level"
+import { isReasoningLevel, splitReasoningSuffix } from "./reasoning-level"
 
 function parseVariantFromModel(rawModel: string): { modelID: string; variant?: string } {
   const parsed = splitReasoningSuffix(rawModel)
@@ -28,7 +28,7 @@ function parseVariantFromModel(rawModel: string): { modelID: string; variant?: s
   if (spaceVariant) {
     const modelID = spaceVariant[1]?.trim() ?? ""
     const variant = spaceVariant[2]?.trim().toLowerCase()
-    if (variant) {
+    if (variant && isReasoningLevel(variant)) {
       return { modelID, variant }
     }
   }

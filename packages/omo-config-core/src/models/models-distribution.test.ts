@@ -23,3 +23,10 @@ test("cursors are per target and owner and wrap without duplicating models", () 
   expect(distribute("empty", [], "round_robin")).toEqual([])
   expect(distribute("single", ["provider/a"], "round_robin")).toEqual(["provider/a"])
 })
+
+test("round_robin preserves distinct space-separated model names while deduplicating space-variant suffixes", () => {
+  const distribute = createModelDistributor()
+  const entries = ["cpa/Gemini 4 Argon", "cpa/Gemini 4 Neon", "cpa/Gemini 4 Argon high"]
+  expect(distribute("category:one", entries, "round_robin")).toEqual(["cpa/Gemini 4 Argon", "cpa/Gemini 4 Neon"])
+  expect(distribute("category:one", entries, "round_robin")).toEqual(["cpa/Gemini 4 Neon", "cpa/Gemini 4 Argon"])
+})
