@@ -117,4 +117,4 @@ does not prove what the screen shows.
   in call order cannot fail this test.
 - Wait for the event or the state, never for a fixed time.
 - Prove the test can fail: revert the fix and watch it go red for that reason.
-- `/visual-qa`'s `references/behaviour-evidence.md` has the hold recipe and the capture cases.
+- The `visual-qa` skill's `references/behaviour-evidence.md` has the hold recipe and the capture cases.
