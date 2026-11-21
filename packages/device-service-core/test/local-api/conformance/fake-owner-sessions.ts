@@ -32,7 +32,7 @@ const matches = (row: ListingRow, filter: SessionFilter | undefined): boolean =>
   (filter?.state === undefined || row.state === filter.state)
 
 const list = (state: OwnerState, conn: Conn, request: SessionsList): Outcome => {
-  if (rowsRefused(request, state.world.listing.rowsNewest ?? 4)) return refuse("invalid_request", "rows")
+  if (rowsRefused(request, state.world.listing.rowsNewest ?? 7)) return refuse("invalid_request", "rows")
   const query_id = state.mint()
   const { revisions, devices } = state.world.listing
   const pending = Object.fromEntries(Object.keys(devices).map((d) => [d, "pending"]))

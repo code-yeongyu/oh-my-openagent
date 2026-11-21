@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6 packages/local-api/src/client-open.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@88e58154bb592d781446a62a3d8d912769675079 packages/local-api/src/client-open.ts
 import {
   EventAssembler,
   type ListingResult,
@@ -84,10 +84,11 @@ export type LocalApiClient = {
     /**
      * `rows: 2` asks for each row's kind and parent link (#316), `rows: 3` for those and its durable_id (#935),
      * `rows: 4` for those and its model and archived flag (#1121; a service at 0.1.37 or older refuses it), `rows: 5`
-     * for those and its settled state (a service at 0.1.38 or older refuses it); a service before either answers
-     * invalid_request.
+     * for those and its settled state (a service at 0.1.38 or older refuses it), `rows: 6` for those and its holder's
+     * retry wait and `rows: 7` for those and its engine version (#1447; a service at 0.1.45 or older refuses either); a
+     * service before either answers invalid_request.
      */
-    rows?: 2 | 3 | 4 | 5,
+    rows?: 2 | 3 | 4 | 5 | 6 | 7,
   ) => Promise<ListingResult>;
   readonly read: (attach: string, options?: ReadOptions) => Promise<ReadPage>;
   readonly oversizedLines: () => number;

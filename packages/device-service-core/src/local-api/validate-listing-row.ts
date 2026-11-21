@@ -1,4 +1,4 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6 packages/local-api/src/validate-listing-row.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@88e58154bb592d781446a62a3d8d912769675079 packages/local-api/src/validate-listing-row.ts
 import {
   SESSION_ID_MAX_CHARS,
   SESSION_KIND_MAX_CHARS,
@@ -10,7 +10,7 @@ import {
   SESSION_SUMMARY_PROJECT_MAX_CHARS,
   SESSION_SUMMARY_TITLE_MAX_CHARS,
 } from "./spec-proto.ts";
-import type { ListingRow, ListingSettledBy } from "./protocol.ts";
+import type { ListingRow, ListingSettledBy, ListingWait } from "./protocol.ts";
 import {
   assertNever,
   bool,
@@ -25,8 +25,8 @@ import { deviceId, millis, sessionId } from "./validate-shapes.ts";
 import { LISTING_SETTLED_BY_KINDS, LISTING_SOURCES, SESSION_ROW_STATES } from "./vocabulary.ts";
 
 // One sessions.listing_rows row: the nine fields every client reads, plus kind and the parent link at rows 2 (#316)
-// and durable_id at rows 3 (#935), model and archived at rows 4 (#1121), settled and settled_by at rows 5. Split from
-// validate-shapes.ts for size.
+// and durable_id at rows 3 (#935), model and archived at rows 4 (#1121), settled and settled_by at rows 5, waiting at
+// rows 6 and engine_version at rows 7 (#1447). Split from validate-shapes.ts for size.
 const ROW_FIELDS = [
   "device",
   "session_id",
@@ -133,11 +133,56 @@ const rowSettled = (m: Fields): Pick<ListingRow, "settled" | "settled_by"> => {
   const by = settledByOf(reason);
   return by === undefined ? { settled } : { settled, settled_by: by };
 };
+// Rows 6 and 7 (#1447): the relay's own bounds (relay-spec waitingOf and engineVersionOf), read here with this client's
+// helpers and bounds because the published bundle carries no relay wire code (decision D8) and a vendor's spec-proto
+// rewrite needs no new export; DUR5 pins every verdict, the 128-character bound included, to the relay's.
+const ENGINE_VERSION_MAX_CHARS = 128;
+const WAIT_KINDS = ["rate_limit", "retry"] as const;
+const WAIT_UNTIL_MAX_CHARS = 27;
+const waitUntil = (v: unknown): string => {
+  const until = text(v, WAIT_UNTIL_MAX_CHARS, "waiting until");
+  const ms = Date.parse(until);
+  return Number.isFinite(ms) && new Date(ms).toISOString() === until
+    ? until
+    : fail("waiting until");
+};
+const waitingOf = (v: unknown): ListingWait => {
+  const m = known(v, ["kind", "attempt", "maxAttempts", "delayMs", "until"], [], "waiting");
+  const maxAttempts = uint(m["maxAttempts"], 1, Number.MAX_SAFE_INTEGER, "waiting maxAttempts");
+  return {
+    kind: oneOf(WAIT_KINDS, m["kind"], "waiting kind"),
+    attempt: uint(m["attempt"], 1, maxAttempts, "waiting attempt"),
+    maxAttempts,
+    delayMs: uint(m["delayMs"], 0, Number.MAX_SAFE_INTEGER, "waiting delayMs"),
+    until: waitUntil(m["until"]),
+  };
+};
+const rowHolder = (m: Fields): Pick<ListingRow, "waiting" | "engine_version"> => {
+  const waiting = m["waiting"];
+  const version = m["engine_version"];
+  return {
+    ...(waiting === undefined ? {} : { waiting: waitingOf(waiting) }),
+    ...(version === undefined
+      ? {}
+      : { engine_version: text(version, ENGINE_VERSION_MAX_CHARS, "engine_version") }),
+  };
+};
 export const listingRowOf = (v: unknown): ListingRow => {
   const m = known(
     v,
     ROW_FIELDS,
-    ["kind", "parent", "parent_listed", "durable_id", "model", "archived", "settled", "settled_by"],
+    [
+      "kind",
+      "parent",
+      "parent_listed",
+      "durable_id",
+      "model",
+      "archived",
+      "settled",
+      "settled_by",
+      "waiting",
+      "engine_version",
+    ],
     "listing row",
   );
   const durable = m["durable_id"];
@@ -146,6 +191,7 @@ export const listingRowOf = (v: unknown): ListingRow => {
     ...rowLinks(m),
     ...rowModel(m["model"]),
     ...rowSettled(m),
+    ...rowHolder(m),
     ...(archived === undefined ? {} : { archived: archived === true ? true : fail("archived") }),
     ...(durable === undefined
       ? {}

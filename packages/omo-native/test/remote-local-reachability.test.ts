@@ -38,7 +38,7 @@ const RUNTIME_WRAPPERS = "packages/utils/src/runtime/"
 
 // Rule 1: every reachable file importing node:child_process or a spawn wrapper (the utils runtime, the Bun spawn shim).
 const SPAWN_IMPORTERS = [
-  "packages/device-service-core/src/local-api/dacl.ts",
+  "packages/device-service-core/src/local-api/powershell.ts",
   "packages/memory-core/src/locks/process-identity.ts",
   "packages/omo-native/bin/lib/process-list.js",
   "packages/omo-opencode/src/cli/service-auth/account-home.ts",
@@ -58,13 +58,14 @@ const SPAWN_IMPORTERS = [
 const BUN_PRIMITIVE_USES: Record<string, number> = {}
 // Rule 3: every call that can start a process, with its command and argv as written (spawn-call-sites.ts).
 const SPAWN_CALL_SITES = [
-  "packages/device-service-core/src/local-api/dacl.ts: applyExactDacl(path; userSid)",
   "packages/device-service-core/src/local-api/dacl.ts: describeDacl(path; run)",
-  'packages/device-service-core/src/local-api/dacl.ts: node:child_process#spawn("powershell.exe"; ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encoded])',
   "packages/device-service-core/src/local-api/dacl.ts: run(APPLY_DACL_SCRIPT; {LA_PATH,LA_SID,LA_KIND})",
   "packages/device-service-core/src/local-api/dacl.ts: run(CURRENT_USER_SID_SCRIPT; {})",
   "packages/device-service-core/src/local-api/dacl.ts: run(DESCRIBE_DACL_SCRIPT; {LA_PATH})",
-  "packages/device-service-core/src/local-api/dacl.ts: verifyExactDacl(path; userSid)",
+  'packages/device-service-core/src/local-api/powershell.ts: node:child_process#spawn("powershell.exe"; ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encoded])',
+  "packages/device-service-core/src/local-api/secure-windows.ts: packages/device-service-core/src/local-api/dacl.ts#applyExactDacl(path; userSid)",
+  "packages/device-service-core/src/local-api/secure-windows.ts: packages/device-service-core/src/local-api/dacl.ts#verifyExactDacl(path; userSid)",
+  "packages/device-service-core/src/local-api/secure-windows.ts: run(sddlReaderWith(LEVEL_READ); {OMO_LEVEL_PATH})",
   'packages/memory-core/src/locks/process-identity.ts: execFileText("/bin/ps"; ["-o", "args=", "-p", String(pid)])',
   'packages/memory-core/src/locks/process-identity.ts: execFileText("/bin/ps"; ["-o", "lstart=", "-p", String(pid)])',
   'packages/memory-core/src/locks/process-identity.ts: execFileText("powershell.exe"; [ "-NoProfile", "-Command", `(Get-Process -Id ${pid} -ErrorAction SilentlyContinue).StartTime.ToUniversalTime().ToString(\'o\')`, ])',
