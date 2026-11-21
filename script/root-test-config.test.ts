@@ -48,6 +48,7 @@ describe("root test Bun config", () => {
     expect(posixShard2).toContain(
       "bun --config=bunfig.win2.parallel.toml test --timeout 20000 $(junit root-2-remainder)\n",
     )
+    expect(posixShard2).toContain("bun --config=bunfig.win2.parallel.toml test --timeout 20000 --shard=")
     expect(posixShard2).not.toContain("bun test -c")
     expect(workflow).not.toContain("bun test -c")
     expect(workflow).not.toContain("format('-c {0}'")
