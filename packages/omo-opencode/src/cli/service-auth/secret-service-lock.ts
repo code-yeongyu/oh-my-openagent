@@ -1,7 +1,9 @@
 import { spawn } from "node:child_process"
 
-// "unknown": the probe itself could not answer (no gdbus binary, or the bus did not reply in time). The
-// store then falls back to asking libsecret directly, as it did before the probe existed.
+// "absent": no Secret Service exists (no session bus, or nothing owns org.freedesktop.secrets); the shared sign-in then
+// lives in the private state file (#7185b). "unknown": the probe itself could not answer (no gdbus binary, a bus that
+// did not reply in time, a Secret Service with no default collection). The store then falls back to asking libsecret
+// directly, as it did before the probe existed.
 export type SecretServiceLockState = "locked" | "unlocked" | "absent" | "unknown"
 export type SecretServiceLockProbe = () => Promise<SecretServiceLockState>
 
@@ -20,25 +22,44 @@ export const parseLockedReply = (stdout: string): SecretServiceLockState | null 
   return match[1] === "true" ? "locked" : "unlocked"
 }
 
+// Only two gdbus answers prove there is no Secret Service: no session bus at all (no bus socket, and no way to start
+// one), or a bus on which nothing owns or can be activated as the Secret Service name. A bus that refuses this process
+// (another user's bus address under sudo -u), a refused connection, a timeout or any other failure leaves the question
+// open, so a running keyring is never bypassed for the file (#13640 review M1).
+const NO_SECRET_SERVICE =
+  /^Error connecting: (?:Could not connect: No such file or directory|Cannot autolaunch D-Bus without X11 \$DISPLAY|Failed to execute child process .dbus-launch. \(No such file or directory\))|org\.freedesktop\.DBus\.Error\.(?:ServiceUnknown|NameHasNoOwner)\b/m
+
+export const classifyProbeFailure = (stderr: string): SecretServiceLockState =>
+  NO_SECRET_SERVICE.test(stderr) ? "absent" : "unknown"
+
 // Service.Unlock answers (unlocked objects, prompt). Prompt "/" means the request finished with no one asked (a keyring
 // with an empty password, #14039). The object list is not compared: a service may answer the alias with the real
 // collection path, or list nothing because another client unlocked it first, so Locked is read again instead.
 const finishedWithoutPrompt = (stdout: string): boolean => /objectpath\s+'\/'\s*\)\s*$/.test(stdout)
 
-type GdbusAnswer = { readonly kind: "reply"; readonly stdout: string } | { readonly kind: "failed" | "unknown" }
+type GdbusAnswer =
+  | { readonly kind: "reply"; readonly stdout: string }
+  | { readonly kind: "failed"; readonly stderr: string }
+  | { readonly kind: "unknown" }
 
 const gdbus = (args: readonly string[], timeoutMs: number): Promise<GdbusAnswer> =>
   new Promise((resolve) => {
+    // LC_ALL=C: gdbus translates its own "Error connecting:" prefix, which the classification reads.
     const child = spawn("gdbus", ["call", "--session", "--dest", "org.freedesktop.secrets", ...args], {
-      stdio: ["ignore", "pipe", "ignore"],
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, LC_ALL: "C" },
     })
     let stdout = ""
+    let stderr = ""
     const timer = setTimeout(() => {
       child.kill()
       resolve({ kind: "unknown" })
     }, timeoutMs)
     child.stdout.on("data", (chunk: Buffer) => {
       stdout += chunk.toString()
+    })
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString()
     })
     // A missing gdbus (minimal installs ship libglib without libglib2.0-bin) says nothing about the keyring.
     child.on("error", () => {
@@ -47,7 +68,7 @@ const gdbus = (args: readonly string[], timeoutMs: number): Promise<GdbusAnswer>
     })
     child.on("close", (code) => {
       clearTimeout(timer)
-      resolve(code === 0 ? { kind: "reply", stdout } : { kind: "failed" })
+      resolve(code === 0 ? { kind: "reply", stdout } : { kind: "failed", stderr })
     })
   })
 
@@ -64,7 +85,7 @@ const readLocked = async (timeoutMs: number): Promise<SecretServiceLockState> =>
     timeoutMs,
   )
   if (answer.kind === "unknown") return "unknown"
-  return answer.kind === "reply" ? (parseLockedReply(answer.stdout) ?? "absent") : "absent"
+  return answer.kind === "reply" ? (parseLockedReply(answer.stdout) ?? "unknown") : classifyProbeFailure(answer.stderr)
 }
 
 // A locked default collection is first asked to unlock without a prompt; it stays "locked" when that needs a

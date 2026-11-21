@@ -19,6 +19,8 @@
         "test/fixtures/config-migration/opencode-side-effect-import.ts",
         // Test fixtures run as their own process by path (`bun run <dir>/fixtures/<name>.ts`), so nothing imports them.
         "src/hooks/prometheus-md-only/fixtures/*.ts",
+        // Preloaded by path (`bun --preload <file>`) into the launcher child of state-file-cli.test.ts.
+        "src/cli/service-auth/state-file-cli.fixture.ts",
       ],
       "ignoreFiles": [
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
@@ -435,8 +437,6 @@
     "packages/omo-opencode/src/config/schema/fallback-models.ts": ["FallbackModelStringArraySchema", "FallbackModelObjectArraySchema", "FallbackModelMixedArraySchema"],
     // pre-existing at origin dev 4686e425b5: unused export(s) PermissionValueSchema
     "packages/omo-opencode/src/config/schema/internal/permission.ts": ["PermissionValueSchema"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) KeywordTypeSchema
-    "packages/omo-opencode/src/config/schema/keyword-detector.ts": ["KeywordTypeSchema"],
     // pre-existing at origin dev 4686e425b5: unused export(s) OpenClawGatewaySchema, OpenClawHookSchema, OpenClawReplyListenerConfigSchema
     "packages/omo-opencode/src/config/schema/openclaw.ts": ["OpenClawGatewaySchema", "OpenClawHookSchema", "OpenClawReplyListenerConfigSchema"],
     // pre-existing at origin dev 4686e425b5: unused export(s) RalphLoopConfigSchema

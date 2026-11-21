@@ -1,3 +1,4 @@
+import { rowKey } from "@oh-my-opencode/thread-address-core"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import type { RpcRemoteSource, SenpiExtensionAPI } from "../../../extension/types"
 import type * as CrossDevice from "./cross-device"
@@ -55,11 +56,11 @@ export const createRelayTransport = (
   }
 }
 
-/** The control of a thread on another device, from the sidecar; its identity is the listing row's, read with no load. */
+/** The control of a thread on another device, from the sidecar; its identity is the listing row's key (as the sidecar's), read with no load. */
 export const createRelayControl = (remote: RemoteThreadSurface, row: RemoteSessionRow): SessionControl => {
   const built = runtime().then((loaded) => loaded.createRelayControl(remote, row))
   return {
-    thread_id: row.durable_id ?? "",
+    thread_id: rowKey(row),
     device: row.device,
     // #13304: printed by thread_read; another device's own text.
     title: escapeForDisplay(row.title),
@@ -68,6 +69,7 @@ export const createRelayControl = (remote: RemoteThreadSurface, row: RemoteSessi
     close: async (options) => await (await built).close(options),
     setName: async (name) => await (await built).setName(name),
     getAvailableModels: async (options) => await (await built).getAvailableModels(options),
+    getModelState: async () => await (await built).getModelState(),
     setModel: async (provider, id) => await (await built).setModel(provider, id),
     getAvailableThinkingLevels: async () => await (await built).getAvailableThinkingLevels(),
     setThinkingLevel: async (level) => await (await built).setThinkingLevel(level),

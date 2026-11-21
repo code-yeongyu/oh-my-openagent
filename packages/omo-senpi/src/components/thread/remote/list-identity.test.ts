@@ -60,7 +60,7 @@ describe("thread_list row names (#14305 U6)", () => {
   })
 
   test("#given b lists a session with no name #when its folder name is used as an address #then it is no address: only a real name is", async () => {
-    const a = account({ rows: [{ ...B_ROW, title: "", project: "/work/notes" }] })
+    const a = account({ rows: [{ ...B_ROW, title: "", path: "/work/notes", project: "/work/notes" }] })
     const { run } = surface(a.remote)
     expect(onB(await run("thread_list", {})).map((thread) => thread.name)).toEqual(["notes"])
     expect(await run("thread_set_model", { thread: "notes", model: "opus" })).toMatchObject({
