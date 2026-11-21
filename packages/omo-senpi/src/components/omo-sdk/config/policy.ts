@@ -96,16 +96,20 @@ type ParsedEdit =
       readonly scope: "global" | "project"
     }
 
+/** An empty key, or one that would walk into an object's prototype instead of the document. */
+const PROTOTYPE_KEYS: ReadonlySet<Segment> = new Set(["__proto__", "constructor", "prototype"])
+const isUnusableSegment = (segment: Segment): boolean => segment === "" || PROTOTYPE_KEYS.has(segment)
+
 function parseEdit(edit: ConfigEdit): ParsedEdit | undefined {
   const scope = edit.scope ?? "user"
   if (typeof edit.path === "string" && edit.path.startsWith(ENGINE_PATH_PREFIX)) {
     const segments = engineKeySegments(edit.path.slice(ENGINE_PATH_PREFIX.length))
-    return segments.some((segment) => segment.length === 0)
+    return segments.some(isUnusableSegment)
       ? undefined
       : { kind: "engine", segments, value: edit.value, scope: scope === "user" ? "global" : "project" }
   }
   const segments = typeof edit.path === "string" ? edit.path.split(".") : edit.path
-  return segments.length === 0 || segments.some((segment) => segment === "")
+  return segments.length === 0 || segments.some(isUnusableSegment)
     ? undefined
     : { kind: "omo", segments, value: edit.value, scope }
 }
@@ -114,9 +118,14 @@ export function checkPolicy(context: ConfigContext, options: CheckOptions = {}):
   const parsed = (options.edits ?? []).map((edit) => ({ edit, parsed: parseEdit(edit) }))
   const invalid = parsed.find((entry) => entry.parsed === undefined)
   if (invalid !== undefined)
-    return refused("unknown_path", "an edit has an empty key path", "give every edit a dotted key path", {
-      path: invalid.edit.path,
-    })
+    return refused(
+      "unknown_path",
+      "an edit has an empty or reserved key in its path",
+      "give every edit a dotted key path of configuration keys",
+      {
+        path: invalid.edit.path,
+      },
+    )
   const edits = parsed.flatMap((entry) => (entry.parsed === undefined ? [] : [entry.parsed]))
 
   const base = loadSenpiOmoConfig({ cwd: context.cwd, env: context.env })
