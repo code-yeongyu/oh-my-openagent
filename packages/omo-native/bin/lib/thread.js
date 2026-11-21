@@ -19,7 +19,7 @@ const USAGE = [
   "usage: omo thread <list|send|read|close> [options] [--json]",
   "",
   "  list      [--all-scope] [--state running|idle|inactive|archived[,...]]  (repeatable; default: all but archived)",
-  "  send      <target> <text> [--mode auto|steer|follow_up] [--expected-turn <n>] [--idempotency-key <k>]",
+  "  send      <target> <text> [--mode auto|steer|follow_up] [--expected-turn <n>] [--idempotency-key <k>] [--collapse-key <k>]",
   "  read      <target> [--limit <items>] [--max-bytes <n>] [--cursor <c>]",
   "  close     <target> [--force | --graceful [--wait-ms <n>]] [--idempotency-key <k>]",
   "",
@@ -44,7 +44,7 @@ const COMMANDS = {
     },
   },
   send: {
-    values: ["--mode", "--expected-turn", "--idempotency-key"],
+    values: ["--mode", "--expected-turn", "--idempotency-key", "--collapse-key"],
     booleans: [],
     arity: [2, 2],
     call: (sdk, p, o, scope) =>
@@ -55,6 +55,7 @@ const COMMANDS = {
         mode: o["--mode"],
         expected_turn_id: integerOption(o, "--expected-turn"),
         idempotency_key: o["--idempotency-key"],
+        collapse_key: o["--collapse-key"],
       }),
   },
   read: {

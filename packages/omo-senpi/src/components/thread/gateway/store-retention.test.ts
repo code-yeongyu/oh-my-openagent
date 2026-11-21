@@ -20,11 +20,11 @@ function insertDelivery(
   id: string,
   state: string,
   updatedAt: number,
-  extra: { readonly target?: string; readonly seq: number; readonly root?: string },
+  extra: { readonly target?: string; readonly seq: number; readonly root?: string; readonly expiresAt?: number },
 ): void {
   db.run(
     'INSERT INTO deliveries (delivery_id, target_durable_id, seq, sender, envelope, body, bytes, mode_requested, state, root_id, hop, created_at, updated_at, expires_at) VALUES (?, ?, ?, \'session:A\', \'{"provenance":{"workspace":"Example","project":"project"}}\', \'body\', 4, \'auto\', ?, ?, 1, ?, ?, ?)',
-    [id, extra.target ?? "B", extra.seq, state, extra.root ?? "root-x", updatedAt, updatedAt, updatedAt + DAY],
+    [id, extra.target ?? "B", extra.seq, state, extra.root ?? "root-x", updatedAt, updatedAt, extra.expiresAt ?? updatedAt + DAY],
   )
 }
 
@@ -66,8 +66,8 @@ describe("gateway store retention", () => {
       )
       insertDelivery(db, "d-applied", "applied", t0, { seq: 1, root: "root-old" })
       insertDelivery(db, "d-refused", "refused", t0, { seq: 2 })
-      insertDelivery(db, "d-queued", "queued", t0, { seq: 3 })
-      insertDelivery(db, "d-admitted", "admitted", t0, { seq: 4 })
+      insertDelivery(db, "d-queued", "queued", t0, { seq: 3, expiresAt: t0 + 40 * DAY })
+      insertDelivery(db, "d-admitted", "admitted", t0, { seq: 4, expiresAt: t0 + 40 * DAY })
       insertDelivery(db, "d-receipt", "applied", t0, { seq: 5 })
       insertDelivery(db, "d-recent", "applied", t0 + 30 * DAY, { seq: 6, root: "root-live" })
       db.run(

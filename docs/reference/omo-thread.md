@@ -28,7 +28,7 @@ Listing, name ambiguity and fuzzy matching still use broad discovery. No TTL or 
 
 ```bash
 omo thread list [--all-scope] [--state running|idle|inactive|archived[,...]] [--json]
-omo thread send <target> <text> [--mode auto|steer|follow_up] [--expected-turn <n>] [--idempotency-key <k>] [--json]
+omo thread send <target> <text> [--mode auto|steer|follow_up] [--expected-turn <n>] [--idempotency-key <k>] [--collapse-key <k>] [--json]
 omo thread read <target> [--limit <items>] [--max-bytes <n>] [--cursor <c>] [--json]
 ```
 
@@ -118,11 +118,17 @@ Every send is checked against fixed budgets, which no setting raises:
 | Guard | Limit | Answer |
 | --- | --- | --- |
 | Message size | 1 MiB for `send` | `message_too_large` |
-| Backlog of one target | 128 undelivered messages or 1 MiB | `queue_full` |
+| Backlog of one target | 128 undelivered follow-up/auto messages or 1 MiB; steers have their own 16 / 256 KiB; an expired message no longer counts, also while the target is not running | `queue_full` (details: held count, how many the session holds vs the gateway, oldest age, reason, `target_running`, and `frees_at`: when the oldest queued message expires and frees a slot) |
 | One sender to one target (the loop guard) | bursts of 8, then one every 5 s | `pair_loop_guard` with `burst`, `window_ms` and `retry_after_ms` |
 | One causal chain (a message and the messages it caused) | no count limit; each delivery records its hop | - |
 | A send to itself | always refused | `loop_detected` |
-| An undelivered message | expires after 24 hours | the row ends `refused` |
+| An undelivered message | expires after 24 hours, whether or not the target is running | the row ends `refused` |
+
+A sender that repeats one message (an alert re-sent every few minutes) passes `--collapse-key <k>`
+(`collapse_key` on `thread_send`): the send replaces the sender's earlier undelivered message under
+the same key, which ends `refused` `superseded`, or, when the session already took that one into its
+queue, is answered deduplicated with its delivery id and `collapsed: true` (this text is not delivered;
+the earlier message stands). One key never holds more than one undelivered message. It reaches sessions on this device only; a send to another device with it answers `unsupported`.
 
 A session may message the session that messaged it, so A to B to A is delivered; answers also flow back through `read`.
 

@@ -51,6 +51,7 @@ const gateway = [
   ["adopt", "adopt.mjs"],
   ["draft-preservation", "draft-preservation.mjs"],
   ["default-delivery", "default-delivery.mjs"],
+  ["busy-backlog", "busy-backlog.mjs"],
 ]
 
 const legacy = [

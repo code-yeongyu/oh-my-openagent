@@ -16,6 +16,16 @@ import { settled } from "./testing/settled"
  */
 const V14 = 14
 
+/** What the steps after v15 add to `deliveries`: v16's collapse key column and its index (#14428). */
+const SINCE_V15 = {
+  column: { name: "collapse_key", type: "TEXT", notnull: 0, dflt_value: null, pk: 0 },
+  object: { type: "index", name: "deliveries_collapse" },
+  row: { collapse_key: null },
+}
+
+const byTypeAndName = (left: { type: string; name: string }, right: { type: string; name: string }) =>
+  left.type === right.type ? left.name.localeCompare(right.name) : left.type.localeCompare(right.type)
+
 let harness: GatewayHarness | undefined
 afterEach(async () => {
   await harness?.dispose()
@@ -33,8 +43,8 @@ const ENVELOPE = (id: string) =>
     delivery_id: id,
   })
 
-/** The binding-era objects the v16 step drops from an empty-bindings store, with their registry rows. */
-const V16_DROPPED = /^(sqlite_autoindex_)?(bindings|outbox|outbox_cursors|completion_arms)(_|$)/
+/** The binding-era objects the v17 step drops from an empty-bindings store, with their registry rows. */
+const V17_DROPPED = /^(sqlite_autoindex_)?(bindings|outbox|outbox_cursors|completion_arms)(_|$)/
 
 /** A v14 row with every column set, the later-added ones included, so a dropped or reordered column shows. */
 const DELIVERY_ROW = (id: string, seq: number, effective: string | null, extra: Partial<Record<string, string>> = {}) =>
@@ -110,12 +120,14 @@ test("#given a v14 store holding deliveries in every lane #when the current buil
 
   const after = snapshot(path)
   expect(after.version).toBe(GATEWAY_MIGRATIONS.length)
-  expect(after.rows).toEqual(before.rows)
-  expect(after.columns).toEqual(before.columns)
-  expect(after.objects).toEqual(before.objects)
-  // v16 then drops the binding-era tables (this store holds no binding rows) and their registry rows; nothing else goes.
+  expect(after.rows).toEqual(before.rows.map((row) => ({ ...(row as object), ...SINCE_V15.row })))
+  expect(after.columns).toEqual([...before.columns, SINCE_V15.column])
+  expect(after.objects).toEqual(
+    [...(before.objects as { type: string; name: string }[]), SINCE_V15.object].toSorted(byTypeAndName),
+  )
+  // v17 then drops the binding-era tables (this store holds no binding rows) and their registry rows; nothing else goes.
   expect(after.registry).toEqual(
-    (before.registry as { readonly name: string }[]).filter((row) => !V16_DROPPED.test(row.name)),
+    (before.registry as { readonly name: string }[]).filter((row) => !V17_DROPPED.test(row.name)),
   )
   expect(after.foreignKeyViolations).toBe(0)
   insertStart()

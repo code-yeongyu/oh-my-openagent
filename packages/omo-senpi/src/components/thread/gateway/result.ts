@@ -20,6 +20,10 @@ export const REFUSAL_CODES: Readonly<Record<string, { readonly code: ThreadError
     code: "not_resumable",
     next: "The thread was closed before it read this message; reopen it (tool.thread_create({ thread }) in an eval cell) and send again if it still matters.",
   },
+  superseded: {
+    code: "not_resumable",
+    next: "A newer message from the same sender with the same collapse_key replaced this one before the target read it; nothing to do.",
+  },
 }
 
 /** What a row the receiver admitted to its queue waits on, if anything: the hold it was kept under, or the approval its receiver was parked on. */

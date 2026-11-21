@@ -442,7 +442,13 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
     ...PROVENANCE_MIGRATION,
   ],
 
-  // v16 (#14312): thread bindings are gone, with the outbox, its consumer cursors and the completion arms that only a
+  // v16 (#14428): a sender's collapse key, so a repeat replaces its earlier undelivered delivery to the same target.
+  [
+    "ALTER TABLE deliveries ADD COLUMN collapse_key TEXT",
+    "CREATE INDEX deliveries_collapse ON deliveries (target_durable_id, sender, collapse_key) WHERE collapse_key IS NOT NULL",
+  ],
+
+  // v17 (#14312): thread bindings are gone, with the outbox, its consumer cursors and the completion arms that only a
   // binding fed. One-way: their rows are deleted. `bindings` itself is dropped only when it holds no rows AND no table
   // declares a foreign key to it (store-ops.ts dropEmptyBindings): an extension that kept thread routes on core
   // bindings imports their owners through the read-only `tx.bindingFor` on its next open (dori-extension#122), and an

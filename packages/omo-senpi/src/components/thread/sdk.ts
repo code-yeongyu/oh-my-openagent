@@ -48,7 +48,7 @@ import { resolveThreadSocket } from "./live-surface-paths"
 import { createGatewayServices } from "./tools/gateway-services"
 import { addressBook, hostView, sendAddressBook } from "./tools/internals"
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "./tools/ports"
-import { listThreads, readThread } from "./tools/read-ops"
+import { listThreads, readThread, withBacklog } from "./tools/read-ops"
 import { sendView } from "./tools/send-view"
 import { listAcross } from "./remote/cross-device"
 import { TOOL_CALL_BUDGET_MS, waitWithinCallBudget, withCallDeadline } from "../call-budget/call-deadline"
@@ -132,6 +132,8 @@ export type ThreadSdk = StoreExtensionApi & {
         readonly text: string
         readonly mode?: GatewayDeliveryMode
         readonly expected_turn_id?: number
+        /** Replaces this sender's earlier undelivered send to the thread under the same key (#14428). */
+        readonly collapse_key?: string
       },
   ) => Promise<ThreadSdkSendResult>
   readonly locate: (
@@ -216,7 +218,15 @@ function unknownKeys(request: unknown, known: readonly string[]): Failure | unde
 
 const LIST_KEYS = ["all_scope", "state"] as const
 const READ_KEYS = ["thread", "max_bytes", "cursor", "all_scope"] as const
-const SEND_KEYS = ["thread", "text", "mode", "expected_turn_id", "all_scope", "idempotency_key"] as const
+const SEND_KEYS = [
+  "thread",
+  "text",
+  "mode",
+  "expected_turn_id",
+  "all_scope",
+  "idempotency_key",
+  "collapse_key",
+] as const
 const LOCATE_KEYS = ["thread", "all_scope"] as const
 
 // omo#14130: every SDK operation runs inside one tool-call budget, as an agent's thread tool call does (tools.ts).
@@ -314,7 +324,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
           unknownKeys(request, LIST_KEYS) ??
           listAcross(
             options.remote,
-            listThreads(surface, await view(), request.all_scope, request.state),
+            await withBacklog(surface.store, listThreads(surface, await view(), request.all_scope, request.state)),
             request.all_scope === true,
             request.state,
           ),
@@ -379,6 +389,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
           mode: request.mode ?? DEFAULT_THREAD_DELIVERY,
           ...(request.expected_turn_id === undefined ? {} : { expected_turn_id: String(request.expected_turn_id) }),
           idempotency_key: request.idempotency_key ?? `auto:${randomUUID()}`,
+          ...(request.collapse_key === undefined ? {} : { collapse_key: request.collapse_key }),
           args: request,
         })
         if (sent.kind === "ok" && "device" in sent)

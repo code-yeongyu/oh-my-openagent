@@ -13,7 +13,7 @@ afterEach(async () => {
   harness = undefined
 })
 
-/** Schema v14: a store from before the v15 deliveries rebuild and the v16 binding drop. Pinned, not `length - 1`, because later migrations append. */
+/** Schema v14: a store from before the v15 deliveries rebuild, the v16 collapse key and the v17 binding drop. Pinned, not `length - 1`, because later migrations append. */
 const V14 = 14
 
 const moduleUrl = new URL("./testing/store-extension.mjs", import.meta.url).href
@@ -125,7 +125,7 @@ test("#given a v14 store with no binding rows #when the current store opens it #
   }
 })
 
-/** Schema v15: train 6's store (the `deliveries` rebuild for the start lane), the one a released omo leaves before v16. */
+/** Schema v15: train 6's store (the `deliveries` rebuild for the start lane), the one a released omo leaves before v16 and v17. */
 const V15 = 15
 
 test.each<[string, boolean, { name: string }[]]>([
@@ -165,7 +165,7 @@ test.each([
   ["holding the binding", true, { binding_id: "bnd-1", policy_id: "dori:v1:route-1", session_durable_id: "target" }],
   ["with no binding rows", false, null],
 ] as const)(
-  "#given a v14 store %s #when an extension reads the thread's legacy binding after v16 #then it gets the owner while the rows exist, else null",
+  "#given a v14 store %s #when an extension reads the thread's legacy binding after v17 #then it gets the owner while the rows exist, else null",
   async (_label, bound, expected) => {
     const h = (harness = createGatewayHarness())
     v14Fixture(gatewayDatabasePath(h.agentDir), [], { bound })
@@ -187,14 +187,14 @@ test.each([
   },
 )
 
-// An extension table that still declares a foreign key to `bindings` keeps it usable: v16 leaves an empty `bindings` in
+// An extension table that still declares a foreign key to `bindings` keeps it usable: v17 leaves an empty `bindings` in
 // place while any table references it, because dropping it would make every later insert into that table fail with
 // "no such table: main.bindings" once foreign keys are back on.
 test.each([
   ["ON DELETE CASCADE", "REFERENCES bindings ON DELETE CASCADE"],
   ["a plain REFERENCES", "REFERENCES bindings"],
 ])(
-  "#given an empty bindings table and an extension table referencing it with %s #when the store migrates to v16 #then bindings stays, the extension rows stay, and the extension table still takes writes",
+  "#given an empty bindings table and an extension table referencing it with %s #when the store migrates to v17 #then bindings stays, the extension rows stay, and the extension table still takes writes",
   async (_label, reference) => {
     const h = (harness = createGatewayHarness())
     const path = gatewayDatabasePath(h.agentDir)
