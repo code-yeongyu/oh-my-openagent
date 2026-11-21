@@ -7,8 +7,9 @@ import { remoteCommand, type RemoteProgram } from "./ssh-port"
 
 const LINK = "https://app.doriterm.example/join#secret-join-fixture-7f3a"
 const meshLine = (members: number) =>
-  `doriterm-setup: mesh ok mesh 1a2b3c4d sync=on ${members} members: a=self b=connected`
-const OK = "doriterm-setup: result ok"
+  `doriterm-setup: mesh ok mesh heihjzwj sync=ok ${members} members: a=self b=connected`
+// doriterm's own result line, as its setup CLI prints it.
+const OK = "doriterm-setup: result ok exit 0"
 
 type Remote = { lines: readonly string[]; code: number }
 

@@ -54,15 +54,16 @@ const bunRecentEnough = (version: string): boolean => {
   return true
 }
 
-// "doriterm-setup: mesh ok mesh 1a2b3c4d sync=... 3 members: a=self b=connected c=connected"
+// "doriterm-setup: mesh ok mesh heihjzwj sync=ok 3 members: a=self b=connected c=connected" (the mesh id is lowercase base32)
 const membersOf = (lines: readonly string[]): number | undefined => {
   for (const line of lines) {
-    const match = /^doriterm-setup: mesh \w+ mesh [0-9a-f]+ \S+ (\d+) members:/.exec(line)
+    const match = /^doriterm-setup: mesh \w+ mesh [0-9a-z]+ \S+ (\d+) members:/.exec(line)
     if (match?.[1] !== undefined) return Number(match[1])
   }
   return undefined
 }
-const resultOk = (lines: readonly string[]): boolean => lines.includes("doriterm-setup: result ok")
+// doriterm ends every command with "doriterm-setup: result ok exit 0" or "doriterm-setup: result fail exit <n>".
+const resultOk = (lines: readonly string[]): boolean => lines.some((line) => /^doriterm-setup: result ok\b/.test(line))
 
 const failed = (code: DoritermFailureCode): DoritermOutcome => ({
   kind: "failed",
