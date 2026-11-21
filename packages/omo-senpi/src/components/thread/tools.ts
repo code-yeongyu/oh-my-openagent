@@ -347,7 +347,20 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
       if (refusal === undefined) return await failed(error)
       result = { kind: "error", error: refusal }
     }
-    if (receipted) await store.toolReceiptSettle({ ...scope, now: now(), result }).catch(unrecorded("the call ran"))
+    // A create that may have made its thread (its open's reply was lost) has no answer yet: its receipt stays uncertain,
+    // so a retry under the key runs the create again, which finds that thread or answers uncertain again (#14060).
+    const undecided =
+      name === "thread_create" && result.kind === "error" && result.error.code === "idempotency_uncertain"
+        ? result.error.message
+        : undefined
+    if (receipted)
+      await store
+        .toolReceiptSettle({
+          ...scope,
+          now: now(),
+          ...(undecided === undefined ? { result } : { error_note: undecided }),
+        })
+        .catch(unrecorded("the call ran"))
     running.delete(receiptKey(scope))
     return output(result)
   }
