@@ -18,7 +18,7 @@ import { buildMemorySnapshot, createMemoryRpcGitRepo } from "./memory-rpc-snapsh
 import type { SenpiExtensionAPI } from "../../extension/types"
 import type { MemoryIdentityContext } from "./context"
 
-import { MEMORY_CALL_TIMEOUT_MS, boundMemoryCall, type MemoryCallStage } from "./tool-call-bound"
+import { MEMORY_CALL_TIMEOUT_MS, boundMemoryCall, type MemoryCallStage, type MemoryCallState } from "./tool-call-bound"
 import { MEMORY_TOOL_DESCRIPTION, MEMORY_TOOL_NAME } from "./tool-metadata"
 
 export { MEMORY_TOOL_NAME }
@@ -192,7 +192,7 @@ function createMemoryTool(
       const context = resolveContext()
       if (context === undefined) return errorResult(`${MEMORY_TOOL_NAME}: ${UNBOUND_IDENTITY_MESSAGE}`)
       let stage: MemoryCallStage = "prepare"
-      const runWrite = async (): Promise<MemoryToolExecutionResult> => {
+      const runWrite = async (call: MemoryCallState): Promise<MemoryToolExecutionResult> => {
         const { repo, lock, author } = await prepareEngine(context, options)
         const provenance = readToolProvenance(params)
         const result = await runMemoryTool({
@@ -203,7 +203,11 @@ function createMemoryTool(
             stage = next
           },
         })
+        stage = "report"
+        // A write that lands after its call was answered as cancelled or timed out must not announce itself as an edit.
+        if (call.stopped) return okResult(result.message)
         if (result.commit !== undefined) options.onCommit?.(result.commit)
+        if (call.stopped) return okResult(result.message)
         return okResult(result.message, await writeNoticeFor(context, result.commit, options))
       }
       const outcome = await boundMemoryCall(runWrite, {

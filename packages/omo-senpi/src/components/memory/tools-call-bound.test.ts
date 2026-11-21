@@ -118,6 +118,58 @@ describe.skipIf(process.platform === "win32")("memory tool call bound", () => {
     expect(next.isError).toBeUndefined()
   })
 
+  test("#given a call stopped mid-commit #when its write lands later #then it announces no commit", async () => {
+    // given
+    const fixture = await boundFixture()
+    const announced: string[] = []
+    const [memoryTool] = createMemoryTools(() => fixture.context, {
+      onCommit: (commit) => announced.push(commit.subject),
+    })
+    const held = await holdNextCommit(fixture)
+    const controller = new AbortController()
+    const call = memoryTool.execute(
+      "call-1",
+      { command: "create", reason: "Held write", file_path: "held.md", description: "d" },
+      controller.signal,
+    )
+    await held.insideHook
+    controller.abort()
+    expect((await call).isError).toBe(true)
+
+    // when
+    await held.release()
+    const next = await memoryTool.execute("call-2", {
+      command: "create",
+      reason: "Next write",
+      file_path: "next.md",
+      description: "d",
+    })
+
+    // then
+    expect(next.isError).toBeUndefined()
+    expect((await git(fixture.repo, ["log", "-2", "--format=%s"])).split("\n")).toEqual(["Next write", "Held write"])
+    expect(announced).toEqual(["Next write"])
+  })
+
+  test("#given the commit landed #when the call is stopped while it reports the write #then the stage says so", async () => {
+    // given
+    const fixture = await boundFixture()
+    const controller = new AbortController()
+    const [memoryTool] = createMemoryTools(() => fixture.context, { onCommit: () => controller.abort() })
+
+    // when
+    const result = await memoryTool.execute(
+      "call-1",
+      { command: "create", reason: "Landed write", file_path: "landed.md", description: "d" },
+      controller.signal,
+    )
+
+    // then
+    expect(result.isError).toBe(true)
+    expect(textOf(result)).toContain("memory: create was cancelled while reporting the write")
+    expect(await git(fixture.repo, ["log", "-1", "--format=%s"])).toBe("Landed write")
+  })
+
   test("#given an already-aborted signal #when the tool executes #then it refuses before touching the repository", async () => {
     // given
     const fixture = await boundFixture()

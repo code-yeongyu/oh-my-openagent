@@ -6,7 +6,7 @@ import type { MemoryWriteStage } from "@oh-my-opencode/memory-core"
  */
 export const MEMORY_CALL_TIMEOUT_MS = 180_000
 
-export type MemoryCallStage = "prepare" | MemoryWriteStage
+export type MemoryCallStage = "prepare" | MemoryWriteStage | "report"
 
 const STAGE_TEXT: Record<MemoryCallStage, string> = {
   prepare: "preparing the memory repository",
@@ -14,6 +14,12 @@ const STAGE_TEXT: Record<MemoryCallStage, string> = {
   check: "checking the memory repository state",
   apply: "editing the memory file",
   commit: "committing to git",
+  report: "reporting the write",
+}
+
+/** `stopped` turns true, before the caller hears of it, once the call has answered with a timeout or a cancellation. */
+export interface MemoryCallState {
+  readonly stopped: boolean
 }
 
 const LATE_WRITE_NOTE =
@@ -26,10 +32,11 @@ export type BoundedCall<T> =
 
 /**
  * Starts `start` unless `signal` already aborted, then waits until it settles, `signal` aborts, or `timeoutMs` passes.
- * Work that is stopped keeps running in the background (a write cannot be undone halfway); its result is dropped.
+ * Work that is stopped keeps running in the background (a write cannot be undone halfway); its result is dropped, and
+ * it reads `state.stopped` to skip anything that would present it as a normal outcome.
  */
 export async function boundMemoryCall<T>(
-  start: () => Promise<T>,
+  start: (state: MemoryCallState) => Promise<T>,
   options: {
     readonly command: string
     readonly stage: () => MemoryCallStage
@@ -39,19 +46,23 @@ export async function boundMemoryCall<T>(
 ): Promise<BoundedCall<T>> {
   const { command, stage, timeoutMs, signal } = options
   if (signal?.aborted === true) return { kind: "stopped", message: cancelledMessage(command, stage()) }
-  const work = start()
+  const state = { stopped: false }
+  const work = start(state)
   let timer: ReturnType<typeof setTimeout> | undefined
   let onAbort: (() => void) | undefined
   const stopped = new Promise<BoundedCall<T>>((resolve) => {
+    const stop = (message: string) => {
+      state.stopped = true
+      resolve({ kind: "stopped", message })
+    }
     timer = setTimeout(
       () =>
-        resolve({
-          kind: "stopped",
-          message: `memory: ${command} did not finish within ${formatSeconds(timeoutMs)} (stopped while ${STAGE_TEXT[stage()]}). ${LATE_WRITE_NOTE}`,
-        }),
+        stop(
+          `memory: ${command} did not finish within ${formatSeconds(timeoutMs)} (stopped while ${STAGE_TEXT[stage()]}). ${LATE_WRITE_NOTE}`,
+        ),
       timeoutMs,
     )
-    onAbort = () => resolve({ kind: "stopped", message: cancelledMessage(command, stage()) })
+    onAbort = () => stop(cancelledMessage(command, stage()))
     signal?.addEventListener("abort", onAbort, { once: true })
   })
   try {
