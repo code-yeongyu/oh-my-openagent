@@ -63,9 +63,14 @@ describe("devices.revoke", () => {
     expect([...names.keys()]).toEqual(["dev-a"])
   })
 
-  test("#given a name that is not the device's current name #when revoked #then confirmation_mismatch and no DELETE", async () => {
+  // An eval cell calls the SDK untyped, so a missing or undefined name has to be refused like a wrong one.
+  test.each([
+    ["a wrong name", { id: "dev-b", confirmName: "wrong" }],
+    ["no name", { id: "dev-b" }],
+    ["an undefined name", { id: "dev-b", confirmName: undefined }],
+  ])("#given %s #when revoked #then confirmation_mismatch and no DELETE", async (_case, call) => {
     const { ports, requests, names } = account({ "dev-a": "device-a", "dev-b": "device-b" })
-    const error = errorOf(await sdkWith(ports).devices.revoke({ id: "dev-b", confirmName: "wrong" }))
+    const error = errorOf(await sdkWith(ports).devices.revoke(call as { id: string; confirmName: string }))
     expect(error.code).toBe("confirmation_mismatch")
     expect(deletes(requests)).toEqual([])
     expect([...names.keys()]).toEqual(["dev-a", "dev-b"])
