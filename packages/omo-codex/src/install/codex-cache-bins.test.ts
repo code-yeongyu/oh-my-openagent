@@ -5,8 +5,14 @@ import { mkdtempSync } from "node:fs"
 import { chmod, lstat, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { linkRootRuntimeBin } from "./codex-cache-bins"
-import { windowsCommandShim } from "./codex-cache-command-shim"
+import { linkCachedPluginBins, linkRootRuntimeBin } from "./codex-cache-bins"
+import { COMMAND_SHIM_MARKER, windowsCommandShim } from "./codex-cache-command-shim"
+
+const STANDALONE_OMO_BINARY = Buffer.concat([
+  Buffer.from([0xcf, 0xfa, 0xed, 0xfe]),
+  Buffer.alloc(1024),
+  Buffer.from('var RUNTIME_WRAPPER_MARKER = "OMO_GENERATED_RUNTIME_WRAPPER";\n'),
+])
 
 async function createRepoFixture(): Promise<{ repoRoot: string; binDir: string; codexHome: string }> {
   const root = mkdtempSync(join(tmpdir(), "omo-codex-cache-bins-"))
@@ -313,5 +319,132 @@ describe("legacy omo reclamation across link kinds", () => {
 
     // then
     expect(link?.name).toBe("omo-agent-toolkit")
+  })
+
+  it("#given bin/omo is a standalone omo binary embedding the marker past its header #when writing the canonical wrapper #then preserves it byte-identical", async () => {
+    // given: the standalone omo build bundles this installer, so the marker string sits in its payload
+    const fixture = await createRepoFixture()
+    await mkdir(fixture.binDir, { recursive: true })
+    const legacyPath = join(fixture.binDir, "omo")
+    await writeFile(legacyPath, STANDALONE_OMO_BINARY)
+
+    // when
+    await linkRootRuntimeBin({ ...fixture, platform: "linux" })
+
+    // then
+    expect(await readFile(legacyPath)).toEqual(STANDALONE_OMO_BINARY)
+  })
+
+  it("#given bin/omo is a symlink to a standalone omo binary embedding the marker #when writing the canonical wrapper #then preserves the symlink", async () => {
+    // given
+    const fixture = await createRepoFixture()
+    await mkdir(fixture.binDir, { recursive: true })
+    const target = join(fixture.repoRoot, "omo-standalone")
+    await writeFile(target, STANDALONE_OMO_BINARY)
+    await symlink(target, join(fixture.binDir, "omo"))
+
+    // when
+    await linkRootRuntimeBin({ ...fixture, platform: "linux" })
+
+    // then
+    const entry = await lstat(join(fixture.binDir, "omo"))
+    expect(entry.isSymbolicLink()).toBe(true)
+  })
+})
+
+describe("command shim header checks on the win32 link path", () => {
+  async function createPluginFixture(): Promise<{ root: string; pluginRoot: string; binDir: string }> {
+    const root = mkdtempSync(join(tmpdir(), "omo-codex-shim-header-"))
+    const pluginRoot = join(root, "plugin")
+    const binDir = join(root, "bin")
+    await mkdir(pluginRoot, { recursive: true })
+    await writeFile(join(pluginRoot, "target.cjs"), "console.log('hi')\n")
+    await writeFile(join(pluginRoot, "package.json"), JSON.stringify({
+      name: "shim-header-fixture",
+      bin: { mytool: "target.cjs" },
+    }))
+    return { root, pluginRoot, binDir }
+  }
+
+  // A file that merely embeds the marker below its header, like a standalone binary
+  // bundling the installer module, must not read as a generated command shim.
+  const MARKER_BELOW_HEADER = `@echo off\r\nrem custom wrapper\r\n${COMMAND_SHIM_MARKER}\r\n`
+
+  it("#given bin/mytool.cmd embeds the shim marker below its header #when linking plugin bins on win32 #then rejects and preserves the file byte-identical", async () => {
+    // given
+    const fixture = await createPluginFixture()
+    try {
+      await mkdir(fixture.binDir, { recursive: true })
+      const shimPath = join(fixture.binDir, "mytool.cmd")
+      await writeFile(shimPath, MARKER_BELOW_HEADER)
+
+      // when
+      await expect(linkCachedPluginBins({ ...fixture, platform: "win32" })).rejects.toThrow(
+        "already exists and is not a generated command shim",
+      )
+
+      // then
+      expect(await readFile(shimPath, "utf8")).toBe(MARKER_BELOW_HEADER)
+    } finally {
+      await rm(fixture.root, { recursive: true, force: true })
+    }
+  })
+
+  it("#given bin/mytool.cmd is a genuine generated shim #when linking plugin bins on win32 #then overwrites it with the new shim", async () => {
+    // given
+    const fixture = await createPluginFixture()
+    try {
+      await mkdir(fixture.binDir, { recursive: true })
+      const shimPath = join(fixture.binDir, "mytool.cmd")
+      await writeFile(shimPath, windowsCommandShim(join(fixture.pluginRoot, "stale-target.cjs")))
+
+      // when
+      const linked = await linkCachedPluginBins({ ...fixture, platform: "win32" })
+
+      // then
+      expect(linked).toHaveLength(1)
+      expect(linked[0].name).toBe("mytool")
+      expect(await readFile(shimPath, "utf8")).toBe(windowsCommandShim(join(fixture.pluginRoot, "target.cjs")))
+    } finally {
+      await rm(fixture.root, { recursive: true, force: true })
+    }
+  })
+
+  it("#given bin/omo.cmd embeds the shim marker below its header #when linking plugin bins on win32 #then preserves it", async () => {
+    // given
+    const fixture = await createPluginFixture()
+    try {
+      await mkdir(fixture.binDir, { recursive: true })
+      const legacyPath = join(fixture.binDir, "omo.cmd")
+      await writeFile(legacyPath, MARKER_BELOW_HEADER)
+
+      // when
+      const linked = await linkCachedPluginBins({ ...fixture, platform: "win32" })
+
+      // then
+      expect(linked).toHaveLength(1)
+      expect(await readFile(legacyPath, "utf8")).toBe(MARKER_BELOW_HEADER)
+    } finally {
+      await rm(fixture.root, { recursive: true, force: true })
+    }
+  })
+
+  it("#given bin/omo.cmd is a genuine generated shim #when linking plugin bins on win32 #then removes it", async () => {
+    // given
+    const fixture = await createPluginFixture()
+    try {
+      await mkdir(fixture.binDir, { recursive: true })
+      const legacyPath = join(fixture.binDir, "omo.cmd")
+      await writeFile(legacyPath, windowsCommandShim(join(fixture.pluginRoot, "stale-target.cjs")))
+
+      // when
+      const linked = await linkCachedPluginBins({ ...fixture, platform: "win32" })
+
+      // then
+      expect(linked).toHaveLength(1)
+      await expect(lstat(legacyPath)).rejects.toThrow()
+    } finally {
+      await rm(fixture.root, { recursive: true, force: true })
+    }
   })
 })

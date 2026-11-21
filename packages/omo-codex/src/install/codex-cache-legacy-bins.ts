@@ -1,6 +1,6 @@
 import { lstat, readFile, readlink, rm } from "node:fs/promises"
 import { join } from "node:path"
-import { COMMAND_SHIM_MARKER } from "./codex-cache-command-shim"
+import { hasCommandShimHeader } from "./codex-cache-command-shim"
 
 type LinkPlatform = NodeJS.Platform
 
@@ -50,7 +50,7 @@ async function removeLegacyCodexComponentBin(
     }
     if (!stat.isFile()) return
     const content = await readFile(linkPath, "utf8")
-    if (content.includes(COMMAND_SHIM_MARKER)) await rm(linkPath, { force: true })
+    if (hasCommandShimHeader(content)) await rm(linkPath, { force: true })
   } catch (error) {
     if (isNodeErrorWithCode(error) && error.code === "ENOENT") return
     throw error
