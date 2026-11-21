@@ -89,3 +89,72 @@ describe("sendParentWakePrompt promptAsync gate hold", () => {
     expect(delays).toEqual([5])
   })
 })
+
+describe("sendParentWakePrompt admitted notices", () => {
+  function captureClient(prompts: string[]): PromptDispatchClient {
+    return unsafeTestValue<PromptDispatchClient>({
+      session: {
+        status: async () => ({ data: { "parent-admitted": { type: "idle" } } }),
+        messages: async () => ({ data: [] }),
+        promptAsync: async (call: { body: { parts: Array<{ text: string }> } }) => {
+          prompts.push(call.body.parts[0]?.text ?? "")
+          return {}
+        },
+      },
+    })
+  }
+
+  async function dispatch(client: PromptDispatchClient, wake: PendingParentWake): Promise<void> {
+    await sendParentWakePrompt({
+      client,
+      directory: "/tmp",
+      sessionID: "parent-admitted",
+      latestWake: wake,
+      emptyAssistantTurnRetry: false,
+      toolWaitDecision: { defer: false },
+      getDispatchedWake: () => undefined,
+      hasRecordedPromptAfterDispatch: async () => false,
+      trackDispatchedWake: () => {},
+      requeueWake: () => {},
+      scheduleFlush: () => {},
+    })
+  }
+
+  test("#given notice A was already deposited admit-only #when the reply wake carries A and B #then only B is sent", async () => {
+    // given
+    const prompts: string[] = []
+    const wake: PendingParentWake = {
+      notifications: ["<system-reminder>notice-A</system-reminder>", "<system-reminder>notice-B</system-reminder>"],
+      admittedNotifications: ["<system-reminder>notice-A</system-reminder>"],
+      promptContext: { agent: "sisyphus" },
+      shouldReply: true,
+    }
+
+    // when
+    await dispatch(captureClient(prompts), wake)
+
+    // then
+    expect(prompts).toHaveLength(1)
+    expect(prompts[0]).toContain("notice-B")
+    expect(prompts[0]).not.toContain("notice-A")
+  })
+
+  test("#given every notice was already deposited #when the owed reply wake is sent #then it carries only the pointer to the notices above", async () => {
+    // given
+    const prompts: string[] = []
+    const wake: PendingParentWake = {
+      notifications: ["<system-reminder>notice-A</system-reminder>"],
+      admittedNotifications: ["<system-reminder>notice-A</system-reminder>"],
+      promptContext: { agent: "sisyphus" },
+      shouldReply: true,
+    }
+
+    // when
+    await dispatch(captureClient(prompts), wake)
+
+    // then
+    expect(prompts).toHaveLength(1)
+    expect(prompts[0]).toContain("[BACKGROUND TASK RESULTS ABOVE]")
+    expect(prompts[0]).not.toContain("notice-A")
+  })
+})

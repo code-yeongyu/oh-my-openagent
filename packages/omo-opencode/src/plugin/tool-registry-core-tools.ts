@@ -37,6 +37,8 @@ export function createCoreTools(args: {
     pluginConfig.agents,
     pluginConfig.categories,
     managers.modelFallbackControllerAccessor,
+    pluginConfig.background_task?.syncPollTimeoutMs,
+    pluginConfig.background_task?.foregroundHandoffMs,
   )
   const isMultimodalLookerEnabled = !(pluginConfig.disabled_agents ?? []).some(
     (agent) => agent.toLowerCase() === "multimodal-looker",
@@ -76,6 +78,7 @@ export function createCoreTools(args: {
     sisyphusAgentConfig: pluginConfig.sisyphus_agent,
     claudeCodeAgentsEnabled: pluginConfig.claude_code?.agents ?? true,
     syncPollTimeoutMs: pluginConfig.background_task?.syncPollTimeoutMs,
+    foregroundHandoffMs: pluginConfig.background_task?.foregroundHandoffMs,
     taskCleanupDelayMs: pluginConfig.background_task?.taskCleanupDelayMs,
     modelFallbackControllerAccessor: managers.modelFallbackControllerAccessor,
     onSyncSessionCreated: async (event) => {

@@ -91,4 +91,79 @@ describe("waitForCompletion", () => {
       globalThis.setTimeout = originalSetTimeout
     }
   })
+
+  describe("#given a child that stays busy for an hour of clock time before it settles", () => {
+    function runHourLongChild(timeoutMs: number | undefined) {
+      const originalDateNow = Date.now
+      const originalSetTimeout = globalThis.setTimeout
+      let currentTime = 0
+      Date.now = () => {
+        currentTime += 10 * 60_000
+        return currentTime
+      }
+      globalThis.setTimeout = ((handler: TimerHandler) => {
+        if (typeof handler === "function") handler()
+        return originalSetTimeout(() => {}, 0)
+      }) as typeof globalThis.setTimeout
+      let statusCalls = 0
+      const status = mock(async () => {
+        statusCalls += 1
+        return { data: { "ses-hour": { type: statusCalls <= 6 ? "busy" : "idle" } } }
+      })
+      const messages = mock(async () => ({
+        data: [{ info: { id: "msg-user", role: "user" } }, { info: { id: "msg-assistant", role: "assistant" } }],
+      }))
+      const restore = () => {
+        Date.now = originalDateNow
+        globalThis.setTimeout = originalSetTimeout
+      }
+      return {
+        run: waitForCompletion("ses-hour", createToolContext(), createContext({ status, messages }), timeoutMs),
+        restore,
+      }
+    }
+
+    test("#when no limit is configured #then the 5 minute default ends the wait", async () => {
+      // given
+      const { run, restore } = runHourLongChild(undefined)
+      try {
+        // then
+        await expect(run).rejects.toThrow("timed out after 5 minutes")
+      } finally {
+        restore()
+      }
+    })
+
+    test("#when the limit is 0 #then the wait never times out", async () => {
+      // given
+      const { run, restore } = runHourLongChild(0)
+      try {
+        // then
+        await expect(run).resolves.toBe("completed")
+      } finally {
+        restore()
+      }
+    })
+  })
+
+  test("#given the handoff signal has fired #when waiting #then it returns handed-off and leaves the child alone", async () => {
+    // given
+    const status = mock(async () => ({ data: { "ses-busy": { type: "busy" } } }))
+    const messages = mock(async () => ({ data: [] }))
+    const controller = new AbortController()
+    controller.abort()
+
+    // when
+    const result = await waitForCompletion(
+      "ses-busy",
+      createToolContext(),
+      createContext({ status, messages }),
+      60_000,
+      controller.signal,
+    )
+
+    // then
+    expect(result).toBe("handed-off")
+    expect(status).not.toHaveBeenCalled()
+  })
 })
