@@ -44,7 +44,7 @@ Every gate runs on captures produced AFTER the last edit to the rendered source.
 
 ### Evidence must be real
 
-Under every capture name what it ran on: packaged app, dev server or fixture page; seeded, mocked or real-account data. A pass on a stub or a mocked response proves the stub: run the case once on the real build and data, or mark it UNVERIFIED. Mark each behaviour claim EXECUTED (you ran it and saw it) or TRACED (read in source); only EXECUTED is a PASS. A tool's "visible" is true for a covered, transparent or off-viewport element, so check its box or capture the region. Wait for the event or the state, never a fixed time, and never loosen a wait, tolerance, locator or expected value to pass. A pass on retry does not erase the first failure: keep its capture.
+Under every capture name what it ran on: packaged app, dev server or fixture page; seeded, mocked or real-account data. A hold or a failure you inject at the network boundary is the condition of the Held, Failed and Switch cases, not a mock: the case is EXECUTED when the client under test is the real build. What an injected answer cannot prove is success: a success path answered by a stub, a mock or a fixture proves the stub, so run it once against the real backend and data, or mark it UNVERIFIED. Mark each behaviour claim EXECUTED (you ran it and saw it) or TRACED (read in source); only EXECUTED is a PASS. A tool's "visible" is true for a covered, transparent or off-viewport element, so check its box or capture the region. Wait for the event or the state, never a fixed time, and never loosen a wait, tolerance, locator or expected value to pass. A pass on retry does not erase the first failure: keep its capture.
 
 ### Machine pre-check - the detect SDK before any reviewer
 

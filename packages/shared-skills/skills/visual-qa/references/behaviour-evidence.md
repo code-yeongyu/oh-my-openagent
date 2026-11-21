@@ -134,8 +134,11 @@ path, and the entry point you skipped is where the defect lives. When a bypass i
 diagnosis, record its result apart from the user path.
 
 Name what the check ran on: the build (packaged app, dev server, fixture page) and the data
-(seeded, mocked, real account). A pass against a stub or a mocked response proves the stub. Run
-the case once on the real build and data, or leave it UNVERIFIED.
+(seeded, mocked, real account). The client under test is the real build. A hold or a failure you
+inject at the network boundary is the condition of the Held, Failed and Switch cases, not a mock:
+that case is EXECUTED. What an injected answer cannot prove is success. A success path answered
+by a stub, a mock or a fixture proves the stub: run it once against the real backend and data,
+or leave it UNVERIFIED.
 
 Before filing a product finding from a capture, confirm the capture shows what you meant: the
 right build loaded, the theme repainted, the locator resolved the control and not its caption. A
