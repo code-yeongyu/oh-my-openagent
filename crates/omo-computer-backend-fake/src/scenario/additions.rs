@@ -12,6 +12,10 @@ pub struct AxNotification {
     pub window: String,
     /// The OS notification name (`AXValueChanged`, `object:children-changed`, ...).
     pub kind: String,
+    /// The window leaves the listing when this event fires (it closed). A destroyed child of a
+    /// window raises the same notification on macOS and leaves the window listed.
+    #[serde(default)]
+    pub closes: bool,
 }
 
 /// From `t_ms` on, the window shows (or stops showing) a loading indicator.
@@ -23,6 +27,24 @@ pub struct BusyMark {
     pub busy: bool,
     #[serde(default)]
     pub indicator: Option<String>,
+}
+
+/// The user presses the stop chord at fake-clock time `t_ms` after backend creation. The press
+/// fires when the fake's observer wait moves the clock past it (a settle or busy wait).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StopPress {
+    pub t_ms: u64,
+}
+
+/// One notification the notification surface lists from fake-clock time `t_ms` on.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NotificationPost {
+    pub t_ms: u64,
+    pub app: String,
+    pub title: String,
+    pub body: String,
 }
 
 /// The focused element of `window` is a secure field.
