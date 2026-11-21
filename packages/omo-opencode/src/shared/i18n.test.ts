@@ -93,6 +93,17 @@ describe("initI18n()", () => {
     })
   })
 
+  describe("#given LANG=ko_KR.UTF-8", () => {
+    it("#then auto-detects locale as ko", () => {
+      // given
+      process.env.LANG = "ko_KR.UTF-8"
+      // when
+      initI18n()
+      // then
+      expect(getLocale()).toBe("ko")
+    })
+  })
+
   describe("#given LANG=en_US.UTF-8", () => {
     it("#then auto-detects locale as en", () => {
       // given
@@ -124,6 +135,18 @@ describe("initI18n()", () => {
       // then
       expect(getLocale()).toBe("zh")
       expect(t("toast.task_completed")).toBe("任务完成")
+    })
+  })
+
+  describe("#given an explicit locale 'ko'", () => {
+    it("#then uses that locale", () => {
+      // given
+      process.env.LANG = "en_US.UTF-8"
+      // when
+      initI18n({ locale: "ko" })
+      // then
+      expect(getLocale()).toBe("ko")
+      expect(t("toast.task_completed")).toBe("작업 완료")
     })
   })
 
@@ -165,6 +188,19 @@ describe("setLocale() / getLocale()", () => {
       // then
       expect(getLocale()).toBe("zh")
       expect(t("toast.task_completed")).toBe("任务完成")
+    })
+  })
+
+  describe("#given setLocale('ko') and a template with params", () => {
+    it("#then renders the Korean template with the params filled in", () => {
+      // given - en
+      // when
+      setLocale("ko")
+      // then
+      expect(getLocale()).toBe("ko")
+      expect(t("toast.task_completion_message", { description: "build", duration: "3m" })).toBe(
+        '"build" 작업이 3m 만에 끝났어요',
+      )
     })
   })
 
