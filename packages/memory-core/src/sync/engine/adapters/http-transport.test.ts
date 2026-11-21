@@ -191,7 +191,10 @@ test("#given the service's client floor refuses this build #when the event strea
     baseUrl: "http://sync.example",
     token: () => "tok",
     floorRetryMs: 5,
-    fetch: (async () => {
+    fetch: (async (url: string | URL | Request) => {
+      // The connect's state re-read while inline is not accepted (#14476) is not a stream open.
+      if (new URL(url instanceof Request ? url.url : String(url)).pathname === "/v1/sync/state")
+        return Response.json({ head: { seq: 0 }, oldest_retained_seq: 1, snapshot: null })
       opened += 1
       if (opened === 1)
         return Response.json(

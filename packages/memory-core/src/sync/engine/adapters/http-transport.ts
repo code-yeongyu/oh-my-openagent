@@ -187,7 +187,16 @@ export function createHttpTransport(options: HttpTransportOptions): Transport {
           fetch: doFetch,
           ...(options.floorRetryMs === undefined ? {} : { floorRetryMs: options.floorRetryMs }),
         },
-        handlers,
+        {
+          ...handlers,
+          // The announced-head pull skips the state read, so a service that began taking inline batches after this
+          // client's last state read is noticed on the next stream connect instead of never (#14476). A failed re-read
+          // keeps the previous answer; the next connect or the next full pull reads the state again.
+          onConnected: (up, cause) => {
+            if (up && !inlineAccepted) void readState().catch(() => undefined)
+            handlers.onConnected(up, cause)
+          },
+        },
         abort.signal,
       )
       return () => abort.abort()

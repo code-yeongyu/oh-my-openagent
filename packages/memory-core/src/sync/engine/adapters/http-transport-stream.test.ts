@@ -32,7 +32,11 @@ interface Connect {
 function streamServer(answers: readonly ((signal: AbortSignal | null | undefined) => Response)[]) {
   const connects: Connect[] = []
   const waiting: { readonly count: number; readonly resolve: () => void }[] = []
-  const serve = (async (_url: string | URL | Request, init?: RequestInit) => {
+  const serve = (async (url: string | URL | Request, init?: RequestInit) => {
+    // A connect re-reads the state while inline is not accepted (#14476); only the stream route counts as a connect.
+    if (new URL(url instanceof Request ? url.url : String(url)).pathname === "/v1/sync/state") {
+      return Response.json({ head: { seq: 0 }, oldest_retained_seq: 1, snapshot: null })
+    }
     const headers = new Headers(init?.headers)
     connects.push({ lastEventId: headers.get("last-event-id") })
     for (const w of waiting.filter((x) => connects.length >= x.count)) w.resolve()
