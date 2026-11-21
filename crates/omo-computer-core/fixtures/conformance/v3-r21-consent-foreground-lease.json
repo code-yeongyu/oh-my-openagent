@@ -1,0 +1,207 @@
+{
+  "description": "Row 21 (AC-54, AC-85 single-connection leg): control.grant gives the human foreground grant once; a desktop capture (row 20: a click maps through the target's newest frame) and a desktop click then take the machine's single foreground lease (the presence surface is shown) and its events reach the sink; a second control.acquire on the same connection while the lease is held answers InputBusy with the holder and sends nothing. The two-session leg is proven by the session crate's two-independent-session tests and owed to row 29 as a replay (DEFERRED-LEGS.tsv).",
+  "transport": "stdio",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/v3-null-consent.json",
+  "env": {
+    "OMO_COMPUTER_FAKE_STOP_PATH": "live"
+  },
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 1,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": null,
+                "integrityLevel": null,
+                "screenLocked": false,
+                "displayAsleep": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "stopPath.start",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "suspended": false,
+              "globalLive": true,
+              "hostRelayLive": false,
+              "heartbeatFresh": true,
+              "stopPath": "global",
+              "reason": null
+            }
+          },
+          "variable": []
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "control.grant",
+        "params": {
+          "reason": "the user approved desktop input",
+          "confirmationId": "confirm-1"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": {
+              "active": true,
+              "reason": "the user approved desktop input",
+              "grantedAt": null
+            }
+          },
+          "variable": []
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 31,
+        "method": "capture",
+        "params": {
+          "target": "desktop"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 31,
+            "result": {
+              "mode": "inline-png",
+              "data": "png-base64",
+              "mimeType": "image/png",
+              "artifactPath": null,
+              "width": 1920,
+              "height": 1080,
+              "sourceWidth": 1920,
+              "sourceHeight": 1080,
+              "coordinateWidth": 1920,
+              "coordinateHeight": 1080,
+              "region": null,
+              "scale": 1,
+              "target": "desktop",
+              "frameId": "frame-1",
+              "note": null
+            }
+          },
+          "variable": [
+            "/result/data"
+          ]
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "click",
+        "params": {
+          "target": "desktop",
+          "x": 10,
+          "y": 10
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "result": null
+          },
+          "variable": []
+        }
+      ],
+      "sink": 4
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "control.acquire",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "error": {
+              "code": -32021,
+              "message": "InputBusy",
+              "data": {
+                "code": "InputBusy",
+                "hint": null,
+                "holder": {
+                  "sessionId": "per-process-random",
+                  "agent": ""
+                }
+              }
+            }
+          },
+          "variable": [
+            "/error/data/holder/sessionId",
+            "/error/data/holder/agent"
+          ]
+        }
+      ],
+      "sink": 4
+    }
+  ],
+  "supersedes": [
+    "v3-consent-foreground-lease.json"
+  ]
+}
