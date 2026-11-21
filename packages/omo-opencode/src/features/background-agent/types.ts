@@ -71,6 +71,8 @@ export interface BackgroundTask {
   parentTools?: Record<string, boolean>
   skillContent?: string
   sessionPermission?: SessionPermissionRule[]
+  /** A resumed task: when its current run started. Output written before then is an earlier run's, not this one's. */
+  runOutputSince?: number
   /** Marks if the task was launched from an unstable agent/category */
   isUnstableAgent?: boolean
   /** Category used for this task (e.g., 'quick', 'visual-engineering') */
