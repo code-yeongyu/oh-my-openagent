@@ -50,3 +50,57 @@ describe("a thread on another device reports its working folder, not the folder'
     },
   )
 })
+
+describe("an unnamed row is named after the folder its path names, the same name its refusal candidate carries", () => {
+  // #14429's rowFolder (path, else project) is the row's cwd; the name a row shows must come from the same folder, so
+  // thread_list and a refusal candidate cannot disagree (#14305 follow-up).
+  const PREFIX = "0aa9e7d1"
+  const rows: readonly (typeof B_ROW)[] = [
+    {
+      ...B_ROW,
+      session_id: "rk-name-a",
+      durable_id: `${PREFIX}-0000-4000-8000-000000000001`,
+      title: "",
+      project: "renamed-tooling",
+      path: "/srv/runs/legacy-tooling",
+    },
+    {
+      ...B_ROW,
+      session_id: "rk-name-b",
+      durable_id: `${PREFIX}-0000-4000-8000-000000000002`,
+      title: "",
+      project: "renamed-tooling",
+      path: "/srv/runs/attic-thing",
+    },
+  ]
+
+  test("#given two unnamed rows whose path and project differ #when thread_list runs with all_scope #then each is named after its path's folder", async () => {
+    const a = account({ rows })
+    const { run } = surface(a.remote)
+
+    const result = await run("thread_list", { all_scope: true })
+
+    expect(result.kind).toBe("ok")
+    const listed = (result.kind === "ok" ? result.threads : [])
+      .filter((thread) => thread.device === "b")
+      .map((thread) => ({ name: thread.name, unnamed: thread.unnamed === true }))
+    expect(listed).toEqual([
+      { name: "legacy-tooling", unnamed: true },
+      { name: "attic-thing", unnamed: true },
+    ])
+  })
+
+  test("#given the same rows #when a send addresses their shared id prefix #then the ambiguous refusal's candidates carry those same names", async () => {
+    const a = account({ rows })
+    const { run } = surface(a.remote)
+
+    const result = await run("thread_send", { thread: PREFIX, message: "hi" })
+
+    expect(result).toMatchObject({ kind: "error", error: { code: "ambiguous_target" } })
+    const refusal = result.kind === "error" ? result.error : undefined
+    const candidates = ((refusal?.candidates ?? refusal?.details?.["candidates"] ?? []) as readonly {
+      name: string
+    }[])
+    expect(candidates.map((candidate) => candidate.name).sort()).toEqual(["attic-thing", "legacy-tooling"])
+  })
+})
