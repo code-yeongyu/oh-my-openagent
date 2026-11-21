@@ -258,3 +258,26 @@ describe("config.check writes nothing", () => {
     expect(sandbox.snapshot()).toEqual(before)
   })
 })
+
+describe("config.check edit paths", () => {
+  test.each([
+    ["__proto__.pollutedByCheck"],
+    ["constructor.prototype.pollutedByCheck"],
+    ["categories.__proto__.pollutedByCheck"],
+    ["engine:__proto__.pollutedByCheck"],
+  ])("#given the edit path %s #when it is checked #then it is refused and no prototype changes", async (path) => {
+    sandbox = configSandbox()
+    const result = await sandbox.config().check({ edits: [{ path, value: true }] })
+
+    expect(result.kind === "error" ? result.error.code : result.kind).toBe("unknown_path")
+    expect(Object.hasOwn(Object.prototype, "pollutedByCheck")).toBe(false)
+  })
+
+  test("#given a prototype key as a path segment array #when it is checked #then it is refused", async () => {
+    sandbox = configSandbox()
+    const result = await sandbox.config().check({ edits: [{ path: ["agents", "__proto__", "model"], value: "x" }] })
+
+    expect(result.kind === "error" ? result.error.code : result.kind).toBe("unknown_path")
+    expect(Object.hasOwn(Object.prototype, "model")).toBe(false)
+  })
+})
