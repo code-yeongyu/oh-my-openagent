@@ -4,6 +4,7 @@
 mod chain;
 pub mod gc;
 mod line;
+mod lock;
 mod memory;
 mod redact;
 mod segment;
@@ -19,6 +20,7 @@ pub use line::{
     DispositionRecord, Gate, GateOutcome, Grant, GrantKind, GrantVerdict, Status, TextRecord, Tier,
     Warning,
 };
+pub use lock::{HandLock, LOCK_FILE};
 pub use memory::MemoryAudit;
 pub use redact::{keys, text, truncate, KeysRecord};
 pub use sink::{AuditSink, UnavailableAudit, AUDIT_UNAVAILABLE};

@@ -1,6 +1,7 @@
 //! ONE audit file per hand, `<auditDir>/computer/<handId>/audit.jsonl` (0600), written by
 //! every writer of the uid as per-writer segments keyed `(writerPid, writerProcStartMs, seq)`
-//! under the file lock. Each segment opens with `audit.meta`; the AUTHORITY host's segment
+//! under the hand's lock (`audit.lock`, A-IS-62 R7-3), which also covers every size check and the
+//! rotation. Each segment opens with `audit.meta`; the AUTHORITY host's segment
 //! follows it with a `rotation_anchor` grant. Only the authority host rotates (at
 //! `rotate_at`, to `audit.1.jsonl`); any other writer keeps appending up to `hard_cap` and
 //! then refuses exec `audit_unavailable`.
@@ -14,7 +15,8 @@ use omo_computer_core::backend::Refusal;
 use serde_json::json;
 
 use super::line::{now_ms, AuditEvent};
-use super::segment::{anchor_event, chain_link, lock, stamp, truncated, Segment};
+use super::lock::HandLock;
+use super::segment::{anchor_event, chain_link, stamp, truncated, Segment};
 use super::sink::{AuditSink, AUDIT_UNAVAILABLE};
 
 pub const AUDIT_FILE: &str = "audit.jsonl";
@@ -132,6 +134,7 @@ impl AuditWriter {
             authority,
             degraded: false,
         };
+        let _held = HandLock::take(this.hand_dir()?)?;
         let last = chain_link(&this.path);
         this.open_segment(last)?;
         Ok(this)
@@ -163,10 +166,11 @@ impl AuditWriter {
             text.push_str(&line.to_string());
             text.push('\n');
         }
-        self.write_locked(text.as_bytes())
+        self.write_held(text.as_bytes())
     }
 
-    fn write_locked(&self, bytes: &[u8]) -> io::Result<()> {
+    /// Appends `bytes`; the caller holds the hand's lock.
+    fn write_held(&self, bytes: &[u8]) -> io::Result<()> {
         let mut options = OpenOptions::new();
         options.create(true).append(true);
         #[cfg(unix)]
@@ -175,7 +179,6 @@ impl AuditWriter {
             options.mode(0o600).custom_flags(libc::O_NOFOLLOW);
         }
         let mut file = options.open(&self.path)?;
-        lock(&file)?;
         file.write_all(bytes)?;
         file.sync_data()
     }
@@ -184,6 +187,13 @@ impl AuditWriter {
         fs::metadata(&self.path).map_or(0, |meta| meta.len())
     }
 
+    fn hand_dir(&self) -> io::Result<&Path> {
+        self.path
+            .parent()
+            .ok_or_else(|| io::Error::other("no audit dir"))
+    }
+
+    /// The caller holds the hand's lock.
     fn rotate(&mut self) -> io::Result<()> {
         let rotated = self.path.with_file_name(ROTATED_FILE);
         let last = chain_link(&self.path);
@@ -214,6 +224,7 @@ impl AuditSink for AuditWriter {
 
 impl AuditWriter {
     fn append_line(&mut self, event: AuditEvent) -> io::Result<String> {
+        let _held = HandLock::take(self.hand_dir()?)?;
         if self.authority.is_some() && self.size() >= self.limits.rotate_at {
             self.rotate()?;
         }
@@ -227,7 +238,7 @@ impl AuditWriter {
             line = stamp(&mut segment, &truncated(&event))?.to_string();
         }
         line.push('\n');
-        self.write_locked(line.as_bytes())?;
+        self.write_held(line.as_bytes())?;
         self.segment = segment;
         Ok(self.segment.prev.clone())
     }

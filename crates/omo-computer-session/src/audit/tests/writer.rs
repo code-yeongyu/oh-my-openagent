@@ -77,10 +77,12 @@ fn audit_is_one_file_per_hand_with_per_writer_segments() {
     first.append(event("click")).expect("append");
     second.append(event("typeText")).expect("append");
     first.append(event("click")).expect("append");
+    let mut files = files_under(dir.path());
+    files.sort();
     assert_eq!(
-        files_under(dir.path()),
-        vec!["computer/hand-1/audit.jsonl".to_owned()],
-        "one file per hand"
+        files,
+        vec!["computer/hand-1/audit.jsonl".to_owned(), "computer/hand-1/audit.lock".to_owned()],
+        "one audit file per hand, beside the hand's lock (A-IS-62 R7-3)"
     );
     let all = lines(first.path());
     let metas: Vec<&Value> = all

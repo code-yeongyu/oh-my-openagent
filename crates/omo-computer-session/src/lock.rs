@@ -72,8 +72,10 @@ impl InteractionLock {
     }
 }
 
+/// The exclusive lock on `file` that every lock of the crate takes (the interaction lock and the
+/// hand's audit lock); `nonblocking` answers `WouldBlock` instead of waiting.
 #[cfg(unix)]
-fn flock(file: &File, nonblocking: bool) -> io::Result<()> {
+pub(crate) fn flock(file: &File, nonblocking: bool) -> io::Result<()> {
     use std::os::unix::io::AsRawFd;
     let operation = libc::LOCK_EX | if nonblocking { libc::LOCK_NB } else { 0 };
     // SAFETY: the descriptor is open for the call; flock has no other precondition.
@@ -86,7 +88,7 @@ fn flock(file: &File, nonblocking: bool) -> io::Result<()> {
 }
 
 #[cfg(not(unix))]
-fn flock(_file: &File, _nonblocking: bool) -> io::Result<()> {
+pub(crate) fn flock(_file: &File, _nonblocking: bool) -> io::Result<()> {
     // The Windows named-object lock is the Windows lane's (row 60); a file open is enough here.
     Ok(())
 }
