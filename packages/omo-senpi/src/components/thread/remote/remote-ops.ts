@@ -1,12 +1,11 @@
 import { failed as fail, type Failed as Failure } from "../address/refusals"
+import { resolveTypedDevice } from "../address/device"
 import type { CommandResult } from "@oh-my-opencode/device-service-core"
-import type { RemoteClient } from "../../remote"
-import { accountDevices, accountState } from "../address/account"
+import { accountState } from "../address/account"
 import { outcomeFailure, READ_UNCERTAIN } from "./outcome"
 import {
   type AliasError,
   type AliasHolder,
-  type RemoteDevice,
   type JsonObject,
   type RemoteSessionRow,
   type RemoteThreadSurface,
@@ -74,49 +73,6 @@ export function aliasFailure(error: AliasError): Failure {
   return fail("host_unavailable", error.message, "Retry when the account service is reachable.", {
     reason: error.details?.reason,
   })
-}
-
-/** A typed `device_offline` when the device is known and not online; nothing is ever queued for it (A3). */
-export async function deviceOnline(remote: RemoteThreadSurface, device: string): Promise<Failure | undefined> {
-  const listed = await listedDevices(remote.client, device)
-  return "kind" in listed ? listed : deviceRefusal(listed.devices, device)
-}
-
-/** The account's devices, or a typed host_unavailable naming `device` when this device's service cannot list them. */
-async function listedDevices(
-  client: RemoteClient,
-  device: string,
-): Promise<{ readonly devices: readonly RemoteDevice[] } | Failure> {
-  try {
-    return { devices: (await accountDevices(client)).devices }
-  } catch (error) {
-    return fail(
-      "host_unavailable",
-      "This device's device service could not list the account's devices.",
-      "Retry when the device service is reachable.",
-      { device, reason: error instanceof Error ? error.message : String(error) },
-    )
-  }
-}
-
-/** deviceOnline over a device list the caller already read: not_found for an unknown id, device_offline for an offline one. */
-function deviceRefusal(devices: readonly RemoteDevice[], device: string): Failure | undefined {
-  const row = devices.find((candidate) => candidate.device === device)
-  if (row === undefined)
-    return fail(
-      "not_found",
-      `No device named ${device} is signed in to this account.`,
-      "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to see the account's devices and threads.",
-      { device },
-    )
-  if (!row.online)
-    return fail(
-      "device_offline",
-      `Device ${device} is offline.`,
-      "Retry when that device is online; nothing was queued.",
-      { device },
-    )
-  return undefined
 }
 
 /**
@@ -233,8 +189,8 @@ export async function followRemote(
     readonly clientMessageId?: string
   },
 ): Promise<RemoteFollow | Failure> {
-  const offline = await deviceOnline(remote, row.device)
-  if (offline !== undefined) return offline
+  const online = await resolveTypedDevice(remote.client, row.device)
+  if (online.kind === "error") return online
   // An id-carrying send: the user entries carrying its text before it is sent (read before the watch, so before the
   // send). On an engine that stamps no id they are all earlier sends, finished or not, and a prompt matched only by
   // its text is never one of them; undefined when the read failed, and then no text match counts (#13481 delta M1).

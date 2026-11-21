@@ -186,7 +186,7 @@ async function runSessionOn(
       } else if (!json) {
         dependencies.error(`omo remote: ${result.error.message}`)
         dependencies.error(personNextAction(result.error.next_action))
-        for (const line of candidateLines(result.error.details)) dependencies.error(line)
+        for (const line of candidateLines(result.error)) dependencies.error(line)
       }
       return REMOTE_EXIT.failed
     }

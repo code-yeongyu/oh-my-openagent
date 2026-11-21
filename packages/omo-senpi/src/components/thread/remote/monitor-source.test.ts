@@ -102,6 +102,7 @@ describe("monitor rpc remote targets (#12719): omo's RpcRemoteSource", () => {
     ["by id, offline", "b", { online: false }],
     ["by name, offline", "studio", { online: false }],
     ["by id, missing from this listing round", "b", { incomplete: ["b"] }],
+    ["by id, this device's service cannot list the account's devices", "b", { devicesFail: true }],
   ] as const)(
     "#given a persistent device-wide monitor restored on <device>/* (%s) #when it re-opens #then it keeps following b's listing rows, never lost on the device check",
     async (_case, device, options) => {
