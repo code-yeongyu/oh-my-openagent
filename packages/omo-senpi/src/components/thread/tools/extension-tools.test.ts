@@ -5,7 +5,6 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { gatewayDatabasePath } from "../gateway/paths"
-import { GATEWAY_MIGRATIONS } from "../gateway/schema"
 import { createGatewayStore, type GatewayStore } from "../gateway/store"
 import type { SessionCallableOp, StoreExtensionRegistration } from "../gateway/store-extensions"
 import { createThreadTools, type ThreadHost, type ThreadHostSession } from "../tools"

@@ -1,8 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 
-import { deviceLabel } from "@oh-my-opencode/thread-address-core"
-
 import { askHost } from "../../../../senpi-task/src/runners/rpc-host/host-request"
 import { classifyWarmReply, type WarmAnswer } from "../../../../senpi-task/src/runners/rpc-host/host-warm-reply"
 
@@ -49,7 +47,6 @@ import { createGatewayServices } from "./tools/gateway-services"
 import { addressBook, hostView, sendAddressBook } from "./tools/internals"
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "./tools/ports"
 import { listThreads, readThread, withBacklog } from "./tools/read-ops"
-import { sendView } from "./tools/send-view"
 import { listAcross } from "./remote/cross-device"
 import { TOOL_CALL_BUDGET_MS, waitWithinCallBudget, withCallDeadline } from "../call-budget/call-deadline"
 import type { RemoteThreadSurface } from "./remote/ports"

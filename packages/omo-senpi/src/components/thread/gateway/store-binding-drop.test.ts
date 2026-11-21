@@ -162,7 +162,8 @@ test.each<[string, boolean, { name: string }[]]>([
 /** Schema v16: dev's store after the collapse key (#14428), the one a host running dev leaves before v17. */
 const V16 = 16
 
-const BINDING_ERA = "SELECT name FROM sqlite_schema WHERE name IN ('bindings', 'outbox', 'outbox_cursors', 'completion_arms') ORDER BY name"
+const BINDING_ERA =
+  "SELECT name FROM sqlite_schema WHERE name IN ('bindings', 'outbox', 'outbox_cursors', 'completion_arms') ORDER BY name"
 
 // The binding drop (v17) must leave the collapse-key data and the target's backlog alone, whether the store arrives at
 // it already at v16 or runs v16 and v17 in one open from v15.
@@ -201,12 +202,19 @@ test.each([
         deliveries: db
           .query("SELECT delivery_id, state, body, collapse_key FROM deliveries ORDER BY delivery_id")
           .all(),
-        collapseIndex: db.query("SELECT name FROM sqlite_schema WHERE type = 'index' AND name = 'deliveries_collapse'").all(),
+        collapseIndex: db
+          .query("SELECT name FROM sqlite_schema WHERE type = 'index' AND name = 'deliveries_collapse'")
+          .all(),
       }).toEqual({
         version: GATEWAY_MIGRATIONS.length,
         tables: bound ? [{ name: "bindings" }] : [],
         deliveries: [
-          { delivery_id: "d-backlog", state: "queued", body: "alert", collapse_key: version === V16 ? "alert-1" : null },
+          {
+            delivery_id: "d-backlog",
+            state: "queued",
+            body: "alert",
+            collapse_key: version === V16 ? "alert-1" : null,
+          },
           ...(bound ? [{ delivery_id: "d-bound", state: "queued", body: "from chat", collapse_key: null }] : []),
         ],
         collapseIndex: [{ name: "deliveries_collapse" }],
