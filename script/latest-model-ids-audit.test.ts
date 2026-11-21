@@ -24,6 +24,10 @@ const MODEL_IDENTITY_FILES = new Map<string, string>([
   ["packages/omo-codex/src/install/managed-agent-model-defaults.ts", "models LazyCodex once bundled"],
   ["packages/omo-codex/src/install/codex-model-catalog.ts", "the Astra id the Codex edition ships"],
   ["packages/utils/src/migration/agent-category.ts", "each known id's migration category"],
+  [
+    "packages/omo-senpi/src/components/omo-sdk/config/engine-fallback-chains.ts",
+    "a frozen copy of the pinned engine's default fallback chains, held by a parity test",
+  ],
   ["packages/prompts-core/src/atlas-prompts.ts", "prompts written for one model"],
   ["packages/prompts-core/src/variant-resolver.ts", "prompts written for one model"],
   ["packages/omo-opencode/src/agents/gpt-prompt-identity.ts", "prompts written for one model"],

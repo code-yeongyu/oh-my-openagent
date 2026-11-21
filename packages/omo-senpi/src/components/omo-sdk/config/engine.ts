@@ -6,6 +6,8 @@ import { dirname, join, normalize, resolve } from "node:path"
 import { resolveAgentHome } from "@oh-my-opencode/senpi-task/agent-home"
 import { parseJsoncSafe } from "@oh-my-opencode/utils"
 
+import { ENGINE_DEFAULT_FALLBACK_CHAINS } from "./engine-fallback-chains"
+
 /**
  * The engine version the defaults below and the two behaviour notes were read at. The runtime bundles
  * inline everything except Node builtins, so the SDK keeps this table instead of importing the engine;
@@ -18,7 +20,7 @@ export const ENGINE_READ_AT_VERSION = "2026.11.19-5"
  * `SENPI_BRAND.configDir` `.omo` (omo-native `compiled-environment.ts`), which wins over the engine
  * package's own `piConfig.configDir` (`.senpi`) in its `CONFIG_DIR_NAME`.
  */
-export const ENGINE_CONFIG_DIR_NAME = ".omo"
+const ENGINE_CONFIG_DIR_NAME = ".omo"
 
 /** The engine's `MAX_PARENT_CONFIG_SEARCH_DEPTH` (`nearest-parent-config.js`). */
 const MAX_PARENT_SEARCH_DEPTH = 100
@@ -34,22 +36,6 @@ export const ENGINE_DEFAULTS = {
 } as const satisfies Readonly<Record<string, boolean | number | string>>
 
 export type EngineDefaultKey = keyof typeof ENGINE_DEFAULTS
-
-/** The shipped fallback chains, keyed by bare model id; settings chains layer over them per key. */
-export const ENGINE_DEFAULT_FALLBACK_CHAINS: Readonly<Record<string, readonly string[]>> = {
-  "claude-fable-5-2": ["claude-opus-5-5", "claude-opus-5"],
-  "claude-fable-5-1": ["claude-opus-5-5", "claude-opus-5"],
-  "claude-fable-5": ["claude-opus-5-5", "claude-opus-5"],
-  "claude-opus-5-5": ["claude-fable-5-2:medium", "kimi-k3.1-pro:max"],
-}
-
-export const COMPACTION_KEYS = [
-  "compaction.enabled",
-  "compaction.speculativeEnabled",
-  "compaction.speculativeFraction",
-  "compaction.speculativeCooldownMs",
-  "compaction.idleCompactionEnabled",
-] as const
 
 /** Engine behaviours the engine does not export, stated with the version they were read at. */
 export const ENGINE_BEHAVIOURS = {
@@ -116,7 +102,7 @@ function settingsPathIn(directory: string): string {
   return existsSync(jsonc) ? jsonc : join(directory, "settings.json")
 }
 
-export function engineSettingsPath(scope: EngineScope, location: EngineLocation): string {
+function engineSettingsPath(scope: EngineScope, location: EngineLocation): string {
   const homeDir = location.homeDir ?? location.env.HOME ?? homedir()
   const directory =
     scope === "global"
@@ -125,7 +111,7 @@ export function engineSettingsPath(scope: EngineScope, location: EngineLocation)
   return settingsPathIn(directory)
 }
 
-export function parseEngineSettings(content: string): {
+function parseEngineSettings(content: string): {
   readonly document: Readonly<Record<string, unknown>>
   readonly diagnostics: readonly string[]
 } {
@@ -142,7 +128,7 @@ export function parseEngineSettings(content: string): {
   return { document: data as Record<string, unknown>, diagnostics: [] }
 }
 
-export function readEngineSettings(scope: EngineScope, location: EngineLocation): EngineSettingsFile {
+function readEngineSettings(scope: EngineScope, location: EngineLocation): EngineSettingsFile {
   const path = engineSettingsPath(scope, location)
   if (!existsSync(path)) return { scope, path, exists: false, loaded: false, diagnostics: [], document: {} }
   const { document, diagnostics } = parseEngineSettings(readFileSync(path, "utf-8"))
@@ -188,7 +174,7 @@ export function valueAt(document: unknown, path: readonly (string | number)[]): 
 }
 
 /** The effective value of a dotted engine key: project over global over the default table. */
-export function effectiveEngineValue(
+function effectiveEngineValue(
   key: string,
   global: Readonly<Record<string, unknown>>,
   project: Readonly<Record<string, unknown>>,

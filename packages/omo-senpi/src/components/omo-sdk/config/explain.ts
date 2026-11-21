@@ -3,8 +3,8 @@ import { describeModelChains } from "@oh-my-opencode/senpi-task/model-chains"
 import { loadSenpiOmoConfig } from "../../config-resolution"
 import { ok, type OmoResult, refused } from "../result"
 import type { ConfigContext } from "."
+import { ENGINE_DEFAULT_FALLBACK_CHAINS } from "./engine-fallback-chains"
 import {
-  ENGINE_DEFAULT_FALLBACK_CHAINS,
   ENGINE_DEFAULTS,
   type EngineDefaultKey,
   engineKeySegments,

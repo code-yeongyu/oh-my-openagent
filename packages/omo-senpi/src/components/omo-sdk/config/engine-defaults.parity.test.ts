@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import { SettingsManager } from "@code-yeongyu/senpi"
 
-import { ENGINE_DEFAULT_FALLBACK_CHAINS, ENGINE_DEFAULTS, type EngineDefaultKey } from "./engine"
+import { ENGINE_DEFAULTS, type EngineDefaultKey } from "./engine"
+import { ENGINE_DEFAULT_FALLBACK_CHAINS } from "./engine-fallback-chains"
 
 describe("engine defaults parity", () => {
   const engine = SettingsManager.inMemory({})

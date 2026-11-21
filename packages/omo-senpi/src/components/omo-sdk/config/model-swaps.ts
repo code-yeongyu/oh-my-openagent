@@ -37,7 +37,7 @@ const isFile = (path: string): boolean => {
   }
 }
 
-export function resolveSessionFile(reference: string, context: ConfigContext): string | undefined {
+function resolveSessionFile(reference: string, context: ConfigContext): string | undefined {
   const looksLikePath = reference.endsWith(".jsonl") || isAbsolute(reference) || /[\\/]/.test(reference)
   if (looksLikePath) {
     const path = resolve(context.cwd, reference)

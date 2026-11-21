@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { configSandbox, type ConfigSandbox, errorOf, valueOf } from "./config-sandbox.test-support"
-import { ENGINE_DEFAULT_FALLBACK_CHAINS } from "./engine"
+import { ENGINE_DEFAULT_FALLBACK_CHAINS } from "./engine-fallback-chains"
 
 let sandbox: ConfigSandbox
 afterEach(() => sandbox.cleanup())

@@ -2,7 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { join } from "node:path"
 
 import { configSandbox, type ConfigSandbox, LAUNCH, modelChange, valueOf } from "./config-sandbox.test-support"
-import { ENGINE_DEFAULT_FALLBACK_CHAINS, ENGINE_READ_AT_VERSION } from "./engine"
+import { ENGINE_READ_AT_VERSION } from "./engine"
+import { ENGINE_DEFAULT_FALLBACK_CHAINS } from "./engine-fallback-chains"
 
 let sandbox: ConfigSandbox
 afterEach(() => sandbox.cleanup())
