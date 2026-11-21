@@ -26,7 +26,7 @@ interface SwitchMarker {
   readonly files: readonly string[]
 }
 
-export class AccountSwitchError extends Error {
+class AccountSwitchError extends Error {
   override readonly name = "AccountSwitchError"
 }
 
