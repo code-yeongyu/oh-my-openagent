@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, type Stats } from "node:fs"
 import { join } from "node:path"
 
@@ -12,7 +13,7 @@ import {
   takeOverTombstone,
   writeExpungeOwner,
 } from "./expunge-owner"
-import { withTaskRecordLock } from "./record-lock"
+import { withTaskRecordLock, withTaskRecordLockAsync } from "./record-lock"
 import { parseTaskRecord } from "./record-parse"
 import { writeRecord } from "./record-write"
 import { resolveStateDir } from "./state-dir"
@@ -173,6 +174,11 @@ export function createTaskRecordStore(
     takeOverExpunging(taskId, from, to) {
       const parsedTaskId = parseTaskId(taskId)
       return takeOverTombstone(taskPath(stateDir, parsedTaskId), tombstonePath(stateDir, parsedTaskId), from, to)
+    },
+    withOwnerLock(ownerKey, operation) {
+      const ownerDir = join(stateDir, "owner-locks")
+      mkdirSync(ownerDir, { recursive: true })
+      return withTaskRecordLockAsync(join(ownerDir, createHash("sha256").update(ownerKey).digest("hex")), operation)
     },
     listExpunging() {
       const tasksDir = join(stateDir, "tasks")

@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto"
-import { mkdirSync } from "node:fs"
 import { join } from "node:path"
 
 import { log } from "@oh-my-opencode/utils"
@@ -210,12 +208,8 @@ function redispatchRefusal(record: TaskRecord): RedispatchOutcome | undefined {
   }
   return undefined
 }
-function ownerLockPath(stateDir: string, owner: DagTaskOwnerKey): string {
-  const ownerKey = `${owner.kind}\0${owner.runId}\0${owner.nodeId}`
-  const digest = createHash("sha256").update(ownerKey).digest("hex")
-  const ownerDir = join(stateDir, "owner-locks")
-  mkdirSync(ownerDir, { recursive: true })
-  return join(ownerDir, digest)
+function ownerLockKey(owner: DagTaskOwnerKey): string {
+  return `${owner.kind}\0${owner.runId}\0${owner.nodeId}`
 }
 
 // allow: SIZE_OK - one stateful manager keeps concurrency, queue, live-handle, and waiter invariants in one closure-backed implementation.
@@ -517,12 +511,11 @@ class TaskManagerImpl implements TaskManager {
     spec.admission?.assertOpen()
     const refused = memberKernelToolRefusal(spec)
     if (refused !== undefined) return refused
-    const lockPath = ownerLockPath(this.#options.store.stateDir, owner)
     const resolution = await planWithWarmBarrel(this.#options.planner, spec)
     spec.admission?.assertOpen()
     if (resolution.kind === "error") return { kind: "plan_unresolved", error: resolution.error }
 
-    return withTaskRecordLockAsync(lockPath, async () => {
+    return this.#options.store.withOwnerLock(ownerLockKey(owner), async () => {
       spec.admission?.assertOpen()
       const raced = this.#ownedResult(owner)
       if (raced !== undefined) return raced

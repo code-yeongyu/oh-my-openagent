@@ -82,6 +82,7 @@ export function createCompletionObservingStore(backing: TaskRecordStore, deps: C
     restoreExpunging: (taskId, owner) => backing.restoreExpunging(taskId, owner),
     readExpungeOwner: (taskId) => backing.readExpungeOwner(taskId),
     takeOverExpunging: (taskId, from, to) => backing.takeOverExpunging(taskId, from, to),
+    withOwnerLock: (ownerKey, operation) => backing.withOwnerLock(ownerKey, operation),
   }
 }
 
