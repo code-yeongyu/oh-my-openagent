@@ -14,6 +14,7 @@ import { setSessionTools } from "../../shared/session-tools-store"
 import { buildTaskPrompt } from "./prompt-builder"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
 import { getTaskID } from "./task-id"
+import { SYNC_POLL_HANDED_OFF, handOffSyncTask, startForegroundHandoffTimer } from "./sync-foreground-handoff"
 import { resolveMetadataModel } from "./resolve-metadata-model"
 import { log } from "../../shared/logger"
 import { cancelSyncSessionDeletion, scheduleSyncSessionDeletion } from "./sync-session-cleanup"
@@ -131,6 +132,7 @@ export async function executeSyncContinuation(
   let anchorMessageCount: number | undefined
   let anchorMessageID: string | undefined
   let handedBackToParent = false
+  let handedOff = false
 
   try {
     const resumeContext = await resolveResumeContext(client, continuationID)
@@ -204,19 +206,38 @@ export async function executeSyncContinuation(
   }
 
   try {
-    const pollError = await deps.pollSyncSession(
-      ctx,
-      client,
-      {
-        sessionID: continuationID,
-        agentToUse: resumeAgent ?? "continue",
-        toastManager,
-        taskId,
-        anchorMessageCount,
-        anchorMessageID,
-      },
-      syncPollTimeoutMs,
+    const handoffTimer = startForegroundHandoffTimer(
+      typeof executorCtx.manager?.adoptForegroundSession === "function" ? executorCtx.foregroundHandoffMs : undefined,
     )
+    const pollError = await deps
+      .pollSyncSession(
+        ctx,
+        client,
+        {
+          sessionID: continuationID,
+          agentToUse: resumeAgent ?? "continue",
+          toastManager,
+          taskId,
+          anchorMessageCount,
+          anchorMessageID,
+          ...(handoffTimer.signal ? { handoffSignal: handoffTimer.signal } : {}),
+        },
+        syncPollTimeoutMs,
+      )
+      .finally(handoffTimer.cancel)
+    if (pollError === SYNC_POLL_HANDED_OFF) {
+      handedOff = true
+      return handOffSyncTask({
+        manager: executorCtx.manager,
+        taskId,
+        sessionID: continuationID,
+        parentSessionID: parentContext.sessionID,
+        parentAgent: parentContext.agent,
+        args,
+        agentToUse: resumeAgent ?? "continue",
+        startTime,
+      })
+    }
     if (pollError && shouldAttemptPollErrorRecovery(pollError)) {
       if (anchorMessageCount === undefined) {
         return pollError
@@ -284,7 +305,8 @@ ${buildTaskMetadataBlock({
     }
     // Every terminal continuation path must restore the cleanup grace timer,
     // including prompt/poll failures after revival cancelled the old timer.
+    // A child handed to the background keeps running; the background manager owns its session from then on.
     detachFromManager?.()
-    scheduleSyncSessionDeletion(client, continuationID, taskCleanupDelayMs)
+    if (!handedOff) scheduleSyncSessionDeletion(client, continuationID, taskCleanupDelayMs)
   }
 }

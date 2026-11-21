@@ -66,6 +66,7 @@ export interface DelegateTaskArgs {
   subagent_type?: string
   requested_subagent_type?: string
   run_in_background: boolean
+  wake?: "each" | "none"
   task_id?: string
   command?: string
   load_skills: string[]
@@ -124,6 +125,7 @@ export interface DelegateTaskToolOptions {
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
   onSyncSessionCreated?: (event: SyncSessionCreatedEvent) => Promise<void>
   syncPollTimeoutMs?: number
+  foregroundHandoffMs?: number
   taskCleanupDelayMs?: number
   /** OpenCode native skill accessor for skills registered via config.skills.paths. Same shape as SkillLoadOptions.nativeSkills. */
   nativeSkills?: {
