@@ -67,6 +67,7 @@ export function convertImageToJpeg(inputPath: string, mimeType: string): string 
           stdio: "pipe",
           encoding: "utf-8",
           timeout: CONVERSION_TIMEOUT_MS,
+          windowsHide: true,
         })
 
         if (existsSync(outputPath)) {
@@ -85,6 +86,7 @@ export function convertImageToJpeg(inputPath: string, mimeType: string): string 
         stdio: "pipe",
         encoding: "utf-8",
         timeout: CONVERSION_TIMEOUT_MS,
+        windowsHide: true,
       })
 
       if (existsSync(outputPath)) {

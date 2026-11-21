@@ -12,6 +12,7 @@ export function collectGitDiffStats(directory: string): GitFileStat[] {
       encoding: "utf-8",
       timeout: 5000,
       stdio: ["pipe", "pipe", "pipe"],
+      windowsHide: true,
     })
 
     const statusOutput = childProcess.execFileSync(
@@ -22,6 +23,7 @@ export function collectGitDiffStats(directory: string): GitFileStat[] {
         encoding: "utf-8",
         timeout: 5000,
         stdio: ["pipe", "pipe", "pipe"],
+        windowsHide: true,
       },
     )
 
@@ -30,6 +32,7 @@ export function collectGitDiffStats(directory: string): GitFileStat[] {
       encoding: "utf-8",
       timeout: 5000,
       stdio: ["pipe", "pipe", "pipe"],
+      windowsHide: true,
     })
 
     const untrackedNumstat = untrackedOutput
