@@ -23,6 +23,7 @@ const MODEL_IDENTITY_FILES = new Map<string, string>([
   ],
   ["packages/omo-codex/src/install/managed-agent-model-defaults.ts", "models LazyCodex once bundled"],
   ["packages/omo-codex/src/install/codex-model-catalog.ts", "the Astra id the Codex edition ships"],
+  ["packages/omo-codex/plugin/components/rules/src/post-compact-budget.ts", "per-model context-window budgets"],
   ["packages/utils/src/migration/agent-category.ts", "each known id's migration category"],
   ["packages/prompts-core/src/atlas-prompts.ts", "prompts written for one model"],
   ["packages/prompts-core/src/variant-resolver.ts", "prompts written for one model"],
@@ -45,7 +46,8 @@ const LATEST_MODEL_LITERAL = latestModelLiteralPattern(Object.values(LATEST_MODE
 
 async function trackedSourceFiles(): Promise<string[]> {
   // :(glob) makes `**/` match zero directories too; the plain pathspec skipped every file directly under src/.
-  const proc = Bun.spawn(["git", "ls-files", "-z", "--", ":(glob)packages/*/src/**/*.ts"], {
+  const sources = [":(glob)packages/*/src/**/*.ts", ":(glob)packages/omo-codex/plugin/components/*/src/**/*.ts"]
+  const proc = Bun.spawn(["git", "ls-files", "-z", "--", ...sources], {
     cwd: REPOSITORY_ROOT,
     stdout: "pipe",
   })
@@ -76,6 +78,7 @@ describe("latest model id audit", () => {
     expect(files.length).toBeGreaterThan(100)
     // Architecture contract: files directly under a package's src/ are scanned too (a fallback-chain table lives there).
     expect(files).toContain("packages/model-core/src/category-model-requirements.ts")
+    expect(files).toContain("packages/omo-codex/plugin/components/ulw-loop/src/steering.ts")
 
     const offenders: string[] = []
     for (const file of files) {

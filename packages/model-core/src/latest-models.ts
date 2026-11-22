@@ -1,7 +1,8 @@
 /**
  * The current member of each model family (#10141). Every default, rung, alias, gate and migration
  * target meaning "the newest model of this family" reads it from here, so a bump is one edit;
- * `script/latest-model-ids-audit.test.ts` rejects a literal copy elsewhere. Deliberate older rungs
+ * `script/latest-model-ids-audit.test.ts` checks package TypeScript sources and the Codex plugin
+ * components' TypeScript sources, except explicit per-model identity tables. Deliberate older rungs
  * (`claude-opus-4-6`, `gpt-5.6-sol`, `claude-fable-5-1`, and the GPT-6 / GPT-6.1 rungs behind GPT-6.2) stay literal. No imports: consumers outside the barrel use the
  * `@oh-my-opencode/model-core/latest-models` subpath. Not covered: the Codex edition pins its own Astra
  * id (`CODEX_ASTRA_MODEL` in `omo-codex/src/install/codex-model-catalog.ts`) beside the data files that
