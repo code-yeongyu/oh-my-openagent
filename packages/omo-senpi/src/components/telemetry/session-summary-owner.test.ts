@@ -114,7 +114,6 @@ describe("owner registry without a readable start time", () => {
       dir,
       owner: { pid: 1_212, bootId: "reader" },
       isPidAlive: () => true,
-      now: () => now,
       processStartTime: () => "readable",
     })
 
@@ -132,7 +131,6 @@ describe("owner registry without a readable start time", () => {
       dir,
       owner: { pid: 1_212, bootId: "reader" },
       isPidAlive: () => false,
-      now: () => now,
       processStartTime: () => "readable",
     })
 
@@ -150,7 +148,6 @@ describe("owner registry without a readable start time", () => {
       dir,
       owner: { pid: 1_313, bootId: "reader" },
       isPidAlive: () => true,
-      now: () => clock,
       processStartTime: () => null,
     })
 
@@ -182,7 +179,6 @@ describe("owner registry without a readable start time", () => {
       dir,
       owner: { pid: 1_515, bootId: "reader" },
       isPidAlive: () => true,
-      now: () => T0,
       processStartTime: () => {
         register("new")
         return "new-start"
@@ -201,7 +197,6 @@ describe("owner registry without a readable start time", () => {
       dir,
       owner: { pid: 1_515, bootId: "reader" },
       isPidAlive: reuseThenProbe(false),
-      now: () => T0,
     })
     expect(byPid({ pid, bootId: "old" })).toBe(false)
 
@@ -209,27 +204,11 @@ describe("owner registry without a readable start time", () => {
     expect(JSON.parse(readFileSync(join(dir, "owners", `${pid}.json`), "utf8"))).toMatchObject({ bootId: "new" })
     expect(readdirSync(join(dir, "owners"))).toEqual([`${pid}.json`])
   })
-
-  test("#given an owner on such a platform that keeps writing #when the stale window passes #then its refreshed entry keeps it alive", async () => {
-    const dir = stateDirs.make()
-    const owner = createTestRecorder({ dir, pid: 717_171, startAt: T0, startTimes: () => null })
-    await owner.summary.recordTurn("s1", summaryTurn())
-    owner.advance(4 * 60_000)
-    owner.tick()
-
-    const isAlive = createOwnerLiveness({
-      dir: summaryDir(dir),
-      owner: { pid: 1_414, bootId: "reader" },
-      isPidAlive: () => true,
-      now: () => T0 + 8 * 60_000,
-      processStartTime: () => null,
-    })
-    expect(isAlive(owner.storage.owner)).toBe(true)
-  })
 })
 
-// An idle owner (no open window between turns or after a checkpoint) writes no window, so only its heartbeat tick
-// keeps its entry fresh where no start time can be compared; otherwise a resuming process adopts a live window.
+// An idle owner (no open window between turns or after a checkpoint) writes no window. A stale heartbeat never
+// ends a live owner: where no start time can be compared, the heartbeat tick only keeps the entry fresh enough
+// that a resuming process writes its own copy instead of adopting the idle owner's live window.
 describe("owner registry heartbeat while idle", () => {
   const errorWithCode = (code: string) => Object.assign(new Error(code), { code })
   const killThrowing = (code: string) => () => {

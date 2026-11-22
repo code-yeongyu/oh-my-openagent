@@ -10,7 +10,9 @@ import { parseLstart } from "../thread/gateway/process-identity"
  * Linux: field 22 of `/proc/<pid>/stat` (clock ticks since boot), a file read with no subprocess.
  * macOS and other Unix: `ps -o lstart=` in the C locale at UTC, the source `thread/gateway/process-identity.ts`
  * already uses. Windows: null. Its only source is the process creation time behind a PowerShell or WMI call,
- * far too slow to run on every liveness check, so the registry falls back to the entry's heartbeat there.
+ * far too slow to run on every liveness check, so a live owner is judged by its pid's liveness alone there
+ * (session-summary-liveness.ts: a live owner is never judged dead by heartbeat age); its entry's heartbeat
+ * only keeps an idle owner's file from being adopted by a resuming process.
  */
 export function readProcessStartTime(pid: number, platform: typeof process.platform = process.platform): string | null {
   if (platform === "win32") return null
