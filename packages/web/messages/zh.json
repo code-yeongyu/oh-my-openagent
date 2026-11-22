@@ -206,6 +206,7 @@
     }
   },
   "docs": {
+    "englishFallback": "本文档仅提供英文版。",
     "mobileHeader": "OmO 文档",
     "searchPlaceholder": "搜索文档...",
     "searchLabel": "筛选文档章节",
