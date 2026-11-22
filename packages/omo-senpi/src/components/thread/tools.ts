@@ -1,5 +1,6 @@
 import {
   TOOL_CALL_BUDGET_MS,
+  callSignal,
   unlessAborted,
   waitWithinCallBudget,
   withCallDeadline,
@@ -51,7 +52,7 @@ import { consumedSendersOf, threadSendPermission } from "./tools/reply-permissio
 import { otherDevice, replyTargetFailure, replyTargetMismatch } from "./tools/reply-target"
 import { accountDevices } from "./address/account"
 import { listAcross } from "./remote/lazy-ops"
-import { rowFolder } from "./remote/ports"
+import { type RemoteThreadSurface, rowFolder } from "./remote/ports"
 import { locateControl } from "./control/locate"
 import { createThread } from "./control/create"
 import { awaitPromptStart, FIRST_PROMPT_START_RESERVE_MS, FIRST_PROMPT_START_WAIT_MS } from "./control/prompt-start"
@@ -106,6 +107,12 @@ const NO_LOCAL_VIEW: ThreadHostView = { sessions: [], hosts: [], disk: [] }
  */
 const DEVICE_READ = new WeakMap<ThreadHostView, string | undefined | ThreadToolFailure>()
 
+/** #13426: read through a call, so a check after an await is not narrowed away by an earlier one. */
+const isCancelled = (signal: AbortSignal | undefined): boolean => signal?.aborted === true
+
+/** #13426: thrown inside a call that was cancelled before its side effect started. */
+const NOT_STARTED = Symbol("thread-tool-not-started")
+
 /** #13426: the caller cancelled the call before it started; nothing ran. */
 const CANCELLED_BEFORE_START = failure(
   "cancelled",
@@ -118,6 +125,35 @@ const CANCELLED_WHILE_RUNNING = failure(
   "The call was cancelled while it ran; what it already sent may have reached the thread.",
   "Read the thread (tool.thread_read() in an eval cell) before calling it again.",
 )
+
+/**
+ * #13426: a command to another device stops holding its call once the call is cancelled. The command may already have
+ * reached the device, so the call reads it as `uncertain` (never as undone); a late answer is dropped.
+ */
+const RELEASED_ON_ABORT = new WeakMap<RemoteThreadSurface["sessions"], RemoteThreadSurface["sessions"]>()
+
+function releasedOnAbort(remote: RemoteThreadSurface): RemoteThreadSurface {
+  // One wrapper per port: what is kept per port (the transcript tail's pages) stays shared by every surface over it.
+  let sessions = RELEASED_ON_ABORT.get(remote.sessions)
+  if (sessions === undefined) {
+    const port = remote.sessions
+    const sessionCommand: RemoteThreadSurface["sessions"]["sessionCommand"] = async (
+      device,
+      sessionId,
+      rpc,
+      options,
+    ) => {
+      const sent = port.sessionCommand(device, sessionId, rpc, options)
+      const signal = callSignal()
+      if (signal === undefined) return await sent
+      const settled = await unlessAborted(sent, signal)
+      return settled === undefined ? { kind: "uncertain", reason: "cancelled" } : settled.value
+    }
+    sessions = { ...port, sessionCommand }
+    RELEASED_ON_ABORT.set(port, sessions)
+  }
+  return { ...remote, sessions }
+}
 
 export function createThreadTools(options: ThreadToolSurfaceOptions): readonly AnyTool[] {
   return buildThreadTools(options).tools
@@ -132,7 +168,8 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
   readonly dispose: () => void
 } {
   // One ledger of the threads these tools closed on other devices, read by every tool through the remote surface (#14170).
-  const options = surface.remote === undefined ? surface : { ...surface, remote: withClosedRows(surface.remote) }
+  const options =
+    surface.remote === undefined ? surface : { ...surface, remote: releasedOnAbort(withClosedRows(surface.remote)) }
   const { store, relay, pipeline } = createGatewayServices(options, () => view({ offline: true }))
   const now = options.now ?? store.now
   async function view(request?: ThreadHostViewRequest): Promise<ThreadHostView> {
@@ -339,17 +376,48 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         ),
       )
     }
-    // #13426: the call was cancelled while it ran. Its remote waits end on the same signal; what it already sent may
-    // have acted, so its receipt records that and a retry under the same key answers idempotency_uncertain.
-    const cancelled = async (): Promise<ToolOutput> => {
-      if (receipted)
-        await store
-          .toolReceiptSettle({ ...scope, now: now(), error_note: "the call was cancelled while it ran" })
-          .catch(unrecorded("the call was cancelled"))
-      running.delete(receiptKey(scope))
-      return output(CANCELLED_WHILE_RUNNING)
+    // #13426: cancelled before anything mutating left this device. Nothing ran, so the receipt is dropped and the same
+    // key runs again; a release the store cannot record leaves the key recoverable instead of uncertain.
+    const notStarted = async (): Promise<ToolOutput> => {
+      if (receipted) {
+        const key = receiptKey(scope)
+        const released = await store.toolReceiptRelease(scope).catch(() => false)
+        if (!released) unanswered.set(key, now() + GATEWAY_RECEIPT_RETENTION_MS)
+        running.delete(key)
+      }
+      return output(CANCELLED_BEFORE_START)
     }
+    // #13426: cancelled after the command left this device. The caller gets its answer now; the key stays held until the
+    // run itself settles and then records what it actually did, so a same-key retry waits (in progress) or replays the
+    // real outcome. Nothing pretends the sent command was undone.
+    const settleAfterCancel = (run: Promise<ThreadToolResult>): void => {
+      void run
+        .then(
+          async (late) => {
+            if (receipted)
+              await store
+                .toolReceiptSettle({ ...scope, now: now(), result: late })
+                .catch(unrecorded("the call ran after it was cancelled"))
+          },
+          async (error: unknown) => {
+            const refusal = controlRefusalOf(error)
+            const message = error instanceof Error ? error.message : String(error)
+            if (receipted)
+              await store
+                .toolReceiptSettle(
+                  refusal === undefined
+                    ? { ...scope, now: now(), error_note: `the call failed after it was cancelled (${message})` }
+                    : { ...scope, now: now(), result: { kind: "error", error: refusal } },
+                )
+                .catch(unrecorded(`the call failed after it was cancelled (${message})`))
+          },
+        )
+        .finally(() => running.delete(receiptKey(scope)))
+    }
+    // #13426: the caller may cancel while the receipt is admitted (an await after the first check); nothing has run yet.
+    if (isCancelled(signal)) return await notStarted()
     let result: ThreadToolResult
+    let dispatched = false
     if (receipted) running.add(receiptKey(scope))
     try {
       // A send takes nothing live as the offline case: its view never raises host_unavailable.
@@ -368,6 +436,9 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
               route?.leaves === true ? { ...NO_LOCAL_VIEW } : await view(receipted ? undefined : { offline: true })
             if (route?.read === true) DEVICE_READ.set(current, route.here)
           }
+          // #13426: the last check before anything mutating can leave this device.
+          if (signal?.aborted === true) throw NOT_STARTED
+          dispatched = true
           return await sideEffect(current, value, scope.idempotency_key, callerId, retrying)
         },
         signal,
@@ -375,10 +446,15 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
       if (signal === undefined) result = await work
       else {
         const settled = await unlessAborted(work, signal)
-        if (settled === undefined) return await cancelled()
+        if (settled === undefined) {
+          if (!dispatched) return await notStarted()
+          settleAfterCancel(work)
+          return output(CANCELLED_WHILE_RUNNING)
+        }
         result = settled.value
       }
     } catch (error) {
+      if (error === NOT_STARTED) return await notStarted()
       // A control's typed refusal is the call's answer, recorded like one: a retry under the same key replays it.
       const refusal = controlRefusalOf(error)
       if (refusal === undefined) return await failed(error)

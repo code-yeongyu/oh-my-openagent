@@ -24,6 +24,9 @@ const scope = new AsyncLocalStorage<CallScope>()
 export const withCallDeadline = <T>(deadlineMs: number, call: () => Promise<T>, signal?: AbortSignal): Promise<T> =>
   scope.run({ deadline: deadlineMs, signal }, call)
 
+/** The enclosing tool call's abort signal (none outside a call, or for a call that took none). */
+export const callSignal = (): AbortSignal | undefined => scope.getStore()?.signal
+
 /** What is left of the enclosing call's budget: none once its signal aborted (no enclosing call: undefined). */
 function remainingMs(now: number): number | undefined {
   const current = scope.getStore()

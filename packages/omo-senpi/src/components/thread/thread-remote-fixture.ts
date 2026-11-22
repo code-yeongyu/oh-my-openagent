@@ -943,6 +943,10 @@ export function createRemoteThreadFixture() {
       createdNeverDrains?: boolean
       /** The live session here (`dur-local`) drains each delivery at once, in this phase (a busy turn, a question). */
       localDrainsIn?: RuntimePhase
+      /** #13426: called as this device's endpoints are listed, before `listingGate` is awaited. */
+      onListing?: () => void
+      /** #13426: this device's listing answers only once this settles (a call still building its view). */
+      listingGate?: Promise<void>
     } = {},
   ) {
     const engine = extra.engine ?? ENGINE
@@ -1013,6 +1017,8 @@ export function createRemoteThreadFixture() {
       socket: "/tmp/thread-remote-test.sock",
       listSessions: async () => {
         localListings += 1
+        extra.onListing?.()
+        if (extra.listingGate !== undefined) await extra.listingGate
         if (listFails) {
           listFails = false
           throw new Error("thread RPC connection closed before the response arrived")
