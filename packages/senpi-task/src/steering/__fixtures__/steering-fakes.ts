@@ -5,6 +5,7 @@ import { join } from "node:path"
 import type { ManagedChildHandle } from "../../manager/child-handle"
 import { createTaskRecord } from "../../state"
 import type { TaskRecord, TaskRecordInput } from "../../state"
+import type { HostLivenessStatus } from "../../state/host-liveness"
 import { createTaskRecordStore } from "../../store"
 import type { TaskRecordStore } from "../../store"
 import { createSteeringEngine } from "../engine"
@@ -42,6 +43,8 @@ export type FakeHandleOptions = {
   readonly followUpGate?: Promise<void>
   readonly followUpGates?: readonly Promise<void>[]
   readonly onFollowUpStart?: () => void
+  // When set, the handle reports this host liveness to send (the unresponsive reply wording, #11347).
+  readonly liveness?: () => HostLivenessStatus
 }
 
 // Both runner adapters normalize onto ManagedChildHandle, so the two flavors differ only in the
@@ -57,6 +60,7 @@ export function makeFakeHandle(taskId: string, flavor: RunnerFlavor, options: Fa
     task_id: taskId,
     sessionId: `sess-${taskId}`,
     pid: flavor === "rpc" ? 4321 : undefined,
+    ...(options.liveness === undefined ? {} : { liveness: options.liveness }),
     steer: async (text, identity) => {
       steerCalls.push(text)
       inputIds.push(identity?.clientMessageId)

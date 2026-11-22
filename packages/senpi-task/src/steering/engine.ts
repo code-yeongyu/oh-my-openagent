@@ -191,11 +191,15 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     const liveness = handle.liveness?.()
     if (liveness !== undefined && liveness.state !== "running") {
       if (record.status === "running") return enqueuePending(record, input.message, deliverAs)
+      // Terminal-pending never returns to running: it ends killed and a later send revives it cold (#11347).
       return {
         kind: "unresponsive",
         task_id: record.task_id,
         retryable: true,
-        reason: `Task ${record.task_id}'s session is unresponsive; nothing was sent. Retry when its host status returns to running.`,
+        reason:
+          liveness.state === "terminal-pending"
+            ? `Task ${record.task_id}'s host session is closing after it went unresponsive; nothing was sent. It never returns to running: it ends killed, and a later send revives it cold.`
+            : `Task ${record.task_id}'s session is unresponsive; nothing was sent. Retry when its host status returns to running.`,
       }
     }
 

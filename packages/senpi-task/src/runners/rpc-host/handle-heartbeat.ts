@@ -9,6 +9,12 @@ export type { HostLivenessStatus } from "../../state/host-liveness"
 
 export const HOST_UNRESPONSIVE_DEADLINE_MS = 120_000
 const MAX_BACKOFF_MS = 30_000
+// A host that keeps failing the confirmed close (it may lack close/listing support) would else
+// retry silently forever; after this many consecutive failed confirms the parent gets ONE
+// escalated terminal-pending notice, then the retries continue unchanged (#11347). The reconnect
+// policy that would eventually give up on a permanently failing reattach is a known follow-up
+// (see `reconnect` in unresponsive-close.ts).
+const CLOSE_ESCALATION_FAILURES = 3
 const STOPPED = Symbol("host heartbeat stopped")
 
 export interface HostHeartbeatInput {
@@ -29,6 +35,8 @@ export function startHostHeartbeat(input: HostHeartbeatInput) {
   let failures = 0
   let probePending = false
   let probeMissed = false
+  let closeFailures = 0
+  let closeEscalated = false
   let timer: ReturnType<typeof setTimeout> | undefined
   let deadline: ReturnType<typeof setTimeout> | undefined
   let closeTimer: ReturnType<typeof setTimeout> | undefined
@@ -93,7 +101,12 @@ export function startHostHeartbeat(input: HostHeartbeatInput) {
         () => gone(true),
         (error) => {
           if (!active()) return
+          closeFailures += 1
           log("senpi-task unresponsive session close pending", { taskId: input.taskId, error: String(error) })
+          if (!closeEscalated && closeFailures >= CLOSE_ESCALATION_FAILURES && status.state === "terminal-pending") {
+            closeEscalated = true
+            publish({ ...status, escalated: true })
+          }
         },
       )
   }
@@ -114,6 +127,8 @@ export function startHostHeartbeat(input: HostHeartbeatInput) {
         (state) => {
           if (state === STOPPED || !active() || status.state === "terminal-pending") return
           failures = 0
+          closeFailures = 0
+          closeEscalated = false
           clearTimeout(deadline)
           if (status.state !== "running") publish({ state: "running" })
           input.onState(state)

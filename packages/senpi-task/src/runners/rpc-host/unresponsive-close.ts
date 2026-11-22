@@ -17,6 +17,7 @@ export function createUnresponsiveClose(input: {
   let disconnected = false
   let reopened = false
   let reconnecting: Promise<void> | undefined
+  let closing: Promise<void> | undefined
   const stopped = Promise.withResolvers<undefined>()
   const reconnect = async (): Promise<void> => {
     const next = await input.reattach?.(input.session(), input.stopped)
@@ -37,6 +38,22 @@ export function createUnresponsiveClose(input: {
     if (port.closeConfirmed === undefined) return Promise.reject(new HostSessionUnresponsiveError())
     return port.closeConfirmed()
   }
+  const runClose = async (): Promise<void> => {
+    await connect()
+    if (input.stopped()) return
+    const port = input.port()
+    const bound = armRecoveryBound({ boundMs: Math.min(input.closeGraceMs, 2_000) })
+    try {
+      await Promise.race([withinBound(bound, port.send({ type: "abort" })), stopped.promise])
+    } catch (error) {
+      log("senpi-task unresponsive session abort pending", { taskId: input.taskId, error: String(error) })
+    } finally {
+      bound.settle()
+    }
+    if (input.stopped()) return
+    // Parent shutdown's best-effort helper swallows this failure. Liveness cannot.
+    await Promise.race([closePort(port), stopped.promise])
+  }
   return {
     stop: () => {
       stopped.resolve(undefined)
@@ -54,21 +71,16 @@ export function createUnresponsiveClose(input: {
       }
       return await port.getState()
     },
+    // One outstanding close attempt per handle (#11347): against a stalled host the heartbeat's
+    // 30 s retry ticks join the attempt already in flight instead of piling up new
+    // close_session/list_sessions probes; a settled failure clears the slot for the next tick.
+    // The reconnect policy that would bound (not just serialize) a permanently failing reattach
+    // stays a known follow-up; until then retries continue every tick, unbounded by design.
     close: async (): Promise<void> => {
-      await connect()
-      if (input.stopped()) return
-      const port = input.port()
-      const bound = armRecoveryBound({ boundMs: Math.min(input.closeGraceMs, 2_000) })
-      try {
-        await Promise.race([withinBound(bound, port.send({ type: "abort" })), stopped.promise])
-      } catch (error) {
-        log("senpi-task unresponsive session abort pending", { taskId: input.taskId, error: String(error) })
-      } finally {
-        bound.settle()
-      }
-      if (input.stopped()) return
-      // Parent shutdown's best-effort helper swallows this failure. Liveness cannot.
-      await Promise.race([closePort(port), stopped.promise])
+      closing ??= runClose().finally(() => {
+        closing = undefined
+      })
+      return closing
     },
   }
 }

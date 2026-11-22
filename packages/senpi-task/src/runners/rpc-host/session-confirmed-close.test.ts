@@ -110,17 +110,25 @@ async function closureFixture(hostState: "answers" | "stalled" | "gone", acked: 
   })
   const started = await manager.start(baseSpec({ execution_mode: "process", run_in_background: true }))
   if (started.kind !== "started") throw new Error("expected started")
+  const closedReasons: string[] = []
+  client.onClosed((event) => {
+    closedReasons.push(event.reason ?? "")
+  })
   return {
     handle,
     manager,
     notices,
     listings,
+    closedReasons,
     taskId: started.task_id,
     clock,
     closeFrame: (reason: string) => {
       onClose = () => {
         for (const listener of events) listener({ type: "session_closed", sessionId: route, reason })
       }
+    },
+    frame: (record: unknown) => {
+      for (const listener of events) listener(record)
     },
     dispose: async () => {
       manager.forget(started.task_id, { path: "park" })
@@ -213,4 +221,22 @@ test("a refused confirmed close keeps the same session route available for retry
   expect(host.sessions()).toHaveLength(0)
   expect(host.commands.filter((command) => command.type === "open_session")).toHaveLength(1)
   expect(host.commands.filter((command) => command.type === "close_session")).toHaveLength(2)
+})
+
+test("a closed frame after a failed confirm still reaches the client", async () => {
+  // Given a host that answers listings but keeps the session listed, so the confirm fails.
+  const fixture = await closureFixture("answers", true, true)
+  try {
+    // When the liveness deadline has run and its confirm failed.
+    await fixture.clock.advance(200_000)
+    expect(fixture.handle.liveness().state).toBe("terminal-pending")
+    expect(fixture.notices).toEqual(["unresponsive", "terminal-pending"])
+    // Then a later host-side closed frame (not provoked by our own in-flight close) reaches the
+    // client's listeners instead of being ignored for its remaining life (#11347).
+    fixture.frame({ type: "session_closed", sessionId: "closing-session", reason: "host_closed" })
+    await fixture.clock.advance(0)
+    expect(fixture.closedReasons).toContain("host_closed")
+  } finally {
+    await fixture.dispose()
+  }
 })
