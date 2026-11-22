@@ -4,6 +4,7 @@
 
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
 import * as connectedProvidersCache from "../../../shared/connected-providers-cache"
+import * as agentLoader from "../../../features/claude-code-agent-loader"
 import type { DelegateTaskArgs } from "../types"
 import type { ExecutorContext } from "../executor-types"
 
@@ -21,15 +22,7 @@ const readProviderModelsCacheMock = mock(
     } | null,
 )
 
-type ClaudeCodeAgentRecord = Record<
-  string,
-  {
-    description?: string
-    mode?: string
-    prompt?: string
-    model?: string | { providerID: string; modelID: string }
-  }
->
+type ClaudeCodeAgentRecord = ReturnType<typeof agentLoader.loadUserAgents>
 
 const loadUserAgentsMock = mock((): ClaudeCodeAgentRecord => ({}))
 const loadProjectAgentsMock = mock((_directory?: string): ClaudeCodeAgentRecord => ({}))
@@ -92,14 +85,8 @@ describe("resolveSubagentExecution", () => {
     spyOn(connectedProvidersCache, "hasProviderModelsCache").mockImplementation(
       () => readProviderModelsCacheMock() !== null,
     )
-    mock.module("../../../features/claude-code-agent-loader/loader", () => ({
-      loadUserAgents: loadUserAgentsMock,
-      loadProjectAgents: loadProjectAgentsMock,
-    }))
-    mock.module("../../../features/claude-code-agent-loader", () => ({
-      loadUserAgents: loadUserAgentsMock,
-      loadProjectAgents: loadProjectAgentsMock,
-    }))
+    spyOn(agentLoader, "loadUserAgents").mockImplementation(loadUserAgentsMock)
+    spyOn(agentLoader, "loadProjectAgents").mockImplementation(loadProjectAgentsMock)
     ;({ resolveSubagentExecution } = await importFreshSubagentResolverModule())
   })
 
@@ -1322,14 +1309,8 @@ describe("resolveSubagentExecution - agent name sanitization", () => {
     spyOn(connectedProvidersCache, "hasProviderModelsCache").mockImplementation(
       () => readProviderModelsCacheMock() !== null,
     )
-    mock.module("../../../features/claude-code-agent-loader/loader", () => ({
-      loadUserAgents: loadUserAgentsMock,
-      loadProjectAgents: loadProjectAgentsMock,
-    }))
-    mock.module("../../../features/claude-code-agent-loader", () => ({
-      loadUserAgents: loadUserAgentsMock,
-      loadProjectAgents: loadProjectAgentsMock,
-    }))
+    spyOn(agentLoader, "loadUserAgents").mockImplementation(loadUserAgentsMock)
+    spyOn(agentLoader, "loadProjectAgents").mockImplementation(loadProjectAgentsMock)
     ;({ resolveSubagentExecution } = await importFreshSubagentResolverModule())
   })
 

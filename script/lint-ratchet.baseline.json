@@ -1107,10 +1107,10 @@
     "omo-testing/no-module-mock": 1
   },
   "packages/omo-opencode/src/tools/delegate-task/zauc-mocks-subagent-resolver/subagent-resolver-claude-code-agents-toggle.test.ts": {
-    "omo-testing/no-module-mock": 2
+    "omo-testing/no-module-mock": 1
   },
   "packages/omo-opencode/src/tools/delegate-task/zauc-mocks-subagent-resolver/subagent-resolver.test.ts": {
-    "omo-testing/no-module-mock": 6
+    "omo-testing/no-module-mock": 2
   },
   "packages/omo-opencode/src/tools/hashline-edit/formatter-trigger.test.ts": {
     "typescript/no-non-null-assertion": 4
@@ -2183,7 +2183,7 @@
     "omo-testing/no-flake-masking": 3
   },
   "script/build-omo-binary.test.ts": {
-    "omo-testing/no-flake-masking": 5,
+    "omo-testing/no-flake-masking": 4,
     "typescript/no-non-null-assertion": 11
   },
   "script/build-omo-binary.ts": {
