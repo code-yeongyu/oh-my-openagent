@@ -1,8 +1,9 @@
 import { parseMemoryFile, renderMemoryFile, type MemoryFrontmatter } from "../memfs/frontmatter"
 import { lookAlikeFrontmatterKeys, normalizedFrontmatterKey } from "../memfs/frontmatter-entries"
+import { PROVENANCE_FRONTMATTER_KEY } from "../memfs/frontmatter-keys"
 import { renderClaimReceipt, type ClaimReceipt } from "../provenance"
 
-export const PROVENANCE_FRONTMATTER_KEY = "provenance"
+export { PROVENANCE_FRONTMATTER_KEY }
 export const MIXED_PROVENANCE = "mixed: parts of this note are not the user's recorded words"
 // Commit trailer every writer adds, once per path, when an edit drops a legacy user header (lead decision C on #10498).
 export const PROVENANCE_STRIPPED_TRAILER = "Omo-Provenance-Stripped"
