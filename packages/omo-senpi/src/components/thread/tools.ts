@@ -359,16 +359,16 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
       const work = withCallDeadline(
         Date.now() + TOOL_CALL_BUDGET_MS,
         async () => {
-        let current: ThreadHostView
-        if (sendTo !== "" && sendTo !== "self" && (await store.sessionOwner(sendTo)) !== null)
-          current = PUBLISHED_SEND_VIEW
-        else {
-          const route = sendTo === "" ? undefined : await replyRoute(options, sendTo)
-          current =
-            route?.leaves === true ? { ...NO_LOCAL_VIEW } : await view(receipted ? undefined : { offline: true })
-          if (route?.read === true) DEVICE_READ.set(current, route.here)
-        }
-        return await sideEffect(current, value, scope.idempotency_key, callerId, retrying)
+          let current: ThreadHostView
+          if (sendTo !== "" && sendTo !== "self" && (await store.sessionOwner(sendTo)) !== null)
+            current = PUBLISHED_SEND_VIEW
+          else {
+            const route = sendTo === "" ? undefined : await replyRoute(options, sendTo)
+            current =
+              route?.leaves === true ? { ...NO_LOCAL_VIEW } : await view(receipted ? undefined : { offline: true })
+            if (route?.read === true) DEVICE_READ.set(current, route.here)
+          }
+          return await sideEffect(current, value, scope.idempotency_key, callerId, retrying)
         },
         signal,
       )
@@ -407,23 +407,23 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         args,
         ectx,
         async (current, value, operationId, callerId, retrying) =>
-        createThread(options, current, value, {
-          operationId,
-          callerId,
-          retrying,
-          view: () => view(),
-          deliverPrompt: (prompted, target, send, key) =>
-            deliverThrough(options, pipeline, prompted, target, send, key, callerId, undefined, "creator"),
-          awaitPromptStart: (deliveryId) =>
-            awaitPromptStart(
-              store,
-              deliveryId,
-              waitWithinCallBudget(
-                options.firstPromptWaitMs ?? FIRST_PROMPT_START_WAIT_MS,
-                FIRST_PROMPT_START_RESERVE_MS,
+          createThread(options, current, value, {
+            operationId,
+            callerId,
+            retrying,
+            view: () => view(),
+            deliverPrompt: (prompted, target, send, key) =>
+              deliverThrough(options, pipeline, prompted, target, send, key, callerId, undefined, "creator"),
+            awaitPromptStart: (deliveryId) =>
+              awaitPromptStart(
+                store,
+                deliveryId,
+                waitWithinCallBudget(
+                  options.firstPromptWaitMs ?? FIRST_PROMPT_START_WAIT_MS,
+                  FIRST_PROMPT_START_RESERVE_MS,
+                ),
               ),
-            ),
-        }),
+          }),
         signal,
       ),
   }
@@ -515,7 +515,13 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
           if (located.kind === "error") return located.result
           // Nothing live holds it: there is nothing to close, and the thread stays resumable from its session file.
           if (located.kind === "not_live")
-            return { kind: "ok", ...controlIdentity(located), closed: false, reason: "not_live", dropped_deliveries: [] }
+            return {
+              kind: "ok",
+              ...controlIdentity(located),
+              closed: false,
+              reason: "not_live",
+              dropped_deliveries: [],
+            }
           return await closeThread(located.control, closeOptions(value))
         },
         signal,
@@ -531,7 +537,14 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         args,
         ectx,
         async (current, value, operationId, callerId) =>
-          deliver(current, value.thread, value, operationId, callerId, value.match === "fuzzy" ? "fuzzy" : "exact_name"),
+          deliver(
+            current,
+            value.thread,
+            value,
+            operationId,
+            callerId,
+            value.match === "fuzzy" ? "fuzzy" : "exact_name",
+          ),
         signal,
       ),
   }

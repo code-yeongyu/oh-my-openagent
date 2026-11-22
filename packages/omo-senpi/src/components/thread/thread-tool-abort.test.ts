@@ -10,7 +10,10 @@ const { account, surface, cleanup } = createRemoteThreadFixture()
 afterEach(cleanup)
 
 /** b's device takes every session command and never answers; `sent` settles when the first one leaves this device. */
-function silentDevice(remote: RemoteThreadSurface): { readonly remote: RemoteThreadSurface; readonly sent: Promise<void> } {
+function silentDevice(remote: RemoteThreadSurface): {
+  readonly remote: RemoteThreadSurface
+  readonly sent: Promise<void>
+} {
   let reached = () => {}
   const sent = new Promise<void>((resolve) => {
     reached = resolve
