@@ -20,6 +20,7 @@ describe("createNativeSkillSources", () => {
     "hyperplan",
     "init-deep",
     "mass-ulw",
+    "omo-relay",
     "onboarding",
     "ultrawork",
     "ulw-plan",

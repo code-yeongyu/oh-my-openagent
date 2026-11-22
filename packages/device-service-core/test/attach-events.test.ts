@@ -33,11 +33,11 @@ function scriptedClient(onCommand: (commandId: string) => void = () => {}) {
       listeners.add(listener)
       return () => listeners.delete(listener)
     },
-    command: async (_attach, _rpc, commandId) => {
+    command: async () => "c",
+    commandTo: async (_target, _rpc, commandId) => {
       queueMicrotask(() => onCommand(commandId ?? "c"))
       return commandId ?? "c"
     },
-    endpointCommand: async () => "c",
     list: async () => ({ query_id: "q", revision: 0, rows: [], incomplete: [], devices: {} }),
     read: async () => ({ entries: [], next_before: null }),
     oversizedLines: () => 0,

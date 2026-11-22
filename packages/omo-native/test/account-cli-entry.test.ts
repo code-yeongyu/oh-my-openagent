@@ -54,7 +54,8 @@ test("omo account adopt on Linux with no gdbus succeeds and prints the fallback 
     new Response(child.stderr).text(),
     child.exited,
   ])
-  expect({ code, out: JSON.parse(stdout.trim()) }).toEqual({
+  // toMatchObject: the answer also carries the additive `storage` field once the launcher bundle includes #7185b.
+  expect({ code, out: JSON.parse(stdout.trim()) }).toMatchObject({
     code: 0,
     out: { adopted: true, device: { id: "dev_e", name: "entry" } },
   })

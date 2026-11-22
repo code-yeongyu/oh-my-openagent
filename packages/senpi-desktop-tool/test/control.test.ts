@@ -1,6 +1,6 @@
 import type { ExecuteTool } from "@oh-my-opencode/senpi-desktop-service"
 import { afterEach, describe, expect, it } from "vitest"
-import { rejectionOf } from "../../senpi-desktop-service/test/harness"
+import { rejectionOf } from "@oh-my-opencode/senpi-desktop-service/testing"
 import { createComputerTool, type ControlConfirmRequest } from "../src/tool"
 import { closeDesktops, desktopFixture, hostContext, methodsOf } from "./fixtures"
 

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { applyExactDacl, exactDaclVerdict, parseSddl } from "../../src/local-api/dacl.ts"
+import { exactDaclVerdict, parseSddl } from "../../src/local-api/dacl.ts"
+import { aliasedDaclVerdict, applyExactDacl } from "../../src/release/windows-dacl.ts"
 import { rejectionOf } from "./conformance/rejection.ts"
 
 const U = "S-1-5-21-1111111111-2222222222-3333333333-1001"
@@ -118,15 +119,29 @@ describe("the SDDL alias of the user", () => {
     const aliased = parseSddl("O:LAD:PAI(A;;FA;;;LA)")
     expect(aliased).toBeDefined()
     if (aliased === undefined) return
-    expect(exactDaclVerdict(aliased, U, "file", "LA")).toBe(true)
-    expect(exactDaclVerdict(aliased, U, "file")).toBe(false)
-    expect(exactDaclVerdict(aliased, U, "file", "BA")).toBe(false)
+    expect(aliasedDaclVerdict(aliased, U, "file", "LA")).toBe(true)
+    expect(aliasedDaclVerdict(aliased, U, "file")).toBe(false)
+    expect(aliasedDaclVerdict(aliased, U, "file", "BA")).toBe(false)
     const mixed = parseSddl("O:LAD:PAI(A;;FA;;;BA)")
-    expect(mixed !== undefined && exactDaclVerdict(mixed, U, "file", "LA")).toBe(false)
+    expect(mixed !== undefined && aliasedDaclVerdict(mixed, U, "file", "LA")).toBe(false)
   })
 })
 
 describe("applying the exact DACL", () => {
+  test("the runner apply script sets the owner with icacls and writes only the DACL, without SetOwner or Set-Acl", async () => {
+    let script = ""
+    const run = async (text: string) => {
+      script = text
+      return { code: 0, out: "applied" }
+    }
+    await applyExactDacl("C:\\state", U, "file", run)
+    expect(script.includes("icacls.exe")).toBe(true)
+    expect(script.includes("$ProgressPreference = 'SilentlyContinue'")).toBe(true)
+    expect(script.includes(".SetAccessControl($acl)")).toBe(true)
+    expect(script.includes("Set-Acl")).toBe(false)
+    expect(script.includes("SetOwner")).toBe(false)
+  })
+
   test("a failed apply names the first line of the script's error", async () => {
     const failing = async () => ({
       code: 1,
@@ -148,6 +163,48 @@ describe("applying the exact DACL", () => {
     })
     expect(await rejectionOf(applyExactDacl("C:\\state", U, "dir", failing))).toMatchObject({
       reason: "the exact DACL could not be applied: Access to the path is denied.",
+    })
+  })
+
+  test("a progress record in front of the real error is not the reported line", async () => {
+    const progress =
+      '<Objs Version="1.1.0.1" xmlns="http://schemas.microsoft.com/powershell/2004/04"><Obj S="progress" RefId="0"><AV>Preparing modules for first use.</AV></Obj>'
+    const failing = async () => ({
+      code: 1,
+      out: "",
+      err: `#< CLIXML\r\n${progress}\r\nException calling "SetAccessControl": Attempted to perform an unauthorized operation.\r\n`,
+    })
+    expect(await rejectionOf(applyExactDacl("C:\\state", U, "dir", failing))).toMatchObject({
+      reason:
+        'the exact DACL could not be applied: Exception calling "SetAccessControl": Attempted to perform an unauthorized operation.',
+    })
+  })
+
+  test("an exception buried in one CLIXML progress line is the reported line", async () => {
+    const failing = async () => ({
+      code: 1,
+      out: "",
+      err: '<Objs Version="1.1.0.1"><Obj S="progress"><AV>Preparing modules for first use.</AV></Obj><S>Exception calling "SetAccessControl": Attempted to perform an unauthorized operation.</S></Objs>',
+    })
+    expect(await rejectionOf(applyExactDacl("C:\\state", U, "dir", failing))).toMatchObject({
+      reason:
+        'the exact DACL could not be applied: Exception calling "SetAccessControl": Attempted to perform an unauthorized operation.',
+    })
+  })
+
+  test("an error record split over CLIXML Error strings is decoded whole, up to its position line", async () => {
+    const failing = async () => ({
+      code: 1,
+      out: "",
+      err:
+        '#< CLIXML\r\n<Objs Version="1.1.0.1"><Obj S="progress" RefId="0"><AV>Preparing modules for first use.</AV></Obj>' +
+        '<S S="Error">Exception calling "SetAccessControl" with "1" argument(s): &quot;Attempted to perform an _x000D__x000A_</S>' +
+        '<S S="Error">unauthorized operation.&quot;_x000D__x000A_</S><S S="Error">At line:18 char:1_x000D__x000A_</S>' +
+        '<S S="Error">    + FullyQualifiedErrorId : UnauthorizedAccessException_x000D__x000A_</S></Objs>',
+    })
+    expect(await rejectionOf(applyExactDacl("C:\\state", U, "dir", failing))).toMatchObject({
+      reason:
+        'the exact DACL could not be applied: Exception calling "SetAccessControl" with "1" argument(s): "Attempted to perform an unauthorized operation."',
     })
   })
 

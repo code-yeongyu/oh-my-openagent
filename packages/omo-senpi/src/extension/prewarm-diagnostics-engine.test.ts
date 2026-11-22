@@ -149,6 +149,8 @@ test("#given a real session with a late unsafe component #when draft prewarm ski
     unsubscribe?.()
     await session?.extensionRunner?.emit({ type: "session_shutdown", reason: "quit" })
     await session?.dispose()
+    // senpi's fallback logger finishes its first-start removal asynchronously; removing the agent dir before it settles leaks it (#9766).
+    await session?.whenToolChildClosed()
     for (const [key, value] of previous) {
       if (value === undefined) delete process.env[key]
       else process.env[key] = value

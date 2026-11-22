@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { join } from "node:path"
 
-import type { ExtensionAPI } from "@code-yeongyu/senpi"
+import type { ExtensionAPI, ExtensionError } from "@code-yeongyu/senpi"
 
 import { loadSenpiBarrel } from "../../lazy/senpi-barrel"
 import { InProcessRunner } from "../in-process"
@@ -123,7 +123,15 @@ describe("in-process child teardown shuts down its extensions (#9413)", () => {
     // given: a child with an extension whose session_shutdown handler never settles, under a 300ms budget
     machine = await createBuiltinChildMachine()
     const senpi = await loadSenpiBarrel()
-    const settingsManager = senpi.SettingsManager.inMemory({ sessionShutdownHandlerTimeoutMs: 300 })
+    // The runner reads the shutdown budget from a fresh SettingsManager.create(cwd, agentDir) at each session_shutdown,
+    // never from the session's own settings manager, so the budget goes into this machine's agent settings on disk.
+    const budgetWriter = senpi.SettingsManager.create(machine.cwd, machine.agentDir)
+    budgetWriter.setSessionShutdownHandlerTimeoutMs(300)
+    await budgetWriter.flush()
+    expect(budgetWriter.drainErrors()).toEqual([])
+    const runnerView = senpi.SettingsManager.create(machine.cwd, machine.agentDir, { projectTrusted: true })
+    expect(runnerView.getSessionShutdownHandlerTimeoutMs()).toBe(300)
+    const settingsManager = senpi.SettingsManager.inMemory()
     let shutdownSignal: AbortSignal | undefined
     const hangsOnShutdown = (pi: ExtensionAPI): void => {
       pi.on("session_shutdown", (event) => {
@@ -158,12 +166,24 @@ describe("in-process child teardown shuts down its extensions (#9413)", () => {
       dispose()
     }
     const handle = createRestoredChildHandle({ taskId: "hung-child", session })
+    const shutdownErrors: ExtensionError[] = []
+    const stopWatchingErrors = session.extensionRunner.onError((error) => {
+      if (error.event === "session_shutdown") shutdownErrors.push(error)
+    })
 
     // when: teardown waits only for the budget, never for the hung handler
     await handle.dispose()
+    stopWatchingErrors()
 
     // then: the handler was asked to stop at the budget, and the session was still disposed
     expect(shutdownSignal?.aborted).toBe(true)
     expect(disposed).toBe(true)
+    // and the runner reported exactly one expiry, of the configured 300ms budget rather than its 10s default
+    expect(
+      shutdownErrors.map((error) => ({
+        extensionPath: error.extensionPath,
+        budgetMs: Number(/handler timed out after (\d+)ms/.exec(error.error)?.[1]),
+      })),
+    ).toEqual([{ extensionPath: expect.stringContaining("hangs-on-shutdown"), budgetMs: 300 }])
   }, 120_000)
 })

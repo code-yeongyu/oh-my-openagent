@@ -1,11 +1,11 @@
 import { afterEach, expect, test } from "bun:test"
-import { loadOmoConfig } from "@oh-my-opencode/omo-config-core"
 import {
   cleanupProjects,
   FakeRunner,
   launchSettled,
 } from "../../../../senpi-task/src/manager/__fixtures__/manager-fakes"
 import { pausedRun } from "../../../../senpi-task/src/dag/__fixtures__/paused-run"
+import { ownedTaskStateConfig } from "../../../../senpi-task/src/store/__fixtures__/owned-task-state"
 import type { RunRef } from "../../../../senpi-task/src/pause/ports"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { composeTaskEngine } from "./engine"
@@ -21,7 +21,7 @@ async function pausedWorkflow(fences: { readonly release?: (runRef: RunRef) => v
   const engine = composeTaskEngine({
     pi,
     cwd: h.project,
-    omoConfig: loadOmoConfig({ cwd: h.project }).config,
+    omoConfig: ownedTaskStateConfig(h.project),
     sharedParentTools: () => [],
     runnerFactories: { inProcess: () => runner, process: () => runner },
     childPausePort: {

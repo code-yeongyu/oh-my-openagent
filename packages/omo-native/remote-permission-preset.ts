@@ -5,11 +5,12 @@ import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { parseJsonc } from "./bin/lib/jsonc.js"
 import { UsageError } from "./remote-exit"
 
-// senpi's approval modes (permission-system/types.ts) and its default for a session nobody configured.
-export const PERMISSION_PRESETS = ["full-access", "workspace", "accept-edits", "auto", "read-only", "ask"] as const
-const DEFAULT_PERMISSION_PRESET = "full-access"
+import { isPermissionPreset, PERMISSION_PRESETS } from "../omo-senpi/src/components/thread/contracts/permission-presets"
 
-export const isPermissionPreset = (value: string): boolean => PERMISSION_PRESETS.some((preset) => preset === value)
+export { isPermissionPreset, PERMISSION_PRESETS }
+
+// senpi's default approval mode for a session nobody configured.
+const DEFAULT_PERMISSION_PRESET = "full-access"
 
 /**
  * The mode a session this person starts on this device gets: the global `permissionPreset` of this device's engine

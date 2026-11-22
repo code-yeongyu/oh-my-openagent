@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { registerSyncRpc } from "./sync-rpc-registration"
@@ -18,10 +18,13 @@ import {
 } from "../../../../memory-core/src/sync/recovery/testing/world.test-support"
 import { createAccountHttp } from "../../../../memory-core/src/sync/account/http"
 import { createPairingHttp } from "../../../../memory-core/src/sync/account/pairing-http"
+import { disableSync, isDeviceSyncOff } from "../../../../memory-core/src/sync/account/device-switch"
+import { openAccountSession } from "../../../../memory-core/src/sync/account/session"
 import { enableSync } from "../../../../memory-core/src/sync/account/enable"
 import { joinAccount } from "../../../../memory-core/src/sync/account/join"
 import { approveDevice } from "../../../../memory-core/src/sync/account/approve"
 import { startChainWireServer } from "../../../../memory-core/src/sync/account/testing/chain-wire-server.test-support"
+import { removeTree } from "../../../../../test-support/remove-tree"
 
 const cleanup: (() => Promise<unknown>)[] = []
 afterEach(async () => {
@@ -51,10 +54,12 @@ function manualClock() {
 async function setup(empty = false) {
   const world = await createWorld("rpc-pairing")
   const chain = empty ? [] : world.server.chain(world.account)
-  const server = startChainWireServer(world.account, chain)
+  const server = startChainWireServer(world.account, chain, { confirmDeviceOff: true })
   cleanup.push(() => server.stop())
   const claimsRoot = await mkdtemp(join(tmpdir(), "g3-wire-"))
-  cleanup.push(() => rm(claimsRoot, { recursive: true, force: true }))
+  // The claims churn lease, lock and guard files here up to dispose; on Windows a just-unlinked one can still be
+  // listed, and Bun's recursive rm then reports success but leaves the root. removeTree checks it is gone.
+  cleanup.push(() => removeTree(claimsRoot))
   const joining = await newDevice()
   const memberPin = freshStateDir()
   if (!empty) {
@@ -119,6 +124,7 @@ async function setup(empty = false) {
     // real HTTP result, while all pairing, signing, verification and pinning remain core code.
     const runtime: SyncRpcRuntime = {
       enableSync,
+      disableSync,
       joinAccount: async (input) => {
         const result = await joinAccount({
           ...input,
@@ -234,9 +240,43 @@ test("#given actual pairing codes #when the person submits a different code #the
   expect(f.chain.length).toBe(before)
 }, 15_000)
 
-test("#given an empty keyring without genesis bridge #when registered enable runs #then it retains needs_first_device", async () => {
+test("#given an empty keyring without genesis bridge #when registered enable runs #then it asks for a method and offers none", async () => {
   const f = await setup(true)
-  expect(await f.joiner.call("enable")).toEqual({ kind: "needs_first_device" })
+  expect(await f.joiner.call("enable")).toEqual({ kind: "method_required", methods: [] })
   expect(f.server.pending()).toHaveLength(0)
-  expect(await f.joiner.call("status")).toMatchObject({ enable: { kind: "needs_first_device" } })
+  expect(await f.joiner.call("status")).toMatchObject({ enable: { kind: "method_required", methods: [] } })
+})
+
+test("#given a member device with sync on #when the registered disable handler runs #then the service switch is cleared with a spent confirmation, the device is off locally, a sync session stays idle, and enable turns both back on", async () => {
+  const { server, world, member } = await setup()
+  const device = `service-${world.owner.principal.id}`
+  const session = {
+    account: world.account,
+    keyring: world.owner.keyring,
+    pinDir: member.pinDir,
+    spaceId: new Uint8Array(16),
+    baseUrl: server.url,
+    token: () => server.tokenFor({ ...world.owner.principal }),
+  }
+  expect(await member.call("enable")).toMatchObject({ kind: "joined" })
+  expect(server.enabled(device)).toBe(true)
+  expect((await openAccountSession(session)).ok).toBe(true)
+
+  expect(await member.call("disable")).toEqual({ kind: "off" })
+  expect(server.enabled(device)).toBe(false)
+  expect(server.switches.at(-1)).toMatch(
+    new RegExp(`^/v1/devices/${device}/sync \\{"enabled":false,"confirmToken":"[A-Za-z0-9_-]{43}"\\}$`),
+  )
+  expect(await isDeviceSyncOff(member.pinDir, world.account)).toBe(true)
+  expect(await openAccountSession(session)).toEqual({ ok: false, reason: "sync_off" })
+  // The trust pin is untouched, so turning sync on again needs no new approval.
+  expect((await loadTrustAnchor(member.pinDir, world.account)).ok).toBe(true)
+
+  expect(await member.call("disable")).toEqual({ kind: "off" })
+  expect(server.enabled(device)).toBe(false)
+
+  expect(await member.call("enable")).toMatchObject({ kind: "joined" })
+  expect(server.enabled(device)).toBe(true)
+  expect(await isDeviceSyncOff(member.pinDir, world.account)).toBe(false)
+  expect((await openAccountSession(session)).ok).toBe(true)
 })

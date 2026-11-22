@@ -1,8 +1,8 @@
-import { spawnSync } from "node:child_process"
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs"
 import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 import { canonicalAgentDir } from "./agent-dir.js"
+import { isEngineCommand } from "./engine-commands.js"
 import { fetchNpmDistTagsSync } from "./npm-dist-tags.js"
 import {
   channelDistTagVersion,
@@ -19,6 +19,7 @@ import { launchSpecDoctorLines } from "./launch-spec-mode.js"
 import { piConfigReport } from "./doctor-pi-config.js"
 import { needsSetupSuggestion } from "./setup-detect.js"
 import { keychainHelperDoctorLines } from "./keychain-helper-doctor.js"
+import { listProcesses } from "./process-list.js"
 import { sameVersion } from "./same-version.js"
 
 export function installedDistTag(version) {
@@ -96,59 +97,22 @@ function engineVersionOrUnresolved(senpi) {
 const ENGINE_MARKERS = ["senpi/dist/cli.js", "senpi/dist/bundle/cli.js"]
 const MANAGED_MODE_FLAG = "--mode"
 
-/**
- * Reads the live process table. `ps` is the portable answer on macOS and Linux alike, and reading
- * it can never be a reason for diagnostics to fail, so an unavailable or unparsable listing is an
- * empty list.
- */
-export function listProcesses() {
-  if (process.platform === "win32") return []
-  // -ww: an unlimited width, so `args` is never cut at the terminal width (BSD/macOS `ps` truncates).
-  const listed = spawnSync("ps", ["-ww", "-axo", "pid=,ppid=,etime=,tty=,args="], { encoding: "utf8" })
-  if (listed.status !== 0 || typeof listed.stdout !== "string") return []
-  const entries = []
-  for (const line of listed.stdout.split("\n")) {
-    const match = /^\s*(\d+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(.*)$/.exec(line)
-    if (!match) continue
-    entries.push({
-      pid: Number(match[1]),
-      ppid: Number(match[2]),
-      elapsed: match[3],
-      tty: match[4],
-      command: match[5],
-    })
-  }
-  return entries
-}
-
 // A standalone binary runs its engine as the provisioned runtime executable itself. The same
 // executable also serves omo's own commands, internal hosts and bundled scripts, so only a bare launch
 // or engine flags count; those other roles are never engines.
 const BINARY_RUNTIME_EXECUTABLE = String.raw`[\\/]binary-runtime[\\/][^\\/\s]+[\\/]omo(?:\.exe)?`
 const BINARY_ENGINE = new RegExp(String.raw`${BINARY_RUNTIME_EXECUTABLE}(?=\s|$)\s*(\S*)`)
-const BINARY_NON_ENGINE_COMMANDS = new Set([
-  "doctor",
-  "setup",
-  "daemon",
-  "update",
-  "upgrade",
-  "host",
-  "install",
-  "remove",
-  "list",
-  "config",
-  "auth",
-  "ulw-loop",
-  "--version",
-  "-v",
-])
+// omo's own commands; the engine's one-shot commands come from engine-commands.js (isEngineCommand).
+const BINARY_NON_ENGINE_COMMANDS = new Set(["doctor", "setup", "daemon", "upgrade", "ulw-loop", "--version", "-v"])
 
 function isBinaryEngine(command) {
   const match = BINARY_ENGINE.exec(command)
   if (!match) return false
   const first = match[1] ?? ""
   if (first.startsWith("--internal-") || /\.(?:m?js|cjs|ts)$/.test(first)) return false
-  return !BINARY_NON_ENGINE_COMMANDS.has(first)
+  // A one-shot command omo hands to the engine unchanged runs to completion and is never a session (#14336).
+  const args = command.slice(match.index + match[0].length - first.length).split(/\s+/)
+  return !BINARY_NON_ENGINE_COMMANDS.has(first) && !isEngineCommand(args)
 }
 
 function isEngine(entry) {

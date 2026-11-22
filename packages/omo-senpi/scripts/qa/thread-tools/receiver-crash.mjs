@@ -100,15 +100,15 @@ await runScenario(
       )
       const entries = deliveryEntries(endpoint.sessionPath).filter((entry) => deliveryIdOf(entry) === deliveryId).length
       const listed = await omo(scratch, install, ["thread", "list", "--json"])
-      const listedRow = Array.isArray(listed.json)
-        ? listed.json.find((thread) => thread.thread_id === endpoint.durableId)
+      const listedRow = Array.isArray(listed.json?.threads)
+        ? listed.json.threads.find((thread) => thread.thread === endpoint.durableId)
         : undefined
       report.assert(
         `${kind}-listed-same-id`,
         listedRow?.alive === true && listedRow.surface === "tui",
         JSON.stringify(
           listedRow
-            ? { id: listedRow.thread_id, surface: listedRow.surface, alive: listedRow.alive }
+            ? { id: listedRow.thread, surface: listedRow.surface, alive: listedRow.alive }
             : listed.stdout.slice(0, 200),
         ),
       )

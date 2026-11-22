@@ -8,6 +8,9 @@ import {
 } from "./chaos-host-actions"
 import { buildHostChaosHarness, HOST_CHAOS_SESSION } from "./chaos-host-harness"
 import { hashSeed, RandomSource } from "./prng"
+import { useOwnedAgentDir } from "../store/__fixtures__/owned-agent-dir"
+
+useOwnedAgentDir()
 
 // Seeded daemon chaos: the SAME four actions in a seed-ordered mix, replayable with
 // `SEED=<label> bun test src/__adversarial__`. The actions are deterministic; only their order and

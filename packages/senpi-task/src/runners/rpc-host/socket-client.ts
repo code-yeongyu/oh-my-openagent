@@ -30,13 +30,17 @@ export async function resolveRpcSocketTransport(
   return { address: `${WINDOWS_PIPE_PREFIX}${name}`, secret }
 }
 
-/** A correlated JSONL conversation; broadcasts never settle a request and cleanup owns the socket. */
+/**
+ * A correlated JSONL conversation; broadcasts never settle a request and cleanup owns the socket. `listen` receives
+ * every other frame (a subscription's records) and, once, the failure that ended the connection.
+ */
 export async function withRpcSocket<T>(
   endpoint: string,
   options: {
     readonly timeoutMs: number
     readonly secret?: Uint8Array
     readonly connect?: (endpoint: string) => Socket
+    readonly listen?: { readonly frame: (frame: RpcObject) => void; readonly closed: (error: Error) => void }
   },
   operation: (request: RpcRequest) => Promise<T>,
 ): Promise<T> {
@@ -52,6 +56,7 @@ export async function withRpcSocket<T>(
   }
   let rejectConnect: (error: Error) => void = () => undefined
   const fail = (error: Error) => {
+    if (failure === undefined) options.listen?.closed(error)
     failure = error
     clear()
     rejectConnect(error)
@@ -87,7 +92,11 @@ export async function withRpcSocket<T>(
       } catch {
         continue
       }
-      if (typeof frame !== "object" || frame === null || !("id" in frame) || frame.id !== pending?.id) continue
+      if (typeof frame !== "object" || frame === null) continue
+      if (!("id" in frame) || frame.id !== pending?.id) {
+        options.listen?.frame(frame as RpcObject)
+        continue
+      }
       const waiter = pending
       pending = undefined
       clear()

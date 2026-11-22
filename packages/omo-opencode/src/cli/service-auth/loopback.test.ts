@@ -119,4 +119,53 @@ describe("loopback sign-in", () => {
     )
     expect(codes).toEqual(["code-1", "code-2"])
   })
+
+  // #6503: the digest rides the exchange; machine_exists ends the sign-in without offering to remove any device.
+  test("sends machineDigest with the exchange, and machine_exists ends the sign-in without removing a device", async () => {
+    const digest = "d".repeat(64)
+    const secrets = memorySecrets()
+    const seen: string[] = []
+    const api = fakeApi(async (request) => {
+      seen.push(`${request.method} ${new URL(request.url).pathname}`)
+      expect((await request.json()).machineDigest).toBe(digest)
+      return Response.json(
+        {
+          error: {
+            code: "machine_exists",
+            message: "synthetic",
+            retryable: false,
+            requestId: "test",
+            detail: { deviceId: "dev-existing" },
+          },
+        },
+        { status: 409 },
+      )
+    })
+    const session = createSession({
+      beforeKeysDiscarded: async () => undefined,
+      api,
+      store: secrets.store(api),
+      home: await temporaryHome(),
+    })
+    const login = loginLoopback(session, {
+      accounts: "https://signin.omo.dev",
+      name: "Test CLI",
+      platform: "macos",
+      machineDigest: digest,
+      chooseDevice: async () => {
+        throw new Error("no device may be offered for removal")
+      },
+      open: async (url) => {
+        const authorize = new URL(url)
+        const callback = new URL(authorize.searchParams.get("redirect_uri") ?? "")
+        callback.searchParams.set("code", "one-use-code")
+        callback.searchParams.set("state", authorize.searchParams.get("state") ?? "")
+        expect((await fetch(callback, { proxy: "" })).status).toBe(200)
+        return true
+      },
+    })
+    await expect(login).rejects.toThrow("This computer already has an OmO device")
+    expect(seen).toEqual(["POST /v1/session/exchange"])
+    expect(secrets.writes).toHaveLength(0)
+  })
 })

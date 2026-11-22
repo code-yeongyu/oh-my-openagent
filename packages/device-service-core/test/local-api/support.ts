@@ -25,6 +25,7 @@ import {
   type Transport,
 } from "../../src/local-api/transport.ts"
 import { startFakeOwner, type FakeOwner } from "./conformance/fake-owner.ts"
+import type { FakeOwnerMode, Withheld } from "./conformance/fake-owner-modes.ts"
 import { PeerClosed, rawPeer, type RawPeer } from "./conformance/raw-peer.ts"
 import { defaultWorld, type World } from "./conformance/world.ts"
 
@@ -59,6 +60,38 @@ export const startOwner = async (
   const owner = await startFakeOwner({ stateDir, world })
   owners.push(owner)
   return owner
+}
+
+// `withheld(what)` settles once the owner kept that answer back: a test awaits it before it moves a fake clock.
+export type ModeOwner = { readonly owner: FakeOwner; readonly withheld: (what: Withheld) => Promise<void> }
+
+export const startModeOwner = async (
+  mode: FakeOwnerMode,
+  world: World = defaultWorld(),
+  terminalCommands?: readonly string[],
+): Promise<ModeOwner> => {
+  const signals = new Map<Withheld, PromiseWithResolvers<void>>()
+  const signal = (what: Withheld): PromiseWithResolvers<void> => {
+    const known = signals.get(what) ?? Promise.withResolvers<void>()
+    signals.set(what, known)
+    return known
+  }
+  const owner = await startFakeOwner({
+    stateDir: freshStateDir(),
+    world,
+    mode,
+    ...(terminalCommands === undefined ? {} : { terminalCommands }),
+    onWithheld: (what) => signal(what).resolve(),
+  })
+  owners.push(owner)
+  const withheld = (what: Withheld): Promise<void> => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const expired = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`waited ${WAIT_MS} ms for the owner to withhold its ${what}`)), WAIT_MS)
+    })
+    return Promise.race([signal(what).promise, expired]).finally(() => clearTimeout(timer))
+  }
+  return { owner, withheld }
 }
 
 export const connectClient = async (owner: FakeOwner, client: ClientInfo = OMO): Promise<LocalApiClient> => {

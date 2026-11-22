@@ -90,7 +90,10 @@ connection and no running turn (`tunables.idleExitMs: 900000` in the launch spec
 `task.host_idle_exit_ms` overrides it per install). senpi's own default for evicting an
 idle retained session is 30 minutes, but OmO's launch path sets
 `SENPI_RPC_SESSION_IDLE_EVICTION_MS` to the idle-exit window, so both are 15 minutes by
-default. A longer inherited eviction window is kept. The trade-off, measured in the cost
+default. `omo daemon run --pinned` starts the operator host with no idle exit at all
+(`SENPI_RPC_HOST_COLD_START=persistent` on that ensure only); the always-on session host unit runs it
+([remote sessions](remote-sessions.md#session-host-unit-and-cold-wake)). A task host started from one of its
+sessions drops that variable and idles out as usual. A longer inherited eviction window is kept. The trade-off, measured in the cost
 section below: a departed parent's own host idles out even when other clients stay
 connected elsewhere, while the previous release's single host, kept alive by any other
 client, used to keep the departed parent's retained sessions for the whole eviction window.
