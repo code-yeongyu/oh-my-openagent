@@ -9,11 +9,12 @@ import { appendFile, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { parseArgs } from "node:util"
+import { sha256Object } from "./mirror-object"
 import { mirrorChannel } from "./mirror-channel"
 import { betasToPrune, MirrorPlanError, parseSha256Sums, planMirrorAssets, VERSION_PATTERN } from "./mirror-plan"
 import { withRetry } from "./mirror-retry"
 import { putVerified, type R2Credentials } from "./r2-signed-put"
-import { createR2Store, type R2Store } from "./r2-store"
+import { createR2Store } from "./r2-store"
 
 const REPO = "code-yeongyu/oh-my-openagent"
 const CHANNELS = new Set(["latest", "beta", "none"])
@@ -63,16 +64,6 @@ async function sha256File(path: string): Promise<string> {
   return hasher.digest("hex")
 }
 
-async function sha256Object(store: R2Store, key: string): Promise<{ readonly sha256: string; readonly size: number }> {
-  const hasher = new Bun.CryptoHasher("sha256")
-  let size = 0
-  for await (const chunk of store.stream(key)) {
-    hasher.update(chunk)
-    size += chunk.byteLength
-  }
-  return { sha256: hasher.digest("hex"), size }
-}
-
 async function main(): Promise<void> {
   const tag = values.tag ?? ""
   const version = tag.replace(/^v/, "")
@@ -101,20 +92,26 @@ async function main(): Promise<void> {
     }))
     await withRetry("download SHA256SUMS", () => downloadAsset(tag, "SHA256SUMS", join(work, "SHA256SUMS")))
     const plan = planMirrorAssets(assets, parseSha256Sums(await Bun.file(join(work, "SHA256SUMS")).text()))
-    await inBatches(plan, UPLOAD_CONCURRENCY, (asset) =>
-      withRetry(`download ${asset.name}`, () => downloadAsset(tag, asset.name, join(work, asset.name))),
-    )
     log(`plan: ${plan.length} assets, ${(plan.reduce((sum, asset) => sum + asset.size, 0) / 1e9).toFixed(2)} GB`)
+    await inBatches(plan, UPLOAD_CONCURRENCY, async (asset) => {
+      log(`downloading ${asset.name} (${asset.size} B)`)
+      await withRetry(`download ${asset.name}`, () => downloadAsset(tag, asset.name, join(work, asset.name)))
+      log(`downloaded ${asset.name}`)
+    })
     for (const asset of plan) {
+      log(`verifying download ${asset.name}`)
       const local = await sha256File(join(work, asset.name))
       if (local !== asset.sha256)
         throw new MirrorPlanError(`${asset.name}: downloaded sha256 ${local} != published ${asset.sha256}`)
+      log(`verified download ${asset.name}`)
     }
     log(`verified all ${plan.length} downloads against SHA256SUMS and the GitHub digests`)
 
     await inBatches(plan, UPLOAD_CONCURRENCY, async (asset) => {
       const key = `releases/v${version}/${asset.name}`
+      log(`checking ${key}`)
       if (await store.exists(key)) {
+        log(`comparing existing ${key} (${asset.size} B)`)
         const stored = await sha256Object(store, key)
         if (stored.sha256 !== asset.sha256)
           throw new MirrorPlanError(
@@ -123,6 +120,7 @@ async function main(): Promise<void> {
         log(`kept ${asset.name} (already mirrored, sha256 matches)`)
         return
       }
+      log(`uploading ${key}`)
       await withRetry(`upload ${asset.name}`, () =>
         putVerified(credentials, `${prefix}${key}`, Bun.file(join(work, asset.name)), asset.sha256, {
           "cache-control": "public, max-age=31536000, immutable",
@@ -133,12 +131,15 @@ async function main(): Promise<void> {
       log(`uploaded ${asset.name} (${asset.size} B)`)
     })
 
-    for (const asset of plan) {
-      const stored = await sha256Object(store, `releases/v${version}/${asset.name}`)
+    await inBatches(plan, UPLOAD_CONCURRENCY, async (asset) => {
+      const key = `releases/v${version}/${asset.name}`
+      log(`reading back ${key}`)
+      const stored = await sha256Object(store, key)
       if (stored.sha256 !== asset.sha256 || stored.size !== asset.size) {
         throw new MirrorPlanError(`read-back mismatch for ${asset.name}: ${stored.sha256}/${stored.size}`)
       }
-    }
+      log(`verified ${key} (${stored.size} B)`)
+    })
     log(`read back and re-hashed all ${plan.length} objects from R2`)
 
     const marker = JSON.stringify({
@@ -147,11 +148,13 @@ async function main(): Promise<void> {
       mirroredAt: new Date().toISOString(),
       run: process.env.GITHUB_RUN_ID ?? null,
     })
+    log(`writing releases/v${version}/.complete`)
     await store.write(`releases/v${version}/.complete`, marker, "application/json")
     log("wrote completion marker")
 
     if (channel !== "none") {
       const pointerKey = `channels/${channel}`
+      log(`checking channel ${pointerKey}`)
       const pointer = await mirrorChannel(
         store,
         live,
