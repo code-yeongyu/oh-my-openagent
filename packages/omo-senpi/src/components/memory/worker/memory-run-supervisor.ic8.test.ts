@@ -18,6 +18,7 @@ const {
   resourceCounts,
   trackProcessGroup,
   untrackProcessGroup,
+  waitBounded,
   waitForExit,
   waitForPath,
 } = harness
@@ -132,6 +133,52 @@ describe("memory run supervisor IC-8 containment", () => {
     expect((await stat(invocationPath)).mtimeMs).toBe(invocationMtimeBeforeGrace)
   }, 60_000)
 
+  for (const enforcer of ["bootstrap", "supervisor"] as const) {
+    test(
+      `#given a POSIX grandchild ignoring TERM #when ${enforcer} acts alone #then the socket closes`,
+      async () => {
+        if (process.platform === "win32") return
+        // given: the grandchild alone owns this socket and connects after installing its SIGTERM handler.
+        const { runDir, clockPath, childExited, exitSocketAccepted } = await makeRun("with-stubborn-grandchild")
+        const supervisor = launchSupervisor(runDir, clockPath, "posix")
+        const exit = waitForExit(supervisor)
+        await waitForPath(join(runDir, "child-started.json"))
+        const { pid } = JSON.parse(await readFile(join(runDir, "grandchild.json"), "utf8")) as { readonly pid: number }
+        const socket = await waitBounded(exitSocketAccepted, IC8_WAIT_MS, "grandchild socket connection")
+
+        try {
+          // when: leave precisely one enforcer alive when the clock reaches the grace deadline.
+          if (enforcer === "bootstrap") {
+            supervisor.kill("SIGKILL")
+            await exit
+          }
+          await advanceClock(clockPath, 2_000)
+          const childExitPath = join(runDir, "child-exit.json")
+          await waitForPath(childExitPath)
+          expect(JSON.parse(await readFile(childExitPath, "utf8"))).toMatchObject({ code: 0, timedOut: true })
+          expect(socket.destroyed).toBe(false)
+          if (enforcer === "supervisor") {
+            const { childPid } = JSON.parse(await readFile(join(runDir, "ledger.json"), "utf8")) as {
+              readonly childPid: number
+            }
+            killFixturePid(childPid)
+          }
+          await advanceClock(clockPath, 3_000)
+
+          // then: await peer closure, not PID disappearance (the orphan may still be a zombie).
+          await waitBounded(childExited, 5_000, "SIGTERM-ignoring grandchild socket close")
+          if (enforcer === "supervisor") expect(await exit).toEqual({ code: 0, signal: null })
+        } finally {
+          if (!socket.destroyed) {
+            killFixturePid(pid)
+            await waitBounded(childExited, 5_000, "grandchild socket cleanup")
+          }
+        }
+      },
+      IC8_WAIT_MS,
+    )
+  }
+
   test("#given a model with a live grandchild #when the hard deadline arrives on injected Windows #then the model's whole tree is terminated", async () => {
     // Runtime regression for the parked reflection runs: child-exit recorded SIGTERM while the
     // agent's descendants kept working for another hour. Only the model CLI died before the fix.
@@ -210,6 +257,11 @@ describe("memory run supervisor IC-8 containment", () => {
         join(runDir, `${platform === "win32" ? "win32-graceful" : "posix-SIGTERM"}-${ledger.childPid}.json`),
       )
       await childExited
+      if (platform === "posix") {
+        await waitForPath(join(runDir, "child-exit.json"))
+        await advanceClock(clockPath, 3_000)
+        await waitForPath(join(runDir, `posix-SIGKILL-${ledger.childPid}.json`))
+      }
       untrackProcessGroup(ledger.childPid)
 
       // then
@@ -217,6 +269,15 @@ describe("memory run supervisor IC-8 containment", () => {
     }, 60_000)
   }
 })
+
+function killFixturePid(pid: number): void {
+  if (!Number.isInteger(pid) || pid <= 0) throw new RangeError("fixture pid must be a positive integer")
+  try {
+    process.kill(pid, "SIGKILL")
+  } catch (error) {
+    if (!(error instanceof Error) || !("code" in error) || error.code !== "ESRCH") throw error
+  }
+}
 
 async function settlementState(signal: Promise<unknown>): Promise<"resolved" | "rejected" | "pending"> {
   let state: "resolved" | "rejected" | "pending" = "pending"

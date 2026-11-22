@@ -1,6 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises"
 import { createConnection } from "node:net"
 import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 
 const [mode, runDir] = process.argv.slice(2)
 if (mode === undefined || runDir === undefined) throw new Error("mode and runDir are required")
@@ -33,25 +34,36 @@ if (mode === "model-not-found") {
   })
   grandchild.unref()
   await writeMarker("grandchild.json", { pid: grandchild.pid })
-} else if (mode === "graceful") {
+} else if (mode === "graceful" || mode === "with-stubborn-grandchild") {
   let terminating = false
   process.on("SIGTERM", () => {
     if (terminating) return
     terminating = true
     void writeMarker("child-terminated.json", { signal: "SIGTERM" }).then(() => process.exit(0))
   })
+  if (mode === "with-stubborn-grandchild") {
+    const { spawn } = await import("node:child_process")
+    const grandchild = spawn(process.execPath, [fileURLToPath(import.meta.url), "stubborn-grandchild", runDir], {
+      stdio: "ignore",
+      windowsHide: true,
+    })
+    grandchild.unref()
+    await writeMarker("grandchild.json", { pid: grandchild.pid })
+  }
 } else if (mode === "stubborn") {
   process.on("SIGTERM", () => {
     void writeMarker("child-terminated.json", { signal: "SIGTERM" })
   })
+} else if (mode === "stubborn-grandchild") {
+  process.on("SIGTERM", () => undefined)
 }
 
 const exitPort = Number(process.env.OMO_MEMORY_SUPERVISOR_EXIT_PORT)
-if (Number.isInteger(exitPort)) {
+if (mode !== "with-stubborn-grandchild" && Number.isInteger(exitPort)) {
   await new Promise<void>((resolve, reject) => {
     const socket = createConnection({ host: "127.0.0.1", port: exitPort }, resolve)
     socket.once("error", reject)
   })
 }
-await writeMarker("child-started.json", { pid: process.pid })
+if (mode !== "stubborn-grandchild") await writeMarker("child-started.json", { pid: process.pid })
 setInterval(() => undefined, 60_000)

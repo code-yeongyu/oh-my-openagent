@@ -95,7 +95,10 @@ export async function runChildBootstrap(runDir: string): Promise<void> {
     process.exitCode = 1
     return
   }
-  cancelKill()
+  const timedOut = deadlineFired || reachedDeadline(readSupervisorClockNow(), manifest.hardDeadlineAt)
+  // The POSIX model can exit on SIGTERM while descendants in our group are still running.
+  // Keep the timer (and this group leader) alive so containment works without the supervisor.
+  if (platform === "win32" || !timedOut) cancelKill()
   // Durable before it is reported: a supervisor that dies after this point loses the pipe message,
   // and recovery may only trust a tip whose child is recorded as having finished cleanly in time.
   await writeRunJsonAtomic(join(runDir, CHILD_EXIT_FILENAME), {
@@ -105,7 +108,7 @@ export async function runChildBootstrap(runDir: string): Promise<void> {
     code: status.code,
     signal: status.signal,
     finishedAt: new Date().toISOString(),
-    timedOut: deadlineFired || reachedDeadline(readSupervisorClockNow(), manifest.hardDeadlineAt),
+    timedOut,
   } satisfies RunChildExit)
   writeBootstrapStatus(status)
 }

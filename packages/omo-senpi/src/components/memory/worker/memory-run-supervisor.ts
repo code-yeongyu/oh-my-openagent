@@ -14,11 +14,12 @@ async function runSupervisor(runDir: string): Promise<void> {
   const {
     getSupervisorProcessStart,
     getSupervisorRuntimePlatform,
+    isSupervisorProcessGroupGone,
     parseSupervisorChildExit,
     readSupervisorClockNow,
     recordSupervisorGracefulDeadline,
     scheduleSupervisorDeadline,
-    terminateSupervisorChildGracefully,
+    signalSupervisorProcessGroup,
     terminateSupervisorChildHard,
   } = await import("./supervisor-process-identity")
   const { publishRunOutcome } = await import("./run-outcome-publication")
@@ -70,31 +71,27 @@ async function runSupervisor(runDir: string): Promise<void> {
     })
   }
 
-  if (bootstrap.pid === undefined) throw new Error("child bootstrap did not receive a pid")
-  const childProcessStart = await getSupervisorProcessStart(bootstrap.pid)
+  const bootstrapPid = bootstrap.pid
+  if (bootstrapPid === undefined) throw new Error("child bootstrap did not receive a pid")
+  const childProcessStart = await getSupervisorProcessStart(bootstrapPid)
   // The pipe gate keeps the child idle until its lease ownership and ledger are durable.
-  await lease.retainFor(bootstrap.pid, childProcessStart)
+  await lease.retainFor(bootstrapPid, childProcessStart)
   await updateRunLedger(ledgerPath, {
-    childPid: bootstrap.pid,
+    childPid: bootstrapPid,
     childProcessStart,
   })
   bootstrap.stdin?.end("1\n")
 
   let timedOut = false
-  let hardKillFinished = Promise.resolve()
-  let finishHardKill: (() => void) | undefined
-  if (platform === "win32")
-    hardKillFinished = new Promise<void>((resolve) => {
-      finishHardKill = resolve
-    })
+  const { promise: hardKillFinished, resolve: finishHardKill } = Promise.withResolvers<undefined>()
   const cancelTerm = scheduleSupervisorDeadline(manifest.hardDeadlineAt, () => {
     timedOut = true
-    if (platform === "win32") recordSupervisorGracefulDeadline(bootstrap.pid)
-    else terminateSupervisorChildGracefully(platform, bootstrap)
+    if (platform === "win32") recordSupervisorGracefulDeadline(bootstrapPid)
+    else signalSupervisorProcessGroup(bootstrapPid, "SIGTERM")
   })
   const cancelKill = scheduleSupervisorDeadline(manifest.hardDeadlineAt + manifest.terminationGraceMs, () => {
-    terminateSupervisorChildHard(platform, modelPid ?? childPid)
-    finishHardKill?.()
+    terminateSupervisorChildHard(platform, platform === "win32" ? (modelPid ?? bootstrapPid) : bootstrapPid)
+    finishHardKill(undefined)
   })
   const wrapperExit = await new Promise<SupervisorChildExit>((resolve, reject) => {
     let settled = false
@@ -110,7 +107,14 @@ async function runSupervisor(runDir: string): Promise<void> {
     })
   })
   const childExit = parseSupervisorChildExit(bootstrapStatus)
-  if (platform === "win32" && timedOut && childExit === undefined) await hardKillFinished
+  // A child-exit record describes only the model. Even the bootstrap can disappear while its
+  // POSIX group survives. A timely model exit is still allowed to complete without escalation.
+  const needsHardKill =
+    platform === "posix"
+      ? (childExit === undefined || timedOut || readSupervisorClockNow() >= manifest.hardDeadlineAt) &&
+        !isSupervisorProcessGroupGone(bootstrapPid)
+      : timedOut && childExit === undefined
+  if (needsHardKill) await hardKillFinished
   cancelTerm()
   cancelKill()
   childPid = undefined

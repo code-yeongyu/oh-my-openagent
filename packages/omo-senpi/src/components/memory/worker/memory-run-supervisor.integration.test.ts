@@ -290,7 +290,7 @@ describe("memory run supervisor", () => {
     expect(JSON.parse(await readFile(join(runDir, "ledger.json"), "utf8"))).toMatchObject({ childPid })
   }, 60_000)
 
-  test("#given a child that exits during termination grace #when the absolute deadline arrives #then timeout is recorded without escalation", async () => {
+  test("#given a child that exits during termination grace #when the absolute deadline arrives #then timeout preserves the child's exit status", async () => {
     // given
     const runDir = await makeRun({ mode: "graceful", hardDeadlineAt: 2_000, terminationGraceMs: 2_000 })
     await createTestClock(runDir, 1_000)
@@ -300,7 +300,8 @@ describe("memory run supervisor", () => {
     const exit = waitForExit(supervisor)
     await waitForPath(join(runDir, "child-started.json"))
     await advanceClock(runDir, 2_000)
-    if (process.platform === "win32") await advanceClock(runDir, 4_000)
+    if (process.platform !== "win32") await waitForPath(join(runDir, "child-exit.json"))
+    await advanceClock(runDir, 4_000)
     const outcome = await readOutcome(runDir)
     await exit
 

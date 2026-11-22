@@ -1,6 +1,6 @@
-import { spawn, spawnSync, type ChildProcess } from "node:child_process"
+import { spawn, spawnSync } from "node:child_process"
 import { readdirSync, watch, writeFileSync } from "@oh-my-opencode/memory-core/fs"
-import { getProcessStartIdentity } from "@oh-my-opencode/memory-core/process-identity"
+import { getPidLiveness, getProcessStartIdentity } from "@oh-my-opencode/memory-core/process-identity"
 
 export type SupervisorRuntimePlatform = "posix" | "win32"
 export type CancelSupervisorDeadline = () => void
@@ -183,11 +183,9 @@ export function recordSupervisorGracefulDeadline(pid: number | undefined): void 
   if (pid !== undefined) recordTestTermination("win32-graceful", pid)
 }
 
-export function terminateSupervisorChildGracefully(platform: SupervisorRuntimePlatform, wrapper: ChildProcess): void {
-  if (platform === "win32") {
-    recordSupervisorGracefulDeadline(wrapper.pid)
-    wrapper.kill()
-  } else if (wrapper.pid !== undefined) signalSupervisorProcessGroup(wrapper.pid, "SIGTERM")
+export function isSupervisorProcessGroupGone(pid: number): boolean {
+  // Only the injected POSIX branch can call this on Windows, where there is no process group.
+  return getPidLiveness(process.platform === "win32" ? pid : -pid) === "dead"
 }
 
 export function terminateSupervisorChildHard(
