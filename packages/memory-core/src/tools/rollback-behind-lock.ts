@@ -1,8 +1,5 @@
-import { join } from "node:path"
-
-import { existsSync } from "../fs/resilient"
 import type { GitMemoryRepo } from "../git"
-import { recordPendingRollback } from "../git/pending-rollback"
+import { indexLockHeld, recordPendingRollback } from "../git/pending-rollback"
 import type { StrandedGitLockError } from "../git/repo-lock-sweep"
 import { restoreWorktreeFromHead } from "../git/worktree-restore"
 import { MemoryToolError } from "./tool-errors"
@@ -12,10 +9,6 @@ import { MemoryToolError } from "./tool-errors"
 // staged it depends on WHEN the lock appeared, not on which lock it is, so the decision reads the
 // index itself. A staged change cannot be unstaged while index.lock exists; it is recorded inside
 // .git, and GitMemoryRepo unstages it (index only) at the next write once the lock is gone.
-
-function indexLockHeld(repo: GitMemoryRepo): boolean {
-  return existsSync(join(repo.dir, ".git", "index.lock"))
-}
 
 // Porcelain v1 "XY path": a non-blank, non-untracked X column is a staged change.
 async function hasStagedChange(repo: GitMemoryRepo, paths: readonly string[]): Promise<boolean> {
@@ -28,7 +21,7 @@ export async function undoBehindKeptLock(repo: GitMemoryRepo, paths: readonly st
   try {
     if (!(await hasStagedChange(repo, paths))) {
       await restoreWorktreeFromHead(repo, paths)
-    } else if (!indexLockHeld(repo)) {
+    } else if (!(await indexLockHeld(repo.dir))) {
       await repo.restorePaths(paths)
     } else {
       await restoreWorktreeFromHead(repo, paths)

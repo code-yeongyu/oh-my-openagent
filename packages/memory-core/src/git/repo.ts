@@ -7,7 +7,7 @@ import { withStrandedGitLockRecovery } from "./repo-lock-sweep"
 import { DirtyRepoError, NoEffectiveChangesError } from "./errors"
 import { commitJudgedByOutcome } from "./commit-outcome"
 import { createNodeGitExec, type GitExec, type GitExecResult } from "./exec"
-import { describeDirtyMarkdownEncodingIssues } from "./porcelain"
+import { dirtyMarkdownDiagnostics } from "./porcelain"
 import { GitPathStateStore } from "./path-state"
 import { authorFlags, commandError, normalizePathspecs, normalizeSeedPath } from "./repo-arguments"
 import { runMemoryRepoMaintenance } from "./repo-maintenance"
@@ -120,7 +120,7 @@ export class GitMemoryRepo {
     await settlePendingRollback(this)
     const porcelain = await this.status()
     if (!porcelain.trim()) return
-    throw new DirtyRepoError(porcelain, describeDirtyMarkdownEncodingIssues(this.dir, porcelain))
+    throw new DirtyRepoError(porcelain, await dirtyMarkdownDiagnostics(this.dir, porcelain))
   }
 
   async commitWrite(

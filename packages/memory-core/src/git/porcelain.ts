@@ -1,15 +1,34 @@
-import { existsSync, readFileSync } from "../fs/resilient"
+import { existsSync, readFile, readFileSync } from "../fs/resilient"
+import { isOnDevice } from "../fs/device-scope"
 import { join } from "node:path"
 
 export function describeDirtyMarkdownEncodingIssues(root: string, porcelain: string): string[] {
+  return dirtyMarkdownPaths(porcelain)
+    .map((path) => describeMarkdownEncodingIssue(root, path))
+    .filter((issue): issue is string => issue !== null)
+}
+
+function dirtyMarkdownPaths(porcelain: string): string[] {
   return porcelain
     .split(/\r?\n/)
     .map((line) => line.trimEnd())
     .filter(Boolean)
     .map(parsePorcelainPath)
     .filter((path): path is string => path?.endsWith(".md") ?? false)
-    .map((path) => describeMarkdownEncodingIssue(root, path))
-    .filter((issue): issue is string => issue !== null)
+}
+
+export async function dirtyMarkdownDiagnostics(root: string, porcelain: string): Promise<string[]> {
+  if (!isOnDevice()) return describeDirtyMarkdownEncodingIssues(root, porcelain)
+  const issues: string[] = []
+  for (const path of dirtyMarkdownPaths(porcelain)) {
+    try {
+      const issue = encodingIssue(path, await readFile(join(root, path)))
+      if (issue !== null) issues.push(issue)
+    } catch (error) {
+      if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error
+    }
+  }
+  return issues
 }
 
 export function parsePorcelainPath(line: string): string | null {
@@ -26,7 +45,10 @@ function describeMarkdownEncodingIssue(root: string, relativePath: string): stri
   const path = join(root, relativePath)
   if (!existsSync(path)) return null
 
-  const bytes = readFileSync(path)
+  return encodingIssue(relativePath, readFileSync(path))
+}
+
+function encodingIssue(relativePath: string, bytes: Buffer): string | null {
   if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
     return `${relativePath} has UTF-16 LE BOM`
   }

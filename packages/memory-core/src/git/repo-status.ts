@@ -1,5 +1,5 @@
 import { DirtyRepoError } from "./errors"
-import { describeDirtyMarkdownEncodingIssues, parsePorcelainPath } from "./porcelain"
+import { dirtyMarkdownDiagnostics, parsePorcelainPath } from "./porcelain"
 
 export async function assertNoUnrelatedChanges(
   dir: string,
@@ -15,5 +15,5 @@ export async function assertNoUnrelatedChanges(
   })
   if (unrelated.length === 0) return
   const listing = `${unrelated.join("\n")}\n`
-  throw new DirtyRepoError(listing, describeDirtyMarkdownEncodingIssues(dir, listing))
+  throw new DirtyRepoError(listing, await dirtyMarkdownDiagnostics(dir, listing))
 }

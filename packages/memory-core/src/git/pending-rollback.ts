@@ -1,6 +1,6 @@
 import { join } from "node:path"
 
-import { existsSync, readFile, rm, writeFile } from "../fs/resilient"
+import { readFile, rm, stat, writeFile } from "../fs/resilient"
 
 // A memory write that failed with its change already staged while index.lock was held cannot be
 // unstaged then (omo #10199). It records its paths and HEAD here, inside .git, and every write
@@ -40,6 +40,16 @@ export async function recordPendingRollback(dir: string, rollback: PendingRollba
   await writeFile(markerPath(dir), JSON.stringify(rollback), "utf8")
 }
 
+export async function indexLockHeld(dir: string): Promise<boolean> {
+  try {
+    await stat(join(dir, ".git", "index.lock"))
+    return true
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return false
+    throw error
+  }
+}
+
 function parsePending(raw: string): PendingRollback | null {
   try {
     const value: unknown = JSON.parse(raw)
@@ -58,7 +68,7 @@ function parsePending(raw: string): PendingRollback | null {
 // commit happened since, and the normal dirty checks report whatever is left.
 export async function settlePendingRollback(repo: PendingRollbackRepo): Promise<void> {
   const raw = await readFile(markerPath(repo.dir), "utf8").catch(() => undefined)
-  if (raw === undefined || existsSync(join(repo.dir, ".git", "index.lock"))) return
+  if (raw === undefined || await indexLockHeld(repo.dir)) return
   const pending = parsePending(raw)
   if (pending === null || (await repo.head()) !== pending.head || pending.paths.length === 0) {
     await rm(markerPath(repo.dir), { force: true })
