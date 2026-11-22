@@ -1,4 +1,5 @@
 import type { TaskManager } from "../../../../senpi-task/src/manager/types"
+import { TERMINAL_STATUSES } from "../../../../senpi-task/src/lifecycle/context"
 import type { TaskPauseMethods } from "../../../../senpi-task/src/manager/run-pause"
 import type { TaskRecord } from "../../../../senpi-task/src/state"
 import type { AdmissionBarrier, ResumeCredential } from "../../../../senpi-task/src/pause/admission-barrier"
@@ -153,6 +154,14 @@ export function createEngineRunPause(ports: {
     },
     observeHold: async (participant, parentSessionId) =>
       participant.taskId === undefined ? undefined : ports.manager.observeTaskHold(participant.taskId, parentSessionId),
+    isTerminal(participant) {
+      const record = participant.taskId === undefined ? undefined : ports.manager.get(participant.taskId)
+      return (
+        record !== undefined &&
+        record.notification.run_epoch === participant.runEpoch &&
+        TERMINAL_STATUSES.has(record.status)
+      )
+    },
     async resume(participant, request, credential) {
       if (participant.key.startsWith("run:")) return { kind: "resumed" }
       // A queued admission has no engine to hold it: it is always re-admitted, lost or not.

@@ -38,6 +38,7 @@ export type RunPauseEffects = {
   endLost?(participant: PauseParticipant, reason: string): Promise<boolean>
   // The child's engine view of this parent's hold; undefined when it reports none.
   observeHold?(participant: PauseParticipant, parentSessionId: string): Promise<ObservedHold | undefined>
+  isTerminal?(participant: PauseParticipant): boolean
 }
 
 type ResumeTransaction = { readonly pauseSeq: number; readonly resumeId: string; readonly credential: ResumeCredential }
@@ -50,7 +51,6 @@ export type RunResumeResult = {
 
 export class RunPauseController {
   readonly #resuming = new Map<string, ResumeTransaction>()
-  readonly #released = new Map<string, ResumeTransaction>()
 
   constructor(
     readonly registry: PauseRegistry,
@@ -145,9 +145,8 @@ export class RunPauseController {
     const record = this.registry.load(parentSessionId)
     if (record === undefined || record.pauseSeq !== pauseSeq || record.phase !== "resumed") return []
     if (this.registry.barrier.state(parentSessionId).kind !== "open") return []
-    const released = this.#released.get(parentSessionId)
-    const credential = released?.pauseSeq === pauseSeq ? released.credential : undefined
     const resumeId = record.resume?.resumeId ?? `parent-resume:${pauseSeq}`
+    const credential = this.registry.barrier.releasedCredential(parentSessionId, pauseSeq, resumeId)
     const failures: ResumeFailure[] = []
     const current = () => {
       const latest = this.registry.load(parentSessionId)
@@ -159,6 +158,17 @@ export class RunPauseController {
     }
     for (const participant of this.registry.orderedAdmissions(parentSessionId)) {
       if (participant.state !== "lost") continue
+      if (!current()) break
+      // An open barrier after restart has no queued admission or credential to replay.
+      if (participant.kind === "held_admission" && credential === undefined) {
+        this.registry.drop(parentSessionId, pauseSeq, participant.key)
+        continue
+      }
+      // Only a terminal task record proves it is safe to stop retrying. A missing live hold does not.
+      if (this.effects.isTerminal?.(participant) === true) {
+        this.registry.drop(parentSessionId, pauseSeq, participant.key)
+        continue
+      }
       const outcome = await this.#resumeOne(
         parentSessionId,
         pauseSeq,
@@ -291,7 +301,6 @@ export class RunPauseController {
     if (!this.registry.barrier.release(parentSessionId, transaction.credential)) return false
     this.registry.phase(parentSessionId, pauseSeq, "resumed")
     this.#resuming.delete(parentSessionId)
-    this.#released.set(parentSessionId, transaction)
     return true
   }
 

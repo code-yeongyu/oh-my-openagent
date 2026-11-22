@@ -21,7 +21,7 @@ const nodeB: PauseParticipant = {
   at: "2026-01-01T00:00:00.000Z",
 }
 
-type ChildState = { readonly status: "running" | "paused"; readonly runPause?: true }
+type ChildState = { readonly status: "running" | "paused" | "completed"; readonly runPause?: true }
 
 function graphOver(child: ChildState, answer: () => ResumeTaskResult) {
   const resumeCalls: string[] = []
@@ -36,6 +36,7 @@ function graphOver(child: ChildState, answer: () => ResumeTaskResult) {
   const manager = {
     list: () => [],
     get: (taskId: string) => (taskId === "st_b" ? record : undefined),
+    observeTaskHold: async () => undefined,
     resumePausedTask: async (taskId: string) => {
       resumeCalls.push(taskId)
       if (record.status !== "paused") throw new Error(`cannot resume ${record.status} task`)
@@ -83,3 +84,19 @@ for (const [name, answer, expected] of [
     expect(graph.registry.require(PARENT).resume?.childSeqCutoffs.st_b).toBe(8)
   })
 }
+
+test("post-release recovery prunes a terminal lost task with no live handle", async () => {
+  const { graph } = graphOver({ status: "completed" }, () => ({ turnId: "never" }))
+  graph.registry.update(PARENT, 7, "st_b", {
+    state: "lost",
+    ackSeq: undefined,
+    observedChildSeq: undefined,
+    lostReason: "pause propagation failed",
+  })
+  await graph.controller.resume(PARENT, 7, "resume-1")
+  expect(graph.controller.released(PARENT, 7, "resume-1")).toBe(true)
+  expect(graph.registry.require(PARENT).participants.st_b?.lostReason).toBe("pause propagation failed")
+
+  expect(await graph.controller.retryLost(PARENT, 7)).toEqual([])
+  expect(graph.registry.require(PARENT).participants.st_b).toBeUndefined()
+})

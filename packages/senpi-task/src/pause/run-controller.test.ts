@@ -151,4 +151,56 @@ describe("whole-run pause custody", () => {
     await h.controller.cancel("root", participant.runRef)
     expect(h.registry.require("root").participants).toEqual({})
   })
+
+  test("#given a lost queued admission after a restart #when retryLost runs without a credential #then it settles and drops instead of failing every session start (#10864)", async () => {
+    const queued: PauseParticipant = {
+      key: "held",
+      kind: "held_admission",
+      runEpoch: 0,
+      runRef: { kind: "task", id: "held" },
+      state: "pending",
+      at: new Date(0).toISOString(),
+    }
+    const h = harness({
+      snapshot: () => [queued],
+      resume: async (entry, _request, credential) => {
+        if (entry.kind === "held_admission" && credential === undefined)
+          throw new Error("a queued admission resumes only inside a resume transaction")
+        throw new Error("queued admission failed to resume")
+      },
+    })
+    await h.controller.pause("root", 1)
+    expect(await h.controller.resume("root", 1, "resume-1")).toMatchObject({
+      failures: [{ key: "held", reason: "resume failed: queued admission failed to resume" }],
+    })
+    expect(h.controller.released("root", 1, "resume-1")).toBe(true)
+    expect(h.registry.require("root").participants.held?.state).toBe("lost")
+
+    const registry = new PauseRegistry(h.registry.stateDir, new AdmissionBarrier())
+    registry.restore("root", { pauseSeq: 1 })
+    const restarted = new RunPauseController(registry, h.effects)
+    expect(await restarted.retryLost("root", 1)).toEqual([])
+    expect(registry.require("root").participants.held).toBeUndefined()
+  })
+
+  test("#given a released Resume's barrier is restored #when a lost child retries #then a stale credential cannot block admission", async () => {
+    let attempts = 0
+    const h = harness({
+      resume: async (entry, request, credential) => {
+        if (++attempts === 1) throw new Error("child host not ready")
+        const admission = h.barrier.enter(request.parentSessionId, entry, credential)
+        if (admission.kind === "held") throw new Error("retry admission was refused")
+        admission.ticket.leave()
+        return { kind: "resumed", turnId: "retry-turn" }
+      },
+    })
+    await h.controller.pause("root", 1)
+    await h.controller.resume("root", 1, "resume-1")
+    expect(h.controller.released("root", 1, "resume-1")).toBe(true)
+    expect(h.registry.require("root").participants.a?.state).toBe("lost")
+    h.registry.restore("root", { pauseSeq: 1 })
+
+    expect(await h.controller.retryLost("root", 1)).toEqual([])
+    expect(h.registry.require("root").participants.a).toMatchObject({ state: "resumed", resumeTurnId: "retry-turn" })
+  })
 })
