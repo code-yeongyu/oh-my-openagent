@@ -3,7 +3,7 @@ import { join } from "node:path"
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { cleanupProjects, tempProject } from "./__fixtures__/manager-fakes"
-import { sessionTailContinuationBlocker } from "./interrupted-turn"
+import { sessionTailContinuationBlocker, sessionTailNeedsContinuation } from "./interrupted-turn"
 
 // senpi#3266: the tail classifier behind the awaiting-input flag. It answers WHY a re-joined idle
 // session cannot continue on its own - its last turn was aborted, or it never answered at all.
@@ -20,6 +20,30 @@ const ABORTED_TURN = [
   { type: "message", message: { role: "user", content: "do the work" } },
   { type: "message", message: { role: "assistant", content: [{ type: "text", text: "" }], stopReason: "aborted" } },
 ]
+
+// #11856: a graceful quit appends the engine's lifecycle ledger rows after the aborted turn. They are
+// bookkeeping, so a reopened child must still be continued instead of settling with no output.
+describe("engine lifecycle rows after an interrupted turn (#11856)", () => {
+  test.each(["session-lifecycle", "work-custody", "child-lifecycle"])(
+    "#given an aborted turn followed by %s rows #then the turn still needs continuation",
+    async (customType) => {
+      const path = transcript(tempProject(), [
+        ...ABORTED_TURN,
+        { type: "custom", customType, data: {} },
+        { type: "custom", customType, data: {} },
+      ])
+
+      await expect(sessionTailNeedsContinuation(path)).resolves.toBe(true)
+      await expect(sessionTailContinuationBlocker(path)).resolves.toBe("aborted")
+    },
+  )
+
+  test("#given an unknown custom row after an aborted turn #then the tail stays undecided", async () => {
+    const path = transcript(tempProject(), [...ABORTED_TURN, { type: "custom", customType: "unknown-extension" }])
+
+    await expect(sessionTailNeedsContinuation(path)).resolves.toBe(false)
+  })
+})
 
 describe("sessionTailContinuationBlocker (senpi#3266)", () => {
   test("#given a tail ending on an aborted assistant row #then the blocker is the aborted turn", async () => {

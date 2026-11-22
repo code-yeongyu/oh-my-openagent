@@ -8,6 +8,11 @@ const BOOKKEEPING_CUSTOM_TYPES = new Set([
   "senpi-memory.session-binding",
   "rpc_client_message_admission",
   "rpc_effect",
+  // The engine's lifecycle ledger rows (session-manager LIFECYCLE_ENTRY_TYPES): a graceful quit appends them after
+  // the interrupted turn, so reading them as conversation would hide that turn from its continuation (#11856).
+  "session-lifecycle",
+  "work-custody",
+  "child-lifecycle",
 ])
 
 export async function sessionTailNeedsContinuation(sessionPath: string, ignoredUserPrompt?: string): Promise<boolean> {
