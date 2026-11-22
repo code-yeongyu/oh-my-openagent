@@ -85,22 +85,57 @@ describe("mirrorChannel", () => {
     },
   )
 
-  test.each([{ force: false }, { force: true }])("newer concurrent read-back force=$force", async ({ force }) => {
+  test.each([{ force: false }, { force: true }])(
+    "a newer pointer that lands after the write is read back force=$force",
+    async ({ force }) => {
+      // given a pointer still at 5.1.47 when this attempt checks it, and a 5.1.49 release landing right after the PUT
+      let pointer = "5.1.47\n"
+      const writes: string[] = []
+      const logs: string[] = []
+      const store = {
+        async readText() {
+          return pointer
+        },
+        async write() {},
+        async writeOnce(_key: string, body: string) {
+          writes.push(body)
+          pointer = "5.1.49\n"
+        },
+      }
+      // when
+      const result = mirrorChannel(store, store, "channels/latest", "5.1.48", false, force, (line) => logs.push(line))
+      // then the write happened, and only a non-forced run accepts the newer read-back
+      if (force) await expect(result).rejects.toThrow("pointer read-back")
+      else {
+        expect(await result).toBe("5.1.49")
+        expect(logs).toContain("channels/latest: accepted newer pointer read-back 5.1.49 after writing 5.1.48")
+      }
+      expect(writes).toEqual(["5.1.48\n"])
+    },
+  )
+
+  test("a newer pointer that lands before the write is left alone", async () => {
+    // given a pointer at 5.1.47 at the first read and at 5.1.49 when the attempt re-reads it
     let reads = 0
+    const writes: string[] = []
     const logs: string[] = []
     const store = {
       async readText() {
         return ++reads === 1 ? "5.1.47\n" : "5.1.49\n"
       },
       async write() {},
-      async writeOnce() {},
+      async writeOnce(_key: string, body: string) {
+        writes.push(body)
+      },
     }
-    const result = mirrorChannel(store, store, "channels/latest", "5.1.48", false, force, (line) => logs.push(line))
-    if (force) await expect(result).rejects.toThrow("pointer read-back")
-    else {
-      expect(await result).toBe("5.1.49")
-      expect(logs.some((line) => line.includes("5.1.49") && line.includes("newer"))).toBe(true)
-    }
+    // when
+    const result = await mirrorChannel(store, store, "channels/latest", "5.1.48", false, false, (line) =>
+      logs.push(line),
+    )
+    // then nothing is written and the newer pointer is the answer
+    expect(writes).toEqual([])
+    expect(result).toBe("5.1.49")
+    expect(logs).toContain("channels/latest: 5.1.49 is newer than 5.1.48 before this attempt; not overwriting it")
   })
 
   test("a dry backfill probes overwrite while reporting the production decision", async () => {
