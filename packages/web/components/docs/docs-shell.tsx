@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { ChevronDown } from "lucide-react"
+import { useLocale, useTranslations } from "next-intl"
 import { DocsSidebar, type DocsShellSection } from "@/components/docs/docs-sidebar"
 import { useDocsNavigation } from "@/components/docs/use-docs-navigation"
 import { cn } from "@/lib/utils"
@@ -36,6 +37,8 @@ export function DocsShell({
   sections,
   children,
 }: DocsShellProps): React.JSX.Element {
+  const locale = useLocale()
+  const t = useTranslations("docs")
   const scrollerRef = React.useRef<HTMLDivElement | null>(null)
   const [searchQuery, setSearchQuery] = React.useState("")
   const [isMenuOpen, setIsMenuOpen] = React.useState(false)
@@ -109,7 +112,12 @@ export function DocsShell({
         className="focus-ring-inset min-h-0 min-w-0 lg:overflow-auto"
       >
         <div className="mx-auto w-full max-w-3xl px-4 pt-10 pb-24 sm:px-5 lg:px-8 lg:pt-12">
-          {children}
+          {locale !== "en" && (
+            <p role="note" className="text-text-mid mb-6 text-sm leading-relaxed">
+              {t("englishFallback")}
+            </p>
+          )}
+          <div>{children}</div>
         </div>
       </div>
     </div>

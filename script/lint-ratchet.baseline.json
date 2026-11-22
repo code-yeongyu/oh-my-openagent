@@ -2152,7 +2152,7 @@
     "omo-testing/no-flake-masking": 3
   },
   "script/build-omo-binary.test.ts": {
-    "omo-testing/no-flake-masking": 5,
+    "omo-testing/no-flake-masking": 4,
     "typescript/no-non-null-assertion": 11
   },
   "script/build-omo-binary.ts": {
