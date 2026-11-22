@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process"
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { appendFileSync, cpSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 // A real git origin for publish-gate-reuse-ci-basis-waiver.test.ts: the gate-reuse waiver fetches,
@@ -36,6 +36,7 @@ const COMMITS = [
 export type CommitName = (typeof COMMITS)[number][0]
 
 export interface GitOrigin {
+  readonly origin: string
   /** Hermetic git environment: no system or user config. */
   readonly gitEnv: Readonly<Record<string, string>>
   readonly sha: Readonly<Record<CommitName, string>>
@@ -43,7 +44,7 @@ export interface GitOrigin {
   readonly initCheckout: (dir: string) => void
 }
 
-export function createGitOrigin(root: string): GitOrigin {
+export function createGitOrigin(root: string, seed?: GitOrigin): GitOrigin {
   const gitConfig = join(root, "gitconfig")
   writeFileSync(gitConfig, "")
   const gitEnv = { PATH: process.env.PATH ?? "", HOME: root, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: gitConfig }
@@ -55,6 +56,23 @@ export function createGitOrigin(root: string): GitOrigin {
   }
 
   const origin = join(root, "origin.git")
+  const sha = seed ? seed.sha : importOrigin(root, origin, git)
+  // Copy refs as well as objects: the workflow can push tags without changing the seed or another case.
+  if (seed) cpSync(seed.origin, origin, { recursive: true })
+  const remote = `[remote "origin"]\n\turl = file://${origin.replaceAll("\\", "/")}\n\tfetch = +refs/heads/*:refs/remotes/origin/*\n`
+  const initCheckout = (dir: string): void => {
+    mkdirSync(dir)
+    git(dir, ["init", "-q"])
+    appendFileSync(join(dir, ".git", "config"), remote)
+  }
+  return { origin, gitEnv, sha, initCheckout }
+}
+
+function importOrigin(
+  root: string,
+  origin: string,
+  git: (cwd: string, args: readonly string[], input?: string) => void,
+): GitOrigin["sha"] {
   git(root, ["init", "-q", "--bare", origin])
   appendFileSync(join(origin, "config"), "[uploadpack]\n\tallowAnySHA1InWant = true\n")
   const markOf = (name: string): number => COMMITS.findIndex(([candidate]) => candidate === name) + 1
@@ -73,11 +91,5 @@ export function createGitOrigin(root: string): GitOrigin {
     if (entry && id) sha[entry[0]] = id
   }
 
-  const remote = `[remote "origin"]\n\turl = file://${origin.replaceAll("\\", "/")}\n\tfetch = +refs/heads/*:refs/remotes/origin/*\n`
-  const initCheckout = (dir: string): void => {
-    mkdirSync(dir)
-    git(dir, ["init", "-q"])
-    appendFileSync(join(dir, ".git", "config"), remote)
-  }
-  return { gitEnv, sha, initCheckout }
+  return sha
 }

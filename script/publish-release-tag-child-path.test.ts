@@ -99,19 +99,19 @@ interface Outcome {
  * Like the job: its own origin (tags are origin state, so no case sees another's), a checkout of the prepared
  * SHA after `git fetch --force --tags`, then the step's script.
  */
-function runStep(input: Run): Outcome {
+function runStep(input: Run, seed?: GitOrigin): Outcome {
   const root = mkdtempSync(join(tmpdir(), "publish-release-tag-"))
   scratch.push(root)
-  const fixture = createGitOrigin(root)
+  const fixture = createGitOrigin(root, seed)
   const checkout = join(root, "checkout")
-  fixture.initCheckout(checkout)
-  git(fixture, checkout, ["fetch", "-q", "origin"])
-  for (const [tag, name] of Object.entries(input.originTags ?? {})) {
+  git(fixture, root, ["clone", "-q", "--no-checkout", fixture.origin, checkout])
+  const originTags = Object.entries(input.originTags ?? {})
+  for (const [tag, name] of originTags) {
     git(fixture, checkout, ["push", "-q", "origin", `${fixture.sha[name]}:refs/tags/${tag}`])
   }
   const prepared = fixture.sha[input.prepared]
   git(fixture, checkout, ["checkout", "-q", "--detach", prepared])
-  git(fixture, checkout, ["fetch", "-q", "--force", "--tags"])
+  if (originTags.length > 0) git(fixture, checkout, ["fetch", "-q", "--force", "--tags"])
   const script = join(root, "step.sh")
   const ghCalls = join(root, "gh-calls")
   writeFileSync(script, STUBS + step(input.where).run)
@@ -153,12 +153,18 @@ function runStep(input: Run): Outcome {
 
 describe("publish.yml child path release tag", () => {
   test("a legacy child can receive a tag for a non-stamp delta only with exact push CI", () => {
+    const root = mkdtempSync(join(tmpdir(), "publish-release-tag-seed-"))
+    scratch.push(root)
+    const seed = createGitOrigin(root)
     for (const [ciEvent, ciHead, allowed] of [
       ["pull_request", "C", false],
       ["push", "B", false],
       ["push", "C", true],
     ] as const) {
-      const result = runStep({ where: DISPATCH_STEP, prepared: "C", pin: "B", pinSupported: false, ciEvent, ciHead })
+      const result = runStep(
+        { where: DISPATCH_STEP, prepared: "C", pin: "B", pinSupported: false, ciEvent, ciHead },
+        seed,
+      )
       expect(result.originTag(`v${VERSION}`)).toBe(allowed ? result.sha.C : "")
       expect(result.ghCalls.includes("workflow run")).toBe(allowed)
       expect(result.status === 0).toBe(allowed)
