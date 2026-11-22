@@ -96,7 +96,6 @@ export async function createPluginFixture(
         {
           sha256: createHash("sha256").update(astGrepRuntimeBytes).digest("hex"),
           mode: 0o755,
-          stagedAtUtc: "2026-08-03T00:00:00.000Z",
         },
         null,
         2,

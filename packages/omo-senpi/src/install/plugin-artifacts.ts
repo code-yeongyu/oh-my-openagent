@@ -178,15 +178,13 @@ async function verifyAstGrepRuntimeIntegrity(pluginPath: string, platform: NodeJ
 
 function isAstGrepRuntimeManifest(
   value: unknown,
-): value is { readonly sha256: string; readonly mode: number; readonly stagedAtUtc: string } {
+): value is { readonly sha256: string; readonly mode: number } {
   if (!isRecord(value)) return false
   return (
     typeof value.sha256 === "string" &&
     /^[a-f0-9]{64}$/.test(value.sha256) &&
     typeof value.mode === "number" &&
-    Number.isInteger(value.mode) &&
-    typeof value.stagedAtUtc === "string" &&
-    !Number.isNaN(Date.parse(value.stagedAtUtc))
+    Number.isInteger(value.mode)
   )
 }
 

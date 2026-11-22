@@ -5,7 +5,7 @@ import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises
 import { createHash } from "node:crypto"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { checkAstGrepMcpRuntimeFresh } from "./stage-ast-grep-mcp-runtime.mjs"
+import { checkAstGrepMcpRuntimeFresh, stageAstGrepMcpRuntime } from "./stage-ast-grep-mcp-runtime.mjs"
 
 const tempDirs = []
 
@@ -35,6 +35,18 @@ async function makeRuntimeFixture() {
 
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+})
+
+describe("ast-grep MCP runtime manifest (#12240)", () => {
+  test("staging unchanged bytes twice writes the same timestamp-free manifest", async () => {
+    const { sourceEntry, targetEntry, manifestPath } = await makeRuntimeFixture()
+    await stageAstGrepMcpRuntime({ sourceEntry, targetEntry })
+    const first = await readFile(manifestPath, "utf8")
+    await stageAstGrepMcpRuntime({ sourceEntry, targetEntry })
+    expect(await readFile(manifestPath, "utf8")).toBe(first)
+    expect(Object.keys(JSON.parse(first)).sort()).toEqual(["mode", "sha256"])
+    expect((await checkAstGrepMcpRuntimeFresh({ sourceEntry, targetEntry })).ok).toBe(true)
+  })
 })
 
 describe("ast-grep MCP staged runtime mode policy", () => {
