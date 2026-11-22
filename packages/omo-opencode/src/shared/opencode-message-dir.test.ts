@@ -3,6 +3,7 @@ import { mkdirSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
+import { preserveModuleMocksForTestFile } from "../testing/module-mock-lifecycle"
 
 const TEST_STORAGE = join(tmpdir(), `omo-msgdir-test-${randomUUID()}`)
 const TEST_MESSAGE_STORAGE = join(TEST_STORAGE, "message")
@@ -19,6 +20,7 @@ mock.module("./opencode-storage-detection", () => ({
   isSqliteBackend: () => sqliteBackend,
   resetSqliteBackendCache: () => {},
 }))
+preserveModuleMocksForTestFile(import.meta.url)
 
 afterAll(() => {
   mock.restore()

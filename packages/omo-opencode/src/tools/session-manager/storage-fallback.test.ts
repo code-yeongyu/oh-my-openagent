@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { randomUUID } from "node:crypto"
+import { preserveModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
 
 const TEST_DIR = join(tmpdir(), `omo-test-session-manager-fallback-${randomUUID()}`)
 const TEST_MESSAGE_STORAGE = join(TEST_DIR, "message")
@@ -47,6 +48,7 @@ mock.module("../../shared/opencode-message-dir", () => ({
     return null
   },
 }))
+preserveModuleMocksForTestFile(import.meta.url)
 
 afterAll(() => {
   mock.restore()

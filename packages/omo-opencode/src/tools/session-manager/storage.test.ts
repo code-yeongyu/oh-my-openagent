@@ -4,6 +4,7 @@ import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
+import { preserveModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
 
 // Named, not a namespace spread: a spread counts every export as used and hides dead ones from knip.
 // satisfies flags a missing or extra key in the editor; no gate typechecks test files, so the export-list test below is
@@ -77,6 +78,7 @@ mock.module("../../shared/opencode-message-dir", () => ({
     return null
   },
 }))
+preserveModuleMocksForTestFile(import.meta.url)
 
 test("#given the ./constants restore set #then it names every export the real module declares", async () => {
   // Bun's parser lists the names constants.ts exports, its own declarations and its `export { ... } from` names. Reading

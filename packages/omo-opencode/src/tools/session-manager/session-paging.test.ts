@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { randomUUID } from "node:crypto"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
+import { preserveModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
 
 // Contract (#10738): session_read / session_search / session_info page through OpenCode's message API
 // with a limit on every request, never hold a whole session, and a timed-out search stops reading.
@@ -34,6 +35,7 @@ mock.module("../../shared/opencode-message-dir", () => ({
     return existsSync(dir) ? dir : null
   },
 }))
+preserveModuleMocksForTestFile(import.meta.url)
 
 afterAll(() => {
   mock.restore()
