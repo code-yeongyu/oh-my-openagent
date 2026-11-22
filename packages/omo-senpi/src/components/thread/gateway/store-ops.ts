@@ -365,7 +365,10 @@ function argsHash(value: unknown): string {
 }
 
 function storedReaderFloor(ctx: StoreContext): number | undefined {
-  const tables = ctx.sql.one(["n"], "SELECT count(*) AS n FROM sqlite_master WHERE type = 'table' AND name = 'gateway_meta'")
+  const tables = ctx.sql.one(
+    ["n"],
+    "SELECT count(*) AS n FROM sqlite_master WHERE type = 'table' AND name = 'gateway_meta'",
+  )
   if (Number(tables?.n ?? 0) === 0) return undefined
   const found = ctx.sql.one(["value"], "SELECT value FROM gateway_meta WHERE key = ?", [GATEWAY_READER_FLOOR_KEY])
   const floor = Number(found?.value)

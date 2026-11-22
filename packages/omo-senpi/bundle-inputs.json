@@ -913,6 +913,7 @@
     "packages/omo-senpi/plugin/scripts/stage-ast-grep-mcp-runtime.mjs",
     "packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs",
     "packages/omo-senpi/plugin/scripts/stage-x-search-skill.mjs",
+    "packages/omo-senpi/src/components/agent-home/dev-build-runtime.ts",
     "packages/omo-senpi/src/components/agent-home/resolve-agent-home.ts",
     "packages/omo-senpi/src/components/ast-grep/index.ts",
     "packages/omo-senpi/src/components/browser-bridge/index.ts",

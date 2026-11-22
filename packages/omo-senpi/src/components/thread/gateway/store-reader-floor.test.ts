@@ -41,7 +41,11 @@ function migrateAhead(agentDir: string, version: number, floor: number | null): 
   try {
     db.exec(`PRAGMA user_version = ${version}`)
     if (floor === null) db.query("DELETE FROM gateway_meta WHERE key = ?").run(GATEWAY_READER_FLOOR_KEY)
-    else db.query("INSERT OR REPLACE INTO gateway_meta (key, value) VALUES (?, ?)").run(GATEWAY_READER_FLOOR_KEY, String(floor))
+    else
+      db.query("INSERT OR REPLACE INTO gateway_meta (key, value) VALUES (?, ?)").run(
+        GATEWAY_READER_FLOOR_KEY,
+        String(floor),
+      )
   } finally {
     db.close()
   }
@@ -52,7 +56,9 @@ test("#given this binary opens its store #then it records reader floor 14 (v15 a
   await h.store().identity()
   const db = new Database(gatewayDatabasePath(h.agentDir), { readonly: true })
   try {
-    expect(db.query("SELECT value FROM gateway_meta WHERE key = ?").get(GATEWAY_READER_FLOOR_KEY)).toEqual({ value: "14" })
+    expect(db.query("SELECT value FROM gateway_meta WHERE key = ?").get(GATEWAY_READER_FLOOR_KEY)).toEqual({
+      value: "14",
+    })
   } finally {
     db.close()
   }
@@ -81,20 +87,23 @@ test("#given running sessions #when a newer binary migrates the store and record
 test.each([
   ["a floor above this binary (a step changed a column it uses)", GATEWAY_MIGRATIONS.length + 1],
   ["no floor recorded (a binary from before the floor)", null],
-] as const)("#given a newer store with %s #when a session opens it #then it is refused typed and left untouched", async (_case, floor) => {
-  const h = (harness = createGatewayHarness())
-  await h.store().identity()
-  migrateAhead(h.agentDir, GATEWAY_MIGRATIONS.length + 1, floor)
+] as const)(
+  "#given a newer store with %s #when a session opens it #then it is refused typed and left untouched",
+  async (_case, floor) => {
+    const h = (harness = createGatewayHarness())
+    await h.store().identity()
+    migrateAhead(h.agentDir, GATEWAY_MIGRATIONS.length + 1, floor)
 
-  const opened = await settled(h.store().identity())
-  expect(opened.error).toMatchObject({ code: "gateway_schema_too_new" })
-  const db = new Database(gatewayDatabasePath(h.agentDir), { readonly: true })
-  try {
-    expect(db.query("PRAGMA user_version").get()).toEqual({ user_version: GATEWAY_MIGRATIONS.length + 1 })
-  } finally {
-    db.close()
-  }
-})
+    const opened = await settled(h.store().identity())
+    expect(opened.error).toMatchObject({ code: "gateway_schema_too_new" })
+    const db = new Database(gatewayDatabasePath(h.agentDir), { readonly: true })
+    try {
+      expect(db.query("PRAGMA user_version").get()).toEqual({ user_version: GATEWAY_MIGRATIONS.length + 1 })
+    } finally {
+      db.close()
+    }
+  },
+)
 
 test("#given an omob source build #when it opens the shared agent dir's store #then it refuses to migrate it and leaves it unmigrated", async () => {
   const h = (harness = createGatewayHarness())
