@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
+import { lstatSync, mkdirSync, readFileSync, readdirSync, type Stats, writeFileSync } from "node:fs"
 import { join, relative } from "node:path"
 
 import { daemonDirectoryName } from "@code-yeongyu/senpi"
@@ -22,7 +22,7 @@ function snapshotState(agentDir: string): string {
 }
 
 function walk(root: string, path: string, hash: ReturnType<typeof createHash>): void {
-  let stat
+  let stat: Stats
   try {
     stat = lstatSync(path)
   } catch (error) {
@@ -54,6 +54,18 @@ async function assertReadOnlyState(agentDir: string, action: () => void | Promis
 
 if (process.platform !== "win32") {
   describe("omo daemon real-engine read-only and observe contracts", () => {
+    test("#given a group-writable umask #when the sandbox is created #then its rpc directories stay private", () => {
+      const previous = process.umask(0o002)
+      try {
+        const { agentDir } = sandbox()
+        for (const dir of [join(agentDir, "rpc"), join(agentDir, "rpc", "shards")]) {
+          expect(lstatSync(dir).mode & 0o077).toBe(0)
+        }
+      } finally {
+        process.umask(previous)
+      }
+    })
+
     test("#given an uncleanly killed shard #when status json runs #then every daemon and shard state byte stays identical", async () => {
       const { agentDir, socket, env } = sandbox()
       const supervisorPid = await ensureShard(socket, env)
@@ -81,7 +93,7 @@ if (process.platform !== "win32") {
 
     test("#given production status with a write mutant #when the read-only guard runs #then production turns red", async () => {
       const { agentDir } = sandbox()
-      mkdirSync(join(agentDir, "rpc-host-daemon"), { recursive: true })
+      mkdirSync(join(agentDir, "rpc-host-daemon"), { recursive: true, mode: 0o700 })
 
       await expect(
         assertReadOnlyState(agentDir, () => {
