@@ -17,7 +17,8 @@ const roots: string[] = []
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))))
 
 describe("memory identity runtime", () => {
-  test.each(["manual", "different", "aborted", "shared", "success", "failure"] as const)(
+  const kinds = ["manual", "different", "aborted", "shared", "success", "failure"] as const
+  test.each(kinds)(
     "#given overlapping identity observers (%s) #when the owner settles #then cancellation belongs to each caller",
     async (kind) => {
       const root = await mkdtemp(join(tmpdir(), "omo-reconcile-flight-"))
@@ -47,10 +48,43 @@ describe("memory identity runtime", () => {
       const reason = new DOMException("Settle observer budget exhausted", "TimeoutError")
       const ownReason = new Error("joining observer retired")
       const failure = new Error("reservation read failed")
+      // Per-kind expectations (#11277): the second caller's signal, both settle outcomes, and the
+      // passes it takes, as one table instead of nested ternaries over six cases.
+      type Kind = (typeof kinds)[number]
+      const secondSignal: Record<Kind, AbortSignal | undefined> = {
+        manual: undefined,
+        different: joiner.signal,
+        aborted: joiner.signal,
+        shared: controller.signal,
+        success: joiner.signal,
+        failure: joiner.signal,
+      }
+      const firstOutcome: Record<Kind, unknown> = {
+        manual: reason,
+        different: reason,
+        aborted: reason,
+        shared: reason,
+        success: undefined,
+        failure,
+      }
+      const secondOutcome: Record<Kind, unknown> = {
+        manual: undefined,
+        different: undefined,
+        aborted: ownReason,
+        shared: reason,
+        success: undefined,
+        failure,
+      }
+      const probeCalls: Record<Kind, number> = {
+        manual: 3,
+        different: 3,
+        aborted: 1,
+        shared: 1,
+        success: 2,
+        failure: 1,
+      }
       const first = runtime.reconcile(controller.signal).catch((error: unknown) => error)
-      const second = runtime
-        .reconcile(kind === "manual" ? undefined : kind === "shared" ? controller.signal : joiner.signal)
-        .catch((error: unknown) => error)
+      const second = runtime.reconcile(secondSignal[kind]).catch((error: unknown) => error)
       try {
         await entered.promise
         expect(probe).toHaveBeenCalledTimes(1)
@@ -58,11 +92,9 @@ describe("memory identity runtime", () => {
         if (kind !== "success") controller.abort(reason)
         if (kind === "failure") release.reject(failure)
         else release.resolve(state)
-        expect(await first).toBe(kind === "success" ? undefined : kind === "failure" ? failure : reason)
-        expect(await second).toBe(
-          kind === "shared" ? reason : kind === "aborted" ? ownReason : kind === "failure" ? failure : undefined,
-        )
-        expect(probe).toHaveBeenCalledTimes(kind === "manual" || kind === "different" ? 3 : kind === "success" ? 2 : 1)
+        expect(await first).toBe(firstOutcome[kind])
+        expect(await second).toBe(secondOutcome[kind])
+        expect(probe).toHaveBeenCalledTimes(probeCalls[kind])
         probe.mockRestore()
         await runtime.reconcile()
       } finally {
@@ -72,6 +104,60 @@ describe("memory identity runtime", () => {
       }
     },
   )
+
+  test("#given a foreign-abort retry #when a later joiner's flight aborts too #then the retry still runs under its own signal and completes (#11277)", async () => {
+    const root = await mkdtemp(join(tmpdir(), "omo-reconcile-flight-"))
+    roots.push(root)
+    const identity = createMemoryIdentityContext({
+      identity: "agent-test",
+      identityPaths: buildIdentityPaths(root, "agent-test"),
+      binding: { identity: "agent-test", repoPathHash: "hash", boundAt: 1 },
+    })
+    const runtime = createIdentityRuntime(identity, {
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      cwd: () => root,
+      resolveModelRegistry: () => undefined,
+    })
+    const state = await runtime.store.readState()
+    const readState = runtime.store.readState.bind(runtime.store)
+    const enteredFirst = Promise.withResolvers<void>()
+    const enteredSecond = Promise.withResolvers<void>()
+    const releaseFirst = Promise.withResolvers<typeof state>()
+    const releaseSecond = Promise.withResolvers<typeof state>()
+    const probe = spyOn(runtime.store, "readState")
+      .mockImplementationOnce(() => {
+        enteredFirst.resolve()
+        return releaseFirst.promise
+      })
+      .mockImplementationOnce(() => {
+        enteredSecond.resolve()
+        return releaseSecond.promise
+      })
+      .mockImplementation(readState)
+    const owner = new AbortController()
+    const claimer = new AbortController()
+    const lateJoiner = new AbortController()
+    const ownerReason = new DOMException("Settle observer budget exhausted", "TimeoutError")
+    const claimerReason = new DOMException("second observer retired", "TimeoutError")
+    const first = runtime.reconcile(owner.signal).catch((error: unknown) => error)
+    // The claimer joins flight 1 first, so its foreign-abort retry claims the next slot; the late
+    // joiner is the caller whose retry must survive that second flight's own abort.
+    const second = runtime.reconcile(claimer.signal).catch((error: unknown) => error)
+    const third = runtime.reconcile(lateJoiner.signal).catch((error: unknown) => error)
+    await enteredFirst.promise
+    expect(probe).toHaveBeenCalledTimes(1)
+    owner.abort(ownerReason)
+    releaseFirst.resolve(state)
+    await enteredSecond.promise
+    expect(probe).toHaveBeenCalledTimes(2)
+    claimer.abort(claimerReason)
+    releaseSecond.resolve(state)
+    expect(await first).toBe(ownerReason)
+    expect(await second).toBe(claimerReason)
+    expect(await third).toBe(undefined)
+    probe.mockRestore()
+    await runtime.reconcile()
+  })
 
   test.skipIf(process.platform !== "darwin" && process.platform !== "linux")(
     "#given an unresolved reflection child command #when the real lazy sandbox is constructed #then the unsandboxed escape reaches the injected logger",

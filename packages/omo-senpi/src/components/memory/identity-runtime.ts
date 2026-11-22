@@ -202,24 +202,36 @@ export function createIdentityRuntime(
         return
       }
       // One identity-wide pass, including any already-admitted durable transition. Its first
-      // observer owns cancellation; an independent caller retries a foreign abort once.
-      // Never clear the flight on timeout alone: a committed transition may still be finishing.
+      // observer owns cancellation; an independent caller retries a foreign abort once, and that
+      // retry always runs under the joiner's OWN signal (#11277): it waits for any flight a third
+      // caller opened meanwhile, then takes the shared slot itself, so a third caller's abort can
+      // never fail it. Never clear the flight on timeout alone: a committed transition may still
+      // be finishing.
+      const startFlight = (owner: AbortSignal | undefined) => {
+        const flight: { signal: AbortSignal | undefined; promise: Promise<void> } = {
+          signal: owner,
+          promise: Promise.resolve(),
+        }
+        flight.promise = reconcileReflectionRuns({
+          identity: asMemoryIdentity(identity),
+          reservation: store,
+          launch,
+          deferOnSchedulerContention: true,
+          ...(owner === undefined ? {} : { signal: owner }),
+        })
+          .then(() => undefined)
+          .finally(() => {
+            if (reconciliation === flight) reconciliation = undefined
+          })
+        return flight
+      }
       for (let attempt = 0; ; attempt += 1) {
         signal?.throwIfAborted()
-        const flight = (reconciliation ??= {
-          signal,
-          promise: reconcileReflectionRuns({
-            identity: asMemoryIdentity(identity),
-            reservation: store,
-            launch,
-            deferOnSchedulerContention: true,
-            ...(signal === undefined ? {} : { signal }),
-          })
-            .then(() => undefined)
-            .finally(() => {
-              reconciliation = undefined
-            }),
-        })
+        if (attempt > 0) {
+          while (reconciliation !== undefined) await reconciliation.promise.catch(() => {})
+        }
+        signal?.throwIfAborted()
+        const flight = attempt === 0 ? (reconciliation ??= startFlight(signal)) : (reconciliation = startFlight(signal))
         try {
           await flight.promise
         } catch (error) {
