@@ -1,8 +1,8 @@
-import { cp, mkdtemp, readdir, rm, stat } from "node:fs/promises"
+import { spawn } from "node:child_process"
+import { cp, mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { buildExtension } from "./build-extension.mjs"
 import { childTreeCpuSeconds } from "../../../omo-native/test/daemon-test-runner.ts"
 
 export function outputPathsIn(root) {
@@ -69,15 +69,19 @@ export const BUILD_CPU_CAP_S = 380
 export const BUILD_HOOK_OUTER_BOUND_MS = 95 * 60_000
 const PROGRESS_SAMPLE_MS = 250
 const PROGRESS_EPSILON_S = 0.02
+const STDERR_TAIL_CHARS = 2_000
+const DEFAULT_BUILD_MODULE = new URL("./build-extension.mjs", import.meta.url).href
 
-// The build's CPU is its child processes' CPU: this test process's own time (sampling included) is subtracted, or the
-// sampler's own work would read as build progress and a hung bundler would never stall.
-function buildCpuSeconds() {
-  const tree = childTreeCpuSeconds(process.pid)
-  if (tree < 0) return tree
-  const own = process.cpuUsage()
-  return tree - (own.user + own.system) / 1e6
-}
+// The build runs in its own node process: buildExtension runs every bundler step through spawnSync, which blocks the
+// event loop of whatever process calls it, so a guard sampling from the same process never runs while a bundler hangs.
+const BUILD_CHILD_SOURCE = `
+import { writeFile } from "node:fs/promises"
+const [moduleUrl, pathsJson, resultPath] = process.argv.slice(1)
+const { buildExtension } = await import(moduleUrl)
+const result = await buildExtension(JSON.parse(pathsJson))
+await writeFile(resultPath, JSON.stringify(result ?? null))
+process.exit(0)
+`
 
 async function outputFingerprint(root) {
   const entries = await readdir(root, { recursive: true, withFileTypes: true }).catch(() => [])
@@ -90,46 +94,94 @@ async function outputFingerprint(root) {
   return fingerprint
 }
 
-export function boundBuildProgress(name, root, work, { stallMs = BUILD_STALL_MS, cpuCapS = BUILD_CPU_CAP_S } = {}) {
+function killGroup(pgid) {
+  try {
+    process.kill(-pgid, "SIGKILL")
+  } catch (error) {
+    if (error?.code !== "ESRCH") throw error
+  }
+}
+
+/**
+ * Builds `paths` with `buildModule`'s buildExtension in a child process group and bounds it by the progress of that
+ * group's process tree and of the output directory `root`. A tripped bound kills the whole group before rejecting.
+ */
+export function boundBuild(
+  name,
+  root,
+  paths,
+  { buildModule = DEFAULT_BUILD_MODULE, stallMs = BUILD_STALL_MS, cpuCapS = BUILD_CPU_CAP_S } = {},
+) {
+  const resultPath = `${root}.build-result.json`
+  const child = spawn(
+    "node",
+    ["--input-type=module", "-e", BUILD_CHILD_SOURCE, buildModule, JSON.stringify(paths), resultPath],
+    {
+      detached: true,
+      stdio: ["ignore", "inherit", "pipe"],
+    },
+  )
+  let stderr = ""
+  child.stderr.setEncoding("utf8").on("data", (chunk) => {
+    stderr = (stderr + chunk).slice(-STDERR_TAIL_CHARS)
+  })
   return new Promise((resolve, reject) => {
-    const startCpu = buildCpuSeconds()
-    let lastCpu = startCpu
+    let lastCpu = 0
     let lastOutput = -1
     let lastAdvance = Date.now()
     let sampling = false
+    let settled = false
     const sampler = setInterval(async () => {
-      if (sampling) return
+      if (sampling || child.pid === undefined) return
       sampling = true
-      const cpu = buildCpuSeconds()
+      const cpu = childTreeCpuSeconds(child.pid)
       const output = await outputFingerprint(root)
       sampling = false
       const now = Date.now()
       if (cpu >= lastCpu + PROGRESS_EPSILON_S || output !== lastOutput) lastAdvance = now
       if (cpu >= 0) lastCpu = cpu
       lastOutput = output
-      const usedCpuS = lastCpu - startCpu
-      if (usedCpuS > cpuCapS) {
-        settle(() => reject(new Error(`${name} ran away: used ${Math.round(usedCpuS)} CPU seconds (cap ${cpuCapS})`)))
+      if (lastCpu > cpuCapS) {
+        trip(`ran away: used ${Math.round(lastCpu)} CPU seconds (cap ${cpuCapS})`)
       } else if (now - lastAdvance >= stallMs) {
-        const stalledS = Math.round((now - lastAdvance) / 1000)
-        settle(() => reject(new Error(`${name} stalled: no CPU or output progress for ${stalledS}s (a hang)`)))
+        trip(`stalled: no CPU or output progress for ${Math.round((now - lastAdvance) / 1000)}s (a hang)`)
       }
     }, PROGRESS_SAMPLE_MS)
-    let settled = false
     function settle(finish) {
       if (settled) return
       settled = true
       clearInterval(sampler)
       finish()
     }
-    work.then(
-      (value) => settle(() => resolve(value)),
-      (error) => settle(() => reject(error)),
-    )
+    function trip(why) {
+      settle(() => {
+        // Reject only once the group leader is reaped, so the caller never sees a group still holding the build.
+        child.once("exit", () => reject(new Error(`${name} ${why}; killed process group ${child.pid}`)))
+        killGroup(child.pid)
+      })
+    }
+    child.on("error", (error) => settle(() => reject(error)))
+    child.on("exit", (code, signal) => {
+      settle(async () => {
+        // A sidecar the build left behind (the minifier server) must not outlive it.
+        killGroup(child.pid)
+        if (code !== 0) {
+          reject(new Error(`${name} failed: code=${String(code)} signal=${String(signal)}\n${stderr}`))
+          return
+        }
+        try {
+          resolve(JSON.parse(await readFile(resultPath, "utf8")))
+        } catch (error) {
+          reject(error)
+        } finally {
+          await rm(resultPath, { force: true })
+        }
+      })
+    })
   })
 }
 
-export function createBuildFixture({ build = buildExtension } = {}) {
+export function createBuildFixture({ buildModule } = {}) {
   const perTestRoots = []
   let sharedBuildPromise = null
   let reproductionPromise = null
@@ -140,7 +192,7 @@ export function createBuildFixture({ build = buildExtension } = {}) {
       const root = await mkdtemp(join(tmpdir(), "omo-senpi-extension-test-shared-"))
       const paths = outputPathsIn(root)
       try {
-        return { root, ...paths, ...(await boundBuildProgress("shared extension build", root, build(paths))) }
+        return { root, ...paths, ...(await boundBuild("shared extension build", root, paths, { buildModule })) }
       } catch (error) {
         await rm(root, { recursive: true, force: true })
         throw error
@@ -162,7 +214,7 @@ export function createBuildFixture({ build = buildExtension } = {}) {
     reproductionPromise ??= (async () => {
       const root = await mkdtemp(join(tmpdir(), "omo-senpi-extension-test-reproduction-"))
       try {
-        await boundBuildProgress("reproduction extension build", root, build(outputPathsIn(root)))
+        await boundBuild("reproduction extension build", root, outputPathsIn(root), { buildModule })
         return root
       } catch (error) {
         await rm(root, { recursive: true, force: true })
