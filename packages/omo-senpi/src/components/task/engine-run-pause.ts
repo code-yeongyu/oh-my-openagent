@@ -2,7 +2,7 @@ import type { TaskManager } from "../../../../senpi-task/src/manager/types"
 import type { TaskPauseMethods } from "../../../../senpi-task/src/manager/run-pause"
 import type { TaskRecord } from "../../../../senpi-task/src/state"
 import type { AdmissionBarrier, ResumeCredential } from "../../../../senpi-task/src/pause/admission-barrier"
-import type { EnginePauseState, RunRef, RunPauseOwner } from "../../../../senpi-task/src/pause/ports"
+import type { RunRef, RunPauseOwner } from "../../../../senpi-task/src/pause/ports"
 import { PauseRegistry, type PauseParticipant } from "../../../../senpi-task/src/pause/registry"
 import { RunPauseController, type RunPauseEffects } from "../../../../senpi-task/src/pause/run-controller"
 import { EngineRunPauseBridge, type LostParticipantRecovery } from "./run-pause-bridge"
@@ -33,7 +33,7 @@ export function createEngineRunPause(ports: {
   readonly stateDir: string
   readonly barrier: AdmissionBarrier
   readonly manager: TaskManager & TaskPauseMethods
-  readonly runtime: { getPauseState(): EnginePauseState | undefined; fenceRun(runRef: RunRef): void }
+  readonly runtime: ConstructorParameters<typeof EngineRunPauseBridge>[1] & { fenceRun(runRef: RunRef): void }
   readonly resumeAdmission?: RunPauseEffects["resume"]
   readonly lostRecovery?: LostParticipantRecovery
 }) {

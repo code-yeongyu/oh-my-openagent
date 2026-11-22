@@ -44,6 +44,15 @@ export interface CapturedUi extends DialogUi {
   setWidget(key: string, content: string[] | undefined, options?: { placement?: "belowEditor" | "aboveEditor" }): void
 }
 
+export function notifyTaskUser(
+  context: Pick<LiveTaskContext, "mode" | "ui">,
+  notice: string,
+  level: "info" | "warning",
+): void {
+  if (context.mode === "print" || context.mode === "json") process.stderr.write(`${notice}\n`)
+  else context.ui?.notify(notice, level)
+}
+
 export type ParentTransition = "compacting" | "session_switching" | "session_shutdown" | undefined
 
 export type ParentServiceTier = "auto" | "flex" | "priority"
@@ -152,6 +161,10 @@ export class TaskRuntimeContext {
 
   ui(): CapturedUi | undefined {
     return this.#ui
+  }
+
+  notifyResumeFailure(parentSessionId: string, text: string): void {
+    if (this.#sessionId === parentSessionId) notifyTaskUser({ mode: this.#mode, ui: this.#ui }, text, "warning")
   }
 
   sessionId(): string | undefined {

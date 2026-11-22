@@ -52,6 +52,7 @@ function hostProcess(
     readonly state: EnginePauseState | undefined
     readonly participants?: readonly PauseParticipant[]
     readonly effects?: (registry: PauseRegistry) => Partial<RunPauseEffects>
+    readonly legacyWithoutNotice?: boolean
   },
 ) {
   const barrier = new AdmissionBarrier()
@@ -85,7 +86,12 @@ function hostProcess(
   }
   let live = options.state
   const controller = new RunPauseController(registry, effects)
-  const bridge = new EngineRunPauseBridge(controller, { getPauseState: () => live })
+  const notices: string[] = []
+  const notice = (_parent: string, text: string) => notices.push(text)
+  const bridge = new EngineRunPauseBridge(controller, {
+    getPauseState: () => live,
+    ...(options.legacyWithoutNotice ? {} : { notifyResumeFailure: notice }),
+  })
   const restart = async () => {
     await bridge.restore(PARENT)
     await bridge.reconciled(PARENT)
@@ -98,6 +104,7 @@ function hostProcess(
     calls,
     resumed,
     paused,
+    notices,
     restart,
     setState: (next: EnginePauseState) => {
       live = next
@@ -148,6 +155,7 @@ test("design 20: a host killed after B resumed and before the scheduler installs
   expect(second.calls.filter((call) => call === "install")).toHaveLength(1)
   expect(second.barrier.state(PARENT)).toEqual({ kind: "open" })
   expect(second.registry.require(PARENT).phase).toBe("resumed")
+  expect(second.notices).toEqual([])
 })
 
 test("design 23: a repeated Stop raises every participant to the new sequence and a Resume at the old one is refused", async () => {
@@ -189,6 +197,7 @@ test("#given an acknowledged Stop persisted by the previous host #when human Res
   let restoreFails = true
   const second = hostProcess(root, {
     state: stopped(7),
+    legacyWithoutNotice: true,
     effects: () => ({
       resume: async (_participant, request) => {
         expect(request.childSeqCutoff).toBe(8)
@@ -219,13 +228,32 @@ test("#given an acknowledged Stop persisted by the previous host #when human Res
     participants: { b: { state: "lost", lostReason: expect.stringContaining("respawn_failed") } },
   })
 
+  const resumeId = second.registry.require(PARENT).resume?.resumeId
+  if (resumeId === undefined) throw new Error("Resume did not persist its identity")
+  const retryEffects = () => ({
+    resume: async (_participant: PauseParticipant, request: Parameters<RunPauseEffects["resume"]>[1]) => {
+      expect(request.resumeId).toBe(resumeId)
+      expect(request.childSeqCutoff).toBe(8)
+      if (restoreFails) throw new Error("paused child st_b restore failed: /private/secret")
+      return { kind: "resumed" as const, turnId: "restored-turn" }
+    },
+  })
+  const third = hostProcess(root, { state: released(7), effects: retryEffects })
+  await third.restart()
+  expect(third.notices).toEqual([expect.stringContaining("1 participant")])
+  expect(third.notices[0]).not.toContain("/private/secret")
+
+  const fourth = hostProcess(root, { state: released(7), effects: retryEffects })
+  await fourth.restart()
+  expect(fourth.notices).toEqual([])
   restoreFails = false
-  await second.bridge.changed(PARENT, { ...released(7), change: "resumed" })
-  expect(second.registry.require(PARENT).participants.b).toMatchObject({
+  await fourth.bridge.changed(PARENT, { ...released(7), change: "resumed" })
+  expect(fourth.registry.require(PARENT).participants.b).toMatchObject({
     state: "resumed",
     resumeTurnId: "restored-turn",
   })
-  expect(second.barrier.state(PARENT)).toEqual({ kind: "open" })
+  expect(fourth.barrier.state(PARENT)).toEqual({ kind: "open" })
+  expect(fourth.notices).toEqual([])
 })
 
 test("design 31: a restart after the Resume was requested completes it exactly once when the engine releases", async () => {

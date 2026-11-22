@@ -1,6 +1,6 @@
 import { log } from "@oh-my-opencode/utils"
 import type { EnginePauseState } from "../../../../senpi-task/src/pause/ports"
-import type { RunPauseController } from "../../../../senpi-task/src/pause/run-controller"
+import type { ResumeFailure, RunPauseController } from "../../../../senpi-task/src/pause/run-controller"
 import { readEngineRunHold } from "./engine-hold-reader"
 
 export type RunHoldChange = EnginePauseState & { readonly change: "paused" | "resumed" }
@@ -20,7 +20,10 @@ export class EngineRunPauseBridge {
 
   constructor(
     readonly controller: RunPauseController,
-    readonly native: { getPauseState(): EnginePauseState | undefined },
+    readonly native: {
+      getPauseState(): EnginePauseState | undefined
+      notifyResumeFailure?(parentSessionId: string, text: string): void
+    },
     readonly afterReleased?: (parentSessionId: string) => void | Promise<void>,
     readonly lostRecovery?: LostParticipantRecovery,
   ) {}
@@ -136,6 +139,8 @@ export class EngineRunPauseBridge {
       })
     }
     if (installed.kind === "installed" && this.controller.released(parentSessionId, pauseSeq, resumeId)) {
+      if (installed.failures !== undefined)
+        this.#notifyFailures(parentSessionId, pauseSeq, resumeId, installed.failures)
       await this.afterReleased?.(parentSessionId)
       // Backgrounded: the hold-change handler must not wait out the retry schedule.
       if (this.lostRecovery !== undefined && this.controller.hasLost(parentSessionId, pauseSeq)) {
@@ -175,10 +180,39 @@ export class EngineRunPauseBridge {
 
   #retryLost(parentSessionId: string, pauseSeq: number): Promise<void> {
     return this.#serialized(parentSessionId, async () => {
+      const resumeId = this.controller.registry.load(parentSessionId)?.resume?.resumeId
       const failures = await this.controller.retryLost(parentSessionId, pauseSeq)
-      if (failures.length > 0)
+      if (failures.length > 0) {
         log("[omo-senpi] run resume retry left participants outside the run", { parentSessionId, pauseSeq, failures })
+        if (resumeId !== undefined) this.#notifyFailures(parentSessionId, pauseSeq, resumeId, failures)
+      }
     })
+  }
+
+  #notifyFailures(
+    parentSessionId: string,
+    pauseSeq: number,
+    resumeId: string,
+    failures: readonly ResumeFailure[],
+  ): void {
+    if (this.native.notifyResumeFailure === undefined) return
+    const state = this.native.getPauseState()
+    if (state !== undefined && readEngineRunHold(state).stopped) return
+    try {
+      if (!this.controller.registry.claimResumeFailureNotice(parentSessionId, pauseSeq, resumeId)) return
+      const reasons = [...new Set(failures.map(({ code }) => code))].sort().join(", ")
+      const count = failures.length
+      this.native.notifyResumeFailure(
+        parentSessionId,
+        `Resume could not restore ${count} participant${count === 1 ? "" : "s"} (${reasons}). Check /tasks for their status.`,
+      )
+    } catch (error) {
+      log("[omo-senpi] run resume failure notice could not be delivered", {
+        parentSessionId,
+        pauseSeq,
+        error: String(error),
+      })
+    }
   }
 
   // Serialized per parent, so overlapping retries and the final end never act on the same child at once.
