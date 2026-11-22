@@ -46,7 +46,7 @@ test("two sessions reading one file cannot splice a stale insert into the winner
   const stale = await insert("B", 2, "B1\nB2")
   expect(stale.details.errorCode).toBe("stale_read")
   expect(stale.isError).toBe(true)
-  expect(stale.details.message).toContain(file_path)
+  expect(stale.details.message).toContain(path)
   expect(await fixture.repo.head()).toBe(head)
   expect(await git(fixture.repo, ["status", "--porcelain"])).toBe("")
   await read("B", true)
@@ -68,7 +68,7 @@ test("an identical insert is a success without a second commit or notice", async
     insert_text: "the announcement\nend",
   } as const
   expect((await tool.execute("first", params)).isError).toBeUndefined()
-  const head = await fixture.repo.head()
+  const head = await git(fixture.repo, ["rev-parse", "HEAD"])
   const second = await tool.execute("repeat", params)
   expect(second.details.message).toContain("already present")
   expect(second.isError).toBeUndefined()
