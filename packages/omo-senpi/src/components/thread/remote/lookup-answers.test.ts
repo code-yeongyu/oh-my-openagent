@@ -69,4 +69,29 @@ describe("omo#13037 A7.2.6: how the single probe's answers are read", () => {
     })
     expect(performance.now() - started).toBeLessThan(2_000)
   })
+
+  test("#14748 review M1: #given a locate still running after its lookup answered silent at the cap #then lookupsIdle settles only once the service answers it", async () => {
+    let answer: (value: { readonly key: string }) => void = () => {}
+    const port = sessionsPort({
+      version: "5.1.70",
+      connect: async () => ({
+        conn: serviceAnswering(() => new Promise((resolve) => (answer = resolve))),
+        owned: true,
+      }),
+      lookupCapMs: 50,
+    })
+    expect(await port.lookup?.("dev-c", "0195f0c2-1a2b-7c3d-8e4f-00000000c001")).toEqual({
+      kind: "silent",
+      reason: "lookup_timeout",
+    })
+    let idle = false
+    const waiting = port.lookupsIdle?.().then(() => (idle = true))
+    await Promise.resolve()
+    expect(idle).toBe(false)
+
+    answer({ key: "S0VZ" })
+    await waiting
+
+    expect(idle).toBe(true)
+  })
 })

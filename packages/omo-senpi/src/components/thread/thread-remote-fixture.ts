@@ -372,6 +372,11 @@ export function createRemoteThreadFixture() {
     const hops: number[] = []
     const lookups: Array<{ readonly device: string; readonly durable_id: string }> = []
     let lookupsInFlight = 0
+    const idleWaiters: Array<() => void> = []
+    const leaveLookup = () => {
+      lookupsInFlight -= 1
+      if (lookupsInFlight === 0) for (const waiter of idleWaiters.splice(0)) waiter()
+    }
     const deviceReads = { thisDevice: 0, devices: 0 }
     // Account listing reads: `all` asks every device (one round across the account), `device` asks one device.
     const listings = { all: 0, device: 0 }
@@ -822,6 +827,9 @@ export function createRemoteThreadFixture() {
           }
         },
         canLookup: async () => options.wakeFeature === true && options.noLookup !== true,
+        lookupsIdle: async () => {
+          if (lookupsInFlight > 0) await new Promise<void>((resolve) => idleWaiters.push(resolve))
+        },
         lookup: async (device, durableId) => {
           if (options.noLookup === true || options.wakeFeature !== true) return { kind: "unavailable" }
           lookups.push({ device, durable_id: durableId })
@@ -831,9 +839,13 @@ export function createRemoteThreadFixture() {
           await Promise.resolve()
           const crowded = lookupsInFlight > 1
           await Promise.resolve()
-          lookupsInFlight -= 1
-          if (crowded && options.crowdedLookups?.includes(device) === true)
+          if (crowded && options.crowdedLookups?.includes(device) === true) {
+            // The caller's cap answered first; the locate itself finishes on a later turn of the event loop, as a capped
+            // service request does (it is raced, never cancelled).
+            setImmediate(leaveLookup)
             return { kind: "silent", reason: "lookup_timeout" }
+          }
+          leaveLookup()
           if (options.silent?.includes(device) === true) return { kind: "silent", reason: "host_not_answering" }
           const key = options.ended?.[device]?.[durableId]
           return key === undefined ? { kind: "none" } : { kind: "found", key }

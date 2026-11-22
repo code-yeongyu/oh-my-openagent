@@ -204,6 +204,11 @@ export type RemoteSessionsPort = {
   /** omo#13037 A4.2/A4.3: one single-probe locate of `durableId` on `device`. Absent: no lookup is ever made. */
   readonly lookup?: (device: string, durableId: string) => Promise<RemoteLookupOutcome>
   /**
+   * Settles once no single-probe locate this port sent is still in flight: a lookup answered `silent` at the caller's cap
+   * leaves its locate running on the device service (#14748 review M1). Absent: nothing is tracked.
+   */
+  readonly lookupsIdle?: () => Promise<void>
+  /**
    * omo#13037 5.4: an `admit_external_message` record to a session of `device` that no listing maps, by its durable id.
    * `unavailable` when this device's own service cannot carry it (nothing is sent). Absent: the same as `unavailable`.
    */

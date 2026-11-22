@@ -305,6 +305,8 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
   }
   // Only the unfiltered account listing waits on every device, so only it is shared; a one-device listing goes out as asked.
   const round = createListingRound(() => listing(), options.now ?? Date.now)
+  // omo#14748 review M1: every single-probe locate this port sent, until the service answers it (a capped lookup does not).
+  const locating = new Set<Promise<unknown>>()
   // thread_list asks for this device's id and name in parallel: overlapping asks share one device.info read.
   let info: ReturnType<DeviceService["thisDevice"]> | undefined
   const deviceInfo = (): ReturnType<DeviceService["thisDevice"]> => {
@@ -456,7 +458,11 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         timer.unref?.()
       })
       try {
-        const answer = await Promise.race([connected.locate(device, durableId, { single: true }), capped])
+        const sent = connected.locate(device, durableId, { single: true })
+        locating.add(sent)
+        const settle = () => void locating.delete(sent)
+        sent.then(settle, settle)
+        const answer = await Promise.race([sent, capped])
         if (answer === "timeout") return { kind: "silent", reason: "lookup_timeout" }
         return { kind: "found", key: answer.key }
       } catch (error) {
@@ -468,6 +474,9 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     },
     canWake: async () => (await svc().catch(() => undefined))?.carriesWakeMark === true,
     canLookup: async () => (await svc().catch(() => undefined))?.takesSingleLocate === true,
+    lookupsIdle: async () => {
+      while (locating.size > 0) await Promise.allSettled([...locating])
+    },
     wake: async (device, durableId, rpc) => {
       let record: WireRpc
       try {

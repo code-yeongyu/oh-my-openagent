@@ -1660,6 +1660,7 @@
     "packages/omo-senpi/src/components/thread/address/probe.ts",
     "packages/omo-senpi/src/components/thread/address/refusals.ts",
     "packages/omo-senpi/src/components/thread/address/resolve.ts",
+    "packages/omo-senpi/src/components/thread/address/solo-retry.ts",
     "packages/omo-senpi/src/components/thread/addressing.ts",
     "packages/omo-senpi/src/components/thread/attachment-fence.ts",
     "packages/omo-senpi/src/components/thread/component.ts",

@@ -6,12 +6,12 @@ import {
   probeMayBuildEndedRow,
   type RemoteDevice,
   type RemoteListing,
-  type RemoteLookupOutcome,
   type RemoteThreadSurface,
 } from "../remote/ports"
 import { remoteReady } from "../remote/remote-ops"
 import { accountDevices, type Ready } from "./account"
 import { asRefusal, refusal, toolRefusal, type ThreadRefusal } from "./refusals"
+import { askSilentAlone } from "./solo-retry"
 import type { Found } from "./types"
 
 const named = (devices: readonly RemoteDevice[] | undefined, id: string) => ({
@@ -23,7 +23,7 @@ const named = (devices: readonly RemoteDevice[] | undefined, id: string) => ({
  * omo#13037 A4.3.3: a thread id this device and the account listing both miss is looked up with one single-probe query
  * to each ONLINE device other than this one, in parallel (the client waits up to 3,500 ms for each locate reply).
  * When no device found it, each device that stayed silent is asked again alone, one at a time, as `<device>/<thread>`
- * asks it: probes in flight together can hold a device past the cap that answers in time alone (#14748).
+ * asks it: probes in flight together can hold a device past the cap that answers in time alone (#14748, solo-retry.ts).
  * One holder: its ended row. Several: ambiguous_target. None and a device stayed silent: device_unanswered. None, every device answered:
  * not_found. Undefined when this device's service makes no single probe: the caller answers as before.
  */
@@ -48,7 +48,7 @@ export async function probeAcross(
   )
   const answers = together.some(({ answer }) => answer.kind === "found")
     ? together
-    : await aloneAgain(probe, thread, together)
+    : await askSilentAlone(remote.sessions, thread, together)
   if (answers.some(({ answer }) => answer.kind === "unavailable")) return undefined
   // Found over silent, by choice: a device that hangs must not block a thread another device can take (A4.3.5).
   const holders = answers.flatMap(({ device, answer }) =>
@@ -99,21 +99,6 @@ export async function probeAcross(
     "The session may live on a device that is offline: retry when that device is online, or call thread_list (tool.thread_list() in an eval cell).",
     { kind: "thread", thread },
   )
-}
-
-type ProbeAnswer = { readonly device: string; readonly answer: RemoteLookupOutcome }
-
-async function aloneAgain(
-  probe: (device: string, thread: string) => Promise<RemoteLookupOutcome>,
-  thread: string,
-  answers: readonly ProbeAnswer[],
-): Promise<readonly ProbeAnswer[]> {
-  const settled: ProbeAnswer[] = []
-  for (const entry of answers)
-    settled.push(
-      entry.answer.kind === "silent" ? { device: entry.device, answer: await probe(entry.device, thread) } : entry,
-    )
-  return settled
 }
 
 /**
