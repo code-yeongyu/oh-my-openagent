@@ -41,7 +41,10 @@ function runClose(name: string, scenario: Scenario): string[] {
   mkdirSync(api, { recursive: true })
   const answer = (key: string, body: unknown) =>
     writeFileSync(join(api, key.replace(/[^A-Za-z0-9]/g, "_")), JSON.stringify(body))
-  answer("issue list", scenario.openIssues.map((number) => ({ number })))
+  answer(
+    "issue list",
+    scenario.openIssues.map((number) => ({ number })),
+  )
   answer("issue view", { body: issueBody(), comments: [] })
   answer(`repos/owner/project/actions/runs/99/jobs?filter=latest&per_page=100`, {
     jobs: [
@@ -123,6 +126,8 @@ describe("#given an open platform-red issue tracking one Windows job", () => {
 describe("#given no open platform-red issue", () => {
   posixBashTest("#then nothing is read or closed", () => {
     const calls = runClose("none", { openIssues: [], windowsTests: "success", compareStatus: "ahead" })
-    expect(calls).toEqual(["issue list --label ci:platform-red --state open --json number --jq map(.number) | min // empty"])
+    expect(calls).toEqual([
+      "issue list --label ci:platform-red --state open --json number --jq map(.number) | min // empty",
+    ])
   })
 })
