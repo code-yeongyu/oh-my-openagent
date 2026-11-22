@@ -109,7 +109,6 @@ export async function publishFinalizedReflectionRun(input: {
   const finishedAt = input.result.completion.finishedAt
   const launcher = input.result.completion.launcher
   const completionsDir = join(input.options.identity.paths.reflection, "completions")
-  const health = await readReflectionHealth(completionsDir)
   const completion = await recordReflectionCompletion(
     completionsDir,
     {
@@ -118,7 +117,6 @@ export async function publishFinalizedReflectionRun(input: {
       ...(input.result.completion.outcome === "merged"
         ? await input.mergedMetadata(input.result.completion.runId)
         : {}),
-      consecutiveFailures: input.result.completion.outcome === "failed" ? health.streak : 0,
     },
     live,
   )

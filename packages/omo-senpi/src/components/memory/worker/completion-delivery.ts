@@ -40,11 +40,15 @@ export async function consumePendingReflectionCompletions(
   const fresh = pending.filter((record) => Date.parse(record.finishedAt) >= cutoff)
   const stale = pending.filter((record) => Date.parse(record.finishedAt) < cutoff)
   const consumed: ReflectionCompletionRecord[] = []
-  for (const record of fresh.slice(0, DETAILED_DRAIN_LIMIT)) {
-    consumed.push(await deliverReflectionCompletion(completionsDir, record, live))
+  const collapsed: ReflectionCompletionRecord[] = []
+  for (const [index, record] of fresh.entries()) {
+    if (index < DETAILED_DRAIN_LIMIT || (record.droppedCount ?? 0) > 0) {
+      consumed.push(await deliverReflectionCompletion(completionsDir, record, live))
+    } else {
+      collapsed.push(record)
+    }
   }
 
-  const collapsed = fresh.slice(DETAILED_DRAIN_LIMIT)
   if (collapsed.length > 0) {
     live.api.appendEntry(REFLECTION_SUMMARY_ENTRY_TYPE, summarize(collapsed))
     for (const record of collapsed) consumed.push(await markDelivered(completionsDir, record, live.sessionId))

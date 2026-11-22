@@ -79,6 +79,8 @@ function isCompletionRecord(value: unknown): value is ReflectionCompletionRecord
     typeof record.outcome === "string" &&
     typeof record.startedAt === "string" &&
     typeof record.finishedAt === "string" &&
+    (record.droppedCount === undefined ||
+      (Number.isSafeInteger(record.droppedCount) && Number(record.droppedCount) >= 0)) &&
     !!delivery &&
     typeof delivery === "object" &&
     !Array.isArray(delivery) &&

@@ -6,6 +6,11 @@ import { join } from "node:path"
 
 import { REFLECTION_COMPLETION_ENTRY_TYPE, type ReflectionCompletionRecord } from "./completion-contracts"
 import { deliverReflectionCompletion } from "./completion-delivery"
+import {
+  consumePendingReflectionCompletions,
+  recordReflectionCompletion,
+  renderReflectionCompletionEntry,
+} from "./completion"
 import { recapFixture } from "./reflection-recap.test-support"
 import { rmEfaultTolerant } from "../teardown.test-support"
 
@@ -54,6 +59,48 @@ async function deliverLive(record: ReflectionCompletionRecord) {
 }
 
 describe("deliverReflectionCompletion", () => {
+  test("renders one redacted notice for an offline drop beyond the drain limit and none for empty runs", async () => {
+    const root = await mkdtemp(join(tmpdir(), "reflection-drop-delivery-"))
+    roots.push(root)
+    const empty = failedRecord({ outcome: "no_changes" })
+    const dropped = failedRecord({
+      outcome: "no_changes",
+      runId: "older-dropped",
+      finishedAt: empty.startedAt,
+      droppedCount: 2,
+      dropReason: "frontmatter",
+      detail: "error: raw provider/model text; private-path.md",
+    })
+    await recordReflectionCompletion(root, dropped)
+    for (const index of [1, 2, 3, 4, 5, 6]) {
+      await recordReflectionCompletion(root, { ...empty, runId: `empty-${index}` })
+    }
+
+    const entries: unknown[] = []
+    const live = {
+      sessionId: "next-session",
+      api: {
+        appendEntry(type: string, data: unknown) {
+          if (type === REFLECTION_COMPLETION_ENTRY_TYPE) entries.push(data)
+        },
+        registerEntryRenderer() {},
+      },
+    }
+    const now = Date.parse(empty.finishedAt)
+    await consumePendingReflectionCompletions(root, empty.identity, live, now)
+    await consumePendingReflectionCompletions(root, empty.identity, live, now)
+
+    const theme = { fg: (_color: string, text: string) => text, bg: (_color: string, text: string) => text }
+    const notices = entries.flatMap((data) => {
+      const component = renderReflectionCompletionEntry({ data } as never, { expanded: true }, theme as never)
+      return component === undefined ? [] : [component.render(120).join("\n")]
+    })
+    expect(notices).toHaveLength(1)
+    expect(notices[0]).toContain("Reflection dropped 2 memory entries")
+    expect(notices[0]).toContain("invalid frontmatter")
+    expect(notices[0]).not.toMatch(/raw provider|private-path/)
+  })
+
   test("#given a proven merge #when delivered #then only the transcript is enriched", async () => {
     const root = await mkdtemp(join(tmpdir(), "recap-delivery-"))
     roots.push(root)

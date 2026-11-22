@@ -47,6 +47,8 @@ export interface ReflectionCompletionRecord {
   readonly durationMs?: number
   readonly mergedCommitSha?: string
   readonly filesChanged?: number
+  readonly droppedCount?: number
+  readonly dropReason?: string
   readonly consecutiveFailures?: number
   readonly launcher?: ReflectionLauncher
   readonly delivery: {

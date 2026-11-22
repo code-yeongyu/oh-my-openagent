@@ -57,6 +57,7 @@ export interface ReflectionReservationLockOptions {
 
 export interface ReflectionCompletionOptions extends ReflectionReservationLockOptions {
   readonly failure?: ReflectionFailureSignal
+  readonly allEntriesDropped?: boolean
 }
 
 export interface CompletionResult {
@@ -194,7 +195,7 @@ export class ReflectionReservationStore {
             lastRunId: runId,
           })
         }
-        const park = await this.parkFile.transition(current.active, runId, outcome, options?.failure)
+        const park = await this.parkFile.transition(current.active, runId, outcome, options)
         const launch =
           park.parked && transition.launch !== undefined && isAutomaticReflectionRequest(transition.launch.request)
             ? undefined

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { readFile, writeFile } from "node:fs/promises"
+import { readFile, unlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import {
@@ -10,6 +10,7 @@ import {
   renderMemoryFile,
 } from "@oh-my-opencode/memory-core"
 
+import { readReflectionCompletion } from "./completion-records"
 import { finalizeRecordedOutcome } from "./run-finalization"
 import { writeRunJsonAtomic } from "./run-artifacts"
 import {
@@ -25,6 +26,17 @@ describe("reflection finalization crash recovery", () => {
   test("#given a secret-bearing tip with an oversized description #when finalized #then the note is dropped, nothing lands, and no exception escapes", async () => {
     const item = await fixture(false)
     const warnings: Readonly<Record<string, unknown>>[] = []
+    const at = "2026-08-11T09:59:00.000Z"
+    const park = {
+      version: 1,
+      streak: 1,
+      firstFailureAt: at,
+      parkedAt: at,
+      lastFailure: { runId: "prior", fingerprint: "child_exit:prior", at, retryable: false, definitive: true },
+    }
+    await writeRunJsonAtomic(join(item.identity.paths.reflection, "park.json"), park)
+    const priorPark = await item.store.readPark()
+    expect(priorPark.streak).toBe(1)
     await writeFile(
       join(item.worktree.dir, "system/learned.md"),
       renderMemoryFile({ description: `${"summary ".repeat(139)}ending` }, "token=synthetic-fixture-value\n"),
@@ -76,6 +88,44 @@ describe("reflection finalization crash recovery", () => {
     })
     expect(landed.code).toBe(1)
     // The refused run still advances the cursor, so this conversation is not replayed into the same refusal.
+    expect((await item.journal.getState()).reflected_completed_steps).toBe(1)
+    const completionsDir = join(item.identity.paths.reflection, "completions")
+    expect(await readReflectionCompletion(completionsDir, item.ledger.runId)).toMatchObject({
+      outcome: "no_changes",
+      droppedCount: 1,
+      dropReason: "frontmatter",
+    })
+    expect(await item.store.readPark()).toEqual(priorPark)
+
+    // Recreate the window after cleanup but before completion publication.
+    await unlink(join(completionsDir, `${item.ledger.runId}.json`))
+    await unlink(join(item.runDir, "final.json"))
+    const recovered = await finalizeRecordedOutcome(
+      { identity: item.identity, reservation: item.store, now: () => Date.parse("2026-08-11T10:01:00.000Z") },
+      item.runDir,
+      item.ledger,
+    )
+    expect(recovered?.completion?.droppedCount).toBe(1)
+  })
+
+  test("an empty worktree settles as an ordinary no-op and clears prior park state", async () => {
+    const item = await fixture(false)
+    const reset = await item.worktree.exec.run(["reset", "--hard", item.worktree.baseSha], {
+      cwd: item.worktree.dir,
+      timeoutMs: 30_000,
+    })
+    expect(reset.code).toBe(0)
+    await writeRunJsonAtomic(join(item.identity.paths.reflection, "park.json"), { version: 1, streak: 1 })
+
+    const result = await finalizeRecordedOutcome(
+      { identity: item.identity, reservation: item.store, now: () => Date.parse("2026-08-11T10:01:00.000Z") },
+      item.runDir,
+      item.ledger,
+    )
+
+    expect(result?.completion?.outcome).toBe("no_changes")
+    expect(result?.completion?.droppedCount ?? 0).toBe(0)
+    expect(await item.store.readPark()).toEqual({ version: 1, streak: 0 })
     expect((await item.journal.getState()).reflected_completed_steps).toBe(1)
   })
 

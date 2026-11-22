@@ -51,6 +51,8 @@ export interface ReservationRunLedger {
   readonly finalizeOutcome?: ReflectionOutcome
   readonly finalizeReason?: string
   readonly finalizeDetail?: string
+  readonly droppedCount?: number
+  readonly dropReason?: string
   readonly finalizedAt?: string
   /** Cleanup left a worktree or branch behind; the reflection orphan sweep reclaims it later. */
   readonly cleanupIncomplete?: boolean
@@ -157,6 +159,7 @@ export function parseReservationRunLedger(value: unknown): ReservationRunLedger 
     "integrationSha",
     "finalizeReason",
     "finalizeDetail",
+    "dropReason",
     "finalizedAt",
   ] as const) {
     if (value[field] !== undefined && typeof value[field] !== "string") throw new Error(`Invalid ${field}`)
@@ -170,6 +173,12 @@ export function parseReservationRunLedger(value: unknown): ReservationRunLedger 
   }
   if (value.finalizeOutcome !== undefined && !isReflectionOutcome(value.finalizeOutcome)) {
     throw new Error("Invalid finalization outcome")
+  }
+  if (
+    value.droppedCount !== undefined &&
+    (!Number.isSafeInteger(value.droppedCount) || Number(value.droppedCount) < 0)
+  ) {
+    throw new Error("Invalid dropped entry count")
   }
   return value as unknown as ReservationRunLedger
 }

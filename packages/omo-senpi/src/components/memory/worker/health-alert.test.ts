@@ -12,11 +12,49 @@ import {
   type ReflectionHealthEntry,
 } from "./health-alert"
 import { CapturedCompletionApi } from "./runner.test-support"
+import { readReflectionHealth, REFLECTION_HEALTH_STALE_MS } from "./health"
 
 const roots: string[] = []
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))))
 
 describe("reflection health alert", () => {
+  test("warns once at three consecutive all-dropped runs without changing the failure streak", async () => {
+    const root = await mkdtemp(join(tmpdir(), "reflection-health-dropped-"))
+    roots.push(root)
+    const harness = liveHarness()
+    const now = Date.parse("2026-09-09T12:00:00.000Z")
+    const addRun = (index: number, overrides: Record<string, unknown> = {}) =>
+      writeFile(
+        join(root, `run-${index}.json`),
+        JSON.stringify({
+          ...completion(`run-${index}`, new Date(now - 1000 + index).toISOString(), "child exit"),
+          ...overrides,
+        }),
+      )
+    await addRun(0)
+    for (const index of [1, 2]) await addRun(index, { outcome: "no_changes", droppedCount: 2 })
+
+    const alert = (runId: string) =>
+      emitReflectionHealthAlert(root, "agent-test", harness.live, harness.once, { observedRunIds: [runId], now })
+    expect(await alert("run-2")).toBe(false)
+    expect(await readReflectionHealth(root, { now })).toMatchObject({ allDroppedStreak: 2, streak: 1 })
+    await addRun(3, { outcome: "no_changes", droppedCount: 1 })
+    expect(await alert("foreign-run")).toBe(false)
+    expect(await alert("run-3")).toBe(true)
+    expect(await alert("run-3")).toBe(false)
+    expect(harness.notifications).toEqual(["Memory reflection dropped every entry in 3 runs in a row."])
+    expect(await readReflectionHealth(root, { now: now + REFLECTION_HEALTH_STALE_MS })).toMatchObject({
+      allDroppedStreak: 0,
+      streak: 0,
+    })
+
+    // Missing count is the legacy wire shape for a genuine no-op.
+    await addRun(4, { outcome: "no_changes" })
+    expect(await alert("run-4")).toBe(false)
+    expect(await readReflectionHealth(root, { now })).toMatchObject({ allDroppedStreak: 0, streak: 0 })
+    expect(harness.notifications).toHaveLength(1)
+  })
+
   test("#given three stable failures and a live UI #when health alerting repeats in one session #then one entry and one warning are emitted", async () => {
     // given
     const root = await failureStreak(3, "stable")

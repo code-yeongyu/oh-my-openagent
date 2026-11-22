@@ -20,6 +20,8 @@ export const REFLECTION_HEALTH_STALE_MS = 7 * 24 * 60 * 60_000
  */
 export interface ReflectionHealth {
   readonly streak: number
+  readonly allDroppedStreak: number
+  readonly allDroppedRunIds?: readonly string[]
   readonly fingerprint: string
   readonly lastFailure?: {
     readonly runId?: string
@@ -52,6 +54,7 @@ export interface ReflectionHealth {
 type HealthRecord = {
   readonly runId?: string
   readonly outcome: ReflectionOutcome
+  readonly droppedCount: number
   readonly reason?: string
   readonly detail?: string
   readonly finishedAt: string
@@ -88,7 +91,7 @@ export async function readReflectionHealth(
 
   const failuresBeforeSuccess: HealthRecord[] = []
   for (const record of bounded) {
-    if (record.outcome === "merged" || record.outcome === "no_changes") break
+    if (isSuccess(record)) break
     if (record.outcome === "failed") failuresBeforeSuccess.push(record)
   }
   const now = options.now ?? Date.now()
@@ -101,7 +104,7 @@ export async function readReflectionHealth(
   const recent = (stale ? [] : failuresBeforeSuccess.slice(0, 3)).map(fingerprintOf)
   const dominant = dominantFingerprint(recent)
   const lastFailure = bounded.find((record) => record.outcome === "failed")
-  const lastSuccess = bounded.find((record) => record.outcome === "merged" || record.outcome === "no_changes")
+  const lastSuccess = bounded.find(isSuccess)
   const streakSinceISO = stale ? undefined : failuresBeforeSuccess.at(-1)?.finishedAt
   const streakRunIds = failuresBeforeSuccess.flatMap((record) => (record.runId === undefined ? [] : [record.runId]))
   const streakRuntimes = [
@@ -110,9 +113,20 @@ export async function readReflectionHealth(
     ),
   ]
   const newest = bounded[0]
+  const allDropped: HealthRecord[] = []
+  if (newest !== undefined && now - Date.parse(newest.finishedAt) <= REFLECTION_HEALTH_STALE_MS) {
+    for (const record of bounded) {
+      if (!isAllDropped(record)) break
+      allDropped.push(record)
+    }
+  }
 
   return {
     streak: stale ? 0 : failuresBeforeSuccess.length,
+    allDroppedStreak: allDropped.length,
+    ...(options.includeStreakRunIds === true
+      ? { allDroppedRunIds: allDropped.flatMap((record) => (record.runId === undefined ? [] : [record.runId])) }
+      : {}),
     fingerprint: dominant,
     ...(lastFailure === undefined
       ? {}
@@ -145,6 +159,14 @@ export async function readReflectionHealth(
   }
 }
 
+function isAllDropped(record: HealthRecord): boolean {
+  return record.outcome === "no_changes" && record.droppedCount > 0
+}
+
+function isSuccess(record: HealthRecord): boolean {
+  return record.outcome === "merged" || (record.outcome === "no_changes" && !isAllDropped(record))
+}
+
 function fingerprintOf(record: HealthRecord): string {
   return failureFingerprint(record.reason, record.detail)
 }
@@ -163,6 +185,7 @@ async function readHealthRecord(path: string): Promise<HealthRecord | undefined>
     return {
       ...(typeof parsed.runId === "string" ? { runId: parsed.runId } : {}),
       outcome: parsed.outcome,
+      droppedCount: Number.isSafeInteger(parsed.droppedCount) ? Number(parsed.droppedCount) : 0,
       ...(typeof parsed.reason === "string" ? { reason: parsed.reason } : {}),
       ...(typeof parsed.detail === "string" ? { detail: parsed.detail } : {}),
       finishedAt: parsed.finishedAt,
@@ -177,6 +200,7 @@ async function readHealthRecord(path: string): Promise<HealthRecord | undefined>
 function emptyHealth(): ReflectionHealth {
   return {
     streak: 0,
+    allDroppedStreak: 0,
     fingerprint: "",
     counts: { merged: 0, no_changes: 0, failed: 0, timed_out: 0 },
     pendingCount: 0,
