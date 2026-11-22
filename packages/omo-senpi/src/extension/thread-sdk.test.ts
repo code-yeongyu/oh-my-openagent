@@ -6,6 +6,7 @@ import { join } from "node:path"
 import { startFakeOwner, type FakeOwner } from "@oh-my-opencode/device-service-core/conformance/fake-owner"
 import { defaultWorld, PEER } from "@oh-my-opencode/device-service-core/conformance/world"
 
+import type { ThreadHost } from "../components/thread/tools"
 import { createThreadSdk } from "./thread-sdk"
 
 const STATE_DIR_ENV = "OMO_DEVICE_SERVICE_STATE_DIR"
@@ -35,7 +36,27 @@ test("#given a script that opens the shipped SDK without a remote #when it lists
   const agentDir = join(root, "agent")
   mkdirSync(agentDir, { recursive: true })
 
-  const sdk = createThreadSdk({ agentDir, cwd: agentDir, uid: 501, user: "lane-monitor" })
+  // This device answers with no sessions, so the listing's devices come from the default account surface alone.
+  const unused = async (): Promise<never> => {
+    throw new Error("not used by a listing")
+  }
+  const host: ThreadHost = {
+    socket: join(agentDir, "none.sock"),
+    listSessions: async () => [],
+    listView: async () => ({ sessions: [], hosts: [], disk: [] }),
+    openSession: unused,
+    getMessages: unused,
+    getState: unused,
+    prompt: unused,
+    interrupt: unused,
+    setSessionName: unused,
+    setModel: unused,
+    getAvailableModels: unused,
+    setThinkingLevel: unused,
+    getAvailableThinkingLevels: unused,
+  }
+
+  const sdk = createThreadSdk({ agentDir, cwd: agentDir, uid: 501, user: "lane-monitor", host })
   cleanups.push(() => sdk.dispose())
   const listed = await sdk.list({ all_scope: true })
 

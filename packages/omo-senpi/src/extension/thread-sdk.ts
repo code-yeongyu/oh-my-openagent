@@ -3,7 +3,7 @@ import { dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { GATEWAY_STORE_WORKER_BUNDLE_NAME } from "../components/thread/gateway/store"
-import { createAccountRemoteSurface } from "../components/thread/remote/account-surface"
+import { createAccountRemoteSurface } from "../components/thread/remote/default-remote"
 import {
   assertThreadSdkOptions,
   createThreadSdk as createSdk,
