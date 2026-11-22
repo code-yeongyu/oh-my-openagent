@@ -26,7 +26,11 @@ export default async function DocsPage() {
           id={section.id}
           className="border-line scroll-mt-20 border-b pt-16 pb-16 first:pt-0 last:border-b-0 last:pb-0 lg:scroll-mt-12"
         >
-          <article className="docs-content" dangerouslySetInnerHTML={{ __html: section.html }} />
+          <article
+            lang="en"
+            className="docs-content"
+            dangerouslySetInnerHTML={{ __html: section.html }}
+          />
         </section>
       ))}
     </DocsShell>
