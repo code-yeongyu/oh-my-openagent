@@ -56,14 +56,37 @@ test(
       ".g\u200cit/config",
       "sub/.git/config",
     ]
-    for (const [i, key] of spellings.entries()) {
-      const seq = await publish(server, item(key, "[omo-test]"), item(`ok-${i}.md`, `ok ${i}`))
-      expect(await b.engine.runCycle()).toMatchObject({ applied: 1, rejectedItems: 1 })
-      expect(await b.read(`ok-${i}.md`)).toBe(`ok ${i}\n`)
-      expect(await b.engine.state()).toMatchObject({ applied: seq, cycle: null, paused: null })
+    const goodKeys = spellings.map((_, i) => `ok-${i}.md`)
+    // The engine rejects each item independently, then commits the surviving files together.
+    const seq = await publish(
+      server,
+      ...spellings.flatMap((key, i) => [item(key, "[omo-test]"), item(`ok-${i}.md`, `ok ${i}`)]),
+    )
+    expect(await b.engine.runCycle()).toMatchObject({ applied: 1, refused: 0, rejectedItems: spellings.length })
+    expect(await b.engine.state()).toMatchObject({
+      applied: seq,
+      cycle: null,
+      paused: null,
+      rejectedItems: spellings.length,
+    })
+    for (const [i, key] of goodKeys.entries()) {
+      expect(await b.read(key)).toBe(`ok ${i}\n`)
     }
+    for (const key of spellings) expect(b.store.keys()).not.toContain(key)
+    expect(await b.renderJournals()).toEqual([])
     expect(await gitConfigBytes(b)).toBe(config)
-    expect(await b.workingFiles()).toEqual([".gitkeep", ...spellings.map((_, i) => `ok-${i}.md`)].sort())
+    expect(await b.workingFiles()).toEqual([".gitkeep", ...goodKeys].sort())
+
+    const next = await publish(server, item("next.md", "next"))
+    expect(await b.engine.runCycle()).toMatchObject({ applied: 1, refused: 0, rejectedItems: 0 })
+    expect(await b.engine.state()).toMatchObject({
+      applied: next,
+      cycle: null,
+      paused: null,
+      rejectedItems: spellings.length,
+    })
+    expect(await b.read("next.md")).toBe("next\n")
+    expect(await b.workingFiles()).toEqual([".gitkeep", ...goodKeys, "next.md"].sort())
   },
   GIT_TEST_TIMEOUT,
 )
