@@ -392,18 +392,24 @@ function schemaVersion(ctx: StoreContext): number {
   return version
 }
 
-/** Records this binary's reader floor on a store at exactly its schema; a store already carrying it takes no write lock. */
+function writeReaderFloor(ctx: StoreContext, version: number): void {
+  write(
+    ctx,
+    "INSERT INTO gateway_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+    [GATEWAY_READER_FLOOR_KEY, String(gatewayReaderFloor(version))],
+  )
+}
+
+/**
+ * Records this binary's reader floor on a store at exactly its schema that lacks it (one a binary from before the floor
+ * migrated); a store already carrying it takes no write lock.
+ */
 async function recordReaderFloor(ctx: StoreContext): Promise<void> {
   const floor = gatewayReaderFloor(GATEWAY_MIGRATIONS.length)
   const current = () => schemaVersion(ctx) === GATEWAY_MIGRATIONS.length && storedReaderFloor(ctx) !== floor
   if (!current()) return
   await transaction(ctx, "migrate", () => {
-    if (!current()) return
-    write(
-      ctx,
-      "INSERT INTO gateway_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
-      [GATEWAY_READER_FLOOR_KEY, String(floor)],
-    )
+    if (current()) writeReaderFloor(ctx, GATEWAY_MIGRATIONS.length)
   })
 }
 
@@ -470,6 +476,8 @@ export async function migrate(ctx: StoreContext): Promise<void> {
           }
         }
         ctx.sql.exec(`PRAGMA user_version = ${current + 1}`)
+        // The floor commits with the version it belongs to, so no reader ever sees a raised version with a stale floor.
+        writeReaderFloor(ctx, current + 1)
       })
     } finally {
       if (needsForeignKeysOff) ctx.sql.exec(`PRAGMA foreign_keys = ${priorForeignKeys === 0 ? "OFF" : "ON"}`)

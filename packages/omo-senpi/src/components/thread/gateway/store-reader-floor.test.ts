@@ -6,7 +6,9 @@ import { join } from "node:path"
 
 import type { GatewayDeliverRequest } from "./engine"
 import { gatewayDatabasePath } from "./paths"
-import { GATEWAY_MIGRATIONS } from "./schema"
+import { GATEWAY_MIGRATIONS, gatewayReaderFloor } from "./schema"
+import { Sql, type SqliteConnection } from "./sql"
+import { migrate, type StoreContext } from "./store-ops"
 
 const GATEWAY_READER_FLOOR_KEY = "reader_floor"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
@@ -62,6 +64,48 @@ test("#given this binary opens its store #then it records reader floor 14 (v15 a
   } finally {
     db.close()
   }
+})
+
+test("#given a fresh store #when migrate commits each step #then every commit makes its version visible together with that version's reader floor", async () => {
+  const { DatabaseSync } = await import("node:sqlite")
+  const db = new DatabaseSync(":memory:")
+  const committed: { version: number; floor: string | null }[] = []
+  const visible = () => {
+    const version = Number((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version)
+    const meta = db.prepare("SELECT count(*) AS n FROM sqlite_master WHERE name = 'gateway_meta'").get() as {
+      n: number
+    }
+    const row =
+      Number(meta.n) === 0
+        ? undefined
+        : (db.prepare("SELECT value FROM gateway_meta WHERE key = ?").get(GATEWAY_READER_FLOOR_KEY) as
+            { value: string } | undefined)
+    return { version, floor: row?.value ?? null }
+  }
+  class CommitObservingSql extends Sql {
+    override exec(sql: string): void {
+      if (sql === "COMMIT") committed.push(visible())
+      super.exec(sql)
+    }
+  }
+  const ctx = {
+    sql: new CommitObservingSql(db as unknown as SqliteConnection),
+    config: { agent_dir: realpathSync(mkdtempSync(join(tmpdir(), "omo-gateway-commit-"))), test_hooks: {} },
+    stats: { writes: 0, marker_unlinks: 0, transactions: 0 },
+    emit: () => undefined,
+    hook: async () => undefined,
+    delay: async () => undefined,
+  } as unknown as StoreContext
+  cleanups.push(() => {
+    db.close()
+    rmSync(ctx.config.agent_dir, { recursive: true, force: true })
+  })
+
+  await migrate(ctx)
+
+  expect(committed).toEqual(
+    GATEWAY_MIGRATIONS.map((_, step) => ({ version: step + 1, floor: String(gatewayReaderFloor(step + 1)) })),
+  )
 })
 
 test("#given running sessions #when a newer binary migrates the store and records a floor this binary meets #then sends keep working and a session opened afterwards sends too", async () => {
