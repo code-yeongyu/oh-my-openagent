@@ -572,6 +572,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     if (typeof here === "object") return refuse(here)
     const replyTo = replySender(address, senders, here)
     if (replyTo !== undefined && "code" in replyTo) return refuse(replyTo)
+    const replyHere = replyTo !== undefined && replyTo.device === undefined
     const localFor = sendBookFor(options, current)
     const context = (local: readonly ThreadAddressEntry[], account = true) => ({
       remote: account ? options.remote : undefined,
@@ -605,7 +606,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         here,
       )
       if (mismatch !== undefined) return refuse(mismatch)
-      return { kind: "local", thread_id: address, all_scope: scope }
+      return { kind: "local", thread_id: address, all_scope: replyHere ? true : scope }
     }
     // Decision 0027: ONE resolver over this device's book and the account's other devices (resolveAddress, which takes
     // <device>/<thread> too); where it resolved says which transport carries the send.
@@ -622,6 +623,12 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
             id_prefix: { exclude: callerId },
           })
         : await resolveAddress(context(entries, false), address, { all_scope: scope, id_prefix: false })
+    // The reply grant: a consumed delivery's sender on this device is answered without all_scope even when it runs in
+    // another workspace. Only a scoped refusal is widened, and the widened hit must still be that sender
+    // (replyTargetMismatch below), so the grant reaches no other session and lasts as long as the reply allowance.
+    let widened = replyHere && resolved.kind === "error" && resolved.code === "scope_denied"
+    if (widened)
+      resolved = await resolveAddress(context(entries, false), address, { all_scope: true, id_prefix: false })
     // #14048: a delivery id without a device part (`rpc:local/<id>`, a bare row id) proves no device: another device's
     // delivery arrives that way when the connection that admitted it declared no remote origin. A sender this device does
     // not hold is then looked up account-wide (exact id or name only, never an id prefix), and the reply goes only to the
@@ -640,6 +647,19 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         return { kind: "remote", row: resolved.where.row }
       }
     }
+    // A stated name no session on this device or the account carries any more (the sender renamed itself, or its session
+    // file records no name) is answered through the sender's recorded id, so a reply by name reaches it as a reply by id
+    // does. A name another session carries, here or on another device, resolved above and is refused there.
+    if (replyHere && resolved.kind === "error" && resolved.code === "not_found" && address !== replyTo.session_id) {
+      const byId = await resolveAddress(context(localFor(replyTo.session_id), false), replyTo.session_id, {
+        all_scope: true,
+        id_prefix: false,
+      })
+      if (byId.kind === "ok") {
+        resolved = byId
+        widened = true
+      }
+    }
     if (resolved.kind === "error") return refuse(resolved)
     // The allowance approved this send as a reply to a consumed delivery's sender (by id or stated name): deliver only when
     // the address resolves to that sender on that sender's device, else refuse by name without sending (decision 0027
@@ -647,7 +667,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     const mismatch = replyTargetMismatch(options, address, resolved.entry, here)
     if (mismatch !== undefined) return refuse(mismatch)
     if (resolved.where.kind === "device") return { kind: "remote", row: resolved.where.row }
-    return { kind: "local", thread_id: resolved.thread, all_scope: resolved.all_scope ?? scope }
+    return { kind: "local", thread_id: resolved.thread, all_scope: widened ? true : (resolved.all_scope ?? scope) }
   }
 
   async function deliver(
