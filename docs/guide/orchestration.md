@@ -53,7 +53,7 @@ flowchart TB
     Main -->|"implementation, tests, QA"| Worker
     Main -->|"research, gap analysis, plan review"| Curated
     Main -->|"final gates"| Reviewers
-    Kibitzer -.->|"recalled memory: <hint>"| Main
+    Kibitzer -.->|"recalled memory: #lt;hint#gt;"| Main
     Worker -->|"results + evidence"| Main
     Curated -->|"findings / verdicts"| Main
     Reviewers -->|"report artifacts"| Main
@@ -108,7 +108,7 @@ stateDiagram-v2
     Defaults --> Brief
     Brief --> Approval: user says okay
     Approval --> GapAnalysis: plan-consultant
-    GapAnalysis --> WritePlan: .omo/plans/<slug>.md
+    GapAnalysis --> WritePlan: .omo/plans/{slug}.md
     WritePlan --> Review: plan-reviewer round
     Review --> WritePlan: REJECT - fix cited issues
     Review --> Done: APPROVE
