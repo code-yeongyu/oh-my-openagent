@@ -3,6 +3,15 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { buildExtension } from "./build-extension.mjs"
+import { RUNAWAY_CAP_MS } from "../../../omo-native/test/daemon-test-runner.ts"
+
+/**
+ * The two cold builds are setup, not the behaviour under test. On a loaded runner they legitimately take
+ * several times their quiet-box time (each case waited past its 90 s budget at load 30+, #13965), so they run
+ * once in `beforeAll`, each build under the #11845 runaway cap (two sequential builds, so twice the cap),
+ * instead of inside the first case's own budget; the cases keep their 90 s bound for their own reads and checks.
+ */
+export const COLD_BUILD_SETUP_TIMEOUT_MS = 2 * RUNAWAY_CAP_MS
 
 export function outputPathsIn(root) {
   return {
@@ -79,8 +88,13 @@ export function createBuildFixture() {
     })()
     return reproductionPromise
   }
+  async function warmBuilds({ reproduction = true } = {}) {
+    await sharedOutputs()
+    if (reproduction) await reproductionRoot()
+  }
   return {
     perTestRoots,
+    warmBuilds,
     sharedOutputs,
     mutableOutputs,
     reproductionRoot,

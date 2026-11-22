@@ -1,4 +1,4 @@
-import { afterAll, afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
+import { afterAll, afterEach, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { cp, mkdir, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { spawn } from "node:child_process"
@@ -8,7 +8,7 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 import { createGatewayStore, gatewayStoreWorkerUrl } from "../../src/components/thread/gateway/store.ts"
 
 import { checkExtensionCurrent } from "./build-extension.mjs"
-import { createBuildFixture } from "./build-extension.test-support.mjs"
+import { COLD_BUILD_SETUP_TIMEOUT_MS, createBuildFixture } from "./build-extension.test-support.mjs"
 
 // The runtimes the built extension ships beside omo.js: the gateway store worker sidecar and the
 // thread SDK that runs on it. One build is shared by the whole file.
@@ -36,6 +36,7 @@ function unexpectedStderr(stderr) {
   return kept.join("\n")
 }
 
+beforeAll(() => fixture.warmBuilds({ reproduction: false }), COLD_BUILD_SETUP_TIMEOUT_MS)
 afterEach(fixture.cleanupTest)
 afterAll(fixture.cleanupFile)
 
