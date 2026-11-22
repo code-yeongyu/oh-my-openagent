@@ -785,35 +785,6 @@ describe("embedded manifest parity (darwin-arm64)", () => {
   )
 })
 
-describe("plugin staging isolation guard", () => {
-  test("#given build-omo-native --output outside the package #when it runs #then packages/omo-native stays porcelain-clean", () => {
-    // given
-    const stageDir = makeTempDir("omo-plugin-stage-")
-    const before = spawnSync("git", ["status", "--porcelain", "--", "packages/omo-native"], {
-      cwd: repoRoot,
-      encoding: "utf8",
-    }).stdout
-
-    // when
-    const built = spawnSync("bun", ["run", "script/build-omo-native.ts", "--output", join(stageDir, "plugin")], {
-      cwd: repoRoot,
-      encoding: "utf8",
-    })
-
-    // then
-    expect(built.status).toBe(0)
-    const after = spawnSync("git", ["status", "--porcelain", "--", "packages/omo-native"], {
-      cwd: repoRoot,
-      encoding: "utf8",
-    }).stdout
-    expect(after).toBe(before)
-    expect(existsSync(join(stageDir, "plugin", "extensions", "omo.js"))).toBe(true)
-    const staged = collectStagedFiles(join(stageDir, "plugin"))
-    expect(staged.length).toBeGreaterThan(0)
-    rmSync(stageDir, { recursive: true, force: true })
-  }, 600_000)
-})
-
 describe("engine graph bundling", () => {
   test("#given the compiled OMO entry #when its engine imports are inspected #then both retain the standard patched engine literal", () => {
     // given

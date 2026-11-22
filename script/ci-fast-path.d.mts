@@ -1,5 +1,6 @@
 export type CiMode = {
   readonly generatedReleasePush: boolean
+  readonly releaseStateOnGreenBase: boolean
   readonly webOnly: boolean
   readonly runHeavy: boolean
   readonly fullMatrix: boolean
@@ -19,4 +20,5 @@ export function classifyCiMode(input: {
   readonly labels?: readonly string[]
   readonly body?: string
   readonly changedFiles?: number
+  readonly basePlatformGreen?: boolean
 }): CiMode

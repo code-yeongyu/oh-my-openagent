@@ -260,7 +260,10 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
       if (admission.kind === "in_progress" && recoverable(key, at) && !running.has(key) && !unsettled.has(key))
         admission = { kind: "accepted" }
       unanswered.delete(key)
-      if (admission.kind === "replay") return output(currentResult(admission.result as ThreadToolResult))
+      if (admission.kind === "replay") {
+        const result = currentResult(admission.result as ThreadToolResult)
+        return output(name === "thread_create" && result.kind === "ok" ? { ...result, deduplicated: true } : result)
+      }
       if (admission.kind === "conflict")
         return output(
           failure(
