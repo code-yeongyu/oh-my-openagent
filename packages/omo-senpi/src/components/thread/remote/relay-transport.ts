@@ -3,7 +3,7 @@ import { rowKey } from "@oh-my-opencode/thread-address-core"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { rowStatus } from "./ports"
 import { pairLoopGuardMessage, pairLoopGuardNextAction, threadToolFailure, type ThreadToolFailure } from "../errors"
-import { hashArgs } from "../gateway/bindings"
+import { hashArgs } from "../gateway/hash-args"
 import { decideDelivery, effectiveLaneOf } from "../gateway/decision"
 import { senderFacts } from "../gateway/envelope"
 import { renderDeliveryDisplayText, renderDeliveryText } from "../gateway/provenance"
@@ -580,8 +580,6 @@ export function createRelayTransport(
             body: delivery.text,
             mode_requested: delivery.mode,
             mode_effective: effective,
-            binding_id: null,
-            binding_revision: null,
           }),
           displayText: renderDeliveryDisplayText({
             envelope: {

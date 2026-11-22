@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import type { ThreadToolResult } from "../contracts"
-import { hashArgs } from "../gateway/bindings"
+import { hashArgs } from "../gateway/hash-args"
 import { createRemoteThreadFixture } from "../thread-remote-fixture"
 import type { ThreadHostSession } from "../tools"
 import { createdThreadId } from "./session-host"

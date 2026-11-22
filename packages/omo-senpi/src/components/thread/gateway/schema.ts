@@ -447,6 +447,23 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
     "ALTER TABLE deliveries ADD COLUMN collapse_key TEXT",
     "CREATE INDEX deliveries_collapse ON deliveries (target_durable_id, sender, collapse_key) WHERE collapse_key IS NOT NULL",
   ],
+
+  // v17 (#14312): thread bindings are gone, with the outbox, its consumer cursors and the completion arms that only a
+  // binding fed. One-way: their rows are deleted. `bindings` itself is dropped only when it holds no rows AND no table
+  // declares a foreign key to it (store-ops.ts dropEmptyBindings): an extension that kept thread routes on core
+  // bindings imports their owners through the read-only `tx.bindingFor` on its next open (dori-extension#122), and an
+  // extension table referencing `bindings` would become unwritable once the table is gone. A kept `bindings` stays until
+  // a later step removes it; that step must repeat both checks. Re-runnable, like every step a rewound store runs
+  // again, so the binding-era `deliveries` columns (`binding_id`, `binding_revision`, `actor_user_id`) stay as unused
+  // nullable columns: SQLite has no DROP COLUMN IF EXISTS, and nothing reads or writes them. It runs with foreign_keys
+  // OFF (store-ops.ts migrate), so dropping the other tables fires no foreign-key action from an extension table.
+  [
+    "DROP TABLE IF EXISTS completion_arms",
+    "DROP TABLE IF EXISTS outbox_cursors",
+    "DROP TABLE IF EXISTS outbox",
+    `DELETE FROM extension_objects WHERE owner IS NULL AND NOT EXISTS
+     (SELECT 1 FROM sqlite_schema s WHERE s.type = extension_objects.type AND s.name = extension_objects.name COLLATE NOCASE)`,
+  ],
 ]
 
 /**
@@ -465,11 +482,7 @@ export const GATEWAY_TABLES = [
   "causal_edges",
   "rate_buckets",
   "session_meta",
-  "bindings",
-  "outbox",
   "gateway_meta",
-  "outbox_cursors",
-  "completion_arms",
   "extension_schema",
   "extension_objects",
   "thread_creations",
