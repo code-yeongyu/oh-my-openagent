@@ -12,7 +12,7 @@ import { ControlGrants } from "./control-grants"
 import { deadline } from "./deadline"
 import { FullAccessConsent, isGlobalInput } from "./global-input"
 import { type Listener, NotificationHub, type Unsubscribe } from "./notifications"
-import { isDesktopCapabilities, isStopPathStatus, parseHello, parseSessionOpened, toCapabilities  } from "./parse"
+import { isDesktopCapabilities, isStopPathStatus, parseHello, parseSessionOpened, toCapabilities } from "./parse"
 import { type CallOptions, DesktopEngineRpcError, DesktopServiceError, RpcClient } from "./rpc-client"
 import {
   CAPABILITIES_TIMEOUT_MS,

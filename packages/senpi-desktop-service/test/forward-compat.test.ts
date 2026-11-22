@@ -115,7 +115,10 @@ describe("capabilities across releases", () => {
   })
 
   it("narrows interventionWatch in an opened session's capabilities too (#11731)", () => {
-    const opened = parseSessionOpened({ resumeToken: "r", capabilities: { ...capabilities, interventionWatch: "paused" } })
+    const opened = parseSessionOpened({
+      resumeToken: "r",
+      capabilities: { ...capabilities, interventionWatch: "paused" },
+    })
     expect(opened?.capabilities.interventionWatch).toBe("unknown")
     expect(opened?.capabilities.cursorOverlay).toBe(false)
   })
