@@ -86,24 +86,101 @@ public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint msg, UIntPtr wP
     }
   }
 
-  function Invoke-OmoFetch([string]$Url, [string]$OutFile) {
+  function Invoke-OmoFetch([string]$Url, [string]$OutFile, [switch]$Progress) {
     $curl = Get-Command curl.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($null -ne $curl) {
+      # A connected transfer under 1 KB/s for 60 s is a stall, not a download (#12344): curl aborts
+      # with exit 28, and --retry counts that abort as transient, so every stall is retried before failing.
       # Continue while curl runs: on 5.1, redirected native stderr under 'Stop' throws on the first line.
       $ErrorActionPreference = 'Continue'
-      $log = & $curl.Path --proto '=https' --tlsv1.2 -fsSL --retry 2 --connect-timeout 15 -A $UserAgent -o $OutFile $Url 2>&1
+      if ($Progress) {
+        # -s would silence the bar; --progress-bar needs the error stream left on the console.
+        & $curl.Path --proto '=https' --tlsv1.2 -f --show-error -L --retry 2 --connect-timeout 15 --speed-limit 1024 --speed-time 60 --progress-bar -A $UserAgent -o $OutFile $Url
+        $log = ''
+      } else {
+        $log = & $curl.Path --proto '=https' --tlsv1.2 -fsSL --retry 2 --connect-timeout 15 --speed-limit 1024 --speed-time 60 -A $UserAgent -o $OutFile $Url 2>&1
+      }
       $code = $LASTEXITCODE
       $ErrorActionPreference = 'Stop'
       if ($code -eq 0) { return }
       Remove-Item -LiteralPath $OutFile -Force -ErrorAction SilentlyContinue
+      if ($code -eq 28) { throw "download of $Url stalled (under 1 KB/s for 60 s) or timed out after retries; check the connection and try again" }
       throw "curl.exe exited $code for ${Url}: $(($log | Out-String).Trim())"
     }
+    # No curl.exe: stream over HttpWebRequest with an inactivity bound, not a total-duration cutoff,
+    # so a healthy but slow transfer (the reported ~144 kbps case) finishes while a stall aborts (#12344).
+    $stalled = $false
+    $response = $null
+    $out = $null
     try {
-      Invoke-WebRequest -UseBasicParsing -Uri $Url -OutFile $OutFile -UserAgent $UserAgent -MaximumRedirection 10
+      try {
+        $request = [Net.HttpWebRequest]::Create($Url)
+        $request.UserAgent = $UserAgent
+        $request.AllowAutoRedirect = $true
+        $request.MaximumAutomaticRedirections = 10
+        $request.Timeout = 15000 # connect and response headers only
+        $response = $request.GetResponse()
+        $stream = $response.GetResponseStream()
+        $out = [IO.File]::Create($OutFile)
+        $buffer = New-Object byte[] 65536
+        $total = [long]$response.ContentLength # -1 when the server does not say
+        $received = [long]0
+        $lastNote = [long]0
+        $idle = [Diagnostics.Stopwatch]::StartNew()
+        $pending = $null
+        while ($true) {
+          if ($null -eq $pending) { $pending = $stream.ReadAsync($buffer, 0, $buffer.Length) }
+          if (-not $pending.Wait(1000)) {
+            if ($idle.ElapsedMilliseconds -ge 60000) { $stalled = $true; throw 'no data received for 60 s' }
+            continue
+          }
+          $read = $pending.Result
+          $pending = $null
+          if ($read -le 0) { break }
+          $out.Write($buffer, 0, $read)
+          $received += $read
+          $idle.Restart()
+          if ($received - $lastNote -ge 1048576) {
+            if ($total -gt 0) { Write-OmoSay ("  {0:N1} of {1:N1} MB received" -f ([double]$received / 1MB), ([double]$total / 1MB)) }
+            else { Write-OmoSay ("  {0:N1} MB received" -f ([double]$received / 1MB)) }
+            $lastNote = $received
+          }
+        }
+      } finally {
+        if ($null -ne $out) { $out.Dispose() }
+        if ($null -ne $response) { $response.Close() }
+      }
     } catch {
       Remove-Item -LiteralPath $OutFile -Force -ErrorAction SilentlyContinue
+      if ($stalled) { throw "download of $Url stalled (no data received for 60 s); check the connection and try again" }
       throw "download of $Url failed: $($_.Exception.Message)"
     }
+  }
+
+  function Get-OmoFileSize([string]$Version, [string]$Name, [string]$Base) {
+    # Best-effort Content-Length for the pre-download line (#12344); 0 when no mirror answers.
+    $curl = Get-Command curl.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    foreach ($url in @("$Base/v/$Version/$Name", "$GitHubDownload/v$Version/$Name")) {
+      try {
+        if ($null -ne $curl) {
+          $ErrorActionPreference = 'Continue'
+          # -L follows the mirror's redirects; curl then prints one header block per hop, and only
+          # the last block's Content-Length is the final asset's (#12344).
+          $head = & $curl.Path --proto '=https' --tlsv1.2 -fsSIL --connect-timeout 15 --max-time 20 -A $UserAgent $url 2>$null
+          $code = $LASTEXITCODE
+          $ErrorActionPreference = 'Stop'
+          if ($code -eq 0) {
+            $lengths = [regex]::Matches(($head | Out-String), '(?im)^\s*content-length:\s*(\d+)')
+            if ($lengths.Count -gt 0) { return [long]$lengths[$lengths.Count - 1].Groups[1].Value }
+          }
+        } else {
+          $response = Invoke-WebRequest -UseBasicParsing -Method Head -Uri $url -UserAgent $UserAgent -TimeoutSec 20 -MaximumRedirection 10
+          $len = @($response.Headers['Content-Length'])[0]
+          if ($len) { return [long]$len }
+        }
+      } catch { }
+    }
+    return [long]0
   }
 
   function Resolve-OmoVersion([string]$Want, [string]$Base, [string]$Work) {
@@ -134,15 +211,15 @@ public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint msg, UIntPtr wP
     return $got
   }
 
-  function Save-OmoReleaseFile([string]$Version, [string]$Name, [string]$OutFile, [string]$Base) {
+  function Save-OmoReleaseFile([string]$Version, [string]$Name, [string]$OutFile, [string]$Base, [switch]$Progress) {
     try {
-      Invoke-OmoFetch "$Base/v/$Version/$Name" $OutFile
+      Invoke-OmoFetch "$Base/v/$Version/$Name" $OutFile -Progress:$Progress
       return
     } catch {
       Write-OmoSay "  mirror download of $Name failed; falling back to GitHub releases ($($_.Exception.Message))"
     }
     try {
-      Invoke-OmoFetch "$GitHubDownload/v$Version/$Name" $OutFile
+      Invoke-OmoFetch "$GitHubDownload/v$Version/$Name" $OutFile -Progress:$Progress
     } catch {
       Stop-OmoInstall "could not download $Name $Version from the mirror or GitHub ($($_.Exception.Message))"
     }
@@ -316,8 +393,12 @@ public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint msg, UIntPtr wP
     if ((Test-Path -LiteralPath $exe) -and (Get-OmoSha256 $exe) -eq $expected) {
       Write-OmoSay "  omo $version is already installed at $exe"
     } else {
+      $size = Get-OmoFileSize $version $asset $base
+      $sizeNote = ' (size unavailable)'
+      if ($size -gt 0) { $sizeNote = " ($([math]::Round([double]$size / 1MB, 1)) MB)" }
+      Write-OmoSay "  Downloading $asset$sizeNote"
       $download = Join-Path $work $asset
-      Save-OmoReleaseFile $version $asset $download $base
+      Save-OmoReleaseFile $version $asset $download $base -Progress
       $actual = Get-OmoSha256 $download
       if ($actual -ne $expected) {
         Remove-Item -LiteralPath $download -Force
@@ -328,8 +409,20 @@ public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint msg, UIntPtr wP
       Install-OmoBinary $download $exe
     }
 
-    try { & $exe --version | Out-Host } catch { Stop-OmoInstall "$exe --version failed: $($_.Exception.Message)" }
-    if ($LASTEXITCODE -ne 0) { Stop-OmoInstall "$exe --version failed (exit code $LASTEXITCODE)" }
+    Write-OmoSay '  Verifying the binary (--version); a first run can pause for an antivirus scan'
+    $versionOut = Join-Path $work 'version.txt'
+    try {
+      $proc = Start-Process -FilePath $exe -ArgumentList '--version' -NoNewWindow -PassThru -RedirectStandardOutput $versionOut
+    } catch {
+      Stop-OmoInstall "$exe --version failed to start: $($_.Exception.Message)"
+    }
+    if (-not $proc.WaitForExit(60000)) {
+      try { $proc.Kill() } catch { }
+      Stop-OmoInstall "$exe --version did not answer within 60 s (likely an antivirus scan holding a first run); wait for the scan to finish and install again"
+    }
+    if ($proc.ExitCode -ne 0) { Stop-OmoInstall "$exe --version failed (exit code $($proc.ExitCode))" }
+    $firstVersionLine = @((Get-Content -LiteralPath $versionOut -ErrorAction SilentlyContinue))[0]
+    if ($firstVersionLine) { Write-OmoSay "  $firstVersionLine" }
 
     $pathEdited = Update-OmoPath $dir
     Write-OmoReceipt $channel $version $asset $exe
