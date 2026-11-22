@@ -24,8 +24,10 @@ try {
 ```
 
 `connectPipe` launches over `--remote-debugging-pipe`: no listening port, stdio drained, the
-process reaped on `close()`. `connect("http://127.0.0.1:<port>")` attaches to a browser something
-else launched. `connectCloakProfile({ profileDir })` launches CloakBrowser with a pinned
+process reaped on `close()`. `connect("http://127.0.0.1:<port>")` attaches to the DevTools endpoint
+of a browser something else launched; attaches to the same browser in one process share one
+connection, and `close()` releases only your handle (the last release disconnects).
+`connectCloakProfile({ profileDir })` launches CloakBrowser with a pinned
 fingerprint seed — the stealth path for WAF and bot-scored targets, where the attached engine's
 console capture would be a signal.
 
