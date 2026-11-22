@@ -191,9 +191,15 @@ describe("session_summary acknowledgment through the native transport", () => {
 // The real PostHog transport against a fake HTTP server: only a 2xx answer retires the pending file.
 describe("session_summary delivery through the real PostHog transport", () => {
   const realTransport =
-    (host: string): TelemetryTransportFactory =>
-    (apiKey, options) =>
-      createDefaultPostHogTransport(apiKey, { ...options, host, fetchRetryCount: 0 })
+    (
+      host: string,
+      createTransport: typeof createDefaultPostHogTransport = createDefaultPostHogTransport,
+    ): TelemetryTransportFactory =>
+    (apiKey, options) => {
+      // The legacy ping is fire-and-forget and is not part of summary delivery.
+      if (options.flushAt !== 20) return { capture: () => undefined, shutdown: async () => undefined }
+      return createTransport(apiKey, { ...options, host, fetchRetryCount: 0 })
+    }
 
   const withServer = async (status: number, run: (host: string) => Promise<void>): Promise<void> => {
     const server = Bun.serve({ port: 0, fetch: () => new Response("{}", { status }) })
@@ -221,10 +227,19 @@ describe("session_summary delivery through the real PostHog transport", () => {
     })
   })
 
-  test("#given a server answering 200 #when the session quits #then the pending file is deleted", async () => {
+  test("#given a server answering 200 #when the session quits #then the summary is retired and only native telemetry used a real client", async () => {
     await withTempAgentDir(async (agentDir) => {
-      await withServer(200, (host) => runSession(agentDir, realTransport(host), true))
+      const realClientBatchSizes: number[] = []
+      await withServer(200, async (host) => {
+        const factory = realTransport(host, (apiKey, options) => {
+          const transport = createDefaultPostHogTransport(apiKey, options)
+          realClientBatchSizes.push(options.flushAt)
+          return transport
+        })
+        await runSession(agentDir, factory, true)
+      })
       expect(pendingOf(agentDir)).toEqual([])
+      expect(realClientBatchSizes).toEqual([20])
     })
   })
 })
