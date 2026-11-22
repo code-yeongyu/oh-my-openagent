@@ -3,6 +3,7 @@ import { createInterface } from "node:readline"
 import { createTaskId, type TaskRecord } from "../../state"
 import { claimTaskRecord } from "../claim"
 import { createTaskRecordStore } from "../record-store"
+import { ownedTaskState } from "./owned-task-state"
 
 const [projectDir, nowMsRaw, countRaw, tag] = process.argv.slice(2)
 
@@ -51,7 +52,7 @@ function draftRecord(taskId: string): TaskRecord {
 }
 
 try {
-  const store = createTaskRecordStore({ project_dir: projectDir })
+  const store = createTaskRecordStore(ownedTaskState(projectDir))
   process.stdout.write("READY\n")
   await waitForGo()
 

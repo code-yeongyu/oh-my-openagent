@@ -152,11 +152,17 @@ describe("root test CI partition", () => {
       "unshare -Upf --mount-proc --map-current-user -- env CI=1 bun test --timeout 20000 packages/memory-core",
     )
     expect(posixShard2).toContain(serialQuarantineCommand())
-    for (const shard of ["1/2", "2/2"]) {
+    for (const [mode, shard] of [
+      ["first", "1/2"],
+      ["second", "2/2"],
+    ]) {
       expect(posixShard2).toContain(
-        `bun --config=bunfig.win2.parallel.toml test --timeout 20000 --shard=${shard} --timings=.github/ci-test-timings.json`,
+        `if [ "$mode" = "${mode}" ]; then\n  bun --config=bunfig.win2.parallel.toml test --timeout 20000 --shard=${shard} --timings=.omo/ci-shard-record.json --update-timings $(junit root-2-${mode})\nfi`,
       )
     }
+    expect(posixShard2).toContain(
+      'if [ "$mode" = "all" ]; then\n  bun --config=bunfig.win2.parallel.toml test --timeout 20000 $(junit root-2-remainder)\nfi',
+    )
     expect(posixShard2).not.toContain("bun --config=bunfig.win2.parallel.toml test --parallel")
   })
 
