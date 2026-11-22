@@ -266,7 +266,7 @@ describe("Senpi compatibility test script", () => {
     // #when
     const senpiJob = sliceWorkflowSection(workflow, "  senpi-compatibility:", "  senpi-bundle-check:")
     const linuxTests = sliceWorkflowSection(workflow, "  senpi-tests-linux:", "  linux-senpi-status:")
-    const linuxStatus = sliceWorkflowSection(workflow, "  linux-senpi-status:", "  lazycodex-published-smoke:")
+    const linuxStatus = sliceWorkflowSection(workflow, "  linux-senpi-status:", "  save-shard-timings:")
     const posixScript = readFileSync(new URL("../.github/scripts/ci-senpi-posix.sh", import.meta.url), "utf8")
     const needsReferences = workflow.match(/needs: \[[^\]]*senpi-compatibility[^\]]*\]/g) ?? []
 
@@ -276,6 +276,7 @@ describe("Senpi compatibility test script", () => {
       "name: senpi-compatibility\n    needs: [ci-mode, senpi-bundle-check, senpi-eq, senpi-tests-linux]",
     )
     expect(linuxStatus).toContain("os: [ubuntu-latest]")
+    expect(linuxTests).toContain("part: [one, two]")
     expect(linuxTests).toContain('bash .github/scripts/ci-senpi-posix.sh "${{ matrix.part }}"')
     expect(senpiJob).toContain('node-version: "24"')
     expect(senpiJob).toContain('bun-version: "1.4.4"')
@@ -288,7 +289,17 @@ describe("Senpi compatibility test script", () => {
     expect(posixScript).toContain("npm --prefix packages/lsp-daemon test -- test/daemon-roundtrip.test.ts")
     expect(posixScript).toContain("bun check --no-script --all -p packages/omo-senpi/tsconfig.json")
     expect(posixScript).toContain("bun test ./.agents/skills/senpi-qa/scripts/resolve-evidence-dir.test.mjs")
-    expect(posixScript).toContain("bun test --timeout 20000 packages/omo-senpi")
+    expect(posixScript).toContain(
+      'if [ "$mode" = "all" ]; then\n  bun test --timeout 20000 packages/omo-senpi $(junit senpi)\nfi',
+    )
+    for (const [mode, shard] of [
+      ["one", "1/2"],
+      ["two", "2/2"],
+    ]) {
+      expect(posixScript).toContain(
+        `if [ "$mode" = "${mode}" ]; then\n  bun test --timeout 20000 packages/omo-senpi --shard=${shard} --timings=.omo/ci-shard-record.json --update-timings $(junit senpi-${mode})\nfi`,
+      )
+    }
     expect(senpiJob).not.toContain("senpi install")
     expect(
       needsReferences.length,

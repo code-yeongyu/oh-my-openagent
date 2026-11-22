@@ -4,6 +4,7 @@ import { createTaskRecordStore } from "../store"
 import { cleanupProjects, makeHandle, tempProject } from "./__fixtures__/manager-fakes"
 import { TaskConcurrency } from "./concurrency"
 import { createTaskRunPause } from "./run-pause"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -14,7 +15,7 @@ const unusedChild = {
 }
 
 function pausedChild(options: { readonly liveHandle: boolean }) {
-  const store = createTaskRecordStore({ project_dir: tempProject() })
+  const store = createTaskRecordStore(ownedTaskState(tempProject()))
   const record = seedRecord(store, { task_id: "st_0e1d0001", status: "paused", run_epoch: 0 })
   store.mutate(record.task_id, (fresh) => ({
     ...fresh,

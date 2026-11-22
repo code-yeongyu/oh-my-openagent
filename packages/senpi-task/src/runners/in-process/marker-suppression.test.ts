@@ -14,6 +14,9 @@ import {
 
 import { InProcessRunner } from "../in-process"
 import type { ChildSession } from "../in-process"
+import { useOwnedAgentDir } from "../../store/__fixtures__/owned-agent-dir"
+
+useOwnedAgentDir()
 
 const sampleParameters = createReadToolDefinition(process.cwd()).parameters
 

@@ -66,6 +66,7 @@ jobs:
       full_matrix: ${{ steps.classify.outputs.full_matrix }}
       runtime_touching: ${{ steps.classify.outputs.runtime_touching }}
       label_refused: ${{ steps.classify.outputs.label_refused }}
+      shard_timings_key: ${{ steps.shard-timings.outputs.cache-matched-key }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -119,6 +120,16 @@ jobs:
           fi
           jq . <<< "$MODE_JSON"
 
+      # Resolve the prefix once. Independent prefix lookups could see different dev snapshots mid-run.
+      - name: Select shard timing snapshot
+        id: shard-timings
+        if: steps.classify.outputs.run_heavy == 'true'
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.temp }}/ci-test-timings.json
+          key: ci-test-timings-${{ github.run_id }}
+          restore-keys: ci-test-timings-
+
       # The report-only temp-leak list (#9766) may only shrink: a new leak is fixed, not listed.
       - name: Report-only temp-leak list only shrinks
         if: github.event_name == 'pull_request'
@@ -137,6 +148,7 @@ jobs:
             - Generated release push: `${{ steps.classify.outputs.generated_release_push || 'unknown' }}`.
             - Web-only change: `${{ steps.classify.outputs.web_only || 'unknown' }}`.
             - Run heavy validation: `${{ steps.classify.outputs.run_heavy || 'unknown' }}`.
+            - Shard timing snapshot: `${{ steps.shard-timings.outputs.cache-matched-key || 'committed fallback' }}`.
             - Runtime-touching change: `${{ steps.classify.outputs.runtime_touching || 'unknown' }}` (informational; the OS matrix follows the full-matrix flag below).
             - `ci:full-matrix` refused: `${{ steps.classify.outputs.label_refused || 'unknown' }}` (the label needs a platform path in the diff or a `Platform-reason: <why>` line in the PR body).
             - Full 3-OS matrix: `${{ steps.classify.outputs.full_matrix || 'unknown' }}` (pull requests set it only for the `ci:full-matrix` label or a release-state head, #13802; false keeps heavy work on ubuntu; add `ci:full-matrix` for a separate run with optional `full-matrix / ...` checks that do not gate merge; keep the label and push a commit or reopen the PR to run the full matrix in required checks).
@@ -485,6 +497,22 @@ jobs:
           echo "PID namespace ready ($procs processes visible)"
           unshare -Upf --mount-proc --map-current-user -- env CI=1 bun test --timeout 20000 packages/memory-core
 
+      - name: Restore selected shard timing snapshot
+        id: shard-timings
+        if: startsWith(matrix.part, 'remainder-') && needs.ci-mode.outputs.shard_timings_key != ''
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.temp }}/ci-test-timings.json
+          key: ${{ needs.ci-mode.outputs.shard_timings_key }}
+          fail-on-cache-miss: true
+
+      - name: Copy the timing snapshot for this shard
+        if: startsWith(matrix.part, 'remainder-')
+        env:
+          TIMINGS_KEY: ${{ needs.ci-mode.outputs.shard_timings_key }}
+          TIMINGS_EXACT_HIT: ${{ steps.shard-timings.outputs.cache-hit }}
+        run: bash .github/scripts/ci-copy-shard-timings.sh
+
       - name: Run the first remainder half
         id: root-tests-linux-first
         if: matrix.part == 'remainder-1'
@@ -495,6 +523,16 @@ jobs:
         if: matrix.part == 'remainder-2'
         run: bash .github/scripts/ci-root-shard-2.sh second
 
+      - name: Upload root shard record
+        if: startsWith(matrix.part, 'remainder-')
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-shard-root-${{ matrix.part }}
+          path: .omo/ci-shard-record.json
+          include-hidden-files: true
+          if-no-files-found: error
+          overwrite: true
+
       - name: Write job summary
         if: always()
         shell: bash
@@ -504,7 +542,7 @@ jobs:
           JOB_SUMMARY_DETAILS: |
             - omo-opencode: the omo-opencode tree in one process, the vendored lsp-daemon tests, then the shared serial quarantine.
             - memory-core: memory-core inside an unprivileged PID namespace.
-            - remainder-1 / remainder-2: every other root test, split by `bun test --shard` on `.github/ci-test-timings.json`.
+            - remainder-1 / remainder-2: every other root test, split by `bun test --shard` on the selected timing snapshot.
           JOB_SUMMARY_NEXT: Open the first failing test; `test (ubuntu-latest, 1/2)` and `2/2` report this job's combined result.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
@@ -527,11 +565,26 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: "24"
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        if: needs.test-linux.result == 'success'
+        with:
+          bun-version: "1.4.4"
+      - name: Download root shard records
+        if: needs.test-linux.result == 'success'
+        uses: actions/download-artifact@v8
+        with:
+          pattern: ci-shard-root-*
+          path: ${{ runner.temp }}/ci-shard-records
+      - name: Verify root shard coverage
+        id: coverage
+        if: needs.test-linux.result == 'success'
+        run: bun script/ci-shard-coverage.ts root "$RUNNER_TEMP/ci-shard-records"
       - name: Write job summary
+        if: always()
         env:
           LEG_OS: ${{ matrix.os }}
           LEG_JOB_STATUS: ${{ needs.test-linux.result }}
-          TEST_OUTCOMES: ${{ needs.test-linux.result }}
+          TEST_OUTCOMES: ${{ needs.test-linux.result }} ${{ steps.coverage.outcome || 'missing' }}
           RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
           FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
           RUNTIME_TOUCHING: ${{ needs.ci-mode.outputs.runtime_touching }}
@@ -1177,9 +1230,33 @@ jobs:
       - name: Remove stale self-package test copies
         run: bun run script/remove-stale-self-package-tests.ts
 
+      - name: Restore selected shard timing snapshot
+        id: shard-timings
+        if: needs.ci-mode.outputs.shard_timings_key != ''
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.temp }}/ci-test-timings.json
+          key: ${{ needs.ci-mode.outputs.shard_timings_key }}
+          fail-on-cache-miss: true
+
+      - name: Copy the timing snapshot for this shard
+        env:
+          TIMINGS_KEY: ${{ needs.ci-mode.outputs.shard_timings_key }}
+          TIMINGS_EXACT_HIT: ${{ steps.shard-timings.outputs.cache-hit }}
+        run: bash .github/scripts/ci-copy-shard-timings.sh
+
       - name: Run Senpi compatibility tests
         shell: bash
         run: bash .github/scripts/ci-senpi-posix.sh "${{ matrix.part }}"
+
+      - name: Upload Senpi shard record
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-shard-senpi-${{ matrix.part }}
+          path: .omo/ci-shard-record.json
+          include-hidden-files: true
+          if-no-files-found: error
+          overwrite: true
 
       - name: Write job summary
         if: always()
@@ -1188,7 +1265,7 @@ jobs:
           JOB_SUMMARY_TITLE: Senpi compatibility tests (ubuntu-latest, part ${{ matrix.part }})
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
-            - Builds the Senpi plugin and runs this part of `bun test packages/omo-senpi`, split by `--shard` on `.github/ci-test-timings.json`.
+            - Builds the Senpi plugin and runs this part of `bun test packages/omo-senpi`, split by `--shard` on the selected timing snapshot.
             - Part one also packs the plugin, runs the LSP daemon round trip, `bun check` and the evidence-dir test.
           JOB_SUMMARY_NEXT: Open the first failing test; `senpi-compatibility (ubuntu-latest)` reports this job's result.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
@@ -1208,15 +1285,64 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: "24"
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        if: needs.senpi-tests-linux.result == 'success'
+        with:
+          bun-version: "1.4.4"
+      - name: Download Senpi shard records
+        if: needs.senpi-tests-linux.result == 'success'
+        uses: actions/download-artifact@v8
+        with:
+          pattern: ci-shard-senpi-*
+          path: ${{ runner.temp }}/ci-shard-records
+      - name: Verify Senpi shard coverage
+        id: coverage
+        if: needs.senpi-tests-linux.result == 'success'
+        run: bun script/ci-shard-coverage.ts senpi "$RUNNER_TEMP/ci-shard-records"
       - name: Write job summary
+        if: always()
         env:
           LEG_OS: ${{ matrix.os }}
           LEG_JOB_STATUS: ${{ (needs.senpi-bundle-check.result == 'skipped' && needs.senpi-eq.result == 'skipped' && needs.senpi-tests-linux.result == 'skipped') && 'skipped' || 'success' }}
-          TEST_OUTCOMES: ${{ needs.senpi-bundle-check.result }} ${{ needs.senpi-eq.result }} ${{ needs.senpi-tests-linux.result }}
+          TEST_OUTCOMES: ${{ needs.senpi-bundle-check.result }} ${{ needs.senpi-eq.result }} ${{ needs.senpi-tests-linux.result }} ${{ steps.coverage.outcome || 'missing' }}
           RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
           FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
           RUNTIME_TOUCHING: ${{ needs.ci-mode.outputs.runtime_touching }}
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/ci-macos-status.sh
+
+  save-shard-timings:
+    needs: [test-linux, senpi-tests-linux]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: "1.4.4"
+      - name: Download both groups' shard records
+        uses: actions/download-artifact@v8
+        with:
+          pattern: ci-shard-*
+          path: ${{ runner.temp }}/ci-shard-records
+      - name: Verify and merge shard timings
+        run: bun script/ci-shard-coverage.ts merge "$RUNNER_TEMP/ci-shard-records" "$RUNNER_TEMP/ci-test-timings.json"
+      - name: Save shard timing snapshot
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ runner.temp }}/ci-test-timings.json
+          key: ci-test-timings-${{ github.run_id }}
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Save Linux shard timings
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Verifies and merges the root remainder and Senpi file records from this dev push.
+            - Cache key: `ci-test-timings-${{ github.run_id }}`.
+          JOB_SUMMARY_NEXT: Inspect the coverage diff or cache step; future runs can still use the previous snapshot or committed fallback.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   lazycodex-published-smoke:
     needs: [ci-mode]
