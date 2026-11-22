@@ -14,6 +14,15 @@ import {
 import { composeOmoSenpiExtension } from "./compose"
 import { testBudgetSignal, useTestTimeout } from "../../../../test-support/test-deadline"
 
+const SETTLED_LOG = ["agent/logs", "agent/logs/.fallback-log-v2"]
+
+/** Every path under the HOME, backslash-normalized so windows-latest listings match. */
+function homeListing(root: string): string[] {
+  return readdirSync(root, { recursive: true })
+    .map((entry) => String(entry).replaceAll("\\", "/"))
+    .sort()
+}
+
 test("#given a real session with a late unsafe component #when draft prewarm skips #then the recorded result warns once with component attribution", async () => {
   useTestTimeout(30_000)
   // given
@@ -91,6 +100,9 @@ test("#given a real session with a late unsafe component #when draft prewarm ski
   const manager = SessionManager.inMemory(root)
   let session: Awaited<ReturnType<typeof createAgentSession>>["session"] | undefined
   let unsubscribe: (() => void) | undefined
+  // The HOME as the initialized fixture leaves it, before the activity under test. The engine may stage its
+  // bundled extensions under agent/ while the session starts; only what appears after this point is checked.
+  let baseline: readonly string[] = []
   const signal = testBudgetSignal("the prewarm diagnostics entry")
   const recorded = Promise.withResolvers<void>()
   const onAbort = () => recorded.reject(new Error("prewarm did not append its entry"))
@@ -111,6 +123,7 @@ test("#given a real session with a late unsafe component #when draft prewarm ski
       tools: [],
     }))
     await session.bindExtensions({ mode: "print" })
+    baseline = homeListing(root)
     expect(warnings).toHaveLength(1)
     warnings.length = 0
     unsubscribe = session.subscribe((event) => {
@@ -155,19 +168,13 @@ test("#given a real session with a late unsafe component #when draft prewarm ski
       if (value === undefined) delete process.env[key]
       else process.env[key] = value
     }
-    // No builtin left a store under this HOME: only the engine-seeded agent layout and the settled
-    // fallback log may remain, so a future builtin store fails this allowlist (#10933). Windows
-    // listings use backslashes; normalize so the guard is platform-stable.
-    const homeEntries = readdirSync(root, { recursive: true })
-      .map((entry) => String(entry).replaceAll("\\", "/"))
-      .sort()
+    // No builtin left a store under this HOME: past the initialized fixture, only the settled fallback log may
+    // appear, so a store any builtin writes during the activity or teardown fails this allowlist (#10933).
+    const homeEntries = homeListing(root)
     rmSync(root, { recursive: true, force: true })
-    expect(homeEntries).toEqual([
-      "agent",
-      "agent/auth.json",
-      "agent/extensions",
-      "agent/logs",
-      "agent/logs/.fallback-log-v2",
-    ])
+    expect(homeEntries.filter((entry) => entry.includes("goal"))).toEqual([])
+    // A run that failed before the fixture finished initializing has no baseline; its own failure stands.
+    if (baseline.length > 0)
+      expect(homeEntries.filter((entry) => !baseline.includes(entry) && !SETTLED_LOG.includes(entry))).toEqual([])
   }
 }, 30_000)
