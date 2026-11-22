@@ -5,6 +5,7 @@ import { compileMemoryBlockWithReads, type CompileMemoryBlockOptions, type Memor
 import { expirySlot } from "./expiry-slot"
 import { DEFAULT_EXTERNAL_PROJECTION_LIMITS } from "./external-projection-limits"
 import { InFlightReads } from "./in-flight-reads"
+import type { loadExternalProjectionRenderer } from "./external-projection-loader"
 
 export const MEMORY_TEMPLATE_STRUCTURE_VERSION = "senpi-memory-v2"
 
@@ -47,6 +48,7 @@ export interface MemoryBlockCacheOptions {
   readonly storeBudgetMs?: number
   /** The clock `expires` is evaluated against when a compile names no instant. */
   readonly now?: () => number
+  readonly loadExternalProjectionRenderer?: typeof loadExternalProjectionRenderer
 }
 
 const DEFAULT_STORE_BUDGET_MS = 25
@@ -126,21 +128,28 @@ export class MemoryBlockCache {
     const existing = slot === undefined ? undefined : entry.blocks.get(slot)
     if (existing !== undefined) return existing
 
-    const pending =
+    const computing =
       revision === null
         ? compileMemoryBlockWithReads(repo, null, options, at)
         : this.compileStored(repo, `block:${key}:${JSON.stringify(options)}`, revision, options, at)
+    const pending = computing.then(({ block, expiries, degraded }) => {
+      if (degraded.length === 0) {
+        entry.expiries ??= expiries
+        entry.blocks.set(expirySlot(expiries, at), pending)
+      } else if (slot !== undefined && entry.blocks.get(slot) === pending) {
+        entry.blocks.delete(slot)
+      }
+      return { block, expiries }
+    })
     if (slot === undefined) entry.first = pending
     else entry.blocks.set(slot, pending)
     try {
-      const compiled = await pending
-      entry.expiries ??= compiled.expiries
-      entry.blocks.set(expirySlot(compiled.expiries, at), pending)
-      return compiled
+      return await pending
     } catch (error) {
-      if (entry.first === pending) entry.first = undefined
       if (slot !== undefined && entry.blocks.get(slot) === pending) entry.blocks.delete(slot)
       throw error
+    } finally {
+      if (entry.first === pending) entry.first = undefined
     }
   }
 
@@ -163,17 +172,23 @@ export class MemoryBlockCache {
     revision: string,
     options: CompileMemoryBlockOptions,
     asOfMs: number,
-  ): Promise<CompiledMemoryBlock> {
+  ): Promise<CompiledMemoryBlock & { readonly degraded: readonly string[] }> {
     const store = this.options.store === undefined ? undefined : await this.storeWithin(repo.dir)
     const key = this.persistKey(revision, name)
     const stored = store === undefined ? undefined : await store.getBlock(key)
     if (stored !== undefined && stored.slot === expirySlot(stored.expiries, asOfMs)) {
-      return { block: stored.block, expiries: stored.expiries }
+      return { block: stored.block, expiries: stored.expiries, degraded: [] }
     }
-    const { block, degraded, expiries } = await compileMemoryBlockWithReads(repo, revision, options, asOfMs)
+    const { block, degraded, expiries } = await compileMemoryBlockWithReads(
+      repo,
+      revision,
+      options,
+      asOfMs,
+      this.options.loadExternalProjectionRenderer,
+    )
     if (degraded.length > 0) this.options.onDegraded?.({ dir: repo.dir, revision, reasons: degraded })
     else store?.putBlock(key, { block, expiries, slot: expirySlot(expiries, asOfMs) })
-    return { block, expiries }
+    return { block, expiries, degraded }
   }
 
   private persistKey(revision: string, name: string): string {
