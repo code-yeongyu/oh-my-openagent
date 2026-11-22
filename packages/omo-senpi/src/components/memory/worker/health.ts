@@ -21,6 +21,8 @@ export const REFLECTION_HEALTH_STALE_MS = 7 * 24 * 60 * 60_000
 export interface ReflectionHealth {
   readonly streak: number
   readonly fingerprint: string
+  /** Local status context; not part of the RPC lastOutcome contract. */
+  readonly integrationFailure?: Pick<HealthRecord, "outcome" | "reason" | "detail">
   readonly lastFailure?: {
     readonly runId?: string
     readonly reason: string
@@ -114,6 +116,19 @@ export async function readReflectionHealth(
   return {
     streak: stale ? 0 : failuresBeforeSuccess.length,
     fingerprint: dominant,
+    ...(newest &&
+    (newest.outcome === "merge_conflict" ||
+      newest.outcome === "parent_dirty" ||
+      newest.outcome === "dirty_uncommitted") &&
+    Date.parse(newest.finishedAt) >= now - REFLECTION_HEALTH_STALE_MS
+      ? {
+          integrationFailure: {
+            outcome: newest.outcome,
+            ...(newest.reason && { reason: newest.reason }),
+            ...(newest.detail && { detail: newest.detail }),
+          },
+        }
+      : {}),
     ...(lastFailure === undefined
       ? {}
       : {

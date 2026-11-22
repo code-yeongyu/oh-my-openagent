@@ -5,6 +5,8 @@ import { GitMemoryRepo, readReflectionParkFile } from "@oh-my-opencode/memory-co
 
 import type { MemoryIdentityContext } from "./context"
 import { shownSyncFailure, type SyncStatusReader } from "./sync-status-surface"
+import { normalizeRendererText } from "@oh-my-opencode/senpi-task/renderer-text"
+import { childFailureCause } from "./worker/failure-detail"
 import { readReflectionHealth } from "./worker/health"
 
 export const MEMORY_STATUS_KEY = "memory"
@@ -41,6 +43,7 @@ export interface MemoryStatusSegments {
   readonly dirty: boolean
   readonly backlogSteps: number
   readonly streak: number
+  readonly integrationFailure?: string
   readonly parked: boolean
   /** Memory sync for this repository is failing (#10637); never trimmed from the line. */
   readonly syncBlocked?: boolean
@@ -80,7 +83,7 @@ export async function refreshMemoryStatus(input: RefreshMemoryStatusInput): Prom
     const committedAt = await repo.headCommitTimestamp()
     const age = committedAt === null ? null : formatRelativeAge(committedAt * SECOND_MS, (input.now ?? Date.now)())
     if (age !== null) {
-      const segments = await readMemoryStatusSegments(repo, input.context, input.sessionId, input.syncStatus)
+      const segments = await readMemoryStatusSegments(repo, input.context, input.sessionId, input.syncStatus, input.now)
       input.ui.setStatus(MEMORY_STATUS_KEY, formatMemoryStatusLine(input.context.identity, age, segments))
       footerShown = true
     }
@@ -114,15 +117,16 @@ export async function readMemoryStatusSegments(
   context: MemoryIdentityContext,
   sessionId: string | undefined,
   syncStatus?: SyncStatusReader,
+  now = Date.now,
 ): Promise<MemoryStatusSegments> {
-  const [dirty, backlogSteps, streak, parked, sync] = await Promise.all([
+  const [dirty, backlogSteps, reflection, parked, sync] = await Promise.all([
     readDirty(repo),
     readBacklogSteps(context, sessionId),
-    readStreak(context),
+    readReflectionStatus(context, now()),
     readParked(context),
     readSyncState(context, syncStatus),
   ])
-  return { dirty, backlogSteps, streak, parked, ...sync }
+  return { dirty, backlogSteps, ...reflection, parked, ...sync }
 }
 
 /**
@@ -131,9 +135,15 @@ export async function readMemoryStatusSegments(
  * segments that ask the person to act.
  */
 export function formatMemoryStatusLine(identity: string, age: string, segments: MemoryStatusSegments): string {
-  const base = `mem:${identity} ${age}`
   const sync =
     segments.syncBlocked === true ? SYNC_BLOCKED_SEGMENT : segments.syncHeld === true ? SYNC_HELD_SEGMENT : ""
+  const base =
+    segments.integrationFailure === undefined
+      ? `mem:${identity} ${age}`
+      : normalizeRendererText(`reflection not integrated: ${segments.integrationFailure}`).slice(
+          0,
+          MEMORY_STATUS_MAX_WIDTH - sync.length,
+        )
   const optional: string[] = [
     segments.dirty ? "*" : "",
     segments.backlogSteps >= 1 ? ` (+${segments.backlogSteps})` : "",
@@ -198,14 +208,26 @@ async function readParked(context: MemoryIdentityContext): Promise<boolean> {
   }
 }
 
-async function readStreak(context: MemoryIdentityContext): Promise<number> {
+async function readReflectionStatus(
+  context: MemoryIdentityContext,
+  now: number,
+): Promise<Pick<MemoryStatusSegments, "streak" | "integrationFailure">> {
   try {
     const health = await readReflectionHealth(join(context.identityPaths.reflection, "completions"), {
       limit: MEMORY_HEALTH_SCAN_LIMIT,
+      now,
     })
-    return health.streak
+    const last = health.integrationFailure
+    if (last) {
+      const cause = [last.reason, childFailureCause(last.detail)].filter(Boolean).join(": ")
+      return {
+        streak: health.streak,
+        integrationFailure: last.outcome.replaceAll("_", " ") + (cause ? ` (${cause})` : ""),
+      }
+    }
+    return { streak: health.streak }
   } catch {
-    return 0
+    return { streak: 0 }
   }
 }
 

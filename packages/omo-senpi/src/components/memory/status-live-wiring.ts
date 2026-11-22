@@ -57,12 +57,13 @@ export function createMemoryFooterStatusLive(options: MemoryFooterStatusLiveOpti
       const repo = repoFor(context)
       const head = await repo.head()
       if (head === null) return `none|${options.isActive(identity)}`
-      const segments = await readMemoryStatusSegments(repo, context, sessionId, options.syncStatus)
+      const segments = await readMemoryStatusSegments(repo, context, sessionId, options.syncStatus, now)
       return [
         head,
         segments.dirty ? "dirty" : "clean",
         segments.backlogSteps,
         segments.streak,
+        segments.integrationFailure,
         options.isActive(identity),
         segments.syncBlocked === true ? "sync-blocked" : segments.syncHeld === true ? "sync-held" : "sync-ok",
       ].join("|")
@@ -77,7 +78,7 @@ export function createMemoryFooterStatusLive(options: MemoryFooterStatusLiveOpti
       const committedAt = await repo.headCommitTimestamp()
       const age = committedAt === null ? null : formatRelativeAge(committedAt * SECOND_MS, now())
       if (age === null) return undefined
-      const segments = await readMemoryStatusSegments(repo, context, sessionId, options.syncStatus)
+      const segments = await readMemoryStatusSegments(repo, context, sessionId, options.syncStatus, now)
       return formatMemoryStatusLine(identity, age, segments)
     },
   })

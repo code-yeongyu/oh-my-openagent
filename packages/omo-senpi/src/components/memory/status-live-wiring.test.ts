@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp } from "node:fs/promises"
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
 import { realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -84,6 +84,53 @@ function stubRepo(overrides: Partial<GitRepoForStatus> = {}): GitRepoForStatus {
 }
 
 describe("memory footer status live wiring", () => {
+  test("a consumed merge conflict is visible in one footer slot across refresh and restart", async () => {
+    const context = await contextFixture()
+    const dir = join(context.identityPaths.reflection, "completions")
+    await mkdir(dir, { recursive: true })
+    const ui = recorder()
+    const start = () =>
+      createMemoryFooterStatusLive({
+        resolveContext: () => context,
+        isActive: () => false,
+        now: () => NOW,
+        createGitRepo: () => stubRepo(),
+      })
+    const first = start()
+    await first.refresh("source", ui.ui)
+    const completion = {
+      runId: "run-57",
+      outcome: "merge_conflict",
+      detail: "notes.md",
+      finishedAt: new Date(NOW).toISOString(),
+      delivery: { status: "consumed" },
+    }
+    await writeFile(join(dir, "run-57.json"), JSON.stringify(completion))
+    await first.refresh("source", ui.ui)
+    await first.refresh("source", ui.ui)
+    const failure = {
+      key: MEMORY_STATUS_KEY,
+      text: expect.stringContaining("not integrated: merge conflict (notes.md)"),
+    }
+    expect(ui.calls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:agent-test 2h ago" }, failure])
+    first.dispose()
+    const next = start()
+    const rebound = recorder()
+    await next.refresh("new-session", rebound.ui)
+    expect(rebound.calls).toEqual([failure])
+    await writeFile(
+      join(dir, "run-58.json"),
+      JSON.stringify({
+        ...completion,
+        runId: "run-58",
+        outcome: "merged",
+        finishedAt: new Date(NOW + 1).toISOString(),
+      }),
+    )
+    await next.refresh("new-session", rebound.ui)
+    expect(rebound.calls.at(-1)).toEqual({ key: MEMORY_STATUS_KEY, text: "mem:agent-test 2h ago" })
+    next.dispose()
+  })
   test("#given an active run for the bound identity #when frames tick #then the memory key animates reflecting", async () => {
     const context = await contextFixture()
     const timers = fakeTimers()
