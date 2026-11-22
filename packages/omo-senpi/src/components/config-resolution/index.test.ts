@@ -26,6 +26,30 @@ afterEach(() => {
 })
 
 describe("loadSenpiOmoConfig", () => {
+  test("#given an agent model without a provider #when resolved #then a diagnostic names the ignored setting (#11763)", () => {
+    // given
+    const { home, project } = fixture()
+    writeConfig(home, {
+      models: { opus: { model: "anthropic/claude-opus-5-5" } },
+      agents: {
+        "plan-consultant": { model: "claude-opus-5-5", models: ["claude-fable-5-1", "anthropic/claude-opus-5-5"] },
+        oracle: { model: "opus" },
+        explore: { model: "anthropic/claude-haiku-5-5" },
+      },
+    })
+
+    // when
+    const result = loadSenpiOmoConfig({ cwd: project, env: { HOME: home }, platform: "linux" })
+
+    // then
+    expect(result.diagnostics.map((diagnostic) => [diagnostic.kind, diagnostic.path])).toEqual([
+      ["validation", "agents.plan-consultant.model"],
+      ["validation", "agents.plan-consultant.models.0"],
+    ])
+    expect(result.diagnostics[0]?.message).toContain("claude-opus-5-5")
+    expect(result.config.agents?.["oracle"]?.model).toBe("anthropic/claude-opus-5-5")
+  })
+
   test("#given the current top-level-only Senpi categories and agents config #when resolved #then it preserves the established configuration exactly", () => {
     // given
     const { home, project } = fixture()
