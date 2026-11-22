@@ -3,6 +3,7 @@ import { log } from "@oh-my-opencode/utils"
 
 import { RunnerError } from "../in-process/runner-error"
 import type { RunnerFailureReason } from "../in-process/child-handle"
+import type { ExcludedModelPatterns } from "../../manager/exclude-fallbacks"
 import { splitModelDecorators } from "../../senpi/explicit-pin"
 import type { RpcRunnerSpec } from "../types"
 import { type ModelCatalogProbeResult, parseModelCatalog, probeModelCatalog } from "./model-catalog-probe"
@@ -45,8 +46,9 @@ export type RpcModelAdmissionVerdict =
 export type RpcModelAdmission = (spec: RpcRunnerSpec) => Promise<void>
 
 export type RpcModelAdmissionOptions = {
-  // omo.json exclude_models: a spawn or revival on an excluded model fails before any probe.
-  readonly excludeModels?: readonly string[]
+  // omo.json exclude_models: a spawn or revival on an excluded model fails before any probe. A getter
+  // is read at every admission, so a mid-session omo.json edit applies to the next launch.
+  readonly excludeModels?: ExcludedModelPatterns
   readonly buildSpawn?: (spec: RpcRunnerSpec) => RpcSpawnDescriptor
   readonly probe?: (descriptor: RpcSpawnDescriptor) => Promise<ModelCatalogProbeResult>
   readonly now?: () => number
@@ -182,7 +184,8 @@ export function createRpcModelAdmission(options: RpcModelAdmissionOptions = {}):
   return async (spec) => {
     const model = spec.model?.trim()
     if (model === undefined || model.length === 0) return
-    const excludedBy = excludedModelPattern(splitModelDecorators(model).base, options.excludeModels)
+    const excludeModels = typeof options.excludeModels === "function" ? options.excludeModels() : options.excludeModels
+    const excludedBy = excludedModelPattern(splitModelDecorators(model).base, excludeModels)
     if (excludedBy !== undefined) {
       throw new RunnerError({
         kind: "model_unavailable",

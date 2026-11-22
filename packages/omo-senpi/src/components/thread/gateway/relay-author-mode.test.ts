@@ -135,11 +135,11 @@ describe("binding inbound rate bucket", () => {
     for (let index = 0; index < PAIR_BUCKET_BURST; index += 1)
       ok(await relay.inbound({ binding_id: x, event_id: `evt-${index}`, text: `m${index}` }))
     const refused = await relay.inbound({ binding_id: x, event_id: "evt-over", text: "one more" })
-    expect(code(refused)).toBe("overloaded")
-    expect(refused.kind === "error" ? refused.error.details : undefined).toMatchObject({ budget: "pair_rate" })
+    expect(code(refused)).toBe("pair_loop_guard")
+    expect(refused.kind === "error" ? refused.error.details : undefined).toMatchObject({ guard: "pair_loop" })
   })
 
-  test("#given binding sends with authors #when one author spends the burst #then another author still gets through and the first is overloaded", async () => {
+  test("#given binding sends with authors #when one author spends the burst #then another author still gets through and the first meets the pair loop guard", async () => {
     const h = (harness = createGatewayHarness())
     h.session("B", { online: false })
     const relay = relayOn(h)
@@ -147,7 +147,7 @@ describe("binding inbound rate bucket", () => {
     for (let index = 0; index < PAIR_BUCKET_BURST; index += 1)
       ok(await relay.inbound({ binding_id: x, event_id: `a-${index}`, text: `m${index}`, author: JANE }))
     expect(code(await relay.inbound({ binding_id: x, event_id: "a-over", text: "one more", author: JANE }))).toBe(
-      "overloaded",
+      "pair_loop_guard",
     )
     expect(
       code(

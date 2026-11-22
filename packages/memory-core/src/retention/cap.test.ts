@@ -81,27 +81,47 @@ async function liveNames(dir: string): Promise<string[]> {
   return (await readdir(dir).catch(() => [] as string[])).filter((name) => !name.startsWith(".prune-")).sort()
 }
 
+// B01's budget comes from the bytes the fixture wrote, never from a live measure of runtime/ taken before
+// the cap takes its own (#13194): anything written between the two reads moved the boundary. The budget
+// sits half a folded run past the third run, so runtime/'s own directories and a small unrelated write
+// both stay inside it; the 256 KiB pad keeps that half run well above them.
+async function capThreeOldestFolded(beforeCap?: (paths: MemoryIdentityPaths) => Promise<void>): Promise<void> {
+  const paths = await identity()
+  const runs = await foldedRuns(paths, 10, 256 * 1024)
+  const sidecars = await Promise.all(
+    [1, 2, 3, 4, 5].map(async (n) => padded(await sidecar(paths, `s-${n}`, daysAgo(1)), 32 * 1024, daysAgo(1))),
+  )
+  const journals = await Promise.all([1, 2, 3, 4, 5].map((n) => journal(paths, `j-${n}`, "never", daysAgo(3))))
+  await settleGuard(paths)
+  let fixtureBytes = await bytesOf(paths, runs)
+  for (const path of [...sidecars, ...journals]) fixtureBytes += await measureTreeBytes(path)
+  const halfThirdRun = Math.floor((await bytesOf(paths, runs.slice(2, 3))) / 2)
+  const maxBytes = fixtureBytes - (await bytesOf(paths, runs.slice(0, 3))) + halfThirdRun
+  await beforeCap?.(paths)
+
+  const report = await cap(paths, maxBytes)
+
+  expect(report.evicted.map((entry) => [entry.tier, entry.name])).toEqual(
+    runs.slice(0, 3).map((runId) => ["folded-run", runId]),
+  )
+  expect(await liveNames(runsDir(paths))).toEqual(runs.slice(3).sort())
+  for (const dir of [...sidecars, ...journals]) expect(existsSync(dir)).toBe(true)
+  expect(report.afterBytes).toBeLessThanOrEqual(maxBytes)
+  expect(report.exceededBytes).toBe(0)
+}
+
 describe("runtime size cap: eviction order", () => {
   test("#given folded runs, sidecars and journals over the cap #when the cap runs #then folded runs go oldest-first until it fits and nothing else is touched (B01)", async () => {
-    const paths = await identity()
-    const runs = await foldedRuns(paths, 10)
-    const sidecars = await Promise.all(
-      [1, 2, 3, 4, 5].map(async (n) => padded(await sidecar(paths, `s-${n}`, daysAgo(1)), 32 * 1024, daysAgo(1))),
-    )
-    const journals = await Promise.all([1, 2, 3, 4, 5].map((n) => journal(paths, `j-${n}`, "never", daysAgo(3))))
-    await settleGuard(paths)
-    const before = (await measureRuntimeSize(paths.runtime)).bytes
-    const maxBytes = before - (await bytesOf(paths, runs.slice(0, 3)))
+    await capThreeOldestFolded()
+  })
 
-    const report = await cap(paths, maxBytes)
-
-    expect(report.evicted.map((entry) => [entry.tier, entry.name])).toEqual(
-      runs.slice(0, 3).map((runId) => ["folded-run", runId]),
-    )
-    expect(await liveNames(runsDir(paths))).toEqual(runs.slice(3).sort())
-    for (const dir of [...sidecars, ...journals]) expect(existsSync(dir)).toBe(true)
-    expect(report.afterBytes).toBeLessThanOrEqual(maxBytes)
-    expect(report.exceededBytes).toBe(0)
+  test("#given the B01 fixture and an unrelated file written after the budget is set #when the cap runs #then exactly the three oldest folded runs still go (B01, #13194)", async () => {
+    let unrelated = ""
+    await capThreeOldestFolded(async (paths) => {
+      unrelated = join(paths.runtime, "unrelated.bin")
+      await writeFile(unrelated, Buffer.alloc(16 * 1024, 1))
+    })
+    expect(existsSync(unrelated)).toBe(true)
   })
 
   test("#given too few folded bytes #when the cap runs #then sidecars idle past 1 h and journals idle past 24 h follow, and the hot ones survive (B02 on)", async () => {

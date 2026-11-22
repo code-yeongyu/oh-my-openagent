@@ -1,0 +1,53 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/skills-loader-core": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "src/features/builtin-skills/skills/debugging.ts",
+        "src/features/builtin-skills/skills/frontend.ts",
+        "src/features/builtin-skills/skills/init-deep.ts",
+        "src/features/builtin-skills/skills/playwright.ts",
+        "src/features/builtin-skills/skills/remove-ai-slops.ts",
+        "src/features/builtin-skills/skills/review-work.ts",
+        "src/features/builtin-skills/skills/visual-qa.ts",
+        "src/features/opencode-skill-loader/discover-worker.ts",
+        "src/shared/claude-config-dir.ts",
+        "src/shared/index.ts",
+        "src/shared/internal-initiator-marker.ts",
+        "src/shared/opencode-command-dirs.ts",
+        "src/shared/opencode-config-dir-types.ts",
+        "src/shared/opencode-config-dir.ts",
+        "src/shared/project-discovery-dirs.ts",
+        "src/shared/skill-path-resolver.ts",
+      ],
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) GIT_ENV_PREFIX_VALIDATION_MESSAGE
+    "packages/skills-loader-core/src/config/git-env-prefix.ts": ["GIT_ENV_PREFIX_VALIDATION_MESSAGE"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) SkillSourceSchema, SkillDefinitionSchema, SkillEntrySchema
+    "packages/skills-loader-core/src/config/skills.ts": ["SkillSourceSchema", "SkillDefinitionSchema", "SkillEntrySchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) SISYPHUS_CO_AUTHOR_TRAILER
+    "packages/skills-loader-core/src/features/opencode-skill-loader/git-master-template-injection.ts": ["SISYPHUS_CO_AUTHOR_TRAILER"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) skillProjectRoot
+    "packages/skills-loader-core/src/features/opencode-skill-loader/skill-provenance.ts": ["skillProjectRoot"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) HOOK_NAME
+    "packages/skills-loader-core/src/hooks/auto-slash-command/constants.ts": ["HOOK_NAME"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) clearPluginConfigFileDetectionCache, detectConfigFile, parseJsonc, parseJsoncSafe, readJsoncFile
+    "packages/skills-loader-core/src/shared/jsonc-parser.ts": ["clearPluginConfigFileDetectionCache", "detectConfigFile", "parseJsonc", "parseJsoncSafe", "readJsoncFile"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) PLUGIN_NAME, LEGACY_PLUGIN_NAME, PUBLISHED_PACKAGE_NAME, ACCEPTED_PACKAGE_NAMES, LOG_FILENAME, CACHE_DIR_NAME
+    "packages/skills-loader-core/src/shared/plugin-identity.ts": ["PLUGIN_NAME", "LEGACY_PLUGIN_NAME", "PUBLISHED_PACKAGE_NAME", "ACCEPTED_PACKAGE_NAMES", "LOG_FILENAME", "CACHE_DIR_NAME"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) shellEscape, shellEscapeForDoubleQuotedCommand, shellSingleQuote
+    "packages/skills-loader-core/src/shared/shell-env.ts": ["shellEscape", "shellEscapeForDoubleQuotedCommand", "shellSingleQuote"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) SCOPE_PRIORITY
+    "packages/skills-loader-core/src/tools/skill/scope-priority.ts": ["SCOPE_PRIORITY"]
+  }
+}

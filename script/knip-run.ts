@@ -3,6 +3,7 @@ import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, realpathSync, sy
 import { tmpdir } from "node:os"
 import { dirname, join, posix, win32 } from "node:path"
 import { Glob } from "bun"
+import { composeKnipConfig, isObject } from "./knip-config.ts"
 
 // realpathSync.native: the JS realpathSync keeps Windows 8.3 short names (C:\Users\RUNNER~1), while knip's resolver
 // returns the long form for files it reaches through imports, so the two forms of one root would not match.
@@ -42,8 +43,7 @@ export const debugEntryPaths = (stdout: string): string[][] =>
       )
     })
 
-export const isObject = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
+export { isObject }
 
 export const runKnip = async (cwd: string, args: string[]) => {
   const proc = Bun.spawn([process.execPath, "run", "knip:check", ...args], {
@@ -66,11 +66,8 @@ export const repoFiles = (): string[] =>
     .split("\0")
     .filter(Boolean)
 
-export const knipConfig = async (): Promise<Record<string, unknown>> => {
-  const config: unknown = Bun.JSONC.parse(await Bun.file(join(REPO_ROOT, "knip.jsonc")).text())
-  if (!isObject(config)) throw new Error("knip.jsonc is not an object")
-  return config
-}
+// The configuration knip itself runs with: knip.ts composes it from knip.base.jsonc and the knip.workspace.jsonc fragments.
+export const knipConfig = async (): Promise<Record<string, unknown>> => composeKnipConfig(REPO_ROOT)
 
 export const packageDirs = async (): Promise<string[]> => {
   const rootPkg: unknown = await Bun.file(join(REPO_ROOT, "package.json")).json()
@@ -87,12 +84,12 @@ export const packageDirs = async (): Promise<string[]> => {
   return [...dirs]
 }
 
-// A temp copy of the files knip can see, with each package's node_modules linked. The caller removes it.
+// A temp copy of the selected repository files, with each copied package's node_modules linked. The caller removes it.
 // realpath: on macOS tmpdir() and /tmp are symlinks into /private, and on Windows tmpdir() can be an 8.3 short
 // name (C:\Users\RUNNER~1); knip misses probes under either form, so the copy root is the native realpath.
-export const copyRepo = async (): Promise<string> => {
+export const copyRepo = async (files: readonly string[] = repoFiles()): Promise<string> => {
   const copy = realpathSync.native(mkdtempSync(join(tmpdir(), "knip-probe-")))
-  for (const file of repoFiles()) {
+  for (const file of files) {
     const src = join(REPO_ROOT, file)
     if (!existsSync(src) || lstatSync(src).isDirectory()) continue
     mkdirSync(dirname(join(copy, file)), { recursive: true })

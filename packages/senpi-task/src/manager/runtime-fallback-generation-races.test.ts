@@ -14,6 +14,7 @@ import { baseSpec, cleanupProjects, FakeRunner, settings, tempProject } from "./
 import { createTaskManager } from "./manager"
 import type { ManagedStartSpec } from "./types"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 // Two generations of one task coexist while runtime fallback finishes closing an old rung: a revived
 // newer run, or a second revival racing the first. Each generation owns only its own lease, handle and
@@ -59,7 +60,7 @@ describe("generations of one task during a runtime-fallback close", () => {
       test(`#given a reload revived the task while its old rung closes #when the newer run ${ending} before the old close ${close} #then no lease of either run is left held`, async () => {
         // given
         const project = tempProject()
-        const store = createTaskRecordStore({ project_dir: project })
+        const store = createTaskRecordStore(ownedTaskState(project))
         const runner = new OldCloseHeld()
         if (close === "rejects") runner.closeFailure = new Error("old close rejected")
         const config = settings({ default_concurrency: 2, global_concurrency: 2 })
@@ -146,7 +147,7 @@ describe("generations of one task during a runtime-fallback close", () => {
   test("#given two revivals of one handoff #when the first loses its claim to the second after the closing-child cleanup #then its rollback leaves the second's run in place", async () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const host = await harness.fakeHost({ transcripts: true })
     const rpc = harness.runnerOver(host)
     const taskId = "st_0000e001"

@@ -117,6 +117,8 @@ describe("monitor open on a remote session target", () => {
       )
     } finally {
       session.dispose()
+      // senpi's fallback logger finishes its first-start removal asynchronously; removing the agent dir before it settles leaks it (#9766).
+      await session.whenToolChildClosed()
     }
   }
 

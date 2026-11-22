@@ -14,7 +14,6 @@ const TEST_TRANSCRIPT_DIR = join(TEST_DIR, "transcripts")
 let sqliteBackend = false
 
 mock.module("./constants", () => ({
-  OPENCODE_STORAGE: TEST_DIR,
   MESSAGE_STORAGE: TEST_MESSAGE_STORAGE,
   PART_STORAGE: TEST_PART_STORAGE,
   SESSION_STORAGE: TEST_SESSION_STORAGE,
@@ -24,8 +23,6 @@ mock.module("./constants", () => ({
   SESSION_READ_DESCRIPTION: "test",
   SESSION_SEARCH_DESCRIPTION: "test",
   SESSION_INFO_DESCRIPTION: "test",
-  SESSION_DELETE_DESCRIPTION: "test",
-  TOOL_NAME_PREFIX: "session_",
 }))
 
 mock.module("../../shared/opencode-storage-detection", () => ({

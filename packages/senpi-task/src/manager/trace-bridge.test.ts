@@ -10,6 +10,7 @@ import { RpcProcessRunner } from "../runners/rpc-process"
 import { createRpcManagedRunner } from "./runner"
 import { categoryPlanner, cleanupProjects, FakeRunner, settings, tempProject } from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const children: ChildProcess[] = []
 
@@ -35,7 +36,7 @@ describe("delegating turn trace context across the task bridge", () => {
       },
     })
     const manager = createTaskManager({
-      store: createTaskRecordStore({ project_dir: project }),
+      store: createTaskRecordStore(ownedTaskState(project)),
       runners: { "in-process": new FakeRunner(), process: createRpcManagedRunner(processRunner) },
       planner: categoryPlanner(),
       config: settings({ default_execution_mode: "process", default_concurrency: 2, max_depth: 2 }),

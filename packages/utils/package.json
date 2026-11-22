@@ -13,6 +13,10 @@
       "types": "./src/atomic-write.ts",
       "import": "./src/atomic-write.ts"
     },
+    "./escape-for-display": {
+      "types": "./src/escape-for-display.ts",
+      "import": "./src/escape-for-display.ts"
+    },
     "./path-containment": {
       "types": "./src/path-containment.ts",
       "import": "./src/path-containment.ts"

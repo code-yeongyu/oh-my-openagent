@@ -322,13 +322,16 @@ gh() {
 bun() { cat >/dev/null; printf '%s' '--latest'; }
 `
     try {
+      // The temp directory carries no release tag, so the step's existing-tag check never reads this checkout's tags.
       const result = spawnSync("bash", ["-c", commands + run], {
+        cwd: directory,
         encoding: "utf8",
         timeout: 5000,
         env: {
           ...process.env,
           VERSION: version,
           DIST_TAG: distTag,
+          RELEASE_SHA: "0123456789abcdef0123456789abcdef01234567",
           VIEW_STATUS: String(view),
           CREATE_STATUS: String(create),
           GITHUB_OUTPUT: outputFile,

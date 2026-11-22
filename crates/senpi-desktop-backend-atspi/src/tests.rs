@@ -197,7 +197,7 @@ fn element_at_asks_the_frame_containing_the_rounded_point() {
     let mut ax = AtSpiAx::with_bus(bus);
     let found = ax.element_at(40.6, 50.4).unwrap().unwrap();
     assert_eq!(found.downcast_native::<u64>(), Some(&12));
-    assert_eq!(ax.bus.calls, ["hit 10 @41,50"]);
+    assert_eq!(ax.bus.calls, ["hit 10 @41,50", "hit 12 @41,50"]);
     assert!(ax.element_at(5000.0, 5000.0).unwrap().is_none());
 }
 

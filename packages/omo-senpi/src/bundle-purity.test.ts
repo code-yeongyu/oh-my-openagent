@@ -12,6 +12,7 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 const builtTaskExtensionPath = join(packageRoot, "plugin", "extensions", "omo-task.js")
 const builtMemoryDoctorExtensionPath = join(packageRoot, "plugin", "extensions", "omo-memory-doctor.js")
 const builtThreadClientExtensionPath = join(packageRoot, "plugin", "extensions", "omo-thread-client.js")
+const builtWakeExtensionPath = join(packageRoot, "plugin", "extensions", "omo-wake.js")
 const builtFeedbackExtensionPath = join(packageRoot, "plugin", "extensions", "omo-feedback.js")
 const builtDesktopToolkitExtensionPath = join(packageRoot, "plugin", "extensions", "omo-desktop-toolkit.js")
 const builtClaimReceiptExtensionPath = join(packageRoot, "plugin", "extensions", "omo-claim-receipt.js")
@@ -66,11 +67,12 @@ describe("omo-senpi bundle purity", () => {
       expect(toolkitSdkInputs.length).toBeGreaterThan(0)
       expect(toolkitSdkInputs.filter((input) => input.replaceAll("\\\\", "/").includes("node_modules/"))).toEqual([])
       // The bunshin-ts SDK is its entry files, the two vendored packages and their one npm dependency; no senpi runtime.
+      // Plus device-service-core's state-dir rule (#13597), a node-builtins-only file, so the transport pick never guesses.
       const bunshinTsInputs = built.bunshinTsInputs.map((input) => input.replaceAll("\\", "/"))
       expect(
         bunshinTsInputs.filter(
           (input) =>
-            !/(src\/extension\/bunshin-ts-[a-z-]+\.ts|\/vendor\/bunshin-ts(-relay)?\/index\.js|\/node_modules\/@sinclair\/typebox\/.+)$/.test(
+            !/(src\/extension\/bunshin-ts-[a-z-]+\.ts|\/vendor\/bunshin-ts(-relay)?\/index\.js|\/node_modules\/@sinclair\/typebox\/.+|(^|\/)packages\/device-service-core\/src\/state-dir\.ts)$/.test(
               input,
             ),
         ),
@@ -114,6 +116,7 @@ describe("omo-senpi bundle purity", () => {
       builtTelemetryPosthogExtensionPath,
       builtTelemetryOtlpExtensionPath,
       builtThreadClientExtensionPath,
+      builtWakeExtensionPath,
       builtTelemetryRecoveryExtensionPath,
       builtFeedbackExtensionPath,
       builtDesktopToolkitExtensionPath,

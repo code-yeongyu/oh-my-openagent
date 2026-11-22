@@ -58,14 +58,15 @@ export const releaseKeySetBytes = (hexes: readonly string[]): readonly Uint8Arra
   return keys.every((key) => strictEd25519Key(key)) ? keys : undefined
 }
 
-// The macOS signing identity of the release binary. The identifier is not published yet, so no binary passes until it is.
-const SIGNING_IDENTIFIER = ""
-const SIGNING_TEAM = "523JNR86LZ"
+// The macOS signing identity every published release binary carries (codesign -dvv on the notarized darwin-arm64 and
+// darwin-x64 builds: Identifier=ai.omo.device-service, TeamIdentifier=523JNR86LZ). An empty identifier refused every
+// macOS install (#13229); the release-signature test fails the build if either field is ever left empty again.
+export const DEVICE_SERVICE_SIGNING_IDENTITY = { identifier: "ai.omo.device-service", team: "523JNR86LZ" } as const
 
 export const codeSignaturePasses = (path: string): boolean => {
-  if (SIGNING_IDENTIFIER === "") return false
+  const { identifier, team } = DEVICE_SERVICE_SIGNING_IDENTITY
   const requirement =
-    `identifier "${SIGNING_IDENTIFIER}" and anchor apple generic and certificate leaf[subject.OU] = "${SIGNING_TEAM}" ` +
+    `identifier "${identifier}" and anchor apple generic and certificate leaf[subject.OU] = "${team}" ` +
     "and certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists"
   const result = spawnSync("/usr/bin/codesign", ["--verify", "--strict", `-R=${requirement}`, path], {
     stdio: "ignore",

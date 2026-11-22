@@ -7,6 +7,7 @@ import type { TaskRecord } from "../../state"
 import { createTaskRecordStore } from "../../store"
 import { createTaskManager } from "../manager"
 import { FakeRunner, baseSpec, categoryPlanner, settings } from "./manager-fakes"
+import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
 
 const mode = process.argv[2]
 
@@ -29,7 +30,7 @@ function record(taskId: string): TaskRecord {
 }
 
 function makeManager(project: string) {
-  const store = createTaskRecordStore({ project_dir: project })
+  const store = createTaskRecordStore(ownedTaskState(project))
   const inProcess = new FakeRunner()
   const process = new FakeRunner()
   const manager = createTaskManager({
@@ -48,7 +49,7 @@ async function run(): Promise<void> {
   try {
     switch (mode) {
       case "seed": {
-        const store = createTaskRecordStore({ project_dir: project })
+        const store = createTaskRecordStore(ownedTaskState(project))
         store.save(record("st_7fffff00"))
         const { manager } = makeManager(project)
         const result = await manager.start(baseSpec())
@@ -57,7 +58,7 @@ async function run(): Promise<void> {
         break
       }
       case "warm-cache": {
-        const store = createTaskRecordStore({ project_dir: project })
+        const store = createTaskRecordStore(ownedTaskState(project))
         store.list()
         mkdirSync(join(store.stateDir, "tasks"), { recursive: true })
         writeFileSync(join(store.stateDir, "tasks", "st_7fffff10.json"), JSON.stringify(record("st_7fffff10")), "utf8")
@@ -76,7 +77,7 @@ async function run(): Promise<void> {
         break
       }
       case "diagnostics": {
-        const store = createTaskRecordStore({ project_dir: project })
+        const store = createTaskRecordStore(ownedTaskState(project))
         store.save(record("st_00000020"))
         mkdirSync(join(store.stateDir, "tasks"), { recursive: true })
         writeFileSync(join(store.stateDir, "tasks", "broken.json"), "{not-json", "utf8")

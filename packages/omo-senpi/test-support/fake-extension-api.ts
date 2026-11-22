@@ -40,7 +40,7 @@ export interface FakeRpcEvent {
 export interface FakeHandlerRegistration {
   event: string
   handler: FakeEventHandler
-  options?: { previewSafe?: boolean }
+  options?: { previewSafe?: boolean; runs?: "brain" | "hand" }
 }
 
 type FakeExtensionEventHandler = (payload: unknown) => void
@@ -126,7 +126,7 @@ export class FakeExtensionAPI implements SenpiExtensionAPI {
 
   private readonly flagValues = new Map<string, boolean | string | undefined>()
 
-  on(event: string, handler: FakeEventHandler, options?: { previewSafe?: boolean }): void {
+  on(event: string, handler: FakeEventHandler, options?: { previewSafe?: boolean; runs?: "brain" | "hand" }): void {
     this.handlers.push({ event, handler, ...(options === undefined ? {} : { options }) })
   }
 

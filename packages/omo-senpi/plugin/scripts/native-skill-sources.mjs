@@ -48,6 +48,10 @@ export function createNativeSkillSources(repoRoot) {
       source: join(nativeSkillsRoot, "mass-ulw"),
     },
     {
+      name: "omo-relay",
+      source: join(nativeSkillsRoot, "omo-relay"),
+    },
+    {
       name: "onboarding",
       source: join(nativeSkillsRoot, "onboarding"),
     },

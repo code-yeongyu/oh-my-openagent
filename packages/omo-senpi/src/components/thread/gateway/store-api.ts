@@ -12,7 +12,10 @@ import type {
   ReportOpResult,
   ToolReceiptBegin,
 } from "./store-relay-ops"
+import type { TargetBacklog } from "./backlog"
 import type { DeliveryReceipt } from "./store-ops"
+import type { IntakeMarkStore, SessionWaitStore } from "./session-wait-types"
+import type { WokenSessionStore } from "./woken-types"
 import type { ClearEndpointRequest, RegisterIncarnationRequest, SessionOwner } from "./store-ownership"
 import type {
   ClaimOutcome,
@@ -23,6 +26,8 @@ import type {
   ExternalAuthor,
   GatewayStoreEvent,
   GatewayStoreStats,
+  IntakeOutcome,
+  IntakeRequest,
   ProcessIdentity,
   ReconcileOutcome,
   ReconcileRequest,
@@ -54,10 +59,24 @@ export type GatewayStore = ExtensionFacade & {
   readonly now: () => number
   readonly identity: () => Promise<ProcessIdentity>
   readonly enqueue: (request: EnqueueRequest) => Promise<EnqueueOutcome>
+  /** A record another device's service attested, for a session here that is not running (#13037); nothing calls it in production yet. */
+  readonly intake: (request: IntakeRequest) => Promise<IntakeOutcome>
+  /** The record of woken sessions (#13037 A3.1); nothing calls it in production yet. */
+  readonly woken: WokenSessionStore
+  /** A session's held or waiting state, read by the carrier, the sweep and the row answers (#13037 A2.6, A3.2.8). */
+  readonly sessionWait: SessionWaitStore
+  /** The newest queued command per (sender device, session), for the device service's hand-over mark (#13037). */
+  readonly intakeMarks: IntakeMarkStore
   readonly reconcile: (request: ReconcileRequest) => Promise<ReconcileOutcome>
   readonly claim: (request: ClaimRequest) => Promise<ClaimOutcome>
   readonly recordOutcome: (request: RecordOutcomeRequest) => Promise<ClaimOutcome>
   readonly refuseQueued: (request: {
+    readonly now: number
+    readonly delivery_id: string
+    readonly reason: RefusalReason
+  }) => Promise<boolean>
+  /** A delivery its session took in and handed back unread at a graceful close (omo#14313); never an applied row. */
+  readonly refuseReturned: (request: {
     readonly now: number
     readonly delivery_id: string
     readonly reason: RefusalReason
@@ -92,6 +111,8 @@ export type GatewayStore = ExtensionFacade & {
     readonly root_id?: string
   }) => Promise<readonly DeliveryRow[]>
   readonly isReferenced: (durableId: string) => Promise<boolean>
+  /** Each session's undelivered deliveries (#14428), keyed by durable id; a session holding none is absent. */
+  readonly backlogs: (durableIds: readonly string[]) => Promise<Readonly<Record<string, TargetBacklog>>>
   readonly journalMode: () => Promise<string>
   readonly stats: () => Promise<GatewayStoreStats>
   readonly legacyMigrated: () => Promise<number>
@@ -105,6 +126,8 @@ export type GatewayStore = ExtensionFacade & {
   readonly toolReceiptRevise: (
     request: ReceiptScope & { readonly now: number; readonly result: unknown },
   ) => Promise<boolean>
+  /** Drops this instance's `prepared` receipt for a call that wrote nothing, so the same key runs again; true when one was dropped. */
+  readonly toolReceiptRelease: (request: ReceiptScope) => Promise<boolean>
   readonly bind: (request: BindOpRequest) => Promise<RelayOutcome<{ readonly binding: BindingRecord } & Deduplicated>>
   readonly unbind: (request: CasRequest) => Promise<
     RelayOutcome<
