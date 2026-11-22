@@ -38,6 +38,10 @@ function controlledTime() {
     stall: (ms: number) => {
       clock += ms
     },
+    /** A probe callback that was already due runs now: the clock does not move. */
+    overdueProbe: () => {
+      for (const probe of [...probes.values()]) probe()
+    },
     /** The caller is responsive: every probe period the probe looks. */
     responsive: (ms: number) => {
       for (let passed = 0; passed < ms; passed += 50) {
@@ -229,6 +233,37 @@ test("#given a stall the request's own clock read saw #when the host drops right
   })
   expect(await call).toMatchObject({ success: true })
   expect(sockets.length).toBe(2)
+})
+
+test("#given a stall the request's own clock read saw #when the overdue probe runs next and the host's reset follows #then the read is redialed (#14624 review M5)", async () => {
+  // The overdue probe is measured against the previous probe, not against the request's clock read just before it.
+  const time = controlledTime()
+  const { connect, sockets } = dialer((frame, socket) => {
+    if (sockets.length > 1) return reply(socket, frame)
+    time.overdueProbe()
+    drop(socket, "ECONNRESET")
+  })
+  const call = withRpcSocket("endpoint", { timeoutMs: 10_000, readCommand: "get_messages", connect }, (request) => {
+    if (sockets.length === 1) time.stall(500)
+    return read(request)
+  })
+  expect(await call).toMatchObject({ success: true })
+  expect(sockets.length).toBe(2)
+})
+
+test("#given a stall the request's own clock read saw #when the overdue probe and then an on-time probe run before the host's reset #then the read is not redialed", async () => {
+  const time = controlledTime()
+  const { connect, sockets } = dialer((_frame, socket) => {
+    time.overdueProbe()
+    time.responsive(50)
+    drop(socket, "ECONNRESET")
+  })
+  const call = withRpcSocket("endpoint", { timeoutMs: 10_000, readCommand: "get_messages", connect }, (request) => {
+    time.stall(500)
+    return read(request)
+  })
+  await expect(call).rejects.toThrow("dropped ECONNRESET")
+  expect(sockets.length).toBe(1)
 })
 
 test("#given a read the host dropped with no caller stall #then it is not redialed", async () => {

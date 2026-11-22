@@ -105,6 +105,7 @@ function callerStallMeter(): CallerStallMeter {
   let last = performance.now()
   let stallCount = 0
   let recovered = true
+  let lastProbe = last
   let probe: ReturnType<typeof setInterval> | undefined
   const look = (probeTick = false) => {
     const now = performance.now()
@@ -113,9 +114,12 @@ function callerStallMeter(): CallerStallMeter {
       stalled += excess
       stallCount += 1
       recovered = false
-    } else if (probeTick) {
-      // Only a probe on time proves the caller runs again; a drop's own look on time proves nothing about the drop.
-      recovered = true
+    }
+    if (probeTick) {
+      // Only a probe on time proves the caller runs again, and on time is measured from the previous probe: an overdue
+      // probe that runs right after some other clock read (a request arming its timer) is not one (#14624 review M5).
+      if (excess === 0 && now - lastProbe <= STALL_PROBE_MS + STALL_TOLERANCE_MS) recovered = true
+      lastProbe = now
     }
     last = now
     return stalled
@@ -123,6 +127,7 @@ function callerStallMeter(): CallerStallMeter {
   const resume = () => {
     if (probe !== undefined) return
     last = performance.now()
+    lastProbe = last
     probe = setInterval(() => look(true), STALL_PROBE_MS)
     probe.unref?.()
   }
