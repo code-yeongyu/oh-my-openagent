@@ -16,6 +16,7 @@ export interface MemoryRepoAccess {
 
 export interface MemoryIdentityContext {
   readonly identity: string
+  readonly oneShot?: boolean
   readonly identityPaths: MemoryIdentityPaths
   /**
    * `<memory>/agents/<id>`: where this identity's memory lives once it owns a `repo/`. Equal to
@@ -31,6 +32,7 @@ export interface MemoryIdentityContext {
 
 export function createMemoryIdentityContext(input: {
   readonly identity: string
+  readonly oneShot?: boolean
   readonly identityPaths: MemoryIdentityPaths
   readonly binding: MemorySessionBinding
   readonly durableRoot?: string
@@ -39,6 +41,7 @@ export function createMemoryIdentityContext(input: {
   let repoAccess: MemoryRepoAccess | undefined
   return {
     identity: input.identity,
+    oneShot: input.oneShot ?? false,
     identityPaths: input.identityPaths,
     durableRoot: input.durableRoot ?? input.identityPaths.root,
     binding: input.binding,

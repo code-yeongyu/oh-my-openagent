@@ -147,6 +147,7 @@ export function createSessionBinder(deps: SessionBinderDeps): SessionBinder {
     state.run = run
     state.context = createMemoryIdentityContext({
       identity: identity.id,
+      oneShot,
       identityPaths: run.paths,
       durableRoot: run.durableRoot,
       binding,
