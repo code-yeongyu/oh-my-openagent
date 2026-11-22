@@ -330,7 +330,7 @@ describe("createKibitzerSidecarChildStarter", () => {
     for (const error of transient) expect(kibitzerConfigurationFailure(error)).toBeUndefined()
   })
 
-  test("#given a model-unavailable ladder #when a later candidate starts #then the success clears the refused set for the next wake (#11104)", async () => {
+  test("#given a model-unavailable ladder #when a later candidate starts #then a refused head stays skipped on later wakes (#10536 contract, #11104)", async () => {
     const twoModels = [
       { provider: "omo-mock", id: "mock-1" },
       { provider: "omo-mock", id: "mock-2" },
@@ -376,9 +376,9 @@ describe("createKibitzerSidecarChildStarter", () => {
     expect(await start(input)).toBe(handle)
     expect(selected).toEqual(["omo-mock/mock-1", "omo-mock/mock-2"])
 
-    // Second wake: the earlier refusal was episodic, so mock-1 is offered (and refused) again.
+    // Second wake: the refused head stays skipped for the sidecar's life, so the wake starts at mock-2.
     expect(await start({ ...input, generation: 2 })).toBe(handle)
-    expect(selected).toEqual(["omo-mock/mock-1", "omo-mock/mock-2", "omo-mock/mock-1", "omo-mock/mock-2"])
+    expect(selected).toEqual(["omo-mock/mock-1", "omo-mock/mock-2", "omo-mock/mock-2"])
   })
 
   test("#given a runner seam #when the starter runs #then one child starts from the persona and the seed and the handle is returned", async () => {

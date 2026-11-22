@@ -296,12 +296,7 @@ export function createKibitzerSidecarChildStarter(
         prompt: input.prompt,
       })
       try {
-        const handle = await runner.start(spec)
-        // A successful start ends the refusal episode: the refused candidates were refused by THIS
-        // ladder walk, and a later wake must offer them again instead of skipping them for the
-        // sidecar's whole life (#11104).
-        refusedModels.clear()
-        return handle
+        return await runner.start(spec)
       } catch (error) {
         lastError = error
         if (runtime?.isModelUnavailableStart(error) !== true) break
