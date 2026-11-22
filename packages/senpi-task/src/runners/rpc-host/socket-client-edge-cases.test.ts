@@ -163,6 +163,74 @@ test("#given a stall that ended and a responsive caller #when the host resets th
   expect(sockets.length).toBe(1)
 })
 
+test("#given a stall whose end a probe recorded #when the host resets right after the first on-time probe #then the read is not redialed (#14624 review M5)", async () => {
+  // The probe that sees the stall arms the marker; the next one, on time, proves the caller runs again.
+  const time = controlledTime()
+  const { connect, sockets } = dialer((_frame, socket) => {
+    time.stall(500)
+    time.responsive(50)
+    time.responsive(50)
+    drop(socket, "ECONNRESET")
+  })
+  const call = withRpcSocket("endpoint", { timeoutMs: 10_000, readCommand: "get_messages", connect }, read)
+  await expect(call).rejects.toThrow("dropped ECONNRESET")
+  expect(sockets.length).toBe(1)
+})
+
+test("#given a connection the caller stalled on before writing anything #when the host's reset is seen only after probes ran on time #then the read is redialed (#14444)", async () => {
+  // The host dropped the silent connection during the stall; under load its reset can reach the caller a probe later.
+  const time = controlledTime()
+  const answering = dialer((frame, socket) => reply(socket, frame))
+  const sockets: Socket[] = []
+  const connect = () => {
+    if (sockets.length > 0) {
+      const socket = answering.connect()
+      sockets.push(socket)
+      return socket
+    }
+    const silent = new Socket()
+    restores.push(() => silent.destroy())
+    sockets.push(silent)
+    time.stall(500)
+    queueMicrotask(() => {
+      time.responsive(100)
+      drop(silent, "ECONNRESET")
+    })
+    return silent
+  }
+  const call = withRpcSocket("endpoint", { timeoutMs: 10_000, readCommand: "get_messages", connect }, read)
+  expect(await call).toMatchObject({ success: true })
+  expect(sockets.length).toBe(2)
+})
+
+test("#given a stall the caller recovered from #when a second stall ends with the host's drop #then the read is redialed", async () => {
+  const time = controlledTime()
+  const { connect, sockets } = dialer((frame, socket) => {
+    if (sockets.length > 1) return reply(socket, frame)
+    time.stall(500)
+    time.responsive(100)
+    time.stall(500)
+    drop(socket, "ECONNRESET")
+  })
+  const call = withRpcSocket("endpoint", { timeoutMs: 10_000, readCommand: "get_messages", connect }, read)
+  expect(await call).toMatchObject({ success: true })
+  expect(sockets.length).toBe(2)
+})
+
+test("#given a stall the request's own clock read saw #when the host drops right after #then the read is redialed", async () => {
+  const time = controlledTime()
+  const { connect, sockets } = dialer((frame, socket) => {
+    if (sockets.length > 1) return reply(socket, frame)
+    drop(socket, "ECONNRESET")
+  })
+  const call = withRpcSocket("endpoint", { timeoutMs: 10_000, readCommand: "get_messages", connect }, (request) => {
+    if (sockets.length === 1) time.stall(500)
+    return read(request)
+  })
+  expect(await call).toMatchObject({ success: true })
+  expect(sockets.length).toBe(2)
+})
+
 test("#given a read the host dropped with no caller stall #then it is not redialed", async () => {
   controlledTime()
   const { connect, sockets } = dialer((_frame, socket) => drop(socket, "ECONNRESET"))

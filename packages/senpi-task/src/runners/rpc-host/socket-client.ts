@@ -39,8 +39,8 @@ export async function resolveRpcSocketTransport(
  * tool's synchronous work in the same engine), no host can be heard, so that time is never charged to the host. A
  * terminal drops a connection whose secret has not arrived within its handshake window (senpi
  * `SOCKET_HANDSHAKE_TIMEOUT_MS`), which a blocked caller cannot send; a read (`isReadCommand`) that lost its connection
- * that way (the host dropped it before any response byte, and the drop is seen as the stall ends), with budget left, is
- * dialed once more. Nothing else is retried.
+ * that way (the host dropped it before any response byte, after a stall that began after the dial, while the caller had
+ * written nothing yet or had not yet run on time again), with budget left, is dialed once more. Nothing else is retried.
  */
 export async function withRpcSocket<T>(
   endpoint: string,
@@ -87,11 +87,10 @@ const STALL_TOLERANCE_MS = 50
 type CallerStallMeter = {
   /** Records the gap since the last look; the milliseconds this process could not run its event loop so far. */
   total(): number
-  /**
-   * Whether a stall ended within one probe period plus the tolerance of now (#14624 review M5): only a drop seen that soon
-   * can be the host giving up on a caller that could not run. The cumulative total says nothing about this drop.
-   */
-  justStalled(): boolean
+  /** How many stalls were seen so far (each look that found one), counting the gap up to now. */
+  stalls(): number
+  /** Whether an on-time probe ran after the last stall: the caller has been running again since (#14624 review M5). */
+  recovered(): boolean
   /** Stops looking while nothing waits on the clock (a subscription between requests); the gap is never counted. */
   pause(): void
   resume(): void
@@ -104,14 +103,19 @@ type CallerStallMeter = {
 function callerStallMeter(): CallerStallMeter {
   let stalled = 0
   let last = performance.now()
-  let stallEndedAt: number | undefined
+  let stallCount = 0
+  let recovered = true
   let probe: ReturnType<typeof setInterval> | undefined
-  const look = () => {
+  const look = (probeTick = false) => {
     const now = performance.now()
     const excess = Math.max(0, now - last - STALL_PROBE_MS - STALL_TOLERANCE_MS)
     if (excess > 0) {
       stalled += excess
-      stallEndedAt = now
+      stallCount += 1
+      recovered = false
+    } else if (probeTick) {
+      // Only a probe on time proves the caller runs again; a drop's own look on time proves nothing about the drop.
+      recovered = true
     }
     last = now
     return stalled
@@ -119,17 +123,17 @@ function callerStallMeter(): CallerStallMeter {
   const resume = () => {
     if (probe !== undefined) return
     last = performance.now()
-    probe = setInterval(look, STALL_PROBE_MS)
+    probe = setInterval(() => look(true), STALL_PROBE_MS)
     probe.unref?.()
   }
   resume()
   return {
     total: () => (probe === undefined ? stalled : look()),
-    justStalled: () => {
-      if (probe === undefined) return false
-      look()
-      return stallEndedAt !== undefined && performance.now() - stallEndedAt <= STALL_PROBE_MS + STALL_TOLERANCE_MS
+    stalls: () => {
+      if (probe !== undefined) look()
+      return stallCount
     },
+    recovered: () => recovered,
     pause: () => {
       if (probe === undefined) return
       look()
@@ -157,6 +161,11 @@ async function converse<T>(
   diagnostic: ReturnType<typeof readRpcDiagnostic>,
   deadline: number,
 ): Promise<T> {
+  // A host drop is this conversation's stall only if a stall began after the dial. Before the caller wrote anything, the
+  // host can only have given up on a silent caller, however late its reset is seen; once the caller wrote, a probe on time
+  // after the stall proves it ran again, so a later reset is not the stall's (#14624 review M5).
+  const stallsAtDial = meter.stalls()
+  let wrote = false
   let socket: Socket
   try {
     socket = (options.connect ?? createConnection)(endpoint)
@@ -178,7 +187,10 @@ async function converse<T>(
   // A deadline is never redialed: the host had its whole budget of this process's running time.
   const fail = (error: Error, droppedByHost = true) => {
     transportFailures.add(error)
-    if (droppedByHost && !answered) lostConnections.set(error, { duringStall: meter.justStalled() })
+    if (droppedByHost && !answered) {
+      const stalled = meter.stalls() > stallsAtDial
+      lostConnections.set(error, { duringStall: stalled && (!wrote || !meter.recovered()) })
+    }
     if (failure === undefined) options.listen?.closed(error)
     failure = error
     clear()
@@ -250,6 +262,7 @@ async function converse<T>(
       pending = { id, resolve, reject }
       arm(timeoutMs)
       diagnostic?.at(command.type === options.readCommand ? "request" : "handshake")
+      wrote = true
       socket.write(`${JSON.stringify({ ...command, id })}\n`)
     })
   }
@@ -260,7 +273,10 @@ async function converse<T>(
       socket.once("connect", () => {
         clear()
         diagnostic?.at(options.secret === undefined ? "connected" : "handshake")
-        if (options.secret !== undefined) socket.write(Buffer.from(options.secret))
+        if (options.secret !== undefined) {
+          wrote = true
+          socket.write(Buffer.from(options.secret))
+        }
         resolve()
       })
     })
