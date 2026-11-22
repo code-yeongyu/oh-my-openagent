@@ -6,7 +6,7 @@ import { join } from "node:path"
 import { PROJECTION_PIN_ENTRY_TYPE } from "./projection-pin"
 import { rmEfaultTolerant } from "./teardown.test-support"
 
-import { buildIdentityPaths, GitMemoryRepo, resolveMemoryIdentity } from "@oh-my-opencode/memory-core"
+import { buildIdentityPaths, GitMemoryRepo, InFlightReads, resolveMemoryIdentity } from "@oh-my-opencode/memory-core"
 import type { MemoryIdentityRuntime } from "./identity-runtime"
 
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
@@ -396,77 +396,85 @@ const eventCtx = {
   },
 }
 
-for (const assertion of ["bounded", "attributed"] as const) {
-  test(`#given a never-resolving reflection reconcile #when the composed memory subscriber settles #then it is ${assertion}`, async () => {
-    useTestTimeout(15_000)
-    // given: the real memory wiring reaches its injected runtime, not a substitute settle handler.
-    const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-settle-")))
-    roots.push(root)
-    const identity = createMemoryIdentityContext({
-      identity: "settle-agent",
-      identityPaths: buildIdentityPaths(root, "settle-agent"),
-      binding: { identity: "settle-agent", repoPathHash: "hash", boundAt: 1 },
-    })
-    const entered = Promise.withResolvers<void>()
-    const release = Promise.withResolvers<void>()
-    const runtime = {
-      reconcile: () => {
-        entered.resolve()
-        return release.promise
-      },
-    } as unknown as MemoryIdentityRuntime
-    const pi = new MemoryFakeExtensionAPI()
-    const context = componentContext()
-    await composeOmoSenpiExtension(
-      [
-        {
-          name: "memory",
-          register(api, ctx) {
-            createMemoryWiring({
-              sessions: new Map([["session-1", { context: identity }]]),
-              loadConfig: () => loadedMemoryConfig(memorySettings()),
-              cwd: () => root,
-              env: {},
-              logger: ctx.logger,
-              createRuntime: () => runtime,
-            }).registerStatic(api, ctx)
-          },
+test("#given a held reflection reconcile #when turns settle #then they finish while the same pass stays alive", async () => {
+  useTestTimeout(15_000)
+  // given: the real memory wiring reaches its injected runtime, not a substitute settle handler.
+  const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-settle-")))
+  roots.push(root)
+  const identity = createMemoryIdentityContext({
+    identity: "settle-agent",
+    identityPaths: buildIdentityPaths(root, "settle-agent"),
+    binding: { identity: "settle-agent", repoPathHash: "hash", boundAt: 1 },
+  })
+  const entered = Promise.withResolvers<void>()
+  const release = Promise.withResolvers<void>()
+  let passes = 0
+  let cancellations = 0
+  const runtime = {
+    reconcile: async (signal?: AbortSignal) => {
+      passes += 1
+      const aborted = Promise.withResolvers<never>()
+      const onAbort = () => {
+        cancellations += 1
+        aborted.reject(signal?.reason)
+      }
+      signal?.addEventListener("abort", onAbort, { once: true })
+      entered.resolve()
+      try {
+        await Promise.race([release.promise, aborted.promise])
+      } finally {
+        signal?.removeEventListener("abort", onAbort)
+      }
+    },
+  } as unknown as MemoryIdentityRuntime
+  const work = new InFlightReads()
+  const pi = new MemoryFakeExtensionAPI()
+  const context = componentContext()
+  await composeOmoSenpiExtension(
+    [
+      {
+        name: "memory",
+        register(api, ctx) {
+          createMemoryWiring({
+            work,
+            sessions: new Map([["session-1", { context: identity }]]),
+            loadConfig: () => loadedMemoryConfig(memorySettings()),
+            cwd: () => root,
+            env: {},
+            logger: ctx.logger,
+            createRuntime: () => runtime,
+          }).registerStatic(api, ctx)
         },
-      ],
-      { logger: context.logger },
-    )(pi)
-    await pi.dispatch("input", { source: "rpc", inputId: "accepted", text: "Work." }, eventCtx)
-    await pi.dispatch("input_disposition", { inputId: "accepted", disposition: "started" }, eventCtx)
-    const settled = pi.dispatch("agent_settled", {}, eventCtx)
-    try {
-      await withinMs(entered.promise, "memory reconciliation entered", remainingTestTime())
-      // when: this watchdog bounds the assertion, never supplies the completion under test.
-      const completed = await withinMs(settled, "bounded memory settle", remainingTestTime()).then(
-        () => true,
-        () => false,
-      )
-      // then
-      if (assertion === "bounded") expect(completed).toBe(true)
-      else
-        expect(context.logs).toContainEqual(
-          expect.objectContaining({
-            message: "extension_handler_stalled",
-            details: expect.objectContaining({
-              component: "memory",
-              hook: "onSettled.reflection.reconcile",
-              handlerEvent: "agent_settled",
-              stage: "timeout",
-              sessionId: "session-1",
-            }),
-          }),
-        )
-    } finally {
-      release.resolve()
-      await settled
-      await pi.dispatch("session_shutdown", {})
-    }
-  }, 15_000)
-}
+      },
+    ],
+    { logger: context.logger },
+  )(pi)
+  await pi.dispatch("input", { source: "rpc", inputId: "accepted", text: "Work." }, eventCtx)
+  await pi.dispatch("input_disposition", { inputId: "accepted", disposition: "started" }, eventCtx)
+  try {
+    // when: the watchdog only bounds a failure; completing by the observer's timeout would log a stall.
+    await withinMs(pi.dispatch("agent_settled", {}, eventCtx), "first settle", remainingTestTime())
+    await withinMs(entered.promise, "memory reconciliation entered", remainingTestTime())
+    await withinMs(pi.dispatch("agent_settled", {}, eventCtx), "second settle", remainingTestTime())
+
+    // then: both turn ends returned while the pass is still held, and the pass was not restarted.
+    expect({ passes, cancellations }).toEqual({ passes: 1, cancellations: 0 })
+    expect(context.logs).not.toContainEqual(expect.objectContaining({ message: "extension_handler_stalled" }))
+
+    // when: the pass finishes, later turns find the session reconciled
+    release.resolve()
+    await withinMs(work.settled(), "detached memory reconciliation finished", remainingTestTime())
+    await withinMs(pi.dispatch("agent_settled", {}, eventCtx), "third settle", remainingTestTime())
+    await withinMs(work.settled(), "third settle's background work finished", remainingTestTime())
+
+    // then
+    expect(passes).toBe(1)
+  } finally {
+    release.resolve()
+    await withinMs(work.settled(), "memory reconciliation cleanup", remainingTestTime())
+    await pi.dispatch("session_shutdown", {})
+  }
+}, 15_000)
 
 describe("memory wiring reflection completion delivery", () => {
   describe("#given a pending completion and a bound session with a real UI callback", () => {
