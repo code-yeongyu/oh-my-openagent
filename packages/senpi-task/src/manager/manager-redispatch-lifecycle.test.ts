@@ -10,6 +10,7 @@ import { baseSpec, cleanupProjects, FakeRunner, settings, tempProject } from "./
 import { TaskConcurrency } from "./concurrency"
 import { createTaskManager } from "./manager"
 import type { ManagedStartSpec } from "./types"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 // senpi#3266 review: re-dispatch must work with the REAL destruction port, wired exactly as
 // omo-senpi's engine wires it (components/task/engine.ts). A mock that skips teardown hid that the
@@ -45,7 +46,7 @@ type LaneOptions = {
 
 function productionLane(options: LaneOptions = {}) {
   const runner = new CountingRunner()
-  const store = createTaskRecordStore({ project_dir: tempProject() })
+  const store = createTaskRecordStore(ownedTaskState(tempProject()))
   const config = settings({ default_concurrency: 1, global_concurrency: 1, max_depth: 1 })
   const concurrency = new TaskConcurrency(config)
   const hook = options.duringRedispatchTeardown

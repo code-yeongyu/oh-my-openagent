@@ -12,6 +12,7 @@ import {
   settings,
   tempProject,
 } from "./__fixtures__/manager-fakes"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -39,7 +40,7 @@ describe("creation-time admission staging", () => {
       },
     }
     const runner = new FakeRunner()
-    const store = createTaskRecordStore({ project_dir: cwd })
+    const store = createTaskRecordStore(ownedTaskState(cwd))
     const manager = createTaskManager({
       cwd,
       store,

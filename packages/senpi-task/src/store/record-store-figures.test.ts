@@ -6,6 +6,7 @@ import { join } from "node:path"
 import { createTaskRecord } from "../state"
 import { createTaskRecordStore } from "./record-store"
 import { resolveStateDir } from "./state-dir"
+import { ownedTaskState } from "./__fixtures__/owned-task-state"
 
 const cleanupRoots: string[] = []
 
@@ -39,10 +40,10 @@ describe("createTaskRecordStore residentFigures", () => {
   test("#given two saved records #when the figures are read #then they count both cached records and their bytes", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     store.save(record("st_00000001"))
     store.save(record("st_00000002"))
-    const tasksDir = join(resolveStateDir({ project_dir: project }), "tasks")
+    const tasksDir = join(resolveStateDir(ownedTaskState(project)), "tasks")
     const bytes = statSync(join(tasksDir, "st_00000001.json")).size + statSync(join(tasksDir, "st_00000002.json")).size
 
     // when
@@ -55,7 +56,7 @@ describe("createTaskRecordStore residentFigures", () => {
   test("#given a removed record #when the figures are read #then it no longer counts", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     store.save(record("st_00000003"))
     store.remove("st_00000003")
 

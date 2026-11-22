@@ -4,6 +4,7 @@ import { seedRecord } from "../lifecycle/__fixtures__/lifecycle-fakes"
 import { createTaskRecordStore } from "../store"
 import { cleanupProjects, makeHandle, tempProject } from "./__fixtures__/manager-fakes"
 import { reattachManagedTask } from "./manager-reattach"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 // senpi#3266: a revival that re-joins a session whose last turn ended aborted (or never answered)
 // flags the reattached record `awaiting_input`, so task_output and the live row say
@@ -15,7 +16,7 @@ const HOST = 11_001
 const NOW = Date.parse("2026-10-14T00:00:00.000Z")
 
 function fixture(options: { readonly status?: "running" | "completed" } = {}) {
-  const store = createTaskRecordStore({ project_dir: tempProject() })
+  const store = createTaskRecordStore(ownedTaskState(tempProject()))
   const taskId = "st_0a326601"
   seedRecord(store, {
     task_id: taskId,

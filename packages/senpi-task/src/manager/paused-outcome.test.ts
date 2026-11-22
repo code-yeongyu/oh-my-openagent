@@ -3,12 +3,13 @@ import { createTaskRecord } from "../state"
 import { createTaskRecordStore } from "../store"
 import { createOutcomeTracker } from "./manager-outcome"
 import { cleanupProjects, makeHandle, tempProject } from "./__fixtures__/manager-fakes"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
 describe("pause intent outcome routing", () => {
   test("#given a pause intent before abort #when the aborted outcome settles #then park without fallback or isolation settlement", async () => {
-    const store = createTaskRecordStore({ project_dir: tempProject() })
+    const store = createTaskRecordStore(ownedTaskState(tempProject()))
     const draft = createTaskRecord({
       parent_session_id: "parent",
       root_session_id: "parent",

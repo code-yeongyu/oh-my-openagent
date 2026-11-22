@@ -19,6 +19,7 @@ import {
 } from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
 import type { ManagedRunner, ManagedStartSpec, SpawnAdmission } from "./types"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const owner: DagTaskOwner = {
   kind: "dag",
@@ -41,7 +42,7 @@ describe("TaskManager.startOwned", () => {
   test("#given a new DAG owner #when started #then the initial claim persists the owner before launch", async () => {
     // given
     const project = tempProject()
-    const inner = createTaskRecordStore({ project_dir: project })
+    const inner = createTaskRecordStore(ownedTaskState(project))
     let claimedOwner: unknown
     const store: TaskRecordStore = {
       ...inner,
@@ -82,7 +83,7 @@ describe("TaskManager.startOwned", () => {
         return launch.promise
       },
     }
-    const firstStore = createTaskRecordStore({ project_dir: project })
+    const firstStore = createTaskRecordStore(ownedTaskState(project))
     const firstManager = createTaskManager({
       store: firstStore,
       runners: { "in-process": runner, process: runner },
@@ -91,7 +92,7 @@ describe("TaskManager.startOwned", () => {
       cwd: project,
     })
     const secondManager = createTaskManager({
-      store: createTaskRecordStore({ project_dir: project }),
+      store: createTaskRecordStore(ownedTaskState(project)),
       runners: { "in-process": runner, process: runner },
       planner: categoryPlanner(),
       config: settings({ default_concurrency: 5, max_depth: 1 }),
