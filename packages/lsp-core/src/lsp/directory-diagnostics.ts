@@ -99,7 +99,7 @@ export async function aggregateDiagnosticsForDirectory(
 
   const serverResult =
     options.server === undefined
-      ? findServerForExtension(extension)
+      ? findServerForExtension(extension, absDir)
       : { status: "found" as const, server: options.server }
   if (serverResult.status !== "found") {
     throw new LspServerLookupError(formatServerLookupError(serverResult))

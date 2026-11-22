@@ -137,4 +137,71 @@ describe("TypeScript server selection from the project's TypeScript", () => {
     // then
     expect(servers.find((server) => server.id === "typescript")?.installed).toBe(true)
   })
+
+  test("#given a monorepo session root without TypeScript 7 #when looking up a file per package #then each package's own TypeScript decides", () => {
+    // given: the root has typescript-language-server only; packages/x is on TypeScript 7, packages/y on TypeScript 5
+    const root = makeProject()
+    mkdirSync(join(root, ".git"))
+    const languageServer = writeExecutable(join(root, "node_modules", ".bin", "typescript-language-server"))
+    const packageX = join(root, "packages", "x")
+    const packageY = join(root, "packages", "y")
+    mkdirSync(join(packageX, "src"), { recursive: true })
+    mkdirSync(join(packageY, "src"), { recursive: true })
+    writeFileSync(join(packageX, "package.json"), "{}\n")
+    writeFileSync(join(packageY, "package.json"), "{}\n")
+    const tscX = installTypescript(join(packageX, "node_modules"), 7)
+    installTypescript(join(packageY, "node_modules"), 5)
+    process.env["PATH"] = join(root, "definitely-empty")
+
+    // when
+    const [inX, inY] = runWithRequestContext(contextFor(root), () => [
+      findServerForExtension(".ts", join(packageX, "src", "broken.ts")),
+      findServerForExtension(".ts", join(packageY, "src", "fine.ts")),
+    ])
+
+    // then
+    if (inX?.status !== "found" || inY?.status !== "found") throw new Error("expected found servers for both packages")
+    expect(inX.server.command).toEqual([tscX, "--lsp", "--stdio"])
+    expect(inY.server.command).toEqual([languageServer, "--stdio"])
+  })
+
+  test("#given a user typescript command equal to the default #when the project is on TypeScript 7 #then the command and its initialization are kept", () => {
+    // given
+    const root = makeProject()
+    installTypescript(join(root, "node_modules"), 7)
+    const languageServer = writeExecutable(join(root, "node_modules", ".bin", "typescript-language-server"))
+    const initialization = { preferences: { quotePreference: "double" } }
+    mkdirSync(join(root, "home-config"), { recursive: true })
+    writeFileSync(
+      contextFor(root).userConfigPath,
+      JSON.stringify({ lsp: { typescript: { command: ["typescript-language-server", "--stdio"], initialization } } }),
+    )
+    process.env["PATH"] = join(root, "definitely-empty")
+
+    // when
+    const result = runWithRequestContext(contextFor(root), () => findServerForExtension(".ts"))
+
+    // then
+    if (result.status !== "found") throw new Error(`expected a found server, got ${result.status}`)
+    expect(result.server.command).toEqual([languageServer, "--stdio"])
+    expect(result.server.initialization).toEqual(initialization)
+  })
+
+  test("#given user initialization on the inherited typescript command #when the project is on TypeScript 7 #then tsc receives only that initialization", () => {
+    // given
+    const root = makeProject()
+    const tsc = installTypescript(join(root, "node_modules"), 7)
+    const initialization = { locale: "en" }
+    mkdirSync(join(root, "home-config"), { recursive: true })
+    writeFileSync(contextFor(root).userConfigPath, JSON.stringify({ lsp: { typescript: { initialization } } }))
+    process.env["PATH"] = join(root, "definitely-empty")
+
+    // when
+    const result = runWithRequestContext(contextFor(root), () => findServerForExtension(".ts"))
+
+    // then
+    if (result.status !== "found") throw new Error(`expected a found server, got ${result.status}`)
+    expect(result.server.command).toEqual([tsc, "--lsp", "--stdio"])
+    expect(result.server.initialization).toEqual(initialization)
+  })
 })
