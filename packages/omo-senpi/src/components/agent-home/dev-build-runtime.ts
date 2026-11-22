@@ -34,15 +34,23 @@ function canonical(path: string): string {
 }
 
 /**
- * True when `agentDir` is one of the agent homes every released omo on this account shares (`resolveAgentHome`'s
- * defaults: `~/.omo/agent`, the flat `~/.omo`, `~/.senpi/agent`). An explicit isolated dir is never shared.
+ * Every home a released omo on this account may resolve its agent dir under: HOME, USERPROFILE and the OS account home
+ * can differ (a Windows session launched without HOME uses %USERPROFILE%), so each one counts (#14622 review M2).
  */
-export function isSharedAgentDir(
-  agentDir: string,
-  home: string = process.env.HOME || process.env.USERPROFILE || homedir(),
-): boolean {
+function accountHomes(env: NodeJS.ProcessEnv): readonly string[] {
+  return [env.HOME, env.USERPROFILE, homedir()].filter((home): home is string => home !== undefined && home.length > 0)
+}
+
+/**
+ * True when `agentDir` is one of the agent homes every released omo on this account shares (`resolveAgentHome`'s
+ * defaults: `~/.omo/agent`, the flat `~/.omo`, `~/.senpi/agent`) under any of the account's home roots. An explicit
+ * isolated dir is never shared.
+ */
+export function isSharedAgentDir(agentDir: string, homes: readonly string[] = accountHomes(process.env)): boolean {
   const target = canonical(agentDir)
-  return [join(home, ".omo", "agent"), join(home, ".omo"), join(home, ".senpi", "agent")].some(
-    (candidate) => canonical(candidate) === target,
+  return homes.some((home) =>
+    [join(home, ".omo", "agent"), join(home, ".omo"), join(home, ".senpi", "agent")].some(
+      (candidate) => canonical(candidate) === target,
+    ),
   )
 }
