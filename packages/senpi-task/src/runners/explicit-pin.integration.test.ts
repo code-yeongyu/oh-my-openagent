@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
@@ -9,6 +9,7 @@ import { OmoTaskSettingsSchema } from "@oh-my-opencode/omo-config-core"
 import { createTaskChildPlanner } from "../../../omo-senpi/src/components/task/planner"
 import { loadSenpiBarrel } from "../lazy/senpi-barrel"
 import { createTaskManager, type TaskManager } from "../manager"
+import { START_REPORT_WINDOW_MS } from "../manager/manager"
 import { createParentRegistrySessionContext } from "../manager/parent-registry-context"
 import { createInProcessManagedRunner } from "../manager/runner"
 import { readSettingsDefaultRoute } from "../senpi/explicit-pin"
@@ -158,33 +159,52 @@ function registerLateModel(machine: BuiltinChildMachine, id: string): void {
 }
 
 describe("explicit task model pins are honoured or fail loudly (#9722)", () => {
-  test("1(a)+(d) #given a settings default of child-fails #when spawned with child-succeeds:medium #then the child runs the pin at medium and the RECORD names the child's model", async () => {
-    // given: the isolated agent dir defaults to model B; the pin asks for model A at medium
-    const machine = await world("child-fails")
-    const engine = makeEngine(machine)
+  test.each(["report-first", "launch-first"] as const)(
+    "1(a)+(d) child-succeeds:medium overrides child-fails (%s)",
+    async (order) => {
+      const reportFirst = order === "report-first"
+      // given: the isolated agent dir defaults to model B; the pin asks for model A at medium
+      const machine = await world("child-fails")
+      const engine = makeEngine(machine)
 
-    // when
-    const started = await startPin(engine, `${PROVIDER}/child-succeeds:medium`)
+      // when
+      const schedule = globalThis.setTimeout
+      const reportTimer = spyOn(globalThis, "setTimeout").mockImplementation(
+        Object.assign((...args: Parameters<typeof setTimeout>) => {
+          if (args[1] !== START_REPORT_WINDOW_MS) return schedule(...args)
+          reportTimer.mockRestore()
+          if (reportFirst) args[0]()
+          return schedule(() => {}, START_REPORT_WINDOW_MS)
+        }, schedule),
+      )
+      const started = await startPin(engine, `${PROVIDER}/child-succeeds:medium`).finally(() =>
+        reportTimer.mockRestore(),
+      )
 
-    // then: the spawn started on the pin at the pinned level
-    if (started.kind !== "started") throw new Error(`pin did not start: ${started.kind}`)
-    await engine.manager.waitFor(started.task_id)
-    const change = firstSessionEntry(engine, started.task_id, "model_change")
-    expect(change.provider).toBe(PROVIDER)
-    expect(change.modelId).toBe("child-succeeds")
-    expect(change.originalModelId).toBeUndefined()
-    expect(firstSessionEntry(engine, started.task_id, "thinking_level_change").thinkingLevel).toBe("medium")
+      // then: the spawn started on the pin at the pinned level
+      if (started.kind !== "started") throw new Error(`pin did not start: ${started.kind}`)
+      expect(started.starting === true).toBe(reportFirst)
+      await engine.manager.waitFor(started.task_id)
+      const change = firstSessionEntry(engine, started.task_id, "model_change")
+      expect(change.provider).toBe(PROVIDER)
+      expect(change.modelId).toBe("child-succeeds")
+      expect(change.originalModelId).toBeUndefined()
+      expect(firstSessionEntry(engine, started.task_id, "thinking_level_change").thinkingLevel).toBe("medium")
 
-    // and (d): the record and the started result name the model the CHILD actually ran - which is
-    // the pin, because the pin was honoured - not a copy of the requested string
-    const record = engine.store.load(started.task_id)
-    expect(record?.model).toBe(`${PROVIDER}/child-succeeds`)
-    expect(record?.effective_model).toMatchObject({ provider: PROVIDER, model_id: "child-succeeds" })
-    expect(`${record?.effective_model?.provider}/${record?.effective_model?.model_id}`).toBe(
-      `${String(change.provider)}/${String(change.modelId)}`,
-    )
-    expect(started.effective_model).toMatchObject({ provider: PROVIDER, model_id: "child-succeeds" })
-  }, 30_000)
+      // and (d): the record and the started result name the model the CHILD actually ran - which is
+      // the pin, because the pin was honoured - not a copy of the requested string
+      const record = engine.store.load(started.task_id)
+      expect(record?.model).toBe(`${PROVIDER}/child-succeeds`)
+      expect(record?.effective_model).toMatchObject({ provider: PROVIDER, model_id: "child-succeeds" })
+      expect(`${record?.effective_model?.provider}/${record?.effective_model?.model_id}`).toBe(
+        `${String(change.provider)}/${String(change.modelId)}`,
+      )
+      // #10042: the bounded acknowledgment cannot attest a model before the launch settles.
+      if (reportFirst) expect(started.effective_model).toBeUndefined()
+      else expect(started.effective_model).toMatchObject({ provider: PROVIDER, model_id: "child-succeeds" })
+    },
+    30_000,
+  )
 
   test("1(b) #given an unhonourable pin #when spawned #then the spawn fails typed naming the pin and the default route, and no child ever starts", async () => {
     // given
