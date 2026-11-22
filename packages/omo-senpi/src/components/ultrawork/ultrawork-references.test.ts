@@ -63,6 +63,10 @@ describe("omo-senpi ultrawork references do not arm", () => {
       "avoid using ulw or mass-ulw on this repo",
       "skip ulw, ulw-loop and ultrawork here",
       "Rules from the guide:\n- avoid ulw on tiny tasks\n- no ultrawork for docs\n- skip ulw-loop when unsure",
+      // #9746: a negation attached to the noun, with an article or as "instead of", is still a prohibition.
+      "this is not an ulw task",
+      "not a ulw run, just answer",
+      "answer directly instead of ulw",
     ]) {
       expect({ text, effective: classify(text).effective }).toEqual({ text, effective: false })
       expect(classify(text).suppressionReason).toBe("negated_mention")
@@ -102,6 +106,9 @@ describe("omo-senpi ultrawork references do not arm", () => {
       "No ulw-loop, just ulw this",
       "skip ulw-plan, ulw the fix",
       "without ultrawork the answer was bad, so ulw this",
+      "no tmux, ulw this",
+      "not that one. ulw the fix",
+      "it is not hard, ulw this",
     ]) {
       expect({ text, effective: classify(text).effective }).toEqual({ text, effective: true })
     }
