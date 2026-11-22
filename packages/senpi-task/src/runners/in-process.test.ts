@@ -6,7 +6,7 @@ import { ModelRegistry, ModelRuntime } from "@code-yeongyu/senpi"
 import { InProcessRunner, RunnerError } from "./in-process"
 import { baseSpec, createFakeSession, makeTool, tmpSessionDirs } from "./in-process-child-spec.test-support"
 import type { CreateAgentSessionOptions } from "./in-process-child-spec.test-support"
-import type { ChildSession } from "./in-process"
+import type { ChildSession, ChildSpec } from "./in-process"
 
 type RealModel = NonNullable<CreateAgentSessionOptions["model"]>
 
@@ -71,7 +71,7 @@ describe("InProcessRunner", () => {
     expect(fake.promptCalls).toBe(0)
   })
 
-  test("#given a mismatch whose session teardown also fails #when start runs #then the failure is still typed (#9722)", async () => {
+  test("#given a mismatch whose session teardown also fails #when start runs #then the teardown failure is its own kind, never a model refusal (#9722, #11104)", async () => {
     // given
     const fake = createFakeSession()
     fake.session = {
@@ -99,9 +99,48 @@ describe("InProcessRunner", () => {
       )
       .catch((error: unknown) => error)
 
-    // then
-    expect(RunnerError.is(failure) ? failure.failure.kind : undefined).toBe("model_unavailable")
+    // then: the Kibitzer ladder must not read this as a pin refusal and skip an innocent model
+    expect(RunnerError.is(failure) ? failure.failure.kind : undefined).toBe("session-teardown-failed")
     expect(failure instanceof Error ? failure.message : "").toContain("shutting down its session failed")
+  })
+
+  test.each([
+    ["luna", "luna-fast"],
+    ["luna-fast", "luna"],
+  ])("a mapped %s pin accepts a raw %s session model (#11104)", async (pinned, started) => {
+    // given: senpi pairs the alias when its upstream id equals the BASE's upstream id (falling back
+    // to the base's own id); this base maps upstream to luna-upstream, not to its literal id
+    const fake = createFakeSession()
+    fake.session = { ...fake.session, model: { provider: "vendor-a", id: started, api: "openai-completions" } }
+    const registry = {
+      getServiceTier: (entry: { id: string }) => (entry.id === "luna-fast" ? "priority" : undefined),
+      getUpstreamModelId: (entry: { id: string }) =>
+        entry.id === "luna-fast" || entry.id === "luna" ? "luna-upstream" : undefined,
+    }
+    const runner = new InProcessRunner({ createSession: async () => fake.session })
+
+    // when / then: the alias start is accepted instead of being a wrong refusal
+    const handle = await runner.start(
+      baseSpec({
+        model: realModel("vendor-a", pinned),
+        selectedModel: `vendor-a/${pinned}`,
+        resolvedModel: {
+          provider: "vendor-a",
+          model_id: pinned,
+          display: `vendor-a/${pinned}`,
+          source: "explicit",
+        },
+        modelRegistry: registry as unknown as ChildSpec["modelRegistry"],
+      }),
+    )
+    try {
+      expect(handle.effectiveModel()).toEqual({ provider: "vendor-a", id: started })
+      expect(fake.promptCalls).toBe(1)
+    } finally {
+      fake.resolvePrompt()
+      await handle.waitForIdle()
+      await handle.dispose()
+    }
   })
 
   test("#given a session on exactly the model the spec resolved #when start runs #then the child is accepted (#9722)", async () => {
@@ -142,7 +181,13 @@ describe("InProcessRunner", () => {
       fake.session = {
         ...fake.session,
         ...{ effectiveServiceTier: "priority" },
-        model: { provider: "vendor-a", id: startedId, serviceTier: "priority", upstreamModelId: "pinned" },
+        model: {
+          provider: "vendor-a",
+          id: startedId,
+          api: "openai-completions",
+          serviceTier: "priority",
+          upstreamModelId: "pinned",
+        },
       }
       const runner = new InProcessRunner({ createSession: async () => fake.session })
 

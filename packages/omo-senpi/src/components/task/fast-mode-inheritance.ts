@@ -12,35 +12,10 @@ type ModelReference = {
   readonly id: string
 }
 
-// A catalog priority-tier alias of the base model: same provider, `<base>-fast` id, declares
-// `serviceTier: "priority"` and points its upstream id back at the base. This is the exact shape
-// senpi's catalog generator emits for openai and chatgpt-subscription; a model that merely ends in `-fast`
-// (a different Cursor composer SKU, a user-defined entry with its own upstream id) is NOT an alias
-// and must not replace the planned model.
-type FastVariant = ModelReference & {
-  readonly upstreamModelId: string
-  readonly serviceTier: "priority"
-}
-
 function splitModelReference(reference: string): ModelReference | undefined {
   const slash = reference.indexOf("/")
   if (slash <= 0 || slash === reference.length - 1) return undefined
   return { provider: reference.slice(0, slash), id: reference.slice(slash + 1) }
-}
-
-function asFastVariant(
-  candidate: unknown,
-  base: ModelReference,
-  registry: PriorityPairingRegistry,
-): FastVariant | undefined {
-  return isPriorityAliasOf(candidate, base, registry)
-    ? {
-        provider: base.provider,
-        id: `${base.id}${FAST_MODEL_SUFFIX}`,
-        upstreamModelId: base.id,
-        serviceTier: "priority",
-      }
-    : undefined
 }
 
 /**
@@ -59,14 +34,15 @@ export function inheritParentFastMode(
   if (parentServiceTier !== "priority" || registry === undefined) return plan
   const base = splitModelReference(plan.model)
   if (base === undefined || base.id.endsWith(FAST_MODEL_SUFFIX)) return plan
-  const variant = asFastVariant(registry.find(base.provider, `${base.id}${FAST_MODEL_SUFFIX}`), base, registry)
-  if (variant === undefined) return plan
-  const model = `${variant.provider}/${variant.id}`
+  const fastId = `${base.id}${FAST_MODEL_SUFFIX}`
+  const baseEntry = registry.find(base.provider, base.id)
+  if (!isPriorityAliasOf(registry.find(base.provider, fastId), baseEntry, registry)) return plan
+  const model = `${base.provider}/${fastId}`
   return {
     ...plan,
     model,
     ...(plan.resolved_model === undefined
       ? {}
-      : { resolved_model: { ...plan.resolved_model, model_id: variant.id, display: model } }),
+      : { resolved_model: { ...plan.resolved_model, model_id: fastId, display: model } }),
   }
 }

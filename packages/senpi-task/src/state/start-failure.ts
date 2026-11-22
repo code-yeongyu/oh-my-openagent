@@ -4,6 +4,7 @@ export const TASK_START_FAILURE_KINDS = [
   "child-turn-failed",
   "child-unresponsive",
   "session-create-failed",
+  "session-teardown-failed",
   "depth-exceeded",
   "model_unavailable",
   "tools_unavailable",

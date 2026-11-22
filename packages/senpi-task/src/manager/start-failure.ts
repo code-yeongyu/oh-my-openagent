@@ -128,6 +128,8 @@ function publicMessage(kind: TaskStartFailureKind, reason: TaskStartFailureReaso
         : "The task host is unavailable."
     case "child-turn-failed":
       return GENERIC_START_FAILURE_MESSAGE
+    case "session-teardown-failed":
+      return "The child session was refused, and shutting it down failed; inspect the engine before respawning."
     case "child-unresponsive":
       return "The child stopped answering. Action: inspect task_output; run it again with task."
     case "suspended_unresumable":

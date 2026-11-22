@@ -133,7 +133,14 @@ describe("openTaskHostSession suffix and post-start model (#9722)", () => {
       getState: () =>
         Promise.resolve({ sessionId: "sess-1", model: { provider: "test", id: "model" }, serviceTier: "priority" }),
       getAvailableModels: async () => [
-        { provider: "test", id: "model-fast", serviceTier: "priority", upstreamModelId: "model" },
+        { provider: "test", id: "model", api: "openai-codex-responses" },
+        {
+          provider: "test",
+          id: "model-fast",
+          api: "openai-codex-responses",
+          serviceTier: "priority",
+          upstreamModelId: "model",
+        },
       ],
     }
 

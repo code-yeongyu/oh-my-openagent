@@ -6,7 +6,12 @@ import type { HostSessionLiveness } from "./handle-port"
 import { SESSION_START_FAILURE_REASONS, isTaskStartFailureReason, type TaskStartFailureReason } from "../../state"
 import { RunnerError } from "../in-process/runner-error"
 import { rpcChildAncestry } from "../child-ancestry"
-import { differsOnlyByPriorityAlias, reportedEffectiveModel, startedOnPinnedModel } from "../pinned-model-equivalence"
+import {
+  differsOnlyByPriorityAlias,
+  findCatalogModel,
+  reportedEffectiveModel,
+  startedOnPinnedModel,
+} from "../pinned-model-equivalence"
 import type { RpcRunnerSpec } from "../types"
 import { HostUnavailableError } from "./daemon"
 import { HostSessionOpenError, SessionHeldElsewhereError, type OpenedHostSession } from "./session-client"
@@ -86,20 +91,16 @@ export async function openTaskHostSession(input: {
       })
     }
     const pinned = { provider: model.provider, id: model.modelId }
-    let pinnedEntry: unknown = pinned
+    let honoured = startedOnPinnedModel(effective, pinned, pinned)
     if (differsOnlyByPriorityAlias(effective, pinned)) {
       try {
         if (input.client.getAvailableModels === undefined) throw new Error("get_available_models is unavailable")
         const catalog = await input.client.getAvailableModels()
-        pinnedEntry = catalog.find(
-          (entry) =>
-            typeof entry === "object" &&
-            entry !== null &&
-            "provider" in entry &&
-            entry.provider === pinned.provider &&
-            "id" in entry &&
-            entry.id === pinned.id,
-        )
+        const startedEntry = findCatalogModel(catalog, effective)
+        honoured =
+          startedEntry !== undefined &&
+          (effective.api === undefined || effective.api === startedEntry.api) &&
+          startedOnPinnedModel(startedEntry, pinned, findCatalogModel(catalog, pinned))
       } catch (error) {
         await input.client.close?.().catch(() => undefined)
         throw new RunnerError({
@@ -109,7 +110,7 @@ export async function openTaskHostSession(input: {
         })
       }
     }
-    if (pinnedEntry === undefined || !startedOnPinnedModel(effective, pinned, pinnedEntry)) {
+    if (!honoured) {
       await input.client.close?.().catch(() => undefined)
       throw new RunnerError({
         kind: "model_unavailable",

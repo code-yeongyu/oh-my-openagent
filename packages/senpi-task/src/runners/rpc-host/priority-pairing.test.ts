@@ -5,8 +5,11 @@ import { stampSpawnEffectiveModel } from "../../manager/observed-model"
 import { createTaskRecord } from "../../state"
 
 const provider = "chatgpt-subscription"
-const base = { provider, id: "gpt-6-luna" }
+const base = { provider, id: "gpt-6-luna", api: "openai-codex-responses" }
 const alias = { ...base, id: `${base.id}-fast`, serviceTier: "priority", upstreamModelId: base.id }
+const upstreamModelId = "wire-luna"
+const mappedBase = { ...base, upstreamModelId }
+const mappedAlias = { ...alias, upstreamModelId }
 const spec = { task_id: "st_pair", cwd: "/tmp/project", state_dir: "/tmp/state", prompt: "work" }
 
 function world(started: typeof base, serviceTier: string | undefined, catalog: readonly unknown[]) {
@@ -50,7 +53,8 @@ describe("host registry pairing (#9812)", () => {
     "forward alias accepts effective tier %s using host catalog",
     async (tier) => {
       // given
-      const { client, counts } = world(base, tier, [alias])
+      // get_state holds the raw base; get_available_models adds the registry mapping to both rows.
+      const { client, counts } = world(base, tier, [mappedBase, mappedAlias])
       // when
       const opened = await openTaskHostSession({
         client,
@@ -78,7 +82,7 @@ describe("host registry pairing (#9812)", () => {
 
   test("reverse alias accepts the started catalog entry and reports priority", async () => {
     // given
-    const { client, counts } = world(alias, "priority", [base])
+    const { client, counts } = world(alias, "priority", [mappedBase, mappedAlias])
     // when
     const opened = await openTaskHostSession({
       client,
@@ -91,26 +95,25 @@ describe("host registry pairing (#9812)", () => {
   })
 
   test.each([
-    ["forward non-priority SKU", false, [{ ...alias, serviceTier: undefined }]],
-    ["forward different upstream", false, [{ ...alias, upstreamModelId: "other" }]],
-    ["forward missing pin", false, []],
-    ["reverse non-priority SKU", true, [base]],
-    ["reverse different upstream", true, [base]],
-    ["reverse missing pin", true, []],
-  ])("%s is refused and closed", async (label, reverse, catalog) => {
+    ["forward non-priority SKU", base, alias, [base, { ...alias, serviceTier: undefined }]],
+    ["forward different upstream", base, alias, [mappedBase, alias]],
+    ["forward different API", base, alias, [base, { ...alias, api: "openai-completions" }]],
+    ["forward missing pin", base, alias, [base]],
+    [
+      "reverse non-priority SKU",
+      { ...alias, serviceTier: undefined },
+      base,
+      [base, { ...alias, serviceTier: undefined }],
+    ],
+    ["reverse different upstream", alias, base, [mappedBase, alias]],
+    ["reverse missing pin", alias, base, [alias]],
+  ] as const)("%s is refused and closed", async (_label, started, pinned, catalog) => {
     // given
-    const started = reverse
-      ? {
-          ...alias,
-          ...(label.includes("non-priority") ? { serviceTier: undefined } : {}),
-          ...(label.includes("different upstream") ? { upstreamModelId: "other" } : {}),
-        }
-      : base
     const { client, counts } = world(started, "priority", catalog)
     // when
     const failure = await openTaskHostSession({
       client,
-      spec: { ...spec, model: `${provider}/${reverse ? base.id : alias.id}` },
+      spec: { ...spec, model: `${provider}/${pinned.id}` },
       sessionPath: "/tmp/pair.jsonl",
     }).catch((error: unknown) => error)
     // then

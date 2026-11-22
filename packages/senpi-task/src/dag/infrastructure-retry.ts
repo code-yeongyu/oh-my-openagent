@@ -33,6 +33,7 @@ export function isInfrastructureFailure(task: TaskRecord): boolean {
     case "child-prompt-failed":
     case "child-turn-failed":
     case "session-create-failed":
+    case "session-teardown-failed":
     case "depth-exceeded":
     case "model_unavailable":
     case "tools_unavailable":

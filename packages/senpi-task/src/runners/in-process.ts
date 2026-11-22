@@ -235,8 +235,10 @@ export class InProcessRunner {
         try {
           await discardUnstartedChildSession(createdSession)
         } catch (shutdownError) {
+          // A failed shutdown of a refused session is its own failure (#11104): reporting it as
+          // model_unavailable made the Kibitzer ladder blame and skip an innocent model.
           throw new RunnerError({
-            kind: "model_unavailable",
+            kind: "session-teardown-failed",
             message: "the pin check failed, and shutting down its session failed",
             cause: new AggregateError([error, shutdownError]),
           })
