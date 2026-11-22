@@ -64,7 +64,7 @@ describe("AGENT_FALLBACK_CHAINS", () => {
         },
         { providers: ["google", "google-vertex", "opencode"], model: "gemini-4-argon", variant: "high" },
         { providers: ["google", "github-copilot", "opencode"], model: "gemini-3.1-pro", variant: "high" },
-        { providers: ["opencode-go"], model: "glm-5.2" },
+        { providers: ["opencode-go"], model: "glm-5.3" },
       ],
     })
   })
