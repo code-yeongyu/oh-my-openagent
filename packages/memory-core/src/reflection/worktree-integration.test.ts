@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from "bun:test"
 import { existsSync, realpathSync } from "node:fs"
-import { mkdtemp, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { GitMemoryRepo, createNodeGitExec } from "../git"
 import { NO_AUTO_MAINTENANCE } from "../git/no-auto-maintenance"
 import { disableFixtureAutoMaintenance } from "../git/test-repo-config.test-support"
@@ -47,26 +47,50 @@ afterEach(async () => {
 })
 
 describe("reflection worktree integration", () => {
-  it("#given a parent change that conflicts with the reflection #when integrated #then the outcome names the conflicting file, not git's empty stderr", async () => {
-    // #12330 review: git lists unmerged files on stdout; the detail must carry them, read before the abort.
-    const { repo, worktree } = await fixture("conflict")
-    await commit(worktree, "memory.md", "reflection\n")
-    await writeFile(join(repo.dir, "memory.md"), "parent\n")
-    await repo.commitWrite(["memory.md"], "parent edit", { agentId: "agent-one", authorName: "Person" })
-    const validation = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
-    if (validation.status !== "valid") throw new Error("expected valid reflection")
+  it.each([
+    { name: "ASCII", path: "memory.md", detail: "memory.md" },
+    { name: "Korean", path: "메모/충돌.md", detail: "메모/충돌.md" },
+    {
+      name: "control-character",
+      // Windows cannot create names containing C0 controls.
+      path: process.platform === "win32" ? "before\u007f\u009b31m.md" : "before\n\u001b[31m\u007f\u009b31m.md",
+      detail: process.platform === "win32" ? "before�31m.md" : "before�[31m�31m.md",
+    },
+  ])(
+    "#given a conflicting $name filename #when integrated #then the outcome shows a safe path and aborts the merge",
+    async ({ name, path, detail }) => {
+      const { root, repo, worktree } = await fixture("conflict")
+      for (const [dir, content] of [
+        [worktree.dir, "reflection\n"],
+        [repo.dir, "parent\n"],
+      ]) {
+        const file = join(dir, path)
+        await mkdir(dirname(file), { recursive: true })
+        await writeFile(file, content)
+        if (name === "control-character") {
+          // Imported histories can contain names the memory commit hook refuses to create.
+          expect((await git(dir, ["add", "--", path])).code).toBe(0)
+          expect((await git(dir, ["-c", `core.hooksPath=${root}`, "commit", "-m", "edit"])).code).toBe(0)
+        } else {
+          const checkout = new GitMemoryRepo({ dir, agentId: "agent-one" })
+          await checkout.commitWrite([path], "edit", { agentId: "agent-one", authorName: "Editor" })
+        }
+      }
+      const validation = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
+      if (validation.status !== "valid") throw new Error(`expected valid reflection: ${JSON.stringify(validation)}`)
 
-    const result = await integrateValidatedReflection(worktree, {
-      mode: "auto",
-      runId: "conflict",
-      summary: "conflicting facts",
-      validated: validation,
-      withWriterLock: unlocked,
-    })
+      const result = await integrateValidatedReflection(worktree, {
+        mode: "auto",
+        runId: "conflict",
+        summary: "conflicting facts",
+        validated: validation,
+        withWriterLock: unlocked,
+      })
 
-    expect(result).toEqual({ outcome: "merge_conflict", detail: "memory.md" })
-    expect((await git(repo.dir, ["status", "--porcelain"])).stdout.trim()).toBe("")
-  })
+      expect(result).toEqual({ outcome: "merge_conflict", detail })
+      expect((await git(repo.dir, ["status", "--porcelain"])).stdout.trim()).toBe("")
+    },
+  )
 
   it("#given a validated tip #when auto integration merges #then the merge runs with auto-maintenance disabled", async () => {
     // omo #10199 review MEDIUM 3: the integration merge must carry the same NO_AUTO_MAINTENANCE

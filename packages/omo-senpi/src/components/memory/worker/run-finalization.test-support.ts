@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 
 import {
   GitMemoryRepo,
@@ -31,7 +31,11 @@ export interface TargetedDreamSetup {
 }
 
 /** A settled reflection run: committed worktree, published outcome, and (by default) a landed merge. */
-export async function finalizationFixture(integrate = true, dream?: TargetedDreamSetup) {
+export async function finalizationFixture(
+  integrate = true,
+  dream?: TargetedDreamSetup,
+  reflectionPath = "system/learned.md",
+) {
   const root = await mkdtemp(join(tmpdir(), "run-finalization-"))
   roots.push(root)
   const identity: MemoryIdentity = {
@@ -64,10 +68,11 @@ export async function finalizationFixture(integrate = true, dream?: TargetedDrea
   if (reserved.status === "parked") throw new Error("fixture reservation was parked")
   const worktree = await createReflectionWorktree(repo, reserved.run.runId, identity.paths.worktrees)
   if (dream === undefined) {
-    await mkdir(join(worktree.dir, "system"), { recursive: true })
-    await writeFile(join(worktree.dir, "system", "learned.md"), "---\ndescription: Learned\n---\nlearned\n")
+    const file = join(worktree.dir, reflectionPath)
+    await mkdir(dirname(file), { recursive: true })
+    await writeFile(file, "---\ndescription: Learned\n---\nlearned\n")
     const childRepo = new GitMemoryRepo({ dir: worktree.dir, agentId: identity.id })
-    await childRepo.commitWrite(["system/learned.md"], "reflection learned", {
+    await childRepo.commitWrite([reflectionPath], "reflection learned", {
       agentId: identity.id,
       authorName: "Reflection Agent",
     })

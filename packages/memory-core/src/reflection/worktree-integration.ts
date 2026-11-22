@@ -125,14 +125,14 @@ export async function integrateValidatedReflection(
     }
 
     const landedMergeHead = await optionalRevision(worktree.exec, worktree.parent.dir, "MERGE_HEAD")
-    const unmerged = await run(worktree.exec, worktree.parent.dir, ["diff", "--name-only", "--diff-filter=U"])
+    const unmerged = await run(worktree.exec, worktree.parent.dir, ["diff", "--name-only", "--diff-filter=U", "-z"])
     if (landedMergeHead === input.validated.tipSha) {
       const aborted = await run(worktree.exec, worktree.parent.dir, ["merge", "--abort"])
       if (aborted.code !== 0) {
         return { outcome: "failed", detail: aborted.stderr.trim() || "Reflection merge conflict could not be aborted" }
       }
     }
-    if (landedMergeHead === input.validated.tipSha || unmerged.stdout.trim()) {
+    if (landedMergeHead === input.validated.tipSha || unmerged.stdout.length > 0) {
       // git prints the conflicting files on stdout, not stderr (#12330 review): read before the abort clears them.
       return { outcome: "merge_conflict", detail: conflictedPaths(unmerged.stdout) ?? merge.stderr.trim() }
     }
@@ -144,9 +144,12 @@ const CONFLICT_PATHS_SHOWN = 3
 
 /** The unmerged files, at most three named, so the detail stays one short line the footer can show. */
 function conflictedPaths(stdout: string): string | undefined {
-  const paths = stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+  const paths = stdout.split("\0").filter(Boolean)
   if (paths.length === 0) return undefined
-  const shown = paths.slice(0, CONFLICT_PATHS_SHOWN).join(", ")
+  const shown = paths
+    .slice(0, CONFLICT_PATHS_SHOWN)
+    .map((path) => path.replace(/[\p{Cc}\p{Zl}\p{Zp}]+/gu, "�"))
+    .join(", ")
   return paths.length > CONFLICT_PATHS_SHOWN ? `${shown} (+${paths.length - CONFLICT_PATHS_SHOWN} more)` : shown
 }
 
