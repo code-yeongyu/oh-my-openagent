@@ -29,7 +29,11 @@ async function seedServerFile(dir: string, relativePath: string, content: string
 
 afterEach(removeTempDirs)
 
-if (process.platform === "win32") setDefaultTimeout(30000)
+// Every case here drives real hooked git commits (init, add, commit with pre/post hooks, mirror
+// pushes): on a loaded host that stack exceeds the runner default (in-repo 20s; the issue's 5s
+// default predated it), so each case carries the per-test budget the win32 leg already needed
+// (#10530). No fixed sleeps; the budget only bounds the awaited real processes.
+setDefaultTimeout(30000)
 
 describe("memory hook Git pathspec environment", () => {
   for (const variable of ["GIT_GLOB_PATHSPECS", "GIT_ICASE_PATHSPECS"] as const) {
