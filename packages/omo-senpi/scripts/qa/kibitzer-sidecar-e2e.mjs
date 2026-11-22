@@ -912,7 +912,7 @@ async function runFastAliasConfig({ session, state, identity, router, facts, par
   const childModels = children
     .flatMap((transcript) => transcript.entries)
     .filter((entry) => entry.type === "model_change")
-    .map((entry) => `${entry.provider}/${entry.modelId}`
+    .map((entry) => `${entry.provider}/${entry.modelId}`)
   // The pin can only pair on the mock's own luna pair (#11104): a ladder step to an unrelated
   // fallback candidate would else satisfy a weaker "at least one child" check.
   const pairedOnMockLuna =

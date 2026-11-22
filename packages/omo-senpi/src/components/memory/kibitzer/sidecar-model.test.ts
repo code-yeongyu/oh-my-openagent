@@ -378,12 +378,7 @@ describe("createKibitzerSidecarChildStarter", () => {
 
     // Second wake: the earlier refusal was episodic, so mock-1 is offered (and refused) again.
     expect(await start({ ...input, generation: 2 })).toBe(handle)
-    expect(selected).toEqual([
-      "omo-mock/mock-1",
-      "omo-mock/mock-2",
-      "omo-mock/mock-1",
-      "omo-mock/mock-2",
-    ])
+    expect(selected).toEqual(["omo-mock/mock-1", "omo-mock/mock-2", "omo-mock/mock-1", "omo-mock/mock-2"])
   })
 
   test("#given a runner seam #when the starter runs #then one child starts from the persona and the seed and the handle is returned", async () => {
