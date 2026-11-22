@@ -119,9 +119,17 @@ function parseHost(value: Json | undefined): HostState {
     rect:
       rect === null
         ? null
-        : { left: numberOf(rect, "left"), top: numberOf(rect, "top"), right: numberOf(rect, "right"), bottom: numberOf(rect, "bottom") },
+        : {
+            left: numberOf(rect, "left"),
+            top: numberOf(rect, "top"),
+            right: numberOf(rect, "right"),
+            bottom: numberOf(rect, "bottom"),
+          },
     firstVisibleLine: exists ? numberOf(entry, "firstVisibleLine") : -1,
-    selection: selection === null ? { start: -1, end: -1 } : { start: numberOf(selection, "start"), end: numberOf(selection, "end") },
+    selection:
+      selection === null
+        ? { start: -1, end: -1 }
+        : { start: numberOf(selection, "start"), end: numberOf(selection, "end") },
   }
 }
 
@@ -159,7 +167,10 @@ export function probe(hosts: readonly PointerHost[], park?: Point): Promise<Poin
   })
 }
 
-export function probeHostsUntil(hosts: readonly PointerHost[], settled: (seen: PointerProbe) => boolean): Promise<PointerProbe> {
+export function probeHostsUntil(
+  hosts: readonly PointerHost[],
+  settled: (seen: PointerProbe) => boolean,
+): Promise<PointerProbe> {
   return probeUntil(() => probe(hosts), settled)
 }
 

@@ -20,7 +20,7 @@ type ExecFileResult = ReturnType<typeof childProcess.execFile>
 
 function mockExecFile(
   calls: ExecFileCall[],
-  getError: (callIndex: number) => Error | null = () => null
+  getError: (callIndex: number) => Error | null = () => null,
 ): ReturnType<typeof spyOn> {
   return spyOn(childProcess, "execFile").mockImplementation(
     unsafeTestValue<typeof childProcess.execFile>(
@@ -28,14 +28,14 @@ function mockExecFile(
         file: string,
         args: readonly string[],
         options: { readonly windowsHide?: boolean },
-        callback: ExecFileCallback
+        callback: ExecFileCallback,
       ) => {
         const callIndex = calls.length
         calls.push({ file, args: [...args], options })
         callback(getError(callIndex), "", "")
         return unsafeTestValue<ExecFileResult>({})
-      }
-    )
+      },
+    ),
   )
 }
 
@@ -71,14 +71,7 @@ describe("session-notification Desktop sidecar fallback", () => {
       expect(execFileCalls).toEqual([
         {
           file: "/usr/local/bin/terminal-notifier",
-          args: [
-            "-title",
-            "Done",
-            "-message",
-            "Task completed",
-            "-activate",
-            "com.opencode.desktop",
-          ],
+          args: ["-title", "Done", "-message", "Task completed", "-activate", "com.opencode.desktop"],
           options: { windowsHide: true },
         },
       ])
@@ -86,7 +79,7 @@ describe("session-notification Desktop sidecar fallback", () => {
 
     test("#then macOS falls back from terminal-notifier execFile failure to osascript execFile", async () => {
       const execFileCalls: ExecFileCall[] = []
-      mockExecFile(execFileCalls, (callIndex) => callIndex === 0 ? new Error("terminal-notifier failed") : null)
+      mockExecFile(execFileCalls, (callIndex) => (callIndex === 0 ? new Error("terminal-notifier failed") : null))
       const mockCtx = unsafeTestValue<PluginInput>({})
 
       await sender.sendSessionNotification(mockCtx, "darwin", "Done", "Task completed")

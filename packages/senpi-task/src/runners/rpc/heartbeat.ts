@@ -65,21 +65,26 @@ export function startHeartbeat<T>(input: {
     // A detached port can throw synchronously; Promise adoption keeps the same failure path. A stop that
     // settles before this launch (a teardown continuation queued ahead of it) sends no probe (#11673).
     const work = Promise.resolve().then<T | typeof STOPPED>(() => (stopped ? STOPPED : input.probe()))
-    void work.then((state) => {
-      if (state === STOPPED || stopped || input.paused()) return
-      failures = 0
-      input.onState(state)
-    }, (error: unknown) => {
-      if (stopped || input.paused()) return
-      // A request rejection after a missed probe must not count the same silence twice.
-      if (!missed) fail(error)
-    }).finally(() => {
-      clearTimeout(deadline)
-      deadline = undefined
-      pending = false
-      // Do not lose the tick coinciding with a timeout. Fast refusals still wait for the next interval.
-      if (!stopped && failures > 0 && Date.now() - startedAt >= input.intervalMs) tick()
-    })
+    void work
+      .then(
+        (state) => {
+          if (state === STOPPED || stopped || input.paused()) return
+          failures = 0
+          input.onState(state)
+        },
+        (error: unknown) => {
+          if (stopped || input.paused()) return
+          // A request rejection after a missed probe must not count the same silence twice.
+          if (!missed) fail(error)
+        },
+      )
+      .finally(() => {
+        clearTimeout(deadline)
+        deadline = undefined
+        pending = false
+        // Do not lose the tick coinciding with a timeout. Fast refusals still wait for the next interval.
+        if (!stopped && failures > 0 && Date.now() - startedAt >= input.intervalMs) tick()
+      })
   }
   const interval = setInterval(tick, input.intervalMs)
   interval.unref?.()

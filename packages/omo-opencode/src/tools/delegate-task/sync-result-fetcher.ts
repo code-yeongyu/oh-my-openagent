@@ -58,14 +58,17 @@ export async function fetchSyncResult(
   client: OpencodeClient,
   sessionID: string,
   anchorMessageCount?: number,
-  options?: { strictAbortRecovery?: boolean; deliverableTag?: string }
+  options?: { strictAbortRecovery?: boolean; deliverableTag?: string },
 ): Promise<{ ok: true; textContent: string } | { ok: false; error: string }> {
   const messagesResult = await client.session.messages({
     path: { id: sessionID },
   })
 
   if ((messagesResult as { error?: unknown }).error) {
-    return { ok: false, error: `Error fetching result: ${(messagesResult as { error: unknown }).error}\n\nSession ID: ${sessionID}` }
+    return {
+      ok: false,
+      error: `Error fetching result: ${(messagesResult as { error: unknown }).error}\n\nSession ID: ${sessionID}`,
+    }
   }
 
   const messages = normalizeSDKResponse(messagesResult, [] as SessionMessage[], {
@@ -111,7 +114,10 @@ export async function fetchSyncResult(
     }
 
     const lastTextParts = lastMessage.parts?.filter((p) => p.type === "text" || p.type === "reasoning") ?? []
-    const lastContent = lastTextParts.map((p) => p.text ?? "").filter(Boolean).join("\n")
+    const lastContent = lastTextParts
+      .map((p) => p.text ?? "")
+      .filter(Boolean)
+      .join("\n")
     if (!lastContent) {
       return {
         ok: false,
@@ -146,7 +152,10 @@ export async function fetchSyncResult(
   let textContent = ""
   for (const msg of assistantMessages) {
     const textParts = msg.parts?.filter((p) => p.type === "text" || p.type === "reasoning") ?? []
-    const content = textParts.map((p) => p.text ?? "").filter(Boolean).join("\n")
+    const content = textParts
+      .map((p) => p.text ?? "")
+      .filter(Boolean)
+      .join("\n")
     if (content) {
       textContent = content
       break

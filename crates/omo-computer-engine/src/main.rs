@@ -1,12 +1,32 @@
 //! The omo-computer-engine binary: router, entry modes, exposure bridge, MCP shim, daemon and launcher.
 
-/// Prints the engine version for `--version`; every other mode arrives with the rows that build it.
-fn main() {
+mod cli;
+mod route;
+mod rpc;
+mod schema;
+mod selftest;
+mod stdio;
+
+use std::process::ExitCode;
+
+use cli::Mode;
+
+fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    if args.iter().any(|arg| arg == "--version") {
-        println!("omo-computer-engine {}", env!("CARGO_PKG_VERSION"));
-        return;
+    let mode = match cli::parse(&args) {
+        Ok(mode) => mode,
+        Err(message) => {
+            eprintln!("{message}\n{}", cli::USAGE);
+            return ExitCode::from(2);
+        }
+    };
+    match mode {
+        Mode::Version => {
+            println!("omo-computer-engine {}", env!("CARGO_PKG_VERSION"));
+            ExitCode::SUCCESS
+        }
+        Mode::Schema => schema::run(),
+        Mode::Selftest { json } => selftest::run(json),
+        Mode::Stdio => stdio::run(),
     }
-    eprintln!("usage: omo-computer-engine --version");
-    std::process::exit(2);
 }

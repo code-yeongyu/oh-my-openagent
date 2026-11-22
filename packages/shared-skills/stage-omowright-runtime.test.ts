@@ -38,7 +38,10 @@ async function makeSourceFixture(layouts: readonly Layout[] = ["js"], root?: str
   const sourceRoot = root ?? (await mkdtemp(join(tmpdir(), "omowright-stage-source-")))
   if (root === undefined) tempDirs.push(sourceRoot)
   await mkdir(sourceRoot, { recursive: true })
-  await writeFile(join(sourceRoot, "package.json"), JSON.stringify({ name: "omowright", version: "0.0.1-fixture", type: "module" }))
+  await writeFile(
+    join(sourceRoot, "package.json"),
+    JSON.stringify({ name: "omowright", version: "0.0.1-fixture", type: "module" }),
+  )
   await writeFile(join(sourceRoot, "LICENSE"), "MIT License\n\nfixture notice\n")
   for (const layout of layouts) await writeLayout(sourceRoot, layout)
   return sourceRoot
@@ -73,7 +76,10 @@ describe("omowright runtime staging", () => {
     expect(Object.keys(manifest.files).sort()).toEqual(["LICENSE", "index.js", "page-bundle.js"])
     // License contract (omowright#290): omowright's MIT text ships byte-for-byte beside the bundle.
     expect(await readFile(join(targetDir, "LICENSE"), "utf8")).toBe(await readFile(join(sourceRoot, "LICENSE"), "utf8"))
-    expect(await checkOmowrightRuntimeFresh({ sourceRoot, targetDir })).toMatchObject({ ok: true, version: "0.0.1-fixture" })
+    expect(await checkOmowrightRuntimeFresh({ sourceRoot, targetDir })).toMatchObject({
+      ok: true,
+      version: "0.0.1-fixture",
+    })
   })
 
   test("#given an omowright source tree in TypeScript #when staged #then the bundle is JavaScript that imports and the freshness digest tracks the .ts sources", async () => {
@@ -154,7 +160,9 @@ describe("omowright runtime staging", () => {
     const targetParent = await mkdtemp(join(tmpdir(), "omowright-stage-target-"))
     tempDirs.push(targetParent)
 
-    await expect(stageOmowrightRuntime({ sourceRoot, targetDir: join(targetParent, "omowright") })).rejects.toThrow(/no LICENSE/)
+    await expect(stageOmowrightRuntime({ sourceRoot, targetDir: join(targetParent, "omowright") })).rejects.toThrow(
+      /no LICENSE/,
+    )
   })
 
   test("#given no staged runtime #when checked #then it reports the missing manifest", async () => {

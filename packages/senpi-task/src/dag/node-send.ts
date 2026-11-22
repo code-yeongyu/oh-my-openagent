@@ -42,11 +42,21 @@ export async function sendToDagNode(
   const record = ownedRecord(options, runId)
   const node = record.nodes.find((entry) => entry.id === nodeId)
   if (node === undefined) {
-    throw new DagNodeControlError({ code: "node_not_found", message: `unknown dag node "${nodeId}"`, runId, nodeIds: [nodeId] })
+    throw new DagNodeControlError({
+      code: "node_not_found",
+      message: `unknown dag node "${nodeId}"`,
+      runId,
+      nodeIds: [nodeId],
+    })
   }
   if (record.status === "paused" && record.pause?.reason === "user_stop") {
     const guidance = guidePausedDag(options, runId, message, nodeId)
-    return { nodeId, delivery: "guidance", guidanceId: guidance.id, ...(node.taskId === undefined ? {} : { taskId: node.taskId }) }
+    return {
+      nodeId,
+      delivery: "guidance",
+      guidanceId: guidance.id,
+      ...(node.taskId === undefined ? {} : { taskId: node.taskId }),
+    }
   }
   // #7412 defect 2: a completed or cancelled run is settled evidence. Reviving a child here
   // would journal running nodes under a terminal run - a checkpoint no recovery path can ever
@@ -55,9 +65,10 @@ export async function sendToDagNode(
   if (record.status === "completed" || record.status === "cancelled") {
     throw new DagNodeControlError({
       code: "node_not_continuable",
-      message: record.status === "completed"
-        ? `dag run "${runId}" already completed; node "${nodeId}" cannot be steered or revived. Amend the definition or start a new run.`
-        : `dag run "${runId}" was cancelled; node "${nodeId}" cannot be steered or revived. Retry the node to run it again.`,
+      message:
+        record.status === "completed"
+          ? `dag run "${runId}" already completed; node "${nodeId}" cannot be steered or revived. Amend the definition or start a new run.`
+          : `dag run "${runId}" was cancelled; node "${nodeId}" cannot be steered or revived. Retry the node to run it again.`,
       runId,
       nodeIds: [nodeId],
     })
@@ -104,8 +115,12 @@ function foldSendOutcome(
     case "uncertain":
       return { nodeId, taskId, delivery: "uncertain", effectId: outcome.effect_id }
     case "failed":
-      throw new DagNodeControlError({ code: "node_not_continuable",
-        message: `${outcome.reason}: ${outcome.detail}. Action: ${outcome.action}.`, runId, nodeIds: [nodeId] })
+      throw new DagNodeControlError({
+        code: "node_not_continuable",
+        message: `${outcome.reason}: ${outcome.detail}. Action: ${outcome.action}.`,
+        runId,
+        nodeIds: [nodeId],
+      })
     case "queued":
       // The steering engine persisted the message on the child's record; the node itself did not
       // change state, and dag.node.steered has no vocabulary for an undelivered message.
@@ -179,11 +194,7 @@ function foldSendOutcome(
 // A revived child can settle OUTSIDE the live settle loop (the run may already be quiescent):
 // no admission pass is necessarily awaiting this task, so the send arms the one watcher that folds
 // its new terminal outcome and persists its result exactly once.
-async function watchRevivedTask(
-  options: DagSchedulerOptions,
-  nodeId: DagNodeId,
-  taskId: string,
-): Promise<void> {
+async function watchRevivedTask(options: DagSchedulerOptions, nodeId: DagNodeId, taskId: string): Promise<void> {
   const now = options.now ?? Date.now
   const runId = options.initialRecord.runId
   let task: TaskRecord
@@ -230,9 +241,13 @@ function revivedTaskFailure(
   message?: string,
 ): { readonly code: DagNodeErrorCode; readonly message: string } {
   switch (status) {
-    case "error": return { code: "task_error", message: message ?? "task failed" }
-    case "interrupted": return { code: "task_interrupted", message: message ?? "task was interrupted" }
-    case "lost": return { code: "task_lost", message: message ?? "task was lost" }
-    case "cancelled": return { code: "task_cancelled", message: message ?? "task was cancelled" }
+    case "error":
+      return { code: "task_error", message: message ?? "task failed" }
+    case "interrupted":
+      return { code: "task_interrupted", message: message ?? "task was interrupted" }
+    case "lost":
+      return { code: "task_lost", message: message ?? "task was lost" }
+    case "cancelled":
+      return { code: "task_cancelled", message: message ?? "task was cancelled" }
   }
 }

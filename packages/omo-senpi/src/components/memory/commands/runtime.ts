@@ -80,14 +80,22 @@ export function runMemoryCommand(
   return memoryCommandHandler(name, pi, deps)(args, ctx)
 }
 
-function captureHandler(name: LazyMemoryCommandName, pi: MemoryCommandPort, deps: MemoryCommandDeps): MemoryCommandHandler {
+function captureHandler(
+  name: LazyMemoryCommandName,
+  pi: MemoryCommandPort,
+  deps: MemoryCommandDeps,
+): MemoryCommandHandler {
   let handler: MemoryCommandHandler | undefined
-  REGISTRARS[name]({
-    registerCommand: (commandName, options) => {
-      if (commandName === name && typeof options.handler === "function") handler = options.handler as MemoryCommandHandler
+  REGISTRARS[name](
+    {
+      registerCommand: (commandName, options) => {
+        if (commandName === name && typeof options.handler === "function")
+          handler = options.handler as MemoryCommandHandler
+      },
+      sendUserMessage: (content, options) => pi.sendUserMessage(content, options),
     },
-    sendUserMessage: (content, options) => pi.sendUserMessage(content, options),
-  }, deps)
+    deps,
+  )
   if (handler === undefined) throw new Error(`memory command runtime registered no handler for /${name}`)
   return handler
 }

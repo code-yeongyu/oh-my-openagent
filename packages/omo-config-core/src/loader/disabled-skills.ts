@@ -31,7 +31,10 @@ function harnessBlockKeys(harness: string): readonly string[] {
   return [harnessBlockKey(canonical), ...legacy]
 }
 
-function scopesOf(config: Record<string, unknown>, harness: string | undefined): readonly (Record<string, unknown> | undefined)[] {
+function scopesOf(
+  config: Record<string, unknown>,
+  harness: string | undefined,
+): readonly (Record<string, unknown> | undefined)[] {
   if (harness === undefined) return [config]
   return [config, ...harnessBlockKeys(harness).map((key) => toRecord(config[key]))]
 }
@@ -60,7 +63,8 @@ function collectUnionedList(key: UnionedListKey, options: CollectDisabledSkillsO
   for (const layer of options.layers) {
     const config = toRecord(layer.config)
     if (config === undefined) continue
-    const profile = options.profile === undefined ? undefined : toRecord(toRecord(config["profiles"])?.[options.profile])
+    const profile =
+      options.profile === undefined ? undefined : toRecord(toRecord(config["profiles"])?.[options.profile])
     const scopes = [
       ...scopesOf(config, options.harness),
       ...(profile === undefined ? [] : scopesOf(profile, options.harness)),

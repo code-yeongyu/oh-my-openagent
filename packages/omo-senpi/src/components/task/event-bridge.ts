@@ -107,11 +107,13 @@ export function wireEventBridge(
       reconciled.resolve(active())
       throw error
     }
-    recovered = recoverSession(sessionId, controller.signal, () => reconciled.resolve(active())).catch((error: unknown) => {
-      ctx.logger.warn("omo-senpi task session recovery failed", { error: String(error) })
-      // A failed reconcile must not strand DAG recovery or the workpools: they proceed as before.
-      reconciled.resolve(active())
-    })
+    recovered = recoverSession(sessionId, controller.signal, () => reconciled.resolve(active())).catch(
+      (error: unknown) => {
+        ctx.logger.warn("omo-senpi task session recovery failed", { error: String(error) })
+        // A failed reconcile must not strand DAG recovery or the workpools: they proceed as before.
+        reconciled.resolve(active())
+      },
+    )
     void reconciled.promise.then((current) => {
       if (current && sessionId !== undefined) engine.manager.workpools?.attach({ sessionId })
     })
@@ -215,32 +217,40 @@ export function wireEventBridge(
     const reason = shutdownEvent.reason
     engine.lifecycle.dispose?.()
     if (typeof reason !== "string") {
-      ctx.logger.warn(
-        "omo-senpi task session_shutdown skipped: malformed reason",
-        { parentSessionId, reason },
-      )
+      ctx.logger.warn("omo-senpi task session_shutdown skipped: malformed reason", { parentSessionId, reason })
       return
     }
     // The context can lose its session id during teardown. Only this engine's live handles
     // establish fallback ownership; scanning every record would suspend sibling host sessions.
-    const parentSessionIds = parentSessionId === undefined
-      ? new Set(engine.manager.residentTaskIds().flatMap((taskId) => {
-        const record = engine.manager.get(taskId)
-        return record === undefined ? [] : [record.parent_session_id]
-      }))
-      : new Set([parentSessionId])
+    const parentSessionIds =
+      parentSessionId === undefined
+        ? new Set(
+            engine.manager.residentTaskIds().flatMap((taskId) => {
+              const record = engine.manager.get(taskId)
+              return record === undefined ? [] : [record.parent_session_id]
+            }),
+          )
+        : new Set([parentSessionId])
     for (const sessionId of parentSessionIds) {
-      const continuing = reason === "new" || reason === "quit"
-        ? engine.manager.list({ scope: "parent-session", session_id: sessionId })
-          .filter(({ record }) => record.killed !== true && (
-            (record.status === "running" && record.runner_kind === "host-session") ||
-            (record.status === "pending" && record.execution_mode === "process" &&
-              engine.settings.process_runner !== "child-process" && engine.settings.resume_children !== false)
-          ))
-        : []
+      const continuing =
+        reason === "new" || reason === "quit"
+          ? engine.manager
+              .list({ scope: "parent-session", session_id: sessionId })
+              .filter(
+                ({ record }) =>
+                  record.killed !== true &&
+                  ((record.status === "running" && record.runner_kind === "host-session") ||
+                    (record.status === "pending" &&
+                      record.execution_mode === "process" &&
+                      engine.settings.process_runner !== "child-process" &&
+                      engine.settings.resume_children !== false)),
+              )
+          : []
       const ownTaskId = ownHostedTaskId(pi, engine.stateDir)
       const summary = await engine.lifecycle.suspendOnSessionShutdown(
-        ownTaskId === undefined ? { parentSessionId: sessionId, reason } : { parentSessionId: sessionId, reason, ownTaskId },
+        ownTaskId === undefined
+          ? { parentSessionId: sessionId, reason }
+          : { parentSessionId: sessionId, reason, ownTaskId },
       )
       const notify = (notice: string, level: "info" | "warning"): void => {
         if (liveContext.mode === "print" || liveContext.mode === "json") process.stderr.write(`${notice}\n`)
@@ -248,10 +258,16 @@ export function wireEventBridge(
       }
       // A stopped owner's session can never be resumed, so nothing kept running there to collect.
       if (summary.stopped_owner === undefined) {
-        const count = continuing.filter(({ record }) =>
-          !summary.failures.some((failure) => failure.task_id === record.task_id)
-          && engine.manager.get(record.task_id)?.status !== "cancelled").length
-        if (count > 0) notify(`${count} background task(s) keep running under session ${sessionId}; resume it (omo --resume ${sessionId}) to collect their results`, "info")
+        const count = continuing.filter(
+          ({ record }) =>
+            !summary.failures.some((failure) => failure.task_id === record.task_id) &&
+            engine.manager.get(record.task_id)?.status !== "cancelled",
+        ).length
+        if (count > 0)
+          notify(
+            `${count} background task(s) keep running under session ${sessionId}; resume it (omo --resume ${sessionId}) to collect their results`,
+            "info",
+          )
         continue
       }
       // Only a child that ever started can still be running; a pending one that failed to tear down never ran.
@@ -259,7 +275,11 @@ export function wireEventBridge(
         const record = engine.manager.get(failure.task_id)
         return record?.started_at !== undefined && (record.status === "running" || record.status === "cancelled")
       }).length
-      if (unstopped > 0) notify(`${unstopped} child task(s) of stopped task ${summary.stopped_owner} could not be stopped and may still be running on the task host`, "warning")
+      if (unstopped > 0)
+        notify(
+          `${unstopped} child task(s) of stopped task ${summary.stopped_owner} could not be stopped and may still be running on the task host`,
+          "warning",
+        )
     }
   })
 
@@ -278,28 +298,29 @@ export function wireEventBridge(
     )
   })
 
-  pi.on("before_agent_start", (payload, eventCtx) => {
-    if (isPreview(payload)) return undefined
-    engine.runtime.captureFrom(asLiveContext(eventCtx))
-    const liveSessionId = engine.runtime.sessionId()
-    // Every real turn (person, extension or delivery) re-checks the run's Stop against the engine's live
-    // ledger, which is what proves a Stop the bridge missed was released. The release resumes children,
-    // which can take as long as their resume turns, so it runs in the background and never holds the turn;
-    // a failure is logged.
-    if (runPause !== undefined && liveSessionId !== undefined) {
-      void runPause.releaseStale(liveSessionId).catch((error: unknown) => {
-        ctx.logger.warn("omo-senpi task stale run Stop release failed", { error: String(error) })
-      })
-    }
-    if (ctx.config.getFlag(TASK_USAGE_HINT_FLAG) === false) return undefined
-    const sessionId = liveSessionId ?? "unknown-session"
-    if (!guidanceGuard(sessionId)) return undefined
-    pi.sendMessage(
-      { customType: "senpi-task.usage", content: TASK_USAGE_GUIDANCE, display: false, details: {} },
-      {},
-    )
-    return undefined
-  }, { previewSafe: true })
+  pi.on(
+    "before_agent_start",
+    (payload, eventCtx) => {
+      if (isPreview(payload)) return undefined
+      engine.runtime.captureFrom(asLiveContext(eventCtx))
+      const liveSessionId = engine.runtime.sessionId()
+      // Every real turn (person, extension or delivery) re-checks the run's Stop against the engine's live
+      // ledger, which is what proves a Stop the bridge missed was released. The release resumes children,
+      // which can take as long as their resume turns, so it runs in the background and never holds the turn;
+      // a failure is logged.
+      if (runPause !== undefined && liveSessionId !== undefined) {
+        void runPause.releaseStale(liveSessionId).catch((error: unknown) => {
+          ctx.logger.warn("omo-senpi task stale run Stop release failed", { error: String(error) })
+        })
+      }
+      if (ctx.config.getFlag(TASK_USAGE_HINT_FLAG) === false) return undefined
+      const sessionId = liveSessionId ?? "unknown-session"
+      if (!guidanceGuard(sessionId)) return undefined
+      pi.sendMessage({ customType: "senpi-task.usage", content: TASK_USAGE_GUIDANCE, display: false, details: {} }, {})
+      return undefined
+    },
+    { previewSafe: true },
+  )
   return { afterSessionStartReconcile: () => reconciledGate, sessionStartRecovered: () => recovered }
 }
 

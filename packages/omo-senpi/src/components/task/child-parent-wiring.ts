@@ -62,7 +62,10 @@ export function createChildParentWiring(input: ChildParentWiringInput): ChildPar
     if (preset === undefined) return
     for (const listener of [...listeners]) listener(preset)
   }
-  for (const event of PARENT_MODE_WAKES) input.pi.on(event, () => { wake() })
+  for (const event of PARENT_MODE_WAKES)
+    input.pi.on(event, () => {
+      wake()
+    })
   // The bus can outlive this extension instance (a reload), so it is held only while a child follows.
   let unsubscribeBus: (() => void) | undefined
   const parentPermission: ParentPermissionMode = {
@@ -82,17 +85,27 @@ export function createChildParentWiring(input: ChildParentWiringInput): ChildPar
 }
 
 function canRaise(ui: DialogUi, dialog: ForwardableDialog): boolean {
-  return (dialog.method !== "input" || ui.input !== undefined) && (dialog.method !== "editor" || ui.editor !== undefined)
+  return (
+    (dialog.method !== "input" || ui.input !== undefined) && (dialog.method !== "editor" || ui.editor !== undefined)
+  )
 }
 
-async function raise(ui: DialogUi, dialog: ForwardableDialog, title: string, signal: AbortSignal): Promise<ForwardedAnswer> {
+async function raise(
+  ui: DialogUi,
+  dialog: ForwardableDialog,
+  title: string,
+  signal: AbortSignal,
+): Promise<ForwardedAnswer> {
   const opts = {
     signal,
     ...("timeout" in dialog && dialog.timeout !== undefined ? { timeout: dialog.timeout } : {}),
     ...("toolCallId" in dialog && dialog.toolCallId !== undefined ? { toolCallId: dialog.toolCallId } : {}),
-    ...("parentToolCallId" in dialog && dialog.parentToolCallId !== undefined ? { parentToolCallId: dialog.parentToolCallId } : {}),
+    ...("parentToolCallId" in dialog && dialog.parentToolCallId !== undefined
+      ? { parentToolCallId: dialog.parentToolCallId }
+      : {}),
   }
-  const text = (value: string | undefined): ForwardedAnswer => (value === undefined ? CANCELLED_CHILD_DIALOG : { kind: "value", value })
+  const text = (value: string | undefined): ForwardedAnswer =>
+    value === undefined ? CANCELLED_CHILD_DIALOG : { kind: "value", value }
   switch (dialog.method) {
     case "select":
       return text(await ui.select(title, [...dialog.options], opts))

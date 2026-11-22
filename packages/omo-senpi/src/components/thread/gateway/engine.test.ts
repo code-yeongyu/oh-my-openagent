@@ -7,7 +7,7 @@ import { join } from "node:path"
 import { ROOT_LIFETIME_MS } from "./constants"
 import type { GatewayDeliverRequest } from "./engine"
 import { gatewayInboxDirectory } from "./paths"
-import { createRemoteThreadFixture } from "../thread-remote-fixture"
+import { createRemoteThreadFixture, fakeRemoteClient } from "../thread-remote-fixture"
 import type { RemoteThreadSurface } from "../remote/ports"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
 import { settled } from "./testing/settled"
@@ -25,12 +25,26 @@ function open(): GatewayHarness {
   return harness
 }
 
-type SendOptions = Omit<GatewayDeliverRequest, "sender" | "target" | "text"> & { readonly turn_id?: string; readonly cause_delivery_id?: string }
+type SendOptions = Omit<GatewayDeliverRequest, "sender" | "target" | "text"> & {
+  readonly turn_id?: string
+  readonly cause_delivery_id?: string
+}
 
-function send(h: GatewayHarness, from: string, to: string, text: string, options: SendOptions = {}): Promise<GatewayDeliveryResult> {
+function send(
+  h: GatewayHarness,
+  from: string,
+  to: string,
+  text: string,
+  options: SendOptions = {},
+): Promise<GatewayDeliveryResult> {
   const { turn_id, cause_delivery_id, ...rest } = options
   return h.get(from).engine.deliver({
-    sender: { kind: "session", durable_id: from, ...(turn_id === undefined ? {} : { turn_id }), ...(cause_delivery_id === undefined ? {} : { cause_delivery_id }) },
+    sender: {
+      kind: "session",
+      durable_id: from,
+      ...(turn_id === undefined ? {} : { turn_id }),
+      ...(cause_delivery_id === undefined ? {} : { cause_delivery_id }),
+    },
     target: to,
     text,
     ...rest,
@@ -55,11 +69,21 @@ describe("all_fifteen_delivery_state_cases", () => {
     const h = open()
     h.session("A")
     const expected: Record<string, readonly [string, string | null]> = {
-      "idle/auto": ["started", "applied"], "idle/steer": ["error:not_steerable", "refused"], "idle/follow_up": ["started", "applied"],
-      "mid_turn/auto": ["steered", "admitted"], "mid_turn/steer": ["steered", "admitted"], "mid_turn/follow_up": ["queued", "admitted"],
-      "waiting_question/auto": ["queued", "admitted"], "waiting_question/steer": ["error:not_steerable", "refused"], "waiting_question/follow_up": ["queued", "admitted"],
-      "compacting/auto": ["queued", "admitted"], "compacting/steer": ["error:not_steerable", "refused"], "compacting/follow_up": ["queued", "admitted"],
-      "offline/auto": ["queued_offline", "queued"], "offline/steer": ["error:turn_conflict", null], "offline/follow_up": ["queued_offline", "queued"],
+      "idle/auto": ["started", "applied"],
+      "idle/steer": ["error:not_steerable", "refused"],
+      "idle/follow_up": ["started", "applied"],
+      "mid_turn/auto": ["steered", "admitted"],
+      "mid_turn/steer": ["steered", "admitted"],
+      "mid_turn/follow_up": ["queued", "admitted"],
+      "waiting_question/auto": ["queued", "admitted"],
+      "waiting_question/steer": ["error:not_steerable", "refused"],
+      "waiting_question/follow_up": ["queued", "admitted"],
+      "compacting/auto": ["queued", "admitted"],
+      "compacting/steer": ["error:not_steerable", "refused"],
+      "compacting/follow_up": ["queued", "admitted"],
+      "offline/auto": ["queued_offline", "queued"],
+      "offline/steer": ["error:turn_conflict", null],
+      "offline/follow_up": ["queued_offline", "queued"],
     }
     const observed: Record<string, readonly [string, string | null]> = {}
     for (const state of ["idle", "mid_turn", "waiting_question", "compacting", "offline"] as const) {
@@ -68,7 +92,10 @@ describe("all_fifteen_delivery_state_cases", () => {
         const target = h.session(id, { online: state !== "offline" })
         if (state !== "idle" && state !== "offline") target.runtime.beginUserTurn()
         if (state === "waiting_question" || state === "compacting") target.runtime.phaseValue = state
-        const result = await send(h, "A", id, `cell ${state}/${mode}`, { mode, ...(mode === "steer" ? { expected_turn_id: target.runtime.epoch } : {}) })
+        const result = await send(h, "A", id, `cell ${state}/${mode}`, {
+          mode,
+          ...(mode === "steer" ? { expected_turn_id: target.runtime.epoch } : {}),
+        })
         await h.quiesce()
         const rows = await target.store.list({ target_durable_id: id })
         observed[`${state}/${mode}`] = [summary(result), rows[0]?.state ?? null]
@@ -82,25 +109,37 @@ describe("all_fifteen_delivery_state_cases", () => {
 
 describe("#13014: a local send to a session parked on a question names the wait, as a send to another device does", () => {
   const remote = createRemoteThreadFixture().account().remote
-  const down: RemoteThreadSurface = { ...remote, sessions: { ...remote.sessions, thisDevice: async () => { throw new Error("device service down") } } }
+  const down: RemoteThreadSurface = {
+    ...remote,
+    client: fakeRemoteClient({
+      state: () => "connected",
+      here: "here",
+      devices: () => [],
+      fail: { kind: "error", code: "host_unavailable", message: "device service down", next_action: "Retry." },
+    }),
+  }
   test.each([
     ["whose device service names this device", remote, { kind: "approval", device: "here" }],
     ["whose device service is down", down, { kind: "approval" }],
     ["with no device service", undefined, { kind: "approval" }],
-  ] as const)("#given B waits on a question and A runs on an install %s #when A sends a follow_up #then it is queued with waiting_on approval, naming this device only when the stamp has one", async (_label, surface, waiting) => {
-    harness = createGatewayHarness(surface === undefined ? {} : { remote: surface })
-    const h = harness
-    h.session("A")
-    const b = h.session("B")
-    b.runtime.beginUserTurn()
-    b.runtime.phaseValue = "waiting_question"
-    const result = await send(h, "A", "B", "after your question", { mode: "follow_up", idempotency_key: "k-wait" })
-    if (result.kind !== "ok" || result.delivery.kind !== "queued") throw new Error(`expected queued, got ${JSON.stringify(result)}`)
-    expect(result.delivery).toEqual({ kind: "queued", queue_position: 1, waiting_on: waiting })
-    // A retry under the same idempotency key replays the completed receipt's stored answer, which names the same wait.
-    const replay = await send(h, "A", "B", "after your question", { mode: "follow_up", idempotency_key: "k-wait" })
-    expect(replay).toMatchObject({ kind: "ok", deduplicated: true, delivery: { waiting_on: waiting } })
-  })
+  ] as const)(
+    "#given B waits on a question and A runs on an install %s #when A sends a follow_up #then it is queued with waiting_on approval, naming this device only when the stamp has one",
+    async (_label, surface, waiting) => {
+      harness = createGatewayHarness(surface === undefined ? {} : { remote: surface })
+      const h = harness
+      h.session("A")
+      const b = h.session("B")
+      b.runtime.beginUserTurn()
+      b.runtime.phaseValue = "waiting_question"
+      const result = await send(h, "A", "B", "after your question", { mode: "follow_up", idempotency_key: "k-wait" })
+      if (result.kind !== "ok" || result.delivery.kind !== "queued")
+        throw new Error(`expected queued, got ${JSON.stringify(result)}`)
+      expect(result.delivery).toEqual({ kind: "queued", queue_position: 1, waiting_on: waiting })
+      // A retry under the same idempotency key replays the completed receipt's stored answer, which names the same wait.
+      const replay = await send(h, "A", "B", "after your question", { mode: "follow_up", idempotency_key: "k-wait" })
+      expect(replay).toMatchObject({ kind: "ok", deduplicated: true, delivery: { waiting_on: waiting } })
+    },
+  )
 
   test("#given B is busy in a turn, not on a question #when A sends a follow_up #then it is queued with no waiting_on", async () => {
     const h = open()
@@ -155,7 +194,11 @@ describe("turn_epoch_cas_and_fifo", () => {
     b.runtime.clearDraft()
     await b.drain.drain({ reason: "draft_cleared" })
     const row = (await b.store.deliveryView(steer))?.row
-    expect({ state: row?.state, reason: row?.reason, enqueued: b.runtime.enqueueCount(steer) }).toEqual({ state: "refused", reason: "turn_conflict", enqueued: 0 })
+    expect({ state: row?.state, reason: row?.reason, enqueued: b.runtime.enqueueCount(steer) }).toEqual({
+      state: "refused",
+      reason: "turn_conflict",
+      enqueued: 0,
+    })
   })
 })
 
@@ -197,7 +240,11 @@ describe("repeated_wake_during_streaming", () => {
     expect(b.runtime.enqueueCount(m1)).toBe(1)
     b.runtime.endTurn()
     await h.quiesce()
-    expect({ state: await stateOf(h, m1), enqueued: b.runtime.enqueueCount(m1), entries: b.runtime.transcriptEntries(m1) }).toEqual({ state: "applied", enqueued: 1, entries: 1 })
+    expect({
+      state: await stateOf(h, m1),
+      enqueued: b.runtime.enqueueCount(m1),
+      entries: b.runtime.transcriptEntries(m1),
+    }).toEqual({ state: "applied", enqueued: 1, entries: 1 })
   })
 })
 
@@ -212,10 +259,16 @@ describe("repeated_wake_during_pending_steer", () => {
     const m2 = okId(result)
     expect(b.runtime.listAdmittedDeliveries()).toEqual({ pending: [m2], emitted: [] })
     for (let wake = 0; wake < 3; wake++) await b.drain.drain({ reason: "command" })
-    expect({ state: await stateOf(h, m2), enqueued: b.runtime.enqueueCount(m2) }).toEqual({ state: "admitted", enqueued: 1 })
+    expect({ state: await stateOf(h, m2), enqueued: b.runtime.enqueueCount(m2) }).toEqual({
+      state: "admitted",
+      enqueued: 1,
+    })
     b.runtime.toolBoundary()
     await h.quiesce()
-    expect({ state: await stateOf(h, m2), entries: b.runtime.transcriptEntries(m2) }).toEqual({ state: "applied", entries: 1 })
+    expect({ state: await stateOf(h, m2), entries: b.runtime.transcriptEntries(m2) }).toEqual({
+      state: "applied",
+      entries: 1,
+    })
   })
 })
 
@@ -238,18 +291,29 @@ describe("lost_ack_and_durable_recovery", () => {
     const b = h.session("B", { online: false })
     const crashing = h.engineFor(h.store({ _test: { afterDbCommit: "throw" } }))
     const retrying = h.engineFor(h.store())
-    const request = (key: string): GatewayDeliverRequest => ({ sender: { kind: "session", durable_id: "A" }, target: "B", text: `lost ${key}`, idempotency_key: key })
+    const request = (key: string): GatewayDeliverRequest => ({
+      sender: { kind: "session", durable_id: "A" },
+      target: "B",
+      text: `lost ${key}`,
+      idempotency_key: key,
+    })
 
-    expect((await settled(crashing.deliver(request("unadmitted")))).error?.message).toContain("gateway test hook afterDbCommit")
+    expect((await settled(crashing.deliver(request("unadmitted")))).error?.message).toContain(
+      "gateway test hook afterDbCommit",
+    )
     const uncertain = await retrying.deliver(request("unadmitted"))
     expect(summary(uncertain)).toBe("error:idempotency_uncertain")
 
-    expect((await settled(crashing.deliver(request("admitted")))).error?.message).toContain("gateway test hook afterDbCommit")
+    expect((await settled(crashing.deliver(request("admitted")))).error?.message).toContain(
+      "gateway test hook afterDbCommit",
+    )
     b.online = true
     await b.drain.drain({ reason: "start" })
     await h.quiesce()
     const replayed = await retrying.deliver(request("admitted"))
-    expect(replayed.kind === "ok" && { delivery: replayed.delivery.kind, deduplicated: replayed.deduplicated }).toEqual({ delivery: "steered", deduplicated: true })
+    expect(replayed.kind === "ok" && { delivery: replayed.delivery.kind, deduplicated: replayed.deduplicated }).toEqual(
+      { delivery: "steered", deduplicated: true },
+    )
 
     const stillUncertain = await retrying.deliver(request("unadmitted"))
     expect(summary(stillUncertain)).toBe("error:idempotency_uncertain")
@@ -262,19 +326,28 @@ describe("lost_ack_and_durable_recovery", () => {
     const h = open()
     h.session("A")
     h.session("B", { online: false })
-    const ids = [okId(await send(h, "A", "B", "one")), okId(await send(h, "A", "B", "two")), okId(await send(h, "A", "B", "three"))]
+    const ids = [
+      okId(await send(h, "A", "B", "one")),
+      okId(await send(h, "A", "B", "two")),
+      okId(await send(h, "A", "B", "three")),
+    ]
     await h.get("A").store.dispose()
     await h.get("B").store.dispose()
     const reopened = h.session("B2")
     const { createInboxDrain } = await import("./drain")
-    const drain = createInboxDrain({ store: h.store(), runtime: reopened.runtime, durableId: "B", sessionPath: () => reopened.runtime.sessionPath })
+    const drain = createInboxDrain({
+      store: h.store(),
+      runtime: reopened.runtime,
+      durableId: "B",
+      sessionPath: () => reopened.runtime.sessionPath,
+    })
     reopened.runtime.beginUserTurn()
     await drain.drain({ reason: "start" })
     expect(reopened.runtime.enqueueCalls.map((call) => call.delivery_id)).toEqual(ids)
   })
 })
 
-describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
+describe("causal_cycle_hop_and_rate_budgets", () => {
   // K8: A->B->A thread chains are allowed and no count limit applies unless the user sets one; only a
   // session sending to itself is refused.
   test("#given A->B->C under one root #when C sends back to A and A answers B directly #then both are delivered and carry the chain's hop count", async () => {
@@ -290,7 +363,12 @@ describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
     await h.quiesce()
     const views = await Promise.all([ca, ab2].map((id) => h.get("A").store.deliveryView(id)))
     // B may still be in the turn A's first message started, so the answer is admitted (queued) or applied; never refused
-    expect(views.map((view) => [view?.row.state === "admitted" || view?.row.state === "applied", view?.row.hop])).toEqual([[true, 3], [true, 4]])
+    expect(
+      views.map((view) => [view?.row.state === "admitted" || view?.row.state === "applied", view?.row.hop]),
+    ).toEqual([
+      [true, 3],
+      [true, 4],
+    ])
     const self = await send(h, "A", "A", "me")
     expect(self.kind === "error" && self.error.details?.guard).toBe("self_send")
   })
@@ -318,7 +396,10 @@ describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
     const xp = okId(await send(h, "X", "P", "p", { cause_delivery_id: wx, turn_id: "x1" }))
     const xq = okId(await send(h, "X", "Q", "q", { cause_delivery_id: wx, turn_id: "x1" }))
     await h.quiesce()
-    const results = await Promise.all([send(h, "P", "Q", "p->q", { cause_delivery_id: xp }), send(h, "Q", "P", "q->p", { cause_delivery_id: xq })])
+    const results = await Promise.all([
+      send(h, "P", "Q", "p->q", { cause_delivery_id: xp }),
+      send(h, "Q", "P", "q->p", { cause_delivery_id: xq }),
+    ])
     expect(results.map((result) => result.kind)).toEqual(["ok", "ok"])
   })
 
@@ -327,7 +408,9 @@ describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
     for (let index = 0; index <= 12; index++) h.session(`H${index}`)
     let cause: string | undefined
     for (let hop = 1; hop <= 12; hop++) {
-      cause = okId(await send(h, `H${hop - 1}`, `H${hop}`, `hop ${hop}`, cause === undefined ? {} : { cause_delivery_id: cause }))
+      cause = okId(
+        await send(h, `H${hop - 1}`, `H${hop}`, `hop ${hop}`, cause === undefined ? {} : { cause_delivery_id: cause }),
+      )
       await h.quiesce()
     }
     expect((await h.get("H0").store.deliveryView(cause ?? ""))?.row.hop).toBe(12)
@@ -368,29 +451,50 @@ describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
     expect(Math.max(...sizes) - Math.min(...sizes)).toBeLessThan(16)
   }, 60_000)
 
-  test("#given one sender turn #when it reaches a 17th distinct session #then that send is refused while a second send to a known target passes", async () => {
+  // Q 2026-11-19: no per-turn cap on how many sessions one turn may reach; a recovering sender must be able to wake every
+  // session it owns from one turn.
+  test("#given one sender turn #when it sends to 40 distinct sessions #then every send is delivered", async () => {
     const h = open()
     h.session("F")
-    for (let index = 1; index <= 17; index++) h.phantom(`G${index}`)
+    for (let index = 1; index <= 40; index++) h.phantom(`G${index}`)
     const results: string[] = []
-    for (let index = 1; index <= 17; index++) results.push(summary(await send(h, "F", `G${index}`, "fan", { turn_id: "turn-1" })))
-    expect(results.slice(0, 16).every((result) => result === "queued_offline")).toBe(true)
-    expect(results[16]).toBe("error:overloaded")
-    expect(summary(await send(h, "F", "G1", "again", { turn_id: "turn-1" }))).toBe("queued_offline")
+    for (let index = 1; index <= 40; index++)
+      results.push(summary(await send(h, "F", `G${index}`, "fan", { turn_id: "turn-1" })))
+    expect(results).toEqual(Array.from({ length: 40 }, () => "queued_offline"))
   })
 
   test("#given a pair bucket of 8 #when a 9th send follows at once, a retry replays, and 5 s pass #then the 9th is refused, the retry costs nothing, and one token refills", async () => {
     const h = open()
     h.session("R")
     h.phantom("S")
-    for (let index = 1; index <= 8; index++) expect(summary(await send(h, "R", "S", `m${index}`, { idempotency_key: `r${index}` }))).toBe("queued_offline")
+    for (let index = 1; index <= 8; index++)
+      expect(summary(await send(h, "R", "S", `m${index}`, { idempotency_key: `r${index}` }))).toBe("queued_offline")
     const ninth = await send(h, "R", "S", "m9", { idempotency_key: "r9" })
-    expect(ninth.kind === "error" && { code: ninth.error.code, budget: ninth.error.details?.budget }).toEqual({ code: "overloaded", budget: "pair_rate" })
+    expect(ninth.kind === "error" && { code: ninth.error.code, guard: ninth.error.details?.guard }).toEqual({
+      code: "pair_loop_guard",
+      guard: "pair_loop",
+    })
     const retry = await send(h, "R", "S", "m3", { idempotency_key: "r3" })
     expect(retry.kind === "ok" && retry.deduplicated).toBe(true)
     h.clock.now += 5_000
     expect(summary(await send(h, "R", "S", "m9", { idempotency_key: "r9" }))).toBe("queued_offline")
-    expect(summary(await send(h, "R", "S", "m10", { idempotency_key: "r10" }))).toBe("error:overloaded")
+    expect(summary(await send(h, "R", "S", "m10", { idempotency_key: "r10" }))).toBe("error:pair_loop_guard")
+  })
+
+  test("#given A sends to B in one burst #when the 9th send follows the 8th at once and the refill window then passes #then all 8 deliver, the 9th is refused pair_loop_guard with the measured burst and the wait, and the next send is accepted", async () => {
+    const h = open()
+    h.session("A")
+    h.session("B")
+    for (let index = 1; index <= 8; index++)
+      expect((await send(h, "A", "B", `burst ${index}`, { idempotency_key: `b${index}` })).kind).toBe("ok")
+    const ninth = await send(h, "A", "B", "burst 9", { idempotency_key: "b9" })
+    if (ninth.kind !== "error") throw new Error(`expected the 9th send refused, got ${JSON.stringify(ninth)}`)
+    expect(ninth.error.code).toBe("pair_loop_guard")
+    expect(ninth.error.details).toEqual({ guard: "pair_loop", burst: 8, window_ms: 40_000, retry_after_ms: 5_000 })
+    // The message names the sending end of the loop by its principal, whatever its wording.
+    expect(ninth.error.message).toContain("session:A")
+    h.clock.now += Number(ninth.error.details?.retry_after_ms)
+    expect((await send(h, "A", "B", "burst 9", { idempotency_key: "b9" })).kind).toBe("ok")
   })
 
   test("#given roots are minted by the gateway #when a caller names its own root or continues a delivery it never received #then each is refused, and a chain continued past the root lifetime is delivered under a fresh root", async () => {
@@ -407,7 +511,10 @@ describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
     const late = okId(await send(h, "B", "C", "after the root lifetime", { cause_delivery_id: ab }))
     const lateView = await h.get("B").store.deliveryView(late)
     const firstView = await h.get("A").store.deliveryView(ab)
-    expect({ hop: lateView?.row.hop, sameRoot: lateView?.row.root_id === firstView?.row.root_id }).toEqual({ hop: 2, sameRoot: false })
+    expect({ hop: lateView?.row.hop, sameRoot: lateView?.row.root_id === firstView?.row.root_id }).toEqual({
+      hop: 2,
+      sameRoot: false,
+    })
   })
 
   // #13004 (decision 0027 section 3): a run's cause is the delivery it consumed on either transport. One that no row here
@@ -415,7 +522,9 @@ describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
   test("#given a run consumed a delivery no row here holds #when it sends #then the send is delivered under a new root with the inbound hop continued", async () => {
     const h = open()
     for (const id of ["A", "B"]) h.session(id)
-    const sent = okId(await send(h, "A", "B", "continue", { cause_delivery_id: "d-from-another-device", inbound_hop: 2 }))
+    const sent = okId(
+      await send(h, "A", "B", "continue", { cause_delivery_id: "d-from-another-device", inbound_hop: 2 }),
+    )
     const view = await h.get("A").store.deliveryView(sent)
     expect({ hop: view?.row.hop, root: view?.row.root_id.startsWith("root-") }).toEqual({ hop: 3, root: true })
   })
@@ -429,7 +538,11 @@ describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
     const outcomes: string[] = []
     for (let index = 0; index < 65; index++) {
       h.phantom(`N${index}`)
-      outcomes.push(summary(await send(h, "F", `N${index}`, "fan", { cause_delivery_id: seed, turn_id: `t${Math.floor(index / 16)}` })))
+      outcomes.push(
+        summary(
+          await send(h, "F", `N${index}`, "fan", { cause_delivery_id: seed, turn_id: `t${Math.floor(index / 16)}` }),
+        ),
+      )
     }
     expect(outcomes.filter((outcome) => outcome === "queued_offline")).toHaveLength(65)
     // 65 sequential fsync'd (`synchronous=FULL`) transactions: measured 5.2-5.3 s at load ~370 and
@@ -464,19 +577,28 @@ describe("cli_sender_principal", () => {
     const h = open()
     const b = h.session("B")
     const cli = h.engineFor(h.store())
-    const result = await cli.deliver({ sender: { kind: "cli", uid: 501, user: "tester" }, target: "B", text: "from the shell" })
+    const result = await cli.deliver({
+      sender: { kind: "cli", uid: 501, user: "tester" },
+      target: "B",
+      text: "from the shell",
+    })
     const id = okId(result)
     await h.quiesce()
     const row = (await b.store.deliveryView(id))?.row
     expect({ sender: row?.sender, origin: row?.envelope.origin }).toEqual({
       sender: "cli:501",
-      origin: { external: { platform: "cli", account_id: "tester", chat_id: "@cli", thread_id: "@chat", message_id: id } },
+      origin: {
+        external: { platform: "cli", account_id: "tester", chat_id: "@cli", thread_id: "@chat", message_id: id },
+      },
     })
     const text = b.runtime.textOf(id) ?? ""
     expect(text.split("\n")[0]).toStartWith("From unclassified / ")
     expect(text.split("\n")[0]).toContain("source=external")
     expect(text.split("\n")[2]).toBe(JSON.stringify("from the shell"))
-    expect(b.runtime.senderOf(id)).toEqual({ sender: { kind: "command_line", user: "tester" }, display_text: "From unclassified / fixture\nfrom the shell" })
+    expect(b.runtime.senderOf(id)).toEqual({
+      sender: { kind: "command_line", user: "tester" },
+      display_text: "From unclassified / fixture\nfrom the shell",
+    })
   })
 
   test("#given a named session sends to another #when it lands #then the receiver is told the sending session's id and name and the message as written, apart from the provenance header the model reads", async () => {
@@ -484,16 +606,30 @@ describe("cli_sender_principal", () => {
     h.session("A")
     const b = h.session("B")
     const named = h.engineFor(h.store())
-    const result = await named.deliver({ sender: { kind: "session", durable_id: "A", name: "planner" }, target: "B", text: "review the diff" })
+    const result = await named.deliver({
+      sender: { kind: "session", durable_id: "A", name: "planner" },
+      target: "B",
+      text: "review the diff",
+    })
     const id = okId(result)
     await h.quiesce()
-    expect(b.runtime.senderOf(id)).toEqual({ sender: { kind: "agent", session_id: "A", name: "planner" }, display_text: 'From unclassified / fixture / session "planner"\nreview the diff' })
+    expect(b.runtime.senderOf(id)).toEqual({
+      sender: { kind: "agent", session_id: "A", name: "planner" },
+      display_text: 'From unclassified / fixture / session "planner"\nreview the diff',
+    })
     expect((b.runtime.textOf(id) ?? "").split("\n")[0]).toContain('/ session "planner" [OMO_GATEWAY v=1 ')
     expect((b.runtime.textOf(id) ?? "").split("\n")[0]).toContain("source=peer_agent")
 
-    const unnamed = await named.deliver({ sender: { kind: "session", durable_id: "A" }, target: "B", text: "and the tests" })
+    const unnamed = await named.deliver({
+      sender: { kind: "session", durable_id: "A" },
+      target: "B",
+      text: "and the tests",
+    })
     await h.quiesce()
-    expect(b.runtime.senderOf(okId(unnamed))).toEqual({ sender: { kind: "agent", session_id: "A" }, display_text: "From unclassified / fixture\nand the tests" })
+    expect(b.runtime.senderOf(okId(unnamed))).toEqual({
+      sender: { kind: "agent", session_id: "A" },
+      display_text: "From unclassified / fixture\nand the tests",
+    })
   })
 })
 
@@ -510,11 +646,34 @@ describe("held_draft_quiescence", () => {
     await b.drain.drain({ reason: "inbox" })
     const after = await b.store.stats()
     const row = (await b.store.deliveryView(id))?.row
-    expect({ writes: after.writes - before.writes, marker: existsSync(marker), state: row?.state, attempt: row?.attempt }).toEqual({ writes: 0, marker: true, state: "queued", attempt: 0 })
+    expect({
+      writes: after.writes - before.writes,
+      marker: existsSync(marker),
+      state: row?.state,
+      attempt: row?.attempt,
+    }).toEqual({ writes: 0, marker: true, state: "queued", attempt: 0 })
     b.runtime.submitDraft()
     await b.drain.drain({ reason: "submission" })
     b.runtime.endTurn()
     await h.quiesce()
-    expect({ state: (await b.store.deliveryView(id))?.row.state, marker: existsSync(marker), entries: b.runtime.transcriptEntries(id) }).toEqual({ state: "applied", marker: false, entries: 1 })
+    expect({
+      state: (await b.store.deliveryView(id))?.row.state,
+      marker: existsSync(marker),
+      entries: b.runtime.transcriptEntries(id),
+    }).toEqual({ state: "applied", marker: false, entries: 1 })
+  })
+})
+
+describe("held_target", () => {
+  // senpi#7014: an idle session under a hold that is not only `unattended` keeps a peer delivery as a held notice and
+  // answers admission `held`. The sender is told the delivery waits on that hold; it is never answered started.
+  test("#given an idle target whose engine holds it #when A sends auto #then the answer is queued waiting on the hold and no turn starts", async () => {
+    const h = open()
+    h.session("A")
+    const target = h.session("T")
+    target.runtime.sessionHolds = ["session_hold"]
+    const result = await send(h, "A", "T", "are you there")
+    expect(result).toMatchObject({ kind: "ok", delivery: { kind: "queued", waiting_on: { kind: "hold" } } })
+    expect(target.runtime.enqueueCalls).toEqual([])
   })
 })

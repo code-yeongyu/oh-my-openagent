@@ -24,7 +24,12 @@ describe("installAstGrepForCodex", () => {
     })
 
     // then
-    expect(calls).toEqual([{ skillDir: join(pluginRoot, "skills", "ast-grep"), targetDir: join("/tmp/codex", "runtime", "ast-grep", "darwin-arm64") }])
+    expect(calls).toEqual([
+      {
+        skillDir: join(pluginRoot, "skills", "ast-grep"),
+        targetDir: join("/tmp/codex", "runtime", "ast-grep", "darwin-arm64"),
+      },
+    ])
   })
 
   test("#given vendored installer fails #when Codex installer calls it #then installation continues without throwing", async () => {
@@ -32,14 +37,16 @@ describe("installAstGrepForCodex", () => {
     const logs: string[] = []
 
     // when
-    await expect(installAstGrepForCodex({
-      codexHome: "/tmp/codex",
-      installed: [{ marketplaceName: "sisyphuslabs", name: "omo", path: "/tmp/plugin", version: "4.10.0" }],
-      installer: async () => ({ kind: "timed-out" }),
-      log: (message) => logs.push(message),
-      arch: "x64",
-      platform: "linux",
-    })).resolves.toBeUndefined()
+    await expect(
+      installAstGrepForCodex({
+        codexHome: "/tmp/codex",
+        installed: [{ marketplaceName: "sisyphuslabs", name: "omo", path: "/tmp/plugin", version: "4.10.0" }],
+        installer: async () => ({ kind: "timed-out" }),
+        log: (message) => logs.push(message),
+        arch: "x64",
+        platform: "linux",
+      }),
+    ).resolves.toBeUndefined()
 
     // then
     expect(logs.join("\n")).toContain("timed out")

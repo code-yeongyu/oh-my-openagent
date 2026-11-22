@@ -17,9 +17,22 @@ try {
   failure = error
 } finally {
   mkdirSync(dirname(out), { recursive: true })
-  writeFileSync(out, JSON.stringify({ head, platform: process.platform, bun: Bun.version,
-    passed: failure === undefined, result, error: failure instanceof Error ? failure.stack : failure,
-    stages: trace.stages, graphs: trace.graphs,
-  }, null, 2))
+  writeFileSync(
+    out,
+    JSON.stringify(
+      {
+        head,
+        platform: process.platform,
+        bun: Bun.version,
+        passed: failure === undefined,
+        result,
+        error: failure instanceof Error ? failure.stack : failure,
+        stages: trace.stages,
+        graphs: trace.graphs,
+      },
+      null,
+      2,
+    ),
+  )
 }
 if (failure !== undefined) throw failure

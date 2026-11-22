@@ -54,18 +54,8 @@ export async function attemptDeduplicationRecovery(
   if (!plan) return
 
   const pruningState = createPruningState()
-  const prunedCount = await executeDeduplication(
-    sessionID,
-    pruningState,
-    plan.config,
-    plan.protectedTools,
-    client,
-  )
-  const { truncatedCount } = await truncateToolOutputsByCallId(
-    sessionID,
-    pruningState.toolIdsToPrune,
-    client,
-  )
+  const prunedCount = await executeDeduplication(sessionID, pruningState, plan.config, plan.protectedTools, client)
+  const { truncatedCount } = await truncateToolOutputsByCallId(sessionID, pruningState.toolIdsToPrune, client)
 
   if (prunedCount > 0 || truncatedCount > 0) {
     log("[auto-compact] deduplication recovery applied", {

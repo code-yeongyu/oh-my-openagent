@@ -9,7 +9,9 @@ const engineEntry = import.meta.resolve("@code-yeongyu/senpi")
 const { toJsonEvent } = await import(new URL("./modes/json-event.js", engineEntry).href)
 
 const roots = []
-afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
+afterEach(() => {
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
+})
 
 describe("telemetry provider RPC serialization", () => {
   test("#given the generated provider #when it streams a tool call #then the real serializer preserves its identity", async () => {
@@ -19,7 +21,11 @@ describe("telemetry provider RPC serialization", () => {
     writeFileSync(path, mockProviderSource())
     const { default: register } = await import(pathToFileURL(path).href)
     let provider
-    register({ registerProvider(_name, value) { provider = value } })
+    register({
+      registerProvider(_name, value) {
+        provider = value
+      },
+    })
     const streams = [provider.streamSimple({}, { messages: [] }, {}), provider.streamSimple({}, { messages: [] }, {})]
     const expectedIds = []
     const events = []
@@ -37,6 +43,7 @@ describe("telemetry provider RPC serialization", () => {
     expect(events).toHaveLength(2)
     expect(new Set(expectedIds).size).toBe(2)
     expect(events.map((event) => event.assistantMessageEvent.id)).toEqual(expectedIds)
-    for (const event of events) expect(event.assistantMessageEvent).toMatchObject({ type: "toolcall_start", toolName: "create_goal" })
+    for (const event of events)
+      expect(event.assistantMessageEvent).toMatchObject({ type: "toolcall_start", toolName: "create_goal" })
   })
 })

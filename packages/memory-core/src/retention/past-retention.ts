@@ -6,7 +6,11 @@ import { join } from "node:path"
 
 import { existsSync, lstat } from "../fs/resilient"
 import type { MemoryIdentityPaths } from "../identity/layout"
-import { readReflectionRunIdMark, reflectionRunNumber, scanReflectionRunHighWater } from "../reflection/run-id-high-water"
+import {
+  readReflectionRunIdMark,
+  reflectionRunNumber,
+  scanReflectionRunHighWater,
+} from "../reflection/run-id-high-water"
 import { COMPLETIONS_KEEP_NEWEST, readCompletion } from "./completions"
 import { classifyJournalEntry } from "./journals"
 import { readUnreflectedRetentionGate } from "./reflection-health-signal"
@@ -24,7 +28,11 @@ export interface RuntimePastRetention {
 }
 
 /** Folded runs the next pass would remove, by its rules (reflection-runs.ts), minus what only the pass decides. */
-async function pastRetentionRunNames(input: { readonly paths: MemoryIdentityPaths; readonly policy: RuntimeRetentionPolicy; readonly now: () => number }): Promise<string[]> {
+async function pastRetentionRunNames(input: {
+  readonly paths: MemoryIdentityPaths
+  readonly policy: RuntimeRetentionPolicy
+  readonly now: () => number
+}): Promise<string[]> {
   const cutoff = input.now() - input.policy.retentionDays * DAY_MS
   const runsDir = join(input.paths.reflection, "runs")
   const highWater = await scanReflectionRunHighWater(input.paths)
@@ -34,7 +42,9 @@ async function pastRetentionRunNames(input: { readonly paths: MemoryIdentityPath
     const classified = await classifyReflectionRun(join(runsDir, name), name)
     if (typeof classified !== "string") folded.push({ name, finishedAt: classified.finishedAt })
   }
-  const newest = folded.toSorted((left, right) => right.finishedAt - left.finishedAt || right.name.localeCompare(left.name))[0]?.name
+  const newest = folded.toSorted(
+    (left, right) => right.finishedAt - left.finishedAt || right.name.localeCompare(left.name),
+  )[0]?.name
   const names: string[] = []
   for (const run of folded) {
     if (run.name === newest || reflectionRunNumber(run.name) === highWater || run.finishedAt > cutoff) continue
@@ -57,7 +67,12 @@ export async function countRuntimePastRetention(input: {
 
   let journals = 0
   let unclassifiedJournals = 0
-  const context = { paths: input.paths, policy: input.policy, now: input.now, ...(input.signal === undefined ? {} : { signal: input.signal }) }
+  const context = {
+    paths: input.paths,
+    policy: input.policy,
+    now: input.now,
+    ...(input.signal === undefined ? {} : { signal: input.signal }),
+  }
   const gate = await readUnreflectedRetentionGate(input.paths.reflection, input.reflectionEnabled ?? true)
   for (const sessionId of await listNames(input.paths.transcripts)) {
     if (input.isLiveSession?.(sessionId) === true) continue
@@ -145,7 +160,10 @@ export async function countRuntimePastRetentionOtherStores(input: {
     if (record !== undefined) records.push(record)
   }
   const newest = new Set(
-    records.toSorted((left, right) => right.finishedAt - left.finishedAt || (left.runId < right.runId ? 1 : -1)).slice(0, COMPLETIONS_KEEP_NEWEST).map((record) => record.runId),
+    records
+      .toSorted((left, right) => right.finishedAt - left.finishedAt || (left.runId < right.runId ? 1 : -1))
+      .slice(0, COMPLETIONS_KEEP_NEWEST)
+      .map((record) => record.runId),
   )
   let completions = 0
   for (const record of records) {
@@ -167,7 +185,11 @@ export async function countRuntimePastRetentionOtherStores(input: {
   let legacy = 0
   for (const name of await listNames(input.paths.reflectionSessions)) {
     input.signal?.throwIfAborted()
-    if (reflectionRunNumber(name) !== highWater && (await idleSince(join(input.paths.reflectionSessions, name), retentionCutoff))) legacy += 1
+    if (
+      reflectionRunNumber(name) !== highWater &&
+      (await idleSince(join(input.paths.reflectionSessions, name), retentionCutoff))
+    )
+      legacy += 1
   }
   const recallRuns = join(input.paths.recall, "runs")
   if (existsSync(recallRuns) && (await idleSince(recallRuns, retentionCutoff))) legacy += 1

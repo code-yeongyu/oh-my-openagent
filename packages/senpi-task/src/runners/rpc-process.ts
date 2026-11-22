@@ -68,8 +68,7 @@ export class RpcProcessRunner {
     this.onWarning = options.onWarning ?? ((message) => log("senpi-task process runner", { message }))
     this.terminateChild = options.terminateChild
     this.spawnChild =
-      options.spawnChild ??
-      ((descriptor) => defaultSpawnChild(descriptor, options.spawnProcess ?? spawn))
+      options.spawnChild ?? ((descriptor) => defaultSpawnChild(descriptor, options.spawnProcess ?? spawn))
     this.buildSpawn = options.buildSpawn ?? ((spec) => buildRpcSpawn(spec))
     this.heartbeatIntervalMs = options.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS
     this.onMalformedLine = options.onMalformedLine
@@ -85,7 +84,12 @@ export class RpcProcessRunner {
         ? { ...specInput, extensions: this.inheritedExtensions }
         : specInput
     await this.modelAdmission(spec)
-    const parent = new ChildParentLink(spec.task_id, this.options.dialogs, this.options.parentPermission, (message, token) => this.onWarning(message, token))
+    const parent = new ChildParentLink(
+      spec.task_id,
+      this.options.dialogs,
+      this.options.parentPermission,
+      (message, token) => this.onWarning(message, token),
+    )
     const descriptor = this.buildSpawn(parent.named(spec))
     const child = this.spawnChild(descriptor)
     const client = new RpcProtocolClient({ child, onMalformedLine: this.onMalformedLine, parent })
@@ -93,9 +97,11 @@ export class RpcProcessRunner {
       client,
       child,
       taskId: spec.task_id,
-      ...(spec.taskStoreDir === undefined ? {} : {
-        inputStore: createTaskRecordStore({ project_dir: spec.cwd, task: { state_dir: spec.taskStoreDir } }),
-      }),
+      ...(spec.taskStoreDir === undefined
+        ? {}
+        : {
+            inputStore: createTaskRecordStore({ project_dir: spec.cwd, task: { state_dir: spec.taskStoreDir } }),
+          }),
       heartbeatIntervalMs: this.heartbeatIntervalMs,
       now: this.now,
       childEnv: descriptor.env,
@@ -133,13 +139,17 @@ export class RpcProcessRunner {
       const message = error instanceof Error ? error.message : String(error)
       // The child's own model resolution is the authority admission defers to (#10863): a child that
       // exited because it could not resolve its `--model` fails typed, carrying its own error.
-      const unresolvedModel = exitOutcome?.kind === "crashed" ? childUnresolvedModelError(exitOutcome.facts.stderrTail) : undefined
+      const unresolvedModel =
+        exitOutcome?.kind === "crashed" ? childUnresolvedModelError(exitOutcome.facts.stderrTail) : undefined
       // A child that died before its first prompt leaves its cause ONLY here: the classified exit is
       // otherwise folded into `message`, which is stderr-derived and gets sanitized away downstream.
       throw new RunnerError({
-        kind: unresolvedModel !== undefined
-          ? "model_unavailable"
-          : spec.resumeSessionPath === undefined ? "child-prompt-failed" : "session_unavailable",
+        kind:
+          unresolvedModel !== undefined
+            ? "model_unavailable"
+            : spec.resumeSessionPath === undefined
+              ? "child-prompt-failed"
+              : "session_unavailable",
         message: unresolvedModel === undefined ? message : `the child could not resolve its model: ${unresolvedModel}`,
         cause: error,
         rejected_while: exitOutcome === undefined ? "alive" : "exited",
@@ -155,9 +165,7 @@ export class RpcProcessRunner {
         ...(spec.memberEnv === undefined ? {} : { memberEnv: spec.memberEnv }),
       },
       switchSession: (sessionPath: string) =>
-        sessionPath === spec.resumeSessionPath && resume !== undefined
-          ? resume
-          : client.switchSession(sessionPath),
+        sessionPath === spec.resumeSessionPath && resume !== undefined ? resume : client.switchSession(sessionPath),
       getEntries: (since?: string) => client.getEntries(since),
     })
   }
@@ -185,17 +193,24 @@ export class RpcProcessRunner {
     // A child that died or whose pipe failed is a transport failure: the start keeps its exit/transport
     // classification instead of reading as an engine that refused the chain.
     if (client.exited) {
-      throw new Error(`task ${spec.task_id}: its designated model chain (${chain}) was not applied because the child exited while it was being sent`)
+      throw new Error(
+        `task ${spec.task_id}: its designated model chain (${chain}) was not applied because the child exited while it was being sent`,
+      )
     }
-    const [kind, reason]: readonly [DesignatedChainNotHeldReason, string] = outcome === "unsupported"
-        ? ["unsupported", "this senpi engine cannot take a task child's model chain (no retry_fallback_command); upgrade it"]
+    const [kind, reason]: readonly [DesignatedChainNotHeldReason, string] =
+      outcome === "unsupported"
+        ? [
+            "unsupported",
+            "this senpi engine cannot take a task child's model chain (no retry_fallback_command); upgrade it",
+          ]
         : outcome === "timeout"
           ? ["timeout", `no answer within ${this.fallbackChainDeadlineMs} ms`]
           : ["refused", outcome.refused]
     throw new DesignatedChainNotHeldError({
       reason: kind,
       models: [spec.model, ...(spec.fallbackModels ?? [])],
-      message: `task ${spec.task_id}: its designated model chain (${chain}) ` +
+      message:
+        `task ${spec.task_id}: its designated model chain (${chain}) ` +
         `was not applied (${reason}), and a child never runs outside its designated models, so it was not started`,
     })
   }
@@ -214,7 +229,6 @@ export class RpcProcessRunner {
       return { refused: `refused: ${error instanceof Error ? error.message : String(error)}` }
     }
   }
-
 }
 
 async function withDeadline<T>(work: Promise<T>, ms: number, expired: AbortController): Promise<T | "timeout"> {
@@ -236,7 +250,8 @@ async function engineAcceptsFallbackChain(client: RpcProtocolClient): Promise<bo
   const response = await client.send({ type: "get_protocol_info" })
   if (!response.success || response.command !== "get_protocol_info") return false
   const data: unknown = response.data
-  const capabilities: unknown = typeof data === "object" && data !== null ? Reflect.get(data, "capabilities") : undefined
+  const capabilities: unknown =
+    typeof data === "object" && data !== null ? Reflect.get(data, "capabilities") : undefined
   return Array.isArray(capabilities) && capabilities.includes(RETRY_FALLBACK_COMMAND_CAPABILITY)
 }
 

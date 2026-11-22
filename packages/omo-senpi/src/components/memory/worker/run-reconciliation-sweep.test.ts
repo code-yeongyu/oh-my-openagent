@@ -53,15 +53,21 @@ describe("reflection reconciliation orphan sweep", () => {
     const warnings: { readonly message: string; readonly details?: Record<string, unknown> }[] = []
 
     // when
-    const results = await withinPhase("sweep-reconcile", () => reconcileReflectionRuns({
-      identity: item.identity,
-      reservation: item.store,
-      now: () => Date.now() + HOUR_MS,
-      getPidLiveness: () => "alive",
-      getProcessStartIdentity: async () => "supervisor-start",
-      waitForOutcome: async () => "timeout",
-      logger: { warn: (message, details) => { warnings.push({ message, ...(details === undefined ? {} : { details }) }) } },
-    }))
+    const results = await withinPhase("sweep-reconcile", () =>
+      reconcileReflectionRuns({
+        identity: item.identity,
+        reservation: item.store,
+        now: () => Date.now() + HOUR_MS,
+        getPidLiveness: () => "alive",
+        getProcessStartIdentity: async () => "supervisor-start",
+        waitForOutcome: async () => "timeout",
+        logger: {
+          warn: (message, details) => {
+            warnings.push({ message, ...(details === undefined ? {} : { details }) })
+          },
+        },
+      }),
+    )
 
     // then
     expect(results).toEqual([])
@@ -80,12 +86,14 @@ describe("reflection reconciliation orphan sweep", () => {
     const orphan = await addOrphanWorktree(item, Date.now() - HOUR_MS)
 
     // when
-    const results = await withinPhase("deferred-sweep", () => reconcileReflectionRuns({
-      identity: item.identity,
-      reservation: contendedReservation(reflectionSchedulerLockPath(item.identity.paths.locks), null),
-      now: () => Date.now() + HOUR_MS,
-      deferOnSchedulerContention: true,
-    }))
+    const results = await withinPhase("deferred-sweep", () =>
+      reconcileReflectionRuns({
+        identity: item.identity,
+        reservation: contendedReservation(reflectionSchedulerLockPath(item.identity.paths.locks), null),
+        now: () => Date.now() + HOUR_MS,
+        deferOnSchedulerContention: true,
+      }),
+    )
 
     // then
     expect(results).toEqual([])
@@ -101,17 +109,24 @@ describe("retention tombstones (A09)", () => {
     await keepRunAlive(item)
     const tombstone = join(item.identity.paths.reflection, "runs", ".prune-run-gone-0f0f")
     await mkdir(tombstone, { recursive: true })
-    await writeRunJsonAtomic(join(tombstone, "ledger.json"), { ...item.ledger, runId: "run-gone", pid: 5151, processStart: "gone-start" })
+    await writeRunJsonAtomic(join(tombstone, "ledger.json"), {
+      ...item.ledger,
+      runId: "run-gone",
+      pid: 5151,
+      processStart: "gone-start",
+    })
 
     // when
-    const results = await withinPhase("tombstone-reconcile", () => reconcileReflectionRuns({
-      identity: item.identity,
-      reservation: item.store,
-      now: () => Date.now() + HOUR_MS,
-      getPidLiveness: (pid) => (pid === 5151 ? "dead" : "alive"),
-      getProcessStartIdentity: async () => "supervisor-start",
-      waitForOutcome: async () => "timeout",
-    }))
+    const results = await withinPhase("tombstone-reconcile", () =>
+      reconcileReflectionRuns({
+        identity: item.identity,
+        reservation: item.store,
+        now: () => Date.now() + HOUR_MS,
+        getPidLiveness: (pid) => (pid === 5151 ? "dead" : "alive"),
+        getProcessStartIdentity: async () => "supervisor-start",
+        waitForOutcome: async () => "timeout",
+      }),
+    )
 
     // then
     expect(results).toEqual([])

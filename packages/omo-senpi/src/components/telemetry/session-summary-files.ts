@@ -3,7 +3,11 @@ import { dirname } from "node:path"
 
 // Every write is a temp file renamed over the target, so a reader (or a process killed mid-write) sees
 // either the previous complete file or the new complete file, never a torn one.
-export function writeJsonAtomic(path: string, value: unknown, owner: { readonly pid: number; readonly bootId: string }): void {
+export function writeJsonAtomic(
+  path: string,
+  value: unknown,
+  owner: { readonly pid: number; readonly bootId: string },
+): void {
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
   const temp = `${path}.${owner.pid}-${owner.bootId}.tmp`
   writeFileSync(temp, JSON.stringify(value), { mode: 0o600 })

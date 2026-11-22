@@ -52,7 +52,8 @@ describe("batch ids", () => {
   // The documented limit of the counter (otlp-spool-dir.ts, createBatchId): order survives ONE
   // counter overflow while the clock stays one millisecond behind the advanced timestamp; after a
   // second overflow in that same clock millisecond the counter reseeds and the order can break.
-  const after = (a: BatchIdCounter, b: BatchIdCounter): boolean => b.ms > a.ms || (b.ms === a.ms && b.counter > a.counter)
+  const after = (a: BatchIdCounter, b: BatchIdCounter): boolean =>
+    b.ms > a.ms || (b.ms === a.ms && b.counter > a.counter)
   const seed = (): number => 0
   const T = 1_760_000_000_000
 

@@ -18,7 +18,10 @@ export interface LegacyDaemonAttestationDeps {
 
 const PROBE_TIMEOUT_MS = 500
 
-export async function probeLegacyJsonRpcEndpoint(endpoint: string, timeoutMs: number = PROBE_TIMEOUT_MS): Promise<boolean> {
+export async function probeLegacyJsonRpcEndpoint(
+  endpoint: string,
+  timeoutMs: number = PROBE_TIMEOUT_MS,
+): Promise<boolean> {
   return await new Promise<boolean>((resolve) => {
     const socket = connect(endpoint)
     let settled = false
@@ -99,15 +102,17 @@ async function attestMacOwnership(
     "--",
     input.endpoint,
   ])
-  const lsofOutput = filteredLsofOutput ?? await executeForStdout(executeFileImpl, "/usr/sbin/lsof", [
-    "-a",
-    "-n",
-    "-P",
-    "-p",
-    String(input.pid),
-    "-U",
-    "-Fn",
-  ])
+  const lsofOutput =
+    filteredLsofOutput ??
+    (await executeForStdout(executeFileImpl, "/usr/sbin/lsof", [
+      "-a",
+      "-n",
+      "-P",
+      "-p",
+      String(input.pid),
+      "-U",
+      "-Fn",
+    ]))
   if (lsofOutput === null || !lsofShowsUnixEndpoint(lsofOutput, input.pid, input.endpoint)) return false
 
   const commandOutput = await executeForStdout(executeFileImpl, "/bin/ps", ["-p", String(input.pid), "-o", "command="])
@@ -115,7 +120,12 @@ async function attestMacOwnership(
   return isNodeCliDaemonCommand(commandOutput.trim())
 }
 
-function legacyStatusRequest(): { readonly jsonrpc: "2.0"; readonly id: 1; readonly method: "tools/call"; readonly params: { readonly name: "status"; readonly arguments: Record<string, never> } } {
+function legacyStatusRequest(): {
+  readonly jsonrpc: "2.0"
+  readonly id: 1
+  readonly method: "tools/call"
+  readonly params: { readonly name: "status"; readonly arguments: Record<string, never> }
+} {
   return {
     jsonrpc: "2.0",
     id: 1,
@@ -127,8 +137,15 @@ function legacyStatusRequest(): { readonly jsonrpc: "2.0"; readonly id: 1; reado
 function isJsonRpcResponse(line: string): boolean {
   if (line.length === 0) return false
   try {
-    const parsed = JSON.parse(line) as { readonly jsonrpc?: unknown; readonly id?: unknown; readonly result?: unknown; readonly error?: unknown }
-    return parsed.jsonrpc === "2.0" && parsed.id === 1 && (Object.hasOwn(parsed, "result") || Object.hasOwn(parsed, "error"))
+    const parsed = JSON.parse(line) as {
+      readonly jsonrpc?: unknown
+      readonly id?: unknown
+      readonly result?: unknown
+      readonly error?: unknown
+    }
+    return (
+      parsed.jsonrpc === "2.0" && parsed.id === 1 && (Object.hasOwn(parsed, "result") || Object.hasOwn(parsed, "error"))
+    )
   } catch {
     return false
   }
@@ -185,16 +202,10 @@ async function executeForStdout(
   })
 }
 
-async function readText(
-  readFileImpl: typeof readFile,
-  path: string,
-): Promise<string | null> {
+async function readText(readFileImpl: typeof readFile, path: string): Promise<string | null> {
   return await readFileImpl(path, "utf8").catch(() => null)
 }
 
-async function readBinary(
-  readFileImpl: typeof readFile,
-  path: string,
-): Promise<Buffer | null> {
+async function readBinary(readFileImpl: typeof readFile, path: string): Promise<Buffer | null> {
   return await readFileImpl(path).catch(() => null)
 }

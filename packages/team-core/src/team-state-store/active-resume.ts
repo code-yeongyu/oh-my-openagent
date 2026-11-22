@@ -15,31 +15,31 @@ async function reconcileMemberReservations(
   config: TeamModeConfig,
   staleReservationTtlMs: number,
 ): Promise<void> {
-  await Promise.all(runtimeState.members.map(async (member) => {
-    try {
-      await reconcileStaleReservationsForMember(
-        ctx,
-        runtimeState.teamRunId,
-        member,
-        config,
-        staleReservationTtlMs,
-      )
-    } catch (reclaimError) {
-      log("team mailbox reservation reclaim failed", {
-        event: "team-mailbox-reclaim-failed",
-        teamRunId: runtimeState.teamRunId,
-        member: member.name,
-        error: reclaimError instanceof Error ? reclaimError.message : String(reclaimError),
-      })
-    }
-  }))
+  await Promise.all(
+    runtimeState.members.map(async (member) => {
+      try {
+        await reconcileStaleReservationsForMember(ctx, runtimeState.teamRunId, member, config, staleReservationTtlMs)
+      } catch (reclaimError) {
+        log("team mailbox reservation reclaim failed", {
+          event: "team-mailbox-reclaim-failed",
+          teamRunId: runtimeState.teamRunId,
+          member: member.name,
+          error: reclaimError instanceof Error ? reclaimError.message : String(reclaimError),
+        })
+      }
+    }),
+  )
 }
 
 async function markActiveTeamOrphaned(runtimeState: RuntimeState, config: TeamModeConfig): Promise<void> {
-  await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
-    ...currentRuntimeState,
-    status: "orphaned",
-  }), config)
+  await transitionRuntimeState(
+    runtimeState.teamRunId,
+    (currentRuntimeState) => ({
+      ...currentRuntimeState,
+      status: "orphaned",
+    }),
+    config,
+  )
 }
 
 export async function resumeActiveTeam(
@@ -59,10 +59,14 @@ export async function resumeActiveTeam(
   const workerResumeStatus = summarizeWorkerLiveness(workerCheckResults)
 
   if (workerResumeStatus.hasAnyWorker && !workerResumeStatus.hasAliveWorker) {
-    await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
-      ...markDeadWorkersErrored(currentRuntimeState, workerResumeStatus.deadWorkerNames),
-      status: "orphaned",
-    }), config)
+    await transitionRuntimeState(
+      runtimeState.teamRunId,
+      (currentRuntimeState) => ({
+        ...markDeadWorkersErrored(currentRuntimeState, workerResumeStatus.deadWorkerNames),
+        status: "orphaned",
+      }),
+      config,
+    )
     return "marked_orphaned"
   }
 

@@ -14,7 +14,8 @@ import { TRANSIENT_DIRNAME } from "./transient-identity"
 const roots: string[] = []
 
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0))
+    rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 function fixture(): { readonly cwd: string; readonly memoryHome: string } {
@@ -42,9 +43,7 @@ function fakeRuntime(): MemoryIdentityRuntime {
   } as unknown as MemoryIdentityRuntime
 }
 
-async function bind(options: {
-  readonly hasUI: boolean
-}): Promise<{
+async function bind(options: { readonly hasUI: boolean }): Promise<{
   readonly pi: MemoryFakeExtensionAPI
   readonly context: MemoryIdentityContext
   readonly memoryHome: string
@@ -167,18 +166,19 @@ describe("transient one-shot memory runs", () => {
     // given
     const { cwd, memoryHome } = fixture()
     const roots: string[] = []
-    const component = (deferMs: number, onSweep: () => void) => createMemoryComponent({
-      env: { OMO_MEMORY_HOME: memoryHome },
-      loadConfig: () => loadedMemoryConfig(memorySettings()),
-      resolveCwd: () => cwd,
-      createRuntime: () => fakeRuntime(),
-      transientSweepDeferMs: deferMs,
-      sweepTransientRuns: (input) => {
-        roots.push(input.memoryRoot)
-        onSweep()
-        return Promise.resolve({ removedRuns: 0, removedIdentities: 0, promoted: 0, stranded: 0, kept: 0 })
-      },
-    })
+    const component = (deferMs: number, onSweep: () => void) =>
+      createMemoryComponent({
+        env: { OMO_MEMORY_HOME: memoryHome },
+        loadConfig: () => loadedMemoryConfig(memorySettings()),
+        resolveCwd: () => cwd,
+        createRuntime: () => fakeRuntime(),
+        transientSweepDeferMs: deferMs,
+        sweepTransientRuns: (input) => {
+          roots.push(input.memoryRoot)
+          onSweep()
+          return Promise.resolve({ removedRuns: 0, removedIdentities: 0, promoted: 0, stranded: 0, kept: 0 })
+        },
+      })
     const first = new MemoryFakeExtensionAPI()
     component(60_000, () => undefined).register(first, componentContext())
     await first.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" }, sessionEventContext(false))

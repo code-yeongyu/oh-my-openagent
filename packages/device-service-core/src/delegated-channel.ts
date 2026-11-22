@@ -13,6 +13,8 @@ export type DelegatedChannel = {
   readonly takeReply: (commandId: string) => JsonObject | undefined
   /** The session an endpoint open made, when its reply named it (decision 0018 amendment 2026-11-06, `located`). */
   readonly takeLocated: (commandId: string) => CommandLocated | undefined
+  /** Drops what a command that gave up waiting left here, and its reply should one still arrive. */
+  readonly forget: (commandId: string) => void
   readonly onFrame: (listener: (frame: JsonObject) => void) => () => void
   /** A reply or frame that could not be read, or the channel closing; the reason is the service's or the check's. */
   readonly onLoss: (listener: (reason: string) => void) => () => void
@@ -28,6 +30,8 @@ const isObject = (value: unknown): value is JsonObject =>
 export function followDelegatedChannel(device: string): DelegatedChannel {
   const replies = new Map<string, JsonObject>()
   const locateds = new Map<string, CommandLocated>()
+  // Commands that stopped waiting (request_timeout): a reply that arrives after that has no reader.
+  const forgotten = new Set<string>()
   const frames = new Set<(frame: JsonObject) => void>()
   const losses = new Set<(reason: string) => void>()
   const blobs = new Map<string, Blob>()
@@ -43,12 +47,19 @@ export function followDelegatedChannel(device: string): DelegatedChannel {
     }
     const commandId = value["command_id"]
     const response = value["response"]
-    if (typeof commandId !== "string" || !isObject(response)) return lost("a command event with neither a frame nor a reply")
+    if (typeof commandId !== "string" || !isObject(response))
+      return lost("a command event with neither a frame nor a reply")
+    if (forgotten.delete(commandId)) return
     replies.set(commandId, response)
     // A reply too large for one line carries `located` inside its blob, which the event validator never saw: only a
     // pair that names this device's session is kept, and anything else leaves the caller to locate as before.
     const located = value["located"]
-    if (isObject(located) && typeof located["key"] === "string" && located["key"].length > 0 && located["session"] === `${device}.${located["key"]}`)
+    if (
+      isObject(located) &&
+      typeof located["key"] === "string" &&
+      located["key"].length > 0 &&
+      located["session"] === `${device}.${located["key"]}`
+    )
       locateds.set(commandId, { key: located["key"], session: located["session"] })
   }
   const accept = (event: LocalEvent): void => {
@@ -94,21 +105,25 @@ export function followDelegatedChannel(device: string): DelegatedChannel {
     }
   }
   return {
-    takeReply: commandId => {
+    takeReply: (commandId) => {
       const reply = replies.get(commandId)
       replies.delete(commandId)
       return reply
     },
-    takeLocated: commandId => {
+    takeLocated: (commandId) => {
       const located = locateds.get(commandId)
       locateds.delete(commandId)
       return located
     },
-    onFrame: listener => {
+    forget: (commandId) => {
+      if (!replies.delete(commandId)) forgotten.add(commandId)
+      locateds.delete(commandId)
+    },
+    onFrame: (listener) => {
       frames.add(listener)
       return () => frames.delete(listener)
     },
-    onLoss: listener => {
+    onLoss: (listener) => {
       losses.add(listener)
       return () => losses.delete(listener)
     },

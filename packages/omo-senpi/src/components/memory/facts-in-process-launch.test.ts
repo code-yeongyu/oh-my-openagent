@@ -18,12 +18,16 @@ const LAST = "omo-mock/mock-3"
 
 type LaunchMode = "completed" | "create-failed" | "child-failed" | "record-stop"
 
-function turnEvents(mode: LaunchMode): readonly { readonly type: "message_end"; readonly message: Record<string, unknown> }[] {
+function turnEvents(
+  mode: LaunchMode,
+): readonly { readonly type: "message_end"; readonly message: Record<string, unknown> }[] {
   if (mode === "child-failed") {
-    return [{
-      type: "message_end",
-      message: { role: "assistant", content: [], stopReason: "error", errorMessage: "503 upstream unavailable" },
-    }]
+    return [
+      {
+        type: "message_end",
+        message: { role: "assistant", content: [], stopReason: "error", errorMessage: "503 upstream unavailable" },
+      },
+    ]
   }
   if (mode === "record-stop") {
     return [
@@ -31,7 +35,14 @@ function turnEvents(mode: LaunchMode): readonly { readonly type: "message_end"; 
         type: "message_end",
         message: {
           role: "assistant",
-          content: [{ type: "toolCall", id: "c1", name: FACTS_RECORD_TOOL_NAME, arguments: { scope: "project", text: "uses Bun", date: "2026-08-10" } }],
+          content: [
+            {
+              type: "toolCall",
+              id: "c1",
+              name: FACTS_RECORD_TOOL_NAME,
+              arguments: { scope: "project", text: "uses Bun", date: "2026-08-10" },
+            },
+          ],
           stopReason: "toolUse",
         },
       },
@@ -41,10 +52,12 @@ function turnEvents(mode: LaunchMode): readonly { readonly type: "message_end"; 
       },
     ]
   }
-  return [{
-    type: "message_end",
-    message: { role: "assistant", content: [], stopReason: "stop" },
-  }]
+  return [
+    {
+      type: "message_end",
+      message: { role: "assistant", content: [], stopReason: "stop" },
+    },
+  ]
 }
 
 async function launchFactsChild(
@@ -73,7 +86,9 @@ async function launchFactsChild(
       abort: async () => undefined,
       subscribe: (listener) => {
         listeners.add(listener)
-        return () => { listeners.delete(listener) }
+        return () => {
+          listeners.delete(listener)
+        }
       },
       getLastAssistantText: () => undefined,
       dispose: () => undefined,
@@ -227,9 +242,14 @@ describe("launchFactsInProcess child grant", () => {
       })
     }
 
-    expect(started.map((spec) => ({ toolAllowlist: spec.toolAllowlist, ownApprovalMode: spec.ownApprovalMode }))).toEqual([
+    expect(
+      started.map((spec) => ({ toolAllowlist: spec.toolAllowlist, ownApprovalMode: spec.ownApprovalMode })),
+    ).toEqual([
       { toolAllowlist: [FACTS_RECORD_TOOL_NAME], ownApprovalMode: { allowTools: [FACTS_RECORD_TOOL_NAME] } },
-      { toolAllowlist: [FACTS_RECORD_TOOL_NAME, FACTS_AGREEMENT_TOOL_NAME], ownApprovalMode: { allowTools: [FACTS_RECORD_TOOL_NAME, FACTS_AGREEMENT_TOOL_NAME] } },
+      {
+        toolAllowlist: [FACTS_RECORD_TOOL_NAME, FACTS_AGREEMENT_TOOL_NAME],
+        ownApprovalMode: { allowTools: [FACTS_RECORD_TOOL_NAME, FACTS_AGREEMENT_TOOL_NAME] },
+      },
     ])
   })
 })

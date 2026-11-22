@@ -18,7 +18,8 @@ describe("no-em-dash-copy", () => {
   })
 
   test("allows comments, regex literals, hyphens and en dashes", () => {
-    const content = '// Issue \u2014 Browser\nconst title = /[\u2013\u2014-]/u;\nconst label = "Refresh - retry 1\u20132";'
+    const content =
+      '// Issue \u2014 Browser\nconst title = /[\u2013\u2014-]/u;\nconst label = "Refresh - retry 1\u20132";'
     expect(findEmDashCopy(content, path)).toEqual([])
   })
 
@@ -81,8 +82,12 @@ describe("no-em-dash-copy", () => {
   })
 
   test("reports copy in shipped skill scripts", () => {
-    expect(findEmDashCopy('console.log("Unavailable \\u2014 retry");',
-      "packages/shared-skills/skills/browser/scripts/browser-doctor.mjs")).toHaveLength(1)
+    expect(
+      findEmDashCopy(
+        'console.log("Unavailable \\u2014 retry");',
+        "packages/shared-skills/skills/browser/scripts/browser-doctor.mjs",
+      ),
+    ).toHaveLength(1)
   })
 
   test.each([
@@ -95,7 +100,8 @@ describe("no-em-dash-copy", () => {
   })
 
   test("allows the OXC em-dash rule's own EM_DASH constant but checks other copy in that file", () => {
-    const path = "packages/shared-skills/skills/programming/scripts/typescript/oxc/lint/oxlint-plugin/no-em-dash-copy.js"
+    const path =
+      "packages/shared-skills/skills/programming/scripts/typescript/oxc/lint/oxlint-plugin/no-em-dash-copy.js"
     const data = 'const EM_DASH = "\\u2014";'
     expect(findEmDashCopy(data, path)).toEqual([])
     expect(findEmDashCopy(`${data}\nconsole.log("Unavailable \\u2014 retry");`, path)).toHaveLength(1)
@@ -133,7 +139,7 @@ describe("require-suppression-reason", () => {
     "// External payload has no schema.\n// biome-ignore lint/suspicious/noExplicitAny:",
     'const text = "// @ts-ignore";',
     "const text = `\n// @ts-ignore\n`;",
-    'const expression = /https?:\\/\\//;',
+    "const expression = /https?:\\/\\//;",
   ])("allows %s", (content) => {
     expect(findUnexplainedSuppressions(content, path)).toEqual([])
   })
@@ -161,8 +167,9 @@ describe("require-suppression-reason", () => {
   })
 
   test("reports directive positions and uses the existing source scope", () => {
-    expect(findUnexplainedSuppressions("const a = 1;\n// @ts-ignore\nconst b = 2", path))
-      .toEqual([{ line: 2, column: 1 }])
+    expect(findUnexplainedSuppressions("const a = 1;\n// @ts-ignore\nconst b = 2", path)).toEqual([
+      { line: 2, column: 1 },
+    ])
     expect(findUnexplainedSuppressions("// @ts-ignore", "script/example.ts")).toEqual([])
     expect(findUnexplainedSuppressions("// @ts-ignore", "packages/example/src/copy.test.ts")).toEqual([])
   })

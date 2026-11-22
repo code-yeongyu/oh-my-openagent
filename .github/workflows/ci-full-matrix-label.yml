@@ -12,8 +12,22 @@ permissions:
   pull-requests: write
 
 jobs:
+  # The label costs macOS/Windows runners: the shared platform decision honors it only for a platform path in the diff
+  # or a PR body line 'Platform-reason: <why>'. A refused label fails here in seconds, on Linux, before the reusable
+  # full matrix schedules anything. These checks are optional; required CI is untouched.
+  gate:
+    name: Full-matrix label gate
+    if: github.event.label.name == 'ci:full-matrix'
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/pr-platform-decision.yml
+    with:
+      fail-on-refusal: true
+
   full-matrix:
-    if: github.event.label.name == 'ci:full-matrix' || github.event.label.name == 'run-full-ci'
+    needs: gate
+    if: github.event.label.name == 'ci:full-matrix'
     # Only matching labels enter this group; bot labels cannot cancel it.
     concurrency:
       group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number }}-full-matrix

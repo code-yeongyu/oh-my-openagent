@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 
 import { resolveStateDir } from "./state-dir"
+import { ownedTaskState } from "./__fixtures__/owned-task-state"
 
 const cleanupRoots: string[] = []
 const claimRaceChildFixturePath = resolve(import.meta.dir, "__fixtures__", "claim-race-child.ts")
@@ -61,7 +62,12 @@ function readChildStdout(stdout: ReadableStream<Uint8Array>): ChildResult {
     }
   })()
 
-  return { get output() { return output }, ready }
+  return {
+    get output() {
+      return output
+    },
+    ready,
+  }
 }
 
 function parseChildResult(output: string): { readonly ids: readonly string[]; readonly retries: number } {
@@ -74,14 +80,14 @@ describe("claimTaskRecord cross-process race", () => {
   test("#given two processes in one frozen id bucket #when they claim task records concurrently #then every record is unique and collisions retry", async () => {
     // given
     const project = tempProject()
-    const children = ["a", "b"].map((tag) => Bun.spawn([
-      process.execPath,
-      claimRaceChildFixturePath,
-      project,
-      String(frozenNowMs),
-      "50",
-      tag,
-    ], { stdin: "pipe", stdout: "pipe", stderr: "pipe", env: { ...process.env } }))
+    const children = ["a", "b"].map((tag) =>
+      Bun.spawn([process.execPath, claimRaceChildFixturePath, project, String(frozenNowMs), "50", tag], {
+        stdin: "pipe",
+        stdout: "pipe",
+        stderr: "pipe",
+        env: { ...process.env },
+      }),
+    )
     const stdout = children.map((child) => readChildStdout(child.stdout))
     const stderr = children.map((child) => new Response(child.stderr).text())
 
@@ -100,7 +106,7 @@ describe("claimTaskRecord cross-process race", () => {
     const ids = results.flatMap((result) => result.ids)
     expect(ids).toHaveLength(100)
     expect(new Set(ids).size).toBe(100)
-    expect(readdirSync(join(resolveStateDir({ project_dir: project }), "tasks"))).toHaveLength(100)
+    expect(readdirSync(join(resolveStateDir(ownedTaskState(project)), "tasks"))).toHaveLength(100)
     expect(results.reduce((total, result) => total + result.retries, 0)).toBeGreaterThanOrEqual(1)
     for (const output of stderrOutput) expect(output).not.toContain("already exists")
   })

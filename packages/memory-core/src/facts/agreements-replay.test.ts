@@ -19,7 +19,10 @@ const TEXT = "Run the relevant tests before reporting completion"
 const DATE = "2026-10-01"
 const AUTHOR = { agentId: "fixture", authorName: "Fixture" }
 const record = (messageId: string, sessionId = "session-a") => ({
-  action: "new" as const, applies: "global" as const, text: TEXT, date: DATE,
+  action: "new" as const,
+  applies: "global" as const,
+  text: TEXT,
+  date: DATE,
   source: { sessionId, messageId },
 })
 
@@ -62,10 +65,21 @@ test("legacy identityless records count at most once per agreement and date", as
 test("a legacy last-date seed survives a modern correction before pending legacy replay", async () => {
   const { apply, path } = await fixture()
   const id = agreementId(TEXT)
-  await writeFile(path, renderAgreementsFile(undefined, [{
-    id, scope: "global", by: "agent", text: TEXT, n: 1,
-    since: DATE, last: DATE, status: "active",
-  }]))
+  await writeFile(
+    path,
+    renderAgreementsFile(undefined, [
+      {
+        id,
+        scope: "global",
+        by: "agent",
+        text: TEXT,
+        n: 1,
+        since: DATE,
+        last: DATE,
+        status: "active",
+      },
+    ]),
+  )
 
   expect((await apply([{ ...record("modern"), date: "2026-10-02" }]))[0]?.n).toBe(2)
   expect((await apply([{ action: "reaffirm", id, date: DATE }]))[0]?.n).toBe(2)
@@ -90,7 +104,9 @@ test("a reworded new record adds two source keys rather than four source and dat
   const id = initial[0]?.id
   if (id === undefined) throw new Error("missing agreement")
   const text = "Run every relevant test before reporting completion"
-  await apply([{ action: "reaffirm", id, text, date: "2026-10-02", source: { sessionId: "session-a", messageId: "turn-2" } }])
+  await apply([
+    { action: "reaffirm", id, text, date: "2026-10-02", source: { sessionId: "session-a", messageId: "turn-2" } },
+  ])
   await apply([{ ...record("turn-3"), text, date: "2026-10-03" }])
   expect(parseAgreementsLedger(parseMemoryFile(await readFile(path, "utf8")).body).receipts).toHaveLength(4)
 })
@@ -132,7 +148,9 @@ test("a receipt-only dropped ledger cannot be deleted or edited through memory t
   expect(describeAgreementsToolViolation(dropped, "---\ndescription: Agreements\n---\n")).toBeDefined()
   const forged = `<!-- agreement-event: ${"a".repeat(64)} -->`
   expect(describeAgreementsToolViolation(dropped, `${dropped}${forged}\n`)).toBeDefined()
-  expect(describeAgreementsToolViolation(dropped, dropped.replace(/<!-- agreement-event: [0-9a-f]{64} -->/, forged))).toBeDefined()
+  expect(
+    describeAgreementsToolViolation(dropped, dropped.replace(/<!-- agreement-event: [0-9a-f]{64} -->/, forged)),
+  ).toBeDefined()
   expect(describeAgreementsToolViolation(undefined, `---\ndescription: Agreements\n---\n${forged}\n`)).toBeDefined()
   expect(describeAgreementsToolViolation(dropped, dropped)).toBeUndefined()
 })
@@ -167,12 +185,24 @@ test("a replay alias learned before cap eviction is retained within the same bat
   const other = { ...record("other"), text: "Keep the fixture isolated", date: "2026-10-02" }
   const items = await apply([record("turn-1"), other])
   const text = "Run every relevant test before reporting completion"
-  await writeFile(path, renderAgreementsFile(await readFile(path, "utf8"),
-    items.map((item) => item.text === TEXT ? { ...item, text } : item)))
+  await writeFile(
+    path,
+    renderAgreementsFile(
+      await readFile(path, "utf8"),
+      items.map((item) => (item.text === TEXT ? { ...item, text } : item)),
+    ),
+  )
   const replay = { ...record("turn-1"), text }
   const fresh = { ...record("fresh"), text: "Preserve fixture output", date: "2026-10-03" }
-  const target = await renderAgreementsTarget(root, [replay, fresh, replay], { ...DEFAULT_AGREEMENTS_POLICY, maxItems: 2 })
-  expect(agreementItemsOf(target.content).map((item) => item.text).sort()).toEqual([other.text, fresh.text].sort())
+  const target = await renderAgreementsTarget(root, [replay, fresh, replay], {
+    ...DEFAULT_AGREEMENTS_POLICY,
+    maxItems: 2,
+  })
+  expect(
+    agreementItemsOf(target.content)
+      .map((item) => item.text)
+      .sort(),
+  ).toEqual([other.text, fresh.text].sort())
 })
 
 test("independent committed batches replay one event without a second increment", async () => {

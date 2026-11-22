@@ -148,12 +148,9 @@ describe("keyword-detector hyperplan-ultrawork combo", () => {
     // given - combo keyword disabled but standalones remain enabled
     const sessionID = "combo-disabled-session"
     getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
-    const hook = createKeywordDetectorHook(
-      createMockPluginInput(),
-      undefined,
-      undefined,
-      { disabled_keywords: ["hyperplan-ultrawork"] },
-    )
+    const hook = createKeywordDetectorHook(createMockPluginInput(), undefined, undefined, {
+      disabled_keywords: ["hyperplan-ultrawork"],
+    })
     const output = {
       message: {} as Record<string, unknown>,
       parts: [{ type: "text", text: "hpp ulw work it" }],
@@ -174,12 +171,9 @@ describe("keyword-detector hyperplan-ultrawork combo", () => {
     const sessionID = "combo-intersection-session"
     getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
     const toastCalls: string[] = []
-    const hook = createKeywordDetectorHook(
-      createMockPluginInput({ toastCalls }),
-      undefined,
-      undefined,
-      { disabled_keywords: ["ultrawork"] },
-    )
+    const hook = createKeywordDetectorHook(createMockPluginInput({ toastCalls }), undefined, undefined, {
+      disabled_keywords: ["ultrawork"],
+    })
     const output = {
       message: {} as Record<string, unknown>,
       parts: [{ type: "text", text: "hpp ulw plan stuff" }],

@@ -1,0 +1,34 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/boulder-state": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+      ],
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) BOULDER_DIR, BOULDER_FILE, BOULDER_STATE_PATH, NOTEPAD_DIR, NOTEPAD_BASE_PATH, PROMETHEUS_PLANS_DIR, readCurrentTopLevelTask, getPlanChecklist, parsePlanChecklist, isStructuredTaskRow and 33 more
+    // added on dev after the last merge (origin dev 2b5831715e): unused export(s) getPlanReviewsDir, hashPlanContent, isContainedPlanPath, formatMomusReviewArtifact, writeMomusReviewArtifact
+    "packages/boulder-state/index.d.ts": ["BOULDER_DIR", "BOULDER_FILE", "BOULDER_STATE_PATH", "NOTEPAD_DIR", "NOTEPAD_BASE_PATH", "PROMETHEUS_PLANS_DIR", "readCurrentTopLevelTask", "getPlanChecklist", "parsePlanChecklist", "isStructuredTaskRow", "addBoulderWork", "appendSessionId", "appendSessionIdForWork", "clearBoulderState", "completeBoulder", "createBoulderState", "endTaskTimer", "findPrometheusPlans", "generateWorkId", "getActiveWorks", "getBoulderFilePath", "getBoulderWorks", "getPlanName", "getPlanProgress", "getTaskSessionState", "getWorkById", "getWorkByPlanName", "getWorkForSession", "getWorkResumeOptions", "normalizeSessionId", "readBoulderState", "DEFAULT_STALE_WORK_THRESHOLD_MS", "STALE_WORK_THRESHOLD_ENV_KEY", "isWorkStale", "reconcileStaleWorks", "resolveStaleWorkThresholdMs", "resolveBoulderPlanPath", "resolveBoulderPlanPathForWork", "selectActiveWork", "startTaskTimer", "upsertTaskSessionState", "upsertTaskSessionStateForWork", "writeBoulderState", "getPlanReviewsDir", "hashPlanContent", "isContainedPlanPath", "formatMomusReviewArtifact", "writeMomusReviewArtifact"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) BOULDER_STATE_PATH, NOTEPAD_DIR, NOTEPAD_BASE_PATH
+    "packages/boulder-state/src/constants.ts": ["BOULDER_STATE_PATH", "NOTEPAD_DIR", "NOTEPAD_BASE_PATH"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) BOULDER_DIR, BOULDER_FILE, BOULDER_STATE_PATH, NOTEPAD_BASE_PATH, NOTEPAD_DIR, PROMETHEUS_PLANS_DIR, parsePlanChecklist, generateWorkId
+    // added on dev after the last merge (origin dev 2b5831715e): unused export(s) formatMomusReviewArtifact, getPlanReviewsDir
+    "packages/boulder-state/src/index.ts": ["BOULDER_DIR", "BOULDER_FILE", "BOULDER_STATE_PATH", "NOTEPAD_BASE_PATH", "NOTEPAD_DIR", "PROMETHEUS_PLANS_DIR", "parsePlanChecklist", "generateWorkId", "formatMomusReviewArtifact", "getPlanReviewsDir"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) generateWorkId
+    // added on dev after the last merge (origin dev 2b5831715e): unused export(s) formatMomusReviewArtifact, getPlanReviewsDir
+    "packages/boulder-state/src/storage/index.ts": ["generateWorkId", "formatMomusReviewArtifact", "getPlanReviewsDir"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) findNewestSessionTranscriptMs
+    "packages/boulder-state/src/storage/stale-work.ts": ["findNewestSessionTranscriptMs"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) generateWorkId
+    "packages/boulder-state/src/storage/write-state.ts": ["generateWorkId"]
+  }
+}

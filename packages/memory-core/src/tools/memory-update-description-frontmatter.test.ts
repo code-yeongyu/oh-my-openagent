@@ -129,7 +129,11 @@ describe("memory tool update_description on a frontmatter-less note", () => {
     ].join("\n")
 
     // #when
-    const attempt = runMemoryApplyPatch({ repo: setup.repo, lock: setup.lock, params: { reason: "retitle", input, author: AUTHOR } })
+    const attempt = runMemoryApplyPatch({
+      repo: setup.repo,
+      lock: setup.lock,
+      params: { reason: "retitle", input, author: AUTHOR },
+    })
 
     // #then
     await expect(attempt).rejects.toThrow(/missing required frontmatter; add frontmatter with update_description/)

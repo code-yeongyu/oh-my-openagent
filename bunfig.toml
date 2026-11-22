@@ -4,3 +4,8 @@ pathIgnorePatterns = ["dist/**", "packages/web/**", "packages/get-worker/**", "p
 
 [loader]
 ".md" = "text"
+
+# bun fmt (#12225): JS/TS only; scope in .prettierignore.
+[fmt]
+printWidth = 120
+semi = false

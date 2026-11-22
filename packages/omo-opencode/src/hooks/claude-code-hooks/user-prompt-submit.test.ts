@@ -1,10 +1,7 @@
 import { afterEach, describe, expect, it, mock, spyOn } from "bun:test"
 import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
 import * as dispatchHookModule from "./dispatch-hook"
-import {
-  executeUserPromptSubmitHooks,
-  type UserPromptSubmitContext,
-} from "./user-prompt-submit"
+import { executeUserPromptSubmitHooks, type UserPromptSubmitContext } from "./user-prompt-submit"
 
 describe("executeUserPromptSubmitHooks", () => {
   afterEach(() => {
@@ -55,8 +52,7 @@ describe("executeUserPromptSubmitHooks", () => {
     // but current user input does not contain tags
     const ctx: UserPromptSubmitContext = {
       sessionId: "test-session",
-      prompt:
-        "<user-prompt-submit-hook>previous output</user-prompt-submit-hook>\n\nuser message",
+      prompt: "<user-prompt-submit-hook>previous output</user-prompt-submit-hook>\n\nuser message",
       parts: [{ type: "text", text: "user message" }],
       cwd: "/tmp",
     }
@@ -125,9 +121,7 @@ describe("executeUserPromptSubmitHooks", () => {
       cwd: "/tmp",
     }
     const config = {
-      UserPromptSubmit: [
-        { matcher: "*", hooks: [{ type: "command" as const, command: "echo hook" }] },
-      ],
+      UserPromptSubmit: [{ matcher: "*", hooks: [{ type: "command" as const, command: "echo hook" }] }],
     }
 
     // when
@@ -153,9 +147,7 @@ describe("executeUserPromptSubmitHooks", () => {
       cwd: "/tmp",
     }
     const config = {
-      UserPromptSubmit: [
-        { matcher: "*", hooks: [{ type: "command" as const, command: "echo hook" }] },
-      ],
+      UserPromptSubmit: [{ matcher: "*", hooks: [{ type: "command" as const, command: "echo hook" }] }],
     }
 
     // when
@@ -186,9 +178,7 @@ describe("executeUserPromptSubmitHooks", () => {
       cwd: "/tmp",
     }
     const config = {
-      UserPromptSubmit: [
-        { matcher: "*", hooks: [{ type: "command" as const, command: "echo hook" }] },
-      ],
+      UserPromptSubmit: [{ matcher: "*", hooks: [{ type: "command" as const, command: "echo hook" }] }],
     }
 
     // when

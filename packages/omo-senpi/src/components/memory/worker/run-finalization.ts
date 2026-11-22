@@ -14,10 +14,7 @@ import {
   type RunChildExit,
   type RunOutcome,
 } from "./run-artifacts"
-import {
-  withRunFinalizationClaim,
-  type ClaimedRunResult,
-} from "./run-finalization-claim"
+import { withRunFinalizationClaim, type ClaimedRunResult } from "./run-finalization-claim"
 import { cleanupAndRecord, resolveFinalizationDecision } from "./run-finalization-git"
 import { settleReservationRun } from "./run-finalization-settlement"
 import { withRunTerminalGate } from "./run-terminal-gate"
@@ -27,17 +24,9 @@ import type {
   ReservationRunResult,
   RunFinalizationContext,
 } from "./run-finalization-types"
-import {
-  parseReservationRunLedger,
-  worktreeFromLedger,
-  type ReservationRunLedger,
-} from "./reservation-run-ledger"
+import { parseReservationRunLedger, worktreeFromLedger, type ReservationRunLedger } from "./reservation-run-ledger"
 
-export type {
-  ReservationRunResult,
-  ReservationStatePort,
-  RunFinalizationContext,
-} from "./run-finalization-types"
+export type { ReservationRunResult, ReservationStatePort, RunFinalizationContext } from "./run-finalization-types"
 
 export async function finalizeRecordedOutcome(
   context: RunFinalizationContext,
@@ -45,15 +34,10 @@ export async function finalizeRecordedOutcome(
   ledger: ReservationRunLedger,
   options: { readonly recovered?: boolean } = {},
 ): Promise<ReservationRunResult | undefined> {
-  const claimed = await withRunFinalizationClaim(
-    context.identity,
-    runDir,
-    ledger.runId,
-    async () => {
-      if (options.recovered === true) await emitRecovered(context, ledger)
-      return finalizeClaimedOutcome(context, runDir, ledger.runId)
-    },
-  )
+  const claimed = await withRunFinalizationClaim(context.identity, runDir, ledger.runId, async () => {
+    if (options.recovered === true) await emitRecovered(context, ledger)
+    return finalizeClaimedOutcome(context, runDir, ledger.runId)
+  })
   return claimedValue(claimed)
 }
 
@@ -103,15 +87,26 @@ async function readCleanChildExit(runDir: string, ledger: ReservationRunLedger):
   if (typeof record.finishedAt !== "string") return undefined
   const finishedAt = Date.parse(record.finishedAt)
   const startedAt = Date.parse(ledger.startedAt)
-  const clean = record.runId === ledger.runId && record.attempt === ledger.attempt
-    && record.code === 0 && record.signal === null && record.timedOut === false
-    && Number.isFinite(finishedAt) && Number.isFinite(startedAt)
-    && finishedAt >= startedAt && finishedAt < ledger.hardDeadlineAt
-  return clean ? record as RunChildExit : undefined
+  const clean =
+    record.runId === ledger.runId &&
+    record.attempt === ledger.attempt &&
+    record.code === 0 &&
+    record.signal === null &&
+    record.timedOut === false &&
+    Number.isFinite(finishedAt) &&
+    Number.isFinite(startedAt) &&
+    finishedAt >= startedAt &&
+    finishedAt < ledger.hardDeadlineAt
+  return clean ? (record as RunChildExit) : undefined
 }
 
 async function emitRecovered(context: RunFinalizationContext, ledger: ReservationRunLedger): Promise<void> {
-  await emitMemoryReceipt(context.identity.paths.runtime, runReceipt(ledger, "recovered"), context.receipts, context.warn)
+  await emitMemoryReceipt(
+    context.identity.paths.runtime,
+    runReceipt(ledger, "recovered"),
+    context.receipts,
+    context.warn,
+  )
 }
 
 export async function failReservationRun(
@@ -122,16 +117,13 @@ export async function failReservationRun(
   detail?: string,
   options: { readonly recoverWorktreeTip?: boolean } = {},
 ): Promise<ReservationRunResult | undefined> {
-  const claimed = await withRunFinalizationClaim(
-    context.identity,
-    runDir,
-    ledger.runId,
-    async () => withRunTerminalGate(runDir, ledger.runId, async () => {
-      if (await readMatchingOutcome(runDir, ledger) !== undefined) {
+  const claimed = await withRunFinalizationClaim(context.identity, runDir, ledger.runId, async () =>
+    withRunTerminalGate(runDir, ledger.runId, async () => {
+      if ((await readMatchingOutcome(runDir, ledger)) !== undefined) {
         return finalizeClaimedOutcome(context, runDir, ledger.runId)
       }
       const current = await readLedger(runDir, ledger.runId)
-      if (options.recoverWorktreeTip === true && await recoverUnpublishedWorktreeTip(context, runDir, current)) {
+      if (options.recoverWorktreeTip === true && (await recoverUnpublishedWorktreeTip(context, runDir, current))) {
         return finalizeClaimedOutcome(context, runDir, current.runId)
       }
       const described = await describeUnpublishedFailure(runDir, detail)
@@ -168,11 +160,8 @@ export async function overrideFailedReservationRun(
   ledger: ReservationRunLedger,
   detail: string,
 ): Promise<ReservationRunResult | undefined> {
-  const claimed = await withRunFinalizationClaim(
-    context.identity,
-    runDir,
-    ledger.runId,
-    async () => withRunTerminalGate(runDir, ledger.runId, async () => {
+  const claimed = await withRunFinalizationClaim(context.identity, runDir, ledger.runId, async () =>
+    withRunTerminalGate(runDir, ledger.runId, async () => {
       const current = await readLedger(runDir, ledger.runId)
       const decision: DurableFinalizationDecision = {
         outcome: "failed",
@@ -192,17 +181,14 @@ export async function abandonReservationRun(
   runDir: string,
   ledger: ReservationRunLedger,
 ): Promise<ReservationRunResult | undefined> {
-  const claimed = await withRunFinalizationClaim(
-    context.identity,
-    runDir,
-    ledger.runId,
-    async () => withRunTerminalGate(runDir, ledger.runId, async () => {
-      if (await readMatchingOutcome(runDir, ledger) !== undefined) {
+  const claimed = await withRunFinalizationClaim(context.identity, runDir, ledger.runId, async () =>
+    withRunTerminalGate(runDir, ledger.runId, async () => {
+      if ((await readMatchingOutcome(runDir, ledger)) !== undefined) {
         return finalizeClaimedOutcome(context, runDir, ledger.runId)
       }
       const current = await readLedger(runDir, ledger.runId)
       const active = (await context.reservation.readState()).active
-      if (await readMatchingOutcome(runDir, current) !== undefined) {
+      if ((await readMatchingOutcome(runDir, current)) !== undefined) {
         return finalizeClaimedOutcome(context, runDir, current.runId)
       }
       const abandonedAt = new Date(context.now()).toISOString()
@@ -245,9 +231,18 @@ async function finalizeClaimedOutcome(
     throw new Error(`Run outcome attempt ${outcome.attempt ?? "legacy"} does not match ${ledger.attempt ?? "legacy"}`)
   }
   const decision = await resolveFinalizationDecision(context, runDir, ledger, outcome)
-  return settleReservationRun(context, runDir, ledger, outcome.recoveredFromWorktree === true
-    ? { ...decision, recoveredFromWorktree: true, detail: [decision.detail, RECOVERED_DETAIL].filter(Boolean).join("\n") }
-    : decision)
+  return settleReservationRun(
+    context,
+    runDir,
+    ledger,
+    outcome.recoveredFromWorktree === true
+      ? {
+          ...decision,
+          recoveredFromWorktree: true,
+          detail: [decision.detail, RECOVERED_DETAIL].filter(Boolean).join("\n"),
+        }
+      : decision,
+  )
 }
 
 async function readLedger(runDir: string, runId: string): Promise<ReservationRunLedger> {
@@ -256,20 +251,14 @@ async function readLedger(runDir: string, runId: string): Promise<ReservationRun
   return ledger
 }
 
-async function readMatchingOutcome(
-  runDir: string,
-  ledger: ReservationRunLedger,
-): Promise<RunOutcome | undefined> {
+async function readMatchingOutcome(runDir: string, ledger: ReservationRunLedger): Promise<RunOutcome | undefined> {
   const path = join(runDir, "outcome.json")
   if (!existsSync(path)) return undefined
   const outcome = await readRunJson<RunOutcome>(path)
   return runOutcomeMatchesLedger(ledger, outcome) ? outcome : undefined
 }
 
-async function checkpointFailure(
-  runDir: string,
-  decision: DurableFinalizationDecision,
-): Promise<void> {
+async function checkpointFailure(runDir: string, decision: DurableFinalizationDecision): Promise<void> {
   await updateRunLedger(join(runDir, "ledger.json"), {
     finalizeOutcome: decision.outcome,
     ...(decision.reason === undefined ? {} : { finalizeReason: decision.reason }),
@@ -277,8 +266,6 @@ async function checkpointFailure(
   })
 }
 
-function claimedValue(
-  claimed: ClaimedRunResult<ReservationRunResult | undefined>,
-): ReservationRunResult | undefined {
+function claimedValue(claimed: ClaimedRunResult<ReservationRunResult | undefined>): ReservationRunResult | undefined {
   return claimed.status === "busy" ? undefined : claimed.value
 }

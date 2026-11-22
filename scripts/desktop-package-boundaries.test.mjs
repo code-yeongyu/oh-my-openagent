@@ -15,7 +15,12 @@ const ALLOWED_EDGES = {
   "senpi-desktop-prelude": [],
   "senpi-desktop-engine": ["senpi-desktop-protocol"],
   "senpi-desktop-sdk": ["senpi-desktop-protocol"],
-  "senpi-desktop-service": ["senpi-desktop-protocol", "senpi-desktop-engine", "senpi-desktop-prelude", "senpi-desktop-sdk"],
+  "senpi-desktop-service": [
+    "senpi-desktop-protocol",
+    "senpi-desktop-engine",
+    "senpi-desktop-prelude",
+    "senpi-desktop-sdk",
+  ],
   "senpi-desktop-tool": [
     "senpi-desktop-protocol",
     "senpi-desktop-engine",
@@ -83,7 +88,8 @@ function violationsOf(pkg, root = ROOT) {
     if (target !== undefined && !allowed.has(target)) {
       violations.push({ file, specifier, why: `${pkg} may import only ${[...allowed].join(", ")}` })
     }
-    if (isHostPackage(specifier)) violations.push({ file, specifier, why: "desktop packages never import pi-* host packages" })
+    if (isHostPackage(specifier))
+      violations.push({ file, specifier, why: "desktop packages never import pi-* host packages" })
     if (pkg === "senpi-desktop-sdk" && isForbiddenBuiltin(file, specifier)) {
       violations.push({ file, specifier, why: "the SDK launches and connects nothing itself" })
     }

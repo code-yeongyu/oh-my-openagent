@@ -47,7 +47,10 @@ export async function readInputReceipt(sessionPath: string, effectId: string): P
         continue
       }
       carry = start === 0 ? Buffer.alloc(0) : bytes.subarray(0, firstNewline)
-      const lines = bytes.subarray(firstNewline + 1).toString("utf8").split("\n")
+      const lines = bytes
+        .subarray(firstNewline + 1)
+        .toString("utf8")
+        .split("\n")
       for (let index = lines.length - 1; index >= 0; index--) {
         const receipt = receiptOf(lines[index] ?? "", effectId)
         if (receipt !== undefined) return receipt
@@ -68,7 +71,8 @@ function receiptOf(line: string, effectId: string): InputEffectStatus | undefine
   } catch {
     return undefined
   }
-  if (!isRecord(parsed) || parsed.type !== "custom" || parsed.customType !== ADMISSION_ENTRY || !isRecord(parsed.data)) return undefined
+  if (!isRecord(parsed) || parsed.type !== "custom" || parsed.customType !== ADMISSION_ENTRY || !isRecord(parsed.data))
+    return undefined
   const data = parsed.data
   if (data.clientMessageId !== effectId) return undefined
   const state = typeof data.state === "string" ? ADMISSION_STATES[data.state] : undefined

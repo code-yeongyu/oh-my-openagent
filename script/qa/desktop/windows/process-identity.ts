@@ -18,6 +18,10 @@ export function imageOf(pid: number): string | undefined {
 }
 
 /** Whether `pid` is still the process that was tracked under `image`. */
-export function stillTracked(pid: number, image: string, current: (pid: number) => string | undefined = imageOf): boolean {
+export function stillTracked(
+  pid: number,
+  image: string,
+  current: (pid: number) => string | undefined = imageOf,
+): boolean {
   return current(pid)?.toLowerCase() === image.toLowerCase()
 }

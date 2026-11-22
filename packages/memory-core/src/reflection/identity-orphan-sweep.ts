@@ -2,18 +2,27 @@ import { basename, join } from "node:path"
 
 import { readdir, readFile, stat } from "../fs/resilient"
 import { GitMemoryRepo } from "../git"
-import { listReflectionLeftovers, REFLECTION_ORPHAN_GRACE_MS, selectReflectionOrphans, sweepReflectionOrphans } from "./orphan-sweep"
+import {
+  listReflectionLeftovers,
+  REFLECTION_ORPHAN_GRACE_MS,
+  selectReflectionOrphans,
+  sweepReflectionOrphans,
+} from "./orphan-sweep"
 
 const TERMINAL_SENTINELS = ["final.json", "abandoned.json", "quarantined.json"] as const
 
 async function exists(path: string): Promise<boolean> {
-  return stat(path).then(() => true, () => false)
+  return stat(path).then(
+    () => true,
+    () => false,
+  )
 }
 
 async function reservedRunId(path: string): Promise<string | undefined> {
   try {
     const parsed: unknown = JSON.parse(await readFile(path, "utf8"))
-    const runId = typeof parsed === "object" && parsed !== null ? (parsed as { readonly runId?: unknown }).runId : undefined
+    const runId =
+      typeof parsed === "object" && parsed !== null ? (parsed as { readonly runId?: unknown }).runId : undefined
     return typeof runId === "string" ? runId : undefined
   } catch {
     return undefined
@@ -37,7 +46,7 @@ async function collectReflectionLiveRunIds(reflectionDir: string): Promise<Reado
     if (runId.startsWith(".")) continue
     const runDir = join(runsDir, runId)
     if ((await Promise.all(TERMINAL_SENTINELS.map((file) => exists(join(runDir, file))))).some(Boolean)) continue
-    if (await exists(join(runDir, "ledger.json")) || await exists(join(runDir, "prelaunch.json"))) live.add(runId)
+    if ((await exists(join(runDir, "ledger.json"))) || (await exists(join(runDir, "prelaunch.json")))) live.add(runId)
   }
   return live
 }
@@ -53,7 +62,10 @@ export interface IdentityOrphanSweepReport {
  * The orphan worktree/branch sweep for one identity from outside a session (`omo doctor --fix`,
  * DESIGN.r2 6b): needs the identity's git repo; `dryRun` lists what would go and why the rest stays.
  */
-export async function sweepIdentityOrphanWorktrees(identityRoot: string, options: { readonly now: number; readonly dryRun?: boolean }): Promise<IdentityOrphanSweepReport> {
+export async function sweepIdentityOrphanWorktrees(
+  identityRoot: string,
+  options: { readonly now: number; readonly dryRun?: boolean },
+): Promise<IdentityOrphanSweepReport> {
   const repoDir = join(identityRoot, "repo")
   if (!(await exists(join(repoDir, ".git")))) return { skipped: "no-repo", removed: [], kept: [], failed: [] }
   const runtimeDir = join(identityRoot, "runtime")
@@ -63,9 +75,18 @@ export async function sweepIdentityOrphanWorktrees(identityRoot: string, options
   const selection = { liveRunIds, now: options.now, graceMs: REFLECTION_ORPHAN_GRACE_MS }
   const leftovers = await listReflectionLeftovers(repo, worktreesDir)
   const orphans = selectReflectionOrphans(leftovers, selection)
-  const orphanTargets = new Set([...orphans.registeredWorktrees.map((worktree) => worktree.dir), ...orphans.strayDirs, ...orphans.branches])
-  const keptReason = (target: string): string => [...liveRunIds].some((runId) => basename(target).endsWith(runId)) ? "live" : "grace"
-  const kept = [...leftovers.registeredWorktrees.map((worktree) => worktree.dir), ...leftovers.strayDirs, ...leftovers.branches]
+  const orphanTargets = new Set([
+    ...orphans.registeredWorktrees.map((worktree) => worktree.dir),
+    ...orphans.strayDirs,
+    ...orphans.branches,
+  ])
+  const keptReason = (target: string): string =>
+    [...liveRunIds].some((runId) => basename(target).endsWith(runId)) ? "live" : "grace"
+  const kept = [
+    ...leftovers.registeredWorktrees.map((worktree) => worktree.dir),
+    ...leftovers.strayDirs,
+    ...leftovers.branches,
+  ]
     .filter((target) => !orphanTargets.has(target))
     .map((target) => ({ target, reason: keptReason(target) }))
   if (options.dryRun === true) return { removed: [...orphanTargets], kept, failed: [] }
@@ -73,6 +94,8 @@ export async function sweepIdentityOrphanWorktrees(identityRoot: string, options
   return {
     removed: receipts.filter((receipt) => receipt.removed).map((receipt) => receipt.target),
     kept,
-    failed: receipts.filter((receipt) => !receipt.removed).map((receipt) => ({ target: receipt.target, detail: receipt.detail ?? "not removed" })),
+    failed: receipts
+      .filter((receipt) => !receipt.removed)
+      .map((receipt) => ({ target: receipt.target, detail: receipt.detail ?? "not removed" })),
   }
 }

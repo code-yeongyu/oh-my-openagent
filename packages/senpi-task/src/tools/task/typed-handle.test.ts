@@ -41,12 +41,17 @@ describe("typed task handles", () => {
     const { manager, store, inProcess } = makeManager()
     const body = "FOREGROUND_SENTINEL st_11111111 st_22222222"
     // when
-    const response = await buildTaskExecute(makeDeps(manager))("foreground", { prompt: "Inspect", category: "quick" },
-      undefined, (update) => {
+    const response = await buildTaskExecute(makeDeps(manager))(
+      "foreground",
+      { prompt: "Inspect", category: "quick" },
+      undefined,
+      (update) => {
         const child = inProcess.handles.get(update.details.task_id)
         if (!child) throw new Error("missing foreground child")
         child.settle({ status: "completed", finalResponse: body })
-      }, CTX)
+      },
+      CTX,
+    )
     // then
     matched(response.details, store.load(response.details.task_id))
     expect(store.load(response.details.task_id)?.final_response).toBe(body)
@@ -61,7 +66,13 @@ describe("typed task handles", () => {
     const receipts: unknown[] = []
     // when
     for (const status of ["running", "pending"]) {
-      const response = await execute("start", { prompt: "Inspect the fixture", category: "quick", run_in_background: true }, undefined, undefined, CTX)
+      const response = await execute(
+        "start",
+        { prompt: "Inspect the fixture", category: "quick", run_in_background: true },
+        undefined,
+        undefined,
+        CTX,
+      )
       // then
       const record = store.load(response.details.task_id)
       matched(response.details, record)
@@ -76,19 +87,29 @@ describe("typed task handles", () => {
     // given
     const { manager, store } = makeManager({
       config: settings({ default_concurrency: 1 }),
-      planner: (spec) => spec.category === "refuse"
-        ? { kind: "error", error: { code: "unknown_target", message: "st_11111111 and st_22222222 succeeded elsewhere" } }
-        : { kind: "resolved", plan: { model: "fixture/model" } },
+      planner: (spec) =>
+        spec.category === "refuse"
+          ? {
+              kind: "error",
+              error: { code: "unknown_target", message: "st_11111111 and st_22222222 succeeded elsewhere" },
+            }
+          : { kind: "resolved", plan: { model: "fixture/model" } },
     })
     // when
-    const response = await buildTaskExecute(makeDeps(manager))("batch", {
-      run_in_background: true,
-      tasks: [
-        { prompt: "Denied", category: "refuse" },
-        { prompt: "First", category: "quick" },
-        { prompt: "Second", category: "quick" },
-      ],
-    }, undefined, undefined, CTX)
+    const response = await buildTaskExecute(makeDeps(manager))(
+      "batch",
+      {
+        run_in_background: true,
+        tasks: [
+          { prompt: "Denied", category: "refuse" },
+          { prompt: "First", category: "quick" },
+          { prompt: "Second", category: "quick" },
+        ],
+      },
+      undefined,
+      undefined,
+      CTX,
+    )
     // then
     matched(response.details, store.load(response.details.task_id))
     expect(response.details.items).toHaveLength(3)
@@ -106,11 +127,19 @@ describe("typed task handles", () => {
     const scheduled = Promise.withResolvers<() => void>()
     const updates: TaskToolDetails[] = []
     const execute = buildTaskExecute(makeDeps(manager), {
-      scheduleDeadline: (callback) => { scheduled.resolve(callback); return () => {} },
+      scheduleDeadline: (callback) => {
+        scheduled.resolve(callback)
+        return () => {}
+      },
     })
     // when
-    const pending = execute("promote", { prompt: "Inspect", category: "quick" }, undefined,
-      (update) => updates.push(update.details), { ...CTX, getPromptCacheSafeWaitSeconds: () => 1 })
+    const pending = execute(
+      "promote",
+      { prompt: "Inspect", category: "quick" },
+      undefined,
+      (update) => updates.push(update.details),
+      { ...CTX, getPromptCacheSafeWaitSeconds: () => 1 },
+    )
     const promote = await scheduled.promise
     promote()
     const response = await pending
@@ -134,8 +163,18 @@ describe("typed task handles", () => {
       },
     })
     // when
-    const pending = execute("batch-promote", { tasks: [{ prompt: "First", category: "quick" }, { prompt: "Second", category: "quick" }] },
-      undefined, (update) => updates.push(update.details), { ...CTX, getPromptCacheSafeWaitSeconds: () => 1 })
+    const pending = execute(
+      "batch-promote",
+      {
+        tasks: [
+          { prompt: "First", category: "quick" },
+          { prompt: "Second", category: "quick" },
+        ],
+      },
+      undefined,
+      (update) => updates.push(update.details),
+      { ...CTX, getPromptCacheSafeWaitSeconds: () => 1 },
+    )
     await scheduled.promise
     for (const promote of deadlines) promote()
     const response = await pending
@@ -149,7 +188,13 @@ describe("typed task handles", () => {
   test("#given repeated interrupts and resumes #when constructing revived handles #then epochs advance without changing stale snapshots", async () => {
     // given
     const { manager, store, inProcess } = makeManager()
-    const response = await buildTaskExecute(makeDeps(manager))("revive", { prompt: "Inspect", category: "quick", run_in_background: true }, undefined, undefined, CTX)
+    const response = await buildTaskExecute(makeDeps(manager))(
+      "revive",
+      { prompt: "Inspect", category: "quick", run_in_background: true },
+      undefined,
+      undefined,
+      CTX,
+    )
     const id = response.details.task_id
     const initial = store.load(id)
     if (!initial) throw new Error("missing initial record")
@@ -181,10 +226,34 @@ describe("typed task handles", () => {
     const failed = makeManager()
     failed.inProcess.throwOnStart = true
     // when
-    const success = await execute("prose", { prompt: prose, name: prose, category: "quick", run_in_background: true }, undefined, undefined, CTX)
-    const refusal = await buildTaskExecute(makeDeps(denied.manager))("refuse", { prompt: prose, category: "quick", run_in_background: true }, undefined, undefined, CTX)
-    const failure = await buildTaskExecute(makeDeps(failed.manager))("fail", { prompt: prose, category: "quick", run_in_background: true }, undefined, undefined, CTX)
-    const aborted = await execute("abort", { prompt: prose, category: "quick", run_in_background: true }, AbortSignal.abort(), undefined, CTX)
+    const success = await execute(
+      "prose",
+      { prompt: prose, name: prose, category: "quick", run_in_background: true },
+      undefined,
+      undefined,
+      CTX,
+    )
+    const refusal = await buildTaskExecute(makeDeps(denied.manager))(
+      "refuse",
+      { prompt: prose, category: "quick", run_in_background: true },
+      undefined,
+      undefined,
+      CTX,
+    )
+    const failure = await buildTaskExecute(makeDeps(failed.manager))(
+      "fail",
+      { prompt: prose, category: "quick", run_in_background: true },
+      undefined,
+      undefined,
+      CTX,
+    )
+    const aborted = await execute(
+      "abort",
+      { prompt: prose, category: "quick", run_in_background: true },
+      AbortSignal.abort(),
+      undefined,
+      CTX,
+    )
     // then
     matched(success.details, store.load(success.details.task_id))
     expect(success.details.task_id).not.toBe("st_11111111")
@@ -192,6 +261,12 @@ describe("typed task handles", () => {
     expect(refusal.details.task_id).toBe("")
     expect(aborted.details.task_id).toBe("")
     for (const result of [refusal, failure, aborted]) expect(result.details).not.toHaveProperty("run_epoch")
-    evidence("failure", { success: success.details, record: store.load(success.details.task_id), refusal: refusal.details, failure: failure.details, aborted: aborted.details })
+    evidence("failure", {
+      success: success.details,
+      record: store.load(success.details.task_id),
+      refusal: refusal.details,
+      failure: failure.details,
+      aborted: aborted.details,
+    })
   })
 })

@@ -50,7 +50,9 @@ export async function runLazyCodexInstallLocalCli(input: {
     return 0
   }
   if (parsed.kind === "version") {
-    const packageJson = JSON.parse(await readFile(join(input.defaultRepoRoot, "package.json"), "utf8")) as { readonly version?: unknown }
+    const packageJson = JSON.parse(await readFile(join(input.defaultRepoRoot, "package.json"), "utf8")) as {
+      readonly version?: unknown
+    }
     const version = typeof packageJson.version === "string" ? packageJson.version : "unknown"
     input.log(`lazycodex-ai ${version}`)
     return 0
@@ -74,7 +76,12 @@ export async function runLazyCodexInstallLocalCli(input: {
       logInstalled(input.log, result)
       return 0
     }
-    return runLazyCodexManualUpdate({ env: input.env, dryRun: parsed.dryRun, log: input.log, invokedPath: input.invokedPath })
+    return runLazyCodexManualUpdate({
+      env: input.env,
+      dryRun: parsed.dryRun,
+      log: input.log,
+      invokedPath: input.invokedPath,
+    })
   }
 
   const repoRoot = parsed.repoRoot ? resolve(parsed.repoRoot) : input.defaultRepoRoot

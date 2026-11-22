@@ -33,8 +33,14 @@ function parentMode(initial: string): ParentPermissionMode & { change(preset: st
   const listeners = new Set<(preset: string) => void>()
   return {
     current: () => current,
-    onChange: (listener) => { listeners.add(listener); return () => listeners.delete(listener) },
-    change: (preset) => { current = preset; for (const listener of listeners) listener(preset) },
+    onChange: (listener) => {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
+    change: (preset) => {
+      current = preset
+      for (const listener of listeners) listener(preset)
+    },
   }
 }
 
@@ -49,8 +55,19 @@ async function realHost(): Promise<{ readonly root: string; readonly socket: str
   const provider = startHttpProviders({})
   providers.push(provider)
   writeFileSync(join(agentDir, "models.json"), provider.modelsJson)
-  writeFileSync(join(agentDir, "auth.json"), JSON.stringify(Object.fromEntries(Object.keys(ENGINE_MODELS).map((name) => [name, { type: "api_key", key: "test-key" }]))), { mode: 0o600 })
-  const host = await startSocketHost(root, { PATH: process.env["PATH"] ?? "", HOME: home, SENPI_CODING_AGENT_DIR: agentDir, BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0" })
+  writeFileSync(
+    join(agentDir, "auth.json"),
+    JSON.stringify(
+      Object.fromEntries(Object.keys(ENGINE_MODELS).map((name) => [name, { type: "api_key", key: "test-key" }])),
+    ),
+    { mode: 0o600 },
+  )
+  const host = await startSocketHost(root, {
+    PATH: process.env["PATH"] ?? "",
+    HOME: home,
+    SENPI_CODING_AGENT_DIR: agentDir,
+    BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
+  })
   hosts.push(host)
   return { root, socket: host.socket }
 }
@@ -81,7 +98,9 @@ function pushWatchingFactory(): { readonly createClient: HostRpcClientFactory; r
 function within<T>(promise: Promise<T>, what: string): Promise<T> {
   return Promise.race([
     promise,
-    new Promise<never>((_resolve, reject) => setTimeout(() => reject(new Error(`waited ${BUDGET_MS / 2} ms for ${what}`)), BUDGET_MS / 2)),
+    new Promise<never>((_resolve, reject) =>
+      setTimeout(() => reject(new Error(`waited ${BUDGET_MS / 2} ms for ${what}`)), BUDGET_MS / 2),
+    ),
   ])
 }
 
@@ -95,7 +114,9 @@ describe("HostSessionClient following its parent's approval mode on a real host"
     const client = new HostSessionClient({
       socketPath: socket,
       ports: { createClient: watch.createClient },
-      parent: new ChildParentLink("st_real_follow", undefined, mode, (message) => { warnings.push(message) }),
+      parent: new ChildParentLink("st_real_follow", undefined, mode, (message) => {
+        warnings.push(message)
+      }),
     })
     clients.push(client)
     await client.open({
@@ -109,7 +130,11 @@ describe("HostSessionClient following its parent's approval mode on a real host"
       retainOnDisconnect: true,
       autoTitle: false,
     })
-    expect(await client.getState()).toMatchObject({ permissionPreset: "full-access", permissionPresetSource: "client", permissionPresetStatus: "applied" })
+    expect(await client.getState()).toMatchObject({
+      permissionPreset: "full-access",
+      permissionPresetSource: "client",
+      permissionPresetStatus: "applied",
+    })
 
     // when
     mode.change("ask")
@@ -117,6 +142,11 @@ describe("HostSessionClient following its parent's approval mode on a real host"
 
     // then
     expect(warnings).toEqual([])
-    expect(await client.getState()).toMatchObject({ permissionPreset: "ask", permissionPresetSource: "client", permissionPresetStatus: "applied", effectivePermissionPreset: "ask" })
+    expect(await client.getState()).toMatchObject({
+      permissionPreset: "ask",
+      permissionPresetSource: "client",
+      permissionPresetStatus: "applied",
+      effectivePermissionPreset: "ask",
+    })
   })
 })

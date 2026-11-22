@@ -12,7 +12,8 @@ describe("scheduleTransientSweepOnce", () => {
     // given
     const memoryRoot = uniqueRoot()
     let clock = 1_000_000
-    const claim = () => scheduleTransientSweepOnce({ memoryRoot, start: () => undefined, deferMs: 60_000, now: () => clock })
+    const claim = () =>
+      scheduleTransientSweepOnce({ memoryRoot, start: () => undefined, deferMs: 60_000, now: () => clock })
     const first = claim()
 
     // when
@@ -35,15 +36,16 @@ describe("scheduleTransientSweepOnce", () => {
     let clock = 1_000_000
     let sweeps = 0
     let swept: () => void = () => undefined
-    const claim = () => scheduleTransientSweepOnce({
-      memoryRoot,
-      deferMs: 0,
-      now: () => clock,
-      start: () => {
-        sweeps += 1
-        swept()
-      },
-    })
+    const claim = () =>
+      scheduleTransientSweepOnce({
+        memoryRoot,
+        deferMs: 0,
+        now: () => clock,
+        start: () => {
+          sweeps += 1
+          swept()
+        },
+      })
     const firstSweep = new Promise<void>((resolve) => {
       swept = resolve
     })
@@ -70,7 +72,8 @@ describe("scheduleTransientSweepOnce", () => {
     // given
     const memoryRoot = uniqueRoot()
     let clock = 1_000_000
-    const claim = () => scheduleTransientSweepOnce({ memoryRoot, start: () => undefined, deferMs: 60_000, now: () => clock })
+    const claim = () =>
+      scheduleTransientSweepOnce({ memoryRoot, start: () => undefined, deferMs: 60_000, now: () => clock })
     const old = claim()
     clock += TRANSIENT_RUN_MAX_AGE_MS
     const newer = claim()

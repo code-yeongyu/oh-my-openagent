@@ -26,7 +26,10 @@ export function startCompiledAutoUpdate(options: {
     const report = async (line: string) => {
       const safe = line.replace(/[\r\n\x00-\x1f\x7f-\x9f]/g, " ").slice(0, 500)
       if (options.report !== undefined) options.report(safe)
-      else await appendFile(join(agentDir, "auto-update.log"), `${new Date().toISOString()} ${safe}\n`, { mode: 0o600 }).catch(() => {})
+      else
+        await appendFile(join(agentDir, "auto-update.log"), `${new Date().toISOString()} ${safe}\n`, {
+          mode: 0o600,
+        }).catch(() => {})
     }
     const checksDir = join(agentDir, "auto-update-checks")
     const day = Math.floor(Date.now() / (24 * 60 * 60_000))

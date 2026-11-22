@@ -11,7 +11,7 @@ const BOOTSTRAP_DEADLINE_MS = 10 * 60_000
 /** Schedules `expire` and returns its cancel; the default is an unref'd timer at the deadline. */
 export type DeadlineScheduler = (expire: () => void) => () => void
 
-const atDeadline: DeadlineScheduler = expire => {
+const atDeadline: DeadlineScheduler = (expire) => {
   const timer = setTimeout(expire, BOOTSTRAP_DEADLINE_MS)
   timer.unref()
   return () => clearTimeout(timer)
@@ -25,9 +25,7 @@ export class BootstrapWorkerTimeout extends Error {
   }
 }
 
-export type BootstrapReport =
-  | { readonly state: "connected" }
-  | { readonly state: string; readonly notice: string }
+export type BootstrapReport = { readonly state: "connected" } | { readonly state: string; readonly notice: string }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -60,7 +58,9 @@ export function runBootstrapWorker(
   options: { readonly execPath?: string; readonly schedule?: DeadlineScheduler } = {},
 ): Promise<BootstrapReport | undefined> {
   const execPath = options.execPath ?? process.execPath
-  const [command, ...args] = omoBin.endsWith(".js") ? [execPath, omoBin, ...BOOTSTRAP_ARGS] : [omoBin, ...BOOTSTRAP_ARGS]
+  const [command, ...args] = omoBin.endsWith(".js")
+    ? [execPath, omoBin, ...BOOTSTRAP_ARGS]
+    : [omoBin, ...BOOTSTRAP_ARGS]
   return new Promise((resolve, reject) => {
     const child = spawn(command ?? omoBin, args, { stdio: ["ignore", "pipe", "ignore"], windowsHide: true })
     let timedOut = false
@@ -75,7 +75,7 @@ export function runBootstrapWorker(
       bytes += chunk.length
       chunks.push(chunk)
     })
-    child.once("error", error => {
+    child.once("error", (error) => {
       cancel()
       reject(error)
     })

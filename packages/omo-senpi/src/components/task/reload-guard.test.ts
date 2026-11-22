@@ -3,12 +3,7 @@ import { describe, expect, it } from "bun:test"
 import type { TaskRecord } from "@oh-my-opencode/senpi-task"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import {
-  evaluateReloadVeto,
-  wireReloadGuard,
-  type ReloadGuardDagSource,
-  type ReloadGuardManager,
-} from "./reload-guard"
+import { evaluateReloadVeto, wireReloadGuard, type ReloadGuardDagSource, type ReloadGuardManager } from "./reload-guard"
 
 function record(overrides: Partial<TaskRecord> & Pick<TaskRecord, "task_id" | "status">): TaskRecord {
   return {
@@ -33,7 +28,9 @@ function managerOf(records: readonly TaskRecord[]): ReloadGuardManager {
   }
 }
 
-function dagSource(runs: ReadonlyArray<{ readonly runId: string; readonly name: string; readonly status: string }>): ReloadGuardDagSource {
+function dagSource(
+  runs: ReadonlyArray<{ readonly runId: string; readonly name: string; readonly status: string }>,
+): ReloadGuardDagSource {
   return { liveRuns: () => runs.filter((entry) => !["completed", "failed", "cancelled"].includes(entry.status)) }
 }
 
@@ -112,10 +109,7 @@ describe("reload guard", () => {
   })
 
   it("#given a live dag run and no running children #when the veto is evaluated #then reload is cancelled naming the run", () => {
-    const veto = evaluateReloadVeto(
-      managerOf([]),
-      dagSource([{ runId: "dag_1", name: "mass-ulw", status: "running" }]),
-    )
+    const veto = evaluateReloadVeto(managerOf([]), dagSource([{ runId: "dag_1", name: "mass-ulw", status: "running" }]))
 
     expect(veto).toEqual({
       cancel: true,
@@ -144,8 +138,8 @@ describe("reload guard", () => {
     )
 
     expect(veto?.reason).toBe(
-      "1 subagent(s) still running: explore-auth - wait for them to finish or cancel them (task_cancel) before reloading."
-      + " 1 DAG run(s) still in flight: mass-ulw - wait for them to finish or cancel them (dag cancel) before reloading.",
+      "1 subagent(s) still running: explore-auth - wait for them to finish or cancel them (task_cancel) before reloading." +
+        " 1 DAG run(s) still in flight: mass-ulw - wait for them to finish or cancel them (dag cancel) before reloading.",
     )
   })
 

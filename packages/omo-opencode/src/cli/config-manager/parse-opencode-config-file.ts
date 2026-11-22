@@ -25,7 +25,10 @@ export function parseOpenCodeConfigFileWithError(path: string): ParseConfigResul
 
     const content = readFileSync(path, "utf-8")
     if (isEmptyOrWhitespace(content)) {
-      return { config: null, error: `Config file contains only whitespace: ${path}. Delete it or add valid JSON content.` }
+      return {
+        config: null,
+        error: `Config file contains only whitespace: ${path}. Delete it or add valid JSON content.`,
+      }
     }
 
     const config = parseJsonc<OpenCodeConfig>(content)

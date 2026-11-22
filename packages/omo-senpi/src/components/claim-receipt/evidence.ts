@@ -28,7 +28,17 @@ export interface Timeline {
 
 type Rec = Record<string, unknown>
 type CommandKind = Exclude<CheckKind, "lsp" | "lookup">
-const LOOKUP_TOOLS: ReadonlySet<string> = new Set(["read", "grep", "glob", "find", "ls", "lsp_goto_definition", "lsp_find_references", "lsp_symbols", "ast_grep"])
+const LOOKUP_TOOLS: ReadonlySet<string> = new Set([
+  "read",
+  "grep",
+  "glob",
+  "find",
+  "ls",
+  "lsp_goto_definition",
+  "lsp_find_references",
+  "lsp_symbols",
+  "ast_grep",
+])
 const splitKinds = (line: string) => {
   const all = invokedKinds(line)
   return { kinds: all.filter((kind): kind is CommandKind => kind !== "lookup"), lookup: all.includes("lookup") }
@@ -62,7 +72,8 @@ class TimelineBuilder {
   readonly #detached = new Map<string, PendingCheck>()
 
   addCheck(at: number, entryId: string, pending: PendingCheck, outcome: CheckOutcome): void {
-    for (const kind of pending.kinds) this.checks.push({ at, entryId, kind, outcome, command: pending.command.slice(0, 200) })
+    for (const kind of pending.kinds)
+      this.checks.push({ at, entryId, kind, outcome, command: pending.command.slice(0, 200) })
   }
 
   addEdit(at: number, entryId: string, paths: readonly string[]): void {
@@ -72,12 +83,23 @@ class TimelineBuilder {
   entry(entry: unknown, index: number): void {
     if (!isRecord(entry)) return
     const entryId = asString(entry["id"])
-    if (entry["type"] === "custom_message") return this.notification(asString(entry["customType"]), contentText(entry["content"]), entry["details"], index, entryId)
+    if (entry["type"] === "custom_message")
+      return this.notification(
+        asString(entry["customType"]),
+        contentText(entry["content"]),
+        entry["details"],
+        index,
+        entryId,
+      )
     const message = entry["message"]
     if (entry["type"] !== "message" || !isRecord(message)) return
     if (message["role"] === "assistant") {
       for (const part of asArray(message["content"])) {
-        if (isRecord(part) && part["type"] === "toolCall") this.#calls.set(asString(part["id"]), { name: asString(part["name"]), args: isRecord(part["arguments"]) ? part["arguments"] : {} })
+        if (isRecord(part) && part["type"] === "toolCall")
+          this.#calls.set(asString(part["id"]), {
+            name: asString(part["name"]),
+            args: isRecord(part["arguments"]) ? part["arguments"] : {},
+          })
       }
       return
     }
@@ -92,7 +114,8 @@ class TimelineBuilder {
     const text = contentText(message["content"])
     if (toolName === "eval") return this.evalResult(callId, args, message["details"], text, isError, index, entryId)
     if (MUTATION_TOOL_NAMES.has(toolName)) {
-      if (!isError) this.addEdit(index, entryId, extractMutatedFilePaths({ toolName, input: args, details: message["details"] }))
+      if (!isError)
+        this.addEdit(index, entryId, extractMutatedFilePaths({ toolName, input: args, details: message["details"] }))
       return
     }
     if (toolName === "lsp_diagnostics") return this.lsp(text, isError, index, entryId)
@@ -115,7 +138,15 @@ class TimelineBuilder {
     if (outcome !== "unknown") this.checks.push({ at, entryId, kind: "lsp", outcome })
   }
 
-  evalResult(callId: string, args: Rec, details: unknown, text: string, isError: boolean, index: number, entryId: string): void {
+  evalResult(
+    callId: string,
+    args: Rec,
+    details: unknown,
+    text: string,
+    isError: boolean,
+    index: number,
+    entryId: string,
+  ): void {
     const record = isRecord(details) ? details : {}
     const hostCalls = asArray(record["toolCalls"]).filter(isRecord)
     for (const call of hostCalls) this.hostCall(call, index + 0.5, entryId)
@@ -200,9 +231,13 @@ class TimelineBuilder {
     }
     if (customType === "senpi-monitor:notification") {
       if (/\bwatcher (?:killed|timed_out)\b|\bwatcher\b[^\n]*\bkilled\b/.test(content)) return
-      const ids = asArray(isRecord(details) ? details["monitors"] : undefined).map((monitor) => (isRecord(monitor) ? asString(monitor["id"]) : ""))
+      const ids = asArray(isRecord(details) ? details["monitors"] : undefined).map((monitor) =>
+        isRecord(monitor) ? asString(monitor["id"]) : "",
+      )
       const description = MONITOR_DESCRIPTION.exec(content)?.[1]
-      const pending = ids.map((id) => this.#background.get(id)).find((value) => value !== undefined) ?? (description === undefined ? undefined : this.#background.get(`desc:${description}`))
+      const pending =
+        ids.map((id) => this.#background.get(id)).find((value) => value !== undefined) ??
+        (description === undefined ? undefined : this.#background.get(`desc:${description}`))
       const outcome = judgeOutput(content)
       if (pending !== undefined && outcome !== "unknown") this.addCheck(index, entryId, pending, outcome)
     }

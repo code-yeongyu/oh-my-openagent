@@ -7,9 +7,11 @@ import { credentialSchema } from "./protocol"
 const [api, home, recordHome] = process.argv.slice(2)
 if (!api) throw new Error("missing fake API")
 if (recordHome !== undefined) useAccountFacts({ ...systemAccountFacts, recordHome: () => recordHome })
-const store = (kind: "read" | "authoritative") => fetch(`${api}/fake-store`, { proxy: "", headers: { "x-read": kind, "x-pid": String(process.pid) } })
+const store = (kind: "read" | "authoritative") =>
+  fetch(`${api}/fake-store`, { proxy: "", headers: { "x-read": kind, "x-pid": String(process.pid) } })
 const session = createSession({
-  api, ...(home ? { home } : {}),
+  api,
+  ...(home ? { home } : {}),
   beforeKeysDiscarded: async () => undefined,
   store: {
     async read() {
@@ -23,7 +25,9 @@ const session = createSession({
     async write(value) {
       await fetch(`${api}/fake-store`, { method: "PUT", body: JSON.stringify(value), proxy: "" })
     },
-    async clear() { await fetch(`${api}/fake-store`, { method: "DELETE", proxy: "" }) },
+    async clear() {
+      await fetch(`${api}/fake-store`, { method: "DELETE", proxy: "" })
+    },
   },
 })
 await session.accessToken()

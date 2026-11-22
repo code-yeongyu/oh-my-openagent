@@ -1,6 +1,12 @@
 import { InProcessRunner } from "../../in-process"
 import type { ChildSession } from "../child-handle"
-import { acceptsConnections, createBuiltinChildMachine, loopbackPort, openBoundSession, watchHttpServers } from "./builtin-child"
+import {
+  acceptsConnections,
+  createBuiltinChildMachine,
+  loopbackPort,
+  openBoundSession,
+  watchHttpServers,
+} from "./builtin-child"
 
 // #9413, run in its own process so no other test file's module state can hide the bridge: start an
 // in-process child that loads the builtin extensions (codemode included), note the bridge ports it
@@ -43,7 +49,9 @@ if (scenario === "ac1") {
   )
 }
 const stillListening = listening()
-const stillOpen = (await Promise.all(bridges.map(async (port) => ((await acceptsConnections(port)) ? [port] : [])))).flat()
+const stillOpen = (
+  await Promise.all(bridges.map(async (port) => ((await acceptsConnections(port)) ? [port] : [])))
+).flat()
 for (const server of watch.servers) {
   server.closeAllConnections()
   server.close()
@@ -52,4 +60,7 @@ watch.stop()
 machine.cleanup()
 // Exit only once the line is flushed: on Windows a write to a pipe completes asynchronously, and
 // process.exit() would drop it. The explicit exit still ends the run if a leaked handle would keep it alive.
-process.stdout.write(`${JSON.stringify({ bridges: bridges.length, stillListening: stillListening.length, stillOpen: stillOpen.length, startError })}\n`, () => process.exit(0))
+process.stdout.write(
+  `${JSON.stringify({ bridges: bridges.length, stillListening: stillListening.length, stillOpen: stillOpen.length, startError })}\n`,
+  () => process.exit(0),
+)

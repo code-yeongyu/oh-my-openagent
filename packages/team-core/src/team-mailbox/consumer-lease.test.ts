@@ -41,22 +41,34 @@ describe("withInboxConsumerLease", () => {
     const overlapObserved: string[] = []
 
     // when
-    const first = withInboxConsumerLease(teamRunId, "m1", config, async () => {
-      activeCallbacks.add("first")
-      firstEntered.resolve()
-      await releaseFirst.promise
-      if (activeCallbacks.has("second")) overlapObserved.push("first")
-      activeCallbacks.delete("first")
-      return "first"
-    }, { staleAfterMs: 300_000 })
+    const first = withInboxConsumerLease(
+      teamRunId,
+      "m1",
+      config,
+      async () => {
+        activeCallbacks.add("first")
+        firstEntered.resolve()
+        await releaseFirst.promise
+        if (activeCallbacks.has("second")) overlapObserved.push("first")
+        activeCallbacks.delete("first")
+        return "first"
+      },
+      { staleAfterMs: 300_000 },
+    )
     await firstEntered.promise
 
-    const second = withInboxConsumerLease(teamRunId, "m1", config, async () => {
-      activeCallbacks.add("second")
-      if (activeCallbacks.has("first")) overlapObserved.push("second")
-      activeCallbacks.delete("second")
-      return "second"
-    }, { staleAfterMs: 300_000 })
+    const second = withInboxConsumerLease(
+      teamRunId,
+      "m1",
+      config,
+      async () => {
+        activeCallbacks.add("second")
+        if (activeCallbacks.has("first")) overlapObserved.push("second")
+        activeCallbacks.delete("second")
+        return "second"
+      },
+      { staleAfterMs: 300_000 },
+    )
 
     releaseFirst.resolve()
     const results = await Promise.all([first, second])
@@ -76,17 +88,10 @@ describe("withInboxConsumerLease", () => {
     await writeFile(leasePath, `dead-consumer\n999999999\n${Date.now() - 1}\n`)
 
     // when
-    const result = await withInboxConsumerLease(
-      teamRunId,
-      "m1",
-      config,
-      async () => "reacquired",
-      { staleAfterMs: 0 },
-    )
+    const result = await withInboxConsumerLease(teamRunId, "m1", config, async () => "reacquired", { staleAfterMs: 0 })
 
     // then
     expect(result).toBe("reacquired")
     await expect(readFile(leasePath, "utf8")).rejects.toThrow()
   }, 2_000)
-
 })

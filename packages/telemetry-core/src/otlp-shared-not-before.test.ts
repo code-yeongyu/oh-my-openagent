@@ -14,7 +14,9 @@ describe("per-install 429 backoff shared across processes", () => {
     roots.push(cleanup)
     const log: string[] = []
     const first = recordingFetch((_url, call) =>
-      call === 1 ? new Response(null, { status: 429, headers: { "retry-after": "30" } }) : new Response(null, { status: 200 }),
+      call === 1
+        ? new Response(null, { status: 429, headers: { "retry-after": "30" } })
+        : new Response(null, { status: 200 }),
     )
     const throttled = makeTransport(dir, {
       fetch: async (url, init) => {

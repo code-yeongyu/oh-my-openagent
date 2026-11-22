@@ -11,10 +11,7 @@ import { isRealUserTextPart } from "../../shared/internal-initiator-marker"
 import { discoverAllCommands, executeSlashCommand, type ExecutorOptions } from "./executor"
 import { log } from "../../shared"
 import { resolveSessionEventID } from "../../shared/event-session-id"
-import {
-  AUTO_SLASH_COMMAND_TAG_CLOSE,
-  AUTO_SLASH_COMMAND_TAG_OPEN,
-} from "./constants"
+import { AUTO_SLASH_COMMAND_TAG_CLOSE, AUTO_SLASH_COMMAND_TAG_OPEN } from "./constants"
 import { replaceSlashCommandSpan } from "./replace-command-span"
 import { createProcessedCommandStore } from "./processed-command-store"
 import type {
@@ -27,8 +24,6 @@ import type {
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
 
 const COMMAND_EXECUTE_FALLBACK_DEDUP_TTL_MS = 100
-
-
 
 function getDeletedSessionID(properties: unknown): string | null {
   return resolveSessionEventID(properties) ?? null
@@ -62,12 +57,10 @@ function getCommandExecutionEventID(input: CommandExecuteBeforeInput): string | 
 }
 
 function partsContainAutoSlashCommandTags(parts: Array<{ text?: string }>): boolean {
-  return parts.some((part) =>
-    typeof part.text === "string"
-    && (
-      part.text.includes(AUTO_SLASH_COMMAND_TAG_OPEN)
-      || part.text.includes(AUTO_SLASH_COMMAND_TAG_CLOSE)
-    )
+  return parts.some(
+    (part) =>
+      typeof part.text === "string" &&
+      (part.text.includes(AUTO_SLASH_COMMAND_TAG_OPEN) || part.text.includes(AUTO_SLASH_COMMAND_TAG_CLOSE)),
   )
 }
 
@@ -95,10 +88,7 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
   }
 
   return {
-    "chat.message": async (
-      input: AutoSlashCommandHookInput,
-      output: AutoSlashCommandHookOutput
-    ): Promise<void> => {
+    "chat.message": async (input: AutoSlashCommandHookInput, output: AutoSlashCommandHookOutput): Promise<void> => {
       const promptText = extractPromptText(output.parts)
 
       // Debug logging to diagnose slash command issues
@@ -109,10 +99,7 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
         })
       }
 
-      if (
-        promptText.includes(AUTO_SLASH_COMMAND_TAG_OPEN) ||
-        promptText.includes(AUTO_SLASH_COMMAND_TAG_CLOSE)
-      ) {
+      if (promptText.includes(AUTO_SLASH_COMMAND_TAG_OPEN) || promptText.includes(AUTO_SLASH_COMMAND_TAG_CLOSE)) {
         return
       }
 
@@ -133,14 +120,10 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
       // scan per path.
       if (!discoveredCommandNames) {
         const discoveredCommands = await discoverAllCommands(executionOptions)
-        discoveredCommandNames = new Set(
-          discoveredCommands.map((cmd) => cmd.name.toLowerCase())
-        )
+        discoveredCommandNames = new Set(discoveredCommands.map((cmd) => cmd.name.toLowerCase()))
       }
       const availableCommandNames = discoveredCommandNames
-      const resolvingCandidates = candidates.filter((parsed) =>
-        availableCommandNames.has(parsed.command)
-      )
+      const resolvingCandidates = candidates.filter((parsed) => availableCommandNames.has(parsed.command))
 
       if (resolvingCandidates.length === 0) {
         return
@@ -193,7 +176,7 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
 
     "command.execute.before": async (
       input: CommandExecuteBeforeInput,
-      output: CommandExecuteBeforeOutput
+      output: CommandExecuteBeforeOutput,
     ): Promise<void> => {
       if (partsContainAutoSlashCommandTags(output.parts)) {
         return
@@ -236,10 +219,7 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
         return
       }
 
-      sessionProcessedCommandExecutions.add(
-        commandKey,
-        eventID ? undefined : COMMAND_EXECUTE_FALLBACK_DEDUP_TTL_MS
-      )
+      sessionProcessedCommandExecutions.add(commandKey, eventID ? undefined : COMMAND_EXECUTE_FALLBACK_DEDUP_TTL_MS)
 
       const taggedContent = `${AUTO_SLASH_COMMAND_TAG_OPEN}\n${result.replacementText}\n${AUTO_SLASH_COMMAND_TAG_CLOSE}`
 
@@ -250,7 +230,7 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
         }
       } else {
         const startIdx = output.parts.findIndex(
-          (part) => isRealUserTextPart(part) && (part.text ?? "").trim().startsWith("/")
+          (part) => isRealUserTextPart(part) && (part.text ?? "").trim().startsWith("/"),
         )
         if (startIdx >= 0) {
           const partParsed = parseSlashCommand(output.parts[startIdx].text ?? "", input.command)
@@ -269,11 +249,7 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
         command: input.command,
       })
     },
-    event: async ({
-      event,
-    }: {
-      event: { type: string; properties?: unknown }
-    }): Promise<void> => {
+    event: async ({ event }: { event: { type: string; properties?: unknown } }): Promise<void> => {
       if (event.type !== "session.deleted") {
         return
       }

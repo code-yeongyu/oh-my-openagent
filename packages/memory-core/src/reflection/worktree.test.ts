@@ -15,7 +15,6 @@ import { removeTree } from "../../../../test-support/remove-tree"
 const roots: string[] = []
 const exec = createNodeGitExec()
 
-
 async function fixture() {
   const root = realpathSync.native(await mkdtemp(join(tmpdir(), "reflection-worktree-")))
   roots.push(root)
@@ -85,7 +84,10 @@ describe("reflection worktree finalization", () => {
     const result = await finalizeReflectionWorktree(worktree, {
       mode: "auto",
       summary: "learned facts",
-      withWriterLock: async (operation) => { lockCalls += 1; return operation() },
+      withWriterLock: async (operation) => {
+        lockCalls += 1
+        return operation()
+      },
     })
 
     // #then
@@ -93,8 +95,9 @@ describe("reflection worktree finalization", () => {
     expect(result.cleanup).toEqual({ worktreeRemoved: true, branchRemoved: true })
     expect(lockCalls).toBe(1)
     expect(await repo.show("HEAD", "learned.md")).toBe("learned\n")
-    expect((await exec.run(["log", "-1", "--format=%s"], { cwd: parentDir, timeoutMs: 30_000 })).stdout.trim())
-      .toBe("merge(reflection): learned facts")
+    expect((await exec.run(["log", "-1", "--format=%s"], { cwd: parentDir, timeoutMs: 30_000 })).stdout.trim()).toBe(
+      "merge(reflection): learned facts",
+    )
     await assertCleaned(worktree, parentDir)
   })
 
@@ -111,7 +114,10 @@ describe("reflection worktree finalization", () => {
       mode: "auto",
       summary: "targeted dream",
       allowedPaths: ["reference-style.md"],
-      withWriterLock: async (operation) => { lockCalls += 1; return operation() },
+      withWriterLock: async (operation) => {
+        lockCalls += 1
+        return operation()
+      },
     })
 
     // #then
@@ -157,7 +163,9 @@ describe("reflection worktree finalization", () => {
     // #then
     expect(result.status).toBe("merge_conflict")
     expect(await repo.status()).toBe("")
-    expect((await exec.run(["rev-parse", "-q", "--verify", "MERGE_HEAD"], { cwd: parentDir, timeoutMs: 30_000 })).code).toBe(1)
+    expect(
+      (await exec.run(["rev-parse", "-q", "--verify", "MERGE_HEAD"], { cwd: parentDir, timeoutMs: 30_000 })).code,
+    ).toBe(1)
     await assertCleaned(worktree, parentDir)
   })
 
@@ -207,9 +215,10 @@ describe("reflection worktree finalization", () => {
     // #given
     const { repo, worktreesDir } = await fixture()
     const blockBranchDelete: GitExec = {
-      run: async (argv, options) => argv[0] === "branch" && argv[1] === "-D"
-        ? { code: 1, stdout: "", stderr: "error: cannot delete branch used by worktree" }
-        : exec.run(argv, options),
+      run: async (argv, options) =>
+        argv[0] === "branch" && argv[1] === "-D"
+          ? { code: 1, stdout: "", stderr: "error: cannot delete branch used by worktree" }
+          : exec.run(argv, options),
     }
     const worktree = await createReflectionWorktree(repo, "cleanup-blocked", worktreesDir, blockBranchDelete)
     await commit(worktree, "learned.md", "learned\n")

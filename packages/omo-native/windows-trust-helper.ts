@@ -1,6 +1,13 @@
 import { createHash } from "node:crypto"
 
-import type { CertificateId, EngineTrustFacts, EnhancedKeyUsage, TrustChain, WindowsCertificate, WindowsLocation } from "./engine-trust-policy"
+import type {
+  CertificateId,
+  EngineTrustFacts,
+  EnhancedKeyUsage,
+  TrustChain,
+  WindowsCertificate,
+  WindowsLocation,
+} from "./engine-trust-policy"
 
 /** Shared with the helper (`crates/omo-engine-trust-helper/src/document.rs`); anything larger is malformed output. */
 export const WINDOWS_TRUST_HELPER_MAX_OUTPUT_BYTES = 8 * 1024 * 1024
@@ -22,7 +29,7 @@ export type WindowsTrustSource = {
 }
 /** `unsupported-entry-length`: an entry's length is not one its subject algorithm defines (design 4.2 item 2). */
 export type WindowsCtlOutcome =
-  | "read" | "absent" | "unreadable" | "undecodable" | "unsupported-subject-algorithm" | "unsupported-entry-length"
+  "read" | "absent" | "unreadable" | "undecodable" | "unsupported-subject-algorithm" | "unsupported-entry-length"
 export type WindowsTrustHelperDocument = {
   readonly facts: WindowsFacts
   /** Certificate bytes of every positive candidate, by DER SHA-256, for the generation writer. */
@@ -33,22 +40,41 @@ export type WindowsTrustHelperDocument = {
 export type WindowsTrustMalformed = {
   readonly kind: "helper-malformed-output"
   readonly check:
-    | "oversize" | "encoding" | "syntax" | "unknown-field" | "missing-field" | "wrong-type" | "invalid-value"
-    | "unparseable-certificate" | "inconsistent-complete"
+    | "oversize"
+    | "encoding"
+    | "syntax"
+    | "unknown-field"
+    | "missing-field"
+    | "wrong-type"
+    | "invalid-value"
+    | "unparseable-certificate"
+    | "inconsistent-complete"
   /** JSON path of the offending value. */
   readonly path: string
 }
-export type WindowsTrustDecodeResult = { readonly kind: "decoded"; readonly document: WindowsTrustHelperDocument } | WindowsTrustMalformed
+export type WindowsTrustDecodeResult =
+  { readonly kind: "decoded"; readonly document: WindowsTrustHelperDocument } | WindowsTrustMalformed
 
 const LOCATIONS: readonly WindowsLocation[] = [
-  "CURRENT_USER", "LOCAL_MACHINE", "CURRENT_USER_GROUP_POLICY", "LOCAL_MACHINE_GROUP_POLICY",
-  "LOCAL_MACHINE_ENTERPRISE", "CURRENT_SERVICE", "SERVICE_SID", "USER_SID",
+  "CURRENT_USER",
+  "LOCAL_MACHINE",
+  "CURRENT_USER_GROUP_POLICY",
+  "LOCAL_MACHINE_GROUP_POLICY",
+  "LOCAL_MACHINE_ENTERPRISE",
+  "CURRENT_SERVICE",
+  "SERVICE_SID",
+  "USER_SID",
 ]
 const POSITIVE_STORES = ["ROOT", "CA", "TrustedPeople"] as const
 const SOURCE_STORES: readonly WindowsSourceStore[] = [...POSITIVE_STORES, "Disallowed"]
 const OUTCOMES: readonly WindowsSourceOutcome[] = ["read", "absent", "access-denied", "enumeration-failed"]
 const CTL_OUTCOMES: readonly WindowsCtlOutcome[] = [
-  "read", "absent", "unreadable", "undecodable", "unsupported-subject-algorithm", "unsupported-entry-length",
+  "read",
+  "absent",
+  "unreadable",
+  "undecodable",
+  "unsupported-subject-algorithm",
+  "unsupported-entry-length",
 ]
 const OID = /^[0-2](?:\.(?:0|[1-9][0-9]*))+$/
 const SHA256 = /^[0-9a-f]{64}$/
@@ -56,7 +82,10 @@ const SHA1 = /^[0-9a-f]{40}$/
 const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
 
 class Malformed extends Error {
-  constructor(readonly check: WindowsTrustMalformed["check"], readonly path: string) {
+  constructor(
+    readonly check: WindowsTrustMalformed["check"],
+    readonly path: string,
+  ) {
     super(`${check} at ${path}`)
   }
 }
@@ -126,11 +155,17 @@ function der(value: unknown, path: string): Uint8Array {
   return bytes
 }
 function identityOf(bytes: Uint8Array): CertificateId {
-  return { sha256: createHash("sha256").update(bytes).digest("hex"), sha1: createHash("sha1").update(bytes).digest("hex") }
+  return {
+    sha256: createHash("sha256").update(bytes).digest("hex"),
+    sha1: createHash("sha1").update(bytes).digest("hex"),
+  }
 }
 function identity(value: unknown, path: string): CertificateId {
   const record = object(value, path, ["sha256", "sha1"])
-  return { sha256: matching(record.sha256, `${path}.sha256`, SHA256), sha1: matching(record.sha1, `${path}.sha1`, SHA1) }
+  return {
+    sha256: matching(record.sha256, `${path}.sha256`, SHA256),
+    sha1: matching(record.sha1, `${path}.sha1`, SHA1),
+  }
 }
 function eku(value: unknown, path: string): EnhancedKeyUsage {
   if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Malformed("wrong-type", path)
@@ -157,8 +192,19 @@ function chain(value: unknown, path: string, own: CertificateId): TrustChain {
 }
 
 function decode(document: unknown): WindowsTrustHelperDocument {
-  const root = object(document, "$", ["schema", "os", "complete", "sources", "ctl", "certificates", "disallowed", "ctlSha1", "bundledRoots"])
-  if (root.schema !== 1) throw new Malformed(typeof root.schema === "number" ? "invalid-value" : "wrong-type", "$.schema")
+  const root = object(document, "$", [
+    "schema",
+    "os",
+    "complete",
+    "sources",
+    "ctl",
+    "certificates",
+    "disallowed",
+    "ctlSha1",
+    "bundledRoots",
+  ])
+  if (root.schema !== 1)
+    throw new Malformed(typeof root.schema === "number" ? "invalid-value" : "wrong-type", "$.schema")
   oneOf(root.os, "$.os", ["windows"] as const)
   const complete = boolean(root.complete, "$.complete")
   const sources = array(root.sources, "$.sources").map((entry, index): WindowsTrustSource => {
@@ -167,7 +213,8 @@ function decode(document: unknown): WindowsTrustHelperDocument {
     return {
       store: oneOf(record.store, `${path}.store`, SOURCE_STORES),
       location: oneOf(record.location, `${path}.location`, LOCATIONS),
-      physicalStore: record.physicalStore === null ? null : physicalStore(record.physicalStore, `${path}.physicalStore`),
+      physicalStore:
+        record.physicalStore === null ? null : physicalStore(record.physicalStore, `${path}.physicalStore`),
       outcome: oneOf(record.outcome, `${path}.outcome`, OUTCOMES),
       status: win32Status(record.status, `${path}.status`),
     }
@@ -176,7 +223,12 @@ function decode(document: unknown): WindowsTrustHelperDocument {
   const bytes = new Map<string, Uint8Array>()
   const certificates = array(root.certificates, "$.certificates").map((entry, index): WindowsCertificate => {
     const path = `$.certificates[${index}]`
-    const record = object(entry, path, ["der", "store", "location", "physicalStore", "selfSigned", "ca", "eku"], ["chain"])
+    const record = object(
+      entry,
+      path,
+      ["der", "store", "location", "physicalStore", "selfSigned", "ca", "eku"],
+      ["chain"],
+    )
     const encoded = der(record.der, `${path}.der`)
     const id = identityOf(encoded)
     bytes.set(id.sha256, encoded)
@@ -189,7 +241,9 @@ function decode(document: unknown): WindowsTrustHelperDocument {
       ca: boolean(record.ca, `${path}.ca`),
       eku: eku(record.eku, `${path}.eku`),
     }
-    return record.chain === undefined ? certificate : { ...certificate, chain: chain(record.chain, `${path}.chain`, id) }
+    return record.chain === undefined
+      ? certificate
+      : { ...certificate, chain: chain(record.chain, `${path}.chain`, id) }
   })
   const disallowed = array(root.disallowed, "$.disallowed").map((entry, index) => {
     const path = `$.disallowed[${index}]`
@@ -201,17 +255,28 @@ function decode(document: unknown): WindowsTrustHelperDocument {
     }
   })
   const ctlSha1 = array(root.ctlSha1, "$.ctlSha1").map((entry, index) => matching(entry, `$.ctlSha1[${index}]`, SHA1))
-  const bundledRoots = array(root.bundledRoots, "$.bundledRoots").map((entry, index) => identity(entry, `$.bundledRoots[${index}]`))
+  const bundledRoots = array(root.bundledRoots, "$.bundledRoots").map((entry, index) =>
+    identity(entry, `$.bundledRoots[${index}]`),
+  )
   // complete:false is always accepted (it fails closed); complete:true must agree with every negative source.
-  const unreadNegative = sources.some((source) => source.store === "Disallowed"
-    && (source.outcome === "access-denied" || source.outcome === "enumeration-failed"))
-  if (complete && (unreadNegative || (ctl !== "read" && ctl !== "absent"))) throw new Malformed("inconsistent-complete", "$.complete")
-  return { facts: { os: "windows", complete, certificates, disallowed, ctlSha1, bundledRoots }, der: bytes, sources, ctl }
+  const unreadNegative = sources.some(
+    (source) =>
+      source.store === "Disallowed" && (source.outcome === "access-denied" || source.outcome === "enumeration-failed"),
+  )
+  if (complete && (unreadNegative || (ctl !== "read" && ctl !== "absent")))
+    throw new Malformed("inconsistent-complete", "$.complete")
+  return {
+    facts: { os: "windows", complete, certificates, disallowed, ctlSha1, bundledRoots },
+    der: bytes,
+    sources,
+    ctl,
+  }
 }
 
 /** Strict, bounded decoder of the Windows fact helper's stdout into the policy's facts (design 4.1, 4.2). */
 export function decodeWindowsTrustHelperOutput(stdout: Uint8Array): WindowsTrustDecodeResult {
-  if (stdout.length > WINDOWS_TRUST_HELPER_MAX_OUTPUT_BYTES) return { kind: "helper-malformed-output", check: "oversize", path: "$" }
+  if (stdout.length > WINDOWS_TRUST_HELPER_MAX_OUTPUT_BYTES)
+    return { kind: "helper-malformed-output", check: "oversize", path: "$" }
   let text: string
   try {
     text = new TextDecoder("utf-8", { fatal: true }).decode(stdout)
@@ -246,7 +311,9 @@ export function encodeBundledRootsForHelper(roots: readonly Uint8Array[]): Uint8
 }
 
 /** The helper's explicit environment (design 6.2): only SystemRoot, which Windows system DLLs need; nothing that steers trust. */
-export function windowsTrustHelperEnvironment(arrival: Readonly<Record<string, string | undefined>>): Record<string, string> {
+export function windowsTrustHelperEnvironment(
+  arrival: Readonly<Record<string, string | undefined>>,
+): Record<string, string> {
   for (const [name, value] of Object.entries(arrival)) {
     if (name.toUpperCase() === "SYSTEMROOT" && value !== undefined) return { SystemRoot: value }
   }

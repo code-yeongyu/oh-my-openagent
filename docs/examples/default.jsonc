@@ -16,7 +16,7 @@
     "plan-consultant": { "model": "anthropic/claude-fable-5-2", "reasoning": "max" },
 
     // Plan reviewer: checks the work plan for clarity and completeness
-    "plan-reviewer": { "model": "openai/gpt-6-astra", "reasoning": "high" },
+    "plan-reviewer": { "model": "openai/gpt-6.2-astra", "reasoning": "high" },
   },
 
   "categories": {
@@ -25,9 +25,9 @@
     "unspecified-high": { "model": "anthropic/claude-opus-5-5", "reasoning": "medium" },
     "writing": { "model": "anthropic/claude-opus-5-5", "reasoning": "low" },
     "visual-engineering": { "model": "anthropic/claude-fable-5-2", "reasoning": "max" },
-    "architect": { "model": "anthropic/claude-fable-5-2", "reasoning": "max" },
-    "deep-low": { "model": "openai/gpt-6.1-sol", "reasoning": "medium" },
-    "deep-high": { "model": "openai/gpt-6-astra", "reasoning": "high" },
-    "ultrabrain": { "model": "openai/gpt-6-astra", "reasoning": "max" },
+    "architect": { "model": "anthropic/claude-fable-5-2", "reasoning": "xhigh" },
+    "deep-low": { "model": "openai/gpt-6.2-sol", "reasoning": "medium" },
+    "deep-high": { "model": "openai/gpt-6.2-astra", "reasoning": "high" },
+    "ultrabrain": { "model": "openai/gpt-6.2-astra", "reasoning": "max" },
   },
 }

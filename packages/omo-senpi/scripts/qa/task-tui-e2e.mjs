@@ -161,9 +161,11 @@ function hasCostUsage(step) {
 
 function runSelfTest() {
   if (parseArgs(["--scenario", "edge"]).scenario !== "edge") throw new Error("self-test: scenario parser failed")
-  if (parseArgs(["--scenario", "active"]).scenario !== "active") throw new Error("self-test: active scenario parser failed")
+  if (parseArgs(["--scenario", "active"]).scenario !== "active")
+    throw new Error("self-test: active scenario parser failed")
   if (parseArgs(["--scenario", "team"]).scenario !== "team") throw new Error("self-test: team scenario parser failed")
-  if (parseArgs(["--scenario", "team-active"]).scenario !== "team-active") throw new Error("self-test: team-active scenario parser failed")
+  if (parseArgs(["--scenario", "team-active"]).scenario !== "team-active")
+    throw new Error("self-test: team-active scenario parser failed")
   try {
     parseArgs(["--scenario", "bogus"])
     throw new Error("self-test: bad scenario accepted")
@@ -176,26 +178,49 @@ function runSelfTest() {
   const activeCommand = composeCommand("/tmp/senpi", prepared.sessionDir, "active")
   const teamCommand = composeCommand("/tmp/senpi", prepared.sessionDir, "team")
   const teamActiveCommand = composeCommand("/tmp/senpi", prepared.sessionDir, "team-active")
-  const env = childEnv({ PATH: process.env.PATH, OMO_CODING_AGENT_DIR: "/real/agent", SENPI_CODING_AGENT_DIR: "/real/agent", OPENAI_API_KEY: "secret" }, prepared.sandbox, prepared.sessionDir, "/tmp/senpi")
-  if (command.args.includes("-p") || command.args.includes("--mode")) throw new Error("self-test: TUI command must not force print/json mode")
-  if (!command.args.includes(mockProviderEntry) || !command.args.includes("omo-mock") || !command.args.includes("mock-1")) throw new Error("self-test: mock provider command is incomplete")
-  if (!activeCommand.args.includes(SCENARIOS.active.prompt)) throw new Error("self-test: active command prompt is incomplete")
+  const env = childEnv(
+    {
+      PATH: process.env.PATH,
+      OMO_CODING_AGENT_DIR: "/real/agent",
+      SENPI_CODING_AGENT_DIR: "/real/agent",
+      OPENAI_API_KEY: "secret",
+    },
+    prepared.sandbox,
+    prepared.sessionDir,
+    "/tmp/senpi",
+  )
+  if (command.args.includes("-p") || command.args.includes("--mode"))
+    throw new Error("self-test: TUI command must not force print/json mode")
+  if (
+    !command.args.includes(mockProviderEntry) ||
+    !command.args.includes("omo-mock") ||
+    !command.args.includes("mock-1")
+  )
+    throw new Error("self-test: mock provider command is incomplete")
+  if (!activeCommand.args.includes(SCENARIOS.active.prompt))
+    throw new Error("self-test: active command prompt is incomplete")
   if (!teamCommand.args.includes(SCENARIOS.team.prompt)) throw new Error("self-test: team command prompt is incomplete")
-  if (!teamActiveCommand.args.includes(SCENARIOS["team-active"].prompt)) throw new Error("self-test: team-active command prompt is incomplete")
-  if (SCENARIOS.team.customMessages?.[0]?.customType !== "senpi-task.team-message") throw new Error("self-test: team custom message is incomplete")
+  if (!teamActiveCommand.args.includes(SCENARIOS["team-active"].prompt))
+    throw new Error("self-test: team-active command prompt is incomplete")
+  if (SCENARIOS.team.customMessages?.[0]?.customType !== "senpi-task.team-message")
+    throw new Error("self-test: team custom message is incomplete")
   // The final tool step is the request still visible while the child is parked. It must carry a
   // different cache rate from the prior cold request so live QA distinguishes latest from run rate.
   const activeToolStep = SCENARIOS.active.childSteps.at(-1)
   if (!hasCostUsage(activeToolStep)) throw new Error("self-test: active child tool step must carry cost/cache usage")
-  if (SCENARIOS.active.childSteps.at(0)?.usage?.cacheRead !== 0) throw new Error("self-test: active child needs a cold first request")
+  if (SCENARIOS.active.childSteps.at(0)?.usage?.cacheRead !== 0)
+    throw new Error("self-test: active child needs a cold first request")
   const teamActive = SCENARIOS["team-active"]
   const teamCreate = teamActive.parentSteps.find((step) => step.type === "tool_call" && step.name === "team_create")
   if (teamCreate === undefined) throw new Error("self-test: team-active must create a real team")
-  if ((teamCreate.arguments.inline_spec?.members ?? []).length === 0) throw new Error("self-test: team-active team needs a member")
+  if ((teamCreate.arguments.inline_spec?.members ?? []).length === 0)
+    throw new Error("self-test: team-active team needs a member")
   const memberToolStep = teamActive.childSteps.at(-1)
   if (!hasCostUsage(memberToolStep)) throw new Error("self-test: team-active member step must carry cost/cache usage")
-  if (teamActive.childSteps.at(0)?.usage?.cacheRead !== 0) throw new Error("self-test: team-active member needs a cold first request")
-  if (env.SENPI_CODING_AGENT_DIR !== prepared.sandbox.agentDir || env.OPENAI_API_KEY !== undefined) throw new Error("self-test: env isolation failed")
+  if (teamActive.childSteps.at(0)?.usage?.cacheRead !== 0)
+    throw new Error("self-test: team-active member needs a cold first request")
+  if (env.SENPI_CODING_AGENT_DIR !== prepared.sandbox.agentDir || env.OPENAI_API_KEY !== undefined)
+    throw new Error("self-test: env isolation failed")
   const oldOutDir = process.env.TASK_TUI_E2E_OUT_DIR
   process.env.TASK_TUI_E2E_OUT_DIR = receiptDir
   const receipt = writeReceipt({ sandboxCleaned: true, cleanup: "self-test" })
@@ -210,7 +235,9 @@ function runSelfTest() {
 async function main() {
   const args = parseArgs(process.argv.slice(2))
   if (args.help) {
-    console.log(`Usage: node packages/omo-senpi/scripts/qa/task-tui-e2e.mjs [--scenario ${scenarioUsage()}] [--self-test]`)
+    console.log(
+      `Usage: node packages/omo-senpi/scripts/qa/task-tui-e2e.mjs [--scenario ${scenarioUsage()}] [--self-test]`,
+    )
     return
   }
   if (args.selfTest) runSelfTest()

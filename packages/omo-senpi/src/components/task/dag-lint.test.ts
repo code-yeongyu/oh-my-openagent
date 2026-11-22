@@ -35,7 +35,9 @@ describe("dag definition lint", () => {
 
   test("#given a node missing STOP WHEN #when linted #then the warning names the node and the stop condition", () => {
     // given
-    const nodes = [{ id: "build", prompt: "TASK: build it. DELIVERABLE: dist/. SCOPE: dist only. VERIFY: bun run build." }]
+    const nodes = [
+      { id: "build", prompt: "TASK: build it. DELIVERABLE: dist/. SCOPE: dist only. VERIFY: bun run build." },
+    ]
 
     // when
     const warnings = lintDagDefinitionNodes(nodes)

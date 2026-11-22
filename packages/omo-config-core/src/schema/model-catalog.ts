@@ -7,17 +7,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
-const OmoModelCatalogEntryInputSchema = z.object({
-  model: z.string(),
-  reasoning: OmoReasoningSchema.optional(),
-  /** @deprecated Use reasoning. */
-  variant: z.string().optional(),
-  /** @deprecated Use reasoning. */
-  reasoningEffort: OmoReasoningEffortSchema.optional(),
-}).strict()
+const OmoModelCatalogEntryInputSchema = z
+  .object({
+    model: z.string(),
+    reasoning: OmoReasoningSchema.optional(),
+    /** @deprecated Use reasoning. */
+    variant: z.string().optional(),
+    /** @deprecated Use reasoning. */
+    reasoningEffort: OmoReasoningEffortSchema.optional(),
+  })
+  .strict()
 
 export const OmoModelCatalogEntrySchema = z.preprocess(
-  (value) => isRecord(value) ? normalizeLegacyModelFields(value) : value,
+  (value) => (isRecord(value) ? normalizeLegacyModelFields(value) : value),
   OmoModelCatalogEntryInputSchema,
 )
 
@@ -25,7 +27,7 @@ export const OmoModelCatalogSchema = z.record(z.string(), OmoModelCatalogEntrySc
 
 const OmoModelCatalogEntryLayerInputSchema = OmoModelCatalogEntryInputSchema.partial()
 export const OmoModelCatalogEntryLayerSchema = z.preprocess(
-  (value) => isRecord(value) ? normalizeLegacyModelFields(value) : value,
+  (value) => (isRecord(value) ? normalizeLegacyModelFields(value) : value),
   OmoModelCatalogEntryLayerInputSchema,
 )
 export const OmoModelCatalogLayerSchema = z.record(z.string(), OmoModelCatalogEntryLayerSchema)

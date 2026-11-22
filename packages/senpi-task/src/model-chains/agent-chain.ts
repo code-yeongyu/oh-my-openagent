@@ -29,7 +29,8 @@ export function describeAgentChain<TModel extends SenpiModelPort>(
   available: ReadonlySet<string>,
 ): ModelChainEntry {
   const definition = agents[name]
-  if (definition?.disable === true) return { kind: "agent", name, status: "disabled", runtime: [], rungs: [], reason: "disabled by omo.json" }
+  if (definition?.disable === true)
+    return { kind: "agent", name, status: "disabled", runtime: [], rungs: [], reason: "disabled by omo.json" }
   const fromConfig = ownModels(config, name)
   const declared: readonly DeclaredRung[] = [
     ...agentModelCandidates(definition?.model, definition?.models, {}).map((candidate): DeclaredRung => ({
@@ -37,12 +38,16 @@ export function describeAgentChain<TModel extends SenpiModelPort>(
       source: fromConfig.has(candidate.model) ? "omo.json" : "built-in",
     })),
     ...(definition?.categories ?? []).flatMap((category) =>
-      categoryRuntimeChain(resolveCategory(category, config, registry)).map((model): DeclaredRung => ({ model, source: `category:${category}` }))
+      categoryRuntimeChain(resolveCategory(category, config, registry)).map((model): DeclaredRung => ({
+        model,
+        source: `category:${category}`,
+      })),
     ),
     ...builtinRungs(Object.hasOwn(AGENT_FALLBACK_CHAINS, name) ? AGENT_FALLBACK_CHAINS[name] : undefined, available),
   ]
   const result = resolveAgent(name, agents, registry, { omoConfig: config })
-  const runtime = result.kind === "resolved" ? [result.model, ...(result.fallback_models ?? []).map((model) => model.display)] : []
+  const runtime =
+    result.kind === "resolved" ? [result.model, ...(result.fallback_models ?? []).map((model) => model.display)] : []
   return {
     kind: "agent",
     name,

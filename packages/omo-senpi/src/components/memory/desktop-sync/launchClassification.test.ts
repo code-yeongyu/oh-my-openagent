@@ -9,6 +9,6 @@ test("#given the launch classification module #when it is bundled alone #then no
   expect(built.success).toBe(true)
   const inputs = Object.keys(built.metafile?.inputs ?? {})
   expect(inputs).toHaveLength(1)
-  const imports = Object.values(built.metafile?.inputs ?? {}).flatMap(input => input.imports.map(i => i.path))
+  const imports = Object.values(built.metafile?.inputs ?? {}).flatMap((input) => input.imports.map((i) => i.path))
   expect(imports).toEqual([])
 })

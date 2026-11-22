@@ -113,13 +113,19 @@ function skillPaths(count: number): string[] {
 
 describe("omo-ai payload verifier", () => {
   test("#given a payload missing only the agent toolkit SDK #when verified #then it fails naming that artifact", () => {
-    const run = runVerifierOnPayload([...PACKED_ARTIFACTS.filter(path => path !== "plugin/runtime/agent-toolkit-sdk/sdk.js"), ...skillPaths(PACKED_SKILL_COUNT)])
+    const run = runVerifierOnPayload([
+      ...PACKED_ARTIFACTS.filter((path) => path !== "plugin/runtime/agent-toolkit-sdk/sdk.js"),
+      ...skillPaths(PACKED_SKILL_COUNT),
+    ])
     expect(run.exitCode).toBe(1)
     expect(run.output).toContain("missing artifact: plugin/runtime/agent-toolkit-sdk/sdk.js")
   })
 
   test("#given a payload missing only the device-account extension #when verified #then it fails naming that artifact", () => {
-    const run = runVerifierOnPayload([...PACKED_ARTIFACTS.filter(path => path !== "plugin/extensions/omo-device-account.js"), ...skillPaths(PACKED_SKILL_COUNT)])
+    const run = runVerifierOnPayload([
+      ...PACKED_ARTIFACTS.filter((path) => path !== "plugin/extensions/omo-device-account.js"),
+      ...skillPaths(PACKED_SKILL_COUNT),
+    ])
     expect(run.exitCode).toBe(1)
     expect(run.output).toContain("missing artifact: plugin/extensions/omo-device-account.js")
   })
@@ -133,14 +139,25 @@ describe("omo-ai payload verifier", () => {
       expect(run.exitCode).toBe(1)
     })
 
-    test.skipIf(process.platform === "win32")("#when the helper is packed without u+x #then it fails on the execute bit", () => {
-      const run = runVerifierOnPayload([...complete, KEYCHAIN_HELPER], {}, { args: ["--release"], modes: { [KEYCHAIN_HELPER]: 0o644 } })
-      expect(run.output).toContain(`not executable (u+x): ${KEYCHAIN_HELPER}`)
-      expect(run.exitCode).toBe(1)
-    })
+    test.skipIf(process.platform === "win32")(
+      "#when the helper is packed without u+x #then it fails on the execute bit",
+      () => {
+        const run = runVerifierOnPayload(
+          [...complete, KEYCHAIN_HELPER],
+          {},
+          { args: ["--release"], modes: { [KEYCHAIN_HELPER]: 0o644 } },
+        )
+        expect(run.output).toContain(`not executable (u+x): ${KEYCHAIN_HELPER}`)
+        expect(run.exitCode).toBe(1)
+      },
+    )
 
     test.skipIf(process.platform === "win32")("#when the helper is packed with mode 0755 #then it passes", () => {
-      const run = runVerifierOnPayload([...complete, KEYCHAIN_HELPER], {}, { args: ["--release"], modes: { [KEYCHAIN_HELPER]: 0o755 } })
+      const run = runVerifierOnPayload(
+        [...complete, KEYCHAIN_HELPER],
+        {},
+        { args: ["--release"], modes: { [KEYCHAIN_HELPER]: 0o755 } },
+      )
       expect(run.output).not.toContain(KEYCHAIN_HELPER)
       expect(run.exitCode).toBe(0)
     })
@@ -153,7 +170,10 @@ describe("omo-ai payload verifier", () => {
   })
 
   test("#given a payload missing only the omo daemon task-config runtime #when verified #then it fails naming that artifact", () => {
-    const run = runVerifierOnPayload([...PACKED_ARTIFACTS.filter(path => path !== "plugin/runtime/task-config/index.js"), ...skillPaths(PACKED_SKILL_COUNT)])
+    const run = runVerifierOnPayload([
+      ...PACKED_ARTIFACTS.filter((path) => path !== "plugin/runtime/task-config/index.js"),
+      ...skillPaths(PACKED_SKILL_COUNT),
+    ])
     expect(run.exitCode).toBe(1)
     expect(run.output).toContain("missing artifact: plugin/runtime/task-config/index.js")
   })
@@ -199,10 +219,14 @@ describe("omo-ai payload verifier", () => {
       const bundle = "plugin/runtime/dag/library.js"
       const payload = [...PACKED_ARTIFACTS, bundle, ...skillPaths(PACKED_SKILL_COUNT)]
 
-      const run = runVerifierOnPayload(payload, { [bundle]: MINIFIED_SIBLING_READ.replace("assets.generated.json", "library-data.json") })
+      const run = runVerifierOnPayload(payload, {
+        [bundle]: MINIFIED_SIBLING_READ.replace("assets.generated.json", "library-data.json"),
+      })
 
       expect(run.output).not.toContain("missing artifact:")
-      expect(run.output).toContain(`missing sibling asset: ${bundle} reads plugin/runtime/dag/library-data.json, which is not packed`)
+      expect(run.output).toContain(
+        `missing sibling asset: ${bundle} reads plugin/runtime/dag/library-data.json, which is not packed`,
+      )
       expect(run.exitCode).toBe(1)
     })
   })

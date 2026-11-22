@@ -1,11 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  excerptRendererText,
-  linesComponent,
-  normalizeRendererText,
-  rendererVisibleWidth,
-} from "./renderers"
+import { excerptRendererText, linesComponent, normalizeRendererText, rendererVisibleWidth } from "./renderers"
 
 const TERMINAL_CONTROL_PATTERN = /[\u0000-\u001f\u007f-\u009f]/u
 

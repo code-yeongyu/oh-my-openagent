@@ -6,7 +6,10 @@ import type { WakeToolBudget } from "./budget"
 
 // The agent loop honors an inline `isError` (senpi builtin convention) and `terminate` (pi-agent-core
 // early-termination hint); neither is declared on the base result type, so they are intersected here.
-export type KibitzerToolResult = AgentToolResult<undefined> & { readonly isError?: boolean; readonly terminate?: boolean }
+export type KibitzerToolResult = AgentToolResult<undefined> & {
+  readonly isError?: boolean
+  readonly terminate?: boolean
+}
 
 /**
  * A sidecar tool: a member-scoped ToolDefinition whose execute is a plain closure. The third
@@ -86,7 +89,10 @@ export function budgeted<TParams>(
   return async (_toolCallId, params, signal) => {
     const current = budget()
     if (!current.charge()) {
-      return rejection("tool_budget_exceeded", `The tool-call budget for this wake (${current.limit}) is exhausted; end the turn.`)
+      return rejection(
+        "tool_budget_exceeded",
+        `The tool-call budget for this wake (${current.limit}) is exhausted; end the turn.`,
+      )
     }
     return run(params, signal)
   }

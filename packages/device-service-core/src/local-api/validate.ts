@@ -1,3 +1,4 @@
+// Vendored from sisyphuslabs/omo-relay-daemon@edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6 packages/local-api/src/validate.ts
 import { LocalApiError } from "./errors.ts";
 import type {
   Empty,
@@ -14,10 +15,10 @@ import type {
 } from "./protocol.ts";
 import { LOCAL_UPLOAD_PARTS_MAX } from "./upload.ts";
 import { EVENT_KINDS, validateEventFields } from "./validate-events.ts";
+import { sessionWakeState } from "./validate-session-wake.ts";
 import {
   absolutePath,
   bool,
-  commandId,
   exactly,
   fail,
   InvalidMessage,
@@ -31,10 +32,12 @@ import {
   semver,
   uint,
 } from "./validate-fields.ts";
-import { endpointsData, locateData } from "./validate-delegated.ts";
+import { MACHINE_DATA } from "./validate-machine.ts";
+import { DELIVERIES_DATA } from "./validate-deliveries.ts";
+import { commandAnswerOf, refOf } from "./validate-session-answer.ts";
+import { endpointsData, endpointsListData } from "./validate-delegated.ts";
 import { isRequestType, REQUEST_TYPES, validateRequestFields } from "./validate-requests.ts";
 import {
-  deviceId,
   deviceRef,
   deviceRowOf,
   errorBodyOf,
@@ -175,26 +178,13 @@ const attachState = (v: unknown) => {
     changedAt: typeof changedAt === "string" ? changedAt : fail("changedAt"),
   };
 };
-// Raw 32 bytes, unpadded base64url: a machine hash and both public keys share the service's encoding.
-const base64url32 = (v: unknown, what: string): string =>
-  typeof v === "string" && /^[A-Za-z0-9_-]{43}$/.test(v) ? v : fail(what);
-const machineBinding = (v: unknown): ResponseData["device.machine_binding"] => {
-  const m = known(v, ["machine_hash", "device", "merge_device_ids"], [], "data");
-  const ids = m["merge_device_ids"];
+const remoteCommandsState = (v: unknown) => {
+  const m = known(v, ["enabled", "changedAt", "overridden"], [], "data");
+  const changedAt = m["changedAt"];
   return {
-    machine_hash: nullable(m["machine_hash"], (h) => base64url32(h, "machine_hash")),
-    device: nullable(m["device"], (d) => {
-      const device = known(d, ["id", "signing_public_key", "sealing_public_key"], [], "device");
-      return {
-        id: deviceId(device["id"]),
-        signing_public_key: base64url32(device["signing_public_key"], "signing_public_key"),
-        sealing_public_key: base64url32(device["sealing_public_key"], "sealing_public_key"),
-      };
-    }),
-    merge_device_ids:
-      Array.isArray(ids) && ids.length <= 16
-        ? ids.map((id) => deviceId(id, "merge_device_ids"))
-        : fail("merge_device_ids"),
+    enabled: bool(m["enabled"], "enabled"),
+    changedAt: typeof changedAt === "string" ? changedAt : fail("changedAt"),
+    overridden: bool(m["overridden"], "overridden"),
   };
 };
 const DATA: { readonly [T in RequestType]: (v: unknown) => ResponseData[T] } = {
@@ -205,30 +195,40 @@ const DATA: { readonly [T in RequestType]: (v: unknown) => ResponseData[T] } = {
   "refresher.register": empty,
   "device.adopt": (v) => ({ device: deviceRef(one(v, "device"), "device", known) }),
   "device.forget": empty,
-  "device.machine_binding": machineBinding,
   "device.info": (v) => ({
     device: nullable(one(v, "device"), (d) => deviceRef(d, "device", known)),
   }),
   "endpoints.register": empty,
   "endpoints.unregister": empty,
+  "endpoints.list": (v) => endpointsListData(known(v, ["agent_dirs"], [], "data")),
+  "session.presenter_open": empty,
+  "session.presenter_send": empty,
   "devices.list": (v) => {
     const devices = one(v, "devices");
     return Array.isArray(devices) ? { devices: devices.map(deviceRowOf) } : fail("devices");
   },
   "sessions.list": (v) => ({ query_id: localId(one(v, "query_id"), "query_id") }),
+  "sessions.events.subscribe": empty,
   "session.attach": (v) => ({ attach: localId(one(v, "attach"), "attach") }),
   "session.detach": empty,
-  "session.command": (v) => ({ command_id: commandId(one(v, "command_id")) }),
+  "session.command": commandAnswerOf,
   "session.command_part": (v) => ({
     received: uint(one(v, "received"), 0, LOCAL_UPLOAD_PARTS_MAX - 1, "received"),
   }),
   "session.read": (v) => ({ query_id: localId(one(v, "query_id"), "query_id") }),
   "enforcement.report": empty,
   "owner.shutdown_for_upgrade": empty,
-  "session.endpoints": endpointsData,
-  "session.locate": locateData,
+  "owner.update_committed": empty,
   "control.attach.get": attachState,
   "control.attach.set": attachState,
+  "control.remote_commands.get": remoteCommandsState,
+  "control.remote_commands.set": remoteCommandsState,
+  "control.session_wake.get": sessionWakeState,
+  "control.session_wake.set": sessionWakeState,
+  "session.endpoints": endpointsData,
+  "session.locate": (v) => refOf(v, "session.locate data"),
+  ...MACHINE_DATA,
+  ...DELIVERIES_DATA,
 };
 
 export type ValidResponse<T extends RequestType> =

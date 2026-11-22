@@ -74,10 +74,7 @@ export function createAutoRetryDispatcher(
     const previousCurrentModel = fallbackState?.currentModel
     const previousPendingFallbackModel = fallbackState?.pendingFallbackModel
     const previousPendingFallbackPromptMayHaveBeenAccepted = fallbackState?.pendingFallbackPromptMayHaveBeenAccepted
-    const effectiveRetryModel = stringifyRuntimeModelWithVariant(
-      retryModelPayload.model,
-      retryModelPayload.variant,
-    )
+    const effectiveRetryModel = stringifyRuntimeModelWithVariant(retryModelPayload.model, retryModelPayload.variant)
     if (fallbackState && effectiveRetryModel) {
       fallbackState.currentModel = effectiveRetryModel
       fallbackState.pendingFallbackModel = effectiveRetryModel
@@ -95,17 +92,16 @@ export function createAutoRetryDispatcher(
 
       const retryPayload = getLastUserRetryPayload(messagesResp, sessionID)
       const originalRetryMetadata = resolveOriginalUserRetryMetadata(messagesResp)
-      const fetchedParts = originalRetryMetadata.parts.length > 0
-        ? originalRetryMetadata.parts
-        : retryPayload.retryParts
+      const fetchedParts =
+        originalRetryMetadata.parts.length > 0 ? originalRetryMetadata.parts : retryPayload.retryParts
       const usingFetchedUserParts = originalRetryMetadata.parts.length > 0
       const retryParts =
         fetchedParts.length > 0
-          ? fetchedParts.map((part) => (
+          ? fetchedParts.map((part) =>
               hasInternalInitiatorMarker(part.text) && !hasRuntimeFallbackRetryMarker(part.text)
                 ? { ...part, text: `${part.text}\n${OMO_RUNTIME_FALLBACK_RETRY_MARKER}` }
-                : part
-            ))
+                : part,
+            )
           : (() => {
               log(
                 `[${HOOK_NAME}] No user message parts found for auto-retry (${source}); using synthetic continuation`,
@@ -146,17 +142,18 @@ export function createAutoRetryDispatcher(
       // Our own abort leaves a dangling assistant turn with no terminal error, which
       // the gate's assistant-active check would treat as blocking forever. Skip it.
       const wasInternallyAborted = internallyAbortedSessions.has(sessionID)
-      const dispatchRetryPrompt = (retrySource: string, queueBehavior?: "defer") => dispatchInternalPrompt({
-        mode: "async",
-        client: ctx.client,
-        sessionID,
-        source: retrySource,
-        settleMs: 0,
-        ...(queueBehavior ? { queueBehavior } : {}),
-        ...(wasInternallyAborted ? { checkToolState: false } : {}),
-        shouldDispatch: isCurrentFallbackGeneration,
-        input: retryPromptInput,
-      })
+      const dispatchRetryPrompt = (retrySource: string, queueBehavior?: "defer") =>
+        dispatchInternalPrompt({
+          mode: "async",
+          client: ctx.client,
+          sessionID,
+          source: retrySource,
+          settleMs: 0,
+          ...(queueBehavior ? { queueBehavior } : {}),
+          ...(wasInternallyAborted ? { checkToolState: false } : {}),
+          shouldDispatch: isCurrentFallbackGeneration,
+          input: retryPromptInput,
+        })
 
       if (!isCurrentFallbackGeneration()) return staleGenerationOutcome()
       let promptResult = await dispatchRetryPrompt(`runtime-fallback:${source}`, "defer")
@@ -172,10 +169,13 @@ export function createAutoRetryDispatcher(
       if (promptResult.status === "failed") {
         if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
           retryMayHaveBeenAccepted = true
-          log(`[${HOOK_NAME}] Auto-retry prompt failed after dispatch may have been accepted (${source}); preserving fallback state`, {
-            sessionID,
-            error: String(promptResult.error),
-          })
+          log(
+            `[${HOOK_NAME}] Auto-retry prompt failed after dispatch may have been accepted (${source}); preserving fallback state`,
+            {
+              sessionID,
+              error: String(promptResult.error),
+            },
+          )
           return { accepted: true, status: "possibly-accepted" }
         }
         throw promptResult.error
@@ -205,10 +205,13 @@ export function createAutoRetryDispatcher(
         if (reservedResult.status === "failed") {
           if (isAmbiguousPostDispatchPromptFailure(reservedResult)) {
             retryMayHaveBeenAccepted = true
-            log(`[${HOOK_NAME}] Auto-retry prompt failed after dispatch may have been accepted (${source}); preserving fallback state`, {
-              sessionID,
-              error: String(reservedResult.error),
-            })
+            log(
+              `[${HOOK_NAME}] Auto-retry prompt failed after dispatch may have been accepted (${source}); preserving fallback state`,
+              {
+                sessionID,
+                error: String(reservedResult.error),
+              },
+            )
             return { accepted: true, status: "possibly-accepted" }
           }
           throw reservedResult.error

@@ -17,19 +17,29 @@ function fitsEngineBind(path: string): boolean {
 }
 
 /** The parent for `<parent>/<tail>`: the runner's TMPDIR when that path fits, else /tmp. win32 binds named pipes. */
-export function shortSocketParent(tail: string, base: string = tmpdir(), fits: (path: string) => boolean = fitsEngineBind): string {
+export function shortSocketParent(
+  tail: string,
+  base: string = tmpdir(),
+  fits: (path: string) => boolean = fitsEngineBind,
+): string {
   if (process.platform === "win32") return base
   return fits(join(base, tail)) ? base : "/tmp"
 }
 
 /** A fresh `<parent>/s<hash4>-XXXXXX/<socketName>` for one engine socket; the caller removes `dir`. */
-export function shortSocketDir(label: string, socketName: string, base: string = tmpdir()): { readonly dir: string; readonly socket: string } {
+export function shortSocketDir(
+  label: string,
+  socketName: string,
+  base: string = tmpdir(),
+): { readonly dir: string; readonly socket: string } {
   const prefix = `s${createHash("sha256").update(label).digest("hex").slice(0, 4)}-`
   const tail = join(`${prefix}XXXXXX`, socketName)
   const parent = shortSocketParent(tail, base)
   const planned = join(parent, tail)
   if (process.platform !== "win32" && !fitsEngineBind(planned)) {
-    throw new Error(`${planned}: socket path is ${Buffer.byteLength(planned)} bytes, over the ${MAX_SHARD_BIND_PATH}-byte engine limit`)
+    throw new Error(
+      `${planned}: socket path is ${Buffer.byteLength(planned)} bytes, over the ${MAX_SHARD_BIND_PATH}-byte engine limit`,
+    )
   }
   const dir = mkdtempSync(join(parent, prefix))
   return { dir, socket: join(dir, socketName) }

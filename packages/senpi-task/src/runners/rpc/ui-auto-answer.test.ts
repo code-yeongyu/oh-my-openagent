@@ -6,7 +6,13 @@ import { buildAutoUiResponse, type AutoAnswerableUiRequest } from "./ui-auto-ans
 describe("buildAutoUiResponse", () => {
   test("#given a confirm request #when auto-answering #then it denies (confirmed:false)", () => {
     // given
-    const request: RpcExtensionUIRequest = { type: "extension_ui_request", id: "u1", method: "confirm", title: "t", message: "m" }
+    const request: RpcExtensionUIRequest = {
+      type: "extension_ui_request",
+      id: "u1",
+      method: "confirm",
+      title: "t",
+      message: "m",
+    }
 
     // when
     const response = buildAutoUiResponse(request)

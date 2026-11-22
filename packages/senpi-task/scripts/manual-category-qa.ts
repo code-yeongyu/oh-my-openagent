@@ -12,18 +12,21 @@ function model(provider: string, id: string): QaModel {
 }
 
 function throwingProviderAccessorModel(message: string): object {
-  return Object.defineProperties({}, {
-    provider: {
-      enumerable: true,
-      get() {
-        throw new Error(message)
+  return Object.defineProperties(
+    {},
+    {
+      provider: {
+        enumerable: true,
+        get() {
+          throw new Error(message)
+        },
+      },
+      id: {
+        enumerable: true,
+        value: "gpt-6-luna-fast",
       },
     },
-    id: {
-      enumerable: true,
-      value: "gpt-6-luna-fast",
-    },
-  })
+  )
 }
 
 function registry(models: readonly QaModel[]): SenpiModelRegistryPort<QaModel> {
@@ -40,15 +43,21 @@ function requireCondition(condition: boolean, message: string): void {
   }
 }
 
-const happy = resolveCategory("ultrabrain", {}, registry([model("openai", "gpt-5.6-sol")]))
+const happy = resolveCategory("ultrabrain", {}, registry([model("openai", "gpt-6.2-astra")]))
 requireCondition(happy.kind === "resolved", "happy scenario did not resolve")
 if (happy.kind !== "resolved") {
   throw new Error("happy scenario did not resolve")
 }
 requireCondition(happy.spec.provider === "openai", "happy provider mismatch")
-requireCondition(happy.spec.modelId === "gpt-5.6-sol", "happy model mismatch")
+requireCondition(happy.spec.modelId === "gpt-6.2-astra", "happy model mismatch")
 requireCondition(happy.spec.variant === "max", "happy variant mismatch")
-requireCondition(happy.spec.prompt_append?.includes("DEEP LOGICAL REASONING") === true, "happy prompt missing")
+requireCondition(
+  happy.spec.prompt_append?.startsWith('<Category_Context name="ultrabrain">') === true,
+  "happy Astra prompt append missing",
+)
+
+const ultrabrainOlderOnly = resolveCategory("ultrabrain", {}, registry([model("openai", "gpt-6-astra")]))
+requireCondition(ultrabrainOlderOnly.kind === "model_unavailable", "ultrabrain resolved on older GPT-6 Astra")
 
 const visualPrimary = resolveCategory("visual-engineering", {}, registry([model("anthropic", "claude-fable-5-2")]))
 requireCondition(visualPrimary.kind === "resolved", "visual-engineering primary did not resolve")
@@ -108,22 +117,27 @@ requireCondition(unspecifiedHighPrimary.spec.provider === "kimi-coding", "unspec
 requireCondition(unspecifiedHighPrimary.spec.modelId === "k3.1-pro", "unspecified-high primary model mismatch")
 requireCondition(unspecifiedHighPrimary.spec.variant === "max", "unspecified-high primary variant is not max")
 
-const deepSolRegistry = resolveCategory("deep", {}, registry([model("openai", "gpt-5.6-sol")]))
-requireCondition(deepSolRegistry.kind === "resolved", "deep did not resolve on a gpt-5.6-sol registry")
+const deepSolRegistry = resolveCategory("deep", {}, registry([model("openai", "gpt-6.2-sol")]))
+requireCondition(deepSolRegistry.kind === "resolved", "deep did not resolve on a gpt-6.2-sol registry")
 if (deepSolRegistry.kind !== "resolved") {
-  throw new Error("deep did not resolve on a gpt-5.6-sol registry")
+  throw new Error("deep did not resolve on a gpt-6.2-sol registry")
 }
-requireCondition(deepSolRegistry.spec.modelId === "gpt-5.6-sol", "deep model mismatch")
+requireCondition(deepSolRegistry.spec.modelId === "gpt-6.2-sol", "deep model mismatch")
 requireCondition(deepSolRegistry.spec.variant === "medium", "deep variant is not medium")
 
-const noSolRegistry = registry([model("kimi-coding", "k3.1-pro"), model("anthropic", "claude-opus-5-5")])
+const noSolRegistry = registry([
+  model("kimi-coding", "k3.1-pro"),
+  model("anthropic", "claude-opus-5-5"),
+  model("chatgpt-subscription", "gpt-6.2-sol-fast"),
+  model("openai", "gpt-5.6-sol"),
+])
 const deepGated = resolveCategory("deep", {}, noSolRegistry)
-requireCondition(deepGated.kind === "model_unavailable", "deep did not gate on a registry without gpt-5.6-sol")
+requireCondition(deepGated.kind === "model_unavailable", "deep did not gate on a registry without gpt-6.2-sol")
 if (deepGated.kind !== "model_unavailable") {
-  throw new Error("deep did not gate on a registry without gpt-5.6-sol")
+  throw new Error("deep did not gate on a registry without gpt-6.2-sol")
 }
-requireCondition(deepGated.attemptedModel === "chatgpt-subscription/gpt-6.1-sol", "deep gate attempted model mismatch")
-requireCondition(!deepGated.availableCategories.includes("deep-low"), "deep stayed listed without gpt-5.6-sol")
+requireCondition(deepGated.attemptedModel === "chatgpt-subscription/gpt-6.2-sol", "deep gate attempted model mismatch")
+requireCondition(!deepGated.availableCategories.includes("deep-low"), "deep stayed listed without gpt-6.2-sol")
 
 const disabled = resolveCategory(
   "ultrabrain",
@@ -193,26 +207,34 @@ const throwingAvailable = resolveCategory(
     find: () => undefined,
   },
 )
-requireCondition(throwingAvailable.kind === "model_unavailable", "throwing available accessor did not return model_unavailable")
+requireCondition(
+  throwingAvailable.kind === "model_unavailable",
+  "throwing available accessor did not return model_unavailable",
+)
 if (throwingAvailable.kind !== "model_unavailable") {
   throw new Error("throwing available accessor did not return model_unavailable")
 }
 requireCondition(throwingAvailable.availableModels.length === 0, "throwing available accessor leaked available models")
-requireCondition(!JSON.stringify(throwingAvailable).includes(throwingAvailableMarker), "throwing available accessor marker leaked")
+requireCondition(
+  !JSON.stringify(throwingAvailable).includes(throwingAvailableMarker),
+  "throwing available accessor marker leaked",
+)
 
 const secretFindResults = [
   { provider: "openai", id: "gpt-6-luna-fast", password: "hidden" },
   { provider: "openai", id: "gpt-6-luna-fast", accessToken: "hidden" },
   { provider: "openai", id: "gpt-6-luna-fast", privateToken: "hidden" },
 ]
-const secretFind = secretFindResults.map((findResult) => resolveCategory(
-  "quick",
-  {},
-  {
-    getAvailable: () => [model("openai", "gpt-6-luna-fast")],
-    find: () => findResult,
-  },
-))
+const secretFind = secretFindResults.map((findResult) =>
+  resolveCategory(
+    "quick",
+    {},
+    {
+      getAvailable: () => [model("openai", "gpt-6-luna-fast")],
+      find: () => findResult,
+    },
+  ),
+)
 for (const result of secretFind) {
   requireCondition(result.kind === "model_unavailable", "secret find result did not return model_unavailable")
   requireCondition(!JSON.stringify(result).includes("hidden"), "secret find result leaked a private field")
@@ -223,14 +245,16 @@ const identityFindResults = [
   { provider: "evil", id: "other", name: "mismatched identity" },
   { provider: "openai", id: "", name: "empty model id" },
 ]
-const identityFind = identityFindResults.map((findResult) => resolveCategory(
-  "quick",
-  {},
-  {
-    getAvailable: () => [model("openai", "gpt-6-luna-fast")],
-    find: () => findResult,
-  },
-))
+const identityFind = identityFindResults.map((findResult) =>
+  resolveCategory(
+    "quick",
+    {},
+    {
+      getAvailable: () => [model("openai", "gpt-6-luna-fast")],
+      find: () => findResult,
+    },
+  ),
+)
 for (const result of identityFind) {
   requireCondition(result.kind === "model_unavailable", "identity find result did not return model_unavailable")
   if (result.kind !== "model_unavailable") {
@@ -272,8 +296,14 @@ const inheritedIdentity = resolveCategory(
     find: () => inheritedIdentityModel,
   },
 )
-requireCondition(inheritedIdentity.kind === "model_unavailable", "inherited identity model did not return model_unavailable")
-requireCondition(!JSON.stringify(inheritedIdentity).includes("hidden"), "inherited identity model leaked prototype data")
+requireCondition(
+  inheritedIdentity.kind === "model_unavailable",
+  "inherited identity model did not return model_unavailable",
+)
+requireCondition(
+  !JSON.stringify(inheritedIdentity).includes("hidden"),
+  "inherited identity model leaked prototype data",
+)
 
 const nonArrayAvailable = resolveCategory(
   "quick",
@@ -283,7 +313,10 @@ const nonArrayAvailable = resolveCategory(
     find: () => model("openai", "gpt-6-luna-fast"),
   },
 )
-requireCondition(nonArrayAvailable.kind === "model_unavailable", "non-array getAvailable did not return model_unavailable")
+requireCondition(
+  nonArrayAvailable.kind === "model_unavailable",
+  "non-array getAvailable did not return model_unavailable",
+)
 if (nonArrayAvailable.kind !== "model_unavailable") {
   throw new Error("non-array getAvailable did not return model_unavailable")
 }
@@ -292,27 +325,33 @@ requireCondition(nonArrayAvailable.availableModels.length === 0, "non-array getA
 const prototypeName = resolveCategory("__proto__", {}, registry([model("openai", "gpt-6-luna-fast")]))
 requireCondition(prototypeName.kind === "not_found", "prototype-shaped category did not return not_found")
 
-console.log(JSON.stringify({
-  happy,
-  quickPrimary,
-  visualPrimary,
-  visualKimiFallback,
-  artistryPrimary,
-  artistryKimiFallback,
-  artistryOpusFallback,
-  unspecifiedHighPrimary,
-  deepSolRegistry,
-  deepGated,
-  disabled,
-  unavailable,
-  hardcodedFallback,
-  headerBearing,
-  malformed,
-  throwingAvailable,
-  secretFind,
-  identityFind,
-  throwingFind,
-  inheritedIdentity,
-  nonArrayAvailable,
-  prototypeName,
-}, null, 2))
+console.log(
+  JSON.stringify(
+    {
+      happy,
+      quickPrimary,
+      visualPrimary,
+      visualKimiFallback,
+      artistryPrimary,
+      artistryKimiFallback,
+      artistryOpusFallback,
+      unspecifiedHighPrimary,
+      deepSolRegistry,
+      deepGated,
+      disabled,
+      unavailable,
+      hardcodedFallback,
+      headerBearing,
+      malformed,
+      throwingAvailable,
+      secretFind,
+      identityFind,
+      throwingFind,
+      inheritedIdentity,
+      nonArrayAvailable,
+      prototypeName,
+    },
+    null,
+    2,
+  ),
+)

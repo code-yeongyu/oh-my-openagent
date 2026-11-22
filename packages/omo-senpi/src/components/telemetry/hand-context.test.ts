@@ -24,7 +24,12 @@ function telemetryExtension(captured: Captured[]) {
   const component: OmoSenpiComponent = {
     name: "tool-telemetry",
     register(pi) {
-      registerOmoNativeToolTelemetry(pi, { captureEvent: (name, properties) => { captured.push([name, properties]) }, hashSessionId: (id) => id })
+      registerOmoNativeToolTelemetry(pi, {
+        captureEvent: (name, properties) => {
+          captured.push([name, properties])
+        },
+        hashSessionId: (id) => id,
+      })
       pi.registerTool({
         name: "memory",
         label: "memory",

@@ -9,12 +9,17 @@ test("real Bun TLS certificate rejection preserves a retryable sign-in before an
   const tls = tlsTestCertificate()
   let requests = 0
   const server = Bun.serve({
-    hostname: "127.0.0.1", port: 0, tls,
-    fetch() { requests++; return Response.json(grant) },
+    hostname: "127.0.0.1",
+    port: 0,
+    tls,
+    fetch() {
+      requests++
+      return Response.json(grant)
+    },
   })
   onTestFinished(() => server.stop(true))
   const api = server.url.origin
-  const raw: unknown = await fetch(api, { method: "POST", body: "public-probe" }).catch(error => error)
+  const raw: unknown = await fetch(api, { method: "POST", body: "public-probe" }).catch((error) => error)
   expect(raw).toBeInstanceOf(Error)
   const code: unknown = raw instanceof Error ? Reflect.get(raw, "code") : undefined
   expect(code).toBe("DEPTH_ZERO_SELF_SIGNED_CERT")
@@ -24,7 +29,14 @@ test("real Bun TLS certificate rejection preserves a retryable sign-in before an
   const original = { ...grant, ...privateKeys, accessTokenExpiresAt: "2000-01-01T00:00:00Z" }
   await store.write(original)
   const persisted = await store.read()
-  const error: unknown = await createSession({ beforeKeysDiscarded: async () => undefined, api, store, home: await temporaryHome() }).accessToken().catch(error => error)
+  const error: unknown = await createSession({
+    beforeKeysDiscarded: async () => undefined,
+    api,
+    store,
+    home: await temporaryHome(),
+  })
+    .accessToken()
+    .catch((error) => error)
   expect(error).toMatchObject({ notSent: true, retryable: true })
   expect(await store.read()).toEqual(persisted)
   expect(requests).toBe(0)

@@ -61,15 +61,9 @@ export function getParentWakeMessageCreatedAt(message: ParentWakeMessageActivity
 }
 
 export function getParentWakeMessageActivityAt(message: ParentWakeMessageActivity): number | undefined {
-  let latest = latestTimestamp(
-    latestTimeActivity(message.info?.time),
-    latestTimeActivity(message.time),
-  )
+  let latest = latestTimestamp(latestTimeActivity(message.info?.time), latestTimeActivity(message.time))
   for (const part of message.parts ?? []) {
-    const partActivity = latestTimestamp(
-      latestTimeActivity(part.time),
-      latestTimeActivity(part.state?.time),
-    )
+    const partActivity = latestTimestamp(latestTimeActivity(part.time), latestTimeActivity(part.state?.time))
     if (partActivity !== undefined && (latest === undefined || partActivity > latest)) {
       latest = partActivity
     }

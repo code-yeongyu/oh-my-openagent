@@ -11,7 +11,11 @@ export const RECALL_TEXT_WINDOW = 6
 
 // Memory-owned hidden channels. Their content is derived FROM memory, so feeding them back into
 // the query planner would make recall search for the hint it just injected.
-export const EXCLUDED_CUSTOM_TYPES: ReadonlySet<string> = new Set([RECALL_CUSTOM_TYPE, "omo-memorian:recall", MEMORY_NOTICE_CUSTOM_TYPE])
+export const EXCLUDED_CUSTOM_TYPES: ReadonlySet<string> = new Set([
+  RECALL_CUSTOM_TYPE,
+  "omo-memorian:recall",
+  MEMORY_NOTICE_CUSTOM_TYPE,
+])
 
 /** One line of the judge's transcript window: both roles, oldest first. */
 export interface RecallTranscriptTurn {

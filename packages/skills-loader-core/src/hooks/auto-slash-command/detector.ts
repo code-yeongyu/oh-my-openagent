@@ -1,7 +1,5 @@
 import { isRealUserTextPart } from "../../shared/internal-initiator-marker"
-import {
-  EXCLUDED_COMMANDS,
-} from "./constants"
+import { EXCLUDED_COMMANDS } from "./constants"
 import type { ParsedSlashCommand } from "./types"
 
 const TRIPLE_BACKTICK_FENCE_PATTERN = /```[\s\S]*?(?:```|$)/g
@@ -121,9 +119,7 @@ export function detectSlashCommand(text: string): ParsedSlashCommand | null {
   return all.length > 0 ? all[0] : null
 }
 
-export function extractPromptText(
-  parts: Array<{ type: string; text?: string; synthetic?: boolean }>
-): string {
+export function extractPromptText(parts: Array<{ type: string; text?: string; synthetic?: boolean }>): string {
   const textParts = parts.filter(isRealUserTextPart)
   const slashPart = textParts.find((p) => (p.text ?? "").trim().startsWith("/"))
   if (slashPart?.text) {
@@ -135,7 +131,7 @@ export function extractPromptText(
 
 export function findMatchingSlashCommandPartIndex(
   parts: Array<{ type: string; text?: string; synthetic?: boolean }>,
-  commandName: string
+  commandName: string,
 ): number {
   const target = commandName.toLowerCase()
   for (let idx = 0; idx < parts.length; idx += 1) {
@@ -149,9 +145,7 @@ export function findMatchingSlashCommandPartIndex(
   return -1
 }
 
-export function findSlashCommandPartIndex(
-  parts: Array<{ type: string; text?: string; synthetic?: boolean }>
-): number {
+export function findSlashCommandPartIndex(parts: Array<{ type: string; text?: string; synthetic?: boolean }>): number {
   for (let idx = 0; idx < parts.length; idx += 1) {
     const part = parts[idx]
     if (!isRealUserTextPart(part)) continue

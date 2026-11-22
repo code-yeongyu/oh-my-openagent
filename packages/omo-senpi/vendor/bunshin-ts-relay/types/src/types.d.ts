@@ -1,4 +1,4 @@
-export declare const RELAY_STATUS_STATES: readonly ["not_configured", "disabled", "sign_in_required", "plan_required", "keychain_locked", "connecting", "activation_pending", "connected", "offline", "authorization_stale", "service_degraded", "update_required", "signed_out"];
+export declare const RELAY_STATUS_STATES: readonly ["not_configured", "disabled", "sign_in_required", "plan_required", "keychain_locked", "connecting", "activation_pending", "connected", "offline", "authorization_stale", "service_degraded", "update_required", "signed_out", "fail_closed"];
 export type StatusState = (typeof RELAY_STATUS_STATES)[number];
 export type RelayStatus = Readonly<{
     state: StatusState;

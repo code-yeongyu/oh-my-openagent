@@ -6,7 +6,15 @@
 // still moves forward. Classification (`proceed`) is a metadata read: only the abort signal stops it.
 
 // The size cap, which runs after these, keeps its own resume point beside this cursor (stamp.ts).
-const RETENTION_STORES = ["runs", "completions", "reflection-sessions", "journals", "sidecars", "ledgers", "recall-runs"] as const
+const RETENTION_STORES = [
+  "runs",
+  "completions",
+  "reflection-sessions",
+  "journals",
+  "sidecars",
+  "ledgers",
+  "recall-runs",
+] as const
 export type RetentionStore = (typeof RETENTION_STORES)[number]
 
 export interface RetentionCursor {
@@ -64,7 +72,11 @@ export class PassBudget {
     // Nothing finished this pass: the resume point stands unless this store lies past it, so a stop
     // never moves the cursor back to an earlier store.
     if (this.last !== undefined) this.stopped = this.last
-    else if (this.resume !== undefined && RETENTION_STORES.indexOf(this.resume.store as RetentionStore) >= RETENTION_STORES.indexOf(store)) this.stopped = this.resume
+    else if (
+      this.resume !== undefined &&
+      RETENTION_STORES.indexOf(this.resume.store as RetentionStore) >= RETENTION_STORES.indexOf(store)
+    )
+      this.stopped = this.resume
     else this.stopped = { store }
   }
 

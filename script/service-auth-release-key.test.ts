@@ -10,7 +10,7 @@ const MALFORMED = "holds an entry that is not 64 lowercase hex characters"
 const REFUSED = "carries a release key set the device service refuses"
 
 const bundleCarrying = (...keys: readonly string[]): string =>
-  `var releaseKeys={alg:"Ed25519",public_keys_hex:[${keys.map(key => `"${key}"`).join(",")}]};`
+  `var releaseKeys={alg:"Ed25519",public_keys_hex:[${keys.map((key) => `"${key}"`).join(",")}]};`
 
 // A fresh keypair per run: the guard checks the shape of the bytes, and no test may carry a service key.
 const syntheticKey = async (): Promise<string> => {
@@ -66,7 +66,9 @@ describe("the release step refuses a service-auth bundle it cannot verify", () =
   })
 
   test("#given the committed service-auth bundle #when it is asserted #then it carries exactly the committed release key set", async () => {
-    const bundle = await Bun.file(join(import.meta.dir, "../packages/omo-native/bin/lib/service-auth.generated.js")).text()
+    const bundle = await Bun.file(
+      join(import.meta.dir, "../packages/omo-native/bin/lib/service-auth.generated.js"),
+    ).text()
 
     expect(assertReleaseKeySet(bundle)).toEqual(committedReleaseKey.public_keys_hex)
   })

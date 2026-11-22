@@ -46,7 +46,12 @@ export function enterStartAdmission(input: {
   const rootSessionId = spec.root_session_id ?? spec.parent_session_id
   const participant = { key: taskId, runRef: runRef ?? { kind: "task" as const, id: taskId } }
   const entered = barrier.enter(rootSessionId, participant, credential)
-  const result = (pauseSeq: number): HeldStart => ({ kind: "held", pauseSeq, task_id: taskId, root_session_id: rootSessionId })
+  const result = (pauseSeq: number): HeldStart => ({
+    kind: "held",
+    pauseSeq,
+    task_id: taskId,
+    root_session_id: rootSessionId,
+  })
   if (entered.kind === "held") {
     const custody = result(entered.pauseSeq)
     held?.(custody, spec)
@@ -54,15 +59,23 @@ export function enterStartAdmission(input: {
   }
   let transferred = false
   const scope: StartAdmission = {
-    ...entered.ticket, get taskId() { return taskId }, rootSessionId,
+    ...entered.ticket,
+    get taskId() {
+      return taskId
+    },
+    rootSessionId,
     creating: () => entered.ticket.creating(taskId),
-    get runRef() { return participant.runRef },
-    bind: id => {
+    get runRef() {
+      return participant.runRef
+    },
+    bind: (id) => {
       taskId = id
       if (participant.runRef.kind === "task") participant.runRef = { kind: "task", id }
       entered.ticket.update({ key: id, runRef: participant.runRef })
     },
-    transfer: () => { transferred = true },
+    transfer: () => {
+      transferred = true
+    },
     hold: () => {
       const check = entered.ticket.check()
       if (check.kind !== "held") throw new Error("open admission cannot enter held custody")
@@ -78,7 +91,11 @@ export function enterStartAdmission(input: {
   return { kind: "entered" as const, scope, spec: { ...spec, admission: scope }, transferred: () => transferred }
 }
 
-export function createStartAdmissions(barrier: AdmissionBarrier, held?: (result: HeldStart, spec: ManagerStartSpec) => void, now = Date.now) {
+export function createStartAdmissions(
+  barrier: AdmissionBarrier,
+  held?: (result: HeldStart, spec: ManagerStartSpec) => void,
+  now = Date.now,
+) {
   async function run<T>(
     spec: ManagerStartSpec,
     runRef: RunRef | undefined,
@@ -87,8 +104,9 @@ export function createStartAdmissions(barrier: AdmissionBarrier, held?: (result:
   ): Promise<T | HeldStart> {
     const entered = enterStartAdmission({ barrier, spec, taskId: createTaskId(now()), runRef, credential, held })
     if (entered.kind === "held") return entered.result
-    try { return await body(entered.spec) }
-    catch (error) {
+    try {
+      return await body(entered.spec)
+    } catch (error) {
       if (!isAdmissionHeld(error)) throw error
       held?.(error.result, spec)
       return error.result

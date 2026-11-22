@@ -3,26 +3,16 @@ import { join } from "node:path"
 import { maybeKillAt } from "@oh-my-opencode/memory-core"
 
 import { emitMemoryReceipt, runOutcomeReceipt } from "../receipts-port"
-import {
-  ensureReflectionCompletion,
-  readReflectionCompletion,
-} from "./completion"
+import { ensureReflectionCompletion, readReflectionCompletion } from "./completion"
 import { classifyReflectionFailure } from "./failure-policy"
 import { readReflectionHealth } from "./health"
-import {
-  readRunJson,
-  updateRunLedger,
-  writeRunJsonAtomic,
-} from "./run-artifacts"
+import { readRunJson, updateRunLedger, writeRunJsonAtomic } from "./run-artifacts"
 import type {
   DurableFinalizationDecision,
   ReservationRunResult,
   RunFinalizationContext,
 } from "./run-finalization-types"
-import {
-  parseReservationRunLedger,
-  type ReservationRunLedger,
-} from "./reservation-run-ledger"
+import { parseReservationRunLedger, type ReservationRunLedger } from "./reservation-run-ledger"
 
 export async function settleReservationRun(
   context: RunFinalizationContext,
@@ -46,10 +36,11 @@ export async function settleReservationRun(
   const completionsDir = join(context.identity.paths.reflection, "completions")
   const existing = await readReflectionCompletion(completionsDir, current.runId)
   const category = current.category ?? existing?.category
-  const conversationIds = current.conversationIds
-    ?? (active?.runId === current.runId ? active.request.conversationIds : undefined)
-    ?? existing?.conversationIds
-    ?? await readLegacyConversationIds(runDir)
+  const conversationIds =
+    current.conversationIds ??
+    (active?.runId === current.runId ? active.request.conversationIds : undefined) ??
+    existing?.conversationIds ??
+    (await readLegacyConversationIds(runDir))
   if (category === undefined || conversationIds === undefined) {
     throw new Error(`Reflection completion identity unavailable for ${current.runId}`)
   }
@@ -57,7 +48,11 @@ export async function settleReservationRun(
   let park
   if (active?.runId === current.runId) {
     const failure = classifyReflectionFailure(decision)
-    const transition = await context.reservation.complete(current.runId, decision.outcome, failure === undefined ? undefined : { failure })
+    const transition = await context.reservation.complete(
+      current.runId,
+      decision.outcome,
+      failure === undefined ? undefined : { failure },
+    )
     if (transition.launch !== undefined) context.launch?.(transition.launch)
     launch = transition.launch
     park = transition.park
@@ -69,30 +64,32 @@ export async function settleReservationRun(
   // would throw before final.json lands and the reconcile pass would replay this directory
   // on every launch (#8437). Adopt it and finish the terminal artifacts instead.
   const healthBefore = existing === null ? await readReflectionHealth(completionsDir) : undefined
-  const completion = existing ?? await ensureReflectionCompletion(completionsDir, {
-    schemaVersion: 1,
-    runId: current.runId,
-    identity: context.identity.id,
-    category,
-    ...(current.model === undefined ? {} : { model: current.model }),
-    ...(current.thinking === undefined ? {} : { thinking: current.thinking }),
-    conversationIds,
-    trigger: current.trigger,
-    ...(current.origin === undefined ? {} : { origin: current.origin }),
-    outcome: decision.outcome,
-    ...(decision.reason === undefined ? {} : { reason: decision.reason }),
-    ...(decision.detail === undefined ? {} : { detail: decision.detail }),
-    startedAt: current.startedAt,
-    finishedAt: finalizedAt,
-    durationMs: Math.max(0, Date.parse(finalizedAt) - Date.parse(current.startedAt)),
-    ...(decision.outcome === "merged" && decision.integrationSha !== undefined
-      ? { mergedCommitSha: decision.integrationSha }
-      : {}),
-    ...(current.validatedChangedPaths === undefined ? {} : { filesChanged: current.validatedChangedPaths.length }),
-    consecutiveFailures: decision.outcome === "failed" ? (healthBefore?.streak ?? 0) + 1 : 0,
-    ...(current.launcher === undefined ? {} : { launcher: current.launcher }),
-    delivery: { status: "pending" },
-  })
+  const completion =
+    existing ??
+    (await ensureReflectionCompletion(completionsDir, {
+      schemaVersion: 1,
+      runId: current.runId,
+      identity: context.identity.id,
+      category,
+      ...(current.model === undefined ? {} : { model: current.model }),
+      ...(current.thinking === undefined ? {} : { thinking: current.thinking }),
+      conversationIds,
+      trigger: current.trigger,
+      ...(current.origin === undefined ? {} : { origin: current.origin }),
+      outcome: decision.outcome,
+      ...(decision.reason === undefined ? {} : { reason: decision.reason }),
+      ...(decision.detail === undefined ? {} : { detail: decision.detail }),
+      startedAt: current.startedAt,
+      finishedAt: finalizedAt,
+      durationMs: Math.max(0, Date.parse(finalizedAt) - Date.parse(current.startedAt)),
+      ...(decision.outcome === "merged" && decision.integrationSha !== undefined
+        ? { mergedCommitSha: decision.integrationSha }
+        : {}),
+      ...(current.validatedChangedPaths === undefined ? {} : { filesChanged: current.validatedChangedPaths.length }),
+      consecutiveFailures: decision.outcome === "failed" ? (healthBefore?.streak ?? 0) + 1 : 0,
+      ...(current.launcher === undefined ? {} : { launcher: current.launcher }),
+      delivery: { status: "pending" },
+    }))
   await updateRunLedger(ledgerPath, { finalizePhase: "settled" })
   await writeRunJsonAtomic(join(runDir, "final.json"), {
     version: 1,
@@ -105,7 +102,12 @@ export async function settleReservationRun(
     ...(decision.recoveredFromWorktree === true ? { recoveredFromWorktree: true } : {}),
   })
   maybeKillAt("before-receipt")
-  await emitMemoryReceipt(context.identity.paths.runtime, runOutcomeReceipt(current, decision.outcome, decision), context.receipts, context.warn)
+  await emitMemoryReceipt(
+    context.identity.paths.runtime,
+    runOutcomeReceipt(current, decision.outcome, decision),
+    context.receipts,
+    context.warn,
+  )
   return {
     runId: current.runId,
     outcome: decision.outcome,
@@ -117,9 +119,7 @@ export async function settleReservationRun(
   }
 }
 
-async function readLegacyConversationIds(
-  runDir: string,
-): Promise<readonly string[] | undefined> {
+async function readLegacyConversationIds(runDir: string): Promise<readonly string[] | undefined> {
   try {
     const payload = await readRunJson<Record<string, unknown>>(join(runDir, "transcript-payload.json"))
     const request = payload.request

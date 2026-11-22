@@ -32,7 +32,12 @@ describe("loadOmoConfig exclude_models", () => {
     )
 
     // when
-    const { config, diagnostics } = loadOmoConfig({ cwd: paths.cwd, env: { HOME: paths.homeDir }, platform: "linux", harness: "senpi" })
+    const { config, diagnostics } = loadOmoConfig({
+      cwd: paths.cwd,
+      env: { HOME: paths.homeDir },
+      platform: "linux",
+      harness: "senpi",
+    })
 
     // then
     expect(diagnostics).toEqual([])
@@ -44,7 +49,12 @@ describe("loadOmoConfig exclude_models", () => {
     const paths = fixture(`{ "exclude_models": ["claude-fable-*"] }`, `{ "exclude_models": [] }`)
 
     // when
-    const { config } = loadOmoConfig({ cwd: paths.cwd, env: { HOME: paths.homeDir }, platform: "linux", harness: "senpi" })
+    const { config } = loadOmoConfig({
+      cwd: paths.cwd,
+      env: { HOME: paths.homeDir },
+      platform: "linux",
+      harness: "senpi",
+    })
 
     // then
     expect(config.exclude_models).toEqual(["claude-fable-*"])

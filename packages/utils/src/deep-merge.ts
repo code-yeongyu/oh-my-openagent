@@ -1,8 +1,8 @@
-const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
-const MAX_DEPTH = 50;
+const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"])
+const MAX_DEPTH = 50
 
 export function isUnsafeObjectKey(key: string): boolean {
-  return DANGEROUS_KEYS.has(key);
+  return DANGEROUS_KEYS.has(key)
 }
 
 export function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -11,7 +11,7 @@ export function isPlainObject(value: unknown): value is Record<string, unknown> 
     value !== null &&
     !Array.isArray(value) &&
     Object.prototype.toString.call(value) === "[object Object]"
-  );
+  )
 }
 
 /**
@@ -24,34 +24,38 @@ export function isPlainObject(value: unknown): value is Record<string, unknown> 
  * deepMerge({ a: 1, b: { c: 2, d: 3 } }, { b: { c: 10 }, e: 5 })
  * // => { a: 1, b: { c: 10, d: 3 }, e: 5 }
  */
-export function deepMerge<T extends Record<string, unknown>>(base: T, override: Partial<T>, depth?: number): T;
-export function deepMerge<T extends Record<string, unknown>>(base: T | undefined, override: T | undefined, depth?: number): T | undefined;
+export function deepMerge<T extends Record<string, unknown>>(base: T, override: Partial<T>, depth?: number): T
 export function deepMerge<T extends Record<string, unknown>>(
   base: T | undefined,
   override: T | undefined,
-  depth = 0
+  depth?: number,
+): T | undefined
+export function deepMerge<T extends Record<string, unknown>>(
+  base: T | undefined,
+  override: T | undefined,
+  depth = 0,
 ): T | undefined {
-  if (!base && !override) return undefined;
-  if (!base) return override;
-  if (!override) return base;
-  if (depth > MAX_DEPTH) return override ?? base;
+  if (!base && !override) return undefined
+  if (!base) return override
+  if (!override) return base
+  if (depth > MAX_DEPTH) return override ?? base
 
-  const result = { ...base } as Record<string, unknown>;
+  const result = { ...base } as Record<string, unknown>
 
   for (const key of Object.keys(override)) {
-    if (isUnsafeObjectKey(key)) continue;
+    if (isUnsafeObjectKey(key)) continue
 
-    const baseValue = base[key];
-    const overrideValue = override[key];
+    const baseValue = base[key]
+    const overrideValue = override[key]
 
-    if (overrideValue === undefined) continue;
+    if (overrideValue === undefined) continue
 
     if (isPlainObject(baseValue) && isPlainObject(overrideValue)) {
-      result[key] = deepMerge(baseValue, overrideValue, depth + 1);
+      result[key] = deepMerge(baseValue, overrideValue, depth + 1)
     } else {
-      result[key] = overrideValue;
+      result[key] = overrideValue
     }
   }
 
-  return result as T;
+  return result as T
 }

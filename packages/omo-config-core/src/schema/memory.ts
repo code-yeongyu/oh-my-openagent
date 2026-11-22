@@ -1,6 +1,10 @@
 import * as z from "zod"
 
-import { OMO_MEMORY_AGREEMENTS_DEFAULTS, OmoMemoryAgreementsLayerSchema, OmoMemoryAgreementsSchema } from "./memory-agreements"
+import {
+  OMO_MEMORY_AGREEMENTS_DEFAULTS,
+  OmoMemoryAgreementsLayerSchema,
+  OmoMemoryAgreementsSchema,
+} from "./memory-agreements"
 
 export * from "./memory-agreements"
 
@@ -8,224 +12,285 @@ export * from "./memory-agreements"
 // Reflection
 // ---------------------------------------------------------------------------
 
-export const OmoMemoryReflectionTriggerSchema = z.object({
-  step_count: z.number().int().nonnegative().default(25),
-  on_compaction: z.boolean().default(true),
-}).strict()
+export const OmoMemoryReflectionTriggerSchema = z
+  .object({
+    step_count: z.number().int().nonnegative().default(25),
+    on_compaction: z.boolean().default(true),
+  })
+  .strict()
 
-export const OmoMemoryReflectionSchema = z.object({
-  enabled: z.boolean().default(true),
-  trigger: OmoMemoryReflectionTriggerSchema.default({ step_count: 25, on_compaction: true }),
-  merge: z.enum(["auto", "integration"]).default("auto"),
-  category: z.string().min(1).default("quick"),
-  timeout_minutes: z.number().int().positive().default(15),
-  max_concurrent_runs: z.number().int().positive().default(1),
-  sandbox: z.enum(["auto", "required", "off"]).default("auto"),
-}).strict()
+export const OmoMemoryReflectionSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    trigger: OmoMemoryReflectionTriggerSchema.default({ step_count: 25, on_compaction: true }),
+    merge: z.enum(["auto", "integration"]).default("auto"),
+    category: z.string().min(1).default("quick"),
+    timeout_minutes: z.number().int().positive().default(15),
+    max_concurrent_runs: z.number().int().positive().default(1),
+    sandbox: z.enum(["auto", "required", "off"]).default("auto"),
+  })
+  .strict()
 
 // ---------------------------------------------------------------------------
 // Sync + Search
 // ---------------------------------------------------------------------------
 
-export const OmoMemorySyncSchema = z.object({
-  /** @deprecated No-op kept so existing configs load; the git mirror reads its URL from git config, not here. */
-  remote: z.string().min(1).optional(),
-  /** Run end-to-end encrypted memory sync on this device while signed in and sync is on for the account. */
-  enabled: z.boolean().default(true),
-}).strict()
+export const OmoMemorySyncSchema = z
+  .object({
+    /** @deprecated No-op kept so existing configs load; the git mirror reads its URL from git config, not here. */
+    remote: z.string().min(1).optional(),
+    /** Run end-to-end encrypted memory sync on this device while signed in and sync is on for the account. */
+    enabled: z.boolean().default(true),
+  })
+  .strict()
 
-export const OmoMemorySearchSchema = z.object({
-  enabled: z.boolean().default(true),
-}).strict()
+export const OmoMemorySearchSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+  })
+  .strict()
 
 // ---------------------------------------------------------------------------
 // Recall (kibitzer gate; on/off plus how many nudges one turn may carry)
 // ---------------------------------------------------------------------------
 
-export const OmoMemoryRecallEventCapsSchema = z.object({
-  tool_args: z.number().int().nonnegative().default(400),
-  result_head: z.number().int().nonnegative().default(600),
-  assistant: z.number().int().nonnegative().default(1500),
-  prompt: z.number().int().nonnegative().default(4000),
-}).strict()
+export const OmoMemoryRecallEventCapsSchema = z
+  .object({
+    tool_args: z.number().int().nonnegative().default(400),
+    result_head: z.number().int().nonnegative().default(600),
+    assistant: z.number().int().nonnegative().default(1500),
+    prompt: z.number().int().nonnegative().default(4000),
+  })
+  .strict()
 
-export const OmoMemoryRecallSchema = z.object({
-  enabled: z.boolean().default(true),
-  max_items: z.number().int().min(1).max(5).default(2),
-  category: z.string().min(1).default("quick"),
-  event_caps: OmoMemoryRecallEventCapsSchema.default({ tool_args: 400, result_head: 600, assistant: 1500, prompt: 4000 }),
-  sidecar_max_tokens: z.number().int().positive().default(48000),
-  max_concurrent_wakes: z.number().int().positive().default(2),
-  tool_budget: z.number().int().positive().default(8),
-  query_expansion: z.boolean().default(false),
-}).strict()
+export const OmoMemoryRecallSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    max_items: z.number().int().min(1).max(5).default(2),
+    category: z.string().min(1).default("quick"),
+    event_caps: OmoMemoryRecallEventCapsSchema.default({
+      tool_args: 400,
+      result_head: 600,
+      assistant: 1500,
+      prompt: 4000,
+    }),
+    sidecar_max_tokens: z.number().int().positive().default(48000),
+    max_concurrent_wakes: z.number().int().positive().default(2),
+    tool_budget: z.number().int().positive().default(8),
+    query_expansion: z.boolean().default(false),
+  })
+  .strict()
 
 // ---------------------------------------------------------------------------
 // Project scope (#10044)
 // ---------------------------------------------------------------------------
 
-export const OmoMemoryProjectScopeSchema = z.object({
-  nudge: z.boolean().default(true),
-  recall: z.boolean().default(true),
-}).strict()
+export const OmoMemoryProjectScopeSchema = z
+  .object({
+    nudge: z.boolean().default(true),
+    recall: z.boolean().default(true),
+  })
+  .strict()
 
-export const OmoMemoryProjectScopeLayerSchema = z.object({
-  nudge: z.boolean().optional(),
-  recall: z.boolean().optional(),
-}).strict()
+export const OmoMemoryProjectScopeLayerSchema = z
+  .object({
+    nudge: z.boolean().optional(),
+    recall: z.boolean().optional(),
+  })
+  .strict()
 
 // ---------------------------------------------------------------------------
 // Nudge
 // ---------------------------------------------------------------------------
 
-export const OmoMemoryNudgeSchema = z.object({
-  enabled: z.boolean().default(true),
-  every_user_turns: z.number().int().min(1).default(10),
-}).strict()
+export const OmoMemoryNudgeSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    every_user_turns: z.number().int().min(1).default(10),
+  })
+  .strict()
 
 // ---------------------------------------------------------------------------
 // Facts (explicit model overrides the live session; quick remains the legacy configuration)
 // ---------------------------------------------------------------------------
 
-export const OmoMemoryFactsSchema = z.object({
-  enabled: z.boolean().default(true),
-  debounce_settles: z.number().int().min(1).default(4),
-  model: z.string().min(1).optional(),
-}).strict()
+export const OmoMemoryFactsSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    debounce_settles: z.number().int().min(1).default(4),
+    model: z.string().min(1).optional(),
+  })
+  .strict()
 
 // ---------------------------------------------------------------------------
 // Dream
 // ---------------------------------------------------------------------------
 
-export const OmoMemoryDreamSchema = z.object({
-  enabled: z.boolean().default(true),
-  idle_minutes: z.number().int().min(0).default(30),
-  min_hours_between: z.number().int().min(1).default(24),
-  shutdown_launch: z.boolean().default(true),
-  auto_select_max: z.number().int().min(1).max(10).default(5),
-  auto_select_max_chars: z.number().int().min(10000).default(150000),
-}).strict()
+export const OmoMemoryDreamSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    idle_minutes: z.number().int().min(0).default(30),
+    min_hours_between: z.number().int().min(1).default(24),
+    shutdown_launch: z.boolean().default(true),
+    auto_select_max: z.number().int().min(1).max(10).default(5),
+    auto_select_max_chars: z.number().int().min(10000).default(150000),
+  })
+  .strict()
 
 // ---------------------------------------------------------------------------
 // People
 // ---------------------------------------------------------------------------
 
-export const OmoMemoryPeopleSchema = z.object({
-  enabled: z.boolean().default(true),
-  max_entries: z.number().int().min(1).max(100).default(40),
-  max_entry_chars: z.number().int().min(50).max(500).default(200),
-}).strict()
+export const OmoMemoryPeopleSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    max_entries: z.number().int().min(1).max(100).default(40),
+    max_entry_chars: z.number().int().min(50).max(500).default(200),
+  })
+  .strict()
 
 // ---------------------------------------------------------------------------
 // Soul
 // ---------------------------------------------------------------------------
 
-export const OmoMemorySoulSchema = z.object({
-  edit_notice: z.boolean().default(true),
-}).strict()
+export const OmoMemorySoulSchema = z
+  .object({
+    edit_notice: z.boolean().default(true),
+  })
+  .strict()
 
 // ---------------------------------------------------------------------------
 // Write notice (memory tool-result row)
 // ---------------------------------------------------------------------------
 
-export const OmoMemoryWriteNoticeSchema = z.object({
-  enabled: z.boolean().default(true),
-}).strict()
+export const OmoMemoryWriteNoticeSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+  })
+  .strict()
 
 // ---------------------------------------------------------------------------
 // Layer (deep-partial) variants
 // ---------------------------------------------------------------------------
 
-export const OmoMemoryReflectionTriggerLayerSchema = z.object({
-  step_count: z.number().int().nonnegative().optional(),
-  on_compaction: z.boolean().optional(),
-}).strict()
+export const OmoMemoryReflectionTriggerLayerSchema = z
+  .object({
+    step_count: z.number().int().nonnegative().optional(),
+    on_compaction: z.boolean().optional(),
+  })
+  .strict()
 
-export const OmoMemoryReflectionLayerSchema = z.object({
-  enabled: z.boolean().optional(),
-  trigger: OmoMemoryReflectionTriggerLayerSchema.optional(),
-  merge: z.enum(["auto", "integration"]).optional(),
-  category: z.string().min(1).optional(),
-  timeout_minutes: z.number().int().positive().optional(),
-  max_concurrent_runs: z.number().int().positive().optional(),
-  sandbox: z.enum(["auto", "required", "off"]).optional(),
-}).strict()
+export const OmoMemoryReflectionLayerSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    trigger: OmoMemoryReflectionTriggerLayerSchema.optional(),
+    merge: z.enum(["auto", "integration"]).optional(),
+    category: z.string().min(1).optional(),
+    timeout_minutes: z.number().int().positive().optional(),
+    max_concurrent_runs: z.number().int().positive().optional(),
+    sandbox: z.enum(["auto", "required", "off"]).optional(),
+  })
+  .strict()
 
-export const OmoMemorySyncLayerSchema = z.object({
-  /** @deprecated No-op; see OmoMemorySyncSchema. */
-  remote: z.string().min(1).optional(),
-  enabled: z.boolean().optional(),
-}).strict()
+export const OmoMemorySyncLayerSchema = z
+  .object({
+    /** @deprecated No-op; see OmoMemorySyncSchema. */
+    remote: z.string().min(1).optional(),
+    enabled: z.boolean().optional(),
+  })
+  .strict()
 
-export const OmoMemorySearchLayerSchema = z.object({
-  enabled: z.boolean().optional(),
-}).strict()
+export const OmoMemorySearchLayerSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+  })
+  .strict()
 
-export const OmoMemoryRecallEventCapsLayerSchema = z.object({
-  tool_args: z.number().int().nonnegative().optional(),
-  result_head: z.number().int().nonnegative().optional(),
-  assistant: z.number().int().nonnegative().optional(),
-  prompt: z.number().int().nonnegative().optional(),
-}).strict()
+export const OmoMemoryRecallEventCapsLayerSchema = z
+  .object({
+    tool_args: z.number().int().nonnegative().optional(),
+    result_head: z.number().int().nonnegative().optional(),
+    assistant: z.number().int().nonnegative().optional(),
+    prompt: z.number().int().nonnegative().optional(),
+  })
+  .strict()
 
-export const OmoMemoryRecallLayerSchema = z.object({
-  enabled: z.boolean().optional(),
-  max_items: z.number().int().min(1).max(5).optional(),
-  category: z.string().min(1).optional(),
-  event_caps: OmoMemoryRecallEventCapsLayerSchema.optional(),
-  sidecar_max_tokens: z.number().int().positive().optional(),
-  max_concurrent_wakes: z.number().int().positive().optional(),
-  tool_budget: z.number().int().positive().optional(),
-  query_expansion: z.boolean().optional(),
-}).strict()
+export const OmoMemoryRecallLayerSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    max_items: z.number().int().min(1).max(5).optional(),
+    category: z.string().min(1).optional(),
+    event_caps: OmoMemoryRecallEventCapsLayerSchema.optional(),
+    sidecar_max_tokens: z.number().int().positive().optional(),
+    max_concurrent_wakes: z.number().int().positive().optional(),
+    tool_budget: z.number().int().positive().optional(),
+    query_expansion: z.boolean().optional(),
+  })
+  .strict()
 
-export const OmoMemoryNudgeLayerSchema = z.object({
-  enabled: z.boolean().optional(),
-  every_user_turns: z.number().int().min(1).optional(),
-}).strict()
+export const OmoMemoryNudgeLayerSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    every_user_turns: z.number().int().min(1).optional(),
+  })
+  .strict()
 
-export const OmoMemoryFactsLayerSchema = z.object({
-  enabled: z.boolean().optional(),
-  debounce_settles: z.number().int().min(1).optional(),
-  model: z.string().min(1).optional(),
-}).strict()
+export const OmoMemoryFactsLayerSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    debounce_settles: z.number().int().min(1).optional(),
+    model: z.string().min(1).optional(),
+  })
+  .strict()
 
-export const OmoMemoryDreamLayerSchema = z.object({
-  enabled: z.boolean().optional(),
-  idle_minutes: z.number().int().min(0).optional(),
-  min_hours_between: z.number().int().min(1).optional(),
-  shutdown_launch: z.boolean().optional(),
-  auto_select_max: z.number().int().min(1).max(10).optional(),
-  auto_select_max_chars: z.number().int().min(10000).optional(),
-}).strict()
+export const OmoMemoryDreamLayerSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    idle_minutes: z.number().int().min(0).optional(),
+    min_hours_between: z.number().int().min(1).optional(),
+    shutdown_launch: z.boolean().optional(),
+    auto_select_max: z.number().int().min(1).max(10).optional(),
+    auto_select_max_chars: z.number().int().min(10000).optional(),
+  })
+  .strict()
 
-export const OmoMemoryPeopleLayerSchema = z.object({
-  enabled: z.boolean().optional(),
-  max_entries: z.number().int().min(1).max(100).optional(),
-  max_entry_chars: z.number().int().min(50).max(500).optional(),
-}).strict()
+export const OmoMemoryPeopleLayerSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    max_entries: z.number().int().min(1).max(100).optional(),
+    max_entry_chars: z.number().int().min(50).max(500).optional(),
+  })
+  .strict()
 
-export const OmoMemorySoulLayerSchema = z.object({
-  edit_notice: z.boolean().optional(),
-}).strict()
+export const OmoMemorySoulLayerSchema = z
+  .object({
+    edit_notice: z.boolean().optional(),
+  })
+  .strict()
 
-export const OmoMemoryWriteNoticeLayerSchema = z.object({
-  enabled: z.boolean().optional(),
-}).strict()
+export const OmoMemoryWriteNoticeLayerSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+  })
+  .strict()
 
 // ---------------------------------------------------------------------------
 // External projection limits (the <external_projection> name list); 0 disables a limit
 // ---------------------------------------------------------------------------
 
-export const OmoMemoryProjectionSchema = z.object({
-  max_entries_per_directory: z.number().int().min(0).default(0),
-  max_bytes: z.number().int().min(0).default(40960),
-}).strict()
+export const OmoMemoryProjectionSchema = z
+  .object({
+    max_entries_per_directory: z.number().int().min(0).default(0),
+    max_bytes: z.number().int().min(0).default(40960),
+  })
+  .strict()
 
-export const OmoMemoryProjectionLayerSchema = z.object({
-  max_entries_per_directory: z.number().int().min(0).optional(),
-  max_bytes: z.number().int().min(0).optional(),
-}).strict()
+export const OmoMemoryProjectionLayerSchema = z
+  .object({
+    max_entries_per_directory: z.number().int().min(0).optional(),
+    max_bytes: z.number().int().min(0).optional(),
+  })
+  .strict()
 
 // ---------------------------------------------------------------------------
 // Runtime retention (#10144): windows in days for the per-identity runtime/ stores.
@@ -234,47 +299,57 @@ export const OmoMemoryProjectionLayerSchema = z.object({
 // reclaimable disk); switched on, it runs only while reflection is healthy for the identity.
 // ---------------------------------------------------------------------------
 
-const OmoMemoryRuntimeSchema = z.object({
-  retention_days: z.number().int().min(1).default(7),
-  abandoned_journal_days: z.number().int().min(1).default(14),
-  completions_days: z.number().int().min(1).default(30),
-  pass_budget_ms: z.number().int().min(1).default(60000),
-  discard_unreflected_journals: z.boolean().default(false),
-  /** Per-identity runtime size cap in bytes (design 3); `0` = unbounded. */
-  max_bytes: z.number().int().min(0).default(2 * 1024 * 1024 * 1024),
-}).strict()
+const OmoMemoryRuntimeSchema = z
+  .object({
+    retention_days: z.number().int().min(1).default(7),
+    abandoned_journal_days: z.number().int().min(1).default(14),
+    completions_days: z.number().int().min(1).default(30),
+    pass_budget_ms: z.number().int().min(1).default(60000),
+    discard_unreflected_journals: z.boolean().default(false),
+    /** Per-identity runtime size cap in bytes (design 3); `0` = unbounded. */
+    max_bytes: z
+      .number()
+      .int()
+      .min(0)
+      .default(2 * 1024 * 1024 * 1024),
+  })
+  .strict()
 
-const OmoMemoryRuntimeLayerSchema = z.object({
-  retention_days: z.number().int().min(1).optional(),
-  abandoned_journal_days: z.number().int().min(1).optional(),
-  completions_days: z.number().int().min(1).optional(),
-  pass_budget_ms: z.number().int().min(1).optional(),
-  discard_unreflected_journals: z.boolean().optional(),
-  max_bytes: z.number().int().min(0).optional(),
-}).strict()
+const OmoMemoryRuntimeLayerSchema = z
+  .object({
+    retention_days: z.number().int().min(1).optional(),
+    abandoned_journal_days: z.number().int().min(1).optional(),
+    completions_days: z.number().int().min(1).optional(),
+    pass_budget_ms: z.number().int().min(1).optional(),
+    discard_unreflected_journals: z.boolean().optional(),
+    max_bytes: z.number().int().min(0).optional(),
+  })
+  .strict()
 
 // ---------------------------------------------------------------------------
 // Per-agent overrides (layer-shaped)
 // ---------------------------------------------------------------------------
 
-export const OmoMemoryAgentOverridesSchema = z.object({
-  enabled: z.boolean().optional(),
-  agent: z.string().min(1).optional(),
-  reflection: OmoMemoryReflectionLayerSchema.omit({ max_concurrent_runs: true }).optional(),
-  nudge: OmoMemoryNudgeLayerSchema.optional(),
-  facts: OmoMemoryFactsLayerSchema.optional(),
-  dream: OmoMemoryDreamLayerSchema.optional(),
-  people: OmoMemoryPeopleLayerSchema.optional(),
-  agreements: OmoMemoryAgreementsLayerSchema.optional(),
-  soul: OmoMemorySoulLayerSchema.optional(),
-  write_notice: OmoMemoryWriteNoticeLayerSchema.optional(),
-  sync: OmoMemorySyncLayerSchema.optional(),
-  search: OmoMemorySearchLayerSchema.optional(),
-  recall: OmoMemoryRecallLayerSchema.optional(),
-  projection: OmoMemoryProjectionLayerSchema.optional(),
-  runtime: OmoMemoryRuntimeLayerSchema.optional(),
-  compile_warn_tokens: z.number().int().positive().optional(),
-}).strict()
+export const OmoMemoryAgentOverridesSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    agent: z.string().min(1).optional(),
+    reflection: OmoMemoryReflectionLayerSchema.omit({ max_concurrent_runs: true }).optional(),
+    nudge: OmoMemoryNudgeLayerSchema.optional(),
+    facts: OmoMemoryFactsLayerSchema.optional(),
+    dream: OmoMemoryDreamLayerSchema.optional(),
+    people: OmoMemoryPeopleLayerSchema.optional(),
+    agreements: OmoMemoryAgreementsLayerSchema.optional(),
+    soul: OmoMemorySoulLayerSchema.optional(),
+    write_notice: OmoMemoryWriteNoticeLayerSchema.optional(),
+    sync: OmoMemorySyncLayerSchema.optional(),
+    search: OmoMemorySearchLayerSchema.optional(),
+    recall: OmoMemoryRecallLayerSchema.optional(),
+    projection: OmoMemoryProjectionLayerSchema.optional(),
+    runtime: OmoMemoryRuntimeLayerSchema.optional(),
+    compile_warn_tokens: z.number().int().positive().optional(),
+  })
+  .strict()
 
 // ---------------------------------------------------------------------------
 // Root settings schema
@@ -284,75 +359,86 @@ export const OmoMemoryAgentOverridesSchema = z.object({
 // git worktree onto its main working tree so every worktree of one clone shares that memory.
 export const OmoMemoryAutoIdentitySchema = z.enum(["path", "git"])
 
-export const OmoMemorySettingsSchema = z.object({
-  enabled: z.boolean().default(true),
-  agent: z.string().min(1).default("auto"),
-  auto_identity: OmoMemoryAutoIdentitySchema.default("path"),
-  // "direct" registers the memory tools as always-on ToolDefinitions; "search" opts in to the
-  // extension-declared MCP server surfaced through senpi's tool_search catalog.
-  reflection: OmoMemoryReflectionSchema.default({
-    enabled: true,
-    trigger: { step_count: 25, on_compaction: true },
-    merge: "auto",
-    category: "quick",
-    timeout_minutes: 15,
-    max_concurrent_runs: 1,
-    sandbox: "auto",
-  }),
-  nudge: OmoMemoryNudgeSchema.default({ enabled: true, every_user_turns: 10 }),
-  facts: OmoMemoryFactsSchema.default({ enabled: true, debounce_settles: 4 }),
-  dream: OmoMemoryDreamSchema.default({
-    enabled: true,
-    idle_minutes: 30,
-    min_hours_between: 24,
-    shutdown_launch: true,
-    auto_select_max: 5,
-    auto_select_max_chars: 150000,
-  }),
-  people: OmoMemoryPeopleSchema.default({ enabled: true, max_entries: 40, max_entry_chars: 200 }),
-  agreements: OmoMemoryAgreementsSchema.default(OMO_MEMORY_AGREEMENTS_DEFAULTS),
-  soul: OmoMemorySoulSchema.default({ edit_notice: true }),
-  write_notice: OmoMemoryWriteNoticeSchema.default({ enabled: true }),
-  sync: OmoMemorySyncSchema.default({ enabled: true }),
-  search: OmoMemorySearchSchema.default({ enabled: true }),
-  recall: OmoMemoryRecallSchema.default({
-    enabled: true,
-    max_items: 2,
-    category: "quick",
-    event_caps: { tool_args: 400, result_head: 600, assistant: 1500, prompt: 4000 },
-    sidecar_max_tokens: 48000,
-    max_concurrent_wakes: 2,
-    tool_budget: 8,
-    query_expansion: false,
-  }),
-  project_scope: OmoMemoryProjectScopeSchema.default({ nudge: true, recall: true }),
-  projection: OmoMemoryProjectionSchema.default({ max_entries_per_directory: 0, max_bytes: 40960 }),
-  runtime: OmoMemoryRuntimeSchema.default({ retention_days: 7, abandoned_journal_days: 14, completions_days: 30, pass_budget_ms: 60000, discard_unreflected_journals: false, max_bytes: 2 * 1024 * 1024 * 1024 }),
-  compile_warn_tokens: z.number().int().positive().default(30000),
-  agents: z.record(z.string(), OmoMemoryAgentOverridesSchema).default({}),
-}).strict()
+export const OmoMemorySettingsSchema = z
+  .object({
+    enabled: z.boolean().default(true),
+    agent: z.string().min(1).default("auto"),
+    auto_identity: OmoMemoryAutoIdentitySchema.default("path"),
+    // "direct" registers the memory tools as always-on ToolDefinitions; "search" opts in to the
+    // extension-declared MCP server surfaced through senpi's tool_search catalog.
+    reflection: OmoMemoryReflectionSchema.default({
+      enabled: true,
+      trigger: { step_count: 25, on_compaction: true },
+      merge: "auto",
+      category: "quick",
+      timeout_minutes: 15,
+      max_concurrent_runs: 1,
+      sandbox: "auto",
+    }),
+    nudge: OmoMemoryNudgeSchema.default({ enabled: true, every_user_turns: 10 }),
+    facts: OmoMemoryFactsSchema.default({ enabled: true, debounce_settles: 4 }),
+    dream: OmoMemoryDreamSchema.default({
+      enabled: true,
+      idle_minutes: 30,
+      min_hours_between: 24,
+      shutdown_launch: true,
+      auto_select_max: 5,
+      auto_select_max_chars: 150000,
+    }),
+    people: OmoMemoryPeopleSchema.default({ enabled: true, max_entries: 40, max_entry_chars: 200 }),
+    agreements: OmoMemoryAgreementsSchema.default(OMO_MEMORY_AGREEMENTS_DEFAULTS),
+    soul: OmoMemorySoulSchema.default({ edit_notice: true }),
+    write_notice: OmoMemoryWriteNoticeSchema.default({ enabled: true }),
+    sync: OmoMemorySyncSchema.default({ enabled: true }),
+    search: OmoMemorySearchSchema.default({ enabled: true }),
+    recall: OmoMemoryRecallSchema.default({
+      enabled: true,
+      max_items: 2,
+      category: "quick",
+      event_caps: { tool_args: 400, result_head: 600, assistant: 1500, prompt: 4000 },
+      sidecar_max_tokens: 48000,
+      max_concurrent_wakes: 2,
+      tool_budget: 8,
+      query_expansion: false,
+    }),
+    project_scope: OmoMemoryProjectScopeSchema.default({ nudge: true, recall: true }),
+    projection: OmoMemoryProjectionSchema.default({ max_entries_per_directory: 0, max_bytes: 40960 }),
+    runtime: OmoMemoryRuntimeSchema.default({
+      retention_days: 7,
+      abandoned_journal_days: 14,
+      completions_days: 30,
+      pass_budget_ms: 60000,
+      discard_unreflected_journals: false,
+      max_bytes: 2 * 1024 * 1024 * 1024,
+    }),
+    compile_warn_tokens: z.number().int().positive().default(30000),
+    agents: z.record(z.string(), OmoMemoryAgentOverridesSchema).default({}),
+  })
+  .strict()
 
-export const OmoMemorySettingsLayerSchema = z.object({
-  enabled: z.boolean().optional(),
-  agent: z.string().min(1).optional(),
-  auto_identity: OmoMemoryAutoIdentitySchema.optional(),
-  reflection: OmoMemoryReflectionLayerSchema.optional(),
-  nudge: OmoMemoryNudgeLayerSchema.optional(),
-  facts: OmoMemoryFactsLayerSchema.optional(),
-  dream: OmoMemoryDreamLayerSchema.optional(),
-  people: OmoMemoryPeopleLayerSchema.optional(),
-  agreements: OmoMemoryAgreementsLayerSchema.optional(),
-  soul: OmoMemorySoulLayerSchema.optional(),
-  write_notice: OmoMemoryWriteNoticeLayerSchema.optional(),
-  sync: OmoMemorySyncLayerSchema.optional(),
-  search: OmoMemorySearchLayerSchema.optional(),
-  recall: OmoMemoryRecallLayerSchema.optional(),
-  project_scope: OmoMemoryProjectScopeLayerSchema.optional(),
-  projection: OmoMemoryProjectionLayerSchema.optional(),
-  runtime: OmoMemoryRuntimeLayerSchema.optional(),
-  compile_warn_tokens: z.number().int().positive().optional(),
-  agents: z.record(z.string(), OmoMemoryAgentOverridesSchema).optional(),
-}).strict()
+export const OmoMemorySettingsLayerSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    agent: z.string().min(1).optional(),
+    auto_identity: OmoMemoryAutoIdentitySchema.optional(),
+    reflection: OmoMemoryReflectionLayerSchema.optional(),
+    nudge: OmoMemoryNudgeLayerSchema.optional(),
+    facts: OmoMemoryFactsLayerSchema.optional(),
+    dream: OmoMemoryDreamLayerSchema.optional(),
+    people: OmoMemoryPeopleLayerSchema.optional(),
+    agreements: OmoMemoryAgreementsLayerSchema.optional(),
+    soul: OmoMemorySoulLayerSchema.optional(),
+    write_notice: OmoMemoryWriteNoticeLayerSchema.optional(),
+    sync: OmoMemorySyncLayerSchema.optional(),
+    search: OmoMemorySearchLayerSchema.optional(),
+    recall: OmoMemoryRecallLayerSchema.optional(),
+    project_scope: OmoMemoryProjectScopeLayerSchema.optional(),
+    projection: OmoMemoryProjectionLayerSchema.optional(),
+    runtime: OmoMemoryRuntimeLayerSchema.optional(),
+    compile_warn_tokens: z.number().int().positive().optional(),
+    agents: z.record(z.string(), OmoMemoryAgentOverridesSchema).optional(),
+  })
+  .strict()
 
 // ---------------------------------------------------------------------------
 // Inferred types

@@ -60,17 +60,24 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
-const settle = <T,>(waited: Promise<T>) =>
+const settle = <T>(waited: Promise<T>) =>
   waited.then(
     (value) => ({ status: "resolved" as const, value }),
-    (error: unknown) => ({ status: "rejected" as const, name: error instanceof Error || error instanceof DOMException ? error.name : typeof error }),
+    (error: unknown) => ({
+      status: "rejected" as const,
+      name: error instanceof Error || error instanceof DOMException ? error.name : typeof error,
+    }),
   )
 
 const waitPrimitives = [
-  { primitive: "awaitWithinTestBudget", wait: <T,>(event: Promise<T>) => awaitWithinTestBudget(event, "the awaited event"), failure: "Error" },
+  {
+    primitive: "awaitWithinTestBudget",
+    wait: <T>(event: Promise<T>) => awaitWithinTestBudget(event, "the awaited event"),
+    failure: "Error",
+  },
   {
     primitive: "testBudgetSignal",
-    wait: <T,>(event: Promise<T>) => {
+    wait: <T>(event: Promise<T>) => {
       const signal = testBudgetSignal()
       return new Promise<T>((resolve, reject) => {
         signal.addEventListener("abort", () => reject(signal.reason), { once: true })
@@ -86,44 +93,53 @@ const declaredBudgets = waitPrimitives.flatMap((row) => [
   { ...row, budget: "a shorter declared 15 s timeout", declared: 15_000, timeoutMs: 15_000 },
 ])
 
-test.each(declaredBudgets)("#given $budget with part of it spent #when $primitive arms its deadline #then it gets exactly the remaining share of that budget", ({ wait, declared, timeoutMs }) => {
-  // given
-  const timers = fakeTimers()
-  if (declared !== undefined) useTestTimeout(declared)
-  now += 5_000
+test.each(declaredBudgets)(
+  "#given $budget with part of it spent #when $primitive arms its deadline #then it gets exactly the remaining share of that budget",
+  ({ wait, declared, timeoutMs }) => {
+    // given
+    const timers = fakeTimers()
+    if (declared !== undefined) useTestTimeout(declared)
+    now += 5_000
 
-  // when
-  void wait(new Promise<never>(() => undefined)).catch(() => undefined)
+    // when
+    void wait(new Promise<never>(() => undefined)).catch(() => undefined)
 
-  // then
-  expect(timers.armed).toEqual([timeoutMs * 0.9 - 5_000])
-})
+    // then
+    expect(timers.armed).toEqual([timeoutMs * 0.9 - 5_000])
+  },
+)
 
-test.each(waitPrimitives)("#given a stalled runner #when the awaited event arrives after the stall #then $primitive resolves with it", async ({ wait }) => {
-  // given
-  const timers = fakeTimers()
-  const event = deferred<string>()
-  const waited = settle(wait(event.promise))
+test.each(waitPrimitives)(
+  "#given a stalled runner #when the awaited event arrives after the stall #then $primitive resolves with it",
+  async ({ wait }) => {
+    // given
+    const timers = fakeTimers()
+    const event = deferred<string>()
+    const waited = settle(wait(event.promise))
 
-  // when
-  timers.elapse(4_000)
-  event.resolve("arrived")
+    // when
+    timers.elapse(4_000)
+    event.resolve("arrived")
 
-  // then
-  expect(await waited).toEqual({ status: "resolved", value: "arrived" })
-})
+    // then
+    expect(await waited).toEqual({ status: "resolved", value: "arrived" })
+  },
+)
 
-test.each(waitPrimitives)("#given an event that never comes #when the remaining budget runs out #then $primitive fails on its own before the test times out", async ({ wait, failure }) => {
-  // given
-  const timers = fakeTimers()
-  const waited = settle(wait(new Promise<never>(() => undefined)))
+test.each(waitPrimitives)(
+  "#given an event that never comes #when the remaining budget runs out #then $primitive fails on its own before the test times out",
+  async ({ wait, failure }) => {
+    // given
+    const timers = fakeTimers()
+    const waited = settle(wait(new Promise<never>(() => undefined)))
 
-  // when
-  timers.elapse(DEFAULT_TEST_TIMEOUT_MS * 0.9)
+    // when
+    timers.elapse(DEFAULT_TEST_TIMEOUT_MS * 0.9)
 
-  // then
-  expect(await waited).toEqual({ status: "rejected", name: failure })
-})
+    // then
+    expect(await waited).toEqual({ status: "rejected", name: failure })
+  },
+)
 
 test("#given the rows above replaced the timers #when a later test runs #then it sees the real setTimeout and clearTimeout again", () => {
   // then

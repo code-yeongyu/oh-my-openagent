@@ -1,8 +1,7 @@
 import { expect, test } from "bun:test"
 import { windowsTreeKillArgs } from "./windows-process-tree.mjs"
 
-const argsFor = (rows: string, selfPid = 900) =>
-  windowsTreeKillArgs(100, () => ({ status: 0, stdout: rows }), selfPid)
+const argsFor = (rows: string, selfPid = 900) => windowsTreeKillArgs(100, () => ({ status: 0, stdout: rows }), selfPid)
 
 test("#given recycled parent PIDs #when selecting a tree #then older unrelated processes are excluded at every edge", () => {
   const rows = [
@@ -32,21 +31,49 @@ test("#given a missing root or malformed listing #when selecting a tree #then no
 })
 
 test.each([
-  { name: "live descendants after root exit", rows: "102 101 220 child.exe\n101 100 210 node.exe", rootStartedAt: 200n, expected: ["/F", "/PID", "101", "/PID", "102"] },
+  {
+    name: "live descendants after root exit",
+    rows: "102 101 220 child.exe\n101 100 210 node.exe",
+    rootStartedAt: 200n,
+    expected: ["/F", "/PID", "101", "/PID", "102"],
+  },
   { name: "missing spawn time", rows: "101 100 210 node.exe", rootStartedAt: undefined, expected: [] },
   { name: "unknown spawn time", rows: "101 100 210 node.exe", rootStartedAt: 0n, expected: [] },
   { name: "child older than the spawned root", rows: "101 100 199 unrelated.exe", rootStartedAt: 200n, expected: [] },
-  { name: "child at the spawn boundary", rows: "101 100 200 child.exe", rootStartedAt: 200n, expected: ["/F", "/PID", "101"] },
+  {
+    name: "child at the spawn boundary",
+    rows: "101 100 200 child.exe",
+    rootStartedAt: 200n,
+    expected: ["/F", "/PID", "101"],
+  },
   { name: "unknown child creation time", rows: "101 100 0 child.exe", rootStartedAt: 200n, expected: [] },
-  { name: "recycled intermediate pid", rows: "101 100 210 node.exe\n102 101 205 unrelated.exe", rootStartedAt: 200n, expected: ["/F", "/PID", "101"] },
-  { name: "live root with checked descendants", rows: "100 1 200 bun.exe\n101 100 210 child.exe", rootStartedAt: undefined, expected: ["/F", "/PID", "100", "/PID", "101"] },
-  { name: "own ancestor below a missing root", rows: "101 100 210 node.exe\n900 101 220 test.exe", rootStartedAt: 200n, expected: [] },
+  {
+    name: "recycled intermediate pid",
+    rows: "101 100 210 node.exe\n102 101 205 unrelated.exe",
+    rootStartedAt: 200n,
+    expected: ["/F", "/PID", "101"],
+  },
+  {
+    name: "live root with checked descendants",
+    rows: "100 1 200 bun.exe\n101 100 210 child.exe",
+    rootStartedAt: undefined,
+    expected: ["/F", "/PID", "100", "/PID", "101"],
+  },
+  {
+    name: "own ancestor below a missing root",
+    rows: "101 100 210 node.exe\n900 101 220 test.exe",
+    rootStartedAt: 200n,
+    expected: [],
+  },
   { name: "protected image below a missing root", rows: "101 100 210 SVCHOST.EXE", rootStartedAt: 200n, expected: [] },
   { name: "own live ancestor", rows: "100 1 200 bun.exe\n900 100 220 test.exe", rootStartedAt: 200n, expected: [] },
   { name: "protected live root", rows: "100 1 200 services.exe", rootStartedAt: 200n, expected: [] },
-])("#given $name #when selecting a tree #then only proven descendants are selected", ({ rows, rootStartedAt, expected }) => {
-  expect(windowsTreeKillArgs(100, () => ({ status: 0, stdout: rows }), 900, rootStartedAt)).toEqual([...expected])
-})
+])(
+  "#given $name #when selecting a tree #then only proven descendants are selected",
+  ({ rows, rootStartedAt, expected }) => {
+    expect(windowsTreeKillArgs(100, () => ({ status: 0, stdout: rows }), 900, rootStartedAt)).toEqual([...expected])
+  },
+)
 
 test.each([
   { name: "failed", result: { status: 1 } },
@@ -58,6 +85,10 @@ test.each([
 
 test("#given an invalid or own root #when selecting a tree #then no process probe executes", () => {
   for (const pid of [0, -1, Number.NaN, process.pid]) {
-    expect(windowsTreeKillArgs(pid, () => { throw new Error("unexpected probe") })).toEqual([])
+    expect(
+      windowsTreeKillArgs(pid, () => {
+        throw new Error("unexpected probe")
+      }),
+    ).toEqual([])
   }
 })

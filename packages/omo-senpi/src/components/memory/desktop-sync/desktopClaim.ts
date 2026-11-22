@@ -24,11 +24,18 @@ export async function claimDesktopSync(options: {
 }): Promise<MemorySyncSelection> {
   const pending = options.attach(options.take(MEMORY_SYNC_CHANNEL))
   let timer: ReturnType<typeof setTimeout> | undefined
-  const expired = new Promise<"expired">(resolve => { timer = setTimeout(() => resolve("expired"), options.attachDeadlineMs ?? 10_000) })
+  const expired = new Promise<"expired">((resolve) => {
+    timer = setTimeout(() => resolve("expired"), options.attachDeadlineMs ?? 10_000)
+  })
   const attached = await Promise.race([pending, expired]).finally(() => clearTimeout(timer))
   if (attached === "expired") {
     // A late attachment is discarded: close it so the claimed channel cannot outlive the unavailable answer.
-    void pending.then(late => { if (late.kind === "connected") late.channel.close() }, () => undefined)
+    void pending.then(
+      (late) => {
+        if (late.kind === "connected") late.channel.close()
+      },
+      () => undefined,
+    )
     return { kind: "unavailable", reason: "private_channel_unavailable" }
   }
   return attached.kind === "connected" ? { kind: "desktop", channel: attached.channel } : attached

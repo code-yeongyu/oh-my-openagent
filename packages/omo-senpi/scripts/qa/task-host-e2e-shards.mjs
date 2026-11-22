@@ -12,12 +12,7 @@ import { runNestedMatrix } from "./task-host-e2e-shards-nested.mjs"
 import { runRollbackLiveMatrix } from "./task-host-e2e-shards-rollback-live.mjs"
 import { runRetainLiveMatrix } from "./task-host-e2e-shards-retain-live.mjs"
 import { sandboxProcesses } from "./task-host-e2e-process.mjs"
-import {
-  binaryDigest,
-  changedRealAgentFiles,
-  createRunRoot,
-  realAgentDigests,
-} from "./task-host-e2e-sandbox.mjs"
+import { binaryDigest, changedRealAgentFiles, createRunRoot, realAgentDigests } from "./task-host-e2e-sandbox.mjs"
 import { provisionConfig } from "./task-host-e2e-shard-cost-support.mjs"
 
 function parseArgs(argv) {
@@ -27,7 +22,8 @@ function parseArgs(argv) {
     if (flag === "--control") options.control = true
     else if (flag === "--keep-sandbox") options.keepSandbox = true
     else if (flag === "--only") options.only.push(...argv[++index].split(",").filter(Boolean))
-    else if (flag.startsWith("--")) options[flag.slice(2).replace(/-([a-z])/g, (_, value) => value.toUpperCase())] = argv[++index]
+    else if (flag.startsWith("--"))
+      options[flag.slice(2).replace(/-([a-z])/g, (_, value) => value.toUpperCase())] = argv[++index]
   }
   return options
 }
@@ -49,14 +45,18 @@ function artifactTable(report) {
 }
 
 function unimplementedRows(existing, expected) {
-  return Object.fromEntries(expected.filter((id) => existing[id] === undefined).map((id) => [
-    id,
-    {
-      status: "fail",
-      evidence: [],
-      reason: "scenario group has not produced evidence",
-    },
-  ]))
+  return Object.fromEntries(
+    expected
+      .filter((id) => existing[id] === undefined)
+      .map((id) => [
+        id,
+        {
+          status: "fail",
+          evidence: [],
+          reason: "scenario group has not produced evidence",
+        },
+      ]),
+  )
 }
 
 function sweep(root) {
@@ -80,7 +80,8 @@ async function main(options) {
     return 0
   }
   const bin = options.bin ?? process.env.SENPI_BIN
-  if (options.control && options.beforeBin === undefined) throw new Error("--control requires --before-bin <R0 compiled omo>")
+  if (options.control && options.beforeBin === undefined)
+    throw new Error("--control requires --before-bin <R0 compiled omo>")
   if (!options.control && bin === undefined) throw new Error("--bin <compiled branch omo> or SENPI_BIN is required")
   const expected = options.control ? [CONTROL_ID] : selectedScenarioIds(options.only)
   const out = resolve(options.out ?? "task-host-e2e-shards-out")
@@ -201,8 +202,9 @@ async function main(options) {
       real_agent_dir: {
         before: realBefore,
         after: realAfter,
-        credentials_untouched: Object.keys(realBefore).every((dir) =>
-          realBefore[dir]?.credentials === realAfter[dir]?.credentials),
+        credentials_untouched: Object.keys(realBefore).every(
+          (dir) => realBefore[dir]?.credentials === realAfter[dir]?.credentials,
+        ),
         changed_watched_files: changedRealAgentFiles(realBefore, realAfter),
       },
       cleanup: {
@@ -215,27 +217,32 @@ async function main(options) {
     const report = { ...partial, verdict }
     writeFileSync(resolve(out, "fault-matrix.json"), `${JSON.stringify(report, null, 2)}\n`)
     writeFileSync(resolve(out, "fault-matrix.md"), artifactTable(report))
-    console.log(JSON.stringify({
-      pass: verdict.exitCode === 0,
-      mode: report.mode,
-      verdict: verdict.verdict,
-      passed: verdict.passed,
-      expected: verdict.expected,
-      failed: verdict.failed,
-      out,
-    }))
+    console.log(
+      JSON.stringify({
+        pass: verdict.exitCode === 0,
+        mode: report.mode,
+        verdict: verdict.verdict,
+        passed: verdict.passed,
+        expected: verdict.expected,
+        failed: verdict.failed,
+        out,
+      }),
+    )
     return verdict.exitCode
   }
 }
 
 if (import.meta.main ?? process.argv[1]?.endsWith("task-host-e2e-shards.mjs")) {
   const options = parseArgs(process.argv.slice(2))
-  main(options).then((code) => {
-    process.exitCode = code
-  }, (error) => {
-    console.error(error?.stack ?? error)
-    process.exitCode = 1
-  })
+  main(options).then(
+    (code) => {
+      process.exitCode = code
+    },
+    (error) => {
+      console.error(error?.stack ?? error)
+      process.exitCode = 1
+    },
+  )
 }
 
 export { main, parseArgs }

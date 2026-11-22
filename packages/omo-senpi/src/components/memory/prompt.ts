@@ -20,7 +20,11 @@ import {
 import { renderMemoryNotice } from "./prompt-notice"
 import { estimateSystemTokensCached, MEMORY_PRESSURE_SOFT_RATIO } from "./status"
 
-export { MEMORY_AGREEMENT_METADATA_TOKEN, MEMORY_NUDGE_METADATA_TOKEN, MEMORY_SOUL_METADATA_TOKEN } from "./prompt-notice"
+export {
+  MEMORY_AGREEMENT_METADATA_TOKEN,
+  MEMORY_NUDGE_METADATA_TOKEN,
+  MEMORY_SOUL_METADATA_TOKEN,
+} from "./prompt-notice"
 export const MEMORY_PROMPT_TEMPLATE = "omo-senpi:before_agent_start:v3"
 export const MEMORY_NOTICE_CUSTOM_TYPE = "omo-memory:notice"
 export const MEMORY_PRESSURE_METADATA_TOKEN = "memory pressure:"
@@ -42,11 +46,7 @@ export interface MemoryPromptInjectionOptions {
   readonly onRepin?: (sessionId: string, reason: Exclude<ProjectionRepinReason, "first-turn">) => void
   readonly resolveCompileWarnTokens?: (identity: string) => number
   readonly resolveProjectionLimits?: (identity: string) => ExternalProjectionLimits
-  readonly resolveNudgeTurns?: (
-    repo: GitMemoryRepo,
-    sessionId: string,
-    identity: string,
-  ) => Promise<number | undefined>
+  readonly resolveNudgeTurns?: (repo: GitMemoryRepo, sessionId: string, identity: string) => Promise<number | undefined>
   readonly resolveSoulNotice?: (
     repo: GitMemoryRepo,
     sessionId: string,
@@ -97,8 +97,11 @@ export function createMemoryPromptHandler(options: MemoryPromptInjectionOptions)
     let pending = pressureInFlight.get(revision)
     if (pending === undefined) {
       // estimateSystemTokens throws on a failed read, so a stored estimate is always the commit's own.
-      pending = cache.remember(repo, "system-token-estimate", revision, async () =>
-        ({ value: String(await estimateSystemTokensCached(repo, revision, pressureEstimates)), persist: true }))
+      pending = cache
+        .remember(repo, "system-token-estimate", revision, async () => ({
+          value: String(await estimateSystemTokensCached(repo, revision, pressureEstimates)),
+          persist: true,
+        }))
         .then((stored) => {
           const tokens = Number(stored)
           pressureEstimates.set(revision, tokens)
@@ -149,7 +152,9 @@ export function createMemoryPromptHandler(options: MemoryPromptInjectionOptions)
       : await noticeInput("soul", session.id, () => options.resolveSoulNotice?.(repo, session.id, context.identity))
     const flaggedAgreements = preview
       ? undefined
-      : await noticeInput("agreements", session.id, () => options.resolveAgreementsNotice?.(repo, session.id, context.identity))
+      : await noticeInput("agreements", session.id, () =>
+          options.resolveAgreementsNotice?.(repo, session.id, context.identity),
+        )
     const pinInput = { repo, sessionId: session.id, branch: session.branch, head: await repo.head() }
     const turn: ProjectionTurn = preview
       ? await previewTurn(pins, pinInput)
@@ -164,7 +169,11 @@ export function createMemoryPromptHandler(options: MemoryPromptInjectionOptions)
     )
     const expired = preview
       ? []
-      : newlyExpired(expiries, { pinnedAtMs: turn.asOfMs, noticedThroughMs: turn.expiryNoticedThroughMs, nowMs: turn.nowMs })
+      : newlyExpired(expiries, {
+          pinnedAtMs: turn.asOfMs,
+          noticedThroughMs: turn.expiryNoticedThroughMs,
+          nowMs: turn.nowMs,
+        })
     if (expired.length > 0) pins.noticeExpiries({ sessionId: session.id, throughMs: turn.nowMs, record: recordPin })
     const pressureBlock = await addMemoryPressureMetadata(
       block,
@@ -269,9 +278,8 @@ function countCompactedMessages(branch: readonly unknown[]): number {
     firstKeptEntryId = typeof entry.firstKeptEntryId === "string" ? entry.firstKeptEntryId : undefined
   }
   if (compactionIndex < 0) return 0
-  const keptIndex = firstKeptEntryId === undefined
-    ? -1
-    : branch.findIndex((entry) => isRecord(entry) && entry.id === firstKeptEntryId)
+  const keptIndex =
+    firstKeptEntryId === undefined ? -1 : branch.findIndex((entry) => isRecord(entry) && entry.id === firstKeptEntryId)
   const boundary = keptIndex < 0 ? compactionIndex : keptIndex
   return branch.slice(0, boundary).filter((entry) => isRecord(entry) && entry.type === "message").length
 }
@@ -286,10 +294,11 @@ function withHeadReadOnce(repo: GitMemoryRepo): GitMemoryRepo {
   return new Proxy(repo, {
     get(target, property, receiver) {
       if (property === "head") {
-        return () => (head ??= target.head().catch((error: unknown) => {
-          head = undefined
-          throw error
-        }))
+        return () =>
+          (head ??= target.head().catch((error: unknown) => {
+            head = undefined
+            throw error
+          }))
       }
       const value = Reflect.get(target, property, receiver)
       return typeof value === "function" ? value.bind(target) : value

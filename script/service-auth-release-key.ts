@@ -10,11 +10,13 @@ const releaseKeysInBundle = (bundle: string): readonly string[] => {
   // Only one set can be the one the device service ships; with two, a valid-looking earlier literal could pass
   // the check while the bundle runs on the other (#12617).
   if (sets.length > 1)
-    throw new Error(`the service-auth bundle carries ${sets.length} public_keys_hex literals; exactly one release key set is expected`)
-  const entries = (set[1] ?? "").split(",").filter(entry => entry.trim() !== "")
-  if (!entries.every(entry => KEY_ENTRY.test(entry)))
+    throw new Error(
+      `the service-auth bundle carries ${sets.length} public_keys_hex literals; exactly one release key set is expected`,
+    )
+  const entries = (set[1] ?? "").split(",").filter((entry) => entry.trim() !== "")
+  if (!entries.every((entry) => KEY_ENTRY.test(entry)))
     throw new Error("the service-auth bundle's release key set holds an entry that is not 64 lowercase hex characters")
-  return entries.map(entry => entry.trim().slice(1, -1))
+  return entries.map((entry) => entry.trim().slice(1, -1))
 }
 
 export const assertReleaseKeySet = (bundle: string): readonly string[] => {

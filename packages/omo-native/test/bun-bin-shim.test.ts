@@ -3,7 +3,15 @@ import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, 
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { ensureBunBinShim } from "../bin/lib/bun-bin-shim.js"
-import { baseInput, bunTreePackage, legacyShim, NON_POSIX_HOST, POSIX_HOME, recorder, stockLinkTarget } from "./bun-bin-shim.test-support"
+import {
+  baseInput,
+  bunTreePackage,
+  legacyShim,
+  NON_POSIX_HOST,
+  POSIX_HOME,
+  recorder,
+  stockLinkTarget,
+} from "./bun-bin-shim.test-support"
 
 describe.skipIf(NON_POSIX_HOST)("Bun owns its global bin links", () => {
   const scriptPath = bunTreePackage(join(POSIX_HOME, ".bun"))
@@ -15,7 +23,9 @@ describe.skipIf(NON_POSIX_HOST)("Bun owns its global bin links", () => {
       const fs = recorder()
       fs.markLink(binPath)
       const result = ensureBunBinShim({
-        ...options, ...fs, realpath: (path: string) => path === binPath ? scriptPath : path,
+        ...options,
+        ...fs,
+        realpath: (path: string) => (path === binPath ? scriptPath : path),
       })
       expect(result.action).toBe("current")
       expect(fs.lstat(binPath).isSymbolicLink()).toBe(true)
@@ -70,12 +80,12 @@ describe.skipIf(NON_POSIX_HOST)("Bun owns its global bin links", () => {
         }
         const input = { scriptPath, homedir: () => home, env: customRoot ? { BUN_INSTALL: bunRoot } : {} }
 
-        expect(ensureBunBinShim(input).entries.map(entry => entry.action)).toEqual(["repaired", "repaired"])
+        expect(ensureBunBinShim(input).entries.map((entry) => entry.action)).toEqual(["repaired", "repaired"])
         for (const bin of bins) {
           expect(existsSync(bin)).toBe(true)
           expect(realpathSync(bin)).toBe(scriptPath)
         }
-        expect(ensureBunBinShim(input).entries.map(entry => entry.action)).toEqual(["current", "current"])
+        expect(ensureBunBinShim(input).entries.map((entry) => entry.action)).toEqual(["current", "current"])
       } finally {
         rmSync(root, { recursive: true, force: true })
       }
@@ -88,11 +98,12 @@ describe.skipIf(NON_POSIX_HOST)("Bun owns its global bin links", () => {
     const fs = recorder()
     fs.markLink(binPath)
     const result = ensureBunBinShim({
-      ...options, ...fs,
-      realpath: (path: string) => path === binPath ? "/other/omo.js" : path,
+      ...options,
+      ...fs,
+      realpath: (path: string) => (path === binPath ? "/other/omo.js" : path),
     })
     expect(result.action).toBe("foreign-link")
-    expect(fs.renamed.some(entry => entry.to === binPath)).toBe(false)
+    expect(fs.renamed.some((entry) => entry.to === binPath)).toBe(false)
   })
 
   for (const source of [
@@ -125,7 +136,11 @@ describe.skipIf(NON_POSIX_HOST)("Bun owns its global bin links", () => {
     const old = legacyShim(scriptPath, bunPath)
     const fs = recorder({ [binPath]: old })
     const result = ensureBunBinShim({
-      ...options, ...fs, write: () => { throw new Error("EACCES: permission denied") },
+      ...options,
+      ...fs,
+      write: () => {
+        throw new Error("EACCES: permission denied")
+      },
     })
     expect(result).toMatchObject({ action: "failed", error: "EACCES: permission denied", entries: [] })
     expect(fs.readFile(binPath)).toBe(old)
@@ -137,8 +152,11 @@ describe.skipIf(NON_POSIX_HOST)("Bun owns its global bin links", () => {
     const fs = recorder()
     const warnings: string[] = []
     const result = ensureBunBinShim({
-      ...options, ...fs,
-      rename: () => { throw new Error("EROFS: read-only file system") },
+      ...options,
+      ...fs,
+      rename: () => {
+        throw new Error("EROFS: read-only file system")
+      },
       warn: (message: string) => warnings.push(message),
     })
     expect(result.action).toBe("failed")

@@ -16,13 +16,11 @@ function canonicalizeModelIDForDuplicateCheck(modelID: string): string {
   return modelID.toLowerCase().replace(/\./g, "-")
 }
 
-function isSameFailedModel(
-  state: ModelFallbackStateLike,
-  providerID: string,
-  modelID: string,
-): boolean {
-  return state.providerID.toLowerCase() === providerID.toLowerCase()
-    && canonicalizeModelIDForDuplicateCheck(state.modelID) === canonicalizeModelIDForDuplicateCheck(modelID)
+function isSameFailedModel(state: ModelFallbackStateLike, providerID: string, modelID: string): boolean {
+  return (
+    state.providerID.toLowerCase() === providerID.toLowerCase() &&
+    canonicalizeModelIDForDuplicateCheck(state.modelID) === canonicalizeModelIDForDuplicateCheck(modelID)
+  )
 }
 
 export type ModelFallbackStateController = {

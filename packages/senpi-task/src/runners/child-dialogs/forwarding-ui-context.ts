@@ -3,7 +3,13 @@ import type { ExtensionUIContext } from "@code-yeongyu/senpi"
 import type { ChildDialogForwarder } from "./forwarder"
 import type { ForwardableDialog, ForwardedAnswer } from "./forwardable-dialog"
 
-type DialogOptions = { readonly signal?: AbortSignal; readonly timeout?: number; readonly toolCallId?: string; readonly parentToolCallId?: string; readonly secret?: boolean }
+type DialogOptions = {
+  readonly signal?: AbortSignal
+  readonly timeout?: number
+  readonly toolCallId?: string
+  readonly parentToolCallId?: string
+  readonly secret?: boolean
+}
 
 const NEVER_ABORTED = new AbortController().signal
 
@@ -11,7 +17,11 @@ const NEVER_ABORTED = new AbortController().signal
  * An in-process child's UI (#6189 F2d): `headless` (the engine's own no-UI context, every member a no-op) with its
  * four prompting methods answered on the parent's UI through the forwarder. A secret input stays headless.
  */
-export function createForwardingUIContext(headless: ExtensionUIContext, forwarder: ChildDialogForwarder, taskId: string): ExtensionUIContext {
+export function createForwardingUIContext(
+  headless: ExtensionUIContext,
+  forwarder: ChildDialogForwarder,
+  taskId: string,
+): ExtensionUIContext {
   const forward = (dialog: ForwardableDialog, opts: DialogOptions | undefined): Promise<ForwardedAnswer> =>
     forwarder.forward(dialog, { taskId, signal: opts?.signal ?? NEVER_ABORTED })
   const timeout = (opts: DialogOptions | undefined) => (opts?.timeout === undefined ? {} : { timeout: opts.timeout })

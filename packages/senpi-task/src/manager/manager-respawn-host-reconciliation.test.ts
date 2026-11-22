@@ -9,13 +9,26 @@ import { cleanupProjects, makeManager, tempProject } from "./__fixtures__/manage
 import { respawnManagedTask } from "./manager-respawn"
 
 const harness = hostRunnerHarness()
-afterEach(async () => { await harness.release(); cleanupProjects() })
+afterEach(async () => {
+  await harness.release()
+  cleanupProjects()
+})
 
 async function detachedChild(deadline = false, aborted = false, rejectState = false) {
   const project = tempProject()
   const host = await harness.fakeHost({ transcripts: true })
   const runner = harness.runnerOver(host)
-  const initial = createTaskRecord({ parent_session_id: "parent", root_session_id: "parent", depth: 1, execution_mode: "process", model: "anthropic/claude-sonnet-4-5", notify_on_terminal: false }, 0)
+  const initial = createTaskRecord(
+    {
+      parent_session_id: "parent",
+      root_session_id: "parent",
+      depth: 1,
+      execution_mode: "process",
+      model: "anthropic/claude-sonnet-4-5",
+      notify_on_terminal: false,
+    },
+    0,
+  )
   // Production wiring (manager/runner.ts, manager-respawn.ts): the task record exists in the task store before the
   // first input, so input ids come from its persisted effect_seq and the respawned continuation gets the next one.
   const inputStore = createTaskRecordStore({ project_dir: project, task: { state_dir: project } })
@@ -28,18 +41,38 @@ async function detachedChild(deadline = false, aborted = false, rejectState = fa
   await first.dispose()
   await detached
   host.completeTurn(session.routingId, "REAL FINAL ANSWER")
-  if (aborted) appendFileSync(session.sessionPath, `${JSON.stringify({
-    type: "message", id: "aborted-answer", message: { role: "assistant", stopReason: "aborted", content: [{ type: "text", text: "PARTIAL" }] },
-  })}\n`)
-  if (deadline) appendFileSync(session.sessionPath, `${JSON.stringify({
-    type: "agent_end", aborted: true, abortSource: "system", deadline: { kind: "inactivity" },
-  })}\n`)
+  if (aborted)
+    appendFileSync(
+      session.sessionPath,
+      `${JSON.stringify({
+        type: "message",
+        id: "aborted-answer",
+        message: { role: "assistant", stopReason: "aborted", content: [{ type: "text", text: "PARTIAL" }] },
+      })}\n`,
+    )
+  if (deadline)
+    appendFileSync(
+      session.sessionPath,
+      `${JSON.stringify({
+        type: "agent_end",
+        aborted: true,
+        abortSource: "system",
+        deadline: { kind: "inactivity" },
+      })}\n`,
+    )
   const { manager, store } = makeManager({ project })
   const record = {
     ...initial,
-    status: "running" as const, host_pid: process.pid, runner_kind: "host-session" as const,
+    status: "running" as const,
+    host_pid: process.pid,
+    runner_kind: "host-session" as const,
     spawn_spec: { version: 1 as const, cwd: project, prompt: spec.prompt },
-    host_session: { socket: host.socketPath, routing_id: session.routingId, session_path: session.sessionPath, instance_id: session.instanceId },
+    host_session: {
+      socket: host.socketPath,
+      routing_id: session.routingId,
+      session_path: session.sessionPath,
+      instance_id: session.instanceId,
+    },
   }
   store.save(record)
   const beforeRespawn = host.commands.length
@@ -48,8 +81,22 @@ async function detachedChild(deadline = false, aborted = false, rejectState = fa
     host.failReply("get_state", "Synthetic state read unavailable")
   }
   const result = await respawnManagedTask({
-    beforeLaunch: () => undefined, record, sessionPath: session.sessionPath, stateDir: project,
-    runners: { "in-process": { start: async () => { throw new Error("unused") } }, process: { start: async () => { throw new Error("unused") } } },
+    beforeLaunch: () => undefined,
+    record,
+    sessionPath: session.sessionPath,
+    stateDir: project,
+    runners: {
+      "in-process": {
+        start: async () => {
+          throw new Error("unused")
+        },
+      },
+      process: {
+        start: async () => {
+          throw new Error("unused")
+        },
+      },
+    },
     rpcRunner: runner,
   })
   if (!result.ok) throw new Error(result.reason)
@@ -63,9 +110,11 @@ describe("respawn reconciliation on the real host runner", () => {
       expect(f.result.handle.kind).toBe("host-session")
       expect(f.result.handle.hasExited?.()).toBe(false)
       expect(f.host.connections).toBe(1)
-      expect(f.respawnCommands.filter(command =>
-        ["prompt", "steer", "follow_up", "abort", "close_session", "detach_session"].includes(command.type),
-      )).toEqual([])
+      expect(
+        f.respawnCommands.filter((command) =>
+          ["prompt", "steer", "follow_up", "abort", "close_session", "detach_session"].includes(command.type),
+        ),
+      ).toEqual([])
       expect(await f.manager.reattach(f.record, f.result.handle)).toEqual({ ok: true })
       expect(f.store.load(f.record.task_id)?.status).toBe("running")
       expect(f.store.load(f.record.task_id)?.final_response).toBeUndefined()
@@ -85,7 +134,9 @@ describe("respawn reconciliation on the real host runner", () => {
     expect(await f.result.handle.waitForOutcome()).toEqual({ status: "completed", finalResponse: "REAL FINAL ANSWER" })
     expect(f.host.commands.filter((command) => command.type === "prompt")).toHaveLength(1)
     await f.manager.reattach(f.record, f.result.handle)
-    expect((await f.manager.waitFor(f.record.task_id, { signal: AbortSignal.timeout(5_000) })).final_response).toBe("REAL FINAL ANSWER")
+    expect((await f.manager.waitFor(f.record.task_id, { signal: AbortSignal.timeout(5_000) })).final_response).toBe(
+      "REAL FINAL ANSWER",
+    )
     expect(f.store.load(f.record.task_id)?.host_session?.adopted_entry_id).toEqual(expect.any(String))
     await f.result.handle.dispose()
   })
@@ -109,8 +160,12 @@ describe("respawn reconciliation on the real host runner", () => {
     expect(stopped?.final_response).toBeUndefined()
     expect(f.host.commands.filter((command) => command.type === "prompt")).toHaveLength(1)
     const before = f.host.commands.length
-    expect((await f.manager.sendToTask({ idOrName: f.record.task_id, message: "continue", callerSessionId: "parent" })).kind).toBe("revived")
-    expect(f.host.commands.slice(before).filter((command) => ["steer", "follow_up", "prompt"].includes(command.type))).toHaveLength(1)
+    expect(
+      (await f.manager.sendToTask({ idOrName: f.record.task_id, message: "continue", callerSessionId: "parent" })).kind,
+    ).toBe("revived")
+    expect(
+      f.host.commands.slice(before).filter((command) => ["steer", "follow_up", "prompt"].includes(command.type)),
+    ).toHaveLength(1)
     await f.result.handle.dispose()
   })
 })

@@ -1,11 +1,11 @@
 import { buildNativeAgentPrompt } from "./native-model-prompt"
-import type { AgentConfig } from "@opencode-ai/sdk";
-import type { AgentMode, AgentPromptMetadata } from "./types";
-import { buildClaudeThinkingConfig, isGpt5_6Model, isGpt6Model, isGptModel } from "./types";
-import { createAgentToolRestrictions } from "../shared/permission-compat";
-import { MOMUS_GPT_5_6_PROMPT } from "./momus-gpt-5-6";
+import type { AgentConfig } from "@opencode-ai/sdk"
+import type { AgentMode, AgentPromptMetadata } from "./types"
+import { buildClaudeThinkingConfig, isGpt5_6Model, isGpt6Model, isGptModel } from "./types"
+import { createAgentToolRestrictions } from "../shared/permission-compat"
+import { MOMUS_GPT_5_6_PROMPT } from "./momus-gpt-5-6"
 
-const MODE: AgentMode = "subagent";
+const MODE: AgentMode = "subagent"
 
 /**
  * Momus - Plan Reviewer Agent
@@ -200,7 +200,7 @@ If REJECT:
 **Your job is to UNBLOCK work, not to BLOCK it with perfectionism.**
 
 **Response Language**: Match the language of the plan content.
-`;
+`
 
 const MOMUS_GPT_PROMPT = `<identity>
 You are a practical work plan reviewer. You verify that plans are executable and references are valid. You are a blocker-finder, not a perfectionist.
@@ -276,16 +276,12 @@ If REJECT - **Blocking Issues** (max 3): numbered list, each with specific issue
 Approve by default. Max 3 issues. Be specific - "Task X needs Y" not "needs more clarity". No design opinions. Trust developers. Your job is to unblock work, not block it with perfectionism.
 
 Response language: match the language of the plan content.
-</final_rules>`;
+</final_rules>`
 
-export { MOMUS_DEFAULT_PROMPT as MOMUS_SYSTEM_PROMPT };
+export { MOMUS_DEFAULT_PROMPT as MOMUS_SYSTEM_PROMPT }
 
 export function createMomusAgent(model: string): AgentConfig {
-  const restrictions = createAgentToolRestrictions([
-    "write",
-    "edit",
-    "apply_patch",
-  ]);
+  const restrictions = createAgentToolRestrictions(["write", "edit", "apply_patch"])
 
   const base = {
     description:
@@ -295,7 +291,7 @@ export function createMomusAgent(model: string): AgentConfig {
     temperature: 0.1,
     ...restrictions,
     prompt: buildNativeAgentPrompt(model, MOMUS_DEFAULT_PROMPT),
-  } as AgentConfig;
+  } as AgentConfig
 
   if (isGpt5_6Model(model) || isGpt6Model(model)) {
     return {
@@ -303,7 +299,7 @@ export function createMomusAgent(model: string): AgentConfig {
       prompt: buildNativeAgentPrompt(model, MOMUS_GPT_5_6_PROMPT),
       reasoningEffort: "high",
       textVerbosity: "high",
-    } as AgentConfig;
+    } as AgentConfig
   }
 
   if (isGptModel(model)) {
@@ -312,15 +308,15 @@ export function createMomusAgent(model: string): AgentConfig {
       prompt: buildNativeAgentPrompt(model, MOMUS_GPT_PROMPT),
       reasoningEffort: "medium",
       textVerbosity: "high",
-    } as AgentConfig;
+    } as AgentConfig
   }
 
   return {
     ...base,
     ...buildClaudeThinkingConfig(model),
-  } as AgentConfig;
+  } as AgentConfig
 }
-createMomusAgent.mode = MODE;
+createMomusAgent.mode = MODE
 
 export const momusPromptMetadata: AgentPromptMetadata = {
   category: "advisor",
@@ -329,13 +325,11 @@ export const momusPromptMetadata: AgentPromptMetadata = {
   triggers: [
     {
       domain: "Plan review",
-      trigger:
-        "Evaluate work plans for clarity, verifiability, and completeness",
+      trigger: "Evaluate work plans for clarity, verifiability, and completeness",
     },
     {
       domain: "Quality assurance",
-      trigger:
-        "Catch gaps, ambiguities, and missing context before implementation",
+      trigger: "Catch gaps, ambiguities, and missing context before implementation",
     },
   ],
   useWhen: [
@@ -350,5 +344,5 @@ export const momusPromptMetadata: AgentPromptMetadata = {
     "For trivial plans that don't need formal review",
   ],
   keyTrigger:
-    "Work plan saved to `.omo/plans/*.md` → invoke Momus with the file path as the sole prompt (e.g. `prompt=\".omo/plans/my-plan.md\"`). Do NOT invoke Momus for inline plans or todo lists.",
-};
+    'Work plan saved to `.omo/plans/*.md` → invoke Momus with the file path as the sole prompt (e.g. `prompt=".omo/plans/my-plan.md"`). Do NOT invoke Momus for inline plans or todo lists.',
+}

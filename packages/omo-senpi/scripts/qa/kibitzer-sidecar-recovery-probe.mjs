@@ -71,14 +71,19 @@ function sha256File(path) {
 
 function readManifest(path) {
   if (path === undefined) return undefined
-  try { return JSON.parse(readFileSync(path, "utf8")) } catch (error) { throw new Error(`manifest unreadable at ${path}: ${error instanceof Error ? error.message : String(error)}`) }
+  try {
+    return JSON.parse(readFileSync(path, "utf8"))
+  } catch (error) {
+    throw new Error(`manifest unreadable at ${path}: ${error instanceof Error ? error.message : String(error)}`)
+  }
 }
 
 async function main() {
   const options = parseArgs(process.argv.slice(2))
   const manifest = readManifest(options.manifest)
   const explicitPluginRoot = process.argv.includes("--plugin-root")
-  const pluginRoot = !explicitPluginRoot && typeof manifest?.pluginRoot === "string" ? manifest.pluginRoot : options.pluginRoot
+  const pluginRoot =
+    !explicitPluginRoot && typeof manifest?.pluginRoot === "string" ? manifest.pluginRoot : options.pluginRoot
   const bundlePath = join(pluginRoot, "extensions", "omo.js")
   const cleanup = createCleanup()
   installInterruptCleanup(() => [cleanup])
@@ -89,12 +94,27 @@ async function main() {
     // ---- probe layer: the machinery must be sound before the binary's behaviour is judged --------------
     const bundleSha256 = sha256File(bundlePath)
     facts.bundleSha256 = bundleSha256
-    record(PROBE_LAYER, "artifact-present", bundleSha256 !== undefined, `omo.js=${bundlePath} sha256=${bundleSha256 ?? "missing"}`)
+    record(
+      PROBE_LAYER,
+      "artifact-present",
+      bundleSha256 !== undefined,
+      `omo.js=${bundlePath} sha256=${bundleSha256 ?? "missing"}`,
+    )
     if (manifest !== undefined) {
       const expected = manifest.artifacts?.["omo.js"]?.sha256
       facts.matchesManifest = expected !== undefined && expected === bundleSha256
-      record(PROBE_LAYER, "artifact-matches-manifest", facts.matchesManifest, `manifest=${expected ?? "none"} actual=${bundleSha256 ?? "missing"} manifestOk=${manifest.ok}`)
-      record(PROBE_LAYER, "manifest-control-green", manifest.ok === true, `manifest.ok=${manifest.ok} failures=${JSON.stringify(manifest.failures ?? [])}`)
+      record(
+        PROBE_LAYER,
+        "artifact-matches-manifest",
+        facts.matchesManifest,
+        `manifest=${expected ?? "none"} actual=${bundleSha256 ?? "missing"} manifestOk=${manifest.ok}`,
+      )
+      record(
+        PROBE_LAYER,
+        "manifest-control-green",
+        manifest.ok === true,
+        `manifest.ok=${manifest.ok} failures=${JSON.stringify(manifest.failures ?? [])}`,
+      )
     }
     try {
       command = resolveCommand(options)
@@ -107,9 +127,15 @@ async function main() {
     if (checks.some((check) => !check.ok)) return finish(options, facts, cleanup)
 
     const router = createRouter()
-    const requestLogPath = options.evidenceDir === undefined ? undefined : writeEvidence(options.evidenceDir, "recovery-mock-requests.jsonl", "")
+    const requestLogPath =
+      options.evidenceDir === undefined
+        ? undefined
+        : writeEvidence(options.evidenceDir, "recovery-mock-requests.jsonl", "")
     const server = startMockCompletionsServer({ steps: router.steps, requestLogPath, classifyRequest: router.classify })
-    cleanup.add("mock server", () => { server.close(); return "closed" })
+    cleanup.add("mock server", () => {
+      server.close()
+      return "closed"
+    })
     const baseUrl = await server.ready
     const sandbox = prepareSandbox(pluginRoot, baseUrl)
     cleanup.add("sandbox", () => removeSandbox(sandbox, options.keepSandbox))
@@ -120,12 +146,30 @@ async function main() {
 
     // ---- host/runtime layer: the packaged binary does the work from here on ----------------------------------
     const seed = await seedMemories(command, sandbox, env, router, [MEMORIES.rollout])
-    facts.seed = { sessionId: seed.sessionId, identities: seed.identities, results: seed.results, teardown: seed.teardown }
-    if (!record(RUNTIME_LAYER, "memory-seeded", seed.ok, seed.ok ? `identity=${seed.identities[0]}` : `results=${JSON.stringify(seed.results)} identities=${seed.identities.length} stderr=${seed.stderr?.replace(/\n/g, " | ")}`)) return finish(options, facts, cleanup)
+    facts.seed = {
+      sessionId: seed.sessionId,
+      identities: seed.identities,
+      results: seed.results,
+      teardown: seed.teardown,
+    }
+    if (
+      !record(
+        RUNTIME_LAYER,
+        "memory-seeded",
+        seed.ok,
+        seed.ok
+          ? `identity=${seed.identities[0]}`
+          : `results=${JSON.stringify(seed.results)} identities=${seed.identities.length} stderr=${seed.stderr?.replace(/\n/g, " | ")}`,
+      )
+    )
+      return finish(options, facts, cleanup)
     const identity = seed.identities[0]
     const seedRequests = router.state.parent
     writeOmoConfig(sandbox, { recallEnabled: true })
-    router.setParentSteps([{ type: "text", text: "Checking." }, { type: "text", text: "Done." }])
+    router.setParentSteps([
+      { type: "text", text: "Checking." },
+      { type: "text", text: "Done." },
+    ])
     router.setSidecarSteps([nudgeStep(MEMORIES.rollout)])
 
     const session = launchRpc(command, sandbox, env)
@@ -139,14 +183,24 @@ async function main() {
     }
     facts.sessionId = state.sessionId
     facts.pid = session.pid
-    record(RUNTIME_LAYER, "binary-started", typeof state.sessionFile === "string", `pid=${session.pid} sessionId=${state.sessionId}`)
+    record(
+      RUNTIME_LAYER,
+      "binary-started",
+      typeof state.sessionFile === "string",
+      `pid=${session.pid} sessionId=${state.sessionId}`,
+    )
 
     await prompt(session, MEMORIES.rollout.prompt)
     let held
     try {
       held = await waitForAccepted(identity, state, MEMORIES.rollout, { description: "recovery wake: accepted nudge" })
     } catch (error) {
-      record(RUNTIME_LAYER, "wake-completed", false, `${error instanceof Error ? error.message : String(error)}; stderr=${session.stderr().slice(-600).replace(/\n/g, " | ")}`)
+      record(
+        RUNTIME_LAYER,
+        "wake-completed",
+        false,
+        `${error instanceof Error ? error.message : String(error)}; stderr=${session.stderr().slice(-600).replace(/\n/g, " | ")}`,
+      )
       return finish(options, facts, cleanup, identity, state)
     }
     const lineages = sidecarDirs(identity)
@@ -154,19 +208,56 @@ async function main() {
     const seedText = messageText(transcripts[0]?.users[0])
     const nudgeCall = transcripts[0]?.assistants.flatMap(toolCallsOf).find((call) => call.name === "nudge")
     const registry = router.state.sidecarRequests[0]?.toolNames ?? []
-    record(RUNTIME_LAYER, "wake-completed", held.nudges.length === 1 && held.nudges[0].path === MEMORIES.rollout.path, `held=${JSON.stringify(held)}`)
-    record(RUNTIME_LAYER, "one-resident-child", lineages.length === 1 && lineages[0].name === encodeSidecarDirName(state.sessionId) && transcripts.length === 1, `lineages=${lineages.length} generations=${transcripts.length} dir=${lineages[0]?.name}`)
-    record(RUNTIME_LAYER, "seed-envelope", seedText.startsWith("<kibitzer-seed ") && seedText.includes(`<candidate path="${MEMORIES.rollout.path}"`), `head=${JSON.stringify(seedText.slice(0, 100))}`)
-    record(RUNTIME_LAYER, "child-called-nudge", nudgeCall?.arguments?.path === MEMORIES.rollout.path, `nudge=${JSON.stringify(nudgeCall?.arguments ?? null)}`)
-    record(RUNTIME_LAYER, "registry-on-the-wire", router.state.sidecar === 1 && sameNames(registry, SIDECAR_TOOL_NAMES), `sidecarRequests=${router.state.sidecar} tools=[${registry.join(",")}]`)
+    record(
+      RUNTIME_LAYER,
+      "wake-completed",
+      held.nudges.length === 1 && held.nudges[0].path === MEMORIES.rollout.path,
+      `held=${JSON.stringify(held)}`,
+    )
+    record(
+      RUNTIME_LAYER,
+      "one-resident-child",
+      lineages.length === 1 && lineages[0].name === encodeSidecarDirName(state.sessionId) && transcripts.length === 1,
+      `lineages=${lineages.length} generations=${transcripts.length} dir=${lineages[0]?.name}`,
+    )
+    record(
+      RUNTIME_LAYER,
+      "seed-envelope",
+      seedText.startsWith("<kibitzer-seed ") && seedText.includes(`<candidate path="${MEMORIES.rollout.path}"`),
+      `head=${JSON.stringify(seedText.slice(0, 100))}`,
+    )
+    record(
+      RUNTIME_LAYER,
+      "child-called-nudge",
+      nudgeCall?.arguments?.path === MEMORIES.rollout.path,
+      `nudge=${JSON.stringify(nudgeCall?.arguments ?? null)}`,
+    )
+    record(
+      RUNTIME_LAYER,
+      "registry-on-the-wire",
+      router.state.sidecar === 1 && sameNames(registry, SIDECAR_TOOL_NAMES),
+      `sidecarRequests=${router.state.sidecar} tools=[${registry.join(",")}]`,
+    )
     record(RUNTIME_LAYER, "lease-released", leaseFiles(identity).length === 0, `leases=${leaseFiles(identity).length}`)
 
     await prompt(session, MEMORIES.rollout.prompt)
     const entries = readEntries(state.sessionFile)
-    record(RUNTIME_LAYER, "nudge-reached-parent", nudgedPaths(entries).join(",") === MEMORIES.rollout.path && entries.filter(isRecall).length === 1 && router.state.sidecar === 1, `paths=${nudgedPaths(entries).join(",")} via=${entries.filter(isNudged)[0]?.data?.via} recallMessages=${entries.filter(isRecall).length} sidecarRequests=${router.state.sidecar}`)
+    record(
+      RUNTIME_LAYER,
+      "nudge-reached-parent",
+      nudgedPaths(entries).join(",") === MEMORIES.rollout.path &&
+        entries.filter(isRecall).length === 1 &&
+        router.state.sidecar === 1,
+      `paths=${nudgedPaths(entries).join(",")} via=${entries.filter(isNudged)[0]?.data?.via} recallMessages=${entries.filter(isRecall).length} sidecarRequests=${router.state.sidecar}`,
+    )
 
     const exit = await teardown(session)
-    record(RUNTIME_LAYER, "shutdown-clean", leaseFiles(identity).length === 0 && !existsSync(pendingFile(identity, state.sessionId)), `teardown=${exit} leases=${leaseFiles(identity).length} pending=${existsSync(pendingFile(identity, state.sessionId))}`)
+    record(
+      RUNTIME_LAYER,
+      "shutdown-clean",
+      leaseFiles(identity).length === 0 && !existsSync(pendingFile(identity, state.sessionId)),
+      `teardown=${exit} leases=${leaseFiles(identity).length} pending=${existsSync(pendingFile(identity, state.sessionId))}`,
+    )
     facts.wake = {
       completed: held.nudges.length === 1,
       childSessions: lineages.length,
@@ -186,9 +277,12 @@ async function main() {
 
 async function finish(options, facts, cleanup, identity, state) {
   if (options.evidenceDir !== undefined && identity !== undefined) {
-    if (state?.sessionFile !== undefined && existsSync(state.sessionFile)) copyFileSync(state.sessionFile, join(options.evidenceDir, "recovery-parent-session.jsonl"))
+    if (state?.sessionFile !== undefined && existsSync(state.sessionFile))
+      copyFileSync(state.sessionFile, join(options.evidenceDir, "recovery-parent-session.jsonl"))
     for (const lineage of sidecarDirs(identity)) {
-      childTranscripts(lineage.dir).forEach((transcript, index) => copyFileSync(transcript.file, join(options.evidenceDir, `recovery-sidecar-gen${index + 1}.jsonl`)))
+      childTranscripts(lineage.dir).forEach((transcript, index) =>
+        copyFileSync(transcript.file, join(options.evidenceDir, `recovery-sidecar-gen${index + 1}.jsonl`)),
+      )
     }
   }
   facts.cleanup = await cleanup.run()

@@ -38,7 +38,7 @@ export function isModelInCooldown(model: string, state: FallbackState, cooldownS
 export function findNextAvailableFallback(
   state: FallbackState,
   fallbackModels: string[],
-  cooldownSeconds: number
+  cooldownSeconds: number,
 ): string | undefined {
   for (let i = state.fallbackIndex + 1; i < fallbackModels.length; i++) {
     const candidate = fallbackModels[i]
@@ -66,15 +66,17 @@ export function canPrepareFallback(
   currentModel?: string,
 ): boolean {
   const availabilityState = state ?? createFallbackState(currentModel ?? "")
-  return availabilityState.attemptCount < config.max_fallback_attempts
-    && findNextAvailableFallback(availabilityState, fallbackModels, config.cooldown_seconds) !== undefined
+  return (
+    availabilityState.attemptCount < config.max_fallback_attempts &&
+    findNextAvailableFallback(availabilityState, fallbackModels, config.cooldown_seconds) !== undefined
+  )
 }
 
 export function prepareFallback(
   sessionID: string,
   state: FallbackState,
   fallbackModels: string[],
-  config: Required<RuntimeFallbackConfig>
+  config: Required<RuntimeFallbackConfig>,
 ): FallbackResult {
   if (state.attemptCount >= config.max_fallback_attempts) {
     log(`[${HOOK_NAME}] Max fallback attempts reached`, { sessionID, attempts: state.attemptCount })

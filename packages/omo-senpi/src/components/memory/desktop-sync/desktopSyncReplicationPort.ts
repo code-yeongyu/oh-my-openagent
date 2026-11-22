@@ -1,24 +1,36 @@
 import { z } from "zod"
 import type { Transport } from "@oh-my-opencode/memory-core/sync-engine"
-import { DesktopSyncServiceError, SyncInteger, requireSyncSuccess, syncJson } from "./desktopSyncPortSchema"
+import {
+  DesktopSyncServiceError,
+  SYNC_REPLY_MAX_ITEMS,
+  SyncInteger,
+  requireSyncSuccess,
+  syncJson,
+} from "./desktopSyncPortSchema"
 import type { SyncServiceCall } from "./desktopSyncAccountPorts"
 
 const stateSchema = z.object({
   head: z.object({ seq: SyncInteger }),
   oldest_retained_seq: SyncInteger,
-  snapshot: z.object({ covers_seq: SyncInteger, chunk_object_ids: z.array(z.string()) }).nullable(),
+  snapshot: z
+    .object({ covers_seq: SyncInteger, chunk_object_ids: z.array(z.string()).max(SYNC_REPLY_MAX_ITEMS) })
+    .nullable(),
 })
 const pullReply = z.object({
   state: stateSchema,
   batches: z.object({
-    entries: z.array(z.object({
-      seq: SyncInteger,
-      kind: z.enum(["batch", "keyring"]),
-      author: z.object({ kind: z.string(), id: z.string() }),
-      digest: z.string(),
-      object_id: z.string().nullable(),
-      batch_id: z.string().nullable(),
-    })),
+    entries: z
+      .array(
+        z.object({
+          seq: SyncInteger,
+          kind: z.enum(["batch", "keyring"]),
+          author: z.object({ kind: z.string(), id: z.string() }),
+          digest: z.string(),
+          object_id: z.string().nullable(),
+          batch_id: z.string().nullable(),
+        }),
+      )
+      .max(SYNC_REPLY_MAX_ITEMS),
   }),
   limit: SyncInteger,
 })
@@ -31,9 +43,10 @@ export function desktopSyncReplicationPort(call: SyncServiceCall, subscribe: Tra
     async pull(after, limit) {
       const first = pullReply.parse(await json({ op: "pull", after, limit }))
       const state = first.state
-      const snapshot = state.snapshot !== null && after < state.oldest_retained_seq - 1
-        ? { coversSeq: state.snapshot.covers_seq, objectIds: state.snapshot.chunk_object_ids, digest: null }
-        : null
+      const snapshot =
+        state.snapshot !== null && after < state.oldest_retained_seq - 1
+          ? { coversSeq: state.snapshot.covers_seq, objectIds: state.snapshot.chunk_object_ids, digest: null }
+          : null
       const from = snapshot === null ? after : Math.max(after, snapshot.coversSeq)
       const page = from === after ? first : pullReply.parse(await json({ op: "pull", after: from, limit }))
       const rows = page.batches.entries.slice(0, limit)
@@ -42,9 +55,10 @@ export function desktopSyncReplicationPort(call: SyncServiceCall, subscribe: Tra
         snapshot,
         head: Math.max(state.head.seq, last),
         more: last < state.head.seq,
-        entries: rows.map(row => {
+        entries: rows.map((row) => {
           const digest = Buffer.from(row.digest, "base64url")
-          if (digest.length !== 32 || digest.toString("base64url") !== row.digest) throw new DesktopSyncServiceError("malformed_reply", 200)
+          if (digest.length !== 32 || digest.toString("base64url") !== row.digest)
+            throw new DesktopSyncServiceError("malformed_reply", 200)
           return {
             seq: row.seq,
             kind: row.kind,

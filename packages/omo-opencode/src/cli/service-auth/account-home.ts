@@ -46,7 +46,11 @@ export function userRecordHome(facts: PlatformFacts): string | undefined {
 function passwdHome(facts: PlatformFacts): string | undefined {
   if (facts.uid === undefined) return undefined
   const uid = String(facts.uid)
-  const home = facts.readFile("/etc/passwd").split("\n").map(line => line.split(":")).find(fields => fields[2] === uid)?.[5]
+  const home = facts
+    .readFile("/etc/passwd")
+    .split("\n")
+    .map((line) => line.split(":"))
+    .find((fields) => fields[2] === uid)?.[5]
   return home !== undefined && posix.isAbsolute(home) ? home : undefined
 }
 
@@ -67,7 +71,9 @@ function windowsProfile(facts: PlatformFacts): string | undefined {
   const sid = /S-1-[0-9-]+/.exec(facts.run(whoami, ["/user", "/fo", "csv", "/nh"]))?.[0]
   if (sid === undefined) return undefined
   const key = `HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\${sid}`
-  const value = /ProfileImagePath\s+REG_(?:EXPAND_)?SZ\s+(.+)/.exec(facts.run(reg, ["query", key, "/v", "ProfileImagePath"]))?.[1]?.trim()
+  const value = /ProfileImagePath\s+REG_(?:EXPAND_)?SZ\s+(.+)/
+    .exec(facts.run(reg, ["query", key, "/v", "ProfileImagePath"]))?.[1]
+    ?.trim()
   const home = value?.replace(/%([^%]+)%/g, (whole, name: string) => facts.env[name] ?? whole)
   return home !== undefined && !home.includes("%") && win32.isAbsolute(home) ? home : undefined
 }
@@ -96,7 +102,9 @@ export function chooseLockHome(facts: AccountFacts): string {
     return record
   } catch (error) {
     const reason = error instanceof Error && "code" in error ? String(error.code) : String(error)
-    facts.warn(`omo: the account home ${record} cannot hold the credential lock (${reason}); using ${home}. A process started with another HOME may refresh the same sign-in at the same time (#12978).`)
+    facts.warn(
+      `omo: the account home ${record} cannot hold the credential lock (${reason}); using ${home}. A process started with another HOME may refresh the same sign-in at the same time (#12978).`,
+    )
     return home
   }
 }
@@ -105,19 +113,25 @@ export const systemPlatformFacts: PlatformFacts = {
   platform: process.platform,
   uid: process.getuid?.(),
   env: process.env,
-  readFile: path => readFileSync(path, "utf8"),
-  isFile: path => statSync(path, { throwIfNoEntry: false })?.isFile() ?? false,
-  run: (command, args) => execFileSync(command, args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 5_000, windowsHide: true }),
+  readFile: (path) => readFileSync(path, "utf8"),
+  isFile: (path) => statSync(path, { throwIfNoEntry: false })?.isFile() ?? false,
+  run: (command, args) =>
+    execFileSync(command, args, {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 5_000,
+      windowsHide: true,
+    }),
 }
 
 export const systemAccountFacts: AccountFacts = {
   recordHome: () => userRecordHome(systemPlatformFacts),
   homedir,
-  prepareLockDirectory: directory => {
+  prepareLockDirectory: (directory) => {
     mkdirSync(directory, { recursive: true, mode: 0o700 })
     accessSync(directory, constants.W_OK)
   },
-  warn: message => process.stderr.write(`${message}\n`),
+  warn: (message) => process.stderr.write(`${message}\n`),
 }
 
 /** Names the lock home of a CLI child a test starts; read only in a process whose credential store is a test stand-in. */
@@ -134,7 +148,10 @@ const INJECTED_SECRETS = Symbol.for("omo.test.injectedSecrets")
 export function testLockHome(env: Readonly<Record<string, string | undefined>>, secrets: unknown): string | undefined {
   const home = env[TEST_LOCK_HOME_ENV]
   if (home === undefined || !(posix.isAbsolute(home) || win32.isAbsolute(home))) return undefined
-  const marked = typeof secrets === "object" && secrets !== null && (secrets as { readonly [INJECTED_SECRETS]?: unknown })[INJECTED_SECRETS] === true
+  const marked =
+    typeof secrets === "object" &&
+    secrets !== null &&
+    (secrets as { readonly [INJECTED_SECRETS]?: unknown })[INJECTED_SECRETS] === true
   return marked ? home : undefined
 }
 

@@ -10,10 +10,12 @@ let resolveFileReferencesInTextSpy: { mockRestore: () => void } | undefined
 let discoverCommandsSyncSpy: { mockRestore: () => void } | undefined
 
 function setupExecutorSpies(): void {
-  resolveCommandsInTextSpy = spyOn(shared, "resolveCommandsInText")
-    .mockImplementation(async (content: string) => content)
-  resolveFileReferencesInTextSpy = spyOn(shared, "resolveFileReferencesInText")
-    .mockImplementation(async (content: string) => content)
+  resolveCommandsInTextSpy = spyOn(shared, "resolveCommandsInText").mockImplementation(
+    async (content: string) => content,
+  )
+  resolveFileReferencesInTextSpy = spyOn(shared, "resolveFileReferencesInText").mockImplementation(
+    async (content: string) => content,
+  )
   discoverCommandsSyncSpy = spyOn(slashcommand, "discoverCommandsSync").mockReturnValue([
     {
       name: "shadowed",
@@ -39,7 +41,9 @@ function restoreExecutorSpies(): void {
   discoverCommandsSyncSpy = undefined
 }
 
-async function executeSlashCommand(...args: Parameters<typeof import("./executor").executeSlashCommand>): ReturnType<typeof import("./executor").executeSlashCommand> {
+async function executeSlashCommand(
+  ...args: Parameters<typeof import("./executor").executeSlashCommand>
+): ReturnType<typeof import("./executor").executeSlashCommand> {
   const module = await import(`./executor?test=${Date.now()}-${Math.random()}`)
   return module.executeSlashCommand(...args)
 }

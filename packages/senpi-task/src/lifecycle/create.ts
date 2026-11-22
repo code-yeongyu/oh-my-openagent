@@ -4,8 +4,17 @@ import { reconcileDeferredDeadChildren, retryDeferredLegacyOwners } from "./defe
 import { destroyResidentTask } from "./destroy"
 import { driveHostSessionCancel } from "./host-session-cancel-driver"
 import { endHostSessionChild } from "./host-session-end"
-import { parkHostSessionOnDaemonLoss, retryDeferredHostSessions, type HostSessionParkOptions } from "./host-session-revive"
-import { registerLifecycleDetachedRevival, registerLifecycleDetachedRevivalRollback, type DestroyCause, type LifecycleDeps } from "./port"
+import {
+  parkHostSessionOnDaemonLoss,
+  retryDeferredHostSessions,
+  type HostSessionParkOptions,
+} from "./host-session-revive"
+import {
+  registerLifecycleDetachedRevival,
+  registerLifecycleDetachedRevivalRollback,
+  type DestroyCause,
+  type LifecycleDeps,
+} from "./port"
 import { parkTerminalResident } from "./park-terminal-resident"
 import { admitResident, reclaimIdleResidents, startIdleResidentReclaimer } from "./residency"
 import { reconcileOnSessionStart } from "./reconcile"

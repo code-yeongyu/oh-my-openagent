@@ -36,16 +36,30 @@ export function resolveCandidates(
 ): { candidates: BackendKind[]; reason?: string } {
   let candidates: BackendKind[]
   switch (platform) {
-    case "darwin": candidates = ["apfs", "zfs", "rcopy"]; break
-    case "linux": candidates = ["btrfs", "zfs", "reflink", "overlayfs", "rcopy"]; break
-    case "win32": candidates = ["block-clone", "rcopy"]; break
-    default: candidates = ["rcopy"]
+    case "darwin":
+      candidates = ["apfs", "zfs", "rcopy"]
+      break
+    case "linux":
+      candidates = ["btrfs", "zfs", "reflink", "overlayfs", "rcopy"]
+      break
+    case "win32":
+      candidates = ["block-clone", "rcopy"]
+      break
+    default:
+      candidates = ["rcopy"]
   }
   if (preferred !== "auto") candidates = [preferred, ...candidates.filter((kind) => kind !== preferred)]
   return { candidates }
 }
 
 export function isBackendKind(value: unknown): value is BackendKind {
-  return value === "apfs" || value === "btrfs" || value === "zfs" || value === "reflink"
-    || value === "overlayfs" || value === "block-clone" || value === "rcopy"
+  return (
+    value === "apfs" ||
+    value === "btrfs" ||
+    value === "zfs" ||
+    value === "reflink" ||
+    value === "overlayfs" ||
+    value === "block-clone" ||
+    value === "rcopy"
+  )
 }

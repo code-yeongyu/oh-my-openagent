@@ -71,128 +71,170 @@ describe("validatePluginConfig pipeline", () => {
   })
 
   it("#given a partially invalid omo opencode view #when validating #then retains valid sections and warns about the ignored value", () => {
-    withProjectConfig("partial", {
-      "[opencode]": {
-        agents: { sisyphus: { model: 123 } },
-        tui: { sidebar: { enabled: false } },
+    withProjectConfig(
+      "partial",
+      {
+        "[opencode]": {
+          agents: { sisyphus: { model: 123 } },
+          tui: { sidebar: { enabled: false } },
+        },
       },
-    }, (project) => {
-      const result = validatePluginConfig(project)
+      (project) => {
+        const result = validatePluginConfig(project)
 
-      expect(result.valid).toBe(true)
-      expect(result.messages).toEqual([])
-      expect(result.config.tui?.sidebar.enabled).toBe(false)
-      expect(result.warnings).toEqual(["config: ~/project/.omo/omo.jsonc: [opencode].agents.sisyphus.model ignored (invalid value)"])
-    })
+        expect(result.valid).toBe(true)
+        expect(result.messages).toEqual([])
+        expect(result.config.tui?.sidebar.enabled).toBe(false)
+        expect(result.warnings).toEqual([
+          "config: ~/project/.omo/omo.jsonc: [opencode].agents.sisyphus.model ignored (invalid value)",
+        ])
+      },
+    )
   })
 
   it("#given one invalid agent field beside a valid sibling agent in the opencode block #when validating #then only that field is dropped and the sibling agent still applies", () => {
-    withProjectConfig("sibling-agent", {
-      "[opencode]": {
-        agents: { sisyphus: { model: 123, prompt_append: "keep me" }, oracle: { model: "openai/gpt-6" } },
+    withProjectConfig(
+      "sibling-agent",
+      {
+        "[opencode]": {
+          agents: { sisyphus: { model: 123, prompt_append: "keep me" }, oracle: { model: "openai/gpt-6" } },
+        },
       },
-    }, (project) => {
-      const result = validatePluginConfig(project)
+      (project) => {
+        const result = validatePluginConfig(project)
 
-      expect(result.config.agents?.oracle?.model).toBe("openai/gpt-6")
-      expect(result.config.agents?.sisyphus?.prompt_append).toBe("keep me")
-      expect(result.config.agents?.sisyphus?.model).toBeUndefined()
-      expect(result.warnings).toEqual(["config: ~/project/.omo/omo.jsonc: [opencode].agents.sisyphus.model ignored (invalid value)"])
-    })
+        expect(result.config.agents?.oracle?.model).toBe("openai/gpt-6")
+        expect(result.config.agents?.sisyphus?.prompt_append).toBe("keep me")
+        expect(result.config.agents?.sisyphus?.model).toBeUndefined()
+        expect(result.warnings).toEqual([
+          "config: ~/project/.omo/omo.jsonc: [opencode].agents.sisyphus.model ignored (invalid value)",
+        ])
+      },
+    )
   })
 
   it("#given a valid model alias beside an invalid OpenCode model-input leaf #when validating #then resolves the alias after dropping only the invalid leaf", () => {
-    withProjectConfig("alias-with-invalid-leaf", {
-      models: { alias: { model: "provider/resolved" } },
-      "[opencode]": {
-        agents: { sisyphus: { model: "alias" } },
-        categories: { quick: { model: "provider/quick", temperature: "hot" } },
+    withProjectConfig(
+      "alias-with-invalid-leaf",
+      {
+        models: { alias: { model: "provider/resolved" } },
+        "[opencode]": {
+          agents: { sisyphus: { model: "alias" } },
+          categories: { quick: { model: "provider/quick", temperature: "hot" } },
+        },
       },
-    }, (project) => {
-      const result = validatePluginConfig(project)
+      (project) => {
+        const result = validatePluginConfig(project)
 
-      expect(result.config.agents?.sisyphus?.model).toBe("provider/resolved")
-      expect(result.config.categories?.quick?.model).toBe("provider/quick")
-      expect(result.warnings).toEqual([
-        "config: ~/project/.omo/omo.jsonc: [opencode].categories.quick.temperature ignored (invalid value)",
-      ])
-    })
+        expect(result.config.agents?.sisyphus?.model).toBe("provider/resolved")
+        expect(result.config.categories?.quick?.model).toBe("provider/quick")
+        expect(result.warnings).toEqual([
+          "config: ~/project/.omo/omo.jsonc: [opencode].categories.quick.temperature ignored (invalid value)",
+        ])
+      },
+    )
   })
 
   it("#given a valid category model beside an invalid legacy maxTokens value #when validating #then drops only maxTokens and preserves the category", () => {
-    withProjectConfig("legacy-max-tokens", {
-      categories: { quick: { model: "provider/quick", maxTokens: "bad" } },
-    }, (project) => {
-      const result = validatePluginConfig(project)
+    withProjectConfig(
+      "legacy-max-tokens",
+      {
+        categories: { quick: { model: "provider/quick", maxTokens: "bad" } },
+      },
+      (project) => {
+        const result = validatePluginConfig(project)
 
-      expect(result.config.categories?.quick?.model).toBe("provider/quick")
-      expect(result.config.categories?.quick?.maxTokens).toBeUndefined()
-      expect(result.warnings).toEqual([
-        "config: ~/project/.omo/omo.jsonc: categories.quick.maxTokens ignored (invalid value)",
-      ])
-    })
+        expect(result.config.categories?.quick?.model).toBe("provider/quick")
+        expect(result.config.categories?.quick?.maxTokens).toBeUndefined()
+        expect(result.warnings).toEqual([
+          "config: ~/project/.omo/omo.jsonc: categories.quick.maxTokens ignored (invalid value)",
+        ])
+      },
+    )
   })
 
   it("#given canonical max_tokens beside an invalid legacy maxTokens value #when validating #then keeps the category and reports only the invalid legacy leaf", () => {
-    withProjectConfig("canonical-and-invalid-legacy-max-tokens", {
-      categories: { quick: { model: "provider/quick", max_tokens: 4096, maxTokens: "bad" } },
-    }, (project) => {
-      const result = validatePluginConfig(project)
+    withProjectConfig(
+      "canonical-and-invalid-legacy-max-tokens",
+      {
+        categories: { quick: { model: "provider/quick", max_tokens: 4096, maxTokens: "bad" } },
+      },
+      (project) => {
+        const result = validatePluginConfig(project)
 
-      expect(result.config.categories?.quick?.model).toBe("provider/quick")
-      expect(result.warnings).toEqual([
-        "config: ~/project/.omo/omo.jsonc: categories.quick.maxTokens ignored (invalid value)",
-      ])
-    })
+        expect(result.config.categories?.quick?.model).toBe("provider/quick")
+        expect(result.warnings).toEqual([
+          "config: ~/project/.omo/omo.jsonc: categories.quick.maxTokens ignored (invalid value)",
+        ])
+      },
+    )
   })
 
   it("#given an invalid shared task value beside a valid one #when validating #then the loader's ignored key is reported as a warning, not a failure", () => {
-    withProjectConfig("shared-task", {
-      task: { host_engine_policy: "sometimes", default_concurrency: 3 },
-      "[opencode]": { tui: { sidebar: { enabled: false } } },
-    }, (project) => {
-      const result = validatePluginConfig(project)
+    withProjectConfig(
+      "shared-task",
+      {
+        task: { host_engine_policy: "sometimes", default_concurrency: 3 },
+        "[opencode]": { tui: { sidebar: { enabled: false } } },
+      },
+      (project) => {
+        const result = validatePluginConfig(project)
 
-      expect(result.valid).toBe(true)
-      expect(result.config.tui?.sidebar.enabled).toBe(false)
-      expect(result.warnings).toEqual(["config: ~/project/.omo/omo.jsonc: task.host_engine_policy ignored (invalid value)"])
-    })
+        expect(result.valid).toBe(true)
+        expect(result.config.tui?.sidebar.enabled).toBe(false)
+        expect(result.warnings).toEqual([
+          "config: ~/project/.omo/omo.jsonc: task.host_engine_policy ignored (invalid value)",
+        ])
+      },
+    )
   })
 
   it("#given a disabled provider in an omo opencode view #when validating #then substitutes its allowed fallback", () => {
-    withProjectConfig("disabled-provider", {
-      "[opencode]": {
-        disabled_providers: ["blocked"],
-        agents: { sisyphus: { model: "blocked/primary", fallback_models: ["allowed/fallback"] } },
+    withProjectConfig(
+      "disabled-provider",
+      {
+        "[opencode]": {
+          disabled_providers: ["blocked"],
+          agents: { sisyphus: { model: "blocked/primary", fallback_models: ["allowed/fallback"] } },
+        },
       },
-    }, (project) => {
-      const result = validatePluginConfig(project)
+      (project) => {
+        const result = validatePluginConfig(project)
 
-      expect(result.config.agents?.sisyphus?.model).toBe("allowed/fallback")
-    })
+        expect(result.config.agents?.sisyphus?.model).toBe("allowed/fallback")
+      },
+    )
   })
 
   it("#given a legacy ralph_loop omo opencode view #when validating #then migrates it to goal", () => {
-    withProjectConfig("ralph-loop", {
-      "[opencode]": { ralph_loop: { enabled: true, default_max_iterations: 50 } },
-    }, (project) => {
-      const result = validatePluginConfig(project)
+    withProjectConfig(
+      "ralph-loop",
+      {
+        "[opencode]": { ralph_loop: { enabled: true, default_max_iterations: 50 } },
+      },
+      (project) => {
+        const result = validatePluginConfig(project)
 
-      expect(result.config.goal).toMatchObject({ enabled: true, auto_start: false, default_max_iterations: 50 })
-    })
+        expect(result.config.goal).toMatchObject({ enabled: true, auto_start: false, default_max_iterations: 50 })
+      },
+    )
   })
 
   it("#given explicit goal settings beside ralph_loop #when validating #then preserves explicit goal values", () => {
-    withProjectConfig("goal-override", {
-      "[opencode]": {
-        goal: { enabled: false, default_max_iterations: 75 },
-        ralph_loop: { enabled: true, default_max_iterations: 50 },
+    withProjectConfig(
+      "goal-override",
+      {
+        "[opencode]": {
+          goal: { enabled: false, default_max_iterations: 75 },
+          ralph_loop: { enabled: true, default_max_iterations: 50 },
+        },
       },
-    }, (project) => {
-      const result = validatePluginConfig(project)
+      (project) => {
+        const result = validatePluginConfig(project)
 
-      expect(result.config.goal?.enabled).toBe(false)
-      expect(result.config.goal?.default_max_iterations).toBe(75)
-    })
+        expect(result.config.goal?.enabled).toBe(false)
+        expect(result.config.goal?.default_max_iterations).toBe(75)
+      },
+    )
   })
 })

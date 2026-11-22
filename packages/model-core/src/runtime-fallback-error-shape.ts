@@ -16,7 +16,10 @@ function getRecordValue(record: Record<string, unknown> | undefined, key: string
   }
 }
 
-function getNestedRecord(record: Record<string, unknown> | undefined, key: string): Record<string, unknown> | undefined {
+function getNestedRecord(
+  record: Record<string, unknown> | undefined,
+  key: string,
+): Record<string, unknown> | undefined {
   const value = getRecordValue(record, key)
   return isRecord(value) ? value : undefined
 }
@@ -39,7 +42,9 @@ export function getRuntimeFallbackErrorMessage(error: unknown): string {
   const data = getNestedRecord(error, "data")
   const nestedError = getNestedRecord(error, "error")
   const dataError = getNestedRecord(data, "error")
-  const records = [data, nestedError, error, dataError].filter((value): value is Record<string, unknown> => value !== undefined)
+  const records = [data, nestedError, error, dataError].filter(
+    (value): value is Record<string, unknown> => value !== undefined,
+  )
 
   for (const record of records) {
     const message = getRecordValue(record, "message")
@@ -64,10 +69,7 @@ export function getRuntimeFallbackErrorMessage(error: unknown): string {
   }
 }
 
-export function getRuntimeFallbackStatusCode(
-  error: unknown,
-  retryOnErrors?: readonly number[],
-): number | undefined {
+export function getRuntimeFallbackStatusCode(error: unknown, retryOnErrors?: readonly number[]): number | undefined {
   if (isRecord(error)) {
     const topLevelStatusCode = getRecordValue(error, "statusCode")
     if (typeof topLevelStatusCode === "number") return topLevelStatusCode
@@ -103,7 +105,9 @@ export function getRuntimeFallbackErrorName(error: unknown): string | undefined 
   const data = getNestedRecord(error, "data")
   const nestedError = getNestedRecord(error, "error")
   const dataError = getNestedRecord(data, "error")
-  const records = [error, data, nestedError, dataError].filter((value): value is Record<string, unknown> => value !== undefined)
+  const records = [error, data, nestedError, dataError].filter(
+    (value): value is Record<string, unknown> => value !== undefined,
+  )
 
   for (const record of records) {
     const name = getRecordValue(record, "name")
@@ -122,7 +126,9 @@ export function getRuntimeFallbackRetryableSignal(error: unknown): boolean | und
   const nestedError = getNestedRecord(error, "error")
   const dataError = getNestedRecord(data, "error")
   const cause = getNestedRecord(error, "cause")
-  const records = [error, data, nestedError, dataError, cause].filter((value): value is Record<string, unknown> => value !== undefined)
+  const records = [error, data, nestedError, dataError, cause].filter(
+    (value): value is Record<string, unknown> => value !== undefined,
+  )
 
   for (const record of records) {
     const retryable = getRecordValue(record, "isRetryable")

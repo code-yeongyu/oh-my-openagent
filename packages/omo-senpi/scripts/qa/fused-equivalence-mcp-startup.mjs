@@ -9,16 +9,16 @@
 // nothing the case observes.
 
 /** A remote connect is bounded by its server's connect timeout (15 s by default); the window closes after that. */
-const STARTUP_SETTLE_MS = 60_000;
+const STARTUP_SETTLE_MS = 60_000
 
-const surfaces = async (run) => (await run.send({ type: "get_loaded_surfaces" })).data.mcpServers ?? [];
-const connecting = (servers) => servers.filter((server) => server.status === "connecting").map((server) => server.name);
+const surfaces = async (run) => (await run.send({ type: "get_loaded_surfaces" })).data.mcpServers ?? []
+const connecting = (servers) => servers.filter((server) => server.status === "connecting").map((server) => server.name)
 /**
  * A server that settled `connected`, `idle` (a cached lazy server that needs no startup connect), or `disabled` (the
  * driver turns the remote `context7` and `grep_app` off in the sandbox mcp.json so no third party's live
  * instructions reach the goldens, #12256).
  */
-const SETTLED_OK = new Set(["connected", "idle", "disabled"]);
+const SETTLED_OK = new Set(["connected", "idle", "disabled"])
 
 /**
  * A server that settled in any other state (degraded, failed) would leave its instructions out of the prompts and
@@ -26,11 +26,11 @@ const SETTLED_OK = new Set(["connected", "idle", "disabled"]);
  * reporting the missing instructions as a golden diff.
  */
 function assertSettledOk(servers) {
-	const bad = servers.filter((server) => !SETTLED_OK.has(server.status));
-	if (bad.length > 0)
-		throw new Error(
-			`MCP startup did not settle cleanly (${bad.map((server) => `${server.name}=${server.status}`).join(", ")}): the network did not answer`,
-		);
+  const bad = servers.filter((server) => !SETTLED_OK.has(server.status))
+  if (bad.length > 0)
+    throw new Error(
+      `MCP startup did not settle cleanly (${bad.map((server) => `${server.name}=${server.status}`).join(", ")}): the network did not answer`,
+    )
 }
 
 /**
@@ -39,25 +39,25 @@ function assertSettledOk(servers) {
  * server must then be connected or idle.
  */
 async function settleMcpStartup(run) {
-	const initial = await surfaces(run);
-	if (connecting(initial).length === 0) return assertSettledOk(initial);
-	const client = run.client;
-	if (!client.events.some((event) => event.type === "loaded_surfaces_changed"))
-		await client.waitForEvent((event) => event.type === "loaded_surfaces_changed", { timeoutMs: STARTUP_SETTLE_MS });
-	assertSettledOk(await surfaces(run));
+  const initial = await surfaces(run)
+  if (connecting(initial).length === 0) return assertSettledOk(initial)
+  const client = run.client
+  if (!client.events.some((event) => event.type === "loaded_surfaces_changed"))
+    await client.waitForEvent((event) => event.type === "loaded_surfaces_changed", { timeoutMs: STARTUP_SETTLE_MS })
+  assertSettledOk(await surfaces(run))
 }
 
 /** run.open() with the client's MCP startup settled. */
 export async function openSettled(run) {
-	await run.open();
-	await settleMcpStartup(run);
+  await run.open()
+  await settleMcpStartup(run)
 }
 
 /** The harness's reopenState() (O8 headless: reopen, get_state, close) with the reopened client's MCP startup settled. */
 export async function reopenStateSettled(run) {
-	await run.open({ resume: true });
-	await settleMcpStartup(run);
-	const state = await run.send({ type: "get_state" });
-	run.states.push(state.data);
-	await run.close();
+  await run.open({ resume: true })
+  await settleMcpStartup(run)
+  const state = await run.send({ type: "get_state" })
+  run.states.push(state.data)
+  await run.close()
 }

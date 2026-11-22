@@ -9,18 +9,16 @@ describe("pending-calls cleanup interval", () => {
     const setIntervalCalls: number[] = []
     let unrefCalled = 0
 
-    globalThis.setInterval = unsafeTestValue<typeof setInterval>(((
-      _handler: TimerHandler,
-      timeout?: number,
-      ..._args: unknown[]
-    ) => {
-      setIntervalCalls.push(timeout as number)
-      return unsafeTestValue<ReturnType<typeof setInterval>>({
-        unref: () => {
-          unrefCalled += 1
-        },
-      })
-    }))
+    globalThis.setInterval = unsafeTestValue<typeof setInterval>(
+      (_handler: TimerHandler, timeout?: number, ..._args: unknown[]) => {
+        setIntervalCalls.push(timeout as number)
+        return unsafeTestValue<ReturnType<typeof setInterval>>({
+          unref: () => {
+            unrefCalled += 1
+          },
+        })
+      },
+    )
 
     try {
       const modulePath = fileURLToPath(new URL("./pending-calls.ts", import.meta.url))
@@ -45,20 +43,18 @@ describe("pending-calls cleanup interval", () => {
     let intervalHandle: ReturnType<typeof setInterval> | undefined
     let clearCalls = 0
 
-    globalThis.setInterval = unsafeTestValue<typeof setInterval>(((
-      _handler: TimerHandler,
-      _timeout?: number,
-      ..._args: unknown[]
-    ) => {
-      intervalHandle = unsafeTestValue<ReturnType<typeof setInterval>>({ unref: () => {} })
-      return intervalHandle
-    }))
+    globalThis.setInterval = unsafeTestValue<typeof setInterval>(
+      (_handler: TimerHandler, _timeout?: number, ..._args: unknown[]) => {
+        intervalHandle = unsafeTestValue<ReturnType<typeof setInterval>>({ unref: () => {} })
+        return intervalHandle
+      },
+    )
 
-    globalThis.clearInterval = unsafeTestValue<typeof clearInterval>(((handle?: ReturnType<typeof setInterval>) => {
+    globalThis.clearInterval = unsafeTestValue<typeof clearInterval>((handle?: ReturnType<typeof setInterval>) => {
       if (handle === intervalHandle) {
         clearCalls += 1
       }
-    }))
+    })
 
     try {
       const modulePath = fileURLToPath(new URL("./pending-calls.ts", import.meta.url))

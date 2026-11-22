@@ -3,7 +3,10 @@ import { dirname, isAbsolute, relative, sep, join } from "node:path"
 
 const SENPI_COMPILE_ENTRIES = [
   // Older pinned engines do not have a shared-session worker.
-  { define: "SENPI_RPC_SESSION_WORKER_ENTRY", path: "node_modules/@code-yeongyu/senpi/dist/modes/rpc/session-worker.js" },
+  {
+    define: "SENPI_RPC_SESSION_WORKER_ENTRY",
+    path: "node_modules/@code-yeongyu/senpi/dist/modes/rpc/session-worker.js",
+  },
   // The kill guard's judge, imported by URL from codemode kernels (senpi#5358); absent before 2026.11.2-3.
   { define: "SENPI_KILL_GUARD_ENTRY", path: "node_modules/@code-yeongyu/senpi/dist/core/kill-guard/index.js" },
 ] as const

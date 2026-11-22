@@ -112,7 +112,10 @@ function configParameterEntries(text: string): Array<{ source: string; key: stri
 }
 
 /** The environment a memory repository's git runs with: `environment` minus inherited repository redirection and hook-defeating config. */
-export function memoryGitEnvironment(environment: NodeJS.ProcessEnv, platform: NodeJS.Platform = process.platform): NodeJS.ProcessEnv {
+export function memoryGitEnvironment(
+  environment: NodeJS.ProcessEnv,
+  platform: NodeJS.Platform = process.platform,
+): NodeJS.ProcessEnv {
   const kept: NodeJS.ProcessEnv = {}
   // Off Windows, environment names are case-sensitive and git reads only the exact upper-case names, so a
   // `Git_Config_Count` is an unrelated variable that must not become config here either. Windows names are
@@ -136,7 +139,10 @@ export function memoryGitEnvironment(environment: NodeJS.ProcessEnv, platform: N
   })
 
   const parameters = byGitName.get(CONFIG_PARAMETERS)
-  const entries = parameters === undefined ? [] : (configParameterEntries(parameters)?.filter((entry) => !defeatsMemoryHooks(entry.key)) ?? [])
+  const entries =
+    parameters === undefined
+      ? []
+      : (configParameterEntries(parameters)?.filter((entry) => !defeatsMemoryHooks(entry.key)) ?? [])
   if (entries.length > 0) kept[CONFIG_PARAMETERS] = entries.map((entry) => entry.source).join(" ")
   return kept
 }

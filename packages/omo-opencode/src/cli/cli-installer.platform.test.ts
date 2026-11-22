@@ -63,7 +63,7 @@ function stubOpenCodeSuccess(): void {
     hasZaiCodingPlan: false,
     hasKimiForCoding: false,
     hasOpencodeGo: false,
-      hasBailianCodingPlan: false,
+    hasBailianCodingPlan: false,
     hasVercelAiGateway: false,
   })
   spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true)

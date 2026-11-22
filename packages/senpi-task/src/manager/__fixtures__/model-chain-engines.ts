@@ -55,10 +55,24 @@ export async function startEngineRunner(kind: EngineRunnerKind, input: EngineInp
   const providers = startHttpProviders(input.scripts)
   copyFileSync(input.settingsPath, join(agentDir, "settings.json"))
   writeFileSync(join(agentDir, "models.json"), providers.modelsJson)
-  writeFileSync(join(agentDir, "auth.json"), JSON.stringify(Object.fromEntries(Object.keys(ENGINE_MODELS).map((provider) => [provider, { type: "api_key", key: "test-key" }]))), { mode: 0o600 })
-  const env = { PATH: process.env["PATH"] ?? "", HOME: home, SENPI_CODING_AGENT_DIR: agentDir, BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0" }
+  writeFileSync(
+    join(agentDir, "auth.json"),
+    JSON.stringify(
+      Object.fromEntries(
+        Object.keys(ENGINE_MODELS).map((provider) => [provider, { type: "api_key", key: "test-key" }]),
+      ),
+    ),
+    { mode: 0o600 },
+  )
+  const env = {
+    PATH: process.env["PATH"] ?? "",
+    HOME: home,
+    SENPI_CODING_AGENT_DIR: agentDir,
+    BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
+  }
   try {
-    const engine = kind === "process" ? processEngine(env, input.hiddenCapabilities ?? []) : await hostEngine(input.root, env)
+    const engine =
+      kind === "process" ? processEngine(env, input.hiddenCapabilities ?? []) : await hostEngine(input.root, env)
     return {
       runner: engine.runner,
       calls: providers.calls,
@@ -86,7 +100,11 @@ function processEngine(env: Readonly<Record<string, string>>, hiddenCapabilities
     },
     buildSpawn: (spec) => buildRpcSpawn(spec, { parentEnv: env, resolveSenpiExecutable: () => null }),
     spawnChild: (descriptor) => {
-      const child = spawn(descriptor.command, [...descriptor.args], { cwd: descriptor.cwd, env: descriptor.env, stdio: ["pipe", "pipe", "pipe"] })
+      const child = spawn(descriptor.command, [...descriptor.args], {
+        cwd: descriptor.cwd,
+        env: descriptor.env,
+        stdio: ["pipe", "pipe", "pipe"],
+      })
       children.push(child)
       if (hiddenCapabilities.length > 0 && child.stdout !== null) {
         Object.defineProperty(child, "stdout", { value: child.stdout.pipe(withoutCapabilities(hiddenCapabilities)) })
@@ -112,12 +130,16 @@ function withoutCapabilities(hidden: readonly string[]): Transform {
   const rewrite = (line: string): string => {
     try {
       const frame: unknown = JSON.parse(line)
-      if (typeof frame !== "object" || frame === null || Reflect.get(frame, "command") !== "get_protocol_info") return line
+      if (typeof frame !== "object" || frame === null || Reflect.get(frame, "command") !== "get_protocol_info")
+        return line
       const data: unknown = Reflect.get(frame, "data")
       if (typeof data !== "object" || data === null) return line
       const capabilities: unknown = Reflect.get(data, "capabilities")
       if (!Array.isArray(capabilities)) return line
-      return JSON.stringify({ ...frame, data: { ...data, capabilities: capabilities.filter((entry) => !hidden.includes(entry)) } })
+      return JSON.stringify({
+        ...frame,
+        data: { ...data, capabilities: capabilities.filter((entry) => !hidden.includes(entry)) },
+      })
     } catch {
       return line
     }
@@ -181,12 +203,17 @@ async function hostEngine(root: string, engineEnv: Readonly<Record<string, strin
     closeGraceMs: 50,
     modelAdmission: () => Promise.resolve(),
     storeDir: join(root, "host-store"),
-    shardResolver: () => ({ socket, shard: { kind: "p", key: "0000000000000000", ownerSessionId: "root-0", inherited: false }, root: "primary" }),
+    shardResolver: () => ({
+      socket,
+      shard: { kind: "p", key: "0000000000000000", ownerSessionId: "root-0", inherited: false },
+      root: "primary",
+    }),
     ownHostSocket: () => undefined,
     insideHost: () => false,
     onNotice: () => undefined,
     shardEvents: {},
-    ensureDaemon: () => Promise.resolve({ action: "reuse", reason: "compatible", socket, pid, reused: true, upgradeable: true }),
+    ensureDaemon: () =>
+      Promise.resolve({ action: "reuse", reason: "compatible", socket, pid, reused: true, upgradeable: true }),
   })
   return {
     runner: createRpcManagedRunner(runner),
@@ -202,7 +229,10 @@ async function hostEngine(root: string, engineEnv: Readonly<Record<string, strin
 function hostListening(host: ChildProcess): Promise<void> {
   const { promise, resolve, reject } = Promise.withResolvers<void>()
   let stderr = ""
-  const timer = setTimeout(() => reject(new Error(`senpi host did not listen within ${HOST_READY_TIMEOUT_MS} ms: ${stderr}`)), HOST_READY_TIMEOUT_MS)
+  const timer = setTimeout(
+    () => reject(new Error(`senpi host did not listen within ${HOST_READY_TIMEOUT_MS} ms: ${stderr}`)),
+    HOST_READY_TIMEOUT_MS,
+  )
   host.stderr?.on("data", (chunk: Buffer) => {
     stderr += chunk.toString()
     if (stderr.includes(HOST_READY_LINE)) resolve()

@@ -1,32 +1,28 @@
-import type { PluginInput } from "@opencode-ai/plugin";
-import {
-  loadAgentUsageState,
-  saveAgentUsageState,
-  clearAgentUsageState,
-} from "./storage";
-import { TARGET_TOOLS, AGENT_TOOLS, REMINDER_MESSAGE } from "./constants";
-import type { AgentUsageState } from "./types";
-import { getSessionAgent } from "../../features/claude-code-session-state";
-import { getAgentConfigKey } from "../../shared/agent-display-names";
-import { resolveSessionEventID } from "../../shared/event-session-id";
+import type { PluginInput } from "@opencode-ai/plugin"
+import { loadAgentUsageState, saveAgentUsageState, clearAgentUsageState } from "./storage"
+import { TARGET_TOOLS, AGENT_TOOLS, REMINDER_MESSAGE } from "./constants"
+import type { AgentUsageState } from "./types"
+import { getSessionAgent } from "../../features/claude-code-session-state"
+import { getAgentConfigKey } from "../../shared/agent-display-names"
+import { resolveSessionEventID } from "../../shared/event-session-id"
 
 interface ToolExecuteInput {
-  tool: string;
-  sessionID: string;
-  callID: string;
+  tool: string
+  sessionID: string
+  callID: string
 }
 
 interface ToolExecuteOutput {
-  title: string;
-  output: string;
-  metadata: unknown;
+  title: string
+  output: string
+  metadata: unknown
 }
 
 interface EventInput {
   event: {
-    type: string;
-    properties?: unknown;
-  };
+    type: string
+    properties?: unknown
+  }
 }
 
 /**
@@ -34,94 +30,85 @@ interface EventInput {
  * Subagents (explore, librarian, oracle, etc.) are the targets of delegation,
  * so reminding them to delegate to themselves is counterproductive.
  */
-const ORCHESTRATOR_AGENTS = new Set([
-  "sisyphus",
-  "sisyphus-junior",
-  "atlas",
-  "hephaestus",
-  "prometheus",
-]);
+const ORCHESTRATOR_AGENTS = new Set(["sisyphus", "sisyphus-junior", "atlas", "hephaestus", "prometheus"])
 
-const MAX_REMINDERS = 3;
+const MAX_REMINDERS = 3
 
 function isOrchestratorAgent(agentName: string): boolean {
-  return ORCHESTRATOR_AGENTS.has(getAgentConfigKey(agentName));
+  return ORCHESTRATOR_AGENTS.has(getAgentConfigKey(agentName))
 }
 
 export function createAgentUsageReminderHook(_ctx: PluginInput) {
-  const sessionStates = new Map<string, AgentUsageState>();
+  const sessionStates = new Map<string, AgentUsageState>()
 
   function getOrCreateState(sessionID: string): AgentUsageState {
-    const cached = sessionStates.get(sessionID);
-    if (cached !== undefined) return cached;
+    const cached = sessionStates.get(sessionID)
+    if (cached !== undefined) return cached
 
     const state: AgentUsageState = loadAgentUsageState(sessionID) ?? {
       sessionID,
       agentUsed: false,
       reminderCount: 0,
       updatedAt: Date.now(),
-    };
-    sessionStates.set(sessionID, state);
-    return state;
+    }
+    sessionStates.set(sessionID, state)
+    return state
   }
 
   function markAgentUsed(sessionID: string): void {
-    const state = getOrCreateState(sessionID);
-    state.agentUsed = true;
-    state.updatedAt = Date.now();
-    saveAgentUsageState(state);
+    const state = getOrCreateState(sessionID)
+    state.agentUsed = true
+    state.updatedAt = Date.now()
+    saveAgentUsageState(state)
   }
 
   function resetState(sessionID: string): void {
-    sessionStates.delete(sessionID);
-    clearAgentUsageState(sessionID);
+    sessionStates.delete(sessionID)
+    clearAgentUsageState(sessionID)
   }
 
-  const toolExecuteAfter = async (
-    input: ToolExecuteInput,
-    output: ToolExecuteOutput,
-  ) => {
-    const { tool, sessionID } = input;
+  const toolExecuteAfter = async (input: ToolExecuteInput, output: ToolExecuteOutput) => {
+    const { tool, sessionID } = input
 
-    const agent = getSessionAgent(sessionID);
+    const agent = getSessionAgent(sessionID)
     if (agent && !isOrchestratorAgent(agent)) {
-      return;
+      return
     }
 
-    const toolLower = tool.toLowerCase();
+    const toolLower = tool.toLowerCase()
 
     if (AGENT_TOOLS.has(toolLower)) {
-      markAgentUsed(sessionID);
-      return;
+      markAgentUsed(sessionID)
+      return
     }
 
     if (!TARGET_TOOLS.has(toolLower)) {
-      return;
+      return
     }
 
-    const state = getOrCreateState(sessionID);
+    const state = getOrCreateState(sessionID)
 
     if (state.agentUsed || state.reminderCount >= MAX_REMINDERS) {
-      return;
+      return
     }
 
-    output.output += REMINDER_MESSAGE;
-    state.reminderCount++;
-    state.updatedAt = Date.now();
-    saveAgentUsageState(state);
-  };
+    output.output += REMINDER_MESSAGE
+    state.reminderCount++
+    state.updatedAt = Date.now()
+    saveAgentUsageState(state)
+  }
 
   const eventHandler = async ({ event }: EventInput) => {
     if (event.type === "session.deleted") {
-      const sessionID = resolveSessionEventID(event.properties);
+      const sessionID = resolveSessionEventID(event.properties)
       if (sessionID) {
-        resetState(sessionID);
+        resetState(sessionID)
       }
     }
-  };
+  }
 
   return {
     "tool.execute.after": toolExecuteAfter,
     event: eventHandler,
-  };
+  }
 }

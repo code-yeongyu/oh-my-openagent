@@ -15,7 +15,9 @@ export type PackageLogInput = {
 
 export function checkPackageLogs(input: PackageLogInput): { readonly pass: boolean; readonly reason: string } {
   if (!input.isRelease) {
-    const edited = [...input.addedFiles, ...input.modifiedFiles, ...input.deletedFiles].filter((path) => PACKAGE_CHANGES_LOG.test(path))
+    const edited = [...input.addedFiles, ...input.modifiedFiles, ...input.deletedFiles].filter((path) =>
+      PACKAGE_CHANGES_LOG.test(path),
+    )
     if (edited.length > 0) {
       return {
         pass: false,
@@ -27,15 +29,23 @@ export function checkPackageLogs(input: PackageLogInput): { readonly pass: boole
   const split = splitFragment(input.fragment)
   if (split.reasons.length > 0) return { pass: false, reason: split.reasons.join("; ") }
   const missing = split.blocks.filter((block) => !input.existsAtHead(block.log)).map((block) => block.log)
-  if (missing.length > 0) return { pass: false, reason: `a block names a log that does not exist: ${missing.join(", ")}` }
+  if (missing.length > 0)
+    return { pass: false, reason: `a block names a log that does not exist: ${missing.join(", ")}` }
   // A merged fragment is immutable, so refuse here whatever the release stamp would refuse (#10477 review HIGH 1): run the
   // release's own assembly on the text, so the PR check and the stamp can never disagree (#11253 review round 3).
-  if (split.preamble === "") return { pass: false, reason: "the fragment needs CHANGELOG text before its log blocks (a paragraph or ### bullets)" }
+  if (split.preamble === "")
+    return {
+      pass: false,
+      reason: "the fragment needs CHANGELOG text before its log blocks (a paragraph or ### bullets)",
+    }
   try {
     assembleRelease("", [{ pr: 1, content: split.preamble }])
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
-    return { pass: false, reason: `the release cannot place this fragment text (docs/reference/changelog-fragments.md): ${detail}` }
+    return {
+      pass: false,
+      reason: `the release cannot place this fragment text (docs/reference/changelog-fragments.md): ${detail}`,
+    }
   }
   return { pass: true, reason: `${split.blocks.length} package-log block(s) valid` }
 }

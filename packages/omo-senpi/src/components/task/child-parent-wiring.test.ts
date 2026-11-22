@@ -11,13 +11,27 @@ import { createChildParentWiring } from "./child-parent-wiring"
 // cancelled, and which mode a mode change hands the children.
 
 const connection = new AsyncLocalStorage<string>()
-const PROMPT: ForwardableDialog = { method: "select", title: "Run bash?", options: ["Allow once", "Deny"], toolCallId: "call-d", parentToolCallId: "cell-d" }
+const PROMPT: ForwardableDialog = {
+  method: "select",
+  title: "Run bash?",
+  options: ["Allow once", "Deny"],
+  toolCallId: "call-d",
+  parentToolCallId: "cell-d",
+}
 
-type Raised = { readonly via: string; readonly title: string; readonly opts: unknown; readonly connection: string | undefined }
+type Raised = {
+  readonly via: string
+  readonly title: string
+  readonly opts: unknown
+  readonly connection: string | undefined
+}
 
 function recordingUi(via: string, raised: Raised[], answer = "Allow once"): DialogUi {
   return {
-    select: async (title, _options, opts) => { raised.push({ via, title, opts, connection: connection.getStore() }); return answer },
+    select: async (title, _options, opts) => {
+      raised.push({ via, title, opts, connection: connection.getStore() })
+      return answer
+    },
     confirm: async () => true,
   }
 }
@@ -36,14 +50,20 @@ function harness() {
           if (name !== "permission_preset_changed") return () => {}
           const run = () => handler({ permissionPreset: "x" })
           changes.add(run)
-          return () => { changes.delete(run) }
+          return () => {
+            changes.delete(run)
+          }
         },
       },
-      on: (event, handler) => { lifecycle.set(event, () => void handler({ type: event })) },
+      on: (event, handler) => {
+        lifecycle.set(event, () => void handler({ type: event }))
+      },
       getPermissionPreset: () => preset,
       sessionDialog: recordingUi("session", raised),
     },
-    runtime: { ui: () => ({ ...recordingUi("origin", raised), notify: () => {}, setStatus: () => {}, setWidget: () => {} }) },
+    runtime: {
+      ui: () => ({ ...recordingUi("origin", raised), notify: () => {}, setStatus: () => {}, setWidget: () => {} }),
+    },
     labelOf: (taskId) => `task ${taskId}`,
     origins,
   })
@@ -51,9 +71,14 @@ function harness() {
     raised,
     origins,
     wiring,
-    change: (next: string) => { preset = next; changes.forEach((run) => run()) },
+    change: (next: string) => {
+      preset = next
+      changes.forEach((run) => run())
+    },
     // The engine moves the enforced mode without announcing it (a restore, a host default re-read).
-    moveSilently: (next: string) => { preset = next },
+    moveSilently: (next: string) => {
+      preset = next
+    },
     emit: (event: string) => lifecycle.get(event)?.(),
     busListeners: () => changes.size,
   }
@@ -65,11 +90,21 @@ describe("createChildParentWiring", () => {
     const { raised, wiring } = harness()
 
     // when
-    const answer = await wiring.dialogForwarder.forward(PROMPT, { taskId: "st_bg", signal: new AbortController().signal })
+    const answer = await wiring.dialogForwarder.forward(PROMPT, {
+      taskId: "st_bg",
+      signal: new AbortController().signal,
+    })
 
     // then
     expect(answer).toEqual({ kind: "value", value: "Allow once" })
-    expect(raised).toEqual([{ via: "session", title: "task st_bg: Run bash?", opts: expect.objectContaining({ toolCallId: "call-d", parentToolCallId: "cell-d" }), connection: undefined }])
+    expect(raised).toEqual([
+      {
+        via: "session",
+        title: "task st_bg: Run bash?",
+        opts: expect.objectContaining({ toolCallId: "call-d", parentToolCallId: "cell-d" }),
+        connection: undefined,
+      },
+    ])
   })
 
   test("#given a child the parent turn waits on #when it asks from outside that turn #then the prompt is raised in the turn's own connection context", async () => {
@@ -83,7 +118,10 @@ describe("createChildParentWiring", () => {
     await wiring.dialogForwarder.forward(PROMPT, { taskId: "st_fg", signal: new AbortController().signal })
 
     // then
-    expect(raised.map(({ via, connection: at }) => ({ via, at }))).toEqual([{ via: "origin", at: "conn-origin" }, { via: "session", at: undefined }])
+    expect(raised.map(({ via, connection: at }) => ({ via, at }))).toEqual([
+      { via: "origin", at: "conn-origin" },
+      { via: "session", at: undefined },
+    ])
   })
 
   test("#given a forwarded prompt #when the child task is cancelled #then the prompt's signal is aborted", async () => {

@@ -1,3 +1,4 @@
+// Vendored from sisyphuslabs/omo-relay-daemon@edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6 packages/local-api/src/transport.ts
 import { lstatSync, readFileSync, unlinkSync } from "node:fs";
 import { createConnection, createServer, type Server, type Socket } from "node:net";
 import { join } from "node:path";
@@ -138,11 +139,7 @@ export const listenLocal = async (
   };
 };
 
-// `background`: the socket never keeps the process alive (an engine's long-lived registrant connection).
-export const connectLocal = (
-  stateDir: string,
-  options: { readonly background?: boolean } = {},
-): Promise<Transport> =>
+export const connectLocal = (stateDir: string): Promise<Transport> =>
   new Promise((resolve, reject) => {
     const port = process.platform === "win32" ? readEndpointPort(stateDir) : undefined;
     const endpoint = port === undefined ? UNIX_ENDPOINT : tcpEndpoint(port);
@@ -150,7 +147,6 @@ export const connectLocal = (
       port === undefined
         ? createConnection({ path: join(stateDir, SOCKET_FILE) })
         : createConnection({ host: "127.0.0.1", port });
-    if (options.background === true) socket.unref();
     socket.once("error", reject);
     socket.once("connect", () => {
       socket.off("error", reject);

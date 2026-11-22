@@ -39,7 +39,9 @@ function fakeUi(): FakeUi {
       for (let index = widgets.length - 1; index >= 0; index -= 1) {
         const call = widgets[index]
         if (call?.key !== key) continue
-        return typeof call.content === "function" ? (call.content as (tui: unknown, theme: unknown) => PanelComponent) : undefined
+        return typeof call.content === "function"
+          ? (call.content as (tui: unknown, theme: unknown) => PanelComponent)
+          : undefined
       }
       return undefined
     },

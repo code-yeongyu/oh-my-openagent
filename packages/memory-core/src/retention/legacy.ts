@@ -8,7 +8,15 @@ import { existsSync } from "../fs/resilient"
 import { removeTree } from "../fs/remove-tree"
 import { reflectionRunNumber } from "../reflection/run-id-high-water"
 import type { LazyRetentionGuard } from "./guard"
-import { DAY_MS, StoreTally, describeError, idleSince, listNames, type RetentionContext, type RetentionStoreResult } from "./policy"
+import {
+  DAY_MS,
+  StoreTally,
+  describeError,
+  idleSince,
+  listNames,
+  type RetentionContext,
+  type RetentionStoreResult,
+} from "./policy"
 
 export type LegacyRecallRunsOutcome = "absent" | "kept" | "removed"
 
@@ -42,7 +50,10 @@ export async function pruneLegacyReflectionSessions(
         await removeTree(path)
         tally.removed.push(name)
       } catch (error) {
-        context.warn?.("memory runtime retention could not remove a legacy reflection session", { path, error: describeError(error) })
+        context.warn?.("memory runtime retention could not remove a legacy reflection session", {
+          path,
+          error: describeError(error),
+        })
         tally.keep(name, "changed-during-removal")
       }
     }

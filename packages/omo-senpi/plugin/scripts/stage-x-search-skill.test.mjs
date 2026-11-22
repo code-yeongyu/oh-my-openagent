@@ -24,46 +24,62 @@ afterEach(async () => {
 })
 
 describe("x-search conditional skill staging", () => {
-  test("#given no staged copy #when --check runs #then it skips with a notice for a fresh checkout", { timeout: STAGING_TEST_TIMEOUT_MS }, async () => {
-    const fixture = await makeFixture()
+  test(
+    "#given no staged copy #when --check runs #then it skips with a notice for a fresh checkout",
+    { timeout: STAGING_TEST_TIMEOUT_MS },
+    async () => {
+      const fixture = await makeFixture()
 
-    const result = await checkXSearchSkillStaged(fixture)
+      const result = await checkXSearchSkillStaged(fixture)
 
-    assert.deepEqual(result, {
-      ok: true,
-      skipped: true,
-      reason: "not staged locally",
-      sourceSkill: fixture.sourceSkill,
-      targetSkill: fixture.targetSkill,
-    })
-  })
+      assert.deepEqual(result, {
+        ok: true,
+        skipped: true,
+        reason: "not staged locally",
+        sourceSkill: fixture.sourceSkill,
+        targetSkill: fixture.targetSkill,
+      })
+    },
+  )
 
-  test("#given a staged copy #when --check runs #then it passes and the bytes match the source", { timeout: STAGING_TEST_TIMEOUT_MS }, async () => {
-    const fixture = await makeFixture()
+  test(
+    "#given a staged copy #when --check runs #then it passes and the bytes match the source",
+    { timeout: STAGING_TEST_TIMEOUT_MS },
+    async () => {
+      const fixture = await makeFixture()
 
-    const staged = await stageXSearchSkill(fixture)
-    const result = await checkXSearchSkillStaged(fixture)
+      const staged = await stageXSearchSkill(fixture)
+      const result = await checkXSearchSkillStaged(fixture)
 
-    assert.equal(staged.ok, true)
-    assert.equal(staged.targetSkill, fixture.targetSkill)
-    assert.equal(result.ok, true)
-    assert.equal(await readFile(fixture.targetSkill, "utf8"), await readFile(fixture.sourceSkill, "utf8"))
-  })
+      assert.equal(staged.ok, true)
+      assert.equal(staged.targetSkill, fixture.targetSkill)
+      assert.equal(result.ok, true)
+      assert.equal(await readFile(fixture.targetSkill, "utf8"), await readFile(fixture.sourceSkill, "utf8"))
+    },
+  )
 
-  test("#given a stale staged copy #when --check runs #then it fails as stale", { timeout: STAGING_TEST_TIMEOUT_MS }, async () => {
-    const fixture = await makeFixture()
-    await stageXSearchSkill(fixture)
-    await writeFile(fixture.targetSkill, "---\nname: x-search\ndescription: stale copy\n---\nOLD BODY\n", "utf8")
+  test(
+    "#given a stale staged copy #when --check runs #then it fails as stale",
+    { timeout: STAGING_TEST_TIMEOUT_MS },
+    async () => {
+      const fixture = await makeFixture()
+      await stageXSearchSkill(fixture)
+      await writeFile(fixture.targetSkill, "---\nname: x-search\ndescription: stale copy\n---\nOLD BODY\n", "utf8")
 
-    await assert.rejects(checkXSearchSkillStaged(fixture), /stale/)
-  })
+      await assert.rejects(checkXSearchSkillStaged(fixture), /stale/)
+    },
+  )
 
-  test("#given a missing source skill #when staged #then it fails loudly instead of writing a partial copy", { timeout: STAGING_TEST_TIMEOUT_MS }, async () => {
-    const fixture = await makeFixture()
-    await rm(fixture.sourceSkill)
+  test(
+    "#given a missing source skill #when staged #then it fails loudly instead of writing a partial copy",
+    { timeout: STAGING_TEST_TIMEOUT_MS },
+    async () => {
+      const fixture = await makeFixture()
+      await rm(fixture.sourceSkill)
 
-    await assert.rejects(stageXSearchSkill(fixture), /source SKILL\.md is missing/)
-  })
+      await assert.rejects(stageXSearchSkill(fixture), /source SKILL\.md is missing/)
+    },
+  )
 
   // Regression: the native staging build redirects every other artifact with OMO_SENPI_PLUGIN_OUTPUT,
   // so a target pinned to the source plugin dir left the staged payload without the skill.
@@ -80,7 +96,10 @@ describe("x-search conditional skill staging", () => {
   })
 
   test("#given OMO_X_SEARCH_SKILL_TARGET #when resolving the target #then it wins over the plugin root", () => {
-    const target = resolveTargetSkill({ OMO_X_SEARCH_SKILL_TARGET: join("/scratch", "SKILL.md"), OMO_SENPI_PLUGIN_OUTPUT: join("/staged", "plugin") })
+    const target = resolveTargetSkill({
+      OMO_X_SEARCH_SKILL_TARGET: join("/scratch", "SKILL.md"),
+      OMO_SENPI_PLUGIN_OUTPUT: join("/staged", "plugin"),
+    })
 
     assert.equal(target, join("/scratch", "SKILL.md"))
   })

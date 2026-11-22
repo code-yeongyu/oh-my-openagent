@@ -1,3 +1,4 @@
+// Vendored from sisyphuslabs/omo-relay-daemon@edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6 packages/local-api/src/validate-stream-events.ts
 import { LOCAL_BLOB_MAX, LOCAL_CHUNK_MAX } from "./limits.ts";
 import type { BlobTarget, EventKind, LocalEvent } from "./protocol.ts";
 import {
@@ -14,6 +15,7 @@ import {
   uint,
 } from "./validate-fields.ts";
 import { attachId, SNAPSHOT_FIELDS, snapshotBodyOf } from "./validate-shapes.ts";
+import { SNAPSHOT_OPTIONAL_FIELDS } from "./validate-snapshot-from.ts";
 import {
   ATTACH_PENDING_REASONS,
   BLOB_ABORT_REASONS,
@@ -68,9 +70,16 @@ const targetOf = (m: Fields): BlobTarget => {
   }
 };
 
+// omo#12719: one stream seq per record, strictly increasing (a record's seq is unique within its attach_id).
+const seqsOf = (v: unknown, count: number): readonly number[] => {
+  if (!Array.isArray(v) || v.length !== count) return fail("seqs");
+  const seqs = v.map((s) => uint(s, 1, Number.MAX_SAFE_INTEGER, "seq"));
+  return seqs.every((s, i) => i === 0 || s > (seqs[i - 1] ?? s)) ? seqs : fail("seqs order");
+};
+
 export const STREAM_EVENT_VALIDATORS: EventValidators<StreamKind> = {
   "session.snapshot": (v) => {
-    const m = eventFields(v, ["attach", ...SNAPSHOT_FIELDS]);
+    const m = eventFields(v, ["attach", ...SNAPSHOT_FIELDS], SNAPSHOT_OPTIONAL_FIELDS);
     return { type: "event", kind: "session.snapshot", attach: attachOf(m), ...snapshotBodyOf(m) };
   },
   "session.snapshot_loading": (v) => {
@@ -83,7 +92,7 @@ export const STREAM_EVENT_VALIDATORS: EventValidators<StreamKind> = {
     };
   },
   "session.records": (v) => {
-    const m = eventFields(v, ["attach", "attach_id", "records"]);
+    const m = eventFields(v, ["attach", "attach_id", "records"], ["seqs"]);
     const records = m["records"];
     if (!Array.isArray(records) || records.length === 0) return fail("records");
     const attach_id = attachId(m["attach_id"]);
@@ -93,6 +102,7 @@ export const STREAM_EVENT_VALIDATORS: EventValidators<StreamKind> = {
       attach: attachOf(m),
       attach_id,
       records: records.map((r) => jsonObject(r, "record")),
+      ...(m["seqs"] === undefined ? {} : { seqs: seqsOf(m["seqs"], records.length) }),
     };
   },
   "session.blob_open": (v) => {

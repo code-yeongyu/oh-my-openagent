@@ -66,42 +66,70 @@ export function parseReservationRunLedger(value: unknown): ReservationRunLedger 
     throw new Error("Invalid reservation run trigger")
   }
   if ((kind === "dream") !== (trigger === "dream")) throw new Error("Reservation run kind and trigger disagree")
-  if (trigger === "dream" && value.origin !== "manual" && value.origin !== "idle" && value.origin !== "shutdown" && value.origin !== "pressure") {
+  if (
+    trigger === "dream" &&
+    value.origin !== "manual" &&
+    value.origin !== "idle" &&
+    value.origin !== "shutdown" &&
+    value.origin !== "pressure"
+  ) {
     throw new Error("Dream run origin is required")
   }
-  const requiredStrings = ["startedAt", "worktreeDir", "worktreeBranch", "baseSha", "gitFilePath", "gitFileSnapshot", "commonConfigPath"] as const
-  if (requiredStrings.some((field) => typeof value[field] !== "string")) throw new Error("Invalid reservation run paths")
+  const requiredStrings = [
+    "startedAt",
+    "worktreeDir",
+    "worktreeBranch",
+    "baseSha",
+    "gitFilePath",
+    "gitFileSnapshot",
+    "commonConfigPath",
+  ] as const
+  if (requiredStrings.some((field) => typeof value[field] !== "string"))
+    throw new Error("Invalid reservation run paths")
   const requiredNumbers = ["hardDeadlineAt", "terminationGraceMs", "deadlineAt"] as const
   if (requiredNumbers.some((field) => typeof value[field] !== "number" || !Number.isFinite(value[field]))) {
     throw new Error("Invalid reservation run deadline")
   }
   const hardDeadlineAt = Number(value.hardDeadlineAt)
   const terminationGraceMs = Number(value.terminationGraceMs)
-  if (Number(value.deadlineAt) !== hardDeadlineAt + terminationGraceMs) throw new Error("Reservation run deadline mismatch")
-  if (value.mergePolicy !== "auto" && value.mergePolicy !== "integration") throw new Error("Invalid reservation merge policy")
+  if (Number(value.deadlineAt) !== hardDeadlineAt + terminationGraceMs)
+    throw new Error("Reservation run deadline mismatch")
+  if (value.mergePolicy !== "auto" && value.mergePolicy !== "integration")
+    throw new Error("Invalid reservation merge policy")
   if (value.targetDoc !== undefined && (kind !== "dream" || typeof value.targetDoc !== "string")) {
     throw new Error("Invalid dream target document")
   }
   for (const field of ["systemTokenBudget", "systemTokenTarget"] as const) {
-    if (value[field] !== undefined
-      && (kind !== "dream" || !Number.isInteger(value[field]) || Number(value[field]) <= 0)) {
+    if (
+      value[field] !== undefined &&
+      (kind !== "dream" || !Number.isInteger(value[field]) || Number(value[field]) <= 0)
+    ) {
       throw new Error(`Invalid dream ${field}`)
     }
   }
   if ((value.systemTokenBudget === undefined) !== (value.systemTokenTarget === undefined)) {
     throw new Error("Dream token budget metadata is incomplete")
   }
-  if (!optionalPid(value.pid) || !optionalIdentity(value.processStart) || !optionalPid(value.childPid) || !optionalIdentity(value.childProcessStart)) {
+  if (
+    !optionalPid(value.pid) ||
+    !optionalIdentity(value.processStart) ||
+    !optionalPid(value.childPid) ||
+    !optionalIdentity(value.childProcessStart)
+  ) {
     throw new Error("Invalid reservation process identity")
   }
   if (value.attempt !== undefined && (!Number.isInteger(value.attempt) || Number(value.attempt) <= 0)) {
     throw new Error("Invalid reservation run attempt")
   }
   if (value.model !== undefined && typeof value.model !== "string") throw new Error("Invalid reservation run model")
-  if (value.thinking !== undefined && typeof value.thinking !== "string") throw new Error("Invalid reservation run thinking")
-  if (value.category !== undefined && typeof value.category !== "string") throw new Error("Invalid reservation run category")
-  if (value.conversationIds !== undefined
-    && (!Array.isArray(value.conversationIds) || !value.conversationIds.every((id) => typeof id === "string"))) {
+  if (value.thinking !== undefined && typeof value.thinking !== "string")
+    throw new Error("Invalid reservation run thinking")
+  if (value.category !== undefined && typeof value.category !== "string")
+    throw new Error("Invalid reservation run category")
+  if (
+    value.conversationIds !== undefined &&
+    (!Array.isArray(value.conversationIds) || !value.conversationIds.every((id) => typeof id === "string"))
+  ) {
     throw new Error("Invalid reservation run conversations")
   }
   if (value.launching !== undefined && typeof value.launching !== "boolean") {
@@ -116,17 +144,28 @@ export function parseReservationRunLedger(value: unknown): ReservationRunLedger 
   if (value.commonConfigSnapshot !== null && typeof value.commonConfigSnapshot !== "string") {
     throw new Error("Invalid common config snapshot")
   }
-  if (value.finalizePhase !== undefined
-    && value.finalizePhase !== "validated"
-    && value.finalizePhase !== "integrated"
-    && value.finalizePhase !== "settled") {
+  if (
+    value.finalizePhase !== undefined &&
+    value.finalizePhase !== "validated" &&
+    value.finalizePhase !== "integrated" &&
+    value.finalizePhase !== "settled"
+  ) {
     throw new Error("Invalid finalization phase")
   }
-  for (const field of ["validatedTipSha", "integrationSha", "finalizeReason", "finalizeDetail", "finalizedAt"] as const) {
+  for (const field of [
+    "validatedTipSha",
+    "integrationSha",
+    "finalizeReason",
+    "finalizeDetail",
+    "finalizedAt",
+  ] as const) {
     if (value[field] !== undefined && typeof value[field] !== "string") throw new Error(`Invalid ${field}`)
   }
-  if (value.validatedChangedPaths !== undefined
-    && (!Array.isArray(value.validatedChangedPaths) || !value.validatedChangedPaths.every((path) => typeof path === "string"))) {
+  if (
+    value.validatedChangedPaths !== undefined &&
+    (!Array.isArray(value.validatedChangedPaths) ||
+      !value.validatedChangedPaths.every((path) => typeof path === "string"))
+  ) {
     throw new Error("Invalid validated changed paths")
   }
   if (value.finalizeOutcome !== undefined && !isReflectionOutcome(value.finalizeOutcome)) {
@@ -148,12 +187,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isReflectionOutcome(value: unknown): value is ReflectionOutcome {
-  return value === "merged"
-    || value === "no_changes"
-    || value === "parent_dirty"
-    || value === "dirty_uncommitted"
-    || value === "merge_conflict"
-    || value === "admin_tamper"
-    || value === "timed_out"
-    || value === "failed"
+  return (
+    value === "merged" ||
+    value === "no_changes" ||
+    value === "parent_dirty" ||
+    value === "dirty_uncommitted" ||
+    value === "merge_conflict" ||
+    value === "admin_tamper" ||
+    value === "timed_out" ||
+    value === "failed"
+  )
 }

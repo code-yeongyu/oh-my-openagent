@@ -2,8 +2,15 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
 import { spawnSync } from "node:child_process"
 import {
-  chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync,
-  statSync, writeFileSync,
+  chmodSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
 } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
@@ -38,18 +45,22 @@ const TTY_DRIVER = resolve(fileURLToPath(new URL("tty-driver.py", import.meta.ur
 const roots: string[] = []
 const transcripts: string[] = []
 const secrets = [
-  "SK-SENTINEL-DO-NOT-LOG-1", "SK-SENTINEL-DO-NOT-LOG-2",
-  "SK-SENTINEL-DO-NOT-LOG-3", "SK-SENTINEL-DO-NOT-LOG-4",
-  "SK-SENTINEL-DO-NOT-LOG-5", "SK-SENTINEL-DO-NOT-LOG-6",
-  "SK-SENTINEL-DO-NOT-LOG-7", "SK-SENTINEL-DO-NOT-LOG-8",
+  "SK-SENTINEL-DO-NOT-LOG-1",
+  "SK-SENTINEL-DO-NOT-LOG-2",
+  "SK-SENTINEL-DO-NOT-LOG-3",
+  "SK-SENTINEL-DO-NOT-LOG-4",
+  "SK-SENTINEL-DO-NOT-LOG-5",
+  "SK-SENTINEL-DO-NOT-LOG-6",
+  "SK-SENTINEL-DO-NOT-LOG-7",
+  "SK-SENTINEL-DO-NOT-LOG-8",
   "SK-SENTINEL-DO-NOT-LOG-9",
 ]
 
 // The engine's own config-value resolver: every api_key the engine reads from auth.json goes through it.
 const senpiPackageRoot = dirname(dirname(fileURLToPath(import.meta.resolve("@code-yeongyu/senpi"))))
-const { resolveConfigValue } = await import(
+const { resolveConfigValue } = (await import(
   pathToFileURL(join(senpiPackageRoot, "dist", "core", "resolve-config-value.js")).href
-) as { resolveConfigValue(config: string, env?: Record<string, string>): Promise<string | undefined> }
+)) as { resolveConfigValue(config: string, env?: Record<string, string>): Promise<string | undefined> }
 
 type Fixture = { root: string; home: string; agentDir: string; xdg: string; launcher: string }
 type DatabaseHandle = { readonly isOpen: boolean }
@@ -61,7 +72,11 @@ function write(path: string, content: string): void {
   writeFileSync(path, content)
 }
 
-async function database(path: string, version: number, rows: Array<[string, string, string, string | null]>): Promise<void> {
+async function database(
+  path: string,
+  version: number,
+  rows: Array<[string, string, string, string | null]>,
+): Promise<void> {
   mkdirSync(dirname(path), { recursive: true })
   const DatabaseSync = await loadDatabaseSync()
   const db = new DatabaseSync(path)
@@ -81,7 +96,9 @@ async function database(path: string, version: number, rows: Array<[string, stri
     // close() under Bun 1.4 (oven-sh/bun#40001), and the reader that opens the same file next
     // would then block on the Windows file lock.
     for (const [provider, type, key, disabled] of rows) {
-      database.exec(`INSERT INTO auth_credentials (provider, credential_type, data, disabled_cause) VALUES (${sqlLiteral(provider)}, ${sqlLiteral(type)}, ${sqlLiteral(JSON.stringify({ key }))}, ${sqlLiteral(disabled)})`)
+      database.exec(
+        `INSERT INTO auth_credentials (provider, credential_type, data, disabled_cause) VALUES (${sqlLiteral(provider)}, ${sqlLiteral(type)}, ${sqlLiteral(JSON.stringify({ key }))}, ${sqlLiteral(disabled)})`,
+      )
     }
   })
 }
@@ -102,16 +119,23 @@ function fixture(): Fixture {
 function run(item: Fixture, args: string[], ttyInput?: string) {
   const before = sourceSnapshot(item)
   const env: NodeJS.ProcessEnv = {
-    ...process.env, HOME: item.home, USERPROFILE: item.home, SENPI_CODING_AGENT_DIR: item.agentDir,
+    ...process.env,
+    HOME: item.home,
+    USERPROFILE: item.home,
+    SENPI_CODING_AGENT_DIR: item.agentDir,
     XDG_DATA_HOME: item.xdg,
   }
   delete env.OMO_CODING_AGENT_DIR
   delete env.PI_CODING_AGENT_DIR
   // spawnSync only returns after the child exited and was reaped, so teardown never races a live
   // child; a surfaced spawn error must fail here instead of being read as empty output.
-  const result = ttyInput === undefined
-    ? spawnSync(process.execPath, [item.launcher, ...args], { encoding: "utf8", env })
-    : spawnSync("python3", [TTY_DRIVER, ttyInput, "[Y/n]", process.execPath, item.launcher, ...args], { encoding: "utf8", env })
+  const result =
+    ttyInput === undefined
+      ? spawnSync(process.execPath, [item.launcher, ...args], { encoding: "utf8", env })
+      : spawnSync("python3", [TTY_DRIVER, ttyInput, "[Y/n]", process.execPath, item.launcher, ...args], {
+          encoding: "utf8",
+          env,
+        })
   if (result.error) throw result.error
   transcripts.push(`${result.stdout}${result.stderr}`)
   expectSourcesUntouched(before)
@@ -159,15 +183,18 @@ afterEach(() => {
 describe("omo setup credential inheritance", () => {
   test("#given opencode api oauth mapped and gateway entries #when accepted #then every usable api id imports", () => {
     const item = fixture()
-    write(join(item.xdg, "opencode", "auth.json"), JSON.stringify({
-      google: { type: "api", key: secrets[0] },
-      "anthropic-api": { type: "api", key: secrets[1] },
-      xai: { type: "oauth", access: secrets[2] },
-      opencode: { type: "api", key: secrets[3] },
-      "opencode-go": { type: "api", key: secrets[4] },
-      "zai-coding-plan": { type: "api", key: secrets[5] },
-      "unknown-gateway": { type: "api", key: secrets[6] },
-    }))
+    write(
+      join(item.xdg, "opencode", "auth.json"),
+      JSON.stringify({
+        google: { type: "api", key: secrets[0] },
+        "anthropic-api": { type: "api", key: secrets[1] },
+        xai: { type: "oauth", access: secrets[2] },
+        opencode: { type: "api", key: secrets[3] },
+        "opencode-go": { type: "api", key: secrets[4] },
+        "zai-coding-plan": { type: "api", key: secrets[5] },
+        "unknown-gateway": { type: "api", key: secrets[6] },
+      }),
+    )
     const before = sourceSnapshot(item)
 
     const result = run(item, ["setup", "--yes"])
@@ -191,10 +218,13 @@ describe("omo setup credential inheritance", () => {
     const item = fixture()
     const commandShaped = `!${secrets[7]} {env:HOME} \\ ü`
     const templateShaped = `${secrets[8]}$HOME\${HOME}$$$!!`
-    write(join(item.xdg, "opencode", "auth.json"), JSON.stringify({
-      openai: { type: "api", key: commandShaped },
-      google: { type: "api", key: templateShaped },
-    }))
+    write(
+      join(item.xdg, "opencode", "auth.json"),
+      JSON.stringify({
+        openai: { type: "api", key: commandShaped },
+        google: { type: "api", key: templateShaped },
+      }),
+    )
 
     const result = run(item, ["setup", "--yes"])
 
@@ -207,10 +237,13 @@ describe("omo setup credential inheritance", () => {
 
   test("#given a skipped oauth provider #when setup reports #then it names the real sign-in command", () => {
     const item = fixture()
-    write(join(item.xdg, "opencode", "auth.json"), JSON.stringify({
-      openai: { type: "oauth", access: secrets[0] },
-      google: { type: "api", key: secrets[1] },
-    }))
+    write(
+      join(item.xdg, "opencode", "auth.json"),
+      JSON.stringify({
+        openai: { type: "oauth", access: secrets[0] },
+        google: { type: "api", key: secrets[1] },
+      }),
+    )
 
     const result = run(item, ["setup", "--yes"])
 
@@ -222,10 +255,13 @@ describe("omo setup credential inheritance", () => {
 
   test("#given a skipped oauth provider and keys to import #when accepted #then the sign-in guidance is printed exactly once", () => {
     const item = fixture()
-    write(join(item.xdg, "opencode", "auth.json"), JSON.stringify({
-      openai: { type: "oauth", access: secrets[0] },
-      google: { type: "api", key: secrets[1] },
-    }))
+    write(
+      join(item.xdg, "opencode", "auth.json"),
+      JSON.stringify({
+        openai: { type: "oauth", access: secrets[0] },
+        google: { type: "api", key: secrets[1] },
+      }),
+    )
 
     const result = run(item, ["setup", "--yes"])
 
@@ -245,13 +281,19 @@ describe("omo setup credential inheritance", () => {
 
   test("#given the user already signed in to the omo provider #when setup re-runs #then it does not ask for that sign-in again", () => {
     const item = fixture()
-    write(join(item.agentDir, "auth.json"), JSON.stringify({
-      "chatgpt-subscription": { type: "oauth", access: "EXISTING", refresh: "EXISTING", expires: 1 },
-    }))
-    write(join(item.xdg, "opencode", "auth.json"), JSON.stringify({
-      openai: { type: "oauth", access: secrets[0] },
-      anthropic: { type: "oauth", access: secrets[1] },
-    }))
+    write(
+      join(item.agentDir, "auth.json"),
+      JSON.stringify({
+        "chatgpt-subscription": { type: "oauth", access: "EXISTING", refresh: "EXISTING", expires: 1 },
+      }),
+    )
+    write(
+      join(item.xdg, "opencode", "auth.json"),
+      JSON.stringify({
+        openai: { type: "oauth", access: secrets[0] },
+        anthropic: { type: "oauth", access: secrets[1] },
+      }),
+    )
 
     const result = run(item, ["setup", "--yes"])
 
@@ -262,10 +304,13 @@ describe("omo setup credential inheritance", () => {
 
   test("#given a dry run with skipped credentials #when setup previews #then the same guidance is shown", () => {
     const item = fixture()
-    write(join(item.xdg, "opencode", "auth.json"), JSON.stringify({
-      openai: { type: "oauth", access: secrets[0] },
-      "unknown-gateway": { type: "api", key: secrets[1] },
-    }))
+    write(
+      join(item.xdg, "opencode", "auth.json"),
+      JSON.stringify({
+        openai: { type: "oauth", access: secrets[0] },
+        "unknown-gateway": { type: "api", key: secrets[1] },
+      }),
+    )
 
     const result = run(item, ["setup", "--dry-run"])
 
@@ -275,42 +320,49 @@ describe("omo setup credential inheritance", () => {
     expect(result.stdout).toContain("models.json")
   })
 
-  test.skipIf(!SQLITE_AVAILABLE)("#given pinned omp and gjc databases #when accepted #then allow-listed rows import and unknown schema is noticed", async () => {
-    const item = fixture()
-    await database(join(item.home, ".omp", "agent", "agent.db"), 7, [["google", "api_key", secrets[0], null]])
-    await database(join(item.home, ".gjc", "agent", "agent.db"), 4, [
-      ["openai", "api_key", secrets[1], null],
-      ["xai", "oauth", secrets[2], null],
-      ["anthropic", "api_key", secrets[3], "disabled"],
-    ])
+  test.skipIf(!SQLITE_AVAILABLE)(
+    "#given pinned omp and gjc databases #when accepted #then allow-listed rows import and unknown schema is noticed",
+    async () => {
+      const item = fixture()
+      await database(join(item.home, ".omp", "agent", "agent.db"), 7, [["google", "api_key", secrets[0], null]])
+      await database(join(item.home, ".gjc", "agent", "agent.db"), 4, [
+        ["openai", "api_key", secrets[1], null],
+        ["xai", "oauth", secrets[2], null],
+        ["anthropic", "api_key", secrets[3], "disabled"],
+      ])
 
-    const result = run(item, ["setup", "--yes"])
-    const output = `${result.stdout}${result.stderr}`
+      const result = run(item, ["setup", "--yes"])
+      const output = `${result.stdout}${result.stderr}`
 
-    expect(result.status).toBe(0)
-    expect(output).not.toContain("could not inspect agent.db")
-    expect(output).toContain("imported: 2")
-    expect(existsSync(join(item.agentDir, "auth.json"))).toBe(true)
-    expect(auth(item)).toEqual({
-      google: { type: "api_key", key: secrets[0] },
-      openai: { type: "api_key", key: secrets[1] },
-    })
-    const unknown = fixture()
-    await database(join(unknown.home, ".omp", "agent", "agent.db"), 99, [["google", "api_key", secrets[0], null]])
-    const unknownResult = run(unknown, ["setup", "--yes"])
-    expect(unknownResult.status).toBe(0)
-    expect(unknownResult.stdout).toContain("auth schema version 99 is unknown")
-    expect(existsSync(join(unknown.agentDir, "auth.json"))).toBe(false)
-    expect(databaseHandles.map((database) => database.isOpen)).toEqual([false, false, false])
-  })
+      expect(result.status).toBe(0)
+      expect(output).not.toContain("could not inspect agent.db")
+      expect(output).toContain("imported: 2")
+      expect(existsSync(join(item.agentDir, "auth.json"))).toBe(true)
+      expect(auth(item)).toEqual({
+        google: { type: "api_key", key: secrets[0] },
+        openai: { type: "api_key", key: secrets[1] },
+      })
+      const unknown = fixture()
+      await database(join(unknown.home, ".omp", "agent", "agent.db"), 99, [["google", "api_key", secrets[0], null]])
+      const unknownResult = run(unknown, ["setup", "--yes"])
+      expect(unknownResult.status).toBe(0)
+      expect(unknownResult.stdout).toContain("auth schema version 99 is unknown")
+      expect(existsSync(join(unknown.agentDir, "auth.json"))).toBe(false)
+      expect(databaseHandles.map((database) => database.isOpen)).toEqual([false, false, false])
+    },
+  )
 
   test("#given an existing senpi provider #when other keys import #then its entry stays structurally byte-identical", () => {
     const item = fixture()
     const existing = { type: "api_key", key: "EXISTING-NOT-A-SENTINEL", metadata: { order: [3, 2, 1] } }
     write(join(item.agentDir, "auth.json"), JSON.stringify({ google: existing }))
-    write(join(item.xdg, "opencode", "auth.json"), JSON.stringify({
-      google: { type: "api", key: secrets[0] }, openai: { type: "api", key: secrets[1] },
-    }))
+    write(
+      join(item.xdg, "opencode", "auth.json"),
+      JSON.stringify({
+        google: { type: "api", key: secrets[0] },
+        openai: { type: "api", key: secrets[1] },
+      }),
+    )
 
     const result = run(item, ["setup", "--yes"])
 
@@ -354,14 +406,17 @@ describe("omo setup credential inheritance", () => {
     expect(`${result.stdout}${result.stderr}`).toContain("DRY RUN")
   })
 
-  test.skipIf(process.platform === "win32")("#given declined consent #when setup runs #then auth remains absent", () => {
-    const item = fixture()
-    write(join(item.xdg, "opencode", "auth.json"), JSON.stringify({ openai: { type: "api", key: secrets[0] } }))
-    const result = run(item, ["setup"], "n\n")
-    expect(result.status).toBe(0)
-    expect(existsSync(join(item.agentDir, "auth.json"))).toBe(false)
-    expect(`${result.stdout}${result.stderr}`).toContain("Import cancelled")
-  })
+  test.skipIf(process.platform === "win32")(
+    "#given declined consent #when setup runs #then auth remains absent",
+    () => {
+      const item = fixture()
+      write(join(item.xdg, "opencode", "auth.json"), JSON.stringify({ openai: { type: "api", key: secrets[0] } }))
+      const result = run(item, ["setup"], "n\n")
+      expect(result.status).toBe(0)
+      expect(existsSync(join(item.agentDir, "auth.json"))).toBe(false)
+      expect(`${result.stdout}${result.stderr}`).toContain("Import cancelled")
+    },
+  )
 
   test("#given malformed senpi auth #when accepted #then it warns and skips all writes", () => {
     const item = fixture()
@@ -398,7 +453,12 @@ describe("omo setup import", () => {
           join(item.xdg, "opencode", "auth.json"),
           JSON.stringify({ google: { type: "api", key: "IMPORT-SECRET" } }),
         )
-        const env: NodeJS.ProcessEnv = { ...process.env, HOME: item.home, USERPROFILE: item.home, XDG_DATA_HOME: item.xdg }
+        const env: NodeJS.ProcessEnv = {
+          ...process.env,
+          HOME: item.home,
+          USERPROFILE: item.home,
+          XDG_DATA_HOME: item.xdg,
+        }
         delete env.OMO_CODING_AGENT_DIR
         delete env.SENPI_CODING_AGENT_DIR
         delete env.PI_CODING_AGENT_DIR

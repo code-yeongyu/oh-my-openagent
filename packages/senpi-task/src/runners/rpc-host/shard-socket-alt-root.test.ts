@@ -4,8 +4,22 @@ import { tmpdir } from "node:os"
 import { basename, dirname, join } from "node:path"
 import { afterEach, describe, expect, test } from "bun:test"
 
-import { MAX_SHARD_BIND_PATH, SHARD_ROOT_ENV, altRoot, resolveShardSocket, validateBindPath, type AltRootFs } from "./shard-socket"
-import { LEGACY_OVERRIDES, LONG_ROOT, OWNER_KEY, freshAgentDir, removeFreshAgentDirs, rootIdentity } from "./shard-socket.test-support"
+import {
+  MAX_SHARD_BIND_PATH,
+  SHARD_ROOT_ENV,
+  altRoot,
+  resolveShardSocket,
+  validateBindPath,
+  type AltRootFs,
+} from "./shard-socket"
+import {
+  LEGACY_OVERRIDES,
+  LONG_ROOT,
+  OWNER_KEY,
+  freshAgentDir,
+  removeFreshAgentDirs,
+  rootIdentity,
+} from "./shard-socket.test-support"
 
 afterEach(removeFreshAgentDirs)
 
@@ -36,7 +50,9 @@ describe.skipIf(process.platform === "win32")("the POSIX alternate shard root", 
 
         // then
         expect(root).toMatch(/^\/tmp\/omo-rpc-[0-9a-f]{8}$/)
-        expect(root).toBe(join("/tmp", `omo-rpc-${createHash("sha256").update("/h/.omo/agent").digest("hex").slice(0, 8)}`))
+        expect(root).toBe(
+          join("/tmp", `omo-rpc-${createHash("sha256").update("/h/.omo/agent").digest("hex").slice(0, 8)}`),
+        )
         expect(root.startsWith(tmpdir())).toBe(false)
       } finally {
         if (previous === undefined) delete process.env["TMPDIR"]
@@ -49,7 +65,11 @@ describe.skipIf(process.platform === "win32")("the POSIX alternate shard root", 
     test("#given a fresh alternate root #when resolving #then it is created as a private directory and accepted", () => {
       const agentDir = freshAgentDir()
 
-      const resolution = resolveShardSocket({ agentDir, env: { [SHARD_ROOT_ENV]: LONG_ROOT }, identity: rootIdentity() })
+      const resolution = resolveShardSocket({
+        agentDir,
+        env: { [SHARD_ROOT_ENV]: LONG_ROOT },
+        identity: rootIdentity(),
+      })
 
       expect(resolution.root).toBe("alt")
       expect(statSync(dirname(resolution.socket)).mode & 0o777).toBe(0o700)
@@ -61,9 +81,9 @@ describe.skipIf(process.platform === "win32")("the POSIX alternate shard root", 
       mkdirSync(root, { recursive: true, mode: 0o700 })
       chmodSync(root, 0o755)
 
-      expect(() => resolveShardSocket({ agentDir, env: { [SHARD_ROOT_ENV]: LONG_ROOT }, identity: rootIdentity() })).toThrow(
-        "shard_alt_root_unsafe",
-      )
+      expect(() =>
+        resolveShardSocket({ agentDir, env: { [SHARD_ROOT_ENV]: LONG_ROOT }, identity: rootIdentity() }),
+      ).toThrow("shard_alt_root_unsafe")
     })
 
     test("#given a symlink at the alternate root path #when resolving #then it throws shard_alt_root_unsafe", () => {
@@ -71,9 +91,9 @@ describe.skipIf(process.platform === "win32")("the POSIX alternate shard root", 
       const root = altRoot(agentDir)
       symlinkSync(agentDir, root)
 
-      expect(() => resolveShardSocket({ agentDir, env: { [SHARD_ROOT_ENV]: LONG_ROOT }, identity: rootIdentity() })).toThrow(
-        "shard_alt_root_unsafe",
-      )
+      expect(() =>
+        resolveShardSocket({ agentDir, env: { [SHARD_ROOT_ENV]: LONG_ROOT }, identity: rootIdentity() }),
+      ).toThrow("shard_alt_root_unsafe")
     })
 
     for (const shape of ["file", "dangling symlink"] as const) {
@@ -83,9 +103,9 @@ describe.skipIf(process.platform === "win32")("the POSIX alternate shard root", 
         if (shape === "file") writeFileSync(root, "occupied")
         else symlinkSync(join(agentDir, "absent"), root)
 
-        expect(() => resolveShardSocket({ agentDir, env: { [SHARD_ROOT_ENV]: LONG_ROOT }, identity: rootIdentity() })).toThrow(
-          "shard_alt_root_unsafe",
-        )
+        expect(() =>
+          resolveShardSocket({ agentDir, env: { [SHARD_ROOT_ENV]: LONG_ROOT }, identity: rootIdentity() }),
+        ).toThrow("shard_alt_root_unsafe")
       })
     }
 
@@ -111,9 +131,9 @@ describe.skipIf(process.platform === "win32")("the POSIX alternate shard root", 
       expect(stat.mode & 0o777).toBe(0o700)
 
       // when / then
-      expect(() => resolveShardSocket({ agentDir, env: { [SHARD_ROOT_ENV]: LONG_ROOT }, identity: rootIdentity(), fs })).toThrow(
-        "shard_alt_root_unsafe",
-      )
+      expect(() =>
+        resolveShardSocket({ agentDir, env: { [SHARD_ROOT_ENV]: LONG_ROOT }, identity: rootIdentity(), fs }),
+      ).toThrow("shard_alt_root_unsafe")
     })
 
     test("#given an owned 0600 regular file at the alternate root path #when resolving #then the shape alone refuses it with shard_alt_root_unsafe", () => {
@@ -127,9 +147,9 @@ describe.skipIf(process.platform === "win32")("the POSIX alternate shard root", 
       expect(stat.mode & 0o777).toBe(0o600)
 
       // when / then
-      expect(() => resolveShardSocket({ agentDir, env: { [SHARD_ROOT_ENV]: LONG_ROOT }, identity: rootIdentity() })).toThrow(
-        "shard_alt_root_unsafe",
-      )
+      expect(() =>
+        resolveShardSocket({ agentDir, env: { [SHARD_ROOT_ENV]: LONG_ROOT }, identity: rootIdentity() }),
+      ).toThrow("shard_alt_root_unsafe")
     })
 
     test("#given the created alternate root is replaced by a symlink before validation #when resolving #then it refuses the replacement", () => {
@@ -147,9 +167,9 @@ describe.skipIf(process.platform === "win32")("the POSIX alternate shard root", 
         },
       }
 
-      expect(() => resolveShardSocket({ agentDir, env: { [SHARD_ROOT_ENV]: LONG_ROOT }, identity: rootIdentity(), fs })).toThrow(
-        "shard_alt_root_unsafe",
-      )
+      expect(() =>
+        resolveShardSocket({ agentDir, env: { [SHARD_ROOT_ENV]: LONG_ROOT }, identity: rootIdentity(), fs }),
+      ).toThrow("shard_alt_root_unsafe")
     })
 
     test("#given an alternate root owned by another uid through the injected port #when resolving #then it throws shard_alt_root_unsafe", () => {
@@ -163,9 +183,9 @@ describe.skipIf(process.platform === "win32")("the POSIX alternate shard root", 
         },
       }
 
-      expect(() => resolveShardSocket({ agentDir, env: { [SHARD_ROOT_ENV]: LONG_ROOT }, identity: rootIdentity(), fs })).toThrow(
-        "shard_alt_root_unsafe",
-      )
+      expect(() =>
+        resolveShardSocket({ agentDir, env: { [SHARD_ROOT_ENV]: LONG_ROOT }, identity: rootIdentity(), fs }),
+      ).toThrow("shard_alt_root_unsafe")
     })
 
     test("#given a 120-byte root #when resolving #then the same basename lands under the alternate root with a notice and its siblings fit", () => {
@@ -173,7 +193,11 @@ describe.skipIf(process.platform === "win32")("the POSIX alternate shard root", 
       const agentDir = freshAgentDir()
 
       // when
-      const resolution = resolveShardSocket({ agentDir, env: { [SHARD_ROOT_ENV]: LONG_ROOT }, identity: rootIdentity() })
+      const resolution = resolveShardSocket({
+        agentDir,
+        env: { [SHARD_ROOT_ENV]: LONG_ROOT },
+        identity: rootIdentity(),
+      })
 
       // then
       expect(Buffer.byteLength(LONG_ROOT)).toBe(120)
@@ -196,7 +220,11 @@ describe.skipIf(process.platform === "win32")("the POSIX alternate shard root", 
         const alt = altRoot(agentDir)
 
         // when
-        const resolution = resolveShardSocket({ agentDir, env: { [SHARD_ROOT_ENV]: LONG_ROOT }, identity: rootIdentity() })
+        const resolution = resolveShardSocket({
+          agentDir,
+          env: { [SHARD_ROOT_ENV]: LONG_ROOT },
+          identity: rootIdentity(),
+        })
 
         // then
         const name = basename(resolution.socket)
@@ -215,7 +243,13 @@ describe.skipIf(process.platform === "win32")("the POSIX alternate shard root", 
       // when / then
       const alt = resolveShardSocket({ agentDir, env: { [SHARD_ROOT_ENV]: LONG_ROOT }, identity: rootIdentity() })
       expect(alt.root).toBe("alt")
-      expect(resolveShardSocket({ agentDir, env: { ...LEGACY_OVERRIDES, [SHARD_ROOT_ENV]: LONG_ROOT }, identity: rootIdentity() })).toEqual(alt)
+      expect(
+        resolveShardSocket({
+          agentDir,
+          env: { ...LEGACY_OVERRIDES, [SHARD_ROOT_ENV]: LONG_ROOT },
+          identity: rootIdentity(),
+        }),
+      ).toEqual(alt)
     })
   })
 })

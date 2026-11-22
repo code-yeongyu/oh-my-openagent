@@ -108,9 +108,13 @@ describe("run terminal precedence", () => {
     useTestTimeout(30_000)
     const item = await fixture()
     let releaseStateRead!: () => void
-    const stateReadRelease = new Promise<void>((resolve) => { releaseStateRead = resolve })
+    const stateReadRelease = new Promise<void>((resolve) => {
+      releaseStateRead = resolve
+    })
     let stateReadReached!: () => void
-    const reachedStateRead = new Promise<void>((resolve) => { stateReadReached = resolve })
+    const reachedStateRead = new Promise<void>((resolve) => {
+      stateReadReached = resolve
+    })
     let completedAsFailed = false
     const reservation = {
       readState: async () => {
@@ -123,11 +127,15 @@ describe("run terminal precedence", () => {
         return { outcome }
       },
     }
-    const abandonment = abandonReservationRun({
-      identity: item.identity,
-      reservation,
-      now: Date.now,
-    }, item.runDir, item.ledger)
+    const abandonment = abandonReservationRun(
+      {
+        identity: item.identity,
+        reservation,
+        now: Date.now,
+      },
+      item.runDir,
+      item.ledger,
+    )
     await reachedStateRead
 
     const supervisor = spawn(process.execPath, [supervisorPath, item.runDir], {
@@ -138,7 +146,7 @@ describe("run terminal precedence", () => {
     const supervisorExit = waitForExit(supervisor)
     await waitForFilesystemState(
       item.runDir,
-      () => existsSync(join(item.runDir, "publishing.json")) ? true : undefined,
+      () => (existsSync(join(item.runDir, "publishing.json")) ? true : undefined),
       remainingTestTime(),
       "outcome publication claim",
     )

@@ -35,11 +35,19 @@ async function repoMirroringToABlockedRemote(shell: string) {
   const pushing = join(bare, "pushing")
   execFileSync("git", ["init", "--bare", "--quiet", "--initial-branch=main", bare])
   disableFixtureAutoMaintenance(bare, true)
-  await writeFile(join(bare, "hooks", "pre-receive"), `#!/bin/sh\n: > "${pushing}"\nwhile [ ! -f "${release}" ]; do sleep 0.1; done\nexit 0\n`, "utf8")
+  await writeFile(
+    join(bare, "hooks", "pre-receive"),
+    `#!/bin/sh\n: > "${pushing}"\nwhile [ ! -f "${release}" ]; do sleep 0.1; done\nexit 0\n`,
+    "utf8",
+  )
   chmodSync(join(bare, "hooks", "pre-receive"), 0o755)
   execFileSync("git", ["init", "--quiet", "--initial-branch=main", repo])
   disableFixtureAutoMaintenance(repo)
-  for (const [key, value] of [["user.email", "m@example.invalid"], ["user.name", "m"], [CONFIG_KEY, `file://${bare}`]] as const) {
+  for (const [key, value] of [
+    ["user.email", "m@example.invalid"],
+    ["user.name", "m"],
+    [CONFIG_KEY, `file://${bare}`],
+  ] as const) {
     execFileSync("git", ["-C", repo, "config", key, value])
   }
   const hook = join(repo, ".git", "hooks", "post-commit")
@@ -54,21 +62,34 @@ async function repoMirroringToABlockedRemote(shell: string) {
 const SHELLS = ["/bin/sh", "/bin/dash"].filter((shell) => existsSync(shell))
 
 describe("a mirrored memory commit (omo #10199 delta review)", () => {
-  test.skipIf(process.platform === "win32").each(SHELLS)("#given the mirror push is still running in the background under %s #when the commit finishes #then it settles without waiting on the push or the exit drain", async (shell) => {
-    // #given
-    const { repo, release, pushing } = await repoMirroringToABlockedRemote(shell)
-    const exec = createNodeGitExec()
+  test.skipIf(process.platform === "win32").each(SHELLS)(
+    "#given the mirror push is still running in the background under %s #when the commit finishes #then it settles without waiting on the push or the exit drain",
+    async (shell) => {
+      // #given
+      const { repo, release, pushing } = await repoMirroringToABlockedRemote(shell)
+      const exec = createNodeGitExec()
 
-    // #when
-    const commit = exec.run(["commit", "--allow-empty", "-q", "-m", "mirrored"], { cwd: repo, timeoutMs: 600_000, exitDrainMs: 600_000 })
-    const settled = await settlesWithin(commit, 30_000)
-    const pushStarted = await probeUntil(() => existsSync(pushing), 20_000)
-    await writeFile(release, "", "utf8")
+      // #when
+      const commit = exec.run(["commit", "--allow-empty", "-q", "-m", "mirrored"], {
+        cwd: repo,
+        timeoutMs: 600_000,
+        exitDrainMs: 600_000,
+      })
+      const settled = await settlesWithin(commit, 30_000)
+      const pushStarted = await probeUntil(() => existsSync(pushing), 20_000)
+      await writeFile(release, "", "utf8")
 
-    // #then
-    expect(pushStarted).toBe(true)
-    expect(settled.kind).toBe("settled")
-    if (settled.kind === "settled") expect(settled.value.code).toBe(0)
-    expect(await probeUntil(async () => (await readFile(mirrorLogPath(repo), "utf8").catch(() => "")).includes("exit=0"), 30_000)).toBe(true)
-  }, 120_000)
+      // #then
+      expect(pushStarted).toBe(true)
+      expect(settled.kind).toBe("settled")
+      if (settled.kind === "settled") expect(settled.value.code).toBe(0)
+      expect(
+        await probeUntil(
+          async () => (await readFile(mirrorLogPath(repo), "utf8").catch(() => "")).includes("exit=0"),
+          30_000,
+        ),
+      ).toBe(true)
+    },
+    120_000,
+  )
 })

@@ -76,7 +76,11 @@ export async function writeOptionalRun(path: string, run: ReservedRun | undefine
  * (#11976 case E). The caller holds the scheduler lock and has proven no run is live. Returns the
  * new name, or undefined when the lock is gone or no longer the bytes the caller decided on.
  */
-export async function moveTornReservationAside(reflectionDir: string, expected: string, at: Date): Promise<string | undefined> {
+export async function moveTornReservationAside(
+  reflectionDir: string,
+  expected: string,
+  at: Date,
+): Promise<string | undefined> {
   const activePath = join(reflectionDir, "active.lock")
   let current: string
   try {
@@ -109,11 +113,18 @@ function isReflectionRequest(value: unknown): value is ReflectionRequest {
   if (!value || typeof value !== "object") return false
   const request = value as Record<string, unknown>
   return (
-    (request.trigger === "manual" || request.trigger === "compaction" || request.trigger === "step-count" || request.trigger === "dream") &&
+    (request.trigger === "manual" ||
+      request.trigger === "compaction" ||
+      request.trigger === "step-count" ||
+      request.trigger === "dream") &&
     (request.trigger === "dream"
-      ? request.origin === "manual" || request.origin === "idle" || request.origin === "shutdown" || request.origin === "pressure"
+      ? request.origin === "manual" ||
+        request.origin === "idle" ||
+        request.origin === "shutdown" ||
+        request.origin === "pressure"
       : request.origin === undefined) &&
-    Array.isArray(request.conversationIds) && request.conversationIds.every((id) => typeof id === "string") &&
+    Array.isArray(request.conversationIds) &&
+    request.conversationIds.every((id) => typeof id === "string") &&
     Array.isArray(request.snapshots) &&
     (request.targetDoc === undefined || (request.trigger === "dream" && typeof request.targetDoc === "string"))
   )

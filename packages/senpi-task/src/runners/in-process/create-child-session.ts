@@ -10,7 +10,10 @@ export type ChildDialogBinding = {
   readonly taskId: string
 }
 
-export type CreateChildSession = (options: CreateAgentSessionOptions, dialogs?: ChildDialogBinding) => Promise<ChildSession>
+export type CreateChildSession = (
+  options: CreateAgentSessionOptions,
+  dialogs?: ChildDialogBinding,
+) => Promise<ChildSession>
 
 export const defaultCreateChildSession: CreateChildSession = async (options, dialogs) => {
   // SDK callers that supply a ResourceLoader own its reload and extension binding. Load the
@@ -19,9 +22,10 @@ export const defaultCreateChildSession: CreateChildSession = async (options, dia
   await options.resourceLoader?.reload()
   const session = (await (await loadSenpiBarrel()).createAgentSession(options)).session
   // Without a forwarder the child has no UI, so a gated call that asks is refused (the engine's no-UI path).
-  const uiContext = dialogs === undefined
-    ? undefined
-    : createForwardingUIContext(session.extensionRunner.getUIContext(), dialogs.forwarder, dialogs.taskId)
+  const uiContext =
+    dialogs === undefined
+      ? undefined
+      : createForwardingUIContext(session.extensionRunner.getUIContext(), dialogs.forwarder, dialogs.taskId)
   await session.bindExtensions({ mode: "print", ...(uiContext === undefined ? {} : { uiContext }) })
   return session
 }

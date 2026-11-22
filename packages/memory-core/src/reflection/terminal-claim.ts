@@ -1,13 +1,5 @@
 import { randomUUID } from "node:crypto"
-import {
-  closeSync,
-  fsyncSync,
-  linkSync,
-  openSync,
-  readFileSync,
-  unlinkSync,
-  writeFileSync,
-} from "../fs/resilient"
+import { closeSync, fsyncSync, linkSync, openSync, readFileSync, unlinkSync, writeFileSync } from "../fs/resilient"
 import { dirname, join } from "node:path"
 
 import { withLock } from "../locks/acquire"
@@ -40,7 +32,10 @@ export interface RunTerminalClaim {
 
 /** The claim file can be neither read nor replaced, so no process can ever settle this run through it. */
 export class RunTerminalClaimUnrecoverableError extends Error {
-  constructor(readonly runDir: string, options?: ErrorOptions) {
+  constructor(
+    readonly runDir: string,
+    options?: ErrorOptions,
+  ) {
     super(`Run terminal claim cannot be recovered in ${runDir}`, options)
     this.name = "RunTerminalClaimUnrecoverableError"
   }
@@ -103,9 +98,9 @@ export function runTerminalClaimMatches(
   identity: { readonly runId: string; readonly attempt: number },
   kind?: RunTerminalClaimKind,
 ): boolean {
-  return claim.runId === identity.runId
-    && claim.attempt === identity.attempt
-    && (kind === undefined || claim.kind === kind)
+  return (
+    claim.runId === identity.runId && claim.attempt === identity.attempt && (kind === undefined || claim.kind === kind)
+  )
 }
 
 function createExclusiveClaim(path: string, claim: RunTerminalClaim): boolean {
@@ -157,19 +152,24 @@ async function recoverClaim(
   seams: RunTerminalClaimSeams,
 ): Promise<RunTerminalClaim | undefined> {
   const record = await createLockRecord("reflection-finalize", { runId: identity.runId })
-  return withLock(join(runDir, "terminal-claim-recovery.lock"), record, async () => {
-    const current = readClaimSnapshot(claimPath)
-    if (current === undefined) return undefined
-    if (current.raw !== inspected.raw) return current.claim
-    if (reason === "invalid") {
-      if (current.claim !== undefined) return current.claim
-    } else {
-      if (current.claim === undefined) return undefined
-      if (current.claim.kind !== "publish" || !claimantIsConfirmedDead(current.claim, seams)) return current.claim
-    }
-    removeClaim(claimPath)
-    return undefined
-  }, { waitTimeoutMs: Number.POSITIVE_INFINITY })
+  return withLock(
+    join(runDir, "terminal-claim-recovery.lock"),
+    record,
+    async () => {
+      const current = readClaimSnapshot(claimPath)
+      if (current === undefined) return undefined
+      if (current.raw !== inspected.raw) return current.claim
+      if (reason === "invalid") {
+        if (current.claim !== undefined) return current.claim
+      } else {
+        if (current.claim === undefined) return undefined
+        if (current.claim.kind !== "publish" || !claimantIsConfirmedDead(current.claim, seams)) return current.claim
+      }
+      removeClaim(claimPath)
+      return undefined
+    },
+    { waitTimeoutMs: Number.POSITIVE_INFINITY },
+  )
 }
 
 function removeClaim(path: string): void {
@@ -185,13 +185,15 @@ function claimantIsConfirmedDead(claim: RunTerminalClaim, seams: RunLivenessSeam
 }
 
 function parseRunTerminalClaim(value: unknown): RunTerminalClaim {
-  if (!isRecord(value)
-    || value.version !== 1
-    || (value.kind !== "publish" && value.kind !== "abandon")
-    || typeof value.runId !== "string"
-    || !Number.isInteger(value.attempt)
-    || !Number.isInteger(value.claimantPid)
-    || Number(value.claimantPid) <= 0) {
+  if (
+    !isRecord(value) ||
+    value.version !== 1 ||
+    (value.kind !== "publish" && value.kind !== "abandon") ||
+    typeof value.runId !== "string" ||
+    !Number.isInteger(value.attempt) ||
+    !Number.isInteger(value.claimantPid) ||
+    Number(value.claimantPid) <= 0
+  ) {
     throw new TypeError("Invalid run terminal claim")
   }
   return {
@@ -235,7 +237,10 @@ export type RunTerminalPublication = "settled" | "finalize" | "veto"
  * sentinel, an outcome published for this attempt, or a publication in progress. `undefined` means
  * nothing has, and a terminal claim may be attempted.
  */
-export function readRunTerminalPublication(runDir: string, attempt: number | undefined): RunTerminalPublication | undefined {
+export function readRunTerminalPublication(
+  runDir: string,
+  attempt: number | undefined,
+): RunTerminalPublication | undefined {
   for (const name of ["final.json", "abandoned.json", "quarantined.json"]) {
     if (fileExists(join(runDir, name))) return "settled"
   }

@@ -14,27 +14,23 @@ export type LastUserRetryPayload = {
   tools?: Record<string, boolean>
 }
 
-export function getLastUserRetryParts(
-  messagesResponse: unknown,
-  sessionID?: string,
-): RetryPart[] {
+export function getLastUserRetryParts(messagesResponse: unknown, sessionID?: string): RetryPart[] {
   return getLastUserRetryPayload(messagesResponse, sessionID).retryParts
 }
 
-export function getLastUserRetryPayload(
-  messagesResponse: unknown,
-  sessionID?: string,
-): LastUserRetryPayload {
+export function getLastUserRetryPayload(messagesResponse: unknown, sessionID?: string): LastUserRetryPayload {
   const bootstrap = sessionID ? getDelegatedChildSessionBootstrap(sessionID) : undefined
   const messages = extractSessionMessages(messagesResponse)
-  const lastUserMessage = messages?.filter((message) => {
-    if (message.info?.role !== "user") return false
-    const propParts = Array.isArray(message.parts) ? message.parts : undefined
-    const infoParts = Array.isArray(message.info?.parts) ? message.info.parts : undefined
-    const parts = propParts && propParts.length > 0 ? propParts : infoParts
-    if (hasCompactionPart(parts)) return false
-    return hasSubstantivePromptText(parts)
-  }).pop()
+  const lastUserMessage = messages
+    ?.filter((message) => {
+      if (message.info?.role !== "user") return false
+      const propParts = Array.isArray(message.parts) ? message.parts : undefined
+      const infoParts = Array.isArray(message.info?.parts) ? message.info.parts : undefined
+      const parts = propParts && propParts.length > 0 ? propParts : infoParts
+      if (hasCompactionPart(parts)) return false
+      return hasSubstantivePromptText(parts)
+    })
+    .pop()
   const propParts = Array.isArray(lastUserMessage?.parts) ? lastUserMessage.parts : undefined
   const infoParts = Array.isArray(lastUserMessage?.info?.parts) ? lastUserMessage.info.parts : undefined
   const lastUserParts = propParts && propParts.length > 0 ? propParts : infoParts
@@ -42,9 +38,7 @@ export function getLastUserRetryPayload(
   const retryParts = (lastUserParts ?? [])
     .filter(
       (part): part is { type: "text"; text: string } =>
-        part.type === "text"
-        && typeof part.text === "string"
-        && part.text.length > 0,
+        part.type === "text" && typeof part.text === "string" && part.text.length > 0,
     )
     .map((part) => ({ type: "text" as const, text: part.text }))
 

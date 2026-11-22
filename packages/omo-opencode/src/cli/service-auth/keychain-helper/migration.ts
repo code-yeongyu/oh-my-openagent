@@ -26,7 +26,10 @@ export async function migrate(
   if ((await helper({ verb: "stage", account, value })).ok !== true) return { kind: "failed", step: "stage" }
   const retired = await helper({ verb: "retire", account })
   // A helper that predates the eight slots answers `skipped` when its one `.old` slot is taken, and no `slot` on success.
-  if ((retired.error === "exists" && retired.reason === "old-slots-full") || (retired.ok === true && retired.skipped === true)) {
+  if (
+    (retired.error === "exists" && retired.reason === "old-slots-full") ||
+    (retired.ok === true && retired.skipped === true)
+  ) {
     await helper({ verb: "remove", account: `${account}.staging` })
     return { kind: "skipped", reason: "old-slots-full" }
   }

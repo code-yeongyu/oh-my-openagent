@@ -27,7 +27,18 @@ async function fixture(): Promise<{ readonly dir: string; readonly repo: GitMemo
 }
 
 async function retire(dir: string, path: string): Promise<void> {
-  for (const argv of [["rm", "-q", "--", path], ["-c", "user.email=fixture@example.com", "-c", "user.name=fixture", "commit", "-qm", `chore(dream): archive ${path}`]]) {
+  for (const argv of [
+    ["rm", "-q", "--", path],
+    [
+      "-c",
+      "user.email=fixture@example.com",
+      "-c",
+      "user.name=fixture",
+      "commit",
+      "-qm",
+      `chore(dream): archive ${path}`,
+    ],
+  ]) {
     const result = await exec.run(argv, { cwd: dir, timeoutMs: 30_000 })
     if (result.code !== 0) throw new Error(result.stderr)
   }
@@ -36,10 +47,14 @@ async function retire(dir: string, path: string): Promise<void> {
 let batch = 0
 async function extract(repo: GitMemoryRepo, text: string, date: string): Promise<void> {
   batch += 1
-  const result = await applyFactsBatch(repo, {
-    batchId: `11111111-1111-4111-8111-${String(batch).padStart(12, "0")}`,
-    records: [{ scope: "project", text, date }],
-  }, AUTHOR)
+  const result = await applyFactsBatch(
+    repo,
+    {
+      batchId: `11111111-1111-4111-8111-${String(batch).padStart(12, "0")}`,
+      records: [{ scope: "project", text, date }],
+    },
+    AUTHOR,
+  )
   expect(result.outcome).toBe("committed")
 }
 
@@ -58,7 +73,9 @@ describe("facts never reuse a retired ledger path (#12642)", () => {
     expect(existsSync(join(dir, "notes/facts/2026-10.md"))).toBe(false)
     const successor = parseMemoryFile(await readFile(join(dir, "notes/facts/2026-10-2.md"), "utf8"))
     expect(successor.frontmatter.description).toBe("Explicit facts for 2026-10")
-    expect(successor.body).toBe("- [2026-10-20] The release moved to Friday.\n- [2026-10-21] Reviews need one approval.\n")
+    expect(successor.body).toBe(
+      "- [2026-10-20] The release moved to Friday.\n- [2026-10-21] Reviews need one approval.\n",
+    )
   }, 30_000)
 
   test("#given the successor ledger was archived too #when the month gets new facts #then the next unused successor is created", async () => {
@@ -75,6 +92,8 @@ describe("facts never reuse a retired ledger path (#12642)", () => {
     // then
     expect(existsSync(join(dir, "notes/facts/2026-10.md"))).toBe(false)
     expect(existsSync(join(dir, "notes/facts/2026-10-2.md"))).toBe(false)
-    expect(parseMemoryFile(await readFile(join(dir, "notes/facts/2026-10-3.md"), "utf8")).body).toBe("- [2026-10-03] Third.\n")
+    expect(parseMemoryFile(await readFile(join(dir, "notes/facts/2026-10-3.md"), "utf8")).body).toBe(
+      "- [2026-10-03] Third.\n",
+    )
   }, 30_000)
 })

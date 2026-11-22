@@ -1,5 +1,10 @@
 import type { ChildModelRegistry, ParentState } from "@oh-my-opencode/senpi-task"
-import { RELEASE_RUN_FENCE, type EnginePauseState, type EngineRunHoldContext, type RunRef } from "../../../../senpi-task/src/pause/ports"
+import {
+  RELEASE_RUN_FENCE,
+  type EnginePauseState,
+  type EngineRunHoldContext,
+  type RunRef,
+} from "../../../../senpi-task/src/pause/ports"
 
 import type { DialogUi } from "../../extension/types"
 

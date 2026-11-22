@@ -65,7 +65,10 @@ export function repairLeakedArguments(params: MemoryToolParams): RepairedMemoryT
 /** Tells the model its call was repaired, so the next call closes every argument with `</parameter>`. */
 export function describeRepairs(repairs: readonly LeakedArgumentRepair[]): string {
   return repairs
-    .map(({ from, to }) => `\nNote: '${to}' arrived inside '${from}' because '${from}' was closed with </${from}> instead of </parameter>; it was split back out before writing.`)
+    .map(
+      ({ from, to }) =>
+        `\nNote: '${to}' arrived inside '${from}' because '${from}' was closed with </${from}> instead of </parameter>; it was split back out before writing.`,
+    )
     .join("")
 }
 

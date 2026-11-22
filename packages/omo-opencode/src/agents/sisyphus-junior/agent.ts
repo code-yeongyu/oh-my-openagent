@@ -17,15 +17,25 @@ export const SISYPHUS_JUNIOR_DEFAULTS = {
 
 export type SisyphusJuniorPromptSource = ReturnType<typeof getNativePromptSource>
 
-export function buildSisyphusJuniorPrompt(model: string | undefined, useTaskSystem: boolean, promptAppend?: string): string {
-  const prompt = buildNativeAgentPrompt(model, withRefusalRule(buildDefaultSisyphusJuniorPrompt(useTaskSystem)), undefined, undefined, useTaskSystem)
+export function buildSisyphusJuniorPrompt(
+  model: string | undefined,
+  useTaskSystem: boolean,
+  promptAppend?: string,
+): string {
+  const prompt = buildNativeAgentPrompt(
+    model,
+    withRefusalRule(buildDefaultSisyphusJuniorPrompt(useTaskSystem)),
+    undefined,
+    undefined,
+    useTaskSystem,
+  )
   return promptAppend ? prompt + "\n\n" + resolvePromptAppend(promptAppend) : prompt
 }
 
 export function createSisyphusJuniorAgentWithOverrides(
   override: AgentOverrideConfig | undefined,
   systemDefaultModel?: string,
-  useTaskSystem = false
+  useTaskSystem = false,
 ): AgentConfig {
   if (override?.disable) {
     override = undefined
@@ -57,7 +67,8 @@ export function createSisyphusJuniorAgentWithOverrides(
   }
 
   const base: AgentConfig = {
-    description: override?.description ??
+    description:
+      override?.description ??
       "Focused task executor. Same discipline, no delegation. (Sisyphus-Junior - OhMyOpenCode)",
     mode: MODE,
     model,

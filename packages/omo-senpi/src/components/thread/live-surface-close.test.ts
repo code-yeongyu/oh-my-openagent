@@ -9,24 +9,36 @@ import { createLiveThreadSurface, type LiveThreadSurface } from "./live-surface"
 function surface(host: ContractHost): LiveThreadSurface {
   return createLiveThreadSurface(undefined, {
     env: { OMO_CODING_AGENT_DIR: host.root, SENPI_RPC_SOCKET: host.socket, SENPI_RPC_KEY_ROOT: host.root },
-    statusAll: async () => undefined, registry: async () => [],
+    statusAll: async () => undefined,
+    registry: async () => [],
   })
 }
 
 async function close(host: ContractHost): Promise<unknown> {
   const client = surface(host)
   if (client.closeSession === undefined) throw new Error("closeSession is missing")
-  return await client.closeSession("rpc-1", "dur-selected")
+  const answer = await client.closeSession("rpc-1", "dur-selected")
+  expect(answer.dropped_deliveries).toEqual([])
+  return answer.outcome
 }
 
-const sentTypes = (host: ContractHost) => host.frames.map(({ frame }) => frame.type).filter((type) => type !== "get_protocol_info" && type !== "authenticate")
+const sentTypes = (host: ContractHost) =>
+  host.frames.map(({ frame }) => frame.type).filter((type) => type !== "get_protocol_info" && type !== "authenticate")
 
 describe("thread_close on this device's host: the session ends for every client that holds it", () => {
   test("#given a session another client also holds #when it is closed #then the host ends it for every holder and the close answers closed", async () => {
     await withContractHost({ auth: true, otherAttachments: 1 }, async (host) => {
       expect(await close(host)).toBe("closed")
       expect(host.live()).toBe(false)
-      expect(host.mutations).toEqual([expect.objectContaining({ type: "unload_session", sessionId: "rpc-1", force: true, interrupt: true, children: "detach" })])
+      expect(host.mutations).toEqual([
+        expect.objectContaining({
+          type: "unload_session",
+          sessionId: "rpc-1",
+          force: true,
+          children: "detach",
+          deliveries: "refuse",
+        }),
+      ])
       expect(sentTypes(host).slice(0, 2)).toEqual(["attach_session", "unload_session"])
     })
   })
@@ -50,11 +62,34 @@ describe("thread_close on this device's host: the session ends for every client 
   test.each([
     ["a reason the ladder does not know", "attached", "unsupported"],
     ["a draining host", "host_draining", "host_unavailable"],
-  ] as const)("#given unload_session refused with %s #when it is closed #then the refusal is typed %s naming the reason, as on another device", async (_label, reason, code) => {
-    await withContractHost({ auth: true, unloadRefusal: reason }, async (host) => {
-      const refused = await close(host).then(() => undefined, (error: unknown) => controlRefusalOf(error))
-      expect(refused).toMatchObject({ code, details: { command: "unload_session", reason } })
-      expect(host.mutations).toEqual([])
+  ] as const)(
+    "#given unload_session refused with %s #when it is closed #then the refusal is typed %s naming the reason, as on another device",
+    async (_label, reason, code) => {
+      await withContractHost({ auth: true, unloadRefusal: reason }, async (host) => {
+        const refused = await close(host).then(
+          () => undefined,
+          (error: unknown) => controlRefusalOf(error),
+        )
+        expect(refused).toMatchObject({ code, details: { command: "unload_session", reason } })
+        expect(host.mutations).toEqual([])
+      })
+    },
+  )
+
+  // #14169: the refusal must say which blocker the engine hit (a turn, a bash command, an unwritten delivery), because
+  // the caller reads the message, not only `details`. The engine's detail is data the ladder passes through.
+  test("#given an engine without unload_refuse_deliveries that refuses the unload work_pending #when it is closed #then the refusal carries the engine's detail, says the ids are unavailable, and nothing was interrupted (#14234)", async () => {
+    await withContractHost({ auth: true, unloadRefusal: "work_pending" }, async (host) => {
+      const refused = await close(host).then(
+        () => undefined,
+        (error: unknown) => controlRefusalOf(error),
+      )
+      expect(refused).toMatchObject({
+        code: "turn_active",
+        details: { reason: "work_pending", detail: "refused: work_pending", pending_deliveries: "unavailable" },
+      })
+      expect(refused?.message).toContain("refused: work_pending")
+      expect(host.mutations.filter((frame) => frame["interrupt"] === true)).toEqual([])
     })
   })
 

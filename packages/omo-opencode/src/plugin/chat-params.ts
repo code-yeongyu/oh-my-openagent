@@ -25,8 +25,6 @@ export type ChatParamsOutput = {
   options: Record<string, unknown>
 }
 
-
-
 function buildChatParamsInput(raw: unknown): ChatParamsHookInput | null {
   if (!isRecord(raw)) return null
 
@@ -53,11 +51,8 @@ function buildChatParamsInput(raw: unknown): ChatParamsHookInput | null {
   if (!agentName) return null
 
   const providerID = model.providerID
-  const modelID = typeof model.modelID === "string"
-    ? model.modelID
-    : typeof model.id === "string"
-      ? model.id
-      : undefined
+  const modelID =
+    typeof model.modelID === "string" ? model.modelID : typeof model.id === "string" ? model.id : undefined
   const providerId = isRecord(provider.info) ? provider.info.id : provider.id
   if (typeof providerID !== "string") return null
   if (typeof modelID !== "string") return null
@@ -82,9 +77,11 @@ function isChatParamsOutput(raw: unknown): raw is ChatParamsOutput {
   return isRecord(raw.options)
 }
 
-export function createChatParamsHandler(_args: {
-  client?: unknown
-} = {}): (input: unknown, output: unknown) => Promise<void> {
+export function createChatParamsHandler(
+  _args: {
+    client?: unknown
+  } = {},
+): (input: unknown, output: unknown) => Promise<void> {
   return async (input, output): Promise<void> => {
     const normalizedInput = buildChatParamsInput(input)
     if (!normalizedInput) return
@@ -98,11 +95,8 @@ export function createChatParamsHandler(_args: {
       if (storedPromptParams.topP !== undefined) {
         output.topP = storedPromptParams.topP
       }
-      if (
-        typeof storedPromptParams.maxOutputTokens === "number" &&
-        storedPromptParams.maxOutputTokens > 0
-      ) {
-        (output as Record<string, unknown>).maxOutputTokens = storedPromptParams.maxOutputTokens
+      if (typeof storedPromptParams.maxOutputTokens === "number" && storedPromptParams.maxOutputTokens > 0) {
+        ;(output as Record<string, unknown>).maxOutputTokens = storedPromptParams.maxOutputTokens
       }
       if (storedPromptParams.options) {
         output.options = {
@@ -122,12 +116,9 @@ export function createChatParamsHandler(_args: {
       providerID: normalizedInput.model.providerID,
       modelID: normalizedInput.model.modelID,
       desired: {
-        variant: typeof normalizedInput.message.variant === "string"
-          ? normalizedInput.message.variant
-          : undefined,
-        reasoningEffort: typeof output.options.reasoningEffort === "string"
-          ? output.options.reasoningEffort
-          : undefined,
+        variant: typeof normalizedInput.message.variant === "string" ? normalizedInput.message.variant : undefined,
+        reasoningEffort:
+          typeof output.options.reasoningEffort === "string" ? output.options.reasoningEffort : undefined,
         temperature: typeof output.temperature === "number" ? output.temperature : undefined,
         topP: typeof output.topP === "number" ? output.topP : undefined,
         maxTokens: typeof output.maxOutputTokens === "number" ? output.maxOutputTokens : undefined,
@@ -171,9 +162,8 @@ export function createChatParamsHandler(_args: {
       if (compatibility.maxTokens !== undefined && compatibility.maxTokens > 0) {
         output.maxOutputTokens = compatibility.maxTokens
       } else {
-        const originalMaxOutputTokens = typeof output.maxOutputTokens === "number"
-          ? output.maxOutputTokens
-          : compatibility.maxTokens
+        const originalMaxOutputTokens =
+          typeof output.maxOutputTokens === "number" ? output.maxOutputTokens : compatibility.maxTokens
         output.maxOutputTokens = SAFE_MAX_OUTPUT_TOKENS_FALLBACK
         if (typeof originalMaxOutputTokens === "number" && originalMaxOutputTokens <= 0) {
           log(

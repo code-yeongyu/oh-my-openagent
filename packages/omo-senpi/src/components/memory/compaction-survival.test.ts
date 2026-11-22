@@ -24,12 +24,7 @@ import { ensureIdentityRuntimeDirs, type MemoryPendingLedger } from "./context"
 import type { MemoryIdentityRuntime } from "./identity-runtime"
 import type { ReservedRun } from "@oh-my-opencode/memory-core"
 import { MEMORY_BINDING_CUSTOM_TYPE, createMemoryComponent } from "./index"
-import {
-  MemoryFakeExtensionAPI,
-  componentContext,
-  loadedMemoryConfig,
-  memorySettings,
-} from "./memory.test-support"
+import { MemoryFakeExtensionAPI, componentContext, loadedMemoryConfig, memorySettings } from "./memory.test-support"
 import { resolveReflectionTriggerConfig } from "./trigger-wiring"
 import { realpathSync } from "node:fs"
 import { rmEfaultTolerant } from "./teardown.test-support"
@@ -44,7 +39,11 @@ const cleanups: Array<() => Promise<void>> = []
 
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup()
-  await Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(
+    roots
+      .splice(0)
+      .map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })),
+  )
 })
 
 interface CompactionFixture {
@@ -66,9 +65,7 @@ async function compactionFixture(): Promise<CompactionFixture> {
   // Memory content committed to the identity repo BEFORE the session binds.
   const repo = new GitMemoryRepo({ dir: identity.paths.repo, agentId: identity.id })
   await repo.init({
-    seedFiles: [
-      { relativePath: "system/persona.md", content: `---\ndescription: Persona\n---\n${PERSONA_BODY}\n` },
-    ],
+    seedFiles: [{ relativePath: "system/persona.md", content: `---\ndescription: Persona\n---\n${PERSONA_BODY}\n` }],
   })
   await ensureIdentityRuntimeDirs(identity.paths)
 
@@ -108,7 +105,11 @@ async function compactionFixture(): Promise<CompactionFixture> {
   }).register(pi, ctx)
   await pi.dispatch("session_start", { type: "session_start" }, sessionEventContext())
   expect(boundLedger).toBeUndefined()
-  await pi.dispatch("input", { source: "interactive", inputId: "compaction-input", text: "Continue." }, sessionEventContext())
+  await pi.dispatch(
+    "input",
+    { source: "interactive", inputId: "compaction-input", text: "Continue." },
+    sessionEventContext(),
+  )
   await pi.dispatch("input_disposition", { inputId: "compaction-input", disposition: "started" }, sessionEventContext())
 
   cleanups.push(async () => {
@@ -149,8 +150,23 @@ async function compact(pi: MemoryFakeExtensionAPI, accepted: boolean): Promise<v
   await pi.dispatch(
     "session_compact",
     accepted
-      ? { type: "session_compact", reason: "auto", requestId: "compact-1", accepted: true, fromExtension: false, willRetry: true }
-      : { type: "session_compact", reason: "manual", requestId: "compact-1", accepted: false, rejectionCause: "cancelled-by-extension", fromExtension: false, willRetry: false },
+      ? {
+          type: "session_compact",
+          reason: "auto",
+          requestId: "compact-1",
+          accepted: true,
+          fromExtension: false,
+          willRetry: true,
+        }
+      : {
+          type: "session_compact",
+          reason: "manual",
+          requestId: "compact-1",
+          accepted: false,
+          rejectionCause: "cancelled-by-extension",
+          fromExtension: false,
+          willRetry: false,
+        },
     sessionEventContext(),
   )
 }

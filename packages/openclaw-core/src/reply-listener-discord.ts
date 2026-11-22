@@ -30,9 +30,7 @@ export async function pollDiscordReplies(
   if (Date.now() < discordBackoffUntil) return
 
   try {
-    const after = state.discordLastMessageId
-      ? `?after=${state.discordLastMessageId}&limit=10`
-      : "?limit=10"
+    const after = state.discordLastMessageId ? `?after=${state.discordLastMessageId}&limit=10` : "?limit=10"
     const url = `https://discord.com/api/v10/channels/${replyListener.discordChannelId}/messages${after}`
 
     const controller = new AbortController()
@@ -66,7 +64,7 @@ export async function pollDiscordReplies(
     const messages = await response.json()
     if (!Array.isArray(messages) || messages.length === 0) return
 
-    for (const message of [...messages as DiscordMessage[]].reverse()) {
+    for (const message of [...(messages as DiscordMessage[])].reverse()) {
       recordSeenDiscordMessage(state, message.id)
       writeReplyListenerDaemonState(state)
 

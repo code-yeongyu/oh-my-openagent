@@ -23,12 +23,17 @@ const NOTHING: LegacyRollupsResult = { removed: 0, skipped: 0, failed: 0 }
 const cleaned = new Set<string>()
 
 /** Once per state dir per process: removes the leftovers and logs counts only, never a name or path. */
-export function removeLegacyRollupsOnce(stateDir: string, diagnostics?: (input: TelemetryDiagnosticInput) => void): void {
+export function removeLegacyRollupsOnce(
+  stateDir: string,
+  diagnostics?: (input: TelemetryDiagnosticInput) => void,
+): void {
   if (cleaned.has(stateDir)) return
   cleaned.add(stateDir)
   const { removed, failed } = removeLegacyRollups(stateDir)
-  if (removed > 0) diagnostics?.({ event: "telemetry_legacy_rollups_removed", source: "omo-native-component", count: removed })
-  if (failed > 0) diagnostics?.({ event: "telemetry_activity_state_write_failed", source: "omo-native-component", count: failed })
+  if (removed > 0)
+    diagnostics?.({ event: "telemetry_legacy_rollups_removed", source: "omo-native-component", count: removed })
+  if (failed > 0)
+    diagnostics?.({ event: "telemetry_activity_state_write_failed", source: "omo-native-component", count: failed })
 }
 
 export function legacyRollupDir(stateDir: string): string {
@@ -47,7 +52,8 @@ export function removeLegacyRollups(stateDir: string, limit: number = LEGACY_ROL
   const dir = legacyRollupDir(stateDir)
   const start = identity(dir)
   if (start === undefined) return NOTHING
-  if (start.kind === "link") return unlink(dir) ? { removed: 1, skipped: 0, failed: 0 } : { removed: 0, skipped: 0, failed: 1 }
+  if (start.kind === "link")
+    return unlink(dir) ? { removed: 1, skipped: 0, failed: 0 } : { removed: 0, skipped: 0, failed: 1 }
   if (start.kind !== "directory") return { removed: 0, skipped: 1, failed: 0 }
 
   const entries = list(dir)

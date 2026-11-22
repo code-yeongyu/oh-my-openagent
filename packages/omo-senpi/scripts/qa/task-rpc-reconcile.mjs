@@ -1,10 +1,21 @@
 import { readFileSync, rmSync } from "node:fs"
 import { join } from "node:path"
 
-import { prepareScenarioSandbox, driveSenpiAsync, cleanupSenpiHost, hangingChildSteps } from "./task-rpc-e2e-scenarios.mjs"
+import {
+  prepareScenarioSandbox,
+  driveSenpiAsync,
+  cleanupSenpiHost,
+  hangingChildSteps,
+} from "./task-rpc-e2e-scenarios.mjs"
 import { parseEvents, readRecords, readTaskEventTypes, pidAlive } from "./task-rpc-e2e-helpers.mjs"
 import { waitForRecord, waitForRunningRpcChild } from "./task-rpc-record-wait.mjs"
-import { captureChild, dumpRunProcesses, RELAUNCH_TIMEOUT_MS, stageRecorder, withinDeadline } from "./task-rpc-diagnostics.mjs"
+import {
+  captureChild,
+  dumpRunProcesses,
+  RELAUNCH_TIMEOUT_MS,
+  stageRecorder,
+  withinDeadline,
+} from "./task-rpc-diagnostics.mjs"
 
 const CONFIG = {
   task: { default_execution_mode: "process", process_runner: "child-process", reattach_on_reconcile: false },
@@ -35,14 +46,17 @@ export async function runReconcileCheck(senpiBin, options = {}) {
     return { child, capture }
   }
   const diagnostics = () => ({
-    ...facts, parent: captures[0]?.snapshot(), relaunch: captures[1]?.snapshot(),
+    ...facts,
+    parent: captures[0]?.snapshot(),
+    relaunch: captures[1]?.snapshot(),
   })
   try {
     const parent = launch(hangingChildSteps("pr"), [{ type: "hang" }], "drive the reconcile scenario")
     facts.parentPid = parent.child.pid
     stages.mark("parent_spawned", { pid: parent.child.pid, sandboxRoot: sandbox.root })
     const running = await waitForRunningRpcChild(stateDir, "pr", {
-      ...options.budgets, signal: parent.capture.signal,
+      ...options.budgets,
+      signal: parent.capture.signal,
       onCreated: (record) => stages.mark("task_created", { taskId: record.task_id }),
     })
     if (running === undefined) {
@@ -51,8 +65,11 @@ export async function runReconcileCheck(senpiBin, options = {}) {
         stages.mark("parent_wait_timeout", { dump: facts.timeoutDump })
       }
       return {
-        check: "reconcile_lost_terminates_orphan", verdict: "FAIL",
-        reason: parent.capture.signal.aborted ? "parent exited before RPC child became running" : "no running rpc child appeared to reconcile",
+        check: "reconcile_lost_terminates_orphan",
+        verdict: "FAIL",
+        reason: parent.capture.signal.aborted
+          ? "parent exited before RPC child became running"
+          : "no running rpc child appeared to reconcile",
         facts: diagnostics(),
       }
     }
@@ -67,10 +84,15 @@ export async function runReconcileCheck(senpiBin, options = {}) {
     facts.ownerAliveAfterCrash = typeof running.host_pid === "number" && pidAlive(running.host_pid)
 
     // Subscribe before launch: even a one-response parent can reconcile and exit between reads.
-    const reconciled = waitForRecord(stateDir, (record) =>
-      record.task_id === running.task_id && record.status === "lost"
-        && readTaskEventTypes(stateDir, running.task_id).includes("reconcile_lost"),
-    options.relaunchTimeoutMs ?? RELAUNCH_TIMEOUT_MS, observing.signal).then((record) => {
+    const reconciled = waitForRecord(
+      stateDir,
+      (record) =>
+        record.task_id === running.task_id &&
+        record.status === "lost" &&
+        readTaskEventTypes(stateDir, running.task_id).includes("reconcile_lost"),
+      options.relaunchTimeoutMs ?? RELAUNCH_TIMEOUT_MS,
+      observing.signal,
+    ).then((record) => {
       if (record !== undefined) stages.mark("reconcile_done", { taskId: record.task_id })
       return record
     })
@@ -81,34 +103,57 @@ export async function runReconcileCheck(senpiBin, options = {}) {
       "relaunch for reconcile",
     )
     facts.relaunchPid = relaunch.child.pid
-    const exit = await withinDeadline(relaunch.capture.closed, options.relaunchTimeoutMs ?? RELAUNCH_TIMEOUT_MS, async () => {
-      facts.timeoutDump = await dumpRunProcesses(hosts.map((host) => host.pid), sandbox.root)
-      stages.mark("relaunch_timeout", {
-        dump: facts.timeoutDump, parent: parent.capture.snapshot(), relaunch: relaunch.capture.snapshot(),
-      })
-      await cleanupSenpiHost(relaunch.child)
-    })
+    const exit = await withinDeadline(
+      relaunch.capture.closed,
+      options.relaunchTimeoutMs ?? RELAUNCH_TIMEOUT_MS,
+      async () => {
+        facts.timeoutDump = await dumpRunProcesses(
+          hosts.map((host) => host.pid),
+          sandbox.root,
+        )
+        stages.mark("relaunch_timeout", {
+          dump: facts.timeoutDump,
+          parent: parent.capture.snapshot(),
+          relaunch: relaunch.capture.snapshot(),
+        })
+        await cleanupSenpiHost(relaunch.child)
+      },
+    )
     observing.abort()
     await reconciled
     const latest = readRecords(stateDir).find((r) => r.task_id === running.task_id)
     const eventTypes = readTaskEventTypes(stateDir, running.task_id)
-    if (latest?.status === "lost" && eventTypes.includes("reconcile_lost")
-      && !stages.stages.some((entry) => entry.stage === "reconcile_done")) {
+    if (
+      latest?.status === "lost" &&
+      eventTypes.includes("reconcile_lost") &&
+      !stages.stages.some((entry) => entry.stage === "reconcile_done")
+    ) {
       stages.mark("reconcile_done", { taskId: running.task_id, source: "exit_readback" })
     }
     stages.mark("relaunch_exited", { pid: relaunch.child.pid, status: exit.status, signal: exit.signal })
     const orphanDead = pidAlive(orphanPid) === false
     const pass = exit.status === 0 && latest?.status === "lost" && eventTypes.includes("reconcile_lost") && orphanDead
     Object.assign(facts, {
-      orphanDead, ownerAliveAfterRelaunch: typeof running.host_pid === "number" && pidAlive(running.host_pid),
-      finalRecord: latest, events: readTaskEvents(stateDir, running.task_id), status: latest?.status,
-      error_message: latest?.error_message, failure_kind: latest?.failure_kind,
-      failure_reason: latest?.failure_reason, killed: latest?.killed, eventTypes,
+      orphanDead,
+      ownerAliveAfterRelaunch: typeof running.host_pid === "number" && pidAlive(running.host_pid),
+      finalRecord: latest,
+      events: readTaskEvents(stateDir, running.task_id),
+      status: latest?.status,
+      error_message: latest?.error_message,
+      failure_kind: latest?.failure_kind,
+      failure_reason: latest?.failure_reason,
+      killed: latest?.killed,
+      eventTypes,
       breadcrumb: (latest?.error_message ?? "").slice(0, 120),
     })
     return {
-      check: "reconcile_lost_terminates_orphan", verdict: pass ? "PASS" : "FAIL",
-      ...(pass ? {} : { reason: `relaunchOk=${exit.status === 0} lostRecord=${latest?.status === "lost"} lostEvent=${eventTypes.includes("reconcile_lost")} orphanDead=${orphanDead}` }),
+      check: "reconcile_lost_terminates_orphan",
+      verdict: pass ? "PASS" : "FAIL",
+      ...(pass
+        ? {}
+        : {
+            reason: `relaunchOk=${exit.status === 0} lostRecord=${latest?.status === "lost"} lostEvent=${eventTypes.includes("reconcile_lost")} orphanDead=${orphanDead}`,
+          }),
       facts: diagnostics(),
     }
   } catch (error) {
@@ -118,7 +163,11 @@ export async function runReconcileCheck(senpiBin, options = {}) {
     try {
       for (const host of hosts) await cleanupSenpiHost(host)
       if (typeof orphanPid === "number" && pidAlive(orphanPid)) {
-        try { process.kill(orphanPid, "SIGKILL") } catch (error) { if (error.code !== "ESRCH") throw error }
+        try {
+          process.kill(orphanPid, "SIGKILL")
+        } catch (error) {
+          if (error.code !== "ESRCH") throw error
+        }
       }
     } finally {
       rmSync(sandbox.root, { recursive: true, force: true })

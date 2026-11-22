@@ -207,7 +207,9 @@ describe("createEventHandler", () => {
     deps.sessionStates.set(sessionID, state)
     const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
 
-    await handler({ event: { type: "session.error", properties: { sessionID, error: { name: "MessageAbortedError" } } } })
+    await handler({
+      event: { type: "session.error", properties: { sessionID, error: { name: "MessageAbortedError" } } },
+    })
     clearCalls.length = 0
 
     await handler({ event: { type: "session.idle", properties: { sessionID } } })
@@ -238,7 +240,9 @@ describe("createEventHandler", () => {
     const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
 
     // when
-    await handler({ event: { type: "session.error", properties: { sessionID, error: { name: "MessageAbortedError" } } } })
+    await handler({
+      event: { type: "session.error", properties: { sessionID, error: { name: "MessageAbortedError" } } },
+    })
 
     // then - state intact, attemptCount preserved
     const preserved = deps.sessionStates.get(sessionID)
@@ -264,7 +268,9 @@ describe("createEventHandler", () => {
     const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
 
     // when
-    await handler({ event: { type: "session.error", properties: { sessionID, error: { name: "MessageAbortedError" } } } })
+    await handler({
+      event: { type: "session.error", properties: { sessionID, error: { name: "MessageAbortedError" } } },
+    })
 
     // then - state reset, behaviour matches pre-fix cancellation path
     const reset = deps.sessionStates.get(sessionID)
@@ -289,7 +295,9 @@ describe("createEventHandler", () => {
 
     // iteration 1: internal abort -> session.error{isAbort:true}
     deps.internallyAbortedSessions.add(sessionID)
-    await handler({ event: { type: "session.error", properties: { sessionID, error: { name: "MessageAbortedError" } } } })
+    await handler({
+      event: { type: "session.error", properties: { sessionID, error: { name: "MessageAbortedError" } } },
+    })
     expect(deps.sessionStates.get(sessionID)?.attemptCount).toBe(1)
 
     // simulate the next retry signal advancing the counter
@@ -300,7 +308,9 @@ describe("createEventHandler", () => {
 
     // iteration 2: another internal abort
     deps.internallyAbortedSessions.add(sessionID)
-    await handler({ event: { type: "session.error", properties: { sessionID, error: { name: "MessageAbortedError" } } } })
+    await handler({
+      event: { type: "session.error", properties: { sessionID, error: { name: "MessageAbortedError" } } },
+    })
 
     // then - counter is at 2, not reset to 0
     expect(deps.sessionStates.get(sessionID)?.attemptCount).toBe(2)
@@ -425,7 +435,10 @@ describe("createEventHandler", () => {
     await handler({
       event: {
         type: "session.error",
-        properties: { sessionID, error: { name: "ProviderError", message: "monthly usage limit reached", statusCode: 503 } },
+        properties: {
+          sessionID,
+          error: { name: "ProviderError", message: "monthly usage limit reached", statusCode: 503 },
+        },
       },
     })
 
@@ -484,7 +497,9 @@ describe("createEventHandler", () => {
     await handler({
       event: {
         type: "session.created",
-        properties: { info: { id: sessionID, model: { id: "gpt-5.5-codex", providerID: "openai", variant: "medium" } } },
+        properties: {
+          info: { id: sessionID, model: { id: "gpt-5.5-codex", providerID: "openai", variant: "medium" } },
+        },
       },
     })
 
@@ -677,5 +692,4 @@ describe("createEventHandler", () => {
     expect(created?.currentModel).toBe("test-provider/test-model")
     expect(created?.fallbackIndex).toBe(0)
   })
-
 })

@@ -48,7 +48,16 @@ export type Finding = {
   readonly message: string
 }
 
-const EXCLUDED_DIRS: ReadonlySet<string> = new Set([".git", "node_modules", "dist", "build", "target", "__pycache__", ".venv", "vendor"])
+const EXCLUDED_DIRS: ReadonlySet<string> = new Set([
+  ".git",
+  "node_modules",
+  "dist",
+  "build",
+  "target",
+  "__pycache__",
+  ".venv",
+  "vendor",
+])
 
 const TEST_FILE_PATTERNS: readonly RegExp[] = [
   /\.(test|spec)\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/,
@@ -140,7 +149,9 @@ function main(argv: readonly string[]): number {
     console.log(JSON.stringify({ findings, rules: RULE_IDS }, null, 2))
   } else {
     for (const finding of findings) console.log(`${finding.file}:${finding.line} ${finding.rule} ${finding.message}`)
-    console.log(findings.length === 0 ? "check-test-junk: no findings" : `check-test-junk: ${findings.length} finding(s)`)
+    console.log(
+      findings.length === 0 ? "check-test-junk: no findings" : `check-test-junk: ${findings.length} finding(s)`,
+    )
   }
   return findings.length === 0 ? 0 : 1
 }

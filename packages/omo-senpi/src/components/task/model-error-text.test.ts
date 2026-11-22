@@ -2,7 +2,12 @@ import { describe, expect, test } from "bun:test"
 
 import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
 
-import { agentModelFailureText, categoryModelFailureText, chainUnavailableText, pinnedModelUnavailableText } from "./model-error-text"
+import {
+  agentModelFailureText,
+  categoryModelFailureText,
+  chainUnavailableText,
+  pinnedModelUnavailableText,
+} from "./model-error-text"
 
 const CHAIN: readonly DelegateFallbackEntry[] = [
   { providers: ["kimi-coding", "kimi-for-coding"], model: "kimi-for-coding-highspeed" },

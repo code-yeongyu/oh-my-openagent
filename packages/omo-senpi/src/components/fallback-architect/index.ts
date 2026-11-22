@@ -7,11 +7,7 @@ import {
   FALLBACK_ARCHITECT_DIRECTIVE_TYPE,
   FALLBACK_ARCHITECT_REMINDER_TYPE,
 } from "./directive"
-import {
-  buildFallbackArchitectNotice,
-  FALLBACK_ARCHITECT_NOTICE_TYPE,
-  renderFallbackArchitectNotice,
-} from "./notice"
+import { buildFallbackArchitectNotice, FALLBACK_ARCHITECT_NOTICE_TYPE, renderFallbackArchitectNotice } from "./notice"
 
 const FALLBACK_ARCHITECT_DISABLED_FLAG = "omo-senpi-fallback-architect-disabled"
 
@@ -32,11 +28,10 @@ interface FallbackArchitectState {
   active: { from: string; to: string } | undefined
 }
 
-export function createFallbackArchitectComponent(
-  options: FallbackArchitectComponentOptions = {},
-): OmoSenpiComponent {
+export function createFallbackArchitectComponent(options: FallbackArchitectComponentOptions = {}): OmoSenpiComponent {
   const hasArchitectCategory =
-    options.hasArchitectCategory ?? ((cwd: string, registry?: GateRegistry) => hasActiveArchitectCategory(cwd, { registry }))
+    options.hasArchitectCategory ??
+    ((cwd: string, registry?: GateRegistry) => hasActiveArchitectCategory(cwd, { registry }))
 
   return {
     name: "fallback-architect",
