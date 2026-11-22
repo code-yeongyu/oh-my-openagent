@@ -8,7 +8,8 @@ import { describe, expect, it, onTestFinished } from "bun:test"
 import { MAX_SHARD_BIND_PATH } from "../../senpi-task/src/runners/rpc-host/shard-socket"
 import { shortSocketDir } from "../../senpi-task/src/runners/rpc-host/short-socket-dir.test-support"
 import { testTempDir } from "../test-support/temp-dir"
-import { remainingTestTime, useTestTimeout } from "../../../test-support/test-deadline"
+import { childTreeCpuSeconds, RUNAWAY_CAP_MS, STALL_KILL_MS } from "../../omo-native/test/daemon-test-runner"
+import { useTestTimeout } from "../../../test-support/test-deadline"
 
 // O01 package probe (senpi#4272, PLAN rows X06/T7): the senpi engine omo actually ships, launched from its
 // packaged bin at the pinned version, must advertise the engine-socket compact delta pair in get_protocol_info
@@ -35,28 +36,50 @@ function probeSocketPath(): string {
   return socket
 }
 
+// #11845 cold-start policy (#14682): a packaged host starting on a loaded runner legitimately needs multiples of
+// its quiet-box start time (82 s at load 43 vs 2.5 s alone), so startup gets no wall-clock budget of its own.
+// It is bounded the way daemon-test-runner bounds a cold daemon: killed when its process tree stops making CPU
+// progress for STALL_KILL_MS, and capped at RUNAWAY_CAP_MS. The behaviour under test keeps its own bound,
+// measured from readiness (PROTOCOL_ANSWER_MS).
+const PROTOCOL_ANSWER_MS = 30_000
+const PROGRESS_SAMPLE_MS = 250
+const PROGRESS_EPSILON_S = 0.02
+const PROBE_TIMEOUT_MS = RUNAWAY_CAP_MS + 5_000
+
 // Readiness is the host's own signal: it prints `senpi rpc listening on unix://<path>` once the socket is bound.
 // A directory watch is not one: macOS does not report a bound socket as a change event, so the wait never ended.
 function waitForListening(
   stderr: NodeJS.ReadableStream,
   socketPath: string,
+  hostPid: number | undefined,
   exited: Promise<number | null>,
 ): Promise<void> {
   const ready = `senpi rpc listening on unix://${socketPath}`
   return new Promise((resolve, reject) => {
     let seen = ""
     // The tail carries the host's error line; the head is only the source excerpt Bun prints above it.
-    const timer = setTimeout(
-      () =>
-        finish(
-          new Error(
-            `host never reported listening on ${socketPath} within the test budget; stderr: ${seen.slice(-2000)}`,
-          ),
-        ),
-      remainingTestTime(),
+    const fail = (why: string) =>
+      finish(new Error(`host ${why} before listening on ${socketPath}; stderr: ${seen.slice(-2000)}`))
+    const cap = setTimeout(
+      () => fail(`exceeded the ${RUNAWAY_CAP_MS}ms runaway cap while still making CPU progress`),
+      RUNAWAY_CAP_MS,
     )
+    let lastCpu = -1
+    let lastAdvance = Date.now()
+    const sampler = setInterval(() => {
+      if (hostPid === undefined) return
+      const cpu = childTreeCpuSeconds(hostPid)
+      if (cpu < 0) return
+      if (cpu >= lastCpu + PROGRESS_EPSILON_S) {
+        lastCpu = cpu
+        lastAdvance = Date.now()
+      } else if (Date.now() - lastAdvance >= STALL_KILL_MS) {
+        fail(`made no CPU progress for ${Math.round((Date.now() - lastAdvance) / 1000)}s`)
+      }
+    }, PROGRESS_SAMPLE_MS)
     function finish(error?: Error) {
-      clearTimeout(timer)
+      clearTimeout(cap)
+      clearInterval(sampler)
       stderr.off("data", onData)
       if (error) reject(error)
       else resolve()
@@ -77,8 +100,8 @@ function requestProtocolInfo(socketPath: string): Promise<ProtocolInfo> {
     const socket = createConnection(socketPath)
     let buffer = ""
     const timer = setTimeout(
-      () => done(new Error("get_protocol_info did not answer within the test budget")),
-      remainingTestTime(),
+      () => done(new Error(`get_protocol_info did not answer within ${PROTOCOL_ANSWER_MS}ms of readiness`)),
+      PROTOCOL_ANSWER_MS,
     )
     function done(error: Error | undefined, info?: ProtocolInfo) {
       clearTimeout(timer)
@@ -127,7 +150,7 @@ async function probePackagedHost(compactFlag: "1" | undefined): Promise<Protocol
     host.once("error", () => resolve(null))
   })
   try {
-    await waitForListening(host.stderr, socketPath, exited)
+    await waitForListening(host.stderr, socketPath, host.pid, exited)
     host.stderr.resume()
     return await requestProtocolInfo(socketPath)
   } finally {
@@ -143,36 +166,48 @@ describe.skipIf(process.platform === "win32")("packaged senpi engine compact del
 
   // #12557: the root suite's preload nests TMPDIR one level deeper than a package run, and a long runner TMPDIR
   // then put `<TMPDIR>/<probe dir>/h.sock` over the engine's limit, so the host exited 1 before binding.
-  it("#given a runner TMPDIR too deep for the engine's socket limit #when the packaged host is probed #then it still binds and answers", async () => {
-    useTestTimeout(90_000)
-    const deep = join(testTempDir("omo-o01-deep-"), "d".repeat(MAX_SHARD_BIND_PATH))
-    mkdirSync(deep)
-    const previous = process.env.TMPDIR
-    process.env.TMPDIR = deep
-    try {
-      const info = await probePackagedHost(undefined)
+  it(
+    "#given a runner TMPDIR too deep for the engine's socket limit #when the packaged host is probed #then it still binds and answers",
+    async () => {
+      useTestTimeout(PROBE_TIMEOUT_MS)
+      const deep = join(testTempDir("omo-o01-deep-"), "d".repeat(MAX_SHARD_BIND_PATH))
+      mkdirSync(deep)
+      const previous = process.env.TMPDIR
+      process.env.TMPDIR = deep
+      try {
+        const info = await probePackagedHost(undefined)
+
+        expect(info.serverVersion).toBe(pinnedVersion)
+      } finally {
+        if (previous === undefined) delete process.env.TMPDIR
+        else process.env.TMPDIR = previous
+      }
+    },
+    PROBE_TIMEOUT_MS,
+  )
+
+  it(
+    "#given SENPI_ENGINE_SOCKET_COMPACT_UPDATES=1 #when the packaged host answers get_protocol_info #then it advertises the compact delta pair",
+    async () => {
+      useTestTimeout(PROBE_TIMEOUT_MS)
+      const info = await probePackagedHost("1")
 
       expect(info.serverVersion).toBe(pinnedVersion)
-    } finally {
-      if (previous === undefined) delete process.env.TMPDIR
-      else process.env.TMPDIR = previous
-    }
-  }, 90_000)
+      expect(info.capabilities).toEqual(expect.arrayContaining([...COMPACT_PAIR]))
+    },
+    PROBE_TIMEOUT_MS,
+  )
 
-  it("#given SENPI_ENGINE_SOCKET_COMPACT_UPDATES=1 #when the packaged host answers get_protocol_info #then it advertises the compact delta pair", async () => {
-    useTestTimeout(90_000)
-    const info = await probePackagedHost("1")
+  it(
+    "#given the compact flag unset #when the packaged host answers get_protocol_info #then no compact name is advertised",
+    async () => {
+      useTestTimeout(PROBE_TIMEOUT_MS)
+      const info = await probePackagedHost(undefined)
 
-    expect(info.serverVersion).toBe(pinnedVersion)
-    expect(info.capabilities).toEqual(expect.arrayContaining([...COMPACT_PAIR]))
-  }, 90_000)
-
-  it("#given the compact flag unset #when the packaged host answers get_protocol_info #then no compact name is advertised", async () => {
-    useTestTimeout(90_000)
-    const info = await probePackagedHost(undefined)
-
-    expect(info.capabilities.filter((capability) => (COMPACT_NAMES as readonly string[]).includes(capability))).toEqual(
-      [],
-    )
-  }, 90_000)
+      expect(
+        info.capabilities.filter((capability) => (COMPACT_NAMES as readonly string[]).includes(capability)),
+      ).toEqual([])
+    },
+    PROBE_TIMEOUT_MS,
+  )
 })
