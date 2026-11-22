@@ -3,24 +3,25 @@ import { LOADING_SPINNER_FRAME_MS, loadingSpinnerFrame } from "@oh-my-opencode/u
 import { ignoreToastError } from "./ignore-toast-error"
 
 export async function showSpinnerToast(ctx: PluginInput, version: string, message: string): Promise<void> {
-  let now = Date.now()
-  const deadline = now + 5_000
+  let elapsedClock = performance.now()
+  const deadline = elapsedClock + 5_000
 
-  while (now < deadline) {
+  while (elapsedClock < deadline) {
     const toast = ctx.client.tui
       .showToast({
         body: {
-          title: `${loadingSpinnerFrame(now)} OhMyOpenCode ${version}`,
+          title: `${loadingSpinnerFrame(Date.now())} OhMyOpenCode ${version}`,
           message,
           variant: "info" as const,
-          duration: Math.min(LOADING_SPINNER_FRAME_MS, deadline - now) + 50,
+          duration: Math.min(LOADING_SPINNER_FRAME_MS, Math.ceil(deadline - elapsedClock)) + 50,
         },
       })
       .catch(ignoreToastError)
 
     // Budget the request into the frame interval without letting toast requests overlap.
-    const delay = Math.max(0, Math.min(now + LOADING_SPINNER_FRAME_MS, deadline) - Date.now())
+    const nextFrame = Math.min(elapsedClock + LOADING_SPINNER_FRAME_MS, deadline)
+    const delay = Math.max(0, Math.ceil(nextFrame - performance.now()))
     await Promise.all([toast, new Promise<void>((resolve) => setTimeout(resolve, delay))])
-    now = Date.now()
+    elapsedClock = performance.now()
   }
 }

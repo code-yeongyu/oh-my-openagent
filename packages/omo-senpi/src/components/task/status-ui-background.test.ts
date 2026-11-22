@@ -8,6 +8,7 @@ import {
   type TaskStatus,
 } from "@oh-my-opencode/senpi-task"
 
+import { createMemoryFooterLive } from "../memory/status-live"
 import type { CapturedUi } from "./runtime-context"
 import { createTaskStatusUi, type StatusUiManager, type StatusUiTimers } from "./status-ui"
 
@@ -197,6 +198,49 @@ describe("createTaskStatusUi.background progress", () => {
     expect(ui.widgetCalls.at(-1)?.content?.[1]).toStartWith("⠙ Earlier child")
     expect(delays).toEqual([90, 90])
     expect(listCalls).toBe(1)
+  })
+
+  it("paints the same glyph in staggered task and memory timer repaints", () => {
+    let wallTime = 0
+    const now = () => wallTime
+    const pending = new Map<number, { callback: () => void; due: number }>()
+    let nextHandle = 0
+    const timers: StatusUiTimers = {
+      set(callback, delay) {
+        const handle = nextHandle++
+        pending.set(handle, { callback, due: wallTime + delay })
+        return handle
+      },
+      clear(handle) {
+        if (typeof handle === "number") pending.delete(handle)
+      },
+    }
+    const taskUi = fakeUi()
+    const memoryUi = fakeUi()
+    const task = record({ task_id: "st_phase", name: "Phase child", status: "running" })
+    const widget = createTaskStatusUi({
+      manager: { list: () => listed([task]), wasBackground: () => true },
+      runtime: { ui: () => taskUi, sessionId: () => "session-a", mode: () => "tui" },
+      timers,
+      now,
+    })
+    const footer = createMemoryFooterLive({ timers, now })
+    const taskGlyph = () => taskUi.widgetCalls.at(-1)?.content?.[0]?.split(" ")[0]
+    const memoryGlyph = () => memoryUi.statusCalls.at(-1)?.split(" ")[1]
+
+    widget.syncNow()
+    wallTime = 100
+    footer.setActive("phase", true, memoryUi)
+    expect([taskGlyph(), memoryGlyph()]).toEqual(["⠋", "⠙"])
+
+    // Both timers are now due: the widget's first callback was delayed by the host.
+    wallTime = 190
+    for (const { callback, due } of [...pending.values()]) {
+      if (due <= wallTime) callback()
+    }
+    expect([taskGlyph(), memoryGlyph()]).toEqual(["⠹", "⠹"])
+    widget.dispose()
+    footer.dispose()
   })
 
   it("#given a child before its first turn #when a host reattach resumes its turn #then both the footer progress line and the status row read running instead of starting", () => {
