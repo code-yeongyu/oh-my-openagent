@@ -1,5 +1,5 @@
 import { readFileSync, realpathSync, statSync } from "node:fs"
-import { homedir } from "node:os"
+import { homedir, userInfo } from "node:os"
 import { join, resolve } from "node:path"
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -36,9 +36,22 @@ function canonical(path: string): string {
 /**
  * Every home a released omo on this account may resolve its agent dir under: HOME, USERPROFILE and the OS account home
  * can differ (a Windows session launched without HOME uses %USERPROFILE%), so each one counts (#14622 review M2).
+ * `os.homedir()` follows HOME on POSIX, so the passwd entry's home is read too: an omob run under an alternate HOME
+ * still sees the real account's store (#14622 review M4).
  */
 function accountHomes(env: NodeJS.ProcessEnv): readonly string[] {
-  return [env.HOME, env.USERPROFILE, homedir()].filter((home): home is string => home !== undefined && home.length > 0)
+  return [env.HOME, env.USERPROFILE, homedir(), passwdHome()].filter(
+    (home): home is string => home !== undefined && home.length > 0,
+  )
+}
+
+function passwdHome(): string | undefined {
+  try {
+    return userInfo().homedir
+  } catch {
+    // No passwd entry for this uid (a container user): HOME and USERPROFILE still count.
+    return undefined
+  }
 }
 
 /**

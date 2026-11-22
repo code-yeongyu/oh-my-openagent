@@ -136,6 +136,34 @@ test("#given running sessions #when a newer binary migrates the store and record
 })
 
 test.each([
+  ["a floor above this binary", GATEWAY_MIGRATIONS.length + 1],
+  ["no floor recorded", null],
+] as const)(
+  "#given a worker already open on the store #when a newer binary migrates it with %s #then the next send is refused typed and writes nothing",
+  async (_case, floor) => {
+    const h = (harness = createGatewayHarness())
+    h.session("A")
+    h.session("B")
+    expect(kindOf(await send(h, "A", "B", "before the install"))).toBe("started")
+    const rowsBefore = () => {
+      const db = new Database(gatewayDatabasePath(h.agentDir), { readonly: true })
+      try {
+        return db.query("SELECT count(*) AS n FROM deliveries").get()
+      } finally {
+        db.close()
+      }
+    }
+    const before = rowsBefore()
+
+    migrateAhead(h.agentDir, GATEWAY_MIGRATIONS.length + 1, floor)
+
+    const after = await settled(send(h, "B", "A", "after the incompatible install"))
+    expect(after.error).toMatchObject({ code: "gateway_schema_too_new" })
+    expect(rowsBefore()).toEqual(before)
+  },
+)
+
+test.each([
   ["a floor above this binary (a step changed a column it uses)", GATEWAY_MIGRATIONS.length + 1],
   ["no floor recorded (a binary from before the floor)", null],
 ] as const)(

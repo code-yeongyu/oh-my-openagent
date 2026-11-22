@@ -212,7 +212,7 @@ async function beginImmediate(ctx: StoreContext, op: string, retryUntilLocked: b
     try {
       ctx.sql.exec("BEGIN IMMEDIATE")
       ctx.stats.transactions++
-      return true
+      return lockedSchemaCheck(ctx)
     } catch (error) {
       if (!isBusyError(error)) throw error
       ctx.emit({ kind: "busy", op })
@@ -230,6 +230,20 @@ async function beginImmediate(ctx: StoreContext, op: string, retryUntilLocked: b
       await ctx.delay(ctx.config.busy_timeout_ms)
     }
   }
+}
+
+/**
+ * Checks the store's schema under the write lock just taken (#14622 review M5): a newer binary may have migrated the
+ * store after this worker opened it, and a store this binary no longer meets is refused before anything is written.
+ */
+function lockedSchemaCheck(ctx: StoreContext): true {
+  try {
+    schemaVersion(ctx)
+  } catch (error) {
+    rollbackQuietly(ctx)
+    throw error
+  }
+  return true
 }
 
 function rollbackQuietly(ctx: StoreContext): void {
@@ -379,7 +393,7 @@ function storedReaderFloor(ctx: StoreContext): number | undefined {
  * The store's schema version. A store newer than this binary stays usable when the binary that migrated it recorded a
  * reader floor this binary meets (#14382); otherwise, or with no floor recorded, it is refused typed.
  */
-function schemaVersion(ctx: StoreContext): number {
+export function schemaVersion(ctx: StoreContext): number {
   const version = Number(
     ctx.sql.one(["user_version"], "SELECT user_version FROM pragma_user_version()")?.user_version ?? 0,
   )

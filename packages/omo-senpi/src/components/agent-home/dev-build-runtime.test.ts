@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test"
+import { spawnSync } from "node:child_process"
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -31,6 +32,34 @@ test("#given the process env #when USERPROFILE differs from HOME #then the USERP
     }
   }
 })
+
+// A fresh Node process, because os.homedir() reads HOME once at startup and Node's userInfo() reads the passwd entry;
+// Bun's userInfo().homedir follows HOME as well, so this configuration is only distinguishable under Node.
+test.skipIf(process.platform === "win32")(
+  "#given a process started with HOME at a temp dir and no USERPROFILE #when the agent dir is the passwd home's store #then it is shared",
+  () => {
+    const alternate = mkdtempSync(join(tmpdir(), "agent-home-alt-"))
+    try {
+      const env: NodeJS.ProcessEnv = { ...process.env, HOME: alternate }
+      delete env.USERPROFILE
+      const probe = spawnSync(
+        "node",
+        [
+          "--input-type=module",
+          "-e",
+          `import { userInfo } from "node:os"; import { join } from "node:path"; import { isSharedAgentDir } from ${JSON.stringify(join(import.meta.dirname, "dev-build-runtime.ts"))}; console.log(JSON.stringify({ passwd: userInfo().homedir, shared: isSharedAgentDir(join(userInfo().homedir, ".omo", "agent")) }))`,
+        ],
+        { env, encoding: "utf8", windowsHide: true },
+      )
+      expect(probe.stderr).toBe("")
+      const result = JSON.parse(probe.stdout) as { passwd: string; shared: boolean }
+      expect(result.passwd).not.toBe(alternate)
+      expect(result.shared).toBe(true)
+    } finally {
+      rmSync(alternate, { recursive: true, force: true })
+    }
+  },
+)
 
 test("#given an existing shared store #when the agent dir spells it with different case on a case-insensitive volume #then it is shared", () => {
   const home = mkdtempSync(join(tmpdir(), "agent-home-case-"))
