@@ -13,7 +13,7 @@ export interface Gate {
   open(): void
 }
 
-export function gate(): Gate {
+function gate(): Gate {
   let resolvePromise: (() => void) | undefined
   const promise = new Promise<void>((resolve) => {
     resolvePromise = resolve
@@ -22,7 +22,7 @@ export function gate(): Gate {
 }
 
 /** A client whose start finishes when `started` opens and whose stop finishes when `stopped` opens. */
-export class GatedClient extends LspClient {
+class GatedClient extends LspClient {
   readonly started = gate()
   readonly stopped = gate()
   stopCount = 0
