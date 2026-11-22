@@ -19,7 +19,8 @@ const BROWSER: Window = 0x90_0001;
 pub(super) fn input() -> X11Input<FakeInputServer> {
     X11Input::with_server(
         FakeInputServer::new(Some(EDITOR))
-            .window(TERMINAL, (100, 50), b"xterm\0XTerm\0")
+            .window(TERMINAL, (100, 50), b"xedit\0Xedit\0")
+            .process(TERMINAL, &["libXaw.so.7", "libXt.so.6"], &["xedit"])
             .window(GTK_APP, (0, 0), b"gtk3-demo\0Gtk3-demo\0"),
     )
 }

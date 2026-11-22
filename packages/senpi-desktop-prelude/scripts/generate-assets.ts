@@ -3,12 +3,15 @@
 // precompiles the prelude and doc assets into src/assets.generated.json, which src/assets.ts reads lazily, so the
 // ~29 KB of prelude text never enters a bundle that senpi's extension loader re-transpiles at every session start
 // (#9113). Runs first in `build`; `test/assets.test.ts` and `test/facade-manifest.test.ts` fail when a committed
-// output drifts from what this script renders.
+// output drifts from what this script renders. Every rendered JS/TS source goes through the repo formatter, so a
+// regeneration leaves `bun fmt --check` clean.
+import { spawnSync } from "node:child_process"
 import { readFileSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const packageDir = join(dirname(fileURLToPath(import.meta.url)), "..")
+const repoRoot = join(packageDir, "..", "..")
 const protocolCallPath = join(packageDir, "..", "senpi-desktop-protocol", "src", "call.ts")
 const protocolAllowlistTestPath = join(packageDir, "..", "senpi-desktop-protocol", "test", "method-allowlist.test.ts")
 const helperNamesPath = join(packageDir, "test", "helper-names.ts")
@@ -314,19 +317,35 @@ function renderPreludePy(current: string): string {
   return replaceRegion(current, "src/prelude.py", body, "#", "    ")
 }
 
+/** Formats a rendered JS/TS source as `bun fmt` would format the file in place (root bunfig.toml `[fmt]`). */
+function formatSource(path: string, text: string): string {
+  const result = spawnSync("bun", ["fmt", "--no-script", `--stdin-filepath=${path}`], {
+    cwd: repoRoot,
+    input: text,
+    encoding: "utf8",
+    windowsHide: true,
+  })
+  if (result.error !== undefined) throw new Error(`bun fmt could not run for ${path}: ${result.error.message}`)
+  if (result.status !== 0) throw new Error(`bun fmt failed on ${path}: ${result.stderr}`)
+  return result.stdout
+}
+
 export function renderGeneratedSources(): Map<string, string> {
   const tables = resolveTiers(readManifestCopy())
   const read = (path: string): string => readFileSync(path, "utf8")
   const sources = new Map<string, string>()
-  sources.set(protocolCallPath, renderProtocolCall(read(protocolCallPath), tables))
+  const setFormatted = (path: string, text: string): void => {
+    sources.set(path, formatSource(path, text))
+  }
+  setFormatted(protocolCallPath, renderProtocolCall(read(protocolCallPath), tables))
   const indexPath = join(packageDir, "src", "index.ts")
-  sources.set(indexPath, renderPreludeIndex(read(indexPath)))
+  setFormatted(indexPath, renderPreludeIndex(read(indexPath)))
   const jsPath = join(packageDir, "src", "prelude.js")
-  sources.set(jsPath, renderPreludeJs(read(jsPath)))
+  setFormatted(jsPath, renderPreludeJs(read(jsPath)))
   const pyPath = join(packageDir, "src", "prelude.py")
   sources.set(pyPath, renderPreludePy(read(pyPath)))
-  sources.set(protocolAllowlistTestPath, renderProtocolAllowlistTest(read(protocolAllowlistTestPath)))
-  sources.set(helperNamesPath, renderHelperNames(read(helperNamesPath)))
+  setFormatted(protocolAllowlistTestPath, renderProtocolAllowlistTest(read(protocolAllowlistTestPath)))
+  setFormatted(helperNamesPath, renderHelperNames(read(helperNamesPath)))
   return sources
 }
 

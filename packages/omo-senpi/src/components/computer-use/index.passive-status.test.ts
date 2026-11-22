@@ -2,7 +2,8 @@ import { expect, spyOn, test } from "bun:test"
 import { spawn } from "node:child_process"
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { join } from "node:path"
+import { FAKE_ENGINE_PATH } from "@oh-my-opencode/senpi-desktop-service/testing"
 import { resolveComputerSettings } from "@oh-my-opencode/senpi-desktop-tool"
 import { computerUseDoctorReport } from "../../../../omo-native/computer-use-doctor-runtime"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
@@ -30,7 +31,7 @@ for (const state of ["ready", "abi-mismatch"]) {
       const script = join(root, "engine.mjs")
       const engine = join(root, "engine")
       const log = join(root, "requests.jsonl")
-      const fake = resolve(import.meta.dir, "../../../../senpi-desktop-service/test/fake-engine.mjs")
+      const fake = FAKE_ENGINE_PATH
       writeFileSync(
         script,
         `

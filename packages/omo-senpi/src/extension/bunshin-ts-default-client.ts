@@ -6,7 +6,9 @@ import {
   type FleetEventSource,
 } from "../../vendor/bunshin-ts/index.js"
 
+import { deviceOperationError } from "./bunshin-ts-errors"
 import { pickTransport } from "./bunshin-ts-pick-transport"
+import { typedClient } from "./bunshin-ts-typed-machine"
 
 type LazyBunshinClientOptions = {
   /** Receives a connect failure no caller can be rejected with: a listener subscribed by `events().subscribe`
@@ -53,7 +55,8 @@ const lazyEvents = (pending: Promise<FleetEventSource>, reportError: (error: unk
 
 /**
  * A client that connects on its first awaited call and reuses that connection. Property access never connects;
- * a failed connect is not memoized, so the next call retries; `close()` drops the connection.
+ * a failed connect is not memoized, so the next call retries; `close()` drops the connection. Every failure, the
+ * connect's included, is a typed `BunshinSessionError`.
  */
 export function createLazyBunshinClient(
   open: () => Promise<BunshinClient>,
@@ -63,14 +66,16 @@ export function createLazyBunshinClient(
   let memo: Promise<BunshinClient> | undefined
   const client = (): Promise<BunshinClient> => {
     if (memo !== undefined) return memo
-    const pending = open()
+    const pending = open().catch((error: unknown) => {
+      throw deviceOperationError(error, "connect", "the fleet")
+    })
     memo = pending
     pending.catch(() => {
       if (memo === pending) memo = undefined
     })
     return pending
   }
-  return {
+  return typedClient({
     setPolicy: (machineId, policy) => client().then((c) => c.setPolicy(machineId, policy)),
     getPolicy: (machineId) => client().then((c) => c.getPolicy(machineId)),
     listMachines: () => client().then((c) => c.listMachines()),
@@ -89,7 +94,7 @@ export function createLazyBunshinClient(
       memo = undefined
       if (pending !== undefined) await (await pending).close()
     },
-  }
+  })
 }
 
 export const bunshin: BunshinClient = createLazyBunshinClient(async () =>

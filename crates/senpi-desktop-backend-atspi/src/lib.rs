@@ -168,6 +168,14 @@ impl<B: AtSpiBus> AxBackend for AtSpiAx<B> {
         apps::focused_element(&mut self.bus).map(|found| found.map(AxHandle::native))
     }
 
+    /// Same bus connection and object path.
+    fn same_element(&mut self, a: &AxHandle, b: &AxHandle) -> bool {
+        match (Self::node(a), Self::node(b)) {
+            (Ok(a), Ok(b)) => self.bus.object_id(a) == self.bus.object_id(b),
+            _ => false,
+        }
+    }
+
     fn attributes(&mut self, h: &AxHandle) -> CoreResult<Vec<(String, String)>> {
         props::attributes(&mut self.bus, Self::node(h)?)
     }
@@ -190,6 +198,10 @@ impl<B: AtSpiBus> AxBackend for AtSpiAx<B> {
 mod action_tests;
 #[cfg(test)]
 mod fake;
+#[cfg(test)]
+mod hit_live_tests;
+#[cfg(test)]
+mod hit_tests;
 #[cfg(test)]
 mod live_tests;
 #[cfg(test)]

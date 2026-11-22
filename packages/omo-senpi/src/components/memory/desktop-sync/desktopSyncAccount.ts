@@ -8,6 +8,8 @@ import type {
   SyncOperationAuthority,
 } from "@oh-my-opencode/memory-core/sync-engine"
 import type { DeviceKeyring } from "@oh-my-opencode/memory-core/keyring"
+// The light subpath: a value import from sync-engine would pull the whole engine (and its wasm asset) into this bundle.
+import { SYNC_CAPABILITIES } from "@oh-my-opencode/memory-core/sync-capabilities"
 import { desktopSyncAccountPorts } from "./desktopSyncAccountPorts"
 import { desktopSyncBoundary } from "./desktopSyncBoundary"
 import { openDesktopSyncOperation } from "./desktopSyncOperation"
@@ -68,22 +70,46 @@ const sameDescriptor = (a: DesktopSyncDescriptor, b: DesktopSyncDescriptor) =>
 
 /** Install this source in the engine's composition root, never the CLI credential source. */
 export async function openDesktopSyncAccount(wire: DesktopSyncEngineWire, home?: string): Promise<DesktopSyncAccount> {
+  // The account ends with the channel or at main's `retired` event, which leaves the channel open (#13325). Listening
+  // before the descriptor request also ends an account whose describe raced its own retirement.
+  const retired = new AbortController()
+  const stopListening = wire.onEvent((event) => {
+    if (event.event === "retired") retired.abort()
+  })
+  const signal = AbortSignal.any([wire.signal, retired.signal])
+  signal.addEventListener("abort", stopListening, { once: true })
+  try {
+    return await openAccount(wire, signal, home, () => retired.abort())
+  } catch (error) {
+    retired.abort()
+    throw error
+  }
+}
+
+async function openAccount(
+  wire: DesktopSyncEngineWire,
+  signal: AbortSignal,
+  home: string | undefined,
+  end: () => void,
+): Promise<DesktopSyncAccount> {
   const descriptor: DesktopSyncDescriptor = SyncDescriptor.parse(await wire.request({ op: "descriptor" }))
-  const boundary = desktopSyncBoundary(descriptor, wire.signal, home)
+  const boundary = desktopSyncBoundary(descriptor, signal, home)
   const accountAuthority: SyncOperationAuthority = {
-    signal: wire.signal,
+    signal,
     admit(effect) {
-      if (wire.signal.aborted) throw new DesktopSyncRefused()
+      if (signal.aborted) throw new DesktopSyncRefused()
       return effect()
     },
     boundary,
   }
   const open = async (authority: SyncOperationAuthority) => {
     const operation = await openDesktopSyncOperation(wire, {
-      signal: AbortSignal.any([wire.signal, authority.signal]),
+      signal: AbortSignal.any([signal, authority.signal]),
       admit: (effect) => accountAuthority.admit(() => authority.admit(effect)),
     })
-    const call = (data: Readonly<Record<string, unknown>>) => operation.request({ op: "service", data })
+    // A1.1-M3: desktop main copies syncCapabilities verbatim into the `omo-sync-capabilities` header of this request.
+    const call = (data: Readonly<Record<string, unknown>>) =>
+      operation.request({ op: "service", data: { ...data, syncCapabilities: SYNC_CAPABILITIES } })
     const keyring: DeviceKeyring = {
       principal: () => ({ kind: "device", id: descriptor.syncPrincipalId }),
       publicKeys: () => descriptor.publicKeys,
@@ -128,7 +154,7 @@ export async function openDesktopSyncAccount(wire: DesktopSyncEngineWire, home?:
     let active = true
     let subscription: Awaited<ReturnType<typeof open>> | undefined
     const remove = wire.onEvent((event) => {
-      if (!active || wire.signal.aborted || event.event === "retired" || event.handle !== subscription?.handle) return
+      if (!active || signal.aborted || event.event === "retired" || event.handle !== subscription?.handle) return
       if (event.event === "advanced") handlers.onAdvanced(event.head)
       else handlers.onConnected(event.connected)
     })
@@ -139,13 +165,13 @@ export async function openDesktopSyncAccount(wire: DesktopSyncEngineWire, home?:
         await operation.call({ op: "subscribe" })
       })
       .catch(() => {
-        if (active && !wire.signal.aborted) handlers.onConnected(false)
+        if (active && !signal.aborted) handlers.onConnected(false)
       })
     return () => {
       if (!active) return
       active = false
       remove()
-      if (subscription !== undefined && !wire.signal.aborted) void subscription.close().catch(() => undefined)
+      if (subscription !== undefined && !signal.aborted) void subscription.close().catch(() => undefined)
     }
   })
   const forOperation = async (authority: SyncOperationAuthority): Promise<DesktopSyncOperation> => {
@@ -157,9 +183,13 @@ export async function openDesktopSyncAccount(wire: DesktopSyncEngineWire, home?:
       devices: operation.devices,
       close: operation.close,
     }
-    if (descriptor.genesis !== "supported") return ports
+    const phrase = descriptor.phraseGenesis === "supported"
+    if (descriptor.genesis !== "supported" && !phrase) return ports
     try {
-      const offered = capability.parse(await authority.admit(() => wire.request({ op: "capability" })))
+      const offered =
+        descriptor.genesis === "supported"
+          ? capability.parse(await authority.admit(() => wire.request({ op: "capability" })))
+          : { prfSupported: false, genesisSupported: false }
       // Bound to this operation's main-issued handle; never the background account ports.
       const genesis: GenesisBridge = {
         prfSupported: offered.prfSupported && offered.genesisSupported,
@@ -167,6 +197,16 @@ export async function openDesktopSyncAccount(wire: DesktopSyncEngineWire, home?:
           const reply = await options.operation.admit(() => operation.request({ op: "genesisRun", data: request }))
           return genesisResult.parse(reply) as GenesisBridgeResult
         },
+        ...(phrase && {
+          phraseSupported: true,
+          // The words stay in desktop main's protected window; only the public prepared genesis comes back.
+          async createPhraseGenesis(request, options) {
+            const reply = await options.operation.admit(() =>
+              operation.request({ op: "phraseGenesisRun", data: request }),
+            )
+            return genesisResult.parse(reply) as GenesisBridgeResult
+          },
+        }),
       }
       return { ...ports, genesis }
     } catch (error) {
@@ -177,7 +217,7 @@ export async function openDesktopSyncAccount(wire: DesktopSyncEngineWire, home?:
   return {
     kind: "desktop",
     descriptor,
-    signal: wire.signal,
+    signal,
     keyring: background.keyring,
     chain: background.chain,
     pairing: background.pairing,
@@ -187,13 +227,19 @@ export async function openDesktopSyncAccount(wire: DesktopSyncEngineWire, home?:
     boundary,
     forOperation,
     async isCurrent() {
-      if (wire.signal.aborted) return false
+      if (signal.aborted) return false
       const current = SyncDescriptor.parse(await wire.request({ op: "descriptor" }))
-      if (wire.signal.aborted || !sameDescriptor(current, descriptor)) return false
-      return boundary(() => true).then(
-        () => true,
-        () => false,
-      )
+      const live =
+        !signal.aborted &&
+        sameDescriptor(current, descriptor) &&
+        (await boundary(() => true).then(
+          () => true,
+          () => false,
+        ))
+      // Callers replace an account that is not current (the account source opens main's next one), so it ends here:
+      // its `retired` listener leaves the channel and sessions on it end, with or without a `retired` event.
+      if (!live) end()
+      return live
     },
   }
 }

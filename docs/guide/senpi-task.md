@@ -11,12 +11,12 @@ Use the `task` tool. A single spawn needs `prompt` plus exactly one of `category
 - `run_in_background: false` (default) waits and returns the child's final response inline.
 - `run_in_background: true` returns a task id (prefixed `st_`) immediately so you can keep working and check back later.
 - `name` gives the child a stable, human-friendly handle within the session so you can steer it by name instead of id.
-- `model` is valid only with `subagent_type`; category-routed tasks reject it and resolve their model from category config. `load_skills` prepends named SKILL.md content to the child prompt.
+- `model` is valid only with `subagent_type` naming a custom agent from your omo.json. Category-routed tasks reject it and resolve their model from category config. The builtin agents (`explore`, `librarian`, `plan-consultant`, `plan-reviewer`, `omo-native-code-reviewer`, `omo-native-qa-executor`, `omo-native-gate-reviewer`) also reject it with `agent_with_model`, because a call-site model would replace their designated chain; change one with `agents.<name>.model` or `agents.<name>.models` in omo.json. `load_skills` prepends named SKILL.md content to the child prompt.
 - `subagent_type` must name a loaded agent. A name that is unknown or disabled fails with `unknown_target` listing the available agents; it is never resolved as a category of the same name, so `task(subagent_type="architect")` fails instead of quietly returning the `architect` category's model. Pass `category: "architect"` when a category is what you want.
 
 To continue an existing child with full context instead of spawning a new one, use `task_send` with `to` set to the child id or name.
 
-For fanout, pass `tasks:[...]` instead of the top-level `prompt`/target fields. Each item chooses its own `category` or `subagent_type` and may set `name` and `load_skills`; `model` is available only to items routed by `subagent_type`:
+For fanout, pass `tasks:[...]` instead of the top-level `prompt`/target fields. Each item chooses its own `category` or `subagent_type` and may set `name` and `load_skills`; `model` is available only to items routed by `subagent_type` to a custom agent:
 
 ```jsonc
 {

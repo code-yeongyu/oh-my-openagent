@@ -16,6 +16,8 @@
         "test/fake-engine.mjs",
         "test/global-input-harness.ts",
         "test/harness.ts",
+        // the package's ./testing export, imported by other packages' tests
+        "test/testing.ts",
         // run by path as a Worker by test/sandbox.test.ts, never imported
         "test/fixtures/quickjs-crash-worker.mjs",
         // run by path as the computer.run QuickJS sandbox Worker (src/run/sandbox/quickjs.ts), never imported

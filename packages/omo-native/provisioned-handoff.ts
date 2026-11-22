@@ -1,4 +1,4 @@
-import { closeSync } from "node:fs"
+import { closeSync, fstatSync } from "node:fs"
 import { dirname, isAbsolute } from "node:path"
 import { propagateResult, runChild } from "./bin/lib/child-process.js"
 import { inspectPrivateFdTable, PRIVATE_FDS_ENV, privateFdHandoffFor } from "./bin/lib/private-fd-table.js"
@@ -67,6 +67,31 @@ function handedOffLauncher(launcher: string | undefined, expected: string): stri
   return isProvisionedExecutable(launcher, expected) ? undefined : launcher
 }
 
+// senpi's startup hand-off (`SENPI_RPC_HOST_STARTUP_EVENTS`) and the pipe it names at `STARTUP_EVENT_FD`.
+const STARTUP_EVENTS_ENV = "SENPI_RPC_HOST_STARTUP_EVENTS"
+const STARTUP_EVENT_FD = 16
+
+function holdsStartupPipe(env: NodeJS.ProcessEnv, platform: NodeJS.Platform): boolean {
+  if (platform === "win32" || !env[STARTUP_EVENTS_ENV]) return false
+  try {
+    const stat = fstatSync(STARTUP_EVENT_FD)
+    return stat.isSocket() || stat.isFIFO()
+  } catch {
+    return false
+  }
+}
+
+/** A coordinated engine start keeps its startup pipe across the handoff: execve would close it (#13622). */
+type ChildHandoff = { env: NodeJS.ProcessEnv; stdio: (string | number)[]; onSpawn?: () => void }
+
+function withStartupPipe(handoff: ChildHandoff | undefined, env: NodeJS.ProcessEnv): ChildHandoff {
+  const base = handoff ?? { env, stdio: ["inherit", "inherit", "inherit"] }
+  const stdio: (string | number)[] = [...base.stdio]
+  while (stdio.length <= STARTUP_EVENT_FD) stdio.push("ignore")
+  stdio[STARTUP_EVENT_FD] = STARTUP_EVENT_FD
+  return { ...base, stdio }
+}
+
 export async function reexecProvisionedRuntime(expected: string, options: ReexecOptions = {}): Promise<void> {
   const argv = options.argv ?? process.argv.slice(2)
   const env = options.env ?? process.env
@@ -78,7 +103,8 @@ export async function reexecProvisionedRuntime(expected: string, options: Reexec
   const table = env[PRIVATE_FDS_ENV]
   // The compiled Windows hop captures the pair too; helper spawns must never see its declaration.
   if (platform === "win32") delete env[PRIVATE_FDS_ENV]
-  const handoff = privateFdHandoffFor(env, table, platform)
+  const privateHandoff = privateFdHandoffFor(env, table, platform)
+  const handoff = holdsStartupPipe(env, platform) ? withStartupPipe(privateHandoff, env) : privateHandoff
   // Named sockets it cannot forward would stay open in this waiting parent, so their peer never saw EOF.
   if (handoff !== undefined) for (const fd of inspectPrivateFdTable(table, platform).discard) closeSync(fd)
   if (handoff === undefined && platform !== "win32" && typeof execve === "function") {

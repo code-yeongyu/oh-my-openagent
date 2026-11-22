@@ -35,6 +35,7 @@ packages/omo-senpi/plugin/runtime/
 packages/omo-senpi/plugin/scripts/install.mjs
 # Byte-pinned or source-text-pinned by tests: formatting them breaks the pin, so they keep their bytes.
 packages/device-service-core/src/strict-ed25519/
+packages/device-service-core/src/local-api/
 packages/memory-core/src/sync/crypto/strict-ed25519/
 packages/memory-core/src/sync/crypto/testing/strict-ed25519-oracle.test-support.ts
 script/knip-preexisting-exports.ts

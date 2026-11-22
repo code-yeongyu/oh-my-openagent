@@ -62,13 +62,16 @@ export const AGENT_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFal
     { providers: ["opencode"], model: LATEST_MODEL_BY_FAMILY.kimiK3, variant: "max" },
   ],
   "plan-reviewer": [
+    // GPT-6 Astra stays behind each GPT-6.2 Astra rung for a registry without 6.2; Copilot does not serve 6.2.
     { providers: ["chatgpt-subscription", "openai"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "xhigh" },
-    { providers: ["github-copilot"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "high" },
+    { providers: ["chatgpt-subscription", "openai"], model: "gpt-6-astra", variant: "xhigh" },
+    { providers: ["github-copilot"], model: "gpt-6-astra", variant: "high" },
     {
       providers: ["chatgpt-subscription", "openai", "opencode"],
       model: LATEST_MODEL_BY_FAMILY.gptAstra,
       variant: "high",
     },
+    { providers: ["chatgpt-subscription", "openai", "opencode"], model: "gpt-6-astra", variant: "high" },
     {
       providers: ["anthropic-subscription", "anthropic", "github-copilot", "opencode"],
       model: LATEST_MODEL_BY_FAMILY.claudeOpus,

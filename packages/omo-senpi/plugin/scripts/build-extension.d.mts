@@ -7,6 +7,7 @@ export interface BuildExtensionOptions {
   sidePanelRuntimeOutputPath?: string
   toolkitSdkOutputPath?: string
   bunshinTsOutputPath?: string
+  omoSdkOutputPath?: string
   rollbackRuntimeOutputPath?: string
   memoryDoctorOutputPath?: string
   memoryMemfsOutputPath?: string
@@ -19,6 +20,7 @@ export interface BuildExtensionOptions {
   telemetryPosthogOutputPath?: string
   memorySyncOutputPath?: string
   threadClientOutputPath?: string
+  wakeOutputPath?: string
   telemetryRecoveryOutputPath?: string
   feedbackOutputPath?: string
   desktopToolkitOutputPath?: string
@@ -45,6 +47,7 @@ export function buildExtension(options?: BuildExtensionOptions): Promise<{
   telemetryPosthogInputs: string[]
   memorySyncInputs: string[]
   threadClientInputs: string[]
+  wakeInputs: string[]
   telemetryRecoveryInputs: string[]
   feedbackInputs: string[]
   desktopToolkitInputs: string[]
@@ -53,6 +56,7 @@ export function buildExtension(options?: BuildExtensionOptions): Promise<{
   computerRunWorkerInputs: string[]
   toolkitSdkInputs: string[]
   bunshinTsInputs: string[]
+  omoSdkInputs: string[]
   rollbackRuntimeInputs: string[]
   gatewayStoreWorkerInputs: string[]
   threadSdkInputs: string[]

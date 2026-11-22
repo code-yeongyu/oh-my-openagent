@@ -59,6 +59,8 @@ pub(crate) struct Worker {
     pub(crate) epochs: crate::epoch::Epochs,
     /// The time the actionability battery waits on.
     pub(crate) battery_clock: Box<dyn crate::actionability::BatteryClock>,
+    /// The last activity, for the object-mode idle flush.
+    pub(crate) idle: crate::idle::Idle,
 }
 
 /// A mutating request's reply and the audit event it emitted.
@@ -101,6 +103,7 @@ impl Worker {
             report_extras: Rc::default(),
             epochs: crate::epoch::Epochs::default(),
             battery_clock: Box::new(crate::actionability::HostClock::new()),
+            idle: crate::idle::Idle::default(),
         };
         worker.install_screen_probe();
         worker.refresh_capabilities();
@@ -160,6 +163,7 @@ impl Worker {
         self.gc = ArtifactGc::default();
         self.maybe_gc();
         self.publish_report_mode();
+        self.mark_active();
         self.refresh_capabilities()
     }
 
@@ -206,12 +210,15 @@ impl Worker {
             self.attach_user_input_feed();
             self.drain_user_input();
         }
+        self.flush_if_idle();
+        self.mark_active();
         self.apply_epoch();
         let result = self.serve(op, cancelled);
         if matches!(&result, Err(error) if error.code == ErrorCode::SpaceUnsupported) {
             self.epochs.record(senpi_desktop_core::protocol_results::EpochReason::Space);
         }
         self.apply_epoch();
+        self.mark_active();
         result
     }
 

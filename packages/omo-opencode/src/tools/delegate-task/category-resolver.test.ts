@@ -44,7 +44,7 @@ describe("resolveCategoryExecution", () => {
   test("returns unpinned resolution when category cache is not ready on first run", async () => {
     //#given
     const args = {
-      category: "deep-low",
+      category: "unspecified-low",
       prompt: PROMPT_INPUT_SENTINEL,
       description: DESCRIPTION_INPUT_SENTINEL,
       run_in_background: false,
@@ -54,7 +54,7 @@ describe("resolveCategoryExecution", () => {
     }
     const executorCtx = createMockExecutorContext()
     executorCtx.userCategories = {
-      "deep-low": {},
+      "unspecified-low": {},
     }
     const inheritedModel = undefined
     const systemDefaultModel = "anthropic/claude-sonnet-4-6"
