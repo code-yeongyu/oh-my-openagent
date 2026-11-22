@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process"
 import { dirname, join } from "node:path"
 import { runChild } from "./child-process.js"
 import { fetchNpmDistTagsSync } from "./npm-dist-tags.js"
@@ -17,6 +18,27 @@ import { findVersionedInstall, updateVersionedInstall, versionedUpdateTarget } f
 
 export { isPrintOnlyUpdate }
 
+/**
+ * Install scripts npm >= 11 blocks by default that this package's install is known-safe without
+ * (#9281): esbuild's postinstall only copies the platform binary its optionalDependencies already
+ * provide, @google/genai's preinstall echoes a no-op, protobufjs' postinstall is optional. The
+ * printed command carries the package spec too, so it runs as-is, unlike npm's own suggestion.
+ */
+export const SAFE_INSTALL_SCRIPTS = ["esbuild", "@google/genai", "protobufjs"]
+
+/** npm's major version, or 0 when npm cannot be asked (bun installs never call this). */
+export function npmMajorVersion() {
+  try {
+    return (
+      Number.parseInt(
+        execFileSync("npm", ["--version"], { encoding: "utf8", shell: process.platform === "win32" }).split(".")[0],
+        10,
+      ) || 0
+    )
+  } catch {
+    return 0
+  }
+}
 export function formatUpdateCommand(update) {
   return `omo is updated via ${update.manager}: ${update.command}`
 }
@@ -60,6 +82,7 @@ export function formatVersionChange(before, after) {
  * @typedef {{ manager: string, command: string, argv: string[], env?: Record<string, string> }} UpdateTarget
  * @typedef {{
  *   resolveUpdate?: (targetVersion?: string) => UpdateTarget,
+ *   npmMajor?: number,
  *   fetchDistTags?: () => Record<string, unknown> | null,
  *   log?: (line: string) => void,
  *   error?: (line: string) => void,
@@ -78,9 +101,12 @@ export function formatVersionChange(before, after) {
  * @returns {Promise<number>}
  */
 export async function runSelfUpdate(args, options = {}) {
+  const npmMajor = options.npmMajor ?? npmMajorVersion()
+  const allowScripts = npmMajor >= 11 ? SAFE_INSTALL_SCRIPTS : undefined
   const resolveUpdate =
     options.resolveUpdate ??
-    ((targetVersion) => updateTarget(undefined, undefined, undefined, undefined, undefined, targetVersion))
+    ((targetVersion) =>
+      updateTarget(undefined, undefined, undefined, undefined, undefined, targetVersion, allowScripts))
   const fetchDistTags = options.fetchDistTags ?? fetchNpmDistTagsSync
   const log = options.log ?? ((line) => console.log(line))
   const error = options.error ?? ((line) => console.error(line))

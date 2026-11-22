@@ -1,10 +1,16 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, mock, test } from "bun:test"
 import { channelPackageSpec, releaseChannel, updateTarget } from "../bin/lib/package-paths.js"
 
 // updateTarget reads the version of the install it is pointed at and falls back to this package's own
 // manifest, so the expected spelling follows the package channel (`omo-ai` stable, `omo-ai@beta` prerelease).
 const SPEC = channelPackageSpec()
-import { formatUpdateCommand, formatVersionChange, isPrintOnlyUpdate, runSelfUpdate } from "../bin/lib/self-update.js"
+import {
+  formatUpdateCommand,
+  formatVersionChange,
+  isPrintOnlyUpdate,
+  runSelfUpdate,
+  SAFE_INSTALL_SCRIPTS,
+} from "../bin/lib/self-update.js"
 
 // These cases cover the spawn mechanics on the registry-unreachable path, which keeps the unpinned
 // channel spec; the pinned path lives in self-update-pinned-target.test.ts.
@@ -200,5 +206,39 @@ describe("omo self-update", () => {
         expect(errors).toEqual([`omo: update failed; retry with: npm i -g ${SPEC}`])
       })
     })
+  })
+})
+
+// #9281: npm >= 11 gets the safe install scripts allowed so its warning and its broken suggested
+// command never appear; an older npm must not receive an unknown option.
+describe("self update npm allow-scripts", () => {
+  const fakeTarget = () =>
+    updateTarget("/prefix/lib/node_modules/omo-ai", "linux", "5.0.0", "/home/someone", () => false)
+  test.skipIf(process.env.DISABLE_9281 === "1")(
+    "#given npm >= 11 #when the update installs #then the safe scripts are allowed and the spec is in the argv",
+    async () => {
+      const run = mock((_command: string, _argv: string[]) => Promise.resolve({ status: 0, signal: null }))
+      const exit = await runSelfUpdate([], {
+        npmMajor: 11,
+        fetchDistTags: () => ({ latest: "5.0.1" }),
+        readInstalled: ((calls) => () => ({ omo: ++calls === 1 ? "5.0.0" : "5.0.1", engine: "1.0.0" }))(0),
+        run,
+      })
+      expect(exit).toBe(0)
+      const argv = run.mock.calls[0]?.[1] ?? []
+      expect(argv).toContain("--allow-scripts=esbuild,@google/genai,protobufjs")
+    },
+  )
+  test("#given npm 9 #when the update installs #then no unknown option reaches npm", async () => {
+    const run = mock((_command: string, _argv: string[]) => Promise.resolve({ status: 0, signal: null }))
+    await runSelfUpdate([], {
+      npmMajor: 9,
+      resolveUpdate: fakeTarget,
+      fetchDistTags: () => ({ latest: "5.0.1" }),
+      readInstalled: () => ({ omo: "5.0.0", engine: "1.0.0" }),
+      run,
+    })
+    const argv = run.mock.calls[0]?.[1] ?? []
+    expect(argv.join(" ")).not.toContain("--allow-scripts")
   })
 })

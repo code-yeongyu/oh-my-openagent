@@ -26,3 +26,25 @@ describe("omo-ai release channel", () => {
     })
   })
 })
+
+// #9281: npm 11 blocks install scripts by default and its own suggested fix lacks the package spec.
+describe("updateTarget npm allow-scripts handling", () => {
+  const home = "/home/someone"
+  test("#given npm 11 install scripts to allow #when an npm target lists them #then the flag follows the package spec and the command stays runnable", () => {
+    const target = updateTarget("/prefix/lib/node_modules/omo-ai", "linux", "5.0.0", home, () => false, undefined, [
+      "esbuild",
+      "@google/genai",
+    ])
+    expect(target.command).toBe("npm i -g omo-ai --allow-scripts=esbuild,@google/genai")
+    expect(target.argv).toEqual(["npm", "i", "-g", "omo-ai", "--allow-scripts=esbuild,@google/genai"])
+  })
+  test("#given no scripts to allow #when an npm target is built #then no flag is appended", () => {
+    const target = updateTarget("/prefix/lib/node_modules/omo-ai", "linux", "5.0.0", home, () => false)
+    expect(target.command).toBe("npm i -g omo-ai")
+  })
+  test("#given a bun global install #when scripts are listed #then the bun command is unchanged", () => {
+    const root = `/home/someone${"/.bun/install/global/node_modules/omo-ai"}`
+    const target = updateTarget(root, "linux", "5.0.0", home, () => false, undefined, ["esbuild"])
+    expect(target.command).toBe("bun add -g omo-ai")
+  })
+})
