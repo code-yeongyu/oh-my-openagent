@@ -333,20 +333,25 @@ describe("thread_create whose first prompt does not start", () => {
     },
   )
 
-  test("#given a thread that holds no alias #when it is reopened with a new alias and a prompt and its host never registers it #then the alias this call claimed is released (#14648 review)", async () => {
-    const a = account()
-    const { run, agentDir } = surface(a.remote, {
-      firstPromptWaitMs: 50,
-      createdNeverDrains: true,
-      diskSessions: ["dur-saved"],
-    })
-    writeSession(agentDir, "dur-saved")
-    expect(await run("thread_create", { thread: "dur-saved", alias: "lane-new", prompt: "build it" })).toMatchObject({
-      kind: "error",
-      error: { code: "host_unavailable", details: { alias: "lane-new", alias_released: true } },
-    })
-    expect(a.aliases.has("lane-new")).toBe(false)
-  })
+  test.each([
+    ["a registry that answers", undefined],
+    ["a registry whose lookups fail after planning found the alias free", 1],
+  ] as const)(
+    "#given a thread that holds no alias and %s #when it is reopened with a new alias and a prompt and its host never registers it #then no alias is claimed, so none is left behind (#14648 review M2)",
+    async (_, resolveFailsAfter) => {
+      const a = account(resolveFailsAfter === undefined ? {} : { resolveFailsAfter })
+      const { run, agentDir } = surface(a.remote, {
+        firstPromptWaitMs: 50,
+        createdNeverDrains: true,
+        diskSessions: ["dur-saved"],
+      })
+      writeSession(agentDir, "dur-saved")
+      const result = await run("thread_create", { thread: "dur-saved", alias: "lane-new", prompt: "build it" })
+      expect(result).toMatchObject({ kind: "error", error: { code: "host_unavailable" } })
+      expect(a.aliases.has("lane-new")).toBe(false)
+      expect(a.registryCalls.includes("claim")).toBe(false)
+    },
+  )
 
   test("#given a thread that already holds an alias #when it is reopened by that alias with a prompt and its host never registers it #then the refusal keeps the alias (#14648 review B4)", async () => {
     const a = account()
@@ -365,15 +370,26 @@ describe("thread_create whose first prompt does not start", () => {
     expect(a.aliases.get("lane-held")).toEqual(holder)
   })
 
-  test("#given a create with an alias whose new session its host never registers #when it is refused #then the alias it claimed is released (#14648 review B4)", async () => {
+  test("#given a create with an alias whose new session its host never registers #when it is refused #then no alias was claimed (#14648 review M2)", async () => {
     const a = account()
     const { run } = surface(a.remote, { firstPromptWaitMs: 50, createdNeverDrains: true })
     const result = await run("thread_create", { alias: "lane-14648", prompt: "build it" })
-    expect(result).toMatchObject({
-      kind: "error",
-      error: { code: "host_unavailable", details: { alias: "lane-14648", alias_released: true, created: false } },
-    })
+    expect(result).toMatchObject({ kind: "error", error: { code: "host_unavailable", details: { created: false } } })
     expect(a.aliases.has("lane-14648")).toBe(false)
+    expect(a.registryCalls.includes("claim")).toBe(false)
+  })
+
+  test("#given a create with an alias whose first prompt starts here #when it is created #then the alias is claimed after the prompt and names the new thread (#14648 review M2)", async () => {
+    const a = account()
+    const { run } = surface(a.remote)
+    const result = await run("thread_create", { alias: "lane-started", prompt: "build it" })
+    expect(result).toMatchObject({
+      kind: "ok",
+      thread: "dur-created-here",
+      alias: "lane-started",
+      prompt: { delivery: { kind: "started" } },
+    })
+    expect(a.aliases.get("lane-started")?.session_id).toBe("dur-created-here")
   })
 
   test("#given a new session here its host registered but whose control endpoint never drains #when created with a prompt #then the create fails prompt_not_started naming the thread, the delivery and its last state", async () => {

@@ -219,6 +219,8 @@ export function createRemoteThreadFixture() {
       failSessionsList?: boolean
       failAliasesOf?: boolean
       failClaim?: boolean
+      /** The alias registry answers the first N resolves, then every later one fails as a network outage would. */
+      resolveFailsAfter?: number
       otherHolders?: number
       unwritten?: boolean
       unloadReason?: string
@@ -648,6 +650,18 @@ export function createRemoteThreadFixture() {
       resolve: async (alias) => {
         registryCalls.push("resolve")
         if (options.registryDown !== undefined) return await down()
+        if (
+          options.resolveFailsAfter !== undefined &&
+          registryCalls.filter((call) => call === "resolve").length > options.resolveFailsAfter
+        )
+          return {
+            kind: "error",
+            error: {
+              code: "alias_registry_unavailable",
+              message: "the alias registry did not answer",
+              details: { reason: "network" },
+            },
+          }
         const held = aliases.get(alias)
         return held === undefined
           ? { kind: "error", error: { code: "alias_not_found", message: "no such alias" } }

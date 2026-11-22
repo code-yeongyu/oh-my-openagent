@@ -114,8 +114,8 @@ export async function createThread(
   let opened: HostedThread | undefined
   // #14648: this call opened the session on this device (`madeNew`: its session file too), so it answers for what is left.
   let openedHere: OpenedHere | undefined
-  // An alias the thread held before this call is its own: a refused reopen keeps it and releases only what it claimed.
-  let aliasHeldBefore = true
+  // The alias claim of a local open with a first prompt, run once the prompt shows the create stands (#14648 review M2).
+  let deferredAlias: ((recorded: ThreadToolResult) => Promise<ThreadToolResult>) | undefined
   const made = await (async (): Promise<ThreadToolResult> => {
     const skills =
       value.skills === undefined || value.skills.length === 0 ? undefined : checkInitialSkills(value.skills)
@@ -245,50 +245,48 @@ export async function createThread(
       return recorded.kind === "ok"
         ? ({ ...recorded, alias_scope: "local", alias_unavailable: plan.localAlias } as ThreadToolResult)
         : recorded
-    if (value.alias !== undefined && value.prompt !== undefined && plan.host.device === undefined)
-      aliasHeldBefore = await aliasHeldBy(options.remote, value.alias, outcome.thread.thread_id)
-    if (!plan.creates) return await withAlias(options.remote, value.alias, recorded, plan.host.device)
-    const claimed = await claimCreatedAlias(options.remote, value.alias, recorded, plan.host.device)
-    if (!("local" in claimed)) return claimed
-    // The account was gone by the claim, after the create: the alias names the new thread here, as with no account.
-    if (recorded.kind !== "ok" || !("thread" in recorded) || value.alias === undefined) return recorded
-    const local = { alias_scope: "local", alias_unavailable: claimed.local } as const
-    if (value.name !== undefined) return { ...recorded, ...local } as ThreadToolResult
-    const localName = value.alias.trim()
-    const nameRefusal = await nameCreatedThread(
-      options,
-      recorded.thread,
-      localName,
-      await plan.host.visible(),
-      callerId,
-      view,
-    )
-    return (
-      nameRefusal === undefined
-        ? { ...recorded, name: localName, link: threadLink(recorded.thread, localName), ...local }
-        : {
-            ...recorded,
-            ...local,
-            local_name_unavailable: nameRefusal.code,
-            ...(nameRefusal.reason === undefined ? {} : { local_name_unavailable_reason: nameRefusal.reason }),
-          }
-    ) as ThreadToolResult
+    // #14648 review M2: the alias is claimed only once this create stands. A local open with a first prompt can still be
+    // refused (its host never registered the session); claiming after that verdict means a refusal holds no claim to
+    // undo, so it can neither leak a new alias nor release one the thread held before, whatever the registry answers.
+    const applyAlias = async (recorded: ThreadToolResult): Promise<ThreadToolResult> => {
+      if (!plan.creates) return await withAlias(options.remote, value.alias, recorded, plan.host.device)
+      const claimed = await claimCreatedAlias(options.remote, value.alias, recorded, plan.host.device)
+      if (!("local" in claimed)) return claimed
+      // The account was gone by the claim, after the create: the alias names the new thread here, as with no account.
+      if (recorded.kind !== "ok" || !("thread" in recorded) || value.alias === undefined) return recorded
+      const local = { alias_scope: "local", alias_unavailable: claimed.local } as const
+      if (value.name !== undefined) return { ...recorded, ...local } as ThreadToolResult
+      const localName = value.alias.trim()
+      const nameRefusal = await nameCreatedThread(
+        options,
+        recorded.thread,
+        localName,
+        await plan.host.visible(),
+        callerId,
+        view,
+      )
+      return (
+        nameRefusal === undefined
+          ? { ...recorded, name: localName, link: threadLink(recorded.thread, localName), ...local }
+          : {
+              ...recorded,
+              ...local,
+              local_name_unavailable: nameRefusal.code,
+              ...(nameRefusal.reason === undefined ? {} : { local_name_unavailable_reason: nameRefusal.reason }),
+            }
+      ) as ThreadToolResult
+    }
+    if (value.alias !== undefined && value.prompt !== undefined && plan.host.device === undefined) {
+      deferredAlias = applyAlias
+      return recorded
+    }
+    return await applyAlias(recorded)
   })()
   // A create given no prompt says so (`prompt: null`), so a caller sees nothing was sent (the owner's lost-brief case).
   if (value.prompt === undefined) return made.kind === "ok" ? ({ ...made, prompt: null } as ThreadToolResult) : made
   if (made.kind !== "ok" || opened === undefined) return made
   const thread = opened
   const here = openedHere
-  // An alias this call claimed for the thread it made names it across the account: a refused create releases it with the
-  // thread. A reopened thread may have held the alias before this call, so its alias is kept.
-  const claimedAlias =
-    !aliasHeldBefore &&
-    value.alias !== undefined &&
-    "alias" in made &&
-    typeof made.alias === "string" &&
-    !("alias_scope" in made)
-      ? made.alias
-      : undefined
   const unregistered =
     here === undefined
       ? undefined
@@ -297,12 +295,12 @@ export async function createThread(
             const owner = await options.store.sessionOwner(thread.thread_id)
             return owner?.endpoint == null || owner.incarnation === here.priorIncarnation
           },
-          refuse: (deliveryId: string) => refuseUnregistered(options, context, thread, deliveryId, here, claimedAlias),
+          refuse: (deliveryId: string) => refuseUnregistered(options, context, thread, deliveryId, here),
         }
   const prompt = await promptThatRan(await firstPrompt(current, opened, value, context), opened, context, unregistered)
-  return "not_started" in prompt
-    ? { kind: "error", error: prompt.not_started }
-    : ({ ...made, prompt } as ThreadToolResult)
+  if ("not_started" in prompt) return { kind: "error", error: prompt.not_started }
+  const stands = { ...made, prompt } as ThreadToolResult
+  return deferredAlias === undefined ? stands : await deferredAlias(stands)
 }
 
 /**
@@ -394,22 +392,6 @@ type OpenedHere = {
   readonly discard?: SessionHost["discard"]
 }
 
-/**
- * Whether `alias` names `threadId` in the account's registry before this call claims it. Only `alias_not_found` (or
- * another holder) is a no; an unreadable registry counts as held, so a refusal never releases an alias it may have held.
- */
-async function aliasHeldBy(
-  remote: ThreadToolSurfaceOptions["remote"],
-  alias: string,
-  threadId: string,
-): Promise<boolean> {
-  if (remote?.aliases === undefined) return false
-  const held = await remote.aliases.resolve(alias).catch(() => undefined)
-  if (held === undefined) return true
-  if (held.kind === "ok") return held.value.session_id === threadId
-  return held.error.code !== "alias_not_found"
-}
-
 /** #14648: whether the session a create opened here is still unregistered, and the refusal that ends it if so. */
 type UnregisteredCheck = {
   readonly check: () => Promise<boolean>
@@ -430,7 +412,6 @@ async function refuseUnregistered(
   thread: HostedThread,
   deliveryId: string,
   here: OpenedHere,
-  claimedAlias: string | undefined,
 ): Promise<ThreadToolFailure | undefined> {
   const { madeNew } = here
   // Only this create's own prompt is taken back: other messages a reopened thread holds stay queued for it.
@@ -478,20 +459,6 @@ async function refuseUnregistered(
       )
     }
   }
-  let aliasReleased = false
-  if (claimedAlias !== undefined) {
-    const released = await options.remote?.aliases
-      ?.release({ session_id: thread.thread_id, alias: claimedAlias })
-      .catch((error: unknown) => ({
-        kind: "error" as const,
-        error: { code: error instanceof Error ? error.message : String(error) },
-      }))
-    aliasReleased = released?.kind === "ok"
-    if (!aliasReleased)
-      failures.push(
-        `releasing its alias ${claimedAlias} failed: ${released?.kind === "error" ? released.error.code : "no alias registry"}`,
-      )
-  }
   const engine = thread.engine_version === undefined ? "" : ` (it runs engine ${thread.engine_version})`
   return threadToolFailure(
     "host_unavailable",
@@ -508,7 +475,6 @@ async function refuseUnregistered(
       ...(here.worktree === undefined
         ? {}
         : { worktree: { path: here.worktree.path, branch: here.worktree.branch, removed: worktreeRemoved } }),
-      ...(claimedAlias === undefined ? {} : { alias: claimedAlias, alias_released: aliasReleased }),
       ...(thread.engine_version === undefined ? {} : { engine_version: thread.engine_version }),
       ...(failures.length === 0 ? {} : { failures }),
     },
