@@ -6,7 +6,7 @@ import { type ChildProcess, spawn, spawnSync } from "node:child_process"
 // its whole life blocked in spawnSync while the daemon tree does the work — so the only honest progress
 // signal is CPU time of the child's whole descendant tree. Kill on CPU stall, bound the runaway, and let
 // bun's test timeout sit above both.
-const STALL_KILL_MS = 10_000
+export const STALL_KILL_MS = 10_000
 export const RUNAWAY_CAP_MS = 120_000
 const PROGRESS_SAMPLE_MS = 250
 // Two scheduler quanta: less than this between samples is scheduling noise, not work.
@@ -18,7 +18,7 @@ export class SpawnBudgetError extends Error {
 // Linux: sum utime+stime+cutime+cstime over the /proc subtree rooted at the child. The CLI's own utime
 // stays flat while it blocks on the daemon, so sampling the tree is what separates slow from stalled.
 // macOS: ps gives the same graph once per sample. CLK_TCK is 100 on every host we run on.
-function childTreeCpuSeconds(rootPid: number): number {
+export function childTreeCpuSeconds(rootPid: number): number {
   if (process.platform === "linux") {
     try {
       const ppidOf = new Map<number, number>()
