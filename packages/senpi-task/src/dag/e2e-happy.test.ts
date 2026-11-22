@@ -16,6 +16,7 @@ import { createDagManager, type DagManager, type DagRunRecordV1, type DagStartRe
 import { createDagScheduler, type DagNodeSendResult, type DagRunReentry, type DagScheduler } from "./scheduler"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNodeId, DagRunEvent, DagRunId } from "./types"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 // bunfig preloads test-setup.ts to raise the default timeout, but Bun honours a preload's
 // setDefaultTimeout only for the FIRST test file of a run; every later file silently reverts to
@@ -171,8 +172,8 @@ type E2eFixture = {
 
 function e2eFixture(options: { readonly admit?: AdmitResident; readonly runner?: ManagedRunner } = {}): E2eFixture {
   const project = tempProject()
-  const store = createDagFileStore({ project_dir: project })
-  const taskStore = createTaskRecordStore({ project_dir: project })
+  const store = createDagFileStore(ownedTaskState(project))
+  const taskStore = createTaskRecordStore(ownedTaskState(project))
   const runner = new ScriptedRunner()
   const activeRunner = options.runner ?? runner
   const taskManager = createTaskManager({

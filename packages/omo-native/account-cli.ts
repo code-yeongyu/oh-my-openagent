@@ -1,41 +1,36 @@
 import { resolveMemoryRoot } from "../memory-core/src/identity/layout"
-import { loadTrustAnchor } from "../memory-core/src/sync/crypto/trust-pin.ts"
 import { syncPinDir } from "../memory-core/src/sync/pin-dir"
 import {
   createCredentialStore,
   type CredentialStore,
   INTERACTIVE_READ_WAIT,
   InvalidCredentialState,
-  KeychainLockedError,
-  SecretServiceUnavailableError,
 } from "../omo-opencode/src/cli/service-auth/keystore"
-import {
-  type Credentials,
-  credentialSchema,
-  serviceOrigin,
-  SignInError,
-} from "../omo-opencode/src/cli/service-auth/protocol"
+import { type Credentials, credentialSchema, serviceOrigin } from "../omo-opencode/src/cli/service-auth/protocol"
 import { registerHelperCandidates } from "../omo-opencode/src/cli/service-auth/keychain-helper/darwin-backend"
 import {
   type BeforeKeysDiscarded,
   createSession,
   type DeviceServiceHandoff,
-  discardedOf,
   type Session,
 } from "../omo-opencode/src/cli/service-auth/session"
 import { retireSyncPinOnDiscard } from "../omo-opencode/src/cli/service-auth/sync-pin-retire"
 import { retireSyncDevice } from "../memory-core/src/sync/device-retire"
 import { runDevicesVerb } from "./account-devices"
+import { type DeviceServiceOutcome, runSignInVerb } from "./account-sign-in"
 import { sessionFailure, signedOut } from "./account-session-outcome"
 import { ACCOUNT_EXIT, accountStoreFailure, showAccount } from "./account-show"
 import { accountStoreDependencies, runAccountStore } from "./account-store"
 import { cliDeviceServiceHandoff } from "./device-service-handoff"
+import { setUpRemoteAfterSignIn } from "./remote-entry"
 
 export { ACCOUNT_EXIT }
 
 // `omo account` lets the desktop share this machine's one OS-keychain credential with `omo login`
 // (one sync device per machine). It is a machine interface: one JSON line on stdout, secrets only on
-// stdin and stdout, and the exit code carries the outcome (codes in account-show.ts).
+// stdin and stdout, and the exit code carries the outcome (codes in account-show.ts). `sign-in` alone prints JSON
+// lines, one object per line and nothing else on stdout, because its user code must reach the caller before the
+// approval it waits for (account-sign-in.ts).
 
 export interface AccountCommandDependencies {
   readonly api: string
@@ -46,6 +41,8 @@ export interface AccountCommandDependencies {
   readonly beforeKeysDiscarded?: BeforeKeysDiscarded
   /** This machine's device service: adopt hands it the adopted keys, every forget and ended session forgets the device. */
   readonly deviceService?: DeviceServiceHandoff
+  /** The device-service setup a fresh sign-in runs; absent, `sign-in` reports the device service `not_on`. */
+  readonly setUpDeviceService?: () => Promise<DeviceServiceOutcome>
   readonly readStdin: () => Promise<string>
   readonly output: (line: string) => void
   readonly error: (line: string) => void
@@ -101,12 +98,15 @@ async function adopt(dependencies: AccountCommandDependencies, replace: boolean)
         current.device.id === incoming.device.id &&
         current.refreshState !== "uncertain" &&
         Date.parse(current.accessTokenExpiresAt) > Date.parse(incoming.accessTokenExpiresAt)
-      if (current !== null && current.device.id !== incoming.device.id)
-        await retireHook(dependencies)(discardedOf(current, "replaced"))
+      if (current !== null && current.device.id !== incoming.device.id) await session.discard(current, "replaced")
       if (!keepCurrent) await dependencies.store.write(incoming)
       await session.clearSignedOutMarker()
       adopted = keepCurrent ? current : incoming
-      return reply(dependencies, { adopted: true, device: deviceOf(incoming) })
+      return reply(dependencies, {
+        adopted: true,
+        device: deviceOf(incoming),
+        ...(dependencies.store.storage === undefined ? {} : { storage: dependencies.store.storage() }),
+      })
     },
     { replaceInvalid: replace },
   )
@@ -167,7 +167,7 @@ async function runVerb(dependencies: AccountCommandDependencies, args: readonly 
               )
               return reply(dependencies, { forgotten: false, device: deviceOf(current) }, ACCOUNT_EXIT.conflict)
             }
-            if (current !== null) await retireHook(dependencies)(discardedOf(current, "forget"))
+            if (current !== null) await session.discard(current, "forget")
             await dependencies.store.clear()
             forgotten = true
             return reply(dependencies, { forgotten: true })
@@ -187,6 +187,15 @@ async function runVerb(dependencies: AccountCommandDependencies, args: readonly 
       return runAccountStore(accountStoreDependencies(dependencies.api, dependencies), flags)
     case "devices":
       return runDevicesVerb(dependencies, sessionOf(dependencies), flags)
+    case "sign-in":
+      return runSignInVerb(
+        {
+          ...dependencies,
+          session: sessionOf(dependencies),
+          setUpDeviceService: dependencies.setUpDeviceService ?? (async () => "not_on"),
+        },
+        flags,
+      )
     case "retire-sync": {
       // The desktop's discard of its own sealed session (#12280): the pin of that account is retired.
       const account = flags[0] === "--account" && flags.length === 2 ? flags[1] : undefined
@@ -199,7 +208,7 @@ async function runVerb(dependencies: AccountCommandDependencies, args: readonly 
     }
     default:
       dependencies.error(
-        "usage: omo account show [--account <id>]|adopt [--replace]|token|export|forget [--device <id>]|devices [revoke <id>]|retire-sync --account <id>|store status|enable|disable [--discard]",
+        "usage: omo account show [--account <id>]|adopt [--replace]|token|export|forget [--device <id>]|devices [revoke <id>]|sign-in [--stdin|--check]|retire-sync --account <id>|store status|enable|disable [--discard]",
       )
       return ACCOUNT_EXIT.invalid
   }
@@ -237,6 +246,7 @@ export async function runAccountCommand(
         log: (line) => process.stderr.write(`${line}\n`),
       }),
       deviceService: cliDeviceServiceHandoff({ api, log: (line) => process.stderr.write(`${line}\n`) }),
+      setUpDeviceService: setUpRemoteAfterSignIn,
       readStdin: () => new Response(Bun.stdin.stream()).text(),
       output: (line) => process.stdout.write(`${line}\n`),
       error: (line) => process.stderr.write(`${line}\n`),

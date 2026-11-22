@@ -21,6 +21,7 @@ import {
   storeLoad,
 } from "./__fixtures__/residency"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupRoots)
 
@@ -28,7 +29,7 @@ describe("task_send lazy terminal RPC revival", () => {
   test("#given the detached terminal RPC respawn fails #when manager task_send targets it #then it returns not-continuable and rolls back to detached", async () => {
     const project = mkdtempSync(join(tmpdir(), "senpi-task-steering-manager-failure-"))
     roots.push(project)
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const record = detachedTerminal(store)
     const lifecycle = createTaskLifecycle({
       hostEndpoint: NO_HOST_ENDPOINT,
@@ -61,7 +62,7 @@ describe("task_send lazy terminal RPC revival", () => {
   test("#given detached terminal revival fails #when task_send sends a message #then it returns not-continuable and leaves the record detached", async () => {
     const project = mkdtempSync(join(tmpdir(), "senpi-task-steering-failure-"))
     roots.push(project)
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const record = detachedTerminal(store)
     const reviveReasons: string[] = []
     const engine = createSteeringEngine(portFor(store, undefined, reviveReasons))
@@ -77,7 +78,7 @@ describe("task_send lazy terminal RPC revival", () => {
   test("#given a detached terminal process at concurrency capacity #when task_send revives it #then capacity is deferred before respawn", async () => {
     const project = mkdtempSync(join(tmpdir(), "senpi-task-steering-capacity-"))
     roots.push(project)
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const record = detachedTerminal(store)
     const processRunner = new FakeRunner()
     let respawns = 0
@@ -115,7 +116,7 @@ describe("task_send lazy terminal RPC revival", () => {
   test("#given a revived child whose followUp rejects while alive #when task_send delivers #then it destroys, restores terminal status, and remains lazily revivable", async () => {
     const project = mkdtempSync(join(tmpdir(), "senpi-task-steering-followup-failure-"))
     roots.push(project)
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const record = detachedTerminal(store)
     let live = false
     let attempts = 0
@@ -187,7 +188,7 @@ describe("task_send lazy terminal RPC revival", () => {
   test("#given persistence of the revived running record throws #when task_send delivers #then it rolls back before delivery", async () => {
     const project = mkdtempSync(join(tmpdir(), "senpi-task-steering-persistence-failure-"))
     roots.push(project)
-    const baseStore = createTaskRecordStore({ project_dir: project })
+    const baseStore = createTaskRecordStore(ownedTaskState(project))
     const record = detachedTerminal(baseStore)
     const followUps: string[] = []
     let live = false

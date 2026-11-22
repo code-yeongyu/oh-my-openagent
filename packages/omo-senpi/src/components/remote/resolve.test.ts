@@ -93,6 +93,24 @@ describe("sessions.resolve", () => {
     })
   })
 
+  test("#given one thread id listed by two devices with no name #when the id is resolved #then each ambiguous_target candidate says its name is a fallback (unnamed)", async () => {
+    const { client } = await account([
+      listed(PEER, "rk-1", "dur-twice", "", "/work/anon-folder"),
+      listed(OFFLINE_PEER, "rk-2", "dur-twice", "", "/work/anon-folder"),
+    ])
+    const failure = failureOf(await client.sessions.resolve("dur-twice"))
+    expect(failure).toMatchObject({ code: "ambiguous_target" })
+    expect(
+      (failure.details?.["candidates"] as { name: string; unnamed?: boolean }[]).map((candidate) => [
+        candidate.name,
+        candidate.unnamed,
+      ]),
+    ).toEqual([
+      ["anon-folder", true],
+      ["anon-folder", true],
+    ])
+  })
+
   test("#given an address no device lists #when it is resolved #then it is not_found after one listing, and a session that listing named then resolves with no relist", async () => {
     const { client, listings } = await account([listed(PEER, "rk-1", "dur-1", "first")])
     expect(failureOf(await client.sessions.resolve("dur-gone"))).toMatchObject({

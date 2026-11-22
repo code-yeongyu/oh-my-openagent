@@ -38,6 +38,15 @@ describe("monitor rpc target addressing (#14294): the address thread_send takes"
     expect(refusedCode(await resolve("nowhere/dur-on-b"))).toBe("not_found")
   })
 
+  test("#14477: a timed-out probe keeps its reason when the monitor refuses a bare thread id", async () => {
+    expect(
+      await resolve("0195f0c2-1a2b-7c3d-8e4f-00000000a003", { wakeFeature: true, lookupTimeouts: ["b"] }),
+    ).toMatchObject({
+      kind: "refused",
+      failure: { code: "host_unavailable", details: { device_reasons: { b: "lookup_timeout" } } },
+    })
+  })
+
   test("#given device b offline #when either form names its thread #then the refusal is device_offline", async () => {
     expect(refusedCode(await resolve("studio/dur-on-b", { online: false }))).toBe("device_offline")
     expect(refusedCode(await resolve("dur-on-b", { online: false }))).toBe("device_offline")
@@ -46,6 +55,11 @@ describe("monitor rpc target addressing (#14294): the address thread_send takes"
   test("#given two devices share the name studio #when <device name>/<thread> names it #then the refusal is ambiguous_target", async () => {
     const twins = { devices: [{ device: "c", label: "studio", online: true }] }
     expect(refusedCode(await resolve("studio/dur-on-b", twins))).toBe("ambiguous_target")
+  })
+
+  test("#given this device as here and b's thread by its name #when the target is <device>/<thread name> #then the thread part resolves among that device's threads, as thread_send's does (#14305)", async () => {
+    expect(await resolve("here/local peer")).toEqual({ kind: "target", target: "dur-local" })
+    expect(await resolve("studio/on b")).toEqual({ kind: "target", target: "b/dur-on-b" })
   })
 })
 

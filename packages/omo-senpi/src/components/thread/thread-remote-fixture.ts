@@ -261,6 +261,8 @@ export function createRemoteThreadFixture() {
       ended?: Readonly<Record<string, Readonly<Record<string, string>>>>
       /** omo#13037: devices whose single-probe lookup gets no answer within the bound. */
       silent?: readonly string[]
+      /** Devices whose lookup exceeds the caller's cap. */
+      lookupTimeouts?: readonly string[]
       /** omo#13037: this device's service carries the wake mark and the single probe (both gates open). Off by default, as shipped. */
       wakeFeature?: boolean
       /** omo#14270: what kind of device b registers as (`cli` daemon or `desktop` app); unset, b names none. */
@@ -307,6 +309,17 @@ export function createRemoteThreadFixture() {
       }
       /** b knows a session it just opened only by its relay key (relayKeys), not by its durable id: a listing that has not caught up yet. */
       relayKeyOnly?: boolean
+      /**
+       * #14394: b's engine takes an open_session, but b's route never lists the session it made (a Desktop host whose
+       * sessions the service does not route): every session command to it is refused (`unlistedReason`), while an
+       * endpoint command (the open's own path) still reaches the engine that holds it.
+       */
+      openUnrouted?: boolean
+      /**
+       * #14397 review L3: b's route lists a session it just opened only after this many session commands to it: until
+       * then each is refused `unlistedReason` (`route_unlisted`), though the session is live and reachable after.
+       */
+      routeLag?: number
       /** The device service throws on b's admit_external_message (a lost connection mid-delivery). */
       admitThrows?: string
       /** Every get_state after b admitted a delivery is refused with this reason (the read after the admission fails). */
@@ -368,6 +381,11 @@ export function createRemoteThreadFixture() {
       options.live ?? [B_ROW.session_id, ...(B_ROW.durable_id === undefined ? [] : [B_ROW.durable_id])],
     )
     // b's engine's run and its unwritten deliveries (omo#14234); an interrupting unload ends the one and hands back the other.
+    // The sessions b's engine holds that b's route does not list (openUnrouted), by the engine's routing id.
+    const unrouted = new Set<string>()
+    // The session commands b's route still refuses for the session it opened last (routeLag).
+    let lagging = 0
+    let lagged: string | undefined
     let busy = options.busy === true
     const unread = [...(options.unread ?? [])]
     const capable = options.refusesDeliveries !== false
@@ -379,6 +397,10 @@ export function createRemoteThreadFixture() {
         response: { type: "response", id: null, command: rpc["type"] ?? null, success: true, data },
       })
       if (options.refuse !== undefined) return { kind: "refused", reason: options.refuse }
+      if (attachedTo !== undefined && attachedTo === lagged && lagging > 0) {
+        lagging -= 1
+        return { kind: "refused", reason: options.unlistedReason ?? "route_unlisted" }
+      }
       if (attachedTo !== undefined && !live.has(attachedTo))
         return { kind: "refused", reason: options.unlistedReason ?? "unknown_session" }
       // A terminal's engine takes no session lifecycle record (live-surface.ts `unsupported:` on this device): it answers the
@@ -394,6 +416,9 @@ export function createRemoteThreadFixture() {
         if (options.protocolInfoFails === true) return { kind: "refused", reason: "request_timeout" }
         return ok({ capabilities: capable ? ["unload_session", "unload_refuse_deliveries"] : ["unload_session"] })
       }
+      // An endpoint unload (no attach) of a session b's engine holds unrouted ends it there (#14394's rollback path).
+      if (rpc["type"] === "unload_session" && attachedTo === undefined && unrouted.delete(String(rpc["sessionId"])))
+        return ok({ outcome: "unloaded" })
       if (rpc["type"] === "unload_session" && attachedTo !== undefined) {
         if (options.unloadReason !== undefined)
           return ok({ outcome: "refused", reason: options.unloadReason, detail: `refused: ${options.unloadReason}` })
@@ -471,7 +496,12 @@ export function createRemoteThreadFixture() {
                 ? undefined
                 : Object.entries(sessionFiles).find(([, file]) => file === rpc["sessionPath"])?.[0]) ?? "dur-on-b")
         const key = options.relayKeys?.get(opened) ?? opened
-        for (const id of options.relayKeyOnly === true ? [key] : [opened, key]) live.add(id)
+        if (options.routeLag !== undefined) {
+          lagging = options.routeLag
+          lagged = key
+        }
+        if (options.openUnrouted === true) unrouted.add("rpc-9")
+        else for (const id of options.relayKeyOnly === true ? [key] : [opened, key]) live.add(id)
         return ok(options.openData ?? { sessionId: "rpc-9", state: { durableSessionId: opened } })
       }
       if (rpc["type"] === "get_state" && stateOutcomes.length > 0) return stateOutcomes.shift() as RemoteCommandOutcome
@@ -558,6 +588,7 @@ export function createRemoteThreadFixture() {
       ...(options.rows ?? []).map((row) => row.device),
       ...Object.keys(options.ended ?? {}),
       ...(options.silent ?? []),
+      ...(options.lookupTimeouts ?? []),
     ])
       if (!devices.some((known) => known.device === device) && !(options.removed ?? []).includes(device))
         devices.push({ device, label: device, online: true })
@@ -790,6 +821,7 @@ export function createRemoteThreadFixture() {
         lookup: async (device, durableId) => {
           if (options.noLookup === true || options.wakeFeature !== true) return { kind: "unavailable" }
           lookups.push({ device, durable_id: durableId })
+          if (options.lookupTimeouts?.includes(device) === true) return { kind: "silent", reason: "lookup_timeout" }
           if (options.silent?.includes(device) === true) return { kind: "silent", reason: "host_not_answering" }
           const key = options.ended?.[device]?.[durableId]
           return key === undefined ? { kind: "none" } : { kind: "found", key }

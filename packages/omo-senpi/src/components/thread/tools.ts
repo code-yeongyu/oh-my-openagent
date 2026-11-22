@@ -8,6 +8,7 @@ import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { gatewaySchemaRefusal, threadToolFailure } from "./errors"
 import type { ThreadToolFailure } from "./errors"
 import { type Static } from "typebox"
+import { toThreadAddressEntries } from "./address-book"
 import { type ThreadAddressEntry } from "./addressing"
 import { resolveAddress } from "./address/lazy"
 import {
@@ -39,7 +40,7 @@ import type { DeliveryPipeline } from "./gateway/pipeline"
 import type { DeliveryTarget } from "./gateway/transport"
 import type { DeliveryAuthority } from "./gateway/types"
 import { createGatewayServices } from "./tools/gateway-services"
-import { listThreads, readThread } from "./tools/read-ops"
+import { listThreads, readThread, withBacklog } from "./tools/read-ops"
 import { archiveThread } from "./tools/archive-ops"
 import { rowState, threadModel } from "./tools/thread-state"
 import { createRelayTools } from "./tools/relay-tools"
@@ -47,8 +48,9 @@ import { threadToolPermission } from "./tools/local-permission"
 import { withThreadRenderers } from "./tools/render"
 import { consumedSendersOf, threadSendPermission } from "./tools/reply-permission"
 import { otherDevice, replyTargetFailure, replyTargetMismatch } from "./tools/reply-target"
-import { accountDevices } from "./remote/account"
+import { accountDevices } from "./address/account"
 import { listAcross } from "./remote/lazy-ops"
+import { rowFolder } from "./remote/ports"
 import { locateControl } from "./control/locate"
 import { createThread } from "./control/create"
 import { awaitPromptStart, FIRST_PROMPT_START_RESERVE_MS, FIRST_PROMPT_START_WAIT_MS } from "./control/prompt-start"
@@ -77,8 +79,8 @@ import {
   failure,
   hostView,
   metadata,
+  addressBook,
   output,
-  resolveEntries,
   sendAddressBook,
   sendBookFor,
   summary,
@@ -107,8 +109,12 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
   return buildThreadTools(options).tools
 }
 
+/** thread_send as `callerId` with no tool call behind it, through the same wrapper a tool call takes (#14430 operator alerts). */
+export type ThreadSendAs = (callerId: string, args: ThreadSendInput) => Promise<ThreadToolResult>
+
 function buildThreadTools(surface: ThreadToolSurfaceOptions): {
   readonly tools: readonly AnyTool[]
+  readonly sendAs: ThreadSendAs
   readonly dispose: () => void
 } {
   // One ledger of the threads these tools closed on other devices, read by every tool through the remote surface (#14170).
@@ -390,7 +396,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         async (current, value) =>
           await listAcross(
             options.remote,
-            listThreads(options, current, value.all_scope, value.state),
+            await withBacklog(options.store, listThreads(options, current, value.all_scope, value.state)),
             value.all_scope === true,
             value.state,
           ),
@@ -412,6 +418,16 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
       execute("thread_send", id, args, ectx, async (current, value, operationId, callerId) =>
         deliver(current, value.thread, value, operationId, callerId),
       ),
+  }
+  const sendAs: ThreadSendAs = async (callerId, args) => {
+    const sent = await execute(
+      "thread_send",
+      `send-as:${args.idempotency_key ?? callerId}`,
+      args,
+      { sessionManager: { getSessionId: () => callerId } },
+      async (current, value, operationId, id) => deliver(current, value.thread, value, operationId, id),
+    )
+    return sent.details.result
   }
   const interrupt: AnyTool = {
     ...metadata("thread_interrupt"),
@@ -509,6 +525,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         permissionParser: tool.permissionParser ?? threadToolPermission(tool.name, options),
       }),
     ),
+    sendAs,
     dispose,
   }
 
@@ -574,7 +591,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     }
     // Decision 0027: ONE resolver over this device's book and the account's other devices (resolveAddress, which takes
     // <device>/<thread> too); where it resolved says which transport carries the send.
-    const entries = match === "fuzzy" ? resolveEntries(options, current) : localFor(address)
+    const entries = match === "fuzzy" ? toThreadAddressEntries(addressBook(options, current)) : localFor(address)
     // A reply to a sender on this device resolves among this device's entries only (A4.3.1), and only by the sender's
     // exact id or stated name: an id prefix never turns an approved reply into a send to another thread. A send never
     // targets its own caller, so an id prefix is resolved without it (UUIDv7 ids share 8 hex characters for ~65 s).
@@ -673,6 +690,7 @@ async function deliverThrough(
     mode: value.delivery ?? DEFAULT_THREAD_DELIVERY,
     ...(value.expected_turn_id === undefined ? {} : { expected_turn_id: value.expected_turn_id }),
     idempotency_key: idempotencyKey,
+    ...("collapse_key" in value && value.collapse_key !== undefined ? { collapse_key: value.collapse_key } : {}),
     args: value,
     ...(inboundHop === undefined || inboundHop <= 0 ? {} : { inbound_hop: inboundHop }),
     ...(authority === undefined ? {} : { authority }),
@@ -706,7 +724,7 @@ async function deliverThrough(
         status: "live",
         state: rowState(row),
         ...threadModel(row.model),
-        cwd: escapeForDisplay(row.project),
+        cwd: escapeForDisplay(rowFolder(row)),
         created_at: seen,
         updated_at: seen,
         device: row.device,
@@ -722,6 +740,7 @@ async function deliverThrough(
   const facts = {
     delivery_id: sent.delivery_id,
     effective_mode: sent.effective_mode,
+    ...(sent.collapsed === true ? { collapsed: true as const } : {}),
   }
   if (resolvedBy === undefined) {
     const title = current.sessions.find((session) => (session.durableSessionId ?? session.sessionId) === threadId)?.name
@@ -765,7 +784,7 @@ export function registerThreadTools(
   pi: ExtensionToolHost,
   options: ThreadToolSurfaceOptions,
   log: (line: string) => void = () => undefined,
-): { readonly dispose: () => void } {
+): { readonly sendAs: ThreadSendAs; readonly dispose: () => void } {
   const built = buildThreadTools(options)
   // Thread tools run on the loop side of a split session (engine `ToolDefinition.runs`).
   for (const tool of built.tools) pi.registerTool({ ...tool, runs: "brain" })
@@ -774,7 +793,7 @@ export function registerThreadTools(
     registerExtensionTools(host, options, log)
     installMonitorTargetResolution(host, createMonitorTargetResolver(options), options.callerSessionId)
   }
-  return { dispose: built.dispose }
+  return { sendAs: built.sendAs, dispose: built.dispose }
 }
 
 type ConsumedSender = { readonly session_id: string; readonly device?: string }

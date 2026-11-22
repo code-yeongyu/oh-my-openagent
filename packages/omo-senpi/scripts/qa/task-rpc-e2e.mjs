@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, mkdirSync, readFileSync, rmSync, watch, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { delimiter, dirname, extname, isAbsolute, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
@@ -15,8 +15,8 @@ const {
   analyzeRpcRouting,
   eventsMentionSteerAck,
   statusSnapshots,
-  liveRecordRpcChildPids,
   recordRpcChildPids,
+  survivingRecordedChildren,
 } = await import(pathToFileURL(join(scriptDir, "task-rpc-e2e-helpers.mjs")).href)
 const {
   SCENARIO_A_STEPS,
@@ -128,59 +128,18 @@ async function runChecks(senpiBin, sandbox, sessionDir, stateDir) {
   checks.push(await runKillCheck(senpiBin))
   checks.push(await runReconcileCheck(senpiBin))
 
-  killProcessTree(stateDir)
-  const leakedPids = await waitForRecordedPidsToExit(stateDir)
+  // Scenario A's parent has exited, and its teardown terminated the child before parking the record, so there is
+  // nothing left to wait for: any recorded child still running is a leak. The driver kills nothing before this
+  // probe (a kill here would hide a real leak), and judges each pid by its start time, not by the bare number (#14529).
+  const { survivors, reused } = await survivingRecordedChildren(readRecords(stateDir))
+  const leakedPids = survivors.map((survivor) => survivor.pid)
   checks.push({
     check: "no_leaked_rpc_child_pids",
     verdict: leakedPids.length === 0 ? "PASS" : "FAIL",
     ...(leakedPids.length > 0 && { reason: `leaked pids ${leakedPids.join(",")}` }),
-    facts: { leakedPids },
+    facts: { leakedPids, survivors, reused },
   })
   return { checks, leakedPids, spawnPass: spawn.pass, routed: routing.routed }
-}
-
-async function waitForRecordedPidsToExit(stateDir, timeoutMs = 5_000) {
-  const tasksDir = join(stateDir, "tasks")
-  const logsDir = join(stateDir, "logs")
-  const findLivePids = () => {
-    try {
-      return liveRecordRpcChildPids(readRecords(stateDir))
-    } catch (error) {
-      if (error?.code === "ENOENT" || error instanceof SyntaxError) return []
-      throw error
-    }
-  }
-  const initial = findLivePids()
-  if (initial.length === 0) return initial
-  return new Promise((resolve, reject) => {
-    let settled = false
-    const finish = (livePids) => {
-      if (settled) return
-      settled = true
-      clearTimeout(timeout)
-      closeWatchers()
-      resolve(livePids)
-    }
-    const watchers = [tasksDir, logsDir].map((dir) =>
-      watch(dir, { persistent: false }, () => {
-        const livePids = findLivePids()
-        if (livePids.length === 0) finish(livePids)
-      }),
-    )
-    const closeWatchers = () => watchers.forEach((watcher) => watcher.close())
-    const timeout = setTimeout(() => finish(findLivePids()), timeoutMs)
-    for (const watcher of watchers) {
-      watcher.on("error", (error) => {
-        if (settled) return
-        settled = true
-        clearTimeout(timeout)
-        closeWatchers()
-        reject(error)
-      })
-    }
-    const livePids = findLivePids()
-    if (livePids.length === 0) finish(livePids)
-  })
 }
 
 async function main() {
@@ -232,14 +191,16 @@ async function main() {
           }),
     }
   } finally {
-    killProcessTree(stateDir)
+    await killSurvivingChildren(stateDir)
     rmSync(sandbox.root, { recursive: true, force: true })
   }
   console.log(JSON.stringify(payload))
 }
 
-function killProcessTree(stateDir) {
-  for (const pid of liveRecordRpcChildPids(readRecords(stateDir))) {
+// Only a pid proven to still be our child is killed: a pid reused by an unrelated process is left alone (#14529).
+async function killSurvivingChildren(stateDir) {
+  const { survivors } = await survivingRecordedChildren(readRecords(stateDir))
+  for (const { pid } of survivors) {
     try {
       process.kill(pid, "SIGTERM")
       process.kill(pid, "SIGKILL")

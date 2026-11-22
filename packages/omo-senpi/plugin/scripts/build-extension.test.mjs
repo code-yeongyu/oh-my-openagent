@@ -19,7 +19,7 @@ import { COMPUTER_RUN_WASM_NAME } from "./build-extension-core.mjs"
 import { npmPackStage, runBoundedStage, systemTar } from "./bounded-stage.test-support.mjs"
 import { createBuildFixture, outputPathsIn } from "./build-extension.test-support.mjs"
 import {
-  SENPI_ASTRA_ULTRAWORK_DIRECTIVE,
+  SENPI_GPT_ULTRAWORK_DIRECTIVE,
   SENPI_ULTRAWORK_DIRECTIVE,
 } from "../../src/components/ultrawork/generated-directive.ts"
 import { runtimePersonaSources } from "./persona-artifacts.mjs"
@@ -250,25 +250,32 @@ describe("checkExtensionCurrent", () => {
     expect(advisorRuntime).not.toMatch(/^[\t ]+$/m)
   })
 
-  // Generated payload confinement (#9913): the shared directive parts are dropped from every bundle
-  // that imports the ultrawork module without using the directives. The probe is a line both
-  // directives share, read from the generated module rather than pinned here.
+  // Generated payload confinement (#9913): the directives are dropped from every bundle that imports
+  // the ultrawork module without using them. Each probe is the longest plain line of one variant,
+  // read from the generated module rather than pinned here.
   test("#given the split extension build #when bundles are inspected #then only the main entry carries the ultrawork directive text", async () => {
     // given
     const outputs = await sharedOutputs()
-    const sharedLine = SENPI_ULTRAWORK_DIRECTIVE.split("\n")
-      .filter((line) => /^[A-Za-z0-9 ,.:;()-]+$/.test(line) && SENPI_ASTRA_ULTRAWORK_DIRECTIVE.includes(line))
-      .sort((left, right) => right.length - left.length)[0]
+    const probes = [SENPI_ULTRAWORK_DIRECTIVE, SENPI_GPT_ULTRAWORK_DIRECTIVE].map(
+      (directive) =>
+        directive
+          .split("\n")
+          .filter((line) => /^[A-Za-z0-9 ,.:;()-]+$/.test(line))
+          .sort((left, right) => right.length - left.length)[0],
+    )
 
     // when
-    const carriers = []
+    const carriers = probes.map(() => [])
     for (const [name, path] of Object.entries(outputPathsIn(outputs.root))) {
-      if ((await readFile(path, "utf8")).includes(sharedLine)) carriers.push(name)
+      const bundle = await readFile(path, "utf8")
+      probes.forEach((probe, index) => {
+        if (bundle.includes(probe)) carriers[index].push(name)
+      })
     }
 
     // then
-    expect(sharedLine.length).toBeGreaterThan(40)
-    expect(carriers).toEqual(["outputPath"])
+    for (const probe of probes) expect(probe.length).toBeGreaterThan(40)
+    expect(carriers).toEqual([["outputPath"], ["outputPath"]])
   })
 
   test("#given the split extension build #when metafile inputs are inspected #then task sources live only in the lazy sidecar", async () => {
@@ -827,6 +834,7 @@ describe("checkExtensionCurrent", () => {
       "#telemetry-immediate-send": "./extensions/omo-telemetry-recovery.js",
       "#omo-agent-toolkit-sdk": "./runtime/agent-toolkit-sdk/sdk.js",
       "#bunshin-ts": "./runtime/bunshin-ts/sdk.js",
+      "#omo-sdk": "./runtime/omo-sdk/sdk.js",
     })
   })
 })

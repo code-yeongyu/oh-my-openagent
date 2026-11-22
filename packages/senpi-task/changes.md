@@ -1,3 +1,15 @@
+## 2026-11-20 - a typed socket probe shared with omo sync status (#14437)
+
+`runners/rpc-host/busy-host.ts` gains `probeSocket` (`accepts` / `refused` / `unknown` with a reason): ECONNREFUSED and ENOENT are `refused`, a permission error or no answer within the timeout is `unknown`. `socketAcceptsConnection` is now `probeSocket(...).kind === "accepts"`, so the liveness path is unchanged, and `omo sync status` uses the same probe instead of a copy.
+
+## 2026-11-20 - Keep the exact-category predicate internal (#14447)
+
+`src/category/builtins.ts` no longer exports the unused `isExactModelCategory` helper. Its callers in that module and its category matching behavior are unchanged.
+
+## 2026-11-20 - Exact GPT models for deep categories (#14427)
+
+The three built-in GPT deep categories use only their named GPT-6.2 model and effort. A provider that offers only Fast or older models no longer makes the category available.
+
 ## 2026-11-17 - resolvers report who chose the model (#14025)
 
 `resolveCategory` now sets `modelSelection.source` and `resolveAgent` sets `modelSource` (`"user" | "builtin"`); an agent's own-model source is read from the definition being resolved (a builtin still on its builtin model is `builtin`), and `firstCategoryDefaultModel` and the find-only selection share one walk that returns the model with its source: `user` when the selected model came from omo.json (`model`, `models`, `fallback_models`, an agent's own model or a user category it runs through, or a call-site pin), `builtin` for a builtin default, chain rung or system default. Selection itself is unchanged.
