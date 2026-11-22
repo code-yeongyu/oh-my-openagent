@@ -133,10 +133,21 @@ export async function integrateValidatedReflection(
       }
     }
     if (landedMergeHead === input.validated.tipSha || unmerged.stdout.trim()) {
-      return { outcome: "merge_conflict", detail: merge.stderr.trim() }
+      // git prints the conflicting files on stdout, not stderr (#12330 review): read before the abort clears them.
+      return { outcome: "merge_conflict", detail: conflictedPaths(unmerged.stdout) ?? merge.stderr.trim() }
     }
     return { outcome: "failed", detail: merge.stderr.trim() || "Reflection merge failed" }
   })
+}
+
+const CONFLICT_PATHS_SHOWN = 3
+
+/** The unmerged files, at most three named, so the detail stays one short line the footer can show. */
+function conflictedPaths(stdout: string): string | undefined {
+  const paths = stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+  if (paths.length === 0) return undefined
+  const shown = paths.slice(0, CONFLICT_PATHS_SHOWN).join(", ")
+  return paths.length > CONFLICT_PATHS_SHOWN ? `${shown} (+${paths.length - CONFLICT_PATHS_SHOWN} more)` : shown
 }
 
 export async function cleanupReflectionWorktree(worktree: ReflectionWorktree): Promise<ReflectionCleanupReceipt> {

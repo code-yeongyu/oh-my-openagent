@@ -5,6 +5,12 @@ import { GitMemoryRepo, readReflectionParkFile } from "@oh-my-opencode/memory-co
 
 import type { MemoryIdentityContext } from "./context"
 import { shownSyncFailure, type SyncStatusReader } from "./sync-status-surface"
+import {
+  excerptRendererText,
+  normalizeRendererText,
+  rendererVisibleWidth,
+} from "@oh-my-opencode/senpi-task/renderer-text"
+import { childFailureCause } from "./worker/failure-detail"
 import { readReflectionHealth } from "./worker/health"
 
 export const MEMORY_STATUS_KEY = "memory"
@@ -41,6 +47,7 @@ export interface MemoryStatusSegments {
   readonly dirty: boolean
   readonly backlogSteps: number
   readonly streak: number
+  readonly integrationFailure?: MemoryIntegrationFailure
   readonly parked: boolean
   /** Memory sync for this repository is failing (#10637); never trimmed from the line. */
   readonly syncBlocked?: boolean
@@ -80,7 +87,7 @@ export async function refreshMemoryStatus(input: RefreshMemoryStatusInput): Prom
     const committedAt = await repo.headCommitTimestamp()
     const age = committedAt === null ? null : formatRelativeAge(committedAt * SECOND_MS, (input.now ?? Date.now)())
     if (age !== null) {
-      const segments = await readMemoryStatusSegments(repo, input.context, input.sessionId, input.syncStatus)
+      const segments = await readMemoryStatusSegments(repo, input.context, input.sessionId, input.syncStatus, input.now)
       input.ui.setStatus(MEMORY_STATUS_KEY, formatMemoryStatusLine(input.context.identity, age, segments))
       footerShown = true
     }
@@ -114,15 +121,16 @@ export async function readMemoryStatusSegments(
   context: MemoryIdentityContext,
   sessionId: string | undefined,
   syncStatus?: SyncStatusReader,
+  now = Date.now,
 ): Promise<MemoryStatusSegments> {
-  const [dirty, backlogSteps, streak, parked, sync] = await Promise.all([
+  const [dirty, backlogSteps, reflection, parked, sync] = await Promise.all([
     readDirty(repo),
     readBacklogSteps(context, sessionId),
-    readStreak(context),
+    readReflectionStatus(context, now()),
     readParked(context),
     readSyncState(context, syncStatus),
   ])
-  return { dirty, backlogSteps, streak, parked, ...sync }
+  return { dirty, backlogSteps, ...reflection, parked, ...sync }
 }
 
 /**
@@ -131,9 +139,12 @@ export async function readMemoryStatusSegments(
  * segments that ask the person to act.
  */
 export function formatMemoryStatusLine(identity: string, age: string, segments: MemoryStatusSegments): string {
-  const base = `mem:${identity} ${age}`
   const sync =
     segments.syncBlocked === true ? SYNC_BLOCKED_SEGMENT : segments.syncHeld === true ? SYNC_HELD_SEGMENT : ""
+  const base =
+    segments.integrationFailure === undefined
+      ? `mem:${identity} ${age}`
+      : formatIntegrationFailure(segments.integrationFailure, MEMORY_STATUS_MAX_WIDTH - rendererVisibleWidth(sync))
   const optional: string[] = [
     segments.dirty ? "*" : "",
     segments.backlogSteps >= 1 ? ` (+${segments.backlogSteps})` : "",
@@ -143,9 +154,42 @@ export function formatMemoryStatusLine(identity: string, age: string, segments: 
   // Drop right-to-left (`paused`, then `!N`, then `(+N)`, then `*`) until the line fits the budget.
   for (let keep = optional.length; keep > 0; keep -= 1) {
     const candidate = base + optional.slice(0, keep).join("") + sync
-    if (candidate.length <= MEMORY_STATUS_MAX_WIDTH) return candidate
+    if (rendererVisibleWidth(candidate) <= MEMORY_STATUS_MAX_WIDTH) return candidate
   }
   return base + sync
+}
+
+/** The last reflection that did not integrate: its outcome, the internal reason code, and the child's own cause. */
+export interface MemoryIntegrationFailure {
+  readonly outcome: string
+  readonly reason?: string
+  readonly cause?: string
+}
+
+const INTEGRATION_FAILURE_PREFIX = "reflection not integrated: "
+
+/**
+ * The failure line in at most `width` terminal cells (#12330). The child's cause (a file, a refusal) is what the
+ * person can act on, so the internal reason code is dropped first, then the outcome; only a cause that still does
+ * not fit is cut, by display width so wide (CJK) text never spills past the segment's budget.
+ */
+function formatIntegrationFailure(failure: MemoryIntegrationFailure, width: number): string {
+  const outcome = normalizeRendererText(failure.outcome)
+  const reason = failure.reason === undefined ? undefined : normalizeRendererText(failure.reason)
+  const cause = failure.cause === undefined ? undefined : normalizeRendererText(failure.cause)
+  const candidates = [
+    reason && cause ? `${outcome} (${reason}: ${cause})` : undefined,
+    cause ? `${outcome} (${cause})` : undefined,
+    cause,
+    reason && !cause ? `${outcome} (${reason})` : undefined,
+    cause ? undefined : outcome,
+  ]
+  for (const candidate of candidates) {
+    if (!candidate) continue
+    const line = INTEGRATION_FAILURE_PREFIX + candidate
+    if (rendererVisibleWidth(line) <= width) return line
+  }
+  return excerptRendererText(INTEGRATION_FAILURE_PREFIX + (cause || outcome), width)
 }
 
 async function readSyncState(
@@ -198,14 +242,30 @@ async function readParked(context: MemoryIdentityContext): Promise<boolean> {
   }
 }
 
-async function readStreak(context: MemoryIdentityContext): Promise<number> {
+async function readReflectionStatus(
+  context: MemoryIdentityContext,
+  now: number,
+): Promise<Pick<MemoryStatusSegments, "streak" | "integrationFailure">> {
   try {
     const health = await readReflectionHealth(join(context.identityPaths.reflection, "completions"), {
       limit: MEMORY_HEALTH_SCAN_LIMIT,
+      now,
     })
-    return health.streak
+    const last = health.integrationFailure
+    if (last) {
+      const cause = childFailureCause(last.detail)
+      return {
+        streak: health.streak,
+        integrationFailure: {
+          outcome: last.outcome.replaceAll("_", " "),
+          ...(last.reason ? { reason: last.reason } : {}),
+          ...(cause ? { cause } : {}),
+        },
+      }
+    }
+    return { streak: health.streak }
   } catch {
-    return 0
+    return { streak: 0 }
   }
 }
 
