@@ -66,7 +66,7 @@ describe("omo-senpi skill-pointers omo-relay pointer", () => {
     ])
     const content = injectedContent(pi, OMO_RELAY_CUSTOM_TYPE)
     expect(content).toStartWith("<omo-omo-relay-pointer>")
-    expect(content).toContain("omo-relay/SKILL.md")
+    expect(content).toContain("the built-in `omo-relay` skill")
     // The forbidden entry the pointer must still carry: importing the node-agent executable exits the kernel.
     expect(content).toContain("scripts/node/bunshin-node.mjs")
   })

@@ -107,8 +107,8 @@ describe("omo-senpi skill-pointers companion", () => {
       expect(result.text.indexOf("<omo-browser-pointer>")).toBeLessThan(
         result.text.indexOf("<omo-ultimate-browsing-pointer>"),
       )
-      expect(result.text).toContain("browser/SKILL.md")
-      expect(result.text).toContain("ultimate-browsing/SKILL.md")
+      expect(result.text).toContain("the built-in `browser` skill")
+      expect(result.text).toContain("the built-in `ultimate-browsing` skill")
     })
   })
 

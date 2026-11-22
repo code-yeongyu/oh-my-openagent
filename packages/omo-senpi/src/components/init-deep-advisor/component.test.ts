@@ -47,7 +47,7 @@ describe("createInitDeepAdvisorComponent", () => {
           {
             message: {
               customType: "omo-init-deep-advisor:run",
-              content: expect.stringContaining("Read the init-deep skill at"),
+              content: expect.stringContaining("Read the built-in `init-deep` skill"),
               display: false,
             },
             options: { triggerTurn: true, deliverAs: "followUp" },

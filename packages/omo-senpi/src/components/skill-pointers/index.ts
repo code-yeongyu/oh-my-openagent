@@ -1,7 +1,7 @@
 import { readSessionRole } from "@oh-my-opencode/senpi-task"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
-import { getBuiltinSkillsRoot } from "../telemetry/product-identity"
+import { bundledSkillReference } from "../bundled-skills/skill-reference"
 import { resolveUlwLoopSessionScope } from "../ulw-loop/session-scope"
 import { BUNSHIN_TS_IMPORT_SAFETY } from "../../extension/sdk-root-provisioning"
 import { NOT_AFTER_IDENTIFIER, NOT_BEFORE_PATH, NOT_INTO_IDENTIFIER, stripQuotedRegions } from "./strip-quoted-regions"
@@ -214,20 +214,25 @@ function handleInput(
   const binds = (target: SkillPointerTarget): boolean => target.bindingPattern?.test(visible) === true
   // A slash command ("/mass-ulw") is not a bare name, so it is invoked through its binding form.
   const invoked = TARGETS.filter((target) => target.pattern.test(visible) || binds(target))
+  if (invoked.length === 0) return { action: "continue" }
+  const reference = bundledSkillReference(pi)
   const massMode = invoked.some((target) => target.customType === MASS_ULW_CUSTOM_TYPE && binds(target))
   const pointers: SkillPointerMessage[] = invoked
     .filter((target) => binds(target) || !alreadyLoaded(target.skillName, target.expandedBlockPattern))
     .map((target) => ({
       customType: target.customType,
       content: binds(target)
-        ? skillMode(target, massMode, sessionScope)
-        : (target.pointer ?? skillPointer(target, sessionScope)),
+        ? skillMode(target, massMode, sessionScope, reference(target.skillName))
+        : (target.pointer ?? skillPointer(target, sessionScope, reference(target.skillName))),
     }))
   for (const parent of invoked) {
     for (const companion of parent.companions ?? []) {
       if (alreadyLoaded(companion.skillName, companion.expandedBlockPattern)) continue
       if (pointers.some((pointer) => pointer.customType === companion.customType)) continue
-      pointers.push({ customType: companion.customType, content: companionPointer(parent, companion, binds(parent)) })
+      pointers.push({
+        customType: companion.customType,
+        content: companionPointer(parent, companion, binds(parent), reference(companion.skillName)),
+      })
     }
   }
 
@@ -265,14 +270,15 @@ function ulwLoopToolSentence(sessionScope: string | null): string {
 // Reached only for a binding form (see `bindingForms`) in text that survived the quote, relay, negation,
 // identifier, child-session and extension filters, so the block states the mode as settled and names the
 // first reads and the dispatch shape that satisfy it.
-function skillMode(target: SkillPointerTarget, massMode: boolean, sessionScope: string | null): string {
-  const skillsRoot = getBuiltinSkillsRoot()
+function skillMode(
+  target: SkillPointerTarget,
+  massMode: boolean,
+  sessionScope: string | null,
+  reference: string,
+): string {
   const extra = target.extra?.(sessionScope) ?? ""
   const tag = `omo-${target.skillName}-mode`
-  const reads =
-    target.customType === MASS_ULW_CUSTOM_TYPE
-      ? `${skillsRoot}${target.skillName}/SKILL.md and its references/planning.md`
-      : `${skillsRoot}${target.skillName}/SKILL.md`
+  const reads = target.customType === MASS_ULW_CUSTOM_TYPE ? `${reference} and its references/planning.md` : reference
   const dispatch =
     target.customType === MASS_ULW_CUSTOM_TYPE
       ? " The work runs as workflow runs started from an eval cell, their nodes executing in dependency-ordered waves; doing the job inline, or through one-off task spawns in place of workflow runs, does not satisfy this request. Where the ultrawork directive's general delegation guidance differs, this mode decides how lanes are dispatched."

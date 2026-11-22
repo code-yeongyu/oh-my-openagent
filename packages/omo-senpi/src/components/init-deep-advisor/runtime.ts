@@ -1,7 +1,7 @@
 import type { ExtensionContext } from "@code-yeongyu/senpi"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
-import { getBuiltinSkillsRoot } from "../telemetry/product-identity"
+import { bundledSkillReference } from "../bundled-skills/skill-reference"
 import { computeEligibility } from "./eligibility"
 import { gitHead, run } from "./git-helpers"
 import { buildProposedData } from "./proposed-data"
@@ -54,11 +54,10 @@ function handleChoice(
   eligibility: EligibilityResult,
 ): void {
   if (choice === "Run now") {
-    const skillsRoot = getBuiltinSkillsRoot()
     pi.sendMessage(
       {
         customType: "omo-init-deep-advisor:run",
-        content: `Read the init-deep skill at ${skillsRoot}/init-deep/SKILL.md with the read tool and follow it.`,
+        content: `Read ${bundledSkillReference(pi)("init-deep")} with the read tool and follow it.`,
         display: false,
       },
       { triggerTurn: true, deliverAs: "followUp" },
