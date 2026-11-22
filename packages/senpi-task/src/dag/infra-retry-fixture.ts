@@ -11,6 +11,7 @@ import { createInMemoryDagStore } from "./__fixtures__/in-memory-store"
 import { createDagManager } from "./manager"
 import { createDagScheduler } from "./scheduler"
 import type { DagDefinition } from "./graph"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 export type Outcome = Awaited<ReturnType<ManagedChildHandle["waitForOutcome"]>>
 
@@ -24,11 +25,11 @@ export function infraFixture(
 ) {
   const project = fs.mkdtempSync(join(tmpdir(), "dag-infra-retry-"))
   const starts = new Map<string, number>()
-  const taskStore = createTaskRecordStore({ project_dir: project })
+  const taskStore = createTaskRecordStore(ownedTaskState(project))
   // These cases assert retry semantics, not crash durability. Real journal commits charge contended
   // host I/O per commit, which is what made two of them exceed the 5 s default under load (#11621),
   // so the DAG journal is kept in memory with identical seq/paging/encoding semantics.
-  const stateDir = resolveStateDir({ project_dir: project })
+  const stateDir = resolveStateDir(ownedTaskState(project))
   const store = createInMemoryDagStore(stateDir)
   const runner: ManagedRunner = {
     start: async (spec) => {
