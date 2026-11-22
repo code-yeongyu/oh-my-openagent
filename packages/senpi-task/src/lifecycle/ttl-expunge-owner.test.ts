@@ -9,6 +9,7 @@ import { createTaskLifecycle } from "./create"
 import { hostLifecycleDeps, hostSession } from "./__fixtures__/host-session-fakes"
 import { seedRecord } from "./__fixtures__/lifecycle-fakes"
 import type { LifecycleDeps } from "./port"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 // Invariant: only the sweep attempt that tombstoned a record restores or deletes it, and never while
 // its close of the record's session is still unanswered.
@@ -23,7 +24,7 @@ type Close = { readonly answer: PromiseWithResolvers<void> }
 function expiredSession(
   options: { readonly closeTimeoutMs?: number; readonly hostPid?: number; readonly livePids?: readonly number[] } = {},
 ) {
-  const store = createTaskRecordStore({ project_dir: tempProject() })
+  const store = createTaskRecordStore(ownedTaskState(tempProject()))
   sequence += 1
   const taskId = `st_${(0xabc00000 + sequence).toString(16)}`
   const identity = hostSession(taskId)

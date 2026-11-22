@@ -8,6 +8,7 @@ import { createTaskRecordStore } from "../store"
 import { bounded, fixture, fixtureHandle, poolInput } from "./__fixtures__/admission"
 import type { WorkpoolAggregateMessage, WorkpoolAggregatePort } from "./aggregate"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 function acking(messages: WorkpoolAggregateMessage[]): WorkpoolAggregatePort {
   return {
@@ -30,7 +31,7 @@ function reopen(root: string) {
     global_concurrency: 1,
     residency_max_children: 4,
   })
-  const store = createTaskRecordStore({ project_dir: root })
+  const store = createTaskRecordStore(ownedTaskState(root))
   const concurrency = new TaskConcurrency(config)
   const runner = { start: async (spec: { taskId: string }) => fixtureHandle(spec.taskId).handle }
   const registry: ResidencyRegistry = {

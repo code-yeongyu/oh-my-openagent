@@ -10,6 +10,7 @@ import type { DagTaskOwner, OwnedStartResult } from "./owner"
 import { createDagRecovery } from "./recovery"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagRunId } from "./types"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const roots: string[] = []
 afterEach(() => {
@@ -19,7 +20,7 @@ afterEach(() => {
 function fixture() {
   const root = fs.mkdtempSync(join(tmpdir(), "dag-recovery-scope-"))
   roots.push(root)
-  return createDagFileStore({ project_dir: root }, { fsync: false })
+  return createDagFileStore(ownedTaskState(root), { fsync: false })
 }
 
 async function seed(store: DagFileStore, owner: string, holder?: number) {
