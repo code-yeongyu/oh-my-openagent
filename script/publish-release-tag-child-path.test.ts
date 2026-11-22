@@ -53,6 +53,7 @@ const STUBS = [
   "gh() {",
   '  printf "%s\\n" "$*" >> "$GH_CALLS"',
   '  case "$1 $2" in',
+  '    "api --method") printf \'{"workflow_runs":[{"event":"%s","head_sha":"%s","status":"completed","conclusion":"success"}]}\\n\' "$CI_EVENT" "$CI_HEAD" ;;',
   '    "release list") printf "v1.0.0\\n" ;;',
   '    "release view") return 1 ;;',
   "  esac",
@@ -81,6 +82,8 @@ interface Run {
   readonly lazycodexOnly?: boolean
   readonly pin?: CommitName
   readonly pinSupported?: boolean
+  readonly ciEvent?: "push" | "pull_request"
+  readonly ciHead?: CommitName
 }
 
 interface Outcome {
@@ -122,6 +125,9 @@ function runStep(input: Run): Outcome {
     env: {
       ...fixture.gitEnv,
       GH_CALLS: ghCalls,
+      GITHUB_REPOSITORY: "test/repo",
+      CI_EVENT: input.ciEvent ?? "pull_request",
+      CI_HEAD: fixture.sha[input.ciHead ?? input.prepared],
       GITHUB_OUTPUT: join(root, "output"),
       GITHUB_STEP_SUMMARY: join(root, "summary"),
       VERSION,
@@ -146,6 +152,18 @@ function runStep(input: Run): Outcome {
 }
 
 describe("publish.yml child path release tag", () => {
+  test("a legacy child can receive a tag for a non-stamp delta only with exact push CI", () => {
+    for (const [ciEvent, ciHead, allowed] of [
+      ["pull_request", "C", false],
+      ["push", "B", false],
+      ["push", "C", true],
+    ] as const) {
+      const result = runStep({ where: DISPATCH_STEP, prepared: "C", pin: "B", pinSupported: false, ciEvent, ciHead })
+      expect(result.originTag(`v${VERSION}`)).toBe(allowed ? result.sha.C : "")
+      expect(result.ghCalls.includes("workflow run")).toBe(allowed)
+      expect(result.status === 0).toBe(allowed)
+    }
+  })
   test("#given both steps #then they read the prepared release SHA from the dispatch input", () => {
     for (const where of [TAG_STEP, RELEASE_STEP]) {
       expect({ ...where, sha: step(where).env?.RELEASE_SHA }).toEqual({

@@ -932,10 +932,22 @@ jobs:
               echo "::error::Refusing to tag ${RELEASE_SHA}: its first parent is not ${SOURCE_SHA}."
               exit 1
             fi
-            # The tag owns the child workflow. Older pins can still publish via
-            # their existing exact-stamp CI gate, but cannot accept a new input.
+            # The tag owns the child workflow; a legacy child cannot enforce the pin.
             accepts_pin="$(yq '.on.workflow_dispatch.inputs | has("source_sha")' ".github/workflows/publish.yml")"
-            if [ "$accepts_pin" = true ]; then source_args+=(-f "source_sha=${SOURCE_SHA}"); fi
+            if [ "$accepts_pin" = true ]; then
+              source_args+=(-f "source_sha=${SOURCE_SHA}")
+            else
+              git checkout --detach "$SOURCE_SHA"
+              if ! node script/release-state-paths.mjs --check-stamp "$SOURCE_SHA" "$RELEASE_SHA"; then
+                runs="$(gh api --method GET "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs" \
+                  -f event=push -f "head_sha=${RELEASE_SHA}" -f status=success -f per_page=100)"
+                if ! jq -e --arg sha "$RELEASE_SHA" 'any(.workflow_runs[]; .event == "push" and .head_sha == $sha and .status == "completed" and .conclusion == "success")' <<< "$runs" >/dev/null; then
+                  echo "::error::No exact push CI for legacy release stamp ${RELEASE_SHA}; refusing to tag or dispatch."
+                  exit 1
+                fi
+              fi
+              git checkout --detach "$RELEASE_SHA"
+            fi
           fi
 
           # LazyCodex-only releases tag the source under their own namespace so the omo release
