@@ -11,8 +11,8 @@ export const KNOWN_PROFILES = "daily-heavy, daily-normal, geeky-heavy, geeky-nor
 
 // The refresh token the fixture OAuth lane in model-profile-e2e-mock-provider.ts refuses to
 // exchange (kept literal on both sides: the mock runs inside the senpi process, this file in node).
-export const REJECTED_REFRESH_TOKEN = "rejected-refresh"
-export const FLAKY_REFRESH_TOKEN = "flaky-refresh"
+const REJECTED_REFRESH_TOKEN = "rejected-refresh"
+const FLAKY_REFRESH_TOKEN = "flaky-refresh"
 
 export const SCENARIOS = {
   "geeky-normal-api-sol": {
