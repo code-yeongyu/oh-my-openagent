@@ -753,6 +753,38 @@ jobs:
           echo "release_branch=${RELEASE_BRANCH}" >> "$GITHUB_OUTPUT"
           echo "Release state generated on ${RELEASE_BRANCH}; handing off to the privileged publish step."
 
+      - name: Verify pinned stamp before pushing
+        if: steps.prepare.outputs.needs_push == 'true' && inputs.source_sha != ''
+        run: |
+          set -euo pipefail
+
+          pin="$(git rev-parse --verify "$SOURCE_SHA")"
+          stamp="$(git rev-parse HEAD)"
+          proof_dir="$(mktemp -d)"
+          trap 'rm -rf "$proof_dir"' EXIT
+          # Match Node's canonical module path so the checker's CLI entry point runs.
+          proof_dir="$(cd "$proof_dir" && pwd -P)"
+          # A dev push after the PR merges tests the merge commit, not this stamp. The checker
+          # belongs to the dispatch commit; neither the historical pin nor the stamp supplies it.
+          if [ "$(git rev-parse "${stamp}^1")" != "$pin" ] ||
+            ! git show "${GITHUB_SHA}:script/release-state-paths.mjs" > "$proof_dir/dispatch.mjs" ||
+            ! node "$proof_dir/dispatch.mjs" --check-stamp "$pin" "$stamp"; then
+            echo "::error::Cannot prove pinned release stamp ${stamp}; refusing to push a stamp that would need exact push CI."
+            exit 1
+          fi
+
+          accepts_pin="$(git show "${stamp}:.github/workflows/publish.yml" |
+            yq '.on.workflow_dispatch.inputs | has("source_sha")' -)"
+          if [ "$accepts_pin" = true ]; then
+            # A source-aware child independently repeats the proof using its green basis. A
+            # path-only or missing checker there cannot prove this child can reuse the pin's CI.
+            if ! git show "${pin}:script/release-state-paths.mjs" > "$proof_dir/basis.mjs" ||
+              ! node "$proof_dir/basis.mjs" --check-stamp "$pin" "$stamp"; then
+              echo "::error::The source-aware child cannot prove this stamp from its basis ${pin}; refusing to push."
+              exit 1
+            fi
+          fi
+
       - name: Publish prepared release state
         id: publish_state
         if: steps.prepare.outputs.needs_push == 'true'
@@ -928,25 +960,34 @@ jobs:
 
           source_args=(-f "prepared_release_sha=${RELEASE_SHA}")
           if [ -n "$SOURCE_SHA" ]; then
-            if [ "$(git rev-parse HEAD^1)" != "$(git rev-parse "$SOURCE_SHA")" ]; then
+            pin="$(git rev-parse --verify "$SOURCE_SHA")"
+            if [ "$(git rev-parse HEAD^1)" != "$pin" ]; then
               echo "::error::Refusing to tag ${RELEASE_SHA}: its first parent is not ${SOURCE_SHA}."
               exit 1
             fi
+            proof_dir="$(mktemp -d)"
+            trap 'rm -rf "$proof_dir"' EXIT
+            proof_dir="$(cd "$proof_dir" && pwd -P)"
+            if ! git show "${GITHUB_SHA}:script/release-state-paths.mjs" > "$proof_dir/dispatch.mjs"; then
+              # The checkout targeted the stamp, not the dispatch ref, which may have advanced.
+              git fetch --no-tags origin "$GITHUB_SHA"
+              git show "${GITHUB_SHA}:script/release-state-paths.mjs" > "$proof_dir/dispatch.mjs"
+            fi
+            if ! node "$proof_dir/dispatch.mjs" --check-stamp "$pin" "$RELEASE_SHA"; then
+              # A reused stamp may already have exact push CI even though it cannot reuse the pin's CI.
+              runs="$(gh api --method GET "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs" \
+                -f event=push -f "head_sha=${RELEASE_SHA}" -f status=success -f per_page=100)"
+              if ! jq -e --arg sha "$RELEASE_SHA" 'any(.workflow_runs[]; .event == "push" and .head_sha == $sha and .status == "completed" and .conclusion == "success")' <<< "$runs" >/dev/null; then
+                echo "::error::No exact push CI for release stamp ${RELEASE_SHA}; refusing to tag or dispatch."
+                exit 1
+              fi
+            fi
+
             # The tag owns the child workflow; a legacy child cannot enforce the pin.
-            accepts_pin="$(yq '.on.workflow_dispatch.inputs | has("source_sha")' ".github/workflows/publish.yml")"
+            accepts_pin="$(git show "${RELEASE_SHA}:.github/workflows/publish.yml" |
+              yq '.on.workflow_dispatch.inputs | has("source_sha")' -)"
             if [ "$accepts_pin" = true ]; then
               source_args+=(-f "source_sha=${SOURCE_SHA}")
-            else
-              git checkout --detach "$SOURCE_SHA"
-              if ! node script/release-state-paths.mjs --check-stamp "$SOURCE_SHA" "$RELEASE_SHA"; then
-                runs="$(gh api --method GET "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs" \
-                  -f event=push -f "head_sha=${RELEASE_SHA}" -f status=success -f per_page=100)"
-                if ! jq -e --arg sha "$RELEASE_SHA" 'any(.workflow_runs[]; .event == "push" and .head_sha == $sha and .status == "completed" and .conclusion == "success")' <<< "$runs" >/dev/null; then
-                  echo "::error::No exact push CI for legacy release stamp ${RELEASE_SHA}; refusing to tag or dispatch."
-                  exit 1
-                fi
-              fi
-              git checkout --detach "$RELEASE_SHA"
             fi
           fi
 

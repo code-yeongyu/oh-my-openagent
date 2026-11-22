@@ -6,6 +6,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { z } from "zod"
+import { createMergedSelectionFixture } from "./fixtures/publish-merged-selection"
 
 /**
  * Executes the release-state reuse decision of publish.yml's "prepare" step against a real git
@@ -42,10 +43,11 @@ function prepareRunBlock(): string {
   return step.run.slice(0, cut)
 }
 
-function git(cwd: string, args: string[]): string {
+function git(cwd: string, args: string[], input?: string): string {
   const result = spawnSync("git", args, {
     cwd,
     encoding: "utf8",
+    input,
     env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" },
   })
   if (result.status !== 0) throw new Error(`git ${args.join(" ")} failed: ${result.stderr}`)
@@ -314,9 +316,10 @@ describe("publish.yml prepare-release-state reuse decision", () => {
 
   for (const extraContent of [false, true]) {
     test(`#given a merged release with ${extraContent ? "additional" : "identical"} content #when selecting publication source #then ${extraContent ? "publication is refused" : "the stamping commit is selected"}`, () => {
-      const fixture = createFixture()
+      const root = mkdtempSync(join(tmpdir(), "publish-stale-stamp-"))
       try {
-        const { stamp, merge } = mergedRelease(fixture, "9.9.9-beta.5", extraContent)
+        const fixture = createMergedSelectionFixture(root, "9.9.9-beta.5", extraContent, git)
+        const { stamp, merge } = fixture
 
         const result = runMergedSelection(fixture, stamp, merge)
 
@@ -329,7 +332,7 @@ describe("publish.yml prepare-release-state reuse decision", () => {
           expect(result.output).not.toContain(`release_sha=${merge}\n`)
         }
       } finally {
-        rmSync(fixture.root, { recursive: true, force: true })
+        rmSync(root, { recursive: true, force: true })
       }
     })
   }

@@ -31,6 +31,8 @@ const DISPATCH_STEP = {
   job: "dispatch-provenance-safe-publish",
   name: "Tag prepared source and dispatch provenance-safe publish",
 } as const
+const PRE_PUSH = { job: "prepare-release-state", name: "Publish prepared release state" } as const
+const VERIFY_STAMP = "Verify pinned stamp before pushing"
 const RELEASE_STEP = { job: "release", name: "Create GitHub release" } as const
 const VERSION = "9.9.9"
 const TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
@@ -49,6 +51,17 @@ function step(where: { readonly job: string; readonly name: string }): Step & { 
   return { ...found, run: found.run }
 }
 
+function runThroughReleaseBranchPush(): string {
+  const job = stepsOf(PRE_PUSH.job)
+  const push = step(PRE_PUSH).run
+  const beforePush = job.slice(0, job.findIndex((candidate) => candidate.name === PRE_PUSH.name))
+  const proof = beforePush.find((candidate) => candidate.name === VERIFY_STAMP)?.run ?? ":"
+  const end = push.indexOf("\nretry_gh()")
+  if (end < 0) throw new Error("missing boundary after the release-state branch push")
+  // Preserve the real push but never install credentials or leave the scratch origin.
+  return `git() { if [ "$1 $2" != "remote set-url" ]; then command git "$@"; fi; }\n(\n${proof}\n)\n${push.slice(0, end)}`
+}
+
 const STUBS = [
   "gh() {",
   '  printf "%s\\n" "$*" >> "$GH_CALLS"',
@@ -59,7 +72,7 @@ const STUBS = [
   "  esac",
   "}",
   'bun() { cat >/dev/null; printf "%s\\n" "--latest=false"; }',
-  'yq() { printf "%s\\n" "$PIN_SUPPORTED"; }',
+  'yq() { if [ "${*: -1}" = "-" ]; then cat >/dev/null; fi; printf "%s\\n" "$PIN_SUPPORTED"; }',
   "",
 ].join("\n")
 
@@ -93,6 +106,7 @@ interface Outcome {
   readonly sha: GitOrigin["sha"]
   /** The commit the origin's tag points at after the step, or "" when the origin has no such tag. */
   readonly originTag: (tag: string) => string
+  readonly releaseBranch: string
 }
 
 /**
@@ -114,7 +128,7 @@ function runStep(input: Run, seed?: GitOrigin): Outcome {
   if (originTags.length > 0) git(fixture, checkout, ["fetch", "-q", "--force", "--tags"])
   const script = join(root, "step.sh")
   const ghCalls = join(root, "gh-calls")
-  writeFileSync(script, STUBS + step(input.where).run)
+  writeFileSync(script, STUBS + (input.where === PRE_PUSH ? runThroughReleaseBranchPush() : step(input.where).run))
   writeFileSync(ghCalls, "")
   writeFileSync(join(root, "output"), "")
   writeFileSync(join(root, "summary"), "")
@@ -126,6 +140,7 @@ function runStep(input: Run, seed?: GitOrigin): Outcome {
       ...fixture.gitEnv,
       GH_CALLS: ghCalls,
       GITHUB_REPOSITORY: "test/repo",
+      GITHUB_SHA: fixture.sha.A,
       CI_EVENT: input.ciEvent ?? "pull_request",
       CI_HEAD: fixture.sha[input.ciHead ?? input.prepared],
       GITHUB_OUTPUT: join(root, "output"),
@@ -133,6 +148,8 @@ function runStep(input: Run, seed?: GitOrigin): Outcome {
       VERSION,
       DIST_TAG: "",
       RELEASE_SHA: prepared,
+      RELEASE_BRANCH: "refs/heads/release/test-source-state",
+      GH_TOKEN: "",
       SOURCE_SHA: input.pin ? fixture.sha[input.pin] : "",
       PIN_SUPPORTED: String(input.pinSupported ?? true),
       BUMP: "patch",
@@ -148,10 +165,64 @@ function runStep(input: Run, seed?: GitOrigin): Outcome {
     ghCalls: readFileSync(ghCalls, "utf8"),
     sha: fixture.sha,
     originTag: (tag) => git(fixture, checkout, ["ls-remote", "origin", `refs/tags/${tag}`]).split(/\s+/)[0] ?? "",
+    get releaseBranch() {
+      return git(fixture, checkout, ["ls-remote", "origin", "refs/heads/release/test-source-state"]).split(/\s+/)[0] ?? ""
+    },
   }
 }
 
 describe("publish.yml child path release tag", () => {
+  test.each([["H", "HT"], ["O", "OT"]] as const)(
+    "a legitimate historical pin %s is pushed and dispatched without exact stamp CI",
+    (pin, prepared) => {
+      const input = { prepared, pin, pinSupported: false }
+      const prePush = runStep({ where: PRE_PUSH, ...input })
+      const dispatched = runStep({ where: DISPATCH_STEP, ...input })
+      expect(dispatched.status, dispatched.output).toBe(0)
+      expect(dispatched.originTag(`v${VERSION}`)).toBe(dispatched.sha[prepared])
+      expect(dispatched.ghCalls).toContain(`workflow run publish.yml --ref v${VERSION}`)
+      expect(dispatched.ghCalls).not.toContain("api --method")
+      expect(prePush.status, prePush.output).toBe(0)
+      expect(prePush.releaseBranch).toBe(prePush.sha[prepared])
+    },
+  )
+
+  test("an unproved historical stamp cannot push the release branch or supply its own checker", () => {
+    const input = { prepared: "HX", pin: "H", pinSupported: false } as const
+    const prePush = runStep({ where: PRE_PUSH, ...input })
+    expect(prePush.status).not.toBe(0)
+    expect(prePush.output).toContain("Cannot prove pinned release stamp")
+    expect(prePush.releaseBranch).toBe("")
+    const dispatched = runStep({ where: DISPATCH_STEP, ...input })
+    expect(dispatched.status).not.toBe(0)
+    expect(dispatched.output).toContain("No exact push CI")
+    expect(dispatched.originTag(`v${VERSION}`)).toBe("")
+    expect(dispatched.ghCalls).not.toContain("workflow run")
+  })
+
+  test("a source-aware child with a path-only basis checker cannot push the release branch", () => {
+    const result = runStep({ where: PRE_PUSH, prepared: "OT", pin: "O", pinSupported: true })
+    expect(result.status).not.toBe(0)
+    expect(result.output).toContain("The source-aware child cannot prove this stamp")
+    expect(result.releaseBranch).toBe("")
+  })
+
+  test("a source-aware child cannot receive a non-stamp delta approved only by PR CI", () => {
+    const result = runStep({ where: DISPATCH_STEP, prepared: "C", pin: "B" })
+    expect(result.status).not.toBe(0)
+    expect(result.output).toContain("No exact push CI")
+    expect(result.originTag(`v${VERSION}`)).toBe("")
+    expect(result.ghCalls).not.toContain("workflow run")
+  })
+
+  test("a reused historical stamp can dispatch with a completed push at the exact stamp", () => {
+    const result = runStep({ where: DISPATCH_STEP, prepared: "HX", pin: "H", pinSupported: false, ciEvent: "push" })
+    expect(result.status, result.output).toBe(0)
+    expect(result.ghCalls).toContain(`head_sha=${result.sha.HX}`)
+    expect(result.originTag(`v${VERSION}`)).toBe(result.sha.HX)
+    expect(result.ghCalls).toContain(`workflow run publish.yml --ref v${VERSION}`)
+  })
+
   test("a legacy child can receive a tag for a non-stamp delta only with exact push CI", () => {
     const root = mkdtempSync(join(tmpdir(), "publish-release-tag-seed-"))
     scratch.push(root)

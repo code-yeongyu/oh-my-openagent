@@ -16,14 +16,21 @@ function file(path: string, body: string): string {
  */
 const COMMITS = [
   [
-    "A", "main", "",
+    "H", "historical", "",
     [
       file("src/a.ts", "a\n"),
       file(".github/workflows/publish.yml", "on: workflow_dispatch\n"),
       file("package.json", '{"version":"1"}\n'),
       file("packages/omo-native/package.json", '{"version":"1"}\n'),
-      file("script/release-state-paths.mjs", readFileSync(new URL("../release-state-paths.mjs", import.meta.url), "utf8")),
     ].join(""),
+  ],
+  ["O", "historical", "H", file("script/release-state-paths.mjs", 'process.exit(process.argv[2] === "--check" ? 0 : 1)\n')],
+  ["HT", "historical-stamp", "H", file("package.json", '{"version":"2"}\n')],
+  ["OT", "older-stamp", "O", file("package.json", '{"version":"2"}\n')],
+  ["HX", "unsafe-stamp", "H", file("src/a.ts", "changed\n") + file("script/release-state-paths.mjs", "process.exit(0)\n")],
+  [
+    "A", "main", "O",
+    file("script/release-state-paths.mjs", readFileSync(new URL("../release-state-paths.mjs", import.meta.url), "utf8")),
   ],
   ["B", "main", "A", file(".github/workflows/publish.yml", "on: workflow_dispatch\n# waiver\n")],
   ["C", "main", "B", file("src/a.ts", "c\n")],
@@ -84,7 +91,7 @@ function importOrigin(
   const marks = join(root, "marks")
   git(origin, ["fast-import", "--quiet", `--export-marks=${marks}`], stream)
 
-  const sha: Record<CommitName, string> = { A: "", B: "", C: "", D: "", E: "", R: "", T: "" }
+  const sha: Record<CommitName, string> = { H: "", O: "", HT: "", OT: "", HX: "", A: "", B: "", C: "", D: "", E: "", R: "", T: "" }
   for (const line of readFileSync(marks, "utf8").trim().split("\n")) {
     const [mark, id] = line.split(" ")
     const entry = COMMITS[Number(mark?.slice(1)) - 1]
