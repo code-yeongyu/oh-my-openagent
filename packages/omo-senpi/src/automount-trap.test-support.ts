@@ -23,7 +23,9 @@ const isTrigger = (path: unknown): boolean => {
   const home = posix.resolve(homedir()).toLowerCase()
   const roots = ["/home", "/net", "/system/volumes/data/home", "/system/volumes/data/net"]
   // Fixture temp dirs are the test's own paths: a host whose TMPDIR sits under /home but outside HOME must not
-  // trap them (#11547). A TMPDIR that is itself a trigger root (or `/`) exempts nothing.
+  // trap them (#11547). A TMPDIR that is itself a trigger root (or `/`) exempts nothing. The exemption is host-
+  // dependent by nature (#11891): on a dev host whose TMPDIR lives under /home but outside HOME, a product
+  // regression that resolves such a path would not be caught here; CI hosts are unaffected.
   const tmp = posix.resolve(tmpdir()).toLowerCase()
   const fixture = tmp !== "/" && !roots.includes(tmp) && under(lexical, tmp)
   return roots.some((root) => under(lexical, root)) && (home === "/" || !under(lexical, home)) && !fixture
