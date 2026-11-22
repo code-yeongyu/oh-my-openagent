@@ -90,6 +90,10 @@ export function registerMemoryGuard(
     for (const rawPath of extractTargetPaths(event.input, operation === "patch")) {
       const cwd = resolveCwd()
       // Built-ins open path.resolve()d targets; suffix-classified external tools may open raw strings.
+      // Assumption (#11354): a tool is held to open cwd-resolved targets only when its normalized name
+      // equals the operation exactly (or is apply_patch). An extension that registers a bare `read`
+      // yet opens raw strings some other way is still judged on the resolved path - which can only
+      // under-block such an extension, never deny a built-in's legitimate read.
       const name = normalizeToolName(event.toolName)
       const target =
         name === operation || name === "apply_patch"
@@ -393,6 +397,10 @@ function readSessionId(value: unknown): string {
   return typeof sessionId === "string" && sessionId.length > 0 ? sessionId : "unknown-session"
 }
 
+// ENOTDIR counts as missing here on purpose, and only here: this walk feeds deny decisions that fail
+// toward blocking, so walking up past a file-in-place-of-a-directory ancestor is safe. The grants
+// helper (project-memory-grants.ts canonicalAllowingMissing) accepts ENOENT only - there a looser
+// walk would GRANT a read, so it refuses on anything but a plainly absent path (#11354, #11339).
 function isMissingPathError(error: unknown): boolean {
   if (!(error instanceof Error) || !("code" in error)) return false
   return error.code === "ENOENT" || error.code === "ENOTDIR"
