@@ -153,6 +153,13 @@ export async function resolveFinalizationDecision(
     summary: `${ledger.trigger} ${ledger.runId}`,
     validated,
     withWriterLock: (operation) => writerLock(context, operation),
+    // Resume must probe the validated tip that actually lands.
+    onRebased: async (rebased) => {
+      await updateRunLedger(ledgerPath, {
+        validatedTipSha: rebased.tipSha,
+        validatedChangedPaths: rebased.changedPaths,
+      })
+    },
   })
   maybeKillAt("after-merge")
   const budget = integrated.outcome === "merged" ? await validateIntegratedDreamBudget(context, ledger) : {}
