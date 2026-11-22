@@ -19,16 +19,24 @@ const HANDSHAKE_TIMEOUT_MS = 2_000
 export interface FakeHostTransport {
   /** What `net.Server.listen` binds: the logical path on POSIX, the derived pipe on win32. */
   readonly listenAddress: string
+  /** Publish a prepared Windows generation only after its listener is ready. */
+  readonly publish?: () => void
   /** Runs `accept` once the connection is allowed to carry wire frames. */
   authenticate(socket: Socket, accept: () => void): void
 }
 
-export function fakeHostTransport(socketPath: string, platform: NodeJS.Platform = process.platform): FakeHostTransport {
+export function fakeHostTransport(
+  socketPath: string,
+  platform: NodeJS.Platform = process.platform,
+  deferPublication = false,
+): FakeHostTransport {
   if (platform !== "win32") return { listenAddress: socketPath, authenticate: (_socket, accept) => accept() }
   const secret = randomBytes(SECRET_BYTES)
-  writeFileSync(`${socketPath}.secret`, secret, { mode: 0o600 })
+  const publish = () => writeFileSync(`${socketPath}.secret`, secret, { mode: 0o600 })
+  if (!deferPublication) publish()
   return {
     listenAddress: pipeNameFor(socketPath, secret),
+    ...(deferPublication && { publish }),
     authenticate: (socket, accept) => authenticateHandshake(socket, secret, accept),
   }
 }

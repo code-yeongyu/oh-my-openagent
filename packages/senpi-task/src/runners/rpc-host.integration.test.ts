@@ -128,6 +128,33 @@ describe("two parents on one daemon", () => {
     expect(world.host.sessions()).toHaveLength(32)
   })
 
+  test("#given a surviving host with retained children #when its listener restarts #then both parents reattach without replaying their prompts", async () => {
+    const { world, a, b } = await twoParents()
+    await Promise.all([
+      a.lifecycle.suspendOnSessionShutdown({ parentSessionId: "parent-a", reason: "session_shutdown" }),
+      b.lifecycle.suspendOnSessionShutdown({ parentSessionId: "parent-b", reason: "session_shutdown" }),
+    ])
+    await world.host.waitForConnections(0)
+    const paths = world.host
+      .sessions()
+      .map((session) => session.sessionPath)
+      .sort()
+    await world.host.restart()
+    expect(
+      world.host
+        .sessions()
+        .map((session) => session.sessionPath)
+        .sort(),
+    ).toEqual(paths)
+
+    const resumed = [
+      ...(await world.connect("parent-a").lifecycle.reconcileOnSessionStart("parent-a")).outcomes,
+      ...(await world.connect("parent-b").lifecycle.reconcileOnSessionStart("parent-b")).outcomes,
+    ]
+    expect(of(resumed, "resumed")).toHaveLength(32)
+    expect(world.prompts()).toHaveLength(32)
+  })
+
   test("#given a daemon that died under 32 live children #when they park and it comes back #then the next session start reconciles every child", async () => {
     // given
     const { world, a, b } = await twoParents()
