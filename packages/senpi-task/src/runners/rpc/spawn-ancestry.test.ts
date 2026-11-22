@@ -67,8 +67,10 @@ const rows: readonly Row[] = [
 test.each(rows)("CLI spawn on $engine sends --spawned-by only when the launched engine accepts it", (row) => {
   // given the engine the descriptor will actually launch
   const bin = row.bin === undefined ? undefined : senpiBin(row.bin)
+  const warnings: string[] = []
   // when the child descriptor is built
   const descriptor = buildRpcSpawn(spec, {
+    onWarning: (message) => warnings.push(message),
     isBunBinary: false,
     isCompiledEngine: false,
     execPath: "/synthetic/bun",
@@ -81,6 +83,13 @@ test.each(rows)("CLI spawn on $engine sends --spawned-by only when the launched 
   if (bin === undefined) expect(descriptor.args[0]).toBe("/synthetic/rpc-entry.js")
   else expect(descriptor.command).toBe(bin)
   expect(descriptor.args.filter((arg) => arg === "--spawned-by")).toHaveLength(row.accepts ? 1 : 0)
+  // and a dropped ancestry is named once, with the launch target, so the drop is diagnosable (#11352)
+  const dropped = warnings.filter((message) => message.includes("--spawned-by"))
+  expect(dropped).toHaveLength(row.accepts ? 0 : 1)
+  if (!row.accepts)
+    expect(dropped[0]).toContain(
+      descriptor.command === "/synthetic/bun" ? "/synthetic/rpc-entry.js" : descriptor.command,
+    )
   if (row.accepts) {
     const encoded = descriptor.args[descriptor.args.indexOf("--spawned-by") + 1]
     if (encoded === undefined) throw new Error("ancestry JSON missing")
