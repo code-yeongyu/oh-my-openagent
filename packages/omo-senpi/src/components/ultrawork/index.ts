@@ -2,7 +2,7 @@ import { readSessionRole } from "@oh-my-opencode/senpi-task"
 
 import { transformContextText } from "../../extension/context-text-transform"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
-import { classifyUltraworkInput, isUltraworkInput, type InputSource } from "./classify-input"
+import { classifyUltraworkInput, isUltraworkInput, type InputAttribution, type InputSource } from "./classify-input"
 import { ULTRAWORK_DIRECTIVES, ultraworkDirectiveFor } from "./directive-variants"
 import * as keywordDetector from "./keyword-detector-settings"
 import { type SessionArming, sharedSessionArming, snapshotSessionArming } from "./session-arming"
@@ -36,6 +36,7 @@ interface SenpiInputEvent {
   type: "input"
   text: string
   source: InputSource
+  attribution?: InputAttribution
   streamingBehavior?: "steer" | "followUp"
 }
 
@@ -140,7 +141,7 @@ function handleInput(
     return { action: "continue" }
   }
 
-  if (payload.source === "extension") {
+  if (payload.source === "extension" || payload.attribution === "agent") {
     return { action: "continue" }
   }
 

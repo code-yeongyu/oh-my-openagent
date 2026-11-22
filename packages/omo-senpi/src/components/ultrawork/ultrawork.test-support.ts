@@ -33,6 +33,7 @@ export async function dispatchInput(
   source: unknown = "interactive",
   streamingBehavior?: unknown,
   eventCtx?: unknown,
+  attribution?: unknown,
 ): Promise<InputDispatchResult> {
   const [result] = await pi.dispatch(
     "input",
@@ -41,6 +42,7 @@ export async function dispatchInput(
       text,
       source,
       ...(streamingBehavior === undefined ? {} : { streamingBehavior }),
+      ...(attribution === undefined ? {} : { attribution }),
     },
     eventCtx,
   )

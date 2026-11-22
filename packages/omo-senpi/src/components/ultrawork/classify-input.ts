@@ -11,6 +11,8 @@ import {
 import type { ArmingSnapshot } from "./session-arming"
 
 export type InputSource = "interactive" | "rpc" | "extension"
+// Who the host says sent the input: a person, or an agent (an extension, tool, subagent or another session).
+export type InputAttribution = "user" | "agent"
 
 // The keyword arms only as a word of its own: "ulw", "ulw loop", a leading "ulw-loop" or "ulw-plan." do;
 // "ulwfoo", "ulw_helper", "mass-ulw-refactor", "ulw-plan.md" and ".omo/ulw/" do not (#9738). Quoted,
@@ -30,6 +32,7 @@ export type UltraworkRoute = "none" | "direct" | "skill_args" | "skill_expansion
 export type UltraworkSuppressionReason =
   | "none"
   | "extension_source"
+  | "agent_input"
   | "child_session"
   | "no_keyword"
   | "identifier_reference"
@@ -53,7 +56,12 @@ export function isUltraworkInput(text: string): boolean {
 }
 
 export function classifyUltraworkInput(
-  input: { readonly text: string; readonly source: InputSource; readonly sessionRole?: SessionRole },
+  input: {
+    readonly text: string
+    readonly source: InputSource
+    readonly attribution?: InputAttribution
+    readonly sessionRole?: SessionRole
+  },
   snapshot: ArmingSnapshot,
 ): UltraworkClassification {
   const quotedText = stripQuotedSpans(input.text)
@@ -81,6 +89,11 @@ export function classifyUltraworkInput(
 
   if (input.source === "extension") {
     return { ...base, effective: false, stage: "none", route: "none", suppressionReason: "extension_source" }
+  }
+
+  // Relayed or agent-sent text is not this session's user asking for ultrawork (#10096).
+  if (input.attribution === "agent") {
+    return { ...base, effective: false, stage: "none", route: "none", suppressionReason: "agent_input" }
   }
 
   if (matches.length === 0) {
