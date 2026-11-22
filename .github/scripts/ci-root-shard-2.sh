@@ -5,9 +5,7 @@ set -euo pipefail
 #
 # all (local receipts and local runs): quarantine, then the whole remainder, in one process each.
 # quarantine / first / second (Ubuntu, #14573): parallel parts. The remainder is split by Bun's --shard, balanced by the
-# measured per-file times in .github/ci-test-timings.json; every file still runs in exactly one part, in path order. A file
-# missing from the timings file still runs; only the balance drifts. Refresh the file from a full serial run:
-# bun --config=bunfig.win2.parallel.toml test --timings=.github/ci-test-timings.json --update-timings
+# measured per-file times in a private copy of the run's snapshot. Bun replaces that copy with the files this shard ran.
 # Mode names stay lowercase letters and the blocks stay flat if-blocks of plain commands: the local-receipt reader parses
 # this file in its default mode without running it.
 # heavy / light (macOS shard 2): the same tests in two steps. One 20-minute step no longer fits a slow macOS
@@ -34,10 +32,10 @@ if [ "$mode" = "all" ]; then
   bun --config=bunfig.win2.parallel.toml test --timeout 20000 $(junit root-2-remainder)
 fi
 if [ "$mode" = "first" ]; then
-  bun --config=bunfig.win2.parallel.toml test --timeout 20000 --shard=1/2 --timings=.github/ci-test-timings.json $(junit root-2-first)
+  bun --config=bunfig.win2.parallel.toml test --timeout 20000 --shard=1/2 --timings=.omo/ci-shard-record.json --update-timings $(junit root-2-first)
 fi
 if [ "$mode" = "second" ]; then
-  bun --config=bunfig.win2.parallel.toml test --timeout 20000 --shard=2/2 --timings=.github/ci-test-timings.json $(junit root-2-second)
+  bun --config=bunfig.win2.parallel.toml test --timeout 20000 --shard=2/2 --timings=.omo/ci-shard-record.json --update-timings $(junit root-2-second)
 fi
 if [ "$mode" = "light" ]; then
   bun --config=bunfig.win2.parallel.rest.toml test --timeout 20000 $(junit root-2-rest)
