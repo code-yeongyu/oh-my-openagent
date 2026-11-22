@@ -1133,16 +1133,18 @@ async function verifyFastAliasRpcFixture() {
     api: fixture.api,
   }))
   const { upstreamModelId: _registryOnly, ...rawBase } = base
+  const literalAlias = { ...alias, upstreamModelId: rawBase.id }
   const results = []
-  for (const [started, pinned] of [
-    [rawBase, alias],
-    [base, { ...alias, api: "openai-completions" }],
+  for (const [catalogBase, pinned] of [
+    [base, alias],
+    [rawBase, literalAlias],
+    [rawBase, { ...literalAlias, api: "openai-completions" }],
   ]) {
     const result = await openTaskHostSession({
       client: {
         open: async () => ({ sessionId: "route", attached: false, instanceId: "host", engineVersion: "test" }),
-        getState: async () => ({ sessionId: "synthetic", model: started }),
-        getAvailableModels: async () => [base, pinned],
+        getState: async () => ({ sessionId: "synthetic", model: rawBase }),
+        getAvailableModels: async () => [catalogBase, pinned],
       },
       spec: {
         task_id: "st_fast_alias",
@@ -1158,8 +1160,10 @@ async function verifyFastAliasRpcFixture() {
     )
     results.push(result)
   }
-  if (!isDeepStrictEqual(results, [FAST_ALIAS.base, "model_unavailable"]))
-    throw new Error(`self-test: expected mapped base then API refusal, got ${JSON.stringify(results)}`)
+  if (!isDeepStrictEqual(results, [FAST_ALIAS.base, FAST_ALIAS.base, "model_unavailable"]))
+    throw new Error(
+      `self-test: expected mapped and literal base accepts, then an API refusal, got ${JSON.stringify(results)}`,
+    )
 }
 
 async function runSelfTest() {
