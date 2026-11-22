@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { mirrorChannel } from "./mirror-channel"
+import { withRetry } from "./mirror-retry"
 
 describe("mirrorChannel", () => {
   test("a dry run writes and reads the scratch pointer without changing the live channel", async () => {
@@ -15,12 +16,18 @@ describe("mirrorChannel", () => {
         scratchWrites.push(body)
         scratch.set(key, body)
       },
+      async writeOnce() {
+        throw new Error("a dry run never writes once")
+      },
     }
     const live = {
       async readText() {
         return "5.1.47\n"
       },
       async write(key: string) {
+        liveWrites.push(key)
+      },
+      async writeOnce(key: string) {
         liveWrites.push(key)
       },
     }
@@ -43,6 +50,9 @@ describe("mirrorChannel", () => {
       async write(key: string) {
         writes.push(key)
       },
+      async writeOnce(key: string) {
+        writes.push(key)
+      },
     }
     // when
     const pointer = await mirrorChannel(store, store, "channels/latest", "5.1.48", false, false, () => {})
@@ -63,6 +73,9 @@ describe("mirrorChannel", () => {
         async write(_key: string, body: string) {
           pointer = body
         },
+        async writeOnce(_key: string, body: string) {
+          pointer = body
+        },
       }
       // when
       const result = await mirrorChannel(store, store, "channels/latest", "5.1.48", false, force, () => {})
@@ -80,6 +93,7 @@ describe("mirrorChannel", () => {
         return ++reads === 1 ? "5.1.47\n" : "5.1.49\n"
       },
       async write() {},
+      async writeOnce() {},
     }
     const result = mirrorChannel(store, store, "channels/latest", "5.1.48", false, force, (line) => logs.push(line))
     if (force) await expect(result).rejects.toThrow("pointer read-back")
@@ -99,12 +113,18 @@ describe("mirrorChannel", () => {
       async write(_key: string, body: string) {
         writes.push(body)
       },
+      async writeOnce() {
+        throw new Error("a dry run never writes once")
+      },
     }
     const live = {
       async readText() {
         return "5.1.49\n"
       },
       async write() {
+        throw new Error("dry run touched production")
+      },
+      async writeOnce() {
         throw new Error("dry run touched production")
       },
     }
@@ -120,10 +140,48 @@ describe("mirrorChannel", () => {
         return null
       },
       async write() {},
+      async writeOnce() {},
     }
     // when
     const result = mirrorChannel(store, store, "channels/latest", "5.1.48", true, false, () => {})
     // then
     await expect(result).rejects.toThrow("pointer read-back")
   })
+
+  // #11341: R2 can commit a PUT and still answer an error; a newer release may move the pointer before the retry.
+  test("a retried pointer write never overwrites a newer pointer that landed after the failed attempt", async () => {
+    // given a live pointer at 5.1.47 whose first PUT of 5.1.48 commits but reports a 502,
+    // and a concurrent 5.1.50 release that moves the pointer before the retry
+    let pointer = "5.1.47\n"
+    let attempts = 0
+    const sleeps: number[] = []
+    const noWait = async (ms: number) => {
+      sleeps.push(ms)
+    }
+    const writeOnce = async (_key: string, body: string) => {
+      attempts++
+      pointer = body
+      if (attempts === 1) {
+        pointer = "5.1.50\n"
+        throw new Error("HTTP 502 Bad Gateway")
+      }
+    }
+    const live = {
+      async readText() {
+        return pointer
+      },
+      writeOnce,
+      // The production store's write is the same single attempt wrapped in the shared retry.
+      async write(key: string, body: string) {
+        await withRetry(`write ${key}`, () => writeOnce(key, body), noWait)
+      },
+    }
+    // when
+    const result = await mirrorChannel(live, live, "channels/latest", "5.1.48", false, false, () => {}, noWait)
+    // then the newer pointer survives and only the first attempt wrote
+    expect(pointer).toBe("5.1.50\n")
+    expect(result).toBe("5.1.50")
+    expect(attempts).toBe(1)
+    expect(sleeps).toEqual([5_000])
+  }, 20_000)
 })
