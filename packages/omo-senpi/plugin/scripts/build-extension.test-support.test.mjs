@@ -1,7 +1,10 @@
-import { access, writeFile } from "node:fs/promises"
+import { spawn } from "node:child_process"
+import { access, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { expect, test } from "bun:test"
 
-import { createBuildFixture } from "./build-extension.test-support.mjs"
+import { boundBuildProgress, createBuildFixture } from "./build-extension.test-support.mjs"
 
 // #13965: one case whose build rejected (its timeout killed the shared minifier) must not fail every later case.
 test("#given the shared build rejects once #when the next case asks for it #then it rebuilds instead of reusing the rejection and removes both roots", async () => {
@@ -54,4 +57,43 @@ test("#given the reproduction build rejects once #when it is asked for again #th
   expect(calls).toBe(2)
   await expect(access(outputs[0])).rejects.toMatchObject({ code: "ENOENT" })
   await expect(access(outputs[1])).rejects.toMatchObject({ code: "ENOENT" })
+})
+// #13965: the cold build is bounded by its progress, not the per-test wall clock. A hung build must still fail as a
+// stall, and a build whose processes burn CPU without end must fail as a runaway.
+test("#given a build that makes no CPU or output progress #when it is bounded #then it fails as a stall naming the build", async () => {
+  // given
+  const root = await mkdtemp(join(tmpdir(), "omo-build-stall-"))
+  try {
+    // when
+    const bounded = boundBuildProgress("shared extension build", root, new Promise(() => {}), {
+      stallMs: 1_000,
+      cpuCapS: 600,
+    })
+
+    // then
+    await expect(bounded).rejects.toThrow(
+      /^shared extension build stalled: no CPU or output progress for \d+s \(a hang\)$/,
+    )
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test("#given a build whose process tree keeps burning CPU #when it passes the CPU cap #then it fails as a runaway naming the CPU used", async () => {
+  // given
+  const root = await mkdtemp(join(tmpdir(), "omo-build-runaway-"))
+  const spinner = spawn(process.execPath, ["-e", "for (;;) {}"], { stdio: "ignore" })
+  try {
+    // when
+    const bounded = boundBuildProgress("shared extension build", root, new Promise(() => {}), {
+      stallMs: 60_000,
+      cpuCapS: 1,
+    })
+
+    // then
+    await expect(bounded).rejects.toThrow(/^shared extension build ran away: used \d+ CPU seconds \(cap 1\)$/)
+  } finally {
+    spinner.kill()
+    await rm(root, { recursive: true, force: true })
+  }
 })
