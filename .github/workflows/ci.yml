@@ -5,7 +5,11 @@ on:
     branches: [master, dev]
   pull_request:
     branches: [master, dev]
-    types: [opened, synchronize, reopened]
+    # edited: GitHub retargets a stacked PR to dev after its base merges as an "edited" event, which never starts CI
+    # on its own, so the PR waits forever on missing required contexts (#14615). Only a base change runs CI: every
+    # root job and every always() status job checks github.event.changes.base, and other edits get their own
+    # concurrency group so they never cancel a running PR run.
+    types: [opened, synchronize, reopened, edited]
   merge_group:
     types: [checks_requested]
   workflow_call:
@@ -15,7 +19,7 @@ concurrency:
   # master/dev is never cancelled, so the running dev run always finishes (the baseline PR failures are judged
   # against), and GitHub keeps only the newest pending push run, so at most two dev runs exist at a time. PR runs
   # still cancel their superseded run on the same ref.
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}${{ github.event.action == 'edited' && github.event.changes.base == null && '-non-base-edit' || '' }}
   cancel-in-progress: ${{ github.event_name != 'push' }}
 
 permissions:
@@ -26,6 +30,7 @@ jobs:
   # when the rest of CI takes a docs/web/release fast path.
   lint-ratchet:
     name: Lint ratchet
+    if: (github.event.action != 'edited' || github.event.changes.base != null)
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
@@ -58,6 +63,7 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   ci-mode:
+    if: (github.event.action != 'edited' || github.event.changes.base != null)
     runs-on: ubuntu-26.04
     outputs:
       generated_release_push: ${{ steps.classify.outputs.generated_release_push }}
@@ -158,7 +164,7 @@ jobs:
   # Block PRs targeting master branch (comment + auto-close, then fail the check)
   block-master-pr:
     runs-on: ubuntu-26.04
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && (github.event.action != 'edited' || github.event.changes.base != null)
     permissions:
       pull-requests: write
     steps:
@@ -551,7 +557,7 @@ jobs:
   linux-test-status:
     name: test
     needs: [ci-mode, test-linux]
-    if: ${{ always() && !cancelled() }}
+    if: ${{ always() && !cancelled() && (github.event.action != 'edited' || github.event.changes.base != null) }}
     runs-on: ubuntu-26.04
     strategy:
       matrix:
@@ -702,7 +708,7 @@ jobs:
   macos-test-1-status:
     name: test
     needs: [ci-mode, macos-combined]
-    if: ${{ always() && !cancelled() }}
+    if: ${{ always() && !cancelled() && (github.event.action != 'edited' || github.event.changes.base != null) }}
     runs-on: ubuntu-26.04
     strategy:
       matrix:
@@ -727,7 +733,7 @@ jobs:
   macos-test-2-status:
     name: test
     needs: [ci-mode, macos-combined]
-    if: ${{ always() && !cancelled() }}
+    if: ${{ always() && !cancelled() && (github.event.action != 'edited' || github.event.changes.base != null) }}
     runs-on: ubuntu-26.04
     strategy:
       matrix:
@@ -752,7 +758,7 @@ jobs:
   macos-codex-status:
     name: codex-compatibility
     needs: [ci-mode, macos-combined]
-    if: ${{ always() && !cancelled() }}
+    if: ${{ always() && !cancelled() && (github.event.action != 'edited' || github.event.changes.base != null) }}
     runs-on: ubuntu-26.04
     strategy:
       matrix:
@@ -777,7 +783,7 @@ jobs:
   macos-senpi-status:
     name: senpi-compatibility
     needs: [ci-mode, macos-combined]
-    if: ${{ always() && !cancelled() }}
+    if: ${{ always() && !cancelled() && (github.event.action != 'edited' || github.event.changes.base != null) }}
     runs-on: ubuntu-26.04
     strategy:
       matrix:
@@ -1275,7 +1281,7 @@ jobs:
   linux-senpi-status:
     name: senpi-compatibility
     needs: [ci-mode, senpi-bundle-check, senpi-eq, senpi-tests-linux]
-    if: ${{ always() && !cancelled() }}
+    if: ${{ always() && !cancelled() && (github.event.action != 'edited' || github.event.changes.base != null) }}
     runs-on: ubuntu-26.04
     strategy:
       matrix:
