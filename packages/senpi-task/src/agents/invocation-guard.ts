@@ -49,9 +49,7 @@ export const EMPTY_SKILL_INVOCATIONS: SkillInvocationState = {
   planArtifactReferences: () => [],
 }
 
-export type InvocationGuardVerdict =
-  | { readonly kind: "allow" }
-  | { readonly kind: "deny"; readonly message: string }
+export type InvocationGuardVerdict = { readonly kind: "allow" } | { readonly kind: "deny"; readonly message: string }
 
 export function invocationConditionForAgent(agentName: string): AgentInvocationCondition | undefined {
   return CONDITIONS[agentName]

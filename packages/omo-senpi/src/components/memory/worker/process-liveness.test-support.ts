@@ -58,9 +58,21 @@ export type ProcessIdentity = Readonly<{ pid: number; command: string }>
 
 function commandForPid(pid: number): string | null {
   try {
-    if (process.platform === "linux") return readFileSync(`/proc/${String(pid)}/cmdline`, "utf8").replaceAll("\\0", " ").trim()
+    if (process.platform === "linux")
+      return readFileSync(`/proc/${String(pid)}/cmdline`, "utf8")
+        .replaceAll("\\0", " ")
+        .trim()
     if (process.platform === "win32") {
-      const out = execFileSync("powershell", ["-NoProfile", "-NonInteractive", "-Command", `(Get-CimInstance Win32_Process -Filter "ProcessId=${String(pid)}").CommandLine`], { encoding: "utf8" }).trim()
+      const out = execFileSync(
+        "powershell",
+        [
+          "-NoProfile",
+          "-NonInteractive",
+          "-Command",
+          `(Get-CimInstance Win32_Process -Filter "ProcessId=${String(pid)}").CommandLine`,
+        ],
+        { encoding: "utf8" },
+      ).trim()
       return out === "" ? null : out
     }
     return execFileSync("ps", ["-p", String(pid), "-o", "command="], { encoding: "utf8" }).trim()
@@ -93,7 +105,11 @@ export function pidTerminalWithin(identity: ProcessIdentity, boundMs: number): P
  * event exists (fs.watch is unreliable on some platforms - events can arrive late or never).
  * It is never an ordering oracle: callers assert on the condition outcome, not on elapsed time.
  */
-export async function probeUntil(condition: () => boolean | Promise<boolean>, boundMs: number, intervalMs = 25): Promise<boolean> {
+export async function probeUntil(
+  condition: () => boolean | Promise<boolean>,
+  boundMs: number,
+  intervalMs = 25,
+): Promise<boolean> {
   const deadline = Date.now() + boundMs
   for (;;) {
     if (await condition()) return true
@@ -127,7 +143,11 @@ export async function readPidFileWhenWritten(path: string, boundMs: number): Pro
 }
 
 /** Reads a pid file written by a foreign helper and snapshots its command identity. */
-export async function readPidWhenWritten(path: string, boundMs: number, expectedCommand?: string): Promise<ProcessIdentity> {
+export async function readPidWhenWritten(
+  path: string,
+  boundMs: number,
+  expectedCommand?: string,
+): Promise<ProcessIdentity> {
   let identity: ProcessIdentity | null = null
   const found = await probeUntil(() => {
     let raw: number
@@ -152,7 +172,9 @@ export async function readPidOnce(path: string, expectedCommand?: string): Promi
     const raw = Number((await readFile(path, "utf8")).trim())
     if (!Number.isInteger(raw) || raw <= 0) return null
     const command = commandForPid(raw)
-    return command !== null && (expectedCommand === undefined || command.includes(expectedCommand)) ? { pid: raw, command } : null
+    return command !== null && (expectedCommand === undefined || command.includes(expectedCommand))
+      ? { pid: raw, command }
+      : null
   } catch (error) {
     if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error
     return null

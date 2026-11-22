@@ -82,7 +82,10 @@ export function dominantFixFirstCause(records: readonly FactsFailureRecord[]): F
  * batch with a surviving run log is used. An unreadable runs directory also
  * yields no path, so a display failure can never invent a run log.
  */
-export function parkedRunPath(records: readonly FactsFailureRecord[], factsDir: string | undefined): string | undefined {
+export function parkedRunPath(
+  records: readonly FactsFailureRecord[],
+  factsDir: string | undefined,
+): string | undefined {
   if (factsDir === undefined) return undefined
   const newestFirst = [...parkedOf(records)].sort(
     (left, right) => Date.parse(right.lastFailureAt) - Date.parse(left.lastFailureAt),

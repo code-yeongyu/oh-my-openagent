@@ -1,6 +1,9 @@
 import type { HostSessionIdentity, SuspensionReason } from "../state"
 
-export type HostParkedReason = Extract<SuspensionReason, "daemon_unavailable" | "host_incompatible" | "own_host_unreachable">
+export type HostParkedReason = Extract<
+  SuspensionReason,
+  "daemon_unavailable" | "host_incompatible" | "own_host_unreachable"
+>
 import { reconciliationActive, type LifecycleContext } from "./context"
 
 export type RecordedHostVerdict = "alive" | "host_unreachable" | "host_incompatible" | "own_host_unreachable"

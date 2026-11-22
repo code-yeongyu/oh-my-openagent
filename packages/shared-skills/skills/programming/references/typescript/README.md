@@ -16,7 +16,7 @@ These are deliberate project choices. Violations are always wrong, not "style pr
 | Category | Use | Never |
 |---|---|---|
 | Runtime | Bun (native TS, single binary) | ts-node, tsx |
-| Package manager | `pnpm` | npm, yarn (unless workspace requires it) |
+| Package manager | Bun (`bun install`); `pnpm` only when Node is forced | npm, yarn (unless workspace requires it) |
 | Linter + formatter | **oxlint + oxfmt**, with both local copy rules | New ESLint, Prettier, or Biome setups; retain them only in repositories already using them |
 | Type checker | `tsc --noEmit` with strict config | skip type checking |
 | Web framework | Hono | Express |
@@ -39,7 +39,7 @@ These are deliberate project choices. Violations are always wrong, not "style pr
 11. **as const for constants** — module-level constant objects and arrays use `as const`.
 12. **import type** — type-only imports use `import type`. Enforced by `verbatimModuleSyntax`.
 13. **Named exports only** — no `export default`. Exception: framework requirement (Next.js pages, etc.).
-14. **No empty catch, no catch-and-swallow** — every `catch` block must either (a) narrow the error with `instanceof` and handle each case, or (b) re-throw. Empty catch blocks and `catch (e) { console.error(e) }` without narrowing or re-throw are banned — they hide bugs. At top-level boundaries (CLI entry, HTTP handler), opt out with `// no-excuse-ok: catch`.
+14. **No empty catch, no catch-and-swallow** — every `catch` block must either (a) narrow the error with `instanceof` and handle each case, or (b) re-throw. Empty catch blocks and `catch (e) { console.error(e) }` without narrowing or re-throw are banned — they hide bugs. At top-level boundaries (CLI entry, HTTP handler), opt out with `// no-excuse-ok: catch` on the `catch` line.
 
 ### Data modeling — which construct, when
 
@@ -91,10 +91,10 @@ try {
 }
 
 // GOOD — top-level boundary (only place catch-all is acceptable)
-async function main(): Promise<void> {  // no-excuse-ok: catch
+async function main(): Promise<void> {
   try {
     await run()
-  } catch (e) {
+  } catch (e) {  // no-excuse-ok: catch
     console.error("unhandled:", e)
     process.exit(1)
   }
@@ -190,7 +190,7 @@ Tests still follow the iron list — branded types, typed errors, exhaustive swi
 
 ## Existing codebases
 
-When editing an existing file that doesn't follow these rules: **write new code in strict style, don't refactor existing code in the same change.**
+When editing an existing file that doesn't follow these rules: **write new code in strict style, don't refactor existing code in the same change.** The one exception is the 250 pure-LOC ceiling: if your edit adds lines to a file already over it, split the unit you are touching into its own file first (see [`../code-smells.md`](../code-smells.md) Smell 1); everything else waits for a separate change.
 
 ## Activation
 

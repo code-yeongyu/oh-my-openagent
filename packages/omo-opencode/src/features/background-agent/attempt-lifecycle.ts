@@ -3,7 +3,9 @@ import type { BackgroundTask, BackgroundTaskAttempt, BackgroundTaskStatus } from
 
 type TerminalAttemptStatus = Extract<BackgroundTaskStatus, "completed" | "error" | "cancelled" | "interrupt">
 
-function toAttemptModel(model: DelegatedModelConfig | undefined): Pick<BackgroundTaskAttempt, "providerId" | "modelId" | "variant"> {
+function toAttemptModel(
+  model: DelegatedModelConfig | undefined,
+): Pick<BackgroundTaskAttempt, "providerId" | "modelId" | "variant"> {
   return {
     providerId: model?.providerID,
     modelId: model?.modelID,
@@ -81,11 +83,10 @@ export function projectTaskFromCurrentAttempt(task: BackgroundTask): BackgroundT
   task.completedAt = currentAttempt.completedAt
   task.error = currentAttempt.error
   const currentModel = toTaskModel(currentAttempt)
-  task.model = currentModel
-    && task.model?.providerID === currentModel.providerID
-    && task.model.modelID === currentModel.modelID
-    ? { ...task.model, ...currentModel, variant: currentAttempt.variant }
-    : currentModel
+  task.model =
+    currentModel && task.model?.providerID === currentModel.providerID && task.model.modelID === currentModel.modelID
+      ? { ...task.model, ...currentModel, variant: currentAttempt.variant }
+      : currentModel
 
   return task
 }

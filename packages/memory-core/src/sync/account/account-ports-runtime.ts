@@ -2,3 +2,4 @@
 export { createAccountHttp } from "./http"
 export { createPairingHttp } from "./pairing-http"
 export { deviceKeyringFromMaterial } from "./device-keyring"
+export { parseRevocationView, type RevocationView } from "./revocation-view"

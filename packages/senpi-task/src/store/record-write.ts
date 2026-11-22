@@ -74,5 +74,10 @@ function renameWithWindowsRetry(from: string, to: string, platform: NodeJS.Platf
 }
 
 function isTransientWindowsError(error: unknown): boolean {
-  return error instanceof Error && "code" in error && typeof error.code === "string" && WINDOWS_TRANSIENT_CODES.has(error.code)
+  return (
+    error instanceof Error &&
+    "code" in error &&
+    typeof error.code === "string" &&
+    WINDOWS_TRANSIENT_CODES.has(error.code)
+  )
 }

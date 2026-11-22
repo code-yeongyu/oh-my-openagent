@@ -40,7 +40,9 @@ export async function destroyResidentTask(
     const handle = context.registry.get(taskId)
     try {
       if (handle !== undefined) {
-        await withinTeardownBudget(context.teardownStepDeadline, { taskId, pid: handle.pid }, "dispose", () => handle.dispose())
+        await withinTeardownBudget(context.teardownStepDeadline, { taskId, pid: handle.pid }, "dispose", () =>
+          handle.dispose(),
+        )
       }
     } finally {
       context.registry.forget(taskId, { path: "park" })
@@ -59,8 +61,13 @@ export async function destroyResidentTask(
     if (cause === "evict" || cause === "revive_failure") {
       const queued = context.store.load(taskId)
       const handle = context.registry.get(taskId)
-      if ((queued?.pending_steering?.length ?? 0) > 0 && queued?.killed !== true
-        && queued?.status !== "cancelled" && queued?.status !== "lost" && handle !== undefined) {
+      if (
+        (queued?.pending_steering?.length ?? 0) > 0 &&
+        queued?.killed !== true &&
+        queued?.status !== "cancelled" &&
+        queued?.status !== "lost" &&
+        handle !== undefined
+      ) {
         await suspendHandle(context, handle, cause)
         return
       }
@@ -75,29 +82,42 @@ export async function destroyResidentTask(
         context.failedTeardowns.add(taskId)
         throw error
       } finally {
-        if (cause !== "fallback_handoff") context.registry.forget(taskId, {
-          path: cause === "revive_failure" ? "park" : cause === "evict" ? "evict" : "end",
-          ...(cause === "target_gone" || cause === "reconcile_lost" || cause === "ttl" ? { reason: "target_gone" as const } : {}),
-        })
+        if (cause !== "fallback_handoff")
+          context.registry.forget(taskId, {
+            path: cause === "revive_failure" ? "park" : cause === "evict" ? "evict" : "end",
+            ...(cause === "target_gone" || cause === "reconcile_lost" || cause === "ttl"
+              ? { reason: "target_gone" as const }
+              : {}),
+          })
         if (cause === "revive_failure") recordRevivalFailure(context, taskId)
       }
       // A daemon child whose stop could not reach its host (the transport was down, or crash recovery
       // gave up) may still hold its session there: the cancel ends it once the host answers.
       // A close the host answered over the handle's own connection already ended the session (omo#11765).
-      if (handle.kind !== "in-process" && (cause === "cancel" || cause === "cancel_without_abort") && handle.hostEndAnswered?.() !== true) {
+      if (
+        handle.kind !== "in-process" &&
+        (cause === "cancel" || cause === "cancel_without_abort") &&
+        handle.hostEndAnswered?.() !== true
+      ) {
         await closeParkedSession(context, taskId)
       }
     } else if (cause === "reconcile_lost" || cause === "ttl" || cause === "revive_failure" || cause === "target_gone") {
       await terminateOrphan(context, taskId, orphan)
       if (cause === "revive_failure") recordRevivalFailure(context, taskId)
       const record = context.store.load(taskId)
-      if (cause === "reconcile_lost" && record !== null && record.killed !== true
-        && record.status !== "cancelled" && record.status !== "lost"
-        && (record.pending_steering?.length ?? 0) > 0
-        && (isHostSessionRecord(record) || newestSessionPath(context, taskId) !== undefined)) {
+      if (
+        cause === "reconcile_lost" &&
+        record !== null &&
+        record.killed !== true &&
+        record.status !== "cancelled" &&
+        record.status !== "lost" &&
+        (record.pending_steering?.length ?? 0) > 0 &&
+        (isHostSessionRecord(record) || newestSessionPath(context, taskId) !== undefined)
+      ) {
         context.registry.forget(taskId, { path: "park" })
         context.store.transition(taskId, {
-          type: record.execution_mode === "process" ? "detach_rpc" : "persist_only", timestamp: nowIso(context),
+          type: record.execution_mode === "process" ? "detach_rpc" : "persist_only",
+          timestamp: nowIso(context),
         })
         return
       }
@@ -142,7 +162,11 @@ async function confirmClosingChildGone(context: LifecycleContext, taskId: string
 
 // A host-session handle's terminate() IS `abort` then `close_session` (runners/rpc-host/handle.ts),
 // so the rpc branch below is exactly right for it: no pid is involved on either side.
-async function teardownHandle(context: LifecycleContext, handle: ResidentHandle, skipInProcessAbort: boolean): Promise<void> {
+async function teardownHandle(
+  context: LifecycleContext,
+  handle: ResidentHandle,
+  skipInProcessAbort: boolean,
+): Promise<void> {
   // The pre-dispose step (in-process abort / rpc terminate) is best-effort: an already-exited child
   // rejects it. DAG cancellation skips in-process abort only after the child's outcome has settled,
   // because Senpi can float retry rejections from both abort() and active-session dispose(). Dispose

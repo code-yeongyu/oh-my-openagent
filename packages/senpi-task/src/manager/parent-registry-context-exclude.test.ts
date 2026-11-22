@@ -30,7 +30,17 @@ function registry(): ModelRegistry {
     baseUrl: "file://mock-provider",
     apiKey: "mock",
     api: "openai-completions",
-    models: [{ id: "fable-1", name: "Fable", reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 16_000, maxTokens: 4096 }],
+    models: [
+      {
+        id: "fable-1",
+        name: "Fable",
+        reasoning: false,
+        input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 16_000,
+        maxTokens: 4096,
+      },
+    ],
   })
   return live
 }
@@ -40,7 +50,11 @@ const EXCLUDE = ["fable-*"]
 describe("task children honor exclude_models on respawn and resume", () => {
   test("#given an in-process child respawned on an excluded model #when its context is built #then it fails model_unavailable", () => {
     // given
-    const provide = createParentRegistrySessionContext(registry, () => undefined, () => EXCLUDE)
+    const provide = createParentRegistrySessionContext(
+      registry,
+      () => undefined,
+      () => EXCLUDE,
+    )
 
     // when / then
     expect(() => provide(spec({ model: "omo-mock/fable-1" }))).toThrow(RunnerError)
@@ -49,7 +63,9 @@ describe("task children honor exclude_models on respawn and resume", () => {
 
   test("#given a resumed child whose persisted model is excluded #when resumed #then it is refused", () => {
     // given
-    const resumed = spec({ resolvedModel: { source: "category", provider: "omo-mock", model_id: "fable-1", display: "omo-mock/fable-1" } })
+    const resumed = spec({
+      resolvedModel: { source: "category", provider: "omo-mock", model_id: "fable-1", display: "omo-mock/fable-1" },
+    })
 
     // when
     const refused = resolveResumeContext(registry, resumed, EXCLUDE)
@@ -98,7 +114,9 @@ describe("task children honor exclude_models on respawn and resume", () => {
     })
 
     // when / then
-    await expect(admission({ model: "omo-mock/fable-1", cwd: "/tmp" } as Parameters<typeof admission>[0])).rejects.toBeInstanceOf(RunnerError)
+    await expect(
+      admission({ model: "omo-mock/fable-1", cwd: "/tmp" } as Parameters<typeof admission>[0]),
+    ).rejects.toBeInstanceOf(RunnerError)
     expect(probes).toBe(0)
   })
 })

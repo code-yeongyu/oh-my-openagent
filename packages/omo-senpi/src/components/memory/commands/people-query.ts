@@ -7,13 +7,9 @@ const MAX_CLOSE_SLUGS = 5
 const MIN_SHARED_PREFIX = 3
 
 export type PersonQueryResolution =
-  | { readonly kind: "hit"; readonly slug: string }
-  | { readonly kind: "miss"; readonly close: readonly string[] }
+  { readonly kind: "hit"; readonly slug: string } | { readonly kind: "miss"; readonly close: readonly string[] }
 
-export function resolvePersonQuery(
-  nodes: readonly PalacePeopleNode[],
-  query: string,
-): PersonQueryResolution {
+export function resolvePersonQuery(nodes: readonly PalacePeopleNode[], query: string): PersonQueryResolution {
   const needle = query.trim().toLowerCase()
   if (needle.length === 0) return { kind: "miss", close: nodes.map((node) => node.slug) }
 
@@ -21,9 +17,7 @@ export function resolvePersonQuery(
   if (exact !== undefined) return { kind: "hit", slug: exact.slug }
 
   const named = nodes.find(
-    (node) =>
-      node.displayName.toLowerCase() === needle ||
-      node.aliases.some((alias) => alias.toLowerCase() === needle),
+    (node) => node.displayName.toLowerCase() === needle || node.aliases.some((alias) => alias.toLowerCase() === needle),
   )
   if (named !== undefined) return { kind: "hit", slug: named.slug }
 

@@ -1,0 +1,9 @@
+<!DOCTYPE Menu PUBLIC "-//freedesktop//DTD Menu 1.0//EN" "http://www.freedesktop.org/standards/menu-spec/1.0/menu.dtd">
+<!-- SP-W: a full Plasma install ships a menu; this image has none, and without one the KDE service cache indexes
+     no application, so KWin could not find any desktop file's X-KDE-Wayland-Interfaces. -->
+<Menu>
+  <Name>Applications</Name>
+  <DefaultAppDirs/>
+  <DefaultDirectoryDirs/>
+  <Include><All/></Include>
+</Menu>

@@ -77,7 +77,9 @@ function seedRunningRun(store: ReturnType<typeof createDagFileStore>): void {
     generation: 1,
     createdAt,
     updatedAt: createdAt,
-    nodes: compiled.nodes.map((entry) => (entry.id === "alpha" ? { ...entry, state: "running", startedAt: createdAt } : entry)),
+    nodes: compiled.nodes.map((entry) =>
+      entry.id === "alpha" ? { ...entry, state: "running", startedAt: createdAt } : entry,
+    ),
     edges: compiled.edges,
     waves: compiled.waves,
     criticalPath: compiled.criticalPath,
@@ -101,8 +103,16 @@ try {
   report.detached_text = textOf(detached)
   check("default wait returns the detached kind", detached.details.kind === "detached", detached.details.kind)
   if (detached.details.kind === "detached") {
-    check("detached carries the live snapshot", detached.details.snapshot.status === "running", detached.details.snapshot.status)
-    check("detached names the wake contract", textOf(detached).includes("woken as each node completes"), textOf(detached))
+    check(
+      "detached carries the live snapshot",
+      detached.details.snapshot.status === "running",
+      detached.details.snapshot.status,
+    )
+    check(
+      "detached names the wake contract",
+      textOf(detached).includes("woken as each node completes"),
+      textOf(detached),
+    )
   }
   check("default wait registers no waiter", surface.waiterCount(RUN_ID) === 0, surface.waiterCount(RUN_ID))
 
@@ -115,7 +125,11 @@ try {
   })
   await new Promise((resolve) => setTimeout(resolve, 300))
   check("detach=false blocks while the run is live", settledEarly === false, settledEarly)
-  check("the blocking wait registered exactly one waiter", surface.waiterCount(RUN_ID) === 1, surface.waiterCount(RUN_ID))
+  check(
+    "the blocking wait registered exactly one waiter",
+    surface.waiterCount(RUN_ID) === 1,
+    surface.waiterCount(RUN_ID),
+  )
   // Settle through the REAL journal append path: the scheduler's own reducer transitions the
   // checkpoint, the WAL is written, and publishCommit notifies the wait surface's durable channel.
   const seeded = store.readCheckpoint<DagRunRecordV1>(RUN_ID)
@@ -128,15 +142,31 @@ try {
   })
   journal.append({
     type: "dag.run.completed",
-    counts: { total: 2, pending: 0, blocked: 0, scheduled: 0, running: 0, completed: 2, failed: 0, cancelled: 0, skipped: 0 },
+    counts: {
+      total: 2,
+      pending: 0,
+      blocked: 0,
+      scheduled: 0,
+      running: 0,
+      completed: 2,
+      failed: 0,
+      cancelled: 0,
+      skipped: 0,
+    },
   })
   const waited = await Promise.race([
     blocked,
-    new Promise<DagToolResult>((_resolve, reject) => setTimeout(() => reject(new Error("blocking wait did not settle within 2s")), 2000)),
+    new Promise<DagToolResult>((_resolve, reject) =>
+      setTimeout(() => reject(new Error("blocking wait did not settle within 2s")), 2000),
+    ),
   ])
   check("the durable journal settles the blocking wait", waited.details.kind === "waited", waited.details.kind)
   if (waited.details.kind === "waited") {
-    check("the settled wait reports completed", waited.details.result.status === "completed", waited.details.result.status)
+    check(
+      "the settled wait reports completed",
+      waited.details.result.status === "completed",
+      waited.details.result.status,
+    )
   }
   check("a settled run retains no waiter bookkeeping", surface.waiterCount(RUN_ID) === 0, surface.waiterCount(RUN_ID))
 
@@ -146,9 +176,9 @@ try {
 
   // Case D: the real wake path - production coordinator flush window, real createDagWake.
   const deliveries: Array<{ readonly customType: unknown; readonly content: string; readonly deliverAs: string }> = []
-  const coordinator = new IdleInjectionCoordinator(
-    (message, options) => { deliveries.push({ customType: message.customType, content: message.content, deliverAs: options.deliverAs }) },
-  )
+  const coordinator = new IdleInjectionCoordinator((message, options) => {
+    deliveries.push({ customType: message.customType, content: message.content, deliverAs: options.deliverAs })
+  })
   const wake = createDagWake({ coordinator, parentState: () => ({ kind: "idle" }) })
   wake.onRunEvent(
     { runId: RUN_ID, name: RUN_NAME, parentSessionId: PARENT_SESSION },
@@ -156,15 +186,33 @@ try {
       runId: RUN_ID,
       seq: 1,
       type: "dag.run.completed",
-      counts: { total: 2, pending: 0, blocked: 0, scheduled: 0, running: 0, completed: 2, failed: 0, cancelled: 0, skipped: 0 },
+      counts: {
+        total: 2,
+        pending: 0,
+        blocked: 0,
+        scheduled: 0,
+        running: 0,
+        completed: 2,
+        failed: 0,
+        cancelled: 0,
+        skipped: 0,
+      },
     },
   )
   await new Promise((resolve) => setTimeout(resolve, 700))
   report.wake_delivery = deliveries[0]
   check("the terminal wake is delivered through the real coordinator", deliveries.length === 1, deliveries.length)
   check("the wake rides a steer", deliveries[0]?.deliverAs === "steer", deliveries[0]?.deliverAs)
-  check("the wake names the run and outcome", deliveries[0]?.content.includes(RUN_NAME) === true && deliveries[0]?.content.includes("completed") === true, deliveries[0]?.content)
-  check("the wake carries the verification directive", deliveries[0]?.content.includes("TREAT AS FALSE UNTIL YOU PROVE IT") === true, deliveries[0]?.content)
+  check(
+    "the wake names the run and outcome",
+    deliveries[0]?.content.includes(RUN_NAME) === true && deliveries[0]?.content.includes("completed") === true,
+    deliveries[0]?.content,
+  )
+  check(
+    "the wake carries the verification directive",
+    deliveries[0]?.content.includes("TREAT AS FALSE UNTIL YOU PROVE IT") === true,
+    deliveries[0]?.content,
+  )
 
   report.state_dir = store.stateDir
   report.failures = failures

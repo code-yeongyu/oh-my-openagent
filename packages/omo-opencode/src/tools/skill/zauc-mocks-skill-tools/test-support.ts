@@ -42,7 +42,9 @@ beforeEach(() => {
   clearRequireCache("../skill-body")
   clearRequireCache("../../../features/opencode-skill-loader/skill-content")
   clearRequireCache("../../../../../skills-loader-core/src/features/opencode-skill-loader/skill-content")
-  clearRequireCache("../../../../../skills-loader-core/src/features/opencode-skill-loader/loaded-skill-template-extractor")
+  clearRequireCache(
+    "../../../../../skills-loader-core/src/features/opencode-skill-loader/loaded-skill-template-extractor",
+  )
   clearRequireCache("../../slashcommand/command-discovery")
 
   mock.module("node:fs", () => ({
@@ -65,9 +67,7 @@ afterAll(() => {
   mock.restore()
 })
 
-export function createSkillTool(
-  options: TestSkillLoadOptions = {},
-): ReturnType<SkillToolFactory> {
+export function createSkillTool(options: TestSkillLoadOptions = {}): ReturnType<SkillToolFactory> {
   if (!createSkillToolFactory) {
     throw new Error("createSkillTool test factory was not initialized")
   }
@@ -91,10 +91,7 @@ export function createMockSkill(
   }
 }
 
-export function createMockSkillWithMcp(
-  name: string,
-  mcpServers: Record<string, unknown>,
-): LoadedSkill {
+export function createMockSkillWithMcp(name: string, mcpServers: Record<string, unknown>): LoadedSkill {
   return {
     name,
     resolvedPath: `/test/skills/${name}`,

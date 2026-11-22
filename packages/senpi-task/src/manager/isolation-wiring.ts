@@ -103,7 +103,8 @@ export function createIsolationWiring(ports: IsolationWiringPorts): IsolationWir
         ...(binding === undefined ? {} : { baseline: binding.baseline, handle: binding.handle }),
       })
       ports.store.mutate(taskId, (fresh) =>
-        fresh.isolation === undefined ? fresh : { ...fresh, isolation: { ...fresh.isolation, merge_result } })
+        fresh.isolation === undefined ? fresh : { ...fresh, isolation: { ...fresh.isolation, merge_result } },
+      )
     },
   }
 }

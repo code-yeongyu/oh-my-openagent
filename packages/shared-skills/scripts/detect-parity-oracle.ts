@@ -9,14 +9,22 @@ import { existsSync, readdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 
-export type OracleElement = { readonly selector: string; readonly id: string | null; readonly page: boolean; readonly types: readonly string[] }
-export type OracleFixture = { readonly counts: Readonly<Record<string, number>>; readonly elements: readonly OracleElement[] }
+export type OracleElement = {
+  readonly selector: string
+  readonly id: string | null
+  readonly page: boolean
+  readonly types: readonly string[]
+}
+export type OracleFixture = {
+  readonly counts: Readonly<Record<string, number>>
+  readonly elements: readonly OracleElement[]
+}
 
 const args = process.argv.slice(2)
 const [root, out] = args
 if (!root || !out || !existsSync(join(root, "crates/live/assets/detect-antipatterns-browser.js"))) {
-	process.stderr.write("usage: detect-parity-oracle.ts <impeccable-checkout> <out.json> [--jobs N]\n")
-	process.exit(2)
+  process.stderr.write("usage: detect-parity-oracle.ts <impeccable-checkout> <out.json> [--jobs N]\n")
+  process.exit(2)
 }
 const jobsAt = args.indexOf("--jobs")
 const jobs = jobsAt === -1 ? 6 : Math.max(1, Number(args[jobsAt + 1]) || 6)
@@ -41,32 +49,34 @@ const DETECT = `window.impeccableDetectAsync({ visualContrast: false }).then((fo
 const isElements = (v: unknown): v is OracleElement[] => Array.isArray(v)
 
 async function record(fixture: string): Promise<OracleFixture> {
-	const view = new Bun.WebView({ width: 1280, height: 800, backend: "chrome" })
-	try {
-		await view.navigate(pathToFileURL(join(fixturesDir, fixture)).href)
-		await view.evaluate("document.fonts ? document.fonts.ready.then(() => true) : true")
-		if ((await view.evaluate(LOAD)) !== true) throw new Error(`could not load the upstream bundle into ${fixture}`)
-		const raw: unknown = await view.evaluate(DETECT)
-		const elements: unknown = typeof raw === "string" ? JSON.parse(raw) : null
-		if (!isElements(elements)) throw new Error(`upstream detector returned no list for ${fixture}`)
-		const counts: Record<string, number> = {}
-		for (const e of elements) for (const t of e.types) counts[t] = (counts[t] ?? 0) + 1
-		return { counts, elements }
-	} finally {
-		await view.close()
-	}
+  const view = new Bun.WebView({ width: 1280, height: 800, backend: "chrome" })
+  try {
+    await view.navigate(pathToFileURL(join(fixturesDir, fixture)).href)
+    await view.evaluate("document.fonts ? document.fonts.ready.then(() => true) : true")
+    if ((await view.evaluate(LOAD)) !== true) throw new Error(`could not load the upstream bundle into ${fixture}`)
+    const raw: unknown = await view.evaluate(DETECT)
+    const elements: unknown = typeof raw === "string" ? JSON.parse(raw) : null
+    if (!isElements(elements)) throw new Error(`upstream detector returned no list for ${fixture}`)
+    const counts: Record<string, number> = {}
+    for (const e of elements) for (const t of e.types) counts[t] = (counts[t] ?? 0) + 1
+    return { counts, elements }
+  } finally {
+    await view.close()
+  }
 }
 
-const fixtures = readdirSync(fixturesDir).filter((f) => f.endsWith(".html")).sort()
+const fixtures = readdirSync(fixturesDir)
+  .filter((f) => f.endsWith(".html"))
+  .sort()
 const result: Record<string, OracleFixture> = {}
 let next = 0
 await Promise.all(
-	Array.from({ length: jobs }, async () => {
-		for (let i = next++; i < fixtures.length; i = next++) {
-			const fixture = fixtures[i]
-			if (fixture) result[fixture] = await record(fixture)
-		}
-	}),
+  Array.from({ length: jobs }, async () => {
+    for (let i = next++; i < fixtures.length; i = next++) {
+      const fixture = fixtures[i]
+      if (fixture) result[fixture] = await record(fixture)
+    }
+  }),
 )
 writeFileSync(out, JSON.stringify(result, null, 1))
 process.stdout.write(`recorded ${Object.keys(result).length} fixtures -> ${out}\n`)

@@ -85,7 +85,7 @@ fn a_remote_window_takes_no_insertion_even_into_a_text_field() {
     let mut harness = harness(&remote("hidReports"));
     let reference = element_ref(&mut harness, "textarea");
     let reply = harness.process(Op::AxTypeText(AxTypeTextParams { ref_: reference.clone(), text: "hello".to_owned(), opts: None }));
-    assert_eq!(reply.expect("typed"), Response::AxInput(AxInputResult { method: AxInputMethod::Keys }));
+    assert_eq!(reply.expect("typed"), Response::AxInput(AxInputResult { method: AxInputMethod::Keys, report: None }));
     // Still mapped in full before any key.
     let refused = harness.process(Op::AxTypeText(AxTypeTextParams { ref_: reference, text: "h😀".to_owned(), opts: None })).unwrap_err();
     assert_eq!(refused.code, ErrorCode::InvalidKey);

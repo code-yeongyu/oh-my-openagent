@@ -2,7 +2,13 @@ import { existsSync } from "../fs/resilient"
 import { mkdir, readdir, readFile, rename, rm, stat, unlink, writeFile } from "../fs/resilient"
 import { dirname, join, relative } from "node:path"
 import type { GitCommitAuthor, GitMemoryRepo } from "../git"
-import { isMissingDescriptionError, isMissingFrontmatterError, parseMemoryFile, renderMemoryFile, type ParsedMemoryFile } from "../memfs/frontmatter"
+import {
+  isMissingDescriptionError,
+  isMissingFrontmatterError,
+  parseMemoryFile,
+  renderMemoryFile,
+  type ParsedMemoryFile,
+} from "../memfs/frontmatter"
 import { describeDescriptionViolation } from "../memfs/frontmatter-validation"
 import { validateMemoryPath, validateRepositoryPath } from "../memfs/paths"
 import { MemoryPatchHunkError, MemoryPatchParseError, applyMemoryPatch } from "./patch-apply"
@@ -13,13 +19,7 @@ import { describeRepairs, repairLeakedArguments } from "./leaked-arguments"
 import { MemoryToolError } from "./tool-errors"
 
 export type MemoryCommand =
-  | "create"
-  | "str_replace"
-  | "insert"
-  | "delete"
-  | "rename"
-  | "update_description"
-  | "apply_patch"
+  "create" | "str_replace" | "insert" | "delete" | "rename" | "update_description" | "apply_patch"
 
 export interface MemoryToolProvenance {
   readonly sessionId: string
@@ -97,12 +97,18 @@ export async function runMemoryTool(options: RunMemoryToolOptions): Promise<Memo
 
 async function applyCommand(root: string, params: MemoryToolParams): Promise<AppliedCommand> {
   switch (params.command) {
-    case "create": return create(root, params)
-    case "str_replace": return strReplace(root, params)
-    case "insert": return insert(root, params)
-    case "delete": return remove(root, params)
-    case "rename": return move(root, params)
-    case "update_description": return updateDescription(root, params)
+    case "create":
+      return create(root, params)
+    case "str_replace":
+      return strReplace(root, params)
+    case "insert":
+      return insert(root, params)
+    case "delete":
+      return remove(root, params)
+    case "rename":
+      return move(root, params)
+    case "update_description":
+      return updateDescription(root, params)
     case "apply_patch": {
       const input = required(params.input, "input", "apply_patch")
       return applyMemoryPatch(root, input, params.provenance?.claim)
@@ -116,7 +122,14 @@ async function create(root: string, params: MemoryToolParams): Promise<AppliedCo
   const path = validateMemoryPath(root, source, { fieldName: "file_path" })
   if (existsSync(path)) throw toolError(`create: block already exists at ${source}`)
   await mkdir(dirname(path), { recursive: true })
-  await writeFile(path, renderMemoryFile(stampReceipt(undefined, { description }, params.file_text ?? "", params.provenance?.claim), params.file_text ?? ""), "utf8")
+  await writeFile(
+    path,
+    renderMemoryFile(
+      stampReceipt(undefined, { description }, params.file_text ?? "", params.provenance?.claim),
+      params.file_text ?? "",
+    ),
+    "utf8",
+  )
   return affected(root, path)
 }
 
@@ -129,7 +142,11 @@ async function strReplace(root: string, params: MemoryToolParams): Promise<Appli
   const index = file.body.indexOf(oldString)
   if (index < 0) throw toolError("str_replace: old_string was not found in the target memory block")
   const body = file.body.slice(0, index) + newString + file.body.slice(index + oldString.length)
-  await writeFile(path, renderMemoryFile(stampReceipt(file, file.frontmatter, body, params.provenance?.claim), body), "utf8")
+  await writeFile(
+    path,
+    renderMemoryFile(stampReceipt(file, file.frontmatter, body, params.provenance?.claim), body),
+    "utf8",
+  )
   return affected(root, path, file)
 }
 
@@ -144,7 +161,14 @@ async function insert(root: string, params: MemoryToolParams): Promise<AppliedCo
   const lines = file.body.length > 0 ? file.body.split("\n") : []
   const line = Math.max(1, Math.floor(params.insert_line))
   lines.splice(Math.min(line - 1, lines.length), 0, ...text.split("\n"))
-  await writeFile(path, renderMemoryFile(stampReceipt(file, file.frontmatter, lines.join("\n"), params.provenance?.claim), lines.join("\n")), "utf8")
+  await writeFile(
+    path,
+    renderMemoryFile(
+      stampReceipt(file, file.frontmatter, lines.join("\n"), params.provenance?.claim),
+      lines.join("\n"),
+    ),
+    "utf8",
+  )
   return affected(root, path, file)
 }
 
@@ -172,8 +196,16 @@ async function move(root: string, params: MemoryToolParams): Promise<AppliedComm
   const loaded = await loadEditable(oldPath, oldSource)
   await mkdir(dirname(newPath), { recursive: true })
   await rename(oldPath, newPath)
-  if (isLegacyUserHeader(readHeader(loaded.frontmatter))) await writeFile(newPath, renderMemoryFile(stampReceipt(loaded, loaded.frontmatter, loaded.body, undefined), loaded.body), "utf8")
-  return { affectedPaths: [relativePath(root, oldPath), relativePath(root, newPath)], ...(isLegacyUserHeader(readHeader(loaded.frontmatter)) ? { strippedPaths: [relativePath(root, oldPath)] } : {}) }
+  if (isLegacyUserHeader(readHeader(loaded.frontmatter)))
+    await writeFile(
+      newPath,
+      renderMemoryFile(stampReceipt(loaded, loaded.frontmatter, loaded.body, undefined), loaded.body),
+      "utf8",
+    )
+  return {
+    affectedPaths: [relativePath(root, oldPath), relativePath(root, newPath)],
+    ...(isLegacyUserHeader(readHeader(loaded.frontmatter)) ? { strippedPaths: [relativePath(root, oldPath)] } : {}),
+  }
 }
 
 async function updateDescription(root: string, params: MemoryToolParams): Promise<AppliedCommand> {
@@ -211,13 +243,24 @@ async function updateDescription(root: string, params: MemoryToolParams): Promis
   if (parsed === undefined) {
     // A frontmatter-less note has no read_only key to protect, and the whole file is the body:
     // this is the one edit allowed to add the missing block, rendered like a create.
-    await writeFile(path, renderMemoryFile(stampReceipt(undefined, { description }, content, params.provenance?.claim), content), "utf8")
+    await writeFile(
+      path,
+      renderMemoryFile(stampReceipt(undefined, { description }, content, params.provenance?.claim), content),
+      "utf8",
+    )
     return affected(root, path)
   }
   if (parsed.frontmatter.read_only === "true") {
     throw toolError(`${source} is read_only and cannot be modified`)
   }
-  await writeFile(path, renderMemoryFile(stampReceipt(parsed, { ...parsed.frontmatter, description }, parsed.body, params.provenance?.claim), parsed.body), "utf8")
+  await writeFile(
+    path,
+    renderMemoryFile(
+      stampReceipt(parsed, { ...parsed.frontmatter, description }, parsed.body, params.provenance?.claim),
+      parsed.body,
+    ),
+    "utf8",
+  )
   return affected(root, path, parsed)
 }
 
@@ -235,7 +278,9 @@ async function loadEditable(path: string, source: string): Promise<ParsedMemoryF
     parsed = parseMemoryFile(content)
   } catch (error) {
     if (isMissingFrontmatterError(error)) {
-      throw toolError("frontmatter: target file is missing required frontmatter; add frontmatter with update_description")
+      throw toolError(
+        "frontmatter: target file is missing required frontmatter; add frontmatter with update_description",
+      )
     }
     throw error
   }
@@ -274,7 +319,7 @@ async function collectFiles(directory: string, root: string): Promise<string[]> 
   const paths: string[] = []
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const path = join(directory, entry.name)
-    if (entry.isDirectory()) paths.push(...await collectFiles(path, root))
+    if (entry.isDirectory()) paths.push(...(await collectFiles(path, root)))
     else if (entry.isFile()) paths.push(relativePath(root, path))
   }
   return paths
@@ -283,7 +328,9 @@ async function collectFiles(directory: string, root: string): Promise<string[]> 
 // `prior` is the note before an edit; every edit drops a legacy user header (stampReceipt), so it is reported here.
 function affected(root: string, path: string, prior?: ParsedMemoryFile): AppliedCommand {
   const relative = relativePath(root, path)
-  return isLegacyUserHeader(prior === undefined ? undefined : readHeader(prior.frontmatter)) ? { affectedPaths: [relative], strippedPaths: [relative] } : { affectedPaths: [relative] }
+  return isLegacyUserHeader(prior === undefined ? undefined : readHeader(prior.frontmatter))
+    ? { affectedPaths: [relative], strippedPaths: [relative] }
+    : { affectedPaths: [relative] }
 }
 
 function relativePath(root: string, path: string): string {

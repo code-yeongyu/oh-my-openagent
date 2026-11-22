@@ -5,10 +5,7 @@ export const FALLBACK_AGENT = "general"
 
 export function isAgentNotFoundError(error: unknown): boolean {
   const message = getErrorMessage(error)
-  return (
-    message.includes("Agent not found") ||
-    message.includes("agent.name")
-  )
+  return message.includes("Agent not found") || message.includes("agent.name")
 }
 
 function getErrorMessage(error: unknown): string {

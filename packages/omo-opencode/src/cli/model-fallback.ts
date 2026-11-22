@@ -1,7 +1,4 @@
-import {
-  CLI_AGENT_MODEL_REQUIREMENTS,
-  CLI_CATEGORY_MODEL_REQUIREMENTS,
-} from "./model-fallback-requirements"
+import { CLI_AGENT_MODEL_REQUIREMENTS, CLI_CATEGORY_MODEL_REQUIREMENTS } from "./model-fallback-requirements"
 import type { FallbackModelObject } from "../config/schema/fallback-models"
 import type { FallbackEntry } from "../shared/model-requirements"
 import { getModelCapabilities, resolveCompatibleModelSettings } from "@oh-my-opencode/model-core"
@@ -11,11 +8,11 @@ import type { AgentConfig, CategoryConfig, GeneratedOmoConfig } from "./model-fa
 import { applyOpenAiOnlyModelCatalog, isOpenAiOnlyAvailability } from "./openai-only-model-catalog"
 import { isProviderAvailable, toProviderAvailability } from "./provider-availability"
 import {
-	getSisyphusFallbackChain,
-	isAnyFallbackEntryAvailable,
-	isRequiredModelAvailable,
-	isRequiredProviderAvailable,
-	resolveModelFromChain,
+  getSisyphusFallbackChain,
+  isAnyFallbackEntryAvailable,
+  isRequiredModelAvailable,
+  isRequiredProviderAvailable,
+  resolveModelFromChain,
 } from "./fallback-chain-resolution"
 import { transformModelForProvider } from "./provider-model-id-transform"
 import { isExcludedFallbackLaneModel } from "./fallback-lane-policy"
@@ -56,11 +53,15 @@ function resolveCompatibleFallbackSettings(
 
   return {
     ...(compatibility.variant ? { variant: compatibility.variant } : {}),
-    ...(compatibility.reasoningEffort ? { reasoningEffort: compatibility.reasoningEffort as FallbackModelObject["reasoningEffort"] } : {}),
+    ...(compatibility.reasoningEffort
+      ? { reasoningEffort: compatibility.reasoningEffort as FallbackModelObject["reasoningEffort"] }
+      : {}),
     ...(compatibility.temperature !== undefined ? { temperature: compatibility.temperature } : {}),
     ...(compatibility.topP !== undefined ? { top_p: compatibility.topP } : {}),
     ...(compatibility.maxTokens !== undefined ? { maxTokens: compatibility.maxTokens } : {}),
-    ...(compatibility.thinking !== undefined ? { thinking: compatibility.thinking as FallbackModelObject["thinking"] } : {}),
+    ...(compatibility.thinking !== undefined
+      ? { thinking: compatibility.thinking as FallbackModelObject["thinking"] }
+      : {}),
   }
 }
 
@@ -100,13 +101,12 @@ function collectAvailableFallbacks(
   const expandedFallbacks = fallbackChain.flatMap((entry) =>
     entry.providers
       .filter((provider: string) => isProviderAvailable(provider, availability))
-      .map((provider: string) => toFallbackModelObject(entry, provider))
+      .map((provider: string) => toFallbackModelObject(entry, provider)),
   )
-  return expandedFallbacks.filter((entry, index, allEntries) =>
-    allEntries.findIndex((candidate) =>
-      candidate.model === entry.model &&
-      candidate.variant === entry.variant
-    ) === index
+  return expandedFallbacks.filter(
+    (entry, index, allEntries) =>
+      allEntries.findIndex((candidate) => candidate.model === entry.model && candidate.variant === entry.variant) ===
+      index,
   )
 }
 
@@ -121,7 +121,8 @@ function attachFallbackModels<T extends AgentConfig | CategoryConfig>(
     return config
   }
 
-  const fallbackModels = uniqueFallbacks.slice(primaryIndex + 1)
+  const fallbackModels = uniqueFallbacks
+    .slice(primaryIndex + 1)
     .filter((entry) => !isExcludedFallbackLaneModel(entry.model))
   if (fallbackModels.length === 0) {
     return config
@@ -152,8 +153,6 @@ function attachAllFallbackModels<T extends AgentConfig | CategoryConfig>(
   }
 }
 
-
-
 export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
   const avail = toProviderAvailability(config)
   const hasAnyProvider =
@@ -175,12 +174,12 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
       agents: Object.fromEntries(
         Object.entries(CLI_AGENT_MODEL_REQUIREMENTS)
           .filter(([role, req]) => !(role === "sisyphus" && req.requiresAnyModel))
-          .map(([role]) => [role, { model: ULTIMATE_FALLBACK }])
+          .map(([role]) => [role, { model: ULTIMATE_FALLBACK }]),
       ),
       categories: Object.fromEntries(
         Object.entries(CLI_CATEGORY_MODEL_REQUIREMENTS)
           .filter(([, req]) => !req.requiresAnyModel)
-          .map(([cat]) => [cat, { model: ULTIMATE_FALLBACK }])
+          .map(([cat]) => [cat, { model: ULTIMATE_FALLBACK }]),
       ),
     }
   }
@@ -287,9 +286,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     categories,
   }
 
-  return isOpenAiOnlyAvailability(avail)
-    ? applyOpenAiOnlyModelCatalog(generatedConfig)
-    : generatedConfig
+  return isOpenAiOnlyAvailability(avail) ? applyOpenAiOnlyModelCatalog(generatedConfig) : generatedConfig
 }
 
 export function shouldShowChatGPTOnlyWarning(config: InstallConfig): boolean {

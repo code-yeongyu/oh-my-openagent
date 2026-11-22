@@ -30,17 +30,13 @@ export async function resolveSession(options: {
     const res = await client.session.create({
       body: {
         title: `${PUBLISHED_PACKAGE_NAME} run`,
-        permission: [
-          { permission: "question", action: "deny" as const, pattern: "*" },
-        ],
+        permission: [{ permission: "question", action: "deny" as const, pattern: "*" }],
       } as Record<string, unknown>,
       query: { directory },
     })
 
     if (res.error) {
-      console.error(
-        pc.yellow(`Session create attempt ${attempt}/${SESSION_CREATE_MAX_RETRIES} failed:`)
-      )
+      console.error(pc.yellow(`Session create attempt ${attempt}/${SESSION_CREATE_MAX_RETRIES} failed:`))
       console.error(pc.dim(`  Error: ${serializeError(res.error)}`))
 
       if (attempt < SESSION_CREATE_MAX_RETRIES) {
@@ -55,11 +51,7 @@ export async function resolveSession(options: {
       return res.data.id
     }
 
-    console.error(
-      pc.yellow(
-        `Session create attempt ${attempt}/${SESSION_CREATE_MAX_RETRIES}: No session ID returned`
-      )
-    )
+    console.error(pc.yellow(`Session create attempt ${attempt}/${SESSION_CREATE_MAX_RETRIES}: No session ID returned`))
 
     if (attempt < SESSION_CREATE_MAX_RETRIES) {
       const delay = retryDelayMs * attempt

@@ -18,10 +18,7 @@ type ToolContextWithMetadata = {
   callID?: string
 }
 
-export function createBackgroundTask(
-  manager: BackgroundManager,
-  client: PluginInput["client"]
-): ToolDefinition {
+export function createBackgroundTask(manager: BackgroundManager, client: PluginInput["client"]): ToolDefinition {
   return tool({
     description: BACKGROUND_TASK_DESCRIPTION,
     args: {
@@ -38,11 +35,7 @@ export function createBackgroundTask(
 
       try {
         const messageDir = getMessageDir(ctx.sessionID)
-        const { prevMessage, firstMessageAgent } = await resolveMessageContext(
-          ctx.sessionID,
-          client,
-          messageDir
-        )
+        const { prevMessage, firstMessageAgent } = await resolveMessageContext(ctx.sessionID, client, messageDir)
 
         const sessionAgent = getSessionAgent(ctx.sessionID)
         const parentAgent = ctx.agent ?? sessionAgent ?? firstMessageAgent ?? prevMessage?.agent

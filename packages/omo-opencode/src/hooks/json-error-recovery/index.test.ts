@@ -11,9 +11,7 @@ import {
 describe("createJsonErrorRecoveryHook", () => {
   let hook: ReturnType<typeof createJsonErrorRecoveryHook>
 
-  type ToolExecuteAfterHandler = NonNullable<
-    ReturnType<typeof createJsonErrorRecoveryHook>["tool.execute.after"]
-  >
+  type ToolExecuteAfterHandler = NonNullable<ReturnType<typeof createJsonErrorRecoveryHook>["tool.execute.after"]>
   type ToolExecuteAfterInput = Parameters<ToolExecuteAfterHandler>[0]
   type ToolExecuteAfterOutput = Parameters<ToolExecuteAfterHandler>[1]
 
@@ -41,7 +39,9 @@ describe("createJsonErrorRecoveryHook", () => {
       metadata: {},
     })
 
-    const createUnknownOutput = (value: unknown): { title: string; output: unknown; metadata: Record<string, unknown> } => ({
+    const createUnknownOutput = (
+      value: unknown,
+    ): { title: string; output: unknown; metadata: Record<string, unknown> } => ({
       title: "Tool Error",
       output: value,
       metadata: {},
@@ -132,7 +132,8 @@ describe("createJsonErrorRecoveryHook", () => {
         "skill",
         "skill_mcp",
       ]
-      const proseMentioningJson = "The oracle re-reviewed. Note: the JSON parse error: unexpected EOF text is spurious content embedded in the returned text, not a real system error."
+      const proseMentioningJson =
+        "The oracle re-reviewed. Note: the JSON parse error: unexpected EOF text is spurious content embedded in the returned text, not a real system error."
 
       for (const tool of subagentTools) {
         const output = createOutput(proseMentioningJson)
@@ -217,7 +218,7 @@ describe("createJsonErrorRecoveryHook", () => {
 
       // when
       const allExpectedToolsIncluded = expectedExcludedTools.every((toolName) =>
-        JSON_ERROR_TOOL_EXCLUDE_LIST.includes(toolName)
+        JSON_ERROR_TOOL_EXCLUDE_LIST.includes(toolName),
       )
 
       // then

@@ -25,7 +25,8 @@ export function fakeModel(turn: FakeTurn, hooks: { readonly onAbort?: (spec: Chi
   const createRunner = (): InProcessRunnerLike => ({
     start: async (spec: ChildSpec): Promise<ChildHandle> => {
       starts.push(spec)
-      const tool = spec.memberScopedTools?.find((candidate) => candidate.name === FACTS_RECORD_TOOL_NAME) as unknown as FactsRecordTool | undefined
+      const tool = spec.memberScopedTools?.find((candidate) => candidate.name === FACTS_RECORD_TOOL_NAME) as unknown as
+        FactsRecordTool | undefined
       if (tool === undefined) throw new Error("the facts child was started without record_fact")
       const record = async (text: string): Promise<boolean> => {
         call += 1
@@ -34,18 +35,23 @@ export function fakeModel(turn: FakeTurn, hooks: { readonly onAbort?: (spec: Chi
       }
       const outcome = await turn({ spec, start: starts.length, record })
       if (outcome === "throw") throw new Error("model provider unavailable")
-      const idle = outcome === "hang"
-        ? new Promise<never>(() => undefined)
-        : Promise.resolve(outcome === "completed"
-          ? { status: "completed" as const, finalResponse: "" }
-          : { status: "error" as const, failure: { kind: "child_failed", message: "503 upstream" } as never })
+      const idle =
+        outcome === "hang"
+          ? new Promise<never>(() => undefined)
+          : Promise.resolve(
+              outcome === "completed"
+                ? { status: "completed" as const, finalResponse: "" }
+                : { status: "error" as const, failure: { kind: "child_failed", message: "503 upstream" } as never },
+            )
       return {
         task_id: spec.taskId,
         sessionId: `session-${spec.taskId}`,
         effectiveModel: () => undefined,
         steer: async () => undefined,
         followUp: async () => undefined,
-        abort: async () => { await hooks.onAbort?.(spec) },
+        abort: async () => {
+          await hooks.onAbort?.(spec)
+        },
         subscribe: () => () => undefined,
         waitForIdle: () => idle,
         lastAssistantText: () => undefined,

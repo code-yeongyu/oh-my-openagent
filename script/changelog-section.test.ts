@@ -9,6 +9,8 @@ describe("current changelog section", () => {
   })
   test("fails closed for malformed markers", () => {
     expect(() => extractCurrentSection("# Changelog")).toThrow()
-    expect(() => extractCurrentSection("<!-- omo:current-releases:start -->\n<!-- omo:current-releases:end -->")).toThrow()
+    expect(() =>
+      extractCurrentSection("<!-- omo:current-releases:start -->\n<!-- omo:current-releases:end -->"),
+    ).toThrow()
   })
 })

@@ -6,13 +6,14 @@ import { createTaskRecordStore } from "../store"
 import { createSteeringEngine } from "./engine"
 import type { ReviveReservation } from "./types"
 import { cleanupRoots, detachedTerminal, fakeHandle, portFor, roots } from "./__fixtures__/residency"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupRoots)
 
 test("#given an already granted revival #when O9 routes a detached terminal through cold revival #then the same reservation is consumed without reacquisition", async () => {
   const root = mkdtempSync(join(tmpdir(), "senpi-granted-cold-revival-"))
   roots.push(root)
-  const store = createTaskRecordStore({ project_dir: root })
+  const store = createTaskRecordStore(ownedTaskState(root))
   const record = detachedTerminal(store)
   const followUps: string[] = []
   const reasons: string[] = []
@@ -26,12 +27,19 @@ test("#given an already granted revival #when O9 routes a detached terminal thro
   }
   const granted: ReviveReservation = {
     ok: true,
-    commit: () => { commits += 1 },
-    release: () => { releases += 1 },
+    commit: () => {
+      commits += 1
+    },
+    release: () => {
+      releases += 1
+    },
   }
   const engine = createSteeringEngine({ ...port, reserveForRevive: reserve, reserveForDetachedRevive: reserve })
 
-  const result = await engine.sendToTask({ idOrName: record.task_id, callerSessionId: "parent", message: "next turn" }, granted)
+  const result = await engine.sendToTask(
+    { idOrName: record.task_id, callerSessionId: "parent", message: "next turn" },
+    granted,
+  )
 
   expect(result.kind).toBe("revived")
   expect(acquisitions).toBe(0)

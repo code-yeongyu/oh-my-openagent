@@ -36,7 +36,11 @@ export type CreateEventTelemetryClientInput = {
 
 export type EventTelemetryClient = {
   readonly enabled: boolean
-  readonly captureEvent: (name: string, properties: EventTelemetryProperties, options?: EventTelemetryCaptureOptions) => void
+  readonly captureEvent: (
+    name: string,
+    properties: EventTelemetryProperties,
+    options?: EventTelemetryCaptureOptions,
+  ) => void
   readonly flush: () => Promise<void>
   readonly shutdown: () => Promise<void>
 }
@@ -52,12 +56,7 @@ const EVENT_TRANSPORT_OVERRIDES = {
   flushInterval: 10_000,
 } as const
 const SHUTDOWN_TIMEOUT_MS = 1_000
-const ALLOWED_DOLLAR_KEYS = new Set([
-  "$os",
-  "$os_version",
-  "$process_person_profile",
-  "$session_id",
-])
+const ALLOWED_DOLLAR_KEYS = new Set(["$os", "$os_version", "$process_person_profile", "$session_id"])
 const FORBIDDEN_SUFFIX = /_(?:text|path|prompt)$/
 const EVENT_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
@@ -68,9 +67,7 @@ const NO_OP_EVENT_CLIENT: EventTelemetryClient = {
   shutdown: async () => undefined,
 }
 
-export function createEventTelemetryClient(
-  input: CreateEventTelemetryClientInput,
-): EventTelemetryClient {
+export function createEventTelemetryClient(input: CreateEventTelemetryClientInput): EventTelemetryClient {
   if (!isTelemetryClientEnabled(input)) {
     return NO_OP_EVENT_CLIENT
   }
@@ -80,9 +77,7 @@ export function createEventTelemetryClient(
     return NO_OP_EVENT_CLIENT
   }
 
-  const allowlists = new Map(
-    Object.entries(input.propertyAllowlist).map(([name, keys]) => [name, new Set(keys)]),
-  )
+  const allowlists = new Map(Object.entries(input.propertyAllowlist).map(([name, keys]) => [name, new Set(keys)]))
   const sharedProperties = {
     // Spread first: a product may extend the shared block (omo-native attribution rides here),
     // but it can never override the fixed identity keys below.
@@ -220,9 +215,7 @@ function isForbiddenKey(key: string, value: unknown): boolean {
 
 function isEventPropertyValue(value: unknown): value is string | number | boolean {
   return (
-    typeof value === "string" ||
-    typeof value === "boolean" ||
-    (typeof value === "number" && Number.isFinite(value))
+    typeof value === "string" || typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value))
   )
 }
 

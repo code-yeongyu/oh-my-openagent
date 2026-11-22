@@ -42,9 +42,13 @@ export function createTaskStoreChain(deps: TaskStoreChainDeps): TaskStoreChain {
   })
   const stamping = createConfigGenerationStampingStore(observing, () => deps.generations.current()?.generation)
   const listeners = new Set<(change: StoreMutation) => void>()
-  const store = createMutationNotifyingStore(stamping, (change) => {
-    for (const listener of listeners) listener(change)
-  }, deps.terminal.observers)
+  const store = createMutationNotifyingStore(
+    stamping,
+    (change) => {
+      for (const listener of listeners) listener(change)
+    },
+    deps.terminal.observers,
+  )
   return {
     store,
     onMutation: (listener) => {

@@ -9,7 +9,13 @@ import { CLAIM_RECEIPT_NUDGE_FLAG, type ClaimReceiptComponentOptions, createClai
 import { createClaimReceiptRuntimeLoader } from "./runtime-loader"
 import { NUDGE_MESSAGE_TYPE, VERDICT_ENTRY_TYPE } from "./verdict"
 
-type Draft = { readonly type: string; readonly customType: string; readonly data?: unknown; readonly content?: unknown; readonly display?: boolean }
+type Draft = {
+  readonly type: string
+  readonly customType: string
+  readonly data?: unknown
+  readonly content?: unknown
+  readonly display?: boolean
+}
 
 function setup(env: Record<string, string> = {}, nudge = true, options: ClaimReceiptComponentOptions = {}) {
   const pi = new FakeExtensionAPI()
@@ -24,8 +30,21 @@ function setup(env: Record<string, string> = {}, nudge = true, options: ClaimRec
   const eventCtx = { sessionManager: { getSessionId: () => "s1", getBranch: () => branch } }
   const finish = async (entries: FixtureEntry[], agentEnd: Record<string, unknown> = {}) => {
     branch = entries
-    await pi.dispatch("agent_end", { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop", content: [] }], ...agentEnd }, eventCtx)
-    const [result] = await pi.dispatch("agent_before_settle", { type: "agent_before_settle", outcome: "completed", entries: [{ type: "custom", customType: "other" }], continue: false }, eventCtx)
+    await pi.dispatch(
+      "agent_end",
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop", content: [] }], ...agentEnd },
+      eventCtx,
+    )
+    const [result] = await pi.dispatch(
+      "agent_before_settle",
+      {
+        type: "agent_before_settle",
+        outcome: "completed",
+        entries: [{ type: "custom", customType: "other" }],
+        continue: false,
+      },
+      eventCtx,
+    )
     return result as { entries?: Draft[]; continue?: boolean } | undefined
   }
   const input = (source: string) => pi.dispatch("input", { type: "input", text: "go", source }, eventCtx)
@@ -48,7 +67,11 @@ describe("claim-receipt component", () => {
         ["custom_message", NUDGE_MESSAGE_TYPE],
       ])
       expect(result?.entries?.[2]?.display).toBe(true)
-      expect(result?.entries?.[1]?.data).toMatchObject({ flagged: true, nudged: true, verdicts: [{ status: "unsupported", reason: "no-check" }] })
+      expect(result?.entries?.[1]?.data).toMatchObject({
+        flagged: true,
+        nudged: true,
+        verdicts: [{ status: "unsupported", reason: "no-check" }],
+      })
       expect(pi.messages).toEqual([])
     })
   })
@@ -58,7 +81,10 @@ describe("claim-receipt component", () => {
       const { finish, input } = setup()
       await input("interactive")
       expect((await finish(unsupported()))?.entries).toHaveLength(3)
-      expect((await finish(unsupported()))?.entries?.map((draft) => draft.customType)).toEqual(["other", VERDICT_ENTRY_TYPE])
+      expect((await finish(unsupported()))?.entries?.map((draft) => draft.customType)).toEqual([
+        "other",
+        VERDICT_ENTRY_TYPE,
+      ])
       await input("extension")
       expect((await finish(unsupported()))?.entries).toHaveLength(2)
       await input("rpc")
@@ -69,7 +95,12 @@ describe("claim-receipt component", () => {
   describe("#given a supported or claim-free answer", () => {
     it("#then records a supported verdict without a nudge, and adds nothing for an answer with no claim", async () => {
       const { finish } = setup()
-      const supported = await finish([userInput("fix"), ...editResult("e1", "src/a.ts"), ...passingTest("t1"), answer("All tests pass.")])
+      const supported = await finish([
+        userInput("fix"),
+        ...editResult("e1", "src/a.ts"),
+        ...passingTest("t1"),
+        answer("All tests pass."),
+      ])
       expect(supported?.entries?.map((draft) => draft.customType)).toEqual(["other", VERDICT_ENTRY_TYPE])
       expect(supported?.entries?.[1]?.data).toMatchObject({ flagged: false, nudged: false })
       expect(await finish([userInput("hi"), answer("Here is the summary you asked for.")])).toBeUndefined()
@@ -89,7 +120,11 @@ describe("claim-receipt component", () => {
       expect(await finish(unsupported())).toBeUndefined()
       expect(warnings).toHaveLength(1)
       expect(warnings[0]).toContain("extensions/omo-claim-receipt.js")
-      expect((await finish(unsupported()))?.entries?.map((draft) => draft.customType)).toEqual(["other", VERDICT_ENTRY_TYPE, NUDGE_MESSAGE_TYPE])
+      expect((await finish(unsupported()))?.entries?.map((draft) => draft.customType)).toEqual([
+        "other",
+        VERDICT_ENTRY_TYPE,
+        NUDGE_MESSAGE_TYPE,
+      ])
       expect(imports).toBe(2)
     })
   })
@@ -141,7 +176,11 @@ describe("claim-receipt component", () => {
       await toolCall(gate)
       expect(gate.input.prompt).toBe("Review it.")
       const current = await finish(unsupported())
-      expect(current?.entries?.map((draft) => draft.customType)).toEqual(["other", VERDICT_ENTRY_TYPE, NUDGE_MESSAGE_TYPE])
+      expect(current?.entries?.map((draft) => draft.customType)).toEqual([
+        "other",
+        VERDICT_ENTRY_TYPE,
+        NUDGE_MESSAGE_TYPE,
+      ])
       expect(current?.entries?.[1]?.data).toMatchObject({ epoch: 2, nudged: true })
     })
   })
@@ -162,7 +201,11 @@ describe("claim-receipt component", () => {
       await input("interactive")
       const result = await finish(unsupported())
       expect(result?.entries?.map((draft) => draft.customType)).toEqual(["other", VERDICT_ENTRY_TYPE])
-      expect(result?.entries?.[1]?.data).toMatchObject({ flagged: true, nudged: false, verdicts: [{ status: "unsupported", reason: "no-check" }] })
+      expect(result?.entries?.[1]?.data).toMatchObject({
+        flagged: true,
+        nudged: false,
+        verdicts: [{ status: "unsupported", reason: "no-check" }],
+      })
       const gate = { toolName: "task", input: { subagent_type: "omo-native-gate-reviewer", prompt: "Review it." } }
       await toolCall(gate)
       expect(gate.input.prompt).toBe("Review it.")
@@ -175,7 +218,13 @@ describe("claim-receipt component", () => {
       await input("interactive")
       await finish(unsupported())
       const gate = { toolName: "task", input: { subagent_type: "omo-native-gate-reviewer", prompt: "Review it." } }
-      const batch = { toolName: "task", input: { subagent_type: "omo-native-gate-reviewer", tasks: [{ prompt: "A" }, { subagent_type: "explore", prompt: "B" }] } }
+      const batch = {
+        toolName: "task",
+        input: {
+          subagent_type: "omo-native-gate-reviewer",
+          tasks: [{ prompt: "A" }, { subagent_type: "explore", prompt: "B" }],
+        },
+      }
       const explore = { toolName: "task", input: { subagent_type: "explore", prompt: "Look." } }
       await toolCall(gate)
       await toolCall(gate)

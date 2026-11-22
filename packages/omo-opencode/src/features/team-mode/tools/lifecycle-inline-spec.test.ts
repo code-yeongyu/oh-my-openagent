@@ -41,7 +41,13 @@ function createRuntimeState(spec: TeamSpec, leadSessionId: string, teamRunId: st
     status: "active",
     leadSessionId,
     shutdownRequests: [],
-    bounds: { maxMembers: 8, maxParallelMembers: 4, maxMessagesPerRun: 10000, maxWallClockMinutes: 120, maxMemberTurns: 500 },
+    bounds: {
+      maxMembers: 8,
+      maxParallelMembers: 4,
+      maxMessagesPerRun: 10000,
+      maxWallClockMinutes: 120,
+      maxMemberTurns: 500,
+    },
     members: spec.members.map((member) => ({
       name: member.name,
       sessionId: member.name === spec.leadAgentId ? undefined : `${member.name}-session`,
@@ -105,37 +111,46 @@ describe("createTeamCreateTool inline_spec normalization", () => {
     createTeamRunMock.mockClear()
   })
 
-  test.each([false, true, undefined])("accepts inline_spec objects and forwards claudeCodeAgentsEnabled=%s", async (claudeCodeAgentsEnabled) => {
-    // given
-    const createTeamCreateTool = await loadCreateTeamCreateTool()
-    const config = createConfig()
-    const teamCreateTool = createTeamCreateToolForTest(createTeamCreateTool, config, { claudeCodeAgentsEnabled })
-    const inlineSpec = {
-      name: "alpha-team",
-      lead: { kind: "subagent_type", subagent_type: "sisyphus" },
-      members: [
-        { kind: "category", category: "quick", prompt: "Quick scout the workspace for entrypoints." },
-        { kind: "subagent_type", subagent_type: "atlas" },
-      ],
-    }
+  test.each([false, true, undefined])(
+    "accepts inline_spec objects and forwards claudeCodeAgentsEnabled=%s",
+    async (claudeCodeAgentsEnabled) => {
+      // given
+      const createTeamCreateTool = await loadCreateTeamCreateTool()
+      const config = createConfig()
+      const teamCreateTool = createTeamCreateToolForTest(createTeamCreateTool, config, { claudeCodeAgentsEnabled })
+      const inlineSpec = {
+        name: "alpha-team",
+        lead: { kind: "subagent_type", subagent_type: "sisyphus" },
+        members: [
+          { kind: "category", category: "quick", prompt: "Quick scout the workspace for entrypoints." },
+          { kind: "subagent_type", subagent_type: "atlas" },
+        ],
+      }
 
-    // when
-    const result = JSON.parse(await teamCreateTool.execute({ inline_spec: inlineSpec }, createToolContext("lead-session")))
-    const firstCall = createTeamRunMock.mock.calls[0]
+      // when
+      const result = JSON.parse(
+        await teamCreateTool.execute({ inline_spec: inlineSpec }, createToolContext("lead-session")),
+      )
+      const firstCall = createTeamRunMock.mock.calls[0]
 
-    // then
-    expect(firstCall?.[0]).toMatchObject({
-      leadAgentId: "lead",
-      members: [
-        { name: "lead", kind: "subagent_type", subagent_type: "sisyphus" },
-        { name: "quick-1", kind: "category", category: "quick" },
-        { name: "atlas-1", kind: "subagent_type", subagent_type: "atlas" },
-      ],
-    })
-    expect(firstCall?.[1]).toBe("lead-session")
-    expect(firstCall?.[2].claudeCodeAgentsEnabled).toBe(claudeCodeAgentsEnabled)
-    expect(result.runtimeState.members.map((member: { name: string }) => member.name)).toEqual(["lead", "quick-1", "atlas-1"])
-  })
+      // then
+      expect(firstCall?.[0]).toMatchObject({
+        leadAgentId: "lead",
+        members: [
+          { name: "lead", kind: "subagent_type", subagent_type: "sisyphus" },
+          { name: "quick-1", kind: "category", category: "quick" },
+          { name: "atlas-1", kind: "subagent_type", subagent_type: "atlas" },
+        ],
+      })
+      expect(firstCall?.[1]).toBe("lead-session")
+      expect(firstCall?.[2].claudeCodeAgentsEnabled).toBe(claudeCodeAgentsEnabled)
+      expect(result.runtimeState.members.map((member: { name: string }) => member.name)).toEqual([
+        "lead",
+        "quick-1",
+        "atlas-1",
+      ])
+    },
+  )
 
   test("exposes inline_spec object shape in the tool schema", async () => {
     // given
@@ -174,10 +189,17 @@ describe("createTeamCreateTool inline_spec normalization", () => {
     })
 
     // when
-    const result = JSON.parse(await teamCreateTool.execute({ inline_spec: inlineSpec }, createToolContext("lead-session")))
+    const result = JSON.parse(
+      await teamCreateTool.execute({ inline_spec: inlineSpec }, createToolContext("lead-session")),
+    )
 
     // then
-    expect(result.runtimeState.members.map((member: { name: string }) => member.name)).toEqual(["lead", "quick-1", "deep-1", "deep-2"])
+    expect(result.runtimeState.members.map((member: { name: string }) => member.name)).toEqual([
+      "lead",
+      "quick-1",
+      "deep-1",
+      "deep-2",
+    ])
     expect(result.runtimeState.teamName).toBe("ccapi-explorers-v2")
   })
 
@@ -220,9 +242,24 @@ describe("createTeamCreateTool inline_spec normalization", () => {
       leadAgentId: "lead",
       members: [
         { name: "lead", kind: "subagent_type" },
-        { name: "structure-analyst", kind: "category", category: "quick", prompt: "Focus on directory layouts, module boundaries, and architectural organization." },
-        { name: "core-logic-analyst", kind: "category", category: "quick", prompt: "Focus on initialization flows, plugin architecture, hooks, tools, and MCP integration." },
-        { name: "quality-analyst", kind: "category", category: "quick", prompt: "Focus on tests, CI/CD, build scripts, conventions, and anti-pattern enforcement." },
+        {
+          name: "structure-analyst",
+          kind: "category",
+          category: "quick",
+          prompt: "Focus on directory layouts, module boundaries, and architectural organization.",
+        },
+        {
+          name: "core-logic-analyst",
+          kind: "category",
+          category: "quick",
+          prompt: "Focus on initialization flows, plugin architecture, hooks, tools, and MCP integration.",
+        },
+        {
+          name: "quality-analyst",
+          kind: "category",
+          category: "quick",
+          prompt: "Focus on tests, CI/CD, build scripts, conventions, and anti-pattern enforcement.",
+        },
       ],
     })
   })
@@ -255,7 +292,10 @@ describe("createTeamCreateTool inline_spec normalization", () => {
     // when
     let errorMessage = ""
     try {
-      await teamCreateTool.execute({ inline_spec: { name: "project-analysis-team" } }, createToolContext("lead-session", "Sisyphus"))
+      await teamCreateTool.execute(
+        { inline_spec: { name: "project-analysis-team" } },
+        createToolContext("lead-session", "Sisyphus"),
+      )
     } catch (error) {
       errorMessage = error instanceof Error ? error.message : String(error)
     }
@@ -273,9 +313,21 @@ describe("createTeamCreateTool inline_spec normalization", () => {
     const inlineSpec = {
       name: "Project Analysis Team",
       members: [
-        { name: "Agent 1: Structure Analyst", category: "quick", prompt: "Analyze project structure and report concrete files." },
-        { name: "Agent 2: Core Logic Analyst", category: "quick", prompt: "Analyze initialization flow and report concrete functions." },
-        { name: "Agent 3: Quality/Process Analyst", category: "quick", prompt: "Analyze tests, builds, CI, and conventions." },
+        {
+          name: "Agent 1: Structure Analyst",
+          category: "quick",
+          prompt: "Analyze project structure and report concrete files.",
+        },
+        {
+          name: "Agent 2: Core Logic Analyst",
+          category: "quick",
+          prompt: "Analyze initialization flow and report concrete functions.",
+        },
+        {
+          name: "Agent 3: Quality/Process Analyst",
+          category: "quick",
+          prompt: "Analyze tests, builds, CI, and conventions.",
+        },
       ],
     }
 
@@ -378,7 +430,13 @@ describe("createTeamCreateTool inline_spec normalization", () => {
       inline_spec: {
         name: "hyperplan-smoke-test",
         members: [
-          { name: "worker", kind: "category", category: "quick", subagent_type: "", prompt: "Temporary smoke test member." },
+          {
+            name: "worker",
+            kind: "category",
+            category: "quick",
+            subagent_type: "",
+            prompt: "Temporary smoke test member.",
+          },
         ],
         lead: { name: "", kind: "", category: "", subagent_type: "", prompt: "" },
         leadAgentId: "",
@@ -445,9 +503,24 @@ describe("createTeamCreateTool inline_spec normalization", () => {
       name: "project-analysis-team",
       members: [
         { name: "lead", kind: "subagent_type" },
-        { name: "agent-1-structure-analyst", kind: "category", category: "analysis", prompt: "Role: Structure Analyst\ndirectory layouts, module boundaries" },
-        { name: "agent-2-core-logic-analyst", kind: "category", category: "quick", prompt: "Role: Core Logic Analyst\nAnalyze initialization flow and plugin architecture." },
-        { name: "agent-3-quality-process-analyst", kind: "category", category: "analysis", prompt: "Role: Quality/Process Analyst\ntests, builds, CI/CD" },
+        {
+          name: "agent-1-structure-analyst",
+          kind: "category",
+          category: "analysis",
+          prompt: "Role: Structure Analyst\ndirectory layouts, module boundaries",
+        },
+        {
+          name: "agent-2-core-logic-analyst",
+          kind: "category",
+          category: "quick",
+          prompt: "Role: Core Logic Analyst\nAnalyze initialization flow and plugin architecture.",
+        },
+        {
+          name: "agent-3-quality-process-analyst",
+          kind: "category",
+          category: "analysis",
+          prompt: "Role: Quality/Process Analyst\ntests, builds, CI/CD",
+        },
       ],
     })
   })
@@ -456,7 +529,10 @@ describe("createTeamCreateTool inline_spec normalization", () => {
 describe("parseTeamCreateArgs empty-string optional handling", () => {
   test("treats empty-string teamName and leadSessionId as absent when inline_spec is provided", () => {
     // given the tool-calling host serializes omitted optionals as empty strings
-    const inlineSpec = { name: "smoke-test-team", members: [{ name: "worker", category: "quick", prompt: "Do the assigned work." }] }
+    const inlineSpec = {
+      name: "smoke-test-team",
+      members: [{ name: "worker", category: "quick", prompt: "Do the assigned work." }],
+    }
     const args = parseTeamCreateArgs({ teamName: "", inline_spec: inlineSpec, leadSessionId: "" })
 
     // then inline_spec is accepted as the single provided option
@@ -498,7 +574,10 @@ describe("parseTeamCreateArgs null-valued optional handling", () => {
 
   test("treats null teamName as absent when inline_spec is provided", () => {
     // given the tool-calling surface serializes the unused optional as null
-    const inlineSpec = { name: "smoke-test-team", members: [{ name: "worker", category: "quick", prompt: "Do the assigned work." }] }
+    const inlineSpec = {
+      name: "smoke-test-team",
+      members: [{ name: "worker", category: "quick", prompt: "Do the assigned work." }],
+    }
     const args = parseTeamCreateArgs({ teamName: null, inline_spec: inlineSpec })
 
     // then inline_spec is accepted as the single provided option

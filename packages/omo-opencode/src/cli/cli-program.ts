@@ -6,6 +6,9 @@ import { getLocalVersion } from "./get-local-version"
 import { doctor, resolveDoctorTarget } from "./doctor"
 import { createMcpOAuthCommand } from "./mcp-oauth"
 import { configureAccountKeysCommands } from "./account-keys/commands"
+import "./service-auth/cli-service-auth-hooks.js"
+import { serviceAccountsOpen } from "./service-auth/accounts-gate"
+import { openCodeServiceAuthHooks } from "./service-auth/cli-service-auth-state"
 import { configureServiceAuthCommands } from "./service-auth/commands"
 import { resolveInstallArgs, type InstallCommandOptions } from "./install-command-options"
 import { configureRuntimeCommands } from "./runtime-commands"
@@ -231,9 +234,11 @@ program
 configureRuntimeCommands(program)
 
 program.addCommand(createMcpOAuthCommand())
-configureServiceAuthCommands(program)
+configureServiceAuthCommands(program, serviceAccountsOpen(), openCodeServiceAuthHooks())
 configureAccountKeysCommands(program)
 
 export function runCli(): void {
   program.parse()
 }
+
+export { openCodeServiceAuthHooks }

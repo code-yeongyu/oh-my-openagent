@@ -6,7 +6,14 @@ import type { TaskRecordStore } from "../store"
 import type { TaskStatus } from "../state"
 import { createTaskLifecycle } from "./create"
 import {
-  cleanupProjects, FakeRegistry, fakeHandle, readEvents, seedRecord, settings, tempStore, type CallLog,
+  cleanupProjects,
+  FakeRegistry,
+  fakeHandle,
+  readEvents,
+  seedRecord,
+  settings,
+  tempStore,
+  type CallLog,
 } from "./__fixtures__/lifecycle-fakes"
 import { NO_HOST_ENDPOINT } from "./host-session"
 
@@ -18,7 +25,9 @@ const CHILD = "st_000000c1"
 type AfterSnapshot = (store: TaskRecordStore) => void
 
 function stoppedOwnerWorld(child: {
-  status: TaskStatus; live: boolean; queued?: number
+  status: TaskStatus
+  live: boolean
+  queued?: number
   // Runs between the shutdown's list() snapshot and its writes: the store moves on, the snapshot does not.
   afterSnapshot?: AfterSnapshot
   // Runs when the shutdown dequeues the pending child: a launch admitting it right then.
@@ -28,18 +37,28 @@ function stoppedOwnerWorld(child: {
 }) {
   const store = tempStore()
   seedRecord(store, {
-    task_id: "st_000000b0", parent_session_id: "root-1", status: "cancelled",
-    execution_mode: "process", child_session_id: PARENT_SESSION, host_pid: process.pid,
+    task_id: "st_000000b0",
+    parent_session_id: "root-1",
+    status: "cancelled",
+    execution_mode: "process",
+    child_session_id: PARENT_SESSION,
+    host_pid: process.pid,
   })
   seedRecord(store, {
-    task_id: CHILD, parent_session_id: PARENT_SESSION, status: child.status, execution_mode: "in-process",
-    residency_state: "resident", host_pid: process.pid,
+    task_id: CHILD,
+    parent_session_id: PARENT_SESSION,
+    status: child.status,
+    execution_mode: "in-process",
+    residency_state: "resident",
+    host_pid: process.pid,
   })
   if ((child.queued ?? 0) > 0) {
     store.mutate(CHILD, (record) => ({
       ...record,
       pending_steering: Array.from({ length: child.queued ?? 0 }, (_, index) => ({
-        id: `q${index}`, message: `queued ${index}`, deliver_as: "followUp" as const,
+        id: `q${index}`,
+        message: `queued ${index}`,
+        deliver_as: "followUp" as const,
       })),
     }))
   }
@@ -49,25 +68,29 @@ function stoppedOwnerWorld(child: {
   const dequeued: string[] = []
   const snapshot = store.list()
   child.afterSnapshot?.(store)
-  const viewedStore = child.afterSnapshot !== undefined || child.afterCancel !== undefined
-    ? new Proxy(store, {
-      get: (target, key) => {
-        if (key === "list" && child.afterSnapshot !== undefined) return () => snapshot
-        if (key === "transition" && child.afterCancel !== undefined) {
-          const afterCancel = child.afterCancel
-          return (...args: Parameters<TaskRecordStore["transition"]>) => {
-            const result = target.transition(...args)
-            if (args[1].type === "cancel") afterCancel(target)
-            return result
-          }
-        }
-        const value: unknown = Reflect.get(target, key)
-        return typeof value === "function" ? value.bind(target) : value
-      },
-    })
-    : store
+  const viewedStore =
+    child.afterSnapshot !== undefined || child.afterCancel !== undefined
+      ? new Proxy(store, {
+          get: (target, key) => {
+            if (key === "list" && child.afterSnapshot !== undefined) return () => snapshot
+            if (key === "transition" && child.afterCancel !== undefined) {
+              const afterCancel = child.afterCancel
+              return (...args: Parameters<TaskRecordStore["transition"]>) => {
+                const result = target.transition(...args)
+                if (args[1].type === "cancel") afterCancel(target)
+                return result
+              }
+            }
+            const value: unknown = Reflect.get(target, key)
+            return typeof value === "function" ? value.bind(target) : value
+          },
+        })
+      : store
   const lifecycle = createTaskLifecycle({
-    hostEndpoint: NO_HOST_ENDPOINT, store: viewedStore, registry, config: settings(),
+    hostEndpoint: NO_HOST_ENDPOINT,
+    store: viewedStore,
+    registry,
+    config: settings(),
     dequeuePending: (taskId) => {
       dequeued.push(taskId)
       child.onDequeue?.(store, registry, order)
@@ -100,9 +123,14 @@ describe("stopped owner's children at the record level", () => {
 
   test("#given a child that already settled on its own #when the stopped owner's session shuts down #then it keeps its outcome and no cancelled event is written", async () => {
     const { store, order, lifecycle } = stoppedOwnerWorld({
-      status: "running", live: true,
+      status: "running",
+      live: true,
       afterSnapshot: (store) => {
-        store.transition(CHILD, { type: "complete", timestamp: new Date().toISOString(), final_response: "done on its own" })
+        store.transition(CHILD, {
+          type: "complete",
+          timestamp: new Date().toISOString(),
+          final_response: "done on its own",
+        })
       },
     })
 
@@ -128,11 +156,16 @@ describe("stopped owner's children at the record level", () => {
   // too, so the cancel message and the steer_dropped event must both count it.
   test("#given a message queued right after the cancel lands #when the stopped owner's session shuts down #then the cancel message and steer_dropped count the same dropped messages", async () => {
     const { store, lifecycle } = stoppedOwnerWorld({
-      status: "running", live: true, queued: 2,
+      status: "running",
+      live: true,
+      queued: 2,
       afterCancel: (current) => {
         current.mutate(CHILD, (fresh) => ({
           ...fresh,
-          pending_steering: [...(fresh.pending_steering ?? []), { id: "late", message: "late", deliver_as: "followUp" as const }],
+          pending_steering: [
+            ...(fresh.pending_steering ?? []),
+            { id: "late", message: "late", deliver_as: "followUp" as const },
+          ],
         }))
       },
     })
@@ -145,10 +178,14 @@ describe("stopped owner's children at the record level", () => {
 
   test("#given a launch admits the pending child while it is being dequeued #when the stopped owner's session shuts down #then the now-live child is marked stopping", async () => {
     const { store, order, lifecycle } = stoppedOwnerWorld({
-      status: "pending", live: false,
+      status: "pending",
+      live: false,
       onDequeue: (current, registry, calls) => {
         current.transition(CHILD, { type: "start", timestamp: new Date().toISOString() })
-        registry.add({ ...fakeHandle(CHILD, "in-process", calls), markStopping: () => calls.push(`markStopping:${CHILD}`) })
+        registry.add({
+          ...fakeHandle(CHILD, "in-process", calls),
+          markStopping: () => calls.push(`markStopping:${CHILD}`),
+        })
       },
     })
 
@@ -160,9 +197,13 @@ describe("stopped owner's children at the record level", () => {
 
   test("#given a message is queued after the shutdown's snapshot #when the stopped owner's session shuts down #then that queue is dropped too", async () => {
     const { store, lifecycle } = stoppedOwnerWorld({
-      status: "running", live: true,
+      status: "running",
+      live: true,
       afterSnapshot: (current) => {
-        current.mutate(CHILD, (record) => ({ ...record, pending_steering: [{ id: "late", message: "late", deliver_as: "followUp" as const }] }))
+        current.mutate(CHILD, (record) => ({
+          ...record,
+          pending_steering: [{ id: "late", message: "late", deliver_as: "followUp" as const }],
+        }))
       },
     })
 

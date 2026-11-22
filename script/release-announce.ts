@@ -31,7 +31,8 @@ export function composeMessage(tag: string, body: string | null): string {
     const delimiter = line.match(/^ {0,3}(`{3,}|~{3,})(.*)$/)
     if (delimiter) {
       if (!fence) fence = delimiter[1]
-      else if (delimiter[1][0] === fence[0] && delimiter[1].length >= fence.length && !delimiter[2].trim()) fence = undefined
+      else if (delimiter[1][0] === fence[0] && delimiter[1].length >= fence.length && !delimiter[2].trim())
+        fence = undefined
     }
     if (!line.trim() && !fence) {
       if (lines.length) paragraphs.push(lines.join("\n").trim())
@@ -91,12 +92,20 @@ export async function announce(options: Options, fetcher: Fetch = fetch, log: (l
   } catch {
     throw new AnnouncementError("Webhook URL is invalid")
   }
-  if (webhook.protocol !== "https:" || webhook.hostname !== "discord.com" ||
-      !/^\/api(?:\/v\d+)?\/webhooks\/\d+\/[^/]+\/?$/.test(webhook.pathname)) {
+  if (
+    webhook.protocol !== "https:" ||
+    webhook.hostname !== "discord.com" ||
+    !/^\/api(?:\/v\d+)?\/webhooks\/\d+\/[^/]+\/?$/.test(webhook.pathname)
+  ) {
     throw new AnnouncementError("Webhook URL is invalid")
   }
-  const response = await request(fetcher, new URL(`https://api.github.com/repos/${repository}/releases/tags/${options.tag}`),
-    "GET", undefined, options.token)
+  const response = await request(
+    fetcher,
+    new URL(`https://api.github.com/repos/${repository}/releases/tags/${options.tag}`),
+    "GET",
+    undefined,
+    options.token,
+  )
   if (!response.ok) throw new AnnouncementError(`GitHub release lookup returned HTTP ${response.status}`)
   let release: z.infer<typeof releaseSchema>
   try {
@@ -117,12 +126,17 @@ export async function announce(options: Options, fetcher: Fetch = fetch, log: (l
     return "dry-run"
   }
   webhook.searchParams.set("wait", "true")
-  const posted = await request(fetcher, webhook, "POST", JSON.stringify({
-    content: options.probe
-      ? `Release announcement pipeline check for ${options.tag}; this message deletes itself.`
-      : content,
-    allowed_mentions: { parse: [] },
-  }))
+  const posted = await request(
+    fetcher,
+    webhook,
+    "POST",
+    JSON.stringify({
+      content: options.probe
+        ? `Release announcement pipeline check for ${options.tag}; this message deletes itself.`
+        : content,
+      allowed_mentions: { parse: [] },
+    }),
+  )
   if (!posted.ok) throw new AnnouncementError(`Discord POST returned HTTP ${posted.status}`)
   let message: z.infer<typeof messageSchema>
   try {
@@ -137,7 +151,8 @@ export async function announce(options: Options, fetcher: Fetch = fetch, log: (l
   const deleted = await request(fetcher, messageUrl, "DELETE")
   if (!deleted.ok) throw new AnnouncementError(`Discord DELETE returned HTTP ${deleted.status}`)
   const verified = await request(fetcher, messageUrl, "GET")
-  if (verified.status !== 404) throw new AnnouncementError(`Discord deletion verification returned HTTP ${verified.status}, expected 404`)
+  if (verified.status !== 404)
+    throw new AnnouncementError(`Discord deletion verification returned HTTP ${verified.status}, expected 404`)
   return "probe"
 }
 
@@ -151,9 +166,13 @@ if (import.meta.main) {
   if (webhook) console.log(`::add-mask::${escapeCommand(webhook)}`)
   try {
     const event = process.env.ANNOUNCEMENT_EVENT ?? process.env.GITHUB_EVENT_NAME
-    if (event !== "release" && event !== "workflow_dispatch" && event !== "workflow_call") throw new AnnouncementError("Unsupported workflow event")
+    if (event !== "release" && event !== "workflow_dispatch" && event !== "workflow_call")
+      throw new AnnouncementError("Unsupported workflow event")
     const result = await announce({
-      tag, event, webhook, token: process.env.GH_TOKEN,
+      tag,
+      event,
+      webhook,
+      token: process.env.GH_TOKEN,
       dryRun: process.env.DRY_RUN === "true",
       probe: process.env.PROBE === "true",
     })

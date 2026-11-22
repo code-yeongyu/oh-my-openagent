@@ -24,10 +24,14 @@ describe("rmSyncEbusyTolerant", () => {
       if (calls === 1) throw errno("EBUSY", "resource busy or locked")
     }
 
-    rmSyncEbusyTolerant("/tmp/omo-native-teardown-ebusy-once", { recursive: true, force: true }, {
-      rmSync,
-      sleep: () => {},
-    })
+    rmSyncEbusyTolerant(
+      "/tmp/omo-native-teardown-ebusy-once",
+      { recursive: true, force: true },
+      {
+        rmSync,
+        sleep: () => {},
+      },
+    )
 
     expect(calls).toBe(2)
   })
@@ -42,12 +46,16 @@ describe("rmSyncEbusyTolerant", () => {
 
     let thrown: unknown
     try {
-      rmSyncEbusyTolerant("/tmp/omo-native-teardown-enotempty", { recursive: true, force: true }, {
-        rmSync,
-        sleep: () => {
-          throw new Error("sleep must not run for non-EBUSY")
+      rmSyncEbusyTolerant(
+        "/tmp/omo-native-teardown-enotempty",
+        { recursive: true, force: true },
+        {
+          rmSync,
+          sleep: () => {
+            throw new Error("sleep must not run for non-EBUSY")
+          },
         },
-      })
+      )
     } catch (caught) {
       thrown = caught
     }
@@ -65,11 +73,15 @@ describe("rmSyncEbusyTolerant", () => {
 
     let thrown: unknown
     try {
-      rmSyncEbusyTolerant("/tmp/omo-native-teardown-ebusy-exhausted", { recursive: true, force: true }, {
-        rmSync,
-        sleep: () => {},
-        ebusyAttempts: 4,
-      })
+      rmSyncEbusyTolerant(
+        "/tmp/omo-native-teardown-ebusy-exhausted",
+        { recursive: true, force: true },
+        {
+          rmSync,
+          sleep: () => {},
+          ebusyAttempts: 4,
+        },
+      )
     } catch (caught) {
       thrown = caught
     }
@@ -84,9 +96,17 @@ describe("rmSyncEbusyTolerant", () => {
 describe("withDatabase", () => {
   test("#given the body throws #when it exits #then the handle is still closed exactly once", () => {
     let closes = 0
-    const database = { close: () => { closes += 1 } }
+    const database = {
+      close: () => {
+        closes += 1
+      },
+    }
 
-    expect(() => withDatabase(database, () => { throw new Error("statement failed") })).toThrow("statement failed")
+    expect(() =>
+      withDatabase(database, () => {
+        throw new Error("statement failed")
+      }),
+    ).toThrow("statement failed")
 
     expect(closes).toBe(1)
     closeTrackedDatabases()
@@ -94,7 +114,11 @@ describe("withDatabase", () => {
   })
 
   test("#given a handle that fails to close #when teardown sweeps #then the failure does not escape", () => {
-    const database = { close: () => { throw errno("ERR_INVALID_STATE", "database is not open") } }
+    const database = {
+      close: () => {
+        throw errno("ERR_INVALID_STATE", "database is not open")
+      },
+    }
 
     expect(() => withDatabase(database, () => "value")).not.toThrow()
   })

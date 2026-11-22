@@ -33,11 +33,7 @@ export function createEvalCellCorrelation(): EvalCellCorrelation {
     },
     consume: (cellId) => {
       const owners = ownersByCell.get(cellId)
-      if (
-        owners === undefined
-        || owners.size !== 1
-        || ambiguousCells.has(cellId)
-      ) {
+      if (owners === undefined || owners.size !== 1 || ambiguousCells.has(cellId)) {
         discard(cellId)
         return undefined
       }

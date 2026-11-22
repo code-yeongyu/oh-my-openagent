@@ -1,16 +1,16 @@
-import type { PostEditFileLocation } from "./file-location.js";
+import type { PostEditFileLocation } from "./file-location.js"
 
 export interface PostEditNotInstalledOutcome {
-	readonly kind: "not_installed";
-	readonly serverId: string;
-	readonly installDecisionTool: boolean;
-	/** A recorded install decision; absent while the user has not decided. */
-	readonly decision?: "declined" | "allowed";
-	readonly text: string;
+  readonly kind: "not_installed"
+  readonly serverId: string
+  readonly installDecisionTool: boolean
+  /** A recorded install decision; absent while the user has not decided. */
+  readonly decision?: "declined" | "allowed"
+  readonly text: string
 }
 
 export interface NotInstalledGuidanceState {
-	readonly notInstalledServers: Set<string>;
+  readonly notInstalledServers: Set<string>
 }
 
 /**
@@ -22,15 +22,15 @@ export interface NotInstalledGuidanceState {
  * server is nudged at most once per session state.
  */
 export function notInstalledGuidance(
-	filePath: string,
-	outcome: PostEditNotInstalledOutcome,
-	state: NotInstalledGuidanceState,
-	locateFile: ((filePath: string) => PostEditFileLocation) | undefined,
+  filePath: string,
+  outcome: PostEditNotInstalledOutcome,
+  state: NotInstalledGuidanceState,
+  locateFile: ((filePath: string) => PostEditFileLocation) | undefined,
 ): string | undefined {
-	if (outcome.decision !== undefined) return outcome.text;
-	if (locateFile !== undefined && locateFile(filePath) !== "project") return undefined;
-	if (outcome.installDecisionTool) return outcome.text;
-	if (state.notInstalledServers.has(outcome.serverId)) return undefined;
-	state.notInstalledServers.add(outcome.serverId);
-	return outcome.text;
+  if (outcome.decision !== undefined) return outcome.text
+  if (locateFile !== undefined && locateFile(filePath) !== "project") return undefined
+  if (outcome.installDecisionTool) return outcome.text
+  if (state.notInstalledServers.has(outcome.serverId)) return undefined
+  state.notInstalledServers.add(outcome.serverId)
+  return outcome.text
 }

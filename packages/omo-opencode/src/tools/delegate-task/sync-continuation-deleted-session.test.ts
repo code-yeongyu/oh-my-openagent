@@ -58,8 +58,17 @@ describe("executeSyncContinuation for a deleted session", () => {
 
     // when
     const result = await executeSyncContinuation(
-      { task_id: "ses_deleted_child", description: "round 2", prompt: "continue", run_in_background: false, load_skills: [] },
-      toolContext, createExecutorContext(client, attachSyncContinuation), parentContext, deps,
+      {
+        task_id: "ses_deleted_child",
+        description: "round 2",
+        prompt: "continue",
+        run_in_background: false,
+        load_skills: [],
+      },
+      toolContext,
+      createExecutorContext(client, attachSyncContinuation),
+      parentContext,
+      deps,
     )
 
     // then
@@ -75,7 +84,9 @@ describe("executeSyncContinuation for a deleted session", () => {
 
   test("#given the session lookup fails for an unknown reason #when it is continued #then the continuation still runs", async () => {
     // given
-    const { client } = createClient(async () => { throw new Error("socket hang up") })
+    const { client } = createClient(async () => {
+      throw new Error("socket hang up")
+    })
     const pollSyncSession = mock(async () => null)
     const deps: SyncContinuationDeps = {
       pollSyncSession,
@@ -84,8 +95,17 @@ describe("executeSyncContinuation for a deleted session", () => {
 
     // when
     const result = await executeSyncContinuation(
-      { task_id: "ses_live_child", description: "round 2", prompt: "continue", run_in_background: false, load_skills: [] },
-      toolContext, createExecutorContext(client), parentContext, deps,
+      {
+        task_id: "ses_live_child",
+        description: "round 2",
+        prompt: "continue",
+        run_in_background: false,
+        load_skills: [],
+      },
+      toolContext,
+      createExecutorContext(client),
+      parentContext,
+      deps,
     )
 
     // then

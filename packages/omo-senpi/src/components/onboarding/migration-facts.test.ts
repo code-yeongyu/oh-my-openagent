@@ -27,16 +27,31 @@ function openCodeHome(): string {
   const root = mkdtempSync(join(tmpdir(), "omo-onboarding-migration-"))
   roots.push(root)
   const home = join(root, "home")
-  write(join(home, ".local", "share", "opencode", "auth.json"), JSON.stringify({
-    openai: { type: "api", key: SECRET },
-    anthropic: { type: "oauth", refresh: "r", access: "a", expires: 1 },
-  }))
-  write(join(home, ".config", "opencode", "opencode.json"), JSON.stringify({
-    model: "openai/gpt-5",
-    mcp: { ctx: { type: "local", command: ["npx", "ctx"] } },
-    provider: { myco: { npm: "@ai-sdk/openai-compatible", options: { baseURL: "https://example.invalid/v1" }, models: { m1: { name: "M1" } } } },
-  }))
-  write(join(home, ".config", "opencode", "skills", "my-skill", "SKILL.md"), "---\nname: my-skill\ndescription: d\n---\nbody\n")
+  write(
+    join(home, ".local", "share", "opencode", "auth.json"),
+    JSON.stringify({
+      openai: { type: "api", key: SECRET },
+      anthropic: { type: "oauth", refresh: "r", access: "a", expires: 1 },
+    }),
+  )
+  write(
+    join(home, ".config", "opencode", "opencode.json"),
+    JSON.stringify({
+      model: "openai/gpt-5",
+      mcp: { ctx: { type: "local", command: ["npx", "ctx"] } },
+      provider: {
+        myco: {
+          npm: "@ai-sdk/openai-compatible",
+          options: { baseURL: "https://example.invalid/v1" },
+          models: { m1: { name: "M1" } },
+        },
+      },
+    }),
+  )
+  write(
+    join(home, ".config", "opencode", "skills", "my-skill", "SKILL.md"),
+    "---\nname: my-skill\ndescription: d\n---\nbody\n",
+  )
   return home
 }
 
@@ -54,7 +69,8 @@ function injectedContent(results: readonly unknown[]): string {
   const contents = results.flatMap((result) =>
     typeof result === "object" && result !== null && "message" in result
       ? [String((result as { message: { content: unknown } }).message.content)]
-      : [])
+      : [],
+  )
   expect(contents).toHaveLength(1)
   return contents[0] ?? ""
 }
@@ -69,7 +85,7 @@ describe("onboarding migration inventory", () => {
 
     const content = injectedContent(await h.prompt())
 
-    expect(content).toContain("onboarding/SKILL.md")
+    expect(content).toContain("built-in `onboarding` skill")
     expect(content).toContain("Migration inventory")
     for (const id of ["openai", "anthropic", "myco", "ctx", "my-skill"]) expect(content).toContain(id)
     expect(content).not.toContain(SECRET)
@@ -85,7 +101,7 @@ describe("onboarding migration inventory", () => {
 
     expect(h.pi.messages).toHaveLength(1)
     const content = String((h.pi.messages[0] as unknown as { message: { content: unknown } }).message.content)
-    expect(content).toContain("onboarding/SKILL.md")
+    expect(content).toContain("built-in `onboarding` skill")
     expect(content).toContain("Migration inventory")
     expect(content).toContain("my-skill")
   })
@@ -104,7 +120,7 @@ describe("onboarding migration inventory", () => {
     await h.start()
 
     const content = injectedContent(await h.prompt())
-    expect(content).toContain("onboarding/SKILL.md")
+    expect(content).toContain("built-in `onboarding` skill")
     expect(content).not.toContain("Migration inventory")
     expect(state.isOnboardingComplete(dir)).toBe(true)
   })
@@ -120,7 +136,11 @@ describe("onboarding migration inventory", () => {
 
     const { runOnboardingScan, migrationFactsFromScan } = await import("./scan-runtime")
     const agentDir = join(home, ".omo", "agent")
-    const { results } = await runOnboardingScan({ home, env: { HOME: home }, agentDir }, { scanId: "one-implementation-check", includeCustomProviders: true }, () => {})
+    const { results } = await runOnboardingScan(
+      { home, env: { HOME: home }, agentDir },
+      { scanId: "one-implementation-check", includeCustomProviders: true },
+      () => {},
+    )
     const facts = migrationFactsFromScan(results)
     expect(facts).toBeDefined()
     expect(content).toContain(`Migration inventory (from the same scan omo setup runs): ${facts}`)
@@ -135,7 +155,10 @@ describe("onboarding migration inventory", () => {
       claimOnboarding: () => false,
       isOnboardingComplete: () => false,
       releaseOnboarding: () => {},
-      migrationFacts: () => { scans++; return Promise.resolve("facts") },
+      migrationFacts: () => {
+        scans++
+        return Promise.resolve("facts")
+      },
     })
     const h = createOnboardingHarness(dir, "s", "rpc", component)
     await h.start()
@@ -155,8 +178,14 @@ describe("onboarding migration inventory", () => {
       releaseOnboarding: () => {},
       stateDir: dir,
       // Hermetic: the default scan would read this environment; an injected inventory must never start it.
-      scanEnvironment: () => { defaultScans++; return { home: dir, env: { HOME: dir }, agentDir: join(dir, "agent") } },
-      migrationFacts: () => { scans++; return Promise.resolve("facts") },
+      scanEnvironment: () => {
+        defaultScans++
+        return { home: dir, env: { HOME: dir }, agentDir: join(dir, "agent") }
+      },
+      migrationFacts: () => {
+        scans++
+        return Promise.resolve("facts")
+      },
       // #10480's background history summary reads the scan environment on its own; injected here so
       // defaultScans counts only the inventory scan.
       sessionHistory: async () => undefined,

@@ -1,9 +1,6 @@
 import { describe, expect, it, mock } from "bun:test"
 
-import {
-  createCompactionAutocontinueHandler,
-  createSessionCompactingHandler,
-} from "./plugin/session-compacting"
+import { createCompactionAutocontinueHandler, createSessionCompactingHandler } from "./plugin/session-compacting"
 
 describe("experimental.session.compacting handler", () => {
   //#given all three hooks are present
@@ -37,12 +34,7 @@ describe("experimental.session.compacting handler", () => {
     const output = { context: [] as string[], prompt: undefined as string | undefined }
     await handler({ sessionID: "ses_test" }, output)
 
-    expect(callOrder).toEqual([
-      "checkpointCapture",
-      "capture",
-      "preCompact",
-      "contextInjector",
-    ])
+    expect(callOrder).toEqual(["checkpointCapture", "capture", "preCompact", "contextInjector"])
     expect(output.context).toEqual(["context-for-ses_test"])
   })
 
@@ -341,11 +333,35 @@ describe("experimental.compaction.autocontinue pre-compaction turn gate (#12118)
   })
 
   it.each([
-    ["a tool-calls finish", [userPrompt, assistantTurn({ finish: "tool-calls" }, [{ type: "tool", state: { status: "completed" } }]), compactionTrigger, compactionSummary]],
-    ["a running tool call under a stop finish", [userPrompt, assistantTurn({ finish: "stop" }, [{ type: "tool", state: { status: "running" } }]), compactionTrigger, compactionSummary]],
+    [
+      "a tool-calls finish",
+      [
+        userPrompt,
+        assistantTurn({ finish: "tool-calls" }, [{ type: "tool", state: { status: "completed" } }]),
+        compactionTrigger,
+        compactionSummary,
+      ],
+    ],
+    [
+      "a running tool call under a stop finish",
+      [
+        userPrompt,
+        assistantTurn({ finish: "stop" }, [{ type: "tool", state: { status: "running" } }]),
+        compactionTrigger,
+        compactionSummary,
+      ],
+    ],
     ["an unknown finish", [userPrompt, assistantTurn({ finish: "unknown" }), compactionTrigger, compactionSummary]],
     ["no finish (interrupted step)", [userPrompt, assistantTurn({}), compactionTrigger, compactionSummary]],
-    ["an aborted turn", [userPrompt, assistantTurn({ finish: "stop", error: { name: "MessageAbortedError" } }), compactionTrigger, compactionSummary]],
+    [
+      "an aborted turn",
+      [
+        userPrompt,
+        assistantTurn({ finish: "stop", error: { name: "MessageAbortedError" } }),
+        compactionTrigger,
+        compactionSummary,
+      ],
+    ],
     ["an unanswered user prompt", [userPrompt, compactionTrigger, compactionSummary]],
   ])("keeps the synthetic continue when the compacted turn ended with %s", async (_label, messages) => {
     //#given

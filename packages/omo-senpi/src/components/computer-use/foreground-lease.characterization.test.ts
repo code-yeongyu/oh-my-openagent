@@ -6,22 +6,18 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { dirname, join } from "node:path"
+import { join } from "node:path"
 import { createInterface } from "node:readline"
-import { fileURLToPath } from "node:url"
 
 import { resolveComputerSettings } from "@oh-my-opencode/senpi-desktop-tool"
 import type { ChildFactory } from "@oh-my-opencode/senpi-desktop-service"
+import { FAKE_ENGINE_PATH } from "@oh-my-opencode/senpi-desktop-service/testing"
 
 import type { ComponentContext, ComponentLogger } from "../../extension/types"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { CONTROL_CONFIRM_TITLE, controlConfirmBody } from "./control-confirm"
 import { createComputerUseComponent } from "./index"
 
-const FAKE_ENGINE = join(
-  dirname(fileURLToPath(import.meta.url)),
-  "../../../../senpi-desktop-service/test/fake-engine.mjs",
-)
 const RECEIVED = "recv "
 const GRANTED_AT = "2026-10-11T00:00:00.000Z"
 const NON_MACOS_DEFAULT_STOP_CHORD = "ctrl+alt+shift+escape"
@@ -65,12 +61,14 @@ interface Received {
 
 function received(line: string): Received | undefined {
   const message: unknown = JSON.parse(line)
-  if (typeof message !== "object" || message === null || !("method" in message) || message.method !== "engine.log") return undefined
+  if (typeof message !== "object" || message === null || !("method" in message) || message.method !== "engine.log")
+    return undefined
   if (!("params" in message) || typeof message.params !== "object" || message.params === null) return undefined
   const text = "message" in message.params ? message.params.message : undefined
   if (typeof text !== "string" || !text.startsWith(RECEIVED)) return undefined
   const request: unknown = JSON.parse(text.slice(RECEIVED.length))
-  if (typeof request !== "object" || request === null || !("method" in request) || typeof request.method !== "string") return undefined
+  if (typeof request !== "object" || request === null || !("method" in request) || typeof request.method !== "string")
+    return undefined
   return { method: request.method, params: "params" in request ? request.params : undefined }
 }
 
@@ -81,7 +79,7 @@ function received(line: string): Received | undefined {
 function fakeEngine(env: Record<string, string>): { readonly factory: ChildFactory; readonly wire: Received[] } {
   const wire: Received[] = []
   const factory: ChildFactory = () => {
-    const child = spawn(process.execPath, [FAKE_ENGINE, "--stdio"], {
+    const child = spawn(process.execPath, [FAKE_ENGINE_PATH, "--stdio"], {
       env: { ...process.env, FAKE_ENGINE_DESKTOP: "1", ...env },
       stdio: "pipe",
     })
@@ -141,7 +139,13 @@ function register(engineEnv: Record<string, string> = {}) {
   async function call(method: string, args: unknown[] = [], hasUI = true): Promise<ToolResult> {
     const execute = pi.tools.find((candidate) => candidate.name === "computer")?.execute
     if (typeof execute !== "function") throw new Error("the computer tool is not registered")
-    return (await execute("call-1", { action: "call", chain: [{ method, args }] }, undefined, undefined, uiContext(hasUI))) as ToolResult
+    return (await execute(
+      "call-1",
+      { action: "call", chain: [{ method, args }] },
+      undefined,
+      undefined,
+      uiContext(hasUI),
+    )) as ToolResult
   }
 
   async function command(args: string): Promise<string[]> {
@@ -327,7 +331,9 @@ describe("foreground-control lease in fused computer use (X16 characterization)"
 
       // then
       expect(stopNotes).toEqual([expect.stringMatching(/^Computer input stopped:/)])
-      expect(session.engine.wire.find((request) => request.method === "stopPath.stop")?.params).toEqual({ source: "host-relay" })
+      expect(session.engine.wire.find((request) => request.method === "stopPath.stop")?.params).toEqual({
+        source: "host-relay",
+      })
       expect(stopped.details?.value).toEqual({ active: false })
       expect(refused.isError).toBe(true)
       expect(refused.details?.value).toMatchObject({ code: "COMPUTER_SUSPENDED" })

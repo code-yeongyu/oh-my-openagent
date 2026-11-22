@@ -28,10 +28,7 @@ describe("transformHarnessNativeRename", () => {
       },
       profiles: { opus: { "[native]": { model_profile: "opus" } } },
     })
-    expect(result.diagnostics).toEqual([
-      "[senpi] renamed to [native]",
-      "profiles.opus.[senpi] renamed to [native]",
-    ])
+    expect(result.diagnostics).toEqual(["[senpi] renamed to [native]", "profiles.opus.[senpi] renamed to [native]"])
   })
 
   test("#given both [native] and [senpi] #when transformed #then the canonical block survives and the drop is reported", () => {

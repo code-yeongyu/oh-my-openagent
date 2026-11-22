@@ -16,12 +16,19 @@ import { createKibitzerSidecarNudgeTool } from "./tools/nudge"
 const root = mkdtempSync(join(tmpdir(), "kibitzer-start-ladder-"))
 afterAll(() => rmSync(root, { recursive: true, force: true }))
 const registry = registrySnapshot([{ id: "mock-1" }, { id: "mock-2" }, { id: "substitute" }])
-const config: OmoConfig = { categories: { quick: { model: "omo-mock/mock-1", fallback_models: [{ model: "omo-mock/mock-2" }] } } }
+const config: OmoConfig = {
+  categories: { quick: { model: "omo-mock/mock-1", fallback_models: [{ model: "omo-mock/mock-2" }] } },
+}
 
 function nudgeTool() {
   const budget = createWakeToolBudget(8)
   return createKibitzerSidecarNudgeTool({
-    offered: new Set(), searched: new Set(), surfaced: new Set(), maxItems: 2, accepted: () => [], budget: () => budget,
+    offered: new Set(),
+    searched: new Set(),
+    surfaced: new Set(),
+    maxItems: 2,
+    accepted: () => [],
+    budget: () => budget,
   })
 }
 
@@ -41,7 +48,9 @@ function sessionsOpeningSubstituteFor(refusedIds: ReadonlySet<string>) {
       abort: async () => undefined,
       subscribe: (listener) => {
         listeners.add(listener)
-        return () => { listeners.delete(listener) }
+        return () => {
+          listeners.delete(listener)
+        }
       },
       getLastAssistantText: () => undefined,
       dispose: () => undefined,
@@ -60,11 +69,24 @@ function starterFor(createSession: CreateChildSession, warnings: string[]) {
     loadPersona: () => "persona text",
     loadTaskRuntime: async () => ({ createInProcessJudgeRunner, findModelReference, isModelUnavailableStart }),
     createSession,
-    logger: { debug: () => undefined, info: () => undefined, warn: (message) => { warnings.push(message) }, error: () => undefined },
+    logger: {
+      debug: () => undefined,
+      info: () => undefined,
+      warn: (message) => {
+        warnings.push(message)
+      },
+      error: () => undefined,
+    },
   })
 }
 
-const wake = (generation: number) => ({ sessionId: "parent-1", generation, prompt: "<kibitzer-seed/>", tools: [nudgeTool()], maxItems: 2 })
+const wake = (generation: number) => ({
+  sessionId: "parent-1",
+  generation,
+  prompt: "<kibitzer-seed/>",
+  tools: [nudgeTool()],
+  maxItems: 2,
+})
 
 describe("Kibitzer start ladder (#10536)", () => {
   test("#given the head candidate is refused after start #when a wake starts #then the next category candidate answers and later wakes begin there", async () => {

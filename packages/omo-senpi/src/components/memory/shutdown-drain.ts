@@ -1,12 +1,29 @@
-// Bounded session_shutdown drain (IC-10). senpi awaits session_shutdown handlers before
-// disposing the runtime, so the drain owns a hard budget: an absolute deadline propagated
-// with a shared AbortSignal into every step. Shutdown enqueues the final transcript delta but
-// never launches facts: an in-process extractor cannot outlive this session. Pending work is
-// launched by the next session_start reconcile path.
+// Bounded session_shutdown drain (IC-10). senpi bounds each session_shutdown handler with its own
+// warn threshold, per-handler hard timeout and total quit budget - shipped defaults of 2 s, 10 s and
+// 2 s, all user-tunable and 0-disableable - so the drain owns a hard budget: an absolute deadline
+// propagated with a shared AbortSignal into every step.
+// Shutdown enqueues the final transcript delta but never launches facts: an in-process
+// extractor cannot outlive this session. Pending work is launched by the next session_start
+// reconcile path.
 
 import type { ComponentLogger } from "../../extension/types"
 
-/** Hard drain budget in milliseconds. Pinned by test: senpi blocks shutdown on this handler. */
+// senpi's handler bounds are settings, not fixed facts: `sessionShutdownHandlerWarnMs`,
+// `sessionShutdownHandlerTimeoutMs` and `sessionShutdownQuitBudgetMs` in
+// code-yeongyu/senpi `packages/coding-agent/src/core/settings-manager.ts` (senpi#3711), whose shipped
+// defaults are a 2 s warning and a 10 s hard timeout for one handler plus a 2 s total wait on every
+// handler when the process quits. omo adds no cap of its own; the drain budget below is sized against
+// those defaults and `shutdown-drain.test.ts` reads them from the installed senpi, so a host release
+// that lowers a default under the drain fails there instead of quietly here.
+/**
+ * Hard drain budget in milliseconds. Under senpi's default handler bounds the host waits for this
+ * handler until it settles or its 10 s timeout aborts it, and the whole shutdown pass only gets the
+ * 2 s quit budget, so the drain stays below the warn threshold and the quit budget: the drain plus
+ * the teardown after it in the same handler finish inside the host's bounds and cannot outlive them.
+ * 1500 ms still leaves room for a real journal flush without a hung persist stalling shutdown. An
+ * operator who lowers `sessionShutdownHandlerWarnMs` or `sessionShutdownQuitBudgetMs` below this
+ * value puts the host's bound first, which is their call to make - the drain never blocks on it.
+ */
 export const SESSION_SHUTDOWN_DRAIN_BUDGET_MS = 1500
 
 export type ShutdownReason = "quit" | "reload" | "new" | "resume" | "fork"
@@ -145,9 +162,11 @@ export function createShutdownDrain(options: ShutdownDrainOptions): ShutdownDrai
         if (!journalCompleted) return false
       }
       if (settings.journalOnly) return journalCompleted
-      if (!(await runStep("facts-enqueue", () => options.steps.enqueueFinalDelta(input.sessionId, signal)))) return journalCompleted
+      if (!(await runStep("facts-enqueue", () => options.steps.enqueueFinalDelta(input.sessionId, signal))))
+        return journalCompleted
       if (input.reason !== "quit") return journalCompleted
-      if (!(await runStep("skills-usage-flush", () => options.steps.flushSkillsUsage(input.sessionId, signal)))) return journalCompleted
+      if (!(await runStep("skills-usage-flush", () => options.steps.flushSkillsUsage(input.sessionId, signal))))
+        return journalCompleted
       for (const evaluator of evaluators) {
         const proceed = await runStep("shutdown-evaluator", async () => {
           await evaluator(evaluatorInput)

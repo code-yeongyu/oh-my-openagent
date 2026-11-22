@@ -33,6 +33,8 @@ type HarnessOptions = {
   readonly summary?: SuspendSummary
   // This engine's task store directory (`engine.stateDir`).
   readonly stateDir?: string
+  // The run-pause bridge the event bridge drives (absent: run-pause wiring is off).
+  readonly runPause?: Parameters<typeof wireEventBridge>[5]["runPause"]
 }
 
 export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
@@ -136,8 +138,7 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
       },
       cancelTask: async (idOrName: string, reason?: string) => {
         cancelCalls.push({ idOrName, ...(reason === undefined ? {} : { reason }) })
-        const record =
-          records[idOrName] ?? Object.values(records).find((candidate) => candidate.name === idOrName)
+        const record = records[idOrName] ?? Object.values(records).find((candidate) => candidate.name === idOrName)
         return {
           kind: "cancelled" as const,
           task_id: record?.task_id ?? idOrName,
@@ -190,7 +191,11 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
     },
   } as unknown as SessionTransitionBridge
 
+  const forgottenTaskOutputSessions: string[] = []
   const state = {
+    forgetTaskOutputReads: (sessionId: string) => {
+      forgottenTaskOutputSessions.push(sessionId)
+    },
     reconcileTeamMailbox: async () => {
       order.push("reclaim")
     },
@@ -202,6 +207,7 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
         order.push("leadShutdown")
       },
     },
+    ...(options.runPause === undefined ? {} : { runPause: options.runPause }),
     resumptionChannels: {
       emitSessionStart: async () => {
         const count = options.resumptionChannelCount ?? 0
@@ -244,6 +250,7 @@ export function wireHarness(sessionId?: string, options: HarnessOptions = {}) {
     pi,
     calls,
     order,
+    forgottenTaskOutputSessions,
     warnings,
     infos,
     reconcileCalls,

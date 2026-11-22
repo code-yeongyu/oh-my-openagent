@@ -3,34 +3,76 @@ import { join } from "node:path"
 import * as comparison from "./dependency-audit/comparison"
 import "./dependency-audit/compare-cli.cases"
 import {
-  classifyFailure, graphArguments, parseCaptureArgs, parseModuleCount,
-  parseTimings, timingGate, byteGate, normalizeReceipt,
+  classifyFailure,
+  graphArguments,
+  parseCaptureArgs,
+  parseModuleCount,
+  parseTimings,
+  timingGate,
+  byteGate,
+  normalizeReceipt,
 } from "./dependency-audit/contracts"
 
 describe("dependency audit parsers", () => {
-  test.each(["Bundled 4476 modules in 300ms", "[100ms] bundle 3995 modules"])("reads module counts when Bun emits %s", (output) => {
-    // given
-    const expected = output.includes("4476") ? 4476 : 3995
-    // when
-    const count = parseModuleCount(output)
-    // then
-    expect(count).toBe(expected)
-  })
-  test.each(["build succeeded", "Bundled 7 modules in 1ms", "Bundled NaN modules"])("rejects misleading graph success when output is %s", (output) => {
-    // given / when / then
-    expect(() => parseModuleCount(output)).toThrow()
-  })
+  test.each(["Bundled 4476 modules in 300ms", "[100ms] bundle 3995 modules"])(
+    "reads module counts when Bun emits %s",
+    (output) => {
+      // given
+      const expected = output.includes("4476") ? 4476 : 3995
+      // when
+      const count = parseModuleCount(output)
+      // then
+      expect(count).toBe(expected)
+    },
+  )
+  test.each(["build succeeded", "Bundled 7 modules in 1ms", "Bundled NaN modules"])(
+    "rejects misleading graph success when output is %s",
+    (output) => {
+      // given / when / then
+      expect(() => parseModuleCount(output)).toThrow()
+    },
+  )
   test("strips compile-only arguments when constructing the graph command", () => {
     // given
-    const release = ["build", "--compile", "--target=bun-darwin-arm64", "--asset=/stage", "--compile-autoload-package-json", "--no-compile-autoload-dotenv", "--minify-whitespace", "entry.ts", "worker.ts", "--outfile", "/binary"]
+    const release = [
+      "build",
+      "--compile",
+      "--target=bun-darwin-arm64",
+      "--asset=/stage",
+      "--compile-autoload-package-json",
+      "--no-compile-autoload-dotenv",
+      "--minify-whitespace",
+      "entry.ts",
+      "worker.ts",
+      "--outfile",
+      "/binary",
+    ]
     // when
     const result = graphArguments(release, "/graph")
     // then
-    expect(result).toEqual(["build", "--target=bun", "--minify-whitespace", "entry.ts", "worker.ts", "--outdir", "/graph", `--metafile=${join("/graph", "meta.json")}`])
+    expect(result).toEqual([
+      "build",
+      "--target=bun",
+      "--minify-whitespace",
+      "entry.ts",
+      "worker.ts",
+      "--outdir",
+      "/graph",
+      `--metafile=${join("/graph", "meta.json")}`,
+    ])
   })
   test("rejects malformed CLI input when a case can escape the output directory", () => {
     // given
-    const args = ["--phase", "baseline", "--binary", "/tmp/audit/native-artifact", "--out", "/tmp/audit", "--case", "../summary"]
+    const args = [
+      "--phase",
+      "baseline",
+      "--binary",
+      "/tmp/audit/native-artifact",
+      "--out",
+      "/tmp/audit",
+      "--case",
+      "../summary",
+    ]
     // when / then
     expect(() => parseCaptureArgs(args)).toThrow()
   })
@@ -70,8 +112,10 @@ test("rejects forged photon success when independent dimensions are wrong", () =
 
 describe("dependency audit numeric gates", () => {
   test.each([
-    [104857600, "p0", true], [104857601, "p0", false],
-    [94371840, "p1", true], [94371841, "p1", false],
+    [104857600, "p0", true],
+    [104857601, "p0", false],
+    [94371840, "p1", true],
+    [94371841, "p1", false],
     [130850802, "p0", false],
   ] as const)("gates %d bytes at %s when comparing a native artifact", (size, gate, expected) => {
     // given / when
@@ -91,9 +135,19 @@ describe("dependency audit numeric gates", () => {
     // then
     expect(result.pass).toBe(true)
   })
-  test.each([["version", 1.10, true], ["version", 1.1001, false], ["oneshot", 1.15, true], ["oneshot", 1.1501, false]] as const)("gates %s at %f when variance is zero", (kind, mean, expected) => {
+  test.each([
+    ["version", 1.1, true],
+    ["version", 1.1001, false],
+    ["oneshot", 1.15, true],
+    ["oneshot", 1.1501, false],
+  ] as const)("gates %s at %f when variance is zero", (kind, mean, expected) => {
     // given
-    const baseline = { mean: 1, stddev: 0, times: Array.from({ length: 30 }, () => 1), exit_codes: Array.from({ length: 30 }, (): 0 => 0) }
+    const baseline = {
+      mean: 1,
+      stddev: 0,
+      times: Array.from({ length: 30 }, () => 1),
+      exit_codes: Array.from({ length: 30 }, (): 0 => 0),
+    }
     // when
     const result = timingGate(baseline, { ...baseline, mean }, kind)
     // then
@@ -101,7 +155,12 @@ describe("dependency audit numeric gates", () => {
   })
   test("adds three combined standard errors when measurements have variance", () => {
     // given
-    const baseline = { mean: 1, stddev: 0.1, times: Array.from({ length: 30 }, () => 1), exit_codes: Array.from({ length: 30 }, (): 0 => 0) }
+    const baseline = {
+      mean: 1,
+      stddev: 0.1,
+      times: Array.from({ length: 30 }, () => 1),
+      exit_codes: Array.from({ length: 30 }, (): 0 => 0),
+    }
     const post = { ...baseline, mean: 1.17, stddev: 0.2 }
     // when
     const result = timingGate(baseline, post, "version")
@@ -111,7 +170,12 @@ describe("dependency audit numeric gates", () => {
   })
   test("rejects timing receipts when a measured command failed", () => {
     // given
-    const raw = { mean: 0.1, stddev: 0, times: Array.from({ length: 30 }, () => 0.1), exit_codes: [...Array.from({ length: 29 }, () => 0), 1] }
+    const raw = {
+      mean: 0.1,
+      stddev: 0,
+      times: Array.from({ length: 30 }, () => 0.1),
+      exit_codes: [...Array.from({ length: 29 }, () => 0), 1],
+    }
     // when / then
     expect(() => parseTimings(raw)).toThrow()
   })

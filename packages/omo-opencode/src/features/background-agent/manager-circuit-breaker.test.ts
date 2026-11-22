@@ -17,7 +17,10 @@ function createManager(config?: BackgroundTaskConfig): BackgroundManager {
     },
   }
 
-  const manager = new BackgroundManager({ pluginContext: unsafeTestValue<PluginInput>({ client, directory: tmpdir() }), config: config })
+  const manager = new BackgroundManager({
+    pluginContext: unsafeTestValue<PluginInput>({ client, directory: tmpdir() }),
+    config: config,
+  })
   const testManager = unsafeTestValue<{
     enqueueNotificationForParent: (sessionId: string, fn: () => Promise<void>) => Promise<void>
     notifyParentSession: (task: BackgroundTask) => Promise<void>
@@ -33,11 +36,11 @@ function createManager(config?: BackgroundTaskConfig): BackgroundManager {
 }
 
 function getTaskMap(manager: BackgroundManager): Map<string, BackgroundTask> {
-  return (unsafeTestValue<{ tasks: Map<string, BackgroundTask> }>(manager)).tasks
+  return unsafeTestValue<{ tasks: Map<string, BackgroundTask> }>(manager).tasks
 }
 
 async function flushAsyncWork() {
-  await new Promise(resolve => setTimeout(resolve, 0))
+  await new Promise((resolve) => setTimeout(resolve, 0))
 }
 
 describe("BackgroundManager circuit breaker", () => {

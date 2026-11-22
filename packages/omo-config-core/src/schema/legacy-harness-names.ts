@@ -62,9 +62,7 @@ export function canonicalizeLegacyHarnessBlocks(document: unknown): Canonicalize
   if (isRecord(profiles)) {
     const canonicalProfiles: Record<string, unknown> = {}
     for (const [name, profile] of Object.entries(profiles)) {
-      canonicalProfiles[name] = isRecord(profile)
-        ? canonicalizeBlocksIn(profile, ["profiles", name], renames)
-        : profile
+      canonicalProfiles[name] = isRecord(profile) ? canonicalizeBlocksIn(profile, ["profiles", name], renames) : profile
     }
     canonicalized["profiles"] = canonicalProfiles
   }

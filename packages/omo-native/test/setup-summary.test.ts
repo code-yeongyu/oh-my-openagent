@@ -18,7 +18,7 @@ const roots: string[] = []
 
 afterEach(() => teardownRoots(roots))
 
-type Sandbox = { home: string, agentDir: string, omoConfig: string }
+type Sandbox = { home: string; agentDir: string; omoConfig: string }
 
 function write(path: string, content: unknown): void {
   mkdirSync(dirname(path), { recursive: true })
@@ -38,13 +38,18 @@ function opencodeUser(): Sandbox {
   })
   write(join(opencodeDir, "opencode.json"), {
     model: "acme/acme-large",
-    provider: { acme: { options: { baseURL: "https://api.acme.example/v1", apiKey: "acme-key" }, models: { "acme-large": {} } } },
+    provider: {
+      acme: { options: { baseURL: "https://api.acme.example/v1", apiKey: "acme-key" }, models: { "acme-large": {} } },
+    },
     mcp: {
       context7: { type: "remote", url: "https://mcp.context7.com/mcp" },
       shelly: { type: "local", command: ["sh", "-c", "echo $(whoami)"] },
     },
   })
-  write(join(opencodeDir, "skills", "release-notes", "SKILL.md"), "---\nname: release-notes\ndescription: notes\n---\nbody\n")
+  write(
+    join(opencodeDir, "skills", "release-notes", "SKILL.md"),
+    "---\nname: release-notes\ndescription: notes\n---\nbody\n",
+  )
   write(join(opencodeDir, "skills", "broken", "README.md"), "not a skill\n")
   return { home, agentDir: join(home, ".omo", "agent"), omoConfig: join(home, ".omo", "omo.jsonc") }
 }
@@ -69,7 +74,10 @@ function run(item: Sandbox, args: string[]): string {
 // Like run, with extra env vars the home's setup findings are keyed from (never scrubbed: they carry
 // no OMO_/OPENCODE_ prefix the scrubber removes).
 function runWithEnv(item: Sandbox, keys: Record<string, string>, args: string[]): string {
-  const result = spawnSync(process.execPath, [LAUNCHER, "setup", ...args], { encoding: "utf8", env: { ...env(item), ...keys } })
+  const result = spawnSync(process.execPath, [LAUNCHER, "setup", ...args], {
+    encoding: "utf8",
+    env: { ...env(item), ...keys },
+  })
   if (result.error) throw result.error
   expect(result.status).toBe(0)
   return result.stdout
@@ -77,7 +85,10 @@ function runWithEnv(item: Sandbox, keys: Record<string, string>, args: string[])
 
 // On a real pty, answering the first prompt that carries `marker`.
 function runOnTerminal(item: Sandbox, answer: string, marker: string): string {
-  const result = spawnSync("python3", [TTY_DRIVER, answer, marker, process.execPath, LAUNCHER, "setup"], { encoding: "utf8", env: env(item) })
+  const result = spawnSync("python3", [TTY_DRIVER, answer, marker, process.execPath, LAUNCHER, "setup"], {
+    encoding: "utf8",
+    env: env(item),
+  })
   if (result.error) throw result.error
   expect(result.status).toBe(0)
   return result.stdout
@@ -93,31 +104,37 @@ function readJson(path: string): Record<string, any> {
 
 describe("omo setup migration summary", () => {
   describe("#given an OpenCode user with logins, MCP servers, skills, a custom provider and a model choice", () => {
-    test.skipIf(process.platform === "win32")("#when setup runs on a terminal and the user accepts the default #then one consent imports every class", () => {
-      // given
-      const item = opencodeUser()
+    test.skipIf(process.platform === "win32")(
+      "#when setup runs on a terminal and the user accepts the default #then one consent imports every class",
+      () => {
+        // given
+        const item = opencodeUser()
 
-      // when
-      const output = runOnTerminal(item, "\n", PLAN_PROMPT)
+        // when
+        const output = runOnTerminal(item, "\n", PLAN_PROMPT)
 
-      // then
-      expect(occurrences(output, PLAN_PROMPT)).toBe(1)
-      expect(occurrences(output, STAGE_PROMPT)).toBe(0)
-      expect(occurrences(output, TELEMETRY_ENV)).toBe(1)
-      expect(readJson(join(item.agentDir, "auth.json"))).toEqual({
-        google: { type: "api_key", key: "g-key" },
-        acme: { type: "api_key", key: "acme-key" },
-      })
-      expect(Object.keys(readJson(join(item.agentDir, "mcp.json")).mcpServers)).toEqual(["context7"])
-      expect(readdirSync(join(item.agentDir, "skills"))).toEqual(["release-notes"])
-      expect(Object.keys(readJson(join(item.agentDir, "models.json")).providers)).toEqual(["acme"])
-      expect(readJson(join(item.agentDir, "settings.json"))).toEqual({ defaultProvider: "acme", defaultModel: "acme-large" })
-      expect(output).toContain("model-choices-carried: default model, model_profile")
-      // Harnesses that are not installed get no row, and a real plan gets no placeholder template.
-      expect(output).not.toContain("gajae-code")
-      expect(output).not.toContain("oh-my-pi")
-      expect(output).not.toContain("<custom-baseUrl-provider>")
-    })
+        // then
+        expect(occurrences(output, PLAN_PROMPT)).toBe(1)
+        expect(occurrences(output, STAGE_PROMPT)).toBe(0)
+        expect(occurrences(output, TELEMETRY_ENV)).toBe(1)
+        expect(readJson(join(item.agentDir, "auth.json"))).toEqual({
+          google: { type: "api_key", key: "g-key" },
+          acme: { type: "api_key", key: "acme-key" },
+        })
+        expect(Object.keys(readJson(join(item.agentDir, "mcp.json")).mcpServers)).toEqual(["context7"])
+        expect(readdirSync(join(item.agentDir, "skills"))).toEqual(["release-notes"])
+        expect(Object.keys(readJson(join(item.agentDir, "models.json")).providers)).toEqual(["acme"])
+        expect(readJson(join(item.agentDir, "settings.json"))).toEqual({
+          defaultProvider: "acme",
+          defaultModel: "acme-large",
+        })
+        expect(output).toContain("model-choices-carried: default model, model_profile")
+        // Harnesses that are not installed get no row, and a real plan gets no placeholder template.
+        expect(output).not.toContain("gajae-code")
+        expect(output).not.toContain("oh-my-pi")
+        expect(output).not.toContain("<custom-baseUrl-provider>")
+      },
+    )
 
     test("#when setup is a dry run #then it prints the plan, asks nothing and writes nothing", () => {
       // given
@@ -131,7 +148,13 @@ describe("omo setup migration summary", () => {
       expect(occurrences(stdout, PLAN_PROMPT)).toBe(0)
       expect(occurrences(stdout, NOT_IMPORTED)).toBe(0)
       expect(occurrences(stdout, TELEMETRY_ENV)).toBe(1)
-      for (const line of ["planned-add: google", "planned-mcp: context7", "planned-skills: release-notes", "planned-providers: acme", "planned-model-choices: default model, model_profile"]) {
+      for (const line of [
+        "planned-add: google",
+        "planned-mcp: context7",
+        "planned-skills: release-notes",
+        "planned-providers: acme",
+        "planned-model-choices: default model, model_profile",
+      ]) {
         expect(stdout).toContain(line)
       }
     })
@@ -156,7 +179,9 @@ describe("omo setup migration summary", () => {
       // given
       const item = opencodeUser()
       run(item, ["--yes"])
-      const files = ["auth.json", "mcp.json", "models.json", "settings.json"].map((name) => join(item.agentDir, name)).concat(item.omoConfig)
+      const files = ["auth.json", "mcp.json", "models.json", "settings.json"]
+        .map((name) => join(item.agentDir, name))
+        .concat(item.omoConfig)
       const before = files.map((path) => readFileSync(path, "utf8"))
 
       // when: no --yes, so any pending class would print the non-interactive refusal
@@ -190,17 +215,22 @@ describe("omo setup migration summary", () => {
 
       // then
       expect(output).toContain("Found your Command Code setup")
-      expect(output).toContain("commandcode -> https://api.commandcode.ai/provider/v1, 12 models")
+      expect(output).toContain("commandcode -> https://api.commandcode.ai/provider/v1, 13 models")
       expect(output).toContain("key from environment variable CMD_API_KEY - will be imported")
       // The key env var's value never appears anywhere; the engine interpolates the reference.
       expect(output).not.toContain("SK-CMD-SENTINEL-SUMMARY")
       // The plan has the provider, so the summary includes the optional ZDR hand edit.
-      expect(output).toContain("To make the Command Code provider enforce zero data retention, add the header \"x-cmd-zdr: 1\" to its models.json entry by hand.")
+      expect(output).toContain(
+        'To make the Command Code provider enforce zero data retention, add the header "x-cmd-zdr: 1" to its models.json entry by hand.',
+      )
       const models = readJson(join(item.agentDir, "models.json")).providers
       expect(Object.keys(models)).toEqual(["commandcode"])
       expect(models.commandcode.baseUrl).toBe("https://api.commandcode.ai/provider/v1")
       expect(models.commandcode.models.length).toBeGreaterThanOrEqual(8)
-      expect(readJson(join(item.agentDir, "auth.json")).commandcode).toEqual({ type: "api_key", key: `\${CMD_API_KEY}` })
+      expect(readJson(join(item.agentDir, "auth.json")).commandcode).toEqual({
+        type: "api_key",
+        key: `\${CMD_API_KEY}`,
+      })
     })
 
     test("#when setup is a dry run #then the Command Code provider is announced alongside its guidance", () => {
@@ -214,7 +244,9 @@ describe("omo setup migration summary", () => {
       expect(stdout).toContain("Found your Command Code setup")
       expect(stdout).toContain("commandcode -> https://api.commandcode.ai/provider/v1")
       expect(existsSync(join(item.home, ".omo"))).toBe(false)
-      expect(stdout).toContain("To make the Command Code provider enforce zero data retention, add the header \"x-cmd-zdr: 1\" to its models.json entry by hand.")
+      expect(stdout).toContain(
+        'To make the Command Code provider enforce zero data retention, add the header "x-cmd-zdr: 1" to its models.json entry by hand.',
+      )
     })
   })
 
@@ -231,7 +263,9 @@ describe("omo setup migration summary", () => {
 
       // then: no key env var is set and no commandcode entry exists, so the summary names no
       // Command Code guidance at all; no row, no files.
-      expect(stdout).not.toContain("To make the Command Code provider enforce zero data retention, add the header \"x-cmd-zdr: 1\" to its models.json entry by hand.")
+      expect(stdout).not.toContain(
+        'To make the Command Code provider enforce zero data retention, add the header "x-cmd-zdr: 1" to its models.json entry by hand.',
+      )
       expect(existsSync(join(item.home, ".omo"))).toBe(false)
     })
   })
@@ -245,7 +279,12 @@ describe("omo setup migration summary", () => {
       const home = join(root, "home")
       const opencodeDir = join(home, ".config", "opencode")
       write(join(opencodeDir, "opencode.json"), {
-        provider: { acme: { options: { baseURL: "https://api.acme.example/v1", apiKey: "acme-key" }, models: { "acme-large": {} } } },
+        provider: {
+          acme: {
+            options: { baseURL: "https://api.acme.example/v1", apiKey: "acme-key" },
+            models: { "acme-large": {} },
+          },
+        },
       })
       const agentDir = join(home, ".omo", "agent")
       write(join(agentDir, "models.json"), {

@@ -18,22 +18,34 @@ export function isolatedEnvironment(sandbox) {
     env[key] = value
   }
   return withTelemetryOptOut({
-    ...env, HOME: sandbox.home, USERPROFILE: sandbox.home,
-    XDG_CONFIG_HOME: join(sandbox.home, "config"), XDG_DATA_HOME: join(sandbox.home, "data"),
-    XDG_STATE_HOME: join(sandbox.home, "state"), XDG_CACHE_HOME: join(sandbox.home, "cache"),
-    TMPDIR: sandbox.root, TMP: sandbox.root, TEMP: sandbox.root,
-    OMO_CODING_AGENT_DIR: sandbox.agentDir, SENPI_CODING_AGENT_SESSION_DIR: sandbox.sessionDir,
+    ...env,
+    HOME: sandbox.home,
+    USERPROFILE: sandbox.home,
+    XDG_CONFIG_HOME: join(sandbox.home, "config"),
+    XDG_DATA_HOME: join(sandbox.home, "data"),
+    XDG_STATE_HOME: join(sandbox.home, "state"),
+    XDG_CACHE_HOME: join(sandbox.home, "cache"),
+    TMPDIR: sandbox.root,
+    TMP: sandbox.root,
+    TEMP: sandbox.root,
+    OMO_CODING_AGENT_DIR: sandbox.agentDir,
+    SENPI_CODING_AGENT_SESSION_DIR: sandbox.sessionDir,
     ...(processIsolation ? { SENPI_CODEMODE_JS_ISOLATION: "process" } : {}),
-    PI_OFFLINE: "1", PI_TELEMETRY: "0",
+    PI_OFFLINE: "1",
+    PI_TELEMETRY: "0",
   })
 }
 
 export function createSandbox(binary) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "omo-eval-smoke-")))
   const sandbox = {
-    root, home: join(root, "home"), cwd: join(root, "project"),
-    agentDir: join(root, "agent"), sessionDir: join(root, "sessions"),
-    providerPath: join(root, "provider.ts"), receiptPath: join(root, "read.jsonl"),
+    root,
+    home: join(root, "home"),
+    cwd: join(root, "project"),
+    agentDir: join(root, "agent"),
+    sessionDir: join(root, "sessions"),
+    providerPath: join(root, "provider.ts"),
+    receiptPath: join(root, "read.jsonl"),
     binary: join(root, process.platform === "win32" ? "omo.exe" : "omo"),
     marker: crypto.randomUUID(),
   }
@@ -45,21 +57,34 @@ export function createSandbox(binary) {
   mkdirSync(join(sandbox.agentDir, "omo-senpi", "omo-native"), { recursive: true })
   writeFileSync(join(sandbox.agentDir, "omo-senpi", "omo-native", "onboarding-completed"), '{"version":1}\n')
   writeFileSync(join(sandbox.agentDir, "trust.json"), JSON.stringify({ [sandbox.cwd]: true }))
-  writeFileSync(join(sandbox.agentDir, "settings.json"), JSON.stringify({
-    defaultProjectTrust: "ask", defaultProvider: "openai", defaultModel: "gpt-5.6-sol",
-  }))
-  writeFileSync(join(sandbox.agentDir, "models.json"), JSON.stringify({
-    providers: { openai: { models: [
-      { id: "gpt-5.6-sol", name: "Eval Smoke", contextWindow: 200000, maxTokens: 4096 },
-    ] } },
-  }))
+  writeFileSync(
+    join(sandbox.agentDir, "settings.json"),
+    JSON.stringify({
+      defaultProjectTrust: "ask",
+      defaultProvider: "openai",
+      defaultModel: "gpt-5.6-sol",
+    }),
+  )
+  writeFileSync(
+    join(sandbox.agentDir, "models.json"),
+    JSON.stringify({
+      providers: {
+        openai: { models: [{ id: "gpt-5.6-sol", name: "Eval Smoke", contextWindow: 200000, maxTokens: 4096 }] },
+      },
+    }),
+  )
   writeFileSync(join(sandbox.cwd, "fixture.txt"), `${sandbox.marker}\n`)
   // Sandbox cells on. Every cell gets 10 s before it detaches (room for a cold QuickJS boot on a slow runner). The
   // large sandbox cell blocks until a later cell releases it, so its detach and the peek after it never race its end.
   mkdirSync(join(sandbox.cwd, ".senpi"), { recursive: true })
-  writeFileSync(join(sandbox.cwd, ".senpi", "codemode.json"), JSON.stringify({
-    sandbox: { enabled: true }, cellTimeoutSeconds: 10, foregroundWindowSeconds: 12,
-  }))
+  writeFileSync(
+    join(sandbox.cwd, ".senpi", "codemode.json"),
+    JSON.stringify({
+      sandbox: { enabled: true },
+      cellTimeoutSeconds: 10,
+      foregroundWindowSeconds: 12,
+    }),
+  )
   writeFileSync(sandbox.providerPath, evalSmokeProviderSource(sandbox.receiptPath))
   return sandbox
 }

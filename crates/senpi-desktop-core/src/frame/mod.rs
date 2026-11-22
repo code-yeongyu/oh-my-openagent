@@ -4,10 +4,12 @@
 mod caps;
 mod encode;
 mod geometry;
+mod hit;
 
 pub use caps::{apply_capture_caps, MAX_COMPOSITE_PIXELS};
 pub use encode::encode_png;
 pub use geometry::FrameGeometry;
+pub use hit::{frame_reason, PointHit};
 
 /// Rounds a pixel measure to `u32`. Float-to-int `as` saturates (negative and
 /// NaN become 0, overflow becomes `u32::MAX`), the clamp every caller wants.

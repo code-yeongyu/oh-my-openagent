@@ -42,21 +42,65 @@ function notices(pi: FakeExtensionAPI): Record<string, unknown>[] {
   return pi.messages.map((call) => call.message).filter((m) => m["customType"] === NOTICE_TYPE)
 }
 
-const NOTICE_THEME = new Theme({
-  accent: "#000000", bashMode: "#000000", border: "#000000", borderAccent: "#000000", borderMuted: "#000000",
-  customMessageLabel: "#000000", customMessageText: "#000000", dim: "#000000", error: "#000000", mdCode: "#000000",
-  mdCodeBlock: "#000000", mdCodeBlockBorder: "#000000", mdHeading: "#000000", mdHr: "#000000", mdLink: "#000000",
-  mdLinkUrl: "#000000", mdListBullet: "#000000", mdQuote: "#000000", mdQuoteBorder: "#000000", muted: "#000000",
-  success: "#000000", syntaxComment: "#000000", syntaxFunction: "#000000", syntaxKeyword: "#000000", syntaxNumber: "#000000",
-  syntaxOperator: "#000000", syntaxPunctuation: "#000000", syntaxString: "#000000", syntaxType: "#000000", syntaxVariable: "#000000",
-  text: "#000000", thinkingHigh: "#000000", thinkingLow: "#000000", thinkingMax: "#000000", thinkingMedium: "#000000",
-  thinkingMinimal: "#000000", thinkingOff: "#000000", thinkingText: "#000000", thinkingXhigh: "#000000", toolDiffAdded: "#000000",
-  toolDiffContext: "#000000", toolDiffRemoved: "#000000", toolOutput: "#000000", toolTitle: "#000000", userMessageText: "#000000",
-  warning: "#000000",
-}, {
-  customMessageBg: "#000000", selectedBg: "#000000", toolErrorBg: "#000000", toolPendingBg: "#000000", toolSuccessBg: "#000000",
-  userMessageBg: "#000000",
-}, "truecolor")
+const NOTICE_THEME = new Theme(
+  {
+    accent: "#000000",
+    bashMode: "#000000",
+    border: "#000000",
+    borderAccent: "#000000",
+    borderMuted: "#000000",
+    customMessageLabel: "#000000",
+    customMessageText: "#000000",
+    dim: "#000000",
+    error: "#000000",
+    mdCode: "#000000",
+    mdCodeBlock: "#000000",
+    mdCodeBlockBorder: "#000000",
+    mdHeading: "#000000",
+    mdHr: "#000000",
+    mdLink: "#000000",
+    mdLinkUrl: "#000000",
+    mdListBullet: "#000000",
+    mdQuote: "#000000",
+    mdQuoteBorder: "#000000",
+    muted: "#000000",
+    success: "#000000",
+    syntaxComment: "#000000",
+    syntaxFunction: "#000000",
+    syntaxKeyword: "#000000",
+    syntaxNumber: "#000000",
+    syntaxOperator: "#000000",
+    syntaxPunctuation: "#000000",
+    syntaxString: "#000000",
+    syntaxType: "#000000",
+    syntaxVariable: "#000000",
+    text: "#000000",
+    thinkingHigh: "#000000",
+    thinkingLow: "#000000",
+    thinkingMax: "#000000",
+    thinkingMedium: "#000000",
+    thinkingMinimal: "#000000",
+    thinkingOff: "#000000",
+    thinkingText: "#000000",
+    thinkingXhigh: "#000000",
+    toolDiffAdded: "#000000",
+    toolDiffContext: "#000000",
+    toolDiffRemoved: "#000000",
+    toolOutput: "#000000",
+    toolTitle: "#000000",
+    userMessageText: "#000000",
+    warning: "#000000",
+  },
+  {
+    customMessageBg: "#000000",
+    selectedBg: "#000000",
+    toolErrorBg: "#000000",
+    toolPendingBg: "#000000",
+    toolSuccessBg: "#000000",
+    userMessageBg: "#000000",
+  },
+  "truecolor",
+)
 
 describe("fallback-architect notice", () => {
   describe("#given a refusal driven fallback off fable 5", () => {
@@ -87,7 +131,10 @@ describe("fallback-architect notice", () => {
         await armRefusalFallback(pi)
         await pi.dispatch(
           "message_end",
-          { type: "message_end", message: { role: "assistant", stopReason: "error", errorMessage: "Request timed out." } },
+          {
+            type: "message_end",
+            message: { role: "assistant", stopReason: "error", errorMessage: "Request timed out." },
+          },
           { cwd: "/tmp/project" },
         )
         await pi.dispatch(
@@ -104,7 +151,14 @@ describe("fallback-architect notice", () => {
   describe("#given structured fallback details", () => {
     it("#when rendered #then the notice uses the custom-message background block", () => {
       const component = renderFallbackArchitectNotice(
-        { role: "custom", customType: NOTICE_TYPE, content: "", display: true, timestamp: 0, details: { from: FABLE.id, to: KIMI.id } },
+        {
+          role: "custom",
+          customType: NOTICE_TYPE,
+          content: "",
+          display: true,
+          timestamp: 0,
+          details: { from: FABLE.id, to: KIMI.id },
+        },
         { expanded: false, outputPad: 0 },
         NOTICE_THEME,
       )

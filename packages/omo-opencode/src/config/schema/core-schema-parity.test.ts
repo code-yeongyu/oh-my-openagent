@@ -65,7 +65,12 @@ function probeValueFor(key: string): unknown {
 
 describe("core <-> adapter schema parity", () => {
   test("both runtimes retain valid distribution policies and reject invalid ones", () => {
-    for (const schema of [OmoAgentDefSchema, OmoCategoryConfigSchema, AgentOverrideConfigSchema, CategoryConfigSchema]) {
+    for (const schema of [
+      OmoAgentDefSchema,
+      OmoCategoryConfigSchema,
+      AgentOverrideConfigSchema,
+      CategoryConfigSchema,
+    ]) {
       for (const policy of ["sequential", "round_robin"]) {
         const result = schema.safeParse({ models_distribution: policy })
         expect(result.success).toBe(true)

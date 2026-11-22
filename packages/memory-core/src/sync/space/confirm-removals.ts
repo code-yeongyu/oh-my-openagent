@@ -27,7 +27,10 @@ export function confirmRemovals(doc: LoroDoc, plan: AdoptionPlan, files: readonl
   const retained: RetainedSource[] = [...plan.retainedSources]
   for (const path of plan.removalCandidates) {
     const source = files.find((file) => file.path === path)
-    const missing = source === undefined ? "source not among the adopted files" : firstMissingFact(committed, normalizeInput(source.text), registers)
+    const missing =
+      source === undefined
+        ? "source not among the adopted files"
+        : firstMissingFact(committed, normalizeInput(source.text), registers)
     if (missing === null) remove.push(path)
     else retained.push({ path, reason: missing })
   }

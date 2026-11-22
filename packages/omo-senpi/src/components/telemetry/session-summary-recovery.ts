@@ -44,7 +44,8 @@ export function purgeSenpiOtlpSpoolOnOptOut(input: {
 }): void {
   const spoolRoot = resolveAgentHome({ env: input.env })
   purgeIdleOtlpSpool({
-    spoolRoot, spoolDir: join(spoolRoot, "omo-senpi", "otlp"),
+    spoolRoot,
+    spoolDir: join(spoolRoot, "omo-senpi", "otlp"),
     ...(input.diagnostics === undefined ? {} : { diagnostics: input.diagnostics }),
     ...(input.isPidAlive === undefined ? {} : { isPidAlive: input.isPidAlive }),
   })
@@ -128,7 +129,15 @@ export function createSummaryRecovery(input: {
     // A dead process's own copy is never continued (its key names that process), so it is not recreated.
     const keepNumbering = () => {
       if (!storage.isOwnCopyKey(key)) {
-        storage.createWindow(key, { ...record, owner: storage.owner, heartbeatAt: storage.now(), epoch, seq: nextSeq, windowId: null, window: null })
+        storage.createWindow(key, {
+          ...record,
+          owner: storage.owner,
+          heartbeatAt: storage.now(),
+          epoch,
+          seq: nextSeq,
+          windowId: null,
+          window: null,
+        })
       }
       removeFile(claimed.claimPath)
     }
@@ -138,18 +147,21 @@ export function createSummaryRecovery(input: {
       keepNumbering()
       return nextSeq
     }
-    void publisher.publishWindow({
-      consent: record.consent,
-      scope: record.scope,
-      sessionHash: record.sessionHash,
-      sessionRole: record.sessionRole,
-      sampleRate: record.sampleRate,
-      epoch,
-      seq: record.seq,
-      windowId: record.windowId,
-      window: record.window,
-      endedBy: "recovered",
-    }, keepNumbering)
+    void publisher.publishWindow(
+      {
+        consent: record.consent,
+        scope: record.scope,
+        sessionHash: record.sessionHash,
+        sessionRole: record.sessionRole,
+        sampleRate: record.sampleRate,
+        epoch,
+        seq: record.seq,
+        windowId: record.windowId,
+        window: record.window,
+        endedBy: "recovered",
+      },
+      keepNumbering,
+    )
     return nextSeq
   }
 
@@ -200,11 +212,18 @@ export function createSummaryRecovery(input: {
 
   // Oldest first, past either cap: a long outage cannot grow the spool without bound.
   const dropOverCap = (uuids: readonly string[]): ReadonlySet<string> => {
-    const aged = uuids.map((uuid) => {
-      const record: ReadResult<PendingRecord> = storage.readPending(uuid)
-      const readable = record !== undefined && record !== CORRUPT ? record : undefined
-      return { uuid, readable, createdAt: readable?.createdAt ?? 0, bytes: fileBytes(join(storage.dir, "pending", `${uuid}.json`)) }
-    }).sort((left, right) => left.createdAt - right.createdAt)
+    const aged = uuids
+      .map((uuid) => {
+        const record: ReadResult<PendingRecord> = storage.readPending(uuid)
+        const readable = record !== undefined && record !== CORRUPT ? record : undefined
+        return {
+          uuid,
+          readable,
+          createdAt: readable?.createdAt ?? 0,
+          bytes: fileBytes(join(storage.dir, "pending", `${uuid}.json`)),
+        }
+      })
+      .sort((left, right) => left.createdAt - right.createdAt)
     let files = aged.length
     let bytes = aged.reduce((total, entry) => total + entry.bytes, 0)
     const dropped = new Set<string>()

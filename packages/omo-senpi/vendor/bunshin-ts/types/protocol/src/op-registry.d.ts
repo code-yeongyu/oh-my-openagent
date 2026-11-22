@@ -1,0 +1,74 @@
+import type { TSchema } from "@sinclair/typebox";
+export type OpEffect = "read" | "mutate";
+export type OpExposure = "invoke" | "agent-to-hub" | "hub-http" | "control";
+export type OpTransport = "built-in" | "sidecar";
+export type OpDeterminism = "fixed" | "variable";
+export type OpDisruption = "none" | "jobs" | "agent" | "host";
+export type RegistryError = {
+    readonly code: string;
+    readonly deterministic: boolean;
+    readonly trigger?: string;
+};
+export type OpRegistryEntry = {
+    readonly op: string;
+    readonly capabilityGroup: string;
+    readonly effect: OpEffect;
+    readonly exposure: OpExposure;
+    readonly transport: OpTransport;
+    readonly determinism: OpDeterminism;
+    readonly disruption: OpDisruption;
+    readonly variableFields?: readonly string[];
+    readonly timeoutBudget?: number;
+    readonly argsSchema: TSchema;
+    readonly resultSchema: TSchema;
+    readonly errors: readonly RegistryError[];
+};
+export declare const OP_REGISTRY: readonly [OpRegistryEntry, OpRegistryEntry, OpRegistryEntry, OpRegistryEntry, OpRegistryEntry, OpRegistryEntry, OpRegistryEntry, OpRegistryEntry, OpRegistryEntry, OpRegistryEntry, OpRegistryEntry, OpRegistryEntry, OpRegistryEntry, OpRegistryEntry, OpRegistryEntry, OpRegistryEntry, OpRegistryEntry, OpRegistryEntry, OpRegistryEntry, OpRegistryEntry, OpRegistryEntry, OpRegistryEntry, OpRegistryEntry, OpRegistryEntry, OpRegistryEntry, OpRegistryEntry, OpRegistryEntry, OpRegistryEntry, OpRegistryEntry];
+export declare const OP_EFFECTS: Readonly<Record<string, OpEffect>>;
+export declare const OP_EXPOSURE: Readonly<Record<string, OpExposure>>;
+export declare const CAPABILITY_GROUPS: Readonly<Record<string, readonly string[]>>;
+export declare const opSchemaArtifacts: {
+    fileName: string;
+    schema: TSchema;
+}[];
+export declare const protocolOpRegistry: {
+    readonly version: 1;
+    readonly features: readonly ["durable-invoke-v1", "artifact-write", "transfer-ticket", "network-report", "transfer-probe", "protocol-rev-2", "error_frames:v2", "durable-result-envelope-v1", "terminal-lifecycle:v1", "machine-key-refresh:v1", "agent-health:v1", "fleet-events:v1", "ssh-bridge:v1"];
+    readonly ops: {
+        op: string;
+        capabilityGroup: string;
+        effect: OpEffect;
+        exposure: OpExposure;
+        transport: OpTransport;
+        determinism: OpDeterminism;
+        disruption: OpDisruption;
+        variableFields: readonly string[] | undefined;
+        timeoutBudget: number | undefined;
+        errors: readonly RegistryError[];
+    }[];
+    readonly capabilityGroups: Readonly<Record<string, readonly string[]>>;
+    readonly constants: {
+        readonly AGENT_MAX_YIELD_MS: 10000;
+        readonly HUB_PENDING_RESPONSE_TIMEOUT_MS: 30000;
+        readonly SDK_MAX_DEADLINE_MS: 30000;
+        readonly DURABLE_INVOKE_INFLIGHT_RETENTION_MS: 120000;
+        readonly DURABLE_INVOKE_RESULT_RETENTION_MS: 120000;
+        readonly DURABLE_INVOKE_INLINE_MAX_BYTES: 65536;
+        readonly LONG_SHELL_BUDGET_MS: 3600000;
+        readonly DURABLE_INVOKE_MAX_BUDGET_MS: 3660000;
+        readonly HEARTBEAT_MS: 30000;
+        readonly PONG_TIMEOUT_MS: 10000;
+        readonly ARTIFACT_OFFLOAD_THRESHOLD_BYTES: 1048576;
+        readonly TERMINAL_YIELD_MIN_MS: 250;
+        readonly TERMINAL_MAX_YIELD_MS: 10000;
+        readonly TRANSFER_CANDIDATE_TTL_MS: 90000;
+        readonly TRANSFER_TICKET_TTL_MS: 60000;
+        readonly TRANSFER_PROBE_TIMEOUT_MS: 500;
+        readonly TRANSFER_MAX_STREAM_MS: 900000;
+        readonly TRANSFER_IDLE_TIMEOUT_MS: 30000;
+        readonly TRANSFER_REDEEM_TIMEOUT_MS: 5000;
+        readonly TREE_TRANSFER_BUDGET_MS: 600000;
+        readonly TREE_ARCHIVE_MAX_BYTES: 268435456;
+        readonly TREE_ARCHIVE_FORMATS: readonly ["tar+gzip"];
+    };
+};

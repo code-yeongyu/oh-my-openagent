@@ -18,7 +18,7 @@ export interface RalphLoopHook {
       messageCountAtStart?: number
       ultrawork?: boolean
       strategy?: "reset" | "continue"
-    }
+    },
   ) => boolean
   resumeLoop: (sessionID: string) => boolean
   cancelLoop: (sessionID: string) => boolean
@@ -41,10 +41,7 @@ function getMessageCountFromResponse(messagesResponse: unknown): number {
   return 0
 }
 
-export function createRalphLoopHook(
-  ctx: PluginInput,
-  options?: RalphLoopOptions
-): RalphLoopHook {
+export function createRalphLoopHook(ctx: PluginInput, options?: RalphLoopOptions): RalphLoopHook {
   const config = options?.config
   const stateDir = config?.state_dir
   const getTranscriptPath = options?.getTranscriptPath ?? getDefaultTranscriptPath
@@ -53,71 +50,69 @@ export function createRalphLoopHook(
   const checkSessionExists = options?.checkSessionExists
   const backgroundManager = options?.backgroundManager
 
-	const loopState = createLoopStateController({
-		directory: ctx.directory,
-		stateDir,
-		config,
-	})
+  const loopState = createLoopStateController({
+    directory: ctx.directory,
+    stateDir,
+    config,
+  })
 
-	const event = createRalphLoopEventHandler(ctx, {
-		directory: ctx.directory,
-		apiTimeoutMs: apiTimeout,
-		idleSettleMs,
-		getTranscriptPath,
-		checkSessionExists,
-		backgroundManager,
-		loopState,
-	})
+  const event = createRalphLoopEventHandler(ctx, {
+    directory: ctx.directory,
+    apiTimeoutMs: apiTimeout,
+    idleSettleMs,
+    getTranscriptPath,
+    checkSessionExists,
+    backgroundManager,
+    loopState,
+  })
 
-	return {
-		event,
-		startLoop: (sessionID, prompt, loopOptions): boolean => {
-			const startSuccess = loopState.startLoop(sessionID, prompt, loopOptions)
-			if (startSuccess) {
-				releasePromptAsyncReservation(sessionID, "ralph-loop:start-loop", {
-					reservedBy: HOOK_NAME,
-				})
-			}
-			if (!startSuccess || typeof loopOptions?.messageCountAtStart === "number") {
-				return startSuccess
-			}
+  return {
+    event,
+    startLoop: (sessionID, prompt, loopOptions): boolean => {
+      const startSuccess = loopState.startLoop(sessionID, prompt, loopOptions)
+      if (startSuccess) {
+        releasePromptAsyncReservation(sessionID, "ralph-loop:start-loop", {
+          reservedBy: HOOK_NAME,
+        })
+      }
+      if (!startSuccess || typeof loopOptions?.messageCountAtStart === "number") {
+        return startSuccess
+      }
 
-			const startedState = loopState.getState()
-			const expectedStartedAt = startedState?.session_id === sessionID
-				? startedState.started_at
-				: undefined
+      const startedState = loopState.getState()
+      const expectedStartedAt = startedState?.session_id === sessionID ? startedState.started_at : undefined
 
-			ctx.client.session
-				.messages({
-					path: { id: sessionID },
-					query: { directory: ctx.directory },
-				})
-				.then((messagesResponse: unknown) => {
-					const messageCountAtStart = getMessageCountFromResponse(messagesResponse)
-					loopState.setMessageCountAtStart(sessionID, messageCountAtStart, expectedStartedAt)
-				})
-				.catch((error: unknown) => {
-					log(`[${HOOK_NAME}] Failed to record loop start message count`, {
-						sessionID,
-						error: String(error),
-					})
-				})
+      ctx.client.session
+        .messages({
+          path: { id: sessionID },
+          query: { directory: ctx.directory },
+        })
+        .then((messagesResponse: unknown) => {
+          const messageCountAtStart = getMessageCountFromResponse(messagesResponse)
+          loopState.setMessageCountAtStart(sessionID, messageCountAtStart, expectedStartedAt)
+        })
+        .catch((error: unknown) => {
+          log(`[${HOOK_NAME}] Failed to record loop start message count`, {
+            sessionID,
+            error: String(error),
+          })
+        })
 
-			return startSuccess
-		},
-		resumeLoop: (sessionID): boolean => {
-			const resumedState = loopState.resumeLoop(sessionID)
-			if (!resumedState) {
-				return false
-			}
+      return startSuccess
+    },
+    resumeLoop: (sessionID): boolean => {
+      const resumedState = loopState.resumeLoop(sessionID)
+      if (!resumedState) {
+        return false
+      }
 
-			releasePromptAsyncReservation(sessionID, "ralph-loop:resume-loop", {
-				reservedBy: HOOK_NAME,
-			})
+      releasePromptAsyncReservation(sessionID, "ralph-loop:resume-loop", {
+        reservedBy: HOOK_NAME,
+      })
 
-			return true
-		},
-		cancelLoop: loopState.cancelLoop,
-		getState: loopState.getState as () => RalphLoopState | null,
-	}
+      return true
+    },
+    cancelLoop: loopState.cancelLoop,
+    getState: loopState.getState as () => RalphLoopState | null,
+  }
 }

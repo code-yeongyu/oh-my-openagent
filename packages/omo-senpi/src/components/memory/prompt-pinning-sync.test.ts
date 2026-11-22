@@ -37,13 +37,16 @@ async function otherSessionCommit(repo: GitMemoryRepo, path: string, body: strin
 
 function handler(repo: GitMemoryRepo, context: MemoryIdentityContext) {
   const pi = new FakeExtensionAPI()
-  pi.on("before_agent_start", createMemoryPromptHandler({
-    resolveContext: () => context,
-    createRepo: () => repo,
-    cache: new MemoryBlockCache(),
-    pins: createProjectionPins({ deviceName: (principal) => DEVICES[principal] }),
-    recordPin: () => undefined,
-  }))
+  pi.on(
+    "before_agent_start",
+    createMemoryPromptHandler({
+      resolveContext: () => context,
+      createRepo: () => repo,
+      cache: new MemoryBlockCache(),
+      pins: createProjectionPins({ deviceName: (principal) => DEVICES[principal] }),
+      recordPin: () => undefined,
+    }),
+  )
   return (turn: number) => dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext(SESSION, liveBranch(turn)))
 }
 

@@ -66,13 +66,15 @@ describe("runSenpiInstaller source refresh", () => {
     const stalePlugin = await tempDir("omo-senpi-stale-package-")
     await mkdir(agentDir, { recursive: true })
     await writeFile(join(stalePlugin, "package.json"), JSON.stringify({ name: "@code-yeongyu/omo-senpi" }))
-    await writeFile(
-      join(agentDir, "settings.json"),
-      JSON.stringify({ packages: ["keep-me", stalePlugin] }),
-    )
+    await writeFile(join(agentDir, "settings.json"), JSON.stringify({ packages: ["keep-me", stalePlugin] }))
 
     // when
-    await runSenpiInstaller({ agentDir, homeDir: await tempDir("omo-senpi-package-replace-home-"), repoRoot, pluginPath })
+    await runSenpiInstaller({
+      agentDir,
+      homeDir: await tempDir("omo-senpi-package-replace-home-"),
+      repoRoot,
+      pluginPath,
+    })
 
     // then
     expect(await settingsPackages(agentDir)).toEqual(["keep-me", pluginPath])
@@ -85,14 +87,26 @@ describe("runSenpiInstaller source refresh", () => {
     await writeFile(join(readableUnrelated, "package.json"), JSON.stringify({ name: "unrelated" }))
     await writeFile(
       join(agentDir, "settings.json"),
-      JSON.stringify({ packages: ["omo-senpi-cli-plugin-Ab12Cd", "omo-senpi-cli-plugin-bad", readableUnrelated, "dead-unrelated"] }),
+      JSON.stringify({
+        packages: ["omo-senpi-cli-plugin-Ab12Cd", "omo-senpi-cli-plugin-bad", readableUnrelated, "dead-unrelated"],
+      }),
     )
 
     // when
-    await runSenpiInstaller({ agentDir, homeDir: await tempDir("omo-senpi-package-cleanup-home-"), repoRoot, pluginPath })
+    await runSenpiInstaller({
+      agentDir,
+      homeDir: await tempDir("omo-senpi-package-cleanup-home-"),
+      repoRoot,
+      pluginPath,
+    })
 
     // then
-    expect(await settingsPackages(agentDir)).toEqual(["omo-senpi-cli-plugin-bad", readableUnrelated, "dead-unrelated", pluginPath])
+    expect(await settingsPackages(agentDir)).toEqual([
+      "omo-senpi-cli-plugin-bad",
+      readableUnrelated,
+      "dead-unrelated",
+      pluginPath,
+    ])
   })
 
   test("#given current and stale OMO entries #when refreshing #then the current package keeps its precedence", async () => {

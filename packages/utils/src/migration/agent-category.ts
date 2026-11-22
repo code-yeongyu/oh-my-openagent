@@ -50,10 +50,7 @@ export function migrateAgentConfigToCategory(config: Record<string, unknown>): {
   }
 }
 
-export function shouldDeleteAgentConfig(
-  config: Record<string, unknown>,
-  category: string
-): boolean {
+export function shouldDeleteAgentConfig(config: Record<string, unknown>, category: string): boolean {
   const defaults = categoryDefaults[category]
   if (!defaults) return false
 

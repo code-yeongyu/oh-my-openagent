@@ -2,12 +2,7 @@ import { existsSync, readFileSync } from "fs"
 import { join } from "path"
 import { homedir } from "os"
 import { getClaudeConfigDir } from "../../shared"
-import type {
-  ClaudeCodeMcpConfig,
-  LoadedMcpServer,
-  McpLoadResult,
-  McpScope,
-} from "./types"
+import type { ClaudeCodeMcpConfig, LoadedMcpServer, McpLoadResult, McpScope } from "./types"
 import { transformMcpServer } from "./transformer"
 import { log } from "../../shared/logger"
 import { shouldLoadMcpServer } from "./scope-filter"
@@ -30,14 +25,11 @@ interface ResolvedMcpLoaderContext {
   readonly claudeConfigDir: string
 }
 
-export function resolveMcpLoaderContext(
-  options: McpLoaderOptions = {}
-): ResolvedMcpLoaderContext {
+export function resolveMcpLoaderContext(options: McpLoaderOptions = {}): ResolvedMcpLoaderContext {
   const cwd = options.cwd ?? process.cwd()
   const homeDir = options.homeDir ?? getHomeDir()
-  const claudeConfigDir = options.claudeConfigDir ?? (
-    options.homeDir === undefined ? getClaudeConfigDir() : join(homeDir, ".claude")
-  )
+  const claudeConfigDir =
+    options.claudeConfigDir ?? (options.homeDir === undefined ? getClaudeConfigDir() : join(homeDir, ".claude"))
 
   return { cwd, homeDir, claudeConfigDir }
 }
@@ -61,9 +53,7 @@ function getHomeDir(): string {
   return process.env.HOME || process.env.USERPROFILE || homedir()
 }
 
-async function loadMcpConfigFile(
-  filePath: string
-): Promise<ClaudeCodeMcpConfig | null> {
+async function loadMcpConfigFile(filePath: string): Promise<ClaudeCodeMcpConfig | null> {
   if (!existsSync(filePath)) {
     return null
   }
@@ -114,7 +104,7 @@ export function getSystemMcpServerNames(options: McpLoaderOptions = {}): Set<str
 
 export async function loadMcpConfigs(
   disabledMcps: string[] = [],
-  options: McpLoaderOptions = {}
+  options: McpLoaderOptions = {},
 ): Promise<McpLoadResult> {
   const servers: McpLoadResult["servers"] = {}
   const loadedServers: LoadedMcpServer[] = []
@@ -178,12 +168,8 @@ export async function loadMcpConfigs(
   return { servers, loadedServers }
 }
 
-export function formatLoadedServersForToast(
-  loadedServers: LoadedMcpServer[]
-): string {
+export function formatLoadedServersForToast(loadedServers: LoadedMcpServer[]): string {
   if (loadedServers.length === 0) return ""
 
-  return loadedServers
-    .map((server) => `${server.name} (${server.scope})`)
-    .join(", ")
+  return loadedServers.map((server) => `${server.name} (${server.scope})`).join(", ")
 }

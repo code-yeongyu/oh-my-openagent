@@ -58,7 +58,10 @@ export const OhMyOpenCodeConfigSchema = z.object({
   /** Enable hashline_edit tool/hook integrations (default: false) */
   hashline_edit: z.boolean().optional(),
   /** Enable anonymous telemetry. Default: enabled when omitted. Set to false to disable. */
-  telemetry: z.boolean().optional().describe("Enable or disable anonymous telemetry. Default: enabled when omitted. Set to false to disable."),
+  telemetry: z
+    .boolean()
+    .optional()
+    .describe("Enable or disable anonymous telemetry. Default: enabled when omitted. Set to false to disable."),
   /** Enable model fallback on API errors (default: false). Set to true to enable automatic model switching when model errors occur. */
   model_fallback: z.boolean().optional(),
   agents: AgentOverridesSchema.optional(),

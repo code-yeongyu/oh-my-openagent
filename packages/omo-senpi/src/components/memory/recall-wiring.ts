@@ -106,10 +106,7 @@ export interface CollectedRecallCandidates {
 export interface MemoryRecallWiring {
   register(pi: MemoryExtensionAPI): void
   /** Settle-time seam: lexical candidates for the completed turn, or undefined when there are none. */
-  collectCandidates(
-    eventCtx: unknown,
-    extraTexts?: readonly string[],
-  ): Promise<CollectedRecallCandidates | undefined>
+  collectCandidates(eventCtx: unknown, extraTexts?: readonly string[]): Promise<CollectedRecallCandidates | undefined>
   /**
    * Synchronous ctx read for detached callers. Returns undefined when the ctx carries no usable
    * session; never throws, so a disposed ctx degrades to "no candidates" instead of a failed turn.
@@ -131,7 +128,8 @@ const CHILD_SENTINELS = ["SENPI_MEMORY_REFLECTION", "SENPI_MEMORY_FACTS"] as con
 export function createMemoryRecallWiring(options: MemoryRecallWiringOptions): MemoryRecallWiring {
   const corpusCache = options.corpusCache ?? new RecallCorpusCache()
   const transcriptMentions = createTranscriptMentionIndex()
-  const projectSourceMentions = options.projectSource === undefined ? undefined : createProjectSourceMentions(options.projectSource)
+  const projectSourceMentions =
+    options.projectSource === undefined ? undefined : createProjectSourceMentions(options.projectSource)
   const createRepo = options.createRepo ?? defaultCreateRepo
   const ledgerFor = options.ledgerFor ?? ((context) => new RecallLedger(context.identityPaths.recallLedger))
   const pendingFor = options.pendingFor ?? ((context) => new PendingNudges(context.identityPaths.recallPending))
@@ -145,7 +143,10 @@ export function createMemoryRecallWiring(options: MemoryRecallWiringOptions): Me
     ...(options.logger === undefined ? {} : { logger: options.logger }),
   })
 
-  async function collect(eventCtx: unknown, extraTexts: readonly string[] = []): Promise<CollectedRecallCandidates | undefined> {
+  async function collect(
+    eventCtx: unknown,
+    extraTexts: readonly string[] = [],
+  ): Promise<CollectedRecallCandidates | undefined> {
     if (CHILD_SENTINELS.some((sentinel) => options.env[sentinel] === "1")) return undefined
     // agent_settled carries no session fields, so the session is read from the event context the
     // same way the before_agent_start handler reads it.
@@ -155,7 +156,10 @@ export function createMemoryRecallWiring(options: MemoryRecallWiringOptions): Me
   }
 
   /** The ctx-free remainder of collection: everything below runs off plain captured values. */
-  async function collectFrom(session: RecallSession, extraTexts: readonly string[] = []): Promise<CollectedRecallCandidates | undefined> {
+  async function collectFrom(
+    session: RecallSession,
+    extraTexts: readonly string[] = [],
+  ): Promise<CollectedRecallCandidates | undefined> {
     if (CHILD_SENTINELS.some((sentinel) => options.env[sentinel] === "1")) return undefined
     const context = options.resolveContext(session.id)
     if (context === undefined) return undefined
@@ -168,14 +172,15 @@ export function createMemoryRecallWiring(options: MemoryRecallWiringOptions): Me
     // newest-first slots so a filename can score even when user chatter owns both default singles.
     const texts = userTexts(session.entries)
     if (texts.length === 0 && extraTexts.length === 0) return undefined
-    const queries = extraTexts.length === 0
-      ? planRecallQueries(texts)
-      : planRecallQueries(texts, { toolTexts: [...extraTexts].reverse() })
+    const queries =
+      extraTexts.length === 0
+        ? planRecallQueries(texts)
+        : planRecallQueries(texts, { toolTexts: [...extraTexts].reverse() })
     if (queries.length === 0) return undefined
 
     const repo = createRepo(context)
     const own = await corpusCache.load(repo)
-    const projects = await options.projectCorpora?.(session.id) ?? []
+    const projects = (await options.projectCorpora?.(session.id)) ?? []
     const projectDocuments = projects.length === 0 ? [] : projectDocumentsOf(projects)
     const allDocuments = withProjectDocuments(own.documents, projectDocuments)
     if (allDocuments.length === 0) return undefined
@@ -188,16 +193,22 @@ export function createMemoryRecallWiring(options: MemoryRecallWiringOptions): Me
       entries: session.entries,
       documents: allDocuments,
     })
-    for (const path of projectSourceMentions?.excludedPaths(session.id, session.entries, projectDocuments) ?? []) excludePaths.add(path)
+    for (const path of projectSourceMentions?.excludedPaths(session.id, session.entries, projectDocuments) ?? [])
+      excludePaths.add(path)
 
     const ledger = ledgerFor(context)
     const surfaced = await ledger.surfacedPaths(session.id)
-    const candidates = selectWithProjectSeats(own.documents, projects, recall.max_items, (documents, extraQueries, identityId) =>
-      selectRecallCandidates(documents, [...queries, ...extraQueries], {
-        maxItems: recall.max_items,
-        surfaced: pathsInCorpus(surfaced, identityId),
-        excludePaths: pathsInCorpus(excludePaths, identityId),
-      }))
+    const candidates = selectWithProjectSeats(
+      own.documents,
+      projects,
+      recall.max_items,
+      (documents, extraQueries, identityId) =>
+        selectRecallCandidates(documents, [...queries, ...extraQueries], {
+          maxItems: recall.max_items,
+          surfaced: pathsInCorpus(surfaced, identityId),
+          excludePaths: pathsInCorpus(excludePaths, identityId),
+        }),
+    )
     if (candidates.length === 0) return undefined
     return {
       sessionId: session.id,

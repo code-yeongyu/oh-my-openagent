@@ -95,6 +95,9 @@ pub struct KeyChordParams {
     pub target: String,
     pub keys: Vec<String>,
     pub opts: Option<PointerOptions>,
+    /// Sends a chord the engine treats as dangerous (`cmd+q`, `alt+f4`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub force: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

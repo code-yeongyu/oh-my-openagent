@@ -80,14 +80,16 @@ describe("resolveFormatters", () => {
     //#given
     const client = {
       config: {
-        get: mock(() => Promise.resolve({
-          formatter: {
-            prettier: {
-              command: ["prettier", "--write", "$FILE"],
-              extensions: [".json"],
+        get: mock(() =>
+          Promise.resolve({
+            formatter: {
+              prettier: {
+                command: ["prettier", "--write", "$FILE"],
+                extensions: [".json"],
+              },
             },
-          },
-        })),
+          }),
+        ),
       },
     }
 

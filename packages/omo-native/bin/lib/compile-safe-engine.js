@@ -86,8 +86,20 @@ function inlineMdnData(cssTreeRoot) {
     `const mdnProperties = ${serializeJsonFile(join(mdnCssRoot, "properties.json"))};`,
     `const mdnSyntaxes = ${serializeJsonFile(join(mdnCssRoot, "syntaxes.json"))};`,
   ].join("\n")
-  inlineOnce(join(cssTreeRoot, "lib", "data.js"), ESM_MDN_REQUIRES, constants, MDN_INLINED_MARKER, "css-tree/lib/data.js")
-  inlineOnce(join(cssTreeRoot, "cjs", "data.cjs"), CJS_MDN_REQUIRES, constants, MDN_INLINED_MARKER, "css-tree/cjs/data.cjs")
+  inlineOnce(
+    join(cssTreeRoot, "lib", "data.js"),
+    ESM_MDN_REQUIRES,
+    constants,
+    MDN_INLINED_MARKER,
+    "css-tree/lib/data.js",
+  )
+  inlineOnce(
+    join(cssTreeRoot, "cjs", "data.cjs"),
+    CJS_MDN_REQUIRES,
+    constants,
+    MDN_INLINED_MARKER,
+    "css-tree/cjs/data.cjs",
+  )
 }
 
 function resolveMdnCssRoot(cssTreeRoot) {

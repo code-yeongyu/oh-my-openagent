@@ -13,16 +13,20 @@ export type SummaryPublish = PublishSummary | NativeCaptureState
  * retry, unless it is a permanent `TelemetryDeliveryError` (the event itself was refused), which deletes it
  * and counts it as dropped. Ships in the recovery sidecar: only a closed window or a resend reaches it.
  */
-export async function sendSummaryRecord(record: PendingRecord, context: {
-  readonly storage: SummaryStorage
-  readonly publish: SummaryPublish
-  readonly report: (event: TelemetryDiagnosticInput["event"], error: unknown) => void
-  readonly countDropped: (count: number) => void
-}): Promise<void> {
+export async function sendSummaryRecord(
+  record: PendingRecord,
+  context: {
+    readonly storage: SummaryStorage
+    readonly publish: SummaryPublish
+    readonly report: (event: TelemetryDiagnosticInput["event"], error: unknown) => void
+    readonly countDropped: (count: number) => void
+  },
+): Promise<void> {
   try {
     const publication = { uuid: record.uuid, properties: record.properties, timestamp: record.createdAt }
     const publish = context.publish
-    if (await (typeof publish === "function" ? publish(publication) : publishThroughState(publish, publication))) context.storage.removePending(record.uuid)
+    if (await (typeof publish === "function" ? publish(publication) : publishThroughState(publish, publication)))
+      context.storage.removePending(record.uuid)
   } catch (error) {
     context.report("telemetry_capture_failed", error)
     if (error instanceof TelemetryDeliveryError && error.permanent) {
@@ -39,7 +43,10 @@ export async function sendSummaryRecord(record: PendingRecord, context: {
 async function publishThroughState(state: NativeCaptureState, publication: SummaryPublication): Promise<boolean> {
   const capture = state.capture
   if (capture === undefined || state.isConsented?.() !== true) return false
-  capture("session_summary", publication.properties, { uuid: publication.uuid, timestamp: new Date(publication.timestamp) })
+  capture("session_summary", publication.properties, {
+    uuid: publication.uuid,
+    timestamp: new Date(publication.timestamp),
+  })
   const ack = state.acks.get(publication.uuid)
   state.acks.delete(publication.uuid)
   if (!state.delivered.delete(publication.uuid)) return false

@@ -7,17 +7,48 @@ const RUNTIME_RETRY_ON_ERRORS = [429, 500, 502, 503, 504] as const
 type ErrorInfo = { readonly name?: string; readonly message?: string; readonly statusCode?: number }
 
 const TEMPORARY_LIMITS: ReadonlyArray<readonly [string, ErrorInfo]> = [
-  ["OpenCode Go monthly limit (#8296)", { statusCode: 429, message: "Monthly usage limit reached. It will reset in 2 days 8 hours" }],
-  ["Z.AI weekly/monthly exhaustion (#7161)", { name: "AI_APICallError", message: "Weekly/Monthly Limit Exhausted. Your limit will reset at 2026-09-30 00:00:00" }],
+  [
+    "OpenCode Go monthly limit (#8296)",
+    { statusCode: 429, message: "Monthly usage limit reached. It will reset in 2 days 8 hours" },
+  ],
+  [
+    "Z.AI weekly/monthly exhaustion (#7161)",
+    {
+      name: "AI_APICallError",
+      message: "Weekly/Monthly Limit Exhausted. Your limit will reset at 2026-09-30 00:00:00",
+    },
+  ],
   ["Anthropic subscription session limit", { message: "You've hit your session limit · resets 3pm (Asia/Seoul)" }],
   ["Anthropic subscription weekly limit", { message: "You've hit your weekly limit · resets 5am (Asia/Seoul)" }],
   ["Anthropic subscription 5-hour limit", { message: "5-hour limit reached ∙ resets 3pm" }],
   ["Anthropic subscription model weekly limit", { message: "You've hit your Fable weekly limit · resets Oct 2, 9am" }],
   ["Claude usage limit marker", { message: "Claude AI usage limit reached|1759075200" }],
-  ["Codex usage_limit_reached body", { name: "AI_APICallError", message: '{"error":{"type":"usage_limit_reached","message":"The usage limit has been reached"}}' }],
-  ["Copilot quota 429", { statusCode: 429, message: "GitHub Copilot quota exceeded (HTTP 429): the plan's included usage or its additional-usage limit is used up, so premium models are refused until it resets or the limit is raised." }],
-  ["GLM daily call limit", { statusCode: 429, message: "Daily call limit for this API key has been reached. Limit will reset at midnight UTC." }],
-  ["GLM account in arrears", { statusCode: 429, message: "Your account is in arrears, please recharge and try again." }],
+  [
+    "Codex usage_limit_reached body",
+    {
+      name: "AI_APICallError",
+      message: '{"error":{"type":"usage_limit_reached","message":"The usage limit has been reached"}}',
+    },
+  ],
+  [
+    "Copilot quota 429",
+    {
+      statusCode: 429,
+      message:
+        "GitHub Copilot quota exceeded (HTTP 429): the plan's included usage or its additional-usage limit is used up, so premium models are refused until it resets or the limit is raised.",
+    },
+  ],
+  [
+    "GLM daily call limit",
+    {
+      statusCode: 429,
+      message: "Daily call limit for this API key has been reached. Limit will reset at midnight UTC.",
+    },
+  ],
+  [
+    "GLM account in arrears",
+    { statusCode: 429, message: "Your account is in arrears, please recharge and try again." },
+  ],
   ["quota reset window", { message: "quota will reset after 1 hour" }],
   ["billing-period quota", { message: "quota exceeded for this billing period" }],
   ["insufficient credits", { message: "insufficient credits to complete this request" }],
@@ -50,7 +81,10 @@ describe("model-error-classifier usage and quota limits", () => {
 
   test("#given a rate restriction under a fair-use policy #when classified #then both classifiers advance the chain", () => {
     //#given
-    const error = { statusCode: 429, message: "Request blocked under Fair Use Policy. Your request rate has been restricted." }
+    const error = {
+      statusCode: 429,
+      message: "Request blocked under Fair Use Policy. Your request rate has been restricted.",
+    }
 
     //#when
     const results = [isRetryableModelError(error), isRuntimeFallbackRetryableError(error, RUNTIME_RETRY_ON_ERRORS)]

@@ -23,26 +23,34 @@ function fixture() {
   return { root, project, outside }
 }
 
-test.each(["root", "nested"])("merged host discovery checks the spelled project %s before dereference", async (layout) => {
-  // given
-  const f = fixture()
-  const skillsRoot = join(f.project, ".opencode", "skills")
-  if (layout === "root") symlinkSync(f.outside, skillsRoot)
-  else {
-    mkdirSync(skillsRoot)
-    symlinkSync(f.outside, join(skillsRoot, "escape"))
-  }
-  const diagnostics: { category: string }[] = []
-  // when
-  const result = await createSkillContext(Object.assign({
-    directory: f.project,
-    pluginConfig: OhMyOpenCodeConfigSchema.parse({ claude_code: { skills: false } }),
-    hostSkills: { paths: [skillsRoot] },
-  }, { onDiagnostic: (d: { category: string }) => diagnostics.push(d) }))
-  // then
-  expect(result.mergedSkills.some((s) => s.name === "escape")).toBe(false)
-  expect(diagnostics.some((d) => d.category === "skill-link-blocked")).toBe(true)
-})
+test.each(["root", "nested"])(
+  "merged host discovery checks the spelled project %s before dereference",
+  async (layout) => {
+    // given
+    const f = fixture()
+    const skillsRoot = join(f.project, ".opencode", "skills")
+    if (layout === "root") symlinkSync(f.outside, skillsRoot)
+    else {
+      mkdirSync(skillsRoot)
+      symlinkSync(f.outside, join(skillsRoot, "escape"))
+    }
+    const diagnostics: { category: string }[] = []
+    // when
+    const result = await createSkillContext(
+      Object.assign(
+        {
+          directory: f.project,
+          pluginConfig: OhMyOpenCodeConfigSchema.parse({ claude_code: { skills: false } }),
+          hostSkills: { paths: [skillsRoot] },
+        },
+        { onDiagnostic: (d: { category: string }) => diagnostics.push(d) },
+      ),
+    )
+    // then
+    expect(result.mergedSkills.some((s) => s.name === "escape")).toBe(false)
+    expect(diagnostics.some((d) => d.category === "skill-link-blocked")).toBe(true)
+  },
+)
 
 test.each(["root", "nested"])("native fallback cannot restore escaping project %s cached bytes", async (layout) => {
   // given
@@ -56,7 +64,9 @@ test.each(["root", "nested"])("native fallback cannot restore escaping project %
   const location = layout === "root" ? join(skillsRoot, "SKILL.md") : join(skillsRoot, "escape", "SKILL.md")
   const entry = { name: "escape", description: "fixture", location, content: "PRE-READ OUTSIDE FIXTURE" }
   const tool = createSkillTool({
-    directory: f.project, skills: [], commands: [],
+    directory: f.project,
+    skills: [],
+    commands: [],
     nativeSkills: { all: () => [entry], get: () => entry, dirs: () => [skillsRoot] },
   })
   // when / then
@@ -67,12 +77,15 @@ test("native fallback cannot restore a missing project descendant's cached bytes
   // given - unresolved descendants still retain project authority through root aliases (#10693).
   const f = fixture()
   const entry = {
-    name: "missing", description: "fixture",
+    name: "missing",
+    description: "fixture",
     location: join(f.project, ".opencode", "skills", "missing", "SKILL.md"),
     content: "PRE-READ MISSING FIXTURE",
   }
   const tool = createSkillTool({
-    directory: f.project, skills: [], commands: [],
+    directory: f.project,
+    skills: [],
+    commands: [],
     nativeSkills: { all: () => [entry], get: () => entry, dirs: () => [] },
   })
   // when / then
@@ -84,7 +97,9 @@ test("native builtin row keeps its supplied descriptorless content", async () =>
   const f = fixture()
   const entry = { name: "builtin-fixture", description: "fixture", location: "<built-in>", content: "BUILTIN FIXTURE" }
   const tool = createSkillTool({
-    directory: f.project, skills: [], commands: [],
+    directory: f.project,
+    skills: [],
+    commands: [],
     nativeSkills: { all: () => [entry], get: () => entry, dirs: () => [] },
   })
   // when
@@ -100,9 +115,12 @@ test.each(["project", "user"])("omo config retains %s origin for an outside skil
   mkdirSync(home)
   const configRoot = join(origin === "user" ? home : f.project, ".omo")
   mkdirSync(configRoot)
-  writeFileSync(join(configRoot, "omo.jsonc"), JSON.stringify({
-    "[opencode]": { claude_code: { skills: false }, skills: { sources: [f.outside] } },
-  }))
+  writeFileSync(
+    join(configRoot, "omo.jsonc"),
+    JSON.stringify({
+      "[opencode]": { claude_code: { skills: false }, skills: { sources: [f.outside] } },
+    }),
+  )
   const pluginConfig = validatePluginConfig(f.project, { HOME: home }).config
   // when
   const result = await createSkillContext({ directory: f.project, pluginConfig, hostSkills: {} })

@@ -18,11 +18,12 @@ export function isTrackedTaskChecked(planPath: string, taskKey: string): boolean
   }
 
   const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-  const matcher = section === "todo"
-    ? new RegExp(`^\\s*[-*]\\s*\\[[xX]\\]\\s*${escapedLabel}\\.\\s+`, "m")
-    : section === "final-wave"
-      ? new RegExp(`^\\s*[-*]\\s*\\[[xX]\\]\\s*${escapedLabel.toUpperCase()}\\.\\s+`, "m")
-      : null
+  const matcher =
+    section === "todo"
+      ? new RegExp(`^\\s*[-*]\\s*\\[[xX]\\]\\s*${escapedLabel}\\.\\s+`, "m")
+      : section === "final-wave"
+        ? new RegExp(`^\\s*[-*]\\s*\\[[xX]\\]\\s*${escapedLabel.toUpperCase()}\\.\\s+`, "m")
+        : null
   if (!matcher) {
     return false
   }

@@ -11,17 +11,21 @@ export async function markLiveDeliveryPending(
   messageId: string,
   config: TeamModeConfig,
 ): Promise<void> {
-  await transitionRuntimeState(teamRunId, (currentRuntimeState) => ({
-    ...currentRuntimeState,
-    members: currentRuntimeState.members.map((member) => (
-      member.name === recipientName
-        ? {
-          ...member,
-          pendingInjectedMessageIds: Array.from(new Set([...member.pendingInjectedMessageIds, messageId])),
-        }
-        : member
-    )),
-  }), config)
+  await transitionRuntimeState(
+    teamRunId,
+    (currentRuntimeState) => ({
+      ...currentRuntimeState,
+      members: currentRuntimeState.members.map((member) =>
+        member.name === recipientName
+          ? {
+              ...member,
+              pendingInjectedMessageIds: Array.from(new Set([...member.pendingInjectedMessageIds, messageId])),
+            }
+          : member,
+      ),
+    }),
+    config,
+  )
 }
 
 export async function loadRuntimeStateForLiveDelivery(

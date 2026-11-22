@@ -2,11 +2,7 @@
 
 import { afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test"
 
-import {
-  AGENT_DISPLAY_NAMES,
-  getAgentListDisplayName,
-  normalizeAgentForPromptKey,
-} from "./agent-display-names"
+import { AGENT_DISPLAY_NAMES, getAgentListDisplayName, normalizeAgentForPromptKey } from "./agent-display-names"
 import { installAgentSortShim, setAgentSortOrder } from "./agent-sort-shim"
 
 type AgentListItem = {
@@ -52,16 +48,7 @@ describe("OpenCode Agent.list() sort with runtime display names", () => {
       const prometheus = getAgentListDisplayName("prometheus")
       const atlas = getAgentListDisplayName("atlas")
 
-      const allAgents = [
-        sisyphus,
-        hephaestus,
-        prometheus,
-        atlas,
-        "athena",
-        "explore",
-        "metis",
-        "oracle",
-      ]
+      const allAgents = [sisyphus, hephaestus, prometheus, atlas, "athena", "explore", "metis", "oracle"]
 
       const sorted = simulateOpencodeSort(allAgents, sisyphus)
       const orderedConfigKeys = sorted.map((name) => normalizeAgentForPromptKey(name))
@@ -89,12 +76,7 @@ describe("OpenCode Agent.list() sort with runtime display names", () => {
       const sorted = simulateOpencodeSort(allAgents, "no-such-default-agent")
       const orderedConfigKeys = sorted.map((name) => normalizeAgentForPromptKey(name))
 
-      expect(orderedConfigKeys.slice(0, 4)).toEqual([
-        "sisyphus",
-        "hephaestus",
-        "prometheus",
-        "atlas",
-      ])
+      expect(orderedConfigKeys.slice(0, 4)).toEqual(["sisyphus", "hephaestus", "prometheus", "atlas"])
     })
   })
 
@@ -108,12 +90,7 @@ describe("OpenCode Agent.list() sort with runtime display names", () => {
       const sorted = simulateOpencodeSort([atlas, prometheus, hephaestus, sisyphus], sisyphus)
       const orderedConfigKeys = sorted.map((name) => normalizeAgentForPromptKey(name))
 
-      expect(orderedConfigKeys).toEqual([
-        "sisyphus",
-        "hephaestus",
-        "prometheus",
-        "atlas",
-      ])
+      expect(orderedConfigKeys).toEqual(["sisyphus", "hephaestus", "prometheus", "atlas"])
     })
   })
 

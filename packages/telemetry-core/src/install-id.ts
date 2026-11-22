@@ -13,7 +13,9 @@ const fallbackInstallIds = new Map<string, string>()
  * send path that has already passed every consent check, because the first call creates the file.
  */
 export function getTelemetryInstallDistinctId(stateDir: string): string {
-  return createHash("sha256").update(readOrCreateInstallId(join(stateDir, TELEMETRY_INSTALL_ID_FILE_NAME))).digest("hex")
+  return createHash("sha256")
+    .update(readOrCreateInstallId(join(stateDir, TELEMETRY_INSTALL_ID_FILE_NAME)))
+    .digest("hex")
 }
 
 function readOrCreateInstallId(path: string): string {

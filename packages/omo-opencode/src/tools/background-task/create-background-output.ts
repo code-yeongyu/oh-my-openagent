@@ -72,7 +72,7 @@ async function getTaskWithMissingRetry(
       taskId,
       status: retriedTask?.status,
       sessionId: retriedTask?.sessionId,
-    }
+    },
   )
 
   return retriedTask
@@ -90,7 +90,10 @@ Use the \`background_task_id\` / \`Background Task ID\` from the task launch out
 To inspect this session directly, use \`session_read(session_id="${taskId}")\`, \`session_info\`, or \`session_search\`.`
 }
 
-export function createBackgroundOutput(manager: BackgroundOutputManager, client: BackgroundOutputClient): ToolDefinition {
+export function createBackgroundOutput(
+  manager: BackgroundOutputManager,
+  client: BackgroundOutputClient,
+): ToolDefinition {
   return tool({
     description: BACKGROUND_OUTPUT_DESCRIPTION,
     args: {
@@ -100,17 +103,32 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
       block: tool.schema
         .boolean()
         .optional()
-        .describe(
-          "Wait for completion (default: false). System notifies when done, so blocking is rarely needed."
-        ),
+        .describe("Wait for completion (default: false). System notifies when done, so blocking is rarely needed."),
       timeout: tool.schema.number().optional().describe("Max wait time in ms (default: 60000, max: 600000)"),
-      full_session: tool.schema.boolean().optional().describe("Return full session messages with filters (default: false)"),
-      include_thinking: tool.schema.boolean().optional().describe("Include thinking/reasoning parts in full_session output (default: false)"),
+      full_session: tool.schema
+        .boolean()
+        .optional()
+        .describe("Return full session messages with filters (default: false)"),
+      include_thinking: tool.schema
+        .boolean()
+        .optional()
+        .describe("Include thinking/reasoning parts in full_session output (default: false)"),
       message_limit: tool.schema.number().optional().describe("Max messages to return (capped at 200)"),
       since_message_id: tool.schema.string().optional().describe("Return messages after this message ID (exclusive)"),
-      include_tool_results: tool.schema.boolean().optional().describe("Include tool results in full_session output (default: false)"),
-      thinking_max_chars: tool.schema.number().optional().describe("Max characters for thinking content (default: 2000)"),
-      from_end: tool.schema.boolean().optional().describe("Read messages from the END of the session (default: false). Pass true to get the most-recent / final assistant message in the output. Recommended when you want the result of a completed task."),
+      include_tool_results: tool.schema
+        .boolean()
+        .optional()
+        .describe("Include tool results in full_session output (default: false)"),
+      thinking_max_chars: tool.schema
+        .number()
+        .optional()
+        .describe("Max characters for thinking content (default: 2000)"),
+      from_end: tool.schema
+        .boolean()
+        .optional()
+        .describe(
+          "Read messages from the END of the session (default: false). Pass true to get the most-recent / final assistant message in the output. Recommended when you want the result of a completed task.",
+        ),
     },
     async execute(args: BackgroundOutputArgs, toolContext) {
       try {
@@ -192,7 +210,11 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
           return await formatTaskResult(resolvedTask, client)
         }
 
-        if (resolvedTask.status === "error" || resolvedTask.status === "cancelled" || resolvedTask.status === "interrupt") {
+        if (
+          resolvedTask.status === "error" ||
+          resolvedTask.status === "cancelled" ||
+          resolvedTask.status === "interrupt"
+        ) {
           return formatTaskStatus(resolvedTask)
         }
 

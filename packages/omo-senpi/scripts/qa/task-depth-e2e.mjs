@@ -26,7 +26,10 @@ function argValue(name, fallback) {
 
 function readJsonLines(path) {
   if (!existsSync(path)) return []
-  return readFileSync(path, "utf8").split(/\r?\n/).filter((line) => line.length > 0).map((line) => JSON.parse(line))
+  return readFileSync(path, "utf8")
+    .split(/\r?\n/)
+    .filter((line) => line.length > 0)
+    .map((line) => JSON.parse(line))
 }
 
 function readTaskRecords(stateDir) {
@@ -74,26 +77,60 @@ function main() {
   const startedAt = Date.now()
   const run = spawnSync(
     senpiBin,
-    ["-e", mockProviderEntry, "-p", "--mode", "json", "--provider", "omo-mock", "--model", "mock-1", "--session-dir", sessionDir, "delegate this"],
+    [
+      "-e",
+      mockProviderEntry,
+      "-p",
+      "--mode",
+      "json",
+      "--provider",
+      "omo-mock",
+      "--model",
+      "mock-1",
+      "--session-dir",
+      sessionDir,
+      "delegate this",
+    ],
     { cwd: sandbox.cwd, env, encoding: "utf8", timeout: timeoutMs, maxBuffer: 64 * 1024 * 1024 },
   )
   const elapsedMs = Date.now() - startedAt
 
   const requests = readJsonLines(join(sandbox.cwd, "depth-requests.jsonl"))
   const records = readTaskRecords(engineStateDir(sandbox.cwd, env))
-  const pids = [...new Set([run.pid, ...requests.map((request) => request.pid)].filter((pid) => typeof pid === "number"))]
+  const pids = [
+    ...new Set([run.pid, ...requests.map((request) => request.pid)].filter((pid) => typeof pid === "number")),
+  ]
   const limit = maxDepth === undefined ? 1 : Number(maxDepth)
   // The deepest session allowed to exist is the one whose spawn gets refused; at limit 0 that is the root.
   const deepestEnv = limit === 0 ? null : String(limit)
-  const refusal = requests.find((request) => request.depth_env === deepestEnv && typeof request.tool_result === "string" && request.tool_result.includes("max_depth"))
+  const refusal = requests.find(
+    (request) =>
+      request.depth_env === deepestEnv &&
+      typeof request.tool_result === "string" &&
+      request.tool_result.includes("max_depth"),
+  )
   const recordDepths = records.map((record) => record.depth)
   const checks = {
     run_exited_cleanly: run.status === 0 && run.error === undefined ? "PASS" : "FAIL",
-    tree_stops_at_max_depth: records.length === limit && recordDepths.every((depth) => depth >= 1 && depth <= limit) && new Set(recordDepths).size === limit ? "PASS" : "FAIL",
-    each_child_saw_its_real_depth: Array.from({ length: limit }, (_, index) => String(index + 1)).every((depth) => requests.some((request) => request.rpc && request.depth_env === depth)) ? "PASS" : "FAIL",
+    tree_stops_at_max_depth:
+      records.length === limit &&
+      recordDepths.every((depth) => depth >= 1 && depth <= limit) &&
+      new Set(recordDepths).size === limit
+        ? "PASS"
+        : "FAIL",
+    each_child_saw_its_real_depth: Array.from({ length: limit }, (_, index) => String(index + 1)).every((depth) =>
+      requests.some((request) => request.rpc && request.depth_env === depth),
+    )
+      ? "PASS"
+      : "FAIL",
     deepest_spawn_refused_with_reason: refusal !== undefined ? "PASS" : "FAIL",
-    no_request_below_max_depth: requests.every((request) => request.depth_env === null || Number(request.depth_env) <= limit) ? "PASS" : "FAIL",
-    delegations_bounded: requests.filter((request) => request.action === "delegate").length <= limit + 1 ? "PASS" : "FAIL",
+    no_request_below_max_depth: requests.every(
+      (request) => request.depth_env === null || Number(request.depth_env) <= limit,
+    )
+      ? "PASS"
+      : "FAIL",
+    delegations_bounded:
+      requests.filter((request) => request.action === "delegate").length <= limit + 1 ? "PASS" : "FAIL",
     requests_bounded: requests.length <= MAX_REQUESTS_PER_LEVEL * (limit + 1) ? "PASS" : "FAIL",
   }
 
@@ -128,13 +165,27 @@ function main() {
     exit: { status: run.status, signal: run.signal ?? null, error: run.error?.message ?? null },
     request_count: requests.length,
     requests,
-    task_records: records.map((record) => ({ task_id: record.task_id, depth: record.depth, root_session_id: record.root_session_id, status: record.status, execution_mode: record.execution_mode })),
+    task_records: records.map((record) => ({
+      task_id: record.task_id,
+      depth: record.depth,
+      root_session_id: record.root_session_id,
+      status: record.status,
+      execution_mode: record.execution_mode,
+    })),
     refusal_text: refusal?.tool_result ?? null,
     sandbox: sandbox.root,
-    cleanup: { pids, killed_leftovers: leaked, still_alive: stillAlive, sandbox_removed: !keep && !existsSync(sandbox.root), remove_error: removeError },
+    cleanup: {
+      pids,
+      killed_leftovers: leaked,
+      still_alive: stillAlive,
+      sandbox_removed: !keep && !existsSync(sandbox.root),
+      remove_error: removeError,
+    },
   }
   writeFileSync(join(outDir, "task-depth-e2e.json"), `${JSON.stringify(result, null, 2)}\n`)
-  console.log(JSON.stringify({ status, checks, request_count: requests.length, elapsed_ms: elapsedMs, cleanup: result.cleanup }))
+  console.log(
+    JSON.stringify({ status, checks, request_count: requests.length, elapsed_ms: elapsedMs, cleanup: result.cleanup }),
+  )
   if (status !== "PASS") process.exitCode = 1
 }
 

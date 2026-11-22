@@ -31,7 +31,10 @@ describe("only a local filesystem lets the git-activity lock vouch (omo #10604)"
     expect(isLocalFilesystemType("win32", 0xef53, 0xef53)).toBe(false)
   })
 
-  test.skipIf(process.platform === "win32")("#given this host's temp directory #then it is on a local filesystem", async () => {
-    expect(await isOnLocalFilesystem(tmpdir())).toBe(true)
-  })
+  test.skipIf(process.platform === "win32")(
+    "#given this host's temp directory #then it is on a local filesystem",
+    async () => {
+      expect(await isOnLocalFilesystem(tmpdir())).toBe(true)
+    },
+  )
 })

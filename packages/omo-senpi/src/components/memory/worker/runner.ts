@@ -11,11 +11,7 @@ import {
   safeNotify,
   type ReflectionLiveSession,
 } from "./completion"
-import {
-  chooseMemoryLaunchRoute,
-  type MemoryLaunchRoute,
-  type MemoryLaunchSurface,
-} from "./fork-cost"
+import { chooseMemoryLaunchRoute, type MemoryLaunchRoute, type MemoryLaunchSurface } from "./fork-cost"
 import { memoryLaunchRouteInput, reflectionPayloadTokens } from "./runner-launch-route"
 import {
   resolveReflectionModel,
@@ -26,10 +22,7 @@ import {
 import { readRunJson } from "./run-artifacts"
 import type { RunFinalizationContext } from "./run-finalization-types"
 import { parseReservationRunLedger } from "./reservation-run-ledger"
-import {
-  publishFinalizedReflectionRun,
-  settleReflectionRun,
-} from "./runner-completion-publication"
+import { publishFinalizedReflectionRun, settleReflectionRun } from "./runner-completion-publication"
 import { executeReflectionRun } from "./runner-execution"
 
 export type {
@@ -39,7 +32,12 @@ export type {
   SenpiSubprocessRunnerOptions,
 } from "./runner-types"
 
-import type { ExecutionResult, ReflectionRunResult, ReflectionRunner, SenpiSubprocessRunnerOptions } from "./runner-types"
+import type {
+  ExecutionResult,
+  ReflectionRunResult,
+  ReflectionRunner,
+  SenpiSubprocessRunnerOptions,
+} from "./runner-types"
 
 // missing_providers rides the failure detail so the health fingerprint and the remediation hint
 // can name what to connect; the fingerprint truncates at 60 chars, keeping it stable.
@@ -79,11 +77,17 @@ export class SenpiSubprocessRunner implements ReflectionRunner {
 
     if (resolution.kind === "category_unavailable") {
       this.notifyCategoryUnavailable(loaded.config, resolution)
-      return this.settle(run, {
-        outcome: "failed",
-        reason: "category_unavailable",
-        detail: categoryUnavailableDetail(category, resolution),
-      }, startedAt, resolution, true)
+      return this.settle(
+        run,
+        {
+          outcome: "failed",
+          reason: "category_unavailable",
+          detail: categoryUnavailableDetail(category, resolution),
+        },
+        startedAt,
+        resolution,
+        true,
+      )
     }
 
     const route = this.chooseLaunchRoute(run, resolution, registry, sessionModel)
@@ -114,16 +118,18 @@ export class SenpiSubprocessRunner implements ReflectionRunner {
   ): MemoryLaunchRoute {
     const surface: MemoryLaunchSurface = run.request.trigger === "dream" ? "dream" : "reflection"
     const parentContextTokens = this.options.resolveParentContextTokens?.()
-    return chooseMemoryLaunchRoute(memoryLaunchRouteInput({
-      surface,
-      quickModel: resolution.model,
-      ...(resolution.thinking === undefined ? {} : { quickThinking: resolution.thinking }),
-      registry,
-      ...(sessionModel === undefined ? {} : { sessionModel }),
-      ...(parentContextTokens === undefined ? {} : { parentContextTokens }),
-      payloadTokens: reflectionPayloadTokens(run.request.snapshots),
-      cacheHit: this.options.resolveParentCacheReusable?.() ?? false,
-    }))
+    return chooseMemoryLaunchRoute(
+      memoryLaunchRouteInput({
+        surface,
+        quickModel: resolution.model,
+        ...(resolution.thinking === undefined ? {} : { quickThinking: resolution.thinking }),
+        registry,
+        ...(sessionModel === undefined ? {} : { sessionModel }),
+        ...(parentContextTokens === undefined ? {} : { parentContextTokens }),
+        payloadTokens: reflectionPayloadTokens(run.request.snapshots),
+        cacheHit: this.options.resolveParentCacheReusable?.() ?? false,
+      }),
+    )
   }
 
   private settle(
@@ -163,13 +169,11 @@ export class SenpiSubprocessRunner implements ReflectionRunner {
   ): Promise<void> {
     const live = this.options.liveSession?.()
     if (!live) return
-    const states = this.options.getTranscriptState === undefined
-      ? []
-      : await Promise.all(run.request.conversationIds.map((id) => this.options.getTranscriptState?.(id)))
-    const backlogSteps = states.reduce(
-      (sum, state) => sum + (state?.steps_since_last_successful_reflection ?? 0),
-      0,
-    )
+    const states =
+      this.options.getTranscriptState === undefined
+        ? []
+        : await Promise.all(run.request.conversationIds.map((id) => this.options.getTranscriptState?.(id)))
+    const backlogSteps = states.reduce((sum, state) => sum + (state?.steps_since_last_successful_reflection ?? 0), 0)
     live.api.appendEntry(REFLECTION_LAUNCHED_ENTRY_TYPE, {
       schemaVersion: 1,
       runId: run.runId,
@@ -186,9 +190,9 @@ export class SenpiSubprocessRunner implements ReflectionRunner {
 
   private async mergedMetadata(runId: string): Promise<{ mergedCommitSha?: string; filesChanged?: number }> {
     try {
-      const ledger = parseReservationRunLedger(await readRunJson<unknown>(
-        join(this.options.identity.paths.reflection, "runs", runId, "ledger.json"),
-      ))
+      const ledger = parseReservationRunLedger(
+        await readRunJson<unknown>(join(this.options.identity.paths.reflection, "runs", runId, "ledger.json")),
+      )
       return {
         ...(ledger.integrationSha === undefined ? {} : { mergedCommitSha: ledger.integrationSha }),
         filesChanged: ledger.validatedChangedPaths?.length ?? 0,
@@ -198,7 +202,10 @@ export class SenpiSubprocessRunner implements ReflectionRunner {
     }
   }
 
-  private notifyCategoryUnavailable(config: OmoConfig, resolution: Extract<ReflectionModelResolution, { readonly kind: "category_unavailable" }>): void {
+  private notifyCategoryUnavailable(
+    config: OmoConfig,
+    resolution: Extract<ReflectionModelResolution, { readonly kind: "category_unavailable" }>,
+  ): void {
     const live = this.options.liveSession?.()
     if (!live?.ui || !shouldWarnCategoryUnavailable(config, resolution.category)) return
     if (!this.warnedCategory(`${live.sessionId}:${resolution.category}`)) return
@@ -223,9 +230,7 @@ export class SenpiSubprocessRunner implements ReflectionRunner {
       identity: this.options.identity,
       reservation: this.options.reservation,
       now: () => this.now().getTime(),
-      ...(this.options.withWriterLock === undefined
-        ? {}
-        : { withWriterLock: this.options.withWriterLock }),
+      ...(this.options.withWriterLock === undefined ? {} : { withWriterLock: this.options.withWriterLock }),
     }
   }
 }

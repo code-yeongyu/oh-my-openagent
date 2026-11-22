@@ -5,13 +5,7 @@ import { join } from "node:path"
 
 import { afterEach, describe, expect, test } from "bun:test"
 
-import {
-  cleanupTempDirs,
-  makeDirWithSourceFiles,
-  makeTempDir,
-  sourceFile,
-  writeFileAt,
-} from "./fixtures.test-support"
+import { cleanupTempDirs, makeDirWithSourceFiles, makeTempDir, sourceFile, writeFileAt } from "./fixtures.test-support"
 import { computeCandidateDirs, computeCoverageRatio, isCovered, shouldProposeInit } from "./coverage"
 
 afterEach(() => {

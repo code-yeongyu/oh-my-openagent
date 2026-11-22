@@ -1,6 +1,6 @@
-use super::round_to_u32;
+use super::{frame_reason, round_to_u32};
 use crate::error::{CoreResult, DesktopError};
-use crate::types::{DesktopDisplay, DesktopWindow};
+use crate::types::{DesktopDisplay, DesktopWindow, WindowIdentity};
 
 mod zoom;
 
@@ -57,6 +57,8 @@ pub struct FrameGeometry {
     /// `true` when the capture ran through the legacy `screencapture`
     /// fallback, not the ScreenCaptureKit worker (macOS B9).
     legacy_capture: bool,
+    /// Who owned the captured window, when the backend reported it.
+    identity: Option<WindowIdentity>,
 }
 
 impl FrameGeometry {
@@ -103,6 +105,7 @@ impl FrameGeometry {
             regions,
             kind: FrameKind::Desktop,
             legacy_capture: false,
+            identity: None,
         }
     }
 
@@ -128,6 +131,33 @@ impl FrameGeometry {
                 is_on_screen: window.is_on_screen,
             },
             legacy_capture: false,
+            identity: window.identity.clone(),
+        }
+    }
+
+    /// The captured window's identity at capture time, when known.
+    pub const fn identity(&self) -> Option<&WindowIdentity> {
+        self.identity.as_ref()
+    }
+
+    /// Refuses with reason `resized` when `current` no longer has the size
+    /// this window frame captured; any other frame passes.
+    pub fn check_size(&self, current: &DesktopWindow) -> CoreResult<()> {
+        match self.captured_size() {
+            Some(size) if size != (current.width, current.height) => Err(resized()),
+            _ => Ok(()),
+        }
+    }
+
+    /// The captured window's logical size, when this is a window frame.
+    pub const fn captured_size(&self) -> Option<(u32, u32)> {
+        match self.kind {
+            FrameKind::Window {
+                captured_width,
+                captured_height,
+                ..
+            } => Some((captured_width, captured_height)),
+            _ => None,
         }
     }
 
@@ -150,6 +180,7 @@ impl FrameGeometry {
             regions: Vec::new(),
             kind: FrameKind::PixelsOnly { reason: reason.into() },
             legacy_capture: false,
+            identity: None,
         }
     }
 
@@ -171,11 +202,14 @@ impl FrameGeometry {
             regions: Vec::new(),
             kind: FrameKind::Identity,
             legacy_capture: false,
+            identity: None,
         }
     }
 
     /// Maps a capture pixel to a global logical desktop point. Window frames
     /// re-anchor on the window's current origin and reject a resized window.
+    /// Refusals carry the object-mode reason `out_of_bounds`, `pixels_only`
+    /// or `resized`; a window that is gone carries none.
     pub fn map_point(
         &self,
         x: f64,
@@ -189,13 +223,17 @@ impl FrameGeometry {
             || x >= f64::from(self.width)
             || y >= f64::from(self.height)
         {
-            return Err(DesktopError::invalid_coordinate_frame(format!(
-                "coordinate ({x}, {y}) is outside the last capture frame ({}x{} px); pointer/hit-test \
-                 coordinates are pixels in the most recent screenshot of this target",
-                self.width, self.height
-            )));
+            return Err(frame_reason(
+                DesktopError::invalid_coordinate_frame(format!(
+                    "coordinate ({x}, {y}) is outside the last capture frame ({}x{} px); pointer/hit-test \
+                     coordinates are pixels in the most recent screenshot of this target",
+                    self.width, self.height
+                )),
+                "out_of_bounds",
+            ));
         }
-        self.refuse_pixels_only()?;
+        self.refuse_pixels_only()
+            .map_err(|error| frame_reason(error, "pixels_only"))?;
         if self.kind == FrameKind::Identity {
             return Ok((x, y));
         }
@@ -204,10 +242,13 @@ impl FrameGeometry {
             .iter()
             .find(|r| r.contains_pixel(x, y))
             .ok_or_else(|| {
-                DesktopError::invalid_coordinate_frame(format!(
-                    "capture coordinate ({x}, {y}) falls between display regions; pick a point inside \
-                 one display"
-                ))
+                frame_reason(
+                    DesktopError::invalid_coordinate_frame(format!(
+                        "capture coordinate ({x}, {y}) falls between display regions; pick a point inside \
+                         one display"
+                    )),
+                    "out_of_bounds",
+                )
             })?;
         let local_x = (x - region.pixel_x) * region.width / region.pixel_width;
         let local_y = (y - region.pixel_y) * region.height / region.pixel_height;
@@ -220,10 +261,7 @@ impl FrameGeometry {
                 let current = current_window
                     .ok_or_else(|| DesktopError::window_not_found("target window is no longer available"))?;
                 if current.width != captured_width || current.height != captured_height {
-                    return Err(DesktopError::invalid_coordinate_frame(
-                        "target window was resized since capture; capture it again before coordinate \
-                         input",
-                    ));
+                    return Err(resized());
                 }
                 Ok((f64::from(current.x) + local_x, f64::from(current.y) + local_y))
             }
@@ -279,4 +317,15 @@ impl FrameGeometry {
             })
             .collect()
     }
+}
+
+/// The refusal for a window whose size changed since its capture.
+#[must_use]
+pub(super) fn resized() -> DesktopError {
+    frame_reason(
+        DesktopError::invalid_coordinate_frame(
+            "target window was resized since capture; capture it again before coordinate input",
+        ),
+        "resized",
+    )
 }

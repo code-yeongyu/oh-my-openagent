@@ -33,63 +33,117 @@ function seedScenario(sandbox) {
   mkdirSync(sessionDir, { recursive: true })
   const omoDir = join(sandbox.cwd, ".omo")
   mkdirSync(omoDir, { recursive: true })
-  writeFileSync(join(omoDir, "omo.json"), `${JSON.stringify({
-    categories: { mockcat: { description: "Local mock category.", model: "omo-mock/mock-1" } },
-  }, null, 2)}\n`)
+  writeFileSync(
+    join(omoDir, "omo.json"),
+    `${JSON.stringify(
+      {
+        categories: { mockcat: { description: "Local mock category.", model: "omo-mock/mock-1" } },
+      },
+      null,
+      2,
+    )}\n`,
+  )
   const skillDir = join(sandbox.agentDir, "skills", skillName)
   mkdirSync(skillDir, { recursive: true })
   writeFileSync(
     join(skillDir, "SKILL.md"),
     `---\nname: ${skillName}\ndescription: Isolated live QA skill\n---\n${skillMarker}\n`,
   )
-  writeFileSync(join(sandbox.cwd, "mock-script.json"), `${JSON.stringify({
-    childSteps: [{ type: "text", text: "skill child complete" }],
-    parentSteps: [
+  writeFileSync(
+    join(sandbox.cwd, "mock-script.json"),
+    `${JSON.stringify(
       {
-        type: "tool_call",
-        name: "task",
-        arguments: {
-          category: "mockcat",
-          prompt: "run the skill-marked child",
-          load_skills: [skillName, missingSkillName],
-          run_in_background: false,
-          name: "skill-child",
-        },
+        childSteps: [{ type: "text", text: "skill child complete" }],
+        parentSteps: [
+          {
+            type: "tool_call",
+            name: "task",
+            arguments: {
+              category: "mockcat",
+              prompt: "run the skill-marked child",
+              load_skills: [skillName, missingSkillName],
+              run_in_background: false,
+              name: "skill-child",
+            },
+          },
+          { type: "text", text: "skill task returned inline" },
+        ],
       },
-      { type: "text", text: "skill task returned inline" },
-    ],
-  }, null, 2)}\n`)
+      null,
+      2,
+    )}\n`,
+  )
   return sessionDir
 }
 
 function seedExecutorBoundaryScenario(sandbox) {
   const sessionDir = seedScenario(sandbox)
   const git = (args) => {
-    const result = spawnSync("git", args, { cwd: sandbox.cwd, env: isolatedChildEnv(process.env, sandbox.agentDir), encoding: "utf8", windowsHide: true })
+    const result = spawnSync("git", args, {
+      cwd: sandbox.cwd,
+      env: isolatedChildEnv(process.env, sandbox.agentDir),
+      encoding: "utf8",
+      windowsHide: true,
+    })
     if (result.status !== 0) throw new Error(`executor QA git setup failed: ${result.stderr}`)
   }
   git(["init", "-q"])
-  git(["-c", "user.name=QA Executor", "-c", "user.email=qa@example.invalid", "commit", "--allow-empty", "-qm", "qa: seed"])
-  writeFileSync(join(sandbox.cwd, ".omo", "omo.json"), `${JSON.stringify({
-    task: { default_execution_mode: "in-process" },
-    categories: { mockcat: { description: "Local mock executor.", model: "omo-mock/mock-1" } },
-  }, null, 2)}\n`)
-  writeFileSync(join(sandbox.cwd, "mock-script.json"), `${JSON.stringify({
-    childSteps: [
-      { type: "tool_call", name: "eval", arguments: {
-        language: "js", summary: "commit the assigned bounded executor file",
-        code: `const result = await tool.bash({ command: "printf 'bounded executor output\\\\n' > executor.txt && git add executor.txt && git -c user.name='QA Executor' -c user.email=qa@example.invalid commit -qm '${executorCommitMessage}'" }); console.log(result)`,
-      } },
-      { type: "text", text: "bounded executor commit complete" },
-    ],
-    parentSteps: [
-      { type: "tool_call", name: "task", arguments: {
-        category: "mockcat", run_in_background: false, name: "bounded-executor",
-        prompt: "ROLE: delegated executor. Implement and verify only the assigned unit: write executor.txt and commit it. Allowed file: executor.txt. Acceptance: one bounded commit. Evidence reference: .omo/ulw-execute/ledger.jsonl. Return the result to the parent. Do not invoke ulw-execute or delegate this unit again.",
-      } },
-      { type: "text", text: "executor result received" },
-    ],
-  }, null, 2)}\n`)
+  git([
+    "-c",
+    "user.name=QA Executor",
+    "-c",
+    "user.email=qa@example.invalid",
+    "commit",
+    "--allow-empty",
+    "-qm",
+    "qa: seed",
+  ])
+  writeFileSync(
+    join(sandbox.cwd, ".omo", "omo.json"),
+    `${JSON.stringify(
+      {
+        task: { default_execution_mode: "in-process" },
+        categories: { mockcat: { description: "Local mock executor.", model: "omo-mock/mock-1" } },
+      },
+      null,
+      2,
+    )}\n`,
+  )
+  writeFileSync(
+    join(sandbox.cwd, "mock-script.json"),
+    `${JSON.stringify(
+      {
+        childSteps: [
+          {
+            type: "tool_call",
+            name: "eval",
+            arguments: {
+              language: "js",
+              summary: "commit the assigned bounded executor file",
+              code: `const result = await tool.bash({ command: "printf 'bounded executor output\\\\n' > executor.txt && git add executor.txt && git -c user.name='QA Executor' -c user.email=qa@example.invalid commit -qm '${executorCommitMessage}'" }); console.log(result)`,
+            },
+          },
+          { type: "text", text: "bounded executor commit complete" },
+        ],
+        parentSteps: [
+          {
+            type: "tool_call",
+            name: "task",
+            arguments: {
+              category: "mockcat",
+              run_in_background: false,
+              name: "bounded-executor",
+              prompt:
+                "ROLE: delegated executor. Implement and verify only the assigned unit: write executor.txt and commit it. Allowed file: executor.txt. Acceptance: one bounded commit. Evidence reference: .omo/ulw-execute/ledger.jsonl. Return the result to the parent. Do not invoke ulw-execute or delegate this unit again.",
+            },
+          },
+          { type: "text", text: "executor result received" },
+        ],
+      },
+      null,
+      2,
+    )}\n`,
+  )
   return sessionDir
 }
 
@@ -117,11 +171,13 @@ function count(text, needle) {
 }
 
 function selfTest() {
-  const details = skillResult([{
-    type: "tool_execution_end",
-    toolName: "task",
-    result: { details: { skills: { requested: [skillName], resolved: [skillName], missing: [] } } },
-  }])
+  const details = skillResult([
+    {
+      type: "tool_execution_end",
+      toolName: "task",
+      result: { details: { skills: { requested: [skillName], resolved: [skillName], missing: [] } } },
+    },
+  ])
   if (details?.resolved?.[0] !== skillName) throw new Error("skill result parser failed")
   if (count(`x${skillMarker}y${skillMarker}`, skillMarker) !== 2) throw new Error("marker counter failed")
   console.log("SELF-TEST OK")
@@ -152,7 +208,20 @@ function main() {
     const sessionDir = executorBoundary ? seedExecutorBoundaryScenario(sandbox) : seedScenario(sandbox)
     const run = spawnSync(
       senpiBin,
-      ["-e", mockProviderEntry, "-p", "--mode", "json", "--provider", "omo-mock", "--model", "mock-1", "--session-dir", sessionDir, executorBoundary ? "/skill:ulw-execute bounded executor QA" : "run load_skills live QA"],
+      [
+        "-e",
+        mockProviderEntry,
+        "-p",
+        "--mode",
+        "json",
+        "--provider",
+        "omo-mock",
+        "--model",
+        "mock-1",
+        "--session-dir",
+        sessionDir,
+        executorBoundary ? "/skill:ulw-execute bounded executor QA" : "run load_skills live QA",
+      ],
       {
         cwd: sandbox.cwd,
         env: {
@@ -175,40 +244,54 @@ function main() {
       const id = event?.result?.details?.task_id
       return typeof id === "string" && id.startsWith("st_") ? [id] : []
     })[0]
-    const taskPath = typeof taskId === "string"
-      ? join(sandboxStateDir(sandbox), "tasks", `${taskId}.json`)
-      : ""
+    const taskPath = typeof taskId === "string" ? join(sandboxStateDir(sandbox), "tasks", `${taskId}.json`) : ""
     const taskRecord = taskPath && existsSync(taskPath) ? JSON.parse(readFileSync(taskPath, "utf8")) : undefined
     const spawnPrompt = taskRecord?.spawn_spec?.prompt ?? ""
-    const childRoot = typeof taskId === "string"
-      ? join(sandboxStateDir(sandbox), "children", taskId, "sessions")
-      : ""
+    const childRoot = typeof taskId === "string" ? join(sandboxStateDir(sandbox), "children", taskId, "sessions") : ""
     const transcript = childRoot
-      ? collectJsonl(childRoot).map((path) => readFileSync(path, "utf8")).join("\n")
+      ? collectJsonl(childRoot)
+          .map((path) => readFileSync(path, "utf8"))
+          .join("\n")
       : ""
     const changedRealDirs = snapshots
       .filter(({ dir, before }) => before !== credentialDigest(dir))
       .map(({ dir }) => dir)
-    const checks = executorBoundary ? {
-      process_exit: run.status === 0 ? "PASS" : "FAIL",
-      executor_commit: spawnSync("git", ["log", "-1", "--format=%s"], { cwd: sandbox.cwd, encoding: "utf8", windowsHide: true }).stdout?.trim() === executorCommitMessage ? "PASS" : "FAIL",
-      child_session: transcript.includes("bounded executor commit complete") ? "PASS" : "FAIL",
-      executor_brief: spawnPrompt.includes("ROLE: delegated executor") ? "PASS" : "FAIL",
-      no_nested_spawn: !/"name"\s*:\s*"(?:task|workflow)"/.test(transcript) ? "PASS" : "FAIL",
-      no_child_directive: !transcript.includes("omo-ultrawork:directive") && !transcript.includes("<ultrawork-mode>") ? "PASS" : "FAIL",
-      real_agent_dirs_untouched: changedRealDirs.length === 0 ? "PASS" : "FAIL",
-    } : {
-      process_exit: run.status === 0 ? "PASS" : "FAIL",
-      skill_summary: JSON.stringify(details) === JSON.stringify({
-        requested: [skillName, missingSkillName],
-        resolved: [skillName],
-        missing: [missingSkillName],
-      }) ? "PASS" : "FAIL",
-      result_warning: stdout.includes(`Missing skills: ${missingSkillName}`) ? "PASS" : "FAIL",
-      spawn_prompt: spawnPrompt.includes(skillMarker) && count(spawnPrompt, skillMarker) === 1 ? "PASS" : "FAIL",
-      child_session: transcript.includes(skillMarker) && count(transcript, skillMarker) === 1 ? "PASS" : "FAIL",
-      real_agent_dirs_untouched: changedRealDirs.length === 0 ? "PASS" : "FAIL",
-    }
+    const checks = executorBoundary
+      ? {
+          process_exit: run.status === 0 ? "PASS" : "FAIL",
+          executor_commit:
+            spawnSync("git", ["log", "-1", "--format=%s"], {
+              cwd: sandbox.cwd,
+              encoding: "utf8",
+              windowsHide: true,
+            }).stdout?.trim() === executorCommitMessage
+              ? "PASS"
+              : "FAIL",
+          child_session: transcript.includes("bounded executor commit complete") ? "PASS" : "FAIL",
+          executor_brief: spawnPrompt.includes("ROLE: delegated executor") ? "PASS" : "FAIL",
+          no_nested_spawn: !/"name"\s*:\s*"(?:task|workflow)"/.test(transcript) ? "PASS" : "FAIL",
+          no_child_directive:
+            !transcript.includes("omo-ultrawork:directive") && !transcript.includes("<ultrawork-mode>")
+              ? "PASS"
+              : "FAIL",
+          real_agent_dirs_untouched: changedRealDirs.length === 0 ? "PASS" : "FAIL",
+        }
+      : {
+          process_exit: run.status === 0 ? "PASS" : "FAIL",
+          skill_summary:
+            JSON.stringify(details) ===
+            JSON.stringify({
+              requested: [skillName, missingSkillName],
+              resolved: [skillName],
+              missing: [missingSkillName],
+            })
+              ? "PASS"
+              : "FAIL",
+          result_warning: stdout.includes(`Missing skills: ${missingSkillName}`) ? "PASS" : "FAIL",
+          spawn_prompt: spawnPrompt.includes(skillMarker) && count(spawnPrompt, skillMarker) === 1 ? "PASS" : "FAIL",
+          child_session: transcript.includes(skillMarker) && count(transcript, skillMarker) === 1 ? "PASS" : "FAIL",
+          real_agent_dirs_untouched: changedRealDirs.length === 0 ? "PASS" : "FAIL",
+        }
     const result = Object.values(checks).every((value) => value === "PASS") ? "PASS" : "FAIL"
     const payload = {
       result,

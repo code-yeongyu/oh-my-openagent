@@ -2,13 +2,20 @@ import { afterEach, describe, expect, test } from "bun:test"
 import type { ExtensionToolContext } from "@code-yeongyu/senpi"
 
 import { collisionStore } from "../../manager/__fixtures__/collision-store"
-import { FakeRunner, categoryPlanner, cleanupProjects, settings, tempProject } from "../../manager/__fixtures__/manager-fakes"
+import {
+  FakeRunner,
+  categoryPlanner,
+  cleanupProjects,
+  settings,
+  tempProject,
+} from "../../manager/__fixtures__/manager-fakes"
 import { createTaskManager } from "../../manager"
 import { createTeam, normalizeSenpiTeamSpec } from "../../team"
 import { stateDirConfig, taskSettings } from "../../team/__fixtures__/runtime-fakes"
 import { createTaskRecordStore } from "../../store"
 import { createFakeTeamService } from "./__fixtures__/team-tool-fakes"
 import { createTeamCreateTool } from "./lifecycle"
+import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -16,7 +23,7 @@ describe("team_create collision handling", () => {
   test("#given a first-save collision #when the real team_create tool creates a team #then the team activates without a member rejection or raw collision", async () => {
     // given
     const project = tempProject()
-    const inner = createTaskRecordStore({ project_dir: project })
+    const inner = createTaskRecordStore(ownedTaskState(project))
     const manager = createTaskManager({
       store: collisionStore(inner).store,
       runners: { "in-process": new FakeRunner(), process: new FakeRunner() },
@@ -46,7 +53,12 @@ describe("team_create collision handling", () => {
     // when
     const result = await tool.execute(
       "collision-team-create",
-      { inline_spec: { name: "collision-team", members: [{ name: "alpha", kind: "category", category: "quick", prompt: "work" }] } },
+      {
+        inline_spec: {
+          name: "collision-team",
+          members: [{ name: "alpha", kind: "category", category: "quick", prompt: "work" }],
+        },
+      },
       undefined,
       undefined,
       context,

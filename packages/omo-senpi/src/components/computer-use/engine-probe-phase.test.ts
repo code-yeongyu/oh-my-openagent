@@ -11,10 +11,13 @@ const HELLO = { protocolVersion: "x", engineVersion: "x", buildSha: "x", abi: "x
 function writeEngine(body: string): { readonly path: string; readonly cleanup: () => void } {
   const root = mkdtempSync(join(tmpdir(), "omo-probe-phase-"))
   const path = join(root, "engine")
-  writeFileSync(path, `#!${process.execPath}
+  writeFileSync(
+    path,
+    `#!${process.execPath}
 import { createInterface } from "node:readline";
 ${body}
-`)
+`,
+  )
   chmodSync(path, 0o755)
   return { path, cleanup: () => rmSync(root, { recursive: true, force: true }) }
 }
@@ -40,66 +43,70 @@ test.skipIf(process.platform === "win32")(
   10_000,
 )
 
-test(
-  "#given an engine that answers hello but never capabilities #when the probe deadline expires #then the timeout names that phase",
-  async () => {
-    // given: an in-process engine that answers engine.hello in the same tick the request is written,
-    // so the phase reached before the deadline never depends on how fast a real process starts.
-    const stdout = new PassThrough()
-    const stdin = new Writable({
-      write(chunk: Buffer, _encoding, done) {
-        for (const line of chunk.toString("utf8").split("\n").filter(Boolean)) {
-          const request = JSON.parse(line) as { id: number; method: string }
-          if (request.method === "engine.hello") stdout.write(`${JSON.stringify({ jsonrpc: "2.0", id: request.id, result: HELLO })}\n`)
-        }
-        done()
-      },
-    })
-    const child = Object.assign(new EventEmitter(), {
-      stdin, stdout, stderr: new PassThrough(), pid: undefined, unref: () => {}, kill: () => true,
-    })
-    const launch: EngineLauncher = () => child as unknown as ReturnType<EngineLauncher>
+test("#given an engine that answers hello but never capabilities #when the probe deadline expires #then the timeout names that phase", async () => {
+  // given: an in-process engine that answers engine.hello in the same tick the request is written,
+  // so the phase reached before the deadline never depends on how fast a real process starts.
+  const stdout = new PassThrough()
+  const stdin = new Writable({
+    write(chunk: Buffer, _encoding, done) {
+      for (const line of chunk.toString("utf8").split("\n").filter(Boolean)) {
+        const request = JSON.parse(line) as { id: number; method: string }
+        if (request.method === "engine.hello")
+          stdout.write(`${JSON.stringify({ jsonrpc: "2.0", id: request.id, result: HELLO })}\n`)
+      }
+      done()
+    },
+  })
+  const child = Object.assign(new EventEmitter(), {
+    stdin,
+    stdout,
+    stderr: new PassThrough(),
+    pid: undefined,
+    unref: () => {},
+    kill: () => true,
+  })
+  const launch: EngineLauncher = () => child as unknown as ReturnType<EngineLauncher>
 
-    // when
-    const result = await probeComputerUseEngine("in-process-engine", {}, 300, launch)
+  // when
+  const result = await probeComputerUseEngine("in-process-engine", {}, 300, launch)
 
-    // then
-    expect(result).toMatchObject({ ok: false, code: "timeout" })
-    expect(result.ok ? "" : result.message).toBe(
-      "desktop engine probe timed out after 300 ms at in-process-engine (phase: engine.hello answered, awaiting capabilities)",
-    )
-  },
-  10_000,
-)
+  // then
+  expect(result).toMatchObject({ ok: false, code: "timeout" })
+  expect(result.ok ? "" : result.message).toBe(
+    "desktop engine probe timed out after 300 ms at in-process-engine (phase: engine.hello answered, awaiting capabilities)",
+  )
+}, 10_000)
 
-test(
-  "#given an engine that answers capabilities but never engine.hello #when the probe deadline expires #then the timeout names that phase",
-  async () => {
-    // given: an in-process engine that answers capabilities in the same tick the request is written,
-    // so the phase reached before the deadline never depends on how fast a real process starts.
-    const stdout = new PassThrough()
-    const stdin = new Writable({
-      write(chunk: Buffer, _encoding, done) {
-        for (const line of chunk.toString("utf8").split("\n").filter(Boolean)) {
-          const request = JSON.parse(line) as { id: number; method: string }
-          if (request.method === "capabilities") stdout.write(`${JSON.stringify({ jsonrpc: "2.0", id: request.id, result: {} })}\n`)
-        }
-        done()
-      },
-    })
-    const child = Object.assign(new EventEmitter(), {
-      stdin, stdout, stderr: new PassThrough(), pid: undefined, unref: () => {}, kill: () => true,
-    })
-    const launch: EngineLauncher = () => child as unknown as ReturnType<EngineLauncher>
+test("#given an engine that answers capabilities but never engine.hello #when the probe deadline expires #then the timeout names that phase", async () => {
+  // given: an in-process engine that answers capabilities in the same tick the request is written,
+  // so the phase reached before the deadline never depends on how fast a real process starts.
+  const stdout = new PassThrough()
+  const stdin = new Writable({
+    write(chunk: Buffer, _encoding, done) {
+      for (const line of chunk.toString("utf8").split("\n").filter(Boolean)) {
+        const request = JSON.parse(line) as { id: number; method: string }
+        if (request.method === "capabilities")
+          stdout.write(`${JSON.stringify({ jsonrpc: "2.0", id: request.id, result: {} })}\n`)
+      }
+      done()
+    },
+  })
+  const child = Object.assign(new EventEmitter(), {
+    stdin,
+    stdout,
+    stderr: new PassThrough(),
+    pid: undefined,
+    unref: () => {},
+    kill: () => true,
+  })
+  const launch: EngineLauncher = () => child as unknown as ReturnType<EngineLauncher>
 
-    // when
-    const result = await probeComputerUseEngine("in-process-engine", {}, 300, launch)
+  // when
+  const result = await probeComputerUseEngine("in-process-engine", {}, 300, launch)
 
-    // then
-    expect(result).toMatchObject({ ok: false, code: "timeout" })
-    expect(result.ok ? "" : result.message).toBe(
-      "desktop engine probe timed out after 300 ms at in-process-engine (phase: capabilities answered, awaiting engine.hello)",
-    )
-  },
-  10_000,
-)
+  // then
+  expect(result).toMatchObject({ ok: false, code: "timeout" })
+  expect(result.ok ? "" : result.message).toBe(
+    "desktop engine probe timed out after 300 ms at in-process-engine (phase: capabilities answered, awaiting engine.hello)",
+  )
+}, 10_000)

@@ -9,6 +9,7 @@ import type { ManagedChildHandle } from "../child-handle"
 import { createTaskManager } from "../manager"
 import type { ManagedRunner, ManagedStartSpec, TaskManager } from "../types"
 import { categoryPlanner, settings, tempProject } from "./manager-fakes"
+import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
 
 export type RaceFlavor = "in-process" | "rpc"
 
@@ -75,7 +76,9 @@ class RaceRunner implements ManagedRunner {
   start(spec: ManagedStartSpec): Promise<ManagedChildHandle> {
     const handle =
       this.#flavor === "in-process"
-        ? adaptInProcessHandle(createChildHandle({ taskId: spec.taskId, session: oneIdleSession(), promptText: spec.prompt }))
+        ? adaptInProcessHandle(
+            createChildHandle({ taskId: spec.taskId, session: oneIdleSession(), promptText: spec.prompt }),
+          )
         : adaptRpcHandle(oneIdleRpc(spec.taskId))
     return Promise.resolve(handle)
   }
@@ -103,7 +106,7 @@ export type RaceHarness = {
 
 export function makeRaceHarness(flavor: RaceFlavor): RaceHarness {
   const project = tempProject()
-  const store = createTaskRecordStore({ project_dir: project })
+  const store = createTaskRecordStore(ownedTaskState(project))
   const destruction = makeRaceDestruction()
   const runner = new RaceRunner(flavor)
   const manager = createTaskManager({

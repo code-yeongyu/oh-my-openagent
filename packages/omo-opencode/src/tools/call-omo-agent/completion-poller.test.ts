@@ -48,11 +48,7 @@ describe("waitForCompletion", () => {
 
     try {
       // when
-      const result = waitForCompletion(
-        "ses-undurable",
-        createToolContext(),
-        createContext({ status, messages }),
-      )
+      const result = waitForCompletion("ses-undurable", createToolContext(), createContext({ status, messages }))
 
       // then
       await expect(result).rejects.toThrow("Prompt was not durably accepted by OpenCode")
@@ -81,19 +77,12 @@ describe("waitForCompletion", () => {
 
     const status = mock(async () => ({ data: { "ses-complete": { type: "idle" } } }))
     const messages = mock(async () => ({
-      data: [
-        { info: { id: "msg-user", role: "user" } },
-        { info: { id: "msg-assistant", role: "assistant" } },
-      ],
+      data: [{ info: { id: "msg-user", role: "user" } }, { info: { id: "msg-assistant", role: "assistant" } }],
     }))
 
     try {
       // when
-      await waitForCompletion(
-        "ses-complete",
-        createToolContext(),
-        createContext({ status, messages }),
-      )
+      await waitForCompletion("ses-complete", createToolContext(), createContext({ status, messages }))
 
       // then
       expect(messages).toHaveBeenCalled()

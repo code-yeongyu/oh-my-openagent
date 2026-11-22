@@ -52,7 +52,9 @@ export function hostWorldRecovery() {
         hostCloseScheduler: time.scheduler,
         onStoreMutation: (listener: () => void) => {
           listeners.add(listener)
-          return () => { listeners.delete(listener) }
+          return () => {
+            listeners.delete(listener)
+          }
         },
       }
     },

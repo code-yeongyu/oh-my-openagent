@@ -25,14 +25,18 @@ import { getPostCommitHookScript } from "../sync/mirror"
  * sync/redact.ts; single-quoted forms are left out because the expression is embedded in single quotes, which
  * only makes the hook stricter.
  */
-const END = "[],<>})\"]*$"
+const END = '[],<>})"]*$'
 const REFERENCE_TOKEN =
-  "(process\\.env\\.[A-Za-z_][A-Za-z0-9_]*|os\\.environ(\\.get\\(|\\[)?(\"[A-Za-z0-9_]*\")?[])]*|" +
+  '(process\\.env\\.[A-Za-z_][A-Za-z0-9_]*|os\\.environ(\\.get\\(|\\[)?("[A-Za-z0-9_]*")?[])]*|' +
   "env\\.[A-Za-z_][A-Za-z0-9_]*|\\$\\{[A-Za-z_][A-Za-z0-9_]*\\}|\\$[A-Za-z_][A-Za-z0-9_]*|\\{\\{([^}]*\\}\\})?|\\[(redacted|filtered)\\]|(redacted|filtered)|" +
   "(bearer|changeme|placeholder|example|none|null|undefined|true|false))"
 const MATCH_START = "^[^A-Za-z0-9_]?"
 
-export const HOOK_SECRET_PATTERNS: ReadonlyArray<{ readonly class: string; readonly ere: string; readonly exclude?: string }> = [
+export const HOOK_SECRET_PATTERNS: ReadonlyArray<{
+  readonly class: string
+  readonly ere: string
+  readonly exclude?: string
+}> = [
   { class: "aws_access_key", ere: "(^|[^A-Za-z0-9_])AKIA[0-9A-Z]{16}([^A-Za-z0-9_]|$)" },
   {
     class: "credential_assignment",
@@ -46,16 +50,21 @@ export const HOOK_SECRET_PATTERNS: ReadonlyArray<{ readonly class: string; reado
     exclude: `${MATCH_START}authorization[[:space:]]*:[[:space:]]*bearer[[:space:]]+([]<>,})"]|${REFERENCE_TOKEN}${END})`,
   },
   { class: "openai_key", ere: "(^|[^A-Za-z0-9_])sk-(proj-)?[-_A-Za-z0-9]+([^A-Za-z0-9_-]|$)" },
-  { class: "vendor_token", ere: "(^|[^A-Za-z0-9_])(ghp|github_pat|glpat|xox[baprs])[-_][-_A-Za-z0-9]+([^A-Za-z0-9_-]|$)" },
+  {
+    class: "vendor_token",
+    ere: "(^|[^A-Za-z0-9_])(ghp|github_pat|glpat|xox[baprs])[-_][-_A-Za-z0-9]+([^A-Za-z0-9_-]|$)",
+  },
 ]
 
-const SECRET_SCAN_LINES = HOOK_SECRET_PATTERNS.map(({ class: patternClass, ere, exclude }) => [
-  exclude === undefined
-    ? `      if printf '%s' "$blob" | grep -E -q -e '${ere}'; then`
-    : `      if printf '%s' "$blob" | grep -E -o -e '${ere}' | grep -E -v -i -e '${exclude}' | grep -q .; then`,
-  `        printf 'memory pre-commit: %s contains secret-like content (${patternClass})\\n' "$p"`,
-  "      fi",
-].join("\n")).join("\n")
+const SECRET_SCAN_LINES = HOOK_SECRET_PATTERNS.map(({ class: patternClass, ere, exclude }) =>
+  [
+    exclude === undefined
+      ? `      if printf '%s' "$blob" | grep -E -q -e '${ere}'; then`
+      : `      if printf '%s' "$blob" | grep -E -o -e '${ere}' | grep -E -v -i -e '${exclude}' | grep -q .; then`,
+    `        printf 'memory pre-commit: %s contains secret-like content (${patternClass})\\n' "$p"`,
+    "      fi",
+  ].join("\n"),
+).join("\n")
 
 /**
  * Pre-commit validator for staged memory markdown.

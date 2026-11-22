@@ -1,18 +1,16 @@
-import { resolveModelForDelegateTask } from "@oh-my-opencode/delegate-core"
+import { resolveModelForDelegateTask, type DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
-import type { SenpiModelPort, SenpiModelRegistryPort } from "../category"
+import type { ModelSelectionSource, SenpiModelPort, SenpiModelRegistryPort } from "../category"
+import { missingChainProviders } from "../category/chain-diagnostics"
 import { firstCategoryDefaultModel, resolveAgentCategoryModel } from "./resolve-agent-categories"
 import { buildRuntimeModelChain, chainRungCandidates } from "../model-chain"
 import { withoutExcludedModels } from "../model-exclusion"
 import type { ResolvedModelRecord } from "../state"
 import { agentModelCandidates, type AgentModelCandidate } from "./agent-model-entry"
-import {
-  findExactAgentModel,
-  parseAvailableAgentModels,
-  type ParsedAgentModel,
-} from "./agent-model-registry"
-import { agentToolPolicy } from "./agent-tool-policy"
+import { findExactAgentModel, parseAvailableAgentModels, type ParsedAgentModel } from "./agent-model-registry"
+import { agentPersona } from "./agent-persona"
+import { BUILTIN_AGENTS } from "./builtin"
 import { AGENT_FALLBACK_CHAINS } from "./builtin/fallback-chains"
 import { canonicalAgentName } from "./builtin/legacy-agent-names"
 import type { AgentDefinition } from "./types"
@@ -23,7 +21,7 @@ export type ResolveAgentOptions = {
   readonly distributeModels?: import("@oh-my-opencode/omo-config-core").ModelDistributor
 }
 
-type AgentPersona = {
+export type AgentPersona = {
   readonly agentType: string
   readonly instructions?: string
   readonly toolAllowlist?: readonly string[]
@@ -39,6 +37,8 @@ export type ResolvedAgentResult = AgentPersona & {
   readonly kind: "resolved"
   readonly agent: string
   readonly model: string
+  /** `user` when the model came from omo.json (the agent's own model/models, a user category it runs through) or a call-site pin. */
+  readonly modelSource: ModelSelectionSource
   readonly requested_model?: ResolvedModelRecord
   readonly fallback_models?: readonly ResolvedModelRecord[]
   readonly resolved_model?: ResolvedModelRecord
@@ -56,6 +56,10 @@ export type AgentModelUnavailableResult = {
   readonly agent: string
   readonly attemptedModel: string | undefined
   readonly availableAgents: readonly string[]
+  // The builtin chain this machine could not serve, and the chain providers it has not connected:
+  // carried so the spawn refusal can name every model instead of one "attempted" id.
+  readonly attempted_chain?: readonly DelegateFallbackEntry[]
+  readonly missing_providers?: readonly string[]
 }
 
 export type AgentResolutionResult = ResolvedAgentResult | AgentNotFoundResult | AgentModelUnavailableResult
@@ -72,7 +76,8 @@ export function resolveAgent<TModel extends SenpiModelPort>(
   liveRegistry: SenpiModelRegistryPort<TModel> | undefined,
   options: ResolveAgentOptions = {},
 ): AgentResolutionResult {
-  const registry = liveRegistry === undefined ? undefined : withoutExcludedModels(liveRegistry, options.omoConfig?.exclude_models)
+  const registry =
+    liveRegistry === undefined ? undefined : withoutExcludedModels(liveRegistry, options.omoConfig?.exclude_models)
   const name = canonicalAgentName(requestedName.trim())
   const availableAgents = Object.entries(agents)
     .filter(([, definition]) => definition.disable !== true)
@@ -90,6 +95,7 @@ export function resolveAgent<TModel extends SenpiModelPort>(
       kind: "resolved",
       agent: name,
       model: options.modelOverride,
+      modelSource: "user",
       availableAgents,
       ...persona,
     }
@@ -99,13 +105,20 @@ export function resolveAgent<TModel extends SenpiModelPort>(
   if (registry === undefined) {
     const fallbackHead = fallbackChain?.[0]
     const fallbackProvider = fallbackHead?.providers[0]
-    const attemptedModel = definition.model
-      ?? firstConfiguredModel(definition)
-      ?? firstCategoryDefaultModel(definition.categories, options.omoConfig)
-      ?? (fallbackHead !== undefined && fallbackProvider !== undefined
+    const attemptedModel =
+      definition.model ??
+      firstConfiguredModel(definition) ??
+      firstCategoryDefaultModel(definition.categories, options.omoConfig) ??
+      (fallbackHead !== undefined && fallbackProvider !== undefined
         ? `${fallbackProvider}/${fallbackHead.model}`
         : undefined)
-    return { kind: "model_unavailable", agent: name, attemptedModel, availableAgents }
+    return {
+      kind: "model_unavailable",
+      agent: name,
+      attemptedModel,
+      availableAgents,
+      ...(fallbackChain !== undefined ? { attempted_chain: fallbackChain } : {}),
+    }
   }
 
   // `find` answers from the whole catalog, so a configured model the machine has no credentials for
@@ -123,9 +136,18 @@ export function resolveAgent<TModel extends SenpiModelPort>(
     definition.models,
     configuredTuning,
   )
-  const directModels = definition.models?.length && options.distributeModels
-    ? options.distributeModels(`agent:${name}`, configuredModels, definition.models_distribution)
-    : configuredModels
+  const directModels =
+    definition.models?.length && options.distributeModels
+      ? options.distributeModels(`agent:${name}`, configuredModels, definition.models_distribution)
+      : configuredModels
+  // Who chose the direct model, read from the definition this spawn resolves rather than from a config
+  // read at another time: a builtin agent still on its own builtin model/models is omo's, anything
+  // else (an omo.json override, an omo.json-only agent) is the user's.
+  const builtin = Object.hasOwn(BUILTIN_AGENTS, name) ? BUILTIN_AGENTS[name] : undefined
+  const directSource: ModelSelectionSource =
+    builtin !== undefined && definition.model === builtin.model && definition.models === builtin.models
+      ? "builtin"
+      : "user"
   for (const candidate of directModels) {
     attemptedModel = candidate.model
     const found = findExactAgentModel(candidate.model, registry)
@@ -134,6 +156,7 @@ export function resolveAgent<TModel extends SenpiModelPort>(
     return resolvedAgent(
       context,
       found,
+      directSource,
       candidate.variant,
       candidate.reasoningEffort,
       buildRuntimeModelChain({
@@ -157,6 +180,7 @@ export function resolveAgent<TModel extends SenpiModelPort>(
       return resolvedAgent(
         context,
         { provider: selection.provider, modelId: selection.modelId },
+        selection.source,
         selection.variant,
         selection.reasoningEffort,
         {
@@ -187,15 +211,14 @@ export function resolveAgent<TModel extends SenpiModelPort>(
         return resolvedAgent(
           context,
           found,
+          "builtin",
           configuredTuning.variant ?? resolution.variant,
           configuredTuning.reasoningEffort,
           buildRuntimeModelChain({
             candidates: chainRungCandidates({
               chain: fallbackChain,
               selectedModel: resolution.model,
-              ...(resolution.fallbackEntry !== undefined
-                ? { selectedRungEntry: resolution.fallbackEntry }
-                : {}),
+              ...(resolution.fallbackEntry !== undefined ? { selectedRungEntry: resolution.fallbackEntry } : {}),
               availableModels: availableModelSet,
             }),
             selectedModel: resolution.model,
@@ -207,18 +230,14 @@ export function resolveAgent<TModel extends SenpiModelPort>(
     }
   }
 
-  return { kind: "model_unavailable", agent: name, attemptedModel, availableAgents }
-}
-
-function agentPersona(name: string, definition: AgentDefinition): AgentPersona {
-  const agentExecutionMode = toExecutionMode(definition.executionMode)
   return {
-    agentType: name,
-    ...(definition.prompt !== undefined ? { instructions: definition.prompt } : {}),
-    ...agentToolPolicy(definition),
-    ...(agentExecutionMode !== undefined ? { agentExecutionMode } : {}),
-    ...(definition.allowedSubagents !== undefined ? { allowedSubagents: definition.allowedSubagents } : {}),
-    ...(definition.maxDepth !== undefined ? { maxDepth: definition.maxDepth } : {}),
+    kind: "model_unavailable",
+    agent: name,
+    attemptedModel,
+    availableAgents,
+    ...(fallbackChain !== undefined && availableModels !== undefined
+      ? { attempted_chain: fallbackChain, missing_providers: missingChainProviders(fallbackChain, availableModels) }
+      : {}),
   }
 }
 
@@ -231,6 +250,7 @@ function firstConfiguredModel(definition: AgentDefinition): string | undefined {
 function resolvedAgent(
   context: AgentResolutionContext,
   model: ParsedAgentModel,
+  modelSource: ModelSelectionSource,
   variant?: string,
   reasoningEffort?: AgentModelCandidate["reasoningEffort"],
   runtimeModelChain: {
@@ -243,6 +263,7 @@ function resolvedAgent(
     kind: "resolved",
     agent: context.name,
     model: display,
+    modelSource,
     ...runtimeModelChain,
     resolved_model: {
       source: "agent",
@@ -255,15 +276,5 @@ function resolvedAgent(
     },
     availableAgents: context.availableAgents,
     ...context.persona,
-  }
-}
-
-function toExecutionMode(value: string | undefined): AgentPersona["agentExecutionMode"] {
-  switch (value) {
-    case "in-process":
-    case "process":
-      return value
-    default:
-      return undefined
   }
 }

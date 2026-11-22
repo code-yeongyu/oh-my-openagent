@@ -1,9 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  isSessionActive,
-  shouldPromptAfterSessionIdle,
-} from "./session-idle-settle"
+import { isSessionActive, shouldPromptAfterSessionIdle } from "./session-idle-settle"
 
 describe("session idle prompt guard", () => {
   test("#given session.status reports busy #when checking active session #then it returns true", async () => {

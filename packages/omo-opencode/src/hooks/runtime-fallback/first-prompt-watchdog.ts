@@ -24,12 +24,7 @@ export interface FirstPromptWatchdog {
   dispose(): void
 }
 
-const TERMINAL_EVENT_TYPES = new Set([
-  "session.idle",
-  "session.stop",
-  "session.deleted",
-  "session.error",
-])
+const TERMINAL_EVENT_TYPES = new Set(["session.idle", "session.stop", "session.deleted", "session.error"])
 
 function isCompletionMarker(value: unknown): boolean {
   if (typeof value === "boolean") return value
@@ -38,10 +33,12 @@ function isCompletionMarker(value: unknown): boolean {
 
 function hasAssistantCompletionMarker(info: Record<string, unknown>): boolean {
   const time = isRecord(info.time) ? info.time : undefined
-  return isCompletionMarker(info.finish)
-    || isCompletionMarker(info.finished)
-    || isCompletionMarker(info.completed)
-    || isCompletionMarker(time?.completed)
+  return (
+    isCompletionMarker(info.finish) ||
+    isCompletionMarker(info.finished) ||
+    isCompletionMarker(info.completed) ||
+    isCompletionMarker(time?.completed)
+  )
 }
 
 /**
@@ -196,6 +193,7 @@ export function createFirstPromptWatchdog(
   return {
     onUserMessage(sessionID, model, agent) {
       if (!sessionID) return
+      if (watchdogMs <= 0) return
       if (!subagentSessions.has(sessionID)) return
       if (armed.has(sessionID)) return
 

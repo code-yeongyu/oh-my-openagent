@@ -132,7 +132,11 @@ describe("dispatchInternalPrompt", () => {
 
     // then
     expect(first.status).toBe("dispatched")
-    expect(second).toEqual({ status: "reserved", reservedBy: "test:unified-shared:first", expiresAt: expect.any(Number) })
+    expect(second).toEqual({
+      status: "reserved",
+      reservedBy: "test:unified-shared:first",
+      expiresAt: expect.any(Number),
+    })
     expect(calls).toEqual(["async"])
   })
 
@@ -352,20 +356,23 @@ describe("dispatchInternalPrompt", () => {
     _setPromptGateRevalidationTimeoutMsForTesting(5)
 
     // when
-    const result = await waitForPromise(dispatchInternalPrompt({
-      mode: "async",
-      client,
-      sessionID: "ses_queue_stalled_revalidation",
-      input: {
-        path: { id: "ses_queue_stalled_revalidation" },
-        body: { parts: [{ type: "text", text: "stalled validation" }] },
-      },
-      source: "test:queue-stalled-revalidation",
-      settleMs: 0,
-      queueRetryMs: 50,
-      dispatchTimeoutMs: 5_000,
-      shouldDispatch: () => new Promise<boolean>(() => {}),
-    }), "bounded queued revalidation")
+    const result = await waitForPromise(
+      dispatchInternalPrompt({
+        mode: "async",
+        client,
+        sessionID: "ses_queue_stalled_revalidation",
+        input: {
+          path: { id: "ses_queue_stalled_revalidation" },
+          body: { parts: [{ type: "text", text: "stalled validation" }] },
+        },
+        source: "test:queue-stalled-revalidation",
+        settleMs: 0,
+        queueRetryMs: 50,
+        dispatchTimeoutMs: 5_000,
+        shouldDispatch: () => new Promise<boolean>(() => {}),
+      }),
+      "bounded queued revalidation",
+    )
 
     // then
     expect(result.status).toBe("queued")
@@ -655,7 +662,7 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
       _client: { accepted: true },
       async promptAsync(
         this: { _client: { accepted: boolean } },
-        input: { path: { id: string }, body: { parts: unknown[] } },
+        input: { path: { id: string }; body: { parts: unknown[] } },
       ) {
         return { accepted: this._client.accepted, sessionID: input.path.id }
       },
@@ -1219,10 +1226,12 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
       session: {
         status: async () => ({ data: { ses_recovery_tools: { type: "idle" } } }),
         messages: async () => ({
-          data: [{
-            info: { id: "msg_assistant", role: "assistant", finish: "tool-calls" },
-            parts: [{ type: "tool_use", id: "toolu_pending", state: { status: "pending" } }],
-          }],
+          data: [
+            {
+              info: { id: "msg_assistant", role: "assistant", finish: "tool-calls" },
+              parts: [{ type: "tool_use", id: "toolu_pending", state: { status: "pending" } }],
+            },
+          ],
         }),
         promptAsync: async () => {
           promptCalls += 1
@@ -1361,11 +1370,9 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
       source: "model-fallback:message.updated",
       settleMs: 0,
     })
-    const released = releasePromptAsyncReservation(
-      "ses_release_family_scope",
-      "model-fallback-abort:session.error",
-      { reservedByPrefix: "model-fallback:" },
-    )
+    const released = releasePromptAsyncReservation("ses_release_family_scope", "model-fallback-abort:session.error", {
+      reservedByPrefix: "model-fallback:",
+    })
     const second = await dispatchInternalPrompt({
       mode: "async",
       client,
@@ -1500,7 +1507,11 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
 
     // then
     expect(first).toMatchObject({ status: "failed", dispatchAttempted: true })
-    expect(second).toEqual({ status: "reserved", reservedBy: "test:retryable-reject:first", expiresAt: expect.any(Number) })
+    expect(second).toEqual({
+      status: "reserved",
+      reservedBy: "test:retryable-reject:first",
+      expiresAt: expect.any(Number),
+    })
     expect(promptCalls).toBe(1)
   })
 
@@ -1527,11 +1538,9 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
       source: "model-fallbackx:message.updated",
       settleMs: 0,
     })
-    const released = releasePromptAsyncReservation(
-      "ses_prefix_sibling",
-      "model-fallback-abort:session.error",
-      { reservedByPrefix: "model-fallback:" },
-    )
+    const released = releasePromptAsyncReservation("ses_prefix_sibling", "model-fallback-abort:session.error", {
+      reservedByPrefix: "model-fallback:",
+    })
     const second = await dispatchInternalPrompt({
       mode: "async",
       client,
@@ -1570,19 +1579,25 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
     }
 
     // when
-    const first = dispatchInternalPrompt({ mode: "sync", client,
-    sessionID: "ses_prompt_race",
-    input: { path: { id: "ses_prompt_race" }, body: { parts: [] } },
-    source: "test:prompt:first",
-    settleMs: 0,
-    postDispatchHoldMs: 0, })
+    const first = dispatchInternalPrompt({
+      mode: "sync",
+      client,
+      sessionID: "ses_prompt_race",
+      input: { path: { id: "ses_prompt_race" }, body: { parts: [] } },
+      source: "test:prompt:first",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+    })
     await Promise.resolve()
-    const second = await dispatchInternalPrompt({ mode: "sync", client,
-    sessionID: "ses_prompt_race",
-    input: { path: { id: "ses_prompt_race" }, body: { parts: [] } },
-    source: "test:prompt:second",
-    settleMs: 0,
-    postDispatchHoldMs: 0, })
+    const second = await dispatchInternalPrompt({
+      mode: "sync",
+      client,
+      sessionID: "ses_prompt_race",
+      input: { path: { id: "ses_prompt_race" }, body: { parts: [] } },
+      source: "test:prompt:second",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+    })
     releasePrompt?.()
     const firstResult = await first
 
@@ -1604,17 +1619,23 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
     }
 
     // when
-    const first = dispatchInternalPrompt({ mode: "sync", client,
-    sessionID: "ses_prompt_hold_after_dispatch",
-    input: { path: { id: "ses_prompt_hold_after_dispatch" }, body: { parts: [] } },
-    source: "test:prompt-hold:first",
-    settleMs: 0, })
+    const first = dispatchInternalPrompt({
+      mode: "sync",
+      client,
+      sessionID: "ses_prompt_hold_after_dispatch",
+      input: { path: { id: "ses_prompt_hold_after_dispatch" }, body: { parts: [] } },
+      source: "test:prompt-hold:first",
+      settleMs: 0,
+    })
     const firstResult = await first
-    const second = await dispatchInternalPrompt({ mode: "sync", client,
-    sessionID: "ses_prompt_hold_after_dispatch",
-    input: { path: { id: "ses_prompt_hold_after_dispatch" }, body: { parts: [] } },
-    source: "test:prompt-hold:second",
-    settleMs: 0, })
+    const second = await dispatchInternalPrompt({
+      mode: "sync",
+      client,
+      sessionID: "ses_prompt_hold_after_dispatch",
+      input: { path: { id: "ses_prompt_hold_after_dispatch" }, body: { parts: [] } },
+      source: "test:prompt-hold:second",
+      settleMs: 0,
+    })
 
     // then
     expect(firstResult.status).toBe("dispatched")
@@ -1657,7 +1678,7 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
       _client: { accepted: true },
       async prompt(
         this: { _client: { accepted: boolean } },
-        input: { path: { id: string }, body: { parts: unknown[] } },
+        input: { path: { id: string }; body: { parts: unknown[] } },
       ) {
         return { accepted: this._client.accepted, sessionID: input.path.id }
       },
@@ -1665,12 +1686,15 @@ describe("dispatchInternalPrompt shared gate behavior", () => {
     const client = { session }
 
     // when
-    const result = await dispatchInternalPrompt({ mode: "sync", client,
-    sessionID: "ses_bound_prompt",
-    input: { path: { id: "ses_bound_prompt" }, body: { parts: [] } },
-    source: "test:bound-prompt",
-    settleMs: 0,
-    postDispatchHoldMs: 0, })
+    const result = await dispatchInternalPrompt({
+      mode: "sync",
+      client,
+      sessionID: "ses_bound_prompt",
+      input: { path: { id: "ses_bound_prompt" }, body: { parts: [] } },
+      source: "test:bound-prompt",
+      settleMs: 0,
+      postDispatchHoldMs: 0,
+    })
 
     // then
     expect(result).toEqual({
