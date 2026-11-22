@@ -9,9 +9,9 @@ import { describe, expect, it } from "bun:test"
 import { spawn } from "node:child_process"
 import { existsSync } from "node:fs"
 import { lstat, mkdir, readdir, readFile, rename, rm, symlink, writeFile } from "node:fs/promises"
-import { join } from "node:path"
+import { join, sep } from "node:path"
 
-import { GitMemoryRepo, buildIdentityPaths } from "@oh-my-opencode/memory-core"
+import { GitMemoryRepo, acquireLock, buildIdentityPaths, createLockRecord, runOnDevice } from "@oh-my-opencode/memory-core"
 
 import { createMemoryBinding } from "./binding"
 import { SPLIT_UNINITIALIZED_MESSAGE } from "./engine-session"
@@ -99,6 +99,16 @@ async function splitFixture(options: { readonly initialized?: boolean } = {}) {
 }
 
 describe("memory tool on a split session", () => {
+  it("creates the device lock directory explicitly before publishing its record", async () => {
+    const root = await testRoot("omo-split-publish-")
+    const loop = join(root, "loop")
+    const device = remoteDeviceFiles(loop, join(root, "device"))
+    const record = await createLockRecord("test")
+    await runOnDevice(device.files, () => acquireLock(join(loop, "locks", "writer"), record))
+    expect(device.ops.filter((op) => op.startsWith("mkdir ") || op.startsWith("write ")))
+      .toEqual([`mkdir ${sep}locks`, `write ${sep}${join("locks", "writer")}`])
+  })
+
   it("#given device files the loop's disk cannot see #when the memory tool creates a block #then the write and its commit land on the device only", async () => {
     // given
     const { loopRoot, devicePaths, context, device } = await splitFixture()

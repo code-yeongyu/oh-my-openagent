@@ -107,6 +107,7 @@ async function publishFallback(lockPath: string, record: LockRecord): Promise<bo
 
 /** On a split session's device files the lock is one exclusive create of the record; EEXIST is the lost race. */
 async function publishOnDevice(files: MemoryDeviceFiles, lockPath: string, record: LockRecord): Promise<boolean> {
+  await files.mkdir(path.dirname(lockPath))
   try {
     await files.write(lockPath, new TextEncoder().encode(`${JSON.stringify(record)}\n`), { exclusive: true })
     return true
