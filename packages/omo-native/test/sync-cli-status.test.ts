@@ -129,28 +129,44 @@ describe("omo sync status", () => {
     expect(out).toContain("Engine: no engine is running on this machine.")
   })
 
-  test("a refused device list and an unreadable pin dir each report their own reason", async () => {
-    // given a device list that throws and a pin dir this user cannot search
+  test("a refused device list reports its own reason and leaves the other sections readable", async () => {
+    // given a device list that throws
     const ctx = await context({
       devices: async () => {
         throw new Error("service answered 503")
       },
     })
-    await chmod(ctx.pinDir, 0o000)
-    try {
-      // when status runs
-      const { out, exit } = await status([], ctx, RUNNING)
-      // then the command still succeeds and each failed section names why
-      expect(exit).toBe(0)
-      expect(out).toContain("Devices: could not be read (service answered 503).")
-      expect(out.some((line) => line.startsWith("This device: dev_svc, local sync state could not be read ("))).toBe(
-        process.getuid?.() !== 0,
-      )
-      expect(out).toContain("  pend_1: expires 2026-11-20T02:00:00.000Z, waiting")
-    } finally {
-      await chmod(ctx.pinDir, 0o700)
-    }
+    // when status runs
+    const { out, exit } = await status([], ctx, RUNNING)
+    // then the command still succeeds, the device list names why, and the local and pending sections still report
+    expect(exit).toBe(0)
+    expect(out).toContain("Devices: could not be read (service answered 503).")
+    expect(out).toContain("This device: dev_svc, not joined, sync on")
+    expect(out).toContain("  pend_1: expires 2026-11-20T02:00:00.000Z, waiting")
   })
+
+  // Search permission is a POSIX mode bit; Windows has no mode bits, so chmod cannot make a directory unreadable there.
+  test.skipIf(process.platform === "win32")(
+    "a pin dir this user cannot search reports its own reason and leaves the other sections readable",
+    async () => {
+      // given a pin dir with its search bit removed
+      const ctx = await context()
+      await chmod(ctx.pinDir, 0o000)
+      try {
+        // when status runs
+        const { out, exit } = await status([], ctx, RUNNING)
+        // then the command still succeeds and the local section names why (root bypasses mode bits, so it reads fine)
+        expect(exit).toBe(0)
+        expect(out.some((line) => line.startsWith("This device: dev_svc, local sync state could not be read ("))).toBe(
+          process.getuid?.() !== 0,
+        )
+        expect(out).toContain("    desk (dev_b): not syncing, last seen 2026-11-19T01:00:00.000Z")
+        expect(out).toContain("  pend_1: expires 2026-11-20T02:00:00.000Z, waiting")
+      } finally {
+        await chmod(ctx.pinDir, 0o700)
+      }
+    },
+  )
 
   test.skipIf(process.platform === "win32")(
     "the operator socket decides: absent or a leftover file is no engine, a listener is running and receives nothing",

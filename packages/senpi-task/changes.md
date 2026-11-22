@@ -1,3 +1,7 @@
+## 2026-11-20 - a typed socket probe shared with omo sync status (#14437)
+
+`runners/rpc-host/busy-host.ts` gains `probeSocket` (`accepts` / `refused` / `unknown` with a reason): ECONNREFUSED and ENOENT are `refused`, a permission error or no answer within the timeout is `unknown`. `socketAcceptsConnection` is now `probeSocket(...).kind === "accepts"`, so the liveness path is unchanged, and `omo sync status` uses the same probe instead of a copy.
+
 ## 2026-11-20 - Keep the exact-category predicate internal (#14447)
 
 `src/category/builtins.ts` no longer exports the unused `isExactModelCategory` helper. Its callers in that module and its category matching behavior are unchanged.
