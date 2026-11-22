@@ -55,10 +55,13 @@ describe("#given a newly scaffolded TypeScript project", () => {
       specifier: "./lint/oxlint-plugin/index.js",
     })
     expect(config.rules["programming/require-suppression-reason"]).toBe("error")
-    expect(config.overrides[0].rules["programming/no-em-dash-copy"]).toBe("error")
+    const productCopy = config.overrides.find((override: { files: string[] }) => override.files.includes("src/**/*"))
+    expect(productCopy?.files).toEqual(expect.arrayContaining(["apps/*/src/**/*", "packages/*/src/**/*"]))
+    expect(productCopy?.rules["programming/no-em-dash-copy"]).toBe("error")
     const tsconfig = await Bun.file(join(project, "tsconfig.json")).json()
     expect(tsconfig.include).toEqual(["src/**/*.ts", "src/**/*.tsx"])
     expect(tsconfig.compilerOptions.jsx).toBe("react-jsx")
+    expect(tsconfig.compilerOptions.jsxImportSource).toBe("hono/jsx")
   })
 
   test("#when visiting copy offline #then the generated plugin reports em dashes", async () => {
@@ -74,11 +77,8 @@ describe("#given a newly scaffolded TypeScript project", () => {
     visitors.TemplateElement(template)
     visitors.JSXText(jsx)
     expect(reports).toHaveLength(3)
-    expect(reports).toEqual([
-      expect.objectContaining({ node: literal }),
-      expect.objectContaining({ node: template }),
-      expect.objectContaining({ node: jsx }),
-    ])
+    const message = "No em dashes in product copy. Use a period, comma, colon, or parentheses instead."
+    expect(reports).toEqual([literal, template, jsx].map((node) => ({ node, message })))
     visitors.Literal({ type: "Literal", value: "Hello, world" })
     visitors.Literal({ type: "Literal", value: /Hello\u2014world/ })
     visitors.TemplateElement({ type: "TemplateElement", value: { cooked: null } })
@@ -101,6 +101,7 @@ describe("#given a newly scaffolded TypeScript project", () => {
       expect(clean.code).toBe(0)
       const formatted = await run([process.execPath, "run", "fmt:check"])
       expect(formatted.code).toBe(0)
+      writeFileSync(join(project, "src/view.tsx"), "export const view = <p>Hello</p>\n")
       const typed = await run([process.execPath, "run", "typecheck"])
       expect(typed.code).toBe(0)
       writeFileSync(join(project, "src/copy.ts"), 'export const copy = "Hello\\u2014world"\n')
