@@ -143,13 +143,16 @@ for (const code of ["EPERM", "EACCES", "EBUSY"]) {
   })
 }
 
-function loseLockOnDemand(): { lose: () => void } {
+function loseLockOnDemand(): { lose: () => Promise<void> } {
   const realLock = lockfile.lock
-  const handle = { lose: () => {} }
+  const handle = { lose: async () => {} }
   const lock = spyOn(lockfile, "lock").mockImplementation(async (file, options) => {
     const release = await realLock(file, options)
-    handle.lose = () => {
-      void release()
+    // The release's filesystem effect must settle before the compromise fires: production awaits
+    // the backoff delay this lose() rides in, so by the time addGrant rejects the lock file is
+    // gone on every platform - a fire-and-forget release raced the listing on windows-latest (#12058).
+    handle.lose = async () => {
+      await release()
       options?.onCompromised?.(Object.assign(new Error("synthetic lost lock"), { code: "ECOMPROMISED" }))
     }
     return release
@@ -191,7 +194,7 @@ test("refuses the next Windows replace attempt once the lock is lost during a ba
     Object.assign(new Error("synthetic open handle"), { code: "EPERM" }),
   )
   const delay = spyOn(timers, "setTimeout").mockImplementation((async () => {
-    lock.lose()
+    await lock.lose()
   }) as unknown as typeof timers.setTimeout)
   restorers.push(
     () => rename.mockRestore(),
