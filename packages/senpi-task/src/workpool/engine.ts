@@ -88,7 +88,7 @@ export function createWorkpoolEngine(
     )
     if (!started) awaitingAck.delete(key)
   }
-  let checkPolicy = (agent: WorkpoolAgent, _parent: string): void => {
+  let checkPolicy = (agent: WorkpoolAgent, _parent: string, _cwd: string): void => {
     if (agent.subagent_type === undefined) return
     const verdict = evaluateInvocationGuard(agent.subagent_type, EMPTY_SKILL_INVOCATIONS)
     if (verdict.kind === "deny") throw new WorkpoolError("policy_denied", verdict.message)
@@ -97,7 +97,7 @@ export function createWorkpoolEngine(
     store,
     admission,
     emit,
-    authorize: (pool) => checkPolicy(pool.agent, pool.parent_session_id),
+    authorize: (pool) => checkPolicy(pool.agent, pool.parent_session_id, pool.worker_spec.start.cwd),
   })
   function assertParent(caller: Pick<WorkpoolCaller, "sessionId">): void {
     if (caller.sessionId.trim().length === 0)
@@ -146,7 +146,7 @@ export function createWorkpoolEngine(
         "Parent-defined worker tools need a live JavaScript kernel capability.",
       )
     }
-    checkPolicy(input.agent, caller.sessionId)
+    checkPolicy(input.agent, caller.sessionId, caller.cwd)
     const pool = store.create(
       caller,
       { ...input, mode: input.mode ?? WORKPOOL_DEFAULT_MODE, tools: names },
@@ -257,7 +257,7 @@ export function createWorkpoolEngine(
     yieldResults,
     waitForEvent,
     ...createPoolRunPause({ store, admission, stop: dispatcher.cancel, attach: dispatcher.attach }),
-    setSpawnPolicy: (policy: (agent: WorkpoolAgent, parent: string) => void) => {
+    setSpawnPolicy: (policy: (agent: WorkpoolAgent, parent: string, cwd: string) => void) => {
       checkPolicy = policy
     },
     ownsTask: (taskId: string) =>
