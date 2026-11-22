@@ -450,6 +450,44 @@ describe("notificationMessages", () => {
     expect(notices).toEqual([])
   })
 
+  test("#given migration diagnostics naming not-imported keys #when notices are built #then one warning names the keys and the backup location without values", () => {
+    // given
+    const legacyBackupPath =
+      "/home/alice/.omo/migration-backup-2026-11-22T00-00-00-000Z-opencode-config/.config/opencode/oh-my-openagent.json"
+    const migration: SenpiStartupMigrationResult = {
+      journalResumed: false,
+      migratedFrom: ["/home/alice/.config/opencode/oh-my-openagent.json"],
+      results: [
+        {
+          diagnostics: ["not imported: agents"],
+          journalResumed: false,
+          preview: {
+            backupMoves: [{ from: "/home/alice/.config/opencode/oh-my-openagent.json", to: legacyBackupPath }],
+            targetPath: "/home/alice/.omo/omo.jsonc",
+            transform: {},
+          },
+          status: "migrated",
+        },
+      ],
+    }
+    const config: SenpiOmoConfigResult = { config: {}, diagnostics: [], layers: [], sources: [] }
+
+    // when
+    const notices = notificationMessages(migration, config)
+
+    // then
+    expect(notices).toEqual([
+      {
+        message: "OmO Native: migrated legacy configuration from /home/alice/.config/opencode/oh-my-openagent.json",
+        type: "info",
+      },
+      {
+        message: `OmO Native: configuration migration: not imported: agents; backup: ${legacyBackupPath}`,
+        type: "warning",
+      },
+    ])
+  })
+
   test("#given only canonical and custom agent keys #when notices are built #then no alias-deprecated notice is produced", () => {
     // given
     const config: SenpiOmoConfigResult = {

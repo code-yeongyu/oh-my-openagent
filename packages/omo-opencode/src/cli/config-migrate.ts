@@ -38,7 +38,8 @@ function printText(report: readonly MigrationReport[], output: (line: string) =>
     if (entry.targetBackupPath !== undefined) output(`backup: ${entry.targetBackupPath}`)
     if (entry.transform !== undefined) output(`transform: ${JSON.stringify(entry.transform, null, 2)}`)
     if (entry.movePlan.length > 0) output(`move-plan: ${JSON.stringify(entry.movePlan, null, 2)}`)
-    for (const diagnostic of entry.diagnostics) output(`conflict: ${diagnostic}`)
+    for (const diagnostic of entry.diagnostics)
+      output(diagnostic.startsWith("not imported: ") ? diagnostic : `conflict: ${diagnostic}`)
   }
 }
 

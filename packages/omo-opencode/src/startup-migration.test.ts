@@ -162,6 +162,39 @@ describe("runOpenCodeStartupMigration", () => {
     expect(fileSystem.existsSync(configJsoncPath)).toBe(true)
   })
 
+  test("#given a legacy source with mapped and unmapped keys #when startup migration runs #then mapped keys land in the target and unmapped keys are reported once without values", () => {
+    // given
+    const fileSystem = createFileSystem()
+    fileSystem.files.set(
+      rootSourcePath,
+      JSON.stringify({
+        agents: { oracle: { model: "anthropic/legacy" } },
+        categories: { deep: { model: "anthropic/legacy" } },
+        disabled_hooks: ["comment-checker"],
+        git_master: { commit_footer: true, include_co_authored_by: false },
+      }),
+    )
+    const legacyBackupPath = `${homeDir}/.omo/migration-backup-2026-07-27T12-34-56-789Z-opencode-config/.config/opencode/oh-my-openagent.json`
+
+    // when
+    const result = run(fileSystem)
+
+    // then
+    expect(result.error).toBeUndefined()
+    expect(parseFile(fileSystem, targetPath)["[opencode]"]).toMatchObject({
+      disabled_hooks: ["comment-checker"],
+      git_master: { commit_footer: true, include_co_authored_by: false },
+    })
+    expect(result.notImportedKeys).toEqual(["agents", "categories"])
+    expect(result.legacyBackupPaths).toEqual([legacyBackupPath])
+    expect(fileSystem.existsSync(legacyBackupPath)).toBe(true)
+    const notImported = result.results.flatMap((entry) =>
+      entry.diagnostics.filter((diagnostic) => diagnostic.startsWith("not imported: ")),
+    )
+    expect(notImported).toEqual(["not imported: agents", "not imported: categories"])
+    for (const diagnostic of notImported) expect(diagnostic).toMatch(/^not imported: [a-z_]+$/)
+  })
+
   test("#given a journal recorded the target write #when recovery crosses filesystems #then it copies the backup before evaluating migration sources", () => {
     // given
     const fileSystem = createFileSystem()

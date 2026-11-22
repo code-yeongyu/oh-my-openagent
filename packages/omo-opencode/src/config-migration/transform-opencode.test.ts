@@ -5,12 +5,13 @@ import { join, posix } from "node:path"
 
 import { OmoConfigSchema } from "@oh-my-opencode/omo-config-core"
 
+import { OhMyOpenCodeConfigSchema } from "../config/schema/oh-my-opencode-config"
+import { IMPORTABLE_OPENCODE_KEYS, OMITTED_LEGACY_OPENCODE_KEYS, transformOpenCodeSources } from "./transform-opencode"
 import {
   CONFIG_JSONC_MIGRATION_ID,
   OPENCODE_CONFIG_MIGRATION_ID,
   discoverLegacyConfigGroups,
   transformConfigJsoncSources,
-  transformOpenCodeSources,
   type DiscoveredLegacyConfigSource,
   type LoadedLegacyConfigSource,
 } from "./index"
@@ -20,6 +21,18 @@ function loaded(source: DiscoveredLegacyConfigSource, value: unknown): LoadedLeg
 }
 
 describe("OpenCode config migration transform", () => {
+  test("#given the importable key set #when compared to the current [opencode] view schema #then it matches the schema keys minus the deliberately omitted ones", () => {
+    // given: the migration contract - a key imports iff the current view schema still accepts it
+    const schemaKeys = Object.keys(OhMyOpenCodeConfigSchema.shape).filter(
+      (key) => key !== "$schema" && key !== "_migrations",
+    )
+
+    // when
+    const expected = [...new Set([...schemaKeys, "models"])].filter((key) => !OMITTED_LEGACY_OPENCODE_KEYS.has(key))
+
+    // then
+    expect([...IMPORTABLE_OPENCODE_KEYS].sort()).toEqual([...expected].sort())
+  })
   test("#given root and profile configs, config.jsonc, and a project config #when transformed #then the golden unified documents parse through OmoConfigSchema", () => {
     // given
     const fixtureRoot = mkdtempSync(join(tmpdir(), "omo-config-transform-"))
@@ -172,7 +185,7 @@ describe("OpenCode config migration transform", () => {
     })
   })
 
-  test("#given legacy config keys #when transforming #then their current omo equivalents are retained without file-level rewrites", () => {
+  test("#given legacy config keys #when transforming #then keys with current equivalents are imported and the rest are reported", () => {
     const root: DiscoveredLegacyConfigSource = {
       baseRoot: "/home/alice/.config/opencode",
       configPath: "/home/alice/.config/opencode/oh-my-openagent.jsonc",
@@ -201,9 +214,45 @@ describe("OpenCode config migration transform", () => {
     })
 
     expect(result.document["[opencode]"]).toEqual({
+      disabled_agents: ["OmO"],
+      disabled_hooks: ["anthropic-auto-compact", "empty-message-sanitizer"],
+      experimental: { hashline_edit: { enabled: true } },
       sisyphus_agent: { model: "provider/sisyphus" },
     })
+    expect(result.diagnostics).toEqual(["not imported: agents", "not imported: categories", "not imported: lsp"])
     expect(result.document.legacy_migrations).toBeUndefined()
+  })
+
+  test("#given disabled_hooks and git_master alongside unmapped keys #when transforming #then they migrate into [opencode] and only the unmapped keys are reported", () => {
+    const root: DiscoveredLegacyConfigSource = {
+      baseRoot: "/home/alice/.config/opencode",
+      configPath: "/home/alice/.config/opencode/oh-my-opencode.json",
+      kind: "user-config",
+      path: "/home/alice/.config/opencode/oh-my-opencode.json",
+      precedence: 0,
+    }
+
+    const result = transformOpenCodeSources({
+      discovered: [root],
+      scope: { kind: "user" },
+      sources: [
+        loaded(root, {
+          agents: { oracle: { model: "anthropic/legacy" } },
+          categories: { deep: { model: "anthropic/legacy" } },
+          disabled_hooks: ["comment-checker"],
+          git_master: { commit_footer: true, include_co_authored_by: false },
+        }),
+      ],
+    })
+    const parsed = OmoConfigSchema.safeParse(result.document)
+
+    expect(parsed.success).toBe(true)
+    expect(result.document["[opencode]"]).toEqual({
+      disabled_hooks: ["comment-checker"],
+      git_master: { commit_footer: true, include_co_authored_by: false },
+    })
+    expect(result.diagnostics).toEqual(["not imported: agents", "not imported: categories"])
+    for (const diagnostic of result.diagnostics) expect(diagnostic).toMatch(/^not imported: [a-z_]+$/)
   })
 
   test("#given a legacy OpenCode source with agents, categories, and model/provider fields #when transformed #then agents and categories are omitted while model/provider fields remain", () => {
