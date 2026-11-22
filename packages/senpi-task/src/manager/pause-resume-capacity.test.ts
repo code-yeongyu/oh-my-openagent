@@ -11,6 +11,7 @@ import {
   settings,
   tempProject,
 } from "./__fixtures__/manager-fakes"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -34,7 +35,7 @@ test.each([false, true])(
     const makeManager = () =>
       createTaskManager({
         cwd,
-        store: createTaskRecordStore({ project_dir: cwd }),
+        store: createTaskRecordStore(ownedTaskState(cwd)),
         config: settings({ default_concurrency: 1, global_concurrency: 1 }),
         planner: categoryPlanner(),
         runners: { "in-process": runner, process: runner },
@@ -69,7 +70,7 @@ test.each([false, true])(
     barrier.close("parent", 1)
     await bounded(manager.pauseTask(started.task_id, owner))
     // A persisted observed model is not the allocator's original model.
-    createTaskRecordStore({ project_dir: cwd }).mutate(started.task_id, (record) => ({
+    createTaskRecordStore(ownedTaskState(cwd)).mutate(started.task_id, (record) => ({
       ...record,
       model: "observed/canonical",
     }))

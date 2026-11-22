@@ -66,14 +66,112 @@ async function run(args: readonly string[], fake = fakeSdk(), extra: Record<stri
 }
 
 describe("omo thread: argv to SDK calls", () => {
-  test("#given list --json #when run #then the SDK lists in the workspace scope and stdout is the threads array", async () => {
-    const fake = fakeSdk({
-      list: { kind: "ok", scope: "workspace", threads: [{ thread_id: "dur-tui", surface: "tui" }] },
-    })
+  test("#given list --json #when run #then the SDK lists in the workspace scope and stdout is its whole result: threads, devices and remote_unavailable", async () => {
+    const list = {
+      kind: "ok",
+      scope: "workspace",
+      threads: [
+        { thread: "dur-tui", surface: "tui", status: "live", name: "here", cwd: "/w" },
+        { thread: "dur-on-b", status: "resumable", name: "on b", cwd: "/b", device: "dev-b" },
+      ],
+      devices: [
+        {
+          device: "dev-a",
+          name: "this mac",
+          platform: "darwin",
+          online: true,
+          last_seen: null,
+          this_device: true,
+          threads: 1,
+          listing: "listed",
+        },
+        {
+          device: "dev-b",
+          name: "build box",
+          platform: "linux",
+          kind: "cli",
+          online: true,
+          last_seen: null,
+          this_device: false,
+          threads: 1,
+          listing: "listed",
+        },
+        {
+          device: "dev-c",
+          name: "laptop",
+          platform: "darwin",
+          online: true,
+          last_seen: null,
+          this_device: false,
+          threads: 0,
+          listing: "incomplete",
+        },
+      ],
+      remote_unavailable: "devices_unavailable",
+    }
+    const fake = fakeSdk({ list })
     const result = await run(["list", "--json"], fake)
     expect(result.calls.map((call) => call.method)).toEqual(["list"])
-    expect(JSON.parse(result.stdout)).toEqual([{ thread_id: "dur-tui", surface: "tui" }])
+    expect(JSON.parse(result.stdout)).toEqual(list)
     expect({ exitCode: result.exitCode, disposed: result.disposed }).toEqual({ exitCode: THREAD_EXIT.ok, disposed: 1 })
+  })
+
+  test("#given threads on other devices #when list runs without --json #then each names its device and every device gets a line with its listing state", async () => {
+    const result = await run(
+      ["list"],
+      fakeSdk({
+        list: {
+          kind: "ok",
+          scope: "workspace",
+          threads: [
+            { thread: "dur-tui", surface: "tui", status: "live", name: "here", cwd: "/w" },
+            { thread: "dur-on-b", status: "resumable", name: "on b", cwd: "/b", device: "dev-b" },
+          ],
+          devices: [
+            {
+              device: "dev-a",
+              name: "this mac",
+              platform: "darwin",
+              online: true,
+              last_seen: null,
+              this_device: true,
+              threads: 1,
+              listing: "listed",
+            },
+            {
+              device: "dev-b",
+              name: "build box",
+              platform: "linux",
+              kind: "cli",
+              online: true,
+              last_seen: null,
+              this_device: false,
+              threads: 1,
+              listing: "listed",
+            },
+            {
+              device: "dev-c",
+              name: "laptop",
+              platform: "darwin",
+              online: true,
+              last_seen: null,
+              this_device: false,
+              threads: 0,
+              listing: "incomplete",
+            },
+          ],
+          remote_unavailable: "devices_unavailable",
+        },
+      }),
+    )
+    expect(result.stdout.split("\n").filter((line) => line !== "")).toEqual([
+      "dur-tui  tui  live  here  /w",
+      "dur-on-b  ?  resumable  on b  /b  on build box",
+      "device this mac  darwin  this device  1 thread",
+      "device build box  linux  online  1 thread",
+      "device laptop  darwin  online  incomplete: its threads are missing from this list",
+      "remote: devices_unavailable",
+    ])
   })
 
   test("#given send with every addressing flag #when run #then the request carries exactly them, the turn as a number", async () => {
@@ -102,6 +200,17 @@ describe("omo thread: argv to SDK calls", () => {
         idempotency_key: "k-1",
       },
     })
+  })
+
+  test("#given list --state repeated and comma-separated #when run #then the SDK lists exactly those states, each once", async () => {
+    const result = await run(["list", "--state", "archived,idle", "--state", "running", "--state", "idle", "--json"])
+    expect(result.calls).toEqual([{ method: "list", request: { state: ["archived", "idle", "running"] } }])
+  })
+
+  test("#given list --state with a state that is not one of the four #when run #then it is a usage error and the SDK is never loaded", async () => {
+    const result = await run(["list", "--state", "idle,live"])
+    expect({ exitCode: result.exitCode, loaded: result.loaded }).toEqual({ exitCode: THREAD_EXIT.usage, loaded: 0 })
+    expect(result.stderr).toContain("--state must be one of running, idle, inactive, archived")
   })
 
   test("#given send text that reads --json after -- #when run #then it is sent as text and the output stays human", async () => {
@@ -234,7 +343,7 @@ describe("omo thread: argv to SDK calls", () => {
     const fake = fakeSdk({
       read: {
         kind: "ok",
-        thread_id: "t",
+        thread: "t",
         items: [
           { seq: 1, role: "user", content: "a" },
           { seq: 2, role: "assistant", content: "b" },
@@ -477,13 +586,12 @@ describe("omo thread: SDK loading", () => {
     const result = await run(["list", "--json"], failing)
     expect({ exitCode: result.exitCode, stdout: JSON.parse(result.stdout) }).toEqual({
       exitCode: THREAD_EXIT.ok,
-      stdout: [],
+      stdout: { kind: "ok", scope: "workspace", threads: [] },
     })
     expect(result.stderr).toContain("worker gone")
   })
 
-  test("#given the plugin SDK #when loaded #then it gets the agent dir, cwd, cli identity, and an engine status reader over host status --all", async () => {
-    const engineCalls: { args: readonly string[]; env: Record<string, string> }[] = []
+  test("#given the plugin SDK #when loaded #then it gets the agent dir, cwd and cli identity, and no engine status reader: endpoints come from the registry", async () => {
     let received: Record<string, unknown> = {}
     const loaded = await loadThreadSdk({
       pluginRoot: "/plugin",
@@ -492,12 +600,6 @@ describe("omo thread: SDK loading", () => {
       cwd: "/work",
       stderr: { write: () => {} },
       reinstall: "Reinstall omo, then retry.",
-      engine: {
-        run: (args: string[], options: { env: Record<string, string> }) => {
-          engineCalls.push({ args, env: options.env })
-          return { exitCode: 0, stdout: '{"endpoints":[]}', stderr: "" }
-        },
-      },
       loadSqlite: async () => ({}),
       importSdk: async () => ({
         createThreadSdk: (options: Record<string, unknown>) => {
@@ -515,11 +617,7 @@ describe("omo thread: SDK loading", () => {
       uid: 501,
       user: "qa",
     })
-    const statusAll = received.engineStatusAll as () => Promise<string>
-    expect(await statusAll()).toBe('{"endpoints":[]}')
-    expect(engineCalls).toEqual([
-      { args: ["host", "status", "--json", "--all", "--include-workers"], env: { KEEP: "1", OMO_AGENT_DIR: "/agent" } },
-    ])
+    expect("engineStatusAll" in received).toBe(false)
     expect("remote" in received).toBe(false)
   })
 
@@ -534,7 +632,6 @@ describe("omo thread: SDK loading", () => {
       cwd: "/work",
       stderr: { write: () => {} },
       reinstall: "Reinstall omo, then retry.",
-      engine: { run: () => ({ exitCode: 0, stdout: "", stderr: "" }) },
       loadSqlite: async () => ({}),
       importSdk: async () => ({
         createThreadSdk: (options: Record<string, unknown>) => {

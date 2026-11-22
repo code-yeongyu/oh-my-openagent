@@ -29,10 +29,10 @@ import {
   rfc3339,
 } from "./bindings"
 import { answerShape, isUiRequestKind, type UiRequestKind } from "./answer-shape"
-import { GATEWAY_RECEIPT_RETENTION_MS } from "./constants"
+import { GATEWAY_RECEIPT_RETENTION_MS, OPEN_STATES } from "./constants"
 import type { SqlRow, SqlValue } from "./sql"
 import { gatewayOutboxMarkerPath } from "./paths"
-import { OPEN_STATES, type StoreContext, transaction, unlinkMarker, write } from "./store-ops"
+import { type StoreContext, transaction, unlinkMarker, write } from "./store-ops"
 import { deleteExpiredReceipt, sweepRetentionIfDue } from "./store-retention"
 import type { ExternalAuthor, StoreRefusal } from "./types"
 
@@ -383,6 +383,24 @@ export async function toolReceiptRevise(
           request.idempotency_key,
           ctx.config.instance_id,
         ],
+      ) === 1,
+  )
+}
+
+/**
+ * Drops a `prepared` receipt this instance holds for a call that wrote nothing before it failed, so the next call under
+ * the same key runs again instead of replaying that failure. A receipt another instance holds, or one already settled,
+ * is left alone.
+ */
+export async function toolReceiptRelease(ctx: StoreContext, request: Omit<ReceiptKey, "args_hash">): Promise<boolean> {
+  return await transaction(
+    ctx,
+    "tool_receipt_release",
+    () =>
+      write(
+        ctx,
+        "DELETE FROM receipts WHERE principal = ? AND operation = ? AND idempotency_key = ? AND status = 'prepared' AND owner_instance = ?",
+        [request.principal, request.operation, request.idempotency_key, ctx.config.instance_id],
       ) === 1,
   )
 }

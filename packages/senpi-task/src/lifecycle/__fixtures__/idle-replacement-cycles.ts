@@ -7,11 +7,12 @@ import { FakeRunner, tempProject, settings } from "../../manager/__fixtures__/ma
 import { createManagerResidencyRegistry } from "../../../../omo-senpi/src/components/task/residency-registry"
 import { createTaskLifecycle } from "../create"
 import { NO_HOST_ENDPOINT } from "../host-session"
+import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
 
 /** Four active turns share one parent, lane cap and residency cap across four replacement cycles. */
 export async function idleReplacementCycles() {
   const project = tempProject()
-  const store = createTaskRecordStore({ project_dir: project })
+  const store = createTaskRecordStore(ownedTaskState(project))
   const runner = new FakeRunner()
   const config = settings({
     resident_idle_timeout_ms: 37,

@@ -17,7 +17,9 @@ import type { TaskRuntimeContext } from "./runtime-context"
 
 export interface EngineHostWiringInput {
   readonly pi: SenpiExtensionAPI
-  readonly omoConfig: OmoConfig
+  // The live user config, the same getter the planner seam reads, so a revival's current generation
+  // and a child's exclude_models describe the map new plans resolve against.
+  readonly getOmoConfig: () => OmoConfig
   readonly settings: OmoTaskSettings
   readonly runtime: TaskRuntimeContext
   readonly sharedParentTools: () => readonly ToolDefinition[]
@@ -43,7 +45,7 @@ export interface EngineHostWiring {
  * host runtime, so a revival ensure and a spawn ensure hit the same cache and the same notice list.
  */
 export function composeEngineHostWiring(input: EngineHostWiringInput): EngineHostWiring {
-  const { pi, omoConfig, settings, runtime, baseStore, generations } = input
+  const { pi, getOmoConfig, settings, runtime, baseStore, generations } = input
   const host = input.host ?? createEngineHostRuntime(settings, runtime, pi, { storeDir: baseStore.stateDir })
   const lifecycle = createTaskLifecycle({
     ...input.lifecycle,
@@ -56,7 +58,7 @@ export function composeEngineHostWiring(input: EngineHostWiringInput): EngineHos
         const modelRegistry = runtime.modelRegistry()
         return modelRegistry === undefined
           ? generations.current()?.generation
-          : generations.observe({ omoConfig, registry: modelRegistry }).generation
+          : generations.observe({ omoConfig: getOmoConfig(), registry: modelRegistry }).generation
       },
       warn: (warning) => {
         baseStore.appendEvent(warning.task_id, { type: "config_generation_mismatch", payload: warning })
@@ -84,7 +86,7 @@ export function composeEngineHostWiring(input: EngineHostWiringInput): EngineHos
     onHostWarning: host.notices.add,
     hostRouting,
     ...parentLink,
-    ...(input.omoConfig.exclude_models === undefined ? {} : { excludeModels: input.omoConfig.exclude_models }),
+    excludeModels: () => getOmoConfig().exclude_models,
   }
   // One resolver for the whole session, so an ordinary spawn, a revival, a team member and a
   // workpool worker all inherit the SAME package-aware extension list (#8492).

@@ -106,6 +106,31 @@ async fn t25_7_a_failed_peer_credential_lookup_is_a_mismatch() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn t25_24_the_exiting_daemon_closes_its_listener_before_removing_the_socket() {
+    // Given: a daemon that will idle-exit, and a connect attempted at the moment its socket is removed.
+    let dir = private_dir("exit-order");
+    let socket = dir.join("e.sock");
+    let mut bound = bind(socket.to_str().expect("utf-8")).expect("binds");
+    let (seen, at_removal) = std::sync::mpsc::channel();
+    bound.before_remove = Some(Box::new(move |path: &std::path::Path| {
+        let connected = std::os::unix::net::UnixStream::connect(path).map(drop);
+        seen.send((path.exists(), connected.map_err(|error| error.kind()))).expect("recorded");
+    }));
+    let engine = engine();
+    // When
+    listen_checked(&engine, bound, Duration::from_millis(50), |_| Ok(euid()), |_| {})
+        .await
+        .expect("idle exit");
+    engine.shutdown().await;
+    // Then: the socket was still there, yet nothing accepted a connection on it.
+    let (present, connected) = at_removal.recv().expect("the exit removed the socket");
+    assert!(present, "the socket is removed after the listener closes, not before");
+    assert_eq!(connected, Err(std::io::ErrorKind::ConnectionRefused), "the listener was already closed");
+    assert!(!socket.exists(), "the socket is removed at idle exit");
+    std::fs::remove_dir_all(&dir).expect("cleanup");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn the_kernel_lookup_reports_this_process_as_its_own_peer() {
     let (left, _right) = std::os::unix::net::UnixStream::pair().expect("socket pair");
     let uid = crate::peer::peer_euid(std::os::fd::AsRawFd::as_raw_fd(&left)).expect("credentials");

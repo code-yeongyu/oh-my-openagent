@@ -1,4 +1,6 @@
-import { createLazyRemoteSurface } from "./lazy-remote"
+import { createLazyRemoteSurface } from "../../remote/port/lazy-remote"
+import type { RemoteSender } from "../../remote/types"
+import type { SessionEntry } from "@code-yeongyu/senpi"
 import type { RemoteThreadSurface } from "./ports"
 
 /**
@@ -8,11 +10,13 @@ import type { RemoteThreadSurface } from "./ports"
  */
 export function createDefaultRemoteSurface(options: {
   readonly version: string
+  readonly sender: RemoteSender
   readonly log?: (line: string) => void
   readonly permissionPreset?: () => string | undefined
 }): RemoteThreadSurface {
   return createLazyRemoteSurface({
     version: options.version,
+    sender: options.sender,
     loadRuntime: () => import("#omo-thread-client-runtime"),
     loadAliasRegistry: async () => {
       const [{ createServiceAliasRegistry }, { cliServiceAccess }] = await Promise.all([
@@ -28,5 +32,11 @@ export function createDefaultRemoteSurface(options: {
       )
     },
     ...(options.permissionPreset === undefined ? {} : { permissionPreset: options.permissionPreset }),
+    // The engine this extension runs in projects the entries a paged thread_read fetched from another device the way that
+    // device's engine answers get_messages; entries are senpi's own session records, as get_entries hands them over.
+    loadProjector: async () => {
+      const { buildSessionProjection } = await import("@code-yeongyu/senpi")
+      return (entries, leafId) => buildSessionProjection(entries as unknown as SessionEntry[], leafId).entries
+    },
   })
 }

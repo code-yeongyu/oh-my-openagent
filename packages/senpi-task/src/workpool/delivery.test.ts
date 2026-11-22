@@ -10,6 +10,7 @@ import { restartedFixture } from "./__fixtures__/restart"
 import { signal } from "./__fixtures__/delivery"
 import { evidence } from "./__fixtures__/admission"
 import { bounded, deferred, deliveryFixture } from "./__fixtures__/delivery"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 test("#given parked worker #when drains queued items into one revive turn #then durable queue and keyed results survive", async () => {
   // given
@@ -30,7 +31,7 @@ test("#given parked worker #when drains queued items into one revive turn #then 
   const a = f.push("a", 2)
   const b = f.push("b", 3)
   const message = await bounded(captured.promise)
-  const before = createTaskRecordStore({ project_dir: f.root }).load(first.taskId)
+  const before = createTaskRecordStore(ownedTaskState(f.root)).load(first.taskId)
   f.push("later", 4)
   const dispatched = f.event("dispatched")
   ack.resolve()
