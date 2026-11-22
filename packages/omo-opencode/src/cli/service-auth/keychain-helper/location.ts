@@ -18,6 +18,30 @@ export function bundleCandidates(moduleUrl: string): readonly string[] {
 }
 
 /**
+ * The copy beside the running executable: in a compiled binary `import.meta.url` is a virtual `/$bunfs` path, so
+ * `bundleCandidates` never exist on disk and an entry that did not register its own layout would otherwise fall through
+ * to the machine-wide copies (#13102). Under bun or node this names a file that is simply missing and skipped.
+ */
+export function executableCandidates(execPath: string): readonly string[] {
+  return [join(dirname(execPath), "omo-keychain")]
+}
+
+/** Every candidate in trust-neutral search order; each one is still pinned and signature-verified by `locateHelper`. */
+export function storeCandidates(input: {
+  readonly registered: readonly string[]
+  readonly moduleUrl: string
+  readonly execPath: string
+  readonly home: string
+}): readonly string[] {
+  return [
+    ...input.registered,
+    ...bundleCandidates(input.moduleUrl),
+    ...executableCandidates(input.execPath),
+    ...machineCandidates(input.home),
+  ]
+}
+
+/**
  * Other signature-valid copies on this machine, tried after the bundle's own (addendum rows 9 and 10): the desktop
  * app's copies and a bun-global omo-ai install. These are macOS paths, so they are joined with POSIX separators on
  * every host.
