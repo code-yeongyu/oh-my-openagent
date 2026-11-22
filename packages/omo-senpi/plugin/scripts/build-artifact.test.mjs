@@ -77,12 +77,15 @@ test("#given a bundle is queued on the shared minifier #when that child is kille
   try {
     await Promise.all([writeFile(reference, source), writeFile(queued, source)])
     await minifyBundle(reference)
-
-    // when: the request is queued on the live child, which is then killed the way a test runner's timeout kills it
-    const pending = minifyBundle(queued)
     const [pid] = minifierChildPids()
     expect(pid).toBeNumber()
+
+    // when: the child is stopped, so the request written to it now cannot be answered, then it is killed the way
+    // a test runner's timeout kills it; SIGTERM stays pending until SIGCONT, so the child dies without reading it
+    process.kill(pid, "SIGSTOP")
+    const pending = minifyBundle(queued)
     process.kill(pid, "SIGTERM")
+    process.kill(pid, "SIGCONT")
 
     // then
     await pending
@@ -92,7 +95,7 @@ test("#given a bundle is queued on the shared minifier #when that child is kille
     closeNodeMinifier()
     await rm(root, { recursive: true, force: true })
   }
-}, 30_000)
+})
 
 function artifact(sourceDigest, body) {
   return `// omo:${sourceDigest}:${digest(body)}\n${body}`
