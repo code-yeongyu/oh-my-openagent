@@ -47,6 +47,7 @@ export async function createPluginFixture(
   await writeFixtureFile(join(pluginPath, "extensions", "omo-telemetry-posthog.js"), "export {}\n")
   await writeFixtureFile(join(pluginPath, "extensions", "omo-telemetry-otlp.js"), "export {}\n")
   await writeFixtureFile(join(pluginPath, "extensions", "omo-memory-sync.js"), "export {}\n")
+  await writeFixtureFile(join(pluginPath, "extensions", "omo-memory-sync-rpc.js"), "export {}\n")
   await writeFixtureFile(join(pluginPath, "extensions", "loro_wasm_bg.wasm"), "")
   await writeFixtureFile(join(pluginPath, "extensions", "CaseFolding.txt"), "")
   await writeFixtureFile(join(pluginPath, "extensions", "omo-thread-client.js"), "export {}\n")

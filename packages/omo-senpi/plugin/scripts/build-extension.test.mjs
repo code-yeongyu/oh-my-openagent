@@ -82,6 +82,16 @@ describe("checkExtensionCurrent", () => {
     })
   })
 
+  test("#given a missing sync RPC sidecar #when freshness is checked #then it reports that output", async () => {
+    const outputs = await mutableOutputs()
+    await rm(outputs.memorySyncRpcOutputPath)
+    expect(await checkExtensionCurrent(outputs)).toMatchObject({
+      ok: false,
+      reason: "missing-output",
+      output: outputs.memorySyncRpcOutputPath,
+    })
+  })
+
   test("#given the rollback migration runtime #when built #then its store entry and migration event are present", async () => {
     const outputs = await sharedOutputs()
     expect(
@@ -803,6 +813,14 @@ describe("checkExtensionCurrent", () => {
     expect(main).toContain('import("#omo-telemetry-recovery-runtime")')
     expect(posthog).toContain('import("#telemetry-immediate-send")')
     expect(main).toContain('import("#omo-memory-sync-runtime")')
+    const rpcImplementation = /\/sync-rpc-(?:registration|coordinator|operation|claims)\.ts$/
+    expect(outputs.mainInputs.filter((input) => rpcImplementation.test(input))).toEqual([])
+    expect(
+      outputs.memorySyncRpcInputs
+        .filter((input) => rpcImplementation.test(input))
+        .map((input) => input.split("/").at(-1))
+        .sort(),
+    ).toEqual(["sync-rpc-claims.ts", "sync-rpc-coordinator.ts", "sync-rpc-operation.ts", "sync-rpc-registration.ts"])
     expect(main).toContain('import("#omo-feedback-runtime")')
     expect(main).toContain('import("#omo-desktop-toolkit-runtime")')
     expect(main).toContain('import("#omo-claim-receipt-runtime")')
@@ -825,6 +843,7 @@ describe("checkExtensionCurrent", () => {
       "#omo-telemetry-posthog-runtime": "./extensions/omo-telemetry-posthog.js",
       "#omo-telemetry-otlp-runtime": "./extensions/omo-telemetry-otlp.js",
       "#omo-memory-sync-runtime": "./extensions/omo-memory-sync.js",
+      "#omo-memory-sync-rpc-runtime": "./extensions/omo-memory-sync-rpc.js",
       "#omo-feedback-runtime": "./extensions/omo-feedback.js",
       "#omo-desktop-toolkit-runtime": "./extensions/omo-desktop-toolkit.js",
       "#omo-claim-receipt-runtime": "./extensions/omo-claim-receipt.js",

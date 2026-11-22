@@ -4000,6 +4000,7 @@
         "extensions/omo-memory-memfs.js",
         "extensions/omo-memory-palace.js",
         "extensions/omo-memory-sync.js",
+        "extensions/omo-memory-sync-rpc.js",
         "extensions/omo-recall-store.js",
         "extensions/omo-device-service.js",
         "extensions/omo-session-history.js",

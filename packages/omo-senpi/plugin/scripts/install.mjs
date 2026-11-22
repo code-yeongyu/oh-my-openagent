@@ -300,6 +300,7 @@ var REQUIRED_PLUGIN_ARTIFACTS = [
   join4("extensions", "omo-telemetry-posthog.js"),
   join4("extensions", "omo-telemetry-otlp.js"),
   join4("extensions", "omo-memory-sync.js"),
+  join4("extensions", "omo-memory-sync-rpc.js"),
   join4("extensions", "loro_wasm_bg.wasm"),
   join4("extensions", "CaseFolding.txt"),
   join4("extensions", "omo-thread-client.js"),

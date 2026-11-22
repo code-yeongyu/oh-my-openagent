@@ -261,16 +261,19 @@ describe("runSenpiInstaller", () => {
     expect(await backupFiles(agentDir)).toHaveLength(0)
   })
 
-  test("#given packed plugin missing the lazy task runtime #when installing #then settings stay unchanged", async () => {
-    const agentDir = await makeAgentDir()
-    const pluginPath = await makePluginFixture()
-    await rm(join(pluginPath, "extensions", "omo-task.js"))
+  test.each(["omo-task.js", "omo-memory-sync-rpc.js"])(
+    "#given packed plugin missing %s #when installing #then settings stay unchanged",
+    async (artifact) => {
+      const agentDir = await makeAgentDir()
+      const pluginPath = await makePluginFixture()
+      await rm(join(pluginPath, "extensions", artifact))
 
-    const install = runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+      const install = runSenpiInstaller({ env: { SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
 
-    await expect(install).rejects.toThrow("missing required runtime artifacts")
-    await expect(readFile(join(agentDir, "settings.json"), "utf8")).rejects.toThrow()
-  })
+      await expect(install).rejects.toThrow("missing required runtime artifacts")
+      await expect(readFile(join(agentDir, "settings.json"), "utf8")).rejects.toThrow()
+    },
+  )
 
   // Regression: beta.40 shipped without plugin/skills-conditional, so the bundled x-search component
   // advertised a nonexistent skill path and senpi warned "skill path does not exist" at startup.

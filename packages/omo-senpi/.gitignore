@@ -17,6 +17,7 @@
 !/plugin/extensions/omo-telemetry-otlp.js
 !/plugin/extensions/omo-desktop-toolkit.js
 !/plugin/extensions/omo-memory-sync.js
+!/plugin/extensions/omo-memory-sync-rpc.js
 !/plugin/extensions/loro_wasm_bg.wasm
 !/plugin/extensions/CaseFolding.txt
 !/plugin/extensions/omo-computer-use.js

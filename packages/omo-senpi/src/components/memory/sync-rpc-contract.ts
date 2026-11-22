@@ -2,6 +2,23 @@ import type { ApproveOutcome, PhraseVoidNotice } from "@oh-my-opencode/memory-co
 
 import type { MemoryRpcSync } from "./memory-rpc-sync"
 
+export const SYNC_RPC_VERBS = [
+  "enable",
+  "pending",
+  "approve",
+  "status",
+  "devices",
+  "features",
+  "acknowledge",
+  "disable",
+] as const
+export type SyncRpcVerb = (typeof SYNC_RPC_VERBS)[number]
+
+export const syncRpcUntrusted = () =>
+  ({ kind: "unavailable", reason: "A live trusted connection is required." }) as const
+export const syncRpcHandlerFailure = () =>
+  ({ kind: "unavailable", reason: "The sync operation could not complete.", code: "handler_failed" }) as const
+
 export type SyncEnableMethod = "passkey" | "phrase"
 /** `{}` joins or resumes; creating a genesis needs an explicit `method` (D1). */
 export type SyncEnableRequest = { readonly method?: SyncEnableMethod }

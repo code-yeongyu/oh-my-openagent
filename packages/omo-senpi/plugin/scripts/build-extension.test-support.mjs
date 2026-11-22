@@ -28,6 +28,7 @@ export function outputPathsIn(root) {
     telemetryPosthogOutputPath: join(root, "omo-telemetry-posthog.js"),
     telemetryOtlpOutputPath: join(root, "omo-telemetry-otlp.js"),
     memorySyncOutputPath: join(root, "omo-memory-sync.js"),
+    memorySyncRpcOutputPath: join(root, "omo-memory-sync-rpc.js"),
     threadClientOutputPath: join(root, "omo-thread-client.js"),
     wakeOutputPath: join(root, "omo-wake.js"),
     telemetryRecoveryOutputPath: join(root, "omo-telemetry-recovery.js"),
