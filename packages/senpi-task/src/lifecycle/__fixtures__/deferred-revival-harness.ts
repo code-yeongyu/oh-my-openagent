@@ -7,20 +7,21 @@ import { expect } from "bun:test"
 /** Every queued microtask has run: the fakes here resolve immediately and the store is synchronous. */
 export const settled = () => new Promise<void>((resolve) => setImmediate(resolve))
 
-
-export function harness(options: {
-  host?: boolean
-  capacity?: boolean
-  succeeds?: boolean
-  failure?: "model_unavailable" | "session_unavailable"
-  lock?: boolean
-  rollback?: boolean
-  foreign?: boolean
-  gateWait?: (ms: number) => Promise<void>
-  respawnGate?: (attempt: number) => Promise<void>
-  /** Reattach registers the live handle, as the manager's residency view does in production. */
-  attachOnReattach?: boolean
-} = {}) {
+export function harness(
+  options: {
+    host?: boolean
+    capacity?: boolean
+    succeeds?: boolean
+    failure?: "model_unavailable" | "session_unavailable"
+    lock?: boolean
+    rollback?: boolean
+    foreign?: boolean
+    gateWait?: (ms: number) => Promise<void>
+    respawnGate?: (attempt: number) => Promise<void>
+    /** Reattach registers the live handle, as the manager's residency view does in production. */
+    attachOnReattach?: boolean
+  } = {},
+) {
   const raw = tempStore()
   const taskId = "st_94980001"
   const events = new Map<string, ReturnType<typeof Promise.withResolvers<unknown>>>()
@@ -40,13 +41,14 @@ export function harness(options: {
   const suspended = event("suspended")
   const store = {
     ...raw,
-    mutate: (id: string, mutation: Parameters<typeof raw.mutate>[1]) => raw.mutate(id, (fresh) => {
-      const next = mutation(fresh)
-      if (options.rollback && fresh.residency_state === "resident" && next.residency_state === "persisted_only") {
-        throw new Error("rollback lock contended")
-      }
-      return next
-    }),
+    mutate: (id: string, mutation: Parameters<typeof raw.mutate>[1]) =>
+      raw.mutate(id, (fresh) => {
+        const next = mutation(fresh)
+        if (options.rollback && fresh.residency_state === "resident" && next.residency_state === "persisted_only") {
+          throw new Error("rollback lock contended")
+        }
+        return next
+      }),
     appendEvent: (id: string, input: { type: string; payload: unknown }) => {
       eventLog.push(`${id}:${input.type}`)
       const path = raw.appendEvent(id, input)
@@ -63,13 +65,20 @@ export function harness(options: {
     now: () => now,
     config: options.capacity ? { residency_max_children: 1 } : {},
     deferredRetryBackoffMs: [10, 20, 40],
-    onWait: (ms) => { now += ms },
+    onWait: (ms) => {
+      now += ms
+    },
     ...(options.gateWait ? { gateWait: options.gateWait } : {}),
     respawn: async (record) => {
       attempts += 1
       await options.respawnGate?.(attempts)
       if (!options.succeeds || attempts === 1) {
-        return { ok: false, disposition: "retryable", code: options.failure ?? "model_unavailable", reason: "temporarily unavailable" }
+        return {
+          ok: false,
+          disposition: "retryable",
+          code: options.failure ?? "model_unavailable",
+          reason: "temporarily unavailable",
+        }
       }
       const handle: ManagedChildHandle = {
         task_id: record.task_id,
@@ -98,8 +107,12 @@ export function harness(options: {
   if (options.capacity) {
     seedRecord(store, { task_id: "st_94980002", status: "running", host_pid: 2222 })
     fixture.registry.add({
-      task_id: "st_94980002", kind: "in-process", pid: undefined,
-      abort: async () => undefined, dispose: async () => undefined, terminate: async () => undefined,
+      task_id: "st_94980002",
+      kind: "in-process",
+      pid: undefined,
+      abort: async () => undefined,
+      dispose: async () => undefined,
+      terminate: async () => undefined,
     })
   }
   const lifecycle = createTaskLifecycle({
@@ -108,8 +121,12 @@ export function harness(options: {
       ? {
           reattach: async (record: { task_id: string }) => {
             fixture.registry.add({
-              task_id: record.task_id, kind: "in-process", pid: undefined,
-              abort: async () => undefined, dispose: async () => undefined, terminate: async () => undefined,
+              task_id: record.task_id,
+              kind: "in-process",
+              pid: undefined,
+              abort: async () => undefined,
+              dispose: async () => undefined,
+              terminate: async () => undefined,
             })
             return { ok: true as const }
           },
@@ -126,4 +143,3 @@ export async function resume(h: ReturnType<typeof harness>) {
   expect(h.fixture.waits.length).toBeGreaterThan(0)
   return result
 }
-

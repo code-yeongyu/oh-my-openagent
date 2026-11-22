@@ -84,9 +84,13 @@ export async function tryLock(dir: string, source: string, owner: LockOwner): Pr
     await handle.close().catch((thrown: unknown) => {
       closeError = thrown
     })
-    cleanUpThenThrow(error, () => {
-      if (closeError !== undefined) throw closeError
-    }, path)
+    cleanUpThenThrow(
+      error,
+      () => {
+        if (closeError !== undefined) throw closeError
+      },
+      path,
+    )
   }
   await handle.close()
   heldTokens.add(token)
@@ -193,7 +197,8 @@ function cleanUpThenThrow(error: unknown, close: () => void, path: string): neve
       cleanupErrors.push(cleanupError)
     }
   }
-  if (cleanupErrors.length > 0) throw new AggregateError([error, ...cleanupErrors], "spool lock fill failed and its cleanup failed")
+  if (cleanupErrors.length > 0)
+    throw new AggregateError([error, ...cleanupErrors], "spool lock fill failed and its cleanup failed")
   throw error
 }
 

@@ -3,10 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { ContextCollector } from "../../../features/context-injector"
 import { cacheToolInput, getToolInput, stopToolInputCacheCleanup } from "../tool-input-cache"
 import { buildTranscriptFromSession, hasTranscriptCacheEntry, stopTranscriptCacheCleanup } from "../transcript"
-import {
-  clearAllSessionHookState,
-  sessionFirstMessageProcessed,
-} from "../session-hook-state"
+import { clearAllSessionHookState, sessionFirstMessageProcessed } from "../session-hook-state"
 import { getStopHookActive, setStopHookActive } from "../stop"
 import { createSessionEventHandler, disposeSessionEventHandler } from "./session-event-handler"
 

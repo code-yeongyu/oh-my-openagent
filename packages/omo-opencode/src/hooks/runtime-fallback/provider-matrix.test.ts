@@ -203,7 +203,6 @@ describe("runtime-fallback provider matrix quota tests", () => {
       //#then
       expect(errorType).toBe("quota_exceeded")
     })
-
   })
 
   describe("Provider-specific error name patterns", () => {

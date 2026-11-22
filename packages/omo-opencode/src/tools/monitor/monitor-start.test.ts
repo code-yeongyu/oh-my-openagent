@@ -86,10 +86,7 @@ describe("createMonitorStart", () => {
       const tool = createMonitorStart(manager, createPluginConfig(), pluginContext)
 
       // when
-      const result = await tool.execute(
-        { command: "bun test", label: "unit tests" },
-        createToolContext(ask),
-      )
+      const result = await tool.execute({ command: "bun test", label: "unit tests" }, createToolContext(ask))
 
       // then
       expect(start).not.toHaveBeenCalled()
@@ -157,15 +154,11 @@ describe("createMonitorStart", () => {
   })
 
   describe("#given live_safe is disabled in config", () => {
-    test('#when mode is live_safe #then it starts in idle mode and explains the coercion', async () => {
+    test("#when mode is live_safe #then it starts in idle mode and explains the coercion", async () => {
       // given
       const { manager, pluginContext, startCalls } = createHarness(createRecord({ mode: "idle" }))
       const ask = mock(async () => {})
-      const tool = createMonitorStart(
-        manager,
-        createPluginConfig({ live_mode_enabled: false }),
-        pluginContext,
-      )
+      const tool = createMonitorStart(manager, createPluginConfig({ live_mode_enabled: false }), pluginContext)
 
       // when
       const result = await tool.execute(

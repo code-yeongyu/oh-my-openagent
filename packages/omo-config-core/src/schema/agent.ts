@@ -1,10 +1,6 @@
 import * as z from "zod"
 
-import {
-  OmoFallbackModelObjectSchema,
-  OmoReasoningEffortSchema,
-  normalizeLegacyModelFields,
-} from "./fallback-models"
+import { OmoFallbackModelObjectSchema, OmoReasoningEffortSchema, normalizeLegacyModelFields } from "./fallback-models"
 import { OmoReasoningSchema } from "./model-ref"
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -15,48 +11,49 @@ export const OmoAgentModelEntrySchema = z.union([z.string(), OmoFallbackModelObj
 
 const PermissionValueSchema = z.enum(["ask", "allow", "deny"])
 
-const BashPermissionSchema = z.union([
-  PermissionValueSchema,
-  z.record(z.string(), PermissionValueSchema),
-])
+const BashPermissionSchema = z.union([PermissionValueSchema, z.record(z.string(), PermissionValueSchema)])
 
-export const OmoAgentPermissionSchema = z.object({
-  edit: PermissionValueSchema.optional(),
-  bash: BashPermissionSchema.optional(),
-  webfetch: PermissionValueSchema.optional(),
-  task: PermissionValueSchema.optional(),
-  doom_loop: PermissionValueSchema.optional(),
-  external_directory: PermissionValueSchema.optional(),
-}).catchall(PermissionValueSchema.optional())
+export const OmoAgentPermissionSchema = z
+  .object({
+    edit: PermissionValueSchema.optional(),
+    bash: BashPermissionSchema.optional(),
+    webfetch: PermissionValueSchema.optional(),
+    task: PermissionValueSchema.optional(),
+    doom_loop: PermissionValueSchema.optional(),
+    external_directory: PermissionValueSchema.optional(),
+  })
+  .catchall(PermissionValueSchema.optional())
 
 export type OmoAgentPermission = z.infer<typeof OmoAgentPermissionSchema>
 
-const OmoAgentDefInputSchema = z.object({
-  description: z.string().optional(),
-  prompt: z.string().optional(),
-  model: z.string().optional(),
-  models: z.array(OmoAgentModelEntrySchema).optional(),
-  models_distribution: z.enum(["sequential", "round_robin"]).optional(),
-  reasoning: OmoReasoningSchema.optional(),
-  /** @deprecated Use reasoning. */
-  variant: z.string().optional(),
-  /** @deprecated Use reasoning. */
-  reasoningEffort: OmoReasoningEffortSchema.optional(),
-  tools: z.record(z.string(), z.boolean()).optional(),
-  execution_mode: z.enum(["in-process", "process"]).optional(),
-  background: z.boolean().optional(),
-  max_depth: z.number().int().nonnegative().optional(),
-  allowed_subagents: z.array(z.string()).optional(),
-  disallowed_tools: z.array(z.string()).optional(),
-  max_turns: z.number().int().nonnegative().optional(),
-  temperature: z.number().min(0).max(2).optional(),
-  disable: z.boolean().optional(),
-  permission: OmoAgentPermissionSchema.optional(),
-  prompt_append: z.string().optional(),
-}).strict()
+const OmoAgentDefInputSchema = z
+  .object({
+    description: z.string().optional(),
+    prompt: z.string().optional(),
+    model: z.string().optional(),
+    models: z.array(OmoAgentModelEntrySchema).optional(),
+    models_distribution: z.enum(["sequential", "round_robin"]).optional(),
+    reasoning: OmoReasoningSchema.optional(),
+    /** @deprecated Use reasoning. */
+    variant: z.string().optional(),
+    /** @deprecated Use reasoning. */
+    reasoningEffort: OmoReasoningEffortSchema.optional(),
+    tools: z.record(z.string(), z.boolean()).optional(),
+    execution_mode: z.enum(["in-process", "process"]).optional(),
+    background: z.boolean().optional(),
+    max_depth: z.number().int().nonnegative().optional(),
+    allowed_subagents: z.array(z.string()).optional(),
+    disallowed_tools: z.array(z.string()).optional(),
+    max_turns: z.number().int().nonnegative().optional(),
+    temperature: z.number().min(0).max(2).optional(),
+    disable: z.boolean().optional(),
+    permission: OmoAgentPermissionSchema.optional(),
+    prompt_append: z.string().optional(),
+  })
+  .strict()
 
 export const OmoAgentDefSchema = z.preprocess(
-  (value) => isRecord(value) ? normalizeLegacyModelFields(value) : value,
+  (value) => (isRecord(value) ? normalizeLegacyModelFields(value) : value),
   OmoAgentDefInputSchema,
 )
 

@@ -5,7 +5,14 @@ import { basename, dirname, join, relative } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const repositoryRoot = fileURLToPath(new URL("..", import.meta.url))
-const generatedEntrypoint = join(repositoryRoot, "packages", "omo-codex", "scripts", "install-dist", "install-local.mjs")
+const generatedEntrypoint = join(
+  repositoryRoot,
+  "packages",
+  "omo-codex",
+  "scripts",
+  "install-dist",
+  "install-local.mjs",
+)
 const installerSourceRoot = join(repositoryRoot, "packages", "omo-codex", "src", "install")
 const builtinModuleNames = new Set(builtinModules.filter((moduleName) => !moduleName.startsWith("node:")))
 

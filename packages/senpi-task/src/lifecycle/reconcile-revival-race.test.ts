@@ -30,55 +30,67 @@ type Hold = "none" | "hold-probe" | "hold-claim"
 const interleavings = [
   { name: "the winner claims before the loser scans", loserHold: "none", forced: true },
   { name: "the winner claims while the loser probes the dead owner", loserHold: "hold-probe", forced: true },
-  { name: "the winner claims after the loser's ownership re-read, before its CAS", loserHold: "hold-claim", forced: true },
+  {
+    name: "the winner claims after the loser's ownership re-read, before its CAS",
+    loserHold: "hold-claim",
+    forced: true,
+  },
   { name: "both are released at once", loserHold: "none", forced: false },
 ] as const satisfies readonly { readonly name: string; readonly loserHold: Hold; readonly forced: boolean }[]
 
 describe("reconcileOnSessionStart scoped revival ownership race", () => {
-  test.each(interleavings)("#given two OS processes observe one dead-owner resident #when $name #then exactly one respawns and the loser defers", async ({ loserHold, forced }) => {
-    // given: both workers are inside session start before either is released.
-    const store = tempStore()
-    const taskId = seedOrphan(store)
-    const launchLog = join(store.stateDir, "race-launches.log")
-    const [winner, loser] = [spawnWorker(store, launchLog, "none"), spawnWorker(store, launchLog, loserHold)]
-    for (const worker of [winner, loser]) expect(await worker.next()).toBe("started")
+  test.each(interleavings)(
+    "#given two OS processes observe one dead-owner resident #when $name #then exactly one respawns and the loser defers",
+    async ({ loserHold, forced }) => {
+      // given: both workers are inside session start before either is released.
+      const store = tempStore()
+      const taskId = seedOrphan(store)
+      const launchLog = join(store.stateDir, "race-launches.log")
+      const [winner, loser] = [spawnWorker(store, launchLog, "none"), spawnWorker(store, launchLog, loserHold)]
+      for (const worker of [winner, loser]) expect(await worker.next()).toBe("started")
 
-    // when: each step awaits the exact line its worker prints at that barrier.
-    let outcomes: readonly string[]
-    if (!forced) {
-      winner.release()
-      loser.release()
-      outcomes = await Promise.all([winner.next(), loser.next()])
-    } else {
-      if (loserHold !== "none") {
+      // when: each step awaits the exact line its worker prints at that barrier.
+      let outcomes: readonly string[]
+      if (!forced) {
+        winner.release()
         loser.release()
-        expect(await loser.next()).toBe(loserHold === "hold-probe" ? "probing" : "claiming")
+        outcomes = await Promise.all([winner.next(), loser.next()])
+      } else {
+        if (loserHold !== "none") {
+          loser.release()
+          expect(await loser.next()).toBe(loserHold === "hold-probe" ? "probing" : "claiming")
+        }
+        winner.release()
+        const won = await winner.next()
+        loser.release()
+        outcomes = [won, await loser.next()]
       }
-      winner.release()
-      const won = await winner.next()
-      loser.release()
-      outcomes = [won, await loser.next()]
-    }
-    const exits = await Promise.all([winner.finish(), loser.finish()])
+      const exits = await Promise.all([winner.finish(), loser.finish()])
 
-    // then
-    const launches = readFileSync(launchLog, "utf8").trim().split("\n").filter(Boolean)
-    expect(launches).toHaveLength(1)
-    const reported = outcomes.map(outcomeOf)
-    if (forced) {
-      expect(reported).toEqual([`${taskId}:${WON}`, `${taskId}:${LOST}`])
-      expect(launches).toEqual([`${winner.pid}:${taskId}`])
-    } else {
-      expect([...reported].sort()).toEqual([`${taskId}:${LOST}`, `${taskId}:${WON}`])
-    }
-    expect(exits).toEqual([0, 0])
-  }, 20_000)
+      // then
+      const launches = readFileSync(launchLog, "utf8").trim().split("\n").filter(Boolean)
+      expect(launches).toHaveLength(1)
+      const reported = outcomes.map(outcomeOf)
+      if (forced) {
+        expect(reported).toEqual([`${taskId}:${WON}`, `${taskId}:${LOST}`])
+        expect(launches).toEqual([`${winner.pid}:${taskId}`])
+      } else {
+        expect([...reported].sort()).toEqual([`${taskId}:${LOST}`, `${taskId}:${WON}`])
+      }
+      expect(exits).toEqual([0, 0])
+    },
+    20_000,
+  )
 })
 
 function seedOrphan(store: TaskRecordStore): string {
   const seeded = seedRecord(store, {
-    task_id: "st_10000014", parent_session_id: parentSessionId, status: "running",
-    residency_state: "resident", execution_mode: "in-process", host_pid: 2_147_483_647,
+    task_id: "st_10000014",
+    parent_session_id: parentSessionId,
+    status: "running",
+    residency_state: "resident",
+    execution_mode: "in-process",
+    host_pid: 2_147_483_647,
     updated_at: new Date(1_000_000).toISOString(),
   })
   store.replace({ ...seeded, spawn_spec: { version: 1, cwd: "/tmp/project", prompt: `prompt:${seeded.task_id}` } })
@@ -115,7 +127,9 @@ function spawnWorker(store: TaskRecordStore, launchLog: string, hold: Hold): Wor
 }
 
 function outcomeOf(line: string): string {
-  const result = JSON.parse(line) as { readonly outcomes: readonly { readonly task_id: string; readonly kind: string; readonly reason?: string }[] }
+  const result = JSON.parse(line) as {
+    readonly outcomes: readonly { readonly task_id: string; readonly kind: string; readonly reason?: string }[]
+  }
   expect(result.outcomes).toHaveLength(1)
   const [outcome] = result.outcomes
   return `${outcome?.task_id}:${outcome?.kind}:${outcome?.reason}`

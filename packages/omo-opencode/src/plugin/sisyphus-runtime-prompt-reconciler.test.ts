@@ -33,8 +33,7 @@ function registerFallbackSisyphus(model: string): string {
   setSisyphusRuntimePromptContext({
     configuredModel: model,
     bakedPrompt: baked,
-    rebuildPromptForModel: (runtimeModel) =>
-      createSisyphusAgent(runtimeModel, [], [], [], []).prompt ?? "",
+    rebuildPromptForModel: (runtimeModel) => createSisyphusAgent(runtimeModel, [], [], [], []).prompt ?? "",
   })
   return baked
 }
@@ -95,10 +94,7 @@ describe("Sisyphus runtime prompt family reconciliation (#5297/#5316)", () => {
     const handler = createSystemTransformHandler()
     const output = { system: [baked] }
 
-    await handler(
-      { sessionID: "s", model: { id: NON_GPT_MODEL, providerID: "opencode-go" } },
-      output,
-    )
+    await handler({ sessionID: "s", model: { id: NON_GPT_MODEL, providerID: "opencode-go" } }, output)
 
     expect(output.system[0]).toBe(createSisyphusAgent(NON_GPT_MODEL, [], [], [], []).prompt)
   })
@@ -120,7 +116,11 @@ describe("Sisyphus runtime prompt same-family reconciliation (#6966)", () => {
 
   test("#given a registered prompt #when a model switch produces identical content #then the rebuild is suppressed", () => {
     const baked = "SAME_PROMPT_SENTINEL"
-    setSisyphusRuntimePromptContext({ configuredModel: DEEPSEEK_FALLBACK_MODEL, bakedPrompt: baked, rebuildPromptForModel: () => baked })
+    setSisyphusRuntimePromptContext({
+      configuredModel: DEEPSEEK_FALLBACK_MODEL,
+      bakedPrompt: baked,
+      rebuildPromptForModel: () => baked,
+    })
 
     const system = [baked]
     const swapped = reconcileSisyphusRuntimePrompt(system, MINIMAX_FALLBACK_MODEL)
@@ -141,10 +141,7 @@ describe("Sisyphus runtime prompt same-family reconciliation (#6966)", () => {
     const handler = createSystemTransformHandler()
     const output = { system: [baked] }
 
-    await handler(
-      { sessionID: "s", model: { id: "MiniMax-M3", providerID: "minimax-coding-plan" } },
-      output,
-    )
+    await handler({ sessionID: "s", model: { id: "MiniMax-M3", providerID: "minimax-coding-plan" } }, output)
 
     expect(output.system[0]).toBe(createSisyphusAgent(MINIMAX_FALLBACK_MODEL, [], [], [], []).prompt)
   })
@@ -154,10 +151,7 @@ describe("Sisyphus runtime prompt same-family reconciliation (#6966)", () => {
     const handler = createSystemTransformHandler()
     const output = { system: [baked] }
 
-    await handler(
-      { sessionID: "s", model: { id: "gemini-3.1-pro", providerID: "google" } },
-      output,
-    )
+    await handler({ sessionID: "s", model: { id: "gemini-3.1-pro", providerID: "google" } }, output)
 
     expect(output.system[0]).toBe(baked)
   })

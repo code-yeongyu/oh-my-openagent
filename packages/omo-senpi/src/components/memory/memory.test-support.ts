@@ -13,7 +13,8 @@ export type SessionEntryFixture = {
 }
 
 export class MemoryFakeExtensionAPI extends FakeExtensionAPI {
-  readonly entries: Array<{ customType: string; data: unknown; options?: { readonly startupBookkeeping?: boolean } }> = []
+  readonly entries: Array<{ customType: string; data: unknown; options?: { readonly startupBookkeeping?: boolean } }> =
+    []
   readonly entryRenderers: Array<{ customType: string; renderer: unknown }> = []
 
   appendEntry(customType: string, data?: unknown, options?: { readonly startupBookkeeping?: boolean }): void {
@@ -55,9 +56,26 @@ export function memorySettings(overrides: Partial<OmoMemorySettings> = {}): OmoM
     write_notice: { enabled: true },
     sync: { enabled: true },
     search: { enabled: true },
-    recall: { enabled: true, max_items: 2, category: "quick", event_caps: { tool_args: 400, result_head: 600, assistant: 1500, prompt: 4000 }, sidecar_max_tokens: 48000, max_concurrent_wakes: 2, tool_budget: 8, query_expansion: false },
+    recall: {
+      enabled: true,
+      max_items: 2,
+      category: "quick",
+      event_caps: { tool_args: 400, result_head: 600, assistant: 1500, prompt: 4000 },
+      sidecar_max_tokens: 48000,
+      max_concurrent_wakes: 2,
+      tool_budget: 8,
+      query_expansion: false,
+    },
     project_scope: { nudge: true, recall: true },
     projection: { max_entries_per_directory: 0, max_bytes: 40960 },
+    runtime: {
+      retention_days: 7,
+      abandoned_journal_days: 14,
+      completions_days: 30,
+      pass_budget_ms: 60000,
+      discard_unreflected_journals: false,
+      max_bytes: 2 * 1024 * 1024 * 1024,
+    },
     compile_warn_tokens: 30000,
     agents: {},
     ...overrides,
@@ -68,7 +86,9 @@ export function loadedMemoryConfig(memory: OmoMemorySettings): SenpiOmoConfigRes
   return { config: { memory }, diagnostics: [], layers: [], sources: [] }
 }
 
-export function componentContext(flags: Readonly<Record<string, boolean | string | undefined>> = {}): ComponentContext & {
+export function componentContext(
+  flags: Readonly<Record<string, boolean | string | undefined>> = {},
+): ComponentContext & {
   readonly logs: Array<{ level: string; message: string; details?: unknown }>
 } {
   const logs: Array<{ level: string; message: string; details?: unknown }> = []
@@ -83,13 +103,15 @@ export function componentContext(flags: Readonly<Record<string, boolean | string
   }
 }
 
-export function sessionContext(options: {
-  readonly entries?: readonly SessionEntryFixture[]
-  readonly notifications?: Array<{ message: string; level: string }>
-  readonly sessionId?: string
-  /** The session's own working directory, as senpi's ExtensionContext reports it. */
-  readonly cwd?: string
-} = {}): {
+export function sessionContext(
+  options: {
+    readonly entries?: readonly SessionEntryFixture[]
+    readonly notifications?: Array<{ message: string; level: string }>
+    readonly sessionId?: string
+    /** The session's own working directory, as senpi's ExtensionContext reports it. */
+    readonly cwd?: string
+  } = {},
+): {
   readonly sessionManager: {
     getEntries(): readonly SessionEntryFixture[]
     getSessionId(): string

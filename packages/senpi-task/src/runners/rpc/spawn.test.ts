@@ -1,4 +1,13 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { createRequire } from "node:module"
 import { homedir, tmpdir } from "node:os"
 import { delimiter, dirname, isAbsolute, join, relative, sep } from "node:path"
@@ -118,7 +127,12 @@ describe("resolveSenpiExecutable", () => {
   })
 
   test("#given a bun runtime whose sibling Senpi binary is absent #when resolving #then it falls through instead of returning a missing path", () => {
-    const resolved = resolveSenpiExecutable({ ...runtime, isBunBinary: true, execPath: "/opt/senpi/bin/bun", parentEnv: {} })
+    const resolved = resolveSenpiExecutable({
+      ...runtime,
+      isBunBinary: true,
+      execPath: "/opt/senpi/bin/bun",
+      parentEnv: {},
+    })
     expect(resolved).toBeNull()
   })
 
@@ -128,7 +142,9 @@ describe("resolveSenpiExecutable", () => {
     const sibling = join(root, "senpi")
     writeFileSync(sibling, "")
     try {
-      expect(resolveSenpiExecutable({ ...runtime, isBunBinary: true, execPath, parentEnv: {} })).toBe(realpathSync.native(sibling))
+      expect(resolveSenpiExecutable({ ...runtime, isBunBinary: true, execPath, parentEnv: {} })).toBe(
+        realpathSync.native(sibling),
+      )
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
@@ -149,7 +165,12 @@ describe("resolveSenpiExecutable", () => {
     writeFileSync(foreign, "")
     try {
       // when
-      const resolved = resolveSenpiExecutable({ ...runtime, isCompiledEngine: true, execPath, parentEnv: { PATH: dirname(foreign) } })
+      const resolved = resolveSenpiExecutable({
+        ...runtime,
+        isCompiledEngine: true,
+        execPath,
+        parentEnv: { PATH: dirname(foreign) },
+      })
 
       // then
       expect(resolved).toBe(realpathSync.native(execPath))
@@ -319,7 +340,16 @@ describe("buildChildArgs", () => {
     // when
     const args = buildChildArgs({ ...baseSpec, model: "omo-mock/mock-1", extensions: ["/tmp/a.ts", "/tmp/b.ts"] })
     // then
-    expect(args).toEqual(["--no-extensions", "--no-ask-user", "--extension", "/tmp/a.ts", "--extension", "/tmp/b.ts", "--model", "omo-mock/mock-1"])
+    expect(args).toEqual([
+      "--no-extensions",
+      "--no-ask-user",
+      "--extension",
+      "/tmp/a.ts",
+      "--extension",
+      "/tmp/b.ts",
+      "--model",
+      "omo-mock/mock-1",
+    ])
   })
 
   test("#given a spec with neither model nor extensions #when building child args #then no-extensions then no-ask-user are present", () => {
@@ -494,7 +524,13 @@ describe("buildRpcSpawn spawn strategy", () => {
     // when
     const descriptor = buildRpcSpawn(
       { ...baseSpec, model: "omo-mock/mock-1", extensions: ["/tmp/mock.ts"] },
-      { isBunBinary: false, execPath: "/usr/bin/node", platform: "linux", parentEnv: {}, ...withExecutable("/opt/homebrew/bin/senpi") },
+      {
+        isBunBinary: false,
+        execPath: "/usr/bin/node",
+        platform: "linux",
+        parentEnv: {},
+        ...withExecutable("/opt/homebrew/bin/senpi"),
+      },
     )
     // then: the executable is the command; the resolved rpc-entry is NEVER on the argv
     expect(descriptor.command).toBe("/opt/homebrew/bin/senpi")
@@ -513,7 +549,13 @@ describe("buildRpcSpawn spawn strategy", () => {
     // when
     const descriptor = buildRpcSpawn(
       { ...baseSpec, model: "omo-mock/mock-1" },
-      { isBunBinary: true, execPath: "/opt/senpi/bin/bun", platform: "linux", parentEnv: {}, ...withExecutable(join("/opt/senpi/bin", "senpi")) },
+      {
+        isBunBinary: true,
+        execPath: "/opt/senpi/bin/bun",
+        platform: "linux",
+        parentEnv: {},
+        ...withExecutable(join("/opt/senpi/bin", "senpi")),
+      },
     )
     // then
     expect(descriptor.command).toBe(join("/opt/senpi/bin", "senpi"))
@@ -632,7 +674,9 @@ describe("buildRpcSpawn spawn strategy", () => {
     expect(descriptor.env.SENPI_TASK_MEMBER).toBe(memberEnv.SENPI_TASK_MEMBER)
     expect(descriptor.env.SENPI_TASK_MEMBER_TASK_ID).toBe(memberEnv.SENPI_TASK_MEMBER_TASK_ID)
     expect(descriptor.env.SENPI_TASK_TEAM_CONFIG).toBe(memberEnv.SENPI_TASK_TEAM_CONFIG)
-    expect(descriptor.env.SENPI_CODING_AGENT_SESSION_DIR).toBe(resolveChildSessionDir(baseSpec.state_dir, baseSpec.task_id))
+    expect(descriptor.env.SENPI_CODING_AGENT_SESSION_DIR).toBe(
+      resolveChildSessionDir(baseSpec.state_dir, baseSpec.task_id),
+    )
     expect(descriptor.args).toContain("/tmp/omo-member.js")
   })
 })

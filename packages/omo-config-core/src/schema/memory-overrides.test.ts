@@ -103,7 +103,10 @@ describe("memory projection limits", () => {
 
   test("#given projection limits in a layer and an agent override #when parsed #then they stay default-free partials", () => {
     // given
-    const layer = { projection: { max_bytes: 4096 }, agents: { scout: { projection: { max_entries_per_directory: 5 } } } }
+    const layer = {
+      projection: { max_bytes: 4096 },
+      agents: { scout: { projection: { max_entries_per_directory: 5 } } },
+    }
 
     // when
     const parsed = OmoMemorySettingsLayerSchema.parse(layer)

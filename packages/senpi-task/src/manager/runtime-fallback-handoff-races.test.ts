@@ -10,6 +10,7 @@ import { baseSpec, cleanupProjects, FakeRunner, settings, tempProject } from "./
 import { createTaskManager } from "./manager"
 import type { ManagedStartSpec } from "./types"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 // The runtime-fallback handoff is committed before the failed rung's session finishes closing. Every
 // way that window can end - another owner winning the handoff, an interrupt, a cancel - must leave
@@ -38,7 +39,12 @@ class SlowCloseRunner extends FakeRunner {
   override async start(spec: ManagedStartSpec): Promise<ManagedChildHandle> {
     const handle = await super.start(spec)
     if (spec.model === NEXT && this.nextStart !== undefined) await this.nextStart()
-    const hostSession = { socket: "/tmp/dh-fake/rpc.sock", routingId: `routing-${spec.model}`, sessionPath: `/tmp/dh-fake/${spec.taskId}.jsonl`, instanceId: "fake" }
+    const hostSession = {
+      socket: "/tmp/dh-fake/rpc.sock",
+      routingId: `routing-${spec.model}`,
+      sessionPath: `/tmp/dh-fake/${spec.taskId}.jsonl`,
+      instanceId: "fake",
+    }
     return Object.assign(handle, {
       kind: this.kind,
       ...(this.kind === "host-session" ? { hostSession } : {}),
@@ -52,7 +58,11 @@ class SlowCloseRunner extends FakeRunner {
   }
 }
 
-type MutateHook = (taskId: string, change: (record: TaskRecord) => TaskRecord, mutate: TaskRecordStore["mutate"]) => TaskRecord | null
+type MutateHook = (
+  taskId: string,
+  change: (record: TaskRecord) => TaskRecord,
+  mutate: TaskRecordStore["mutate"],
+) => TaskRecord | null
 
 // Every store call goes to the real store; `mutate` can be intercepted to interleave another owner.
 function interceptableStore(base: TaskRecordStore, hook: { current?: MutateHook }): TaskRecordStore {
@@ -71,7 +81,7 @@ function interceptableStore(base: TaskRecordStore, hook: { current?: MutateHook 
 function lane(kind: "host-session" | "in-process" = "host-session") {
   const runner = new SlowCloseRunner(kind)
   const mutateHook: { current?: MutateHook } = {}
-  const store = interceptableStore(createTaskRecordStore({ project_dir: tempProject() }), mutateHook)
+  const store = interceptableStore(createTaskRecordStore(ownedTaskState(tempProject())), mutateHook)
   const config = settings({ default_execution_mode: "process", default_concurrency: 1, global_concurrency: 1 })
   const concurrency = new TaskConcurrency(config)
   const manager = createTaskManager({
@@ -83,13 +93,25 @@ function lane(kind: "host-session" | "in-process" = "host-session") {
     runners: { process: runner, "in-process": runner },
     planner: (spec) => ({
       kind: "resolved",
-      plan: spec.name === "fallback"
-        ? { model: FIRST, requested_model: rung("first"), resolved_model: rung("first"), fallback_models: [rung("next")] }
-        : { model: FIRST },
+      plan:
+        spec.name === "fallback"
+          ? {
+              model: FIRST,
+              requested_model: rung("first"),
+              resolved_model: rung("first"),
+              fallback_models: [rung("next")],
+            }
+          : { model: FIRST },
     }),
     destruction: { destroyResidentTask: (taskId, cause) => lifecycle.destroyResidentTask(taskId, cause) },
   })
-  const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, config, hostPid: OWNER_PID, registry: createManagerResidencyRegistry(() => manager) })
+  const lifecycle = createTaskLifecycle({
+    hostEndpoint: NO_HOST_ENDPOINT,
+    store,
+    config,
+    hostPid: OWNER_PID,
+    registry: createManagerResidencyRegistry(() => manager),
+  })
   const dispose = (): void => {
     runner.finishClose.resolve()
     lifecycle.dispose?.()
@@ -109,7 +131,11 @@ describe("runtime fallback handoff races", () => {
     f.mutateHook.current = (taskId, change, mutate) => {
       if (taskId !== task.task_id) return mutate(taskId, change)
       f.mutateHook.current = undefined
-      mutate(taskId, (record) => ({ ...record, host_pid: OWNER_PID + 1, notification: { ...record.notification, run_epoch: record.notification.run_epoch + 1 } }))
+      mutate(taskId, (record) => ({
+        ...record,
+        host_pid: OWNER_PID + 1,
+        notification: { ...record.notification, run_epoch: record.notification.run_epoch + 1 },
+      }))
       const result = mutate(taskId, change)
       displaced.resolve()
       return result
@@ -117,7 +143,9 @@ describe("runtime fallback handoff races", () => {
 
     try {
       // when
-      f.runner.handles.get(task.task_id)?.settle({ status: "error", failure: { kind: "child-turn-failed", message: "500: upstream overloaded" } })
+      f.runner.handles
+        .get(task.task_id)
+        ?.settle({ status: "error", failure: { kind: "child-turn-failed", message: "500: upstream overloaded" } })
       await displaced.promise
       const following = await f.manager.start(baseSpec({ name: "following", execution_mode: "process" }))
 
@@ -146,7 +174,8 @@ describe("runtime fallback handoff races", () => {
         // when
         first.settle({ status: "error", failure: { kind: "child-turn-failed", message: "500: upstream overloaded" } })
         await f.runner.closing.promise
-        const ended = ending === "interrupt" ? f.manager.interruptTask(task.task_id) : f.manager.cancelTask(task.task_id)
+        const ended =
+          ending === "interrupt" ? f.manager.interruptTask(task.task_id) : f.manager.cancelTask(task.task_id)
         f.runner.finishClose.resolve()
         expect((await ended).kind).toBe(ending === "interrupt" ? "interrupted" : "cancelled")
         await unsubscribed
@@ -211,14 +240,22 @@ describe("runtime fallback handoff races", () => {
       // when
       first.settle({ status: "error", failure: { kind: "child-turn-failed", message: "500: upstream overloaded" } })
       await f.runner.closing.promise
-      f.store.mutate(task.task_id, (record) => ({ ...record, host_pid: OWNER_PID + 1, notification: { ...record.notification, run_epoch: 2 } }))
+      f.store.mutate(task.task_id, (record) => ({
+        ...record,
+        host_pid: OWNER_PID + 1,
+        notification: { ...record.notification, run_epoch: 2 },
+      }))
       f.runner.finishClose.resolve()
       await unsubscribed
       const following = await f.manager.start(baseSpec({ name: "following", execution_mode: "process" }))
 
       // then
       expect(f.runner.startedSpecs.filter((spec) => spec.model === NEXT)).toEqual([])
-      expect(f.store.load(task.task_id)).toMatchObject({ status: "running", host_pid: OWNER_PID + 1, notification: { run_epoch: 2 } })
+      expect(f.store.load(task.task_id)).toMatchObject({
+        status: "running",
+        host_pid: OWNER_PID + 1,
+        notification: { run_epoch: 2 },
+      })
       expect(f.concurrency.leaseState(task.task_id, 1)).toBeUndefined()
       expect(following.kind === "started" ? f.store.load(following.task_id)?.status : following.kind).toBe("running")
     } finally {
@@ -252,7 +289,11 @@ describe("runtime fallback handoff races", () => {
       first.settle({ status: "error", failure: { kind: "child-turn-failed", message: "500: upstream overloaded" } })
       f.runner.finishClose.resolve()
       await entered.promise
-      f.store.mutate(task.task_id, (record) => ({ ...record, host_pid: OWNER_PID + 1, notification: { ...record.notification, run_epoch: record.notification.run_epoch + 1 } }))
+      f.store.mutate(task.task_id, (record) => ({
+        ...record,
+        host_pid: OWNER_PID + 1,
+        notification: { ...record.notification, run_epoch: record.notification.run_epoch + 1 },
+      }))
       release.resolve()
       await nextRungSettled.promise
 
@@ -263,7 +304,12 @@ describe("runtime fallback handoff races", () => {
     }
   })
 
-  for (const [ending, kind] of [["interrupt", "host-session"], ["cancel", "host-session"], ["interrupt", "in-process"], ["cancel", "in-process"]] as const) {
+  for (const [ending, kind] of [
+    ["interrupt", "host-session"],
+    ["cancel", "host-session"],
+    ["interrupt", "in-process"],
+    ["cancel", "in-process"],
+  ] as const) {
     test(`#given a ${kind} rung whose close rejects #when the task was ${ending === "interrupt" ? "interrupted" : "cancelled"} during it #then the unclosed child keeps a cleanup owner and no lease is stranded`, async () => {
       // given
       const f = lane(kind)
@@ -278,7 +324,8 @@ describe("runtime fallback handoff races", () => {
         // when
         first.settle({ status: "error", failure: { kind: "child-turn-failed", message: "500: upstream overloaded" } })
         await f.runner.closing.promise
-        const ended = ending === "interrupt" ? f.manager.interruptTask(task.task_id) : f.manager.cancelTask(task.task_id)
+        const ended =
+          ending === "interrupt" ? f.manager.interruptTask(task.task_id) : f.manager.cancelTask(task.task_id)
         f.runner.finishClose.resolve()
         await ended.catch(() => undefined)
         await unsubscribed
@@ -286,7 +333,8 @@ describe("runtime fallback handoff races", () => {
 
         // then: a daemon session goes back on the record for the orphan path; an in-process child,
         // which nothing outside this process can reach, stays resident as its own cleanup owner
-        if (kind === "host-session") expect(f.store.load(task.task_id)?.host_session?.session_path).toBe(`/tmp/dh-fake/${task.task_id}.jsonl`)
+        if (kind === "host-session")
+          expect(f.store.load(task.task_id)?.host_session?.session_path).toBe(`/tmp/dh-fake/${task.task_id}.jsonl`)
         else expect(f.manager.getResidentHandle(task.task_id)).toBeDefined()
         expect(f.concurrency.leaseState(task.task_id, 0)).toBeUndefined()
         expect(f.runner.startedSpecs.filter((spec) => spec.model === NEXT)).toEqual([])

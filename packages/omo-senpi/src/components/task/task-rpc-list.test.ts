@@ -24,9 +24,7 @@ describe("event-bridge omo.task.list request", () => {
     await pi.dispatch("session_start", {}, {})
     const emitted = pi.rpcEvents.find((entry) => entry.name === "omo.task.updated")
 
-    await expect(
-      invokeRpc("omo.task.list", { parent_session_id: "parent-session" }),
-    ).resolves.toEqual(emitted?.data)
+    await expect(invokeRpc("omo.task.list", { parent_session_id: "parent-session" })).resolves.toEqual(emitted?.data)
   })
 
   it("#given malformed or foreign list requests #when omo.task.list runs #then it fails closed without leaking other sessions", async () => {
@@ -43,19 +41,20 @@ describe("event-bridge omo.task.list request", () => {
     await expect(invokeRpc("omo.task.list", {})).resolves.toMatchObject({
       kind: "invalid_arguments",
     })
-    await expect(
-      invokeRpc("omo.task.list", { parent_session_id: "s".repeat(257) }),
-    ).resolves.toMatchObject({ kind: "invalid_arguments" })
-    await expect(
-      invokeRpc("omo.task.list", { parent_session_id: "other-session" }),
-    ).resolves.toEqual({ kind: "not_found", reason: "No such parent session on this connection." })
+    await expect(invokeRpc("omo.task.list", { parent_session_id: "s".repeat(257) })).resolves.toMatchObject({
+      kind: "invalid_arguments",
+    })
+    await expect(invokeRpc("omo.task.list", { parent_session_id: "other-session" })).resolves.toEqual({
+      kind: "not_found",
+      reason: "No such parent session on this connection.",
+    })
   })
 
   it("#given no attached parent session #when omo.task.list runs #then it answers unavailable", async () => {
     const { invokeRpc } = wireHarness(undefined, { withRpc: true })
 
-    await expect(
-      invokeRpc("omo.task.list", { parent_session_id: "parent-session" }),
-    ).resolves.toMatchObject({ kind: "unavailable" })
+    await expect(invokeRpc("omo.task.list", { parent_session_id: "parent-session" })).resolves.toMatchObject({
+      kind: "unavailable",
+    })
   })
 })

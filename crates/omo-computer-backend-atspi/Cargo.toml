@@ -1,0 +1,11 @@
+[package]
+name = "omo-computer-backend-atspi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+omo-computer-core = { path = "../omo-computer-core" }

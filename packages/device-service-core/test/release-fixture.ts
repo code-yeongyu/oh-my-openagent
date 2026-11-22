@@ -44,12 +44,16 @@ export const buildRelease = (options: ReleaseOptions): Map<string, Uint8Array> =
 
 export type ServedRelease = { readonly fetch: FetchRelease; readonly requested: string[] }
 
-export const serveRelease = (files: ReadonlyMap<string, Uint8Array>, version = PIN_VERSION, channel = "stable"): ServedRelease => {
+export const serveRelease = (
+  files: ReadonlyMap<string, Uint8Array>,
+  version = PIN_VERSION,
+  channel = "stable",
+): ServedRelease => {
   const requested: string[] = []
   const prefix = `${RELEASE_ORIGIN}/${channel}/device-service/${version}/`
   return {
     requested,
-    fetch: async url => {
+    fetch: async (url) => {
       requested.push(url)
       const body = url.startsWith(prefix) ? files.get(url.slice(prefix.length)) : undefined
       return body === undefined ? new Response("not found", { status: 404 }) : new Response(new Uint8Array(body))

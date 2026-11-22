@@ -93,7 +93,7 @@ function createState(): LifetimeState {
   return state
 }
 
-const state = globalThis.__omoTeamLockLifetimeV1 ??= createState()
+const state = (globalThis.__omoTeamLockLifetimeV1 ??= createState())
 export const lockOwnerInstanceId = state.incarnation
 
 /** Bind registrations and exit evidence to this exact Worker, never its reusable routing IDs. */

@@ -60,4 +60,4 @@ python3 -B scripts/find-agent-sessions.py read <session-id>
 pytest scripts/tests
 ```
 
-- Parent: [`packages/shared-skills/AGENTS.md`](../../AGENTS.md).
+- Parent (source checkout only, not shipped with the installed skill): `packages/shared-skills/AGENTS.md`.

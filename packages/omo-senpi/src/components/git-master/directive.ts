@@ -5,8 +5,7 @@ import {
   buildAttributedCommitExample,
 } from "@oh-my-opencode/skills-loader-core/opencode-skill-loader/git-master-template-injection"
 
-export const DEFAULT_COMMIT_FOOTER =
-  "Ultraworked with [omo](https://github.com/code-yeongyu/oh-my-openagent)"
+export const DEFAULT_COMMIT_FOOTER = "Ultraworked with [omo](https://github.com/code-yeongyu/oh-my-openagent)"
 
 export const COMMIT_ATTRIBUTION_OPEN_TAG = "<commit_attribution>"
 

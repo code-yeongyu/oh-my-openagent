@@ -27,43 +27,71 @@ async function runTree(maxDepth: number, hostedParent = false) {
       value: { role: "child", depth: "4", root_session_id: "tree-root" },
     })
   }
+  // senpi#6206: this scripted root is no live engine session, so its in-process children ask (a child of a parent
+  // not live in its process asks); the root's person allows each delegation through the forwarded prompt.
+  Object.defineProperty(pi, "sessionDialog", { value: { select: async () => "Allow once", confirm: async () => true } })
   // Only the provider is scripted. The sessions execute the inherited task tool,
   // the composed manager and the in-process runner without replacing their seams.
-  Reflect.apply(machine.modelRegistry.registerProvider, machine.modelRegistry, [PROVIDER, {
-    api: "openai-completions",
-    baseUrl: "file://nested-ancestry",
-    apiKey: "test-key",
-    models: LEVELS.map((id) => ({
-      id, name: id, reasoning: false, input: ["text"],
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-      contextWindow: 200_000, maxTokens: 4096,
-    })),
-    streamSimple(model: { readonly id: string }, context: { readonly messages: readonly { readonly role: string }[] }) {
-      const next = LEVELS[LEVELS.findIndex((level) => level === model.id) + 1]
-      const delegate = next !== undefined && !context.messages.some((message) => message.role === "toolResult")
-      const message = {
-        role: "assistant",
-        api: "openai-completions",
-        provider: PROVIDER,
-        model: model.id,
-        content: delegate
-          ? [{ type: "toolCall", id: `spawn-${next}`, name: "task", arguments: {
-            category: next, prompt: "Delegate once, then finish.", run_in_background: false,
-          } }]
-          : [{ type: "text", text: "done" }],
-        stopReason: delegate ? "toolUse" : "stop",
-        usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0,
-          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
-        timestamp: Date.now(),
-      }
-      return {
-        result: () => Promise.resolve(message),
-        async *[Symbol.asyncIterator]() {
-          yield { type: "done", reason: message.stopReason, message }
-        },
-      }
+  Reflect.apply(machine.modelRegistry.registerProvider, machine.modelRegistry, [
+    PROVIDER,
+    {
+      api: "openai-completions",
+      baseUrl: "file://nested-ancestry",
+      apiKey: "test-key",
+      models: LEVELS.map((id) => ({
+        id,
+        name: id,
+        reasoning: false,
+        input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 200_000,
+        maxTokens: 4096,
+      })),
+      streamSimple(
+        model: { readonly id: string },
+        context: { readonly messages: readonly { readonly role: string }[] },
+      ) {
+        const next = LEVELS[LEVELS.findIndex((level) => level === model.id) + 1]
+        const delegate = next !== undefined && !context.messages.some((message) => message.role === "toolResult")
+        const message = {
+          role: "assistant",
+          api: "openai-completions",
+          provider: PROVIDER,
+          model: model.id,
+          content: delegate
+            ? [
+                {
+                  type: "toolCall",
+                  id: `spawn-${next}`,
+                  name: "task",
+                  arguments: {
+                    category: next,
+                    prompt: "Delegate once, then finish.",
+                    run_in_background: false,
+                  },
+                },
+              ]
+            : [{ type: "text", text: "done" }],
+          stopReason: delegate ? "toolUse" : "stop",
+          usage: {
+            input: 0,
+            output: 0,
+            cacheRead: 0,
+            cacheWrite: 0,
+            totalTokens: 0,
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+          },
+          timestamp: Date.now(),
+        }
+        return {
+          result: () => Promise.resolve(message),
+          async *[Symbol.asyncIterator]() {
+            yield { type: "done", reason: message.stopReason, message }
+          },
+        }
+      },
     },
-  }])
+  ])
   const engine = composeTaskEngine({
     pi,
     cwd: machine.cwd,
@@ -103,7 +131,10 @@ async function runTree(maxDepth: number, hostedParent = false) {
     expect(started.details.status).toBe("running")
     await engine.manager.waitFor(started.details.task_id)
     const { SessionManager } = await loadSenpiBarrel()
-    const store = createTaskRecordStore({ project_dir: machine.cwd, task: { state_dir: join(machine.agentDir, "tasks") } })
+    const store = createTaskRecordStore({
+      project_dir: machine.cwd,
+      task: { state_dir: join(machine.agentDir, "tasks") },
+    })
     const records = engine.manager.list({ scope: "all" }).map(({ record }) => record)
     return {
       records,
@@ -115,7 +146,10 @@ async function runTree(maxDepth: number, hostedParent = false) {
       rootScoped: engine.manager.list({ scope: "parent-session", session_id: "tree-root" }).map(({ record }) => record),
     }
   } finally {
-    const parents = new Set([sessionId, ...engine.manager.list({ scope: "all" }).map(({ record }) => record.parent_session_id)])
+    const parents = new Set([
+      sessionId,
+      ...engine.manager.list({ scope: "all" }).map(({ record }) => record.parent_session_id),
+    ])
     for (const parentSessionId of parents) {
       await engine.lifecycle.suspendOnSessionShutdown({ parentSessionId, reason: "quit" })
     }
@@ -124,31 +158,43 @@ async function runTree(maxDepth: number, hostedParent = false) {
 }
 
 describe("nested in-process task ancestry (#10732)", () => {
-  test.each([false, true])("records the tree root and each nested depth (hosted parent: %s)", async (hostedParent) => {
-    // given a top-level engine, or an engine whose own session is already at depth 4
-    const offset = hostedParent ? 4 : 0
+  test.each([false, true])(
+    "records the tree root and each nested depth (hosted parent: %s)",
+    async (hostedParent) => {
+      // given a top-level engine, or an engine whose own session is already at depth 4
+      const offset = hostedParent ? 4 : 0
 
-    // when real in-process sessions delegate through their inherited task tools
-    const { records, headers } = await runTree(offset + 3, hostedParent)
-    const child = records.find((record) => record.category === "child")
-    const grandchild = records.find((record) => record.category === "grandchild")
-    const greatGrandchild = records.find((record) => record.category === "great-grandchild")
+      // when real in-process sessions delegate through their inherited task tools
+      const { records, headers } = await runTree(offset + 3, hostedParent)
+      const child = records.find((record) => record.category === "child")
+      const grandchild = records.find((record) => record.category === "grandchild")
+      const greatGrandchild = records.find((record) => record.category === "great-grandchild")
 
-    // then each persisted edge keeps its immediate parent and the original root
-    expect(records).toHaveLength(3)
-    expect(child).toMatchObject({ root_session_id: "tree-root", depth: offset + 1, status: "completed" })
-    expect(grandchild).toMatchObject({
-      parent_session_id: child?.child_session_id, root_session_id: "tree-root", depth: offset + 2, status: "completed",
-    })
-    expect(greatGrandchild).toMatchObject({
-      parent_session_id: grandchild?.child_session_id, root_session_id: "tree-root", depth: offset + 3, status: "completed",
-    })
-    for (const { record, header } of headers) {
-      expect(header?.spawnedBy).toEqual({
-        parentSessionId: record.parent_session_id, rootSessionId: "tree-root", taskId: record.task_id,
+      // then each persisted edge keeps its immediate parent and the original root
+      expect(records).toHaveLength(3)
+      expect(child).toMatchObject({ root_session_id: "tree-root", depth: offset + 1, status: "completed" })
+      expect(grandchild).toMatchObject({
+        parent_session_id: child?.child_session_id,
+        root_session_id: "tree-root",
+        depth: offset + 2,
+        status: "completed",
       })
-    }
-  }, 30_000)
+      expect(greatGrandchild).toMatchObject({
+        parent_session_id: grandchild?.child_session_id,
+        root_session_id: "tree-root",
+        depth: offset + 3,
+        status: "completed",
+      })
+      for (const { record, header } of headers) {
+        expect(header?.spawnedBy).toEqual({
+          parentSessionId: record.parent_session_id,
+          rootSessionId: "tree-root",
+          taskId: record.task_id,
+        })
+      }
+    },
+    30_000,
+  )
 
   test("refuses a nested spawn at max_depth instead of treating its caller as a root", async () => {
     // given / when a child at the configured limit attempts to delegate

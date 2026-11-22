@@ -42,9 +42,7 @@ export interface OnboardingUnderstandRequest {
 }
 
 export type OnboardingUnderstandResponse =
-  | { readonly understandId: string }
-  | OnboardingUnavailable
-  | { readonly kind: "invalid"; readonly reason: string }
+  { readonly understandId: string } | OnboardingUnavailable | { readonly kind: "invalid"; readonly reason: string }
 
 export interface OnboardingUnderstandSkipRequest {
   readonly understandId: string

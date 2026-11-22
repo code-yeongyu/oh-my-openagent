@@ -30,14 +30,11 @@ function tempDir(): string {
 function writeSkill(root: string, body: string, name = "shared"): void {
   const skillDir = join(root, name)
   mkdirSync(skillDir, { recursive: true })
-  writeFileSync(
-    join(skillDir, "SKILL.md"),
-    `---\nname: ${name}\ndescription: ${name} test skill\n---\n${body}\n`,
-  )
+  writeFileSync(join(skillDir, "SKILL.md"), `---\nname: ${name}\ndescription: ${name} test skill\n---\n${body}\n`)
 }
 
 describe("packagedSkillDirs", () => {
-  test("#given the source-tree layout #when packaged dirs resolve #then load_skills [\"x-search\"] resolves from plugin/skills-conditional", () => {
+  test('#given the source-tree layout #when packaged dirs resolve #then load_skills ["x-search"] resolves from plugin/skills-conditional', () => {
     // given
     const root = tempDir()
     const moduleDir = join(root, "packages", "omo-senpi", "src", "components", "task")
@@ -61,7 +58,7 @@ describe("packagedSkillDirs", () => {
     expect(resolution.prepend).toContain("SOURCE TREE X SEARCH BODY")
   })
 
-  test("#given the bundled runtime layout #when packaged dirs resolve #then load_skills [\"x-search\"] resolves from ../skills-conditional", () => {
+  test('#given the bundled runtime layout #when packaged dirs resolve #then load_skills ["x-search"] resolves from ../skills-conditional', () => {
     // given
     const root = tempDir()
     const moduleDir = join(root, "plugin", "extensions")
@@ -109,11 +106,7 @@ describe("createTaskSkillLoader", () => {
   test("#given default attribution settings #when the git-master skill is loaded #then the env-prefix section and one co-author directive ride the skill block", () => {
     const cwd = tempDir()
     const pluginSkillsDir = tempDir()
-    writeSkill(
-      pluginSkillsDir,
-      "GIT MASTER BODY\n\n```bash\ngit add -A .\ngit commit -m \"x\"\n```",
-      "git-master",
-    )
+    writeSkill(pluginSkillsDir, 'GIT MASTER BODY\n\n```bash\ngit add -A .\ngit commit -m "x"\n```', "git-master")
 
     const loader = createTaskSkillLoader({
       agentDir: tempDir(),
@@ -138,12 +131,22 @@ describe("createTaskSkillLoader", () => {
     const pluginSkillsDir = tempDir()
     const loadSettings = () => OmoGitMasterSettingsSchema.parse({ git_env_prefix: "" })
     writeSkill(pluginSkillsDir, "GIT MASTER BODY", "git-master")
-    const firstLoad = createTaskSkillLoader({ agentDir: tempDir(), homeDir: tempDir(), pluginSkillsDirs: [pluginSkillsDir], loadSettings })
+    const firstLoad = createTaskSkillLoader({
+      agentDir: tempDir(),
+      homeDir: tempDir(),
+      pluginSkillsDirs: [pluginSkillsDir],
+      loadSettings,
+    })
     const firstSkill = firstLoad(["git-master"], cwd).skills?.find((skill) => skill.name === "git-master")
     const savedDir = tempDir()
     writeSkill(savedDir, firstSkill?.content ?? "", "git-master")
 
-    const resolution = createTaskSkillLoader({ agentDir: tempDir(), homeDir: tempDir(), pluginSkillsDirs: [savedDir], loadSettings })(["git-master"], cwd)
+    const resolution = createTaskSkillLoader({
+      agentDir: tempDir(),
+      homeDir: tempDir(),
+      pluginSkillsDirs: [savedDir],
+      loadSettings,
+    })(["git-master"], cwd)
 
     expect(occurrences(resolution.prepend, `--trailer "${TRAILER}"`)).toBe(1)
   })

@@ -3,10 +3,7 @@ import type { ReflectionModelCandidate } from "./resolve-model"
 import { classifyRetryableModelMiss, type RetryableModelMiss } from "./model-miss"
 import type { RunAttempt } from "./run-artifacts"
 
-export type MemoryModelChain = readonly [
-  ReflectionModelCandidate,
-  ...ReflectionModelCandidate[],
-]
+export type MemoryModelChain = readonly [ReflectionModelCandidate, ...ReflectionModelCandidate[]]
 
 export type MemoryModelAttempt = {
   readonly candidate: ReflectionModelCandidate
@@ -36,13 +33,14 @@ export async function runMemoryModelAttempts(
   const misses: ExhaustedMemoryModelAttempt[] = []
   for (const [index, candidate] of candidates.entries()) {
     const nextCandidate = candidates[index + 1]
-    const nextAttempt = nextCandidate === undefined
-      ? undefined
-      : {
-          attempt: index + 2,
-          model: nextCandidate.model,
-          ...(nextCandidate.thinking === undefined ? {} : { thinking: nextCandidate.thinking }),
-        }
+    const nextAttempt =
+      nextCandidate === undefined
+        ? undefined
+        : {
+            attempt: index + 2,
+            model: nextCandidate.model,
+            ...(nextCandidate.thinking === undefined ? {} : { thinking: nextCandidate.thinking }),
+          }
     const child = await attempt(candidate, index + 1, nextAttempt)
     const miss = classifyRetryableModelMiss(child)
     if (miss === undefined) return { candidate, child }
@@ -64,12 +62,13 @@ export function isModelUnreachableDetail(detail: string | undefined): boolean {
 }
 
 function formatMemoryModelExhaustion(attempts: readonly ExhaustedMemoryModelAttempt[]): string {
-  const unreachable = attempts.every(({ candidate, miss }) =>
-    miss.kind === "model_not_visible" && candidate.loadExtensions === true)
-  const modelIds = attempts.flatMap(({ miss }) => miss.kind === "model_not_visible" ? [miss.id] : [])
-  const providers = attempts.flatMap(({ miss }) => miss.kind === "auth_missing" ? [miss.provider] : [])
-  const overflows = attempts.flatMap(({ miss }) => miss.kind === "context_overflow" ? [miss.detail] : [])
-  const outages = attempts.flatMap(({ miss }) => miss.kind === "provider_unavailable" ? [miss.detail] : [])
+  const unreachable = attempts.every(
+    ({ candidate, miss }) => miss.kind === "model_not_visible" && candidate.loadExtensions === true,
+  )
+  const modelIds = attempts.flatMap(({ miss }) => (miss.kind === "model_not_visible" ? [miss.id] : []))
+  const providers = attempts.flatMap(({ miss }) => (miss.kind === "auth_missing" ? [miss.provider] : []))
+  const overflows = attempts.flatMap(({ miss }) => (miss.kind === "context_overflow" ? [miss.detail] : []))
+  const outages = attempts.flatMap(({ miss }) => (miss.kind === "provider_unavailable" ? [miss.detail] : []))
   return [
     unreachable ? MODEL_UNREACHABLE_MARKER : undefined,
     modelIds.length === 0 ? undefined : `model_not_visible:${modelIds.join(",")}`,
@@ -77,5 +76,7 @@ function formatMemoryModelExhaustion(attempts: readonly ExhaustedMemoryModelAtte
     providers.length === 0 ? undefined : `auth_missing:${providers.join(",")}`,
     outages.length === 0 ? undefined : `provider_unavailable:${outages.join(" | ")}`,
     `attempted:${attempts.map(({ candidate }) => candidate.model).join(",")}`,
-  ].filter((part): part is string => part !== undefined).join("; ")
+  ]
+    .filter((part): part is string => part !== undefined)
+    .join("; ")
 }

@@ -17,7 +17,11 @@ describe.skipIf(process.platform !== "darwin")("keychain helper build", () => {
     const output = join(root, "bin", "darwin", "omo-keychain")
 
     // when
-    await buildKeychainHelper({ output, flavor: "release", architectures: [process.arch === "arm64" ? "arm64" : "x86_64"] })
+    await buildKeychainHelper({
+      output,
+      flavor: "release",
+      architectures: [process.arch === "arm64" ? "arm64" : "x86_64"],
+    })
 
     // then
     expect(existsSync(output)).toBe(true)

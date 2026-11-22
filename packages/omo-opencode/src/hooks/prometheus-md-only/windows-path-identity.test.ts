@@ -1,7 +1,17 @@
 /// <reference types="bun-types" />
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { randomUUID } from "node:crypto"
 import { tmpdir } from "node:os"
 import { join, parse, sep } from "node:path"
@@ -24,10 +34,16 @@ function attempt(compute: () => string | undefined): string | undefined {
 function shortSpelling(directory: string): string | undefined {
   if (!win32) return undefined
   // cmd's %~sI fully qualifies a \"-escaped argument against the cwd drive, so ask the FileSystemObject instead.
-  const result = Bun.spawnSync([
-    "powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
-    `(New-Object -ComObject Scripting.FileSystemObject).GetFolder('${directory.replace(/'/g, "''")}').ShortPath`,
-  ], { stdout: "pipe", stderr: "pipe" })
+  const result = Bun.spawnSync(
+    [
+      "powershell.exe",
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      `(New-Object -ComObject Scripting.FileSystemObject).GetFolder('${directory.replace(/'/g, "''")}').ShortPath`,
+    ],
+    { stdout: "pipe", stderr: "pipe" },
+  )
   const short = result.stdout.toString().trim()
   return result.success && short.length > 0 && short.toLowerCase() !== directory.toLowerCase() ? short : undefined
 }
@@ -43,7 +59,8 @@ try {
       Bun.spawnSync(["fsutil", "file", "setShortName", probe, "PLANID~1"], { stdout: "pipe", stderr: "pipe" })
     }
     shortNamesSupported = shortSpelling(probe) !== undefined
-    if (!shortNamesSupported) console.warn("Skipping the 8.3 short-name form: the volume keeps no short names and refuses fsutil setShortName")
+    if (!shortNamesSupported)
+      console.warn("Skipping the 8.3 short-name form: the volume keeps no short names and refuses fsutil setShortName")
   } else {
     console.warn("Skipping the 8.3 short-name and drive-letter forms: not a Windows volume")
   }
@@ -54,7 +71,8 @@ try {
   } catch (error) {
     if (!(error instanceof Error) || !("code" in error) || error.code !== "EEXIST") throw error
   }
-  if (!caseVariantSiblingsSupported) console.warn("Skipping the case-variant sibling form: the volume folds .omo and .OMO into one entry")
+  if (!caseVariantSiblingsSupported)
+    console.warn("Skipping the case-variant sibling form: the volume folds .omo and .OMO into one entry")
 } finally {
   rmSync(probe, { recursive: true, force: true })
 }
@@ -92,8 +110,10 @@ describe("Windows path identity: every alias form resolves to the executor's phy
   })
 
   function invoke(args: Record<string, unknown>, workspace: string) {
-    return invokeBefore(createPrometheusMdOnlyHook({ directory: workspace, client: {} } as never),
-      { tool: "write", sessionID, callID: "identity" }, { args },
+    return invokeBefore(
+      createPrometheusMdOnlyHook({ directory: workspace, client: {} } as never),
+      { tool: "write", sessionID, callID: "identity" },
+      { args },
     )
   }
 
@@ -123,7 +143,10 @@ describe("Windows path identity: every alias form resolves to the executor's phy
   }
 
   function swapDriveCase(path: string): string {
-    return path.replace(/^([A-Za-z]):/, (_, letter: string) => `${letter === letter.toUpperCase() ? letter.toLowerCase() : letter.toUpperCase()}:`)
+    return path.replace(
+      /^([A-Za-z]):/,
+      (_, letter: string) => `${letter === letter.toUpperCase() ? letter.toLowerCase() : letter.toUpperCase()}:`,
+    )
   }
 
   const forms: AliasForm[] = [
@@ -252,17 +275,18 @@ describe("Windows path identity: every alias form resolves to the executor's phy
       const layout = form.build(project)
       const workspace = layout.workspace ?? project
       // The CI job keeps only stderr, so the diagnosis travels in the assertion message.
-      const diagnosis = () => `PATH_IDENTITY_FORM ${JSON.stringify({
-        form: form.name,
-        workspace,
-        realRoot: attempt(() => realpathSync.native(parse(workspace).root)),
-        realWorkspace: attempt(() => realpathSync.native(workspace)),
-        lstatWorkspace: attempt(() => String(lstatSync(workspace).isDirectory())),
-        realPlanning: attempt(() => realpathSync.native(join(workspace, ".omo"))),
-        walkedPlanning: attempt(() => resolveFileWritePath(join(workspace, ".omo"), workspace)),
-        walked: attempt(() => resolveFileWritePath(layout.spelling, workspace)),
-        expected: layout.expected,
-      })}`
+      const diagnosis = () =>
+        `PATH_IDENTITY_FORM ${JSON.stringify({
+          form: form.name,
+          workspace,
+          realRoot: attempt(() => realpathSync.native(parse(workspace).root)),
+          realWorkspace: attempt(() => realpathSync.native(workspace)),
+          lstatWorkspace: attempt(() => String(lstatSync(workspace).isDirectory())),
+          realPlanning: attempt(() => realpathSync.native(join(workspace, ".omo"))),
+          walkedPlanning: attempt(() => resolveFileWritePath(join(workspace, ".omo"), workspace)),
+          walked: attempt(() => resolveFileWritePath(layout.spelling, workspace)),
+          expected: layout.expected,
+        })}`
       expect(resolveAllowedFile(layout.spelling, workspace), diagnosis()).toBe(layout.expected)
       const args = { filePath: layout.spelling }
       if (layout.expected === undefined) {
@@ -278,12 +302,15 @@ describe("Windows path identity: every alias form resolves to the executor's phy
     })
   }
 
-  test.skipIf(!caseVariantSiblingsSupported)("a case-variant sibling that is a different entry stays outside the planning directory", () => {
-    mkdirSync(join(project, ".omo"))
-    mkdirSync(join(project, ".OMO"))
-    expect(resolveAllowedFile(".omo/../.OMO/x.md", project)).toBeUndefined()
-    expect(resolveAllowedFile(".OMO/../.omo/x.md", project)).toBe(join(realpathSync.native(project), ".omo", "x.md"))
-  })
+  test.skipIf(!caseVariantSiblingsSupported)(
+    "a case-variant sibling that is a different entry stays outside the planning directory",
+    () => {
+      mkdirSync(join(project, ".omo"))
+      mkdirSync(join(project, ".OMO"))
+      expect(resolveAllowedFile(".omo/../.OMO/x.md", project)).toBeUndefined()
+      expect(resolveAllowedFile(".OMO/../.omo/x.md", project)).toBe(join(realpathSync.native(project), ".omo", "x.md"))
+    },
+  )
 
   test("link-then-dotdot probe: the guard decides on the path the executor opens", async () => {
     mkdirSync(join(project, ".omo/inside/deep"), { recursive: true })
@@ -298,8 +325,12 @@ describe("Windows path identity: every alias form resolves to the executor's phy
     let raw: string
     try {
       writeFileSync(`${project}${sep}${spelling}`, "raw\n")
-      raw = readFileSync(lexical, "utf8") === "raw\n" ? "lexical"
-        : readFileSync(physical, "utf8") === "raw\n" ? "physical" : "elsewhere"
+      raw =
+        readFileSync(lexical, "utf8") === "raw\n"
+          ? "lexical"
+          : readFileSync(physical, "utf8") === "raw\n"
+            ? "physical"
+            : "elsewhere"
     } catch (error) {
       raw = `error:${error instanceof Error && "code" in error ? String(error.code) : String(error)}`
     }
@@ -307,18 +338,30 @@ describe("Windows path identity: every alias form resolves to the executor's phy
     writeFileSync(physical, "physical\n")
 
     const decided = resolveAllowedFile(spelling, project)
-    const child = Bun.spawn([
-      process.execPath, "run", join(import.meta.dir, "fixtures/guarded-hashline.ts"),
-      JSON.stringify({ filePath: spelling, edits: [{ op: "append", lines: ["probe"] }] }),
-    ], { cwd: project, stdout: "pipe", stderr: "pipe" })
+    const child = Bun.spawn(
+      [
+        process.execPath,
+        "run",
+        join(import.meta.dir, "fixtures/guarded-hashline.ts"),
+        JSON.stringify({ filePath: spelling, edits: [{ op: "append", lines: ["probe"] }] }),
+      ],
+      { cwd: project, stdout: "pipe", stderr: "pipe" },
+    )
     const [stdout, stderr, code] = await Promise.all([
-      new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
     ])
     expect(code, stderr).toBe(0)
     const executed = JSON.parse(stdout) as { blocked: boolean; result?: string; filePath?: string }
-    const landed = readFileSync(physical, "utf8").includes("probe") ? "physical"
-      : readFileSync(lexical, "utf8").includes("probe") ? "lexical" : "nowhere"
-    process.stderr.write(`PATH_IDENTITY_PROBE ${JSON.stringify({ platform: process.platform, spelling, raw, decided, executed: executed.filePath, landed })}\n`)
+    const landed = readFileSync(physical, "utf8").includes("probe")
+      ? "physical"
+      : readFileSync(lexical, "utf8").includes("probe")
+        ? "lexical"
+        : "nowhere"
+    process.stderr.write(
+      `PATH_IDENTITY_PROBE ${JSON.stringify({ platform: process.platform, spelling, raw, decided, executed: executed.filePath, landed })}\n`,
+    )
 
     expect(decided).toBe(join(realpathSync.native(project), ".omo", "inside", "escaped.md"))
     expect(executed.blocked).toBe(false)

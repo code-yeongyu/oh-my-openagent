@@ -10,22 +10,34 @@ export function createTeamServiceTestModelRegistry(extraModels: readonly string[
       api: "openai-completions",
       baseUrl: "https://example.test",
       apiKey: "test-key",
-      models: [{ id: ref.slice(slash + 1), name: ref, reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 1, maxTokens: 1 }],
+      models: [
+        {
+          id: ref.slice(slash + 1),
+          name: ref,
+          reasoning: false,
+          input: ["text"],
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+          contextWindow: 1,
+          maxTokens: 1,
+        },
+      ],
     })
   }
   modelRegistry.registerProvider("omo-mock", {
     api: "openai-completions",
     baseUrl: "https://example.test",
     apiKey: "test-key",
-    models: [{
-      id: "mock-1",
-      name: "Mock model",
-      reasoning: false,
-      input: ["text"],
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-      contextWindow: 1,
-      maxTokens: 1,
-    }],
+    models: [
+      {
+        id: "mock-1",
+        name: "Mock model",
+        reasoning: false,
+        input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 1,
+        maxTokens: 1,
+      },
+    ],
   })
   return modelRegistry
 }

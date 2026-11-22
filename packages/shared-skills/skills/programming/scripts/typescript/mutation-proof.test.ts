@@ -34,7 +34,10 @@ describe("#given a production owner and a test that exercises it", () => {
   })
 
   test("#when the find text is not unique or empty #then it refuses before touching the file", async () => {
-    for (const [find, kind] of [["a", "FIND_NOT_UNIQUE"], ["", "FIND_EMPTY"]] as const) {
+    for (const [find, kind] of [
+      ["a", "FIND_NOT_UNIQUE"],
+      ["", "FIND_EMPTY"],
+    ] as const) {
       const attempt = runMutation({ cwd: root, file: "owner.ts", find, replace: "x", tests: [] })
       await expect(attempt).rejects.toMatchObject({ kind })
     }

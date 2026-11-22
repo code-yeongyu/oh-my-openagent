@@ -16,7 +16,10 @@ import type { ReconcileOutcome } from "./types"
  * session still runs would let the child keep working until the TTL sweep caught it. A host that answers
  * but cannot list its sessions leaves the cancel pending the same way (omo#9450).
  */
-export async function finishPendingCancel(context: LifecycleContext, record: TaskRecord): Promise<ReconcileOutcome | undefined> {
+export async function finishPendingCancel(
+  context: LifecycleContext,
+  record: TaskRecord,
+): Promise<ReconcileOutcome | undefined> {
   if (isHostSessionRecord(record) && context.registry.get(record.task_id) === undefined) {
     // Not listed on the recorded socket is not an end: a draining generation may still run it (omo#11765).
     if ((await endHostSessionChild(context, record)).kind !== "ended") return undefined

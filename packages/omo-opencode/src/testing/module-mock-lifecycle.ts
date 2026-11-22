@@ -1,5 +1,6 @@
 import { createRequire } from "node:module"
-import { pathToFileURL } from "node:url"
+import { dirname } from "node:path"
+import { fileURLToPath, pathToFileURL } from "node:url"
 
 type MockModuleFactory = () => Record<string, unknown>
 
@@ -8,9 +9,7 @@ type MockApi = {
   restore: () => unknown
 }
 
-type ModuleLoadResult =
-  | { ok: true; value: unknown }
-  | { ok: false; error: Error }
+type ModuleLoadResult = { ok: true; value: unknown } | { ok: false; error: Error }
 
 type ModuleSnapshot = {
   restoreSpecifier: string
@@ -107,7 +106,7 @@ function defaultGetCallerUrl(): string {
 
 function defaultResolveSpecifier(specifier: string, callerUrl: string): string {
   try {
-    return import.meta.resolve(specifier, callerUrl)
+    return Bun.resolveSync(specifier, dirname(fileURLToPath(callerUrl)))
   } catch (error) {
     if (error instanceof Error) {
       return specifier
@@ -145,9 +144,11 @@ export function installModuleMockLifecycle(
   const getCallerUrl = options.getCallerUrl ?? defaultGetCallerUrl
   const resolveSpecifier = options.resolveSpecifier ?? defaultResolveSpecifier
   const loadUnmockedModule = options.loadUnmockedModule ?? defaultLoadUnmockedModule
-  const shouldPreserveActiveMocksOnRestore = options.shouldPreserveActiveMocksOnRestore ?? (() => {
-    return new Error().stack?.includes("/test-setup.ts") ?? false
-  })
+  const shouldPreserveActiveMocksOnRestore =
+    options.shouldPreserveActiveMocksOnRestore ??
+    (() => {
+      return new Error().stack?.includes("/test-setup.ts") ?? false
+    })
   const preserveOwners = new Set<string>()
   let handledPreserveCleanup = false
 
@@ -303,9 +304,9 @@ export function installModuleMockLifecycle(
 
     const activeMockStack = activeMocks.get(restoreSpecifier) ?? []
     const nextActiveMockStack = activeMockStack.filter((activeMock) => activeMock.ownerUrl !== callerUrl)
-    nextActiveMockStack.push({ specifier, factory, ownerUrl: callerUrl })
+    nextActiveMockStack.push({ specifier: restoreSpecifier, factory, ownerUrl: callerUrl })
     activeMocks.set(restoreSpecifier, nextActiveMockStack)
-    return delegateModule(specifier, factory)
+    return delegateModule(restoreSpecifier, factory)
   }
 
   mockApi.restore = (): unknown => {

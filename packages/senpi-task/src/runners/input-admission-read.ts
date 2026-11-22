@@ -18,7 +18,7 @@ export async function readHostAdmissions(
   ids: readonly string[],
 ): Promise<ReadonlyMap<string, InputAdmission> | undefined> {
   if (port.getPendingInputs === undefined) return undefined
-  return collect(ids, async batch => (await port.getPendingInputs?.(batch))?.outcomes ?? "unsupported")
+  return collect(ids, async (batch) => (await port.getPendingInputs?.(batch))?.outcomes ?? "unsupported")
 }
 
 /**
@@ -30,7 +30,7 @@ export async function readStdioAdmissions(
   client: Pick<RpcProtocolClient, "send">,
   ids: readonly string[],
 ): Promise<ReadonlyMap<string, InputAdmission> | undefined> {
-  return collect(ids, async batch => {
+  return collect(ids, async (batch) => {
     const response = await client.send({ type: "get_pending_inputs", knownClientMessageIds: [...batch] })
     if (response.success && response.command === "get_pending_inputs") return response.data.outcomes
     if (!response.success && /unknown command/iu.test(response.error)) return "unsupported"
@@ -49,7 +49,7 @@ async function collect(
     for (const outcome of answer) admissions.set(outcome.clientMessageId, outcome.status)
   }
   // The engine answers every id it is asked about. An id left out is never read as not admitted.
-  const missing = ids.filter(id => !admissions.has(id))
+  const missing = ids.filter((id) => !admissions.has(id))
   if (missing.length > 0) throw new Error(`get_pending_inputs left out ${missing.length} id(s)`)
   return admissions
 }

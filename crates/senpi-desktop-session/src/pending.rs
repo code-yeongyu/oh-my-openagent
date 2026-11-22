@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::holds::reports_release_failure;
+use senpi_desktop_core::report::ReportMode;
 use senpi_desktop_core::types::DisplaySelector;
 use tokio::time::{timeout_at, Instant};
 
@@ -22,6 +23,29 @@ pub struct Pending {
     pub(crate) release_budget: Option<Duration>,
     /// Names a lock or display sleep in this request's timeout.
     pub(crate) notes: Option<(ScreenNotes, Option<DisplaySelector>)>,
+    /// `Some` for an op: the `reportMode` this request is answered under.
+    pub(crate) mode: Option<RequestMode>,
+}
+
+/// The `reportMode` of one request: the mode applied when it was submitted,
+/// replaced by the mode the session thread served it under once it starts.
+/// An open queued or applied later never changes it.
+#[derive(Clone, Debug, Default)]
+pub struct RequestMode(pub(crate) Arc<parking_lot::Mutex<ReportMode>>);
+
+impl RequestMode {
+    pub(crate) fn new(mode: ReportMode) -> Self {
+        Self(Arc::new(parking_lot::Mutex::new(mode)))
+    }
+
+    pub(crate) fn set(&self, mode: ReportMode) {
+        *self.0.lock() = mode;
+    }
+
+    #[must_use]
+    pub fn get(&self) -> ReportMode {
+        *self.0.lock()
+    }
 }
 
 pub(crate) enum PendingKind {
@@ -39,11 +63,19 @@ impl Pending {
             budget,
             release_budget: None,
             notes: None,
+            mode: None,
         }
     }
 
     pub(crate) fn ready(result: CoreResult<Response>) -> Self {
         Self::new(PendingKind::Ready(Box::new(result)), Duration::ZERO)
+    }
+
+    /// The `reportMode` this request is answered under; `None` for an open
+    /// or a close.
+    #[must_use]
+    pub fn request_mode(&self) -> Option<RequestMode> {
+        self.mode.clone()
     }
 
     /// The engine cancels a hold without dropping its completion receiver.

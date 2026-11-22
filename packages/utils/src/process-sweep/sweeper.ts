@@ -20,16 +20,10 @@ import { selectOrphanedLspDaemonProxies, type LspDaemonProxyProcess } from "./ls
 import type { ProcessInfo } from "./process-table"
 import { discoverOmoOwnedRoots, type OmoOwnedRootsOptions } from "./roots"
 
-export type {
-  ProcessFamilySweepOptions,
-  ProcessFamilySweepResult,
-  ProcessSweepAction,
-} from "./family-sweeper"
+export type { ProcessFamilySweepOptions, ProcessFamilySweepResult, ProcessSweepAction } from "./family-sweeper"
 
 export interface SweepOrphanedLspDaemonProxiesOptions
-  extends OmoOwnedRootsOptions,
-    ProcessFamilySweepOptions,
-    LspDaemonBaseDirOptions {
+  extends OmoOwnedRootsOptions, ProcessFamilySweepOptions, LspDaemonBaseDirOptions {
   readonly ownedRoots?: readonly string[]
   readonly processProvider?: () => Promise<readonly ProcessInfo[]>
 }
@@ -73,8 +67,10 @@ export interface SweepStaleLspDaemonVersionsOptions extends ProcessFamilySweepOp
   readonly isAlive?: (pid: number) => boolean
 }
 
-export interface SweepStaleLspDaemonVersionsResult
-  extends Omit<ProcessFamilySweepResult<StaleLspDaemonVersionTarget, SparedLspDaemonVersion>, "action"> {
+export interface SweepStaleLspDaemonVersionsResult extends Omit<
+  ProcessFamilySweepResult<StaleLspDaemonVersionTarget, SparedLspDaemonVersion>,
+  "action"
+> {
   readonly action: LspDaemonVersionSweepAction
   readonly currentVersion?: string
 }
@@ -95,26 +91,30 @@ export async function sweepStaleLspDaemonVersions(
   }
 
   const platform = options.platform ?? process.platform
-  const attestTarget = options.attestTarget
-    ?? (options.attest === undefined
+  const attestTarget =
+    options.attestTarget ??
+    (options.attest === undefined
       ? (target: StaleLspDaemonVersionTarget) => attestLspDaemonOwner(target)
       : (target: StaleLspDaemonVersionTarget) => options.attest!(target.pid, platform))
-  const result = await runProcessFamilySweep<StaleLspDaemonVersionTarget, SparedLspDaemonVersion>({
-    attestBeforeSignal: (target) => attestTarget(target, platform),
-    familyLabel: "lsp-daemon stale-version sweep",
-    stampFile,
-    collect: async () => {
-      const plan = await planStaleLspDaemonVersionSweep({
-        baseDir,
-        currentVersion,
-        attestTarget,
-        ...(options.isAlive === undefined ? {} : { isAlive: options.isAlive }),
-        ...(options.log === undefined ? {} : { log: options.log }),
-        platform,
-      })
-      return { candidates: [...plan.targets, ...plan.spared], killList: plan.targets, spared: plan.spared }
+  const result = await runProcessFamilySweep<StaleLspDaemonVersionTarget, SparedLspDaemonVersion>(
+    {
+      attestBeforeSignal: (target) => attestTarget(target, platform),
+      familyLabel: "lsp-daemon stale-version sweep",
+      stampFile,
+      collect: async () => {
+        const plan = await planStaleLspDaemonVersionSweep({
+          baseDir,
+          currentVersion,
+          attestTarget,
+          ...(options.isAlive === undefined ? {} : { isAlive: options.isAlive }),
+          ...(options.log === undefined ? {} : { log: options.log }),
+          platform,
+        })
+        return { candidates: [...plan.targets, ...plan.spared], killList: plan.targets, spared: plan.spared }
+      },
     },
-  }, options)
+    options,
+  )
   return { ...result, currentVersion }
 }
 

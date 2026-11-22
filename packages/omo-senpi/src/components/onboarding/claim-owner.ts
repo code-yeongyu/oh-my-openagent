@@ -36,11 +36,14 @@ export interface OnboardingStateSnapshot {
   readonly inProgress: boolean
 }
 
-export async function readOnboardingState(stateDir: string, seams: ClaimOwnerSeams = {}): Promise<OnboardingStateSnapshot> {
+export async function readOnboardingState(
+  stateDir: string,
+  seams: ClaimOwnerSeams = {},
+): Promise<OnboardingStateSnapshot> {
   const completedAt = readOnboardingCompletedAt(stateDir)
   if (completedAt !== null) return { completedAt, inProgress: false }
   const held = readRaw(join(stateDir, ONBOARDING_MARKER))
-  return { completedAt: null, inProgress: held !== null && await claimHolderLive(held, seams) }
+  return { completedAt: null, inProgress: held !== null && (await claimHolderLive(held, seams)) }
 }
 
 /**
@@ -55,7 +58,12 @@ export async function claimOnboardingOwned(stateDir: string, seams: ClaimOwnerSe
     const pid = seams.pid ?? process.pid
     const processStart = await (seams.getProcessStartIdentity ?? getProcessStartIdentity)(pid).catch(() => null)
     const now = seams.now ?? Date.now
-    const record = { claimedAt: new Date(now()).toISOString(), version: 2, owner: { pid, processStart }, nonce: randomUUID() }
+    const record = {
+      claimedAt: new Date(now()).toISOString(),
+      version: 2,
+      owner: { pid, processStart },
+      nonce: randomUUID(),
+    }
     if (writeClaim(marker, record)) return true
     const held = readRaw(marker)
     if (held === null) return writeClaim(marker, record)
@@ -87,7 +95,13 @@ function writeExclusive(path: string, content: string): boolean {
  * renames its claim over it only when the marker still holds the judged bytes, so a live claim is
  * never moved or removed and the marker is never absent.
  */
-async function takeOverClaim(stateDir: string, marker: string, judged: string, mine: string, seams: ClaimOwnerSeams): Promise<boolean> {
+async function takeOverClaim(
+  stateDir: string,
+  marker: string,
+  judged: string,
+  mine: string,
+  seams: ClaimOwnerSeams,
+): Promise<boolean> {
   let target = judged
   for (let link = 0; link < MAX_TAKEOVER_CHAIN; link += 1) {
     const lock = `${marker}.takeover.${createHash("sha256").update(target).digest("hex").slice(0, 32)}`
@@ -110,8 +124,16 @@ function replaceJudgedClaim(stateDir: string, marker: string, judged: string, mi
   } catch {
     return false
   } finally {
-    try { unlinkSync(staged) } catch { /* renamed into place, or never written */ }
-    try { unlinkSync(lock) } catch { /* already gone */ }
+    try {
+      unlinkSync(staged)
+    } catch {
+      /* renamed into place, or never written */
+    }
+    try {
+      unlinkSync(lock)
+    } catch {
+      /* already gone */
+    }
   }
 }
 

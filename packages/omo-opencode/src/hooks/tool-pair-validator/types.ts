@@ -2,10 +2,12 @@ import type { Message, Part } from "@opencode-ai/sdk"
 
 export type TransformPart = Part
 
-export type TransformMessageInfo = Message | {
-  role: "user"
-  sessionID?: string
-}
+export type TransformMessageInfo =
+  | Message
+  | {
+      role: "user"
+      sessionID?: string
+    }
 
 export interface MessageWithParts {
   info: TransformMessageInfo
@@ -20,6 +22,6 @@ export type UnpairedToolPart = {
 export type MessagesTransformHook = {
   "experimental.chat.messages.transform"?: (
     input: Record<string, never>,
-    output: { messages: MessageWithParts[] }
+    output: { messages: MessageWithParts[] },
   ) => Promise<void>
 }

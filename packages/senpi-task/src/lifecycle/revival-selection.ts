@@ -22,14 +22,18 @@ export function isSuspendedResidency(state: ResidencyState): state is SuspendedR
 }
 
 export function isRevivalCandidate(record: TaskRecord, parentSessionId: string): boolean {
-  return record.parent_session_id === parentSessionId
-    && isSuspendedResidency(record.residency_state)
-    && REVIVABLE_STATUSES.has(record.status)
-    && record.killed !== true
+  return (
+    record.parent_session_id === parentSessionId &&
+    isSuspendedResidency(record.residency_state) &&
+    REVIVABLE_STATUSES.has(record.status) &&
+    record.killed !== true
+  )
 }
 
 export function residentsOf(records: readonly TaskRecord[], parentSessionId: string): readonly TaskRecord[] {
-  return records.filter((record) => record.parent_session_id === parentSessionId && record.residency_state === "resident")
+  return records.filter(
+    (record) => record.parent_session_id === parentSessionId && record.residency_state === "resident",
+  )
 }
 
 export type RevivalSelection = {

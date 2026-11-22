@@ -1,10 +1,12 @@
 // Whether a received key can land in this device's working tree, decided before its render record
 // is written (#12147, apply.ts invariants 2-4). A key the grammar accepts can still be unusable
 // here: it names an existing directory, sits under a file, is longer than any path this OS or its
-// git opens, has two on-disk spellings here, or its path goes through or names a symlink (inside the
-// root or not, dangling or not: git refuses to stage a path beyond one, so landing it would wedge).
-// Such a key is refused for this device with the file-system reason, never thrown, because a throw
-// inside the render would leave the durable cycle record failing on every resume.
+// git opens, has two on-disk spellings here, names a path that exists as a non-regular file, or
+// its path goes through or names a symlink (inside the root or not, dangling or not: git refuses
+// to stage a path beyond one, so landing it would wedge). Such a key is refused for this device
+// with the file-system reason, never thrown, because a throw inside the render would leave the
+// durable cycle record failing on every resume. A FIFO leaf is refused before it is read: reading
+// one blocks until a writer opens it, which hangs the cycle (#12158).
 
 import { dirname, isAbsolute, join, relative, sep } from "node:path"
 
@@ -29,7 +31,11 @@ const MINGW_MAX_PATH = 260
  * long is not one a person typed, and dropping it with a receipt is recoverable where a wedged
  * device is not. POSIX decides through its own probe (PATH_MAX surfaces there as ENAMETOOLONG).
  */
-export function commitPathProblem(root: string, path: string, platform: NodeJS.Platform = process.platform): string | null {
+export function commitPathProblem(
+  root: string,
+  path: string,
+  platform: NodeJS.Platform = process.platform,
+): string | null {
   if (platform !== "win32") return null
   const base = root.replace(/[\\/]+$/, "")
   return base.length + 1 + path.length >= MINGW_MAX_PATH ? "git-path-too-long" : null
@@ -49,7 +55,8 @@ export const readWorking = (root: string, path: string): Promise<string | null> 
 
 type Landing = { readonly path: string; readonly working: string | null } | { readonly refused: string }
 
-const missing = (error: unknown): boolean => error instanceof Error && "code" in error && (error.code === "ENOENT" || error.code === "ENOTDIR")
+const missing = (error: unknown): boolean =>
+  error instanceof Error && "code" in error && (error.code === "ENOENT" || error.code === "ENOTDIR")
 
 /** Whether a component of `path` that exists under `root`, the last one included, is a symlink. */
 export async function throughSymlink(root: string, path: string): Promise<boolean> {
@@ -90,6 +97,11 @@ export async function prepareLanding(root: string, path: string | null): Promise
     const realRoot = await realpath(root)
     const parent = await realpath(nearestExisting(root, dirname(target)))
     if (!staysInside(realRoot, parent)) return { refused: "outside-root" }
+    const leaf = await lstat(target).catch((error: unknown) => {
+      if (missing(error)) return null
+      throw error
+    })
+    if (leaf !== null && !leaf.isFile()) return { refused: "non-regular-file" }
     const working = await readWorking(root, path)
     await mkdir(dirname(target), { recursive: true })
     return { path, working }

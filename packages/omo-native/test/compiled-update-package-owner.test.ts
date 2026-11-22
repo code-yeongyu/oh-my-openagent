@@ -1,11 +1,18 @@
 import { describe, expect, test } from "bun:test"
-import { compiledUpdate, type PackageOwner, probePackageOwner, releaseAssetName, type RunOwnerQuery } from "../compiled-update"
+import {
+  compiledUpdate,
+  type PackageOwner,
+  probePackageOwner,
+  releaseAssetName,
+  type RunOwnerQuery,
+} from "../compiled-update"
 
 const ASSET = releaseAssetName(undefined, "linux", "x64")
 
 async function updateWith(owner: PackageOwner | undefined) {
   let lookups = 0
   const probed: string[] = []
+  const installed: string[] = []
   const result = await compiledUpdate({
     omoAiVersion: "9.9.9",
     releaseTarget: undefined,
@@ -17,12 +24,15 @@ async function updateWith(owner: PackageOwner | undefined) {
       return [{ tag_name: "v9.9.10", assets: [{ name: ASSET }] }]
     },
     args: ["update"],
+    install: async (request) => {
+      installed.push(request.destination)
+    },
     probeOwner: (path) => {
       probed.push(path)
       return owner
     },
   })
-  return { result, lookups, probed }
+  return { result, lookups, probed, installed }
 }
 
 function queries(answers: Record<string, string>): { run: RunOwnerQuery; asked: string[] } {
@@ -42,32 +52,42 @@ describe("compiled omo update on a package-manager install", () => {
     const owner: PackageOwner = { manager: "pacman", pkg: "omo-bin" }
 
     // when
-    const { result, lookups, probed } = await updateWith(owner)
+    const { result, lookups, probed, installed } = await updateWith(owner)
 
     // then
     expect(probed).toEqual(["/usr/bin/omo"])
     expect(result.exitCode).toBe(1)
     expect(result.stream).toBe("stderr")
-    expect(result.output).toBe("omo: installed via pacman (omo-bin); update it with pacman or your AUR helper, e.g. `yay -Syu omo-bin`")
+    expect(result.output).toBe(
+      "omo: installed via pacman (omo-bin); update it with pacman or your AUR helper, e.g. `yay -Syu omo-bin`",
+    )
     expect(result.output).not.toContain("curl")
     expect(lookups).toBe(0)
+    expect(installed).toEqual([])
   })
 
-  test("#given no manager owns the binary #when omo update runs #then it keeps today's replace command", async () => {
+  test("#given no manager owns the binary #when omo update runs #then it installs the standalone release", async () => {
     // given / when
-    const { result, lookups } = await updateWith(undefined)
+    const { result, lookups, installed } = await updateWith(undefined)
 
     // then
     expect(result.exitCode).toBe(0)
-    expect(result.output).toStartWith("omo 9.9.10 is available (running 9.9.9). Replace this binary with:\ncurl ")
+    expect(result.output).toBe("omo updated 9.9.9 -> 9.9.10")
+    expect(installed).toEqual(["/usr/bin/omo"])
     expect(lookups).toBe(1)
   })
 
   test("#given update --help on an owned binary #then usage still wins over the ownership refusal", async () => {
     // given / when
     const result = await compiledUpdate({
-      omoAiVersion: "9.9.9", releaseTarget: undefined, destination: "/usr/bin/omo", platform: "linux", arch: "x64",
-      fetchReleases: async () => [], args: ["update", "--help"], probeOwner: () => ({ manager: "pacman", pkg: "omo-bin" }),
+      omoAiVersion: "9.9.9",
+      releaseTarget: undefined,
+      destination: "/usr/bin/omo",
+      platform: "linux",
+      arch: "x64",
+      fetchReleases: async () => [],
+      args: ["update", "--help"],
+      probeOwner: () => ({ manager: "pacman", pkg: "omo-bin" }),
     })
 
     // then
@@ -82,7 +102,10 @@ describe("probePackageOwner", () => {
     const { run, asked } = queries({ pacman: "omo-bin" })
 
     // when / then
-    expect(probePackageOwner("/usr/bin/omo-missing-for-test", "linux", run)).toEqual({ manager: "pacman", pkg: "omo-bin" })
+    expect(probePackageOwner("/usr/bin/omo-missing-for-test", "linux", run)).toEqual({
+      manager: "pacman",
+      pkg: "omo-bin",
+    })
     expect(asked).toEqual(["pacman"])
   })
 
@@ -116,8 +139,14 @@ describe("probePackageOwner", () => {
     const { run, asked } = queries({})
 
     // when / then
-    expect(probePackageOwner("/opt/homebrew/Cellar/omo/5.1.19/bin/omo", "darwin", run)).toEqual({ manager: "brew", pkg: "omo" })
-    expect(probePackageOwner("/nix/store/0123456789abcdfghijklmnpqrsvwxyz-omo-5.1.19/bin/omo", "linux", run)).toEqual({ manager: "nix", pkg: "omo-5.1.19" })
+    expect(probePackageOwner("/opt/homebrew/Cellar/omo/5.1.19/bin/omo", "darwin", run)).toEqual({
+      manager: "brew",
+      pkg: "omo",
+    })
+    expect(probePackageOwner("/nix/store/0123456789abcdfghijklmnpqrsvwxyz-omo-5.1.19/bin/omo", "linux", run)).toEqual({
+      manager: "nix",
+      pkg: "omo-5.1.19",
+    })
     expect(asked).toEqual([])
   })
 

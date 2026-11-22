@@ -1,0 +1,196 @@
+{
+  "schema": 1,
+  "hostKey": "linux-x64-fake",
+  "surface": "fake-engine",
+  "engine": {
+    "version": "0.0.0",
+    "buildSha": "unknown",
+    "features": [
+      "action-report",
+      "frame-identity",
+      "frame-consume",
+      "ax-partial",
+      "trace"
+    ]
+  },
+  "runs": 30,
+  "warmup": 3,
+  "unit": {
+    "wallMs": "ms, request write to reply read at the stdio port",
+    "stagesUs": "engine ActionReport.timings, microseconds"
+  },
+  "load": {
+    "before": {
+      "load1": 10.85,
+      "load5": 14.09,
+      "load15": 29,
+      "cpus": 14
+    },
+    "after": {
+      "load1": 11.9,
+      "load5": 14.26,
+      "load15": 28.97,
+      "cpus": 14
+    }
+  },
+  "generatedAt": "2026-11-05T11:12:06.185Z",
+  "ops": {
+    "windows": {
+      "wallMs": {
+        "n": 30,
+        "p50": 0.688,
+        "p95": 2.847
+      },
+      "stagesUs": {},
+      "timedRuns": 0
+    },
+    "capture": {
+      "wallMs": {
+        "n": 30,
+        "p50": 1.03,
+        "p95": 4.151
+      },
+      "stagesUs": {},
+      "timedRuns": 0
+    },
+    "observe": {
+      "wallMs": {
+        "n": 30,
+        "p50": 1.146,
+        "p95": 5.411
+      },
+      "stagesUs": {},
+      "timedRuns": 0
+    },
+    "ax.query": {
+      "wallMs": {
+        "n": 30,
+        "p50": 0.989,
+        "p95": 4.422
+      },
+      "stagesUs": {},
+      "timedRuns": 0
+    },
+    "click": {
+      "wallMs": {
+        "n": 30,
+        "p50": 0.626,
+        "p95": 3.772
+      },
+      "stagesUs": {
+        "capture": {
+          "n": 30,
+          "p50": 0,
+          "p95": 0
+        },
+        "dispatch": {
+          "n": 30,
+          "p50": 9,
+          "p95": 15
+        },
+        "verify": {
+          "n": 30,
+          "p50": 0,
+          "p95": 0
+        },
+        "restore": {
+          "n": 30,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "timedRuns": 30
+    },
+    "ax.setValue": {
+      "wallMs": {
+        "n": 30,
+        "p50": 0.382,
+        "p95": 3.086
+      },
+      "stagesUs": {
+        "capture": {
+          "n": 30,
+          "p50": 0,
+          "p95": 0
+        },
+        "dispatch": {
+          "n": 30,
+          "p50": 3,
+          "p95": 8
+        },
+        "verify": {
+          "n": 30,
+          "p50": 0,
+          "p95": 0
+        },
+        "restore": {
+          "n": 30,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "timedRuns": 30
+    },
+    "ax.typeText": {
+      "wallMs": {
+        "n": 30,
+        "p50": 0.582,
+        "p95": 5.193
+      },
+      "stagesUs": {
+        "capture": {
+          "n": 30,
+          "p50": 1,
+          "p95": 2
+        },
+        "dispatch": {
+          "n": 30,
+          "p50": 5,
+          "p95": 11
+        },
+        "verify": {
+          "n": 30,
+          "p50": 0,
+          "p95": 0
+        },
+        "restore": {
+          "n": 30,
+          "p50": 1,
+          "p95": 2
+        }
+      },
+      "timedRuns": 30
+    },
+    "ax.perform": {
+      "wallMs": {
+        "n": 30,
+        "p50": 0.502,
+        "p95": 1.917
+      },
+      "stagesUs": {
+        "capture": {
+          "n": 30,
+          "p50": 0,
+          "p95": 0
+        },
+        "dispatch": {
+          "n": 30,
+          "p50": 4,
+          "p95": 14
+        },
+        "verify": {
+          "n": 30,
+          "p50": 0,
+          "p95": 0
+        },
+        "restore": {
+          "n": 30,
+          "p50": 0,
+          "p95": 0
+        }
+      },
+      "timedRuns": 30
+    }
+  },
+  "missingSamples": []
+}

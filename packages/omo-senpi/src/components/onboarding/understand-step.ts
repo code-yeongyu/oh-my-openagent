@@ -74,7 +74,10 @@ async function agentsMdInside(root: string): Promise<string | undefined> {
   return realFile
 }
 
-async function readBounded(path: string, limit: number): Promise<{ readonly text: string; readonly bytes: number; readonly truncated: boolean } | undefined> {
+async function readBounded(
+  path: string,
+  limit: number,
+): Promise<{ readonly text: string; readonly bytes: number; readonly truncated: boolean } | undefined> {
   const handle = await open(path, "r").catch(() => undefined)
   if (handle === undefined) return undefined
   try {
@@ -97,7 +100,9 @@ export function stepPayload(read: StepRead, project: string | undefined, today: 
     "<session_digests>",
     ...read.digests.map((digest) => JSON.stringify(digest)),
     "</session_digests>",
-    ...(read.agentsMd === undefined ? [] : [`<agents_md path=${JSON.stringify(read.agentsMd.path)}>`, read.agentsMd.text, "</agents_md>"]),
+    ...(read.agentsMd === undefined
+      ? []
+      : [`<agents_md path=${JSON.stringify(read.agentsMd.path)}>`, read.agentsMd.text, "</agents_md>"]),
   ].join("\n")
 }
 
@@ -161,12 +166,18 @@ export async function runStep(input: {
     await rm(runDir, { recursive: true, force: true })
     const released = [...children].flatMap((state) => (state.released === undefined ? [] : [state.released]))
     if (released.length > 0) {
-      input.onScratchCleanup(Promise.allSettled(released).then(async (settled) => {
-        for (const outcome of settled) {
-          if (outcome.status === "rejected") input.model.logger?.warn("onboarding understanding child disposal failed", { runId, error: String(outcome.reason) })
-        }
-        await rm(runDir, { recursive: true, force: true })
-      }))
+      input.onScratchCleanup(
+        Promise.allSettled(released).then(async (settled) => {
+          for (const outcome of settled) {
+            if (outcome.status === "rejected")
+              input.model.logger?.warn("onboarding understanding child disposal failed", {
+                runId,
+                error: String(outcome.reason),
+              })
+          }
+          await rm(runDir, { recursive: true, force: true })
+        }),
+      )
     }
   }
 }

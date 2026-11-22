@@ -28,7 +28,7 @@ describe("runCliInstaller telemetry isolation", () => {
         hasZaiCodingPlan: false,
         hasKimiForCoding: false,
         hasOpencodeGo: false,
-      hasBailianCodingPlan: false,
+        hasBailianCodingPlan: false,
         hasVercelAiGateway: false,
       }),
       spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true),

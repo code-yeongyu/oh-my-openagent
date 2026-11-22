@@ -24,10 +24,7 @@ export type ParsedMemberExtensionEnv = {
 }
 
 export type MemberExtensionConfigErrorCode =
-  | "missing_env"
-  | "invalid_identity"
-  | "invalid_task_id"
-  | "invalid_team_config"
+  "missing_env" | "invalid_identity" | "invalid_task_id" | "invalid_team_config"
 
 export class MemberExtensionConfigError extends Error {
   readonly code: MemberExtensionConfigErrorCode
@@ -48,11 +45,11 @@ export function parseMemberExtensionEnv(env: NodeJS.ProcessEnv): ParsedMemberExt
   const teamRunId = identityParts[0]
   const memberName = identityParts[1]
   if (
-    identityParts.length !== 2
-    || teamRunId === undefined
-    || memberName === undefined
-    || !UUID_PATTERN.test(teamRunId)
-    || !MEMBER_NAME_PATTERN.test(memberName)
+    identityParts.length !== 2 ||
+    teamRunId === undefined ||
+    memberName === undefined ||
+    !UUID_PATTERN.test(teamRunId) ||
+    !MEMBER_NAME_PATTERN.test(memberName)
   ) {
     throw new MemberExtensionConfigError(
       `${MEMBER_IDENTITY_ENV} must be '<teamRunId>::<memberName>'`,
@@ -73,11 +70,11 @@ export function parseMemberExtensionEnv(env: NodeJS.ProcessEnv): ParsedMemberExt
   const members = parseMembers(rawConfig.members)
   const configResult = TeamModeConfigSchema.safeParse(rawConfig)
   if (
-    typeof stateDir !== "string"
-    || stateDir.length === 0
-    || !configResult.success
-    || configResult.data.base_dir === undefined
-    || !members.includes(memberName)
+    typeof stateDir !== "string" ||
+    stateDir.length === 0 ||
+    !configResult.success ||
+    configResult.data.base_dir === undefined ||
+    !members.includes(memberName)
   ) {
     throw new MemberExtensionConfigError("SENPI_TASK_TEAM_CONFIG is malformed", "invalid_team_config")
   }
@@ -113,7 +110,10 @@ function parseJsonRecord(raw: string): Record<string, unknown> {
 }
 
 function parseMembers(value: unknown): readonly string[] {
-  if (!Array.isArray(value) || !value.every((member) => typeof member === "string" && MEMBER_NAME_PATTERN.test(member))) {
+  if (
+    !Array.isArray(value) ||
+    !value.every((member) => typeof member === "string" && MEMBER_NAME_PATTERN.test(member))
+  ) {
     throw new MemberExtensionConfigError("SENPI_TASK_TEAM_CONFIG.members is malformed", "invalid_team_config")
   }
   return [...new Set(value)]

@@ -62,7 +62,10 @@ describe("package extensions across the child lifecycle", () => {
     process.argv = ["bun", "omo", "-e", "/installed/omo/plugin"]
     const stopped = new Error("stop before spawning")
     const inherited: (readonly string[] | undefined)[] = []
-    const start = spyOn(RpcProcessRunner.prototype, "start").mockImplementation(function (this: RpcProcessRunner, spec) {
+    const start = spyOn(RpcProcessRunner.prototype, "start").mockImplementation(function (
+      this: RpcProcessRunner,
+      spec,
+    ) {
       inherited.push(spec.extensions ?? this["inheritedExtensions"])
       return Promise.reject(stopped)
     })

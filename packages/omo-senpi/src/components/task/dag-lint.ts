@@ -25,7 +25,10 @@ export function lintDagDefinitionNodes(nodes: readonly DagLintNode[]): readonly 
       warnings.push(`node "${node.id}": prompt is missing a STOP WHEN condition from the mass-ulw node prompt contract`)
     }
   }
-  if (nodes.length >= 2 && !nodes.some((node) => VERIFICATION_SHAPE.test(node.id) || VERIFICATION_SHAPE.test(node.prompt))) {
+  if (
+    nodes.length >= 2 &&
+    !nodes.some((node) => VERIFICATION_SHAPE.test(node.id) || VERIFICATION_SHAPE.test(node.prompt))
+  ) {
     warnings.push(
       `run has ${nodes.length} nodes but no verification node; a graph that produces work ends with a verification wave (mass-ulw planning reference)`,
     )

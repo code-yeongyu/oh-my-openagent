@@ -25,7 +25,9 @@ export function resolveInstallArgs(
   invocationName: string | undefined = process.env.OMO_INVOCATION_NAME,
 ): InstallArgs {
   const defaultPlatform =
-    process.env.OMO_EDITION === "codex" || invocationName === "lazycodex" || invocationName === "lazycodex-ai" ? "codex" : undefined
+    process.env.OMO_EDITION === "codex" || invocationName === "lazycodex" || invocationName === "lazycodex-ai"
+      ? "codex"
+      : undefined
   const platform = options.platform ?? defaultPlatform
   if (platform === "native-dev" && !isNativeDevPlatformEnabled()) {
     throw new Error(

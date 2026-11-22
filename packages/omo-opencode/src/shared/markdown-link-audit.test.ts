@@ -16,11 +16,18 @@ const MAINTAINER_LOCAL_PATH_RE = /file:\/\/\/(?:Users|home)\/|(?:^|[\s(`'"])(?:\
 function collectMarkdownFiles(): string[] {
   const output = Bun.spawnSync(["git", "ls-files", "*.md"], { cwd: WORKSPACE_ROOT, stdout: "pipe" })
   expect(output.exitCode).toBe(0)
-  return output.stdout.toString("utf-8").trim().split("\n").filter(Boolean).map((filePath) => resolve(WORKSPACE_ROOT, filePath))
+  return output.stdout
+    .toString("utf-8")
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((filePath) => resolve(WORKSPACE_ROOT, filePath))
 }
 
 function stripFencedCodeBlocks(markdown: string): string {
-  return markdown.replace(/(^|\n) {0,3}(`{3,}|~{3,})[^\n]*\n[\s\S]*?\n {0,3}\2(?=\n|$)/g, (match) => match.replace(/[^\n]/g, ""))
+  return markdown.replace(/(^|\n) {0,3}(`{3,}|~{3,})[^\n]*\n[\s\S]*?\n {0,3}\2(?=\n|$)/g, (match) =>
+    match.replace(/[^\n]/g, ""),
+  )
 }
 
 function stripIndentedCodeBlocks(markdown: string): string {
@@ -123,25 +130,30 @@ function collectInlineTargets(line: string, lineNumber: number, index = 0): Arra
   }
   const nestedTargets = collectInlineTargets(line.slice(labelStart + 1, labelEnd), lineNumber)
   const destStart = line[labelEnd + 1] === "(" ? skipLeadingWhitespace(line, labelEnd + 2) : -1
-  const target = destStart === -1
-    ? undefined
-    : line[destStart] === "<" ? readAngleBracketTarget(line, destStart + 1) : readMarkdownTarget(line, destStart)
+  const target =
+    destStart === -1
+      ? undefined
+      : line[destStart] === "<"
+        ? readAngleBracketTarget(line, destStart + 1)
+        : readMarkdownTarget(line, destStart)
   const currentTargets = target ? [...nestedTargets, { line: lineNumber, target }] : nestedTargets
   return [...currentTargets, ...collectInlineTargets(line, lineNumber, labelEnd + 1)]
 }
 
 function collectLinkedTargets(markdown: string): Array<{ line: number; target: string }> {
-  return stripInlineCodeSpans(stripIndentedCodeBlocks(stripFencedCodeBlocks(markdown))).split("\n").flatMap((line, lineIndex) => {
-    const referenceTarget = MARKDOWN_REFERENCE_DEFINITION_RE.exec(line)?.[2]
-    const targets = collectInlineTargets(line, lineIndex + 1)
-    return referenceTarget ? [...targets, { line: lineIndex + 1, target: referenceTarget }] : targets
-  })
+  return stripInlineCodeSpans(stripIndentedCodeBlocks(stripFencedCodeBlocks(markdown)))
+    .split("\n")
+    .flatMap((line, lineIndex) => {
+      const referenceTarget = MARKDOWN_REFERENCE_DEFINITION_RE.exec(line)?.[2]
+      const targets = collectInlineTargets(line, lineIndex + 1)
+      return referenceTarget ? [...targets, { line: lineIndex + 1, target: referenceTarget }] : targets
+    })
 }
 
 function collectMaintainerLocalPathLines(markdown: string): number[] {
-  return stripInlineCodeSpans(stripIndentedCodeBlocks(stripFencedCodeBlocks(markdown))).split("\n").flatMap((line, lineIndex) => (
-    MAINTAINER_LOCAL_PATH_RE.test(line) ? [lineIndex + 1] : []
-  ))
+  return stripInlineCodeSpans(stripIndentedCodeBlocks(stripFencedCodeBlocks(markdown)))
+    .split("\n")
+    .flatMap((line, lineIndex) => (MAINTAINER_LOCAL_PATH_RE.test(line) ? [lineIndex + 1] : []))
 }
 
 describe("markdown local link audit", () => {
@@ -151,7 +163,9 @@ describe("markdown local link audit", () => {
   })
 
   test("#given relative file uri markdown link #when resolving target #then it resolves from the markdown file", () => {
-    expect(resolveMarkdownTarget("docs/AGENTS.md", "file://./guide/overview.md")).toBe(resolve("docs/guide/overview.md"))
+    expect(resolveMarkdownTarget("docs/AGENTS.md", "file://./guide/overview.md")).toBe(
+      resolve("docs/guide/overview.md"),
+    )
   })
 
   test("#given reference-style markdown links #when collecting targets #then link definitions are audited", () => {
@@ -161,14 +175,18 @@ describe("markdown local link audit", () => {
   })
 
   test("#given separated reference-style markdown links #when collecting targets #then each definition target is audited", () => {
-    expect(collectLinkedTargets("[Guide][guide] and [Docs][]\n\n[guide]: ./guide/overview.md\n[Docs]: docs/AGENTS.md")).toEqual([
+    expect(
+      collectLinkedTargets("[Guide][guide] and [Docs][]\n\n[guide]: ./guide/overview.md\n[Docs]: docs/AGENTS.md"),
+    ).toEqual([
       { line: 3, target: "./guide/overview.md" },
       { line: 4, target: "docs/AGENTS.md" },
     ])
   })
 
   test("#given image-wrapped markdown link #when collecting targets #then wrapper target is audited", () => {
-    expect(collectLinkedTargets("[![License](https://img.shields.io/badge/license-SUL--1.0-white)](LICENSE.md)")).toEqual([
+    expect(
+      collectLinkedTargets("[![License](https://img.shields.io/badge/license-SUL--1.0-white)](LICENSE.md)"),
+    ).toEqual([
       { line: 1, target: "https://img.shields.io/badge/license-SUL--1.0-white" },
       { line: 1, target: "LICENSE.md" },
     ])
@@ -189,30 +207,28 @@ describe("markdown local link audit", () => {
   })
 
   test("#given escaped target parentheses #when collecting targets #then odd escapes keep reading and even escapes close target", () => {
-    expect(collectLinkedTargets("[Guide](docs/foo\\).md)")).toEqual([
-      { line: 1, target: "docs/foo\\).md" },
-    ])
-    expect(collectLinkedTargets("[Guide](docs/foo\\\\).md)")).toEqual([
-      { line: 1, target: "docs/foo\\\\" },
-    ])
+    expect(collectLinkedTargets("[Guide](docs/foo\\).md)")).toEqual([{ line: 1, target: "docs/foo\\).md" }])
+    expect(collectLinkedTargets("[Guide](docs/foo\\\\).md)")).toEqual([{ line: 1, target: "docs/foo\\\\" }])
   })
 
   test("#given indented fenced code block #when collecting targets #then links inside the fence are ignored", () => {
-    expect(collectLinkedTargets("   ```markdown\n[Missing](./missing.md)\n   ```\n[Guide](./guide/overview.md)")).toEqual([
-      { line: 4, target: "./guide/overview.md" },
-    ])
+    expect(
+      collectLinkedTargets("   ```markdown\n[Missing](./missing.md)\n   ```\n[Guide](./guide/overview.md)"),
+    ).toEqual([{ line: 4, target: "./guide/overview.md" }])
   })
 
   test("#given indented code block #when collecting targets #then links inside the code block are ignored", () => {
-    expect(collectLinkedTargets("    [Missing](./missing.md)\n\t[AlsoMissing](./also-missing.md)\n[Guide](./guide/overview.md)")).toEqual([
-      { line: 3, target: "./guide/overview.md" },
-    ])
+    expect(
+      collectLinkedTargets(
+        "    [Missing](./missing.md)\n\t[AlsoMissing](./also-missing.md)\n[Guide](./guide/overview.md)",
+      ),
+    ).toEqual([{ line: 3, target: "./guide/overview.md" }])
   })
 
   test("#given inline code spans #when collecting targets #then links inside code spans are ignored", () => {
-    expect(collectLinkedTargets("Use `create_memory_object_stream[T](max_buffer_size=N)` then [Guide](./guide/overview.md)")).toEqual([
-      { line: 1, target: "./guide/overview.md" },
-    ])
+    expect(
+      collectLinkedTargets("Use `create_memory_object_stream[T](max_buffer_size=N)` then [Guide](./guide/overview.md)"),
+    ).toEqual([{ line: 1, target: "./guide/overview.md" }])
   })
 
   test("#given angle-bracket-wrapped destination with spaces #when collecting targets #then the spaced target is audited", () => {
@@ -222,9 +238,7 @@ describe("markdown local link audit", () => {
   })
 
   test("#given whitespace-padded inline destination #when collecting targets #then leading whitespace after the paren is skipped", () => {
-    expect(collectLinkedTargets("[Guide]( ./guide/overview.md )")).toEqual([
-      { line: 1, target: "./guide/overview.md" },
-    ])
+    expect(collectLinkedTargets("[Guide]( ./guide/overview.md )")).toEqual([{ line: 1, target: "./guide/overview.md" }])
   })
 
   test("#given whitespace-padded angle-bracket destination #when collecting targets #then the spaced target is audited", () => {
@@ -234,22 +248,35 @@ describe("markdown local link audit", () => {
   })
 
   test("#given checked-in markdown #when local links are audited #then every local target exists", async () => {
-    const offenders = (await Promise.all(collectMarkdownFiles().map(async (filePath) => {
-      return collectLinkedTargets(await readFile(filePath, "utf-8")).flatMap((linkedTarget) => {
-        const targetPath = resolveMarkdownTarget(filePath, linkedTarget.target)
-        // A native senpi skill links to shared assets the sync overlays into it; those resolve in shared-skills.
-        const overlaid = targetPath ? sharedAssetSourceFor(PACKAGES_ROOT, targetPath) : null
-        const exists = targetPath !== undefined && (existsSync(targetPath) || (overlaid !== null && existsSync(overlaid)))
-        return targetPath && !exists ? [`${relativeWorkspacePath(filePath)}:${linkedTarget.line} missing ${linkedTarget.target}`] : []
-      })
-    }))).flat()
+    const offenders = (
+      await Promise.all(
+        collectMarkdownFiles().map(async (filePath) => {
+          return collectLinkedTargets(await readFile(filePath, "utf-8")).flatMap((linkedTarget) => {
+            const targetPath = resolveMarkdownTarget(filePath, linkedTarget.target)
+            // A native senpi skill links to shared assets the sync overlays into it; those resolve in shared-skills.
+            const overlaid = targetPath ? sharedAssetSourceFor(PACKAGES_ROOT, targetPath) : null
+            const exists =
+              targetPath !== undefined && (existsSync(targetPath) || (overlaid !== null && existsSync(overlaid)))
+            return targetPath && !exists
+              ? [`${relativeWorkspacePath(filePath)}:${linkedTarget.line} missing ${linkedTarget.target}`]
+              : []
+          })
+        }),
+      )
+    ).flat()
     expect(offenders.sort()).toEqual([])
   }, 20_000)
 
   test("#given checked-in markdown #when maintainer-local paths are audited #then none are present", async () => {
-    const offenders = (await Promise.all(collectMarkdownFiles().map(async (filePath) => {
-      return collectMaintainerLocalPathLines(await readFile(filePath, "utf-8")).map((line) => `${relativeWorkspacePath(filePath)}:${line}`)
-    }))).flat()
+    const offenders = (
+      await Promise.all(
+        collectMarkdownFiles().map(async (filePath) => {
+          return collectMaintainerLocalPathLines(await readFile(filePath, "utf-8")).map(
+            (line) => `${relativeWorkspacePath(filePath)}:${line}`,
+          )
+        }),
+      )
+    ).flat()
     expect(offenders.sort()).toEqual([])
   }, 20_000)
 })

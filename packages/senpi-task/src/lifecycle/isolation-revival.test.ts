@@ -40,7 +40,12 @@ function isolatedRecord(store: TaskRecordStore, input: Parameters<typeof seedRec
   const record: TaskRecord = {
     ...seeded,
     isolation: isolationSpec,
-    spawn_spec: { version: 1, cwd: isolationSpec.merged_dir, prompt: `prompt:${seeded.task_id}`, isolation: isolationSpec },
+    spawn_spec: {
+      version: 1,
+      cwd: isolationSpec.merged_dir,
+      prompt: `prompt:${seeded.task_id}`,
+      isolation: isolationSpec,
+    },
   }
   store.replace(record)
   return record
@@ -53,7 +58,9 @@ function harness(options: { readonly alive?: Set<number> } = {}) {
   const alive = options.alive ?? new Set<number>()
   const signaller: ProcessSignaller = {
     isAlive: (pid) => alive.has(pid),
-    signal: (pid) => { alive.delete(pid) },
+    signal: (pid) => {
+      alive.delete(pid)
+    },
   }
   const lifecycle = createTaskLifecycle({
     hostEndpoint: NO_HOST_ENDPOINT,
@@ -66,7 +73,12 @@ function harness(options: { readonly alive?: Set<number> } = {}) {
     orphanKillDelayMs: 0,
     respawn: async (record): Promise<RespawnResult> => {
       respawns.push(record.task_id)
-      return { ok: false, disposition: "unrecoverable", code: "spawn_spec_unavailable", reason: "respawn must never run for an isolated record" }
+      return {
+        ok: false,
+        disposition: "unrecoverable",
+        code: "spawn_spec_unavailable",
+        reason: "respawn must never run for an isolated record",
+      }
     },
     reattach: async () => ({ ok: true }),
   })
@@ -78,7 +90,10 @@ describe("isolated records are never revived", () => {
     const { store, lifecycle } = harness()
     expect(lifecycle).toBeDefined()
     const record = isolatedRecord(store, {
-      task_id: "st_20000001", status: "completed", residency_state: "persisted_only", host_pid: hostPid,
+      task_id: "st_20000001",
+      status: "completed",
+      residency_state: "persisted_only",
+      host_pid: hostPid,
     })
     persistSession(store, record.task_id)
 
@@ -92,11 +107,20 @@ describe("isolated records are never revived", () => {
   test("#given an isolated claimed record #when reviveClaimed runs #then it is marked lost so its delta is salvageable, never respawned", async () => {
     const { store, registry, respawns, signaller } = harness()
     const record = isolatedRecord(store, {
-      task_id: "st_20000002", status: "running", residency_state: "resident", host_pid: hostPid,
+      task_id: "st_20000002",
+      status: "running",
+      residency_state: "resident",
+      host_pid: hostPid,
     })
     const context = resolveContext({
       hostEndpoint: NO_HOST_ENDPOINT,
-      store, registry, config: settings(), hostPid, now, signaller, orphanKillDelayMs: 0,
+      store,
+      registry,
+      config: settings(),
+      hostPid,
+      now,
+      signaller,
+      orphanKillDelayMs: 0,
     })
 
     const outcome = await reviveClaimed(context, record, "persisted_only", persistSession(store, record.task_id))
@@ -114,8 +138,13 @@ describe("isolated records are never revived", () => {
   test("#given an isolated legacy process record with a transcript #when startup reconcile runs #then it is marked lost and never respawned", async () => {
     const { store, respawns, lifecycle } = harness()
     const record = isolatedRecord(store, {
-      task_id: "st_20000003", parent_session_id: "session-other", status: "running",
-      residency_state: "resident", execution_mode: "process", pid: 7401, host_pid: 9999,
+      task_id: "st_20000003",
+      parent_session_id: "session-other",
+      status: "running",
+      residency_state: "resident",
+      execution_mode: "process",
+      pid: 7401,
+      host_pid: 9999,
     })
     persistSession(store, record.task_id)
 
@@ -123,7 +152,9 @@ describe("isolated records are never revived", () => {
 
     expect(respawns).toEqual([])
     expect(result.outcomes).toContainEqual({
-      task_id: record.task_id, kind: "lost", reason: "isolated_not_revivable",
+      task_id: record.task_id,
+      kind: "lost",
+      reason: "isolated_not_revivable",
     })
     expect(store.load(record.task_id)?.status).toBe("lost")
   })

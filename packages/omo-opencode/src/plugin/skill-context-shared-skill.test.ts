@@ -37,14 +37,7 @@ function writeSkill(dir: string, frontmatterName: string, description: string, b
   mkdirSync(dir, { recursive: true })
   writeFileSync(
     join(dir, "SKILL.md"),
-    [
-      "---",
-      `name: ${frontmatterName}`,
-      `description: ${description}`,
-      "---",
-      body,
-      "",
-    ].join("\n"),
+    ["---", `name: ${frontmatterName}`, `description: ${description}`, "---", body, ""].join("\n"),
   )
 }
 

@@ -31,9 +31,10 @@ export function adoptForeignWindow(input: {
   // A new epoch on every hand-over: if the owner was misjudged dead and still publishes, no (epoch, seq) repeats.
   const epoch = newSummaryEpoch()
   const published = record.windowId !== null && storage.hasPending(record.windowId)
-  const entry: LiveWindow = published || record.window === null
-    ? fresh(key, epoch, published ? record.seq + 1 : record.seq)
-    : { key, epoch, seq: record.seq, sampleRate: record.sampleRate, windowId: record.windowId, window: record.window }
+  const entry: LiveWindow =
+    published || record.window === null
+      ? fresh(key, epoch, published ? record.seq + 1 : record.seq)
+      : { key, epoch, seq: record.seq, sampleRate: record.sampleRate, windowId: record.windowId, window: record.window }
   input.persist(entry)
   removeFile(claimed.claimPath)
   return entry

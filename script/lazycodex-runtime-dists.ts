@@ -108,7 +108,9 @@ async function copyRuntimeDist(input: CopyLazycodexRuntimeDistsInput, dist: Runt
   const sourcePath = join(input.sourceRoot, dist.sourcePath)
   if (!(await isDirectory(sourcePath))) {
     if (input.skipMissing) {
-      console.warn(`[sync-lazycodex-marketplace] previous-payload reconstruction: skipping missing ${dist.label} at ${sourcePath}`)
+      console.warn(
+        `[sync-lazycodex-marketplace] previous-payload reconstruction: skipping missing ${dist.label} at ${sourcePath}`,
+      )
       return
     }
     throw new Error(`missing built ${dist.label} at ${sourcePath}`)

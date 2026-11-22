@@ -62,11 +62,9 @@ describe("activateTeamLayout", () => {
     createTeamLayoutSpy = spyOn(layoutModule, "createTeamLayout")
     createTeamLayoutSpy.mockResolvedValue(null)
     transitionRuntimeStateSpy = spyOn(storeModule, "transitionRuntimeState")
-    transitionRuntimeStateSpy.mockImplementation(async (
-      _teamRunId,
-      transition,
-      _config,
-    ): Promise<RuntimeState> => transition(createRuntimeState()))
+    transitionRuntimeStateSpy.mockImplementation(async (_teamRunId, transition, _config): Promise<RuntimeState> =>
+      transition(createRuntimeState()),
+    )
   })
 
   test("#given a leader and one member #when activateTeamLayout runs #then it excludes the leader from layout members and only persists panes for non-leaders", async () => {
@@ -82,12 +80,9 @@ describe("activateTeamLayout", () => {
     })
 
     // when
-    const result = await activateTeamLayout(
-      runtimeState,
-      createConfig(true),
-      "/project",
-      { getServerUrl: () => "http://127.0.0.1:12345" } as never,
-    )
+    const result = await activateTeamLayout(runtimeState, createConfig(true), "/project", {
+      getServerUrl: () => "http://127.0.0.1:12345",
+    } as never)
 
     // then
     expect(result).toBe(true)
@@ -135,12 +130,9 @@ describe("activateTeamLayout", () => {
     const runtimeState = createRuntimeState()
 
     // when
-    const result = await activateTeamLayout(
-      runtimeState,
-      createConfig(true),
-      "/project",
-      { getServerUrl: () => "http://127.0.0.1:12345" } as never,
-    )
+    const result = await activateTeamLayout(runtimeState, createConfig(true), "/project", {
+      getServerUrl: () => "http://127.0.0.1:12345",
+    } as never)
 
     // then
     expect(result).toBe(false)
@@ -152,12 +144,9 @@ describe("activateTeamLayout", () => {
     const runtimeState = createRuntimeState()
 
     // when
-    const result = await activateTeamLayout(
-      runtimeState,
-      createConfig(false),
-      "/project",
-      { getServerUrl: () => "http://127.0.0.1:12345" } as never,
-    )
+    const result = await activateTeamLayout(runtimeState, createConfig(false), "/project", {
+      getServerUrl: () => "http://127.0.0.1:12345",
+    } as never)
 
     // then
     expect(result).toBe(false)

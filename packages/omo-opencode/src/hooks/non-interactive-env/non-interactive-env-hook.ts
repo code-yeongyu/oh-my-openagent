@@ -33,7 +33,7 @@ export function createNonInteractiveEnvHook(_ctx: PluginInput, deps: NonInteract
   return {
     "tool.execute.before": async (
       input: { tool: string; sessionID: string; callID: string },
-      output: { args: Record<string, unknown>; message?: string }
+      output: { args: Record<string, unknown>; message?: string },
     ): Promise<void> => {
       if (input.tool.toLowerCase() !== "bash") {
         return
@@ -64,7 +64,7 @@ export function createNonInteractiveEnvHook(_ctx: PluginInput, deps: NonInteract
 
       const shellType = deps.resolveShellType()
       const envPrefix = buildEnvPrefix(NON_INTERACTIVE_ENV, shellType)
-      
+
       // Check if the command already starts with the prefix to avoid stacking.
       // This maintains the non-interactive behavior and makes the operation idempotent.
       if (command.trim().startsWith(envPrefix.trim())) {

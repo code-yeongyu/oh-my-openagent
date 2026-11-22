@@ -20,24 +20,29 @@ function skillFile(dir: string, name: string): string {
   return path
 }
 
-test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("an unreadable native skill skips nothing after it and keeps the host's content (#10693 review L2)", () => {
-  // given: three host rows; the first one's file is unreadable
-  const root = mkdtempSync(join(tmpdir(), "native-unreadable-"))
-  roots.push(root)
-  const project = join(root, "project")
-  mkdirSync(project)
-  mkdirSync(join(project, ".git"))
-  const host = join(root, "host")
-  const locked = skillFile(host, "locked")
-  const entries = ["locked", "second", "third"].map((name) => ({
-    name, description: "fixture", content: `---\nname: ${name}\n---\n${name} host content\n`,
-    location: name === "locked" ? locked : skillFile(host, name),
-  }))
-  chmodSync(locked, 0o000)
-  const skills: LoadedSkill[] = []
-  // when
-  mergeNativeSkills(skills, entries, undefined, project)
-  // then: every row loads, and the unreadable one keeps the content the host already had
-  expect(skills.map((skill) => skill.name)).toEqual(["locked", "second", "third"])
-  expect(skills[0]?.definition.template).toContain("locked host content")
-})
+test.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+  "an unreadable native skill skips nothing after it and keeps the host's content (#10693 review L2)",
+  () => {
+    // given: three host rows; the first one's file is unreadable
+    const root = mkdtempSync(join(tmpdir(), "native-unreadable-"))
+    roots.push(root)
+    const project = join(root, "project")
+    mkdirSync(project)
+    mkdirSync(join(project, ".git"))
+    const host = join(root, "host")
+    const locked = skillFile(host, "locked")
+    const entries = ["locked", "second", "third"].map((name) => ({
+      name,
+      description: "fixture",
+      content: `---\nname: ${name}\n---\n${name} host content\n`,
+      location: name === "locked" ? locked : skillFile(host, name),
+    }))
+    chmodSync(locked, 0o000)
+    const skills: LoadedSkill[] = []
+    // when
+    mergeNativeSkills(skills, entries, undefined, project)
+    // then: every row loads, and the unreadable one keeps the content the host already had
+    expect(skills.map((skill) => skill.name)).toEqual(["locked", "second", "third"])
+    expect(skills[0]?.definition.template).toContain("locked host content")
+  },
+)

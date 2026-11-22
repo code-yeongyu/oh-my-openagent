@@ -26,13 +26,15 @@ export async function runCuratedProcessAndLanguageDenials(): Promise<Record<stri
     assert.equal(hold.toolName, "hold")
 
     const execute = async (params: Record<string, unknown>, capability: unknown): Promise<TaskToolDetails> =>
-      ((await env.taskTool.execute(
-        "omp-item6-denial",
-        params as never,
-        undefined,
-        undefined,
-        env.context(capability as never) as never,
-      )) as AgentToolResult<TaskToolDetails>).details
+      (
+        (await env.taskTool.execute(
+          "omp-item6-denial",
+          params as never,
+          undefined,
+          undefined,
+          env.context(capability as never) as never,
+        )) as AgentToolResult<TaskToolDetails>
+      ).details
 
     // A narrowed child is only refused on an engine that cannot bound the closure's nested host
     // calls. When the INJECTED producer advertises the per-call invoke scope (senpi#1731), those two
@@ -43,19 +45,52 @@ export async function runCuratedProcessAndLanguageDenials(): Promise<Record<stri
     const narrowedAgentCases: { readonly label: string; readonly details: TaskToolDetails }[] = scoped
       ? []
       : [
-        // The two supported ways an agent takes `write` away. `probe-no-write` resolves to an EMPTY
-        // allowlist, which is the most restrictive shape and must never read as "no policy".
-        { label: "empty-allowlist-agent", details: await execute({ ...base, subagent_type: "probe-no-write", tools: ["fixture_lookup"] }, kernel.capability) },
-        { label: "deny-only-agent", details: await execute({ ...base, subagent_type: "restricted-writer", tools: ["fixture_lookup"] }, kernel.capability) },
-      ]
+          // The two supported ways an agent takes `write` away. `probe-no-write` resolves to an EMPTY
+          // allowlist, which is the most restrictive shape and must never read as "no policy".
+          {
+            label: "empty-allowlist-agent",
+            details: await execute(
+              { ...base, subagent_type: "probe-no-write", tools: ["fixture_lookup"] },
+              kernel.capability,
+            ),
+          },
+          {
+            label: "deny-only-agent",
+            details: await execute(
+              { ...base, subagent_type: "restricted-writer", tools: ["fixture_lookup"] },
+              kernel.capability,
+            ),
+          },
+        ]
     const cases: { readonly label: string; readonly details: TaskToolDetails }[] = [
-      { label: "curated-read-only-agent", details: await execute({ ...base, subagent_type: "explore", tools: ["fixture_lookup"] }, kernel.capability) },
-      { label: "non-js-parent-no-capability", details: await execute({ ...base, category: "quick", tools: ["fixture_lookup"] }, undefined) },
-      { label: "reserved-alias", details: await execute({ ...base, category: "quick", tools: ["task_send"] }, kernel.capability) },
-      { label: "normalized-collision", details: await execute({ ...base, category: "quick", tools: ["fixture-lookup", "fixture_lookup"] }, kernel.capability) },
-      { label: "missing-descriptor", details: await execute({ ...base, category: "quick", tools: ["never_defined"] }, kernel.capability) },
+      {
+        label: "curated-read-only-agent",
+        details: await execute({ ...base, subagent_type: "explore", tools: ["fixture_lookup"] }, kernel.capability),
+      },
+      {
+        label: "non-js-parent-no-capability",
+        details: await execute({ ...base, category: "quick", tools: ["fixture_lookup"] }, undefined),
+      },
+      {
+        label: "reserved-alias",
+        details: await execute({ ...base, category: "quick", tools: ["task_send"] }, kernel.capability),
+      },
+      {
+        label: "normalized-collision",
+        details: await execute(
+          { ...base, category: "quick", tools: ["fixture-lookup", "fixture_lookup"] },
+          kernel.capability,
+        ),
+      },
+      {
+        label: "missing-descriptor",
+        details: await execute({ ...base, category: "quick", tools: ["never_defined"] }, kernel.capability),
+      },
       // A REAL process-mode child: the agent definition routes the spawn to the rpc runner.
-      { label: "process-mode-agent", details: await execute({ ...base, subagent_type: "rpc-worker", tools: ["fixture_lookup"] }, kernel.capability) },
+      {
+        label: "process-mode-agent",
+        details: await execute({ ...base, subagent_type: "rpc-worker", tools: ["fixture_lookup"] }, kernel.capability),
+      },
       ...narrowedAgentCases,
     ]
     for (const entry of cases) {
@@ -66,16 +101,27 @@ export async function runCuratedProcessAndLanguageDenials(): Promise<Record<stri
     }
     assert.deepEqual(env.store.list().records, [], "no task record may exist after a grant refusal")
     assert.equal(env.sessions.length, 0, "no child session may exist after a grant refusal")
-    assert.deepEqual(kernel.invocations(), { attempted: 0, succeeded: 0 }, "a refused grant may never reach the parent closure")
+    assert.deepEqual(
+      kernel.invocations(),
+      { attempted: 0, succeeded: 0 },
+      "a refused grant may never reach the parent closure",
+    )
 
     const context = env.context(kernel.capability)
-    const pool = (await env.workpoolTool.execute(
-      "omp-item6-pool-denied",
-      { op: "create", name: "denied-pool", agent: { category: "quick", prompt: "x" }, tools: ["never_defined"] } as never,
-      undefined,
-      undefined,
-      context as never,
-    )).details as { error?: { code: string } }
+    const pool = (
+      await env.workpoolTool.execute(
+        "omp-item6-pool-denied",
+        {
+          op: "create",
+          name: "denied-pool",
+          agent: { category: "quick", prompt: "x" },
+          tools: ["never_defined"],
+        } as never,
+        undefined,
+        undefined,
+        context as never,
+      )
+    ).details as { error?: { code: string } }
     assert.equal(pool.error?.code, "kernel_tool_missing")
     assert.deepEqual(createWorkpoolStore(env.store.stateDir).list(), [], "a refused pool must not be created")
 
@@ -83,7 +129,11 @@ export async function runCuratedProcessAndLanguageDenials(): Promise<Record<stri
     // engine with no per-call invoke scope the closure a granted child could call runs with the
     // PARENT's permissions, and these children's own policy removes a write-capable tool it reaches.
     for (const entry of narrowedAgentCases) {
-      assert.equal(entry.details.kernel_tools?.error?.code, "tools_unavailable", `${entry.label} must be typed tools_unavailable`)
+      assert.equal(
+        entry.details.kernel_tools?.error?.code,
+        "tools_unavailable",
+        `${entry.label} must be typed tools_unavailable`,
+      )
       assert.equal(entry.details.task_id, "", `${entry.label} must not create a task`)
     }
 

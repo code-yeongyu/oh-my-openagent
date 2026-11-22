@@ -17,19 +17,32 @@ for (const kind of ["stdio", "host"] as const) {
     clock = fakeClock()
     const fake = silentChild()
     const port = fakeSessionPort()
-    const handle = kind === "host"
-      ? createHostSessionHandle({
-          client: port, session: FAKE_SESSION, taskId: "st_active", heartbeatIntervalMs: 10_000,
-          now: clock.now, closeGraceMs: 100, openDisposition: "attached",
-        })
-      : createRpcChildHandle({
-          client: new RpcProtocolClient({ child: fake.child }), child: fake.child,
-          taskId: "st_active", heartbeatIntervalMs: 10_000, now: clock.now,
-          terminateChild: async () => { fake.child.emit("close", null, "SIGKILL") },
-        })
+    const handle =
+      kind === "host"
+        ? createHostSessionHandle({
+            client: port,
+            session: FAKE_SESSION,
+            taskId: "st_active",
+            heartbeatIntervalMs: 10_000,
+            now: clock.now,
+            closeGraceMs: 100,
+            openDisposition: "attached",
+          })
+        : createRpcChildHandle({
+            client: new RpcProtocolClient({ child: fake.child }),
+            child: fake.child,
+            taskId: "st_active",
+            heartbeatIntervalMs: 10_000,
+            now: clock.now,
+            terminateChild: async () => {
+              fake.child.emit("close", null, "SIGKILL")
+            },
+          })
     const managed = adaptRpcHandle(handle)
     const statuses: string[] = []
-    managed.onLiveness?.(status => { statuses.push(status.state) })
+    managed.onLiveness?.((status) => {
+      statuses.push(status.state)
+    })
     // When events keep arriving for well beyond three missed state-probe windows.
     for (let i = 0; i < 12; i++) {
       await clock.advance(9_000)
@@ -56,9 +69,19 @@ test("streaming host events do not starve probes or durable session identity", a
   const port = fakeSessionPort()
   let probes = 0
   const handle = createHostSessionHandle({
-    client: { ...port, getState: async () => { probes++; return { sessionId: "durable-active", isStreaming: true } } },
-    session: FAKE_SESSION, taskId: "st_active_probe", heartbeatIntervalMs: 10_000,
-    now: clock.now, closeGraceMs: 100, openDisposition: "attached",
+    client: {
+      ...port,
+      getState: async () => {
+        probes++
+        return { sessionId: "durable-active", isStreaming: true }
+      },
+    },
+    session: FAKE_SESSION,
+    taskId: "st_active_probe",
+    heartbeatIntervalMs: 10_000,
+    now: clock.now,
+    closeGraceMs: 100,
+    openDisposition: "attached",
   })
   try {
     // When traffic arrives faster than the probe interval for two minutes.
@@ -83,9 +106,13 @@ test("a late rejection does not count a previously counted probe silence again",
   let probes = 0
   const port = fakeSessionPort()
   const handle = createHostSessionHandle({
-    client: { ...port, getState: () => probes++ === 0 ? first.promise : next.promise },
-    session: FAKE_SESSION, taskId: "st_late_rejection", heartbeatIntervalMs: 10_000,
-    now: clock.now, closeGraceMs: 100, openDisposition: "attached",
+    client: { ...port, getState: () => (probes++ === 0 ? first.promise : next.promise) },
+    session: FAKE_SESSION,
+    taskId: "st_late_rejection",
+    heartbeatIntervalMs: 10_000,
+    now: clock.now,
+    closeGraceMs: 100,
+    openDisposition: "attached",
   })
   try {
     await clock.advance(35_000)

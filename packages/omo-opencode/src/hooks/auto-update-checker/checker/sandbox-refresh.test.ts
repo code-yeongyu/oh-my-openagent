@@ -29,7 +29,12 @@ function seedSandbox(cacheDir: string, spec: string): string {
 
 function exitRecorder(): { callbacks: (() => void)[]; onExit: (cb: () => void) => void } {
   const callbacks: (() => void)[] = []
-  return { callbacks, onExit: (cb) => { callbacks.push(cb) } }
+  return {
+    callbacks,
+    onExit: (cb) => {
+      callbacks.push(cb)
+    },
+  }
 }
 
 afterEach(() => {
@@ -180,7 +185,13 @@ describe("sandbox refresh that did not complete", () => {
       const cacheDir = tempDir()
       const sandboxDir = seedSandbox(cacheDir, "oh-my-openagent@latest")
       const previousSession = exitRecorder()
-      expect(scheduleOpenCodeSandboxRefreshOnExit(sandboxDir, { onExit: previousSession.onExit, cacheDir, pid: process.ppid })).toBeNull()
+      expect(
+        scheduleOpenCodeSandboxRefreshOnExit(sandboxDir, {
+          onExit: previousSession.onExit,
+          cacheDir,
+          pid: process.ppid,
+        }),
+      ).toBeNull()
       const packagesDir = getPluginSandboxRoot(cacheDir)
       chmodSync(packagesDir, 0o555)
       try {
@@ -191,7 +202,11 @@ describe("sandbox refresh that did not complete", () => {
       expect(existsSync(join(sandboxDir, "node_modules", "oh-my-openagent"))).toBe(true)
 
       // when - the next session detects the same update
-      const unapplied = scheduleOpenCodeSandboxRefreshOnExit(sandboxDir, { onExit: exitRecorder().onExit, cacheDir, pid: 4_194_306 })
+      const unapplied = scheduleOpenCodeSandboxRefreshOnExit(sandboxDir, {
+        onExit: exitRecorder().onExit,
+        cacheDir,
+        pid: 4_194_306,
+      })
 
       // then
       expect(unapplied).not.toBeNull()

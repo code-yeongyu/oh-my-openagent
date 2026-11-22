@@ -3,17 +3,14 @@ import type { PluginConfig } from "./types"
 import type { ContextCollector } from "../../features/context-injector"
 import { createChatMessageHandler } from "./handlers/chat-message-handler"
 import { createPreCompactHandler } from "./handlers/pre-compact-handler"
-import {
-  createSessionEventHandler,
-  disposeSessionEventHandler,
-} from "./handlers/session-event-handler"
+import { createSessionEventHandler, disposeSessionEventHandler } from "./handlers/session-event-handler"
 import { createToolExecuteAfterHandler } from "./handlers/tool-execute-after-handler"
 import { createToolExecuteBeforeHandler } from "./handlers/tool-execute-before-handler"
 
 export function createClaudeCodeHooksHook(
   ctx: PluginInput,
   config: PluginConfig = {},
-  contextCollector?: ContextCollector
+  contextCollector?: ContextCollector,
 ) {
   return {
     "experimental.session.compacting": createPreCompactHandler(ctx, config),

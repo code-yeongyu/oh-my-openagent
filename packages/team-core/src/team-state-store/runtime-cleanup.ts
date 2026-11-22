@@ -5,10 +5,7 @@ import { getRuntimeStateDir, resolveBaseDir } from "../team-registry/paths"
 import type { RuntimeState } from "../types"
 
 function isEnoentError(error: unknown): boolean {
-  return typeof error === "object"
-    && error !== null
-    && "code" in error
-    && error.code === "ENOENT"
+  return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT"
 }
 
 async function runtimeDirectoryExists(teamRunId: string, config: TeamModeConfig): Promise<boolean> {
@@ -28,8 +25,10 @@ export async function removeRuntimeDirectory(teamRunId: string, config: TeamMode
 }
 
 export async function cleanupMemberWorktrees(runtimeState: RuntimeState): Promise<void> {
-  await Promise.all(runtimeState.members.map(async (member) => {
-    if (!member.worktreePath) return
-    await rm(member.worktreePath, { recursive: true, force: true })
-  }))
+  await Promise.all(
+    runtimeState.members.map(async (member) => {
+      if (!member.worktreePath) return
+      await rm(member.worktreePath, { recursive: true, force: true })
+    }),
+  )
 }

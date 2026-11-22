@@ -45,10 +45,14 @@ describe("parseGitStatusPorcelainZ", () => {
 
   test("#given R or C in either status column #when parsing #then renames are modified, copies are added, and each source field is consumed", () => {
     const output = [
-      "RM dst/rm.ts", "xx/rm-src.ts",
-      " R dst/wr.ts", "xx/wr-src.ts",
-      "CM dst/cm.ts", "xx/cm-src.ts",
-      " C dst/wc.ts", "xx/wc-src.ts",
+      "RM dst/rm.ts",
+      "xx/rm-src.ts",
+      " R dst/wr.ts",
+      "xx/wr-src.ts",
+      "CM dst/cm.ts",
+      "xx/cm-src.ts",
+      " C dst/wc.ts",
+      "xx/wc-src.ts",
       " M dst/after.ts",
       "",
     ].join("\0")

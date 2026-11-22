@@ -89,7 +89,10 @@ describe("createOmoConfigValidator deprecated keys", () => {
     const validator = createValidator(fixture)
 
     // when
-    writeConfig(fixture.userConfigPath, { task: { default_concurrency: 3 }, "[senpi]": { task: { default_concurrency: 4 } } })
+    writeConfig(fixture.userConfigPath, {
+      task: { default_concurrency: 3 },
+      "[senpi]": { task: { default_concurrency: 4 } },
+    })
     const validation = validator.validate([fixture.userConfigPath])
 
     // then

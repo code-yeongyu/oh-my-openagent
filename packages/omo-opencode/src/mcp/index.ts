@@ -26,7 +26,11 @@ type BuiltinMcpSourceConfig = {
   readonly websearch?: Parameters<typeof createWebsearchConfig>[0]
 }
 
-export function createBuiltinMcps(disabledMcps: string[] = [], config?: BuiltinMcpSourceConfig, options: BuiltinMcpOptions = {}) {
+export function createBuiltinMcps(
+  disabledMcps: string[] = [],
+  config?: BuiltinMcpSourceConfig,
+  options: BuiltinMcpOptions = {},
+) {
   const mcps: Record<string, BuiltinMcpConfig> = {}
 
   if (!disabledMcps.includes("websearch")) {

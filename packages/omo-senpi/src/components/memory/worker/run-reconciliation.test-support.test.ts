@@ -15,7 +15,14 @@ describe("withinPhase", () => {
     const parked = withinPhase("parked-phase", () => new Promise<never>(() => {}))
 
     // then
-    expect(String(await parked.then(() => undefined, (error: unknown) => error))).toContain("parked-phase stalled: no git progress")
+    expect(
+      String(
+        await parked.then(
+          () => undefined,
+          (error: unknown) => error,
+        ),
+      ),
+    ).toContain("parked-phase stalled: no git progress")
   }, 30_000)
 
   test("#given one git process that outlasts the idle window #when the phase runs #then it is not reported stalled", async () => {
@@ -24,10 +31,9 @@ describe("withinPhase", () => {
     const exec = createNodeGitExec()
 
     // when
-    const result = await withinPhase("slow-git", () => exec.run(
-      ["-c", `alias.slow=!sleep ${seconds}`, "slow"],
-      { cwd: tmpdir(), timeoutMs: 60_000 },
-    ))
+    const result = await withinPhase("slow-git", () =>
+      exec.run(["-c", `alias.slow=!sleep ${seconds}`, "slow"], { cwd: tmpdir(), timeoutMs: 60_000 }),
+    )
 
     // then
     expect(result.code).toBe(0)
@@ -40,7 +46,11 @@ describe("withinPhase", () => {
 
     // when
     const phase = withinPhase("same-tick-git", () => exited.promise)
-    const git = spawn("git", ["-c", `alias.slow=!sleep ${seconds}`, "slow"], { cwd: tmpdir(), stdio: "ignore", windowsHide: true })
+    const git = spawn("git", ["-c", `alias.slow=!sleep ${seconds}`, "slow"], {
+      cwd: tmpdir(),
+      stdio: "ignore",
+      windowsHide: true,
+    })
     git.on("exit", (code) => exited.resolve(code))
 
     // then
@@ -54,7 +64,9 @@ describe("withinPhase", () => {
     // when
     const parked = withinPhase("killed-git", async () => {
       const git = spawn("git", ["-c", `alias.slow=!echo ready; sleep ${seconds}`, "slow"], {
-        cwd: tmpdir(), stdio: ["ignore", "pipe", "ignore"], windowsHide: true,
+        cwd: tmpdir(),
+        stdio: ["ignore", "pipe", "ignore"],
+        windowsHide: true,
       })
       const ready = Promise.withResolvers<void>()
       const exited = Promise.withResolvers<void>()
@@ -67,7 +79,14 @@ describe("withinPhase", () => {
     })
 
     // then
-    expect(String(await parked.then(() => undefined, (error: unknown) => error))).toContain("killed-git stalled: no git progress")
+    expect(
+      String(
+        await parked.then(
+          () => undefined,
+          (error: unknown) => error,
+        ),
+      ),
+    ).toContain("killed-git stalled: no git progress")
   }, 60_000)
 
   test("#given the trace directory disappears mid-phase #when the watchdog checks #then the phase rejects with that error", async () => {
@@ -80,6 +99,13 @@ describe("withinPhase", () => {
     })
 
     // then
-    expect(String(await phase.then(() => undefined, (error: unknown) => error))).toContain("ENOENT")
+    expect(
+      String(
+        await phase.then(
+          () => undefined,
+          (error: unknown) => error,
+        ),
+      ),
+    ).toContain("ENOENT")
   }, 30_000)
 })

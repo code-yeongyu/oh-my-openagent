@@ -33,9 +33,8 @@ function readAuthJson(id, path) {
     }
     for (const [provider, entry] of Object.entries(parsed)) {
       result.providers.push(provider)
-      const type = entry !== null && typeof entry === "object" && typeof entry.type === "string"
-        ? entry.type
-        : "unknown"
+      const type =
+        entry !== null && typeof entry === "object" && typeof entry.type === "string" ? entry.type : "unknown"
       result.credentialTypes.push(type)
       if (id === "opencode" && type === "api") result.importableCount += 1
     }
@@ -119,8 +118,8 @@ function inspectSqlite(id, path, DatabaseSync, modelHint) {
     result.providers = sorted(rows.map((row) => row.provider))
     result.credentialTypes = sorted(rows.map((row) => row.credential_type))
     result.entryCount = rows.length
-    result.importableCount = rows.filter((row) =>
-      row.disabled_cause === null && row.credential_type === "api_key",
+    result.importableCount = rows.filter(
+      (row) => row.disabled_cause === null && row.credential_type === "api_key",
     ).length
   } catch (error) {
     result.notices.push(`could not inspect agent.db: ${error.message}`)

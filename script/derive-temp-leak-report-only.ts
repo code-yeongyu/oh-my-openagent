@@ -48,9 +48,9 @@ export function deriveTempEntries(source: string): string[] {
 export function hasSourceCreator(entry: string, creators: readonly string[]): boolean {
   return creators.some(
     (creator) =>
-      creator === entry
-      || reportOnlyEntryMatches(entry, creator.replace(/\$$/, ""))
-      || (!creator.endsWith("$") && entry.replace(/\$$/, "").startsWith(creator)),
+      creator === entry ||
+      reportOnlyEntryMatches(entry, creator.replace(/\$$/, "")) ||
+      (!creator.endsWith("$") && entry.replace(/\$$/, "").startsWith(creator)),
   )
 }
 
@@ -63,7 +63,13 @@ function trackedSources(): string[] {
   const out = execFileSync("git", ["ls-files", "*.ts", "*.mts", "*.mjs", "*.js", "*.tsx"], { encoding: "utf8" })
   return out
     .split("\n")
-    .filter((file) => file && !/(^|\/)(dist|install-dist|node_modules|vendor)\/|plugin\/extensions\/|\.generated\.|\/upstreams\/|^script\/derive-temp-leak-report-only\.test\.ts$/.test(file))
+    .filter(
+      (file) =>
+        file &&
+        !/(^|\/)(dist|install-dist|node_modules|vendor)\/|plugin\/extensions\/|\.generated\.|\/upstreams\/|^script\/derive-temp-leak-report-only\.test\.ts$/.test(
+          file,
+        ),
+    )
 }
 
 function main(): void {
@@ -82,7 +88,9 @@ function main(): void {
     const creators = [...(derived.get(owner) ?? [])]
     const entries = listed[owner] ?? []
     const unmatched = entries.filter((entry) => !hasSourceCreator(entry, creators))
-    console.log(`${owner}: ${entries.length} listed, ${creators.length} derived from source, ${unmatched.length} with no source creator`)
+    console.log(
+      `${owner}: ${entries.length} listed, ${creators.length} derived from source, ${unmatched.length} with no source creator`,
+    )
     if (unmatched.length > 0) console.log(`  no source creator: ${unmatched.join(" ")}`)
   }
 }

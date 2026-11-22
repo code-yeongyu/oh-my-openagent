@@ -70,7 +70,9 @@ export function decodeRecallTermStore(input: Uint8Array): RecallTermStore | unde
   let termsText: string
   try {
     fingerprint = decoder.decode(bytes.subarray(HEADER_WORDS * 4, HEADER_WORDS * 4 + fingerprintBytes))
-    termsText = decoder.decode(bytes.subarray(HEADER_WORDS * 4 + fingerprintBytes, HEADER_WORDS * 4 + fingerprintBytes + termBytes))
+    termsText = decoder.decode(
+      bytes.subarray(HEADER_WORDS * 4 + fingerprintBytes, HEADER_WORDS * 4 + fingerprintBytes + termBytes),
+    )
   } catch {
     return undefined
   }
@@ -107,7 +109,9 @@ function isValidDocument(ids: Uint32Array, counts: Uint32Array, termCount: numbe
 }
 
 function hexBytes(hex: string): Uint8Array {
-  return Uint8Array.from({ length: KEY_BYTES }, (_, position) => Number.parseInt(hex.slice(position * 2, position * 2 + 2), 16))
+  return Uint8Array.from({ length: KEY_BYTES }, (_, position) =>
+    Number.parseInt(hex.slice(position * 2, position * 2 + 2), 16),
+  )
 }
 
 function keyHex(bytes: Uint8Array): string {

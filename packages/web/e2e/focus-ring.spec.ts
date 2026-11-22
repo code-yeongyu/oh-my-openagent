@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test"
 
-const RING_COLOR = "rgb(0, 212, 255)"
+/** Every page draws the Night accent as its ring (the dark theme is emulated below). */
+const RING_COLOR = "rgb(127, 205, 214)"
 const MAX_TAB_STOPS = 60
 
 type FocusedRing = {
@@ -14,7 +15,7 @@ type FocusedRing = {
 for (const route of ["/", "/docs", "/manifesto"]) {
   test(`every keyboard focus stop on ${route} draws the focus ring`, async ({ page }) => {
     // given
-    await page.emulateMedia({ reducedMotion: "reduce" })
+    await page.emulateMedia({ reducedMotion: "reduce", colorScheme: "dark" })
     await page.goto(route)
     await page.locator("body").focus()
     const stops: FocusedRing[] = []

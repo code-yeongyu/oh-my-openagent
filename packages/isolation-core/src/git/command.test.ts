@@ -23,7 +23,11 @@ const killOnSpawn = (signal: NodeJS.Signals) => (child: ChildProcess) => {
 test("a missing git binary is typed unavailable, not a generic spawn failure", async () => {
   const f = await fixture()
   let failure: unknown
-  try { await runGit(["status"], { cwd: f.repoRoot, env: { PATH: join(f.root, "no-git-here") } }) } catch (error) { failure = error }
+  try {
+    await runGit(["status"], { cwd: f.repoRoot, env: { PATH: join(f.root, "no-git-here") } })
+  } catch (error) {
+    failure = error
+  }
   expect(failure).toBeInstanceOf(IsolationUnavailableError)
 })
 
@@ -33,9 +37,13 @@ test("a git terminated by a signal is a failure, never a zero exit", async () =>
   let resolved: { code: number } | undefined
   try {
     resolved = await runGit(["-c", "alias.wait=!sleep 5", "wait"], {
-      cwd: f.repoRoot, allowedExitCodes: Array.from({ length: 256 }, (_, code) => code), onSpawn: killOnSpawn("SIGKILL"),
+      cwd: f.repoRoot,
+      allowedExitCodes: Array.from({ length: 256 }, (_, code) => code),
+      onSpawn: killOnSpawn("SIGKILL"),
     })
-  } catch (error) { failure = error }
+  } catch (error) {
+    failure = error
+  }
   if (process.platform === "win32") {
     // win32 has no signal deaths: the forced kill surfaces as a non-zero
     // exit code. With every exit code allowed, the run must report that
@@ -52,8 +60,14 @@ test("input written to a child that dies before reading rejects instead of crash
   const f = await fixture()
   let failure: unknown
   try {
-    await runGit(["-c", "alias.wait=!sleep 5", "wait"], { cwd: f.repoRoot, input: "payload\n", onSpawn: killOnSpawn("SIGKILL") })
-  } catch (error) { failure = error }
+    await runGit(["-c", "alias.wait=!sleep 5", "wait"], {
+      cwd: f.repoRoot,
+      input: "payload\n",
+      onSpawn: killOnSpawn("SIGKILL"),
+    })
+  } catch (error) {
+    failure = error
+  }
   expect(failure).toBeInstanceOf(Error)
 })
 
@@ -90,8 +104,13 @@ test("input written to a child that dies while alias-shell survivors hold its pi
     // spawned the alias shell. The survivor lives until this test releases it,
     // so the run can only settle before it exits if it never waits on it.
     const survivor = `cd / && while [ ! -e "$0" ]; do sleep 0.05; done; : > "$1"`
-    await runGit(["-c", `alias.orphan=!sh -c '${survivor}' '${shPath(release)}' '${shPath(exited)}' & exit 1`, "orphan"], { cwd: f.repoRoot, input: "payload\n" })
-  } catch (error) { failure = error }
+    await runGit(
+      ["-c", `alias.orphan=!sh -c '${survivor}' '${shPath(release)}' '${shPath(exited)}' & exit 1`, "orphan"],
+      { cwd: f.repoRoot, input: "payload\n" },
+    )
+  } catch (error) {
+    failure = error
+  }
   expect(failure).toBeInstanceOf(GitCommandError)
   // The survivor still holds the stdio pipes: settling with it alive proves the
   // run did not wait on `close` (the win32 flake waited out the whole test
@@ -101,7 +120,8 @@ test("input written to a child that dies while alias-shell survivors hold its pi
   // so releasing it is enough. On win32 the survivor outlives taskkill /T (its
   // alias shell already exited); wait for it to exit so it never writes into a
   // fixture root that teardown is removing.
-  if (process.platform === "win32") await waitForFile(f.root, "survivor-exited", () => writeFileSync(release, ""), 10_000)
+  if (process.platform === "win32")
+    await waitForFile(f.root, "survivor-exited", () => writeFileSync(release, ""), 10_000)
   else writeFileSync(release, "")
 })
 
@@ -111,43 +131,68 @@ test("input written to a child that dies while alias-shell survivors hold its pi
 // which a loaded runner can stretch past any fixed bound (#9477).
 const TREE_TEARDOWN_TEST_TIMEOUT_MS = 20_000
 
-test("a git process that never exits is terminated at its command deadline", async () => {
-  // given
-  const f = await fixture()
-  let pgid: number | undefined
+test(
+  "a git process that never exits is terminated at its command deadline",
+  async () => {
+    // given
+    const f = await fixture()
+    let pgid: number | undefined
 
-  // when
-  const failure = await runGit(["-c", "alias.wait=!sleep 60", "wait"], {
-    cwd: f.repoRoot, timeoutMs: 50, onSpawn: (child) => { pgid = child.pid },
-  }).then(() => undefined, (error: unknown) => error)
+    // when
+    const failure = await runGit(["-c", "alias.wait=!sleep 60", "wait"], {
+      cwd: f.repoRoot,
+      timeoutMs: 50,
+      onSpawn: (child) => {
+        pgid = child.pid
+      },
+    }).then(
+      () => undefined,
+      (error: unknown) => error,
+    )
 
-  // then
-  expect(failure).toBeInstanceOf(GitCommandTimeoutError)
-  if (process.platform !== "win32" && pgid !== undefined) expect(await processGroupIsGone(pgid)).toBe(true)
-  if (process.platform === "win32") expect(await fixtureRootIsRemovable(f.root)).toBe(true)
-}, TREE_TEARDOWN_TEST_TIMEOUT_MS)
+    // then
+    expect(failure).toBeInstanceOf(GitCommandTimeoutError)
+    if (process.platform !== "win32" && pgid !== undefined) expect(await processGroupIsGone(pgid)).toBe(true)
+    if (process.platform === "win32") expect(await fixtureRootIsRemovable(f.root)).toBe(true)
+  },
+  TREE_TEARDOWN_TEST_TIMEOUT_MS,
+)
 
-test("a budget breach on a still-streaming child preserves the typed limit error", async () => {
-  const f = await fixture()
-  class BudgetError extends Error {}
-  let failure: unknown
-  let pgid: number | undefined
-  try {
-    await runGit(["-c", "alias.spam=!yes x", "spam"], {
-      cwd: f.repoRoot, maxOutputBytes: 4096, outputLimitError: () => new BudgetError(),
-      onSpawn: (child) => { pgid = child.pid },
-    })
-  } catch (error) { failure = error }
-  expect(failure).toBeInstanceOf(BudgetError)
-  // `yes` is git's grandchild through the alias shell; it must go down with
-  // the tree instead of holding the pipe open until the test times out.
-  if (process.platform !== "win32" && pgid !== undefined) expect(await processGroupIsGone(pgid)).toBe(true)
-  if (process.platform === "win32") expect(await fixtureRootIsRemovable(f.root)).toBe(true)
-}, TREE_TEARDOWN_TEST_TIMEOUT_MS)
+test(
+  "a budget breach on a still-streaming child preserves the typed limit error",
+  async () => {
+    const f = await fixture()
+    class BudgetError extends Error {}
+    let failure: unknown
+    let pgid: number | undefined
+    try {
+      await runGit(["-c", "alias.spam=!yes x", "spam"], {
+        cwd: f.repoRoot,
+        maxOutputBytes: 4096,
+        outputLimitError: () => new BudgetError(),
+        onSpawn: (child) => {
+          pgid = child.pid
+        },
+      })
+    } catch (error) {
+      failure = error
+    }
+    expect(failure).toBeInstanceOf(BudgetError)
+    // `yes` is git's grandchild through the alias shell; it must go down with
+    // the tree instead of holding the pipe open until the test times out.
+    if (process.platform !== "win32" && pgid !== undefined) expect(await processGroupIsGone(pgid)).toBe(true)
+    if (process.platform === "win32") expect(await fixtureRootIsRemovable(f.root)).toBe(true)
+  },
+  TREE_TEARDOWN_TEST_TIMEOUT_MS,
+)
 
 const processGroupIsGone = async (pgid: number): Promise<boolean> => {
   for (let attempt = 0; attempt < 50; attempt++) {
-    try { process.kill(-pgid, 0) } catch { return true }
+    try {
+      process.kill(-pgid, 0)
+    } catch {
+      return true
+    }
     await new Promise((resolve) => setTimeout(resolve, 20))
   }
   return false
@@ -158,7 +203,10 @@ const fixtureRootIsRemovable = async (root: string): Promise<boolean> => {
   // once the whole tree is gone. A bounded retry absorbs the kill latency
   // without turning it into a sleep-based test.
   for (let attempt = 0; attempt < 20; attempt++) {
-    try { await rm(root, { recursive: true, force: true }); return true } catch (error) {
+    try {
+      await rm(root, { recursive: true, force: true })
+      return true
+    } catch (error) {
       if (!(error instanceof Error && "code" in error && error.code === "EBUSY")) throw error
       await new Promise((resolve) => setTimeout(resolve, 100))
     }
@@ -166,18 +214,28 @@ const fixtureRootIsRemovable = async (root: string): Promise<boolean> => {
   return false
 }
 
-test("a budget breach tears down the writer even when the alias shell survives its child", async () => {
-  const f = await fixture()
-  class BudgetError extends Error {}
-  let failure: unknown
-  let pgid: number | undefined
-  try {
-    await runGit(["-c", "alias.spam=!sh -c 'yes x'", "spam"], {
-      cwd: f.repoRoot, maxOutputBytes: 4096, outputLimitError: () => new BudgetError(),
-      onSpawn: (child) => { pgid = child.pid },
-    })
-  } catch (error) { failure = error }
-  expect(failure).toBeInstanceOf(BudgetError)
-  if (process.platform !== "win32" && pgid !== undefined) expect(await processGroupIsGone(pgid)).toBe(true)
-  if (process.platform === "win32") expect(await fixtureRootIsRemovable(f.root)).toBe(true)
-}, TREE_TEARDOWN_TEST_TIMEOUT_MS)
+test(
+  "a budget breach tears down the writer even when the alias shell survives its child",
+  async () => {
+    const f = await fixture()
+    class BudgetError extends Error {}
+    let failure: unknown
+    let pgid: number | undefined
+    try {
+      await runGit(["-c", "alias.spam=!sh -c 'yes x'", "spam"], {
+        cwd: f.repoRoot,
+        maxOutputBytes: 4096,
+        outputLimitError: () => new BudgetError(),
+        onSpawn: (child) => {
+          pgid = child.pid
+        },
+      })
+    } catch (error) {
+      failure = error
+    }
+    expect(failure).toBeInstanceOf(BudgetError)
+    if (process.platform !== "win32" && pgid !== undefined) expect(await processGroupIsGone(pgid)).toBe(true)
+    if (process.platform === "win32") expect(await fixtureRootIsRemovable(f.root)).toBe(true)
+  },
+  TREE_TEARDOWN_TEST_TIMEOUT_MS,
+)

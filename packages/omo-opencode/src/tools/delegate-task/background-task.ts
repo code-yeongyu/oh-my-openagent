@@ -41,7 +41,7 @@ function continueSessionSetup(args: {
   void (async () => {
     const waitStart = Date.now()
     while (Date.now() - waitStart < args.timing.WAIT_FOR_SESSION_TIMEOUT_MS) {
-      await new Promise(resolve => setTimeout(resolve, args.timing.WAIT_FOR_SESSION_INTERVAL_MS))
+      await new Promise((resolve) => setTimeout(resolve, args.timing.WAIT_FOR_SESSION_INTERVAL_MS))
       const updated = args.manager.getTask(args.taskID)
       if (!updated) {
         return
@@ -93,7 +93,7 @@ async function waitForBackgroundSessionStart(args: {
       return undefined
     }
 
-    await new Promise(resolve => setTimeout(resolve, args.timing.WAIT_FOR_SESSION_INTERVAL_MS))
+    await new Promise((resolve) => setTimeout(resolve, args.timing.WAIT_FOR_SESSION_INTERVAL_MS))
   }
 
   return sessionId
@@ -131,9 +131,7 @@ export async function executeBackgroundTask(
       skillContent: systemContent,
       category: args.category,
       sessionPermission: QUESTION_DENIED_SESSION_PERMISSION,
-      userPermission: categoryModel?.tools
-        ? migrateToolsToPermission(categoryModel.tools)
-        : undefined,
+      userPermission: categoryModel?.tools ? migrateToolsToPermission(categoryModel.tools) : undefined,
     })
 
     // OpenCode TUI's `Task` tool UI calculates toolcalls by looking up
@@ -159,10 +157,11 @@ export async function executeBackgroundTask(
       },
     })
 
-    const updatedTask = typeof manager.getTask === "function"
-      ? manager.getTask(task.id)
-      : undefined
-    if (!sessionId && (updatedTask?.status === "error" || updatedTask?.status === "cancelled" || updatedTask?.status === "interrupt")) {
+    const updatedTask = typeof manager.getTask === "function" ? manager.getTask(task.id) : undefined
+    if (
+      !sessionId &&
+      (updatedTask?.status === "error" || updatedTask?.status === "cancelled" || updatedTask?.status === "interrupt")
+    ) {
       return `Task failed to start (status: ${updatedTask.status}).\n\nTask ID: ${task.id}`
     }
 
@@ -206,11 +205,11 @@ export async function executeBackgroundTask(
 
     const taskMetadataBlock = sessionId
       ? `\n\n${buildTaskMetadataBlock({
-        sessionId,
-        backgroundTaskId: task.id,
-        agent: task.agent,
-        category: args.category,
-      })}`
+          sessionId,
+          backgroundTaskId: task.id,
+          agent: task.agent,
+          category: args.category,
+        })}`
       : ""
 
     return `Background task launched.

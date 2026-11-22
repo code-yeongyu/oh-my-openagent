@@ -38,8 +38,8 @@ function extractTodos(response: unknown): TodoSnapshot[] {
 }
 
 function isAtlasBootstrapTodo(todo: TodoSnapshot): boolean {
-  return ATLAS_BOOTSTRAP_TODOS.some((bootstrapTodo) =>
-    todo.id === bootstrapTodo.id || todo.content === bootstrapTodo.content
+  return ATLAS_BOOTSTRAP_TODOS.some(
+    (bootstrapTodo) => todo.id === bootstrapTodo.id || todo.content === bootstrapTodo.content,
   )
 }
 
@@ -51,10 +51,7 @@ function isAtlasBootstrapTodoList(todos: TodoSnapshot[]): boolean {
   return todos.length > 0 && todos.every(isAtlasBootstrapTodo)
 }
 
-function shouldRestoreOverCurrentTodos(input: {
-  snapshot: TodoSnapshot[]
-  currentTodos: TodoSnapshot[]
-}): boolean {
+function shouldRestoreOverCurrentTodos(input: { snapshot: TodoSnapshot[]; currentTodos: TodoSnapshot[] }): boolean {
   if (input.currentTodos.length === 0) return true
   if (!isAtlasBootstrapTodoList(input.currentTodos)) return false
   return hasDetailedTodos(input.snapshot)
@@ -71,7 +68,7 @@ function extractTodoArgument(value: unknown): TodoSnapshot[] {
 
   try {
     const parsed = JSON.parse(value)
-    return Array.isArray(parsed) ? parsed as TodoSnapshot[] : []
+    return Array.isArray(parsed) ? (parsed as TodoSnapshot[]) : []
   } catch (err) {
     log(`[${HOOK_NAME}] Failed to parse todowrite todos`, { error: String(err) })
     return []
@@ -109,9 +106,7 @@ export interface CompactionTodoPreserver {
   "tool.execute.before": (input: ToolExecuteBeforeInput, output: ToolExecuteBeforeOutput) => Promise<void>
 }
 
-export function createCompactionTodoPreserverHook(
-  ctx: PluginInput,
-): CompactionTodoPreserver {
+export function createCompactionTodoPreserverHook(ctx: PluginInput): CompactionTodoPreserver {
   const snapshots = new Map<string, TodoSnapshot[]>()
   const protectedSnapshots = new Map<string, TodoSnapshot[]>()
 
@@ -211,10 +206,7 @@ export function createCompactionTodoPreserverHook(
     }
   }
 
-  const beforeToolExecute = async (
-    input: ToolExecuteBeforeInput,
-    output: ToolExecuteBeforeOutput,
-  ): Promise<void> => {
+  const beforeToolExecute = async (input: ToolExecuteBeforeInput, output: ToolExecuteBeforeOutput): Promise<void> => {
     if (!isTodoWriteTool(input.tool)) {
       return
     }

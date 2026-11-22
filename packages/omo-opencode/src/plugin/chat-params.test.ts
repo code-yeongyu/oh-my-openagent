@@ -212,9 +212,7 @@ describe("createChatParamsHandler", () => {
 
     //#then
     expect(output.maxOutputTokens).toBe(4096)
-    expect(logSpy).toHaveBeenCalledWith(
-      "[plugin] maxOutputTokens=0 is non-positive; using safe fallback 4096",
-    )
+    expect(logSpy).toHaveBeenCalledWith("[plugin] maxOutputTokens=0 is non-positive; using safe fallback 4096")
 
     logSpy.mockRestore()
   })
@@ -292,13 +290,15 @@ describe("createChatParamsHandler", () => {
     sharedModule.writeProviderModelsCache({
       connected: ["custom-provider"],
       models: {
-        "custom-provider": [{
-          id: "live-capability-model",
-          temperature: false,
-          reasoning: false,
-          variants: { low: {} },
-          limit: { output: 2048 },
-        }],
+        "custom-provider": [
+          {
+            id: "live-capability-model",
+            temperature: false,
+            reasoning: false,
+            variants: { low: {} },
+            limit: { output: 2048 },
+          },
+        ],
       },
     })
     const input = {

@@ -2,7 +2,10 @@ import { describe, expect, test } from "bun:test"
 
 import { createOwnStartIdentity } from "./lock-owner"
 
-function scriptedReader(answers: ReadonlyArray<string | null>): { readonly read: () => string | null; readonly calls: () => number } {
+function scriptedReader(answers: ReadonlyArray<string | null>): {
+  readonly read: () => string | null
+  readonly calls: () => number
+} {
   let calls = 0
   return {
     read: () => answers[Math.min(calls++, answers.length - 1)] ?? null,

@@ -82,14 +82,16 @@ export function createNativeEditionNudgeHook(ctx: PluginInput, deps: NativeEditi
       // The SDK method reads `this._client`, so it is called with the tui receiver. It can also throw
       // synchronously when the client is gone; `.catch` only covers async rejections.
       try {
-        void tui?.showToast({
-          body: {
-            title: NATIVE_NUDGE_TOAST_TITLE,
-            message: NATIVE_NUDGE_TOAST_MESSAGE,
-            variant: "info" as const,
-            duration: 8000,
-          },
-        }).catch(() => {})
+        void tui
+          ?.showToast({
+            body: {
+              title: NATIVE_NUDGE_TOAST_TITLE,
+              message: NATIVE_NUDGE_TOAST_MESSAGE,
+              variant: "info" as const,
+              duration: 8000,
+            },
+          })
+          .catch(() => {})
       } catch {
         logFn("[native-edition-nudge] toast call threw synchronously")
       }

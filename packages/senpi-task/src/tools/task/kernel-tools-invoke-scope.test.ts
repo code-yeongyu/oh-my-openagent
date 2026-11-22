@@ -16,6 +16,7 @@ import { createTaskRecordStore } from "../../store"
 import { buildTaskExecute } from "./execute"
 import { makeDeps } from "./__fixtures__/task-tool-fakes"
 import type { TaskToolContext, TaskToolDetails } from "./types"
+import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
 
 const roots: string[] = []
 afterEach(() => {
@@ -35,7 +36,7 @@ const CURATED: AgentDefinition = { name: "explore" }
 function harness() {
   const root = mkdtempSync(join(tmpdir(), "omp-b2-scope-"))
   roots.push(root)
-  const store = createTaskRecordStore({ project_dir: root })
+  const store = createTaskRecordStore(ownedTaskState(root))
   const sessions: CreateAgentSessionOptions[] = []
   const bindings = createKernelToolBindings()
   const inProcess = new InProcessRunner({
@@ -66,25 +67,42 @@ function harness() {
       kind: "resolved",
       plan: {
         model: "fixture/fixture",
-        ...(spec.subagent_type === NO_WRITE_RULE.name ? { agentType: spec.subagent_type, toolAllowlist: [], toolDenylist: ["write"] } : {}),
+        ...(spec.subagent_type === NO_WRITE_RULE.name
+          ? { agentType: spec.subagent_type, toolAllowlist: [], toolDenylist: ["write"] }
+          : {}),
         ...(spec.subagent_type === DENY_ONLY.name ? { agentType: spec.subagent_type, toolDenylist: ["write"] } : {}),
       },
     }),
   })
   const capability = fakeKernelTools({ invokeScope: true })
-  capability.define({ name: "fixture_write", run: (args, host) => (args === "nested" ? host("write") : { seen: args }) })
+  capability.define({
+    name: "fixture_write",
+    run: (args, host) => (args === "nested" ? host("write") : { seen: args }),
+  })
   const deps = makeDeps(manager, {
     agents: { [NO_WRITE_RULE.name]: NO_WRITE_RULE, [DENY_ONLY.name]: DENY_ONLY, [CURATED.name]: CURATED },
     resolveChildToolNames: () => CHILD_TOOLS,
   })
-  const context: TaskToolContext = { cwd: root, sessionManager: { getSessionId: () => "parent" }, kernelTools: capability }
+  const context: TaskToolContext = {
+    cwd: root,
+    sessionManager: { getSessionId: () => "parent" },
+    kernelTools: capability,
+  }
   const spawn = async (subagentType: string): Promise<TaskToolDetails> =>
-    (await buildTaskExecute(deps)("call-1", {
-      prompt: "use the parent tool",
-      subagent_type: subagentType,
-      run_in_background: true,
-      tools: ["fixture_write"],
-    } as never, undefined, undefined, context)).details
+    (
+      await buildTaskExecute(deps)(
+        "call-1",
+        {
+          prompt: "use the parent tool",
+          subagent_type: subagentType,
+          run_in_background: true,
+          tools: ["fixture_write"],
+        } as never,
+        undefined,
+        undefined,
+        context,
+      )
+    ).details
   return { spawn, store, sessions, capability }
 }
 

@@ -16,9 +16,7 @@ import type { SenpiModelPort } from "@oh-my-opencode/senpi-task"
 
 import type { SenpiOmoConfigResult } from "../../config-resolution"
 import type { ResolveAndPreflightMemoryLaunch } from "./memory-launch-preflight"
-import type {
-  ReflectionCompletionApi,
-} from "./completion"
+import type { ReflectionCompletionApi } from "./completion"
 import { SenpiSubprocessRunner } from "./runner"
 import type { ReflectionSpawnArgs } from "./spawn"
 
@@ -33,10 +31,7 @@ export class CapturedCompletionApi implements ReflectionCompletionApi {
     this.entries.push({ customType, data })
   }
 
-  registerEntryRenderer<T>(
-    customType: string,
-    renderer: EntryRenderer<T>,
-  ): void {
+  registerEntryRenderer<T>(customType: string, renderer: EntryRenderer<T>): void {
     this.renderers.push({ customType, renderer: renderer as EntryRenderer<unknown> })
   }
 }
@@ -98,8 +93,18 @@ async function reserveDream(store: ReflectionReservationStore, journal: Transcri
 
 export async function createRunnerHarness(options: {
   readonly childMode:
-    | "commit" | "timeout" | "admin" | "model-fallback" | "model-exhausted" | "provider-cooldown"
-    | "extension-provider" | "extension-provider-unreachable" | "noop" | "commit-fail" | "commit-hang" | "commit-late-ok"
+    | "commit"
+    | "timeout"
+    | "admin"
+    | "model-fallback"
+    | "model-exhausted"
+    | "provider-cooldown"
+    | "extension-provider"
+    | "extension-provider-unreachable"
+    | "noop"
+    | "commit-fail"
+    | "commit-hang"
+    | "commit-late-ok"
   /** Builds the identity under this directory instead of a fresh temp dir. */
   readonly root?: string
   /** Reserves a dream run (origin `idle`) instead of a step-count reflection. */
@@ -112,12 +117,13 @@ export async function createRunnerHarness(options: {
   readonly terminationGraceMs?: number
   readonly now?: () => Date
   readonly resolveAndPreflightLaunch?: ResolveAndPreflightMemoryLaunch
-  readonly resolveSessionModel?: () => { readonly provider: string; readonly id: string; readonly thinking?: string } | undefined
+  readonly resolveSessionModel?: () =>
+    { readonly provider: string; readonly id: string; readonly thinking?: string } | undefined
   readonly resolveParentContextTokens?: () => number | undefined
   readonly resolveParentSessionFile?: () => string | undefined
   readonly resolveParentCacheReusable?: () => boolean
 }): Promise<RunnerHarness> {
-  const root = options.root ?? await mkdtemp(join(tmpdir(), "memory-reflection-worker-"))
+  const root = options.root ?? (await mkdtemp(join(tmpdir(), "memory-reflection-worker-")))
   const identity: MemoryIdentity = {
     id: "agent-test",
     safeSlug: "agent-test",
@@ -125,10 +131,12 @@ export async function createRunnerHarness(options: {
   }
   const repo = new GitMemoryRepo({ dir: identity.paths.repo, agentId: identity.id })
   await repo.init({
-    seedFiles: [{
-      relativePath: "system/base.md",
-      content: "---\ndescription: Initial memory\n---\nInitial fact.\n",
-    }],
+    seedFiles: [
+      {
+        relativePath: "system/base.md",
+        content: "---\ndescription: Initial memory\n---\nInitial fact.\n",
+      },
+    ],
   })
 
   const journal = new TranscriptJournal({
@@ -148,9 +156,10 @@ export async function createRunnerHarness(options: {
     },
     createRunId: () => `run-${++nextRun}`,
   })
-  const reserved = options.dream === true
-    ? await reserveDream(store, journal)
-    : await store.evaluate("conversation-a", { kind: "settled", success: true })
+  const reserved =
+    options.dream === true
+      ? await reserveDream(store, journal)
+      : await store.evaluate("conversation-a", { kind: "settled", success: true })
   if (!reserved || reserved.status !== "active") throw new Error("expected active reflection reservation")
 
   const model: SenpiModelPort = { provider: "omo-mock", id: "mock-1" }
@@ -159,10 +168,13 @@ export async function createRunnerHarness(options: {
     { provider: "kimi-coding", id: "fallback" },
   ]
   const extensionModel: SenpiModelPort = { provider: "extension-only", id: "primary" }
-  const models = options.models
-    ?? (isChainMode(options.childMode)
+  const models =
+    options.models ??
+    (isChainMode(options.childMode)
       ? fallbackModels
-      : isExtensionProviderMode(options.childMode) ? [extensionModel] : [model])
+      : isExtensionProviderMode(options.childMode)
+        ? [extensionModel]
+        : [model])
   const categoryAvailable = options.categoryAvailable ?? true
   const memory = OmoMemorySettingsSchema.parse({
     reflection: { category: "quick", timeout_minutes: 15, merge: "auto" },
@@ -199,10 +211,9 @@ export async function createRunnerHarness(options: {
     identity,
     reservation: store,
     resolveModelRegistry: () => ({
-      getAvailable: () => categoryAvailable ? models : [],
-      find: (provider, modelId) => models.find((candidate) =>
-        provider === candidate.provider && modelId === candidate.id
-      ),
+      getAvailable: () => (categoryAvailable ? models : []),
+      find: (provider, modelId) =>
+        models.find((candidate) => provider === candidate.provider && modelId === candidate.id),
     }),
     loadConfig: () => loaded,
     cwd: root,
@@ -214,9 +225,15 @@ export async function createRunnerHarness(options: {
     senpiPrefixArgs: [senpiLauncher],
     resolveAndPreflightLaunch: options.resolveAndPreflightLaunch,
     ...(options.resolveSessionModel === undefined ? {} : { resolveSessionModel: options.resolveSessionModel }),
-    ...(options.resolveParentContextTokens === undefined ? {} : { resolveParentContextTokens: options.resolveParentContextTokens }),
-    ...(options.resolveParentSessionFile === undefined ? {} : { resolveParentSessionFile: options.resolveParentSessionFile }),
-    ...(options.resolveParentCacheReusable === undefined ? {} : { resolveParentCacheReusable: options.resolveParentCacheReusable }),
+    ...(options.resolveParentContextTokens === undefined
+      ? {}
+      : { resolveParentContextTokens: options.resolveParentContextTokens }),
+    ...(options.resolveParentSessionFile === undefined
+      ? {}
+      : { resolveParentSessionFile: options.resolveParentSessionFile }),
+    ...(options.resolveParentCacheReusable === undefined
+      ? {}
+      : { resolveParentCacheReusable: options.resolveParentCacheReusable }),
     getTranscriptState: (conversationId) => {
       if (conversationId !== "conversation-a") throw new Error(`unknown conversation: ${conversationId}`)
       return journal.getState()
@@ -228,17 +245,26 @@ export async function createRunnerHarness(options: {
     }),
     sandbox: (spawnArgs) => {
       spawnCalls.push(spawnArgs)
-      const mode = options.childMode === "model-fallback"
-        ? spawnArgs.args.includes("extension-only/primary") ? "model-not-found" : "commit"
-        : options.childMode === "model-exhausted"
-          ? spawnArgs.args.includes("extension-only/primary") ? "model-not-found" : "auth-missing"
-          : options.childMode === "provider-cooldown"
-            ? spawnArgs.args.includes("extension-only/primary") ? "provider-cooldown" : "commit"
-            : options.childMode === "extension-provider"
-              ? spawnArgs.args.includes("--no-extensions") ? "model-not-found" : "commit"
-              : options.childMode === "extension-provider-unreachable"
-                ? "model-not-found"
-                : options.childMode
+      const mode =
+        options.childMode === "model-fallback"
+          ? spawnArgs.args.includes("extension-only/primary")
+            ? "model-not-found"
+            : "commit"
+          : options.childMode === "model-exhausted"
+            ? spawnArgs.args.includes("extension-only/primary")
+              ? "model-not-found"
+              : "auth-missing"
+            : options.childMode === "provider-cooldown"
+              ? spawnArgs.args.includes("extension-only/primary")
+                ? "provider-cooldown"
+                : "commit"
+              : options.childMode === "extension-provider"
+                ? spawnArgs.args.includes("--no-extensions")
+                  ? "model-not-found"
+                  : "commit"
+                : options.childMode === "extension-provider-unreachable"
+                  ? "model-not-found"
+                  : options.childMode
       return {
         ...spawnArgs,
         command: process.execPath,

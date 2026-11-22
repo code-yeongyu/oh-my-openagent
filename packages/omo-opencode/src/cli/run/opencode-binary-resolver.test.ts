@@ -50,8 +50,7 @@ describe("findWorkingOpencodeBinary", () => {
       if (command === "opencode") return "/bad/opencode"
       return undefined
     }
-    const probe = async (binaryPath: string): Promise<boolean> =>
-      binaryPath === "/good/opencode"
+    const probe = async (binaryPath: string): Promise<boolean> => binaryPath === "/good/opencode"
 
     // when
     const resolved = await findWorkingOpencodeBinary(pathEnv, probe, which, "darwin")
@@ -100,12 +99,9 @@ describe("withWorkingOpencodePath", () => {
     let observedPath = ""
 
     // when
-    await withWorkingOpencodePath(
-      async () => {
-        observedPath = process.env.PATH ?? ""
-      },
-      finder,
-    )
+    await withWorkingOpencodePath(async () => {
+      observedPath = process.env.PATH ?? ""
+    }, finder)
 
     // then
     expect(observedPath).toBe(["/good", "/bad", "/other"].join(delimiter))
@@ -122,12 +118,9 @@ describe("withWorkingOpencodePath", () => {
     // when
     let thrown: Error | undefined
     try {
-      await withWorkingOpencodePath(
-        async () => {
-          throw new Error("boom")
-        },
-        finder,
-      )
+      await withWorkingOpencodePath(async () => {
+        throw new Error("boom")
+      }, finder)
     } catch (error) {
       if (!(error instanceof Error)) throw error
       thrown = error

@@ -14,7 +14,7 @@
  * @returns {string} Full version with leading "v" stripped.
  */
 function normalizeVersion(version) {
-  return version.replace(/^v/, "");
+  return version.replace(/^v/, "")
 }
 
 /**
@@ -36,12 +36,12 @@ function normalizeVersion(version) {
  */
 export function detectPlatformBinaryMismatch({ mainVersion, platformVersion, platformPackage }) {
   if (!mainVersion || !platformVersion) {
-    return null;
+    return null
   }
 
   if (normalizeVersion(mainVersion) === normalizeVersion(platformVersion)) {
-    return null;
+    return null
   }
 
-  return { mainVersion, platformVersion, platformPackage };
+  return { mainVersion, platformVersion, platformPackage }
 }
