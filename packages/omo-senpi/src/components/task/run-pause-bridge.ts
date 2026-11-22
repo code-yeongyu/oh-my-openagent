@@ -46,7 +46,7 @@ export class EngineRunPauseBridge {
     const registry = this.controller.registry
     const record = registry.load(parentSessionId)
     if (record === undefined) return
-    this.#deliverFailureNotice(parentSessionId, record.pendingResumeFailureNotice)
+    this.#deliverFailureNotices(parentSessionId, record.pendingResumeFailureNotices)
     const state = this.native.getPauseState()
     if (state === undefined) return
     const live = readEngineRunHold(state)
@@ -77,7 +77,7 @@ export class EngineRunPauseBridge {
   // ordinary Stop-then-message path) or a `resuming` ledger is left to the path that owns it.
   releaseStale(parentSessionId: string): Promise<void> {
     const record = this.controller.registry.load(parentSessionId)
-    this.#deliverFailureNotice(parentSessionId, record?.pendingResumeFailureNotice)
+    this.#deliverFailureNotices(parentSessionId, record?.pendingResumeFailureNotices)
     if (record === undefined || record.phase !== "applied") return Promise.resolve()
     const inFlight = this.#resumes.get(parentSessionId)
     if (inFlight?.seq === record.pauseSeq && !inFlight.settled) return Promise.resolve()
@@ -201,11 +201,6 @@ export class EngineRunPauseBridge {
     if (this.native.notifyResumeFailure === undefined) return
     try {
       const registry = this.controller.registry
-      const pending = registry.load(parentSessionId)?.pendingResumeFailureNotice
-      if (pending !== undefined) {
-        this.#deliverFailureNotice(parentSessionId, pending)
-        if (pending.pauseSeq === pauseSeq && pending.resumeId === resumeId) return
-      }
       const reasons = [...new Set(failures.map(({ code }) => code))].sort().join(", ")
       const count = failures.length
       const notice = {
@@ -213,8 +208,8 @@ export class EngineRunPauseBridge {
         resumeId,
         text: `Resume could not restore ${count} participant${count === 1 ? "" : "s"} (${reasons}). Check /tasks for their status.`,
       }
-      if (registry.queueResumeFailureNotice(parentSessionId, notice))
-        this.#deliverFailureNotice(parentSessionId, notice)
+      registry.queueResumeFailureNotice(parentSessionId, notice)
+      this.#deliverFailureNotices(parentSessionId, registry.require(parentSessionId).pendingResumeFailureNotices)
     } catch (error) {
       log("[omo-senpi] run resume failure notice could not be queued", {
         parentSessionId,
@@ -224,13 +219,14 @@ export class EngineRunPauseBridge {
     }
   }
 
-  #deliverFailureNotice(parentSessionId: string, notice: PauseRegistryRecord["pendingResumeFailureNotice"]): void {
-    if (notice === undefined || this.native.notifyResumeFailure === undefined) return
+  #deliverFailureNotices(parentSessionId: string, notices: PauseRegistryRecord["pendingResumeFailureNotices"]): void {
+    if (notices === undefined || this.native.notifyResumeFailure === undefined) return
     try {
       const state = this.native.getPauseState()
       if (state !== undefined && readEngineRunHold(state).stopped) return
-      if (this.native.notifyResumeFailure(parentSessionId, notice.text)) {
-        this.controller.registry.markResumeFailureNoticed(parentSessionId, notice)
+      for (const { pauseSeq, resumeId, text } of notices) {
+        if (!this.native.notifyResumeFailure(parentSessionId, text)) break
+        this.controller.registry.markResumeFailureNoticed(parentSessionId, { pauseSeq, resumeId })
       }
     } catch (error) {
       log("[omo-senpi] run resume failure notice could not be delivered", {

@@ -6,11 +6,11 @@ import { cleanupProjects, tempProject } from "../../../../senpi-task/src/manager
 import { AdmissionBarrier } from "../../../../senpi-task/src/pause/admission-barrier"
 import { NativeResumeRefusedError } from "../../../../senpi-task/src/pause/native-child-pause"
 import type { EnginePauseState, ObservedHold } from "../../../../senpi-task/src/pause/ports"
-import { PauseRegistry, type PauseParticipant } from "../../../../senpi-task/src/pause/registry"
+import { type PauseParticipant, PauseRegistry } from "../../../../senpi-task/src/pause/registry"
 import { RunPauseController, type RunPauseEffects } from "../../../../senpi-task/src/pause/run-controller"
 import { createEngineRunPause } from "./engine-run-pause"
 import { EngineRunPauseBridge } from "./run-pause-bridge"
-import { TaskRuntimeContext, type CapturedUi } from "./runtime-context"
+import { type CapturedUi, TaskRuntimeContext } from "./runtime-context"
 
 const roots: string[] = []
 afterEach(() => {
@@ -136,7 +136,7 @@ test("Resume reports multiple failures once, reopens admission, and retries only
   expect(h.barrier.state(PARENT)).toEqual({ kind: "open" })
 })
 
-test("a partial Resume warns only the original parent on return, even after the child recovers", async () => {
+test("two partial Resumes warn only the original parent once each on return, even after recovery", async () => {
   const runtime = new TaskRuntimeContext(tempProject())
   const parentNotices: { text: string; level: string | undefined }[] = []
   const unrelatedNotices: typeof parentNotices = []
@@ -154,8 +154,11 @@ test("a partial Resume warns only the original parent on return, even after the 
   const h = hostOver(
     [child],
     {
-      resume: async () => {
-        if (resumeFails) throw new NativeResumeRefusedError(child.key, "stale")
+      resume: async (_participant, request) => {
+        if (resumeFails) {
+          if (request.resumeId === "parent-resume:7") throw new NativeResumeRefusedError(child.key, "stale")
+          throw new Error("second restore failed")
+        }
         return { kind: "resumed" }
       },
     },
@@ -171,21 +174,33 @@ test("a partial Resume warns only the original parent on return, even after the 
   resumeFails = false
   await h.bridge.changed(PARENT, resume)
   expect(h.registry.require(PARENT).participants.st_b?.state).toBe("resumed")
+
+  const secondResume = { ...released(8), change: "resumed" } as const
+  await h.bridge.changed(PARENT, { ...stopped(8), change: "paused" })
+  resumeFails = true
+  await h.bridge.changed(PARENT, secondResume)
+  expect(h.registry.require(PARENT).participants.st_b?.state).toBe("lost")
+  resumeFails = false
+  await h.bridge.changed(PARENT, secondResume)
+  expect(h.registry.require(PARENT).participants.st_b?.state).toBe("resumed")
   expect(parentNotices).toEqual([])
   expect(unrelatedNotices).toEqual([])
 
   const returned = new EngineRunPauseBridge(h.bridge.controller, runtime)
-  capture(PARENT, released(7), parentNotices)
+  capture(PARENT, released(8), parentNotices)
   await returned.restore(PARENT)
   await returned.reconciled(PARENT)
-  expect(parentNotices).toEqual([{ text: expect.stringContaining("native_resume_refused"), level: "warning" }])
+  expect(parentNotices).toEqual([
+    { text: expect.stringContaining("native_resume_refused"), level: "warning" },
+    { text: expect.stringContaining("(resume_failed)"), level: "warning" },
+  ])
 
   capture("unrelated", released(1), unrelatedNotices)
   await returned.reconciled("unrelated")
-  capture(PARENT, released(7), parentNotices)
+  capture(PARENT, released(8), parentNotices)
   await returned.reconciled(PARENT)
-  await returned.changed(PARENT, resume)
-  expect(parentNotices).toHaveLength(1)
+  await returned.changed(PARENT, secondResume)
+  expect(parentNotices).toHaveLength(2)
   expect(unrelatedNotices).toEqual([])
 })
 

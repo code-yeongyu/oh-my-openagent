@@ -1,7 +1,7 @@
+import { randomUUID } from "node:crypto"
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
-import { randomUUID } from "node:crypto"
-import { AdmissionBarrier, type AdmissionState } from "./admission-barrier"
+import type { AdmissionBarrier, AdmissionState } from "./admission-barrier"
 import type { RunRef } from "./ports"
 
 export type PauseParticipant = {
@@ -26,10 +26,17 @@ export type PauseParticipant = {
   readonly at: string
 }
 
-type ResumeFailureNotice = {
+type ResumeFailureNoticeKey = {
   readonly pauseSeq: number
   readonly resumeId: string
+}
+
+type ResumeFailureNotice = ResumeFailureNoticeKey & {
   readonly text: string
+}
+
+function sameNoticeKey(first: ResumeFailureNoticeKey, second: ResumeFailureNoticeKey): boolean {
+  return first.pauseSeq === second.pauseSeq && first.resumeId === second.resumeId
 }
 
 export type PauseRegistryRecord = {
@@ -38,7 +45,7 @@ export type PauseRegistryRecord = {
   readonly phase: "propagating" | "applied" | "resuming" | "resumed"
   readonly barrier: AdmissionState
   readonly participants: Readonly<Record<string, PauseParticipant>>
-  readonly pendingResumeFailureNotice?: ResumeFailureNotice
+  readonly pendingResumeFailureNotices?: readonly ResumeFailureNotice[]
   readonly resume?: {
     readonly resumeId: string
     readonly childSeqCutoffs: Readonly<Record<string, number>>
@@ -68,7 +75,10 @@ export class PauseRegistry {
       if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined
       throw error
     }
-    const record: PauseRegistryRecord = JSON.parse(text)
+    const persisted: PauseRegistryRecord & {
+      readonly pendingResumeFailureNotice?: ResumeFailureNotice
+    } = JSON.parse(text)
+    const { pendingResumeFailureNotice: legacyNotice, ...record } = persisted
     if (
       record.parentSessionId !== parentSessionId ||
       !Number.isSafeInteger(record.pauseSeq) ||
@@ -77,7 +87,8 @@ export class PauseRegistry {
       record.participants === null
     )
       throw new Error("invalid pause registry")
-    return record
+    if (legacyNotice === undefined || record.pendingResumeFailureNotices !== undefined) return record
+    return { ...record, pendingResumeFailureNotices: [legacyNotice] }
   }
 
   #write(record: PauseRegistryRecord): void {
@@ -99,9 +110,9 @@ export class PauseRegistry {
       phase: "propagating",
       barrier: { kind: "closed", pauseSeq },
       participants: Object.fromEntries(participants.map((participant) => [participant.key, participant])),
-      ...(prior?.pendingResumeFailureNotice === undefined
+      ...(prior?.pendingResumeFailureNotices === undefined
         ? {}
-        : { pendingResumeFailureNotice: prior.pendingResumeFailureNotice }),
+        : { pendingResumeFailureNotices: prior.pendingResumeFailureNotices }),
     }
     this.#write(record)
     return record
@@ -193,27 +204,32 @@ export class PauseRegistry {
 
   queueResumeFailureNotice(parentSessionId: string, notice: ResumeFailureNotice): boolean {
     const record = this.require(parentSessionId)
+    const pending = record.pendingResumeFailureNotices ?? []
     if (
       record.pauseSeq !== notice.pauseSeq ||
       record.phase !== "resumed" ||
       record.resume?.resumeId !== notice.resumeId ||
       record.resume.failureNoticed ||
-      record.pendingResumeFailureNotice !== undefined
+      pending.some((entry) => sameNoticeKey(entry, notice))
     )
       return false
-    this.#write({ ...record, pendingResumeFailureNotice: notice })
+    this.#write({ ...record, pendingResumeFailureNotices: [...pending, notice] })
     return true
   }
 
-  markResumeFailureNoticed(parentSessionId: string, notice: ResumeFailureNotice): void {
-    const { pendingResumeFailureNotice: pending, ...record } = this.require(parentSessionId)
-    if (pending?.pauseSeq !== notice.pauseSeq || pending.resumeId !== notice.resumeId) return
+  markResumeFailureNoticed(parentSessionId: string, key: ResumeFailureNoticeKey): void {
+    const { pendingResumeFailureNotices: pending, ...record } = this.require(parentSessionId)
+    if (pending === undefined) return
+    const remaining = pending.filter((notice) => !sameNoticeKey(notice, key))
+    if (remaining.length === pending.length) return
     const resume = record.resume
-    this.#write(
-      record.pauseSeq === notice.pauseSeq && resume?.resumeId === notice.resumeId
-        ? { ...record, resume: { ...resume, failureNoticed: true } }
-        : record,
-    )
+    this.#write({
+      ...record,
+      ...(remaining.length === 0 ? {} : { pendingResumeFailureNotices: remaining }),
+      ...(record.pauseSeq === key.pauseSeq && resume?.resumeId === key.resumeId
+        ? { resume: { ...resume, failureNoticed: true } }
+        : {}),
+    })
   }
 
   authorizeResume(parentSessionId: string, pauseSeq: number, resumeId: string) {
