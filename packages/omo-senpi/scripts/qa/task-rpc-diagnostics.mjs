@@ -84,16 +84,26 @@ export async function withinDeadline(promise, ms, beforeTimeout) {
   }
 }
 
-export function captureCommand(file, args) {
+export function captureCommand(file, args, maxBuffer = 1024 * 1024) {
   return new Promise((resolve) => {
-    execFile(file, args, { encoding: "utf8", timeout: 5_000, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+    execFile(file, args, { encoding: "utf8", timeout: 5_000, maxBuffer }, (error, stdout, stderr) => {
       resolve({ stdout, stderr, error: error?.message ?? null })
     })
   })
 }
 
+/** Each ps row is cut to this many characters, so enumeration size follows the process count, never argv size (#10269). */
+export const PS_ROW_LIMIT = 200
+
 export async function runProcesses(rootPids, namespace) {
-  const ps = await captureCommand("ps", ["-axo", "pid=,ppid=,stat=,command="])
+  // ps output can exceed any fixed buffer on a host whose processes carry long argv: the rows are cut to
+  // PS_ROW_LIMIT characters inside the shell (a failing ps still exits non-zero through `|| exit 1`), and
+  // the buffer is sized for the row limit, not for raw argv.
+  const ps = await captureCommand(
+    "/bin/sh",
+    ["-c", `rows=$(ps -axo pid=,ppid=,stat=,command=) || exit 1; printf '%s\\n' "$rows" | cut -c 1-${PS_ROW_LIMIT}`],
+    32 * 1024 * 1024,
+  )
   if (ps.error !== null) throw new Error(`process enumeration failed: ${ps.error}`)
   const rows = ps.stdout.split("\n").flatMap((line) => {
     const match = /^\s*(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/.exec(line)
@@ -122,11 +132,11 @@ export async function runProcesses(rootPids, namespace) {
   return rows.filter((row) => owned.has(row.pid) && row.pid !== process.pid)
 }
 
-export async function dumpRunProcesses(rootPids, namespace) {
+export async function dumpRunProcesses(rootPids, namespace, enumerate = runProcesses) {
   if (process.platform === "win32") {
     return { tasklist: await captureCommand("tasklist.exe", ["/FO", "CSV"]), roots: rootPids }
   }
-  const processes = await runProcesses(rootPids, namespace)
+  const processes = await enumerate(rootPids, namespace)
   const sockets = await Promise.all(
     processes.map(async ({ pid }) => ({
       pid,

@@ -107,6 +107,18 @@ test("a pre-kill dump names the still-running process and its open descriptors",
   }
 }, 20_000)
 
+test.skipIf(process.platform === "win32")(
+  "a stubbed enumerator returning more than 1 MB still produces the dump",
+  async () => {
+    const oversizedCommand = "x".repeat(1024 * 1024 + 2048)
+    const enumerate = async () => [{ pid: 4_242_424, ppid: 1, state: "S", command: oversizedCommand }]
+    const dump = await dumpRunProcesses([4_242_424], undefined, enumerate)
+    expect(dump.processes).toEqual([{ pid: 4_242_424, ppid: 1, state: "S", command: oversizedCommand }])
+    expect(dump.sockets.map((row) => row.pid)).toEqual([4_242_424])
+  },
+  20_000,
+)
+
 test("watchdog awaits its dump before rejecting and clears its timer", async () => {
   jest.useFakeTimers()
   const entered = Promise.withResolvers()
